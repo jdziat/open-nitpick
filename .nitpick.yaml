@@ -1,0 +1,52 @@
+# open-nitpick's own review configuration. It is also the worked example the
+# README points at, so it stays readable rather than exhaustive.
+
+models:
+  # The provider name is matched against the SDK's registry; run
+  # "nitpick providers" to see every option.
+  default:
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    max_tokens: 8192
+
+  # Triage only merges and filters findings, so it does not need the expensive
+  # model. Splitting the roles is most of the cost saving available here.
+  triage:
+    provider: anthropic
+    model: claude-haiku-4-5-20251001
+    temperature: 0
+
+review:
+  # Advisory: this project reviews itself, and a false positive should not
+  # block its own PRs.
+  fail_on: none
+  min_severity: info
+  concurrency: 4
+
+instructions:
+  - path: "**/*.go"
+    prompt: >-
+      Flag unchecked errors, ignored context cancellation, and goroutines that
+      can outlive their caller. Do not comment on formatting or naming.
+
+  - path: "internal/diff/**"
+    prompt: >-
+      This package maps diff lines to review-comment anchors. An off-by-one
+      here misplaces every comment in a file, so treat any change to position
+      or line-number arithmetic as high risk and reason about it explicitly.
+
+  - path: "internal/llm/**"
+    prompt: >-
+      This package must keep working across providers with very different
+      capabilities. Flag anything that assumes a provider supports tools,
+      JSON-schema response formats, or a particular error shape.
+
+  - path: "**/*_test.go"
+    prompt: >-
+      Judge whether the test would actually fail if the behavior it describes
+      broke. Do not ask for more tests for their own sake.
+
+linters:
+  mode: auto
+  enabled: [golangci-lint]
+  only_changed_lines: true

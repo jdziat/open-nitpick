@@ -1,0 +1,147 @@
+name: open-nitpick
+description: Self-hosted, model-agnostic pull request review.
+author: open-nitpick contributors
+
+branding:
+  icon: check-square
+  color: purple
+
+inputs:
+  github-token:
+    description: >-
+      Token used to read the pull request and publish the review. The default
+      GITHUB_TOKEN is enough; it needs pull-requests: write.
+    required: false
+    default: ${{ github.token }}
+
+  config:
+    description: Path to the configuration file, relative to the workspace.
+    required: false
+    default: .nitpick.yaml
+
+  provider:
+    description: >-
+      Model provider, overriding models.default.provider. Run
+      "nitpick providers" for the full list.
+    required: false
+
+  model:
+    description: Model name, overriding models.default.model.
+    required: false
+
+  api-key:
+    description: >-
+      API key for the provider. Pass a secret; never a literal. Ignored when
+      the provider reads its own conventional environment variable.
+    required: false
+
+  fail-on:
+    description: >-
+      Lowest severity that fails the job: nit, info, warning, error, critical,
+      or none. Overrides review.fail_on.
+    required: false
+
+  instruction:
+    description: An extra instruction applied to this run only.
+    required: false
+
+  pr-number:
+    description: Pull request to review. Defaults to the triggering pull request.
+    required: false
+
+  version:
+    description: Version of open-nitpick to install.
+    required: false
+    default: latest
+
+  args:
+    description: Additional flags passed verbatim to "nitpick review".
+    required: false
+
+outputs:
+  findings:
+    description: Number of findings published.
+    value: ${{ steps.review.outputs.findings }}
+
+  result:
+    description: >-
+      One of "clean" (no findings), "findings" (the gate was tripped), or
+      "error" (the review could not run). Distinguishing the last is the point:
+      a broken reviewer must not read as a passing one.
+    value: ${{ steps.review.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+        cache: false
+
+    - name: Install open-nitpick
+      shell: bash
+      run: go install github.com/jdziat/open-nitpick/cmd/nitpick@${{ inputs.version }}
+
+    - name: Review
+      id: review
+      shell: bash
+      # Every user-controlled value arrives as an environment variable rather
+      # than being interpolated into the script. Interpolating ${{ }} directly
+      # into a run block lets an input containing shell metacharacters execute
+      # arbitrary commands in this step.
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_MODEL: ${{ inputs.model }}
+        LLM_API_KEY: ${{ inputs.api-key }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        NITPICK_CONFIG: ${{ inputs.config }}
+        NITPICK_FAIL_ON: ${{ inputs.fail-on }}
+        NITPICK_INSTRUCTION: ${{ inputs.instruction }}
+        NITPICK_ARGS: ${{ inputs.args }}
+      run: |
+        set -uo pipefail
+
+        # Build the flag list conditionally. The previous form appended -config
+        # unconditionally and then tried to remove it with a substitution,
+        # which left an EMPTY array element — Go's flag package stops parsing
+        # at that element, so -fail-on and -instruction were silently ignored.
+        flags=(-repo "$GITHUB_WORKSPACE")
+
+        if [ -n "$NITPICK_CONFIG" ] && [ -f "$GITHUB_WORKSPACE/$NITPICK_CONFIG" ]; then
+          flags+=(-config "$NITPICK_CONFIG")
+        fi
+        if [ -n "$NITPICK_FAIL_ON" ]; then
+          flags+=(-fail-on "$NITPICK_FAIL_ON")
+        fi
+        if [ -n "$NITPICK_INSTRUCTION" ]; then
+          flags+=(-instruction "$NITPICK_INSTRUCTION")
+        fi
+
+        # Extra args are split on whitespace deliberately; they are an escape
+        # hatch for flags, not a place to pass a shell command.
+        read -r -a extra <<< "$NITPICK_ARGS"
+
+        set +e
+        nitpick review "${flags[@]}" ${extra+"${extra[@]}"} | tee "$RUNNER_TEMP/nitpick.out"
+        status=${PIPESTATUS[0]}
+        set -e
+
+        # Findings are counted from the run's own summary line so the declared
+        # output is actually populated.
+        findings=$(grep -oE '[0-9]+ (nit|info|warning|error|critical)' "$RUNNER_TEMP/nitpick.out" \
+          | awk '{s+=$1} END {print s+0}')
+        echo "findings=$findings" >> "$GITHUB_OUTPUT"
+
+        # Exit 1 means the review ran and tripped the configured gate, which
+        # should fail the job. Exit 2 means the review could not run at all —
+        # a materially different outcome that must not read as "found issues".
+        case "$status" in
+          0) echo "result=clean"    >> "$GITHUB_OUTPUT" ;;
+          1) echo "result=findings" >> "$GITHUB_OUTPUT" ;;
+          *) echo "result=error"    >> "$GITHUB_OUTPUT"
+             echo "::error::open-nitpick failed to run (exit $status)" ;;
+        esac
+
+        exit "$status"

@@ -1,0 +1,40 @@
+# open-nitpick reviewing its own pull requests.
+name: Review
+
+on:
+  # Deliberately NOT synchronize: reviews are not yet deduplicated against
+  # comments already on the pull request, so every push would re-post the same
+  # findings. Add synchronize once incremental re-review lands.
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  # A new push supersedes an in-flight review; reviewing a stale commit wastes
+  # tokens and posts comments on code that has already changed.
+  group: nitpick-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    # Reviews of forked pull requests would need a token this workflow does not
+    # safely have, and the model API key must never be exposed to fork code.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The reviewer diffs against the base branch, so it needs history.
+          fetch-depth: 0
+
+      - uses: ./
+        with:
+          provider: anthropic
+          model: claude-sonnet-4-20250514
+          api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Advisory until the reviewer has earned the right to block merges.
+          fail-on: none
