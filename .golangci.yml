@@ -1,0 +1,34 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - errorlint
+    - misspell
+    - revive
+    - unconvert
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+          # Every exported symbol in this project is part of the library
+          # surface a webhook server or alternative driver will use.
+          severity: warning
+
+  exclusions:
+    rules:
+      # Test helpers legitimately ignore errors from setup calls that would
+      # have already failed the test another way.
+      - path: _test\.go
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt

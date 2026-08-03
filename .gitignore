@@ -1,0 +1,8 @@
+/bin/
+coverage.out
+
+# Never commit credentials. This repo is a CI tool that holds model API keys
+# and forge tokens; a leaked .env is the whole ballgame.
+.env
+.env.*
+!.env.example

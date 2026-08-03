@@ -1,0 +1,37 @@
+open-nitpick
+Copyright 2026 open-nitpick contributors
+
+This product includes software developed by the open-nitpick contributors,
+licensed under the Apache License, Version 2.0.
+
+--------------------------------------------------------------------------------
+Third-party components
+--------------------------------------------------------------------------------
+
+This product depends on, and its release binaries statically link, the
+following components. Their licenses apply to those portions.
+
+  github.com/nocturnium/llm-go-sdk
+      Apache License 2.0
+      Copyright the llm-go-sdk authors
+      https://github.com/nocturnium/llm-go-sdk
+
+  github.com/google/go-github
+      BSD 3-Clause License
+      Copyright (c) 2013 The go-github AUTHORS
+      https://github.com/google/go-github
+
+  github.com/bmatcuk/doublestar
+      MIT License
+      Copyright (c) 2014 Bob Matcuk
+      https://github.com/bmatcuk/doublestar
+
+  gopkg.in/yaml.v3
+      Apache License 2.0 and MIT License
+      Copyright (c) 2006-2011 Kirill Simonov, Copyright (c) 2011-2019 Canonical Ltd
+      https://github.com/go-yaml/yaml
+
+  go.opentelemetry.io/otel
+      Apache License 2.0
+      Copyright The OpenTelemetry Authors
+      https://github.com/open-telemetry/opentelemetry-go
