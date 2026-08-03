@@ -1,0 +1,34 @@
+diff --git a/a.go b/a.go
+index abe6da9..b2c9e77 100644
+--- a/a.go
++++ b/a.go
+@@ -1,3 +1,3 @@
+ package a
+ 
+-func F() {}
++func F() { _ = 1 }
+diff --git a/doc.md b/doc.md
+index fbbee86..214d0ba 100644
+--- a/doc.md
++++ b/doc.md
+@@ -1,2 +1,3 @@
+ alpha
++--- em dash line
+ beta
+diff --git a/notes.md b/notes.md
+index 814f4a4..2da37f1 100644
+--- a/notes.md
++++ b/notes.md
+@@ -1,2 +1,4 @@
+ one
++++ nested bullet
++real added line
+ two
+diff --git a/tricky.txt b/tricky.txt
+new file mode 100644
+index 0000000..683ef45
+--- /dev/null
++++ b/tricky.txt
+@@ -0,0 +1,2 @@
++diff --git a/fake b/fake
++@@ -1 +1 @@

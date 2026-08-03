@@ -1,0 +1,41 @@
+diff --git a/a.go b/a.go
+index 1cd7cd1..455d14c 100644
+--- a/a.go
++++ b/a.go
+@@ -1,6 +1,8 @@
+ package a
+ 
+ func F() {
+-	x := 1
++	x := 2
++	y := 3
+ 	_ = x
++	_ = y
+ }
+diff --git a/b.txt b/c.txt
+similarity index 77%
+rename from b.txt
+rename to c.txt
+index 4cb29ea..c40a3bd 100644
+--- a/b.txt
++++ b/c.txt
+@@ -1,3 +1,4 @@
+ one
+ two
+ three
++four
+\ No newline at end of file
+diff --git a/gone.txt b/gone.txt
+deleted file mode 100644
+index 286c5f5..0000000
+--- a/gone.txt
++++ /dev/null
+@@ -1 +0,0 @@
+-gone
+diff --git a/new.go b/new.go
+new file mode 100644
+index 0000000..a405166
+--- /dev/null
++++ b/new.go
+@@ -0,0 +1 @@
++package n
