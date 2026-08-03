@@ -431,8 +431,17 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 
 	var b strings.Builder
 	b.WriteString("\nJUDGED MODEL RANKING\n")
-	b.WriteString("MODEL                                GRADE  SPREAD  PREC   FIX  FAIL  FIND  WORTH  INFLATED  MISCLASS  MISSED  SIGNAL\n")
-	b.WriteString("------------------------------------------------------------------------------------------------------------------\n")
+	// INFLATED and UNDER are printed together, and never one without the other.
+	//
+	// Only INFLATED used to be shown, so severity error was visible in one
+	// direction and invisible in the other -- and this comparison has a
+	// contender that understates BY CONSTRUCTION: crSeverity maps Incumbent's
+	// "critical" down to our "error" because its vocabulary carries no separate
+	// error tier. Counting over-claiming while ignoring under-claiming hands a
+	// free win to whichever reviewer is quieter about severity, which is the
+	// opposite of the judgement a reader wants to make.
+	b.WriteString("MODEL                                GRADE  SPREAD  PREC   FIX  FAIL  FIND  WORTH  INFLATED  UNDER  MISCLASS  MISSED  SIGNAL\n")
+	b.WriteString("-------------------------------------------------------------------------------------------------------------------------\n")
 
 	for _, r := range rows {
 		a := r.agg
@@ -457,9 +466,9 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 			spread = fmt.Sprintf("%.2f", a.GradeSpread())
 		}
 
-		fmt.Fprintf(&b, "%-36s %-6.2f %-7s %-6s %-4d %-5d %-5d %-6d %-9d %-9d %-7d %.1f\n",
+		fmt.Fprintf(&b, "%-36s %-6.2f %-7s %-6s %-4d %-5d %-5d %-6d %-9d %-6d %-9d %-7d %.1f\n",
 			truncate(r.model, 36), a.MeanGrade(), spread, prec, fixtures, failed, a.Findings, a.WorthRaising,
-			a.Inflated, a.Misclassed, a.Missed, a.MeanSignal())
+			a.Inflated, a.Understated, a.Misclassed, a.Missed, a.MeanSignal())
 	}
 
 	t.Log(b.String())
