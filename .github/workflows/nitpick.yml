@@ -33,8 +33,13 @@ jobs:
 
       - uses: ./
         with:
-          provider: anthropic
-          model: claude-sonnet-4-20250514
-          api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Must agree with .nitpick.yaml. The config file wins on provider and
+          # model — these inputs only reach LLM_PROVIDER/LLM_MODEL, which are a
+          # fallback for what the file does not say — but api-key is passed as
+          # LLM_API_KEY regardless, so naming a different vendor's secret here
+          # would hand that credential to whatever endpoint the file selected.
+          provider: openrouter
+          model: anthropic/claude-sonnet-4.6
+          api-key: ${{ secrets.OPENROUTER_API_KEY }}
           # Advisory until the reviewer has earned the right to block merges.
           fail-on: none

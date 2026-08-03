@@ -42,16 +42,22 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 		return extractJSON[T](ctx, c, msgs, call)
 
 	case config.StructuredSchema:
-		value, _, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+		if err == nil {
+			err = requireSchemaEnforced(raw, value)
+		}
 		if err != nil {
 			return zero, fmt.Errorf("%s: structured output failed: %w", c, err)
 		}
 		return value, nil
 
 	default: // auto
-		value, _, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
 		if err == nil {
-			return value, nil
+			err = requireSchemaEnforced(raw, value)
+			if err == nil {
+				return value, nil
+			}
 		}
 		// A cancelled context is not a capability problem; retrying under a
 		// different strategy would only produce a second, more confusing error.
@@ -59,15 +65,28 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 			return zero, err
 		}
 
-		// Only a genuine capability rejection should change strategy. A 429 or
-		// a 500 says nothing about whether the provider supports schemas, and
-		// downgrading on one would silently move the whole run — the client is
-		// shared by every batch — onto the weaker, unenforced JSON path.
-		if !isCapabilityError(err) {
+		switch {
+		case schemaNotEnforced(err):
+			// The provider took the json_schema request format and answered
+			// anyway with something the schema forbids. That is a fact about
+			// this RESPONSE, not about the provider — a router hands
+			// consecutive requests to different upstreams — so the JSON path
+			// is retried for this request only. Deliberately no downgrade:
+			// the client is shared by every batch, and half a run executing
+			// under a different strategy than the other half is not a result.
+
+		case isCapabilityError(err):
+			// The provider rejected the request SHAPE, which is a fact about
+			// the provider. Remember it so the fallback is paid for once per
+			// client rather than once per request.
+			c.downgrade()
+
+		default:
+			// A 429 or a 500 says nothing about whether the provider supports
+			// schemas, and neither retrying nor downgrading on one is honest.
 			return zero, fmt.Errorf("%s: structured output failed: %w", c, err)
 		}
 
-		c.downgrade()
 		result, jsonErr := extractJSON[T](ctx, c, msgs, call)
 		if jsonErr != nil {
 			// Report both, since the first error explains why the fallback ran.
@@ -76,6 +95,51 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 		return result, nil
 	}
 }
+
+// errSchemaNotEnforced marks a response that came back through the
+// schema-constrained path without satisfying the schema.
+var errSchemaNotEnforced = errors.New("provider did not enforce the response schema")
+
+// requireSchemaEnforced rejects a schema-path response that decoded cleanly and
+// carries nothing.
+//
+// The bug: the schema path returned llms.GenerateTyped's value whenever its
+// error was nil, and GenerateTyped decodes with a bare json.Unmarshal. `{}`,
+// `null` and any unrelated object all decode into a struct as its zero value
+// with no error, so a batch that produced nothing was recorded as SUCCEEDED, it
+// never reached Report.Incomplete, and the run exited 0 calling the pull request
+// clean. decodeLenient has rejected exactly those three shapes on the JSON path
+// from the start; only the schema path was unguarded. Routing through a provider
+// that forwards response_format to whichever upstream it picked — and does not
+// require that upstream to honor it — is what made an unenforced schema response
+// reachable in the shipped configuration rather than theoretical.
+func requireSchemaEnforced[T any](resp *llms.Response, value T) error {
+	if resp == nil {
+		return fmt.Errorf("%w: empty response", errSchemaNotEnforced)
+	}
+	if err := requirePopulated(strings.TrimSpace(resp.Content), value); err != nil {
+		return fmt.Errorf("%w: %w", errSchemaNotEnforced, err)
+	}
+	return nil
+}
+
+// schemaNotEnforced reports whether an error means the schema was accepted and
+// then not honored, as opposed to rejected outright.
+//
+// Two sources, one meaning: the check above, and the SDK's own decode failure
+// when the model answered with something that is not JSON at all. The latter is
+// matched on text because the SDK returns it untyped.
+func schemaNotEnforced(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, errSchemaNotEnforced) ||
+		strings.Contains(strings.ToLower(err.Error()), sdkSchemaParseFailure)
+}
+
+// sdkSchemaParseFailure is the SDK's wording for "GenerateTyped could not
+// unmarshal what came back" (llms: structured output is not valid JSON: ...).
+const sdkSchemaParseFailure = "structured output is not valid json"
 
 // extractJSON asks for JSON mode with the target schema described in the
 // prompt, then parses leniently. Providers in this path do not enforce the

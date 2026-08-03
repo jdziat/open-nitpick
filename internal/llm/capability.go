@@ -68,6 +68,17 @@ func isCapabilityError(err error) bool {
 func matchesCapabilitySignal(msg string) bool {
 	lower := strings.ToLower(msg)
 
+	// Our own decode failure, not the provider's rejection. The SDK reports it
+	// as "llms: structured output is not valid JSON: ...", which contains two
+	// of the signals below, so a fully schema-capable model that returned one
+	// garbled reply was classified as incapable and downgraded the shared
+	// client for every remaining batch of the run — the exact outcome the
+	// comment above says must not happen. Checked first, because the signal
+	// list cannot be made narrow enough to exclude it.
+	if strings.Contains(lower, sdkSchemaParseFailure) {
+		return false
+	}
+
 	// Rate-limit and overload wording sometimes reaches us without a typed
 	// error; those must never downgrade.
 	for _, transient := range []string{

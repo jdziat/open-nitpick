@@ -327,6 +327,21 @@ func runExplainConfig(args []string) error {
 	fmt.Println("Config source:", source)
 	fmt.Println()
 
+	// The keys sanitize discarded, named here as well as in the review log.
+	// This command exists to answer "what does my config actually resolve to",
+	// and a key that was silently thrown away is the single most surprising
+	// answer it can give — an operator debugging "why is it talking to the
+	// wrong endpoint" reads this, not a CI log. Printing nothing when nothing
+	// was dropped is also what makes the empty case evidence rather than the
+	// same output any config would produce.
+	if len(cfg.Dropped) > 0 {
+		fmt.Println("Ignored (untrusted config; set NITPICK_TRUST_CONFIG_ENDPOINTS=1 where you control the file):")
+		for _, key := range cfg.Dropped {
+			fmt.Printf("  %s\n", key)
+		}
+		fmt.Println()
+	}
+
 	printModel := func(role config.Role) {
 		spec := cfg.Models.ResolveModel(role)
 		fmt.Printf("  %-8s %s/%s", role, spec.Provider, spec.Model)

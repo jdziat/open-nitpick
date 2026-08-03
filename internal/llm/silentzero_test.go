@@ -1,9 +1,12 @@
 package llm
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // realAnswer is what the model actually reported. Every case below wraps it in
@@ -137,6 +140,14 @@ func TestDowngradeOnlyOnCapabilityErrors(t *testing.T) {
 		errors.New("context deadline exceeded"),
 		errors.New("circuit breaker is open"),
 		errors.New("connection reset by peer"),
+
+		// The SDK's own wording when GenerateTyped cannot unmarshal what came
+		// back. Previously this matched two entries of capabilitySignals at
+		// once ("structured output", "schema"), so one garbled reply from a
+		// fully schema-capable model downgraded the shared client for the rest
+		// of the run. The list above is hand-written provider wording, which is
+		// why it never caught this: the string that mattered was ours.
+		errors.New("llms: structured output is not valid JSON: invalid character 'I' looking for beginning of value"),
 	}
 	for _, err := range transient {
 		if isCapabilityError(err) {
@@ -154,5 +165,82 @@ func TestDowngradeOnlyOnCapabilityErrors(t *testing.T) {
 		if !isCapabilityError(err) {
 			t.Errorf("%v SHOULD downgrade: the provider rejected the request shape", err)
 		}
+	}
+}
+
+// TestSchemaPathNeverSilentlyReturnsZero is the same contract as
+// TestNeverSilentlyReturnsZeroFindings, asserted through Extract rather than
+// through decodeLenient.
+//
+// That distinction is the whole bug. decodeLenient guards the JSON path and the
+// test above calls it directly, so it never touched the SCHEMA path — which
+// returned llms.GenerateTyped's value whenever its error was nil, and
+// GenerateTyped is a bare json.Unmarshal. `{}`, `null` and an unrelated object
+// therefore decoded to an empty Result with a NIL error, the batch was counted
+// as SUCCEEDED, and the run reported a clean pull request. auto is the mode
+// config.Defaults() sets, so this is the shipped path.
+func TestSchemaPathNeverSilentlyReturnsZero(t *testing.T) {
+	empty := []string{`{}`, `null`, `{"status":"ok","message":"nothing to do"}`}
+
+	for _, mode := range []config.StructuredMode{config.StructuredAuto, config.StructuredSchema} {
+		for _, content := range empty {
+			t.Run(string(mode)+"/"+content, func(t *testing.T) {
+				// In auto the schema attempt is followed by the JSON fallback,
+				// which gets the same unusable content plus one repair turn.
+				fake := newFakeLLM(
+					turn{content: content}, turn{content: content}, turn{content: content},
+				)
+				got, err := Extract[result](context.Background(), newTestClient(fake, mode), nil)
+				if err == nil {
+					t.Fatalf("SILENT ZERO: content %s decoded to %d finding(s) with err==nil", content, len(got.Findings))
+				}
+			})
+		}
+	}
+
+	// The boundary: an explicitly empty review is a real answer and must still
+	// come back clean, or every genuinely clean diff becomes a failed batch.
+	fake := newFakeLLM(turn{content: `{"findings":[]}`})
+	got, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredAuto), nil)
+	if err != nil {
+		t.Fatalf("an explicit empty findings list is a valid review, got: %v", err)
+	}
+	if len(got.Findings) != 0 {
+		t.Fatalf("findings = %d, want 0", len(got.Findings))
+	}
+	if fake.callCount() != 1 {
+		t.Errorf("calls = %d, want 1: a valid schema response must not fall through", fake.callCount())
+	}
+}
+
+// TestGarbledSchemaResponseDoesNotDowngradeTheClient covers the other half of
+// the same defect: recovery must not be permanent.
+//
+// A response the schema should have prevented says nothing about whether the
+// provider supports schemas — under a router, consecutive requests can land on
+// different upstreams. Downgrading on one would move every remaining batch of
+// the run onto the unenforced JSON path, and nothing in Report records that it
+// happened, so half a run would execute under a different strategy than the
+// other half with no trace.
+func TestGarbledSchemaResponseDoesNotDowngradeTheClient(t *testing.T) {
+	// Turn 1: the schema attempt returns prose-wrapped JSON, which the SDK
+	// cannot unmarshal. Turn 2: the JSON fallback recovers it leniently.
+	fake := newFakeLLM(
+		turn{content: "Here you go:\n```json\n" + realAnswer + "\n```"},
+		turn{content: realAnswer},
+	)
+	client := newTestClient(fake, config.StructuredAuto)
+
+	got, err := Extract[result](context.Background(), client, nil)
+	if err != nil {
+		t.Fatalf("Extract: %v", err)
+	}
+	if len(got.Findings) != 1 {
+		t.Fatalf("findings = %d, want the recovered answer", len(got.Findings))
+	}
+
+	if mode := client.structuredMode(); mode != config.StructuredAuto {
+		t.Errorf("mode = %q after one garbled response, want %q: the client is shared by "+
+			"every batch, so this downgrade is global and permanent", mode, config.StructuredAuto)
 	}
 }

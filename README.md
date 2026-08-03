@@ -13,8 +13,8 @@ driven by configuration and prompts you can read and change.
 ```bash
 go install github.com/jdziat/open-nitpick/cmd/nitpick@latest
 
-export LLM_PROVIDER=anthropic LLM_MODEL=claude-sonnet-4-20250514
-export ANTHROPIC_API_KEY=...
+export LLM_PROVIDER=openrouter LLM_MODEL=anthropic/claude-sonnet-4.6
+export OPENROUTER_API_KEY=sk-or-...
 
 nitpick review          # reviews your uncommitted changes
 ```
@@ -24,8 +24,10 @@ nitpick review          # reviews your uncommitted changes
 Most review bots are a hosted service wrapping one vendor's model, with a prompt
 you cannot see and pricing per seat. open-nitpick inverts that:
 
-- **Any model.** 17 providers via [llm-go-sdk][sdk], plus any OpenAI-compatible
-  endpoint through `base_url`, plus local models via `ollama` and `llamacpp`.
+- **Any model.** 17 providers via [llm-go-sdk][sdk], plus a built-in
+  `openrouter` that reaches the rest of the catalogue on one key, plus any
+  OpenAI-compatible endpoint through `base_url`, plus local models via `ollama`
+  and `llamacpp`.
 - **Different models for different jobs.** A cheap model triages and deduplicates;
   an expensive one does the actual reviewing. That split is most of the cost
   saving available.
@@ -75,9 +77,9 @@ jobs:
           fetch-depth: 0        # the reviewer needs history to diff against base
       - uses: jdziat/open-nitpick@v1
         with:
-          provider: anthropic
-          model: claude-sonnet-4-20250514
-          api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          provider: openrouter
+          model: anthropic/claude-sonnet-4.6
+          api-key: ${{ secrets.OPENROUTER_API_KEY }}
           # Omit fail-on (or set it to none) until you have seen how the model
           # behaves on your codebase. A reviewer that blocks merges on its first
           # false positive is a reviewer the team switches off.
@@ -108,13 +110,13 @@ Everything is optional — with no config file at all, `LLM_PROVIDER` and
 ```yaml
 models:
   default:
-    provider: anthropic
-    model: claude-sonnet-4-20250514
+    provider: openrouter
+    model: anthropic/claude-sonnet-4.6
     max_tokens: 8192
 
   triage:                          # cheap model for merging and filtering
-    provider: anthropic
-    model: claude-haiku-4-5-20251001
+    provider: openrouter
+    model: qwen/qwen3.7-flash
     temperature: 0
 
 review:
@@ -196,17 +198,50 @@ produces.
 `nit` < `info` < `warning` < `error` < `critical`. `fail_on: none` never fails
 the build.
 
-### Using an OpenAI-compatible gateway (OpenRouter, vLLM, LiteLLM)
+### OpenRouter
 
-Any OpenAI-compatible endpoint works through the `openai` provider:
+`openrouter` is a provider in its own right, so it needs a key and nothing else:
+
+```yaml
+models:
+  default:
+    provider: openrouter
+    model: anthropic/claude-sonnet-4.6
+```
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+```
+
+This is what this repository's own `.nitpick.yaml` uses. Its endpoint is
+compiled into the binary rather than read from `base_url`, and that is the whole
+reason it can be a committed default: `base_url` and `api_key_env` are stripped
+from a config the reviewer does not trust (see [Trust model](#trust-model)), so
+the same setup written against the `openai` provider would work only for whoever
+had exported `NITPICK_TRUST_CONFIG_ENDPOINTS` — and would silently talk to
+OpenAI for everybody else.
+
+`LLM_API_KEY` is accepted as a fallback, which is how the GitHub Action's
+`api-key` input arrives. `OPENROUTER_API_KEY` wins when both are set, so a
+generic key exported for some other vendor is never the one sent here.
+`OPENAI_API_KEY` is deliberately *not* accepted: it is a credential for a
+different host.
+
+What the compiled-in endpoint does **not** buy you: `provider` and `model` still
+come from the config file, and for a router the model id chooses which upstream
+receives the code. See [Trust model](#trust-model).
+
+### Other OpenAI-compatible gateways (vLLM, LiteLLM)
+
+Any other OpenAI-compatible endpoint works through the `openai` provider:
 
 ```yaml
 models:
   default:
     provider: openai
-    model: anthropic/claude-sonnet-4.5     # the gateway's model id
-    base_url: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
+    model: my-model
+    base_url: https://gateway.example.com/v1
+    api_key_env: MY_GATEWAY_KEY
 ```
 
 `base_url` and `api_key_env` are only honored when the config file is trusted —
@@ -248,6 +283,20 @@ including `.nitpick.yaml`. Three consequences:
   variable to send as the bearer token — exfiltrating `GITHUB_TOKEN` or your
   model key in one line of YAML. Set `NITPICK_TRUST_CONFIG_ENDPOINTS=1` to allow
   them, only where you control the file. Ignored keys are logged, never silent.
+  Providers whose endpoint is compiled in — `openrouter`, `anthropic`, `ollama`,
+  and the rest — are unaffected, which is why the shipped default names one
+  rather than a `base_url`.
+- **`provider` and `model` are *not* stripped, and that is the residual risk.**
+  A pull request editing its own `.nitpick.yaml` cannot change the endpoint or
+  the bearer token, but it can still choose which model reads the diff. Two
+  consequences worth naming, because the bullet above does not cover them: it
+  can point the review at a weak or free-tier model and get a quiet zero-finding
+  run, and — because a router's model id *is* its routing key — it can change
+  which upstream inference operator receives the code under review, including
+  the whole-file bodies `review.include_full_files` sends. Neither is specific
+  to `openrouter`; naming a router as the default is what makes the reachable
+  set a whole catalogue rather than one vendor's. Review `.nitpick.yaml` changes
+  on their own merits, exactly as you would a change to a CI workflow.
 - **`api_key_env` may never name a forge credential** (`GITHUB_TOKEN` and
   friends), even in a trusted config. A model provider has no business receiving
   it, and the likeliest reason to ask is exfiltration.
@@ -264,10 +313,20 @@ untrusted data, and are never rendered as templates.
 ### Structured output
 
 Findings are constrained to a schema. By default (`structured_output: auto`)
-open-nitpick requests a JSON-Schema response format and, if the provider rejects
-it, falls back to JSON mode with lenient parsing and one bounded repair attempt —
-remembering the downgrade so it is paid for once per run rather than once per
-request. Force either path with `structured_output: schema` or `json`.
+open-nitpick requests a JSON-Schema response format and, if the provider
+*rejects* it, falls back to JSON mode with lenient parsing and one bounded
+repair attempt — remembering that downgrade so it is paid for once per run
+rather than once per request. Force either path with `structured_output: schema`
+or `json`.
+
+A provider that *accepts* the schema and then ignores it is handled separately
+and deliberately: the response is rejected, the same request is retried on the
+JSON path, and the client is **not** downgraded. Routers can hand consecutive
+requests to different upstreams, so one unenforced answer is a fact about that
+answer, not about the provider — and a downgrade would move every later batch of
+the run onto a different strategy with nothing in the report saying so. A
+response that satisfies neither path fails the batch loudly and lands in the
+run's incomplete list; it is never reported as a clean review.
 
 This is what makes small local models usable: they need the fallback, and
 hard-coding the strict path would exclude them.
@@ -314,6 +373,10 @@ make eval RUNS=5                              # run-to-run stability
 make eval FIXTURES=go-nil-deref               # one fixture
 make eval CAPTURE=testdata/responses          # save raw model output
 ```
+
+It is the same `OPENROUTER_API_KEY` the default config uses, but only the eval
+harness reads `.env` — `nitpick review` does not, so export it (`set -a; . ./.env;
+set +a`) or keep it in your shell profile.
 
 Each fixture is a synthetic pull request with bugs planted at known lines,
 built into a real git repository and reviewed through the real engine — so the

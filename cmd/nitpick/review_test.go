@@ -1,8 +1,13 @@
 package main
 
 import (
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // TestResolvePullRequestIntent is the regression test for `-pr 42` silently
@@ -159,4 +164,97 @@ func TestFirstNonEmpty(t *testing.T) {
 	if got := firstNonEmpty("", ""); got != "" {
 		t.Errorf("firstNonEmpty = %q, want empty", got)
 	}
+}
+
+// captureStdout runs fn with os.Stdout redirected and returns what it printed.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+
+	saved := os.Stdout
+	os.Stdout = w
+	defer func() { os.Stdout = saved }()
+
+	done := make(chan string, 1)
+	go func() {
+		var buf strings.Builder
+		_, _ = io.Copy(&buf, r)
+		done <- buf.String()
+	}()
+
+	fn()
+
+	_ = w.Close()
+	return <-done
+}
+
+// TestExplainConfigNamesDiscardedKeys covers the command's answer to the
+// question an operator actually asks it: what did my config resolve to, and
+// what did you throw away?
+//
+// The discarded keys used to appear only in `nitpick review`'s log, so
+// explain-config printed byte-identical "Models:" sections for a config whose
+// endpoint was honored and one whose endpoint was silently stripped. That makes
+// its silence worthless as evidence — the property this repository's committed
+// default depends on could not be checked with the command built to check it.
+func TestExplainConfigNamesDiscardedKeys(t *testing.T) {
+	// Untrusted: this is the CI default and the case that strips keys.
+	t.Setenv(config.EnvTrustConfigEndpoints, "")
+
+	write := func(t *testing.T, body string) string {
+		t.Helper()
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, config.FileName), []byte(body), 0o644); err != nil {
+			t.Fatalf("write config: %v", err)
+		}
+		return dir
+	}
+
+	t.Run("a config naming an endpoint says so", func(t *testing.T) {
+		dir := write(t, `
+models:
+  default:
+    provider: openrouter
+    model: attacker/model
+    base_url: https://attacker.example/v1
+    api_key_env: OPENROUTER_API_KEY
+`)
+		out := captureStdout(t, func() {
+			if err := runExplainConfig([]string{"-repo", dir}); err != nil {
+				t.Errorf("runExplainConfig: %v", err)
+			}
+		})
+
+		for _, want := range []string{"base_url", "api_key_env"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output never mentions the discarded %s key:\n%s", want, out)
+			}
+		}
+		// The endpoint itself must not survive into the resolved model line.
+		if strings.Contains(out, "attacker.example") {
+			t.Errorf("the stripped endpoint is still shown as the resolved one:\n%s", out)
+		}
+	})
+
+	t.Run("the shipped default discards nothing", func(t *testing.T) {
+		// The whole point of the openrouter provider, asserted through the CLI
+		// rather than through config.LoadFile: a committed default that leaned
+		// on base_url would work only for whoever exported the trust variable.
+		out := captureStdout(t, func() {
+			if err := runExplainConfig([]string{"-repo", "../.."}); err != nil {
+				t.Errorf("runExplainConfig: %v", err)
+			}
+		})
+
+		if strings.Contains(out, "Ignored (untrusted config") {
+			t.Errorf("this repository's own config depends on keys an untrusted config cannot supply:\n%s", out)
+		}
+		if !strings.Contains(out, "openrouter/") {
+			t.Errorf("the default no longer resolves to openrouter:\n%s", out)
+		}
+	})
 }

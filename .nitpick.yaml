@@ -2,18 +2,21 @@
 # README points at, so it stays readable rather than exhaustive.
 
 models:
-  # The provider name is matched against the SDK's registry; run
-  # "nitpick providers" to see every option.
+  # openrouter carries its endpoint in the binary (internal/llm/openrouter.go),
+  # which is why this file names no base_url and no api_key_env: both are
+  # stripped from a config the reviewer does not trust, so a default built on
+  # them would silently work for nobody but its author. Only OPENROUTER_API_KEY
+  # is needed. Run "nitpick providers" to see every option.
   default:
-    provider: anthropic
-    model: claude-sonnet-4-20250514
+    provider: openrouter
+    model: anthropic/claude-sonnet-4.6
     max_tokens: 8192
 
   # Triage only merges and filters findings, so it does not need the expensive
   # model. Splitting the roles is most of the cost saving available here.
   triage:
-    provider: anthropic
-    model: claude-haiku-4-5-20251001
+    provider: openrouter
+    model: qwen/qwen3.7-flash
     temperature: 0
 
 review:
