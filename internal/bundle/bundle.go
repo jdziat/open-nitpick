@@ -70,6 +70,16 @@ type Plan struct {
 	// matters: a review that silently ignored half the diff looks identical
 	// to one that found nothing wrong.
 	Skipped []Skip
+
+	// Degraded records files that WERE reviewed, but without their full
+	// content, and why.
+	//
+	// These are kept apart from Skipped because the two mean opposite things
+	// to a reader. Both once shared this list, so a file whose content fetch
+	// failed was reviewed diff-only and then listed under "Files not
+	// reviewed" — understating the review in exactly the way Skipped exists
+	// to prevent it from being overstated.
+	Degraded []Skip
 }
 
 // Skip records one excluded file.
@@ -143,8 +153,9 @@ func Assemble(ctx context.Context, cfg *config.Config, files diff.Files, fetch C
 			content, skip := fetchContent(ctx, cfg, fetch, f)
 			switch {
 			case skip != "":
-				// Not fatal: review the diff without the full file.
-				plan.Skipped = append(plan.Skipped, Skip{Path: f.Path, Reason: skip})
+				// Not fatal: review the diff without the full file. Recorded
+				// as degraded, not skipped — this file is still reviewed.
+				plan.Degraded = append(plan.Degraded, Skip{Path: f.Path, Reason: skip})
 
 			case cfg.Review.SkipGenerated && isGenerated(content):
 				// Generated files are dropped entirely rather than reviewed

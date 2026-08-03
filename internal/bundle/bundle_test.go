@@ -149,8 +149,13 @@ func TestAssembleDegradesWhenContentUnavailable(t *testing.T) {
 	if plan.Batches[0].Entries[0].HasContent() {
 		t.Error("content should be empty when the fetch failed")
 	}
-	if len(plan.Skipped) != 1 || plan.Skipped[0].Reason != ReasonUnavailable {
-		t.Errorf("skipped = %+v, want the unavailable reason recorded", plan.Skipped)
+	if len(plan.Degraded) != 1 || plan.Degraded[0].Reason != ReasonUnavailable {
+		t.Errorf("degraded = %+v, want the unavailable reason recorded", plan.Degraded)
+	}
+	// The file WAS reviewed, so it must not also appear as skipped: the
+	// renderer lists Skipped under "Files not reviewed".
+	if len(plan.Skipped) != 0 {
+		t.Errorf("skipped = %+v, want empty for a file that was reviewed", plan.Skipped)
 	}
 }
 
@@ -214,8 +219,11 @@ func TestAssembleSkipsNonUTF8(t *testing.T) {
 	if plan.Batches[0].Entries[0].HasContent() {
 		t.Error("invalid UTF-8 should not be attached as content")
 	}
-	if len(plan.Skipped) != 1 || plan.Skipped[0].Reason != ReasonNotText {
-		t.Errorf("skipped = %+v, want the non-text reason", plan.Skipped)
+	if len(plan.Degraded) != 1 || plan.Degraded[0].Reason != ReasonNotText {
+		t.Errorf("degraded = %+v, want the non-text reason", plan.Degraded)
+	}
+	if len(plan.Skipped) != 0 {
+		t.Errorf("skipped = %+v, want empty for a file that was reviewed", plan.Skipped)
 	}
 }
 
@@ -235,8 +243,11 @@ func TestAssembleRespectsMaxFileBytes(t *testing.T) {
 	if plan.Batches[0].Entries[0].HasContent() {
 		t.Error("oversized file content should not be attached")
 	}
-	if plan.Skipped[0].Reason != ReasonTooLarge {
-		t.Errorf("reason = %q, want %q", plan.Skipped[0].Reason, ReasonTooLarge)
+	if len(plan.Degraded) != 1 || plan.Degraded[0].Reason != ReasonTooLarge {
+		t.Errorf("degraded = %+v, want %q", plan.Degraded, ReasonTooLarge)
+	}
+	if len(plan.Skipped) != 0 {
+		t.Errorf("skipped = %+v, want empty for a file that was reviewed", plan.Skipped)
 	}
 }
 

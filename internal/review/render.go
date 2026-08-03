@@ -241,6 +241,14 @@ func renderSummary(report *Report, cfg *config.Config) string {
 		b.WriteString("\n</details>\n")
 	}
 
+	// Reported separately, and worded so it cannot be read as "not reviewed":
+	// these files were reviewed, just from the diff alone.
+	if notes := degradedNotes(report); notes != "" {
+		b.WriteString("\n<details>\n<summary>Reviewed from the diff only, without full file context</summary>\n\n")
+		b.WriteString(notes)
+		b.WriteString("\n</details>\n")
+	}
+
 	out := strings.TrimSpace(b.String())
 	if out == "" {
 		return ""
@@ -248,29 +256,37 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	return out + "\n\n<sub>Reviewed by open-nitpick.</sub>"
 }
 
-// skipNotes lists skipped files grouped by reason.
+// skipNotes lists files that were not reviewed, grouped by reason.
 func skipNotes(report *Report) string {
-	if report.Plan == nil || len(report.Plan.Skipped) == 0 {
+	if report.Plan == nil {
 		return ""
 	}
-
 	// Ignored files are excluded by explicit configuration, so listing them
 	// every run is noise rather than information.
+	return groupByReason(report.Plan.Skipped, bundle.ReasonIgnored)
+}
+
+// degradedNotes lists files that were reviewed without their full content.
+func degradedNotes(report *Report) string {
+	if report.Plan == nil {
+		return ""
+	}
+	return groupByReason(report.Plan.Degraded, "")
+}
+
+// groupByReason renders "- reason: path, path" lines, omitting one reason.
+func groupByReason(skips []bundle.Skip, omit string) string {
 	byReason := map[string][]string{}
 	order := []string{}
 
-	for _, s := range report.Plan.Skipped {
-		if s.Reason == bundle.ReasonIgnored {
+	for _, s := range skips {
+		if omit != "" && s.Reason == omit {
 			continue
 		}
 		if _, ok := byReason[s.Reason]; !ok {
 			order = append(order, s.Reason)
 		}
 		byReason[s.Reason] = append(byReason[s.Reason], s.Path)
-	}
-
-	if len(order) == 0 {
-		return ""
 	}
 
 	var b strings.Builder

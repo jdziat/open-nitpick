@@ -11,6 +11,7 @@ import (
 
 	llms "github.com/nocturnium/llm-go-sdk"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/llm"
@@ -416,6 +417,29 @@ Binary files a/huge.bin and b/huge.bin differ
 	}
 	if !strings.Contains(summary, "Files not reviewed") {
 		t.Errorf("summary should have a skipped-files section:\n%s", summary)
+	}
+}
+
+func TestDegradedFilesAreNotReportedAsUnreviewed(t *testing.T) {
+	// Found by running open-nitpick on its own history. A file whose content
+	// fetch fails is reviewed from the diff alone, but was recorded in
+	// Plan.Skipped — which the summary prints under "Files not reviewed".
+	// Claiming a reviewed file was not reviewed is the same class of error as
+	// hiding a skipped one, just in the opposite direction.
+	report := &Report{
+		Summary: "Walkthrough.",
+		Plan: &bundle.Plan{
+			Degraded: []bundle.Skip{{Path: "a.go", Reason: bundle.ReasonUnavailable}},
+		},
+	}
+
+	summary := renderSummary(report, nil)
+
+	if !strings.Contains(summary, "a.go") {
+		t.Errorf("summary should name the degraded file:\n%s", summary)
+	}
+	if strings.Contains(summary, "Files not reviewed") {
+		t.Errorf("a file reviewed diff-only must not be listed as not reviewed:\n%s", summary)
 	}
 }
 
