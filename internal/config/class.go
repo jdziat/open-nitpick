@@ -1,0 +1,171 @@
+package config
+
+import "strings"
+
+// Class is what kind of problem a finding describes.
+//
+// It exists so that nitpick level can be applied as a FILTER over a single
+// review corpus rather than as a change to what the model is asked to look for.
+// That matters for two measured reasons:
+//
+//   - Generating at a wider scope degrades the defect hunt. Across four eval
+//     runs, asking the model to also consider style consistently produced the
+//     worst results — more findings, lower precision, and more missed real
+//     defects — because attention spent on naming is attention not spent on
+//     the race condition.
+//   - Scope-as-generation makes levels incomparable. Changing the level changed
+//     the prompt, so any measured difference confounded scope with model
+//     variance. One corpus plus deterministic filters can be evaluated offline
+//     at zero cost.
+//
+// Free-text categories cannot support that, so this is a closed set the schema
+// enforces.
+type Class string
+
+// Finding classes, ordered roughly by how universally teams want them.
+const (
+	// ClassCorrectness is logic that produces a wrong result.
+	ClassCorrectness Class = "correctness"
+	// ClassConcurrency is races, deadlocks, and missing synchronization.
+	ClassConcurrency Class = "concurrency"
+	// ClassSecurity is injection, authorization, secrets, and traversal.
+	ClassSecurity Class = "security"
+	// ClassResource is leaks and unbounded growth.
+	ClassResource Class = "resource"
+	// ClassDataLoss is destruction or corruption of persisted data.
+	ClassDataLoss Class = "data-loss"
+	// ClassContract is a change that breaks existing callers.
+	ClassContract Class = "contract"
+	// ClassTests is missing coverage for risky new logic.
+	ClassTests Class = "tests"
+	// ClassMaintainability is a structural cost that can be named concretely.
+	ClassMaintainability Class = "maintainability"
+	// ClassStyle is naming, documentation, idiom, and consistency.
+	ClassStyle Class = "style"
+
+	// ClassUnknown is where an unrecognized class lands.
+	//
+	// It is published at EVERY level on purpose. severity.go makes the same
+	// call for the same reason: an unexpected vocabulary should produce a
+	// visible, non-gating finding rather than silently vanishing. Routing
+	// unknowns to a filtered class instead would turn "the model wrote a word
+	// we did not expect" into "a real defect disappeared", which is the exact
+	// failure this codebase is built to avoid.
+	ClassUnknown Class = "unknown"
+)
+
+// Classes returns every class, in schema order.
+func Classes() []Class {
+	return []Class{
+		ClassCorrectness, ClassConcurrency, ClassSecurity, ClassResource,
+		ClassDataLoss, ClassContract, ClassTests, ClassMaintainability, ClassStyle,
+	}
+}
+
+// ClassNames returns the classes a model may choose from.
+//
+// ClassUnknown is deliberately absent: it is the internal landing place for a
+// value we did not recognize, not an option to offer.
+func ClassNames() []string {
+	all := Classes()
+	out := make([]string, 0, len(all))
+	for _, c := range all {
+		out = append(out, string(c))
+	}
+	return out
+}
+
+// defectClasses are the problems every level reports: something demonstrably
+// goes wrong at runtime.
+var defectClasses = []Class{
+	ClassCorrectness, ClassConcurrency, ClassSecurity, ClassResource, ClassDataLoss,
+	// Unrecognized classes ride with the defects so they are never filtered
+	// away unseen. min_severity still gates them.
+	ClassUnknown,
+}
+
+// allowedClasses maps a nitpick level to the classes it publishes.
+//
+// The levels are nested, which is what makes post-hoc filtering sound: each
+// level is a superset of the one before it, so narrowing never needs a finding
+// that was not generated.
+var allowedClasses = map[NitpickLevel]map[Class]bool{
+	NitpickOff:      classSet(defectClasses...),
+	NitpickMinimal:  classSet(append(append([]Class{}, defectClasses...), ClassContract)...),
+	NitpickNormal:   classSet(append(append([]Class{}, defectClasses...), ClassContract, ClassTests, ClassMaintainability)...),
+	NitpickPedantic: classSet(append(Classes(), ClassUnknown)...),
+}
+
+func classSet(cs ...Class) map[Class]bool {
+	out := make(map[Class]bool, len(cs))
+	for _, c := range cs {
+		out[c] = true
+	}
+	return out
+}
+
+// GenerationLevel is the scope every review is generated at, regardless of the
+// configured nitpick level.
+//
+// Normal is the widest scope that does not ask for style. Everything narrower
+// is reached by filtering; style is reached by a separate pass, so the defect
+// hunt is never diluted by it.
+const GenerationLevel = NitpickNormal
+
+// Normalize maps a model-supplied class onto a known one. Unrecognized values
+// become maintainability: visible, filtered out at the strictest levels, and
+// never silently promoted into the defect classes that drive gating.
+func (c Class) Normalize() (Class, bool) {
+	n := Class(strings.ToLower(strings.TrimSpace(string(c))))
+
+	for _, known := range Classes() {
+		if n == known {
+			return n, true
+		}
+	}
+
+	// A few aliases models reach for unprompted.
+	switch n {
+	case "bug", "logic", "correctness-bug":
+		return ClassCorrectness, true
+	case "race", "thread-safety", "threading":
+		return ClassConcurrency, true
+	case "vulnerability", "injection", "authz", "auth":
+		return ClassSecurity, true
+	case "leak", "resources", "resource-leak", "performance":
+		return ClassResource, true
+	case "api", "compatibility", "breaking-change":
+		return ClassContract, true
+	case "test", "testing", "coverage":
+		return ClassTests, true
+	case "naming", "docs", "documentation", "formatting", "idiom", "nit":
+		return ClassStyle, true
+	}
+
+	return ClassUnknown, false
+}
+
+// Publishes reports whether a nitpick level publishes findings of this class.
+func (level NitpickLevel) Publishes(c Class) bool {
+	allowed, ok := allowedClasses[level]
+	if !ok {
+		allowed = allowedClasses[NitpickNormal]
+	}
+
+	// Normalize defensively. An unrecognized or empty class reaching here would
+	// otherwise match nothing and silently drop the finding — turning a missing
+	// field into a disappeared defect, which is the failure mode this whole
+	// codebase is built to avoid.
+	normalized, _ := c.Normalize()
+	return allowed[normalized]
+}
+
+// NeedsStylePass reports whether a level requires findings the generation scope
+// deliberately does not produce.
+//
+// Only pedantic does. Post-hoc filtering can narrow a corpus but never widen
+// it, so style findings — which the generation prompt forbids — have to come
+// from somewhere else.
+func (level NitpickLevel) NeedsStylePass() bool {
+	return level == NitpickPedantic
+}

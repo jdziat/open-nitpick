@@ -1,0 +1,330 @@
+// Package config loads, merges, and validates open-nitpick configuration.
+//
+// Configuration comes from a .nitpick.yaml at the root of the repository being
+// reviewed, overlaid onto built-in defaults so that a repository with no config
+// file still produces a sensible review.
+package config
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"maps"
+	"os"
+	"path/filepath"
+	"time"
+
+	"gopkg.in/yaml.v3"
+)
+
+// FileName is the configuration file looked up at the repository root.
+const FileName = ".nitpick.yaml"
+
+// Config is the fully resolved open-nitpick configuration.
+type Config struct {
+	Models       Models        `yaml:"models"`
+	Review       Review        `yaml:"review"`
+	Instructions []Instruction `yaml:"instructions"`
+	Linters      Linters       `yaml:"linters"`
+
+	// Persona controls the reviewer's voice and how far past outright defects
+	// it ranges.
+	Persona Persona `yaml:"persona"`
+
+	// Source records where the configuration was loaded from. It is empty when
+	// only built-in defaults were used.
+	Source string `yaml:"-"`
+
+	// Dropped names endpoint and credential keys that were ignored because the
+	// config file is not trusted to supply them. Callers should log these: a
+	// silently ignored setting is very hard to diagnose.
+	Dropped []string `yaml:"-"`
+}
+
+// ModelSpec describes one configured model. Provider names are matched against
+// the SDK's provider registry, so any provider the SDK supports is usable here
+// without changes to open-nitpick.
+type ModelSpec struct {
+	Provider string `yaml:"provider"`
+	Model    string `yaml:"model"`
+
+	// BaseURL points at an alternate endpoint. This is what makes local models
+	// (ollama, llama.cpp) and OpenAI-compatible gateways usable.
+	BaseURL string `yaml:"base_url"`
+
+	// APIKeyEnv names the environment variable holding the credential. When
+	// empty the SDK provider resolves its own conventional variable.
+	APIKeyEnv string `yaml:"api_key_env"`
+
+	Temperature *float64      `yaml:"temperature"`
+	MaxTokens   int           `yaml:"max_tokens"`
+	Timeout     time.Duration `yaml:"timeout"`
+
+	// StructuredOutput selects how findings are constrained to the schema:
+	// "auto" (default) prefers a JSON-Schema response format and falls back to
+	// JSON mode, "schema" forces the schema path, "json" forces JSON mode.
+	StructuredOutput StructuredMode `yaml:"structured_output"`
+
+	// AllowPrivateEndpoint permits base_url to use plain HTTP or resolve to a
+	// loopback or private address.
+	//
+	// It is off by default and must be opted into deliberately. open-nitpick
+	// runs in CI against pull requests, and a pull request can edit
+	// .nitpick.yaml — so an endpoint pointing at an internal address turns the
+	// reviewer into an SSRF vector. The ollama and llamacpp providers already
+	// allow loopback themselves, so the ordinary local-model path does not
+	// need this.
+	AllowPrivateEndpoint bool `yaml:"allow_private_endpoint"`
+
+	// Extra carries provider-specific construction parameters (for example
+	// runpod's endpoint_id) straight through to the SDK.
+	Extra map[string]string `yaml:"extra"`
+
+	// MaxRetries bounds SDK-level retries for transient failures.
+	MaxRetries *int `yaml:"max_retries"`
+}
+
+// StructuredMode selects a structured-output strategy.
+type StructuredMode string
+
+// Supported structured-output strategies.
+const (
+	StructuredAuto   StructuredMode = "auto"
+	StructuredSchema StructuredMode = "schema"
+	StructuredJSON   StructuredMode = "json"
+)
+
+// Models maps review roles to model specifications. Review and Triage fall back
+// to Default when unset, which lets a minimal config name a single model while
+// a tuned config uses a cheap model for triage and a strong one for review.
+type Models struct {
+	Default ModelSpec  `yaml:"default"`
+	Review  *ModelSpec `yaml:"review"`
+	Triage  *ModelSpec `yaml:"triage"`
+}
+
+// Review holds reviewer behavior and gating policy.
+type Review struct {
+	// MaxFiles caps how many changed files are reviewed in one run.
+	MaxFiles int `yaml:"max_files"`
+
+	// TokenBudgetPerRequest bounds the context assembled for a single model
+	// call, including full file bodies.
+	TokenBudgetPerRequest int `yaml:"token_budget_per_request"`
+
+	// MaxFilesPerRequest caps how many files are batched into one call.
+	MaxFilesPerRequest int `yaml:"max_files_per_request"`
+
+	// Concurrency bounds in-flight model calls.
+	Concurrency int `yaml:"concurrency"`
+
+	// FailOn is the lowest severity that makes the run exit non-zero.
+	// "none" never fails the run.
+	FailOn Severity `yaml:"fail_on"`
+
+	// MinSeverity drops findings below this severity before publishing.
+	MinSeverity Severity `yaml:"min_severity"`
+
+	// Ignore lists doublestar globs excluded from review.
+	Ignore []string `yaml:"ignore"`
+
+	// IncludeFullFiles sends whole changed files alongside the diff when the
+	// token budget allows. Disabling it reviews hunks in isolation.
+	IncludeFullFiles bool `yaml:"include_full_files"`
+
+	// MaxFileBytes skips files larger than this when reading full contents.
+	MaxFileBytes int `yaml:"max_file_bytes"`
+
+	// SkipGenerated drops files carrying a generated-code marker.
+	SkipGenerated bool `yaml:"skip_generated"`
+
+	// Summary emits a walkthrough summary alongside inline comments.
+	Summary bool `yaml:"summary"`
+}
+
+// Instruction is a path-scoped prompt addition. Every instruction whose Path
+// glob matches a file is appended to that file's review prompt, so instructions
+// compose rather than override one another.
+type Instruction struct {
+	Path   string `yaml:"path"`
+	Prompt string `yaml:"prompt"`
+}
+
+// Linters configures deterministic analyzers whose findings are fed to the
+// model as evidence for triage.
+type Linters struct {
+	// Enabled lists runner names to consider.
+	Enabled []string `yaml:"enabled"`
+
+	// Mode is "auto" (run only runners detected in the repo), "strict" (error
+	// when an enabled runner is missing), or "off".
+	Mode LinterMode `yaml:"mode"`
+
+	// Timeout bounds each individual runner.
+	Timeout time.Duration `yaml:"timeout"`
+
+	// OnlyChangedLines drops linter findings on lines the diff did not touch.
+	OnlyChangedLines bool `yaml:"only_changed_lines"`
+}
+
+// LinterMode selects linter execution behavior.
+type LinterMode string
+
+// Supported linter modes.
+const (
+	LinterAuto   LinterMode = "auto"
+	LinterStrict LinterMode = "strict"
+	LinterOff    LinterMode = "off"
+)
+
+// Load reads configuration for the repository rooted at repoRoot, overlaying
+// any .nitpick.yaml onto built-in defaults. A missing config file is not an
+// error. The returned Config is validated.
+func Load(repoRoot string) (*Config, error) {
+	return LoadFile(filepath.Join(repoRoot, FileName))
+}
+
+// LoadFile loads configuration from an explicit path. A missing file yields
+// validated defaults; any other read or parse failure is returned.
+func LoadFile(path string) (*Config, error) {
+	cfg := Defaults()
+
+	data, err := os.ReadFile(path)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		cfg.applyEnv(nil)
+		cfg.Persona = cfg.Persona.Resolve()
+		if err := cfg.Validate(); err != nil {
+			return nil, fmt.Errorf("no %s found and environment is incomplete: %w", FileName, err)
+		}
+		return cfg, nil
+	case err != nil:
+		return nil, fmt.Errorf("read config %s: %w", path, err)
+	}
+
+	if err := cfg.merge(data); err != nil {
+		return nil, fmt.Errorf("parse config %s: %w", path, err)
+	}
+
+	// Strip endpoint and credential keys before anything reads them. This runs
+	// before applyEnv so the environment can still supply what the file may not.
+	cfg.Dropped = cfg.sanitize(nil)
+
+	cfg.applyEnv(nil)
+	cfg.Persona = cfg.Persona.Resolve()
+	cfg.Source = path
+
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config %s: %w", path, err)
+	}
+	return cfg, nil
+}
+
+// merge decodes YAML over the receiver. Scalar and mapping fields present in
+// the document replace the default; fields absent from the document keep their
+// default value. Sequences replace wholesale rather than appending, so a
+// repository can narrow the default ignore list rather than only widening it.
+func (c *Config) merge(data []byte) error {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+
+	if err := dec.Decode(c); err != nil {
+		// An empty document yields io.EOF and leaves defaults in place.
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// ResolveModel returns the effective spec for a role, falling back to the
+// default model for any field the role does not set.
+func (m Models) ResolveModel(role Role) ModelSpec {
+	var override *ModelSpec
+	switch role {
+	case RoleReview:
+		override = m.Review
+	case RoleTriage:
+		override = m.Triage
+	}
+	if override == nil {
+		return m.Default
+	}
+	return m.Default.overlay(*override)
+}
+
+// Role names a model's function within a review run.
+type Role string
+
+// Supported model roles.
+const (
+	// RoleReview analyzes diffs and produces findings.
+	RoleReview Role = "review"
+	// RoleTriage dedupes and filters findings across batches.
+	RoleTriage Role = "triage"
+)
+
+// overlay returns base with every field the override sets replaced.
+func (base ModelSpec) overlay(over ModelSpec) ModelSpec {
+	out := base
+	if over.Provider != "" {
+		out.Provider = over.Provider
+	}
+	if over.Model != "" {
+		out.Model = over.Model
+	}
+	if over.BaseURL != "" {
+		out.BaseURL = over.BaseURL
+	}
+	if over.APIKeyEnv != "" {
+		out.APIKeyEnv = over.APIKeyEnv
+	}
+	if over.Temperature != nil {
+		out.Temperature = over.Temperature
+	}
+	if over.MaxTokens != 0 {
+		out.MaxTokens = over.MaxTokens
+	}
+	if over.Timeout != 0 {
+		out.Timeout = over.Timeout
+	}
+	if over.StructuredOutput != "" {
+		out.StructuredOutput = over.StructuredOutput
+	}
+	if over.MaxRetries != nil {
+		out.MaxRetries = over.MaxRetries
+	}
+	if over.AllowPrivateEndpoint {
+		out.AllowPrivateEndpoint = true
+	}
+	if len(over.Extra) > 0 {
+		out.Extra = make(map[string]string, len(base.Extra)+len(over.Extra))
+		maps.Copy(out.Extra, base.Extra)
+		maps.Copy(out.Extra, over.Extra)
+	}
+	return out
+}
+
+// InstructionsFor returns the prompts of every instruction whose glob matches
+// path, in configuration order.
+func (c *Config) InstructionsFor(path string) []string {
+	var out []string
+	for _, ins := range c.Instructions {
+		if matchGlob(ins.Path, path) {
+			out = append(out, ins.Prompt)
+		}
+	}
+	return out
+}
+
+// Ignored reports whether path is excluded from review.
+func (c *Config) Ignored(path string) bool {
+	for _, pattern := range c.Review.Ignore {
+		if matchGlob(pattern, path) {
+			return true
+		}
+	}
+	return false
+}
