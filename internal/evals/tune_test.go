@@ -91,7 +91,11 @@ type scored struct {
 // differ because the model answered differently, not because the filter did
 // anything.
 func TestTunePersona(t *testing.T) {
-	opts := OptionsFromEnv()
+	opts, err := OptionsFromEnv()
+	if err != nil {
+		t.Fatalf("options: %v", err)
+	}
+	t.Logf("corpus: %s", CorpusLabel(opts.Fixtures))
 
 	judge, err := NewJudge(strings.TrimSpace(os.Getenv(EnvJudgeModel)))
 	if err != nil {
@@ -107,8 +111,16 @@ func TestTunePersona(t *testing.T) {
 		axis != "nitpick" && axis != "voice" {
 		t.Fatalf("NITPICK_EVAL_AXIS=%q is not one of: nitpick, voice", axis)
 	}
+	// One dump for the whole test, opened here rather than per axis so both
+	// axes write into the same file with the same schema.
+	dump, err := OpenDump()
+	if err != nil {
+		t.Fatalf("open %s: %v", EnvDump, err)
+	}
+	defer func() { _ = dump.Close() }()
+
 	if strings.TrimSpace(os.Getenv("NITPICK_EVAL_AXIS")) == "voice" {
-		runVoiceAxis(t, judge, model, opts)
+		runVoiceAxis(t, judge, model, opts, dump)
 		return
 	}
 
@@ -119,12 +131,12 @@ func TestTunePersona(t *testing.T) {
 	t.Logf("judge: %s   reviewer: %s   fixtures: %d   levels: %d (one review each, filtered offline)",
 		judge.Model(), model.ID, len(opts.Fixtures), len(levels))
 
-	results := runLevels(t, judge, model, levels, opts)
+	results := runLevels(t, judge, model, levels, opts, dump)
 	reportVariants(t, results)
 }
 
 // runLevels reviews each fixture once and derives every level from that corpus.
-func runLevels(t *testing.T, judge *Judge, model Model, levels []config.NitpickLevel, opts Options) []scored {
+func runLevels(t *testing.T, judge *Judge, model Model, levels []config.NitpickLevel, opts Options, dump *Dump) []scored {
 	t.Helper()
 
 	ctx := context.Background()
@@ -189,6 +201,14 @@ func runLevels(t *testing.T, judge *Judge, model Model, levels []config.NitpickL
 				byIndex[v.Index] = v
 			}
 
+			// The corpus position of each finding, so a filtered subset can find
+			// its own verdicts. Keyed the way review.dedupe keys them, which is
+			// what makes the key unique within a corpus.
+			corpusIndex := map[string]int{}
+			for idx, finding := range corpus {
+				corpusIndex[finding.Key()] = idx
+			}
+
 			for i, level := range levels {
 				kept, _ := review.Filter(corpus, level, config.SeverityNit)
 
@@ -198,19 +218,39 @@ func runLevels(t *testing.T, judge *Judge, model Model, levels []config.NitpickL
 					ToneAdherence: assessment.ToneAdherence,
 					Grade:         assessment.Grade,
 				}
-				for idx, finding := range corpus {
-					if !containsFinding(kept, finding) {
-						continue
-					}
-					if v, ok := byIndex[idx]; ok {
+				// Each verdict is re-indexed to its position in THIS level's
+				// list. The verdicts carry indices into the whole corpus, and
+				// Add validates them against the number of findings the level
+				// kept — so any level that dropped a finding before its last
+				// kept one reported "judge verdict index N is out of range"
+				// against a judge that had done nothing wrong, and the noisiest
+				// levels produced the most phantom complaints. Add's expected
+				// count is len(kept) for the same reason: passing
+				// len(sub.Verdicts) compared the slice against itself and could
+				// never detect a verdict the judge actually failed to return.
+				for pos, finding := range kept {
+					if v, ok := byIndex[corpusIndex[finding.Key()]]; ok {
+						v.Index = pos
 						sub.Verdicts = append(sub.Verdicts, v)
 					}
 				}
 
-				if problems := out[i].agg.Add(sub, len(sub.Verdicts)); len(problems) > 0 {
+				if problems := out[i].agg.Add(sub, len(kept)); len(problems) > 0 {
 					for _, p := range problems {
 						out[i].notes = append(out[i].notes, fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", f.Name, p))
 					}
+				}
+				out[i].agg.AddSeverity(ScoreSeverity(f, kept))
+
+				if derr := dump.Record(DumpSample{
+					Model:    model.ID,
+					Variant:  "nitpick=" + string(level),
+					Run:      1,
+					Fixture:  f,
+					Findings: kept,
+					Judged:   sub,
+				}); derr != nil {
+					out[i].notes = append(out[i].notes, fmt.Sprintf("%s: dump: %v", f.Name, derr))
 				}
 
 				if f.Clean() && len(kept) > 0 {
@@ -223,17 +263,6 @@ func runLevels(t *testing.T, judge *Judge, model Model, levels []config.NitpickL
 
 	wg.Wait()
 	return out
-}
-
-// containsFinding reports whether a finding survived the filter, matched on its
-// dedup key rather than by pointer.
-func containsFinding(set []review.Finding, f review.Finding) bool {
-	for _, s := range set {
-		if s.Key() == f.Key() {
-			return true
-		}
-	}
-	return false
 }
 
 // reportVariants prints the comparison table.
@@ -255,8 +284,22 @@ func reportVariants(t *testing.T, results []scored) {
 
 	var b strings.Builder
 	b.WriteString("\n")
-	b.WriteString("VARIANT                 FINDINGS  REAL  WORTH  PRECISION  INFLATED  MISCLASS  TONE-OFF  MISSED  SIGNAL  GRADE\n")
-	b.WriteString("-----------------------------------------------------------------------------------------------------------\n")
+	// J-* is the judge's opinion of each severity; O-* is the same question
+	// answered against the fixture's own planted WantSeverity. Both are shown,
+	// and neither replaces the other: they disagree, and which one a tuning
+	// decision was made against is the difference between reducing inflation and
+	// merely teaching the model to under-claim.
+	//
+	// Every count column is a PER-SAMPLE RATE, and N and FAIL are printed
+	// beside them. They used to be raw sums next to PRECISION, SIGNAL and GRADE
+	// which are means — the defect 595b0d4 fixed for the judged-model table and
+	// which had been reintroduced here for three more columns. The denominator
+	// is not constant across rows: on the voice axis each variant runs its own
+	// reviews, and one failed review silently gives that row a total over fewer
+	// samples than its neighbours. `failures` was counted and then read by
+	// nothing, so the reader had no way to see it happen.
+	b.WriteString("VARIANT                 N     FAIL  FINDINGS  REAL  WORTH  PRECISION  J-INFL  J-UNDER  O-INFL  O-UNDER  O-ACC  MISCLASS  TONE-OFF  MISSED  SIGNAL  GRADE\n")
+	b.WriteString("--------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 
 	for _, r := range results {
 		a := r.agg
@@ -265,12 +308,18 @@ func reportVariants(t *testing.T, results []scored) {
 			precision = fmt.Sprintf("%.2f", a.Precision())
 		}
 
-		fmt.Fprintf(&b, "%-23s %-9d %-5d %-6d %-10s %-9d %-9d %-9d %-7d %-7.1f %.2f\n",
-			truncate(r.variant, 23), a.Findings, a.Real, a.WorthRaising, precision,
-			a.Inflated, a.Misclassed, a.ToneOff, a.Missed, a.MeanSignal(), a.MeanGrade())
+		n := float64(max(len(a.Grades), 1))
+		rate := func(v int) string { return fmt.Sprintf("%.2f", float64(v)/n) }
+
+		fmt.Fprintf(&b, "%-23s %-5d %-5d %-9s %-5s %-6s %-10s %-7s %-8s %-7s %-8s %-6s %-9s %-9s %-7s %-7.1f %.2f\n",
+			truncate(r.variant, 23), len(a.Grades), r.failures,
+			rate(a.Findings), rate(a.Real), rate(a.WorthRaising), precision,
+			rate(a.Inflated), rate(a.Understated), rate(a.SevInflated), rate(a.SevUnderstated), rate(a.SevAccurate),
+			rate(a.Misclassed), rate(a.ToneOff), rate(a.Missed), a.MeanSignal(), a.MeanGrade())
 	}
 
 	t.Log(b.String())
+	t.Log(severityColumnLegend)
 
 	for _, r := range results {
 		if len(r.notes) == 0 {
@@ -305,6 +354,26 @@ func reportVariants(t *testing.T, results []scored) {
 	}
 }
 
+// severityColumnLegend is printed under every table carrying both severity
+// measurements, because the columns are useless to a reader who does not know
+// they are two different instruments answering the same question.
+//
+// It states no arithmetic relation between the O-* columns and FIND. The
+// previous wording asserted their sum was "smaller than FIND", which is not
+// guaranteed and was already false on the shipped corpus — FIND counts judge
+// VERDICTS and the O-* columns count located defects, so they have different
+// sources and can be equal or inverted. Both tables that print this legend now
+// express every count as a per-sample rate, so the claim about units is true of
+// both rather than of one.
+const severityColumnLegend = "SEVERITY IS MEASURED TWICE: J-INFL/J-UNDER are the JUDGE's opinion; " +
+	"O-INFL/O-UNDER/O-ACC compare each LOCATED PLANTED DEFECT to the WantSeverity its fixture declares, " +
+	"with no model involved. They disagree — the judge scored Incumbent as understating NOTHING on a " +
+	"corpus whose ground truth says it understated four of the seven defects it located — and the " +
+	"disagreement is a result, not a rounding error. The two are counted over DIFFERENT things: J-* is " +
+	"per finding the judge returned a verdict for, O-* is per planted defect the review actually found, " +
+	"so neither is a share of the other and a defect nobody reported appears in neither. Every count " +
+	"column, J-* and O-* alike, is divided by N on the same row."
+
 // TestJudgeModels ranks every model in the battery by JUDGED quality.
 //
 // TestPrompts measures keyword recall against planted defects: did the model
@@ -316,13 +385,23 @@ func reportVariants(t *testing.T, results []scored) {
 // Each model reviews every fixture once, and a strong model assesses the result
 // as a senior engineer would.
 func TestJudgeModels(t *testing.T) {
-	opts := OptionsFromEnv()
+	opts, err := OptionsFromEnv()
+	if err != nil {
+		t.Fatalf("options: %v", err)
+	}
 
 	judge, err := NewJudge(strings.TrimSpace(os.Getenv(EnvJudgeModel)))
 	if err != nil {
 		t.Fatalf("build judge: %v", err)
 	}
+	t.Logf("corpus: %s", CorpusLabel(opts.Fixtures))
 	t.Logf("judge: %s   models: %d   fixtures: %d", judge.Model(), len(opts.Models), len(opts.Fixtures))
+
+	dump, err := OpenDump()
+	if err != nil {
+		t.Fatalf("open %s: %v", EnvDump, err)
+	}
+	defer func() { _ = dump.Close() }()
 
 	ctx := context.Background()
 	persona := config.DefaultPersona()
@@ -389,6 +468,17 @@ func TestJudgeModels(t *testing.T) {
 				notes[j.model.ID] = append(notes[j.model.ID],
 					fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", j.fixture.Name, p))
 			}
+			agg.AddSeverity(ScoreSeverity(j.fixture, findings))
+
+			if derr := dump.Record(DumpSample{
+				Model:    j.model.ID,
+				Run:      1,
+				Fixture:  j.fixture,
+				Findings: findings,
+				Judged:   assessment,
+			}); derr != nil {
+				notes[j.model.ID] = append(notes[j.model.ID], fmt.Sprintf("%s: dump: %v", j.fixture.Name, derr))
+			}
 
 			if j.fixture.Clean() && len(findings) > 0 {
 				notes[j.model.ID] = append(notes[j.model.ID],
@@ -431,7 +521,7 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 
 	var b strings.Builder
 	b.WriteString("\nJUDGED MODEL RANKING\n")
-	// INFLATED and UNDER are printed together, and never one without the other.
+	// J-INFL and J-UNDER are printed together, and never one without the other.
 	//
 	// Only INFLATED used to be shown, so severity error was visible in one
 	// direction and invisible in the other -- and this comparison has a
@@ -440,6 +530,14 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 	// error tier. Counting over-claiming while ignoring under-claiming hands a
 	// free win to whichever reviewer is quieter about severity, which is the
 	// opposite of the judgement a reader wants to make.
+	//
+	// O-INFL, O-UNDER and O-ACC answer the same question against the fixtures'
+	// own WantSeverity. They sit beside the judge's columns rather than
+	// replacing them because the two disagree: the judge scored the contender
+	// that understates by construction as understating nothing at all. A prompt
+	// tuned to move J-INFL down while O-UNDER climbs has not become more honest
+	// about severity, it has become quieter, and only printing both makes that
+	// visible.
 	// The count columns are PER SAMPLE, not totals.
 	//
 	// GRADE has always been a mean while FIND, INFLATED, MISSED and the rest
@@ -449,8 +547,8 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 	// looks three times worse for having been measured three times as hard.
 	// COV is the fixture coverage that makes the comparison legitimate at all;
 	// N is what the rates divide by.
-	b.WriteString("MODEL                                GRADE  SPREAD  PREC   COV  N    FAIL  FIND  WORTH  INFLATED  UNDER  MISCLASS  MISSED  SIGNAL\n")
-	b.WriteString("---------------------------------------------------------------------------------------------------------------------------------\n")
+	b.WriteString("MODEL                                GRADE  SPREAD  PREC   COV  N    FAIL  FIND  WORTH  J-INFL  J-UNDER  O-INFL  O-UNDER  O-ACC  MISCLASS  MISSED  SIGNAL\n")
+	b.WriteString("---------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 
 	for _, r := range rows {
 		a := r.agg
@@ -458,6 +556,18 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 		prec := "n/a"
 		if a.HasFindings() {
 			prec = fmt.Sprintf("%.2f", a.Precision())
+		}
+
+		// A contender with no judged sample has no grade, and printing its
+		// MeanGrade zero value as 0.00 reads as "graded, and terrible". The
+		// benchmark reaches that state whenever Incumbent's every invocation
+		// errors — an exhausted allowance, or a fixture with no cached review —
+		// and the row it produced was a last-place entry in a table captioned as
+		// a head-to-head.
+		grade, signal := "n/a", "n/a"
+		if len(a.Grades) > 0 {
+			grade = fmt.Sprintf("%.2f", a.MeanGrade())
+			signal = fmt.Sprintf("%.1f", a.MeanSignal())
 		}
 
 		// Fixtures completed and failures are printed because MeanGrade is a mean
@@ -479,13 +589,15 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 		n := float64(max(len(a.Grades), 1))
 		rate := func(v int) string { return fmt.Sprintf("%.2f", float64(v)/n) }
 
-		fmt.Fprintf(&b, "%-36s %-6.2f %-7s %-6s %-4d %-4d %-5d %-5s %-6s %-9s %-6s %-9s %-7s %.1f\n",
-			truncate(r.model, 36), a.MeanGrade(), spread, prec, a.Coverage(), len(a.Grades), failed,
+		fmt.Fprintf(&b, "%-36s %-6s %-7s %-6s %-4d %-4d %-5d %-5s %-6s %-7s %-8s %-7s %-8s %-6s %-9s %-7s %s\n",
+			truncate(r.model, 36), grade, spread, prec, a.Coverage(), len(a.Grades), failed,
 			rate(a.Findings), rate(a.WorthRaising), rate(a.Inflated), rate(a.Understated),
-			rate(a.Misclassed), rate(a.Missed), a.MeanSignal())
+			rate(a.SevInflated), rate(a.SevUnderstated), rate(a.SevAccurate),
+			rate(a.Misclassed), rate(a.Missed), signal)
 	}
 
 	t.Log(b.String())
+	t.Log(severityColumnLegend)
 
 	// A model judged on fewer fixtures than its peers is not comparable to
 	// them, and quietly averaging it anyway is how a ranking becomes fiction.
@@ -494,7 +606,17 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 		most = max(most, r.agg.Coverage())
 	}
 	for _, r := range rows {
-		if n := r.agg.Coverage(); n < most {
+		n := r.agg.Coverage()
+		switch {
+		case n == 0:
+			// Not a Logf. Zero coverage means every attempt failed, so this row
+			// is not a weak result — it is no result, and the table around it is
+			// not the comparison its caption claims. That has to fail the run,
+			// or "we beat the incumbent" gets read off a run in which the
+			// incumbent was never successfully invoked.
+			t.Errorf("%s was never successfully judged on any fixture; the table is not a comparison "+
+				"and its row is not a score", r.model)
+		case n < most:
 			t.Logf("NOT COMPARABLE: %s was judged on %d of %d fixtures; its grade is a mean over a "+
 				"smaller, easier sample and must not be ranked against the others", r.model, n, most)
 		}
@@ -547,11 +669,39 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		t.Skip("incumbent CLI not installed or not authenticated; run 'incumbent auth login'")
 	}
 
-	opts := OptionsFromEnv()
+	opts, err := OptionsFromEnv()
+	if err != nil {
+		t.Fatalf("options: %v", err)
+	}
 
 	judge, err := NewJudge(strings.TrimSpace(os.Getenv(EnvJudgeModel)))
 	if err != nil {
 		t.Fatalf("build judge: %v", err)
+	}
+
+	dump, err := OpenDump()
+	if err != nil {
+		t.Fatalf("open %s: %v", EnvDump, err)
+	}
+	defer func() { _ = dump.Close() }()
+
+	t.Logf("corpus: %s", CorpusLabel(opts.Fixtures))
+
+	// Which fixtures Incumbent has a cached review for, stated BEFORE the run
+	// rather than inferred from a low row afterwards. Anything listed here has
+	// to be collected live against a rate-limited free allowance, and the
+	// held-out corpus has no cache at all — a benchmark table whose Incumbent
+	// column came from failed invocations is not a comparison, however it reads.
+	var uncached []string
+	for _, f := range opts.Fixtures {
+		if _, ok := CachedIncumbent(crCacheDir, f); !ok {
+			uncached = append(uncached, f.Name)
+		}
+	}
+	if len(uncached) > 0 {
+		t.Logf("NO CACHED INCUMBENT REVIEW for %d of %d fixture(s): %s — these will be collected live "+
+			"on the free allowance; run `make collect-incumbent` first if the comparison has to be complete",
+			len(uncached), len(opts.Fixtures), strings.Join(uncached, ", "))
 	}
 
 	persona := config.DefaultPersona()
@@ -573,7 +723,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		sem = make(chan struct{}, 3)
 	)
 
-	record := func(name string, fx Fixture, findings []review.Finding, err error) {
+	record := func(name string, fx Fixture, run int, findings []review.Finding, err error) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -596,6 +746,18 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		for _, p := range agg.Add(assessment, len(findings)) {
 			notes[name] = append(notes[name], fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", fx.Name, p))
 		}
+		agg.AddSeverity(ScoreSeverity(fx, findings))
+
+		if derr := dump.Record(DumpSample{
+			Model:    name,
+			Run:      run,
+			Fixture:  fx,
+			Findings: findings,
+			Judged:   assessment,
+		}); derr != nil {
+			notes[name] = append(notes[name], fmt.Sprintf("%s: dump: %v", fx.Name, derr))
+		}
+
 		if fx.Clean() && len(findings) > 0 {
 			notes[name] = append(notes[name],
 				fmt.Sprintf("%s: %d finding(s) on a clean change", fx.Name, len(findings)))
@@ -611,22 +773,27 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
+			// Every Incumbent sample is run 1: its side is one review per
+			// fixture, cached, which is the asymmetry the report already
+			// declares. Numbering them otherwise would imply a second sample
+			// exists.
+			//
 			// Prefer the cache: collection is rate-limited and resumable, so a
 			// previously collected review is both cheaper and more complete.
 			if cached, ok := CachedIncumbent(crCacheDir, fx); ok {
-				record(IncumbentModel, fx, cached, nil)
+				record(IncumbentModel, fx, 1, cached, nil)
 				return
 			}
 
 			dir, err := os.MkdirTemp("", "cr-eval-")
 			if err != nil {
-				record(IncumbentModel, fx, nil, err)
+				record(IncumbentModel, fx, 1, nil, err)
 				return
 			}
 			defer func() { _ = os.RemoveAll(dir) }()
 
 			if err := buildRepo(dir, fx); err != nil {
-				record(IncumbentModel, fx, nil, err)
+				record(IncumbentModel, fx, 1, nil, err)
 				return
 			}
 
@@ -634,7 +801,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 			if IsRateLimited(err) {
 				// Never let an exhausted allowance masquerade as a low score.
 				if cached, ok := CachedIncumbent(crCacheDir, fx); ok {
-					record(IncumbentModel, fx, cached, nil)
+					record(IncumbentModel, fx, 1, cached, nil)
 					return
 				}
 			}
@@ -644,7 +811,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 				// table printed anyway would be read as a result.
 				t.Errorf("%s: %v", fx.Name, err)
 			}
-			record(IncumbentModel, fx, findings, err)
+			record(IncumbentModel, fx, 1, findings, err)
 		}(fx)
 
 		for _, m := range opts.Models {
@@ -665,10 +832,10 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 
 					result := RunWithPersona(ctx, m, fx, run, opts, persona)
 					if result.Err != nil {
-						record("nitpick/"+m.ID, fx, nil, result.Err)
+						record("nitpick/"+m.ID, fx, run, nil, result.Err)
 						return
 					}
-					record("nitpick/"+m.ID, fx, result.Report.Findings, nil)
+					record("nitpick/"+m.ID, fx, run, result.Report.Findings, nil)
 				}(m, fx, run)
 			}
 		}
@@ -691,7 +858,11 @@ func TestCollectIncumbent(t *testing.T) {
 		t.Skip("incumbent CLI not installed or not authenticated")
 	}
 
-	opts := OptionsFromEnv()
+	opts, err := OptionsFromEnv()
+	if err != nil {
+		t.Fatalf("options: %v", err)
+	}
+	t.Logf("corpus: %s", CorpusLabel(opts.Fixtures))
 
 	collected, remaining, err := CollectIncumbent(ctx, opts.Fixtures, crCacheDir, opts.Timeout,
 		func(line string) { t.Log(line) })
@@ -719,7 +890,7 @@ func TestCollectIncumbent(t *testing.T) {
 //
 // Unlike the nitpick levels, voice genuinely changes the prompt, so each
 // variant needs its own review — there is no shared corpus to filter.
-func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options) {
+func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options, dump *Dump) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -765,6 +936,18 @@ func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options) {
 
 				for _, p := range out[i].agg.Add(assessment, len(result.Report.Findings)) {
 					out[i].notes = append(out[i].notes, fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", f.Name, p))
+				}
+				out[i].agg.AddSeverity(ScoreSeverity(f, result.Report.Findings))
+
+				if derr := dump.Record(DumpSample{
+					Model:    model.ID,
+					Variant:  v.Name,
+					Run:      1,
+					Fixture:  f,
+					Findings: result.Report.Findings,
+					Judged:   assessment,
+				}); derr != nil {
+					out[i].notes = append(out[i].notes, fmt.Sprintf("%s: dump: %v", f.Name, derr))
 				}
 			}(i, v, f)
 		}

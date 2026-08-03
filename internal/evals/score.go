@@ -47,6 +47,10 @@ type Score struct {
 	// "matched the defect" and "said roughly where to look" become the same
 	// number. One means the reviewer anchored precisely.
 	WidestAnchor int
+
+	// Severity compares the severities this run assigned against the ones the
+	// fixture planted, with no judge involved.
+	Severity SeverityScore
 }
 
 // Recall is the fraction of planted defects found.
@@ -94,6 +98,8 @@ func ScoreRun(r RunResult, f Fixture) Score {
 		s.WidestAnchor = max(s.WidestAnchor, spanLength(finding))
 	}
 
+	s.Severity = ScoreSeverity(f, r.Report.Findings)
+
 	for _, defect := range f.Defects {
 		for _, finding := range r.Report.Findings {
 			if matches(finding, defect) {
@@ -117,6 +123,171 @@ func ScoreRun(r RunResult, f Fixture) Score {
 	s.Violations = append(s.Violations, checkInvariants(r)...)
 
 	return s
+}
+
+// The objective severity vocabulary. It is deliberately the judge's own
+// (accurate | inflated | understated): the two measurements are printed side by
+// side and disagree, and a reader comparing them should not have to translate
+// between two vocabularies first.
+const (
+	SevAccurate    = "accurate"
+	SevInflated    = "inflated"
+	SevUnderstated = "understated"
+)
+
+// SeverityCall is one LOCATED defect's planted severity measured against the
+// severity of the finding credited with reporting it.
+type SeverityCall struct {
+	// FindingIndex is the position of that finding in the list handed to
+	// ScoreSeverity, so a diagnostic dump can attach this verdict to the exact
+	// line the tables counted rather than re-deriving the association and
+	// disagreeing with them.
+	FindingIndex int
+
+	Finding review.Finding
+	Defect  Defect
+
+	// Verdict is one of SevAccurate, SevInflated, SevUnderstated.
+	Verdict string
+}
+
+// SeverityScore compares assigned severities against the planted ones.
+//
+// It exists because severity correctness used to be an LLM opinion and nothing
+// else: every fixture Defect declares WantSeverity and nothing outside
+// fixtures.go read it. That opinion is measurably blind in one direction — the
+// judge reported Incumbent understating NOTHING, on a corpus whose own ground
+// truth says it understated four of the seven defects it located, two of them
+// forced by crSeverity mapping Incumbent's "critical" down to our "error". A
+// prompt tuned to reduce inflation against a scorer that cannot see
+// under-claiming optimizes toward saying less and calls it progress.
+//
+// WantSeverity is the TARGET, not a floor: over-claiming above the planted
+// level is precisely the failure being tuned away, so it is counted rather than
+// tolerated. Defect.WantSeverity documents the same contract, and the two must
+// not be allowed to drift — a fixture authored against a floor reading silently
+// corrupts the inflation column the tuning is aimed at.
+type SeverityScore struct {
+	Accurate    int
+	Inflated    int
+	Understated int
+
+	// Calls is one entry per graded defect, so a report can name the finding
+	// that was inflated instead of only how many were. Aggregate counts are
+	// what a table shows; fixing the prompt needs the finding itself.
+	Calls []SeverityCall
+}
+
+// Graded is how many planted defects were compared against a reported severity.
+// It equals Score.Matched by construction, so RECALL is the denominator the
+// severity columns are read against.
+func (s SeverityScore) Graded() int { return s.Accurate + s.Inflated + s.Understated }
+
+// ScoreSeverity grades the severity of every planted defect a review located.
+//
+// The unit is the DEFECT, not the finding, and that is the whole shape of this
+// function. Grading per finding was wrong three ways at once, all of them
+// measured on the shipped Incumbent cache:
+//
+//   - It counted a defect once per finding that happened to match it, so a
+//     reviewer restating one correct call four ways earned four times the
+//     accuracy of one that said it once. Verbosity is not severity honesty.
+//   - matches() is calibrated for DETECTION, where a loose keyword is harmless
+//     because ScoreRun stops at the first hit. Used per finding it graded
+//     comments about entirely different bugs against a plant's WantSeverity:
+//     Incumbent's "Propagate archive failures" — about tar's ignored exit
+//     status — was counted as understating the command injection.
+//   - Every comment describing these columns says "defects", and the numbers
+//     said findings. Graded (8) exceeded the defects located (7), so the legend
+//     printed under the table contradicted the column beside it.
+//
+// Defects no finding reports are skipped rather than counted: the corpus says
+// nothing about the severity of a bug the reviewer never mentioned, and a miss
+// is already reported as a miss.
+func ScoreSeverity(f Fixture, findings []review.Finding) SeverityScore {
+	var out SeverityScore
+
+	for _, defect := range f.Defects {
+		idx, ok := reportingFinding(findings, defect)
+		if !ok {
+			continue
+		}
+
+		call := SeverityCall{
+			FindingIndex: idx,
+			Finding:      findings[idx],
+			Defect:       defect,
+			Verdict:      severityVerdict(findings[idx].Sev(), defect.WantSeverity),
+		}
+
+		switch call.Verdict {
+		case SevInflated:
+			out.Inflated++
+		case SevUnderstated:
+			out.Understated++
+		default:
+			out.Accurate++
+		}
+
+		out.Calls = append(out.Calls, call)
+	}
+
+	return out
+}
+
+// severityVerdict compares an assigned severity against the planted one.
+func severityVerdict(got, want config.Severity) string {
+	switch {
+	case got.Rank() > want.Rank():
+		return SevInflated
+	case got.Rank() < want.Rank():
+		return SevUnderstated
+	default:
+		return SevAccurate
+	}
+}
+
+// reportingFinding picks which of a review's findings is credited with
+// reporting a defect, returning its index.
+//
+// Several findings can match one plant — a reviewer may raise the same problem
+// twice, or fold two nearby problems into one comment — so the one whose
+// severity sits NEAREST the plant is taken, with ties resolved to the first in
+// report order for reproducibility. The benefit of the doubt belongs here,
+// among a reviewer's own findings: if it rated this defect correctly anywhere,
+// that is its call, and grading it on some other comment that also happened to
+// match would invent a severity error out of the keyword list.
+//
+// The benefit of the doubt deliberately does NOT extend across plants, which is
+// what the previous per-finding form did. multi-defect plants a critical
+// traversal and an error descriptor leak on the same line; letting one finding
+// choose which plant it was graded against made every severity from error to
+// critical score accurate, so under-rating the traversal was unmeasurable and a
+// reviewer could buy immunity from the column being tuned by merging comments.
+// Each defect is now graded against its own planted severity, so a merged
+// comment rated below the worst of them is reported as understating it.
+func reportingFinding(findings []review.Finding, d Defect) (int, bool) {
+	var (
+		best  int
+		gap   int
+		found bool
+	)
+
+	want := d.WantSeverity.Rank()
+	for i, f := range findings {
+		if !matches(f, d) {
+			continue
+		}
+
+		delta := f.Sev().Rank() - want
+		delta = max(delta, -delta)
+
+		if !found || delta < gap {
+			best, gap, found = i, delta, true
+		}
+	}
+
+	return best, found
 }
 
 // matches reports whether a finding plausibly reports a defect: near the right
@@ -319,6 +490,19 @@ type Summary struct {
 	Total      int
 	NoiseTotal int
 
+	// Severity totals across the runs, measured against the planted
+	// WantSeverity.
+	//
+	// Summed rather than averaged because they are graded per LOCATED DEFECT,
+	// so their total is exactly Matched — the numerator of the RECALL cell
+	// printed beside them. That is the divisor, and it is on the row. The
+	// earlier justification here claimed Runs was printed beside them; it never
+	// was, and a bare sum with no divisor anywhere on the line is the artifact
+	// that comment existed to deny.
+	SevAccurate    int
+	SevInflated    int
+	SevUnderstated int
+
 	Violations []string
 
 	// FindingCounts is the number of findings produced per run, which is how
@@ -361,6 +545,9 @@ func Summarize(model, fixture string, scores []Score) Summary {
 		out.Matched += s.Matched
 		out.Total += s.Total
 		out.NoiseTotal += len(s.Unmatched)
+		out.SevAccurate += s.Severity.Accurate
+		out.SevInflated += s.Severity.Inflated
+		out.SevUnderstated += s.Severity.Understated
 		out.Violations = append(out.Violations, s.Violations...)
 		out.FindingCounts = append(out.FindingCounts, len(s.Findings()))
 	}

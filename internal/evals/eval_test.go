@@ -55,9 +55,16 @@ func TestMain(m *testing.M) {
 //  3. NOISE — findings explaining no planted defect. Reported, because the
 //     acceptable level is a judgment call about this specific corpus.
 func TestPrompts(t *testing.T) {
-	opts := OptionsFromEnv()
+	opts, err := OptionsFromEnv()
+	if err != nil {
+		t.Fatalf("options: %v", err)
+	}
 	ctx := context.Background()
 
+	// The corpus is named, not just counted. A held-out table and a tuning
+	// table were textually identical, so the generalization number could not be
+	// told apart from a training score by anyone reading the artifact later.
+	t.Logf("corpus: %s", CorpusLabel(opts.Fixtures))
 	t.Logf("models=%d fixtures=%d runs=%d", len(opts.Models), len(opts.Fixtures), opts.Runs)
 
 	// Reviews are independent, so they run concurrently. Sequentially this
@@ -149,12 +156,25 @@ func logRun(t *testing.T, model string, f Fixture, s Score) {
 	t.Logf("[%s/%s] run %d: %d finding(s) in %s — detected %d/%d planted, %d unexplained%s",
 		model, f.Name, s.Run, len(s.Findings()), s.Duration.Round(1e8), s.Matched, s.Total, len(s.Unmatched), anchor)
 
+	// Severity is reported per defect, not only as a total. Reducing severity
+	// error means changing the prompt for the finding that got it wrong, and a
+	// count says only that one of them did.
+	calls := map[string][]SeverityCall{}
+	for _, c := range s.Severity.Calls {
+		calls[c.Defect.Why] = append(calls[c.Defect.Why], c)
+	}
+
 	for _, defect := range f.Defects {
 		mark := "MISS"
 		if s.Detected[defect.Why] {
 			mark = "HIT "
 		}
 		t.Logf("    [%s] %s:%d %s", mark, defect.Path, defect.Line, defect.Why)
+
+		for _, c := range calls[defect.Why] {
+			t.Logf("           severity %s, planted %s: %s",
+				c.Finding.Sev(), c.Defect.WantSeverity, strings.ToUpper(c.Verdict))
+		}
 	}
 
 	for _, f := range s.Unmatched {
@@ -180,8 +200,17 @@ func printTable(t *testing.T, summaries []Summary) {
 
 	var b strings.Builder
 	b.WriteString("\n")
-	b.WriteString("MODEL                                FIXTURE                   RECALL   NOISE  STABLE  FAILED\n")
-	b.WriteString("-------------------------------------------------------------------------------------------\n")
+	// SEV is accurate/inflated/understated against each fixture's own
+	// WantSeverity, summed over the runs. No judge is involved: this battery
+	// measures the prompt against ground truth, and severity is part of that
+	// ground truth even though nothing outside fixtures.go used to read it.
+	//
+	// It is graded once per LOCATED defect, so the three numbers add up to the
+	// left-hand side of RECALL on the same row. RUNS is printed because NOISE
+	// is a sum with no other divisor on the line, and because a row's counts
+	// scale with how many times it was measured.
+	b.WriteString("MODEL                                FIXTURE                   RUNS  RECALL   SEV A/I/U  NOISE  STABLE  FAILED\n")
+	b.WriteString("------------------------------------------------------------------------------------------------------------\n")
 
 	for _, s := range summaries {
 		recall := "n/a"
@@ -194,8 +223,16 @@ func printTable(t *testing.T, summaries []Summary) {
 			stable = fmt.Sprintf("NO %v", s.FindingCounts)
 		}
 
-		fmt.Fprintf(&b, "%-36s %-25s %-8s %-6d %-7s %d\n",
-			truncate(s.Model, 36), truncate(s.Fixture, 25), recall, s.NoiseTotal, stable, s.Failed)
+		// Blank rather than 0/0/0 when nothing was graded: a clean fixture
+		// plants no severity to compare against, and zeros there would read as
+		// "nothing was wrong" instead of "nothing was measured".
+		sev := ""
+		if s.SevAccurate+s.SevInflated+s.SevUnderstated > 0 {
+			sev = fmt.Sprintf("%d/%d/%d", s.SevAccurate, s.SevInflated, s.SevUnderstated)
+		}
+
+		fmt.Fprintf(&b, "%-36s %-25s %-5d %-8s %-10s %-6d %-7s %d\n",
+			truncate(s.Model, 36), truncate(s.Fixture, 25), s.Runs, recall, sev, s.NoiseTotal, stable, s.Failed)
 	}
 
 	t.Log(b.String())

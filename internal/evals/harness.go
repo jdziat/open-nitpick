@@ -159,7 +159,17 @@ func LoadDotEnv(path string) error {
 }
 
 // OptionsFromEnv builds run options from the environment, applying defaults.
-func OptionsFromEnv() Options {
+//
+// It returns an error rather than silently falling back, because the fallback
+// is the tuning corpus and the thing being named is usually the held-out one.
+// NITPICK_EVAL_FIXTURES used to keep whatever it could resolve and ignore the
+// rest: a single mistyped name in the six-name line the Makefile documents
+// silently measured five of six, and a typo in the ONLY name ran all eight
+// tuning fixtures with no warning anywhere. Neither table names its corpus, so
+// the result was indistinguishable from the held-out run it claimed to be —
+// a silent failure that returns exactly the wrong answer to the one question
+// the held-out set exists to answer.
+func OptionsFromEnv() (Options, error) {
 	opts := Options{
 		Models:   DefaultModels(),
 		Fixtures: Fixtures(),
@@ -187,25 +197,91 @@ func OptionsFromEnv() Options {
 	}
 
 	if raw := strings.TrimSpace(os.Getenv(EnvFixtures)); raw != "" {
-		wanted := map[string]bool{}
-		for name := range strings.SplitSeq(raw, ",") {
-			wanted[strings.TrimSpace(name)] = true
+		// Resolved against BOTH corpora, not against the default list: naming a
+		// held-out fixture has to select it, or the held-out set could only be
+		// run by editing code. Naming nothing still yields Fixtures() alone, so
+		// no tuning run picks up the held-out corpus by accident — spending it
+		// takes saying its name, spelled correctly.
+		known := map[string]Fixture{}
+		for _, f := range AllFixtures() {
+			known[f.Name] = f
 		}
 
-		var kept []Fixture
-		for _, f := range opts.Fixtures {
-			if wanted[f.Name] {
-				kept = append(kept, f)
+		var (
+			kept    []Fixture
+			unknown []string
+			seen    = map[string]bool{}
+		)
+		for name := range strings.SplitSeq(raw, ",") {
+			name = strings.TrimSpace(name)
+			if name == "" || seen[name] {
+				continue
 			}
+			seen[name] = true
+
+			f, ok := known[name]
+			if !ok {
+				unknown = append(unknown, name)
+				continue
+			}
+			kept = append(kept, f)
 		}
-		if len(kept) > 0 {
-			opts.Fixtures = kept
+
+		if len(unknown) > 0 {
+			names := make([]string, 0, len(known))
+			for _, f := range AllFixtures() {
+				names = append(names, f.Name)
+			}
+			return opts, fmt.Errorf("%s names %d fixture(s) that do not exist: %s (known: %s)",
+				EnvFixtures, len(unknown), strings.Join(unknown, ", "), strings.Join(names, ", "))
 		}
+
+		opts.Fixtures = kept
 	}
 
 	opts.CaptureDir = strings.TrimSpace(os.Getenv(EnvCapture))
 
-	return opts
+	return opts, nil
+}
+
+// HeldOut reports whether a fixture belongs to the held-out corpus.
+//
+// Exported so a report can LABEL the corpus it measured. A held-out table and a
+// tuning table were textually identical, which meant the one number the
+// held-out set exists to produce could not be told apart from a training score
+// after the fact — not by a reader, and not by whoever kept the artifact.
+func HeldOut(fixture string) bool {
+	for _, f := range HeldOutFixtures() {
+		if f.Name == fixture {
+			return true
+		}
+	}
+	return false
+}
+
+// CorpusLabel names the corpus a set of fixtures came from, for a report
+// header. A mixed selection is called out as mixed rather than rounded to
+// whichever half is larger.
+func CorpusLabel(fixtures []Fixture) string {
+	var held, tuning int
+	for _, f := range fixtures {
+		if HeldOut(f.Name) {
+			held++
+			continue
+		}
+		tuning++
+	}
+
+	switch {
+	case held == 0 && tuning == 0:
+		return "EMPTY (no fixtures selected)"
+	case held == 0:
+		return fmt.Sprintf("TUNING corpus (%d fixture(s))", tuning)
+	case tuning == 0:
+		return fmt.Sprintf("HELD-OUT corpus (%d fixture(s)) — spent once; a gain measured here is a generalization claim", held)
+	default:
+		return fmt.Sprintf("MIXED corpus (%d tuning + %d HELD-OUT fixture(s)) — not a generalization measurement", tuning, held)
+	}
 }
 
 // buildRepo materializes a fixture as a git repository whose working tree
@@ -271,7 +347,19 @@ func buildRepo(dir string, f Fixture) error {
 
 	// The head state is left uncommitted: that is the working-tree review path,
 	// which is what a developer runs locally.
-	return write(f.Head)
+	if err := write(f.Head); err != nil {
+		return err
+	}
+
+	// Intent-to-add, so a head file that does not exist in base shows up as an
+	// addition. `git diff HEAD` does not report untracked files at all, so
+	// before this a fixture whose change ADDS a file produced an empty diff:
+	// the engine found nothing to review, and the fixture scored as a flawless
+	// clean run no matter what the prompt said. It was the held-out SQL
+	// migration that surfaced it, and a corpus bug that silently RAISES the
+	// score is the worst kind. -N records no content, so the head state is
+	// still uncommitted and still reviewed from the working tree.
+	return git("add", "-N", ".")
 }
 
 // captureProvider records the published review instead of sending it anywhere.

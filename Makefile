@@ -61,12 +61,38 @@ clean:
 #   make eval RUNS=3
 #   make eval FIXTURES=go-nil-deref,clean-refactor
 #   make eval CAPTURE=testdata/responses
+#
+# FIXTURES also reaches the HELD-OUT corpus (evals.HeldOutFixtures), which the
+# default run deliberately excludes. It exists to check once, at the end, that a
+# tuning gain generalizes. Every run of it against a prompt still being tuned
+# converts it into training data and there is no way to un-spend it:
+#
+#   make eval FIXTURES=$(HELD_OUT)
+#
+# A name that resolves to nothing is now an error rather than a silent fallback
+# to the tuning corpus, and every table prints which corpus it measured.
+HELD_OUT := contract-break,data-loss-migration,ts-unawaited-async,timezone-boundary,clean-sql-allowlist,removed-guard,retry-no-backoff
+
 MODELS   ?=
 RUNS     ?=
 FIXTURES ?=
 CAPTURE  ?=
 AXIS     ?=
 JUDGE    ?=
+
+# DUMP writes every judged finding to a JSON Lines file: the finding, the
+# judge's verdict and reasoning, and the severity the fixture planted. The
+# tables say how many findings were inflated; this says which ones, which is
+# what a prompt change has to be aimed at.
+#
+#   make benchmark DUMP=/tmp/findings.jsonl
+#
+# It TRUNCATES the file it is given. Use a different path for a held-out run
+# than for the tuning loop: a held-out dump carries defect_why, which is the
+# planted defect's own prose, and the documented workflow is to read the dump
+# and edit the prompt. Records from the held-out corpus carry "held_out":true so
+# a file that ended up mixed can still be filtered.
+DUMP     ?=
 
 .PHONY: eval
 eval:
@@ -84,6 +110,7 @@ tune:
 	NITPICK_EVAL_FIXTURES='$(FIXTURES)' \
 	NITPICK_EVAL_AXIS='$(AXIS)' \
 	NITPICK_EVAL_JUDGE='$(JUDGE)' \
+	NITPICK_EVAL_DUMP='$(DUMP)' \
 	go test -tags=eval -count=1 -timeout=45m -v -run TestTunePersona ./internal/evals/
 
 # Rank every model in the battery by JUDGED quality, not keyword recall.
@@ -92,6 +119,7 @@ judge-models:
 	NITPICK_EVAL_MODELS='$(MODELS)' \
 	NITPICK_EVAL_FIXTURES='$(FIXTURES)' \
 	NITPICK_EVAL_JUDGE='$(JUDGE)' \
+	NITPICK_EVAL_DUMP='$(DUMP)' \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestJudgeModels ./internal/evals/
 
 # Head-to-head against Incumbent on identical fixtures, same judge.
@@ -102,6 +130,7 @@ benchmark:
 	NITPICK_EVAL_FIXTURES='$(FIXTURES)' \
 	NITPICK_EVAL_JUDGE='$(JUDGE)' \
 	NITPICK_EVAL_RUNS='$(RUNS)' \
+	NITPICK_EVAL_DUMP='$(DUMP)' \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestBenchmarkAgainstIncumbent ./internal/evals/
 
 # Collect Incumbent reviews one fixture at a time, caching each.

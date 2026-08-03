@@ -301,6 +301,25 @@ type Aggregate struct {
 	Misclassed   int
 	Missed       int
 
+	// SevAccurate, SevInflated and SevUnderstated answer the same question
+	// Inflated and Understated answer, but against each fixture's planted
+	// WantSeverity instead of the judge's opinion.
+	//
+	// Both are carried, and the report prints both, because they disagree: the
+	// judge scored Incumbent as understating nothing on a corpus whose ground
+	// truth says it understated four of the seven defects it located. Replacing
+	// the judge's columns with these would hide that disagreement, and the
+	// disagreement is itself the result — one of the two instruments is wrong
+	// about this corpus and a reader has to be able to see which.
+	//
+	// They are counted per LOCATED DEFECT while Inflated and Understated are
+	// counted per judged FINDING, so the two groups do not share a denominator
+	// and neither is a share of the other. The report divides both by the sample
+	// count for that reason.
+	SevAccurate    int
+	SevInflated    int
+	SevUnderstated int
+
 	SignalToNoise []int
 	ToneAdherence []int
 	Grades        []string
@@ -389,6 +408,19 @@ func (a *Aggregate) Add(r *JudgeResult, expected int) []string {
 	a.Grades = append(a.Grades, r.Grade)
 
 	return problems
+}
+
+// AddSeverity folds one sample's objective severity comparison in.
+//
+// It is separate from Add because it needs the fixture and Add does not, but it
+// must be called wherever Add is called and nowhere else: the report divides
+// every count column by len(Grades), so scoring severity for a sample whose
+// judgement failed would put the objective columns over a larger denominator
+// than the judge's and make the two unreadable side by side.
+func (a *Aggregate) AddSeverity(s SeverityScore) {
+	a.SevAccurate += s.Accurate
+	a.SevInflated += s.Inflated
+	a.SevUnderstated += s.Understated
 }
 
 // Precision is the share of findings a senior reviewer would actually raise.
