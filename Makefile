@@ -110,7 +110,7 @@ tune:
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(AXIS),NITPICK_EVAL_AXIS='$(AXIS)') \
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
-	NITPICK_EVAL_DUMP='$(DUMP)' \
+	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
 	go test -tags=eval -count=1 -timeout=45m -v -run TestTunePersona ./internal/evals/
 
 # Rank every model in the battery by JUDGED quality, not keyword recall.
@@ -119,7 +119,7 @@ judge-models:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
-	NITPICK_EVAL_DUMP='$(DUMP)' \
+	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestJudgeModels ./internal/evals/
 
 # Head-to-head against Incumbent on identical fixtures, same judge.
@@ -130,7 +130,7 @@ benchmark:
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
 	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
-	NITPICK_EVAL_DUMP='$(DUMP)' \
+	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestBenchmarkAgainstIncumbent ./internal/evals/
 
 # Collect Incumbent reviews one fixture at a time, caching each.
