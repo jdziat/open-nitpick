@@ -37,6 +37,16 @@ type Score struct {
 	// of which model is used. Any of these is a bug in open-nitpick, not a
 	// weakness of the model.
 	Violations []string
+
+	// WidestAnchor is the largest number of lines any single finding claimed.
+	//
+	// Reported because anchorDistance measures from the nearest edge of a span,
+	// which means a reviewer can earn a match by gesturing at a whole function
+	// rather than pointing at the line. That trade is worth making — a region
+	// containing the defect HAS found it — but it has to be visible, or
+	// "matched the defect" and "said roughly where to look" become the same
+	// number. One means the reviewer anchored precisely.
+	WidestAnchor int
 }
 
 // Recall is the fraction of planted defects found.
@@ -80,6 +90,10 @@ func ScoreRun(r RunResult, f Fixture) Score {
 				len(r.Report.Incomplete), strings.Join(r.Report.Incomplete, ", ")))
 	}
 
+	for _, finding := range r.Report.Findings {
+		s.WidestAnchor = max(s.WidestAnchor, spanLength(finding))
+	}
+
 	for _, defect := range f.Defects {
 		for _, finding := range r.Report.Findings {
 			if matches(finding, defect) {
@@ -112,15 +126,50 @@ func matches(f review.Finding, d Defect) bool {
 		return false
 	}
 
-	distance := f.Line - d.Line
-	if distance < 0 {
-		distance = -distance
-	}
-	if distance > anchorTolerance {
+	if anchorDistance(f, d.Line) > anchorTolerance {
 		return false
 	}
 
 	return mentionsAny(f, d.Keywords)
+}
+
+// anchorDistance is how far a finding's anchor sits from a line, measured from
+// the NEAREST point of a multi-line anchor rather than its start.
+//
+// open-nitpick anchors to one line, so for its own findings this is the plain
+// distance it always was. It matters for reviewers that report a region: taking
+// the start of "lines 11-12" and calling a defect on line 12 one line away is a
+// coincidence that only holds for short spans, and the same reviewer anchored
+// the same defect at 7 on one run and 11-12 on the next — start-only scoring
+// turned that into the difference between a hit and a miss.
+//
+// The tolerance still applies OUTSIDE the span, so a wide anchor buys no extra
+// slack at its edges. It does mean a reviewer could earn credit by reporting
+// "somewhere in this 200-line function", which is why spanLength is reported
+// separately: vagueness should be visible rather than silently rewarded.
+func anchorDistance(f review.Finding, line int) int {
+	lo, hi := f.Line, f.EndLine
+	if hi < lo {
+		hi = lo
+	}
+
+	switch {
+	case line < lo:
+		return lo - line
+	case line > hi:
+		return line - hi
+	default:
+		return 0
+	}
+}
+
+// spanLength is how many lines a finding's anchor covers. One for the ordinary
+// single-line anchor.
+func spanLength(f review.Finding) int {
+	if f.EndLine <= f.Line {
+		return 1
+	}
+	return f.EndLine - f.Line + 1
 }
 
 // explainsAny reports whether a finding describes any planted defect, ignoring

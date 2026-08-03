@@ -20,6 +20,19 @@ type Finding struct {
 	// Line is a line number in the file after the change.
 	Line int `json:"line"`
 
+	// EndLine is the last line of a multi-line anchor. Zero means the finding
+	// is anchored to Line alone, which is what open-nitpick's own reviews
+	// always produce: the prompt's contract is to anchor AT the defect, and the
+	// hand-authored schema does not offer a model this field.
+	//
+	// It exists for reviewers that report a region instead. Scoring one of
+	// those by the start of its span alone is simply wrong — "the credential is
+	// on lines 11-12" has identified a defect on line 12 — and the error is not
+	// even stable: the same reviewer anchored the same defect at 7 on one run
+	// and 11-12 on the next, which start-only scoring turns from a reviewer's
+	// variance into a flipped benchmark result.
+	EndLine int `json:"end_line,omitempty"`
+
 	// Severity is one of nit, info, warning, error, critical.
 	Severity string `json:"severity"`
 

@@ -139,8 +139,15 @@ func logRun(t *testing.T, model string, f Fixture, s Score) {
 		return
 	}
 
-	t.Logf("[%s/%s] run %d: %d finding(s) in %s — detected %d/%d planted, %d unexplained",
-		model, f.Name, s.Run, len(s.Findings()), s.Duration.Round(1e8), s.Matched, s.Total, len(s.Unmatched))
+	anchor := ""
+	if s.WidestAnchor > 1 {
+		// Only when it is not the ordinary single line, so the common case stays
+		// quiet and a reviewer gesturing at a region stands out.
+		anchor = fmt.Sprintf(", widest anchor %d lines", s.WidestAnchor)
+	}
+
+	t.Logf("[%s/%s] run %d: %d finding(s) in %s — detected %d/%d planted, %d unexplained%s",
+		model, f.Name, s.Run, len(s.Findings()), s.Duration.Round(1e8), s.Matched, s.Total, len(s.Unmatched), anchor)
 
 	for _, defect := range f.Defects {
 		mark := "MISS"

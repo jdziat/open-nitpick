@@ -365,7 +365,7 @@ func parseCRFinding(lines []string, start int, severity, category string) (revie
 		body = append(body, trimmed)
 	}
 
-	path, line := crParseLocation(anchor[1])
+	path, line, endLine := crParseLocation(anchor[1])
 	title, rationale := crSplitBody(body)
 
 	// Suggestion is left empty: a plain-text review states the problem in prose
@@ -374,6 +374,7 @@ func parseCRFinding(lines []string, start int, severity, category string) (revie
 	f := review.Finding{
 		Path:      path,
 		Line:      line,
+		EndLine:   endLine,
 		Severity:  string(crSeverity(severity)),
 		Category:  strings.TrimSpace(category),
 		Title:     title,
@@ -397,26 +398,38 @@ func parseCRFinding(lines []string, start int, severity, category string) (revie
 
 // crParseLocation splits "store.go:10-12" into a path and an anchor line.
 //
-// The range's FIRST number is the anchor: Incumbent's ranges start at the line
-// the problem is on, and open-nitpick's own contract is to anchor at the defect
-// rather than where its effect surfaces.
+// BOTH ends of a range are kept. Taking only the first number was wrong twice
+// over: "the credential is on lines 11-12" identifies a defect on line 12, and
+// the discarded end is not decoration -- Incumbent anchored the same defect at
+// 7 on one run and at 11-12 on the next, so scoring the start alone converted
+// the reviewer's own variance into a flipped hit-or-miss. See anchorDistance.
 //
 // A location carrying no line span yields line 0 and the finding is still
 // returned. An unplaceable finding is visibly wrong; a dropped one is invisible,
 // and this benchmark exists to count what the reviewer reported.
-func crParseLocation(s string) (path string, line int) {
+func crParseLocation(s string) (path string, line, endLine int) {
 	s = strings.TrimSpace(s)
 
 	m := crLocation.FindStringSubmatch(s)
 	if m == nil {
-		return s, 0
+		return s, 0, 0
 	}
 
 	n, err := strconv.Atoi(m[2])
 	if err != nil {
-		return m[1], 0
+		return m[1], 0, 0
 	}
-	return m[1], n
+
+	// A malformed or backwards end is dropped rather than trusted: EndLine < Line
+	// would make the span nonsense, and a single-line anchor is the safe reading.
+	end := 0
+	if m[3] != "" {
+		if e, err := strconv.Atoi(m[3]); err == nil && e > n {
+			end = e
+		}
+	}
+
+	return m[1], n, end
 }
 
 // crSplitBody splits a finding's body into its title and rationale.

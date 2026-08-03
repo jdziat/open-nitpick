@@ -1,0 +1,48 @@
+{
+  "fixture": "multi-defect",
+  "findings": [
+    {
+      "path": "handler.go",
+      "line": 12,
+      "severity": "warning",
+      "category": "Functional Correctness",
+      "class": "concurrency",
+      "title": "Update count synchronously after a successful copy.",
+      "rationale": "The goroutine writes h.count without h.mu. Concurrent requests cause a data race and lost increments. It also increments the count before ReadFrom confirms that the upload succeeded.\n\nRemove the goroutine. Lock the mutex and increment count after ReadFrom succeeds.\n\nProposed fix\n\n-\tgo func() { -\t\th.count++ -\t}() - if _, err := f.ReadFrom(r.Body); err != nil { http.Error(w, fmt.Sprintf(\"upload failed: %v\", err), http.StatusInternalServerError) return }\n\n+\th.mu.Lock() +\th.count++ +\th.mu.Unlock() + w.WriteHeader(http.StatusOK)\n\nAlso applies to: 25-27",
+      "suggestion": ""
+    },
+    {
+      "path": "handler.go",
+      "line": 16,
+      "severity": "warning",
+      "category": "Stability \u0026 Availability",
+      "class": "correctness",
+      "title": "Set a maximum upload size.",
+      "rationale": "The handler copies the complete request body to local storage without a limit. A client can consume all available disk space.\n\nApply http.MaxBytesReader with a configured upload limit. Return `413 Request Entity Too Large` when the limit is exceeded.",
+      "suggestion": ""
+    },
+    {
+      "path": "handler.go",
+      "line": 19,
+      "severity": "warning",
+      "category": "Data Integrity \u0026 Integration",
+      "class": "resource",
+      "title": "Close the file and remove partial uploads on copy failure.",
+      "rationale": "f is never closed. Repeated uploads can exhaust file descriptors. If ReadFrom fails after it writes data, the partial file remains at the named destination.\n\nClose the file after creation. Remove the destination file before returning a copy failure.",
+      "suggestion": ""
+    },
+    {
+      "path": "handler.go",
+      "line": 16,
+      "severity": "error",
+      "category": "Security \u0026 Privacy",
+      "class": "security",
+      "title": "Restrict name to one safe file name.",
+      "rationale": "name is request-controlled. A value such as ../../tmp/file makes os.Create write outside /var/uploads. This permits arbitrary file writes with the service account permissions.\n\nReject empty names, . and .., and names where `filepath.Base(name) != name. Return 400 Bad Request` for invalid names.\n\nProposed fix\n\nimport ( \"fmt\" \"net/http\" \"os\" +\t\"path/filepath\" \"sync\" )\n\nfunc (h *Handler) Upload(w http.ResponseWriter, r *http.Request) { name := r.URL.Query().Get(\"name\") +\tif name == \"\" || name == \".\" || name == \"..\" || filepath.Base(name) != name { +\t\thttp.Error(w, \"invalid upload name\", http.StatusBadRequest) +\t\treturn +\t}\n\n-\tf, err := os.Create(\"/var/uploads/\" + name) +\tf, err := os.Create(filepath.Join(\"/var/uploads\", name))",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-03T18:11:28Z",
+  "mode": "plaintext",
+  "fingerprint": "8bbe193898890471d00bcc99a5f6437e10f030374b7645e483fe755fdaa4ffef"
+}
