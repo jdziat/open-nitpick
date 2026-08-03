@@ -96,29 +96,29 @@ DUMP     ?=
 
 .PHONY: eval
 eval:
-	NITPICK_EVAL_MODELS='$(MODELS)' \
-	NITPICK_EVAL_RUNS='$(RUNS)' \
-	NITPICK_EVAL_FIXTURES='$(FIXTURES)' \
-	NITPICK_EVAL_CAPTURE='$(CAPTURE)' \
+	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
+	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
+	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
+	$(if $(CAPTURE),NITPICK_EVAL_CAPTURE='$(CAPTURE)') \
 	go test -tags=eval -count=1 -timeout=60m -v -run 'TestPrompts|TestPlanted|TestKeywords' ./internal/evals/
 
 # Compare persona variants, judged by a strong model standing in for a senior
 # human reviewer. AXIS=nitpick (default) or AXIS=voice.
 .PHONY: tune
 tune:
-	NITPICK_EVAL_MODELS='$(MODELS)' \
-	NITPICK_EVAL_FIXTURES='$(FIXTURES)' \
-	NITPICK_EVAL_AXIS='$(AXIS)' \
-	NITPICK_EVAL_JUDGE='$(JUDGE)' \
+	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
+	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
+	$(if $(AXIS),NITPICK_EVAL_AXIS='$(AXIS)') \
+	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
 	NITPICK_EVAL_DUMP='$(DUMP)' \
 	go test -tags=eval -count=1 -timeout=45m -v -run TestTunePersona ./internal/evals/
 
 # Rank every model in the battery by JUDGED quality, not keyword recall.
 .PHONY: judge-models
 judge-models:
-	NITPICK_EVAL_MODELS='$(MODELS)' \
-	NITPICK_EVAL_FIXTURES='$(FIXTURES)' \
-	NITPICK_EVAL_JUDGE='$(JUDGE)' \
+	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
+	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
+	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
 	NITPICK_EVAL_DUMP='$(DUMP)' \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestJudgeModels ./internal/evals/
 
@@ -126,10 +126,10 @@ judge-models:
 # Requires the incumbent CLI, authenticated: incumbent auth login
 .PHONY: benchmark
 benchmark:
-	NITPICK_EVAL_MODELS='$(MODELS)' \
-	NITPICK_EVAL_FIXTURES='$(FIXTURES)' \
-	NITPICK_EVAL_JUDGE='$(JUDGE)' \
-	NITPICK_EVAL_RUNS='$(RUNS)' \
+	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
+	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
+	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
+	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
 	NITPICK_EVAL_DUMP='$(DUMP)' \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestBenchmarkAgainstIncumbent ./internal/evals/
 
@@ -137,5 +137,5 @@ benchmark:
 # The free CLI allowance is small; re-run until nothing is outstanding.
 .PHONY: collect-incumbent
 collect-incumbent:
-	NITPICK_EVAL_FIXTURES='$(FIXTURES)' \
+	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	go test -tags=eval -count=1 -timeout=120m -v -run TestCollectIncumbent ./internal/evals/
