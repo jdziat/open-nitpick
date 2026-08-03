@@ -534,8 +534,13 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 	}
 
 	persona := config.DefaultPersona()
-	t.Logf("judge: %s   fixtures: %d   contenders: incumbent + %d model(s)",
-		judge.Model(), len(opts.Fixtures), len(opts.Models))
+	// The run count is printed because it was silently dropped once: `make
+	// benchmark RUNS=2` did not forward NITPICK_EVAL_RUNS, so the SPREAD column
+	// measured fixture-to-fixture difficulty while reading as run-to-run
+	// variance. A paid flag that does nothing is the worst kind of instrument,
+	// and this is the second time this Makefile has had one.
+	t.Logf("judge: %s   fixtures: %d   runs per fixture (our side): %d   contenders: incumbent + %d model(s)",
+		judge.Model(), len(opts.Fixtures), max(opts.Runs, 1), len(opts.Models))
 
 	var (
 		mu     sync.Mutex

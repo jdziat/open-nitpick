@@ -452,6 +452,12 @@ func (a Aggregate) MeanGrade() float64 {
 
 // GradeSpread is the range of the graded samples, worst to best.
 //
+// The samples are one per (fixture, run), so this is TOTAL dispersion: fixture
+// difficulty and run-to-run variance together, not separated. That is the right
+// quantity for the only question the table is asked — is this GRADE gap worth
+// anything — because a mean over eight fixtures moves for either reason and the
+// reader cannot act on the difference.
+//
 // It exists because this harness measured its own noise and the noise won: the
 // run-to-run spread on a single model reached 0.49 while the whole distance
 // from the best-ranked model to the twelfth was 0.28. A table of mean grades

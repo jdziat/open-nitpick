@@ -101,6 +101,7 @@ benchmark:
 	NITPICK_EVAL_MODELS='$(MODELS)' \
 	NITPICK_EVAL_FIXTURES='$(FIXTURES)' \
 	NITPICK_EVAL_JUDGE='$(JUDGE)' \
+	NITPICK_EVAL_RUNS='$(RUNS)' \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestBenchmarkAgainstIncumbent ./internal/evals/
 
 # Collect Incumbent reviews one fixture at a time, caching each.
