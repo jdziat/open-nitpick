@@ -41,9 +41,12 @@ const (
 	EnvCapture = "NITPICK_EVAL_CAPTURE"
 )
 
-// openRouterBaseURL is the OpenAI-compatible endpoint. OpenRouter is not a
-// registered SDK provider, so it is driven through the openai provider.
-const openRouterBaseURL = "https://openrouter.ai/api/v1"
+// The endpoint constant that used to live here is gone. internal/llm registers
+// "openrouter" in its package init, and this package imports it, so the harness
+// names that provider instead of rebuilding an equivalent from base_url. Two
+// copies of the endpoint meant two owners that could drift, and the harness
+// resolved its credential by the openai provider's rules rather than the ones
+// production uses.
 
 // DefaultModels is a deliberately small, cheap matrix that exercises the
 // distinct code paths structured output can take.
@@ -240,6 +243,19 @@ func buildRepo(dir string, f Fixture) error {
 	if err := git("init", "-q", "-b", "main"); err != nil {
 		return err
 	}
+
+	// Incumbent matches a review to an organization through the repository's
+	// git remote. With none it warns that "this review will use the free CLI
+	// allowance, even if you're signed in" — so every fixture review was billed
+	// to that allowance regardless of account tier, which is what exhausted it
+	// mid-collection and turned an earlier benchmark into a measurement of the
+	// allowance rather than of the reviewer. Nothing is ever pushed; the remote
+	// exists only to be read. It is harmless for the model runs, which review
+	// the working tree through vcs.Local and never consult a remote.
+	if err := git("remote", "add", "origin", incumbentRemote()); err != nil {
+		return err
+	}
+
 	if err := write(f.Extra); err != nil {
 		return err
 	}
@@ -358,7 +374,15 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	provider := &captureProvider{Local: vcs.NewLocal(dir, io.Discard)}
 
 	engine := &review.Engine{
-		Config:   cfg,
+		Config: cfg,
+
+		// One model in BOTH roles, which is a deliberate limit on what the
+		// matrix measures: it ranks reviewers, and giving each contender a
+		// different triager would confound the two. The shipped .nitpick.yaml
+		// splits the roles, so no number produced here is a measurement of the
+		// shipped pairing — in particular a model annotated in DefaultModels as
+		// good value was ranked as a REVIEWER and has never been measured
+		// triaging another model's findings.
 		Roles:    &llm.Roles{Review: client, Triage: client},
 		Provider: provider,
 		Log:      slog.New(slog.DiscardHandler),
@@ -391,10 +415,14 @@ func evalConfig(model Model) *config.Config {
 	cfg := config.Defaults()
 
 	cfg.Models.Default = config.ModelSpec{
-		Provider:  "openai",
-		Model:     model.ID,
-		BaseURL:   openRouterBaseURL,
-		APIKeyEnv: EnvAPIKey,
+		// The shipped provider, not an equivalent: it carries the endpoint and
+		// it resolves OPENROUTER_API_KEY then LLM_API_KEY exactly as a real
+		// review does. Naming base_url + api_key_env here made `make eval` fail
+		// for anyone who only exported LLM_API_KEY, while `nitpick review`
+		// succeeded for them — a difference between the harness and the thing
+		// it measures.
+		Provider: llm.ProviderOpenRouter,
+		Model:    model.ID,
 
 		// Reviews should be reproducible; run-to-run variance is measured
 		// separately and deliberately, not left to the provider default.

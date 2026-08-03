@@ -491,6 +491,13 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 // same uncommitted working-tree change, the same judge, the same scoring — and
 // deliberately NOT equalized on the thing being compared, which is each
 // reviewer's own prompt and model.
+//
+// One asymmetry is neither, and reading the GRADE column without it is a
+// mistake: judgeRequest shows the judge open-nitpick's configured persona and
+// restricts `missed` to that persona's scope, for BOTH contenders. Incumbent
+// never received that specification, so ToneAdherence, ToneOff and Missed grade
+// it on adherence to a document only its opponent was given. Treat the tone and
+// scope components of its grade as a measure of house-style fit, not quality.
 func TestBenchmarkAgainstIncumbent(t *testing.T) {
 	ctx := context.Background()
 
@@ -558,7 +565,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 
 			// Prefer the cache: collection is rate-limited and resumable, so a
 			// previously collected review is both cheaper and more complete.
-			if cached, ok := CachedIncumbent(crCacheDir, fx.Name); ok {
+			if cached, ok := CachedIncumbent(crCacheDir, fx); ok {
 				record(IncumbentModel, fx, cached, nil)
 				return
 			}
@@ -578,10 +585,16 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 			findings, err := RunIncumbent(ctx, dir, opts.Timeout)
 			if IsRateLimited(err) {
 				// Never let an exhausted allowance masquerade as a low score.
-				if cached, ok := CachedIncumbent(crCacheDir, fx.Name); ok {
+				if cached, ok := CachedIncumbent(crCacheDir, fx); ok {
 					record(IncumbentModel, fx, cached, nil)
 					return
 				}
+			}
+			if IsFreeTier(err) {
+				// Loud, not a note: the comparison this whole test exists to make
+				// is invalid if Incumbent reviewed on the free allowance, and a
+				// table printed anyway would be read as a result.
+				t.Errorf("%s: %v", fx.Name, err)
 			}
 			record(IncumbentModel, fx, findings, err)
 		}(fx)
@@ -635,7 +648,7 @@ func TestCollectIncumbent(t *testing.T) {
 
 	var missing []string
 	for _, f := range opts.Fixtures {
-		if _, ok := CachedIncumbent(crCacheDir, f.Name); !ok {
+		if _, ok := CachedIncumbent(crCacheDir, f); !ok {
 			missing = append(missing, f.Name)
 		}
 	}

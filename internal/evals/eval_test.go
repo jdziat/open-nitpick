@@ -17,6 +17,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	llms "github.com/nocturnium/llm-go-sdk"
 )
 
 // evalConcurrency bounds in-flight reviews. Held well below any provider rate
@@ -28,8 +30,13 @@ func TestMain(m *testing.M) {
 	// Ignore the error: the key may legitimately come from the environment.
 	_ = LoadDotEnv("../../.env")
 
-	if strings.TrimSpace(os.Getenv(EnvAPIKey)) == "" {
-		fmt.Fprintf(os.Stderr, "evals: %s is not set; put it in .env or export it\n", EnvAPIKey)
+	// Either variable, because the harness now builds its client through the
+	// shipped openrouter provider and that provider accepts both. Demanding
+	// only OPENROUTER_API_KEY here would refuse to start for an operator whose
+	// review runs work fine.
+	if strings.TrimSpace(os.Getenv(EnvAPIKey)) == "" && strings.TrimSpace(os.Getenv(llms.EnvLLMAPIKey)) == "" {
+		fmt.Fprintf(os.Stderr, "evals: neither %s nor %s is set; put one in .env or export it\n",
+			EnvAPIKey, llms.EnvLLMAPIKey)
 		os.Exit(1)
 	}
 

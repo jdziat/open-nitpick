@@ -137,10 +137,9 @@ func NewJudge(model string) (*Judge, error) {
 	}
 
 	spec := config.ModelSpec{
-		Provider:  "openai",
-		Model:     model,
-		BaseURL:   openRouterBaseURL,
-		APIKeyEnv: EnvAPIKey,
+		// Same provider the harness and production use; see evalConfig.
+		Provider: llm.ProviderOpenRouter,
+		Model:    model,
 
 		Temperature:      floatPtr(0),
 		MaxTokens:        8192,

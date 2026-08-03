@@ -1,0 +1,35 @@
+────────────────────────────────────────
+Incumbent Review
+
+Diff      : staged changes and tracked edits
+Compare   : main → main
+Directory : cr-probe
+────────────────────────────────────────
+
+(reviewer banner removed)
+
+
+────────────────────────────────────────────────────────────────────────
+  critical [Security & Privacy]
+  → ]8;;vscode://file//tmp/claude-1000/-home-jdziat-Code-jdziat-open-nitpick/3205858d-bfa5-4452-9d1a-4a7840d5f4fb/scratchpad/cr-probe/store.go:10store.go:10-12]8;;
+
+  Use a bound parameter for name.
+
+  fmt.Sprintf embeds name directly into the SQL query. This permits SQL
+  injection and breaks names that contain apostrophes. Use the placeholder
+  syntax supported by the configured SQL driver.
+
+
+────────────────────────────────────────
+Review complete
+1 finding ✔
+
+Critical 1
+
+1 file reviewed:
+- store.go
+────────────────────────────────────────
+
+Print all AI prompts: incumbent review --show-prompts
+
+$25 in free promotional credits have been added to your account for additional reviews. These credits expire after 7 days. To purchase more, visit [billing](https://app.incumbent.ai/settings/billing?tab=usage&orgId=61cab6a9-a776-44a3-8589-886b74c4a499).
