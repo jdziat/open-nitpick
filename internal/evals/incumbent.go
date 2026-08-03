@@ -173,7 +173,10 @@ func crCategoryClass(category string) (config.Class, bool) {
 // import block) instead of at the defect, and prefixes every finding with a
 // fixed instruction to the agent. Scoring review quality against it compared
 // the wrong artifact. The default mode is the actual review.
-func RunIncumbent(ctx context.Context, dir string, timeout time.Duration) ([]review.Finding, error) {
+// The raw return is the review as printed, escapes stripped, and is returned on
+// EVERY path including the failures — a review that did not parse is precisely
+// the one whose text someone needs to read.
+func RunIncumbent(ctx context.Context, dir string, timeout time.Duration) ([]review.Finding, string, error) {
 	if timeout <= 0 {
 		timeout = 8 * time.Minute
 	}
@@ -198,11 +201,15 @@ func RunIncumbent(ctx context.Context, dir string, timeout time.Duration) ([]rev
 	// the stderr-only diagnostics below used to lose them entirely.
 	combined := stdout.String() + "\n" + stderr.String()
 
+	// Escapes stripped once, here, so the retained text is what a human would
+	// read rather than a terminal control stream.
+	raw := crEscape.ReplaceAllString(combined, "")
+
 	// Checked before anything else: a run that fell back to the free allowance
 	// measures the allowance, not the reviewer, so its findings must not be
 	// usable no matter how well they parsed.
 	if crFreeTierFallback(combined) {
-		return nil, freeTierError()
+		return nil, raw, freeTierError()
 	}
 
 	findings, parseErr := parseIncumbent(stdout.Bytes())
@@ -211,7 +218,7 @@ func RunIncumbent(ctx context.Context, dir string, timeout time.Duration) ([]rev
 		// A non-zero exit on top of that is the CLI signalling "findings
 		// exist", not a failure, and discarding a complete review over it
 		// would be its own silent loss.
-		return findings, nil
+		return findings, raw, nil
 	}
 
 	// Everything below is the failure path, and the ORDER is the fix. parseErr
@@ -225,20 +232,20 @@ func RunIncumbent(ctx context.Context, dir string, timeout time.Duration) ([]rev
 		// Both wrapped: callers match on the context error, and the parse error
 		// is what a human needs to see to know the output was truncated rather
 		// than absent.
-		return nil, fmt.Errorf("incumbent: %w (output did not parse: %w)", runCtx.Err(), parseErr)
+		return nil, raw, fmt.Errorf("incumbent: %w (output did not parse: %w)", runCtx.Err(), parseErr)
 
 	case runErr != nil && crRateLimited(combined):
 		// Only inspected when the run FAILED. A review whose prose discusses
 		// rate limiting is a normal successful review, and treating it as an
 		// exhausted allowance would make CollectIncumbent back off for a
 		// quarter of an hour over a finding about someone else's code.
-		return nil, fmt.Errorf("incumbent: %w: %w", ErrRateLimited, runErr)
+		return nil, raw, fmt.Errorf("incumbent: %w: %w", ErrRateLimited, runErr)
 
 	case runErr != nil:
-		return nil, fmt.Errorf("incumbent: %w (stderr: %s)", runErr, truncate(stderr.String(), 200))
+		return nil, raw, fmt.Errorf("incumbent: %w (stderr: %s)", runErr, truncate(stderr.String(), 200))
 
 	default:
-		return nil, fmt.Errorf("incumbent: %w (stderr: %s)", parseErr, truncate(stderr.String(), 200))
+		return nil, raw, fmt.Errorf("incumbent: %w (stderr: %s)", parseErr, truncate(stderr.String(), 200))
 	}
 }
 
@@ -609,6 +616,18 @@ type crCache struct {
 	// head-to-head reviewing different source with no signal that it happened.
 	Mode        string `json:"mode"`
 	Fingerprint string `json:"fingerprint"`
+
+	// Raw is the review as the CLI printed it, escapes already stripped.
+	//
+	// Kept because the parsed findings are a LOSSY read of it, and every
+	// question about whether a number is real turns out to be a question about
+	// what was actually printed. The first such question cost a re-review: the
+	// parser reduces "client.go:7-12" to line 7, so a defect on line 12 scored
+	// as a miss, and nothing on disk could say whether Incumbent had reported
+	// a span or genuinely pointed at the wrong line. Re-running to find out
+	// spends the account's allowance to recover something the collection
+	// already had in hand.
+	Raw string `json:"raw,omitempty"`
 }
 
 // ErrRateLimited reports that the CLI refused the review because the account's
@@ -727,7 +746,7 @@ func CollectIncumbent(
 			return collected, remaining, buildErr
 		}
 
-		findings, runErr := RunIncumbent(ctx, dir, perReview)
+		findings, raw, runErr := RunIncumbent(ctx, dir, perReview)
 		_ = os.RemoveAll(dir)
 
 		switch {
@@ -738,6 +757,7 @@ func CollectIncumbent(
 				At:          time.Now().UTC().Format(time.RFC3339),
 				Mode:        crReviewMode,
 				Fingerprint: crFingerprint(f),
+				Raw:         raw,
 			}, "", "  ")
 			if werr := os.WriteFile(filepath.Join(cacheDir, f.Name+".json"), blob, 0o644); werr != nil {
 				return collected, remaining, werr

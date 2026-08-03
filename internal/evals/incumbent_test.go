@@ -575,7 +575,7 @@ func TestRunIncumbentRefusesPartialReviews(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			crShim(t, tc.script)
 
-			got, err := RunIncumbent(context.Background(), t.TempDir(), tc.timeout)
+			got, _, err := RunIncumbent(context.Background(), t.TempDir(), tc.timeout)
 			if err == nil {
 				t.Fatalf("SILENT PARTIAL: %d finding(s) and no error from a review that never finished: %+v",
 					len(got), got)
@@ -600,7 +600,7 @@ func TestRunIncumbentReturnsCompleteReviews(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			crShim(t, script)
 
-			got, err := RunIncumbent(context.Background(), t.TempDir(), 10*time.Second)
+			got, _, err := RunIncumbent(context.Background(), t.TempDir(), 10*time.Second)
 			if err != nil {
 				t.Fatalf("a review that printed its trailer must be kept: %v", err)
 			}
@@ -636,7 +636,7 @@ func TestRunIncumbentDetectsFreeTierFallback(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			crShim(t, script)
 
-			got, err := RunIncumbent(context.Background(), t.TempDir(), 10*time.Second)
+			got, _, err := RunIncumbent(context.Background(), t.TempDir(), 10*time.Second)
 			if !IsFreeTier(err) {
 				t.Fatalf("err = %v (%d finding(s)); a degraded run must be refused, not scored", err, len(got))
 			}
@@ -670,7 +670,7 @@ func TestRunIncumbentReportsRateLimitsFromEitherStream(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			crShim(t, script)
 
-			_, err := RunIncumbent(context.Background(), t.TempDir(), 10*time.Second)
+			_, _, err := RunIncumbent(context.Background(), t.TempDir(), 10*time.Second)
 			if !IsRateLimited(err) {
 				t.Fatalf("err = %v; an exhausted allowance must be recognizable, or the backoff never runs", err)
 			}
@@ -694,7 +694,7 @@ func TestRunIncumbentNamesTheRealFailure(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, err := RunIncumbent(ctx, t.TempDir(), time.Second)
+		_, _, err := RunIncumbent(ctx, t.TempDir(), time.Second)
 		if !errors.Is(err, context.Canceled) {
 			t.Fatalf("err = %v, want it to wrap context.Canceled", err)
 		}
@@ -703,7 +703,7 @@ func TestRunIncumbentNamesTheRealFailure(t *testing.T) {
 	t.Run("binary not installed", func(t *testing.T) {
 		t.Setenv("PATH", t.TempDir())
 
-		_, err := RunIncumbent(context.Background(), t.TempDir(), time.Second)
+		_, _, err := RunIncumbent(context.Background(), t.TempDir(), time.Second)
 		if err == nil {
 			t.Fatal("a missing CLI must be an error")
 		}

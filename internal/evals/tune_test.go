@@ -603,7 +603,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 				return
 			}
 
-			findings, err := RunIncumbent(ctx, dir, opts.Timeout)
+			findings, _, err := RunIncumbent(ctx, dir, opts.Timeout)
 			if IsRateLimited(err) {
 				// Never let an exhausted allowance masquerade as a low score.
 				if cached, ok := CachedIncumbent(crCacheDir, fx); ok {

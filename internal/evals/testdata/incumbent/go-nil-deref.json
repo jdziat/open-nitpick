@@ -1,0 +1,18 @@
+{
+  "fixture": "go-nil-deref",
+  "findings": [
+    {
+      "path": "fetch.go",
+      "line": 10,
+      "severity": "warning",
+      "category": "Stability \u0026 Availability",
+      "class": "correctness",
+      "title": "Handle the http.Get error before using resp.",
+      "rationale": "If http.Get returns an error, resp can be nil. The `defer resp.Body.Close()` statement can then panic. Capture and return the error before deferring Close.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-03T18:04:53Z",
+  "mode": "plaintext",
+  "fingerprint": "542cbb96a52e5849bf6aff16a6a792d715bdccbf6da6d2e60420009d19498b2f"
+}

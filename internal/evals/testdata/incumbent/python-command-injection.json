@@ -1,0 +1,28 @@
+{
+  "fixture": "python-command-injection",
+  "findings": [
+    {
+      "path": "tools.py",
+      "line": 10,
+      "severity": "warning",
+      "category": "Stability \u0026 Availability",
+      "class": "correctness",
+      "title": "Propagate archive creation failures.",
+      "rationale": "os.system returns a status code, but this function ignores it. If the source is missing or /backups is not writable, archive returns without reporting the failure. Use subprocess.run(..., check=True) so callers cannot treat a missing backup as success.",
+      "suggestion": ""
+    },
+    {
+      "path": "tools.py",
+      "line": 12,
+      "severity": "error",
+      "category": "Security \u0026 Privacy",
+      "class": "security",
+      "title": "Do not pass name through the shell.",
+      "rationale": "os.system interpolates name into a shell command. A caller can inject commands or use ../ segments to escape /data and /backups. Validate name as a single directory name and invoke tar with an argument list.\n\nProposed fix\n\n-import os import subprocess +from pathlib import Path ... def archive(name): \"\"\"Archive a directory by name.\"\"\" -    os.system(\"tar czf /backups/\" + name + \".tar.gz /data/\" + name) +    if not isinstance(name, str) or not name or Path(name).name != name: +        raise ValueError(\"name must be a single directory name\") +    source = Path(\"/data\") / name +    destination = Path(\"/backups\") / f\"{name}.tar.gz\" +    subprocess.run( +        [\"tar\", \"czf\", str(destination), \"--\", str(source)], +        check=True, +    )",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-03T18:08:32Z",
+  "mode": "plaintext",
+  "fingerprint": "982e2b97086bbcd82d88ff4aaee401886f2f0376058f02530b45131d3fc24c7e"
+}

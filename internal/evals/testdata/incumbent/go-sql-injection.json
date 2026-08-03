@@ -1,0 +1,18 @@
+{
+  "fixture": "go-sql-injection",
+  "findings": [
+    {
+      "path": "store.go",
+      "line": 17,
+      "severity": "error",
+      "category": "Security \u0026 Privacy",
+      "class": "security",
+      "title": "Use a parameterized query.",
+      "rationale": "fmt.Sprintf inserts name directly into SQL. A crafted name can alter the WHERE clause and expose user records outside the requested name.\n\nPass name as a query argument and remove the fmt import.\n\nProposed fix\n\nimport ( \"database/sql\" -\t\"fmt\" )\n\n// SearchUsers finds users by name. func (s *Store) SearchUsers(name string) (*sql.Rows, error) { -\tquery := fmt.Sprintf(\"SELECT id, email FROM users WHERE name = '%s'\", name) -\treturn s.db.Query(query) +\treturn s.db.Query(\"SELECT id, email FROM users WHERE name = ?\", name) }",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-03T18:06:00Z",
+  "mode": "plaintext",
+  "fingerprint": "d8346efd0a70fd3f24e11e6791649ae999035f1f45ba9eeb75e61a7d2d0d8e4b"
+}
