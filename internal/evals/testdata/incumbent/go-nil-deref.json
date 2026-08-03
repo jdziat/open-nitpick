@@ -4,15 +4,17 @@
     {
       "path": "fetch.go",
       "line": 10,
-      "severity": "warning",
+      "end_line": 11,
+      "severity": "error",
       "category": "Stability \u0026 Availability",
       "class": "correctness",
-      "title": "Handle the http.Get error before using resp.",
-      "rationale": "If http.Get returns an error, resp can be nil. The `defer resp.Body.Close()` statement can then panic. Capture and return the error before deferring Close.",
+      "title": "Handle the http.Get error before accessing resp.",
+      "rationale": "Line 10 discards the request error. If http.Get fails, resp is nil. Line 11 then panics when it evaluates resp.Body.\n\nProposed fix\n\nfunc Fetch(url string) (int, error) { -\tresp, _ := http.Get(url) +\tresp, err := http.Get(url) +\tif err != nil { +\t\treturn 0, err +\t} defer resp.Body.Close()\n\n-\tbody, err := io.ReadAll(resp.Body) +\tbody, err := io.ReadAll(resp.Body)",
       "suggestion": ""
     }
   ],
-  "at": "2026-08-03T18:04:53Z",
+  "at": "2026-08-03T18:22:23Z",
   "mode": "plaintext",
-  "fingerprint": "542cbb96a52e5849bf6aff16a6a792d715bdccbf6da6d2e60420009d19498b2f"
+  "fingerprint": "542cbb96a52e5849bf6aff16a6a792d715bdccbf6da6d2e60420009d19498b2f",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2101889267\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  critical [Stability \u0026 Availability]\n  → fetch.go:10-11\n\n  Handle the http.Get error before accessing resp.\n\n  Line 10 discards the request error. If http.Get fails, resp is nil.\n  Line 11 then panics when it evaluates resp.Body.\n\n\n  Proposed fix\n\n   func Fetch(url string) (int, error) {\n  -\tresp, _ := http.Get(url)\n  +\tresp, err := http.Get(url)\n  +\tif err != nil {\n  +\t\treturn 0, err\n  +\t}\n   \tdefer resp.Body.Close()\n   \n  -\tbody, err := io.ReadAll(resp.Body)\n  +\tbody, err := io.ReadAll(resp.Body)\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nCritical 1\n\n1 file reviewed:\n- fetch.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 4s elapsed\nPreparing sandbox... 4s elapsed\nSummarizing changes... 7s elapsed\nWriting review comments... 19s elapsed\n"
 }

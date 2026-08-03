@@ -1,7 +1,8 @@
 {
   "fixture": "clean-refactor",
   "findings": null,
-  "at": "2026-08-03T18:09:12Z",
+  "at": "2026-08-03T18:26:28Z",
   "mode": "plaintext",
-  "fingerprint": "d4a5303167f50243780e057c9f4abd0882db46df40c8d18e725367161a04226b"
+  "fingerprint": "d4a5303167f50243780e057c9f4abd0882db46df40c8d18e725367161a04226b",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-798098023\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n- total.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 5s elapsed\nWriting review comments... 10s elapsed\n"
 }

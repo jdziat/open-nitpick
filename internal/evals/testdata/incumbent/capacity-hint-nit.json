@@ -1,7 +1,8 @@
 {
   "fixture": "capacity-hint-nit",
   "findings": null,
-  "at": "2026-08-03T18:13:04Z",
+  "at": "2026-08-03T18:31:41Z",
   "mode": "plaintext",
-  "fingerprint": "8f8b553be60edbe06dd33fdfdd156be639e1d0cd6ce2f90a5e628687b77c7353"
+  "fingerprint": "8f8b553be60edbe06dd33fdfdd156be639e1d0cd6ce2f90a5e628687b77c7353",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2408123551\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n- window.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 6s elapsed\nWriting review comments... 11s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
 }

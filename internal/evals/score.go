@@ -148,7 +148,22 @@ func matches(f review.Finding, d Defect) bool {
 // "somewhere in this 200-line function", which is why spanLength is reported
 // separately: vagueness should be visible rather than silently rewarded.
 func anchorDistance(f review.Finding, line int) int {
-	lo, hi := f.Line, f.EndLine
+	best := spanDistance(review.LineSpan{Line: f.Line, EndLine: f.EndLine}, line)
+
+	// A finding that names several regions is judged by its CLOSEST one. It
+	// reported them all, so measuring it by the first is arbitrary: Incumbent
+	// put the SQL injection's primary anchor on the import block its fix would
+	// edit and named the interpolation under "Also applies to".
+	for _, s := range f.AlsoAt {
+		best = min(best, spanDistance(s, line))
+	}
+
+	return best
+}
+
+// spanDistance is how far a line sits outside one span, zero when inside it.
+func spanDistance(s review.LineSpan, line int) int {
+	lo, hi := s.Line, s.EndLine
 	if hi < lo {
 		hi = lo
 	}
@@ -165,11 +180,24 @@ func anchorDistance(f review.Finding, line int) int {
 
 // spanLength is how many lines a finding's anchor covers. One for the ordinary
 // single-line anchor.
+//
+// It measures the widest SINGLE region rather than the hull of them all: a
+// finding naming lines 3-6 and 15-18 has claimed two tight regions, not one
+// sixteen-line smear, and reporting the hull would invent vagueness it does not
+// have.
 func spanLength(f review.Finding) int {
-	if f.EndLine <= f.Line {
+	widest := spanLines(review.LineSpan{Line: f.Line, EndLine: f.EndLine})
+	for _, s := range f.AlsoAt {
+		widest = max(widest, spanLines(s))
+	}
+	return widest
+}
+
+func spanLines(s review.LineSpan) int {
+	if s.EndLine <= s.Line {
 		return 1
 	}
-	return f.EndLine - f.Line + 1
+	return s.EndLine - s.Line + 1
 }
 
 // explainsAny reports whether a finding describes any planted defect, ignoring

@@ -85,6 +85,18 @@ var crAnchor = regexp.MustCompile(`^\s*(?:→|->)\s*(.*)$`)
 // a path that itself contains a colon intact.
 var crLocation = regexp.MustCompile(`^(.*):(\d+)(?:-(\d+))?$`)
 
+// crAlsoApplies matches Incumbent's secondary-location line, which names
+// further regions the SAME finding covers rather than a new finding.
+//
+// It is not decoration. On the SQL-injection fixture the primary anchor was the
+// import block (its proposed fix deletes the fmt import) and this line was the
+// only thing pointing at the interpolation itself, so dropping it recorded a
+// defect Incumbent had explicitly located as one it missed.
+var crAlsoApplies = regexp.MustCompile(`(?i)^\s*Also applies to:\s*(.+?)\s*$`)
+
+// crExtraSpan matches one entry of that line: "15-18", "22", or "other.go:4-9".
+var crExtraSpan = regexp.MustCompile(`^(?:([^:]+):)?(\d+)(?:-(\d+))?$`)
+
 // crRule matches the box-drawing rules printed between sections. Section rules
 // and finding rules differ in width, so width is not a discriminator: a rule
 // only ever ENDS a block, and what starts one is the header/anchor pair.
@@ -366,6 +378,23 @@ func parseCRFinding(lines []string, start int, severity, category string) (revie
 	}
 
 	path, line, endLine := crParseLocation(anchor[1])
+
+	// The secondary-location line is pulled OUT of the body before the body
+	// becomes prose: it is metadata about where the finding applies, and leaving
+	// it in would put "Also applies to: 15-18" in front of the judge as though
+	// it were part of the reviewer's reasoning.
+	var alsoAt []review.LineSpan
+
+	kept := body[:0]
+	for _, b := range body {
+		if extra := crParseAlsoApplies(b, path); len(extra) > 0 {
+			alsoAt = append(alsoAt, extra...)
+			continue
+		}
+		kept = append(kept, b)
+	}
+	body = kept
+
 	title, rationale := crSplitBody(body)
 
 	// Suggestion is left empty: a plain-text review states the problem in prose
@@ -375,6 +404,7 @@ func parseCRFinding(lines []string, start int, severity, category string) (revie
 		Path:      path,
 		Line:      line,
 		EndLine:   endLine,
+		AlsoAt:    alsoAt,
 		Severity:  string(crSeverity(severity)),
 		Category:  strings.TrimSpace(category),
 		Title:     title,
@@ -430,6 +460,42 @@ func crParseLocation(s string) (path string, line, endLine int) {
 	}
 
 	return m[1], n, end
+}
+
+// crParseAlsoApplies reads the regions named by a secondary-location line.
+//
+// Entries naming a DIFFERENT file are dropped: a span is only meaningful next
+// to the path it belongs to, and Finding carries one Path. Nothing in the
+// observed output does this, and silently attaching another file's line numbers
+// to this finding's path would invent an anchor rather than lose one.
+func crParseAlsoApplies(line, path string) []review.LineSpan {
+	m := crAlsoApplies.FindStringSubmatch(line)
+	if m == nil {
+		return nil
+	}
+
+	var out []review.LineSpan
+	for _, part := range strings.Split(m[1], ",") {
+		e := crExtraSpan.FindStringSubmatch(strings.TrimSpace(part))
+		if e == nil || (e[1] != "" && e[1] != path) {
+			continue
+		}
+
+		start, err := strconv.Atoi(e[2])
+		if err != nil {
+			continue
+		}
+
+		span := review.LineSpan{Line: start}
+		if e[3] != "" {
+			if end, err := strconv.Atoi(e[3]); err == nil && end > start {
+				span.EndLine = end
+			}
+		}
+		out = append(out, span)
+	}
+
+	return out
 }
 
 // crSplitBody splits a finding's body into its title and rationale.
@@ -614,6 +680,13 @@ func crFreeTierFallback(out string) bool {
 // --agent output "the wrong artifact" — but a cache written under it carried no
 // record of that and would have been scored as a plain-text review.
 const crReviewMode = "plaintext"
+
+// crCacheDir is where collected Incumbent reviews persist between runs.
+//
+// It lives beside the cache logic rather than in a test file: the re-parse path
+// reads it and is not eval-tagged, and a constant naming where the corpus lives
+// belongs with the code that writes the corpus.
+const crCacheDir = "testdata/incumbent"
 
 // crCache is one fixture's cached Incumbent review, plus enough provenance to
 // tell whether it still measures what the benchmark is about to compare.

@@ -3,26 +3,28 @@
   "findings": [
     {
       "path": "tools.py",
-      "line": 10,
+      "line": 12,
       "severity": "warning",
       "category": "Stability \u0026 Availability",
       "class": "correctness",
-      "title": "Propagate archive creation failures.",
-      "rationale": "os.system returns a status code, but this function ignores it. If the source is missing or /backups is not writable, archive returns without reporting the failure. Use subprocess.run(..., check=True) so callers cannot treat a missing backup as success.",
+      "title": "Propagate archive failures.",
+      "rationale": "The function ignores the tar exit status. Missing directories, permission errors, or a failed tar command can leave no archive while the caller receives no error. Use subprocess.run(..., check=True) or explicitly handle the exit status.",
       "suggestion": ""
     },
     {
       "path": "tools.py",
-      "line": 12,
+      "line": 10,
+      "end_line": 12,
       "severity": "error",
       "category": "Security \u0026 Privacy",
       "class": "security",
-      "title": "Do not pass name through the shell.",
-      "rationale": "os.system interpolates name into a shell command. A caller can inject commands or use ../ segments to escape /data and /backups. Validate name as a single directory name and invoke tar with an argument list.\n\nProposed fix\n\n-import os import subprocess +from pathlib import Path ... def archive(name): \"\"\"Archive a directory by name.\"\"\" -    os.system(\"tar czf /backups/\" + name + \".tar.gz /data/\" + name) +    if not isinstance(name, str) or not name or Path(name).name != name: +        raise ValueError(\"name must be a single directory name\") +    source = Path(\"/data\") / name +    destination = Path(\"/backups\") / f\"{name}.tar.gz\" +    subprocess.run( +        [\"tar\", \"czf\", str(destination), \"--\", str(source)], +        check=True, +    )",
+      "title": "Do not interpolate name into a shell command.",
+      "rationale": "os.system allows shell injection when name contains shell metacharacters. ../ also allows the source and destination paths to escape /data and /backups. Validate name as one directory name and invoke tar with an argument list.\n\nProposed fix\n\ndef archive(name): \"\"\"Archive a directory by name.\"\"\" -    os.system(\"tar czf /backups/\" + name + \".tar.gz /data/\" + name) +    if not name or os.path.basename(name) != name or name in {\".\", \"..\"}: +        raise ValueError(\"name must be a single directory name\") +    subprocess.run( +        [\"tar\", \"czf\", f\"/backups/{name}.tar.gz\", f\"/data/{name}\"], +        check=True, +    )",
       "suggestion": ""
     }
   ],
-  "at": "2026-08-03T18:08:32Z",
+  "at": "2026-08-03T18:25:52Z",
   "mode": "plaintext",
-  "fingerprint": "982e2b97086bbcd82d88ff4aaee401886f2f0376058f02530b45131d3fc24c7e"
+  "fingerprint": "982e2b97086bbcd82d88ff4aaee401886f2f0376058f02530b45131d3fc24c7e",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2389917646\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Stability \u0026 Availability]\n  → tools.py:12\n\n  Propagate archive failures.\n\n  The function ignores the tar exit status. Missing directories,\n  permission errors, or a failed tar command can leave no archive while\n  the caller receives no error. Use subprocess.run(..., check=True) or\n  explicitly handle the exit status.\n\n\n────────────────────────────────────────────────────────────────────────\n  critical [Security \u0026 Privacy]\n  → tools.py:10-12\n\n  Do not interpolate name into a shell command.\n\n  os.system allows shell injection when name contains shell\n  metacharacters. ../ also allows the source and destination paths to\n  escape /data and /backups. Validate name as one directory name and\n  invoke tar with an argument list.\n\n\n\n\n  Proposed fix\n\n   def archive(name):\n       \"\"\"Archive a directory by name.\"\"\"\n  -    os.system(\"tar czf /backups/\" + name + \".tar.gz /data/\" + name)\n  +    if not name or os.path.basename(name) != name or name in {\".\", \"..\"}:\n  +        raise ValueError(\"name must be a single directory name\")\n  +    subprocess.run(\n  +        [\"tar\", \"czf\", f\"/backups/{name}.tar.gz\", f\"/data/{name}\"],\n  +        check=True,\n  +    )\n\n\n────────────────────────────────────────\nReview complete\n2 findings ✔\n\nCritical 1\nMajor    1\n\n1 file reviewed:\n- tools.py\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 6s elapsed\nWriting review comments... 14s elapsed\n"
 }

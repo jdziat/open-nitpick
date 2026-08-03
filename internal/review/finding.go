@@ -33,6 +33,24 @@ type Finding struct {
 	// variance into a flipped benchmark result.
 	EndLine int `json:"end_line,omitempty"`
 
+	// AlsoAt are further regions the same finding covers.
+	//
+	// One finding can legitimately name several places: a reviewer that reports
+	// a repeated pattern once, or a triage pass that merged duplicates across
+	// batches, both produce a single finding with more than one location.
+	//
+	// Ignoring them misreads the reviewer. Incumbent reported the SQL
+	// injection fixture as "store.go:3-6" — the import block, because its
+	// proposed fix deletes the fmt import — and then "Also applies to: 15-18",
+	// which is where the interpolation actually is. Reading only the primary
+	// anchor scores that as missing a defect it explicitly located, and a
+	// benchmark that reports a competitor missing something it found is worse
+	// than one that does not run.
+	//
+	// open-nitpick's own reviews leave this empty: the schema does not offer it
+	// and one finding gets one anchor.
+	AlsoAt []LineSpan `json:"also_at,omitempty"`
+
 	// Severity is one of nit, info, warning, error, critical.
 	Severity string `json:"severity"`
 
@@ -94,6 +112,13 @@ func (f Finding) Valid() bool {
 	return strings.TrimSpace(f.Path) != "" &&
 		strings.TrimSpace(f.Title) != "" &&
 		f.Line > 0
+}
+
+// LineSpan is a contiguous run of lines, inclusive. EndLine of zero, or below
+// Line, means the span is the single line Line.
+type LineSpan struct {
+	Line    int `json:"line"`
+	EndLine int `json:"end_line,omitempty"`
 }
 
 // Result is the structured output of a review call. Summary is only populated

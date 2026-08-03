@@ -85,3 +85,68 @@ func TestCRParseLocationKeepsBothEnds(t *testing.T) {
 		})
 	}
 }
+
+// TestAlsoAppliesIsScored is the regression test for a false MISS.
+//
+// Incumbent reported the SQL injection with its primary anchor on the import
+// block -- because the fix it proposed deletes the fmt import -- and named the
+// interpolation itself only under "Also applies to: 15-18". The planted defect
+// is store.go:17. Reading the primary anchor alone put it 11 lines away and
+// recorded Incumbent as having missed a defect it had explicitly located.
+func TestAlsoAppliesIsScored(t *testing.T) {
+	f := review.Finding{
+		Path: "store.go", Line: 3, EndLine: 6,
+		AlsoAt: []review.LineSpan{{Line: 15, EndLine: 18}},
+	}
+
+	if d := anchorDistance(f, 17); d != 0 {
+		t.Errorf("distance to the defect = %d, want 0: line 17 is inside the 15-18 region", d)
+	}
+	// The primary region still counts for lines near IT.
+	if d := anchorDistance(f, 4); d != 0 {
+		t.Errorf("distance to line 4 = %d, want 0: it is inside the primary 3-6 region", d)
+	}
+	// The gap between the two regions is not silently covered.
+	if d := anchorDistance(f, 11); d == 0 {
+		t.Error("line 11 sits between the regions and must not read as inside one")
+	}
+	// Two tight regions are not one wide smear.
+	if got := spanLength(f); got != 4 {
+		t.Errorf("widest region = %d, want 4: 3-6 and 15-18 are both four lines, not a 16-line hull", got)
+	}
+}
+
+// TestParseAlsoApplies covers the secondary-location line itself.
+func TestParseAlsoApplies(t *testing.T) {
+	cases := []struct {
+		in   string
+		path string
+		want []review.LineSpan
+	}{
+		{"Also applies to: 15-18", "store.go", []review.LineSpan{{Line: 15, EndLine: 18}}},
+		{"Also applies to: 22", "store.go", []review.LineSpan{{Line: 22}}},
+		{"Also applies to: 15-18, 40-42", "store.go",
+			[]review.LineSpan{{Line: 15, EndLine: 18}, {Line: 40, EndLine: 42}}},
+		{"also applies to: 7-9", "store.go", []review.LineSpan{{Line: 7, EndLine: 9}}},
+		// Same file named explicitly is kept; a different file is dropped rather
+		// than attached to this finding's path.
+		{"Also applies to: store.go:5-8", "store.go", []review.LineSpan{{Line: 5, EndLine: 8}}},
+		{"Also applies to: other.go:5-8", "store.go", nil},
+		{"fmt.Sprintf inserts name directly into SQL.", "store.go", nil},
+		{"", "store.go", nil},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			got := crParseAlsoApplies(tc.in, tc.path)
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %+v, want %+v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Errorf("span %d: got %+v, want %+v", i, got[i], tc.want[i])
+				}
+			}
+		})
+	}
+}

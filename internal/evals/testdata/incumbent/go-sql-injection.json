@@ -3,16 +3,24 @@
   "findings": [
     {
       "path": "store.go",
-      "line": 17,
+      "line": 3,
+      "end_line": 6,
+      "also_at": [
+        {
+          "line": 15,
+          "end_line": 18
+        }
+      ],
       "severity": "error",
       "category": "Security \u0026 Privacy",
       "class": "security",
-      "title": "Use a parameterized query.",
-      "rationale": "fmt.Sprintf inserts name directly into SQL. A crafted name can alter the WHERE clause and expose user records outside the requested name.\n\nPass name as a query argument and remove the fmt import.\n\nProposed fix\n\nimport ( \"database/sql\" -\t\"fmt\" )\n\n// SearchUsers finds users by name. func (s *Store) SearchUsers(name string) (*sql.Rows, error) { -\tquery := fmt.Sprintf(\"SELECT id, email FROM users WHERE name = '%s'\", name) -\treturn s.db.Query(query) +\treturn s.db.Query(\"SELECT id, email FROM users WHERE name = ?\", name) }",
+      "title": "Use a parameterized query in SearchUsers.",
+      "rationale": "fmt.Sprintf inserts name directly into SQL. A caller can use quotes or SQL syntax to change the WHERE clause. Remove fmt and pass name as a query argument.\n\nProposed fix\n\nimport ( \"database/sql\" -\t\"fmt\" )\n\n// SearchUsers finds users by name. func (s *Store) SearchUsers(name string) (*sql.Rows, error) { -\tquery := fmt.Sprintf(\"SELECT id, email FROM users WHERE name = '%s'\", name) -\treturn s.db.Query(query) +\treturn s.db.Query(\"SELECT id, email FROM users WHERE name = ?\", name) }",
       "suggestion": ""
     }
   ],
-  "at": "2026-08-03T18:06:00Z",
+  "at": "2026-08-03T18:23:12Z",
   "mode": "plaintext",
-  "fingerprint": "d8346efd0a70fd3f24e11e6791649ae999035f1f45ba9eeb75e61a7d2d0d8e4b"
+  "fingerprint": "d8346efd0a70fd3f24e11e6791649ae999035f1f45ba9eeb75e61a7d2d0d8e4b",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-727314767\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  critical [Security \u0026 Privacy]\n  → store.go:3-6\n\n  Use a parameterized query in SearchUsers.\n\n  fmt.Sprintf inserts name directly into SQL. A caller can use quotes or\n  SQL syntax to change the WHERE clause. Remove fmt and pass name as a\n  query argument.\n\n\n  Proposed fix\n\n   import (\n   \t\"database/sql\"\n  -\t\"fmt\"\n   )\n  \n   // SearchUsers finds users by name.\n   func (s *Store) SearchUsers(name string) (*sql.Rows, error) {\n  -\tquery := fmt.Sprintf(\"SELECT id, email FROM users WHERE name = '%s'\", name)\n  -\treturn s.db.Query(query)\n  +\treturn s.db.Query(\"SELECT id, email FROM users WHERE name = ?\", name)\n   }\n\n  Also applies to: 15-18\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nCritical 1\n\n1 file reviewed:\n- store.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 5s elapsed\nWriting review comments... 13s elapsed\n"
 }

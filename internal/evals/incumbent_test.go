@@ -815,3 +815,63 @@ func TestFingerprintDistinguishesWhatTheReviewerSaw(t *testing.T) {
 		t.Error("defects changed the fingerprint; they are not part of what the reviewer read")
 	}
 }
+
+// TestReparseCachedRaw re-derives every cached review from its retained raw
+// text and rewrites the cache in place.
+//
+// This is what retaining raw bought. Both anchor fixes -- keeping the end of a
+// span, and reading the "Also applies to" line -- changed how a review parses,
+// and every cached entry predates them. Without the raw text the only way to
+// apply a parser fix to an existing corpus is to buy the reviews again, which
+// is how a benchmark ends up quietly scored under two different parsers.
+//
+// Guarded by NITPICK_REPARSE because it WRITES to testdata.
+func TestReparseCachedRaw(t *testing.T) {
+	if os.Getenv("NITPICK_REPARSE") == "" {
+		t.Skip("set NITPICK_REPARSE=1 to re-derive cached reviews from their raw text")
+	}
+
+	entries, err := filepath.Glob(filepath.Join(crCacheDir, "*.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, path := range entries {
+		blob, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var c crCache
+		if err := json.Unmarshal(blob, &c); err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		if c.Raw == "" {
+			t.Errorf("%s: no raw retained; it must be re-collected", c.Fixture)
+			continue
+		}
+
+		found, err := parseIncumbent([]byte(c.Raw))
+		if err != nil {
+			t.Errorf("%s: re-parse failed: %v", c.Fixture, err)
+			continue
+		}
+		if len(found) != len(c.Findings) {
+			// Loud: a parser change that alters the finding COUNT is a different
+			// event from one that refines an anchor, and silently accepting it
+			// would let the corpus drift.
+			t.Errorf("%s: re-parse yields %d finding(s), cache holds %d",
+				c.Fixture, len(found), len(c.Findings))
+		}
+
+		c.Findings = found
+		out, err := json.MarshalIndent(c, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, out, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("%s: re-derived %d finding(s)", c.Fixture, len(found))
+	}
+}

@@ -651,9 +651,6 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 	reportJudgedModels(t, byName, notes)
 }
 
-// crCacheDir is where collected Incumbent reviews persist between runs.
-const crCacheDir = "testdata/incumbent"
-
 // TestCollectIncumbent gathers Incumbent's reviews one fixture at a time,
 // caching each so a rate limit costs a wait rather than lost progress.
 //
