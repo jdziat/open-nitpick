@@ -304,7 +304,27 @@ type Aggregate struct {
 	SignalToNoise []int
 	ToneAdherence []int
 	Grades        []string
+
+	// Fixtures names the distinct fixtures this contender was judged on.
+	//
+	// Comparability is about COVERAGE, not sample count. Judging one contender
+	// once per fixture and another three times over the same fixtures leaves
+	// both with identical coverage and very different len(Grades), and a guard
+	// that reads the length calls that incomparable -- which it is not, and
+	// which fires as a false alarm the moment RUNS is raised on one side.
+	Fixtures map[string]bool
 }
+
+// Saw records that this contender was judged on a fixture.
+func (a *Aggregate) Saw(fixture string) {
+	if a.Fixtures == nil {
+		a.Fixtures = map[string]bool{}
+	}
+	a.Fixtures[fixture] = true
+}
+
+// Coverage is how many distinct fixtures this contender was judged on.
+func (a Aggregate) Coverage() int { return len(a.Fixtures) }
 
 // Add folds one judgement in.
 //

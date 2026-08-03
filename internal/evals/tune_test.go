@@ -440,8 +440,17 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 	// error tier. Counting over-claiming while ignoring under-claiming hands a
 	// free win to whichever reviewer is quieter about severity, which is the
 	// opposite of the judgement a reader wants to make.
-	b.WriteString("MODEL                                GRADE  SPREAD  PREC   FIX  FAIL  FIND  WORTH  INFLATED  UNDER  MISCLASS  MISSED  SIGNAL\n")
-	b.WriteString("-------------------------------------------------------------------------------------------------------------------------\n")
+	// The count columns are PER SAMPLE, not totals.
+	//
+	// GRADE has always been a mean while FIND, INFLATED, MISSED and the rest
+	// were raw sums, so the moment two contenders had different sample counts
+	// the columns stopped being readable side by side: three runs of a model
+	// that misses one defect a run shows MISSED 3 against a single run's 1, and
+	// looks three times worse for having been measured three times as hard.
+	// COV is the fixture coverage that makes the comparison legitimate at all;
+	// N is what the rates divide by.
+	b.WriteString("MODEL                                GRADE  SPREAD  PREC   COV  N    FAIL  FIND  WORTH  INFLATED  UNDER  MISCLASS  MISSED  SIGNAL\n")
+	b.WriteString("---------------------------------------------------------------------------------------------------------------------------------\n")
 
 	for _, r := range rows {
 		a := r.agg
@@ -456,7 +465,6 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 		// model that fails the hard fixtures and completes only the easy ones
 		// scores higher. Without these columns that artifact is invisible and
 		// reads as model quality.
-		fixtures := len(a.Grades)
 		failed := len(notes[r.model])
 
 		// Spread is blank for a single sample rather than printed as 0.00,
@@ -466,9 +474,15 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 			spread = fmt.Sprintf("%.2f", a.GradeSpread())
 		}
 
-		fmt.Fprintf(&b, "%-36s %-6.2f %-7s %-6s %-4d %-5d %-5d %-6d %-9d %-6d %-9d %-7d %.1f\n",
-			truncate(r.model, 36), a.MeanGrade(), spread, prec, fixtures, failed, a.Findings, a.WorthRaising,
-			a.Inflated, a.Understated, a.Misclassed, a.Missed, a.MeanSignal())
+		// Divide by the sample count so every count column is a rate. n is never
+		// zero here: a contender with no graded sample has no row.
+		n := float64(max(len(a.Grades), 1))
+		rate := func(v int) string { return fmt.Sprintf("%.2f", float64(v)/n) }
+
+		fmt.Fprintf(&b, "%-36s %-6.2f %-7s %-6s %-4d %-4d %-5d %-5s %-6s %-9s %-6s %-9s %-7s %.1f\n",
+			truncate(r.model, 36), a.MeanGrade(), spread, prec, a.Coverage(), len(a.Grades), failed,
+			rate(a.Findings), rate(a.WorthRaising), rate(a.Inflated), rate(a.Understated),
+			rate(a.Misclassed), rate(a.Missed), a.MeanSignal())
 	}
 
 	t.Log(b.String())
@@ -477,13 +491,11 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 	// them, and quietly averaging it anyway is how a ranking becomes fiction.
 	most := 0
 	for _, r := range rows {
-		if n := len(r.agg.Grades); n > most {
-			most = n
-		}
+		most = max(most, r.agg.Coverage())
 	}
 	for _, r := range rows {
-		if n := len(r.agg.Grades); n < most {
-			t.Logf("NOT COMPARABLE: %s completed %d/%d fixtures; its grade is a mean over a "+
+		if n := r.agg.Coverage(); n < most {
+			t.Logf("NOT COMPARABLE: %s was judged on %d of %d fixtures; its grade is a mean over a "+
 				"smaller, easier sample and must not be ranked against the others", r.model, n, most)
 		}
 	}
@@ -574,6 +586,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 			notes[name] = append(notes[name], fmt.Sprintf("%s: %v", fx.Name, err))
 			return
 		}
+		agg.Saw(fx.Name)
 
 		assessment, jerr := judge.Judge(ctx, fx, persona, findings)
 		if jerr != nil {
