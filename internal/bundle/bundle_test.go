@@ -422,3 +422,25 @@ func TestAssembleHonorsContextCancellation(t *testing.T) {
 		t.Fatal("want error for a cancelled context")
 	}
 }
+
+func TestWindowSurvivesChangedLinesPastEndOfFile(t *testing.T) {
+	// Raised as an "error" by open-nitpick reviewing its own history: that a
+	// changed line number beyond the file's length would write past the end of
+	// the keep slice. It cannot -- hi is clamped to len(lines), so the fill
+	// loop does not run when lo exceeds it -- but the mismatch it assumes is
+	// real. ChangedLines yields new-file numbers while content may be fetched
+	// at a different revision, so this pins the property rather than trusting
+	// the clamp to survive a future edit.
+	f := &diff.File{Path: "a.go", Hunks: []diff.Hunk{{
+		NewStart: 9000,
+		Lines:    []diff.Line{{Kind: diff.LineAdded, NewLine: 9000, Content: "x"}},
+	}}}
+
+	got, elided := window("one\ntwo\nthree\n", f)
+
+	// Nothing is in range, so nothing is kept and everything reads as elided.
+	if strings.Contains(got, "9000") {
+		t.Errorf("a line past EOF should not be emitted:\n%s", got)
+	}
+	_ = elided
+}
