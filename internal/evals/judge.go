@@ -449,3 +449,28 @@ func (a Aggregate) MeanGrade() float64 {
 	}
 	return sum / float64(len(a.Grades))
 }
+
+// GradeSpread is the range of the graded samples, worst to best.
+//
+// It exists because this harness measured its own noise and the noise won: the
+// run-to-run spread on a single model reached 0.49 while the whole distance
+// from the best-ranked model to the twelfth was 0.28. A table of mean grades
+// with no dispersion column invites the one reading it cannot support — that
+// the order of the rows means something.
+//
+// Reported rather than turned into a confidence interval on purpose: eight
+// fixtures is too few for the interval to be honest, and a number that looks
+// like statistics gets quoted like statistics.
+func (a Aggregate) GradeSpread() float64 {
+	if len(a.Grades) < 2 {
+		return 0
+	}
+
+	lo, hi := GradePoints(a.Grades[0]), GradePoints(a.Grades[0])
+	for _, g := range a.Grades[1:] {
+		p := GradePoints(g)
+		lo = min(lo, p)
+		hi = max(hi, p)
+	}
+	return hi - lo
+}

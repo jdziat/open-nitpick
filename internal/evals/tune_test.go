@@ -431,8 +431,8 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 
 	var b strings.Builder
 	b.WriteString("\nJUDGED MODEL RANKING\n")
-	b.WriteString("MODEL                                GRADE  PREC   FIX  FAIL  FIND  WORTH  INFLATED  MISCLASS  MISSED  SIGNAL\n")
-	b.WriteString("----------------------------------------------------------------------------------------------------------\n")
+	b.WriteString("MODEL                                GRADE  SPREAD  PREC   FIX  FAIL  FIND  WORTH  INFLATED  MISCLASS  MISSED  SIGNAL\n")
+	b.WriteString("------------------------------------------------------------------------------------------------------------------\n")
 
 	for _, r := range rows {
 		a := r.agg
@@ -450,8 +450,15 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 		fixtures := len(a.Grades)
 		failed := len(notes[r.model])
 
-		fmt.Fprintf(&b, "%-36s %-6.2f %-6s %-4d %-5d %-5d %-6d %-9d %-9d %-7d %.1f\n",
-			truncate(r.model, 36), a.MeanGrade(), prec, fixtures, failed, a.Findings, a.WorthRaising,
+		// Spread is blank for a single sample rather than printed as 0.00,
+		// which would read as "perfectly stable" when it means "not measured".
+		spread := "n/a"
+		if len(a.Grades) > 1 {
+			spread = fmt.Sprintf("%.2f", a.GradeSpread())
+		}
+
+		fmt.Fprintf(&b, "%-36s %-6.2f %-7s %-6s %-4d %-5d %-5d %-6d %-9d %-9d %-7d %.1f\n",
+			truncate(r.model, 36), a.MeanGrade(), spread, prec, fixtures, failed, a.Findings, a.WorthRaising,
 			a.Inflated, a.Misclassed, a.Missed, a.MeanSignal())
 	}
 
@@ -470,6 +477,20 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 			t.Logf("NOT COMPARABLE: %s completed %d/%d fixtures; its grade is a mean over a "+
 				"smaller, easier sample and must not be ranked against the others", r.model, n, most)
 		}
+	}
+
+	// Printed with the table, not left to a reader's memory of a commit message.
+	// This harness's measured run-to-run spread reached 0.49 while the distance
+	// from first to twelfth place was 0.28, so row order here is not a ranking
+	// unless a gap clears the SPREAD beside it. Stating that next to the numbers
+	// is the only thing that stops them being quoted as a leaderboard.
+	t.Log("READ THE SPREAD COLUMN: a GRADE gap smaller than the spread beside it is noise, " +
+		"not a ranking. Rows are sorted so the table is legible, not because the order is a result.")
+
+	if _, ok := byModel[IncumbentModel]; ok {
+		t.Logf("ASYMMETRIC SAMPLE: %s is served from a cache of one review per fixture, so its "+
+			"spread is unmeasured rather than zero. Our side may have several runs per fixture.",
+			IncumbentModel)
 	}
 
 	for _, r := range rows {
@@ -600,19 +621,29 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		}(fx)
 
 		for _, m := range opts.Models {
-			wg.Add(1)
-			go func(m Model, fx Fixture) {
-				defer wg.Done()
-				sem <- struct{}{}
-				defer func() { <-sem }()
+			// RUNS reviews each fixture more than once, so the SPREAD column
+			// has something to measure. It applies to our side only: Incumbent
+			// is served from a cache collected one review per fixture, and
+			// re-reviewing to match would spend the account's allowance to
+			// measure a competitor's variance rather than our own. The report
+			// is therefore asymmetric by construction, and says so.
+			runs := max(opts.Runs, 1)
 
-				result := RunWithPersona(ctx, m, fx, 1, opts, persona)
-				if result.Err != nil {
-					record("nitpick/"+m.ID, fx, nil, result.Err)
-					return
-				}
-				record("nitpick/"+m.ID, fx, result.Report.Findings, nil)
-			}(m, fx)
+			for run := 1; run <= runs; run++ {
+				wg.Add(1)
+				go func(m Model, fx Fixture, run int) {
+					defer wg.Done()
+					sem <- struct{}{}
+					defer func() { <-sem }()
+
+					result := RunWithPersona(ctx, m, fx, run, opts, persona)
+					if result.Err != nil {
+						record("nitpick/"+m.ID, fx, nil, result.Err)
+						return
+					}
+					record("nitpick/"+m.ID, fx, result.Report.Findings, nil)
+				}(m, fx, run)
+			}
 		}
 	}
 
