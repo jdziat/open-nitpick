@@ -71,7 +71,13 @@ clean:
 #
 # A name that resolves to nothing is now an error rather than a silent fallback
 # to the tuning corpus, and every table prints which corpus it measured.
-HELD_OUT := contract-break,data-loss-migration,ts-unawaited-async,timezone-boundary,clean-sql-allowlist,removed-guard,retry-no-backoff
+#
+# This list must name EVERY fixture in evals.HeldOutFixtures. A name missing
+# from it is not an error — it is a shorter held-out run reporting a
+# generalization number over a subset, with nothing on the table saying which
+# fixtures were left out. TestTheMakefileSpendsTheWholeHeldOutCorpus compares
+# the two and fails when they drift.
+HELD_OUT := contract-break,data-loss-migration,ts-unawaited-async,timezone-boundary,clean-sql-allowlist,removed-guard,retry-no-backoff,csharp-client-per-request,bash-fixed-temp-path,cross-file-sort-nit,duplicate-test-case-nit,defensive-copy-nit
 
 MODELS   ?=
 RUNS     ?=

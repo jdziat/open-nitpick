@@ -102,8 +102,25 @@ type Fixture struct {
 	// change is genuinely fine and any finding is a false positive.
 	Defects []Defect
 
-	// Extra files exist in both states and are never changed. They give the
-	// model surrounding context without appearing in the diff.
+	// Extra files exist in both states and are never changed.
+	//
+	// THEY DO NOT REACH THE MODEL. This field used to claim it gave "the model
+	// surrounding context without appearing in the diff", and nine files across
+	// seven fixtures were authored on that reading — a tsconfig.json here, a
+	// pyproject.toml there, an Alerts.csproj to say the project is net8.0.
+	// bundle.Assemble builds its plan by iterating the files the DIFF names and
+	// fetching content for those; a file that is byte-identical in both states
+	// is in no diff, so its content is never requested and nothing about it is
+	// ever sent. Measured by driving Assemble over the whole corpus: all nine
+	// reach the plan zero times, and the assembly test in groundtruth_test.go
+	// now fails if that ever silently changes.
+	//
+	// What they DO is make the repository realistic — buildRepo writes them, so
+	// `git diff` sees a tree that looks like a project rather than one loose
+	// source file, and a fixture in a language with a manifest is not a fixture
+	// whose manifest is missing. That is worth keeping. It is not context, and
+	// a fixture whose defect needs a file to be READABLE must put that file in
+	// Base and Head, not here.
 	Extra map[string]string
 }
 
@@ -113,6 +130,31 @@ func (f Fixture) Clean() bool { return len(f.Defects) == 0 }
 // Fixtures is the corpus. Each one is small on purpose: the point is to measure
 // whether the prompt finds an unambiguous bug, not to benchmark long-context
 // reasoning.
+//
+// The five appended at the bottom are half of the warning and nit plants
+// authored to end a skew that made the severity columns unreadable: over
+// AllFixtures the corpus planted 4 critical, 8 error, 1 warning, 0 info and 1
+// nit, so "answer critical to everything" scored near-perfectly and ONE defect
+// was the entire resolution of every claim about the bottom two levels. Which
+// half lands here and which stays held out is argued fixture by fixture in
+// HeldOutFixtures; the rule behind the whole split is that a property the
+// PROMPT IS TUNED ON has to be in this list, because the other corpus is spent
+// once and cannot answer "did that change help?" twice.
+//
+// Three properties are new to this list and each is here for that reason:
+//
+//   - WARNING plants, of which this corpus had NONE. Warning calibration was
+//     literally untunable: every iteration read a corpus in which the level did
+//     not occur, and the one warning in the tree sat in the set nobody may look
+//     at until the end.
+//   - A SECURITY warning (python-timing-unsafe-hmac). Every security plant here
+//     was error or critical, so "security implies at least error" — a rule a
+//     reviewer can learn and be rewarded for — could not be falsified on the
+//     corpus that shapes the prompt.
+//   - MULTI-FILE and MULTI-BATCH review. ts-unbounded-memo-key changes seven
+//     files, which at the shipped max_files_per_request of 6 is the first
+//     fixture in this project's history to assemble into two batches and merge
+//     their findings before triage.
 func Fixtures() []Fixture {
 	return []Fixture{
 		goNilDerefFixture(),
@@ -123,6 +165,15 @@ func Fixtures() []Fixture {
 		styleOnlyFixture(),
 		multiDefectFixture(),
 		subtleLogicFixture(),
+
+		// Warning and nit plants. See warningFixtures and nitFixtures for how
+		// each was authored, and HeldOutFixtures for why these five and not the
+		// other five.
+		tsUnboundedMemoKeyFixture(),
+		goCancelGoroutineLeakFixture(),
+		pythonTimingUnsafeHMACFixture(),
+		redundantSnapshotCopyNitFixture(),
+		sortedForMinNitFixture(),
 	}
 }
 
@@ -159,6 +210,53 @@ func Fixtures() []Fixture {
 // "at least error" to everything — the exact failure the O-INFL column exists
 // to catch — cannot be caught by the corpus that is supposed to check whether
 // the tuning generalized. TestHeldOutCorpusCanFalsifyInflation pins it.
+//
+// THE SECOND HALF OF THE SEVERITY REBALANCE lands here, and the split was made
+// on one question: what would a prompt tuned on Fixtures() have to GENERALIZE
+// to, rather than what is left over. Held-out fixtures chosen as leftovers make
+// the set thin and the generalization claim weak, which is the state this list
+// was in — seven fixtures, six plants, one of them below error.
+//
+//   - csharp-client-per-request  C#, a language NEITHER corpus contained
+//   - bash-fixed-temp-path       shell, likewise, and a security warning
+//   - defensive-copy-nit         Java, likewise
+//   - cross-file-sort-nit        cross-file reasoning in a different language
+//     from the tuning corpus's cross-file plant
+//   - duplicate-test-case-nit    the `tests` class, which appears NOWHERE in
+//     Fixtures(), and the only nit in either corpus that costs coverage rather
+//     than an allocation
+//
+// The three new languages are the load-bearing ones and they are here on
+// purpose. A language planted in Fixtures() can be tuned for, and a prompt that
+// was tuned until it worked on C# has demonstrated nothing about the next
+// language it meets; the same prompt working on C# it was never shown is the
+// only version of that claim worth publishing. The cost is the one every
+// held-out set pays and is worth stating: if the reviewer is bad at shell, this
+// corpus finds out once, at the end, and the finding cannot be acted on without
+// authoring a replacement.
+//
+// `tests` is here for a related but WEAKER reason than this comment first
+// claimed, and the difference matters. It said the class is one "NitpickNormal's
+// scope includes", which is not true of this plant: that scope asks for "missing
+// tests where new branching logic is genuinely risky", and duplicate-test-case-nit
+// is the opposite — a REDUNDANT case, in a change whose slug.go is byte-identical
+// between base and head, so there is no new branching logic for a missing-test
+// finding to attach to. A reviewer reading the tests clause literally stays
+// silent and is scored a miss, which is the "a corpus that penalizes obedience
+// measures nothing" trap fixtures_nit.go uses to rule out style nits.
+//
+// It stays because it is still reachable, through the maintainability clause of
+// the same scope — a duplicated case has a concrete cost a reviewer can name.
+// So it measures how far the prompt generalizes past the examples it was given,
+// which is worth measuring; it does NOT measure coverage of an instructed
+// class, and no claim resting on that reading should be made from it.
+//
+// WHAT DELIBERATELY DID NOT COME HERE: ts-unbounded-memo-key, the only fixture
+// that assembles into more than one batch. Batching is a property of the
+// assembly and prompt this project keeps changing, and a one-shot corpus cannot
+// answer whether a change to it helped — the first measurement would also be
+// the last. It is in Fixtures() so it can be measured repeatedly, and this list
+// therefore still tests no multi-batch behaviour at all.
 func HeldOutFixtures() []Fixture {
 	return []Fixture{
 		contractBreakFixture(),
@@ -168,6 +266,12 @@ func HeldOutFixtures() []Fixture {
 		cleanSQLAllowlistFixture(),
 		removedGuardFixture(),
 		retryNoBackoffFixture(),
+
+		csharpClientPerRequestFixture(),
+		bashFixedTempPathFixture(),
+		redundantSortNitFixture(),
+		duplicateTestCaseNitFixture(),
+		defensiveCopyOfLocalNitFixture(),
 	}
 }
 

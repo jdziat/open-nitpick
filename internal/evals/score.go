@@ -787,7 +787,7 @@ func spanDistance(s review.LineSpan, line int) int {
 //
 // THE BUG IT FIXES: this measured the widest SINGLE region, and the ANCHOR column
 // is the only thing standing between a precise reviewer and one that gestures at
-// a whole file. A finding naming 36 separate one-line regions scored 1 —
+// a whole file. A finding naming 38 separate one-line regions scored 1 —
 // identical to a reviewer that anchored one comment on one line — while being
 // credited with every defect in the file, because anchorDistance takes the MIN
 // over those regions. crParseAlsoApplies already emits exactly that shape, so
@@ -798,7 +798,7 @@ func spanDistance(s review.LineSpan, line int) int {
 //
 //   - THE WIDEST REGION is what was here. It answers a different question —
 //     how long is the longest thing it pointed at — and that question has no
-//     reader. Someone handed 36 one-line regions has 36 lines to read; being
+//     reader. Someone handed 38 one-line regions has 38 lines to read; being
 //     told the answer is 1 is not an approximation of their work, it is
 //     unrelated to it.
 //   - THE HULL, first line to last, charges for the gaps. A finding naming 3-6
@@ -1324,7 +1324,7 @@ type CorpusTally struct {
 	//
 	// The version of that strategy this column could NOT see was the same blob
 	// spelled as a list of one-line regions instead of one span. It measured the
-	// widest single region, so 36 scattered lines read as 1 and the guard passed
+	// widest single region, so 38 scattered lines read as 1 and the guard passed
 	// on the behaviour it was added to catch. anchoredLines is why it now reads
 	// 36.
 	//

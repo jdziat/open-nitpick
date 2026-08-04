@@ -343,6 +343,22 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 			"failed_batches", failures, "of", len(plan.Batches), "unreviewed_files", len(unreviewed))
 	}
 
+	// Batch results are appended under the mutex in goroutine COMPLETION order,
+	// which is a property of the scheduler and not of the change. Everything
+	// downstream reads the slice in order: dedupe keeps the FIRST of two
+	// equivalent findings, and renderForTriage lays them out for the triage
+	// model exactly as they sit here. So without this, a plan with more than
+	// one batch sends the triage model a different prompt on every run, and a
+	// review pinned to temperature 0 for reproducibility is reproducible only
+	// while it fits in a single request. unreviewed was sorted one line below
+	// for this reason and the sibling slice was missed.
+	//
+	// The residual is ties: two findings with the same severity, path and line
+	// keep their arrival order. That is a far smaller window than "batch two
+	// finished first", and closing it would mean giving sortFindings a total
+	// order, which changes published output.
+	sortFindings(findings)
+
 	sort.Strings(unreviewed)
 	return findings, unreviewed, nil
 }

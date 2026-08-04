@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/review"
@@ -77,6 +80,15 @@ func TestPlantedDefectsAreOnTheRightLine(t *testing.T) {
 		"capacity-hint-nit":        {"make("},
 		"multi-defect":             {"os.Create", "go func", "os.Create"},
 
+		// Warning and nit plants in the tuning corpus. Each needle was read back
+		// out of Head by a probe that printed the line, not counted by eye: the
+		// four wrong anchors this test exists for were all produced by counting.
+		"ts-unbounded-memo-key":     {`remember("q:" + q`},
+		"go-cancel-goroutine-leak":  {"make(chan result)"},
+		"python-timing-unsafe-hmac": {"== provided"},
+		"cross-file-copy-nit":       {"make([]store.Event"},
+		"sorted-for-min-nit":        {"sorted(readings"},
+
 		// Held-out corpus.
 		"contract-break":      {`json:"createdAt"`},
 		"data-loss-migration": {"UPDATE accounts"},
@@ -84,6 +96,12 @@ func TestPlantedDefectsAreOnTheRightLine(t *testing.T) {
 		"timezone-boundary":   {"Truncate"},
 		"removed-guard":       {"s.store.DeleteProject(ctx, projectID)"},
 		"retry-no-backoff":    {"for _ in range(ATTEMPTS)"},
+
+		"csharp-client-per-request": {"new HttpClient"},
+		"bash-fixed-temp-path":      {"OUT=/tmp/"},
+		"cross-file-sort-nit":       {"[...listed].sort("},
+		"duplicate-test-case-nit":   {"space becomes a hyphen"},
+		"defensive-copy-nit":        {"new ArrayList<>(labels)"},
 	}
 
 	for _, f := range AllFixtures() {
@@ -351,6 +369,308 @@ func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
 						"or a failed tar command can leave no archive while the caller receives no error. " +
 						"Use subprocess.run(..., check=True) or explicitly handle the exit status."},
 			}},
+		},
+
+		// The warning plants. Each miss below is the false positive its fixture's
+		// own doc comment names, and each is anchored WITHIN anchorTolerance of
+		// the plant wherever the objection would really be made there — otherwise
+		// the exclusion could be coming from the line number and the keyword list
+		// would be untested. The two exceptions are marked where they occur.
+		"ts-unbounded-memo-key": {
+			hit: []probe{
+				{"names the key space and what the table does with it",
+					review.Finding{Path: "src/search.ts", Line: 13, Severity: "warning", Category: "resource",
+						Title:     "Memo table is keyed by raw search text",
+						Rationale: "remember() never releases an entry, so the table gains one per distinct query and the process grows until it is killed."}},
+				{"names the memory and the lifetime",
+					review.Finding{Path: "src/search.ts", Line: 13, Severity: "warning", Category: "performance",
+						Title:     "Do not memoize user-supplied queries",
+						Rationale: "Entries here are never released, so memory is retained for every string anyone searches for."}},
+			},
+			miss: []probe{
+				{"the staleness objection, which quotes cache.ts's own words about the process lifetime",
+					review.Finding{Path: "src/search.ts", Line: 13, Severity: "warning", Category: "correctness",
+						Title:     "Cached results never refresh",
+						Rationale: "A document renamed after its first search keeps its old title forever, because entries are held for the lifetime of the process."}},
+				{"a rate-limit objection that reaches for \"unbounded\" about the REQUEST rate",
+					review.Finding{Path: "src/search.ts", Line: 13, Severity: "warning", Category: "resilience",
+						Title:     "No rate limit on search",
+						Rationale: "Any client can issue an unbounded number of searches, so one caller can saturate the upstream."}},
+				// Anchored in the OTHER file on purpose: cache.ts is correct as
+				// documented and plans.ts uses it correctly, so the defect is the
+				// call site. This probe is the receipt for that judgement being
+				// deliberate — it fails by PATH, not by keyword, and if a later
+				// editor decides the helper is the defect this is the line that
+				// tells them the current answer was chosen rather than inherited.
+				{"reports the growth but blames the helper instead of the caller that broke its contract",
+					review.Finding{Path: "src/cache.ts", Line: 3, Severity: "warning", Category: "resource",
+						Title:     "Map grows without bound",
+						Rationale: "table never evicts, so memory grows forever."}},
+				// The staleness objection in the words a reviewer writes it in.
+				// "grow stale" is ordinary English for it, and the bare stem
+				// "grow" was in the keyword list, so this was credited with the
+				// growth plant. The probe above passed only because it was
+				// phrased "never refresh ... held for the lifetime".
+				{"the staleness objection, saying results \"grow stale\"",
+					review.Finding{Path: "src/search.ts", Line: 13, Severity: "warning", Category: "correctness",
+						Title:     "Memoized search results are never invalidated",
+						Rationale: "remember() holds the first answer for the life of the process, so results grow stale as documents are re-titled and there is no way to evict an entry."}},
+			},
+		},
+
+		"go-cancel-goroutine-leak": {
+			hit: []probe{
+				{"names the channel and what blocks on it",
+					review.Finding{Path: "resolve.go", Line: 24, Severity: "warning", Category: "resource",
+						Title:     "Unbuffered channel leaks the goroutine",
+						Rationale: "When ctx is done first nothing ever receives, so the send blocks forever and the goroutine is never reclaimed."}},
+				// Anchored at the SEND, four lines below the plant and exactly on
+				// anchorTolerance. A reviewer that points at the blocked send has
+				// found the same defect and must not lose recall to a judgement
+				// about which of two adjacent lines the fix belongs on.
+				{"anchors at the send rather than the make, at the edge of the tolerance",
+					review.Finding{Path: "resolve.go", Line: 28, Severity: "warning", Category: "resource",
+						Title:     "Send has no receiver after a timeout",
+						Rationale: "Once ResolveContext has returned on ctx.Done there is no receiver, and this goroutine is leaked."}},
+			},
+			miss: []probe{
+				{"the interface design objection, which is about cancelling the LOOKUP",
+					review.Finding{Path: "resolve.go", Line: 23, Severity: "info", Category: "design",
+						Title:     "Directory.Lookup should take a context",
+						Rationale: "The lookup itself is not cancelled and keeps running after ResolveContext gives up; add a context-aware method to the interface."}},
+				{"an error-wrapping preference on the same function",
+					review.Finding{Path: "resolve.go", Line: 26, Severity: "nit", Category: "style",
+						Title:     "Wrap the context error",
+						Rationale: "Returning ctx.Err() bare loses which name was being resolved."}},
+			},
+		},
+
+		"python-timing-unsafe-hmac": {
+			hit: []probe{{
+				"names the comparison and the fix",
+				review.Finding{Path: "webhook.py", Line: 15, Severity: "warning", Category: "security",
+					Title:     "Signature is compared in variable time",
+					Rationale: "== returns at the first differing byte, so use hmac.compare_digest instead."},
+			}},
+			miss: []probe{
+				{"the module-level secret objection",
+					review.Finding{Path: "webhook.py", Line: 15, Severity: "warning", Category: "reliability",
+						Title:     "Missing WEBHOOK_SECRET crashes at import",
+						Rationale: "SECRET is read at module scope, so an unset variable raises KeyError before any handler runs."}},
+				{"the replay objection, which says \"timestamp\" without saying \"timing\"",
+					review.Finding{Path: "webhook.py", Line: 15, Severity: "warning", Category: "security",
+						Title:     "No replay protection",
+						Rationale: "verify says nothing about a timestamp, so a captured request can be sent again indefinitely."}},
+				{"the case-sensitivity remark, which is why bare \"compare\" is not a keyword",
+					review.Finding{Path: "webhook.py", Line: 15, Severity: "nit", Category: "correctness",
+						Title:     "Hex digests should be compared case-insensitively",
+						Rationale: "A sender that transmits uppercase hex is rejected; normalize both sides before comparing them."}},
+			},
+		},
+
+		"csharp-client-per-request": {
+			hit: []probe{{
+				"names the sockets and the reuse",
+				review.Finding{Path: "src/Notifier.cs", Line: 17, Severity: "warning", Category: "resource",
+					Title:     "A new HttpClient per call exhausts sockets",
+					Rationale: "Each instance brings its own connection pool and disposing it leaves sockets in TIME_WAIT; reuse one client."},
+			}},
+			miss: []probe{
+				{"the timeout objection, which is near-wrong here since the default was not touched",
+					review.Finding{Path: "src/Notifier.cs", Line: 17, Severity: "warning", Category: "reliability",
+						Title:     "No explicit timeout",
+						Rationale: "Set an explicit Timeout so a hung endpoint cannot stall the alert path."}},
+				{"a disposal objection the using statement already handles",
+					review.Finding{Path: "src/Notifier.cs", Line: 19, Severity: "nit", Category: "error-handling",
+						Title:     "EnsureSuccessStatusCode throws",
+						Rationale: "A non-2xx status raises before the caller can log the body; catch it and include the message."}},
+				// The three below are the same two objections written in
+				// ordinary English rather than in wording that dodges the
+				// keyword list. Each was CREDITED with the socket plant until
+				// the bare token "port" came out, because "port" is a substring
+				// of important, support and reports. The pair above passed
+				// throughout: they were phrased without those words, so they
+				// tested the phrasing rather than the keywords.
+				{"the timeout objection, saying \"important\"",
+					review.Finding{Path: "src/Notifier.cs", Line: 17, Severity: "warning", Category: "reliability",
+						Title:     "No explicit timeout on the HttpClient",
+						Rationale: "The default is 100 seconds. For an alert path that is far too long; it is important to set an explicit, short timeout here."}},
+				{"the timeout objection, saying \"support\"",
+					review.Finding{Path: "src/Notifier.cs", Line: 17, Severity: "warning", Category: "reliability",
+						Title:     "Set HttpClient.Timeout explicitly",
+						Rationale: "HttpClient does not support a per-request deadline here, so a hung webhook blocks the alert path."}},
+				{"the disposal objection, saying \"reports\"",
+					review.Finding{Path: "src/Notifier.cs", Line: 19, Severity: "nit", Category: "error-handling",
+						Title:     "Response is not disposed when EnsureSuccessStatusCode throws",
+						Rationale: "If the webhook reports a non-2xx status the exception propagates. It is important that the response is released on that path too."}},
+			},
+		},
+
+		"bash-fixed-temp-path": {
+			hit: []probe{{
+				"names who else can reach the path, and the fix",
+				review.Finding{Path: "scripts/release-notes.sh", Line: 8, Severity: "warning", Category: "security",
+					Title:     "Fixed path in /tmp",
+					Rationale: "Another user on the host can pre-create this as a symlink and redirect the write; use mktemp."},
+			}},
+			miss: []probe{
+				{"the cleanup objection",
+					review.Finding{Path: "scripts/release-notes.sh", Line: 8, Severity: "nit", Category: "maintainability",
+						Title:     "Temp file is never removed",
+						Rationale: "Nothing deletes the file when the script exits; add a trap to clean it up."}},
+				{"an unrelated resilience suggestion on the adjacent line",
+					review.Finding{Path: "scripts/release-notes.sh", Line: 9, Severity: "nit", Category: "resilience",
+						Title:     "curl has no retry",
+						Rationale: "A transient network failure aborts the whole script; add --retry."}},
+				// The cleanup objection ARRIVING WITH ITS OWN FIX, which is
+				// what a real reviewer writes. OUT=$(mktemp) plus a trap is the
+				// idiomatic answer to "nothing removes the file", so the word
+				// mktemp reached this plant attached to the false positive at
+				// least as often as to the security finding — and it was
+				// credited until the keyword came out. The probe above passed
+				// only because its fix was worded "add a trap to clean it up".
+				{"the cleanup objection carrying the mktemp fix",
+					review.Finding{Path: "scripts/release-notes.sh", Line: 8, Severity: "nit", Category: "maintainability",
+						Title:     "The temporary file is never removed",
+						Rationale: "Nothing deletes the JSON after the two jq reads, so each run leaves a file behind. Use OUT=$(mktemp) and trap 'rm -f \"$OUT\"' EXIT."}},
+			},
+		},
+
+		// The nit plants.
+		"cross-file-copy-nit": {
+			hit: []probe{
+				{"names the contract the callee already provides",
+					review.Finding{Path: "report/summary.go", Line: 17, Severity: "nit", Category: "performance",
+						Title:     "Snapshot already returns a copy",
+						Rationale: "The slice is built under the lock and shares no backing array, so this allocates a second slice for nothing."}},
+				{"names the redundancy directly",
+					review.Finding{Path: "report/summary.go", Line: 17, Severity: "nit", Category: "performance",
+						Title:     "Copy of a copy",
+						Rationale: "The store hands this slice over exclusively; copying it again buys nothing."}},
+			},
+			miss: []probe{
+				{"the hallucination the cross-file contract refutes",
+					review.Finding{Path: "report/summary.go", Line: 17, Severity: "error", Category: "concurrency",
+						Title:     "The store may append after Snapshot returns",
+						Rationale: "Another goroutine calling Add could race with this read and leave the summary stale."}},
+				{"a design remark about the struct",
+					review.Finding{Path: "report/summary.go", Line: 18, Severity: "nit", Category: "maintainability",
+						Title:     "Total duplicates len(Events)",
+						Rationale: "Summary.Total is always the length of Events; compute it at render time."}},
+			},
+		},
+
+		"cross-file-sort-nit": {
+			hit: []probe{
+				{"names the order the callee already guarantees",
+					review.Finding{Path: "src/roster.ts", Line: 6, Severity: "nit", Category: "performance",
+						Title:     "listMembers already returns them sorted",
+						Rationale: "The array arrives in display-name order, so this orders it a second time for an identical result."}},
+				{"names the redundancy directly",
+					review.Finding{Path: "src/roster.ts", Line: 6, Severity: "nit", Category: "performance",
+						Title:     "Redundant sort",
+						Rationale: "The roster is already sorted when it arrives here; drop the re-sort."}},
+			},
+			miss: []probe{
+				{"the in-place-mutation objection both spreads refute",
+					review.Finding{Path: "src/roster.ts", Line: 6, Severity: "error", Category: "correctness",
+						Title:     "sort mutates in place",
+						Rationale: "Array.prototype.sort reorders the caller's array; copy before ordering to avoid corrupting the roster's storage."}},
+				{"the duplicated-comparator finding, whose fix KEEPS the redundant sort",
+					review.Finding{Path: "src/roster.ts", Line: 6, Severity: "nit", Category: "maintainability",
+						Title:     "Inline comparator duplicates byDisplayName",
+						Rationale: "members.ts exports the same comparison; import it rather than repeating the localeCompare call."}},
+			},
+		},
+
+		"sorted-for-min-nit": {
+			hit: []probe{{
+				"names the cheaper call and what the current one copies",
+				review.Finding{Path: "sensors.py", Line: 23, Severity: "nit", Category: "performance",
+					Title:     "Use min() instead of ordering the whole list",
+					Rationale: "sorted() copies and orders every element to read one; min(readings, key=...) walks it once."},
+			}},
+			miss: []probe{
+				{"the empty-list objection the two lines above already handle",
+					review.Finding{Path: "sensors.py", Line: 23, Severity: "error", Category: "correctness",
+						Title:     "IndexError on an empty list",
+						Rationale: "Indexing [0] raises when there are no readings at all."}},
+				{"a sample-count suggestion, which is why the keyword carries its parenthesis",
+					review.Finding{Path: "sensors.py", Line: 23, Severity: "info", Category: "design",
+						Title:     "No minimum sample count",
+						Rationale: "coldest answers from a single reading; require a minimum number of samples first."}},
+			},
+		},
+
+		"duplicate-test-case-nit": {
+			hit: []probe{{
+				"names which case it repeats and what that costs",
+				review.Finding{Path: "slug/slug_test.go", Line: 16, Severity: "nit", Category: "tests",
+					Title:     "Duplicate table case",
+					Rationale: "This is identical to the \"replaces spaces\" case above, so it runs one assertion twice and adds no coverage."},
+			}},
+			miss: []probe{
+				{"a finding about cases that are ABSENT rather than the one repeated",
+					review.Finding{Path: "slug/slug_test.go", Line: 16, Severity: "warning", Category: "tests",
+						Title:     "No case covers the empty string",
+						Rationale: "Slug(\"\") is never exercised; add a case for it and for unicode input."}},
+				{"observes that the expectations repeat, which is why the keyword carries its preposition",
+					review.Finding{Path: "slug/slug_test.go", Line: 15, Severity: "nit", Category: "tests",
+						Title:     "Five cases expect the same output",
+						Rationale: "Most rows are identical in their expectation, which makes a failure hard to localize."}},
+				// The same observation in the two words a reviewer actually
+				// reaches for. "identical to" was chosen with its preposition
+				// to exclude exactly this reviewer, and then "duplicate",
+				// "duplicates" and "repeats" were put in the same list and let
+				// it back in: both of these were credited with finding the
+				// repeated CASE while talking about the repeated COLUMN, and
+				// both sit inside anchorTolerance of line 16 so distance
+				// excludes neither.
+				{"the repeated-column objection, saying \"duplicate\"",
+					review.Finding{Path: "slug/slug_test.go", Line: 14, Severity: "nit", Category: "tests",
+						Title:     "Repeated expected value across the table",
+						Rationale: "Five of the six cases duplicate the same expected output \"hello-world\". Consider deriving it once."}},
+				{"the repeated-column objection, saying \"repeats\"",
+					review.Finding{Path: "slug/slug_test.go", Line: 15, Severity: "nit", Category: "tests",
+						Title:     "The table repeats one expectation",
+						Rationale: "The want column repeats \"hello-world\" for nearly every row, which makes the table hard to scan."}},
+			},
+		},
+
+		"defensive-copy-nit": {
+			hit: []probe{{
+				"names reachability rather than the copy",
+				review.Finding{Path: "src/main/java/com/example/report/Labels.java", Line: 26, Severity: "nit", Category: "performance",
+					Title:     "labels never escapes forIds",
+					Rationale: "The list is built here and no other reference to it exists, so wrapping it directly is already immutable."},
+			}},
+			miss: []probe{
+				{"a real but unrelated null objection shared with the whole file",
+					review.Finding{Path: "src/main/java/com/example/report/Labels.java", Line: 26, Severity: "warning", Category: "correctness",
+						Title:     "NPE when ids is null",
+						Rationale: "forIds dereferences ids.size() with no null check."}},
+				{"a tidier spelling that copies exactly as much",
+					review.Finding{Path: "src/main/java/com/example/report/Labels.java", Line: 26, Severity: "nit", Category: "style",
+						Title:     "Prefer List.copyOf",
+						Rationale: "List.copyOf(labels) is the modern spelling and returns an unmodifiable list in one call."}},
+				// The same suggestion using the ordinary phrase for a double
+				// wrap. It was credited until "unnecessary copy", "redundant
+				// copy", "needless copy" and "no need to copy" came out — four
+				// keywords that contradicted this defect's own comment, which
+				// says the list is built on reachability rather than on "copy".
+				// A reviewer proposing List.copyOf has made none of the escape
+				// judgement the plant is about: List.copyOf allocates the same
+				// second list. The probe above passed only because it avoided
+				// the word copy entirely.
+				{"the same suggestion calling it a redundant copy",
+					review.Finding{Path: "src/main/java/com/example/report/Labels.java", Line: 26, Severity: "nit", Category: "style",
+						Title:     "Prefer List.copyOf",
+						Rationale: "Collections.unmodifiableList(new ArrayList<>(labels)) is a redundant copy spelled the long way; List.copyOf(labels) returns an unmodifiable copy in one call."}},
+				{"the same suggestion calling it an unnecessary copy",
+					review.Finding{Path: "src/main/java/com/example/report/Labels.java", Line: 26, Severity: "nit", Category: "style",
+						Title:     "Use List.copyOf instead of wrapping an ArrayList",
+						Rationale: "Wrapping a fresh ArrayList in unmodifiableList is an unnecessary copy of an idiom the JDK already provides. List.copyOf does the same thing."}},
+			},
 		},
 
 		"multi-defect": {
@@ -634,6 +954,16 @@ func TestPlantedSeveritiesArePinned(t *testing.T) {
 		"multi-defect/handler.go:19/resource":           config.SeverityError,
 		"capacity-hint-nit/window.go:17/resource":       config.SeverityNit,
 
+		// The warning and nit plants that ended the skew. These are the levels
+		// the corpus previously could not resolve at all — one warning and one
+		// nit across fifteen fixtures — so a drift here is not one plant moving,
+		// it is the bottom of the scale becoming unmeasurable again.
+		"ts-unbounded-memo-key/src/search.ts:13/resource":   config.SeverityWarning,
+		"go-cancel-goroutine-leak/resolve.go:24/resource":   config.SeverityWarning,
+		"python-timing-unsafe-hmac/webhook.py:15/security":  config.SeverityWarning,
+		"cross-file-copy-nit/report/summary.go:17/resource": config.SeverityNit,
+		"sorted-for-min-nit/sensors.py:23/resource":         config.SeverityNit,
+
 		// Held-out corpus. Pinned on the same terms: it is spent once, so a
 		// severity edit here is discovered at the moment the number it
 		// corrupted is already being reported.
@@ -643,6 +973,12 @@ func TestPlantedSeveritiesArePinned(t *testing.T) {
 		"timezone-boundary/report.go:13/correctness":                        config.SeverityError,
 		"removed-guard/project.go:31/security":                              config.SeverityCritical,
 		"retry-no-backoff/client.py:11/resource":                            config.SeverityWarning,
+
+		"csharp-client-per-request/src/Notifier.cs:17/resource":                       config.SeverityWarning,
+		"bash-fixed-temp-path/scripts/release-notes.sh:8/security":                    config.SeverityWarning,
+		"cross-file-sort-nit/src/roster.ts:6/resource":                                config.SeverityNit,
+		"duplicate-test-case-nit/slug/slug_test.go:16/tests":                          config.SeverityNit,
+		"defensive-copy-nit/src/main/java/com/example/report/Labels.java:26/resource": config.SeverityNit,
 	}
 
 	got := map[string]config.Severity{}
@@ -675,6 +1011,190 @@ func TestPlantedSeveritiesArePinned(t *testing.T) {
 		if _, ok := want[key]; !ok {
 			t.Errorf("%s is planted %q and is not pinned: add it here so the next edit to it is visible",
 				key, gotSev)
+		}
+	}
+}
+
+// severityLevels is the order histograms are rendered in, loudest first, so two
+// failure messages from different tests can be read against each other.
+var severityLevels = []config.Severity{
+	config.SeverityCritical, config.SeverityError, config.SeverityWarning,
+	config.SeverityInfo, config.SeverityNit,
+}
+
+// severityHistogram counts the plants at each level in a corpus.
+func severityHistogram(corpus []Fixture) map[config.Severity]int {
+	h := map[config.Severity]int{}
+	for _, f := range corpus {
+		for _, d := range f.Defects {
+			h[d.WantSeverity]++
+		}
+	}
+	return h
+}
+
+// renderHistogram spells a histogram the way the failure messages quote it, so a
+// reader sees what the corpus IS rather than only that it moved.
+func renderHistogram(h map[config.Severity]int) string {
+	parts := make([]string, 0, len(severityLevels))
+	total := 0
+	for _, level := range severityLevels {
+		parts = append(parts, fmt.Sprintf("%s %d", level, h[level]))
+		total += h[level]
+	}
+	return fmt.Sprintf("%s = %d plants", strings.Join(parts, "  "), total)
+}
+
+// TestTheSeverityDistributionStaysBalanced is the guard on the property the
+// corpus was rebuilt to have.
+//
+// It had exactly one warning and one nit across fifteen fixtures. Two things
+// follow from a shape like that, and both were live defects rather than
+// theoretical ones. A reviewer that answers "critical" to everything scored
+// perfectly on a severity metric — which is why one such metric has already been
+// withdrawn — and ONE defect was the entire unit of resolution for every claim
+// either report made about the bottom of the scale: "the reviewer calibrates
+// warnings" and "the reviewer got retry-no-backoff right" were the same
+// sentence, indistinguishable by construction.
+//
+// The methodology gate named the consequence: "A+ would require the corpus to be
+// able to answer the questions the reports ask of it, and it cannot."
+//
+// So the distribution is asserted, and it is asserted PER CORPUS, because each
+// one is reported on separately and a balanced total made of two skewed halves
+// answers no question either half is asked. Three rules, each of which the old
+// corpus broke:
+//
+//  1. A level is ABSENT or it is RESOLVED. One plant at a level cannot
+//     distinguish a calibrated reviewer from a lucky one, so a level present at
+//     all needs at least two. Zero is legal and is not an oversight being
+//     tolerated silently — see the note on info below.
+//  2. No level may hold more than half a corpus's plants, which bounds what a
+//     reviewer with no severity opinion at all can score by answering that level
+//     to everything.
+//  3. At least three distinct levels per corpus, so the scale being measured is
+//     a scale rather than a threshold.
+//
+// WHAT THIS TEST DOES NOT CLAIM. Balance is not calibration. Nothing here can
+// check that a plant's WantSeverity is the level a senior reviewer would really
+// pick — that is a judgement, argued per plant against the anchors in
+// internal/prompt/templates/review.md and pinned by
+// TestPlantedSeveritiesArePinned. This test is the guard against the OTHER
+// failure, the one that looks like tidying: a corpus rebalanced by RELABELLING
+// is worse than a skewed one, because it looks like evidence. Rule 1 is what
+// stops the cheapest version of that — dialling a single plant down to fill an
+// empty bucket — from ever being enough.
+//
+// INFO IS EMPTY, and deliberately visible in every message this prints. Three
+// levels were authored to fix the skew; the info level was assigned to an author
+// that produced nothing, so the corpus still cannot resolve a single claim about
+// it. Rule 1 means the next person to work on this cannot close the gap halfway:
+// one info plant fails this test, and two pass it.
+func TestTheSeverityDistributionStaysBalanced(t *testing.T) {
+	const (
+		minPerPresentLevel = 2
+		minDistinctLevels  = 3
+	)
+
+	for _, corpus := range []struct {
+		name  string
+		fx    []Fixture
+		spent string
+	}{
+		{"tuning", Fixtures(), "every tuning iteration reads it"},
+		{"held-out", HeldOutFixtures(), "it is spent once, so a skew here is discovered while the number it corrupted is being reported"},
+	} {
+		h := severityHistogram(corpus.fx)
+		shape := renderHistogram(h)
+
+		total, distinct := 0, 0
+		for _, level := range severityLevels {
+			total += h[level]
+			if h[level] > 0 {
+				distinct++
+			}
+		}
+		if total == 0 {
+			t.Errorf("the %s corpus plants nothing", corpus.name)
+			continue
+		}
+
+		for _, level := range severityLevels {
+			n := h[level]
+			if n > 0 && n < minPerPresentLevel {
+				t.Errorf("the %s corpus plants %s exactly %d time(s): one plant is not a "+
+					"measurement of a level, it is a measurement of one fixture, and every claim "+
+					"made about %s would rest on it. Author a second or author none — %s.\n  %s",
+					corpus.name, level, n, level, corpus.spent, shape)
+			}
+			if n*2 > total {
+				t.Errorf("the %s corpus plants %s %d of %d times, so a reviewer that answers %q to "+
+					"everything and understands nothing scores over half of it. That is the "+
+					"degenerate reviewer a withdrawn severity metric was maximised by.\n  %s",
+					corpus.name, level, n, total, level, shape)
+			}
+		}
+
+		if distinct < minDistinctLevels {
+			t.Errorf("the %s corpus plants only %d distinct severities, so it measures a threshold "+
+				"rather than a scale and cannot observe inflation and understatement in the same "+
+				"run.\n  %s", corpus.name, distinct, shape)
+		}
+	}
+
+	// Logged unconditionally: the histogram is the headline fact about this
+	// corpus, and a reader running the suite should not have to break it to see
+	// what it currently is.
+	t.Logf("tuning:   %s", renderHistogram(severityHistogram(Fixtures())))
+	t.Logf("held-out: %s", renderHistogram(severityHistogram(HeldOutFixtures())))
+	t.Logf("both:     %s", renderHistogram(severityHistogram(AllFixtures())))
+}
+
+// TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus closes the quietest way
+// this corpus has to lose a plant.
+//
+// warningFixtures and nitFixtures are the record of what was AUTHORED at each
+// level. Neither is a corpus: Fixtures() and HeldOutFixtures() name the
+// individual constructors, because the five warning plants and the five nit
+// plants are each split across both. That split is deliberate and is argued in
+// HeldOutFixtures — but it means the authored set and the measured set are two
+// different lists, and nothing else in the tree compares them.
+//
+// A fixture missing from both corpora is invisible in the worst way. It
+// compiles, it is exercised by every ground-truth test that iterates
+// AllFixtures... except that it is not IN AllFixtures, so it is exercised by
+// nothing at all: no line check, no keyword probe, no severity pin. It is a
+// plant that measures nothing while looking, in the diff that added it, exactly
+// like a plant that does. The reverse — the same fixture in both corpora — is
+// the leak TestHeldOutCorpusStaysHeldOut catches by name; this catches it by
+// count for the authored sets.
+func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
+	authored := map[string][]Fixture{
+		"warningFixtures": warningFixtures(),
+		"nitFixtures":     nitFixtures(),
+	}
+
+	tuning := map[string]bool{}
+	for _, f := range Fixtures() {
+		tuning[f.Name] = true
+	}
+	held := map[string]bool{}
+	for _, f := range HeldOutFixtures() {
+		held[f.Name] = true
+	}
+
+	for _, set := range []string{"warningFixtures", "nitFixtures"} {
+		for _, f := range authored[set] {
+			switch {
+			case tuning[f.Name] && held[f.Name]:
+				t.Errorf("%s authored %q and it is in BOTH corpora, so a fixture reported as held "+
+					"out is one the prompt is tuned on", set, f.Name)
+			case !tuning[f.Name] && !held[f.Name]:
+				t.Errorf("%s authored %q and NO corpus contains it, so it is not in AllFixtures and "+
+					"no ground-truth test touches it: its lines are unchecked, its keywords are "+
+					"unprobed, its severity is unpinned, and it measures nothing. Add it to "+
+					"Fixtures() or HeldOutFixtures()", set, f.Name)
+			}
 		}
 	}
 }
@@ -794,6 +1314,35 @@ func TestIncumbentSeverityIsRecordedNotRewritten(t *testing.T) {
 // its one "critical" spans two of our levels. The per-plant lines are logged on
 // failure so a disagreement can be read rather than guessed at.
 func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
+	// The tuning fixtures the shipped cache covers, pinned by name.
+	//
+	// This used to be "all of Fixtures()", and that identity broke the moment the
+	// corpus grew: five warning and nit fixtures were added to end a severity
+	// skew that made these very columns unreadable, and re-collecting the
+	// incumbent's opinion of them is a paid, networked, rate-limited operation
+	// that is not part of authoring a fixture. The guard could not tell that
+	// apart from the failure it exists for — a cached fixture EDITED without
+	// re-collecting, which zeroes its counts and reads as the numbers improving.
+	//
+	// So the set is written down instead of derived. Both directions are checked
+	// below, and the second is the one that matters: a fixture in this list with
+	// no cache was edited, and a tuning fixture with a cache that is NOT in this
+	// list would silently move the pinned totals underneath them.
+	//
+	// WHAT THIS COSTS, stated because the number below is quoted elsewhere: the
+	// incumbent's severity reading now covers EIGHT of the thirteen tuning
+	// fixtures, not all of them, and the five it omits are exactly the warning
+	// and nit plants. Its 2/3/2 is therefore a statement about the corpus as it
+	// stood when it was collected — which was already the honest reading of it,
+	// since it was never a cross-tool score — and it is not evidence about how
+	// the incumbent rates the two levels this corpus previously could not
+	// resolve. Answering that takes a collection run.
+	covered := map[string]bool{
+		"go-nil-deref": true, "go-sql-injection": true, "go-hardcoded-secret": true,
+		"python-command-injection": true, "clean-refactor": true, "style-only": true,
+		"multi-defect": true, "capacity-hint-nit": true,
+	}
+
 	var (
 		got    SeverityScore
 		cached int
@@ -803,6 +1352,19 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 
 	for _, f := range Fixtures() {
 		findings, ok := CachedIncumbent(crCacheDir, f)
+		if ok != covered[f.Name] {
+			switch {
+			case covered[f.Name]:
+				t.Errorf("%s is pinned as covered by %s and has no cached review matching its "+
+					"current source: the fixture was edited without re-collecting, which zeroes "+
+					"its counts and reads as the totals below having improved", f.Name, crCacheDir)
+			default:
+				t.Errorf("%s is NOT pinned as covered and has a cached review, so the totals below "+
+					"are computed over a different corpus than the one they were pinned against; "+
+					"add it here in the same change that re-collects", f.Name)
+			}
+			continue
+		}
 		if !ok {
 			continue
 		}
@@ -823,10 +1385,10 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 
 	// A cache that stopped matching would zero every count and read as the
 	// numbers having improved, which is the failure this whole file guards.
-	if cached != len(Fixtures()) {
-		t.Fatalf("%d of %d tuning fixtures have a cached Incumbent review matching their current "+
-			"source, so this test measures a different corpus than it pins; a fixture was edited "+
-			"without re-collecting %s", cached, len(Fixtures()), crCacheDir)
+	if cached != len(covered) {
+		t.Fatalf("%d of the %d pinned fixtures have a cached Incumbent review matching their "+
+			"current source, so this test measures a different corpus than it pins; a fixture was "+
+			"edited without re-collecting %s", cached, len(covered), crCacheDir)
 	}
 
 	want := SeverityScore{Accurate: 2, Inflated: 3, Understated: 2}
@@ -988,6 +1550,64 @@ func TestHeldOutFixturesAreSelectableByName(t *testing.T) {
 	}
 }
 
+// TestTheMakefileSpendsTheWholeHeldOutCorpus keeps the one-shot run from
+// quietly becoming a partial one.
+//
+// The held-out corpus is spent by `make eval FIXTURES=$(HELD_OUT)`, and HELD_OUT
+// is a hand-typed comma-separated line in the Makefile. Adding a fixture to
+// HeldOutFixtures() does not add it there, and nothing in the tree noticed:
+// five were added to the corpus in one change and the Makefile still named
+// seven, so the generalization run would have measured a subset and printed a
+// table saying "HELD-OUT corpus (7 fixtures)" — which is true, and is not the
+// claim anyone reading it would take away.
+//
+// This is the omission twin of TestMistypedFixtureNameIsAnError. That test
+// catches a name that resolves to NOTHING, which is loud. A name that is simply
+// absent resolves to nothing at all and is silent, and the corpus cannot be
+// re-spent once the number is published.
+func TestTheMakefileSpendsTheWholeHeldOutCorpus(t *testing.T) {
+	src, err := os.ReadFile("../../Makefile")
+	if err != nil {
+		t.Fatalf("reading the Makefile: %v", err)
+	}
+
+	const prefix = "HELD_OUT :="
+	var line string
+	for _, l := range strings.Split(string(src), "\n") {
+		if strings.HasPrefix(l, prefix) {
+			line = strings.TrimSpace(strings.TrimPrefix(l, prefix))
+			break
+		}
+	}
+	if line == "" {
+		t.Fatalf("the Makefile has no %q line, so the held-out corpus has no documented way to be "+
+			"spent and this test asserts nothing", prefix)
+	}
+
+	named := map[string]bool{}
+	for _, name := range strings.Split(line, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			named[name] = true
+		}
+	}
+
+	held := map[string]bool{}
+	for _, f := range HeldOutFixtures() {
+		held[f.Name] = true
+		if !named[f.Name] {
+			t.Errorf("%s is in HeldOutFixtures and is NOT in the Makefile's HELD_OUT line, so the "+
+				"one-shot run silently omits it and reports generalization over a subset", f.Name)
+		}
+	}
+	for name := range named {
+		if !held[name] {
+			t.Errorf("the Makefile's HELD_OUT line names %q, which is not a held-out fixture. "+
+				"OptionsFromEnv rejects a name that resolves to nothing, so this does not report a "+
+				"subset — it makes the held-out run fail outright", name)
+		}
+	}
+}
+
 // TestMistypedFixtureNameIsAnError pins the failure mode that made the held-out
 // corpus unsafe to spend.
 //
@@ -1144,4 +1764,147 @@ func TestEveryPlantedDefectIsReportable(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestTheCorpusStillAssemblesTheWayItsCommentsClaim reads the batching back out
+// of bundle.Assemble instead of trusting the sentences that describe it.
+//
+// Three separate comments in this package rest on one measured fact:
+// ts-unbounded-memo-key changes seven files, so at the shipped
+// max_files_per_request of 6 it is the only fixture that assembles into more
+// than one batch. HeldOutFixtures argues its whole tuning/held-out split on
+// that fact, fixtures_warning.go calls the file count load-bearing, and the
+// fixture's own comment declares an invariant tighter still: the three files a
+// reviewer needs in order to SEE the defect — the caller that breaks the
+// contract, the helper that states it, and the control that honours it — must
+// land in the SAME batch, "because a defect split across batches would be one
+// no reviewer could see, and a plant nothing can find scores as a prompt
+// weakness forever".
+//
+// Nothing read any of it back. Two one-line edits were enough to falsify the
+// claims while `go test ./...` printed ok:
+//
+//   - Deleting the two files the fixture calls "ordinary PR filler" drops it to
+//     five files and ONE batch. The corpus then has zero multi-batch coverage
+//     and every comment above is false.
+//   - Adding one more ordinary file whose path sorts before src/search.ts —
+//     src/format.ts, say — fills the first batch with the six alphabetically
+//     earliest paths and pushes search.ts into the second, ALONE with types.ts.
+//     The planted defect is then structurally unfindable: the reviewer reading
+//     the batch that contains it has never seen cache.ts's contract or plans.ts
+//     honouring it, so every model scores a miss and the eval reports a corpus
+//     bug as a prompt weakness — the exact outcome the fixture says must be
+//     prevented.
+//
+// Both invariants turn on alphabetical position at an exact boundary, which is
+// far too quiet a thing to leave to a sentence. This is the same argument
+// TestTheFiguresTheseCommentsQuoteStillReproduce makes about the numbers in
+// prose, applied to a number no comment could state without running the code.
+func TestTheCorpusStillAssemblesTheWayItsCommentsClaim(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+
+	// The files each fixture's comments say a reviewer cannot see the defect
+	// without. Every one of them must share a batch with the planted line: a
+	// cross-file defect whose halves arrive in different requests is not a
+	// harder defect, it is an impossible one.
+	together := map[string][]string{
+		"ts-unbounded-memo-key": {"src/cache.ts", "src/plans.ts", "src/search.ts"},
+		"cross-file-copy-nit":   {"store/store.go", "report/summary.go"},
+		"cross-file-sort-nit":   {"src/members.ts", "src/roster.ts"},
+	}
+
+	multi := map[string]int{}
+
+	for _, f := range AllFixtures() {
+		dir := t.TempDir()
+		if err := buildRepo(dir, f); err != nil {
+			t.Errorf("%s: build repo: %v", f.Name, err)
+			continue
+		}
+
+		raw, err := vcs.NewLocal(dir, io.Discard).Diff(context.Background(), vcs.Ref{})
+		if err != nil {
+			t.Errorf("%s: diff: %v", f.Name, err)
+			continue
+		}
+		files, err := diff.Parse(raw)
+		if err != nil {
+			t.Errorf("%s: parse diff: %v", f.Name, err)
+			continue
+		}
+
+		// The shipped config, through the same constructor the eval runs, so
+		// this measures the batching a real review would get rather than one
+		// assembled to make the assertion pass.
+		cfg := evalConfig(Model{ID: "assembly-probe"})
+		plan, err := bundle.Assemble(context.Background(), cfg, files,
+			func(_ context.Context, path string) ([]byte, error) {
+				return os.ReadFile(filepath.Join(dir, filepath.FromSlash(path)))
+			})
+		if err != nil {
+			t.Errorf("%s: assemble: %v", f.Name, err)
+			continue
+		}
+
+		batchOf := map[string]int{}
+		for i, b := range plan.Batches {
+			for _, p := range b.Paths() {
+				batchOf[p] = i
+			}
+		}
+		if len(plan.Batches) > 1 {
+			multi[f.Name] = len(plan.Batches)
+		}
+
+		for _, group := range [][]string{together[f.Name]} {
+			if len(group) == 0 {
+				continue
+			}
+			first, ok := batchOf[group[0]]
+			if !ok {
+				t.Errorf("%s: %s is named as context the defect cannot be read without, but it is not in the plan at all",
+					f.Name, group[0])
+				continue
+			}
+			for _, p := range group[1:] {
+				got, ok := batchOf[p]
+				if !ok {
+					t.Errorf("%s: %s is named as context the defect cannot be read without, but it is not in the plan at all",
+						f.Name, p)
+					continue
+				}
+				if got != first {
+					t.Errorf("%s: %s is in batch %d and %s is in batch %d, so no single review request sees both. "+
+						"The defect is split across requests and every reviewer scores a miss on it, which the "+
+						"eval reports as a prompt weakness rather than as this. Reorder or shrink the change so "+
+						"they share a batch.",
+						f.Name, group[0], first+1, p, got+1)
+				}
+			}
+		}
+
+		// Extra is written into the repository and then never reviewed:
+		// Assemble only ever fetches content for files the diff names, so an
+		// unchanged file cannot reach a prompt through it. Pinned rather than
+		// described, because Fixture.Extra's doc claimed the opposite for
+		// nine files across seven fixtures and no test disagreed.
+		for p := range f.Extra {
+			if _, ok := batchOf[p]; ok {
+				t.Errorf("%s: Extra file %s reached the review plan. If that is now intended, "+
+					"Fixture.Extra's doc and this assertion both need rewriting — several fixtures "+
+					"were authored believing it already happened", f.Name, p)
+			}
+		}
+	}
+
+	if len(multi) == 0 {
+		t.Errorf("NO fixture assembles into more than one batch, so nothing in the corpus exercises " +
+			"cross-batch assembly or the merge that follows it. HeldOutFixtures argues its split on " +
+			"this property existing and fixtures_warning.go calls it load-bearing; both are now false. " +
+			"Restore the file count on ts-unbounded-memo-key or author a replacement.")
+	}
+	t.Logf("multi-batch fixtures: %v (max_files_per_request=%d)", multi,
+		evalConfig(Model{ID: "assembly-probe"}).Review.MaxFilesPerRequest)
 }

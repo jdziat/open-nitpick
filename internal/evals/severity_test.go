@@ -1620,8 +1620,8 @@ func explainsWithin(f review.Finding, defects []Defect, tol int) bool {
 // 49 separate one-line regions" scored 1, and explainsAny's said "twenty-two
 // boilerplate one-liners on a grid" scored NOISE 0 against three plants. Neither
 // figure reproduces from this tree. scatteredAnchorReview attaches one region
-// per line of the file and the largest Head file in AllFixtures is 36 lines, so
-// the measured maximum is 36; boilerplateGridReview files one finding per line,
+// per line of the file and the largest Head file in AllFixtures is 38 lines, so
+// the measured maximum is 38; boilerplateGridReview files one finding per line,
 // so the only three-plant fixture yields 36 comments, not 22. The arguments were
 // right and the evidence quoted for them was invented — which is the defect
 // these same files retract twice over ("a retraction argued from an
@@ -1971,10 +1971,31 @@ func radiusSpamReview(f Fixture) []review.Finding {
 	return out
 }
 
-// terseGuessSpacing is how often the guesser files a comment. Every third line
-// is enough to be visibly a guess and few enough that it stays cheaper than
-// explaining, which is the whole content of the strategy it serves.
-const terseGuessSpacing = 3
+// terseGuessSpacing is how often the guesser files a comment: dense enough to be
+// visibly a guess, sparse enough that it stays CHEAPER THAN EXPLAINING, which is
+// the whole content of the cost strategy it serves.
+//
+// The second half is arithmetic over the corpus, not a matter of taste, and it
+// is why this constant is not 3 any more. A guess costs spamTokens and an
+// explained finding explainedTokens, so the guesser undercuts the calibrated
+// reviewer only while
+//
+//	spamTokens * (defects + guesses) < explainedTokens * defects
+//
+// and `guesses` is one per terseGuessSpacing lines of EVERY head file in
+// AllFixtures, while `defects` grows only when a plant is added. Ten fixtures
+// authored to fix the severity skew added far more lines than plants, and at a
+// spacing of 3 the guesser tipped over into costing 3036 against the explainer's
+// 2880 — so it was caught by $/DEFECT, stopped demonstrating that NOISE is
+// load-bearing, and TestEachCostStrategyIsCaughtByTheColumnItClaims failed
+// exactly as it is designed to. At 5 it is 2040 against 2880.
+//
+// The value is a band rather than a point: 4 also clears it, by 17% rather than
+// 29%. 5 is chosen for the headroom, because the margin is consumed by every
+// fixture anyone adds and a guard that has to be re-derived on each one teaches
+// people to adjust the constant instead of reading it. That test is the guard —
+// this comment is not, and a change here that breaks the inequality fails there.
+const terseGuessSpacing = 5
 
 // terseGuessReview is the reviewer that never says why: it names each planted
 // defect on its own line in as few words as it can, and scatters one-line
@@ -2165,7 +2186,7 @@ func degenerateReviewers() []degenerateReviewer {
 			name: "a line-precise reviewer that also points at every other line",
 			why: "the enormous-span strategy spelled as a list of one-line regions instead of one " +
 				"span, which is the shape crParseAlsoApplies actually emits. It is the calibrated " +
-				"reviewer with 36 extra one-line regions bolted onto each finding, so it is right about " +
+				"reviewer with 38 extra one-line regions bolted onto each finding, so it is right about " +
 				"every defect, its severity and its line, AND it points at the whole file. It tied a " +
 				"calibrated reviewer on RECALL, NOISE and ANCHOR together, because ANCHOR reported the " +
 				"widest SINGLE region and every region it added was one line long — while " +
