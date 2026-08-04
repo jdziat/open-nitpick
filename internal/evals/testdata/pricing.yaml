@@ -1,0 +1,642 @@
+# Model prices for the eval battery, in USD per MILLION tokens.
+#
+# This is DATA, and it lives in a file for one reason: prices change without
+# notice and nobody redeploys a benchmark when they do. Compiled into Go, a
+# stale table would keep answering questions about cost-to-performance with
+# numbers nobody had looked at in months, and the answer would still arrive with
+# a dollar sign in front of it. Here every rate carries a date instead.
+#
+# PROVENANCE IS PER MODEL, and every field below is required:
+#
+#   captured_on  the local calendar date the rate was read from the vendor
+#   source       where it was read from
+#   endpoint     WHICH of the vendor's endpoints this rate belongs to
+#   routing      what the other endpoints for this model charge
+#
+# There is deliberately no table-wide capture date. There used to be, and it was
+# the wrong shape: rates get refreshed one model at a time, and a single header
+# date is bumped by whoever touched one entry — which re-dates the other
+# nineteen as fresh without anyone having looked at them. The reported table age
+# is DERIVED as the oldest entry in it, which no single edit can improve.
+#
+# Those fields are a CLAIM. testdata/pricing-source.json is the evidence: the
+# vendor's own pricing object for every model below AND for every endpoint that
+# serves it, captured verbatim, from which this file is re-derived and checked on
+# every `go test` by TestShippedPricesMatchTheCapturedVendorResponse. Edit one
+# without the other and the suite says so.
+#
+# ENDPOINT AND ROUTING. This is the error the second round found, and it is not a
+# transcription slip — every number in the previous file was a correct copy of
+# `/api/v1/models`. The mistake was believing that object names A PRICE. It names
+# ONE ENDPOINT'S price, and OpenRouter serves 14 of these 20 models from between
+# 5 and 34 endpoints at different rates:
+#
+#   openai/gpt-5.6-luna     6 endpoints    $0.05 to $1.10 in     22.0x
+#   openai/gpt-5.6-terra    6 endpoints    $0.50 to $2.75 in      5.5x
+#   openai/gpt-5.4          6 endpoints    $1.25 to $5.00 in      4.0x
+#   deepseek/deepseek-v4-pro 18 endpoints  $0.435 to $1.74 in     4.0x
+#   z-ai/glm-5.2           34 endpoints    $0.5866 to $2.31 in    3.9x
+#   google/gemini-3.5-flash 6 endpoints    $0.75 to $2.70 in      3.6x
+#   qwen/*                  1 endpoint     no spread              1.0x
+#
+# open-nitpick pins no provider, so which endpoint serves a request is the
+# router's choice and is recorded nowhere. A single number in a $/DEFECT column
+# is therefore a POINT INSIDE A BAND whose width is a property of the model, and
+# the five models with no band at all are the five qwen entries. Ranking a qwen
+# row against a glm-5.2 row on six decimal places compares an exact figure with
+# one that could be 3.9x either way, and the column gave a reader nothing to see
+# that with.
+#
+# The direction, measured against the endpoint the router reaches for first
+# (`endpoints` is returned cheapest-first): the recorded rate is EXACT on 16
+# models and TOO HIGH on 4 — glm-5.2 by 1.296x, minimax-m2.7 by 1.042x,
+# kimi-k2.7-code by 1.028x, glm-5.1 by 1.015x. It is never too low against that
+# route. All four are open-weight models with third-party hosts; every model it
+# is exact on is either single-endpoint or first-party, where the alternates are
+# service tiers of the same vendor (openai/flex at half, openai/priority at 2x).
+# So the error tracks MODEL CLASS, which is exactly the axis the table is read
+# along.
+#
+# The fix is not a different number. `routing` records what the whole endpoint
+# set charges, the cost column reports a RANGE where one exists, and an operator
+# who wants a point estimate has an action: pin the provider, and the range
+# collapses to a rate this file can name.
+#
+# A model with NO entry reports its cost as unknown, never as zero — zero is a
+# number a reader will act on. An entry present with a rate of 0.0 is different:
+# that is a published price of zero (a free tier), and it says so by existing.
+#
+# TIERS. OpenRouter publishes `pricing.overrides` keyed on `min_prompt_tokens`
+# for 11 of the 20 models below, and this file records them under `tiers`. A
+# tier INHERITS every rate it does not restate, matching the vendor's own
+# encoding — google/gemini-3.1-pro-preview's 200,000-token tier raises input,
+# output and cache_read and leaves cache_write at the base rate, so restating it
+# here would be inventing a number the vendor did not publish.
+#
+# The tier a call is billed at is chosen PER CALL from that call's reported
+# prompt size, never from an aggregate. An earlier version of this file recorded
+# base rates only, with a comment asserting that reviews are billed at the qwen
+# second tier and are therefore understated by up to 3.3x. Both halves were
+# guesses. The rates were right, and the tier claim was never measured — the
+# whole fixture corpus runs at 1,500 to 2,200 prompt tokens per call against a
+# 32,000-token first step, so "correcting" the qwen rates upward would have
+# overstated the three cheapest models in the battery by 1.8x to 3.3x.
+# `review.token_budget_per_request` is 60,000, which is a CAP on assembled
+# context and not the size of any prompt actually sent.
+#
+# Regenerate a model's entry, INCLUDING its tiers and its routing block, then
+# set its captured_on. Both calls are needed; the second is the one that was
+# missing for two rounds:
+#
+#   curl -s https://openrouter.ai/api/v1/models |
+#     jq '.data[] | select(.id == "MODEL/ID") | .pricing'
+#   curl -s https://openrouter.ai/api/v1/models/MODEL/ID/endpoints |
+#     jq '.data.endpoints[] | {tag, provider_name, pricing}'
+#
+# input / output are the standard prompt and completion rates.
+#
+# cache_read and cache_write are omitted for providers that publish no separate
+# cache tier; an omitted rate falls back to `input`, which is what such a
+# provider actually charges. Writing 0.0 there instead would claim free caching.
+# The routing minima and maxima apply that same fallback PER ENDPOINT before
+# taking the extremum, so they are the bounds of what could actually be billed
+# rather than the bounds of what happens to be published.
+#
+# NOT PRICED HERE, checked and deliberately absent:
+#
+#   internal_reasoning  published by the two gemini entries only, and equal to
+#                       their `completion` rate in both. Reasoning tokens are a
+#                       SUBSET of completion in the SDK's usage, so they are
+#                       already billed at exactly the right rate; a separate
+#                       term would double-count them.
+#   input_cache_write_1h  the two anthropic entries publish a 1-hour cache TTL
+#                       at 1.6x the 5-minute rate ($6.00 against $3.75 on
+#                       sonnet-4.6, $10.00 against $6.25 on opus-5). Nothing in
+#                       open-nitpick enables prompt caching, and the SDK reports
+#                       cache-creation tokens without a TTL, so there is no
+#                       signal to select it on. Recorded here so the omission is
+#                       a decision. This line said 2x for a round — a number
+#                       nobody had divided — which is why the multiple and both
+#                       rates are now asserted against the captured receipt.
+#   discount            several endpoints publish one. It is kept in the receipt
+#                       and not applied: nothing states what it is conditional
+#                       on, and a discount applied on a guess moves every number
+#                       in the flattering direction.
+#   image / audio / web_search  no path in a code review sends any of these.
+#
+# NITPICK_EVAL_PRICES=/path/to/prices.yaml overrides this file wholesale, for an
+# operator who has fresher data and does not want to edit the repository.
+#
+# Entries are ordered by input rate. The spread across this table is the entire
+# reason the column exists: qwen3.7-flash at $0.03 against gpt-5.6-sol at $5.00
+# is 167x on input, so a model that grades marginally better can still be an
+# indefensible default.
+
+models:
+  "qwen/qwen3.7-flash":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "alibaba"
+    input: 0.03
+    output: 0.13
+    cache_read: 0.006
+    cache_write: 0.038
+    tiers:
+      - min_prompt_tokens: 32000
+        input: 0.1
+        output: 0.4
+        cache_read: 0.02
+        cache_write: 0.125
+      - min_prompt_tokens: 256000
+        input: 0.2
+        output: 0.8
+        cache_read: 0.04
+        cache_write: 0.25
+    routing:
+      source: "https://openrouter.ai/api/v1/models/qwen/qwen3.7-flash/endpoints"
+      endpoints: 1
+      cheapest: "alibaba"
+      dearest: "alibaba"
+      min_input: 0.03
+      max_input: 0.03
+      min_output: 0.13
+      max_output: 0.13
+      min_cache_read: 0.006
+      max_cache_read: 0.006
+      min_cache_write: 0.038
+      max_cache_write: 0.038
+
+  "openai/gpt-5.6-luna":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "openai"
+    input: 0.1
+    output: 0.6
+    cache_read: 0.01
+    cache_write: 0.125
+    tiers:
+      - min_prompt_tokens: 272000
+        input: 0.2
+        output: 0.9
+        cache_read: 0.02
+        cache_write: 0.25
+    routing:
+      source: "https://openrouter.ai/api/v1/models/openai/gpt-5.6-luna/endpoints"
+      endpoints: 6
+      cheapest: "openai"
+      dearest: "azure/eu"
+      min_input: 0.05
+      max_input: 1.1
+      min_output: 0.3
+      max_output: 6.6
+      min_cache_read: 0.005
+      max_cache_read: 0.11
+      min_cache_write: 0.0625
+      max_cache_write: 1.375
+
+  "minimax/minimax-m2.7":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "deepinfra/fp8"
+    input: 0.25
+    output: 1
+    cache_read: 0.05
+    routing:
+      source: "https://openrouter.ai/api/v1/models/minimax/minimax-m2.7/endpoints"
+      endpoints: 12
+      cheapest: "mara"
+      dearest: "groq"
+      min_input: 0.24
+      max_input: 0.6
+      min_output: 0.96
+      max_output: 2.4
+      min_cache_read: 0.05
+      max_cache_read: 0.6
+      min_cache_write: 0.24
+      max_cache_write: 0.6
+
+  "qwen/qwen3.7-plus":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "alibaba/fp8"
+    input: 0.32
+    output: 1.28
+    cache_read: 0.064
+    cache_write: 0.4
+    tiers:
+      - min_prompt_tokens: 256000
+        input: 0.96
+        output: 3.84
+        cache_read: 0.192
+        cache_write: 1.2
+    routing:
+      source: "https://openrouter.ai/api/v1/models/qwen/qwen3.7-plus/endpoints"
+      endpoints: 1
+      cheapest: "alibaba/fp8"
+      dearest: "alibaba/fp8"
+      min_input: 0.32
+      max_input: 0.32
+      min_output: 1.28
+      max_output: 1.28
+      min_cache_read: 0.064
+      max_cache_read: 0.064
+      min_cache_write: 0.4
+      max_cache_write: 0.4
+
+  "deepseek/deepseek-v4-pro":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "deepseek"
+    input: 0.435
+    output: 0.87
+    cache_read: 0.003625
+    routing:
+      source: "https://openrouter.ai/api/v1/models/deepseek/deepseek-v4-pro/endpoints"
+      endpoints: 18
+      cheapest: "deepseek"
+      dearest: "baseten/fp4"
+      min_input: 0.435
+      max_input: 1.74
+      min_output: 0.87
+      max_output: 3.48
+      min_cache_read: 0.003625
+      max_cache_read: 0.348
+      min_cache_write: 0.435
+      max_cache_write: 1.74
+
+  "qwen/qwen3-coder-plus":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "alibaba/fp8"
+    input: 0.65
+    output: 3.25
+    cache_read: 0.13
+    cache_write: 0.8125
+    tiers:
+      - min_prompt_tokens: 32000
+        input: 1.17
+        output: 5.85
+        cache_read: 0.234
+        cache_write: 1.4625
+      - min_prompt_tokens: 128000
+        input: 1.95
+        output: 9.75
+        cache_read: 0.39
+        cache_write: 2.4375
+    routing:
+      source: "https://openrouter.ai/api/v1/models/qwen/qwen3-coder-plus/endpoints"
+      endpoints: 1
+      cheapest: "alibaba/fp8"
+      dearest: "alibaba/fp8"
+      min_input: 0.65
+      max_input: 0.65
+      min_output: 3.25
+      max_output: 3.25
+      min_cache_read: 0.13
+      max_cache_read: 0.13
+      min_cache_write: 0.8125
+      max_cache_write: 0.8125
+
+  "moonshotai/kimi-k2.7-code":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "ambient/int4"
+    input: 0.73
+    output: 3.5
+    cache_read: 0.15
+    routing:
+      source: "https://openrouter.ai/api/v1/models/moonshotai/kimi-k2.7-code/endpoints"
+      endpoints: 16
+      cheapest: "coreweave/int4"
+      dearest: "moonshotai/highspeed"
+      min_input: 0.71
+      max_input: 1.9
+      min_output: 3.5
+      max_output: 8
+      min_cache_read: 0.15
+      max_cache_read: 0.38
+      min_cache_write: 0.71
+      max_cache_write: 1.9
+
+  "z-ai/glm-5.2":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "coreweave/fp4"
+    input: 0.76
+    output: 2.42
+    cache_read: 0.14
+    routing:
+      source: "https://openrouter.ai/api/v1/models/z-ai/glm-5.2/endpoints"
+      endpoints: 34
+      cheapest: "novita/fp8"
+      dearest: "alibaba/fast"
+      min_input: 0.5866
+      max_input: 2.31
+      min_output: 1.5
+      max_output: 7.26
+      min_cache_read: 0.1
+      max_cache_read: 0.462
+      min_cache_write: 0.5866
+      max_cache_write: 2.31
+
+  "qwen/qwen3-max-thinking":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "alibaba/fp8"
+    input: 0.78
+    output: 3.9
+    tiers:
+      - min_prompt_tokens: 32000
+        input: 1.56
+        output: 7.8
+      - min_prompt_tokens: 128000
+        input: 1.95
+        output: 9.75
+    routing:
+      source: "https://openrouter.ai/api/v1/models/qwen/qwen3-max-thinking/endpoints"
+      endpoints: 1
+      cheapest: "alibaba/fp8"
+      dearest: "alibaba/fp8"
+      min_input: 0.78
+      max_input: 0.78
+      min_output: 3.9
+      max_output: 3.9
+      min_cache_read: 0.78
+      max_cache_read: 0.78
+      min_cache_write: 0.78
+      max_cache_write: 0.78
+
+  "z-ai/glm-5.1":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "streamlake/fp8"
+    input: 0.966
+    output: 3.036
+    cache_read: 0.1794
+    routing:
+      source: "https://openrouter.ai/api/v1/models/z-ai/glm-5.1/endpoints"
+      endpoints: 19
+      cheapest: "baidu/fp8"
+      dearest: "venice/fp8"
+      min_input: 0.952
+      max_input: 1.54
+      min_output: 2.992
+      max_output: 4.84
+      min_cache_read: 0.098
+      max_cache_read: 1.4
+      min_cache_write: 0.952
+      max_cache_write: 1.54
+
+  "openai/gpt-5.6-terra":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "openai"
+    input: 1
+    output: 6
+    cache_read: 0.1
+    cache_write: 1.25
+    tiers:
+      - min_prompt_tokens: 272000
+        input: 2
+        output: 9
+        cache_read: 0.2
+        cache_write: 2.5
+    routing:
+      source: "https://openrouter.ai/api/v1/models/openai/gpt-5.6-terra/endpoints"
+      endpoints: 6
+      cheapest: "openai"
+      dearest: "azure/eu"
+      min_input: 0.5
+      max_input: 2.75
+      min_output: 3
+      max_output: 16.5
+      min_cache_read: 0.05
+      max_cache_read: 0.275
+      min_cache_write: 0.625
+      max_cache_write: 3.4375
+
+  "openai/gpt-5.6-terra-pro":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "openai"
+    input: 1
+    output: 6
+    cache_read: 0.1
+    cache_write: 1.25
+    tiers:
+      - min_prompt_tokens: 272000
+        input: 2
+        output: 9
+        cache_read: 0.2
+        cache_write: 2.5
+    routing:
+      source: "https://openrouter.ai/api/v1/models/openai/gpt-5.6-terra-pro/endpoints"
+      endpoints: 5
+      cheapest: "openai"
+      dearest: "azure/eu"
+      min_input: 0.5
+      max_input: 2.75
+      min_output: 3
+      max_output: 16.5
+      min_cache_read: 0.05
+      max_cache_read: 0.275
+      min_cache_write: 0.625
+      max_cache_write: 3.4375
+
+  "qwen/qwen3.7-max":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "alibaba/fp8"
+    input: 1.475
+    output: 4.425
+    cache_read: 0.295
+    cache_write: 1.84375
+    routing:
+      source: "https://openrouter.ai/api/v1/models/qwen/qwen3.7-max/endpoints"
+      endpoints: 1
+      cheapest: "alibaba/fp8"
+      dearest: "alibaba/fp8"
+      min_input: 1.475
+      max_input: 1.475
+      min_output: 4.425
+      max_output: 4.425
+      min_cache_read: 0.295
+      max_cache_read: 0.295
+      min_cache_write: 1.84375
+      max_cache_write: 1.84375
+
+  "google/gemini-3.5-flash":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "google-vertex/global"
+    input: 1.5
+    output: 9
+    cache_read: 0.15
+    cache_write: 0.083333333333
+    routing:
+      source: "https://openrouter.ai/api/v1/models/google/gemini-3.5-flash/endpoints"
+      endpoints: 6
+      cheapest: "google-vertex/global"
+      dearest: "google-vertex/global/priority"
+      min_input: 0.75
+      max_input: 2.7
+      min_output: 4.5
+      max_output: 16.2
+      min_cache_read: 0.075
+      max_cache_read: 0.27
+      min_cache_write: 0.041666666667
+      max_cache_write: 0.15
+
+  "google/gemini-3.1-pro-preview":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "google-vertex/global"
+    input: 2
+    output: 12
+    cache_read: 0.2
+    cache_write: 0.375
+    tiers:
+      - min_prompt_tokens: 200000
+        input: 4
+        output: 18
+        cache_read: 0.4
+    routing:
+      source: "https://openrouter.ai/api/v1/models/google/gemini-3.1-pro-preview/endpoints"
+      endpoints: 6
+      cheapest: "google-vertex/global"
+      dearest: "google-vertex/global/priority"
+      min_input: 1
+      max_input: 3.6
+      min_output: 6
+      max_output: 21.6
+      min_cache_read: 0.1
+      max_cache_read: 0.36
+      min_cache_write: 0.1875
+      max_cache_write: 0.675
+
+  "openai/gpt-5.4":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "openai"
+    input: 2.5
+    output: 15
+    cache_read: 0.25
+    tiers:
+      - min_prompt_tokens: 272000
+        input: 5
+        output: 22.5
+        cache_read: 0.5
+    routing:
+      source: "https://openrouter.ai/api/v1/models/openai/gpt-5.4/endpoints"
+      endpoints: 6
+      cheapest: "openai"
+      dearest: "openai/priority"
+      min_input: 1.25
+      max_input: 5
+      min_output: 7.5
+      max_output: 30
+      min_cache_read: 0.125
+      max_cache_read: 0.5
+      min_cache_write: 1.25
+      max_cache_write: 5
+
+  "anthropic/claude-sonnet-4.6":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "anthropic/2"
+    input: 3
+    output: 15
+    cache_read: 0.3
+    cache_write: 3.75
+    routing:
+      source: "https://openrouter.ai/api/v1/models/anthropic/claude-sonnet-4.6/endpoints"
+      endpoints: 8
+      cheapest: "anthropic/2"
+      dearest: "google-vertex/europe"
+      min_input: 3
+      max_input: 3.3
+      min_output: 15
+      max_output: 16.5
+      min_cache_read: 0.3
+      max_cache_read: 0.33
+      min_cache_write: 3.75
+      max_cache_write: 4.125
+
+  "anthropic/claude-opus-5":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "amazon-bedrock/claude-on-aws"
+    input: 5
+    output: 25
+    cache_read: 0.5
+    cache_write: 6.25
+    routing:
+      source: "https://openrouter.ai/api/v1/models/anthropic/claude-opus-5/endpoints"
+      endpoints: 7
+      cheapest: "amazon-bedrock/claude-on-aws"
+      dearest: "google-vertex/europe"
+      min_input: 5
+      max_input: 5.5
+      min_output: 25
+      max_output: 27.5
+      min_cache_read: 0.5
+      max_cache_read: 0.55
+      min_cache_write: 6.25
+      max_cache_write: 6.875
+
+  "openai/gpt-5.6-sol":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "openai"
+    input: 5
+    output: 30
+    cache_read: 0.5
+    cache_write: 6.25
+    tiers:
+      - min_prompt_tokens: 272000
+        input: 10
+        output: 45
+        cache_read: 1
+        cache_write: 12.5
+    routing:
+      source: "https://openrouter.ai/api/v1/models/openai/gpt-5.6-sol/endpoints"
+      endpoints: 6
+      cheapest: "openai"
+      dearest: "openai/priority"
+      min_input: 2.5
+      max_input: 10
+      min_output: 15
+      max_output: 60
+      min_cache_read: 0.25
+      max_cache_read: 1
+      min_cache_write: 3.125
+      max_cache_write: 12.5
+
+  "openai/gpt-5.6-sol-pro":
+    captured_on: "2026-08-03"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "azure"
+    input: 5
+    output: 30
+    cache_read: 0.5
+    cache_write: 6.25
+    tiers:
+      - min_prompt_tokens: 272000
+        input: 10
+        output: 45
+        cache_read: 1
+        cache_write: 12.5
+    routing:
+      source: "https://openrouter.ai/api/v1/models/openai/gpt-5.6-sol-pro/endpoints"
+      endpoints: 5
+      cheapest: "azure"
+      dearest: "openai/priority"
+      min_input: 2.5
+      max_input: 10
+      min_output: 15
+      max_output: 60
+      min_cache_read: 0.25
+      max_cache_read: 1
+      min_cache_write: 3.125
+      max_cache_write: 12.5
+

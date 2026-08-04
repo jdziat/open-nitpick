@@ -36,6 +36,11 @@ have produced a confident wrong number.
 | only `INFLATED` printed, never `UNDERSTATED` | severity error visible in one direction only | favoured the quieter reviewer |
 | `NOT COMPARABLE` guard read sample count | false alarm whenever one side ran more times | neutral |
 | raw sums compared across unequal `N` | a model measured 3× as hard looked 3× worse | against whoever ran more |
+| `O-ACC`/`O-INFL`/`O-UNDER` published with no coverage denominator | reporting only the plants already rated `critical`, and calling them `critical`, tied a perfectly calibrated reviewer on all three — 4 plants of 14 | favoured selective silence |
+| `RECALL`/`NOISE` published with no anchor width | one finding per file, spanning the file, titled with every keyword in it, tied a calibrated reviewer on both | favoured saying where nothing is |
+| full-resolution `O-*` left on Incumbent's row after the banded triple was withdrawn | the retracted comparison stayed on the page in the same sorted ranking, with a note asking the reader not to make it | against Incumbent |
+| `STABLE` returned `yes` for five silent runs | the column's best value went to a reviewer that never spoke; a wobbly correct one got `NO` | favoured silence |
+| the retraction's own figures (`10 of 10`, `0.62 → 0.88`, `O-ACC 0.63`) | none reproduced; each overstated the case it was making | favoured the author |
 
 ### The correction that mattered most
 
@@ -46,9 +51,23 @@ accurate on any of them. Its raw output for `go-sql-injection` reads
 as understating.
 
 A claim was published on the uncorrected number — *"every model beats Incumbent
-decisively on objective severity"* — and retracted. Corrected, Incumbent's O-ACC
-is roughly 0.63 rather than 0.38, which puts it **mid-pack**: one model clearly
-ahead, two level, two behind.
+decisively on objective severity"* — and retracted. **Its replacement was also
+wrong, and is retracted here.** That replacement read: *"corrected, Incumbent's
+O-ACC is roughly 0.63 rather than 0.38, which puts it mid-pack: one model clearly
+ahead, two level, two behind."*
+
+Two things are wrong with it. The number is not reproducible: over the shipped
+cache the corrected parser scores Incumbent 2 accurate / 3 inflated / 2
+understated on the tuning fixtures and 2/4/4 over all of them — O-ACC 0.29 and
+0.20, not 0.63. And the *kind* of claim is the one Rule 6 withdraws: a cross-tool
+severity accuracy figure, used to rank a reviewer with roughly three levels
+against models with five. Ranking it "mid-pack" is exactly the sentence no number
+here supports.
+
+`crSeverity` mapping `critical` up was still the right correction — it records
+what Incumbent said. It just does not license the comparison the old paragraph
+drew from it. The O-* cells on Incumbent's row now print `n/a`; what is
+published for it is the severity vocabulary block.
 
 The original mapping was not careless. It was written to stop Incumbent reading
 as *inflated*, since its `critical` spans what we split into `critical` and

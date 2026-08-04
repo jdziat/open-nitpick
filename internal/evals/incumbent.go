@@ -109,24 +109,87 @@ var crRule = regexp.MustCompile(`^[\x{2500}-\x{257F}=_-]{4,}$`)
 // clean bill of health. See the check in parseIncumbent.
 var crDeclaredCount = regexp.MustCompile(`(?m)^\s*(\d+)\s+findings?\b`)
 
-// crSeverity maps Incumbent's vocabulary onto ours.
+// crSeverity records the severity Incumbent assigned, in our vocabulary.
 //
-// Incumbent publishes critical/warning/info. There is no separate "error"
-// tier, so its critical spans what open-nitpick splits into critical and error.
-// Mapping it straight through would systematically read as inflation that is
-// really a vocabulary difference, so critical lands on error — the level whose
-// definition ("a real bug that produces incorrect behavior") matches what its
-// criticals have actually described.
+// It USED to demote "critical" to our "error", on the reasoning that
+// Incumbent's single critical spans what we split into critical and error and
+// that passing it through would read as inflation. The reasoning identified a
+// real problem and fixed it in the wrong place. A parsed severity is EVIDENCE
+// about the reviewer, and rewriting the evidence to make a comparison come out
+// fairly destroys the thing being measured: no Incumbent review could then
+// score accurate on any of the four plants we plant at critical, however it
+// worded the finding, and its raw output for go-sql-injection literally reads
+// "critical [Security & Privacy]". Mapping down did not remove the bias, it
+// swapped an inflation bias for an understatement bias — and no choice of
+// constant here can fix what is a difference in RESOLUTION rather than in
+// meaning. It does not belong at comparison time either: that was the second
+// attempt, a banded cross-tool score, and it is withdrawn — see
+// NoCrossToolSeverityScore in score.go for the two measurements that killed it.
+// What is left is a faithful record and a description of it.
+//
+// So: a word that IS one of our levels is recorded as that level. Only the
+// foreign tokens are a judgement, and they are the ones a reader should
+// distrust:
+//
+//   - "major" is Incumbent's own word and has no counterpart among our five.
+//     It is recorded at warning — the weakest anchor in review.md that still
+//     asserts a defect ("likely a bug, or a genuine hazard under plausible
+//     conditions") — because a foreign token we cannot resolve should not be
+//     handed the benefit of the doubt. THAT IS A GUESS AND THE CORPUS CONTAINS
+//     NO EVIDENCE FOR IT: every "major" finding it credits sits on a plant we
+//     rate error or critical and none on a plant of warning, and recording it at
+//     error instead moved the withdrawn banded figure from 0.600 to a PERFECT
+//     1.000 with Incumbent's bytes unchanged. (That swing was published as
+//     "0.62 to 0.88"; the figures reproduce from nothing in the tree and are
+//     corrected here — see NoCrossToolSeverityScore.)
+//     That is why no such figure is published any longer, and why this constant
+//     is left alone rather than re-tuned: re-tuning it moves a number our way
+//     with no new evidence, which is the mistake three times over.
+//     TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered measures it.
+//   - "minor" is the same judgement one step down.
+//
+// The vocabulary observed across the whole shipped corpus is {critical, major}
+// — the two words above. Every other arm is defensive: the CLI's tiers are not
+// contractual, and an unrecognized word still has to produce a finding, which
+// is what the default is for.
 func crSeverity(s string) config.Severity {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "critical":
+		return config.SeverityCritical
+	case "error":
 		return config.SeverityError
 	case "warning", "warn", "major":
 		return config.SeverityWarning
-	case "info", "minor", "nit":
+	case "info", "minor":
 		return config.SeverityInfo
+	case "nit", "nitpick":
+		return config.SeverityNit
 	default:
-		return config.SeverityWarning
+		// An unrecognized word is degraded the SAME way an unrecognized word
+		// from one of our own models is, by the same function.
+		//
+		// THE BUG: this arm returned warning, while a finding of ours carrying
+		// an unknown severity goes through config.Severity.Normalize and lands
+		// at info. The identical unusable token therefore scored a whole level
+		// apart depending on which contender emitted it — an advantage handed to
+		// the incumbent by the scorer, in a comparison whose entire purpose is to
+		// be like-for-like.
+		//
+		// The claim here is about THIS ARM and no wider. The arms above are
+		// asymmetric on purpose and the asymmetry is live: "major", "warn" and
+		// "nitpick" are translated here and would Normalize to info if one of
+		// our models emitted them, so the same word is worth a different level
+		// depending on who said it — and "major" carries more than half the
+		// incumbent's severity words in the shipped cache. That is a translation
+		// of a foreign vocabulary, which is why it is enumerated rather than
+		// inferred, why every translated token is a guess this file marks as
+		// one, and why no cross-tool severity score is published from the
+		// result. TestUnusableSeverityIsDegradedIdenticallyForEveryContender
+		// pins the default arm; TestForeignSeverityWordsAreTranslatedOnPurpose
+		// pins the enumerated set, so a fourth translation cannot be added
+		// silently.
+		n, _ := config.Severity(s).Normalize()
+		return n
 	}
 }
 
@@ -772,23 +835,93 @@ func fixtureFingerprint(f Fixture) string {
 // CachedIncumbent returns a fixture's cached findings, if one was collected
 // for this exact fixture content and review mode.
 //
-// A mismatch is reported as "no cache" rather than as an error: the caller's
-// remedy is identical either way — review it again — and a stale entry is
-// overwritten by the next collection.
+// The findings are re-derived from the recorded Raw review whenever there is
+// one, and c.Findings is used only for an entry collected before Raw was kept.
+// Raw is the evidence; c.Findings is one PARSER'S READING of it, and the parser
+// is the part that keeps turning out to be wrong — crSeverity demoted every
+// Incumbent "critical" for the whole of the first benchmark, and a headline
+// number was published on the result. Replaying the stored reading freezes each
+// such bug into the corpus permanently, so fixing one would cost a full
+// re-collection against a rate-limited allowance to recover data already on
+// disk. Re-parsing costs microseconds and makes a parser fix apply to every
+// review ever collected.
+//
+// A Raw that no longer parses is reported as NO CACHE, and this is the second
+// answer this function has given to that question. IT USED TO FALL BACK TO THE
+// STORED FINDINGS, returning ok=true with no marker of any kind, on the
+// reasoning that a stale reading beats a silently absent review. The reasoning
+// is wrong in the only direction that matters here: a stale reading is not
+// merely older, it is a DIFFERENT PARSER'S output being scored in a table
+// captioned as this parser's result, and it arrives looking exactly like a fresh
+// one. A cache that silently serves a stale parse is how a corpus drifts under a
+// measurement — and the fallback fired precisely when the parser had changed,
+// which is precisely when the difference matters. The absent-review worry it was
+// answering is handled where it belongs: every caller lists what has no cache
+// before it runs, and a contender judged on nothing is failed rather than ranked.
+//
+// StaleIncumbentCache says which of the two it was, so a report can tell an
+// operator "the parser and the evidence have diverged, re-collect" instead of
+// "never collected".
+//
+// A fingerprint or mode mismatch is likewise reported as "no cache" rather than
+// as an error: the caller's remedy is identical either way — review it again —
+// and a stale entry is overwritten by the next collection.
 func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
+	c, ok := readCRCache(cacheDir, f)
+	if !ok {
+		return nil, false
+	}
+
+	if c.Raw != "" {
+		findings, err := parseIncumbent([]byte(c.Raw))
+		if err != nil {
+			return nil, false
+		}
+		return findings, true
+	}
+
+	// Collected before Raw was retained. There is no evidence to re-derive from,
+	// so the stored reading is all there is; it is not stale in the sense above,
+	// because no newer reading of the same bytes is possible.
+	return c.Findings, true
+}
+
+// StaleIncumbentCache reports whether a cache entry exists for this fixture and
+// matches its current content, but its recorded review no longer parses.
+//
+// It distinguishes the two reasons CachedIncumbent says no. "Never collected"
+// costs an operator a review against a rate-limited allowance; "collected, and
+// the parser no longer reads it" is a bug in the parser or a change in the CLI's
+// output, and re-collecting would spend that allowance to hide it.
+func StaleIncumbentCache(cacheDir string, f Fixture) (stale bool, why error) {
+	c, ok := readCRCache(cacheDir, f)
+	if !ok || c.Raw == "" {
+		return false, nil
+	}
+
+	if _, err := parseIncumbent([]byte(c.Raw)); err != nil {
+		return true, err
+	}
+	return false, nil
+}
+
+// readCRCache loads the entry for a fixture, if one matches its exact content
+// and review mode.
+func readCRCache(cacheDir string, f Fixture) (crCache, bool) {
 	data, err := os.ReadFile(filepath.Join(cacheDir, f.Name+".json"))
 	if err != nil {
-		return nil, false
+		return crCache{}, false
 	}
 
 	var c crCache
 	if err := json.Unmarshal(data, &c); err != nil {
-		return nil, false
+		return crCache{}, false
 	}
 	if c.Mode != crReviewMode || c.Fingerprint != fixtureFingerprint(f) {
-		return nil, false
+		return crCache{}, false
 	}
-	return c.Findings, true
+
+	return c, true
 }
 
 // CollectIncumbent reviews any fixtures not already cached, one at a time.
@@ -821,6 +954,19 @@ func CollectIncumbent(
 	for _, f := range fixtures {
 		if _, ok := CachedIncumbent(cacheDir, f); ok {
 			log("%s: cached", f.Name)
+			continue
+		}
+
+		// A cached review this parser can no longer read is NOT re-collected.
+		// Overwriting it would replace the bytes that expose the divergence with
+		// bytes that happen to parse, spending a rate-limited allowance to
+		// destroy the only evidence of a parser bug. The remedy is to read the
+		// retained text and fix the parser, or to delete the entry deliberately.
+		if stale, why := StaleIncumbentCache(cacheDir, f); stale {
+			remaining++
+			log("%s: STALE CACHE, not re-collected: the retained review no longer parses (%v). "+
+				"Fix the parser against %s/%s.json, or delete it to force a fresh review",
+				f.Name, why, cacheDir, f.Name)
 			continue
 		}
 

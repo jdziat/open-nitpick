@@ -317,10 +317,10 @@ type Aggregate struct {
 	//
 	// Both are carried, and the report prints both, because they disagree: the
 	// judge scored Incumbent as understating nothing on a corpus whose ground
-	// truth says it understated four of the seven defects it located. Replacing
-	// the judge's columns with these would hide that disagreement, and the
-	// disagreement is itself the result — one of the two instruments is wrong
-	// about this corpus and a reader has to be able to see which.
+	// truth says it understated defects it had located. Replacing the judge's
+	// columns with these would hide that disagreement, and the disagreement is
+	// itself the result — one of the two instruments is wrong about this corpus
+	// and a reader has to be able to see which.
 	//
 	// They are counted per LOCATED DEFECT while Inflated and Understated are
 	// counted per judged FINDING, so the two groups do not share a denominator
@@ -329,6 +329,27 @@ type Aggregate struct {
 	SevAccurate    int
 	SevInflated    int
 	SevUnderstated int
+
+	// SevPlanted is how many defects the fixtures behind those counts planted —
+	// the denominator printed as O-COV.
+	//
+	// It is carried because the triple above is graded only over what the
+	// reviewer LOCATED, so without it the columns are maximised by selective
+	// silence: a reviewer that reports only the defects it is already certain of
+	// scores a perfect triple over the handful it chose. See the O-COV component
+	// of the objective severity metric in PublishedMetrics.
+	SevPlanted int
+
+	// SevUsage is which severity words this contender used against which planted
+	// levels. It is a DESCRIPTION printed beside the table, not a column, and it
+	// is what a reader comparing two vocabularies gets instead of a cross-tool
+	// accuracy figure.
+	//
+	// A banded cross-tool accuracy triple used to be carried here and printed as
+	// B-INFL/B-UNDER/B-ACC. It is withdrawn: it was maximised by a reviewer that
+	// stamped one blocking word on every finding, and it could not see the parser
+	// bug it was written in response to. See NoCrossToolSeverityScore.
+	SevUsage SeverityUsage
 
 	SignalToNoise []int
 	ToneAdherence []int
@@ -470,10 +491,90 @@ func (a *Aggregate) countVerdicts(verdicts []Verdict) {
 // every count column by len(Grades), so scoring severity for a sample whose
 // judgement failed would put the objective columns over a larger denominator
 // than the judge's and make the two unreadable side by side.
-func (a *Aggregate) AddSeverity(s SeverityScore) {
+// The fixture is taken rather than only the score so that O-COV has a
+// denominator: how many defects were AVAILABLE to grade, not just how many the
+// reviewer happened to reach.
+func (a *Aggregate) AddSeverity(f Fixture, s SeverityScore) {
 	a.SevAccurate += s.Accurate
 	a.SevInflated += s.Inflated
 	a.SevUnderstated += s.Understated
+	a.SevPlanted += len(f.Defects)
+
+	if a.SevUsage == nil {
+		a.SevUsage = SeverityUsage{}
+	}
+	a.SevUsage.Merge(s.Usage())
+}
+
+// SevGraded is how many located defects the objective severity columns cover.
+func (a Aggregate) SevGraded() int {
+	return a.SevAccurate + a.SevInflated + a.SevUnderstated
+}
+
+// ObjectiveSeverityCells renders this contender's O-INFL/O-UNDER/O-ACC/O-COV,
+// per sample for the first three and as a share of planted defects for O-COV.
+//
+// It returns "n/a" in all four for a contender whose severity vocabulary is not
+// ours. That is the retraction, applied where the numbers are printed rather
+// than only stated beneath them: filling the cells and adding a note saying not
+// to compare them is the mitigation the previous retraction had already recorded
+// as insufficient, and the row sits in a sorted ranking beside our models.
+// PublishesOurSeverityLevels carries the reasoning.
+func (a Aggregate) ObjectiveSeverityCells(model string, samples int) (infl, under, acc, cov string) {
+	if !PublishesOurSeverityLevels(model) {
+		return "n/a", "n/a", "n/a", "n/a"
+	}
+
+	n := float64(max(samples, 1))
+	rate := func(v int) string { return fmt.Sprintf("%.2f", float64(v)/n) }
+
+	// A row with nothing planted behind it has no coverage to report; printing
+	// 0.00 would read as "found none of them".
+	cov = "n/a"
+	if a.SevPlanted > 0 {
+		cov = fmt.Sprintf("%.2f", float64(a.SevGraded())/float64(a.SevPlanted))
+	}
+	return rate(a.SevInflated), rate(a.SevUnderstated), rate(a.SevAccurate), cov
+}
+
+// VocabularyRow is one contender's severity vocabulary, for the block printed
+// under every table that compares reviewers.
+type VocabularyRow struct {
+	Name  string
+	Usage SeverityUsage
+}
+
+// SeverityVocabularyBlock renders what each contender CALLED the defects it
+// located, against the level each was planted at.
+//
+// This is the description that replaced a withdrawn cross-tool accuracy score,
+// and its shape is the point: there is no number in it. A reader comparing our
+// five levels against a foreign reviewer's three can see for themselves that one
+// answered "critical" to plants of critical AND of error while another split
+// them, and can decide what that is worth. The figure that used to make that
+// judgement for them was maximised by answering "critical" to everything. See
+// NoCrossToolSeverityScore.
+func SeverityVocabularyBlock(rows []VocabularyRow) string {
+	var b strings.Builder
+
+	b.WriteString("SEVERITY VOCABULARY — what each contender called the defects it located, against the " +
+		"level planted. A DESCRIPTION, NOT A SCORE: the vocabularies differ in resolution, and every " +
+		"reduction that makes them comparable is maximised by rating everything blocking.\n")
+
+	for _, r := range rows {
+		lines := r.Usage.Lines()
+		if len(lines) == 0 {
+			// Distinct from a reviewer that rated things badly: it located
+			// nothing, so it said nothing about severity and has no vocabulary
+			// to describe. RECALL is where that shows up.
+			fmt.Fprintf(&b, "%s: no located defect to describe\n", r.Name)
+			continue
+		}
+
+		fmt.Fprintf(&b, "%s\n%s\n", r.Name, strings.Join(lines, "\n"))
+	}
+
+	return b.String()
 }
 
 // Precision is the share of findings a senior reviewer would actually raise.

@@ -1,0 +1,2614 @@
+{
+  "_note": [
+    "THE RECEIPT for pricing.yaml: the vendor's own pricing object for every model",
+    "the eval battery prices, AND for every endpoint that serves it, copied verbatim",
+    "on the date recorded beside it. Rates are USD PER TOKEN here, as the vendor",
+    "publishes them; pricing.yaml records them per MILLION, and that scaling is the",
+    "only transformation applied to the model-level block.",
+    "",
+    "It exists because both errors found so far were TRANSCRIPTION or SCOPE errors,",
+    "not judgement ones, and neither was visible by reading the file:",
+    "",
+    "  round 1  the capture recipe dropped .pricing.overrides, so eleven models lost",
+    "           every tier they are billed at.",
+    "  round 2  .pricing was treated as THE price. It is one endpoint's price, and",
+    "           14 of these 20 models are served by 5 to 34 endpoints spanning up to",
+    "           22x. The endpoints array below is what makes that checkable.",
+    "",
+    "captured_on, source, endpoint and routing in pricing.yaml are a CLAIM; this file",
+    "is the evidence for it, and TestShippedPricesMatchTheCapturedVendorResponse",
+    "re-derives one from the other on every `go test` and fails on drift in either",
+    "direction \u2014 including the routing minima and maxima, which are derived from the",
+    "endpoints array here rather than typed.",
+    "",
+    "Provenance is per model because rates are refreshed one model at a time. To",
+    "refresh one, replace its block here and its entry in pricing.yaml together:",
+    "",
+    "  curl -s https://openrouter.ai/api/v1/models |",
+    "    jq '.data[] | select(.id == \"MODEL/ID\") | .pricing'",
+    "  curl -s https://openrouter.ai/api/v1/models/MODEL/ID/endpoints |",
+    "    jq '[.data.endpoints[] | {tag, provider_name, pricing}]'",
+    "",
+    "Copy the objects WHOLE. Every key is kept, including the ones pricing.yaml does",
+    "not bill (web_search, image, audio, input_cache_write_1h, internal_reasoning,",
+    "discount): the decoder rejects a key it has not seen before, so a new billable",
+    "dimension arrives as a test failure at the moment of capture instead of as",
+    "silence.",
+    "",
+    "The endpoints array is in the order the vendor returns it, which is the order",
+    "the router prefers \u2014 cheapest first. That order is load-bearing: `cheapest` in",
+    "pricing.yaml is derived from it, and it is what the direction of the round-2",
+    "error was measured against."
+  ],
+  "models": {
+    "anthropic/claude-opus-5": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/anthropic/claude-opus-5/endpoints",
+      "pricing": {
+        "completion": "0.000025",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "input_cache_write_1h": "0.00001",
+        "prompt": "0.000005",
+        "web_search": "0.01"
+      },
+      "endpoints": [
+        {
+          "tag": "amazon-bedrock/claude-on-aws",
+          "provider_name": "Amazon Bedrock",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.000025",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "input_cache_write": "0.00000625",
+            "input_cache_write_1h": "0.00001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "claude-on-aws",
+          "provider_name": "Claude Platform on AWS",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.000025",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "input_cache_write": "0.00000625",
+            "input_cache_write_1h": "0.00001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "anthropic",
+          "provider_name": "Anthropic",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.000025",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "input_cache_write": "0.00000625",
+            "input_cache_write_1h": "0.00001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "amazon-bedrock",
+          "provider_name": "Amazon Bedrock",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.000025",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "input_cache_write": "0.00000625",
+            "input_cache_write_1h": "0.00001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "google-vertex/global",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.000025",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "input_cache_write": "0.00000625",
+            "input_cache_write_1h": "0.00001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "azure/global",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.000025",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "input_cache_write": "0.00000625",
+            "input_cache_write_1h": "0.00001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "google-vertex/europe",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.0000055",
+            "completion": "0.0000275",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000055",
+            "input_cache_write": "0.000006875",
+            "input_cache_write_1h": "0.000011",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "anthropic/claude-sonnet-4.6": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/anthropic/claude-sonnet-4.6/endpoints",
+      "pricing": {
+        "completion": "0.000015",
+        "input_cache_read": "0.0000003",
+        "input_cache_write": "0.00000375",
+        "input_cache_write_1h": "0.000006",
+        "prompt": "0.000003",
+        "web_search": "0.01"
+      },
+      "endpoints": [
+        {
+          "tag": "anthropic/2",
+          "provider_name": "Anthropic",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000003",
+            "input_cache_write": "0.00000375",
+            "input_cache_write_1h": "0.000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "google-vertex/global",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000003",
+            "input_cache_write": "0.00000375",
+            "input_cache_write_1h": "0.000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "anthropic",
+          "provider_name": "Anthropic",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000003",
+            "input_cache_write": "0.00000375",
+            "input_cache_write_1h": "0.000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "amazon-bedrock/global",
+          "provider_name": "Amazon Bedrock",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000003",
+            "input_cache_write": "0.00000375",
+            "input_cache_write_1h": "0.000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "azure/global",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000003",
+            "input_cache_write": "0.00000375",
+            "input_cache_write_1h": "0.000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "google-vertex/europe",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.0000033",
+            "completion": "0.0000165",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000033",
+            "input_cache_write": "0.000004125",
+            "input_cache_write_1h": "0.0000066",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "google-vertex/us-east5",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.0000033",
+            "completion": "0.0000165",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000033",
+            "input_cache_write": "0.000004125",
+            "input_cache_write_1h": "0.0000066",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "amazon-bedrock/eu-west-1",
+          "provider_name": "Amazon Bedrock",
+          "pricing": {
+            "prompt": "0.0000033",
+            "completion": "0.0000165",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000033",
+            "input_cache_write": "0.000004125",
+            "input_cache_write_1h": "0.0000066",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "deepseek/deepseek-v4-pro": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/deepseek/deepseek-v4-pro/endpoints",
+      "pricing": {
+        "completion": "0.00000087",
+        "input_cache_read": "0.000000003625",
+        "prompt": "0.000000435"
+      },
+      "endpoints": [
+        {
+          "tag": "deepseek",
+          "provider_name": "DeepSeek",
+          "pricing": {
+            "prompt": "0.000000435",
+            "completion": "0.00000087",
+            "input_cache_read": "0.000000003625",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "streamlake/fp8",
+          "provider_name": "StreamLake",
+          "pricing": {
+            "prompt": "0.000000609",
+            "completion": "0.000001218",
+            "input_cache_read": "0.00000005075",
+            "discount": 0.65
+          }
+        },
+        {
+          "tag": "gmicloud/fp8",
+          "provider_name": "GMICloud",
+          "pricing": {
+            "prompt": "0.0000006612",
+            "completion": "0.0000013224",
+            "input_cache_read": "0.0000000551",
+            "discount": 0.62
+          }
+        },
+        {
+          "tag": "ionstream/fp4",
+          "provider_name": "Ionstream",
+          "pricing": {
+            "prompt": "0.000001131",
+            "completion": "0.000002262",
+            "input_cache_read": "0.000000094",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "novita/fp8",
+          "provider_name": "Novita",
+          "pricing": {
+            "prompt": "0.000001168",
+            "completion": "0.000002336",
+            "input_cache_read": "0.00000009855",
+            "discount": 0.27
+          }
+        },
+        {
+          "tag": "baidu/fp8",
+          "provider_name": "Baidu",
+          "pricing": {
+            "prompt": "0.0000012337",
+            "completion": "0.0000024674",
+            "input_cache_read": "0.0000001022",
+            "discount": 0.27
+          }
+        },
+        {
+          "tag": "deepinfra/fp4",
+          "provider_name": "DeepInfra",
+          "pricing": {
+            "prompt": "0.0000013",
+            "completion": "0.0000026",
+            "input_cache_read": "0.0000001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "digitalocean",
+          "provider_name": "DigitalOcean",
+          "pricing": {
+            "prompt": "0.000001392",
+            "completion": "0.000002784",
+            "input_cache_read": "0.000000348",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "alibaba/fp8",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.000001416",
+            "completion": "0.000002832",
+            "input_cache_read": "0.000000118",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "siliconflow/fp8",
+          "provider_name": "SiliconFlow",
+          "pricing": {
+            "prompt": "0.00000150162",
+            "completion": "0.000003135",
+            "input_cache_read": "0.000000135",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "venice",
+          "provider_name": "Venice",
+          "pricing": {
+            "prompt": "0.00000165",
+            "completion": "0.000003301",
+            "input_cache_read": "0.00000033",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "atlas-cloud/fp4",
+          "provider_name": "AtlasCloud",
+          "pricing": {
+            "prompt": "0.00000168",
+            "completion": "0.00000338",
+            "input_cache_read": "0.00000013",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "baseten/fp4",
+          "provider_name": "BaseTen",
+          "pricing": {
+            "prompt": "0.00000174",
+            "completion": "0.00000348",
+            "input_cache_read": "0.000000145",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "parasail/fp8",
+          "provider_name": "Parasail",
+          "pricing": {
+            "prompt": "0.00000174",
+            "completion": "0.00000348",
+            "input_cache_read": "0.0000001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "cloudflare",
+          "provider_name": "Cloudflare",
+          "pricing": {
+            "prompt": "0.00000174",
+            "completion": "0.00000348",
+            "input_cache_read": "0.000000145",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "together",
+          "provider_name": "Together",
+          "pricing": {
+            "prompt": "0.00000174",
+            "completion": "0.00000348",
+            "input_cache_read": "0.0000002",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "coreweave/fp8",
+          "provider_name": "CoreWeave",
+          "pricing": {
+            "prompt": "0.00000174",
+            "completion": "0.00000348",
+            "input_cache_read": "0.00000014",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.00000174",
+            "completion": "0.00000348",
+            "input_cache_read": "0.000000145",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "google/gemini-3.1-pro-preview": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/google/gemini-3.1-pro-preview/endpoints",
+      "pricing": {
+        "audio": "0.000002",
+        "completion": "0.000012",
+        "image": "0.000002",
+        "input_audio_cache": "0.0000002",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.000000375",
+        "internal_reasoning": "0.000012",
+        "overrides": [
+          {
+            "audio": "0.000004",
+            "completion": "0.000018",
+            "input_audio_cache": "0.0000004",
+            "input_cache_read": "0.0000004",
+            "min_prompt_tokens": 200000,
+            "prompt": "0.000004"
+          }
+        ],
+        "prompt": "0.000002",
+        "web_search": "0.014"
+      },
+      "endpoints": [
+        {
+          "tag": "google-vertex/global",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.000002",
+            "completion": "0.000012",
+            "image": "0.000002",
+            "audio": "0.000002",
+            "input_audio_cache": "0.0000002",
+            "web_search": "0.014",
+            "internal_reasoning": "0.000012",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.000000375",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.000004",
+                "completion": "0.000018",
+                "audio": "0.000004",
+                "input_audio_cache": "0.0000004",
+                "input_cache_read": "0.0000004"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "google-vertex/global/flex",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.000001",
+            "completion": "0.000006",
+            "image": "0.000001",
+            "audio": "0.000001",
+            "input_audio_cache": "0.0000001",
+            "web_search": "0.014",
+            "internal_reasoning": "0.000006",
+            "input_cache_read": "0.0000001",
+            "input_cache_write": "0.0000001875",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.000002",
+                "completion": "0.000009",
+                "audio": "0.000002",
+                "input_audio_cache": "0.0000002",
+                "input_cache_read": "0.0000002"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "google-vertex/global/priority",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.0000036",
+            "completion": "0.0000216",
+            "image": "0.0000036",
+            "audio": "0.0000036",
+            "input_audio_cache": "0.00000036",
+            "web_search": "0.014",
+            "internal_reasoning": "0.0000216",
+            "input_cache_read": "0.00000036",
+            "input_cache_write": "0.000000675",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.0000072",
+                "completion": "0.0000324",
+                "audio": "0.0000072",
+                "input_audio_cache": "0.00000072",
+                "input_cache_read": "0.00000072"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "google-ai-studio",
+          "provider_name": "Google AI Studio",
+          "pricing": {
+            "prompt": "0.000002",
+            "completion": "0.000012",
+            "image": "0.000002",
+            "audio": "0.000002",
+            "input_audio_cache": "0.0000002",
+            "web_search": "0.014",
+            "internal_reasoning": "0.000012",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.000000375",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.000004",
+                "completion": "0.000018",
+                "audio": "0.000004",
+                "input_audio_cache": "0.0000004",
+                "input_cache_read": "0.0000004"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "google-ai-studio/flex",
+          "provider_name": "Google AI Studio",
+          "pricing": {
+            "prompt": "0.000001",
+            "completion": "0.000006",
+            "image": "0.000001",
+            "audio": "0.000001",
+            "input_audio_cache": "0.0000001",
+            "web_search": "0.014",
+            "internal_reasoning": "0.000006",
+            "input_cache_read": "0.0000001",
+            "input_cache_write": "0.0000001875",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.000002",
+                "completion": "0.000009",
+                "audio": "0.000002",
+                "input_audio_cache": "0.0000002",
+                "input_cache_read": "0.0000002"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "google-ai-studio/priority",
+          "provider_name": "Google AI Studio",
+          "pricing": {
+            "prompt": "0.0000036",
+            "completion": "0.0000216",
+            "image": "0.0000036",
+            "audio": "0.0000036",
+            "input_audio_cache": "0.00000036",
+            "web_search": "0.014",
+            "internal_reasoning": "0.0000216",
+            "input_cache_read": "0.00000036",
+            "input_cache_write": "0.000000675",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.0000072",
+                "completion": "0.0000324",
+                "audio": "0.0000072",
+                "input_audio_cache": "0.00000072",
+                "input_cache_read": "0.00000072"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "google/gemini-3.5-flash": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/google/gemini-3.5-flash/endpoints",
+      "pricing": {
+        "audio": "0.000003",
+        "completion": "0.000009",
+        "image": "0.0000015",
+        "input_audio_cache": "0.0000003",
+        "input_cache_read": "0.00000015",
+        "input_cache_write": "0.0000000833333333333333",
+        "internal_reasoning": "0.000009",
+        "prompt": "0.0000015",
+        "web_search": "0.014"
+      },
+      "endpoints": [
+        {
+          "tag": "google-vertex/global",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.0000015",
+            "completion": "0.000009",
+            "image": "0.0000015",
+            "audio": "0.000003",
+            "input_audio_cache": "0.0000003",
+            "web_search": "0.014",
+            "internal_reasoning": "0.000009",
+            "input_cache_read": "0.00000015",
+            "input_cache_write": "0.0000000833333333333333",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "google-vertex/global/flex",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.00000075",
+            "completion": "0.0000045",
+            "image": "0.00000075",
+            "audio": "0.0000015",
+            "input_audio_cache": "0.00000015",
+            "web_search": "0.014",
+            "internal_reasoning": "0.0000045",
+            "input_cache_read": "0.000000075",
+            "input_cache_write": "0.0000000416666666666667",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "google-vertex/global/priority",
+          "provider_name": "Google",
+          "pricing": {
+            "prompt": "0.0000027",
+            "completion": "0.0000162",
+            "image": "0.0000027",
+            "audio": "0.0000054",
+            "input_audio_cache": "0.00000054",
+            "web_search": "0.014",
+            "internal_reasoning": "0.0000162",
+            "input_cache_read": "0.00000027",
+            "input_cache_write": "0.00000015",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "google-ai-studio",
+          "provider_name": "Google AI Studio",
+          "pricing": {
+            "prompt": "0.0000015",
+            "completion": "0.000009",
+            "image": "0.0000015",
+            "audio": "0.000003",
+            "input_audio_cache": "0.0000003",
+            "web_search": "0.014",
+            "internal_reasoning": "0.000009",
+            "input_cache_read": "0.00000015",
+            "input_cache_write": "0.0000000833333333333333",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "google-ai-studio/flex",
+          "provider_name": "Google AI Studio",
+          "pricing": {
+            "prompt": "0.00000075",
+            "completion": "0.0000045",
+            "image": "0.00000075",
+            "audio": "0.0000015",
+            "input_audio_cache": "0.00000015",
+            "web_search": "0.014",
+            "internal_reasoning": "0.0000045",
+            "input_cache_read": "0.000000075",
+            "input_cache_write": "0.0000000416666666666667",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "google-ai-studio/priority",
+          "provider_name": "Google AI Studio",
+          "pricing": {
+            "prompt": "0.0000027",
+            "completion": "0.0000162",
+            "image": "0.0000027",
+            "audio": "0.0000054",
+            "input_audio_cache": "0.00000054",
+            "web_search": "0.014",
+            "internal_reasoning": "0.0000162",
+            "input_cache_read": "0.00000027",
+            "input_cache_write": "0.00000015",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "minimax/minimax-m2.7": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/minimax/minimax-m2.7/endpoints",
+      "pricing": {
+        "completion": "0.000001",
+        "input_cache_read": "0.00000005",
+        "prompt": "0.00000025"
+      },
+      "endpoints": [
+        {
+          "tag": "mara",
+          "provider_name": "Mara",
+          "pricing": {
+            "prompt": "0.00000024",
+            "completion": "0.00000096",
+            "discount": 0.6
+          }
+        },
+        {
+          "tag": "deepinfra/fp8",
+          "provider_name": "DeepInfra",
+          "pricing": {
+            "prompt": "0.00000025",
+            "completion": "0.000001",
+            "input_cache_read": "0.00000005",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "novita/fp8",
+          "provider_name": "Novita",
+          "pricing": {
+            "prompt": "0.00000027",
+            "completion": "0.00000108",
+            "input_cache_read": "0.000000054",
+            "discount": 0.1
+          }
+        },
+        {
+          "tag": "gmicloud/fp8",
+          "provider_name": "GMICloud",
+          "pricing": {
+            "prompt": "0.0000003",
+            "completion": "0.0000012",
+            "input_cache_read": "0.00000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "minimax/fp8",
+          "provider_name": "Minimax",
+          "pricing": {
+            "prompt": "0.0000003",
+            "completion": "0.0000012",
+            "input_cache_read": "0.00000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "atlas-cloud/fp8",
+          "provider_name": "AtlasCloud",
+          "pricing": {
+            "prompt": "0.0000003",
+            "completion": "0.0000012",
+            "input_cache_read": "0.00000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.0000003",
+            "completion": "0.0000012",
+            "input_cache_read": "0.000000059",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "sambanova/minimax-m2.7-dedicated",
+          "provider_name": "SambaNova",
+          "pricing": {
+            "prompt": "0.0000003",
+            "completion": "0.0000015",
+            "input_cache_read": "0.00000015",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "deepinfra/turbo",
+          "provider_name": "DeepInfra",
+          "pricing": {
+            "prompt": "0.00000038",
+            "completion": "0.0000017",
+            "input_cache_read": "0.00000007",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "groq",
+          "provider_name": "Groq",
+          "pricing": {
+            "prompt": "0.0000006",
+            "completion": "0.0000018",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "minimax/highspeed",
+          "provider_name": "Minimax",
+          "pricing": {
+            "prompt": "0.0000006",
+            "completion": "0.0000024",
+            "input_cache_read": "0.00000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "sambanova",
+          "provider_name": "SambaNova",
+          "pricing": {
+            "prompt": "0.0000006",
+            "completion": "0.0000024",
+            "input_cache_read": "0.00000006",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "moonshotai/kimi-k2.7-code": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/moonshotai/kimi-k2.7-code/endpoints",
+      "pricing": {
+        "completion": "0.0000035",
+        "input_cache_read": "0.00000015",
+        "prompt": "0.00000073"
+      },
+      "endpoints": [
+        {
+          "tag": "coreweave/int4",
+          "provider_name": "CoreWeave",
+          "pricing": {
+            "prompt": "0.00000071",
+            "completion": "0.0000035",
+            "input_cache_read": "0.00000015",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "inceptron/int4",
+          "provider_name": "Inceptron",
+          "pricing": {
+            "prompt": "0.00000072",
+            "completion": "0.0000035",
+            "input_cache_read": "0.00000015",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "ambient/int4",
+          "provider_name": "Ambient",
+          "pricing": {
+            "prompt": "0.00000073",
+            "completion": "0.0000035",
+            "input_cache_read": "0.00000015",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "deepinfra/fp4",
+          "provider_name": "DeepInfra",
+          "pricing": {
+            "prompt": "0.00000074",
+            "completion": "0.0000035",
+            "input_cache_read": "0.00000015",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "venice/int4",
+          "provider_name": "Venice",
+          "pricing": {
+            "prompt": "0.00000075",
+            "completion": "0.0000035",
+            "input_cache_read": "0.00000016",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "parasail/int4",
+          "provider_name": "Parasail",
+          "pricing": {
+            "prompt": "0.00000076",
+            "completion": "0.0000035",
+            "input_cache_read": "0.00000016",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "modelrun/fp4",
+          "provider_name": "ModelRun",
+          "pricing": {
+            "prompt": "0.00000085",
+            "completion": "0.00000375",
+            "input_cache_read": "0.00000016",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "siliconflow/fp8",
+          "provider_name": "SiliconFlow",
+          "pricing": {
+            "prompt": "0.00000085916",
+            "completion": "0.0000038",
+            "input_cache_read": "0.00000017993",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "novita/int4",
+          "provider_name": "Novita",
+          "pricing": {
+            "prompt": "0.000000912",
+            "completion": "0.00000384",
+            "input_cache_read": "0.0000001824",
+            "discount": 0.04
+          }
+        },
+        {
+          "tag": "moonshotai/int4",
+          "provider_name": "Moonshot AI",
+          "pricing": {
+            "prompt": "0.00000095",
+            "completion": "0.000004",
+            "input_cache_read": "0.00000019",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "cloudflare",
+          "provider_name": "Cloudflare",
+          "pricing": {
+            "prompt": "0.00000095",
+            "completion": "0.000004",
+            "input_cache_read": "0.00000019",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "atlas-cloud/int4",
+          "provider_name": "AtlasCloud",
+          "pricing": {
+            "prompt": "0.00000095",
+            "completion": "0.000004",
+            "input_cache_read": "0.00000016",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "together",
+          "provider_name": "Together",
+          "pricing": {
+            "prompt": "0.00000095",
+            "completion": "0.000004",
+            "input_cache_read": "0.00000019",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "alibaba/fp8",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.00000095",
+            "completion": "0.000004",
+            "input_cache_read": "0.00000019",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.00000095",
+            "completion": "0.000004",
+            "input_cache_read": "0.00000019",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "moonshotai/highspeed",
+          "provider_name": "Moonshot AI",
+          "pricing": {
+            "prompt": "0.0000019",
+            "completion": "0.000008",
+            "input_cache_read": "0.00000038",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "openai/gpt-5.4": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/openai/gpt-5.4/endpoints",
+      "pricing": {
+        "completion": "0.000015",
+        "input_cache_read": "0.00000025",
+        "overrides": [
+          {
+            "completion": "0.0000225",
+            "input_cache_read": "0.0000005",
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000005"
+          }
+        ],
+        "prompt": "0.0000025",
+        "web_search": "0.01"
+      },
+      "endpoints": [
+        {
+          "tag": "openai",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.0000025",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000025",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000005",
+                "completion": "0.0000225",
+                "input_cache_read": "0.0000005"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/flex",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.00000125",
+            "completion": "0.0000075",
+            "web_search": "0.01",
+            "input_cache_read": "0.000000125",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.0000025",
+                "completion": "0.00001125",
+                "input_cache_read": "0.00000025"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/priority",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.00003",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "azure",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.0000025",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000025",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000005",
+                "completion": "0.0000225",
+                "input_cache_read": "0.0000005"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "azure/eu",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.00000275",
+            "completion": "0.0000165",
+            "web_search": "0.01",
+            "input_cache_read": "0.000000275",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "amazon-bedrock/us-east-1",
+          "provider_name": "Amazon Bedrock",
+          "pricing": {
+            "prompt": "0.00000275",
+            "completion": "0.0000165",
+            "web_search": "0.01",
+            "input_cache_read": "0.000000275",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.0000055",
+                "completion": "0.00002475",
+                "input_cache_read": "0.00000055"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "openai/gpt-5.6-luna": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/openai/gpt-5.6-luna/endpoints",
+      "pricing": {
+        "completion": "0.0000006",
+        "input_cache_read": "0.00000001",
+        "input_cache_write": "0.000000125",
+        "overrides": [
+          {
+            "completion": "0.0000009",
+            "input_cache_read": "0.00000002",
+            "input_cache_write": "0.00000025",
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000002"
+          }
+        ],
+        "prompt": "0.0000001",
+        "web_search": "0.005"
+      },
+      "endpoints": [
+        {
+          "tag": "openai",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.0000001",
+            "completion": "0.0000006",
+            "web_search": "0.005",
+            "input_cache_read": "0.00000001",
+            "input_cache_write": "0.000000125",
+            "discount": 0.5,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.0000002",
+                "completion": "0.0000009",
+                "input_cache_read": "0.00000002",
+                "input_cache_write": "0.00000025"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/flex",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.00000005",
+            "completion": "0.0000003",
+            "web_search": "0.005",
+            "input_cache_read": "0.000000005",
+            "input_cache_write": "0.0000000625",
+            "discount": 0.5,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.0000001",
+                "completion": "0.00000045",
+                "input_cache_read": "0.00000001",
+                "input_cache_write": "0.000000125"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/priority",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.0000002",
+            "completion": "0.0000012",
+            "web_search": "0.005",
+            "input_cache_read": "0.00000002",
+            "input_cache_write": "0.00000025",
+            "discount": 0.5
+          }
+        },
+        {
+          "tag": "amazon-bedrock/us-east-1",
+          "provider_name": "Amazon Bedrock",
+          "pricing": {
+            "prompt": "0.00000022",
+            "completion": "0.00000132",
+            "web_search": "0.01",
+            "input_cache_read": "0.000000022",
+            "input_cache_write": "0.000000275",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.00000044",
+                "completion": "0.00000198",
+                "input_cache_read": "0.000000044",
+                "input_cache_write": "0.00000055"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "azure",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.000001",
+            "completion": "0.000006",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000001",
+            "input_cache_write": "0.00000125",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000002",
+                "completion": "0.000009",
+                "input_cache_read": "0.0000002",
+                "input_cache_write": "0.0000025"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "azure/eu",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.0000011",
+            "completion": "0.0000066",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000011",
+            "input_cache_write": "0.000001375",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.0000022",
+                "completion": "0.0000099",
+                "input_cache_read": "0.00000022",
+                "input_cache_write": "0.00000275"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "openai/gpt-5.6-sol": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/openai/gpt-5.6-sol/endpoints",
+      "pricing": {
+        "completion": "0.00003",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "overrides": [
+          {
+            "completion": "0.000045",
+            "input_cache_read": "0.000001",
+            "input_cache_write": "0.0000125",
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00001"
+          }
+        ],
+        "prompt": "0.000005",
+        "web_search": "0.01"
+      },
+      "endpoints": [
+        {
+          "tag": "openai",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.00003",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "input_cache_write": "0.00000625",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.00001",
+                "completion": "0.000045",
+                "input_cache_read": "0.000001",
+                "input_cache_write": "0.0000125"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/flex",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.0000025",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000025",
+            "input_cache_write": "0.000003125",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000005",
+                "completion": "0.0000225",
+                "input_cache_read": "0.0000005",
+                "input_cache_write": "0.00000625"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/priority",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.00001",
+            "completion": "0.00006",
+            "web_search": "0.01",
+            "input_cache_read": "0.000001",
+            "input_cache_write": "0.0000125",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "azure",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.00003",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "input_cache_write": "0.00000625",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.00001",
+                "completion": "0.000045",
+                "input_cache_read": "0.000001",
+                "input_cache_write": "0.0000125"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "azure/eu",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.0000055",
+            "completion": "0.000033",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000055",
+            "input_cache_write": "0.000006875",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000011",
+                "completion": "0.0000495",
+                "input_cache_read": "0.0000011",
+                "input_cache_write": "0.00001375"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "amazon-bedrock/us-east-1",
+          "provider_name": "Amazon Bedrock",
+          "pricing": {
+            "prompt": "0.0000055",
+            "completion": "0.000033",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000055",
+            "input_cache_write": "0.000006875",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000011",
+                "completion": "0.0000495",
+                "input_cache_read": "0.0000011",
+                "input_cache_write": "0.00001375"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "openai/gpt-5.6-sol-pro": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/openai/gpt-5.6-sol-pro/endpoints",
+      "pricing": {
+        "completion": "0.00003",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "overrides": [
+          {
+            "completion": "0.000045",
+            "input_cache_read": "0.000001",
+            "input_cache_write": "0.0000125",
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00001"
+          }
+        ],
+        "prompt": "0.000005",
+        "web_search": "0.01"
+      },
+      "endpoints": [
+        {
+          "tag": "azure",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.00003",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "input_cache_write": "0.00000625",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.00001",
+                "completion": "0.000045",
+                "input_cache_read": "0.000001",
+                "input_cache_write": "0.0000125"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.000005",
+            "completion": "0.00003",
+            "web_search": "0.01",
+            "input_cache_read": "0.0000005",
+            "input_cache_write": "0.00000625",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.00001",
+                "completion": "0.000045",
+                "input_cache_read": "0.000001",
+                "input_cache_write": "0.0000125"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/flex",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.0000025",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000025",
+            "input_cache_write": "0.000003125",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000005",
+                "completion": "0.0000225",
+                "input_cache_read": "0.0000005",
+                "input_cache_write": "0.00000625"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/priority",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.00001",
+            "completion": "0.00006",
+            "web_search": "0.01",
+            "input_cache_read": "0.000001",
+            "input_cache_write": "0.0000125",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "azure/eu",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.0000055",
+            "completion": "0.000033",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000055",
+            "input_cache_write": "0.000006875",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000011",
+                "completion": "0.0000495",
+                "input_cache_read": "0.0000011",
+                "input_cache_write": "0.00001375"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "openai/gpt-5.6-terra": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/openai/gpt-5.6-terra/endpoints",
+      "pricing": {
+        "completion": "0.000006",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.00000125",
+        "overrides": [
+          {
+            "completion": "0.000009",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.0000025",
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000002"
+          }
+        ],
+        "prompt": "0.000001",
+        "web_search": "0.005"
+      },
+      "endpoints": [
+        {
+          "tag": "openai",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.000001",
+            "completion": "0.000006",
+            "web_search": "0.005",
+            "input_cache_read": "0.0000001",
+            "input_cache_write": "0.00000125",
+            "discount": 0.5,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000002",
+                "completion": "0.000009",
+                "input_cache_read": "0.0000002",
+                "input_cache_write": "0.0000025"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/flex",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.0000005",
+            "completion": "0.000003",
+            "web_search": "0.005",
+            "input_cache_read": "0.00000005",
+            "input_cache_write": "0.000000625",
+            "discount": 0.5,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000001",
+                "completion": "0.0000045",
+                "input_cache_read": "0.0000001",
+                "input_cache_write": "0.00000125"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/priority",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.000002",
+            "completion": "0.000012",
+            "web_search": "0.005",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.0000025",
+            "discount": 0.5
+          }
+        },
+        {
+          "tag": "amazon-bedrock/us-east-1",
+          "provider_name": "Amazon Bedrock",
+          "pricing": {
+            "prompt": "0.0000022",
+            "completion": "0.0000132",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000022",
+            "input_cache_write": "0.00000275",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.0000044",
+                "completion": "0.0000198",
+                "input_cache_read": "0.00000044",
+                "input_cache_write": "0.0000055"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "azure",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.0000025",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000025",
+            "input_cache_write": "0.000003125",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000005",
+                "completion": "0.0000225",
+                "input_cache_read": "0.0000005",
+                "input_cache_write": "0.00000625"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "azure/eu",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.00000275",
+            "completion": "0.0000165",
+            "web_search": "0.01",
+            "input_cache_read": "0.000000275",
+            "input_cache_write": "0.0000034375",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.0000055",
+                "completion": "0.00002475",
+                "input_cache_read": "0.00000055",
+                "input_cache_write": "0.000006875"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "openai/gpt-5.6-terra-pro": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/openai/gpt-5.6-terra-pro/endpoints",
+      "pricing": {
+        "completion": "0.000006",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.00000125",
+        "overrides": [
+          {
+            "completion": "0.000009",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.0000025",
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000002"
+          }
+        ],
+        "prompt": "0.000001",
+        "web_search": "0.005"
+      },
+      "endpoints": [
+        {
+          "tag": "openai",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.000001",
+            "completion": "0.000006",
+            "web_search": "0.005",
+            "input_cache_read": "0.0000001",
+            "input_cache_write": "0.00000125",
+            "discount": 0.5,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000002",
+                "completion": "0.000009",
+                "input_cache_read": "0.0000002",
+                "input_cache_write": "0.0000025"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/flex",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.0000005",
+            "completion": "0.000003",
+            "web_search": "0.005",
+            "input_cache_read": "0.00000005",
+            "input_cache_write": "0.000000625",
+            "discount": 0.5,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000001",
+                "completion": "0.0000045",
+                "input_cache_read": "0.0000001",
+                "input_cache_write": "0.00000125"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "openai/priority",
+          "provider_name": "OpenAI",
+          "pricing": {
+            "prompt": "0.000002",
+            "completion": "0.000012",
+            "web_search": "0.005",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.0000025",
+            "discount": 0.5
+          }
+        },
+        {
+          "tag": "azure",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.0000025",
+            "completion": "0.000015",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000025",
+            "input_cache_write": "0.000003125",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.000005",
+                "completion": "0.0000225",
+                "input_cache_read": "0.0000005",
+                "input_cache_write": "0.00000625"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "azure/eu",
+          "provider_name": "Azure",
+          "pricing": {
+            "prompt": "0.00000275",
+            "completion": "0.0000165",
+            "web_search": "0.01",
+            "input_cache_read": "0.000000275",
+            "input_cache_write": "0.0000034375",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 272000,
+                "prompt": "0.0000055",
+                "completion": "0.00002475",
+                "input_cache_read": "0.00000055",
+                "input_cache_write": "0.000006875"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "qwen/qwen3-coder-plus": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/qwen/qwen3-coder-plus/endpoints",
+      "pricing": {
+        "completion": "0.00000325",
+        "input_cache_read": "0.00000013",
+        "input_cache_write": "0.0000008125",
+        "overrides": [
+          {
+            "completion": "0.00000585",
+            "input_cache_read": "0.000000234",
+            "input_cache_write": "0.0000014625",
+            "min_prompt_tokens": 32000,
+            "prompt": "0.00000117"
+          },
+          {
+            "completion": "0.00000975",
+            "input_cache_read": "0.00000039",
+            "input_cache_write": "0.0000024375",
+            "min_prompt_tokens": 128000,
+            "prompt": "0.00000195"
+          }
+        ],
+        "prompt": "0.00000065"
+      },
+      "endpoints": [
+        {
+          "tag": "alibaba/fp8",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.00000065",
+            "completion": "0.00000325",
+            "input_cache_read": "0.00000013",
+            "input_cache_write": "0.0000008125",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 32000,
+                "prompt": "0.00000117",
+                "completion": "0.00000585",
+                "input_cache_read": "0.000000234",
+                "input_cache_write": "0.0000014625"
+              },
+              {
+                "min_prompt_tokens": 128000,
+                "prompt": "0.00000195",
+                "completion": "0.00000975",
+                "input_cache_read": "0.00000039",
+                "input_cache_write": "0.0000024375"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "qwen/qwen3-max-thinking": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/qwen/qwen3-max-thinking/endpoints",
+      "pricing": {
+        "completion": "0.0000039",
+        "overrides": [
+          {
+            "completion": "0.0000078",
+            "min_prompt_tokens": 32000,
+            "prompt": "0.00000156"
+          },
+          {
+            "completion": "0.00000975",
+            "min_prompt_tokens": 128000,
+            "prompt": "0.00000195"
+          }
+        ],
+        "prompt": "0.00000078"
+      },
+      "endpoints": [
+        {
+          "tag": "alibaba/fp8",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.00000078",
+            "completion": "0.0000039",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 32000,
+                "prompt": "0.00000156",
+                "completion": "0.0000078"
+              },
+              {
+                "min_prompt_tokens": 128000,
+                "prompt": "0.00000195",
+                "completion": "0.00000975"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "qwen/qwen3.7-flash": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/qwen/qwen3.7-flash/endpoints",
+      "pricing": {
+        "completion": "0.00000013",
+        "input_cache_read": "0.000000006",
+        "input_cache_write": "0.000000038",
+        "overrides": [
+          {
+            "completion": "0.0000004",
+            "input_cache_read": "0.00000002",
+            "input_cache_write": "0.000000125",
+            "min_prompt_tokens": 32000,
+            "prompt": "0.0000001"
+          },
+          {
+            "completion": "0.0000008",
+            "input_cache_read": "0.00000004",
+            "input_cache_write": "0.00000025",
+            "min_prompt_tokens": 256000,
+            "prompt": "0.0000002"
+          }
+        ],
+        "prompt": "0.00000003"
+      },
+      "endpoints": [
+        {
+          "tag": "alibaba",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.00000003",
+            "completion": "0.00000013",
+            "input_cache_read": "0.000000006",
+            "input_cache_write": "0.000000038",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 32000,
+                "prompt": "0.0000001",
+                "completion": "0.0000004",
+                "input_cache_read": "0.00000002",
+                "input_cache_write": "0.000000125"
+              },
+              {
+                "min_prompt_tokens": 256000,
+                "prompt": "0.0000002",
+                "completion": "0.0000008",
+                "input_cache_read": "0.00000004",
+                "input_cache_write": "0.00000025"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "qwen/qwen3.7-max": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/qwen/qwen3.7-max/endpoints",
+      "pricing": {
+        "completion": "0.000004425",
+        "input_cache_read": "0.000000295",
+        "input_cache_write": "0.00000184375",
+        "prompt": "0.000001475"
+      },
+      "endpoints": [
+        {
+          "tag": "alibaba/fp8",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.000001475",
+            "completion": "0.000004425",
+            "input_cache_read": "0.000000295",
+            "input_cache_write": "0.00000184375",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "qwen/qwen3.7-plus": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/qwen/qwen3.7-plus/endpoints",
+      "pricing": {
+        "completion": "0.00000128",
+        "input_cache_read": "0.000000064",
+        "input_cache_write": "0.0000004",
+        "overrides": [
+          {
+            "completion": "0.00000384",
+            "input_cache_read": "0.000000192",
+            "input_cache_write": "0.0000012",
+            "min_prompt_tokens": 256000,
+            "prompt": "0.00000096"
+          }
+        ],
+        "prompt": "0.00000032"
+      },
+      "endpoints": [
+        {
+          "tag": "alibaba/fp8",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.00000032",
+            "completion": "0.00000128",
+            "input_cache_read": "0.000000064",
+            "input_cache_write": "0.0000004",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 256000,
+                "prompt": "0.00000096",
+                "completion": "0.00000384",
+                "input_cache_read": "0.000000192",
+                "input_cache_write": "0.0000012"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "z-ai/glm-5.1": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/z-ai/glm-5.1/endpoints",
+      "pricing": {
+        "completion": "0.000003036",
+        "input_cache_read": "0.0000001794",
+        "prompt": "0.000000966"
+      },
+      "endpoints": [
+        {
+          "tag": "baidu/fp8",
+          "provider_name": "Baidu",
+          "pricing": {
+            "prompt": "0.000000952",
+            "completion": "0.000002992",
+            "input_cache_read": "0.0000001768",
+            "discount": 0.32
+          }
+        },
+        {
+          "tag": "streamlake/fp8",
+          "provider_name": "StreamLake",
+          "pricing": {
+            "prompt": "0.000000966",
+            "completion": "0.000003036",
+            "input_cache_read": "0.0000001794",
+            "discount": 0.31
+          }
+        },
+        {
+          "tag": "digitalocean",
+          "provider_name": "DigitalOcean",
+          "pricing": {
+            "prompt": "0.000000975",
+            "completion": "0.0000043",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "chutes/fp8",
+          "provider_name": "Chutes",
+          "pricing": {
+            "prompt": "0.00000098",
+            "completion": "0.00000308",
+            "input_cache_read": "0.000000098",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "gmicloud/fp8",
+          "provider_name": "GMICloud",
+          "pricing": {
+            "prompt": "0.00000098",
+            "completion": "0.00000308",
+            "input_cache_read": "0.000000182",
+            "discount": 0.3
+          }
+        },
+        {
+          "tag": "wafer/fp4",
+          "provider_name": "Wafer",
+          "pricing": {
+            "prompt": "0.000001",
+            "completion": "0.0000032",
+            "input_cache_read": "0.0000001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "deepinfra/fp4",
+          "provider_name": "DeepInfra",
+          "pricing": {
+            "prompt": "0.00000105",
+            "completion": "0.0000035",
+            "input_cache_read": "0.000000205",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "siliconflow/fp8",
+          "provider_name": "SiliconFlow",
+          "pricing": {
+            "prompt": "0.00000119",
+            "completion": "0.00000374",
+            "input_cache_read": "0.0000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "crusoe/fp8",
+          "provider_name": "Crusoe",
+          "pricing": {
+            "prompt": "0.0000012",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000025",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "phala",
+          "provider_name": "Phala",
+          "pricing": {
+            "prompt": "0.00000121",
+            "completion": "0.0000042",
+            "input_cache_read": "0.0000006",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "atlas-cloud/fp8",
+          "provider_name": "AtlasCloud",
+          "pricing": {
+            "prompt": "0.00000126",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000234",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "alibaba/fp8",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.00000133",
+            "completion": "0.00000418",
+            "input_cache_read": "0.000000247",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "novita/fp8",
+          "provider_name": "Novita",
+          "pricing": {
+            "prompt": "0.00000138",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "nebius/fp8",
+          "provider_name": "Nebius",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "parasail/fp8",
+          "provider_name": "Parasail",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "coreweave/fp8",
+          "provider_name": "CoreWeave",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "friendli",
+          "provider_name": "Friendli",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "z-ai/fp8",
+          "provider_name": "Z.AI",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "venice/fp8",
+          "provider_name": "Venice",
+          "pricing": {
+            "prompt": "0.00000154",
+            "completion": "0.00000484",
+            "input_cache_read": "0.000000286",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "z-ai/glm-5.2": {
+      "captured_on": "2026-08-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/z-ai/glm-5.2/endpoints",
+      "pricing": {
+        "completion": "0.00000242",
+        "input_cache_read": "0.00000014",
+        "prompt": "0.00000076"
+      },
+      "endpoints": [
+        {
+          "tag": "novita/fp8",
+          "provider_name": "Novita",
+          "pricing": {
+            "prompt": "0.0000005866",
+            "completion": "0.0000018436",
+            "input_cache_read": "0.00000010894",
+            "discount": 0.581
+          }
+        },
+        {
+          "tag": "streamlake/fp8",
+          "provider_name": "StreamLake",
+          "pricing": {
+            "prompt": "0.000000588",
+            "completion": "0.000001848",
+            "input_cache_read": "0.0000001092",
+            "discount": 0.58
+          }
+        },
+        {
+          "tag": "decart/fp4",
+          "provider_name": "Decart",
+          "pricing": {
+            "prompt": "0.0000006",
+            "completion": "0.0000015",
+            "input_cache_read": "0.0000001",
+            "discount": 0.5
+          }
+        },
+        {
+          "tag": "deepinfra/fp4",
+          "provider_name": "DeepInfra",
+          "pricing": {
+            "prompt": "0.00000075",
+            "completion": "0.0000024",
+            "input_cache_read": "0.00000014",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "coreweave/fp4",
+          "provider_name": "CoreWeave",
+          "pricing": {
+            "prompt": "0.00000076",
+            "completion": "0.00000242",
+            "input_cache_read": "0.00000014",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "akashml/fp8",
+          "provider_name": "AkashML",
+          "pricing": {
+            "prompt": "0.00000077",
+            "completion": "0.00000242",
+            "input_cache_read": "0.000000143",
+            "discount": 0.45
+          }
+        },
+        {
+          "tag": "gmicloud/fp8",
+          "provider_name": "GMICloud",
+          "pricing": {
+            "prompt": "0.000000924",
+            "completion": "0.000002904",
+            "input_cache_read": "0.0000001716",
+            "discount": 0.34
+          }
+        },
+        {
+          "tag": "inceptron/fp4",
+          "provider_name": "Inceptron",
+          "pricing": {
+            "prompt": "0.00000094",
+            "completion": "0.0000029",
+            "input_cache_read": "0.00000017",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "alibaba/fp8",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.000000966",
+            "completion": "0.000003036",
+            "input_cache_read": "0.0000001932",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "sail-research/fp8",
+          "provider_name": "Sail Research",
+          "pricing": {
+            "prompt": "0.000001",
+            "completion": "0.0000035",
+            "input_cache_read": "0.0000002",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "digitalocean",
+          "provider_name": "DigitalOcean",
+          "pricing": {
+            "prompt": "0.00000105",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000021",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "ambient/fp8",
+          "provider_name": "Ambient",
+          "pricing": {
+            "prompt": "0.00000105",
+            "completion": "0.0000044",
+            "input_cache_read": "0.0000002",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "morph",
+          "provider_name": "Morph",
+          "pricing": {
+            "prompt": "0.0000011",
+            "completion": "0.0000041",
+            "input_cache_read": "0.00000022",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "baidu/fp8",
+          "provider_name": "Baidu",
+          "pricing": {
+            "prompt": "0.000001176",
+            "completion": "0.000003696",
+            "input_cache_read": "0.0000002184",
+            "discount": 0.16
+          }
+        },
+        {
+          "tag": "siliconflow/fp8",
+          "provider_name": "SiliconFlow",
+          "pricing": {
+            "prompt": "0.00000119",
+            "completion": "0.00000374",
+            "input_cache_read": "0.000000221",
+            "discount": 0.15
+          }
+        },
+        {
+          "tag": "chutes/fp4",
+          "provider_name": "Chutes",
+          "pricing": {
+            "prompt": "0.00000125",
+            "completion": "0.00000395",
+            "input_cache_read": "0.000000125",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "wafer",
+          "provider_name": "Wafer",
+          "pricing": {
+            "prompt": "0.00000126",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000234",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "atlas-cloud/fp8",
+          "provider_name": "AtlasCloud",
+          "pricing": {
+            "prompt": "0.00000126",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000234",
+            "discount": 0.1
+          }
+        },
+        {
+          "tag": "phala",
+          "provider_name": "Phala",
+          "pricing": {
+            "prompt": "0.00000126",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000234",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "z-ai/fp8",
+          "provider_name": "Z.AI",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000014",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "cloudflare",
+          "provider_name": "Cloudflare",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "friendli",
+          "provider_name": "Friendli",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "parasail/fp4",
+          "provider_name": "Parasail",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "venice/fp8",
+          "provider_name": "Venice",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "together",
+          "provider_name": "Together",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "crusoe/fp8",
+          "provider_name": "Crusoe",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "ionstream/fp4",
+          "provider_name": "Ionstream",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "baseten/fp8",
+          "provider_name": "BaseTen",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000014",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "wafer/fast",
+          "provider_name": "Wafer",
+          "pricing": {
+            "prompt": "0.0000021",
+            "completion": "0.0000066",
+            "input_cache_read": "0.00000021",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks/fast",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.0000021",
+            "completion": "0.0000066",
+            "input_cache_read": "0.00000021",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "cloudflare/fast",
+          "provider_name": "Cloudflare",
+          "pricing": {
+            "prompt": "0.0000021",
+            "completion": "0.0000066",
+            "input_cache_read": "0.00000021",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "baseten/fast",
+          "provider_name": "BaseTen",
+          "pricing": {
+            "prompt": "0.0000021",
+            "completion": "0.0000066",
+            "input_cache_read": "0.00000021",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "alibaba/fast",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.00000231",
+            "completion": "0.00000726",
+            "input_cache_read": "0.000000462",
+            "discount": 0
+          }
+        }
+      ]
+    }
+  }
+}

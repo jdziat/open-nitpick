@@ -91,9 +91,18 @@ func TestParseRealSample(t *testing.T) {
 		t.Errorf("line = %d, want 10 (the first line of the 10-12 range)", f.Line)
 	}
 
-	if f.Severity != string(config.SeverityError) {
-		t.Errorf("severity = %q, want %q: Incumbent's critical maps onto our error",
-			f.Severity, config.SeverityError)
+	// Recorded, not reinterpreted. This used to assert `error`, because
+	// crSeverity demoted every Incumbent critical so its coarser vocabulary
+	// would not read as inflation; the effect was that no Incumbent review
+	// could score accurate on a plant we planted critical, and a headline
+	// number was published on it. The vocabulary mismatch is NOT handled by
+	// correcting it anywhere — the attempt to handle it at comparison time was
+	// withdrawn too, see NoCrossToolSeverityScore — it is described rather than
+	// scored, and the parser records what the reviewer said.
+	if f.Severity != string(config.SeverityCritical) {
+		t.Errorf("severity = %q, want %q: the review says \"critical [Security & Privacy]\", and a "+
+			"parsed severity is evidence about the reviewer rather than a place to correct for "+
+			"vocabulary", f.Severity, config.SeverityCritical)
 	}
 	if f.Class != string(config.ClassSecurity) {
 		t.Errorf("class = %q, want %q from the [Security & Privacy] category", f.Class, config.ClassSecurity)
@@ -248,7 +257,7 @@ Review complete
 				"\x1b[1;31mcritical\x1b[0m \x1b[2m[Security & Privacy]\x1b[0m", 1),
 			want: 1,
 			check: func(t *testing.T, got []review.Finding) {
-				if got[0].Severity != string(config.SeverityError) || got[0].Line != 10 {
+				if got[0].Severity != string(config.SeverityCritical) || got[0].Line != 10 {
 					t.Errorf("CSI escapes changed the parse: %+v", got[0])
 				}
 				if strings.Contains(got[0].Category, "\x1b") {
@@ -756,6 +765,186 @@ func TestCacheIsRejectedWhenItMeasuredSomethingElse(t *testing.T) {
 	write(t, crCache{Fixture: fx.Name, Findings: findings, Mode: crReviewMode, Fingerprint: fixtureFingerprint(fx)})
 	if _, ok := CachedIncumbent(dir, edited); ok {
 		t.Error("a review of the old code must not be scored against the new code")
+	}
+}
+
+// TestCachedReviewIsServedFromRawNotFromTheStoredParse pins which of the two
+// things in a cache entry is the evidence.
+//
+// The stored findings are one parser's reading of the retained text, and the
+// parser is the part that keeps turning out to be wrong: crSeverity demoted
+// every Incumbent "critical" to our "error" for the whole of the first
+// benchmark. If loading replayed the stored reading, that fix would have
+// applied to nothing already collected — the shipped corpus would still be
+// scored under the buggy parser, and correcting the published number would have
+// meant buying fifteen reviews again against a rate-limited allowance to
+// recover text already on disk.
+//
+// The last subtests pin the corollary the first version of this got wrong: when
+// the retained text does NOT parse, the entry is refused rather than quietly
+// served from the stored reading.
+func TestCachedReviewIsServedFromRawNotFromTheStoredParse(t *testing.T) {
+	fx := Fixtures()[0]
+
+	raw := completed(t, 1, crFindingRule+`
+  critical [Security & Privacy]
+  → store.go:10-12
+
+  Use a bound parameter for name.
+
+  fmt.Sprintf embeds name directly into the SQL query.
+`)
+
+	// A stale reading of exactly that text: the severity the OLD crSeverity
+	// would have recorded.
+	stale := []review.Finding{{Path: "store.go", Line: 10, Severity: string(config.SeverityError),
+		Title: "Use a bound parameter for name."}}
+
+	write := func(t *testing.T, dir string, c crCache) {
+		t.Helper()
+		blob, err := json.MarshalIndent(c, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, fx.Name+".json"), blob, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	entry := crCache{Fixture: fx.Name, Mode: crReviewMode, Fingerprint: fixtureFingerprint(fx)}
+
+	t.Run("raw wins over a stale stored parse", func(t *testing.T) {
+		dir := t.TempDir()
+		c := entry
+		c.Findings, c.Raw = stale, raw
+		write(t, dir, c)
+
+		got, ok := CachedIncumbent(dir, fx)
+		if !ok || len(got) != 1 {
+			t.Fatalf("ok=%v got=%+v", ok, got)
+		}
+		if got[0].Sev() != config.SeverityCritical {
+			t.Errorf("severity = %q, want %q: the recorded review says critical and the stored "+
+				"reading says error, so a parser fix reaches the corpus only if raw decides",
+				got[0].Sev(), config.SeverityCritical)
+		}
+	})
+
+	t.Run("a pre-raw entry still loads", func(t *testing.T) {
+		dir := t.TempDir()
+		c := entry
+		c.Findings = stale
+		write(t, dir, c)
+
+		got, ok := CachedIncumbent(dir, fx)
+		if !ok || len(got) != 1 || got[0].Title != stale[0].Title {
+			t.Errorf("ok=%v got=%+v: an entry collected before raw was retained has no other "+
+				"reading available and must not be dropped", ok, got)
+		}
+	})
+
+	// THE BUG, and this subtest used to assert it. When the retained review no
+	// longer parsed, the loader served the STORED findings with ok=true and no
+	// marker of any kind, on the reasoning that a stale reading beats an absent
+	// review. That is wrong in the only direction that matters: the fallback
+	// fires exactly when the parser and the evidence have diverged — the one
+	// moment the difference is not cosmetic — and it hands a previous parser's
+	// output to a table captioned as this parser's result, looking identical to a
+	// fresh review. A cache that silently serves a stale parse is how a corpus
+	// drifts under a measurement.
+	//
+	// The absent-review worry it was answering is real and is handled where it
+	// belongs: callers list what has no usable cache BEFORE they run, and a
+	// contender judged on nothing is failed rather than ranked.
+	t.Run("unparseable raw is refused, and says why", func(t *testing.T) {
+		dir := t.TempDir()
+		c := entry
+		// No trailer, so parseIncumbent refuses it as a truncated review.
+		c.Findings, c.Raw = stale, "  critical [Security & Privacy]\n  → store.go:10\n\n  Cut off"
+		write(t, dir, c)
+
+		got, ok := CachedIncumbent(dir, fx)
+		if ok {
+			t.Errorf("ok=true got=%+v: this served a PREVIOUS parser's reading of bytes THIS parser "+
+				"cannot read, with nothing to distinguish it from a fresh review", got)
+		}
+
+		// And the caller can tell "the parser and the evidence diverged" from
+		// "never collected", because the two have opposite remedies: one is a bug
+		// to fix, the other costs a review against a rate-limited allowance.
+		stale, why := StaleIncumbentCache(dir, fx)
+		if !stale || why == nil {
+			t.Errorf("StaleIncumbentCache = %v, %v: a refusal that cannot say WHY sends an operator "+
+				"to re-collect, which spends allowance to hide a parser bug", stale, why)
+		}
+	})
+
+	t.Run("a healthy cache is not reported stale", func(t *testing.T) {
+		dir := t.TempDir()
+		c := entry
+		c.Findings, c.Raw = stale, raw
+		write(t, dir, c)
+
+		if got, why := StaleIncumbentCache(dir, fx); got {
+			t.Errorf("StaleIncumbentCache = true (%v) for a cache this parser reads fine; a staleness "+
+				"report that cries wolf will be ignored when it matters", why)
+		}
+	})
+
+	t.Run("an absent cache is not reported stale", func(t *testing.T) {
+		// Nothing written. "Never collected" and "collected but unreadable" are
+		// different problems and must not arrive as the same signal.
+		if got, why := StaleIncumbentCache(t.TempDir(), fx); got {
+			t.Errorf("StaleIncumbentCache = true (%v) with no cache at all", why)
+		}
+	})
+}
+
+// TestShippedCacheReflectsTheCurrentParser is the corpus-level half.
+//
+// Every published number about Incumbent is computed from these files, so
+// "the parser was fixed" is only true of the benchmark if the fix reaches them.
+// An entry with no raw retained would be served from whatever parser was
+// current when it was collected, silently mixing two readings in one table.
+func TestShippedCacheReflectsTheCurrentParser(t *testing.T) {
+	for _, f := range AllFixtures() {
+		blob, err := os.ReadFile(filepath.Join(crCacheDir, f.Name+".json"))
+		if err != nil {
+			continue // not yet collected; TestCollectIncumbent reports that
+		}
+
+		var c crCache
+		if err := json.Unmarshal(blob, &c); err != nil {
+			t.Errorf("%s: %v", f.Name, err)
+			continue
+		}
+		if c.Raw == "" {
+			t.Errorf("%s: no raw review retained, so this entry is frozen under whatever parser "+
+				"collected it and cannot be corrected without spending the allowance again", f.Name)
+			continue
+		}
+
+		served, ok := CachedIncumbent(crCacheDir, f)
+		if !ok {
+			continue // fingerprint mismatch; a different test's problem
+		}
+
+		fresh, err := parseIncumbent([]byte(c.Raw))
+		if err != nil {
+			t.Errorf("%s: retained raw no longer parses: %v", f.Name, err)
+			continue
+		}
+		if len(served) != len(fresh) {
+			t.Errorf("%s: served %d finding(s), a fresh parse of the same text yields %d",
+				f.Name, len(served), len(fresh))
+			continue
+		}
+		for i := range served {
+			if served[i].Severity != fresh[i].Severity {
+				t.Errorf("%s finding %d: served severity %q, current parser reads %q from the same "+
+					"recorded review", f.Name, i, served[i].Severity, fresh[i].Severity)
+			}
+		}
 	}
 }
 

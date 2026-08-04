@@ -240,7 +240,7 @@ func runLevels(t *testing.T, judge *Judge, model Model, levels []config.NitpickL
 						out[i].notes = append(out[i].notes, fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", f.Name, p))
 					}
 				}
-				out[i].agg.AddSeverity(ScoreSeverity(f, kept))
+				out[i].agg.AddSeverity(f, ScoreSeverity(f, kept))
 
 				if derr := dump.Record(DumpSample{
 					Model:    model.ID,
@@ -285,10 +285,18 @@ func reportVariants(t *testing.T, results []scored) {
 	var b strings.Builder
 	b.WriteString("\n")
 	// J-* is the judge's opinion of each severity; O-* is the same question
-	// answered against the fixture's own planted WantSeverity. Both are shown,
-	// and neither replaces the other: they disagree, and which one a tuning
-	// decision was made against is the difference between reducing inflation and
-	// merely teaching the model to under-claim.
+	// answered against the fixture's own planted WantSeverity. Both are shown and
+	// neither replaces the other: they disagree, and which one a tuning decision
+	// was made against is the difference between reducing inflation and merely
+	// teaching the model to under-claim.
+	//
+	// A third group, B-*, used to sit between them: O-* recomputed after both
+	// severities were coarsened into bands, offered as the honest cross-tool
+	// reading. It is withdrawn, and no re-tuned replacement is coming — it was
+	// maximised by a reviewer that stamped one blocking word on every finding,
+	// and it could not see the parser bug it was written in response to. The
+	// SEVERITY VOCABULARY block below is the description that replaces it. See
+	// NoCrossToolSeverityScore.
 	//
 	// Every count column is a PER-SAMPLE RATE, and N and FAIL are printed
 	// beside them. They used to be raw sums next to PRECISION, SIGNAL and GRADE
@@ -298,8 +306,8 @@ func reportVariants(t *testing.T, results []scored) {
 	// reviews, and one failed review silently gives that row a total over fewer
 	// samples than its neighbours. `failures` was counted and then read by
 	// nothing, so the reader had no way to see it happen.
-	b.WriteString("VARIANT                 N     FAIL  FINDINGS  REAL  WORTH  PRECISION  J-INFL  J-UNDER  O-INFL  O-UNDER  O-ACC  MISCLASS  TONE-OFF  MISSED  SIGNAL  GRADE\n")
-	b.WriteString("--------------------------------------------------------------------------------------------------------------------------------------------------------\n")
+	b.WriteString(VariantTableHeader + "\n")
+	b.WriteString(strings.Repeat("-", len(VariantTableHeader)) + "\n")
 
 	for _, r := range results {
 		a := r.agg
@@ -311,15 +319,27 @@ func reportVariants(t *testing.T, results []scored) {
 		n := float64(max(len(a.Grades), 1))
 		rate := func(v int) string { return fmt.Sprintf("%.2f", float64(v)/n) }
 
-		fmt.Fprintf(&b, "%-23s %-5d %-5d %-9s %-5s %-6s %-10s %-7s %-8s %-7s %-8s %-6s %-9s %-9s %-7s %-7.1f %.2f\n",
+		// O-COV is printed with the triple, never without: severity is graded
+		// only over defects the reviewer LOCATED, and the triple alone is tied
+		// by a reviewer that reports only what it is already sure of. All four
+		// come from one function so a row cannot render three of them.
+		oInfl, oUnder, oAcc, oCov := a.ObjectiveSeverityCells(r.variant, len(a.Grades))
+
+		fmt.Fprintf(&b, "%-23s %-5d %-5d %-9s %-5s %-6s %-10s %-7s %-8s %-7s %-8s %-6s %-6s %-9s %-9s %-7s %-7.1f %.2f\n",
 			truncate(r.variant, 23), len(a.Grades), r.failures,
 			rate(a.Findings), rate(a.Real), rate(a.WorthRaising), precision,
-			rate(a.Inflated), rate(a.Understated), rate(a.SevInflated), rate(a.SevUnderstated), rate(a.SevAccurate),
+			rate(a.Inflated), rate(a.Understated), oInfl, oUnder, oAcc, oCov,
 			rate(a.Misclassed), rate(a.ToneOff), rate(a.Missed), a.MeanSignal(), a.MeanGrade())
 	}
 
 	t.Log(b.String())
-	t.Log(severityColumnLegend)
+	t.Log(SeverityColumnLegend)
+
+	rows := make([]VocabularyRow, 0, len(results))
+	for _, r := range results {
+		rows = append(rows, VocabularyRow{Name: r.variant, Usage: r.agg.SevUsage})
+	}
+	t.Log(SeverityVocabularyBlock(rows))
 
 	for _, r := range results {
 		if len(r.notes) == 0 {
@@ -353,26 +373,6 @@ func reportVariants(t *testing.T, results []scored) {
 		t.Errorf("best variant precision %.2f: a senior reviewer would not raise most of what this produces", best)
 	}
 }
-
-// severityColumnLegend is printed under every table carrying both severity
-// measurements, because the columns are useless to a reader who does not know
-// they are two different instruments answering the same question.
-//
-// It states no arithmetic relation between the O-* columns and FIND. The
-// previous wording asserted their sum was "smaller than FIND", which is not
-// guaranteed and was already false on the shipped corpus — FIND counts judge
-// VERDICTS and the O-* columns count located defects, so they have different
-// sources and can be equal or inverted. Both tables that print this legend now
-// express every count as a per-sample rate, so the claim about units is true of
-// both rather than of one.
-const severityColumnLegend = "SEVERITY IS MEASURED TWICE: J-INFL/J-UNDER are the JUDGE's opinion; " +
-	"O-INFL/O-UNDER/O-ACC compare each LOCATED PLANTED DEFECT to the WantSeverity its fixture declares, " +
-	"with no model involved. They disagree — the judge scored Incumbent as understating NOTHING on a " +
-	"corpus whose ground truth says it understated four of the seven defects it located — and the " +
-	"disagreement is a result, not a rounding error. The two are counted over DIFFERENT things: J-* is " +
-	"per finding the judge returned a verdict for, O-* is per planted defect the review actually found, " +
-	"so neither is a share of the other and a defect nobody reported appears in neither. Every count " +
-	"column, J-* and O-* alike, is divided by N on the same row."
 
 // TestJudgeModels ranks every model in the battery by JUDGED quality.
 //
@@ -468,7 +468,7 @@ func TestJudgeModels(t *testing.T) {
 				notes[j.model.ID] = append(notes[j.model.ID],
 					fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", j.fixture.Name, p))
 			}
-			agg.AddSeverity(ScoreSeverity(j.fixture, findings))
+			agg.AddSeverity(j.fixture, ScoreSeverity(j.fixture, findings))
 
 			if derr := dump.Record(DumpSample{
 				Model:    j.model.ID,
@@ -524,20 +524,27 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 	// J-INFL and J-UNDER are printed together, and never one without the other.
 	//
 	// Only INFLATED used to be shown, so severity error was visible in one
-	// direction and invisible in the other -- and this comparison has a
-	// contender that understates BY CONSTRUCTION: crSeverity maps Incumbent's
-	// "critical" down to our "error" because its vocabulary carries no separate
-	// error tier. Counting over-claiming while ignoring under-claiming hands a
-	// free win to whichever reviewer is quieter about severity, which is the
-	// opposite of the judgement a reader wants to make.
+	// direction and invisible in the other. Counting over-claiming while
+	// ignoring under-claiming hands a free win to whichever reviewer is quieter
+	// about severity, which is the opposite of the judgement a reader wants to
+	// make.
 	//
 	// O-INFL, O-UNDER and O-ACC answer the same question against the fixtures'
 	// own WantSeverity. They sit beside the judge's columns rather than
-	// replacing them because the two disagree: the judge scored the contender
-	// that understates by construction as understating nothing at all. A prompt
+	// replacing them because the two disagree: the judge scored a contender the
+	// ground truth says understates as understating nothing at all. A prompt
 	// tuned to move J-INFL down while O-UNDER climbs has not become more honest
 	// about severity, it has become quieter, and only printing both makes that
 	// visible.
+	//
+	// THERE IS NO CROSS-TOOL SEVERITY COLUMN IN THIS TABLE, and that is a
+	// deliberate withdrawal rather than an omission. B-INFL/B-UNDER/B-ACC used to
+	// sit here — O-* recomputed after both severities were coarsened into bands —
+	// and were the columns the head-to-head was read from. They were maximised by
+	// a reviewer that stamps one blocking word on every finding, and they could
+	// not see the parser bug they were introduced to fix. The SEVERITY VOCABULARY
+	// block under this table is what a cross-vocabulary reader gets instead: a
+	// description. See NoCrossToolSeverityScore.
 	// The count columns are PER SAMPLE, not totals.
 	//
 	// GRADE has always been a mean while FIND, INFLATED, MISSED and the rest
@@ -547,8 +554,8 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 	// looks three times worse for having been measured three times as hard.
 	// COV is the fixture coverage that makes the comparison legitimate at all;
 	// N is what the rates divide by.
-	b.WriteString("MODEL                                GRADE  SPREAD  PREC   COV  N    FAIL  FIND  WORTH  J-INFL  J-UNDER  O-INFL  O-UNDER  O-ACC  MISCLASS  MISSED  SIGNAL\n")
-	b.WriteString("---------------------------------------------------------------------------------------------------------------------------------------------------------\n")
+	b.WriteString(JudgedModelTableHeader + "\n")
+	b.WriteString(strings.Repeat("-", len(JudgedModelTableHeader)) + "\n")
 
 	for _, r := range rows {
 		a := r.agg
@@ -589,15 +596,29 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 		n := float64(max(len(a.Grades), 1))
 		rate := func(v int) string { return fmt.Sprintf("%.2f", float64(v)/n) }
 
-		fmt.Fprintf(&b, "%-36s %-6s %-7s %-6s %-4d %-4d %-5d %-5s %-6s %-7s %-8s %-7s %-8s %-6s %-9s %-7s %s\n",
+		// n/a for a contender whose severity vocabulary is not ours, and the
+		// coverage denominator beside the triple for one whose is. This is the
+		// table the head-to-head is printed in, so it is the one where a
+		// cross-tool severity comparison was still on offer after the banded
+		// version was withdrawn — same columns, same sorted ranking, a prose
+		// note underneath. See PublishesOurSeverityLevels.
+		oInfl, oUnder, oAcc, oCov := a.ObjectiveSeverityCells(r.model, len(a.Grades))
+
+		fmt.Fprintf(&b, "%-36s %-6s %-7s %-6s %-4d %-4d %-5d %-5s %-6s %-7s %-8s %-7s %-8s %-6s %-6s %-9s %-7s %s\n",
 			truncate(r.model, 36), grade, spread, prec, a.Coverage(), len(a.Grades), failed,
 			rate(a.Findings), rate(a.WorthRaising), rate(a.Inflated), rate(a.Understated),
-			rate(a.SevInflated), rate(a.SevUnderstated), rate(a.SevAccurate),
+			oInfl, oUnder, oAcc, oCov,
 			rate(a.Misclassed), rate(a.Missed), signal)
 	}
 
 	t.Log(b.String())
-	t.Log(severityColumnLegend)
+	t.Log(SeverityColumnLegend)
+
+	vocab := make([]VocabularyRow, 0, len(rows))
+	for _, r := range rows {
+		vocab = append(vocab, VocabularyRow{Name: r.model, Usage: r.agg.SevUsage})
+	}
+	t.Log(SeverityVocabularyBlock(vocab))
 
 	// A model judged on fewer fixtures than its peers is not comparable to
 	// them, and quietly averaging it anyway is how a ranking becomes fiction.
@@ -633,6 +654,23 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 	if _, ok := byModel[IncumbentModel]; ok {
 		t.Logf("ASYMMETRIC SAMPLE: %s is served from a cache of one review per fixture, so its "+
 			"spread is unmeasured rather than zero. Our side may have several runs per fixture.",
+			IncumbentModel)
+
+		// Stated on the row rather than left to the legend, because this is the
+		// specific comparison the table is captioned as making and the specific
+		// place a headline gets quoted from. Two have been quoted from here and
+		// both were retracted: the first off O-ACC against a parser that had
+		// demoted the incumbent's severities, the second off a banded column that
+		// a reviewer stamping "critical" on everything scored perfectly.
+		//
+		// This note used to end "Compare it on B-*". That instruction is deleted
+		// rather than repointed at another column: there is no column to send a
+		// reader to, and inventing a third one is how the first two happened.
+		t.Logf("ASYMMETRIC VOCABULARY: %s publishes ~3 severity tiers to our 5, so ITS O-* COLUMNS "+
+			"ARE NOT A RESULT — its one 'critical' covers our critical and error, and it cannot be "+
+			"accurate on both kinds of plant. NO SEVERITY COLUMN IN THIS TABLE COMPARES IT TO US: "+
+			"read the SEVERITY VOCABULARY block, which describes what each contender said without "+
+			"scoring one vocabulary against the other, and see why no such score is offered.",
 			IncumbentModel)
 	}
 
@@ -694,14 +732,27 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 	// column came from failed invocations is not a comparison, however it reads.
 	var uncached []string
 	for _, f := range opts.Fixtures {
-		if _, ok := CachedIncumbent(crCacheDir, f); !ok {
-			uncached = append(uncached, f.Name)
+		if _, ok := CachedIncumbent(crCacheDir, f); ok {
+			continue
+		}
+		uncached = append(uncached, f.Name)
+
+		// A cached review the parser can no longer read is a different problem
+		// from one never collected, and re-collecting hides it. It is reported
+		// as an ERROR because the alternative — what this used to do — was to
+		// serve the previous parser's reading of those bytes into the table with
+		// no marker at all.
+		if stale, why := StaleIncumbentCache(crCacheDir, f); stale {
+			t.Errorf("%s: a cached Incumbent review exists and matches the fixture, but this parser "+
+				"can no longer read it (%v). The parser and the evidence have diverged; fix the parser "+
+				"or re-collect deliberately, and do not let a previous parser's reading be scored as "+
+				"this one's", f.Name, why)
 		}
 	}
 	if len(uncached) > 0 {
-		t.Logf("NO CACHED INCUMBENT REVIEW for %d of %d fixture(s): %s — these will be collected live "+
-			"on the free allowance; run `make collect-incumbent` first if the comparison has to be complete",
-			len(uncached), len(opts.Fixtures), strings.Join(uncached, ", "))
+		t.Logf("NO USABLE CACHED INCUMBENT REVIEW for %d of %d fixture(s): %s — these will be collected "+
+			"live on the free allowance; run `make collect-incumbent` first if the comparison has to be "+
+			"complete", len(uncached), len(opts.Fixtures), strings.Join(uncached, ", "))
 	}
 
 	persona := config.DefaultPersona()
@@ -746,7 +797,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		for _, p := range agg.Add(assessment, len(findings)) {
 			notes[name] = append(notes[name], fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", fx.Name, p))
 		}
-		agg.AddSeverity(ScoreSeverity(fx, findings))
+		agg.AddSeverity(fx, ScoreSeverity(fx, findings))
 
 		if derr := dump.Record(DumpSample{
 			Model:    name,
@@ -937,7 +988,7 @@ func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options, dump *D
 				for _, p := range out[i].agg.Add(assessment, len(result.Report.Findings)) {
 					out[i].notes = append(out[i].notes, fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", f.Name, p))
 				}
-				out[i].agg.AddSeverity(ScoreSeverity(f, result.Report.Findings))
+				out[i].agg.AddSeverity(f, ScoreSeverity(f, result.Report.Findings))
 
 				if derr := dump.Record(DumpSample{
 					Model:    model.ID,

@@ -171,6 +171,8 @@ func logRun(t *testing.T, model string, f Fixture, s Score) {
 		}
 		t.Logf("    [%s] %s:%d %s", mark, defect.Path, defect.Line, defect.Why)
 
+		// One verdict, at our full resolution. A second, banded one was printed
+		// beside it for the withdrawn cross-tool columns; it is gone with them.
 		for _, c := range calls[defect.Why] {
 			t.Logf("           severity %s, planted %s: %s",
 				c.Finding.Sev(), c.Defect.WantSeverity, strings.ToUpper(c.Verdict))
@@ -209,8 +211,14 @@ func printTable(t *testing.T, summaries []Summary) {
 	// left-hand side of RECALL on the same row. RUNS is printed because NOISE
 	// is a sum with no other divisor on the line, and because a row's counts
 	// scale with how many times it was measured.
-	b.WriteString("MODEL                                FIXTURE                   RUNS  RECALL   SEV A/I/U  NOISE  STABLE  FAILED\n")
-	b.WriteString("------------------------------------------------------------------------------------------------------------\n")
+	//
+	// A BAND A/I/U column stood beside SEV — the same triple after both
+	// severities were coarsened into blocking/medium/low, so that this table and
+	// the head-to-head could be read in the same units. Both it and the
+	// head-to-head's version are withdrawn; the units they shared were maximised
+	// by rating everything blocking. See NoCrossToolSeverityScore.
+	b.WriteString(SummaryTableHeader + "\n")
+	b.WriteString(strings.Repeat("-", len(SummaryTableHeader)) + "\n")
 
 	for _, s := range summaries {
 		recall := "n/a"
@@ -218,24 +226,62 @@ func printTable(t *testing.T, summaries []Summary) {
 			recall = fmt.Sprintf("%d/%d", s.Matched, s.Total)
 		}
 
-		stable := "yes"
-		if !s.Stable() {
-			stable = fmt.Sprintf("NO %v", s.FindingCounts)
+		// n/a, not "yes", when no run produced a finding: silence is not
+		// stability, and yes is the column's best value. See Summary.Stable.
+		stable := "n/a"
+		if ok, defined := s.Stable(); defined {
+			stable = "yes"
+			if !ok {
+				stable = fmt.Sprintf("NO %v", s.FindingCounts)
+			}
 		}
 
 		// Blank rather than 0/0/0 when nothing was graded: a clean fixture
 		// plants no severity to compare against, and zeros there would read as
-		// "nothing was wrong" instead of "nothing was measured".
+		// "nothing was wrong" instead of "nothing was measured". That distinction
+		// is the whole reason PublishedMetrics returns ok=false for an ungraded
+		// corpus — a reviewer that says nothing inflates nothing.
 		sev := ""
 		if s.SevAccurate+s.SevInflated+s.SevUnderstated > 0 {
 			sev = fmt.Sprintf("%d/%d/%d", s.SevAccurate, s.SevInflated, s.SevUnderstated)
 		}
 
-		fmt.Fprintf(&b, "%-36s %-25s %-5d %-8s %-10s %-6d %-7s %d\n",
-			truncate(s.Model, 36), truncate(s.Fixture, 25), s.Runs, recall, sev, s.NoiseTotal, stable, s.Failed)
+		// ANCHOR is the widest single region any finding claimed. It is on the
+		// row rather than in a log line because RECALL and NOISE are both
+		// maximised without it: see CorpusTally.WidestAnchor.
+		anchor := "—"
+		if s.WidestAnchor > 0 {
+			anchor = fmt.Sprintf("%d", s.WidestAnchor)
+		}
+
+		fmt.Fprintf(&b, "%-36s %-25s %-5d %-8s %-10s %-6d %-7s %-7s %d\n",
+			truncate(s.Model, 36), truncate(s.Fixture, 25), s.Runs, recall, sev,
+			s.NoiseTotal, anchor, stable, s.Failed)
 	}
 
 	t.Log(b.String())
+
+	// The legend belongs under this table too. Its own doc comment said it was
+	// printed under every table carrying a severity column, and this one carries
+	// SEV A/I/U and printed no legend at all — so one of the three tables met a
+	// reader with a severity column and no retraction beside it, while the guard
+	// asserting the retraction inspected the const rather than the output.
+	t.Log(SeverityColumnLegend)
+
+	// The description that replaced the withdrawn cross-tool severity score.
+	// Printed here too, even though this battery runs no foreign reviewer: a
+	// reader moving between the two tables should meet the same instrument, and
+	// what our own models call each planted level is worth reading on its own.
+	vocab := make([]VocabularyRow, 0, len(summaries))
+	for _, s := range summaries {
+		if len(s.SevUsage) == 0 {
+			continue
+		}
+		vocab = append(vocab, VocabularyRow{Name: s.Model + " / " + s.Fixture, Usage: s.SevUsage})
+	}
+	if len(vocab) > 0 {
+		t.Log(SeverityVocabularyBlock(vocab))
+	}
 }
 
 // assertCorpusRecall fails a model that found nothing anywhere.

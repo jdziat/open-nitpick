@@ -116,8 +116,28 @@ type Options struct {
 	// CaptureDir, when set, receives every raw model response.
 	CaptureDir string
 
+	// Prices is the rate table this run reports cost against, resolved ONCE at
+	// setup so a battery cannot be priced against two different tables — and so
+	// that a bad NITPICK_EVAL_PRICES is a setup error rather than a discovery
+	// made ninety minutes and a real invoice later, at the moment the report is
+	// formatted. Resolving it here also fixes the rates for the whole run: a
+	// table re-read per row could pick up an edit mid-battery and rank the first
+	// rows against different numbers from the last.
+	Prices *PriceTable
+
 	// Timeout bounds a single review.
 	Timeout time.Duration
+
+	// buildClient constructs the model client. It is unexported and nil in
+	// every real run, where llm.Build is used.
+	//
+	// It exists so a test can drive the WHOLE harness from a scripted model.
+	// Without a seam here the only way to prove that reported usage reaches
+	// RunResult is to spend money at a real provider, and an assertion nobody
+	// can afford to run is not a guard — which matters for exactly this field's
+	// neighbours, since a cost column silently reading zero looks identical to
+	// a cheap model.
+	buildClient func(config.ModelSpec) (*llm.Client, error)
 }
 
 // LoadDotEnv reads KEY=VALUE pairs from path into the process environment
@@ -240,6 +260,15 @@ func OptionsFromEnv() (Options, error) {
 	}
 
 	opts.CaptureDir = strings.TrimSpace(os.Getenv(EnvCapture))
+
+	// Before the run, not at report time. Prices() rejects an unreadable or
+	// undated override rather than falling back to the shipped table — the right
+	// behaviour, but only if it happens while the operator is still watching.
+	prices, err := Prices()
+	if err != nil {
+		return opts, err
+	}
+	opts.Prices = prices
 
 	return opts, nil
 }
@@ -419,6 +448,15 @@ type RunResult struct {
 	// Responses are the raw model outputs seen during the run.
 	Responses []string
 
+	// Usage is what the provider REPORTED this review spent, summed over every
+	// call the run made — review, triage, any repair round-trip. It is the
+	// measurement a cost figure is allowed to rest on; see TokenUsage for why
+	// the estimate internal/bundle already computes is not.
+	//
+	// It is a LOWER bound, and TokenUsage.Failed names the two reasons. The one
+	// that matters here is where the meter is installed: below.
+	Usage TokenUsage
+
 	Err      error
 	Duration time.Duration
 }
@@ -450,11 +488,28 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	cfg := evalConfig(model)
 	cfg.Persona = persona.Resolve()
 
-	client, err := llm.Build(cfg.Models.Default)
+	build := opts.buildClient
+	if build == nil {
+		build = llm.Build
+	}
+
+	client, err := build(cfg.Models.Default)
 	if err != nil {
 		out.Err = fmt.Errorf("build model %s: %w", model.ID, err)
 		return out
 	}
+
+	// Metering sits under the recorder so both see the same calls: one review
+	// makes several (review, triage, and a repair round-trip when a provider
+	// answers with unparseable JSON), and every one of them is billed.
+	//
+	// It also sits OUTSIDE the resilience wrapper llm.Build installed, because
+	// that wrapper is what a real review runs behind and this harness measures
+	// the shipped path. The price is one call per logical request rather than
+	// one per attempt: a retried request contributes only the attempt that
+	// succeeded, and the attempts a provider may have billed for before it are
+	// invisible. Understated, never overstated — see TokenUsage.Failed.
+	meter := MeterClient(client)
 
 	recorder := &recordingLLM{inner: client.LLM}
 	client.LLM = recorder
@@ -488,6 +543,12 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	out.Report = report
 	out.Review = provider.review
 	out.Responses = recorder.captured()
+
+	// Read after the review, including when it failed: a run that died at
+	// triage still paid for the review calls that preceded it, and dropping
+	// that spend would make an unreliable model look cheap.
+	out.Usage = meter.Usage()
+
 	out.Err = err
 	out.Duration = time.Since(started)
 

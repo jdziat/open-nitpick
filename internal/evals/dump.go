@@ -144,8 +144,14 @@ type DumpRecord struct {
 	WantSeverity string `json:"want_severity,omitempty"`
 
 	// SeverityDelta is the objective verdict — accurate, inflated or
-	// understated — against WantSeverity. Precomputed so a reader does not
-	// reimplement the severity ordering to recover it.
+	// understated — against WantSeverity, comparing EXACT levels. Precomputed so
+	// a reader does not reimplement the severity ordering to recover it.
+	//
+	// A second, banded verdict used to be written beside it as band_delta, for
+	// the cross-tool columns that are now withdrawn. It is gone rather than
+	// merely unprinted: a field carried in the dump is a number someone will
+	// aggregate, and this one is maximised by rating everything critical. See
+	// NoCrossToolSeverityScore.
 	SeverityDelta string `json:"severity_delta,omitempty"`
 
 	// DefectWhy is the planted defect's own description, so a line of this file

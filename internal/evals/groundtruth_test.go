@@ -612,9 +612,12 @@ func TestTuningCorpusCanFalsifyInflation(t *testing.T) {
 //
 // When this fails: check the new level against the anchor clause in
 // internal/prompt/templates/review.md, check what it does to the corpus's
-// ability to observe INFLATION (raising plants removes that ability), check
-// what it does to a reviewer whose vocabulary cannot reach the new level — see
-// TestIncumbentCannotExpressCritical — and then update the entry.
+// ability to observe INFLATION (raising plants removes that ability), check what
+// it does to TestNoDegenerateReviewerCanMaxOutAPublishedMetric — a corpus whose
+// plants all sit at one level is one no severity metric can be falsified on, and
+// that is how the withdrawn cross-tool column came to be maximised by a reviewer
+// with no severity opinion at all — and then update the entry, along with the
+// pinned incumbent numbers in TestIncumbentObjectiveSeverityOnTheShippedCache.
 func TestPlantedSeveritiesArePinned(t *testing.T) {
 	// Keyed "fixture/path:line/class". The class is in the key because two of
 	// multi-defect's plants sit on the SAME line of the same file — the
@@ -676,64 +679,195 @@ func TestPlantedSeveritiesArePinned(t *testing.T) {
 	}
 }
 
-// TestIncumbentCannotExpressCritical pins the ceiling the objective severity
-// columns are read through.
+// TestIncumbentSeverityIsRecordedNotRewritten pins the fix for the defect this
+// corpus was measured through for the whole of the first benchmark.
 //
-// crSeverity has no branch that returns critical — Incumbent publishes
-// critical/warning/info with no separate error tier, so its critical is mapped
-// onto ours deliberately. The consequence is easy to forget and expensive: no
-// Incumbent review can ever score ACCURATE on a plant we planted critical, and
-// none can ever be caught INFLATING one. Raising a plant to critical therefore
-// moves the head-to-head numbers with no change whatever in Incumbent's
-// output, and it happened: two plants were raised, O-ACC and O-UNDER each moved
-// by two against the incumbent, and nothing objected.
+// crSeverity used to map Incumbent's "critical" onto our "error" so that its
+// coarser vocabulary would not read as inflation. The effect was a CEILING: no
+// Incumbent review could score ACCURATE on any of the four plants we plant at
+// critical, however it worded the finding, and none could be caught INFLATING
+// one either. A headline claim was published on the resulting number and had to
+// be retracted. Fidelity now lives in the parser, and the vocabulary difference
+// is not corrected for anywhere: the second attempt, a banded comparison, was
+// retracted too. It is DESCRIBED instead — see NoCrossToolSeverityScore.
 //
-// So the count is pinned rather than merely documented. It is the number
-// ScoreSeverity's own comment states, and the two must not drift apart.
-func TestIncumbentCannotExpressCritical(t *testing.T) {
-	for _, word := range []string{"critical", "CRITICAL", " Critical ", "blocker", "major", "warning", "info", "nit", ""} {
-		if got := crSeverity(word); got == config.SeverityCritical {
-			t.Fatalf("crSeverity(%q) = %q: the ceiling this test exists to describe has moved, and "+
-				"score.go's account of the objective severity columns is now wrong", word, got)
+// A word that IS one of our levels must therefore round-trip. That is the whole
+// property: a parsed severity is evidence about the reviewer, and a parser that
+// edits the evidence to make a comparison come out fairly has destroyed the
+// thing being compared.
+func TestIncumbentSeverityIsRecordedNotRewritten(t *testing.T) {
+	for _, sev := range []config.Severity{
+		config.SeverityCritical, config.SeverityError, config.SeverityWarning,
+		config.SeverityInfo, config.SeverityNit,
+	} {
+		for _, spelling := range []string{
+			string(sev), strings.ToUpper(string(sev)), " " + string(sev) + " ",
+		} {
+			if got := crSeverity(spelling); got != sev {
+				t.Errorf("crSeverity(%q) = %q, want %q. Incumbent used one of OUR OWN severity "+
+					"words and the parser answered with a different one. There is nowhere else for "+
+					"that correction to go: this message used to send the next reader to Band, an "+
+					"instrument deleted with the retraction it belongs to. A vocabulary difference "+
+					"is DESCRIBED (SeverityVocabularyBlock) and not corrected for anywhere",
+					spelling, got, sev)
+			}
 		}
 	}
 
-	// Graded calls on plants Incumbent's vocabulary cannot reach. These are
-	// UNDERSTATEMENTS BY CONSTRUCTION: no output could have scored otherwise.
-	const wantForced = 2
+	// Unrecognized input must still produce a usable severity — an unknown word
+	// has to yield a finding, which is why crSeverity has a default at all.
+	for _, word := range []string{"blocker", "trivial", "", "  ", "banana"} {
+		if got := crSeverity(word); !got.IsFinding() {
+			t.Errorf("crSeverity(%q) = %q, which no finding may carry", word, got)
+		}
+	}
 
+	// The words crSeverity translates rather than degrades, enumerated.
+	//
+	// crSeverity's default arm is symmetric with our own models by construction
+	// — it calls the same Normalize — and the guard for that only ever tested
+	// words that REACH the default. These three do not: they are foreign tokens
+	// given bespoke arms, so the identical word is worth a different level
+	// depending on which contender emitted it, and "major" carries more than
+	// half the incumbent's severity words in the shipped cache. That asymmetry
+	// is deliberate and is the reason no cross-tool severity score is published.
+	// Pinning the set is what stops a fourth translation being added quietly and
+	// moving a published number with no new evidence.
+	translated := map[string]config.Severity{
+		"major":   config.SeverityWarning,
+		"warn":    config.SeverityWarning,
+		"nitpick": config.SeverityNit,
+		"minor":   config.SeverityInfo,
+	}
+	for word, want := range translated {
+		if got := crSeverity(word); got != want {
+			t.Errorf("crSeverity(%q) = %q, want %q. Changing a translation moves published "+
+				"severity numbers with the reviewer's bytes unchanged", word, got, want)
+		}
+		if normalized, known := config.Severity(word).Normalize(); known {
+			t.Errorf("%q is a level of ours (%q), so it is not a foreign token and does not belong "+
+				"in this table", word, normalized)
+		}
+	}
+
+	for word := range translated {
+		normalized, _ := config.Severity(word).Normalize()
+		if crSeverity(word) == normalized {
+			continue
+		}
+		t.Logf("asymmetric on purpose: %q is worth %q from %s and %q from one of ours",
+			word, crSeverity(word), IncumbentModel, normalized)
+	}
+}
+
+// TestIncumbentObjectiveSeverityOnTheShippedCache is the receipt for BOTH
+// retractions.
+//
+// It recomputes the incumbent's objective severity over the reviews on disk:
+//
+//	                                   exact (O-*)
+//	first published                acc 3  infl 0  under 4
+//	after the parser fix           acc 2  infl 3  under 2
+//
+// Read that carefully, because the obvious summary of the parser fix is wrong.
+// Recording Incumbent's criticals faithfully does not hand it points back at
+// full resolution — it LOSES one there. Two calls it could not previously win
+// became accurate (the hardcoded secret and multi-defect's traversal, both
+// planted critical), and three that were accurate became INFLATED, because the
+// same word it uses for those two is the word it used on plants of error
+// (nil-deref, SQL injection, command injection). That is not a new bias; it is
+// the same vocabulary mismatch pointing the other way, and it is the proof that
+// no constant in crSeverity could have fixed it.
+//
+// A THIRD COLUMN USED TO BE PINNED HERE and is deleted: the banded triple, whose
+// 5/0/2 on this corpus was quoted as "0.62" — it is 0.714 — and offered as the
+// cross-tool result. It is withdrawn, and reconstructing it says why: a reviewer
+// stamping one blocking word on every finding bands 7/1/0 here against the
+// incumbent's 5/0/2, one that reports only the already-blocking plants bands
+// 7/0/0, and the column moved not at all when the parser bug above was fixed.
+// See NoCrossToolSeverityScore.
+//
+// WHAT SURVIVES IS NOT A CROSS-TOOL SCORE. These counts are pinned as EVIDENCE
+// about this cache — they catch a fixture edited without re-collecting, and a
+// scorer change that silently moves the incumbent — and Incumbent's own O-*
+// remains a statement about vocabulary rather than about review quality, because
+// its one "critical" spans two of our levels. The per-plant lines are logged on
+// failure so a disagreement can be read rather than guessed at.
+func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 	var (
-		forced []string
+		got    SeverityScore
 		cached int
+		lines  []string
+		usage  = SeverityUsage{}
 	)
+
 	for _, f := range Fixtures() {
 		findings, ok := CachedIncumbent(crCacheDir, f)
 		if !ok {
 			continue
 		}
 		cached++
-		for _, c := range ScoreSeverity(f, findings).Calls {
-			if c.Defect.WantSeverity == config.SeverityCritical {
-				forced = append(forced, fmt.Sprintf("%s (%s)", f.Name, c.Finding.Title))
-			}
+
+		s := ScoreSeverity(f, findings)
+		got.Accurate += s.Accurate
+		got.Inflated += s.Inflated
+		got.Understated += s.Understated
+		usage.Merge(s.Usage())
+
+		for _, c := range s.Calls {
+			lines = append(lines, fmt.Sprintf("%s: planted %s, said %s -> %s (%s)",
+				f.Name, c.Defect.WantSeverity, c.Finding.Sev(), c.Verdict,
+				truncate(c.Finding.Title, 40)))
 		}
 	}
 
-	// A cache that stopped matching would drop `forced` to zero and read as the
-	// ceiling having gone away, which is the opposite of what happened.
-	if cached == 0 {
-		t.Fatalf("no cached Incumbent review in %s matches the current corpus, so this test measures "+
-			"nothing; a fixture's source was edited without re-collecting", crCacheDir)
+	// A cache that stopped matching would zero every count and read as the
+	// numbers having improved, which is the failure this whole file guards.
+	if cached != len(Fixtures()) {
+		t.Fatalf("%d of %d tuning fixtures have a cached Incumbent review matching their current "+
+			"source, so this test measures a different corpus than it pins; a fixture was edited "+
+			"without re-collecting %s", cached, len(Fixtures()), crCacheDir)
 	}
 
-	if len(forced) != wantForced {
-		t.Errorf("%d of the tuning corpus's graded Incumbent calls sit on a plant its vocabulary "+
-			"cannot reach, and %d are accounted for: %s.\n"+
-			"Each one is an O-UNDER the incumbent could not have avoided and an O-INFL it could not "+
-			"have committed, so the column is that much less a statement about review quality. "+
-			"If a plant was raised to critical, say why the anchor requires it AND update the count "+
-			"here and the account in ScoreSeverity's doc comment",
-			len(forced), wantForced, strings.Join(forced, ", "))
+	want := SeverityScore{Accurate: 2, Inflated: 3, Understated: 2}
+
+	if got.Accurate != want.Accurate || got.Inflated != want.Inflated || got.Understated != want.Understated {
+		t.Errorf("exact acc/infl/under = %d/%d/%d, want %d/%d/%d. This is EVIDENCE about this cache, "+
+			"not a cross-tool result: %s publishes one 'critical' spanning two of our levels, so it "+
+			"cannot be accurate on both kinds of plant and its O-* is a statement about vocabulary",
+			got.Accurate, got.Inflated, got.Understated,
+			want.Accurate, want.Inflated, want.Understated, IncumbentModel)
+	}
+
+	// The vocabulary description, pinned on the same terms and for the same
+	// reason: it is what the retracted number was replaced BY, so a change that
+	// silently empties or re-shapes it removes the only thing this table now says
+	// about severity across vocabularies.
+	//
+	// Read it as the whole argument in four numbers. On plants of ERROR the
+	// incumbent answers "critical" three times and "warning" twice; on plants of
+	// CRITICAL it answers "critical" twice. One word covering both kinds of plant
+	// is exactly the resolution difference no mapping can repair — and it is why
+	// the banded reduction that "fixed" it scored a reviewer with no severity
+	// opinion at all as perfect.
+	for _, tc := range []struct {
+		planted, said config.Severity
+		want          int
+	}{
+		{config.SeverityCritical, config.SeverityCritical, 2},
+		{config.SeverityError, config.SeverityCritical, 3},
+		{config.SeverityError, config.SeverityWarning, 2},
+	} {
+		if n := usage[tc.planted][tc.said]; n != tc.want {
+			t.Errorf("on plants of %s the incumbent said %s %d time(s), want %d",
+				tc.planted, tc.said, n, tc.want)
+		}
+	}
+
+	if t.Failed() {
+		for _, l := range lines {
+			t.Log(l)
+		}
 	}
 }
 
