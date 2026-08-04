@@ -27,13 +27,23 @@ type ContentFetcher func(ctx context.Context, path string) ([]byte, error)
 type Entry struct {
 	File *diff.File
 
-	// Content is the full new-side file, empty when it was unavailable,
-	// too large, binary, or excluded by the token budget.
+	// Content is the new-side file, empty when it was unavailable, binary, or
+	// excluded by the token budget.
 	Content string
 
 	// Truncated marks that Content is a window around the changed hunks
 	// rather than the whole file.
 	Truncated bool
+
+	// ContextLines is how many lines of surrounding code the window kept on
+	// each side of every change, meaningful only when Truncated.
+	//
+	// It is recorded rather than assumed because the width is now chosen per
+	// file against the budget. A reader who cannot tell a 200-line window from
+	// a 12-line one cannot tell a well-contextualised review from a thin one,
+	// and Render states it in the prompt so the model knows how much of the
+	// file it is NOT being shown.
+	ContextLines int
 
 	// Instructions are the configured path-scoped prompts that apply here.
 	Instructions []string
@@ -71,8 +81,8 @@ type Plan struct {
 	// to one that found nothing wrong.
 	Skipped []Skip
 
-	// Degraded records files that WERE reviewed, but without their full
-	// content, and why.
+	// Degraded records files that WERE reviewed, but from the diff alone with
+	// no file content at all, and why.
 	//
 	// These are kept apart from Skipped because the two mean opposite things
 	// to a reader. Both once shared this list, so a file whose content fetch
@@ -80,6 +90,25 @@ type Plan struct {
 	// reviewed" — understating the review in exactly the way Skipped exists
 	// to prevent it from being overstated.
 	Degraded []Skip
+
+	// Windowed records files reviewed with a window around their changes
+	// rather than whole, and how wide that window was.
+	//
+	// Separate from Degraded for the same reason Degraded is separate from
+	// Skipped: a windowed file was reviewed WITH file context, just not all of
+	// it, and reporting it as diff-only would understate the review.
+	//
+	// NOTHING RENDERS THIS YET, and that is a regression against what the
+	// published comment used to say. A file over review.max_file_bytes was
+	// previously refused its content outright and landed in Degraded, which
+	// internal/review/render.go prints under "Reviewed from the diff only".
+	// Such a file now gets a window and lands here instead, so a reader who
+	// was told something is now told nothing — even where 98% of the file was
+	// elided. The fix belongs in render.go, alongside degradedNotes: a
+	// "Reviewed with reduced file context" section over this list. Until then
+	// only Entry.ContextLines carries the fact, and it carries it to the model
+	// rather than to the human.
+	Windowed []Skip
 }
 
 // Skip records one excluded file.
@@ -107,8 +136,21 @@ const (
 	ReasonFileLimit   = "exceeded review.max_files"
 	ReasonUnavailable = "contents could not be read"
 	ReasonTooLarge    = "exceeded review.max_file_bytes"
+	ReasonOverBudget  = "exceeded review.token_budget_per_request"
 	ReasonNotText     = "not valid UTF-8 text"
 )
+
+// windowedReason and diffOnlyReason phrase what a size limit cost a file. Both
+// name the limit that bound, because "too large" without saying too large for
+// WHAT sends a reader to the wrong knob: the byte cap and the token budget are
+// tuned independently and fail at different sizes.
+func windowedReason(limit string, contextLines int) string {
+	return fmt.Sprintf("%s: reviewed with %d lines of context around each change", limit, contextLines)
+}
+
+func diffOnlyReason(limit string) string {
+	return fmt.Sprintf("%s: no window fit either, reviewed from the diff alone", limit)
+}
 
 // Assemble selects reviewable files, attaches their contents, and groups them
 // into batches.
@@ -124,24 +166,27 @@ func Assemble(ctx context.Context, cfg *config.Config, files diff.Files, fetch C
 	plan := &Plan{}
 	estimator := llms.DefaultTokenEstimator()
 
-	selected := make([]*diff.File, 0, len(files))
+	// Selection and content run in one pass so that review.max_files counts
+	// files that were actually reviewed. Selecting first meant a generated file
+	// — only recognisable once its content had been read — spent a slot and
+	// then dropped out of the review, and a reviewable file behind it was
+	// refused for a limit nothing reviewed had reached. Six files at
+	// max_files=3, the first three generated, reviewed nothing and reported
+	// success.
+	entries := make([]Entry, 0, len(files))
 	for _, f := range files {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		if reason, ok := skipReason(cfg, f); ok {
 			plan.Skipped = append(plan.Skipped, Skip{Path: f.Path, Reason: reason})
 			continue
 		}
 
-		if len(selected) >= cfg.Review.MaxFiles {
+		if len(entries) >= cfg.Review.MaxFiles {
 			plan.Skipped = append(plan.Skipped, Skip{Path: f.Path, Reason: ReasonFileLimit})
 			continue
-		}
-		selected = append(selected, f)
-	}
-
-	entries := make([]Entry, 0, len(selected))
-	for _, f := range selected {
-		if err := ctx.Err(); err != nil {
-			return nil, err
 		}
 
 		entry := Entry{
@@ -150,7 +195,7 @@ func Assemble(ctx context.Context, cfg *config.Config, files diff.Files, fetch C
 		}
 
 		if cfg.Review.IncludeFullFiles && fetch != nil {
-			content, skip := fetchContent(ctx, cfg, fetch, f)
+			content, skip := fetchContent(ctx, fetch, f)
 			switch {
 			case skip != "":
 				// Not fatal: review the diff without the full file. Recorded
@@ -161,6 +206,10 @@ func Assemble(ctx context.Context, cfg *config.Config, files diff.Files, fetch C
 				// Generated files are dropped entirely rather than reviewed
 				// diff-only: commenting on output nobody edits by hand is
 				// pure noise.
+				//
+				// Checked on the file as read, before any windowing: the
+				// marker convention puts it at the top, and a file whose top
+				// was elided would be reviewed as if it were hand-written.
 				plan.Skipped = append(plan.Skipped, Skip{Path: f.Path, Reason: ReasonGenerated})
 				continue
 
@@ -169,7 +218,17 @@ func Assemble(ctx context.Context, cfg *config.Config, files diff.Files, fetch C
 			}
 		}
 
-		fitEntry(&entry, cfg.Review.TokenBudgetPerRequest, estimator)
+		// Both limits are enforced in one place so that whichever binds, the
+		// answer is a narrower window rather than no content: the byte cap
+		// bounds what is HELD, the token budget bounds what is SENT, and
+		// neither is allowed to decide what is UNDERSTOOD on its own.
+		if reason := fitEntry(&entry, cfg.Review.TokenBudgetPerRequest, cfg.Review.MaxFileBytes, estimator); reason != "" {
+			if entry.Truncated {
+				plan.Windowed = append(plan.Windowed, Skip{Path: f.Path, Reason: reason})
+			} else {
+				plan.Degraded = append(plan.Degraded, Skip{Path: f.Path, Reason: reason})
+			}
+		}
 		entries = append(entries, entry)
 	}
 
@@ -177,9 +236,17 @@ func Assemble(ctx context.Context, cfg *config.Config, files diff.Files, fetch C
 	return plan, nil
 }
 
-// fetchContent reads a file's contents, applying the size and encoding limits.
-// The returned reason is non-empty when full content was not attached.
-func fetchContent(ctx context.Context, cfg *config.Config, fetch ContentFetcher, f *diff.File) (content, reason string) {
+// fetchContent reads a file's contents. The returned reason is non-empty when
+// no content could be attached at all.
+//
+// It deliberately does NOT apply review.max_file_bytes. That check used to live
+// here, and rejecting a file before windowing was ever considered meant a
+// 255 KiB file got a full window while a 257 KiB one got nothing: a cap written
+// to bound how much is READ had ended up deciding how much is UNDERSTOOD. The
+// cap is enforced in fitEntry instead, where it can pick a narrower window
+// rather than throw the file's context away. Only encoding is decided here,
+// because content that is not text cannot be windowed into text.
+func fetchContent(ctx context.Context, fetch ContentFetcher, f *diff.File) (content, reason string) {
 	data, err := fetch(ctx, f.Path)
 	switch {
 	case errors.Is(err, vcs.ErrNotFound):
@@ -188,9 +255,6 @@ func fetchContent(ctx context.Context, cfg *config.Config, fetch ContentFetcher,
 		return "", fmt.Sprintf("%s: %v", ReasonUnavailable, err)
 	}
 
-	if len(data) > cfg.Review.MaxFileBytes {
-		return "", ReasonTooLarge
-	}
 	if !utf8.Valid(data) {
 		return "", ReasonNotText
 	}
@@ -215,31 +279,139 @@ func skipReason(cfg *config.Config, f *diff.File) (string, bool) {
 	return "", false
 }
 
-// fitEntry costs an entry and, when it alone would blow the per-request
-// budget, replaces its full content with a window around the changes. The diff
-// itself is never trimmed: it is the thing being reviewed.
-func fitEntry(e *Entry, budget int, estimator *llms.TokenEstimator) {
-	e.Tokens = estimator.EstimateTokens(Render(*e))
-	if e.Tokens <= budget || !e.HasContent() {
-		return
-	}
-
-	windowed, elided := window(e.Content, e.File)
-	if !elided {
-		return
-	}
-
-	e.Content = windowed
-	e.Truncated = true
-	e.Tokens = estimator.EstimateTokens(Render(*e))
-
-	// Still too large even windowed: drop full-file context and review the
-	// diff alone rather than sending a request the provider will reject.
-	if e.Tokens > budget {
-		e.Content = ""
-		e.Truncated = false
+// fitEntry costs an entry and, when its content will not fit, narrows that
+// content to the widest window around the changes that does. The diff itself is
+// never trimmed: it is the thing being reviewed.
+//
+// Two limits bind, for different reasons, and each is measured in the unit it
+// names. maxBytes is review.max_file_bytes and bounds how much FILE is
+// understood: it is compared against the file's own bytes, both for the whole
+// file and for the bytes a window retains of it. budget bounds what is SENT and
+// is compared against the rendered entry, line numbering and headings included,
+// because that is the text the provider actually receives. Neither is allowed
+// to answer "no content at all" while a narrower window would have satisfied
+// it. The held prompt fragment needs no separate cap: it is the thing budget
+// measures.
+//
+// The returned reason is empty when nothing was given up; otherwise it names
+// the limit an operator would have to raise to get more context, and says what
+// the file was left with. e.Truncated distinguishes the two outcomes: windowed
+// (context reduced) from dropped (diff only).
+func fitEntry(e *Entry, budget, maxBytes int, estimator *llms.TokenEstimator) string {
+	if !e.HasContent() {
 		e.Tokens = estimator.EstimateTokens(Render(*e))
+		return ""
 	}
+
+	// The byte cap is read before the whole file is costed, because it alone
+	// can force a window and the cost of the whole file is then irrelevant.
+	// Rendering and estimating it anyway was work that scaled with the largest
+	// file in the diff and was bounded by nothing: a 64 MiB file spent 632 MiB
+	// of allocation computing a number that was thrown away, to produce a
+	// 29 KiB window.
+	//
+	// maxBytes <= 0 is read as "no cap" rather than "cap of zero". Validation
+	// rejects a non-positive value, but a hand-built Config reaches here too,
+	// and the wrong reading would strip every file's content in silence.
+	bound := ReasonTooLarge
+	if maxBytes <= 0 || len(e.Content) <= maxBytes {
+		bound = ReasonOverBudget
+		e.Tokens = estimator.EstimateTokens(Render(*e))
+		if e.Tokens <= budget {
+			return ""
+		}
+	}
+
+	win := newWindower(e.Content, e.File)
+
+	// probe reports whether a width fits, and records which limit turned it
+	// down. The last refusal is the narrowest one, so bound ends up naming the
+	// knob that stopped the window from being wider — not merely the one that
+	// rejected the whole file. Naming the wrong one sends an operator to a
+	// setting they can raise without anything changing, which the reason
+	// strings exist to prevent.
+	probe := func(width int) (text string, tokens int, ok bool) {
+		text, srcBytes, elided := win.render(width)
+		if !elided {
+			return "", 0, false
+		}
+		if maxBytes > 0 && srcBytes > maxBytes {
+			bound = ReasonTooLarge
+			return "", 0, false
+		}
+
+		// Costed on a copy: a width that turns out not to fit must leave the
+		// entry exactly as it was.
+		trial := *e
+		trial.Content, trial.Truncated, trial.ContextLines = text, true, width
+		if tokens = estimator.EstimateTokens(Render(trial)); tokens > budget {
+			bound = ReasonOverBudget
+			return "", 0, false
+		}
+		return text, tokens, true
+	}
+
+	// Widen from the floor rather than narrow from the ceiling. Both find the
+	// same width, but this way every render is at most twice the size of the
+	// window that ends up shipping, where starting at the ceiling means
+	// rendering something close to the whole file first — the cost the byte cap
+	// was just moved above to avoid.
+	var (
+		fit    int
+		over   int
+		text   string
+		tokens int
+	)
+	// The start is a floor, not the floor: a file whose edits all point past
+	// the end of the content it was fetched with keeps nothing until the
+	// window is wide enough to reach back into it.
+	start := max(minContextLines, win.floor())
+	if ceiling := win.ceiling(); ceiling >= start {
+		for width := start; ; width = min(width*2, ceiling) {
+			t, n, ok := probe(width)
+			if !ok {
+				over = width
+				break
+			}
+			fit, text, tokens = width, t, n
+			if width == ceiling {
+				break
+			}
+		}
+
+		// Doubling only locates the answer within a factor of two, and the half
+		// it leaves behind is context the reviewer could have had and did not.
+		for range windowBisectSteps {
+			if fit == 0 || over-fit < 2 {
+				break
+			}
+
+			mid := fit + (over-fit)/2
+			t, n, ok := probe(mid)
+			if !ok {
+				over = mid
+				continue
+			}
+			fit, text, tokens = mid, t, n
+		}
+	}
+
+	if fit > 0 {
+		e.Content, e.Truncated, e.ContextLines, e.Tokens = text, true, fit, tokens
+		return windowedReason(bound, fit)
+	}
+
+	// Not even the narrowest useful window fits. Drop file context and review
+	// the diff alone rather than send a request the provider will reject — a
+	// rejected request loses every file in its batch, so an over-budget send is
+	// worse than a thinner review. Recorded, because an entry that reads as
+	// fully attached while carrying nothing is the same silent zero the
+	// Degraded list exists to prevent.
+	e.Content = ""
+	e.Truncated = false
+	e.ContextLines = 0
+	e.Tokens = estimator.EstimateTokens(Render(*e))
+	return diffOnlyReason(bound)
 }
 
 // batch groups entries under both a per-request file count and a token budget.
@@ -247,6 +419,20 @@ func fitEntry(e *Entry, budget int, estimator *llms.TokenEstimator) {
 // An entry that alone exceeds the budget still gets its own batch: dropping it
 // would silently skip a reviewable file, and an over-budget request that the
 // provider rejects is a visible, diagnosable failure instead.
+//
+// Which of the two limits binds is decided entirely by file size, because
+// fitEntry has already sized every entry against the WHOLE request budget on
+// its own. Measured by TestPackingTable at the shipped 60k budget and 6 files
+// per request, by the row names it prints: "6 tiny" (20-line files) fills a
+// request to 4.9% of budget and "6 small (200L)" to 36.1%, both split only by
+// the file ceiling, while "6 big (2000L)" costs 33,116 tokens a file and takes
+// a request each without ever reaching that ceiling. Packing by count is the
+// deliberate half — fewer files per request means more attention each — but the
+// consequence is that max_files_per_request is a ceiling large files cannot
+// reach and the budget is a limit small ones cannot approach. Re-measure there
+// before retuning either, and take the numbers from the row that is named: the
+// 4.9% figure was once attributed to "six small files", which names a different
+// row that measures 36.1%.
 func batch(entries []Entry, maxFiles, budget int) []Batch {
 	var (
 		batches []Batch
@@ -282,9 +468,9 @@ func batch(entries []Entry, maxFiles, budget int) []Batch {
 func Render(e Entry) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "### File: %s\n", e.File.Path)
+	fmt.Fprintf(&b, "### File: %s\n", promptSafe(e.File.Path))
 	if e.File.OldPath != "" && e.File.OldPath != e.File.Path {
-		fmt.Fprintf(&b, "Renamed from: %s\n", e.File.OldPath)
+		fmt.Fprintf(&b, "Renamed from: %s\n", promptSafe(e.File.OldPath))
 	}
 
 	stats := e.File.Stats()
@@ -293,7 +479,7 @@ func Render(e Entry) string {
 	if len(e.Instructions) > 0 {
 		b.WriteString("Repository instructions for this path:\n")
 		for _, ins := range e.Instructions {
-			fmt.Fprintf(&b, "- %s\n", ins)
+			fmt.Fprintf(&b, "- %s\n", promptSafe(ins))
 		}
 		b.WriteByte('\n')
 	}
@@ -304,7 +490,16 @@ func Render(e Entry) string {
 
 	if e.HasContent() {
 		if e.Truncated {
-			b.WriteString("\n#### File after the change (regions around the edits)\n\n")
+			// The width is stated because it tells the model how much of the
+			// file it is NOT seeing. Without it, a window reads like a whole
+			// file, and "this helper is never called" is a confident finding
+			// drawn from the part that happened to be elided.
+			//
+			// "an edit" is exact, and had to be earned: the window is built
+			// around removal sites as well as added lines. Built on additions
+			// alone, a pure-deletion hunk's site was elided while this heading
+			// told the model it was seeing the regions around every edit.
+			fmt.Fprintf(&b, "\n#### File after the change (only the regions within %d lines of an edit; the rest of the file is not shown)\n\n", e.ContextLines)
 		} else {
 			b.WriteString("\n#### Full file after the change\n\n")
 		}

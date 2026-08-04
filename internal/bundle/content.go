@@ -2,6 +2,7 @@ package bundle
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/diff"
@@ -39,71 +40,259 @@ func isGenerated(content string) bool {
 	return false
 }
 
-// windowContext is how many lines of surrounding code a window keeps on each
-// side of a changed region. Enough to see the enclosing function's shape
-// without pulling in the whole file.
-const windowContext = 40
-
-// window reduces a file to the regions around its changed lines, joined by
-// elision markers. It is the fallback when a whole file will not fit the token
-// budget: a window is far better than the diff alone, because the model still
-// sees declarations and neighboring code.
+// minContextLines is the narrowest window worth attaching. It is a floor rather
+// than a smaller number because of what the prompt already holds: the diff in
+// the same entry carries the differ's own context — three lines each side,
+// git's default — so a window at or below that width shows the model nothing it
+// has not already been sent, under a heading claiming to be the surrounding
+// file. Four is one line past it, which is thin but is code the diff did not
+// carry, and the elision markers still account for every line between.
 //
-// It returns text that is already line-numbered, since the elision markers
-// occupy no line number of their own. The bool reports whether anything was
-// actually elided.
-func window(content string, f *diff.File) (string, bool) {
-	lines := splitLines(content)
-	if len(lines) == 0 {
-		return content, false
-	}
+// The floor used to be 12, picked against an imagined alternative: a sliver
+// that reads like file context and is not. The measured alternative was worse.
+// A file edited every 25 lines has no width at or above 12 that elides
+// anything, so the search ran out of rungs and threw away ALL of its context
+// while 93% of the request budget went unspent — and at width 8 the same file
+// fit with 68% of its lines attached. A thin window beats no window.
+const minContextLines = 4
 
-	changed := f.ChangedLines()
-	if len(changed) == 0 {
-		return content, false
-	}
+// windowBisectSteps is how many times the width search bisects between the
+// widest window that fit and the narrowest that did not. The search doubles to
+// find its range, so on its own it settles for as little as half the context
+// the limits would have paid for; four steps cut that shortfall to a sixteenth,
+// and each costs one render no larger than the window it is trying to beat.
+const windowBisectSteps = 4
 
-	keep := make([]bool, len(lines)+1) // 1-based
-	for _, ln := range changed {
-		lo := max(1, ln-windowContext)
-		hi := min(len(lines), ln+windowContext)
-		for i := lo; i <= hi; i++ {
-			keep[i] = true
+// elisionMarker stands in for the lines a window left out. It carries no line
+// number of its own, so a citation can never land on it.
+const elisionMarker = "        … unchanged lines omitted …\n"
+
+// windower reduces one file to the regions around its edits, at whatever width
+// is asked for.
+//
+// It exists as a type rather than a function because fitEntry searches for a
+// width and therefore renders the same file many times. Splitting the content
+// and locating its edits are per-file work, not per-width work: done inside the
+// loop they dominated it, and on a large file they allocated a slice of every
+// line on every trial.
+type windower struct {
+	// content is the file as read, returned unchanged whenever a width elides
+	// nothing — Render numbers whole files itself and would otherwise number
+	// them twice.
+	content string
+
+	lines []string
+
+	// anchors are the new-file lines a window is built around: ascending,
+	// deduplicated, and restricted to lines that exist in content.
+	anchors []int
+}
+
+func newWindower(content string, f *diff.File) windower {
+	anchors := anchorLines(f)
+	slices.Sort(anchors)
+	anchors = slices.Compact(anchors)
+	// A line number below 1 names nothing and would drag a span to the top of
+	// the file. Anchors PAST the end are kept: ChangedLines yields new-file
+	// numbers while content may have been fetched at a different revision, and
+	// the lines nearest such an edit are the closest thing to it the file has.
+	anchors = slices.DeleteFunc(anchors, func(ln int) bool { return ln < 1 })
+
+	return windower{content: content, lines: splitLines(content), anchors: anchors}
+}
+
+// anchorLines returns the new-file lines a window must be built around: every
+// added line, plus the new-file position each removal used to occupy.
+//
+// diff.ChangedLines yields added lines only, and correctly so — a review
+// comment cannot be anchored to a line that no longer exists. A window is not a
+// comment. Code deleted between two surviving lines is exactly where breakage
+// shows, and a window built only on additions elides the site of a
+// pure-deletion hunk while Render's heading tells the model it is being shown
+// the regions around every edit. That made the heading a precise false claim
+// rather than a vague one, in the one direction that costs findings: a removed
+// guard is invisible if the code that needed it was elided.
+func anchorLines(f *diff.File) []int {
+	var out []int
+
+	for _, h := range f.Hunks {
+		// site tracks the last new-file line seen in this hunk, so a removal
+		// can be placed against the surviving line above it. A hunk that opens
+		// with a removal has no such line yet, and the position the removed
+		// code used to occupy is the hunk's own new-file start.
+		site := 0
+
+		for _, l := range h.Lines {
+			switch l.Kind {
+			case diff.LineAdded:
+				site = l.NewLine
+				out = append(out, l.NewLine)
+			case diff.LineContext:
+				site = l.NewLine
+			case diff.LineRemoved:
+				if site == 0 {
+					site = h.NewStart
+				}
+				if site >= 1 {
+					out = append(out, site)
+				}
+			}
 		}
 	}
 
-	var (
-		b       strings.Builder
-		elided  bool
-		inGap   bool
-		emitted int
-	)
+	return out
+}
 
-	for i := 1; i <= len(lines); i++ {
-		if keep[i] {
-			if inGap {
-				fmt.Fprintf(&b, "%6s  … unchanged lines omitted …\n", "")
-				inGap = false
-			}
-			fmt.Fprintf(&b, "%6d  %s\n", i, lines[i-1])
-			emitted++
+// ceiling is the widest width at which this file still elides anything. Above
+// it every line lies within the width of some anchor, so the "window" is the
+// whole file — which the caller only reaches after establishing the whole file
+// does not fit. A negative result means no width elides anything, so no window
+// is worth rendering at all.
+//
+// It is derived from the file's own edit geometry because a fixed ceiling
+// cannot spend headroom. With one pinned at 200, a 20,000-line file with a
+// single edit got the same 401-line window at every budget from 5,000 to
+// 235,507 tokens — 98% of the largest of those requests left unspent — and then
+// the whole file one token later. It also removes the opposite cliff: there is
+// no longer a width that elides nothing, so the search cannot run out of rungs
+// while the file is still too big.
+//
+// It bisects rather than solving for the widest gap. The closed form has to
+// reason about anchors pointing past the end of the content, whose spans are
+// truncated or empty, and got the degenerate cases wrong in the direction that
+// costs context — Go truncates -1/2 toward zero, so a file with every line
+// changed reported a ceiling of 0 and the search wasted a render on it.
+func (w windower) ceiling() int {
+	if len(w.lines) == 0 || len(w.anchors) == 0 {
+		return -1
+	}
+
+	// Every span grows with width and never shrinks, so "keeps everything"
+	// flips once and never flips back: the widest eliding width is the one
+	// below the flip.
+	lo := w.floor()
+	if w.covers(lo) {
+		return -1
+	}
+
+	// At this width every anchor's span is the whole file, so it covers by
+	// construction and bounds the search from above.
+	hi := w.anchors[len(w.anchors)-1] + len(w.lines)
+	for hi-lo > 1 {
+		mid := lo + (hi-lo)/2
+		if w.covers(mid) {
+			hi = mid
+			continue
+		}
+		lo = mid
+	}
+	return lo
+}
+
+// floor is the narrowest width that keeps any line at all, and so the width the
+// search must start from. It is zero whenever an anchor lands inside the
+// content, and positive only when every anchor points past the end of what was
+// read: such an anchor reaches back into the file only once its context does.
+// Starting below it would read the empty result as "this width elides nothing"
+// and abandon a file that a wider window would still have shown.
+func (w windower) floor() int {
+	need := -1
+	for _, ln := range w.anchors {
+		if n := max(0, ln-len(w.lines)); need < 0 || n < need {
+			need = n
+		}
+	}
+	return max(0, need)
+}
+
+// covers reports whether a width keeps every line, which is the same thing as
+// eliding nothing.
+func (w windower) covers(contextLines int) bool {
+	return w.coversAll(w.spans(contextLines))
+}
+
+// coversAll reports whether spans leave nothing out, so that render and the
+// ceiling search cannot disagree about what "elided nothing" means.
+func (w windower) coversAll(spans [][2]int) bool {
+	return len(spans) == 1 && spans[0][0] == 1 && spans[0][1] == len(w.lines)
+}
+
+// spans returns the merged, ascending line ranges a width keeps.
+func (w windower) spans(contextLines int) [][2]int {
+	var out [][2]int
+
+	for _, ln := range w.anchors {
+		lo := max(1, ln-contextLines)
+		hi := min(len(w.lines), ln+contextLines)
+		if lo > hi {
+			// The anchor and its context both lie outside the content, so
+			// there is nothing here to keep.
 			continue
 		}
 
-		if !inGap {
-			inGap = true
-			elided = true
+		// Merged when they touch OR abut: two ranges with no line between them
+		// have nothing to elide, and emitting a marker there would claim the
+		// model is missing code it is looking at.
+		if n := len(out); n > 0 && lo <= out[n-1][1]+1 {
+			out[n-1][1] = max(out[n-1][1], hi)
+			continue
+		}
+		out = append(out, [2]int{lo, hi})
+	}
+
+	return out
+}
+
+// render reduces the file to the regions within contextLines of its anchors,
+// joined by elision markers.
+//
+// Every anchor that exists in content is kept, at every width including zero.
+// That is the invariant the review depends on: a changed line missing from the
+// content is a defect the model cannot see, and an unseen defect is reported as
+// no defect — a silent zero indistinguishable from a clean file.
+//
+// The text it returns is already line-numbered, since the elision markers
+// occupy no line number of their own.
+//
+// srcBytes is how much of the file the window retained, in the file's own
+// bytes. It is what review.max_file_bytes is compared against, so that the cap
+// means the same thing for a window as it does for a whole file. Measuring the
+// numbered text against it instead made a window routinely larger than the file
+// it came from — 3.5x on short lines — so a cap that admitted a file whole
+// could reject every window of it, and raising a cap the file already satisfied
+// was what restored its context.
+//
+// The bool reports whether anything was actually elided. When it is false the
+// content comes back untouched and unnumbered: Render numbers whole files
+// itself and would otherwise number them twice. Returning the numbered build
+// alongside a false was a bug waiting for a caller — every citation into it
+// would have been ambiguous — and only the caller discarding that text kept it
+// from happening.
+func (w windower) render(contextLines int) (text string, srcBytes int, elided bool) {
+	// Nothing kept and everything kept both mean "this width did not reduce the
+	// file", and they arrive differently: no anchor landed inside the content at
+	// all, or every line fell within the width of one.
+	spans := w.spans(contextLines)
+	if len(spans) == 0 || w.coversAll(spans) {
+		return w.content, 0, false
+	}
+
+	var b strings.Builder
+	for i, s := range spans {
+		// A gap before the first span is elided too, and reads as one.
+		if i > 0 || s[0] > 1 {
+			b.WriteString(elisionMarker)
+		}
+		for ln := s[0]; ln <= s[1]; ln++ {
+			fmt.Fprintf(&b, "%6d  %s\n", ln, w.lines[ln-1])
+			srcBytes += len(w.lines[ln-1]) + 1
 		}
 	}
-
-	if inGap {
-		fmt.Fprintf(&b, "%6s  … unchanged lines omitted …\n", "")
+	if spans[len(spans)-1][1] < len(w.lines) {
+		b.WriteString(elisionMarker)
 	}
 
-	if emitted == 0 {
-		return content, false
-	}
-	return b.String(), elided
+	return b.String(), srcBytes, true
 }
 
 // splitLines splits content into lines without a trailing empty element.
