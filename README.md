@@ -350,6 +350,21 @@ diff → select and batch files → review each batch → triage → render → 
 - **Anchor** snaps near-miss line numbers onto real changed lines and drops
   findings that cannot be placed, so comments land where they belong.
 
+## Measurement
+
+This project makes empirical claims about review quality, so how those numbers are
+produced is part of the product.
+
+- [docs/measurement.md](docs/measurement.md) — what has to hold before a number
+  out of the eval harness is worth acting on. Thirteen rules, each written
+  because the harness produced a confident wrong number and something believed it.
+- [docs/findings.md](docs/findings.md) — what has actually been measured, what it
+  supports, and the nine instrument bugs found so far. Four of them flattered one
+  side of a comparison; one produced a published claim that had to be retracted.
+
+The short version: prefer the judge-free columns. The LLM judge runs at
+temperature 0 and still scores byte-identical input anywhere from 3.66 to 3.98.
+
 ## Development
 
 ```bash
