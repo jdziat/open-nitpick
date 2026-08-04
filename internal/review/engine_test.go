@@ -33,6 +33,11 @@ type scriptedLLM struct {
 	// err, when set, fails every call.
 	err error
 
+	// seen records every prompt sent, so a test can assert on what the model
+	// was actually TOLD. Asserting only on what came back would pass against a
+	// prompt still carrying an injection the model happened to ignore.
+	seen []string
+
 	calls int
 }
 
@@ -41,15 +46,17 @@ func (s *scriptedLLM) GenerateContent(_ context.Context, msgs []llms.Message, _ 
 	defer s.mu.Unlock()
 
 	s.calls++
-	if s.err != nil {
-		return nil, s.err
-	}
 
 	var joined strings.Builder
 	for _, m := range msgs {
 		joined.WriteString(m.Content)
 	}
 	text := joined.String()
+	s.seen = append(s.seen, text)
+
+	if s.err != nil {
+		return nil, s.err
+	}
 
 	for needle, response := range s.byPrompt {
 		if strings.Contains(text, needle) {
@@ -70,6 +77,13 @@ func (s *scriptedLLM) callCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.calls
+}
+
+// prompts returns every prompt the model was sent.
+func (s *scriptedLLM) prompts() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.seen...)
 }
 
 // mustJSON encodes a Result as the model would return it.

@@ -23,8 +23,9 @@ import (
 // the model inventing severities that later degrade to info or, worse, to the
 // "none" sentinel.
 const (
-	findingsSchemaName = "review_findings"
-	triageSchemaName   = "triage_result"
+	findingsSchemaName   = "review_findings"
+	triageSchemaName     = "triage_result"
+	validationSchemaName = "finding_validation"
 )
 
 // severityEnum is the closed set a model may return.
@@ -119,6 +120,49 @@ func triageSchema() (json.RawMessage, error) {
 			},
 		},
 		"required":             []string{"findings", "summary"},
+		"additionalProperties": false,
+	}
+
+	return json.Marshal(schema)
+}
+
+// validationSchema is the response schema for one expert validation.
+//
+// Hand-authored for the same reason as the two above, and this is the sharpest
+// case of it: SchemaFrom marks every exported field required, which would make
+// `revised_severity` mandatory on every verdict. A model forced to fill that
+// field for a finding whose severity is already right invents a level, and the
+// engine would then apply it — turning a schema convenience into silent
+// severity churn on findings nobody disputed. Only verdict and reason are
+// required.
+//
+// `reason` is required on every verdict, not just refutations, because it is
+// the one field that makes a verdict auditable in the log. The engine still
+// checks it rather than trusting the schema: JSON-mode providers do not enforce
+// required either, and an empty reason on a refutation must not delete a
+// finding.
+func validationSchema() (json.RawMessage, error) {
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"verdict": map[string]any{
+				"type": "string",
+				"enum": verdictEnum,
+				"description": "confirmed when the claim holds, refuted when you can name why it is wrong, " +
+					"severity when the defect is real but rated wrong.",
+			},
+			"reason": map[string]any{
+				"type": "string",
+				"description": "One or two sentences. For a refutation this is the specific reason the claim " +
+					"is wrong; uncertainty is not a reason.",
+			},
+			"revised_severity": map[string]any{
+				"type":        "string",
+				"enum":        severityEnum,
+				"description": "OPTIONAL. Only for the severity verdict: the level the demonstrated consequence supports.",
+			},
+		},
+		"required":             []string{"verdict", "reason"},
 		"additionalProperties": false,
 	}
 

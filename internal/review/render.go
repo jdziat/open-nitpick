@@ -2,6 +2,7 @@ package review
 
 import (
 	"fmt"
+	"html"
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
@@ -205,11 +206,119 @@ func fenceFor(s string) string {
 }
 
 // renderSummary builds the walkthrough comment.
+//
+// The policy notice and the withheld list are the two parts review.summary does
+// not switch off. That setting asks for less narration; it is not permission to
+// change what a review means without saying so. Everything else here describes
+// FILES, and suppressing those costs a reader context — while these two describe
+// a finding the reviewer produced and something else then removed, and a
+// configuration the change supplied and this run refused. With summaries off and
+// these suppressed too, a run whose only finding an expert overruled, or whose
+// policy came from somewhere other than the file in the change, publishes
+// nothing at all and is indistinguishable from a clean review.
 func renderSummary(report *Report, cfg *config.Config) string {
-	if cfg != nil && !cfg.Review.Summary {
+	var b strings.Builder
+
+	// First, because it changes how everything below it should be read: these
+	// findings, these skips and these budgets are the product of a policy that
+	// is not the one in the change.
+	b.WriteString(policyNotice(report))
+
+	if cfg == nil || cfg.Review.Summary {
+		b.WriteString(walkthrough(report))
+	}
+
+	if notes := overruledNotes(report); notes != "" {
+		// The heading has to describe what happened. These findings were
+		// reported and then withheld; calling them anything else repeats an
+		// error this renderer has already been fixed for once.
+		b.WriteString("\n<details>\n<summary>Reported by the reviewer, then withheld after a domain expert disagreed</summary>\n\n")
+		b.WriteString(notes)
+		b.WriteString("\n</details>\n")
+	}
+
+	out := strings.TrimSpace(b.String())
+	if out == "" {
+		return ""
+	}
+	return out + "\n\n<sub>Reviewed by open-nitpick.</sub>"
+}
+
+// policyNotice states that the change's own configuration was not applied, and
+// names the policy that was.
+//
+// It is neither collapsed into a <details> nor gated on review.summary. A
+// contributor who edited the config file has to learn that the edit did not take
+// effect for this run — otherwise they read a review that ignored their ignore
+// rule as a bug — and a reviewer has to be able to see that the change tried to
+// configure its own review, which is the whole signal when the edit was hostile.
+//
+// The wording follows the rule the "Files not reviewed" heading was fixed for:
+// say exactly what happened. It names the file that was set aside, states that
+// its configuration was not applied, and names what ran instead — never that the
+// configuration was "ignored" or "invalid", because it was neither.
+func policyNotice(report *Report) string {
+	if !report.Policy.Replaced {
 		return ""
 	}
 
+	// The last sentence is the part a maintainer can act on. Without it the
+	// notice describes a dead end: their edit did nothing, and nothing says
+	// whether it ever will. Locally there is no way to preview it either —
+	// vcs.Local resolves the base of a working-tree review to HEAD, so an
+	// uncommitted config edit is reviewed under the committed file.
+	return blockquote(fmt.Sprintf(
+		"**The configuration in this change was not applied to this review.**\n"+
+			"This change edits `%s`, and a change may not supply the policy it is reviewed\n"+
+			"under. This review ran under %s.\n"+
+			"Those settings govern changes that do not edit them, so this file takes effect\n"+
+			"for reviews after it lands. To try it out first, pass `-config` a copy kept\n"+
+			"outside the repository.",
+		inline(report.Policy.Modified), report.Policy.Source()))
+}
+
+// policyFailureNotice explains, on the pull request, why no review ran at all.
+//
+// It is published in place of a review, never alongside one: the run has no
+// findings to report and no clean bill of health to give, and the maintainer
+// whose configuration change triggered it would otherwise learn nothing except
+// that a job went red.
+//
+// The wording claims only what is true on every path that reaches it. A resolver
+// that errored has not said whether the change edits the configuration, so
+// asserting that it does would be a guess printed as a fact on somebody's pull
+// request.
+func policyFailureNotice(cause error) string {
+	return blockquote(fmt.Sprintf(
+		"**This change was not reviewed.**\n"+
+			"A change may not supply the policy it is reviewed under, so the policy for this\n"+
+			"review has to come from a revision the change did not write, or from built-in\n"+
+			"defaults. Neither could produce a usable one:\n"+
+			"%s", inline(cause.Error())))
+}
+
+// blockquote prefixes every line so that nothing spliced into a notice can
+// leave it.
+//
+// The values these notices carry are forge errors, parser errors and
+// config.Policy.Reason, and a config that fails validation twice reports both
+// messages joined by a newline. A single "> " on the first line meant the rest
+// of that error rendered at top level of a comment posted under this bot's name.
+func blockquote(s string) string {
+	var b strings.Builder
+
+	for line := range strings.SplitSeq(strings.TrimRight(s, "\n"), "\n") {
+		b.WriteString("> ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	b.WriteByte('\n')
+
+	return b.String()
+}
+
+// walkthrough is the narration review.summary controls.
+func walkthrough(report *Report) string {
 	var b strings.Builder
 
 	if s := strings.TrimSpace(report.Summary); s != "" {
@@ -228,7 +337,10 @@ func renderSummary(report *Report, cfg *config.Config) string {
 		fmt.Fprintf(&b, "\n> **This review is incomplete.** %d file(s) could not be reviewed, "+
 			"so the absence of findings for them means nothing:\n>\n", len(report.Incomplete))
 		for _, path := range report.Incomplete {
-			fmt.Fprintf(&b, "> - `%s`\n", path)
+			// Flattened for the same reason a finding's title is: this list can
+			// carry a path taken from the diff, and a name containing a newline
+			// breaks out of the bullet and continues at top level.
+			fmt.Fprintf(&b, "> - `%s`\n", inline(path))
 		}
 	}
 
@@ -249,12 +361,54 @@ func renderSummary(report *Report, cfg *config.Config) string {
 		b.WriteString("\n</details>\n")
 	}
 
-	out := strings.TrimSpace(b.String())
-	if out == "" {
-		return ""
+	// Distinct from both of the above: these files WERE reviewed and DID carry
+	// file context, just not all of it. The heading has to say that precisely,
+	// because a reader who concludes "not reviewed" from this list will
+	// re-review the file by hand, and one who concludes "fully reviewed" will
+	// trust an absence of findings in the part that was elided.
+	if notes := windowedNotes(report); notes != "" {
+		b.WriteString("\n<details>\n<summary>Reviewed with reduced file context</summary>\n\n")
+		b.WriteString(notes)
+		b.WriteString("\n</details>\n")
 	}
-	return out + "\n\n<sub>Reviewed by open-nitpick.</sub>"
+
+	return b.String()
 }
+
+// overruledNotes lists findings an expert kept off the pull request, each with
+// who overruled it, why, and — for a re-rating — where it moved to.
+//
+// Both the finding's own text and the expert's reason are model-authored, and
+// the model wrote them after reading a diff whose author is the person under
+// review. So they are flattened onto one line, because a newline would break
+// out of the bullet and leave the section reading as though the expert had
+// overruled something else, and their markup characters are escaped, because a
+// `</details>` in a reason closes the collapsed block early and puts the rest at
+// top level of a comment posted under this bot's name — where GitHub renders an
+// <img> or an <a>.
+func overruledNotes(report *Report) string {
+	var b strings.Builder
+
+	for _, r := range report.Overruled {
+		fmt.Fprintf(&b, "- `%s:%d` — %s\n", r.Finding.Path, r.Finding.Line, inline(r.Finding.Title))
+
+		if r.Revised != "" {
+			fmt.Fprintf(&b, "  - %s re-rated this from %s to %s, below this repository's minimum severity: %s\n",
+				inline(r.Expert), r.Finding.Sev(), r.Revised, inline(r.Reason))
+			continue
+		}
+		fmt.Fprintf(&b, "  - %s: %s\n", inline(r.Expert), inline(r.Reason))
+	}
+
+	return b.String()
+}
+
+// oneLine collapses text onto a single line.
+func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+// inline prepares model-authored text for a bullet: one line, and unable to
+// leave the element it is rendered inside.
+func inline(s string) string { return html.EscapeString(oneLine(s)) }
 
 // skipNotes lists files that were not reviewed, grouped by reason.
 func skipNotes(report *Report) string {
@@ -272,6 +426,21 @@ func degradedNotes(report *Report) string {
 		return ""
 	}
 	return groupByReason(report.Plan.Degraded, "")
+}
+
+// windowedNotes lists files reviewed with only a window around their changes.
+//
+// A file too large for its full content used to be refused outright and land in
+// Degraded, which is printed. Windowing such a file instead is a clear
+// improvement — a window beats a bare diff — but it moved the file onto a list
+// nothing rendered, so a reader who was previously told "this was reviewed from
+// the diff alone" is now told nothing at all, even where most of the file was
+// elided. Better context must not be paid for with worse disclosure.
+func windowedNotes(report *Report) string {
+	if report.Plan == nil {
+		return ""
+	}
+	return groupByReason(report.Plan.Windowed, "")
 }
 
 // groupByReason renders "- reason: path, path" lines, omitting one reason.

@@ -262,7 +262,9 @@ func runWithLinter(t *testing.T, level config.NitpickLevel, review, lint, triage
 		Config:   cfg,
 		Roles:    &llm.Roles{Review: client, Triage: client},
 		Provider: &stubProvider{diff: classDiff},
-		Linters:  &stubLinter{findings: lint},
+		Linters: func(*config.Config) LinterRunner {
+			return &stubLinter{findings: lint}
+		},
 	}
 
 	report, err := engine.Review(context.Background(), vcs.Ref{})

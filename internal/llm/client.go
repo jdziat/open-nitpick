@@ -121,16 +121,39 @@ func validateProvider(name string) error {
 	return fmt.Errorf("unknown provider %q (available: %s)", name, strings.Join(sorted, ", "))
 }
 
-// Roles holds the clients a review run uses. Both are always non-nil; when the
-// config names no override they are distinct clients built from the same spec.
+// Roles holds the clients a review run uses. BuildRoles fills every field; when
+// the config names no override they are distinct clients built from the same
+// spec.
 type Roles struct {
 	Review *Client
 	Triage *Client
+
+	// Validate is the expert-validation client. It may be nil — callers that
+	// assemble Roles by hand, such as the eval harness, only name the roles
+	// they are measuring — so read it through Validator rather than directly.
+	Validate *Client
 }
 
-// BuildRoles constructs every client a review run needs. Building both up front
-// means a misconfigured triage model fails immediately rather than after the
-// expensive review calls have already been paid for.
+// Validator returns the client the expert-validation pass speaks through,
+// falling back to the review client.
+//
+// The fallback is what makes validation A/B-able by flipping one config field:
+// a harness that wires Roles itself and never heard of this role still gets a
+// working validation pass, and validating with the reviewing model is the
+// honest default when nothing else was named.
+func (r *Roles) Validator() *Client {
+	if r == nil {
+		return nil
+	}
+	if r.Validate != nil {
+		return r.Validate
+	}
+	return r.Review
+}
+
+// BuildRoles constructs every client a review run needs. Building them all up
+// front means a misconfigured triage or validation model fails immediately
+// rather than after the expensive review calls have already been paid for.
 func BuildRoles(cfg *config.Config) (*Roles, error) {
 	review, err := Build(cfg.Models.ResolveModel(config.RoleReview))
 	if err != nil {
@@ -142,7 +165,12 @@ func BuildRoles(cfg *config.Config) (*Roles, error) {
 		return nil, fmt.Errorf("triage model: %w", err)
 	}
 
-	return &Roles{Review: review, Triage: triage}, nil
+	validate, err := Build(cfg.Models.ResolveModel(config.RoleValidate))
+	if err != nil {
+		return nil, fmt.Errorf("validation model: %w", err)
+	}
+
+	return &Roles{Review: review, Triage: triage, Validate: validate}, nil
 }
 
 // CallOptions renders the spec's generation parameters as SDK call options.
