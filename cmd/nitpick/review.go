@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -104,11 +105,18 @@ func runReview(ctx context.Context, args []string) error {
 			"hint", "set "+config.EnvTrustConfigEndpoints+"=1 if you control this file")
 	}
 
-	roles, err := llm.BuildRoles(cfg)
-	if err != nil {
-		return err
+	// A config file that is not there is the one outcome this command used to
+	// produce no output for at all: LoadFile treats a missing file as "use
+	// defaults", so a mistyped -config path reviewed the repository under
+	// settings its maintainers never chose and nothing on stderr said so.
+	if cfg.Missing != "" {
+		msg := "no configuration file; reviewing under built-in defaults and the environment"
+		if f.configPath != "" {
+			log.Warn(msg, "looked_for", cfg.Missing, "hint", "-config names a file that is not there")
+		} else {
+			log.Info(msg, "looked_for", cfg.Missing)
+		}
 	}
-	log.Info("models ready", "review", roles.Review.String(), "triage", roles.Triage.String())
 
 	provider, ref, err := selectProvider(&f, repo)
 	if err != nil {
@@ -116,29 +124,136 @@ func runReview(ctx context.Context, args []string) error {
 	}
 	log.Info("reviewing", "provider", provider.Name(), "ref", ref.String())
 
-	engine := &review.Engine{
-		Config:      cfg,
-		Roles:       roles,
-		Provider:    provider,
-		Log:         log,
-		Instruction: f.instruction,
-	}
-
-	if !f.noLinters && cfg.Linters.Mode != config.LinterOff {
-		engine.Linters = linters.New(repo, cfg, log)
-	}
-
-	report, err := engine.Review(ctx, ref)
+	report, err := newEngine(&f, repo, cfg, provider, log).Review(ctx, ref)
 	if err != nil {
 		return err
 	}
 
 	fmt.Fprintf(os.Stderr, "\nReviewed %d file(s): %s\n", report.Plan.Files(), report.Counts)
+	printPolicy(report)
+	printOverruled(report)
 
-	if report.Failed(cfg.Review.FailOn) {
+	if report.Failed(gate(report, f.failOn, cfg)) {
 		return errFindings
 	}
 	return nil
+}
+
+// newEngine wires the review engine this command drives.
+//
+// It is a function rather than a literal inside runReview because the wiring IS
+// the defense: an engine without Policy reviews a config-editing change under
+// the configuration that change wrote, and one without Models lets that change
+// pick the model that reviews it. Both are optional on the engine — an offline
+// driver has no base revision to resolve against — so neither omission is a
+// build error, and a test can only pin them by constructing what the command
+// constructs.
+func newEngine(f *reviewFlags, repo string, cfg *config.Config, provider vcs.Provider, log *slog.Logger) *review.Engine {
+	engine := &review.Engine{
+		Config:   cfg,
+		Provider: provider,
+		Log:      log,
+
+		// A change may not supply the policy it is reviewed under. Wired here
+		// rather than defaulted inside the engine because only this layer knows
+		// the checkout the diff's paths are relative to and which forge can name
+		// the base revision.
+		Policy: &config.BasePolicy{RepoRoot: repo, Loaded: cfg, Provider: provider},
+
+		// Built from the policy the engine resolved, never from the file on
+		// disk: models.* names the model, its temperature and its token ceiling,
+		// so clients built here from cfg would let a change that edits
+		// .nitpick.yaml still choose what reviews it.
+		Models: func(policy *config.Config) (*llm.Roles, error) { return llm.BuildRoles(policy) },
+
+		Instruction: f.instruction,
+	}
+
+	// Built per review from the resolved policy for the same reason. The
+	// analyzers read review.ignore themselves, so a change that edits
+	// .nitpick.yaml would otherwise silence them on exactly the paths it named
+	// even though the model no longer honors that file.
+	if !f.noLinters {
+		engine.Linters = func(policy *config.Config) review.LinterRunner {
+			if policy.Linters.Mode == config.LinterOff {
+				return nil
+			}
+			return linters.New(repo, policy, log)
+		}
+	}
+
+	return engine
+}
+
+// gate returns the severity that decides this run's exit status.
+//
+// It cannot be read from the loaded configuration. When the change under review
+// edits .nitpick.yaml the engine reviews under a policy resolved from a revision
+// the change cannot write, and taking fail_on from the change's own file here
+// would hand back the one knob that decides whether CI goes red — after every
+// other knob had already been taken away.
+//
+// The -fail-on flag still outranks both, because it comes from the operator's
+// command line rather than from the change.
+func gate(report *review.Report, flag string, cfg *config.Config) config.Severity {
+	if flag != "" {
+		return config.Severity(flag)
+	}
+	if policy := report.Policy.Config; policy != nil {
+		return policy.Review.FailOn
+	}
+	return cfg.Review.FailOn
+}
+
+// printPolicy reports that the change's own configuration was set aside.
+//
+// It is on stderr as well as in the published summary because the local and
+// dry-run paths are where a contributor checks what their config change does,
+// and a run that silently reviewed under something else looks like the config
+// simply had no effect.
+func printPolicy(report *review.Report) {
+	if !report.Policy.Replaced {
+		return
+	}
+
+	fmt.Fprintf(os.Stderr,
+		"This change edits %s, so the configuration in it was not applied; reviewed under %s.\n",
+		report.Policy.Modified, report.Policy.Source())
+
+	// The Dropped reported above resolution belongs to the file that was set
+	// aside. These are the keys scrubbed from the policy that actually ran, and
+	// they were being discarded unread — so an operator whose base_url stopped
+	// applying was told about the wrong file's keys, or about none at all.
+	if policy := report.Policy.Config; policy != nil && len(policy.Dropped) > 0 {
+		fmt.Fprintf(os.Stderr,
+			"Ignored endpoint settings from that policy: %s (set %s=1 where you control the file).\n",
+			strings.Join(policy.Dropped, ", "), config.EnvTrustConfigEndpoints)
+	}
+}
+
+// printOverruled reports the findings a domain expert kept off the pull
+// request.
+//
+// The counts line above cannot show them: they were removed before it was
+// taken. Without this, a run whose only real finding an expert overruled prints
+// exactly what a clean run prints, and the operator deciding whether validation
+// is worth its recall cost has no way to see what it cost.
+func printOverruled(report *review.Report) {
+	if len(report.Overruled) == 0 {
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "%d finding(s) withheld after a domain expert disagreed:\n", len(report.Overruled))
+	for _, r := range report.Overruled {
+		if r.Revised != "" {
+			fmt.Fprintf(os.Stderr, "  %s:%d %s — %s re-rated %s → %s: %s\n",
+				r.Finding.Path, r.Finding.Line, r.Finding.Title, r.Expert,
+				r.Finding.Sev(), r.Revised, r.Reason)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "  %s:%d %s — %s: %s\n",
+			r.Finding.Path, r.Finding.Line, r.Finding.Title, r.Expert, r.Reason)
+	}
 }
 
 // selectProvider chooses where the review comes from and goes to.
@@ -213,6 +328,22 @@ func (d *dryRunProvider) Diff(ctx context.Context, ref vcs.Ref) ([]byte, error) 
 
 func (d *dryRunProvider) FileContent(ctx context.Context, ref vcs.Ref, path string) ([]byte, error) {
 	return d.source.FileContent(ctx, ref, path)
+}
+
+// BaseRevision forwards to the wrapped forge so a dry run resolves policy the
+// way the real run will.
+//
+// vcs.BaseRevision asks for the interface rather than a method on Provider
+// precisely so a wrapper that cannot answer is forced to say so — but this one
+// can answer, and staying silent would push every config-editing change onto the
+// defaults fallback under -dry-run alone. A dry run that previews a different
+// review from the one that will be published is worse than no preview.
+func (d *dryRunProvider) BaseRevision(ctx context.Context, ref vcs.Ref) (string, error) {
+	resolver, ok := d.source.(vcs.BaseResolver)
+	if !ok {
+		return "", fmt.Errorf("%s: %w", d.Name(), vcs.ErrNoBaseRevision)
+	}
+	return resolver.BaseRevision(ctx, ref)
 }
 
 func (d *dryRunProvider) PublishReview(_ context.Context, ref vcs.Ref, review vcs.Review) error {
@@ -321,10 +452,34 @@ func runExplainConfig(args []string) error {
 
 	source := cfg.Source
 	if source == "" {
-		source = "(defaults and environment; no config file found)"
+		source = fmt.Sprintf("(defaults and environment; no config file at %s)", cfg.Missing)
 	}
 
 	fmt.Println("Config source:", source)
+
+	// Where the file is and which policy applies are different questions, and
+	// they have different answers for exactly one change: the one that edits
+	// this file. An operator asking this command what their configuration
+	// resolves to gets a misleading answer without this line — they read the
+	// resolved ignore list here and then watch a review not honor it.
+	//
+	// Which answer is right turns on whether the change under review can reach
+	// the file at all, so the resolver's own containment rule decides it rather
+	// than a paragraph printed unconditionally. Stating the substitution for a
+	// -config outside the repository was exactly backwards, and that file is the
+	// one the defaults-fallback failure recommends.
+	switch rel, inRepo := cfg.RepoRelative(root); {
+	case inRepo:
+		fmt.Printf("Policy source:  this file, unless the change under review edits it.\n"+
+			"                A change may not supply the policy it is reviewed under, so a change\n"+
+			"                that edits %s is reviewed under the version of it at the base\n"+
+			"                revision — or under built-in defaults when none can be read. Defaults\n"+
+			"                name no model, so that last fallback needs %s and %s set.\n",
+			rel, config.EnvProvider, config.EnvModel)
+	case cfg.Source != "":
+		fmt.Printf("Policy source:  this file, always. It is outside %s, so no change under\n"+
+			"                review can edit it and nothing substitutes it away.\n", root)
+	}
 	fmt.Println()
 
 	// The keys sanitize discarded, named here as well as in the review log.
@@ -354,6 +509,13 @@ func runExplainConfig(args []string) error {
 	fmt.Println("Models:")
 	printModel(config.RoleReview)
 	printModel(config.RoleTriage)
+	printModel(config.RoleValidate)
+
+	// Printed whether or not validation is on, because "which model would
+	// check my findings" and "is checking switched on" are separate questions
+	// and an operator turning it on wants the answer to the first beforehand.
+	fmt.Printf("\nValidation (a domain expert re-checks each finding before it is published):\n  enabled %t\n  classes %s\n",
+		cfg.Validation.Enabled, describeClasses(cfg.Validation.Classes))
 
 	fmt.Printf("\nGating:\n  fail_on      %s\n  min_severity %s\n", cfg.Review.FailOn, cfg.Review.MinSeverity)
 	fmt.Printf("\nBudget:\n  max_files              %d\n  max_files_per_request  %d\n  token_budget_per_req   %d\n  concurrency            %d\n",
@@ -398,6 +560,21 @@ func runProviders() error {
 	fmt.Println("\nSet base_url to point any OpenAI-compatible endpoint at a provider,")
 	fmt.Println("or use ollama / llamacpp for local models.")
 	return nil
+}
+
+// describeClasses renders a validation class list. The empty case is spelled
+// out rather than printed blank: "" and "every class" mean the same thing here
+// and only one of them says so.
+func describeClasses(classes []config.Class) string {
+	if len(classes) == 0 {
+		return "(every class)"
+	}
+
+	names := make([]string, 0, len(classes))
+	for _, c := range classes {
+		names = append(names, string(c))
+	}
+	return strings.Join(names, ", ")
 }
 
 // cmp returns value, or fallback when value is empty.

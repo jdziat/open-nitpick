@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/go-github/v74/github"
@@ -38,6 +39,16 @@ type GitHubOptions struct {
 // DefaultBotMarker identifies comments this tool published.
 const DefaultBotMarker = "<!-- open-nitpick -->"
 
+// requestTimeout bounds a single API call.
+//
+// github.NewClient(nil) uses http.DefaultClient, which has no timeout at all,
+// and the only context in play comes from signal.NotifyContext with no deadline
+// — so a connection the far side accepts and never answers hangs the review
+// forever with nothing logged after "parsed diff". It is generous because one
+// of these calls streams a file body; the point is that there is a ceiling, not
+// where it sits.
+const requestTimeout = 2 * time.Minute
+
 // NewGitHub builds a GitHub provider.
 func NewGitHub(opts GitHubOptions) (*GitHub, error) {
 	token := strings.TrimSpace(opts.Token)
@@ -45,7 +56,7 @@ func NewGitHub(opts GitHubOptions) (*GitHub, error) {
 		return nil, errors.New("github: a token is required (set GITHUB_TOKEN)")
 	}
 
-	client := github.NewClient(nil).WithAuthToken(token)
+	client := github.NewClient(&http.Client{Timeout: requestTimeout}).WithAuthToken(token)
 
 	if base := strings.TrimSpace(opts.BaseURL); base != "" {
 		var err error
@@ -83,6 +94,7 @@ func (g *GitHub) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error)
 		Body:    pr.GetBody(),
 		Author:  pr.GetUser().GetLogin(),
 		BaseRef: pr.GetBase().GetRef(),
+		BaseSHA: pr.GetBase().GetSHA(),
 		HeadRef: pr.GetHead().GetRef(),
 		HeadSHA: pr.GetHead().GetSHA(),
 		Draft:   pr.GetDraft(),
@@ -102,6 +114,26 @@ func (g *GitHub) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 		return nil, fmt.Errorf("github: get diff for %s: %w", ref, err)
 	}
 	return []byte(raw), nil
+}
+
+// BaseRevision returns the commit the pull request is measured against.
+//
+// The SHA is preferred over the branch name because the branch moves: whatever
+// is read at the base has to be the state the pull request diverged from, not
+// whatever has landed on main since it was opened.
+func (g *GitHub) BaseRevision(ctx context.Context, ref Ref) (string, error) {
+	pr, err := g.PullRequest(ctx, ref)
+	if err != nil {
+		return "", err
+	}
+
+	if sha := strings.TrimSpace(pr.BaseSHA); sha != "" {
+		return sha, nil
+	}
+	if name := strings.TrimSpace(pr.BaseRef); name != "" {
+		return name, nil
+	}
+	return "", fmt.Errorf("github: %s: %w", ref, ErrNoBaseRevision)
 }
 
 // FileContent fetches a file at the pull request's head.

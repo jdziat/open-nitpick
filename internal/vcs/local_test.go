@@ -20,24 +20,11 @@ func newRepo(t *testing.T) string {
 	}
 
 	dir := t.TempDir()
-	run := func(args ...string) {
-		t.Helper()
-
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		cmd.Env = append(os.Environ(),
-			"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=t@example.com",
-			"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=t@example.com",
-		)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
-		}
-	}
 
 	write(t, dir, "a.go", "package a\n\nfunc F() int {\n\treturn 1\n}\n")
-	run("init", "-q", "-b", "main")
-	run("add", "-A")
-	run("commit", "-qm", "initial")
+	gitIn(t, dir, "init", "-q", "-b", "main")
+	gitIn(t, dir, "add", "-A")
+	gitIn(t, dir, "commit", "-qm", "initial")
 
 	return dir
 }
@@ -207,31 +194,17 @@ func TestLocalPublishReviewWithNilOutIsSafe(t *testing.T) {
 func TestLocalDiffAgainstBaseUsesMergeBase(t *testing.T) {
 	dir := newRepo(t)
 
-	run := func(args ...string) {
-		t.Helper()
-
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		cmd.Env = append(os.Environ(),
-			"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=t@example.com",
-			"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=t@example.com",
-		)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
-		}
-	}
-
 	// Branch off, change one file, then advance main separately. A two-dot
 	// diff would attribute main's change to this branch.
-	run("checkout", "-qb", "feature")
+	gitIn(t, dir, "checkout", "-qb", "feature")
 	write(t, dir, "a.go", "package a\n\nfunc F() int {\n\treturn 2\n}\n")
-	run("add", "-A")
-	run("commit", "-qm", "feature change")
+	gitIn(t, dir, "add", "-A")
+	gitIn(t, dir, "commit", "-qm", "feature change")
 
-	run("checkout", "-q", "main")
+	gitIn(t, dir, "checkout", "-q", "main")
 	write(t, dir, "other.go", "package a\n\nvar Unrelated = true\n")
-	run("add", "-A")
-	run("commit", "-qm", "unrelated main change")
+	gitIn(t, dir, "add", "-A")
+	gitIn(t, dir, "commit", "-qm", "unrelated main change")
 
 	local := NewLocal(dir, nil)
 

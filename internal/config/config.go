@@ -32,14 +32,36 @@ type Config struct {
 	// it ranges.
 	Persona Persona `yaml:"persona"`
 
+	// Validation controls the expert re-check applied to findings on their way
+	// to publication.
+	Validation Validation `yaml:"validation"`
+
 	// Source records where the configuration was loaded from. It is empty when
 	// only built-in defaults were used.
 	Source string `yaml:"-"`
+
+	// Missing is the path a configuration file was looked for at and not found,
+	// set only when Source is empty. The two are exclusive: one of them always
+	// names the file this configuration is about.
+	//
+	// Recording an absence matters for the same reason recording the source
+	// does. A change that DELETES .nitpick.yaml leaves a checkout with no
+	// Source, so a review that only knows about files it read cannot tell that
+	// the change replaced the repository's accepted policy with built-in
+	// defaults — and a mistyped -config path silently reviews a repository under
+	// settings its maintainers never chose.
+	Missing string `yaml:"-"`
 
 	// Dropped names endpoint and credential keys that were ignored because the
 	// config file is not trusted to supply them. Callers should log these: a
 	// silently ignored setting is very hard to diagnose.
 	Dropped []string `yaml:"-"`
+
+	// Policy records which configuration decided this review's behavior, and
+	// why it is not simply the file named by Source. Like Dropped, callers
+	// should surface it: a maintainer whose newly added ignore rule did nothing
+	// has no other way to learn that their rule was not the one in force.
+	Policy Policy `yaml:"-"`
 }
 
 // ModelSpec describes one configured model. Provider names are matched against
@@ -95,13 +117,19 @@ const (
 	StructuredJSON   StructuredMode = "json"
 )
 
-// Models maps review roles to model specifications. Review and Triage fall back
-// to Default when unset, which lets a minimal config name a single model while
-// a tuned config uses a cheap model for triage and a strong one for review.
+// Models maps review roles to model specifications. Every role falls back to
+// Default when unset, which lets a minimal config name a single model while a
+// tuned config uses a cheap model for triage and a strong one for review.
 type Models struct {
 	Default ModelSpec  `yaml:"default"`
 	Review  *ModelSpec `yaml:"review"`
 	Triage  *ModelSpec `yaml:"triage"`
+
+	// Validate is the model the domain experts speak through. It is separate
+	// so a deployment can have one model review and a different one check the
+	// result: an independent check is worth more when it is not the same
+	// weights re-reading their own claim.
+	Validate *ModelSpec `yaml:"validate"`
 }
 
 // Review holds reviewer behavior and gating policy.
@@ -188,23 +216,35 @@ func Load(repoRoot string) (*Config, error) {
 // LoadFile loads configuration from an explicit path. A missing file yields
 // validated defaults; any other read or parse failure is returned.
 func LoadFile(path string) (*Config, error) {
-	cfg := Defaults()
-
 	data, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		cfg.applyEnv(nil)
-		cfg.Persona = cfg.Persona.Resolve()
-		if err := cfg.Validate(); err != nil {
+		cfg, err := defaultConfig()
+		if err != nil {
 			return nil, fmt.Errorf("no %s found and environment is incomplete: %w", FileName, err)
 		}
+		cfg.Missing = path
 		return cfg, nil
 	case err != nil:
 		return nil, fmt.Errorf("read config %s: %w", path, err)
 	}
 
+	return loadBytes(data, path)
+}
+
+// loadBytes builds a validated Config from one config file's contents.
+//
+// LoadFile and base-revision policy resolution both go through it so the two
+// cannot drift apart. Every step here — scrubbing before anything reads the
+// values, the environment fallback after, persona resolution, validation — has
+// to apply to a config read out of git exactly as it applies to one read off
+// disk, and a second hand-maintained copy of this sequence would eventually
+// miss one.
+func loadBytes(data []byte, source string) (*Config, error) {
+	cfg := Defaults()
+
 	if err := cfg.merge(data); err != nil {
-		return nil, fmt.Errorf("parse config %s: %w", path, err)
+		return nil, fmt.Errorf("parse config %s: %w", source, err)
 	}
 
 	// Strip endpoint and credential keys before anything reads them. This runs
@@ -213,10 +253,30 @@ func LoadFile(path string) (*Config, error) {
 
 	cfg.applyEnv(nil)
 	cfg.Persona = cfg.Persona.Resolve()
-	cfg.Source = path
+	cfg.Source = source
+
+	// Stated even before ResolvePolicy has had a say, so that every Config can
+	// answer which policy it carries. A field that is accurate only after some
+	// other call has run is a field that reads as a lie the rest of the time.
+	cfg.Policy = Policy{Origin: OriginCheckout, Path: source}
 
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid config %s: %w", path, err)
+		return nil, fmt.Errorf("invalid config %s: %w", source, err)
+	}
+	return cfg, nil
+}
+
+// defaultConfig returns the built-in configuration with the environment
+// applied: what governs a review when no config file supplies anything.
+func defaultConfig() (*Config, error) {
+	cfg := Defaults()
+
+	cfg.applyEnv(nil)
+	cfg.Persona = cfg.Persona.Resolve()
+	cfg.Policy = Policy{Origin: OriginCheckout}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, err
 	}
 	return cfg, nil
 }
@@ -248,6 +308,8 @@ func (m Models) ResolveModel(role Role) ModelSpec {
 		override = m.Review
 	case RoleTriage:
 		override = m.Triage
+	case RoleValidate:
+		override = m.Validate
 	}
 	if override == nil {
 		return m.Default
@@ -264,6 +326,8 @@ const (
 	RoleReview Role = "review"
 	// RoleTriage dedupes and filters findings across batches.
 	RoleTriage Role = "triage"
+	// RoleValidate independently checks a finding before it is published.
+	RoleValidate Role = "validate"
 )
 
 // overlay returns base with every field the override sets replaced.

@@ -20,6 +20,7 @@ func (c *Config) Validate() error {
 	errs = append(errs, c.Review.validate()...)
 	errs = append(errs, c.Linters.validate()...)
 	errs = append(errs, c.Persona.validate()...)
+	errs = append(errs, c.Validation.validate()...)
 
 	for i, ins := range c.Instructions {
 		if strings.TrimSpace(ins.Path) == "" {
@@ -47,6 +48,9 @@ func (m Models) validate() []error {
 	}
 	if m.Triage != nil {
 		errs = append(errs, prefixAll("models.triage", m.Triage.validate(false))...)
+	}
+	if m.Validate != nil {
+		errs = append(errs, prefixAll("models.validate", m.Validate.validate(false))...)
 	}
 
 	return errs

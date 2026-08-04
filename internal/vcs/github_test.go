@@ -34,6 +34,22 @@ func TestGitHubRequiresToken(t *testing.T) {
 	}
 }
 
+// TestGitHubRequestsAreBounded: the review's only context comes from
+// signal.NotifyContext and carries no deadline, so with http.DefaultClient — no
+// timeout at all — a connection the far side accepts and never answers hangs the
+// run forever, with nothing logged after "parsed diff" and no way to tell it
+// apart from a slow model.
+func TestGitHubRequestsAreBounded(t *testing.T) {
+	gh, err := NewGitHub(GitHubOptions{Token: "t"})
+	if err != nil {
+		t.Fatalf("NewGitHub: %v", err)
+	}
+
+	if timeout := gh.client.Client().Timeout; timeout <= 0 {
+		t.Errorf("http client timeout = %v; a stalled connection would never be broken", timeout)
+	}
+}
+
 func TestGitHubValidatesRef(t *testing.T) {
 	gh := newFakeGitHub(t, func(http.ResponseWriter, *http.Request) {
 		t.Error("no request should be made for an invalid ref")

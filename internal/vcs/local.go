@@ -109,6 +109,40 @@ func (l *Local) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 	return l.gitRaw(ctx, args...)
 }
 
+// BaseRevision resolves the revision the ref's diff was computed against.
+//
+// Every case below mirrors a case in Diff, and that correspondence is the whole
+// point: a caller reading a file "as it was before this change" has to read it
+// at the same revision the diff subtracted, or the two disagree about what the
+// change did.
+func (l *Local) BaseRevision(ctx context.Context, ref Ref) (string, error) {
+	switch {
+	case ref.Head == Worktree && ref.Base == "":
+		return l.revParse(ctx, "HEAD")
+	case ref.Head == Worktree:
+		return l.revParse(ctx, ref.Base)
+	case ref.Base == "":
+		// `git diff <head>` compares the working tree against head, so head is
+		// what these changes were measured against.
+		return l.revParse(ctx, ref.Head)
+	default:
+		return l.mergeBase(ctx, ref.Base, ref.Head)
+	}
+}
+
+// mergeBase resolves the fork point, matching the three-dot range Diff uses.
+//
+// Unrelated histories and shallow clones have no merge base. The named base is
+// still a revision this change did not author — the property a caller is after
+// — so it is used rather than failing the resolution outright.
+func (l *Local) mergeBase(ctx context.Context, base, head string) (string, error) {
+	out, err := l.git(ctx, "merge-base", base, head)
+	if err != nil {
+		return l.revParse(ctx, base)
+	}
+	return strings.TrimSpace(out), nil
+}
+
 // FileContent reads a file at the ref's head. For a working-tree review the
 // file is read from disk, so uncommitted edits are reviewed as they actually
 // are rather than as they were last committed.

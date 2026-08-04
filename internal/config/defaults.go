@@ -71,6 +71,10 @@ func Defaults() *Config {
 			Summary:          true,
 		},
 		Persona: DefaultPersona(),
+		// Stated rather than left to the zero value, because "off" here is a
+		// decision with a reason: the pass is unmeasured and its risk is to
+		// recall. See Validation.Enabled.
+		Validation: Validation{Enabled: false},
 		Linters: Linters{
 			Enabled:          append([]string(nil), DefaultLinters...),
 			Mode:             LinterAuto,

@@ -71,6 +71,7 @@ func (c *Config) sanitize(getenv func(string) string) []string {
 	scrub("models.default", &c.Models.Default)
 	scrub("models.review", c.Models.Review)
 	scrub("models.triage", c.Models.Triage)
+	scrub("models.validate", c.Models.Validate)
 
 	// persona.custom is free text that lands in the SYSTEM prompt, which is the
 	// highest-trust position available. Every other config-sourced string

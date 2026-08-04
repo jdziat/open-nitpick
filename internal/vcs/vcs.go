@@ -10,12 +10,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // ErrNotFound reports that a requested file does not exist at a revision.
 // Callers treat it as "no content available" rather than a failure, since a
 // deleted file legitimately has no new-side content.
 var ErrNotFound = errors.New("vcs: not found")
+
+// ErrNoBaseRevision reports that a provider cannot name the revision a change
+// is measured against.
+//
+// It is not a failure of the run. A caller that needed the base revision in
+// order to avoid trusting the change under review falls back to something the
+// change also did not write — built-in defaults — rather than carrying on with
+// the change's own version.
+var ErrNoBaseRevision = errors.New("vcs: base revision unavailable")
 
 // Ref identifies what to review.
 type Ref struct {
@@ -31,6 +41,17 @@ type Ref struct {
 	// the forge; for a local review they come from the command line.
 	Base string
 	Head string
+}
+
+// At returns a copy of the ref pointing at rev, so a caller can read files as
+// they exist somewhere other than the head under review.
+//
+// Head is what FileContent reads, which is why this sets Head rather than Base:
+// "read the base version of this file" means "read this ref with its head moved
+// to the base".
+func (r Ref) At(rev string) Ref {
+	r.Head = rev
+	return r
 }
 
 // String renders the ref for logs.
@@ -51,6 +72,12 @@ type PullRequest struct {
 	Author string
 
 	BaseRef string
+
+	// BaseSHA is the revision the change is measured against, when the provider
+	// knows it. It may be empty even where BaseRef is set, so BaseRevision is
+	// how to ask for it rather than reading this directly.
+	BaseSHA string
+
 	HeadRef string
 	HeadSHA string
 
@@ -121,4 +148,39 @@ type Provider interface {
 
 	// Name identifies the provider for logs and errors.
 	Name() string
+}
+
+// BaseResolver names the revision a ref's change is measured against: the state
+// of the repository that already existed, and that the change under review
+// therefore did not author.
+//
+// It is deliberately separate from Provider. A wrapper or a test double that
+// has no way to answer must be *unable* to answer — its caller then falls back
+// to defaults and says so — where a method on Provider would oblige every
+// implementation to return something, and the plausible-looking something is
+// the head under review.
+type BaseResolver interface {
+	BaseRevision(ctx context.Context, ref Ref) (string, error)
+}
+
+// BaseRevision returns the revision p measures ref's change against, or
+// ErrNoBaseRevision when p cannot say.
+//
+// An empty revision is refused rather than passed back: Local reads the working
+// tree for an empty head, so a caller feeding one to Ref.At and FileContent
+// would read precisely the changed version it is trying to avoid.
+func BaseRevision(ctx context.Context, p Provider, ref Ref) (string, error) {
+	resolver, ok := p.(BaseResolver)
+	if !ok {
+		return "", fmt.Errorf("%s: %w", p.Name(), ErrNoBaseRevision)
+	}
+
+	rev, err := resolver.BaseRevision(ctx, ref)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(rev) == "" {
+		return "", fmt.Errorf("%s: %w", p.Name(), ErrNoBaseRevision)
+	}
+	return rev, nil
 }
