@@ -54,6 +54,53 @@ type Finding struct {
 	// Severity is one of nit, info, warning, error, critical.
 	Severity string `json:"severity"`
 
+	// SeverityTranslated records that Severity above is THIS PROJECT'S word
+	// rather than the reporter's own — because an adapter mapped a foreign
+	// vocabulary onto our five levels, because the reporter published no severity
+	// at all and we assigned one, or because the reporter published a word we did
+	// not recognize and normalized away.
+	//
+	// It is a separate field from RawSeverity because the two facts are
+	// independent and "" cannot carry both. "Nobody translated this, so Severity
+	// is the reporter's own word" and "somebody translated it and the original did
+	// not survive" are opposite claims about the same finding, and an empty
+	// RawSeverity is the state of both. Reporting the second as the first is what
+	// quotes a reviewer as having said a word we chose for it.
+	//
+	// Whoever sets Severity to something the reporter did not write MUST set this,
+	// and the invariant is that RawSeverity is never populated without it.
+	SeverityTranslated bool `json:"-"`
+
+	// RawSeverity is the severity word the REPORTER itself printed, kept when
+	// Severity above is this project's translation of it rather than the
+	// reporter's own word.
+	//
+	// It is empty when nothing was translated, which is the ordinary case: a
+	// model writes Severity itself, so for its findings that field already IS
+	// the word it said. Only an adapter for a reviewer with a different
+	// vocabulary fills this in, and it must, because the alternative is that the
+	// original is destroyed at parse time and every downstream report describes
+	// the reviewer using words the reviewer never used.
+	//
+	// That is not hypothetical, and it happened on BOTH sides. internal/evals
+	// published a block captioned "what each contender called the defects it
+	// located" that read "critical x4, warning x3" for a reviewer which had
+	// printed "critical" and "major" — our translation, presented as their
+	// vocabulary, and a function of a constant we are free to change. That was
+	// fixed for the incumbent and reintroduced for our own contenders: the review
+	// engine rewrites a model's severity and used to set nothing here, and the
+	// eval report answered "nothing was translated" for every model we ship,
+	// quoting each of them as having said whatever we had substituted. Empty here
+	// therefore means "not recovered", and a reader is told that, rather than
+	// being shown the translation as though it were a quotation.
+	//
+	// It is not serialized: a finding read back from JSON has lost the word, and
+	// claiming otherwise would put the same substitution back one layer down.
+	// SeverityTranslated is not serialized either, for the same reason — a
+	// consumer that recovered the flag without the word would be told a word
+	// exists and shown ours.
+	RawSeverity string `json:"-"`
+
 	// Category groups findings, for example correctness or security. It is
 	// free text and is shown to readers.
 	Category string `json:"category"`

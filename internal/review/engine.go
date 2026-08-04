@@ -454,7 +454,7 @@ func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bun
 		if !f.Valid() {
 			continue
 		}
-		f.Severity = e.normalizeSeverity(f)
+		e.recordSeverity(&f)
 		f.Class = e.normalizeClass(f)
 		if f.Source == "" {
 			f.Source = e.Roles.Review.String()
@@ -480,20 +480,64 @@ func (e *Engine) normalizeClass(f Finding) string {
 	return string(normalized)
 }
 
-// normalizeSeverity maps a model-supplied severity onto a real level, logging
-// anything unrecognized.
+// recordSeverity maps a model-supplied severity onto a real level, logging
+// anything unrecognized and KEEPING the model's own word when it rewrites one.
 //
 // The schema constrains severity to an enum, but JSON-mode providers do not
 // enforce it, so an unexpected value still reaches here. Left alone, "none"
 // would outrank critical and trip every gate, and "P1" would silently become
 // info with nothing to explain the surprise.
-func (e *Engine) normalizeSeverity(f Finding) string {
+//
+// THE BUG IT FIXES: this used to return only the normalized level, so a model
+// that said "P1" or "Critical" had its word destroyed here and nothing recorded
+// that a substitution had happened. internal/evals then published a block
+// captioned as each contender's own severity vocabulary, and answered it from
+// "was this finding produced by the Incumbent adapter?" — so every model this
+// project ships was reported as having printed the word we had just written over
+// it. The identical defect had already been found and fixed on the incumbent's
+// side, where a lost word at least prints "(word not recorded)"; here the
+// substitute was quoted silently as the model's own.
+//
+// Only a REWRITE is recorded. A model that writes a level we already use has not
+// been translated and must not be marked as though it had, or every finding in
+// the tree would report its own severity as unquotable.
+func (e *Engine) recordSeverity(f *Finding) {
 	normalized, ok := config.Severity(f.Severity).Normalize()
 	if !ok {
 		e.log().Warn("unrecognized severity from model; treating as info",
 			"severity", f.Severity, "path", f.Path, "title", f.Title)
 	}
-	return string(normalized)
+
+	if string(normalized) == f.Severity {
+		return
+	}
+
+	f.SeverityTranslated = true
+	f.RawSeverity = f.Severity
+	f.Severity = string(normalized)
+}
+
+// restoreSeverityProvenance puts back the reporter's own severity word on a
+// finding that came back through a pass which cannot carry it.
+//
+// Only when the LEVEL is unchanged. If the pass moved the severity, the word now
+// published is that pass's own choice and the earlier reporter's spelling is
+// stale beside it — the same rule applyOutcomes applies when an expert re-rates,
+// and for the same reason: a review model's "P1" travelling beside a level
+// somebody else chose describes a finding that never existed.
+//
+// It is keyed on Finding.Key(), so a genuinely reworded finding is not
+// recognized and keeps whatever the pass itself said. That is the conservative
+// direction: failing to restore prints "(word not recorded)", which is visible,
+// while restoring onto the wrong finding quotes a reviewer as saying something
+// it did not — the failure this whole field pair exists to prevent.
+func (e *Engine) restoreSeverityProvenance(f *Finding, before map[string]Finding) {
+	original, ok := before[f.Key()]
+	if !ok || original.Severity != f.Severity {
+		return
+	}
+	f.SeverityTranslated = original.SeverityTranslated
+	f.RawSeverity = original.RawSeverity
 }
 
 // filterAnchors drops findings that cannot be placed and snaps near-misses onto
@@ -594,11 +638,29 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 	// default level — a real defect disappearing because a summarizer guessed.
 	classBefore := make(map[string]string, len(findings))
 	sourceBefore := make(map[string]string, len(findings))
+	// severityBefore preserves the severity PROVENANCE — the reporter's own word
+	// and the fact that we rewrote it — for the same reason sourceBefore exists.
+	//
+	// THE BUG IT FIXES: SeverityTranslated and RawSeverity are `json:"-"`, so
+	// they arrive from triage's decode zeroed. recordSeverity below could not
+	// restore them either, because renderForTriage shows triage `[%s]` of
+	// f.Severity — THIS PROJECT'S word, already normalized — so a triage model
+	// that echoes what it was shown normalizes to itself and the call returns
+	// early. Every finding that survived triage was therefore published claiming
+	// nobody had translated it, and internal/evals' severityAsSaid reads that as
+	// "Severity IS the reporter's word" and quotes our substitute as the model's
+	// own, unmarked. That is verbatim the defect recordSeverity's doc comment
+	// says it fixes, one pass downstream of the fix, and it was live on the path
+	// the eval battery runs. It was worse for linter findings, because Source is
+	// deliberately restored below: the finding was published attributed to gosec
+	// with our word quoted as gosec's.
+	severityBefore := make(map[string]Finding, len(findings))
 	for _, f := range findings {
 		allowed[f.Path] = struct{}{}
 		if _, seen := classBefore[f.Key()]; !seen {
 			classBefore[f.Key()] = f.Class
 			sourceBefore[f.Key()] = f.Source
+			severityBefore[f.Key()] = f
 		}
 	}
 
@@ -612,7 +674,8 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 				"path", f.Path, "title", f.Title)
 			continue
 		}
-		f.Severity = e.normalizeSeverity(f)
+		e.recordSeverity(&f)
+		e.restoreSeverityProvenance(&f, severityBefore)
 
 		// Restore the reviewer's class when this finding is recognizably one it
 		// reported. Only genuinely new wording falls back to triage's guess.

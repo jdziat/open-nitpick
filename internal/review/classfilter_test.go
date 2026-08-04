@@ -217,6 +217,74 @@ func TestLinterAttributionSurvivesTriage(t *testing.T) {
 	}
 }
 
+// TestSeverityProvenanceSurvivesTriage is the SEVERITY half of the property
+// above, and it was missing while Source had a test.
+//
+// THE BUG: SeverityTranslated and RawSeverity carry `json:"-"`, so triage's
+// decode zeroed both, and recordSeverity could not put them back — renderForTriage
+// shows the triage model `[%s]` of an ALREADY NORMALIZED Severity, so a model
+// that echoes what it was shown normalizes to itself and the call returns early.
+// Every finding that survived triage was published claiming nobody had
+// translated it. internal/evals' severityAsSaid reads that as "Severity is the
+// reporter's own word" and quotes it unmarked, so the eval report said gosec
+// printed "error" when gosec printed "HIGH", and said a review model printed
+// "info" when it printed "P1". That is the defect recordSeverity's doc comment
+// says it fixes, alive one pass downstream of the fix and on the path the eval
+// battery runs.
+//
+// Both directions are asserted. The second is what keeps the restore honest: if
+// triage MOVES the level, the published word is triage's own and the earlier
+// reporter's spelling is stale beside it, exactly as applyOutcomes treats an
+// expert's re-rate.
+func TestSeverityProvenanceSurvivesTriage(t *testing.T) {
+	lint := Finding{
+		Path: "app.go", Line: 4, Severity: "error",
+		Class: string(config.ClassSecurity), Category: "lint",
+		Title: "Potential file inclusion via variable", Rationale: "Reported by golangci-lint(gosec).",
+		Source: "golangci-lint(gosec)", SeverityTranslated: true, RawSeverity: "HIGH",
+	}
+
+	// `echoed` is what triage's decode actually yields: the two unserialized
+	// fields cleared. Passing `lint` itself would let the struct smuggle the
+	// provenance across a boundary that cannot carry it, and the test would pass
+	// against the broken code.
+	echoed := lint
+	echoed.SeverityTranslated = false
+	echoed.RawSeverity = ""
+
+	report := runWithLinter(t, config.NitpickNormal, nil, []Finding{lint}, []Finding{echoed})
+	if len(report.Findings) != 1 {
+		t.Fatalf("findings = %d, want the linter finding published", len(report.Findings))
+	}
+
+	got := report.Findings[0]
+	if !got.SeverityTranslated || got.RawSeverity != "HIGH" {
+		t.Errorf("published as translated=%v raw=%q; gosec printed \"HIGH\" and this finding is "+
+			"attributed to gosec (%s), so our word is being quoted as the analyzer's",
+			got.SeverityTranslated, got.RawSeverity, got.Source)
+	}
+
+	// Triage re-rating it: the level published is triage's, so "HIGH" must go.
+	moved := echoed
+	moved.Severity = string(config.SeverityWarning)
+
+	report = runWithLinter(t, config.NitpickNormal, nil, []Finding{lint}, []Finding{moved})
+	if len(report.Findings) != 1 {
+		t.Fatalf("findings = %d after a triage re-rate", len(report.Findings))
+	}
+
+	got = report.Findings[0]
+	if got.Severity != string(config.SeverityWarning) {
+		t.Fatalf("Severity = %q, want triage's warning; the rest of this case is about that move",
+			got.Severity)
+	}
+	if got.SeverityTranslated || got.RawSeverity != "" {
+		t.Errorf("translated=%v raw=%q survived a triage re-rate to %q. The analyzer never said "+
+			"\"HIGH\" about a warning, and a report quoting it beside one describes a finding that "+
+			"never existed", got.SeverityTranslated, got.RawSeverity, got.Severity)
+	}
+}
+
 // TestModelFindingAttributionIsNotDoubled: when the reviewer and triager are
 // both models, do not print a confusing double attribution.
 func TestModelFindingAttributionIsNotDoubled(t *testing.T) {

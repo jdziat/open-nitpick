@@ -29,6 +29,15 @@ type Finding struct {
 	Rule     string
 	Message  string
 	Severity config.Severity
+
+	// RawSeverity is the token the ANALYZER printed, when Severity above is
+	// mapSeverity's translation of it rather than the analyzer's own word.
+	//
+	// Empty means the analyzer published no severity at all and this package
+	// chose one — ruff is the case, and there the level is entirely ours.
+	// Either way Severity is not a quotation, which is why every runner that
+	// fills this in also sets review.Finding.SeverityTranslated downstream.
+	RawSeverity string
 }
 
 // Runner is one analyzer.
@@ -192,15 +201,24 @@ func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 			severity = config.SeverityWarning
 		}
 
+		// EVERY analyzer finding's severity is this project's word. mapSeverity
+		// translated it, or the runner had nothing to translate and we picked
+		// one, or the fallback just above overwrote an unusable value — there is
+		// no path here on which the level is the analyzer's own spelling. Marking
+		// them all is therefore correct rather than conservative, and it is what
+		// stops a report captioning "gosec said error" over a word gosec never
+		// printed. RawSeverity carries the original where there was one.
 		out = append(out, review.Finding{
-			Path:      f.Path,
-			Line:      f.Line,
-			Severity:  string(severity),
-			Category:  "lint",
-			Class:     string(classForRule(f.Rule)),
-			Title:     strings.TrimSpace(f.Message),
-			Rationale: fmt.Sprintf("Reported by %s.", f.Rule),
-			Source:    f.Rule,
+			Path:               f.Path,
+			Line:               f.Line,
+			Severity:           string(severity),
+			SeverityTranslated: true,
+			RawSeverity:        f.RawSeverity,
+			Category:           "lint",
+			Class:              string(classForRule(f.Rule)),
+			Title:              strings.TrimSpace(f.Message),
+			Rationale:          fmt.Sprintf("Reported by %s.", f.Rule),
+			Source:             f.Rule,
 		})
 	}
 

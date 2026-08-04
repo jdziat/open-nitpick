@@ -83,6 +83,21 @@ func TestPrompts(t *testing.T) {
 		}
 	}
 
+	// The cost ledger had NO caller anywhere outside its own tests: nothing built
+	// one, nothing called ObserveScore, and nothing printed the table. A whole
+	// accounting block, its price table, its staleness marks and its routing
+	// bands existed as an artifact no run produced — which is also why three
+	// mutations of ObserveScore left the suite green.
+	//
+	// A missing price table is reported and not fatal. A battery that refuses to
+	// run because nobody recaptured a rate spends nothing and measures nothing,
+	// and the ledger already says "unknown" per row rather than guessing.
+	prices, perr := Prices()
+	if perr != nil {
+		t.Logf("NO COST ACCOUNTING THIS RUN: %v — the review results below are unaffected", perr)
+	}
+	ledger := NewCostLedger(prices)
+
 	var (
 		mu        sync.Mutex
 		summaries []Summary
@@ -110,6 +125,14 @@ func TestPrompts(t *testing.T) {
 				score := ScoreRun(result, j.fixture)
 				scores = append(scores, score)
 
+				// Every term of the cost reading — the tokens, the detections,
+				// the noise, the widest anchor — already sits on the Score, which
+				// is what ObserveScore takes. Booking it here is what makes the
+				// noise and anchor counts in the cost table the scorer's answer
+				// rather than a second derivation free to disagree with the score
+				// table printed above it.
+				ledger.ObserveScore(score)
+
 				mu.Lock()
 				logRun(t, j.model.ID, j.fixture, score)
 
@@ -133,7 +156,21 @@ func TestPrompts(t *testing.T) {
 
 	wg.Wait()
 
-	printTable(t, summaries)
+	printTable(t, opts.Fixtures, summaries)
+
+	// The cost block, under the score table it is read beside. Its columns are
+	// computed from the same Scores the table above was, so the two cannot
+	// describe different runs.
+	if prices != nil {
+		for _, note := range ledger.ComparabilityNotes() {
+			t.Log(note)
+		}
+		for _, note := range ledger.OrderingNotes() {
+			t.Log(note)
+		}
+		t.Log(ledger.Table())
+	}
+
 	assertCorpusRecall(t, summaries)
 }
 
@@ -186,7 +223,7 @@ func logRun(t *testing.T, model string, f Fixture, s Score) {
 
 // printTable renders the summary a human reads to decide whether the prompt is
 // good enough.
-func printTable(t *testing.T, summaries []Summary) {
+func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 	t.Helper()
 
 	if len(summaries) == 0 {
@@ -236,15 +273,11 @@ func printTable(t *testing.T, summaries []Summary) {
 			}
 		}
 
-		// Blank rather than 0/0/0 when nothing was graded: a clean fixture
-		// plants no severity to compare against, and zeros there would read as
-		// "nothing was wrong" instead of "nothing was measured". That distinction
-		// is the whole reason PublishedMetrics returns ok=false for an ungraded
-		// corpus — a reviewer that says nothing inflates nothing.
-		sev := ""
-		if s.SevAccurate+s.SevInflated+s.SevUnderstated > 0 {
-			sev = fmt.Sprintf("%d/%d/%d", s.SevAccurate, s.SevInflated, s.SevUnderstated)
-		}
+		// Rendered by Summary rather than formatted here, because this cell is
+		// one of the two renderings of the objective-severity metric and the
+		// vocabulary withdrawal has to apply to both. Formatting it inline left
+		// the withdrawal in the judged tables only; see Summary.SeverityCell.
+		sev := s.SeverityCell()
 
 		// ANCHOR is the widest single region any finding claimed. It is on the
 		// row rather than in a log line because RECALL and NOISE are both
@@ -260,6 +293,13 @@ func printTable(t *testing.T, summaries []Summary) {
 	}
 
 	t.Log(b.String())
+
+	// What the counts above can and cannot express, derived from the corpus that
+	// produced them. RECALL and SEV are printed as counts rather than as
+	// percentages for the reason this note states, and the note is here so a
+	// reader is told the reason instead of having to notice it.
+	t.Log(CorpusResolution(corpus))
+	t.Log(RateLegend)
 
 	// The legend belongs under this table too. Its own doc comment said it was
 	// printed under every table carrying a severity column, and this one carries

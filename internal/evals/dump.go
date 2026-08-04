@@ -101,11 +101,37 @@ type DumpRecord struct {
 	// surviving is not evidence the change did.
 	FixtureHash string `json:"fixture_hash,omitempty"`
 
-	Path     string `json:"path"`
-	Line     int    `json:"line"`
-	EndLine  int    `json:"end_line,omitempty"`
+	Path    string `json:"path"`
+	Line    int    `json:"line"`
+	EndLine int    `json:"end_line,omitempty"`
+
+	// Severity is the level THIS PROJECT recorded the finding at. It is not
+	// necessarily a word the reviewer used, and the two fields below say which.
+	//
+	// THE BUG: it was written under a bare "severity" key beside
+	// "model":"incumbent/cli", so the artifact every downstream reading is
+	// re-derived from published our translation of a foreign vocabulary as the
+	// reviewer's own severity. review.Finding.RawSeverity carries `json:"-"`, so
+	// the word the reviewer actually printed could not reach this file at all —
+	// the substitution the tables had been fixed for survived one layer down, in
+	// the file a reader goes to when they doubt the tables.
 	Severity string `json:"severity"`
-	Class    string `json:"class"`
+
+	// SeveritySaid is the word the REVIEWER printed, when this project rewrote it
+	// into Severity above. Absent when SeverityTranslated is false, because then
+	// Severity IS the reviewer's word and repeating it would invent a second
+	// source for one fact.
+	//
+	// Absent WITH SeverityTranslated true is the third state and it is a real
+	// one: something rewrote the severity and the original is not recoverable —
+	// a Incumbent cache entry collected before the raw review was retained, or
+	// an analyzer that published no severity at all. A reader must be able to
+	// tell that from "the reviewer said this", which is why the flag is written
+	// rather than inferred from the word's absence.
+	SeveritySaid       string `json:"severity_said,omitempty"`
+	SeverityTranslated bool   `json:"severity_translated,omitempty"`
+
+	Class string `json:"class"`
 
 	// Category and Suggestion are scored by nothing and recorded anyway,
 	// because judgeRequest SHOWS both to the judge.
@@ -279,6 +305,19 @@ func (d *Dump) Record(s DumpSample) error {
 		rec.Line = f.Line
 		rec.EndLine = f.EndLine
 		rec.Severity = f.Severity
+
+		// Routed through severityAsSaid so this file and the published
+		// vocabulary block cannot disagree about who said what. Deriving it here
+		// from the finding's fields would be a second answer to one question, and
+		// the whole reason this record exists is to be the evidence behind the
+		// tables rather than a rival to them.
+		said := severityAsSaid(f)
+		rec.SeverityTranslated = severityWasTranslated(f)
+		rec.SeveritySaid = ""
+		if rec.SeverityTranslated {
+			rec.SeveritySaid = said.Said
+		}
+
 		rec.Class = f.Class
 		rec.Category = f.Category
 		rec.Title = f.Title

@@ -313,6 +313,10 @@ type Rates struct {
 	// separate cache tier, and an omitted rate falls back to Input — which is
 	// what such a provider actually charges for those tokens.
 	//
+	// CacheWrite is the 5-MINUTE TTL rate where a provider publishes more than
+	// one; the others live on Price, because which one was billed is not a
+	// property of the rate table. See Price.CacheWrite1h.
+	//
 	// A published rate of 0.0 is a DIFFERENT statement: free caching, which
 	// some providers do publish. float64 alone cannot tell the two apart, so
 	// the escape hatch the file header documents did not exist — an operator
@@ -366,7 +370,7 @@ type Tier struct {
 // It exists because the round-2 error was not a wrong number, it was a wrong
 // object. `/api/v1/models` returns one `pricing` block per model and every rate
 // in the previous table was a correct copy of it — but that block is ONE
-// ENDPOINT'S price. OpenRouter serves 14 of the 20 battery models from between
+// ENDPOINT'S price. OpenRouter serves 15 of the 20 battery models from between
 // 5 and 34 endpoints, spanning 22x on openai/gpt-5.6-luna and 3.9x on
 // z-ai/glm-5.2, and open-nitpick pins no provider, so which one served a request
 // is the router's choice and is recorded nowhere. A $/DEFECT figure was
@@ -436,8 +440,46 @@ type Price struct {
 	// the vendor's own serving of the model.
 	Endpoint string
 
+	// CacheWrite1h is a SECOND published cache-write rate, for a one-hour TTL,
+	// and it exists to make a row REFUSE rather than approximate.
+	//
+	// The two anthropic entries publish it at 1.6x their five-minute rate. A
+	// usage report says how many cache-creation tokens were written and NOT
+	// which TTL they were written at, so on a model publishing both, a call that
+	// wrote any is not priceable from this table — the amount is one of two
+	// numbers 1.6x apart and nothing here can say which. Billing it at the
+	// five-minute rate is the cheaper of the two, which is the direction that
+	// flatters a model into being the default.
+	//
+	// Nothing in open-nitpick enables prompt caching today, so this refusal
+	// should never fire. That is exactly why it is encoded rather than left as
+	// the comment it used to be: "no path sends these tokens" is a property of
+	// this month's call sites, and the accounting has to be right the month
+	// somebody adds one.
+	//
+	// cacheWrite1hKnown separates an unpublished rate from a published free one,
+	// for the same reason cacheReadFree does on Rates.
+	CacheWrite1h      float64
+	cacheWrite1hKnown bool
+
 	// Routing is the rest of the endpoint set.
 	Routing Routing
+}
+
+// Unpriceable reports why this usage cannot be priced from this entry at all,
+// or "" when it can.
+//
+// It is a refusal and not a caveat: the caller reports unknown. The alternative
+// is a plausible-looking number carrying a footnote, and a footnote does not
+// stop a reader sorting the column it is attached to.
+func (p Price) Unpriceable(u TokenUsage) string {
+	if !p.cacheWrite1hKnown || p.CacheWrite1h == p.CacheWrite || u.CacheWrite() == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d cache-write token(s) were billed at one of two published rates "+
+		"($%.2f/M at a 5-minute TTL, $%.2f/M at 1 hour) and a usage report does not say which; "+
+		"pricing them at either would be a guess, and at the cheaper one a guess in the flattering direction",
+		u.CacheWrite(), p.CacheWrite, p.CacheWrite1h)
 }
 
 // rateAt returns the rates a prompt of this size is billed at.
@@ -500,6 +542,10 @@ type rawPrice struct {
 	Output     *float64 `yaml:"output"`
 	CacheRead  *float64 `yaml:"cache_read"`
 	CacheWrite *float64 `yaml:"cache_write"`
+
+	// CacheWrite1h is recorded to be REFUSED on rather than to be billed. See
+	// Price.CacheWrite1h.
+	CacheWrite1h *float64 `yaml:"cache_write_1h"`
 
 	Tiers   []rawTier   `yaml:"tiers"`
 	Routing *rawRouting `yaml:"routing"`
@@ -643,6 +689,22 @@ func parsePrice(raw rawPrice) (Price, error) {
 	}
 	price.Rates = base
 
+	if raw.CacheWrite1h != nil {
+		if *raw.CacheWrite1h < 0 {
+			return Price{}, fmt.Errorf("has a negative cache_write_1h rate (%v)", *raw.CacheWrite1h)
+		}
+		if raw.CacheWrite == nil {
+			// The pair is what makes a call unpriceable. A 1-hour rate recorded
+			// beside no 5-minute rate would make the entry refuse against a
+			// fallback-to-input figure the vendor never published as a cache
+			// rate at all, which is a different statement from the one this
+			// field exists to make.
+			return Price{}, fmt.Errorf("records cache_write_1h with no cache_write: the field exists to " +
+				"say that TWO published rates could have applied, and one of them is missing")
+		}
+		price.CacheWrite1h, price.cacheWrite1hKnown = *raw.CacheWrite1h, true
+	}
+
 	previous := 0
 	for i, rawT := range raw.Tiers {
 		if rawT.MinPromptTokens == nil {
@@ -676,7 +738,7 @@ func parsePrice(raw rawPrice) (Price, error) {
 		price.Tiers = append(price.Tiers, Tier{MinPromptTokens: mpt, Rates: rates})
 	}
 
-	routing, err := parseRouting(raw.Routing, base)
+	routing, err := parseRouting(raw.Routing, base, price.Endpoint)
 	if err != nil {
 		return Price{}, err
 	}
@@ -692,7 +754,21 @@ func parsePrice(raw rawPrice) (Price, error) {
 // would have caught the round-2 error at the moment of capture: a rate that is
 // not inside its own model's endpoint band is a rate that belongs to some other
 // model, some other date, or nothing at all.
-func parseRouting(raw *rawRouting, base Rates) (Routing, error) {
+//
+// endpoint is which endpoint base belongs to, and the check it enables is the
+// one that catches the ROUND-3 error. `cheapest` and `dearest` were derived from
+// the position of an endpoint in the vendor's array, on the belief — written
+// into both file headers as load-bearing — that `/api/v1/models/…/endpoints`
+// returns them cheapest first. It does not: the array is unsorted for 8 of the
+// 20 models here, in every case because a half-price `/flex` service tier is
+// listed after the standard one. So 8 entries named an endpoint as the cheapest
+// that costs exactly 2.00x the band floor recorded beside it, and never one
+// below — the numbers were right and the advice attached to them ("pin the
+// cheapest to collapse the band") pointed at twice the price. It is checkable
+// without the endpoint list because the two claims contradict each other on the
+// page: if the recorded endpoint IS the cheapest, its recorded rate is the
+// band's floor.
+func parseRouting(raw *rawRouting, base Rates, endpoint string) (Routing, error) {
 	if raw == nil {
 		return Routing{}, fmt.Errorf("has no routing block: OpenRouter serves most of this battery from " +
 			"several endpoints at different rates and open-nitpick pins none of them, so an entry that " +
@@ -755,6 +831,30 @@ func parseRouting(raw *rawRouting, base Rates) (Routing, error) {
 	if out.Endpoints == 1 && (low != high) {
 		return Routing{}, fmt.Errorf("routing declares 1 endpoint and a band wider than a point (%v..%v input): "+
 			"one of the two was not recaptured with the other", low.Input, high.Input)
+	}
+
+	// Only this direction is checkable, and saying so is the point. Several
+	// endpoints routinely tie at an extreme — six of claude-opus-5's seven share
+	// its floor — so a recorded rate EQUAL to the floor does not imply this
+	// entry's endpoint is the one named. The converse does imply something: an
+	// endpoint named as the cheapest whose own rate is above the floor is two
+	// statements that cannot both be true.
+	for _, c := range []struct {
+		role  string
+		named string
+		rate  float64
+	}{
+		{"cheapest", out.Cheapest, low.Input},
+		{"dearest", out.Dearest, high.Input},
+	} {
+		if c.named != endpoint || base.Input == c.rate {
+			continue
+		}
+		return Routing{}, fmt.Errorf("routing names %q as the %s endpoint and that is this entry's own "+
+			"endpoint, whose recorded input rate is %v — but the band's %s input is %v. A label derived "+
+			"from the vendor's array order rather than from its rates says this: the endpoints response is "+
+			"NOT sorted by price",
+			c.named, c.role, base.Input, c.role, c.rate)
 	}
 
 	out.Low, out.High = low, high
@@ -1102,13 +1202,64 @@ type CostLedger struct {
 	judges map[string]*modelSpend
 }
 
+// Detections is what one review found, as the cost reading needs it: the two
+// terms of recall, and the findings that matched nothing planted.
+//
+// It is a struct rather than three more parameters on Observe because the three
+// are read TOGETHER or not at all — see PublishedCostReadings — and because
+// Observe already took two bare ints in an order nothing but the call site
+// documented. Adding a third of the same type to that list is how Noise ends up
+// summed into Matched by a caller that miscounted the commas.
+type Detections struct {
+	// Matched and Planted are the numerator and denominator of recall over the
+	// reviews this cost was computed from.
+	Matched int
+	Planted int
+
+	// Noise is findings that corresponded to no planted defect, and WidestAnchor
+	// the most lines any single finding claimed.
+	//
+	// They are here because score.go's AllTableHeaders records that the cost
+	// table published RECALL with neither beside it, and hands the gap to this
+	// track. RECALL is not a score on its own in a cost table for the same reason
+	// it is not one in a score table, and the two ways of breaking it cost
+	// DIFFERENT amounts, which is what makes both terms load-bearing here:
+	//
+	//   - Explain nothing, and guess. Output is billed per finding and a comment
+	//     carrying no reason is a fraction of one that does, so a reviewer that
+	//     names every defect tersely and scatters guesses through the rest of the
+	//     file reaches recall 1.00 BELOW the calibrated reviewer's token cost.
+	//     Its $/DEFECT heads the table. NOISE is what sees it.
+	//
+	//     This bullet used to say "forty one-line findings are cheaper to
+	//     generate than three explained ones", and the degenerate table's row for
+	//     it declared its own token count to make that true. Run over the real
+	//     corpus, a comment on every line of a twenty-line file with one defect
+	//     costs MORE than explaining that defect, so the dollar columns caught
+	//     the spammer and NOISE could have been deleted with every guard green.
+	//     What is genuinely cheap is refusing to explain, not filing more.
+	//   - Point at everything. A finding covering the whole file — as one span,
+	//     or as a list of one-line regions, which is the shape Incumbent's
+	//     secondary locations parse into — is credited with every plant inside it
+	//     and is noise for none, at no extra output cost. It ties a calibrated
+	//     reviewer on RECALL and NOISE both and beats it on dollars. Only ANCHOR
+	//     sees it, and only once ANCHOR counts distinct lines.
+	Noise int
+
+	// WidestAnchor is a worst case rather than a rate, so it is not divided by
+	// anything and rows are compared on the widest span either of them filed.
+	WidestAnchor int
+}
+
 // modelSpend is one model's running total.
 type modelSpend struct {
-	reviews  int
-	measured int
-	detected int
-	planted  int
-	usage    TokenUsage
+	reviews      int
+	measured     int
+	detected     int
+	planted      int
+	noise        int
+	widestAnchor int
+	usage        TokenUsage
 
 	// attempted and priced count RUNS PER FIXTURE: how many times this model was
 	// run on each fixture, and how many of those runs could actually be priced.
@@ -1161,13 +1312,13 @@ func (l *CostLedger) PriceTable() *PriceTable { return l.prices }
 // tell a model measured on eight fixtures from one measured on the four it did
 // not crash on, and those two rows are not comparable.
 //
-// `planted` is recorded for the same reason `detected` is, and it arrived a
-// round later: cost per defect ALONE is maximised by doing the least work that
-// still lands one cheap hit, so it is only a score beside the recall it was
-// bought at. Without the denominator here the ledger could not state that pair,
-// and $/DEFECT would have been published as a standalone ranking. See
+// Detections carries the three counts for the same reason: cost per defect
+// ALONE is maximised by doing the least work that still lands one cheap hit, so
+// it is only a score beside the recall it was bought at — and recall in turn is
+// maximised by saying everything, so it is only a score beside the noise it was
+// bought with. Each arrived a round after the one before it. See
 // PublishedCostReadings.
-func (l *CostLedger) Observe(model, fixture string, usage TokenUsage, detected, planted int) {
+func (l *CostLedger) Observe(model, fixture string, usage TokenUsage, found Detections) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -1180,8 +1331,10 @@ func (l *CostLedger) Observe(model, fixture string, usage TokenUsage, detected, 
 	}
 
 	spend.measured++
-	spend.detected += detected
-	spend.planted += planted
+	spend.detected += found.Matched
+	spend.planted += found.Planted
+	spend.noise += found.Noise
+	spend.widestAnchor = max(spend.widestAnchor, found.WidestAnchor)
 	spend.priced[fixture]++
 	spend.usage = spend.usage.Add(usage)
 }
@@ -1189,7 +1342,12 @@ func (l *CostLedger) Observe(model, fixture string, usage TokenUsage, detected, 
 // ObserveScore records a scored run, which is where every term of the cost
 // reading already sits side by side.
 func (l *CostLedger) ObserveScore(s Score) {
-	l.Observe(s.Model, s.Fixture, s.Usage, s.Matched, s.Total)
+	l.Observe(s.Model, s.Fixture, s.Usage, Detections{
+		Matched:      s.Matched,
+		Planted:      s.Total,
+		Noise:        len(s.Unmatched),
+		WidestAnchor: s.WidestAnchor,
+	})
 }
 
 // ObserveJudge records one judge call's usage, kept out of every model's cost.
@@ -1317,6 +1475,8 @@ func (l *CostLedger) row(in map[string]*modelSpend, model string, reference []st
 		row.Measured = spend.measured
 		row.Detected = spend.detected
 		row.Planted = spend.planted
+		row.Noise = spend.noise
+		row.WidestAnchor = spend.widestAnchor
 		row.Usage = spend.usage
 		row.Attempted = len(spend.attempted)
 		row.Covered = len(spend.priced)
@@ -1387,8 +1547,17 @@ type CostRow struct {
 	// Planted how many those reviews contained. Both are needed because
 	// Detected alone is the numerator of a ratio a lazy reviewer wins: see
 	// PublishedCostReadings.
-	Detected int
-	Planted  int
+	//
+	// Noise counts findings in those same reviews that matched nothing planted,
+	// and WidestAnchor is the most DISTINCT LINES any single one of them claimed
+	// across all of its regions together. They
+	// are the third and fourth terms for the same reason the second one is: the
+	// reading without them ranks a reviewer that comments on every line, or one
+	// that files a single span per file, above a correct one. See Detections.
+	Detected     int
+	Planted      int
+	Noise        int
+	WidestAnchor int
 
 	// Usage is the measured usage those reviews reported.
 	Usage TokenUsage
@@ -1446,6 +1615,19 @@ func (r CostRow) Recall() (float64, bool) {
 		return 0, false
 	}
 	return float64(r.Detected) / float64(r.Planted), true
+}
+
+// NoiseRate is unmatched findings per MEASURED review.
+//
+// Per review rather than in total, for the same reason the detection metric
+// divides by samples: a row priced over more reviews would otherwise read as
+// noisier for having been measured more. It is computed over exactly the
+// reviews the dollar amounts came from, like Recall and for the same reason.
+func (r CostRow) NoiseRate() (float64, bool) {
+	if r.Measured == 0 {
+		return 0, false
+	}
+	return float64(r.Noise) / float64(r.Measured), true
 }
 
 // coverageReason states why a row may not be ranked.
@@ -1558,6 +1740,9 @@ func (r CostRow) Total() Cost {
 			return unknownCost("no reviews recorded for %s", r.Model)
 		}
 		return unknownCost("no usage reported by %s in %d review(s)", r.Model, r.Reviews)
+	}
+	if why := r.Price.Unpriceable(r.Usage); why != "" {
+		return unknownCost("%s: %s", r.Model, why)
 	}
 	return r.qualify(r.Price.Cost(r.Usage))
 }
@@ -1680,9 +1865,19 @@ func PublishedCostReadings() []CostReading {
 			// out of Score, so the degenerate table never asked what maximises
 			// it — and the answer is "a review that does nothing", which is the
 			// same unasked question that shipped the banded severity column.
-			Columns: []string{"$/DEFECT", "$/REVIEW", "RECALL"},
+			// NOISE and ANCHOR are here because RECALL was not enough, and the
+			// gap was named in score.go before it was closed here: the cost table
+			// published RECALL with neither beside it, which is the shape the
+			// detection metric's own completeness rule exists to stop. Both ways
+			// of buying recall cheaply are strategies this repository has already
+			// written down, and in dollars they do better than tie — see
+			// Detections. This reading now carries the detection metric's whole
+			// rendering, which is what "published complete" means for RECALL
+			// wherever it is printed.
+			Columns: []string{"$/DEFECT", "$/REVIEW", "RECALL", "NOISE", "ANCHOR"},
 			Doc: "what one located defect and one whole review cost, read against how much of " +
-				"what was planted the same priced reviews actually found",
+				"what was planted the same priced reviews actually found, how much they invented " +
+				"getting there, and how precisely they said where to look",
 			Score: func(r CostRow) ([]float64, bool) {
 				// An incomparable row is not scored at all. Its dollars are
 				// correct and describe a smaller, easier corpus, which is
@@ -1704,9 +1899,22 @@ func PublishedCostReadings() []CostReading {
 					return nil, false
 				}
 
+				// And noise is the component that makes recall one. Without it,
+				// "say everything" is the optimum instead.
+				noise, ok := r.NoiseRate()
+				if !ok {
+					return nil, false
+				}
+
 				// Negated so that higher is better in every position: cheaper is
-				// better, and more of the corpus found is better.
-				return []float64{-perDefect.USD, -perReview.USD, recall}, true
+				// better, more of the corpus found is better, less invented is
+				// better, and a narrower worst-case span is better. The anchor
+				// is NOT divided by anything — it is a worst case, following the
+				// detection metric, which is what makes it survive a strategy
+				// that files one wide span among many narrow ones.
+				return []float64{
+					-perDefect.USD, -perReview.USD, recall, -noise, -float64(r.WidestAnchor),
+				}, true
 			},
 		},
 	}
@@ -1892,15 +2100,31 @@ func (l *CostLedger) OrderingNotes() []string {
 // rather than only in a footnote: it is the difference between a figure that is
 // exact and one that could be several times either way, and a reader comparing
 // two rows needs it in the same glance as the dollars.
-const CostTableHeader = "MODEL                                REVIEWS  PRICED  COV  FAILED  DEFECTS  TOKENS     COST        $/REVIEW    RECALL   $/DEFECT     SPREAD     AGE"
+//
+// NOISE and ANCHOR sit between RECALL and $/DEFECT because the five are one
+// reading and those two are the ones a reader would not think to want. RECALL
+// was printed here without either for a round — score.go's AllTableHeaders
+// records the gap and hands it to this track — and each of them is the only
+// column that sees one of the two cheap ways to buy recall.
+// The RECALL field is 11 wide and not 8: its cell is "14/14 1.00", which is ten
+// characters, and at 8 it pushed every column to its right out of line on every
+// row in the table.
+const CostTableHeader = "MODEL                                REVIEWS  PRICED  COV  FAILED  DEFECTS  TOKENS     COST        $/REVIEW    RECALL      NOISE  ANCHOR  $/DEFECT     SPREAD     AGE"
 
 // CostReadingLegend is printed under the cost table, for the same reason
 // SeverityColumnLegend is printed under the severity ones: the number a reader
 // most wants to sort on is the one that must not be read alone.
 const CostReadingLegend = "$/DEFECT IS NOT A RANKING ON ITS OWN. It is minimised by a reviewer that does the " +
 	"least work that still lands one cheap hit — its dollars are real, its detections are real, and it " +
-	"would head this table. Read it ONLY beside RECALL, which is computed over exactly the PRICED " +
-	"reviews the dollar amounts came from, and ONLY between rows with equal COV AND equal PRICED: a model " +
+	"would head this table. Read it ONLY beside RECALL, NOISE and ANCHOR, all computed over exactly the " +
+	"PRICED reviews the dollar amounts came from. RECALL alone does not rescue it, and the two ways of " +
+	"buying recall cheaply need a column each: output is billed per finding and a comment carrying no " +
+	"reason is a fraction of one that does, so a reviewer that names every defect and explains none " +
+	"reaches recall 1.00 UNDER a calibrated one's price while a third of what it filed is guessed " +
+	"(NOISE sees it), and a finding that points at the whole file — as one span, or as a list of " +
+	"one-line regions — is credited with every plant inside it while being noise for none, at no extra " +
+	"cost at all (only ANCHOR sees it). Read them ONLY " +
+	"between rows with equal COV AND equal PRICED: a model " +
 	"priced on the fixtures it did not fail describes a smaller, easier corpus, and one priced on fewer " +
 	"RUNS of a fixture its peers completed describes the runs that went well — the dropped runs are the " +
 	"ones that reported no usage, which is not a random subset. Either marks the cost * and it must not " +
@@ -1916,6 +2140,9 @@ const CostReadingLegend = "$/DEFECT IS NOT A RANKING ON ITS OWN. It is minimised
 	"still have been billed for a response that was never delivered, and the meter sits outside the " +
 	"SDK's retry loop, so a request that succeeded on its second attempt contributes only the second " +
 	"attempt's tokens. Neither is knowable from a response, and neither is filled in from a guess. " +
+	RateLegend + " Here that means RECALL and NOISE: RECALL is printed as the defects located over the " +
+	"defects planted in the PRICED reviews, and NOISE as invented findings per priced review. Both step " +
+	"by one whole finding, and DEFECTS and PRICED are the counts they step over. " +
 	"See PublishedCostReadings."
 
 // Table renders the cost block a report prints under its score table.
@@ -1964,7 +2191,7 @@ func (l *CostLedger) tableAt(now time.Time) string {
 	// the footnotes would carry "the judge detected no planted defect" as though
 	// that were a shortcoming.
 	writeRow := func(r CostRow, rated bool) {
-		defects, perDefect, recall := "—", "—", "—"
+		defects, perDefect, recall, noise, anchor := "—", "—", "—", "—", "—"
 		qualified := []Cost{r.Total(), r.PerReview()}
 		if rated {
 			defects, perDefect = fmt.Sprint(r.Detected), r.PerDefect().String()
@@ -1976,11 +2203,18 @@ func (l *CostLedger) tableAt(now time.Time) string {
 			if share, ok := r.Recall(); ok {
 				recall = fmt.Sprintf("%d/%d %.2f", r.Detected, r.Planted, share)
 			}
+
+			// Same rule: a row with no priced review has no noise RATE and no
+			// widest anchor, and 0 in either is the best value in the column.
+			if rate, ok := r.NoiseRate(); ok {
+				noise = fmt.Sprintf("%.2f", rate)
+				anchor = fmt.Sprint(r.WidestAnchor)
+			}
 		}
 
-		fmt.Fprintf(&b, "%-36s %-8d %-7d %-4d %-7d %-8s %-10d %-11s %-11s %-8s %-12s %-10s %s\n",
+		fmt.Fprintf(&b, "%-36s %-8d %-7d %-4d %-7d %-8s %-10d %-11s %-11s %-11s %-6s %-7s %-12s %-10s %s\n",
 			truncate(r.Model, 36), r.Reviews, r.Measured, r.Covered, r.Usage.Failed, defects,
-			r.Usage.Total(), r.Total(), r.PerReview(), recall, perDefect, spread(r), age(r))
+			r.Usage.Total(), r.Total(), r.PerReview(), recall, noise, anchor, perDefect, spread(r), age(r))
 
 		for _, c := range qualified {
 			notes = append(notes, c.Notes()...)
@@ -2002,6 +2236,23 @@ func (l *CostLedger) tableAt(now time.Time) string {
 		b.WriteString("JUDGE — a measurement expense, not part of what running this tool costs a user:\n")
 		for _, r := range judges {
 			writeRow(r, false)
+		}
+	}
+
+	// The counts behind the two rates in the table above.
+	//
+	// RECALL already prints its pair in the cell; NOISE does not, because a rate
+	// and its counts do not fit in six characters and the column widths in the
+	// header and the row format are hand-maintained in two places — a mismatch
+	// there silently misaligns every column to the right of it, which this table
+	// has already done once. Below the table they fit however large the corpus
+	// gets, which is the property that matters as fixtures are added.
+	if len(rows) > 0 {
+		b.WriteString("\nDENOMINATORS — the counts the two rates above were computed from:\n")
+		for _, r := range rows {
+			fmt.Fprintf(&b, "  %-36s RECALL %d/%d defects | NOISE %d invented finding(s) over %d "+
+				"priced review(s) | ANCHOR %d line(s), a worst case over those reviews\n",
+				truncate(r.Model, 36), r.Detected, r.Planted, r.Noise, r.Measured, r.WidestAnchor)
 		}
 	}
 

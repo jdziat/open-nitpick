@@ -463,16 +463,32 @@ func parseCRFinding(lines []string, start int, severity, category string) (revie
 	// Suggestion is left empty: a plain-text review states the problem in prose
 	// and offers no replacement code, which is exactly the difference from
 	// --agent mode. The judge treats it as optional.
+	// RawSeverity keeps the word the CLI actually printed, beside the level
+	// crSeverity translates it to.
+	//
+	// THE BUG IT FIXES: only the translation survived the parse, and the eval
+	// report published it as the reviewer's own vocabulary. Incumbent never
+	// printed "warning" anywhere in the shipped corpus — it prints "critical" and
+	// "major" — yet the block captioned "what each contender called the defects it
+	// located" read "critical x4, warning x3", and swapping crSeverity's free
+	// "major" constant re-rendered the identical cached bytes as "critical x4,
+	// error x3". A description that moves when we change our own constant, with
+	// nothing in the reviewer's output changing, is not a description of the
+	// reviewer. That block exists precisely because a SCORE could not be
+	// justified; a derived figure wearing the authority of an observation is the
+	// defect the withdrawal was about, one level down.
 	f := review.Finding{
-		Path:      path,
-		Line:      line,
-		EndLine:   endLine,
-		AlsoAt:    alsoAt,
-		Severity:  string(crSeverity(severity)),
-		Category:  strings.TrimSpace(category),
-		Title:     title,
-		Rationale: rationale,
-		Source:    IncumbentModel,
+		Path:               path,
+		Line:               line,
+		EndLine:            endLine,
+		AlsoAt:             alsoAt,
+		Severity:           string(crSeverity(severity)),
+		SeverityTranslated: true,
+		RawSeverity:        strings.TrimSpace(severity),
+		Category:           strings.TrimSpace(category),
+		Title:              title,
+		Rationale:          rationale,
+		Source:             IncumbentModel,
 	}
 	if f.Category == "" {
 		f.Category = "incumbent"
@@ -883,7 +899,49 @@ func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
 	// Collected before Raw was retained. There is no evidence to re-derive from,
 	// so the stored reading is all there is; it is not stale in the sense above,
 	// because no newer reading of the same bytes is possible.
-	return c.Findings, true
+	//
+	// Source and SeverityTranslated are both restored because both are
+	// `json:"-"` and neither survived the round trip. SeverityTranslated is the
+	// load-bearing one: these findings' Severity is crSeverity's word, their
+	// RawSeverity was never serialized, and a replayed finding that came back
+	// claiming nothing had translated it would have its TRANSLATION republished
+	// as the reviewer's own spelling — the exact substitution RawSeverity exists
+	// to stop, reintroduced by a field that was never serialized. Setting the
+	// flag with no word is the honest pair: something rewrote this, and the
+	// original is gone. The vocabulary block prints UnrecordedWord for each of
+	// them rather than filling the gap from our reading.
+	out := make([]review.Finding, len(c.Findings))
+	copy(out, c.Findings)
+	for i := range out {
+		out[i].Source = IncumbentModel
+		out[i].SeverityTranslated = true
+	}
+	return out, true
+}
+
+// severityWasTranslated reports whether a finding's Severity is this project's
+// word rather than the reporter's own.
+//
+// It reads the FACT the rewriter recorded. It used to read the finding's SOURCE
+// — `f.Source == IncumbentModel` — and the comment here justified that by
+// claiming crSeverity was "the only place in the tree that rewrites a reviewer's
+// severity vocabulary" and that "everything else writes its own severity and is
+// quoted verbatim". BOTH HALVES WERE FALSE, and the second one is the defect.
+// review.Engine rewrites every model's severity through Normalize, and
+// linters.mapSeverity collapses four analyzers' vocabularies onto three levels;
+// neither recorded anything, so this function answered "nothing was translated"
+// for every contender this project ships and the vocabulary block quoted each of
+// them as having printed the word we had substituted. That is the same defect the
+// incumbent's side was fixed for, reintroduced on ours — and worse, because there
+// a lost word prints UnrecordedWord and here the substitute was published
+// silently as a quotation.
+//
+// Keying on the reporter could not have been right at any value. "Whose word is
+// this?" is a fact about what happened to the finding, and a reviewer's identity
+// only correlates with it — so the answer was guaranteed to drift the moment any
+// other path rewrote a severity, which two already had.
+func severityWasTranslated(f review.Finding) bool {
+	return f.SeverityTranslated
 }
 
 // StaleIncumbentCache reports whether a cache entry exists for this fixture and

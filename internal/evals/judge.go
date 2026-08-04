@@ -7,6 +7,7 @@ import (
 	"maps"
 	"math"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -537,6 +538,31 @@ func (a Aggregate) ObjectiveSeverityCells(model string, samples int) (infl, unde
 	return rate(a.SevInflated), rate(a.SevUnderstated), rate(a.SevAccurate), cov
 }
 
+// ObjectiveSeverityCounts renders the COUNTS behind O-INFL/O-UNDER/O-ACC/O-COV,
+// so a reader can see what resolution those four rates have.
+//
+// It passes through the same vocabulary gate as the cells, and that is not
+// tidiness. The counts ARE the withdrawn thing: a foreign contender's severity
+// triple is blanked in the table precisely because our five levels and its three
+// are not commensurable, and printing "12 accurate of 14" underneath restores the
+// comparison the cells refused, in a form that is easier to quote. Rendering
+// these at the table rather than here is what
+// TestNoReportFormatsSeverityCountersDirectly exists to catch, and it caught this
+// function's first draft.
+//
+// O-COV's denominator survives the gate for a foreign row because it is not a
+// severity claim: how many planted defects a reviewer LOCATED is a statement
+// about detection, in nobody's severity vocabulary.
+func (a Aggregate) ObjectiveSeverityCounts(model string) string {
+	located := fmt.Sprintf("%d located of %d planted", a.SevGraded(), a.SevPlanted)
+
+	if !PublishesOurSeverityLevels(model) {
+		return "O-* withdrawn (severity vocabulary is not ours); " + located
+	}
+	return fmt.Sprintf("O-* %d accurate + %d inflated + %d understated over %s",
+		a.SevAccurate, a.SevInflated, a.SevUnderstated, located)
+}
+
 // VocabularyRow is one contender's severity vocabulary, for the block printed
 // under every table that compares reviewers.
 type VocabularyRow struct {
@@ -554,12 +580,25 @@ type VocabularyRow struct {
 // them, and can decide what that is worth. The figure that used to make that
 // judgement for them was maximised by answering "critical" to everything. See
 // NoCrossToolSeverityScore.
+//
+// The words are the reviewer's own. They used to be OURS: the block printed the
+// level crSeverity had translated each foreign word to, captioned as what the
+// contender called the defect, so a description offered in place of a score was
+// itself a function of the free constant the withdrawal rested on. Where a word
+// was translated the reading is now printed beside it and marked as ours; see
+// SeverityUsage.
 func SeverityVocabularyBlock(rows []VocabularyRow) string {
 	var b strings.Builder
 
-	b.WriteString("SEVERITY VOCABULARY — what each contender called the defects it located, against the " +
-		"level planted. A DESCRIPTION, NOT A SCORE: the vocabularies differ in resolution, and every " +
-		"reduction that makes them comparable is maximised by rating everything blocking.\n")
+	b.WriteString("SEVERITY VOCABULARY — the severity word each contender PRINTED for the defects it " +
+		"located, against the level planted. A DESCRIPTION, NOT A SCORE: the vocabularies differ in " +
+		"resolution, and every reduction that makes them comparable is maximised by rating everything " +
+		"blocking.\n" +
+		"THE WORDS ARE VERBATIM AND THE READINGS ARE OURS: where this project translates a word into " +
+		"its own five levels, the level follows it as [we read as X] and is our reading, not the " +
+		"reviewer's claim. A word shown as " + UnrecordedWord + " was destroyed before it reached here, " +
+		"or was never printed at all, and is reported missing rather than filled in from our reading.\n" +
+		translatedWordsNote(rows))
 
 	for _, r := range rows {
 		lines := r.Usage.Lines()
@@ -575,6 +614,101 @@ func SeverityVocabularyBlock(rows []VocabularyRow) string {
 	}
 
 	return b.String()
+}
+
+// translatedWordsNote names the words in THESE rows that this project had to
+// translate, and what it read each of them as.
+//
+// It is derived rather than written down. The sentence it replaces was a
+// hand-maintained claim about which words a particular reviewer prints —
+// "incumbent prints 'critical' and 'major'" — sitting inside the block whose
+// entire thesis is that a reviewer's vocabulary must be quoted rather than
+// restated from memory. It was the same failure in miniature, and it was already
+// drifting: it named one reviewer while the engine had begun translating our own
+// models' words too, so the note described the corpus as it was two rounds ago.
+//
+// A word counts as translated when the reporter's spelling and our recorded
+// level differ, CASE ASIDE. Identical spellings are left out: a reviewer that
+// writes "error" and is recorded at error was not translated, and listing it
+// would bury the words that were.
+//
+// TWO WAYS THIS NOTE CONTRADICTED THE ROWS IT INTRODUCES, both fixed here.
+//
+// A DESTROYED WORD IS NOT AN UNTRANSLATED ONE. Said == "" was skipped as though
+// it were nothing to report, so a block in which every word had been destroyed
+// printed "NO WORD IN THIS BLOCK WAS TRANSLATED ... each line quotes its
+// reviewer directly" directly above rows reading "(word not recorded) x1 [we
+// read as warning]" — the preamble asserting the exact opposite of every line
+// under it, in the one published block whose entire purpose is to keep our
+// substitutions distinguishable from a reviewer's own words. It is reachable
+// with no cache at all: linters.normalize marks every analyzer finding
+// translated and the ruff runner records no word, so a row of ruff findings
+// produced it.
+//
+// CASE IS DECIDED IN ONE PLACE. The note compared with == while SeverityUsage
+// .Lines suppresses the "[we read as X]" marker with EqualFold, so a model
+// printing "Critical" was announced as a translated word above a row that quoted
+// it unmarked. Lines' rule is the right one and its reason is written out there
+// — a difference of case is not a difference of vocabulary — so this now asks
+// the same question rather than a second, differently-spelled one.
+func translatedWordsNote(rows []VocabularyRow) string {
+	readings := map[string]map[string]bool{}
+	destroyed := 0
+	for _, r := range rows {
+		for _, said := range r.Usage {
+			for w, n := range said {
+				if w.Said == "" {
+					destroyed += n
+					continue
+				}
+				if strings.EqualFold(w.Said, w.Recorded.String()) {
+					continue
+				}
+				if readings[w.Said] == nil {
+					readings[w.Said] = map[string]bool{}
+				}
+				readings[w.Said][w.Recorded.String()] = true
+			}
+		}
+	}
+
+	lostNote := ""
+	if destroyed > 0 {
+		lostNote = fmt.Sprintf(" %d GRADED FINDING(S) REACHED THIS BLOCK WITH NO WORD AT ALL, shown "+
+			"as %s: something translated those and did not keep the original, so the level beside "+
+			"them is ours and the reviewer's own word is unrecoverable.", destroyed, UnrecordedWord)
+	}
+
+	if len(readings) == 0 {
+		if destroyed > 0 {
+			return "NO SURVIVING WORD IN THIS BLOCK WAS TRANSLATED: every word that reached here is " +
+				"one this project already uses, so those lines quote their reviewer directly." +
+				lostNote + "\n"
+		}
+		return "NO WORD IN THIS BLOCK WAS TRANSLATED: every contender above printed a word this " +
+			"project already uses, so each line quotes its reviewer directly.\n"
+	}
+
+	words := make([]string, 0, len(readings))
+	for w := range readings {
+		words = append(words, w)
+	}
+	sort.Strings(words)
+
+	parts := make([]string, 0, len(words))
+	for _, w := range words {
+		levels := make([]string, 0, len(readings[w]))
+		for l := range readings[w] {
+			levels = append(levels, l)
+		}
+		sort.Strings(levels)
+		parts = append(parts, fmt.Sprintf("%q read as %s", w, strings.Join(levels, "/")))
+	}
+
+	return "WORDS THIS PROJECT TRANSLATED, in this block: " + strings.Join(parts, "; ") +
+		". Each reading is a choice we are free to change, and a word with no counterpart among our " +
+		"five levels is a guess no corpus here can check — which is one of the reasons no cross-tool " +
+		"severity score is offered." + lostNote + "\n"
 }
 
 // Precision is the share of findings a senior reviewer would actually raise.

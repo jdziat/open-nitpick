@@ -845,22 +845,31 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 	// about severity across vocabularies.
 	//
 	// Read it as the whole argument in four numbers. On plants of ERROR the
-	// incumbent answers "critical" three times and "warning" twice; on plants of
-	// CRITICAL it answers "critical" twice. One word covering both kinds of plant
+	// incumbent prints "critical" three times and "major" twice; on plants of
+	// CRITICAL it prints "critical" twice. One word covering both kinds of plant
 	// is exactly the resolution difference no mapping can repair — and it is why
 	// the banded reduction that "fixed" it scored a reviewer with no severity
 	// opinion at all as perfect.
+	//
+	// THE WORDS PINNED HERE ARE INCUMBENT'S, and this table used to pin OURS.
+	// It expected {error plant, warning} twice, because the block recorded what
+	// crSeverity had translated "major" into. Incumbent prints no "warning"
+	// anywhere in this cache; the pin asserted that a description captioned as
+	// the reviewer's vocabulary reported our translation, and it would have gone
+	// green on a corpus the reviewer had never seen. "major" is what it printed,
+	// and what it is read as is ours and marked as ours.
 	for _, tc := range []struct {
-		planted, said config.Severity
-		want          int
+		planted config.Severity
+		said    SeverityWord
+		want    int
 	}{
-		{config.SeverityCritical, config.SeverityCritical, 2},
-		{config.SeverityError, config.SeverityCritical, 3},
-		{config.SeverityError, config.SeverityWarning, 2},
+		{config.SeverityCritical, SeverityWord{"critical", config.SeverityCritical}, 2},
+		{config.SeverityError, SeverityWord{"critical", config.SeverityCritical}, 3},
+		{config.SeverityError, SeverityWord{"major", config.SeverityWarning}, 2},
 	} {
 		if n := usage[tc.planted][tc.said]; n != tc.want {
-			t.Errorf("on plants of %s the incumbent said %s %d time(s), want %d",
-				tc.planted, tc.said, n, tc.want)
+			t.Errorf("on plants of %s the incumbent printed %q (which we read as %s) %d time(s), want %d",
+				tc.planted, tc.said.Said, tc.said.Recorded, n, tc.want)
 		}
 	}
 

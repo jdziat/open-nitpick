@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/config"
@@ -55,11 +56,12 @@ func (g *golangciLint) Run(ctx context.Context, repoRoot string, files []string)
 	findings := make([]Finding, 0, len(parsed.Issues))
 	for _, issue := range parsed.Issues {
 		findings = append(findings, Finding{
-			Path:     filepath.ToSlash(issue.Pos.Filename),
-			Line:     issue.Pos.Line,
-			Rule:     issue.FromLinter,
-			Message:  issue.Text,
-			Severity: mapSeverity(issue.Severity),
+			Path:        filepath.ToSlash(issue.Pos.Filename),
+			Line:        issue.Pos.Line,
+			Rule:        issue.FromLinter,
+			Message:     issue.Text,
+			Severity:    mapSeverity(issue.Severity),
+			RawSeverity: strings.TrimSpace(issue.Severity),
 		})
 	}
 	return findings, nil
@@ -131,6 +133,10 @@ func (r *ruff) Run(ctx context.Context, repoRoot string, files []string) ([]Find
 
 	findings := make([]Finding, 0, len(issues))
 	for _, issue := range issues {
+		// RawSeverity stays empty because ruff publishes no severity at all:
+		// the warning below is entirely this project's choice, and there is no
+		// word of ruff's to quote. Downstream that reads as "not recorded",
+		// which is the truth, rather than as ruff having said "warning".
 		findings = append(findings, Finding{
 			Path:     relative(repoRoot, issue.Filename),
 			Line:     issue.Location.Row,
@@ -193,11 +199,12 @@ func (e *eslint) Run(ctx context.Context, repoRoot string, files []string) ([]Fi
 			}
 
 			findings = append(findings, Finding{
-				Path:     relative(repoRoot, file.FilePath),
-				Line:     m.Line,
-				Rule:     m.RuleID,
-				Message:  m.Message,
-				Severity: severity,
+				Path:        relative(repoRoot, file.FilePath),
+				Line:        m.Line,
+				Rule:        m.RuleID,
+				Message:     m.Message,
+				Severity:    severity,
+				RawSeverity: strconv.Itoa(m.Severity),
 			})
 		}
 	}
@@ -252,11 +259,12 @@ func (s *semgrep) Run(ctx context.Context, repoRoot string, files []string) ([]F
 	findings := make([]Finding, 0, len(parsed.Results))
 	for _, r := range parsed.Results {
 		findings = append(findings, Finding{
-			Path:     filepath.ToSlash(r.Path),
-			Line:     r.Start.Line,
-			Rule:     r.CheckID,
-			Message:  r.Extra.Message,
-			Severity: mapSeverity(r.Extra.Severity),
+			Path:        filepath.ToSlash(r.Path),
+			Line:        r.Start.Line,
+			Rule:        r.CheckID,
+			Message:     r.Extra.Message,
+			Severity:    mapSeverity(r.Extra.Severity),
+			RawSeverity: strings.TrimSpace(r.Extra.Severity),
 		})
 	}
 	return findings, nil
@@ -265,6 +273,12 @@ func (s *semgrep) Run(ctx context.Context, repoRoot string, files []string) ([]F
 // mapSeverity translates an analyzer's severity vocabulary to ours. Analyzers
 // disagree wildly here, and an unknown value becoming "critical" would poison
 // the gate, so anything unrecognized becomes a warning.
+//
+// It DESTROYS the analyzer's word, which is why every caller records the
+// original in Finding.RawSeverity beside the result. Four analyzers' spellings
+// collapse onto three levels here — "HIGH", "ERROR" and "CRITICAL" all land on
+// error — so the mapped value cannot be un-mapped, and a report that quotes it
+// as the analyzer's own has invented a quotation.
 func mapSeverity(s string) config.Severity {
 	switch strings.ToUpper(strings.TrimSpace(s)) {
 	case "ERROR", "HIGH", "CRITICAL":

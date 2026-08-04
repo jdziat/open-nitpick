@@ -28,7 +28,7 @@
 # ENDPOINT AND ROUTING. This is the error the second round found, and it is not a
 # transcription slip — every number in the previous file was a correct copy of
 # `/api/v1/models`. The mistake was believing that object names A PRICE. It names
-# ONE ENDPOINT'S price, and OpenRouter serves 14 of these 20 models from between
+# ONE ENDPOINT'S price, and OpenRouter serves 15 of these 20 models from between
 # 5 and 34 endpoints at different rates:
 #
 #   openai/gpt-5.6-luna     6 endpoints    $0.05 to $1.10 in     22.0x
@@ -47,15 +47,41 @@
 # one that could be 3.9x either way, and the column gave a reader nothing to see
 # that with.
 #
-# The direction, measured against the endpoint the router reaches for first
-# (`endpoints` is returned cheapest-first): the recorded rate is EXACT on 16
-# models and TOO HIGH on 4 — glm-5.2 by 1.296x, minimax-m2.7 by 1.042x,
-# kimi-k2.7-code by 1.028x, glm-5.1 by 1.015x. It is never too low against that
-# route. All four are open-weight models with third-party hosts; every model it
-# is exact on is either single-endpoint or first-party, where the alternates are
-# service tiers of the same vendor (openai/flex at half, openai/priority at 2x).
-# So the error tracks MODEL CLASS, which is exactly the axis the table is read
-# along.
+# The direction, measured against the cheapest endpoint: the recorded rate is
+# exact on 8 models and ABOVE the floor on 12. It is never below. The eight are
+# the five single-endpoint qwen entries, deepseek-v4-pro and the two anthropic
+# ones, whose alternates are all dearer; the twelve are 2.00x on the six openai
+# and two google entries, whose floor is a half-price `/flex` service tier, then
+# glm-5.2 at 1.296x, minimax-m2.7 at 1.042x, kimi-k2.7-code at 1.028x and glm-5.1
+# at 1.015x.
+#
+# That is not an error — the recorded rate is a real endpoint's real rate, and
+# `routing` is what says the rest — but it is the reason the band is published:
+# the size of the gap tracks MODEL CLASS, which is exactly the axis the table is
+# read along.
+#
+# `cheapest` AND `dearest` NAME AN ENDPOINT AND ARE DERIVED FROM RATES, NOT FROM
+# ARRAY ORDER. This is the round-3 error, and it lived in this header as an
+# assertion: "`endpoints` is returned cheapest-first". It is not. The array is
+# unsorted by price for 8 of the 20 models, in every case because the half-price
+# `/flex` tier is listed after the standard one — so 8 entries named a `cheapest`
+# that costs exactly 2.00x the min_input recorded three lines below it, and never
+# one below. The numbers were right; the advice attached to them ("pin the
+# cheapest and the band collapses") pointed at twice the floor, on the eight
+# first-party endpoints. Same one-directional shape as the round-2 error, and the
+# same axis: it tracks model class.
+#
+# Derive both from the rates, and expect ties — six of claude-opus-5's seven
+# endpoints share its floor, and both gemini entries have two at each end. Any
+# endpoint AT the extreme is a correct answer; one merely near it is not:
+#
+#   jq -r '.data.endpoints | sort_by(.pricing.prompt|tonumber) |
+#          (first|"cheapest \(.tag) \(.pricing.prompt)"),
+#          (last |"dearest  \(.tag) \(.pricing.prompt)")'
+#
+# parseRouting checks the half of this that is checkable without the endpoint
+# list: if an entry names its OWN endpoint as the cheapest, its own recorded rate
+# has to be the band floor. That catches all eight.
 #
 # The fix is not a different number. `routing` records what the whole endpoint
 # set charges, the cost column reports a RANGE where one exists, and an operator
@@ -102,6 +128,21 @@
 # taking the extremum, so they are the bounds of what could actually be billed
 # rather than the bounds of what happens to be published.
 #
+# PRICED AS A REFUSAL, not as a rate:
+#
+#   cache_write_1h      the two anthropic entries publish a 1-hour cache TTL at
+#                       1.6x the 5-minute rate ($6.00 against $3.75 on
+#                       sonnet-4.6, $10.00 against $6.25 on opus-5). The SDK
+#                       reports cache-creation tokens WITHOUT a TTL, so on these
+#                       two models a call that wrote any is one of two amounts
+#                       1.6x apart and nothing can say which: the row reports
+#                       unknown. It used to be recorded as a comment saying
+#                       nothing enables prompt caching — true of this month's
+#                       call sites, not of the accounting — and the five-minute
+#                       rate was billed silently, which is the cheaper of the two
+#                       and so an error in the flattering direction. This line
+#                       also said 2x for a round, a number nobody had divided.
+#
 # NOT PRICED HERE, checked and deliberately absent:
 #
 #   internal_reasoning  published by the two gemini entries only, and equal to
@@ -109,15 +150,6 @@
 #                       SUBSET of completion in the SDK's usage, so they are
 #                       already billed at exactly the right rate; a separate
 #                       term would double-count them.
-#   input_cache_write_1h  the two anthropic entries publish a 1-hour cache TTL
-#                       at 1.6x the 5-minute rate ($6.00 against $3.75 on
-#                       sonnet-4.6, $10.00 against $6.25 on opus-5). Nothing in
-#                       open-nitpick enables prompt caching, and the SDK reports
-#                       cache-creation tokens without a TTL, so there is no
-#                       signal to select it on. Recorded here so the omission is
-#                       a decision. This line said 2x for a round — a number
-#                       nobody had divided — which is why the multiple and both
-#                       rates are now asserted against the captured receipt.
 #   discount            several endpoints publish one. It is kept in the receipt
 #                       and not applied: nothing states what it is conditional
 #                       on, and a discount applied on a guess moves every number
@@ -183,7 +215,7 @@ models:
     routing:
       source: "https://openrouter.ai/api/v1/models/openai/gpt-5.6-luna/endpoints"
       endpoints: 6
-      cheapest: "openai"
+      cheapest: "openai/flex"
       dearest: "azure/eu"
       min_input: 0.05
       max_input: 1.1
@@ -404,7 +436,7 @@ models:
     routing:
       source: "https://openrouter.ai/api/v1/models/openai/gpt-5.6-terra/endpoints"
       endpoints: 6
-      cheapest: "openai"
+      cheapest: "openai/flex"
       dearest: "azure/eu"
       min_input: 0.5
       max_input: 2.75
@@ -432,7 +464,7 @@ models:
     routing:
       source: "https://openrouter.ai/api/v1/models/openai/gpt-5.6-terra-pro/endpoints"
       endpoints: 5
-      cheapest: "openai"
+      cheapest: "openai/flex"
       dearest: "azure/eu"
       min_input: 0.5
       max_input: 2.75
@@ -472,11 +504,15 @@ models:
     input: 1.5
     output: 9
     cache_read: 0.15
-    cache_write: 0.083333333333
+    # Recorded to the vendor's full precision. It was truncated at twelve
+    # significant digits for a round, which is invisible in a dollar column and
+    # is exactly the kind of drift a re-derivation from the receipt exists to
+    # refuse: once a rate is "close enough", so is the next one.
+    cache_write: 0.0833333333333333
     routing:
       source: "https://openrouter.ai/api/v1/models/google/gemini-3.5-flash/endpoints"
       endpoints: 6
-      cheapest: "google-vertex/global"
+      cheapest: "google-vertex/global/flex"
       dearest: "google-vertex/global/priority"
       min_input: 0.75
       max_input: 2.7
@@ -484,7 +520,7 @@ models:
       max_output: 16.2
       min_cache_read: 0.075
       max_cache_read: 0.27
-      min_cache_write: 0.041666666667
+      min_cache_write: 0.0416666666666667
       max_cache_write: 0.15
 
   "google/gemini-3.1-pro-preview":
@@ -503,7 +539,7 @@ models:
     routing:
       source: "https://openrouter.ai/api/v1/models/google/gemini-3.1-pro-preview/endpoints"
       endpoints: 6
-      cheapest: "google-vertex/global"
+      cheapest: "google-vertex/global/flex"
       dearest: "google-vertex/global/priority"
       min_input: 1
       max_input: 3.6
@@ -529,7 +565,7 @@ models:
     routing:
       source: "https://openrouter.ai/api/v1/models/openai/gpt-5.4/endpoints"
       endpoints: 6
-      cheapest: "openai"
+      cheapest: "openai/flex"
       dearest: "openai/priority"
       min_input: 1.25
       max_input: 5
@@ -548,6 +584,7 @@ models:
     output: 15
     cache_read: 0.3
     cache_write: 3.75
+    cache_write_1h: 6
     routing:
       source: "https://openrouter.ai/api/v1/models/anthropic/claude-sonnet-4.6/endpoints"
       endpoints: 8
@@ -570,6 +607,7 @@ models:
     output: 25
     cache_read: 0.5
     cache_write: 6.25
+    cache_write_1h: 10
     routing:
       source: "https://openrouter.ai/api/v1/models/anthropic/claude-opus-5/endpoints"
       endpoints: 7
@@ -601,7 +639,7 @@ models:
     routing:
       source: "https://openrouter.ai/api/v1/models/openai/gpt-5.6-sol/endpoints"
       endpoints: 6
-      cheapest: "openai"
+      cheapest: "openai/flex"
       dearest: "openai/priority"
       min_input: 2.5
       max_input: 10
@@ -629,7 +667,7 @@ models:
     routing:
       source: "https://openrouter.ai/api/v1/models/openai/gpt-5.6-sol-pro/endpoints"
       endpoints: 5
-      cheapest: "azure"
+      cheapest: "openai/flex"
       dearest: "openai/priority"
       min_input: 2.5
       max_input: 10

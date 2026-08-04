@@ -15,15 +15,36 @@ On a corpus of 8 single-file fixtures with planted defects, judged by
 **open-nitpick is competitive with Incumbent on detection and behind it on
 precision.** Nothing stronger than that is supportable yet.
 
-Concretely, `anthropic/claude-sonnet-4.6` at 3 runs per fixture: detection 71%
-against Incumbent's 75%, precision 0.82 against 1.00. The grade gap (3.69 vs
-3.90) is inside the noise and is **not** a ranking.
+Concretely, `anthropic/claude-sonnet-4.6` at 3 runs per fixture: detection 71%,
+precision 0.82, grade 3.69 against 3.90. The grade gap is inside the judge's own
+noise and is **not** a ranking.
+
+**Two figures that used to sit in that sentence are removed rather than
+restated.** It read "detection 71% against Incumbent's 75%, precision 0.82
+against 1.00". Incumbent's detection is deterministic — its cache is fixed, the
+fixtures are fixed, and no model is involved — and over this corpus it is 7 of 8,
+88%, not 75%. Whatever run produced 75% cannot be recovered, and a figure that
+contradicts one the tree computes is not a measurement of anything. The 1.00 was
+the judge's precision for Incumbent; the deterministic reading of the same
+reviews is 7 of 8 findings explaining a plant, 0.88. Putting a judged number and
+a deterministic one on either side of "against" compares two instruments, which
+Rule 1 exists to stop.
+
+The deterministic side of the comparison is in the next section and reproduces
+from the tree. Our own side is a live measurement and does not.
 
 ## What the instrument got wrong
 
-Nine measurement bugs were found. Four of them flattered one side, which is why
-this section exists at all: none were bugs in open-nitpick, and every one would
-have produced a confident wrong number.
+Sixteen measurement bugs have been found, listed below. Six of them scored
+against Incumbent and five flattered whichever behaviour this project would
+rather see — silence, selective reporting, or the author's own argument — which
+is why this section exists at all: none were bugs in open-nitpick, and every one
+would have produced a confident wrong number.
+
+The count is the number of rows in the table, so it moves when the table does.
+It said "nine" against fourteen rows for two rounds, which is the same failure
+these documents keep recording one size down: a figure restated rather than
+recomputed.
 
 | bug | effect | direction |
 |---|---|---|
@@ -39,6 +60,8 @@ have produced a confident wrong number.
 | `O-ACC`/`O-INFL`/`O-UNDER` published with no coverage denominator | reporting only the plants already rated `critical`, and calling them `critical`, tied a perfectly calibrated reviewer on all three — 4 plants of 14 | favoured selective silence |
 | `RECALL`/`NOISE` published with no anchor width | one finding per file, spanning the file, titled with every keyword in it, tied a calibrated reviewer on both | favoured saying where nothing is |
 | full-resolution `O-*` left on Incumbent's row after the banded triple was withdrawn | the retracted comparison stayed on the page in the same sorted ranking, with a note asking the reader not to make it | against Incumbent |
+| the severity vocabulary block published OUR translation as the reviewer's words | the description offered in place of the withdrawn score was itself a function of the free `major` constant, captioned as observation | undetermined; it moved with our constant |
+| the withdrawal applied to one of the metric's two renderings | `O-*` was gated on vocabulary and the `SEV a/i/u` cell was formatted inline, so "a foreign row prints `n/a`" held only because that table had no foreign row | latent |
 | `STABLE` returned `yes` for five silent runs | the column's best value went to a reviewer that never spoke; a wobbly correct one got `NO` | favoured silence |
 | the retraction's own figures (`10 of 10`, `0.62 → 0.88`, `O-ACC 0.63`) | none reproduced; each overstated the case it was making | favoured the author |
 
@@ -69,6 +92,47 @@ what Incumbent said. It just does not license the comparison the old paragraph
 drew from it. The O-* cells on Incumbent's row now print `n/a`; what is
 published for it is the severity vocabulary block.
 
+### The block that replaced it was publishing our own words
+
+And that is the third correction in this spot. `SeverityUsage` recorded the level
+`crSeverity` had translated each foreign word *to*, under a caption saying it was
+what the contender called the defect. Incumbent's vocabulary across the shipped
+cache is `{critical, major}` — it printed neither `error` nor `warning`. Swapping
+the free `major` constant re-rendered the same cached bytes with `error` in place
+of `warning`.
+
+So the description offered *because* a score could not be justified was itself a
+function of the free parameter the withdrawal rested on. What is published now is
+the reviewer's own word, read from the retained review text, with our reading of
+it beside it and marked as ours. **Both corpora, before and after, so the pair is
+one instrument:**
+
+    tuning corpus (Fixtures)
+      before:  planted critical (2 located): critical x2
+               planted error    (5 located): critical x3, warning x2
+      after:   planted critical (2 located): critical x2
+               planted error    (5 located): critical x3, major x2 [we read as warning]
+
+    every fixture (AllFixtures)
+      before:  planted critical (3 located): critical x2, warning x1
+               planted error    (7 located): critical x4, warning x3
+      after:   planted critical (3 located): critical x2, major x1 [we read as warning]
+               planted error    (7 located): critical x4, major x3 [we read as warning]
+
+Printed both ways because the earlier version of this section did not, and that
+is the same error it corrects for the `precision` row thirty lines above: it
+quoted `critical x4, warning x3` as the "before" and the tuning corpus as the
+"after". Those are 15 fixtures against 8. The counts move — `7 located` to
+`5 located`, `x4/x3` to `x3/x2` — and a reader takes the movement for an effect
+of the fix. **Only the word changed.** Read down a column, not across.
+
+The `after` blocks are pinned by
+`TestIncumbentObjectiveSeverityOnTheShippedCache` rather than quoted from
+memory. Read them as the whole argument: one word covering plants of both
+`critical` and `error` is the resolution difference no mapping repairs, and
+`major` is a word with no counterpart among our five whose placement this corpus
+cannot check.
+
 The original mapping was not careless. It was written to stop Incumbent reading
 as *inflated*, since its `critical` spans what we split into `critical` and
 `error`. That diagnosis was right and the fix was wrong: mapping down trades an
@@ -78,16 +142,29 @@ Rule 6.
 
 ## Generalisation
 
-Incumbent on the 7 held-out fixtures, scored deterministically:
+Incumbent on the 7 held-out fixtures, scored deterministically — every figure
+below re-derives from the shipped cache and the fixtures, with no model and no
+network:
 
 | | tuning | held-out |
 |---|---|---|
 | detection | 7/8 (88%) | **3/6 (50%)** |
-| precision | 1.00 | **0.60** |
+| findings raised | 8 | 5 |
+| unexplained (`NOISE`) | 1 | **2** |
 
-It missed the contract break and the deleted authorization guard outright, and
-produced a false positive on `clean-sql-allowlist` — the fixture built
-specifically to tempt one.
+The `precision` row here read `1.00` against `0.60`. The held-out cell was the
+deterministic share of findings explaining a plant; the tuning cell was the
+*judge's* precision, and the deterministic reading of the same reviews is 0.88.
+One row, two instruments, and the difference between them read as a drop in
+Incumbent's precision. `NOISE` is a count of the same thing with nothing derived
+from it.
+
+It missed three of the six outright — the contract break, the deleted
+authorization guard, and the un-backed-off retry loop — and raised two findings
+explaining no plant, one of them on `clean-sql-allowlist`, the fixture built
+specifically to tempt a false positive. (This paragraph said "missed the contract
+break and the deleted authorization guard"; it named two of three misses, which
+made a 3/6 read like a 4/6.)
 
 The honest reading is **not** "Incumbent is weaker than it looked". The held-out
 corpus is harder by construction — its defect classes were chosen to be — and our

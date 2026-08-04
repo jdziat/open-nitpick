@@ -129,8 +129,19 @@ func (v *Validator) Validate(ctx context.Context, findings []Finding, code map[s
 
 	wg.Wait()
 
-	kept := make([]Finding, 0, len(findings))
-	var overruled []Overruled
+	return applyOutcomes(outcomes)
+}
+
+// applyOutcomes turns each expert's verdict into the finding that is published
+// and the record of what was overruled.
+//
+// Split from Validate so it can be tested without an expert model behind it:
+// what it decides is pure bookkeeping over the verdicts, and the one part of it
+// that is easy to get wrong — what a re-rating does to the severity's
+// provenance — had no test while it lived inside a function that needed a
+// network call to reach.
+func applyOutcomes(outcomes []outcome) (kept []Finding, overruled []Overruled) {
+	kept = make([]Finding, 0, len(outcomes))
 
 	for _, o := range outcomes {
 		switch {
@@ -148,6 +159,15 @@ func (v *Validator) Validate(ctx context.Context, findings []Finding, code map[s
 
 			revised := o.finding
 			revised.Severity = string(o.revised)
+
+			// The expert WROTE this level, so it is a reporter's own word again
+			// and any record of an earlier translation is now stale. Left in
+			// place, a review model's "P1" would keep travelling beside a
+			// severity the expert chose, and the eval report would quote the
+			// finding as saying "P1" while publishing the expert's warning.
+			revised.SeverityTranslated = false
+			revised.RawSeverity = ""
+
 			kept = append(kept, revised)
 
 		default:

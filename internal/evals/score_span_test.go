@@ -50,14 +50,19 @@ func TestAnchorSpanScoring(t *testing.T) {
 
 // TestSpanLengthMakesVaguenessVisible: scoring from the nearest edge means a
 // wide anchor can earn credit, so the width has to be reportable.
+//
+// The multi-region cases live in severity_test.go, untagged. This file is behind
+// the `eval` tag, so nothing here runs under `go test ./...` — which is how
+// anchoredLines shipped measuring the widest single region for three rounds with
+// the suite green.
 func TestSpanLengthMakesVaguenessVisible(t *testing.T) {
-	if got := spanLength(review.Finding{Line: 10}); got != 1 {
+	if got := anchoredLines(review.Finding{Line: 10}); got != 1 {
 		t.Errorf("single-line span = %d, want 1", got)
 	}
-	if got := spanLength(review.Finding{Line: 10, EndLine: 12}); got != 3 {
+	if got := anchoredLines(review.Finding{Line: 10, EndLine: 12}); got != 3 {
 		t.Errorf("10-12 span = %d, want 3", got)
 	}
-	if got := spanLength(review.Finding{Line: 10, EndLine: 4}); got != 1 {
+	if got := anchoredLines(review.Finding{Line: 10, EndLine: 4}); got != 1 {
 		t.Errorf("backwards span = %d, want 1", got)
 	}
 }
@@ -110,9 +115,11 @@ func TestAlsoAppliesIsScored(t *testing.T) {
 	if d := anchorDistance(f, 11); d == 0 {
 		t.Error("line 11 sits between the regions and must not read as inside one")
 	}
-	// Two tight regions are not one wide smear.
-	if got := spanLength(f); got != 4 {
-		t.Errorf("widest region = %d, want 4: 3-6 and 15-18 are both four lines, not a 16-line hull", got)
+	// Two tight regions are eight claimed lines, not a sixteen-line hull and not
+	// the four of the widest one.
+	if got := anchoredLines(f); got != 8 {
+		t.Errorf("anchored lines = %d, want 8: 3-6 and 15-18 claim eight lines between them, "+
+			"which is neither the 16-line hull nor the 4 of the widest single region", got)
 	}
 }
 

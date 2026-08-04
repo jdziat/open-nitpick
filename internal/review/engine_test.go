@@ -219,6 +219,101 @@ func TestReviewEndToEnd(t *testing.T) {
 	}
 }
 
+// TestRewritingAModelsSeverityRecordsTheModelsWord pins the provenance half of
+// severity normalization.
+//
+// THE BUG: normalizeSeverity returned only the level and threw the model's word
+// away. internal/evals then published a block captioned as each contender's own
+// severity vocabulary, and answered "was this translated?" from the finding's
+// SOURCE — so every model this project ships was reported as having printed the
+// word we had just written over it. The same defect had been found and fixed for
+// the incumbent, where a lost word at least prints "(word not recorded)"; here
+// the substitute was quoted silently as the model's own.
+//
+// Both directions are asserted, and the second is the one that keeps the fix
+// honest: a model writing a level we already use has NOT been translated, and
+// marking it as though it had would make every finding in the tree unquotable
+// and the flag meaningless.
+func TestRewritingAModelsSeverityRecordsTheModelsWord(t *testing.T) {
+	cases := map[string]struct {
+		said       string
+		want       string
+		translated bool
+	}{
+		"unrecognized vocabulary": {said: "P1", want: "info", translated: true},
+		"our word, wrong case":    {said: "Warning", want: "warning", translated: true},
+		"our own word":            {said: "warning", want: "warning", translated: false},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			out := mustJSON(t, Result{Findings: []Finding{
+				{Path: "app.go", Line: 4, Severity: tc.said, Title: "Ignored error from http.Get"},
+			}})
+
+			model := &scriptedLLM{fallback: out}
+			engine := newEngine(t, model, &stubProvider{diff: engineDiff}, func(c *config.Config) {
+				c.Review.MinSeverity = config.SeverityNit
+			})
+
+			report, err := engine.Review(context.Background(), vcs.Ref{})
+			if err != nil {
+				t.Fatalf("Review: %v", err)
+			}
+			if len(report.Findings) != 1 {
+				t.Fatalf("findings = %d, want 1: %+v", len(report.Findings), report.Findings)
+			}
+
+			f := report.Findings[0]
+			if f.Severity != tc.want {
+				t.Errorf("severity = %q, want %q", f.Severity, tc.want)
+			}
+			if f.SeverityTranslated != tc.translated {
+				t.Errorf("SeverityTranslated = %v, want %v for a model that said %q and was published "+
+					"at %q", f.SeverityTranslated, tc.translated, tc.said, f.Severity)
+			}
+
+			switch {
+			case tc.translated && f.RawSeverity != tc.said:
+				t.Errorf("RawSeverity = %q, want %q. The model's word was destroyed here, so every "+
+					"report downstream quotes it as having said %q — a word this package chose",
+					f.RawSeverity, tc.said, f.Severity)
+			case !tc.translated && f.RawSeverity != "":
+				t.Errorf("RawSeverity = %q for a finding nothing translated; Severity is already the "+
+					"model's own word and a second copy of it invents a distinction", f.RawSeverity)
+			}
+		})
+	}
+}
+
+// TestAnExpertRerateClearsTheEarlierTranslation: a re-rating is a fresh claim by
+// a reporter, so any record of an earlier translation is stale.
+//
+// Left in place, a review model's "P1" would keep travelling beside a severity
+// the EXPERT chose, and the eval report would quote the finding as saying "P1"
+// while publishing the expert's word.
+func TestAnExpertRerateClearsTheEarlierTranslation(t *testing.T) {
+	f := Finding{
+		Path: "app.go", Line: 4, Class: string(config.ClassCorrectness),
+		Severity: "info", SeverityTranslated: true, RawSeverity: "P1",
+		Title: "Ignored error",
+	}
+
+	kept, _ := applyOutcomes([]outcome{{finding: f, revised: config.SeverityWarning, expert: "go"}})
+
+	if len(kept) != 1 {
+		t.Fatalf("kept = %d, want 1", len(kept))
+	}
+	if kept[0].Severity != "warning" {
+		t.Fatalf("severity = %q, want warning", kept[0].Severity)
+	}
+	if kept[0].SeverityTranslated || kept[0].RawSeverity != "" {
+		t.Errorf("the re-rated finding still carries translated=%v raw=%q from before the expert "+
+			"rewrote it. The expert WROTE this level, so it is a reporter's own word again",
+			kept[0].SeverityTranslated, kept[0].RawSeverity)
+	}
+}
+
 func TestFindingsOutsideTheDiffAreDropped(t *testing.T) {
 	// Anchoring a comment to a line the change did not touch produces a
 	// comment on unrelated code, which the forge may reject outright.

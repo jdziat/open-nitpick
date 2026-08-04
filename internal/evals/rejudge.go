@@ -581,17 +581,27 @@ func sameFinding(a, b DumpRecord) bool {
 // be: the judge is shown one location per finding, so a secondary span changes
 // the scorer's recall arithmetic and not one character of the prompt. Source
 // and Triager are excluded for the same reason — the judge never sees them.
+//
+// The severity provenance IS restored, even though the judge never sees that
+// either. A rebuilt finding is scored as well as judged, and a finding that came
+// back claiming nobody had translated its severity would have OUR word published
+// as its reviewer's — which is exactly the substitution these two fields exist to
+// stop, arriving through the file that was written to prevent it. A record from a
+// dump predating them carries neither, and reads as an untranslated finding,
+// which is what it was recorded as.
 func findingFromRecord(r DumpRecord) review.Finding {
 	return review.Finding{
-		Path:       r.Path,
-		Line:       r.Line,
-		EndLine:    r.EndLine,
-		Severity:   r.Severity,
-		Category:   r.Category,
-		Class:      r.Class,
-		Title:      r.Title,
-		Rationale:  r.Rationale,
-		Suggestion: r.Suggestion,
+		Path:               r.Path,
+		Line:               r.Line,
+		EndLine:            r.EndLine,
+		Severity:           r.Severity,
+		SeverityTranslated: r.SeverityTranslated,
+		RawSeverity:        r.SeveritySaid,
+		Category:           r.Category,
+		Class:              r.Class,
+		Title:              r.Title,
+		Rationale:          r.Rationale,
+		Suggestion:         r.Suggestion,
 	}
 }
 

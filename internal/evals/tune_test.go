@@ -488,11 +488,11 @@ func TestJudgeModels(t *testing.T) {
 	}
 
 	wg.Wait()
-	reportJudgedModels(t, byModel, notes)
+	reportJudgedModels(t, opts.Fixtures, byModel, notes)
 }
 
 // reportJudgedModels prints the judged ranking.
-func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[string][]string) {
+func reportJudgedModels(t *testing.T, fixtures []Fixture, byModel map[string]*Aggregate, notes map[string][]string) {
 	t.Helper()
 
 	type row struct {
@@ -612,6 +612,42 @@ func reportJudgedModels(t *testing.T, byModel map[string]*Aggregate, notes map[s
 	}
 
 	t.Log(b.String())
+
+	// EVERY RATE IN THE TABLE ABOVE, AS THE COUNTS IT CAME FROM.
+	//
+	// The columns are rates because contenders are measured different numbers of
+	// times and raw sums are not comparable across that — but a rate hides its
+	// own resolution, and these denominators are single digits. PREC 0.74 and
+	// PREC 0.67 read as a difference until you are told they are 17/23 and 2/3,
+	// at which point the second is one comment away from 1.00 and the comparison
+	// is not one. The methodology gate called this the cheapest high-value item
+	// available to this harness and it is: the numbers were already here, and
+	// nothing printed them.
+	//
+	// Below rather than inside the row because the columns are fixed-width and a
+	// count pair outgrows its cell the moment a contender files a hundred
+	// findings — at which point the table silently misaligns, which is a defect
+	// this file has already had once.
+	var counts strings.Builder
+	counts.WriteString("DENOMINATORS — every rate above, as the counts it was computed from:\n")
+	for _, r := range rows {
+		a := r.agg
+		// The objective-severity counts come from the gated renderer, not from
+		// the fields. A foreign contender's triple is withdrawn in the table, and
+		// printing it here would restore the comparison the cells refused.
+		fmt.Fprintf(&counts,
+			"  %-36s samples %d over %d fixture(s) | PREC %d/%d worth raising | judge called %d "+
+				"inflated and %d understated of %d findings | %s | MISSED %d | GRADE mean of %d\n",
+			truncate(r.model, 36), len(a.Grades), a.Coverage(),
+			a.WorthRaising, a.Findings,
+			a.Inflated, a.Understated, a.Findings,
+			a.ObjectiveSeverityCounts(r.model),
+			a.Missed, len(a.Grades))
+	}
+	t.Log(counts.String())
+
+	t.Log(CorpusResolution(fixtures))
+	t.Log(RateLegend)
 	t.Log(SeverityColumnLegend)
 
 	vocab := make([]VocabularyRow, 0, len(rows))
@@ -893,7 +929,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 	}
 
 	wg.Wait()
-	reportJudgedModels(t, byName, notes)
+	reportJudgedModels(t, opts.Fixtures, byName, notes)
 }
 
 // TestCollectIncumbent gathers Incumbent's reviews one fixture at a time,

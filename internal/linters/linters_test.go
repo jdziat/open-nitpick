@@ -195,6 +195,55 @@ func TestFindingsAreAttributedToTheirLinter(t *testing.T) {
 	}
 }
 
+// TestALinterFindingNeverClaimsOurSeverityAsItsOwn pins the provenance of a
+// severity nobody but this package chose.
+//
+// mapSeverity collapses four analyzers' vocabularies onto three of our levels —
+// "HIGH", "ERROR" and "CRITICAL" all land on error — and ruff publishes no
+// severity at all, so the level on a linter finding is never the analyzer's own
+// spelling. Nothing recorded that, and internal/evals answered "was this
+// translated?" from the reporter's identity, so a report captioned as each
+// contender's severity vocabulary would quote gosec as having printed a word
+// gosec never used.
+func TestALinterFindingNeverClaimsOurSeverityAsItsOwn(t *testing.T) {
+	cfg := baseConfig()
+
+	set := New(".", cfg, nil)
+	set.runners = []Runner{&fakeRunner{name: "gosec", detected: true, findings: []Finding{
+		{Path: "app.go", Line: 1, Rule: "G404", Message: "weak rng",
+			Severity: mapSeverity("HIGH"), RawSeverity: "HIGH"},
+		// ruff's shape: no severity published, so this package chose one and
+		// there is no word to quote.
+		{Path: "app.go", Line: 2, Rule: "E501", Message: "line too long",
+			Severity: config.SeverityWarning},
+	}}}
+
+	got, err := set.Run(context.Background(), parse(t, changedDiff))
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("findings = %d, want 2", len(got))
+	}
+
+	for _, f := range got {
+		if !f.SeverityTranslated {
+			t.Errorf("%s:%d is published at %q and does not record that the level is ours. Every "+
+				"path through this package either maps the analyzer's word or invents one",
+				f.Path, f.Line, f.Severity)
+		}
+	}
+
+	if got[0].RawSeverity != "HIGH" {
+		t.Errorf("RawSeverity = %q, want %q: mapSeverity folds HIGH, ERROR and CRITICAL onto one "+
+			"level, so the analyzer's word cannot be recovered from ours", got[0].RawSeverity, "HIGH")
+	}
+	if got[1].RawSeverity != "" {
+		t.Errorf("RawSeverity = %q for an analyzer that published no severity; there is no word to "+
+			"quote and inventing one is the substitution this field exists to stop", got[1].RawSeverity)
+	}
+}
+
 func TestUnknownSeverityBecomesWarning(t *testing.T) {
 	// An unrecognized analyzer severity must not be able to trip the gate.
 	cfg := baseConfig()
