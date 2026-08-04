@@ -1,0 +1,20 @@
+{
+  "fixture": "ts-unawaited-async",
+  "findings": [
+    {
+      "path": "src/sync.ts",
+      "line": 10,
+      "end_line": 12,
+      "severity": "error",
+      "category": "Functional Correctness",
+      "class": "correctness",
+      "title": "Await every save call and propagate failures.",
+      "rationale": "forEach does not await asynchronous callbacks. Therefore, saveAll resolves before the saves complete, and a rejected save promise does not reject saveAll. Preserve the previous sequential behavior with an awaited loop.\n\nProposed fix\n\n-  items.forEach(async (item) =\u003e { -    await save(item); -  }); +  for (const item of items) { +    await save(item); +  }",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-03T22:05:39Z",
+  "mode": "plaintext",
+  "fingerprint": "0bb92eabf458b445e319d42cd965bfbf1b24eae3bc866b21b0f2b3196cbd02e8",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3238427103\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  critical [Functional Correctness]\n  → src/sync.ts:10-12\n\n  Await every save call and propagate failures.\n\n  forEach does not await asynchronous callbacks. Therefore, saveAll\n  resolves before the saves complete, and a rejected save promise does not\n  reject saveAll. Preserve the previous sequential behavior with an\n  awaited loop.\n\n\n  Proposed fix\n\n  -  items.forEach(async (item) =\u003e {\n  -    await save(item);\n  -  });\n  +  for (const item of items) {\n  +    await save(item);\n  +  }\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nCritical 1\n\n1 file reviewed:\n- src/sync.ts\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nWriting review comments... 14s elapsed\n"
+}

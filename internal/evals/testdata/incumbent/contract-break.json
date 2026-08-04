@@ -1,0 +1,8 @@
+{
+  "fixture": "contract-break",
+  "findings": null,
+  "at": "2026-08-03T22:03:44Z",
+  "mode": "plaintext",
+  "fingerprint": "c5ac7e448b2d962d78734356c8da3e4b9454f5165bf61f487213ff9a3aa16b27",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2653101503\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n- event.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 6s elapsed\nWriting review comments... 12s elapsed\n"
+}

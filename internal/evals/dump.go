@@ -22,11 +22,14 @@ const EnvDump = "NITPICK_EVAL_DUMP"
 // number in the reports.
 //
 // One line per finding rather than per sample, because this file is read by a
-// program that groups and filters rather than by a human who scrolls. The
-// consequence is that a sample whose reviewer said nothing contributes no
-// lines: misses live in the judge's `missed` list and in Score.Detected, not
-// here. A finding credited with reporting two planted defects gets one line per
-// defect, so grouping by defect_why counts each located defect once.
+// program that groups and filters rather than by a human who scrolls. A finding
+// credited with reporting two planted defects gets one line per defect, so
+// grouping by defect_why counts each located defect once.
+//
+// A sample whose reviewer said nothing writes one Silent line, not zero lines.
+// Misses still live in the judge's `missed` list and in Score.Detected rather
+// than here — what the marker records is that the sample was RUN, which is the
+// one thing a reader cannot infer from an absence.
 type DumpRecord struct {
 	Model   string `json:"model"`
 	Fixture string `json:"fixture"`
@@ -52,16 +55,72 @@ type DumpRecord struct {
 	Variant string `json:"variant,omitempty"`
 
 	// Index is the finding's position in the list submitted to the judge, which
-	// is what Verdict.Index refers to.
+	// is what Verdict.Index refers to. It is -1 on a Silent record, because -1
+	// is not a position: any reader that treats records as findings by position
+	// fails on it rather than inserting a blank finding at 0.
 	Index int `json:"index"`
 
-	Path      string `json:"path"`
-	Line      int    `json:"line"`
-	EndLine   int    `json:"end_line,omitempty"`
-	Severity  string `json:"severity"`
-	Class     string `json:"class"`
-	Title     string `json:"title"`
-	Rationale string `json:"rationale,omitempty"`
+	// Silent marks a review that reported NOTHING.
+	//
+	// Such a review used to write no lines at all, which made it indomitably
+	// ambiguous: a contender that stayed correctly silent on a clean fixture
+	// and a contender that was never given that fixture are the same absence.
+	// GroupDump had to guess the matrix back from the records present, and
+	// guessed wrong in both directions — it invented groups for corpora a
+	// contender never reviewed, and lost whole runs a contender was silent
+	// through. One marker line ends the guessing.
+	Silent bool `json:"silent,omitempty"`
+
+	// Findings is how many findings the judged list held, so a reconstruction
+	// can tell a COMPLETE list from a truncated one.
+	//
+	// Without it a dump whose last line was lost — a killed run, a `head -n`,
+	// a filter — rebuilds SHORT and silently, because the length was inferred
+	// from the largest index present. A hole in the middle was refused and a
+	// hole at the end was not, which is the worse of the two: the re-judged
+	// review is shorter than the one the recorded verdicts were made against.
+	Findings int `json:"findings,omitempty"`
+
+	// Verdicts is how many verdicts the judge returned for the whole sample,
+	// which is NOT recoverable from the lines themselves.
+	//
+	// This file attaches at most one verdict per finding position, so a judge
+	// that answered index 0 twice, or answered an index that has no finding,
+	// loses verdicts here that the published tables counted. Recording the raw
+	// count lets a reader see that the reconstruction is lossy instead of
+	// reporting the loss as the ORIGINAL judge having said too little.
+	Verdicts int `json:"verdicts,omitempty"`
+
+	// FixtureHash pins the source the reviewer actually read.
+	//
+	// A dump names its fixture and nothing else, and the fixtures are Go source
+	// that gets edited. Re-judging resolves the name against the CURRENT
+	// corpus, so an edit to a fixture's Head between the benchmark and the
+	// re-judge changes the prompt as well as the judge — reintroducing, through
+	// the corpus, the exact confound re-judging exists to remove. The name
+	// surviving is not evidence the change did.
+	FixtureHash string `json:"fixture_hash,omitempty"`
+
+	Path     string `json:"path"`
+	Line     int    `json:"line"`
+	EndLine  int    `json:"end_line,omitempty"`
+	Severity string `json:"severity"`
+	Class    string `json:"class"`
+
+	// Category and Suggestion are scored by nothing and recorded anyway,
+	// because judgeRequest SHOWS both to the judge.
+	//
+	// Re-judging a recorded finding has to rebuild the prompt the first judge
+	// saw. A reconstruction missing two rendered fields measures those missing
+	// fields as well as the change of judge, which is the exact confound the
+	// re-judge path exists to remove. A dump written before these fields
+	// existed carries neither, and RejudgeReport says so rather than quietly
+	// comparing a judge against a shorter prompt.
+	Category string `json:"category,omitempty"`
+
+	Title      string `json:"title"`
+	Rationale  string `json:"rationale,omitempty"`
+	Suggestion string `json:"suggestion,omitempty"`
 
 	// Verdict is the judge's assessment, absent when the judge returned none
 	// for this index. Absent is not "the judge approved it" — a judge that
@@ -174,25 +233,51 @@ func (d *Dump) Record(s DumpSample) error {
 
 	heldOut := HeldOut(s.Fixture.Name)
 
+	var rawVerdicts int
+	if s.Judged != nil {
+		rawVerdicts = len(s.Judged.Verdicts)
+	}
+
+	// The per-sample fields, identical on every line the sample writes. They are
+	// repeated rather than emitted once because this file is JSON Lines: a
+	// reader that filters it with grep or jq keeps whole lines, and a header
+	// record would not survive the filtering the format exists to allow.
+	sample := DumpRecord{
+		Model:       s.Model,
+		Fixture:     s.Fixture.Name,
+		HeldOut:     heldOut,
+		Run:         s.Run,
+		Variant:     s.Variant,
+		Findings:    len(s.Findings),
+		Verdicts:    rawVerdicts,
+		FixtureHash: fixtureFingerprint(s.Fixture),
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	// A review that said nothing writes ONE line rather than none. Silence is a
+	// result — it is the correct answer on a clean fixture — and recording it as
+	// an absence made it indistinguishable from a sample that was never run.
+	if len(s.Findings) == 0 {
+		rec := sample
+		rec.Index = -1
+		rec.Silent = true
+		return d.enc.Encode(rec)
+	}
+
 	for i, f := range s.Findings {
-		rec := DumpRecord{
-			Model:     s.Model,
-			Fixture:   s.Fixture.Name,
-			HeldOut:   heldOut,
-			Run:       s.Run,
-			Variant:   s.Variant,
-			Index:     i,
-			Path:      f.Path,
-			Line:      f.Line,
-			EndLine:   f.EndLine,
-			Severity:  f.Severity,
-			Class:     f.Class,
-			Title:     f.Title,
-			Rationale: f.Rationale,
-		}
+		rec := sample
+		rec.Index = i
+		rec.Path = f.Path
+		rec.Line = f.Line
+		rec.EndLine = f.EndLine
+		rec.Severity = f.Severity
+		rec.Class = f.Class
+		rec.Category = f.Category
+		rec.Title = f.Title
+		rec.Rationale = f.Rationale
+		rec.Suggestion = f.Suggestion
 
 		if v, ok := byIndex[i]; ok {
 			rec.Verdict = &v

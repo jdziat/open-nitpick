@@ -475,3 +475,55 @@ func readDump(t *testing.T, path string) []DumpRecord {
 
 	return out
 }
+
+// TestDumpRecordsSilenceAsAResult pins that a review with no findings writes a
+// line.
+//
+// It used to write none, which made silence indistinguishable from a sample
+// that was never run: a reader had to guess the (contender, fixture, run)
+// matrix back from the records present, and the guess was wrong in both
+// directions — it invented samples for corpora a contender never reviewed, and
+// lost whole runs a contender was silent through. Silence on a clean fixture is
+// the CORRECT answer, so it is the one result the file must not omit.
+func TestDumpRecordsSilenceAsAResult(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dump.jsonl")
+
+	dump, err := NewDump(path)
+	if err != nil {
+		t.Fatalf("new dump: %v", err)
+	}
+	if err := dump.Record(DumpSample{
+		Model: "nitpick/test-model", Run: 1, Fixture: severityFixture(),
+		Judged: &JudgeResult{Grade: "A"},
+	}); err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	if err := dump.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	records := readDump(t, path)
+	if len(records) != 1 {
+		t.Fatalf("a silent review wrote %d record(s), want exactly 1", len(records))
+	}
+
+	rec := records[0]
+	if !rec.Silent {
+		t.Error("the record is not marked silent, so a reader cannot tell it from a finding")
+	}
+	if rec.Index != -1 {
+		t.Errorf("silent record has index %d: it must not be a POSITION, or a reader rebuilding a "+
+			"finding list by position inserts a blank finding at that index", rec.Index)
+	}
+	if rec.Findings != 0 || rec.Title != "" || rec.Path != "" {
+		t.Errorf("the silent record carries finding fields: %+v", rec)
+	}
+	if rec.Model != "nitpick/test-model" || rec.Fixture != "hand-built" || rec.Run != 1 {
+		t.Errorf("the silent record does not identify its sample, so it cannot fill the hole it "+
+			"exists to fill: %+v", rec)
+	}
+	if rec.FixtureHash == "" {
+		t.Error("the silent record carries no fixture hash, so a re-judge of it cannot tell whether " +
+			"the change it was silent about is still the same change")
+	}
+}

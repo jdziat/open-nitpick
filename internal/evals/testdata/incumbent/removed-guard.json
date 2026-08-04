@@ -1,0 +1,8 @@
+{
+  "fixture": "removed-guard",
+  "findings": null,
+  "at": "2026-08-03T22:09:18Z",
+  "mode": "plaintext",
+  "fingerprint": "de1af1a33d3a0275ddb76079fab4de754395a68156c365d5b022ba0a54cae2e9",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-923164187\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n- project.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 3s elapsed\nPreparing sandbox... 4s elapsed\nSummarizing changes... 7s elapsed\nWriting review comments... 13s elapsed\n"
+}

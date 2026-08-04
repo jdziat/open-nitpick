@@ -1,0 +1,20 @@
+{
+  "fixture": "clean-sql-allowlist",
+  "findings": [
+    {
+      "path": "query.go",
+      "line": 24,
+      "end_line": 34,
+      "severity": "warning",
+      "category": "Performance \u0026 Scalability",
+      "class": "security",
+      "title": "Validate and cap limit before the query.",
+      "rationale": "Parameterization prevents SQL injection. It does not prevent a caller from requesting all users with a very large limit. Reject non-positive limits and enforce the maximum page size from the API contract before s.db.Query.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-03T22:08:16Z",
+  "mode": "plaintext",
+  "fingerprint": "c66c0224042119841f333a57056c301a708738a02c36b4d50ff295a65e6bc0c6",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2581691748\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Performance \u0026 Scalability]\n  → query.go:24-34\n\n  Validate and cap limit before the query.\n\n  Parameterization prevents SQL injection. It does not prevent a caller from\n  requesting all users with a very large limit. Reject non-positive limits\n  and enforce the maximum page size from the API contract before\n  s.db.Query.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n- query.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 5s elapsed\nWriting review comments... 12s elapsed\n"
+}

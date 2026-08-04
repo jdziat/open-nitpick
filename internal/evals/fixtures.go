@@ -34,13 +34,54 @@ type Defect struct {
 	// findings rather than with a list of words.
 	Keywords []string
 
+	// Class is the closest class in the shipped taxonomy.
+	//
+	// It exists so severity consistency can be checked mechanically: two plants
+	// of the same class must agree about WantSeverity or say why they do not.
+	// The security class is why. It holds five plants across two levels, and
+	// which level each one gets turns on a distinction — whether the untrusted
+	// source is IN the diff or only in Defect.Why, which the reviewer never
+	// sees — that no reader would reconstruct from the severities alone.
+	// Unwritten, that distinction is indistinguishable from drift, and a plant
+	// can then be moved in whichever direction the week's numbers want.
+	//
+	// It is NOT ground truth for a model's class assignment and nothing scores
+	// against it. capacity-hint-nit is why: the closed set has no home for an
+	// allocation that is merely unnecessary, so `resource` there is the
+	// least-wrong box rather than a correct answer, and grading a model against
+	// it would be grading it against a gap in the taxonomy.
+	//
+	// It is also author-declared and unverified, so it cannot be the only guard
+	// on a severity: an editor moving a plant's level can move its class to
+	// match and silence the consistency check. TestPlantedSeveritiesArePinned
+	// is the guard that does not depend on it.
+	Class config.Class
+
 	// WantSeverity is the severity a correct reviewer should assign — a TARGET,
 	// not a floor. Rating a defect above it counts as inflation and below it as
 	// understatement (see severityVerdict), because over-claiming is one of the
 	// two failures the severity columns exist to tune away and "at least the
 	// floor" cannot see it. Author fixtures to the level a senior reviewer would
 	// actually pick, not to the lowest defensible one.
+	//
+	// Author it against the anchors in internal/prompt/templates/review.md,
+	// which is the definition the model is actually given. A plant that
+	// disagrees with the published anchor does not measure the reviewer; it
+	// penalises the reviewer for obeying its instructions.
 	WantSeverity config.Severity
+
+	// SeverityNote is why this plant's WantSeverity departs from others of its
+	// Class. TestSeverityIsConsistentWithinADefectClass requires one from EVERY
+	// member of a class carrying more than one severity: with two plants
+	// disagreeing there is no fact about which is the outlier, and letting a
+	// single note excuse a whole class would reopen the hole this closes.
+	//
+	// It must NAME the level it is defending, in words. A note that only
+	// explains a defect goes stale the moment the level moves and then reads as
+	// a justification for a number it never justified — which is worse than no
+	// note, because the next editor trusts it. Naming the level makes the test
+	// able to catch that, and it is the only part of a note a test can check.
+	SeverityNote string
 
 	// Why documents the defect for whoever reads a failing eval report.
 	Why string
@@ -197,7 +238,16 @@ func Events() []Event { return nil }
 			// "created_at" was on this list and defeated the whole distinction:
 			// it is the REMOVED line, so every style objection to the retag
 			// quotes it and scored as detection.
-			Keywords:     []string{"breaking", "backward", "compatib", "wire format", "existing client", "consumer", "api contract", "decode a zero", "already deployed"},
+			Keywords: []string{"breaking", "backward", "compatib", "wire format", "existing client", "consumer", "api contract", "decode a zero", "already deployed"},
+			Class:    config.ClassContract,
+			// error, not critical. The demonstrated consequence is a zero
+			// timestamp — "incorrect behavior on a reachable path" — not data
+			// loss, not a breach, and not a failure that is guaranteed:
+			// consumers keep serving, wrongly. Calibration rule 2 takes the
+			// lower level. It is the only plant of its class, so no note is
+			// owed and TestSeverityIsConsistentWithinADefectClass has nothing to
+			// compare it against; TestPlantedSeveritiesArePinned is what keeps
+			// it from moving unremarked.
 			WantSeverity: config.SeverityError,
 			Why:          "created_at is renamed to createdAt on a public payload, so every existing consumer silently decodes a zero timestamp",
 		}},
@@ -248,6 +298,9 @@ COMMIT;
 				"where clause", "missing where", "without a where", "unconditional",
 				"data loss", "overwrite", "every account", "every row", "all rows", "destroy",
 			},
+			Class: config.ClassDataLoss,
+			// "data loss", the critical anchor's first clause, verbatim: the old
+			// plan values are gone once the transaction commits.
 			WantSeverity: config.SeverityCritical,
 			Why:          "the UPDATE has no WHERE, so it overwrites the plan of every account rather than only the NULL rows the comment describes",
 		}},
@@ -317,6 +370,7 @@ export async function saveAll(items: Item[], save: Save): Promise<void> {
 				"discards the promise", "ignores the returned promise",
 				"resolves before", "returns before", "does not wait",
 			},
+			Class:        config.ClassCorrectness,
 			WantSeverity: config.SeverityError,
 			Why:          "forEach discards the promise each async callback returns, so saveAll resolves before any item is stored and save's errors are never surfaced",
 		}},
@@ -372,7 +426,10 @@ func StartOfDay(t time.Time) time.Time {
 			// Nor "location", for the same reason it looked safe: the word is
 			// already in the file's own unchanged doc comment, so "say which
 			// location the result carries" — a documentation nit — matched.
-			Keywords:     []string{"utc", "timezone", "time zone", "local midnight", "dst", "daylight", "zone offset", "wrong day"},
+			Keywords: []string{"utc", "timezone", "time zone", "local midnight", "dst", "daylight", "zone offset", "wrong day"},
+			Class:    config.ClassCorrectness,
+			// The error anchor's own worked example is "comparing timestamps
+			// from two different timezones", which is this defect exactly.
 			WantSeverity: config.SeverityError,
 			Why:          "Truncate rounds relative to the zero time in UTC, so StartOfDay returns UTC midnight rather than midnight in t's location",
 		}},
@@ -556,15 +613,21 @@ func (s *Service) DeleteProject(ctx context.Context, callerID, projectID string)
 			// remaining "ownership" is a word only a reviewer reasoning about
 			// the CHECK reaches for.
 			Keywords:     []string{"authoriz", "access control", "ownership", "idor", "permission", "privilege", "any caller", "delete any", "anyone can"},
+			Class:        config.ClassSecurity,
 			WantSeverity: config.SeverityCritical,
-			Why:          "the ownership check was deleted, so any authenticated caller can delete any project by id",
+			SeverityNote: "critical under \"a security breach\", above the two injection plants, because the " +
+				"breach is visible in the diff rather than asserted about a caller: the REMOVED lines are " +
+				"the ownership check itself, so the change demonstrates that any authenticated caller " +
+				"now deletes any project. Calibration rule 1 confirms it rather than lowering it — the " +
+				"caller ends up destroying projects it never had any access to.",
+			Why: "the ownership check was deleted, so any authenticated caller can delete any project by id",
 		}},
 	}
 }
 
 // retryNoBackoffFixture adds a retry loop that fires attempts back to back.
 //
-// Every other plant in both corpora is error or critical, which leaves the
+// Every other plant in this corpus is error or critical, which leaves the
 // severity measurement one-sided: understatement is observable everywhere and
 // inflation almost nowhere. This one is a genuine defect that a senior reviewer
 // raises at WARNING and not above — five immediate retries turn one client's
@@ -621,8 +684,15 @@ def fetch(url):
 				"backoff", "back off", "back-off", "sleep", "jitter",
 				"thundering herd", "hammer", "delay between", "no delay", "without waiting",
 			},
+			// Classed by what is consumed — a struggling dependency's capacity.
+			// The closed set has no "resilience", so this is the nearest box
+			// rather than a snug one.
+			Class:        config.ClassResource,
 			WantSeverity: config.SeverityWarning,
-			Why:          "the retries fire immediately one after another, so a failing dependency is hit five times per call with no backoff",
+			SeverityNote: "warning under \"a genuine hazard under plausible conditions\", between the error-level " +
+				"descriptor leak and the nit-level capacity hint that share its class: the retry itself is " +
+				"correct, nothing is yet wrong on a normal path, and the amplification is bounded at five.",
+			Why: "the retries fire immediately one after another, so a failing dependency is hit five times per call with no backoff",
 		}},
 	}
 }
@@ -692,13 +762,20 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 				Path:         "handler.go",
 				Line:         19,
 				Keywords:     []string{"path traversal", "traversal", "sanitiz", "arbitrary", "../", "untrusted", "user-controlled path"},
+				Class:        config.ClassSecurity,
 				WantSeverity: config.SeverityCritical,
-				Why:          "the query parameter is concatenated into a filesystem path, so ../ escapes the upload directory",
+				SeverityNote: "critical under \"a security breach\", above the two injection plants, and the " +
+					"difference is what the diff shows. Head line 12 is r.URL.Query().Get(\"name\"), so the " +
+					"untrusted source, the sink, and the path between them are all in front of the " +
+					"reviewer; a crafted name writes outside /var/uploads, which is access the caller " +
+					"did not have. go-sql-injection and python-command-injection show only the sink.",
+				Why: "the query parameter is concatenated into a filesystem path, so ../ escapes the upload directory",
 			},
 			{
 				Path:         "handler.go",
 				Line:         25,
 				Keywords:     []string{"race", "data race", "mutex", "unsynchron", "concurrent", "atomic"},
+				Class:        config.ClassConcurrency,
 				WantSeverity: config.SeverityError,
 				Why:          "h.count is incremented from a goroutine with no synchronization despite the struct carrying a mutex",
 			},
@@ -706,8 +783,15 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 				Path:         "handler.go",
 				Line:         19,
 				Keywords:     []string{"close", "leak", "file descriptor", "not closed", "defer"},
+				Class:        config.ClassResource,
 				WantSeverity: config.SeverityError,
-				Why:          "the created file is never closed, leaking a descriptor on every request",
+				SeverityNote: "error under \"a real bug that produces incorrect behavior on a reachable path\": " +
+					"the leak is on the NORMAL path, not a hazardous one — every successful upload loses a " +
+					"descriptor, with no condition to be met and no bound on the total. That is what " +
+					"separates it from retry-no-backoff, a warning because it is \"a genuine hazard under " +
+					"plausible conditions\" that has not gone wrong yet, and from capacity-hint-nit, whose " +
+					"one reallocation is the anchor's own nit example.",
+				Why: "the created file is never closed, leaking a descriptor on every request",
 			},
 		},
 	}
@@ -768,11 +852,20 @@ func MovingAverage(samples []float64, n int) []float64 {
 `,
 		},
 		Defects: []Defect{{
-			Path:         "window.go",
-			Line:         17,
-			Keywords:     []string{"capacity", "len(samples)-n+1", "reallocat"},
+			Path:     "window.go",
+			Line:     17,
+			Keywords: []string{"capacity", "len(samples)-n+1", "reallocat"},
+			// `resource` is the least-wrong box, not a correct answer: the class
+			// means "leaks and unbounded growth" and this is a single bounded
+			// reallocation. The closed set has no home for an allocation that is
+			// merely unnecessary, which is exactly why nothing scores a model
+			// against Class.
+			Class:        config.ClassResource,
 			WantSeverity: config.SeverityNit,
-			Why:          "the loop bound is correct, but make() reserves capacity len(samples)-n for len(samples)-n+1 appends, forcing one reallocation",
+			SeverityNote: "nit under the anchor's own nit example, \"an unnecessary intermediate copy\" — a " +
+				"reallocation is exactly that — while the descriptor leak it shares a class with is an error. " +
+				"Nothing here produces a wrong result, so no higher clause applies.",
+			Why: "the loop bound is correct, but make() reserves capacity len(samples)-n for len(samples)-n+1 appends, forcing one reallocation",
 		}},
 	}
 }
@@ -817,9 +910,14 @@ func Fetch(url string) (int, error) {
 `,
 		},
 		Defects: []Defect{{
-			Path:         "fetch.go",
-			Line:         10, // resp, _ := http.Get(url)
-			Keywords:     []string{"nil", "panic", "ignored error", "unchecked", "discard", "error return", "dereference"},
+			Path:     "fetch.go",
+			Line:     10, // resp, _ := http.Get(url)
+			Keywords: []string{"nil", "panic", "ignored error", "unchecked", "discard", "error return", "dereference"},
+			Class:    config.ClassCorrectness,
+			// error, not critical: the panic needs http.Get to fail first, so
+			// it is not the "guaranteed production failure" the critical anchor
+			// describes, and calibration rule 2 — when torn, take the lower —
+			// settles what is left. A crash is not automatically critical here.
 			WantSeverity: config.SeverityError,
 			Why:          "http.Get's error is discarded; on failure resp is nil and the deferred Close panics",
 		}},
@@ -869,8 +967,17 @@ func (s *Store) SearchUsers(name string) (*sql.Rows, error) {
 			Path:         "store.go",
 			Line:         17, // the Sprintf query
 			Keywords:     []string{"sql injection", "injection", "parameteri", "placeholder", "sanitiz", "untrusted input", "concatenat"},
+			Class:        config.ClassSecurity,
 			WantSeverity: config.SeverityError,
-			Why:          "user-controlled name is interpolated into SQL instead of being passed as a parameter",
+			SeverityNote: "error, below the security class's three criticals, because the diff does not show " +
+				"who calls SearchUsers: Head is the bare method and there is no Base caller and no Extra. " +
+				"That `name` is user-controlled is asserted by this Why field, which the reviewer never " +
+				"sees, and review.md tells it \"Do not speculate about code you were not shown\". What the " +
+				"change demonstrates is \"a real bug that produces incorrect behavior on a reachable path\" " +
+				"— a quoted name breaks the query — and calibration rule 2, when torn take the lower, " +
+				"settles the rest. multi-defect's traversal is critical because its Head contains " +
+				"r.URL.Query().Get(\"name\"): the untrusted source is IN the diff there and is not here.",
+			Why: "user-controlled name is interpolated into SQL instead of being passed as a parameter",
 		}},
 	}
 }
@@ -910,8 +1017,15 @@ func APIKey() string {
 			Path:         "client.go",
 			Line:         12, // the literal key
 			Keywords:     []string{"hardcod", "secret", "credential", "api key", "committed", "source control", "rotate"},
+			Class:        config.ClassSecurity,
 			WantSeverity: config.SeverityCritical,
-			Why:          "a live-format credential is committed to source",
+			SeverityNote: "critical under \"a security breach\", above the two injection plants, because the " +
+				"breach needs no caller at all: the ADDED line is the credential, so committing it IS " +
+				"the exposure and the diff demonstrates it whole. It survives calibration rule 1 — " +
+				"repository read access is not the access this key grants, so whoever reads the line " +
+				"gains something they did not have. The `sk-live` prefix is the evidence; the comment " +
+				"above it calling the value a staging key is the claim under review, not a finding.",
+			Why: "a live-format credential is committed to source",
 		}},
 	}
 }
@@ -957,8 +1071,14 @@ def archive(name):
 			// subprocess.run(check=True) — was credited with finding the
 			// command injection and then graded for its severity.
 			Keywords:     []string{"command injection", "injection", "shell", "untrusted", "sanitiz", "arbitrary command", "metacharacter"},
+			Class:        config.ClassSecurity,
 			WantSeverity: config.SeverityError,
-			Why:          "name is concatenated into a shell command, so a crafted value runs arbitrary commands",
+			SeverityNote: "error, on the same reading as go-sql-injection: archive() is a bare module " +
+				"function, Extra is a pyproject.toml, and nothing in the diff shows `name` arriving from " +
+				"outside. The demonstrated consequence is a broken command on a reachable path, which is " +
+				"the error anchor; \"a security breach\" needs an untrusted source the reviewer was not " +
+				"shown. Calibration rule 2 takes the lower of the two.",
+			Why: "name is concatenated into a shell command, so a crafted value runs arbitrary commands",
 		}},
 	}
 }

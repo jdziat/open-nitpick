@@ -162,6 +162,14 @@ type SeverityCall struct {
 // prompt tuned to reduce inflation against a scorer that cannot see
 // under-claiming optimizes toward saying less and calls it progress.
 //
+// Those two forced understatements are the price of comparing across two
+// vocabularies, and they are the reason a plant must not be raised to
+// `critical` casually: crSeverity has no branch that returns it, so every such
+// plant is one Incumbent cannot score accurate on and cannot be caught
+// inflating. Raising one moves O-ACC and O-UNDER with no change whatever in
+// Incumbent's output. TestIncumbentCannotExpressCritical pins the count so
+// the number in this comment and the corpus cannot drift apart.
+//
 // WantSeverity is the TARGET, not a floor: over-claiming above the planted
 // level is precisely the failure being tuned away, so it is counted rather than
 // tolerated. Defect.WantSeverity documents the same contract, and the two must

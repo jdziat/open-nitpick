@@ -735,13 +735,20 @@ func IsRateLimited(err error) bool {
 		strings.Contains(strings.ToLower(err.Error()), "rate limit")
 }
 
-// crFingerprint hashes the exact source a fixture puts in front of a reviewer,
-// so a cached review can be matched to the code it actually read.
+// fixtureFingerprint hashes the exact source a fixture puts in front of a
+// reviewer, so a recorded review can be matched to the code it actually read.
+//
+// Two callers, one question. The Incumbent cache asks it to avoid replaying a
+// review of code that has since changed; DumpRecord asks it so a re-judge can
+// refuse a dump whose fixture was edited between the benchmark and the
+// re-judge. Both are the same failure — a verdict compared against a prompt
+// nobody made it against — so both read the same hash rather than two that can
+// drift.
 //
 // Defects are deliberately excluded: they are the ground truth the judge scores
 // AGAINST, not input to the reviewer, and folding them in would discard a still
 // valid review every time a defect's wording was edited.
-func crFingerprint(f Fixture) string {
+func fixtureFingerprint(f Fixture) string {
 	h := sha256.New()
 
 	for _, files := range []map[string]string{f.Base, f.Head, f.Extra} {
@@ -778,7 +785,7 @@ func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, false
 	}
-	if c.Mode != crReviewMode || c.Fingerprint != crFingerprint(f) {
+	if c.Mode != crReviewMode || c.Fingerprint != fixtureFingerprint(f) {
 		return nil, false
 	}
 	return c.Findings, true
@@ -842,7 +849,7 @@ func CollectIncumbent(
 				Findings:    findings,
 				At:          time.Now().UTC().Format(time.RFC3339),
 				Mode:        crReviewMode,
-				Fingerprint: crFingerprint(f),
+				Fingerprint: fixtureFingerprint(f),
 				Raw:         raw,
 			}, "", "  ")
 			if werr := os.WriteFile(filepath.Join(cacheDir, f.Name+".json"), blob, 0o644); werr != nil {

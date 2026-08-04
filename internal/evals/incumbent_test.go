@@ -739,12 +739,12 @@ func TestCacheIsRejectedWhenItMeasuredSomethingElse(t *testing.T) {
 
 	findings := []review.Finding{{Path: "a.go", Line: 1, Title: "cached"}}
 
-	write(t, crCache{Fixture: fx.Name, Findings: findings, Mode: crReviewMode, Fingerprint: crFingerprint(fx)})
+	write(t, crCache{Fixture: fx.Name, Findings: findings, Mode: crReviewMode, Fingerprint: fixtureFingerprint(fx)})
 	if got, ok := CachedIncumbent(dir, fx); !ok || len(got) != 1 {
 		t.Fatalf("a cache matching the fixture and the mode must load: ok=%v got=%+v", ok, got)
 	}
 
-	write(t, crCache{Fixture: fx.Name, Findings: findings, Mode: "agent", Fingerprint: crFingerprint(fx)})
+	write(t, crCache{Fixture: fx.Name, Findings: findings, Mode: "agent", Fingerprint: fixtureFingerprint(fx)})
 	if _, ok := CachedIncumbent(dir, fx); ok {
 		t.Error("a review collected in another mode must not be ranked as this one")
 	}
@@ -753,7 +753,7 @@ func TestCacheIsRejectedWhenItMeasuredSomethingElse(t *testing.T) {
 	edited := fx
 	edited.Head = map[string]string{"store.go": "package store // rewritten\n"}
 
-	write(t, crCache{Fixture: fx.Name, Findings: findings, Mode: crReviewMode, Fingerprint: crFingerprint(fx)})
+	write(t, crCache{Fixture: fx.Name, Findings: findings, Mode: crReviewMode, Fingerprint: fixtureFingerprint(fx)})
 	if _, ok := CachedIncumbent(dir, edited); ok {
 		t.Error("a review of the old code must not be scored against the new code")
 	}
@@ -772,9 +772,9 @@ func TestFingerprintDistinguishesWhatTheReviewerSaw(t *testing.T) {
 	// walked the maps unsorted would make cache entries miss at random. The
 	// first value is captured before the loop so the comparison is not two
 	// calls the compiler can fold together.
-	first := crFingerprint(base)
+	first := fixtureFingerprint(base)
 	for range 8 {
-		if got := crFingerprint(base); got != first {
+		if got := fixtureFingerprint(base); got != first {
 			t.Fatalf("fingerprint changed between calls (%s then %s); map order leaked into the hash",
 				first, got)
 		}
@@ -802,7 +802,7 @@ func TestFingerprintDistinguishesWhatTheReviewerSaw(t *testing.T) {
 	changed["a file moved from base to extra"] = moved
 
 	for name, f := range changed {
-		if crFingerprint(f) == crFingerprint(base) {
+		if fixtureFingerprint(f) == fixtureFingerprint(base) {
 			t.Errorf("%s: fingerprint unchanged; a cache of the old source would still load", name)
 		}
 	}
@@ -811,7 +811,7 @@ func TestFingerprintDistinguishesWhatTheReviewerSaw(t *testing.T) {
 	// Rewording one must not throw away a still-valid review.
 	reworded := base
 	reworded.Defects = []Defect{{Path: "a.go", Line: 1}}
-	if crFingerprint(reworded) != crFingerprint(base) {
+	if fixtureFingerprint(reworded) != fixtureFingerprint(base) {
 		t.Error("defects changed the fingerprint; they are not part of what the reviewer read")
 	}
 }

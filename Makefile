@@ -94,6 +94,38 @@ JUDGE    ?=
 # a file that ended up mixed can still be filtered.
 DUMP     ?=
 
+# REJUDGE re-scores an ALREADY-COLLECTED dump with a different judge, running
+# no review at all:
+#
+#   make rejudge REJUDGE=/tmp/findings.jsonl JUDGE=anthropic/claude-opus-5
+#
+# The judge is an OpenAI model and three contenders are OpenAI models, one of
+# them the judge's own pro variant, so precision and every J-* column rest on a
+# vendor scoring its own family. Changing the judge by re-running `make
+# benchmark` would change the findings AND the judge together; this judges the
+# SAME recorded findings twice, which changes exactly one thing. The report
+# prints both rankings with the judge's vendor cohort separated out.
+#
+# BASELINE names the judge that produced the dump, for the cohort split and the
+# report header. The dump records verdicts, not who made them, so this is an
+# assertion; it defaults to evals.DefaultJudgeModel.
+#
+# Pointing JUDGE at the SAME id as BASELINE is the other measurement: identical
+# input judged twice by one model is that model's own variance, which is the
+# noise floor any vendor comparison has to clear.
+#
+# DUMP is deliberately NOT forwarded here. It names a file to WRITE and the
+# writer truncates on open, so a re-judge that inherited it could be handed the
+# file it is reading.
+#
+# A dump collected before a fixture's source was edited is REFUSED, by design:
+# the dump names its fixture and the re-judge resolves that name against the
+# corpus as it stands now, so an edited Head would move the change under review
+# as well as the judge — the one confound this target exists to eliminate.
+# Re-collect the dump rather than working around it.
+REJUDGE  ?=
+BASELINE ?=
+
 .PHONY: eval
 eval:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
@@ -132,6 +164,15 @@ benchmark:
 	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
 	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestBenchmarkAgainstIncumbent ./internal/evals/
+
+# Re-judge findings that were already collected, with a different judge.
+# Runs no review: every finding comes out of the dump, in its recorded position.
+.PHONY: rejudge
+rejudge:
+	$(if $(REJUDGE),NITPICK_EVAL_REJUDGE_DUMP='$(REJUDGE)') \
+	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
+	$(if $(BASELINE),NITPICK_EVAL_BASELINE_JUDGE='$(BASELINE)') \
+	go test -tags=eval -count=1 -timeout=90m -v -run TestRejudgeDump ./internal/evals/
 
 # Collect Incumbent reviews one fixture at a time, caching each.
 # The free CLI allowance is small; re-run until nothing is outstanding.

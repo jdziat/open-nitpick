@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -238,14 +240,22 @@ Judge only what is in front of you. Do not invent problems to seem rigorous.`
 func judgeRequest(f Fixture, persona config.Persona, findings []review.Finding) string {
 	var b strings.Builder
 
+	// Sorted, not map order. `range` over a map permutes on every call, so two
+	// judgements of the SAME review were two different prompts whenever the
+	// fixture touched more than one file, and the resulting variance was
+	// indistinguishable from the judge changing its mind. Judging identical
+	// recorded findings twice is how this harness now separates judge
+	// disagreement from judge noise, and that separation is only meaningful if
+	// the prompt is a function of its inputs. Nothing about file order carries
+	// meaning here, which is exactly why it must not vary.
 	b.WriteString("# The change under review\n\n")
-	for path, content := range f.Head {
-		fmt.Fprintf(&b, "## %s (after the change)\n\n```\n%s```\n\n", path, numbered(content))
+	for _, path := range slices.Sorted(maps.Keys(f.Head)) {
+		fmt.Fprintf(&b, "## %s (after the change)\n\n```\n%s```\n\n", path, numbered(f.Head[path]))
 	}
 
 	b.WriteString("### The same files before the change\n\n")
-	for path, content := range f.Base {
-		fmt.Fprintf(&b, "#### %s\n\n```\n%s```\n\n", path, content)
+	for _, path := range slices.Sorted(maps.Keys(f.Base)) {
+		fmt.Fprintf(&b, "#### %s\n\n```\n%s```\n\n", path, f.Base[path])
 	}
 
 	b.WriteString("# The voice the review was configured to use\n\n")
@@ -355,15 +365,67 @@ func (a *Aggregate) Add(r *JudgeResult, expected int) []string {
 		return []string{"judge returned no result"}
 	}
 
+	problems := a.AddVerdicts(r.Verdicts, expected)
+
+	if r.SignalToNoise < 0 || r.SignalToNoise > 10 {
+		problems = append(problems, fmt.Sprintf("signal_to_noise %d is out of range", r.SignalToNoise))
+	}
+	if r.ToneAdherence < 0 || r.ToneAdherence > 10 {
+		problems = append(problems, fmt.Sprintf("tone_adherence %d is out of range", r.ToneAdherence))
+	}
+
+	a.Missed += len(r.Missed)
+	a.SignalToNoise = append(a.SignalToNoise, r.SignalToNoise)
+	a.ToneAdherence = append(a.ToneAdherence, r.ToneAdherence)
+	a.Grades = append(a.Grades, r.Grade)
+
+	return problems
+}
+
+// AddVerdicts folds the per-finding half of a judgement in, WITHOUT the
+// review-level fields, and returns the same suspicions Add reports about the
+// verdict list.
+//
+// It is the pair verdictProblems + countVerdicts, kept together because that is
+// what Add wants and separating them at every call site would let the two drift
+// apart. Callers that must apply them to DIFFERENT lists — the re-judge report
+// validates what the judge returned and counts what the dump could carry — use
+// the two directly.
+//
+// The counting lives here rather than in each caller so that a number derived
+// from a dump and the same number in the published table cannot come from two
+// implementations. That guarantee covers the CODE and not the data: a dump
+// attaches at most one verdict per finding position, so a judge that answered a
+// position twice, or answered a position with no finding, arrives here through
+// a dump with fewer verdicts than it arrived with live. GroupDump reports that
+// shortfall; nothing here can see it, because by then the discarded verdicts
+// are gone.
+func (a *Aggregate) AddVerdicts(verdicts []Verdict, expected int) []string {
+	problems := verdictProblems(verdicts, expected)
+	a.countVerdicts(verdicts)
+	return problems
+}
+
+// verdictProblems reports what is wrong with a verdict list, separately from
+// counting it.
+//
+// The two are split because the re-judge report has to do them to DIFFERENT
+// lists: it counts a list reduced to one verdict per finding position, so that
+// both judges are counted by one rule, but the complaint belongs to the list
+// the judge actually returned. Validating the reduced list instead would report
+// nothing at all — the reduction is what removed the duplicate and the
+// out-of-range index, so the judge's malformed answer would be silently
+// laundered into a well-formed one.
+func verdictProblems(verdicts []Verdict, expected int) []string {
 	var problems []string
 
-	if len(r.Verdicts) != expected {
+	if len(verdicts) != expected {
 		problems = append(problems, fmt.Sprintf(
-			"judge returned %d verdicts for %d findings", len(r.Verdicts), expected))
+			"judge returned %d verdicts for %d findings", len(verdicts), expected))
 	}
 
 	seen := map[int]bool{}
-	for _, v := range r.Verdicts {
+	for _, v := range verdicts {
 		if v.Index < 0 || v.Index >= expected {
 			problems = append(problems, fmt.Sprintf("judge verdict index %d is out of range", v.Index))
 		}
@@ -373,14 +435,12 @@ func (a *Aggregate) Add(r *JudgeResult, expected int) []string {
 		seen[v.Index] = true
 	}
 
-	if r.SignalToNoise < 0 || r.SignalToNoise > 10 {
-		problems = append(problems, fmt.Sprintf("signal_to_noise %d is out of range", r.SignalToNoise))
-	}
-	if r.ToneAdherence < 0 || r.ToneAdherence > 10 {
-		problems = append(problems, fmt.Sprintf("tone_adherence %d is out of range", r.ToneAdherence))
-	}
+	return problems
+}
 
-	for _, v := range r.Verdicts {
+// countVerdicts folds a verdict list into the totals.
+func (a *Aggregate) countVerdicts(verdicts []Verdict) {
+	for _, v := range verdicts {
 		a.Findings++
 		if v.Real {
 			a.Real++
@@ -401,13 +461,6 @@ func (a *Aggregate) Add(r *JudgeResult, expected int) []string {
 			a.Misclassed++
 		}
 	}
-
-	a.Missed += len(r.Missed)
-	a.SignalToNoise = append(a.SignalToNoise, r.SignalToNoise)
-	a.ToneAdherence = append(a.ToneAdherence, r.ToneAdherence)
-	a.Grades = append(a.Grades, r.Grade)
-
-	return problems
 }
 
 // AddSeverity folds one sample's objective severity comparison in.

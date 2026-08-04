@@ -1,0 +1,19 @@
+{
+  "fixture": "data-loss-migration",
+  "findings": [
+    {
+      "path": "migrations/0007_backfill_plan.sql",
+      "line": 8,
+      "severity": "warning",
+      "category": "Data Integrity \u0026 Integration",
+      "class": "data-loss",
+      "title": "Do not overwrite existing account plans.",
+      "rationale": "UPDATE accounts SET plan = 'free' affects every row. If an account already has a non-NULL plan, this statement replaces it with 'free'. Update only rows that require the backfill.\n\nProposed fix\n\n-UPDATE accounts SET plan = 'free'; +UPDATE accounts SET plan = 'free' WHERE plan IS NULL;",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-03T22:04:46Z",
+  "mode": "plaintext",
+  "fingerprint": "23bdfbff35677c330bcfa8d1c4b40ccfc1e424c3ee9a3fd515d3d46d7fb6374c",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3208774659\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Data Integrity \u0026 Integration]\n  → migrations/0007_backfill_plan.sql:8\n\n  Do not overwrite existing account plans.\n\n  UPDATE accounts SET plan = 'free' affects every row. If an account\n  already has a non-NULL plan, this statement replaces it with 'free'.\n  Update only rows that require the backfill.\n\n\n  Proposed fix\n\n  -UPDATE accounts SET plan = 'free';\n  +UPDATE accounts SET plan = 'free' WHERE plan IS NULL;\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n- migrations/0007_backfill_plan.sql\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 5s elapsed\nWriting review comments... 8s elapsed\n"
+}

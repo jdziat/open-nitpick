@@ -1,0 +1,20 @@
+{
+  "fixture": "retry-no-backoff",
+  "findings": [
+    {
+      "path": "client.py",
+      "line": 11,
+      "end_line": 15,
+      "severity": "warning",
+      "category": "Performance \u0026 Scalability",
+      "class": "correctness",
+      "title": "Restrict the retryable error set.",
+      "rationale": "urllib.error.HTTPError subclasses urllib.error.URLError, so this handler retries permanent responses such as 401, 403, and 404. Handle HTTPError first, retry only approved transient status codes, and re-raise permanent HTTP errors immediately.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-03T22:12:22Z",
+  "mode": "plaintext",
+  "fingerprint": "7211498e117c971d3c236cbec9e1c348105cd9251f42c7e304bbe14e89a5a3d3",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1334372890\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Performance \u0026 Scalability]\n  → client.py:11-15\n\n  Restrict the retryable error set.\n\n  urllib.error.HTTPError subclasses urllib.error.URLError, so this\n  handler retries permanent responses such as 401, 403, and 404. Handle\n  HTTPError first, retry only approved transient status codes, and\n  re-raise permanent HTTP errors immediately.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n- client.py\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 5s elapsed\nWriting review comments... 9s elapsed\nWriting review comments... 1m 00s elapsed - still working\nWriting review comments... 2m 00s elapsed - still working\n"
+}

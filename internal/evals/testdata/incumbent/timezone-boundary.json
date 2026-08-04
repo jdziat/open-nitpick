@@ -1,0 +1,20 @@
+{
+  "fixture": "timezone-boundary",
+  "findings": [
+    {
+      "path": "report.go",
+      "line": 10,
+      "end_line": 13,
+      "severity": "warning",
+      "category": "Functional Correctness",
+      "class": "data-loss",
+      "title": "Construct the report-day boundary from calendar fields.",
+      "rationale": "time.Time.Truncate rounds the instant against the zero-time duration and does not truncate local calendar fields. For non-UTC locations, it can return a time other than local midnight. Use time.Date with t.Date() and t.Location(). Define the intended policy for locations where midnight is skipped or repeated. If reports use UTC days, convert to UTC explicitly and document that contract.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-03T22:07:11Z",
+  "mode": "plaintext",
+  "fingerprint": "e54a676fff2fe0e78cfb173194c560de5aa1fc55abd179c1b28c3b1e86eb29d6",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-92114923\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Functional Correctness]\n  → report.go:10-13\n\n  Construct the report-day boundary from calendar fields.\n\n  time.Time.Truncate rounds the instant against the zero-time duration and\n  does not truncate local calendar fields. For non-UTC locations, it can\n  return a time other than local midnight. Use time.Date with t.Date()\n  and t.Location(). Define the intended policy for locations where\n  midnight is skipped or repeated. If reports use UTC days, convert to UTC\n  explicitly and document that contract.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n- report.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 6s elapsed\nWriting review comments... 12s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

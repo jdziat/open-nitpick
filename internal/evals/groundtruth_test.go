@@ -2,6 +2,7 @@ package evals
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os/exec"
 	"slices"
@@ -440,6 +441,299 @@ func TestEveryDefectDeclaresAUsableSeverity(t *testing.T) {
 					f.Name, d.Path, d.Line, d.WantSeverity, d.Why)
 			}
 		}
+	}
+}
+
+// classPlant is one planted defect with the fixture carrying it, so a
+// consistency failure can name both sides of a disagreement.
+type classPlant struct {
+	fixture string
+	defect  Defect
+}
+
+// TestSeverityIsConsistentWithinADefectClass fails when two plants of the same
+// class disagree about WantSeverity and neither says why.
+//
+// The security class is the case that motivated it. It holds three plants at
+// critical and two at error, and the line between them is not visible in the
+// severities: the criticals show the untrusted source, the removed guard or the
+// credential IN the diff, and the two injections show only the sink, with
+// reachability asserted by a Defect.Why the reviewer is never given. Unwritten,
+// a reader sees a corpus answering one question two ways — and someone will
+// eventually "fix" it in whichever direction the week's numbers prefer, since
+// both directions look equally like tidying.
+//
+// A judgement about severity cannot be asserted mechanically, so this asserts
+// the property that can be: that the corpus does not contradict itself in
+// silence. Divergence stays legal — resource genuinely holds an error, a
+// warning and a nit — but it has to be written down where the next editor
+// reads it, and the note has to name the level it is defending, or moving the
+// level leaves prose that argues for a number that is no longer there.
+//
+// The rule is deliberately strict about WHO writes it. When a class carries
+// more than one severity every member of it needs a note, because with two
+// plants disagreeing there is no fact about which is the outlier, and letting a
+// single note excuse a class would let the next drift in through whichever
+// member happened to be annotated.
+//
+// What it CANNOT do: a class with one plant has nothing to disagree with, so
+// contract, data-loss and concurrency are exempt by construction, and Class is
+// author-declared, so moving a plant's class along with its severity silences
+// it. TestPlantedSeveritiesArePinned covers both.
+func TestSeverityIsConsistentWithinADefectClass(t *testing.T) {
+	byClass := map[config.Class][]classPlant{}
+
+	for _, f := range AllFixtures() {
+		for _, d := range f.Defects {
+			class, known := d.Class.Normalize()
+			if !known {
+				// An unset or unrecognized class normalizes to one bucket, which
+				// would silently group defects that have nothing to do with each
+				// other and let this test pass by comparing the wrong things.
+				t.Errorf("%s: defect at %s:%d declares class %q, which is not one of %v: %s",
+					f.Name, d.Path, d.Line, d.Class, config.ClassNames(), d.Why)
+				continue
+			}
+
+			byClass[class] = append(byClass[class], classPlant{fixture: f.Name, defect: d})
+		}
+	}
+
+	for class, plants := range byClass {
+		severities := map[config.Severity]bool{}
+		for _, p := range plants {
+			severities[p.defect.WantSeverity] = true
+		}
+		if len(severities) < 2 {
+			continue
+		}
+
+		var silent, stale []string
+		for _, p := range plants {
+			note := strings.TrimSpace(p.defect.SeverityNote)
+			where := fmt.Sprintf("%s (%s:%d)", p.fixture, p.defect.Path, p.defect.Line)
+
+			switch {
+			case note == "":
+				silent = append(silent, where)
+			case !strings.Contains(strings.ToLower(note), strings.ToLower(p.defect.WantSeverity.String())):
+				// A note that never names its own level cannot go stale
+				// visibly. Move the plant and the prose still reads as a
+				// justification — for a number it no longer justifies — and the
+				// next editor trusts it. Requiring the word is the only part of
+				// a note a test can hold to the plant beside it.
+				stale = append(stale, where)
+			}
+		}
+		if len(silent) == 0 && len(stale) == 0 {
+			continue
+		}
+
+		// One failure per class rather than per plant: the disagreement is a
+		// property of the class, and reporting it once per member buries the
+		// list of who has to answer for it under five copies of the question.
+		if len(silent) > 0 {
+			t.Errorf("class %q is planted at more than one severity (%s) with no reason given by %s. "+
+				"Two plants of one class disagreeing in silence reads as drift, and the next editor "+
+				"will resolve it in whichever direction the numbers prefer.",
+				class, plantSeverities(plants), strings.Join(silent, ", "))
+		}
+		if len(stale) > 0 {
+			t.Errorf("class %q: the note on %s never says which level it is defending, so it cannot be "+
+				"read against the plant it sits beside; the class is planted at %s",
+				class, strings.Join(stale, ", "), plantSeverities(plants))
+		}
+	}
+}
+
+// plantSeverities renders a class's disagreement as "go-sql-injection=critical,
+// multi-defect=error", so a failure names it rather than only reporting that it
+// exists. Corpus order is fixed, so the rendering is stable.
+func plantSeverities(plants []classPlant) string {
+	parts := make([]string, 0, len(plants))
+	for _, p := range plants {
+		parts = append(parts, fmt.Sprintf("%s=%s", p.fixture, p.defect.WantSeverity))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// TestTuningCorpusCanFalsifyInflation is TestHeldOutCorpusCanFalsifyInflation's
+// twin, for the corpus that actually shapes the prompt.
+//
+// The held-out set is spent once; the tuning set is what every iteration reads,
+// so a one-sided severity distribution there is the more expensive of the two.
+// capacity-hint-nit is the only plant in it below error — one fixture away from
+// a corpus that cannot tell "rates everything at least error" from a calibrated
+// reviewer.
+//
+// This asserts the weaker of the two properties it would like to. The corpus
+// can also be degraded WITHOUT dropping that floor, by moving plants upward:
+// raising two errors to critical took the tuning corpus from 6 observable
+// inflations to 4 against a reviewer that answers critical to everything, and
+// this test passed unchanged through it because the nit was still there.
+// TestPlantedSeveritiesArePinned is what catches that; this one only keeps the
+// floor from disappearing entirely.
+func TestTuningCorpusCanFalsifyInflation(t *testing.T) {
+	var lowest config.Severity
+	for _, f := range Fixtures() {
+		for _, d := range f.Defects {
+			if lowest == "" || d.WantSeverity.Rank() < lowest.Rank() {
+				lowest = d.WantSeverity
+			}
+		}
+	}
+
+	if lowest == "" {
+		t.Fatal("the tuning corpus plants no defects at all")
+	}
+	if lowest.Rank() >= config.SeverityError.Rank() {
+		t.Errorf("the lowest tuning plant is %q: the prompt is tuned against a corpus where over-claiming "+
+			"cannot be observed, which is the failure the O-INFL column exists to measure", lowest)
+	}
+}
+
+// TestPlantedSeveritiesArePinned makes every change to the ground truth an
+// explicit one.
+//
+// WantSeverity is the target both severity columns are measured against, so
+// editing it moves the score of every reviewer at once — including the
+// incumbent it is being compared to — without touching a line of reviewer code.
+// Nothing else in the tree could see such an edit. The class-consistency check
+// cannot: it groups on Class, which the same editor declares, so moving a plant
+// and its class together silences it. And it exempts any class with one member,
+// which is three of these fourteen — contract-break, data-loss-migration and
+// multi-defect's race could each be demoted to a nit with every other test
+// still green.
+//
+// So the levels are written down twice. This table is not a second opinion
+// about what the anchors say; it is a receipt, and its only job is to make a
+// severity edit impossible to land without also editing the record of what the
+// severity used to be, in a diff a reviewer reads.
+//
+// When this fails: check the new level against the anchor clause in
+// internal/prompt/templates/review.md, check what it does to the corpus's
+// ability to observe INFLATION (raising plants removes that ability), check
+// what it does to a reviewer whose vocabulary cannot reach the new level — see
+// TestIncumbentCannotExpressCritical — and then update the entry.
+func TestPlantedSeveritiesArePinned(t *testing.T) {
+	// Keyed "fixture/path:line/class". The class is in the key because two of
+	// multi-defect's plants sit on the SAME line of the same file — the
+	// traversal and the descriptor leak both anchor at handler.go:19 — and
+	// without it they would collide and this table would silently pin one of
+	// them twice.
+	want := map[string]config.Severity{
+		"go-nil-deref/fetch.go:10/correctness":          config.SeverityError,
+		"go-sql-injection/store.go:17/security":         config.SeverityError,
+		"go-hardcoded-secret/client.go:12/security":     config.SeverityCritical,
+		"python-command-injection/tools.py:12/security": config.SeverityError,
+		"multi-defect/handler.go:19/security":           config.SeverityCritical,
+		"multi-defect/handler.go:25/concurrency":        config.SeverityError,
+		"multi-defect/handler.go:19/resource":           config.SeverityError,
+		"capacity-hint-nit/window.go:17/resource":       config.SeverityNit,
+
+		// Held-out corpus. Pinned on the same terms: it is spent once, so a
+		// severity edit here is discovered at the moment the number it
+		// corrupted is already being reported.
+		"contract-break/event.go:9/contract":                                config.SeverityError,
+		"data-loss-migration/migrations/0007_backfill_plan.sql:8/data-loss": config.SeverityCritical,
+		"ts-unawaited-async/src/sync.ts:10/correctness":                     config.SeverityError,
+		"timezone-boundary/report.go:13/correctness":                        config.SeverityError,
+		"removed-guard/project.go:31/security":                              config.SeverityCritical,
+		"retry-no-backoff/client.py:11/resource":                            config.SeverityWarning,
+	}
+
+	got := map[string]config.Severity{}
+	for _, f := range AllFixtures() {
+		for _, d := range f.Defects {
+			class, _ := d.Class.Normalize()
+			key := fmt.Sprintf("%s/%s:%d/%s", f.Name, d.Path, d.Line, class)
+			if _, dup := got[key]; dup {
+				t.Errorf("two plants share the key %q, so this table cannot tell them apart", key)
+			}
+			got[key] = d.WantSeverity
+		}
+	}
+
+	for key, wantSev := range want {
+		gotSev, ok := got[key]
+		if !ok {
+			t.Errorf("%s is pinned at %q and no longer exists: a plant was moved, renamed or deleted, "+
+				"and every severity number shifts with it", key, wantSev)
+			continue
+		}
+		if gotSev != wantSev {
+			t.Errorf("%s is planted %q and pinned at %q. A severity edit changes what every reviewer "+
+				"scores, the incumbent included, so it does not land as a one-token change: justify it "+
+				"from review.md's anchors and update the pin in the same diff",
+				key, gotSev, wantSev)
+		}
+	}
+	for key, gotSev := range got {
+		if _, ok := want[key]; !ok {
+			t.Errorf("%s is planted %q and is not pinned: add it here so the next edit to it is visible",
+				key, gotSev)
+		}
+	}
+}
+
+// TestIncumbentCannotExpressCritical pins the ceiling the objective severity
+// columns are read through.
+//
+// crSeverity has no branch that returns critical — Incumbent publishes
+// critical/warning/info with no separate error tier, so its critical is mapped
+// onto ours deliberately. The consequence is easy to forget and expensive: no
+// Incumbent review can ever score ACCURATE on a plant we planted critical, and
+// none can ever be caught INFLATING one. Raising a plant to critical therefore
+// moves the head-to-head numbers with no change whatever in Incumbent's
+// output, and it happened: two plants were raised, O-ACC and O-UNDER each moved
+// by two against the incumbent, and nothing objected.
+//
+// So the count is pinned rather than merely documented. It is the number
+// ScoreSeverity's own comment states, and the two must not drift apart.
+func TestIncumbentCannotExpressCritical(t *testing.T) {
+	for _, word := range []string{"critical", "CRITICAL", " Critical ", "blocker", "major", "warning", "info", "nit", ""} {
+		if got := crSeverity(word); got == config.SeverityCritical {
+			t.Fatalf("crSeverity(%q) = %q: the ceiling this test exists to describe has moved, and "+
+				"score.go's account of the objective severity columns is now wrong", word, got)
+		}
+	}
+
+	// Graded calls on plants Incumbent's vocabulary cannot reach. These are
+	// UNDERSTATEMENTS BY CONSTRUCTION: no output could have scored otherwise.
+	const wantForced = 2
+
+	var (
+		forced []string
+		cached int
+	)
+	for _, f := range Fixtures() {
+		findings, ok := CachedIncumbent(crCacheDir, f)
+		if !ok {
+			continue
+		}
+		cached++
+		for _, c := range ScoreSeverity(f, findings).Calls {
+			if c.Defect.WantSeverity == config.SeverityCritical {
+				forced = append(forced, fmt.Sprintf("%s (%s)", f.Name, c.Finding.Title))
+			}
+		}
+	}
+
+	// A cache that stopped matching would drop `forced` to zero and read as the
+	// ceiling having gone away, which is the opposite of what happened.
+	if cached == 0 {
+		t.Fatalf("no cached Incumbent review in %s matches the current corpus, so this test measures "+
+			"nothing; a fixture's source was edited without re-collecting", crCacheDir)
+	}
+
+	if len(forced) != wantForced {
+		t.Errorf("%d of the tuning corpus's graded Incumbent calls sit on a plant its vocabulary "+
+			"cannot reach, and %d are accounted for: %s.\n"+
+			"Each one is an O-UNDER the incumbent could not have avoided and an O-INFL it could not "+
+			"have committed, so the column is that much less a statement about review quality. "+
+			"If a plant was raised to critical, say why the anchor requires it AND update the count "+
+			"here and the account in ScoreSeverity's doc comment",
+			len(forced), wantForced, strings.Join(forced, ", "))
 	}
 }
 
