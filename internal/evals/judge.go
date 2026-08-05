@@ -2,10 +2,14 @@ package evals
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
 	"math"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -25,10 +29,95 @@ import (
 // say whether a finding is worth a colleague's attention — a question keyword
 // matching cannot answer. Keyword scoring tells you a bug was found; only a
 // judgement call tells you the review was worth reading.
+//
+// DEFAULTJUDGEMODEL SHARES A VENDOR WITH CONTENDERS IT SCORES, and that is not
+// a defect this constant can fix on its own. DefaultModels carries three OpenAI
+// entries — gpt-5.6-luna, gpt-5.4, and THIS MODEL. The judge is not merely from
+// the same vendor as three contenders; it is one of them, grading its own
+// output. LLM-as-judge self-preference is a documented effect and every judged
+// column inherits whatever preference it carries.
+//
+// The exact list is not written down here, because a list in a comment is wrong
+// the first time somebody edits the battery — the brief that commissioned the
+// second judge named three OpenAI contenders that are not in DefaultModels at
+// all, and named three CLEAN vendors that are. VendorConflicts computes it.
+//
+// Swapping this constant for a clean vendor would move the conflict rather than
+// measure it: the new judge would have its own preferences and nothing would say
+// how much either one moved the table. SecondJudgeModel is the answer instead —
+// the same findings scored twice, with the disagreement published beside every
+// judged figure. VendorConflicts is what refuses to let the conflict go
+// unstated, and it is computed from DefaultModels rather than described here,
+// because a battery edit is what makes a sentence like this one wrong.
 const DefaultJudgeModel = "openai/gpt-5.6-terra"
+
+// SecondJudgeModel corroborates the primary judge from a vendor NO contender
+// shares.
+//
+// x-ai has no entry in DefaultModels — checked against the live OpenRouter
+// catalog (GET /api/v1/models) on 2026-08-04, which listed 338 models across 8
+// contender vendors and 49 others. TestTheSecondJudgeSharesNoVendorWithAny
+// Contender recomputes that from the battery on every run, so adding an x-ai
+// contender fails the suite rather than quietly re-creating the conflict this
+// judge exists to remove.
+//
+// grok-4.5 specifically, on three requirements the judge has:
+//
+//   - STRONGER THAN THE FIELD. DefaultJudgeModel's doc comment states the
+//     requirement and it is not negotiable — the judge decides whether a finding
+//     was worth a colleague's attention. grok-4.5 is x-ai's flagship ("frontier
+//     performance on coding, knowledge work, and STEM"), and ~x-ai/grok-latest
+//     redirects to it. The clean vendors that are NOT this are all weaker: the
+//     brief that commissioned this work named mistral as a candidate, and
+//     mistralai/mistral-medium-3.1 was DROPPED from this battery for judging
+//     last at 2.74 with 7 inflated findings of 11.
+//   - STRUCTURED OUTPUT. The judge extracts a hand-authored JSON schema, so a
+//     model without json_schema support falls back to JSON mode and the verdict
+//     list stops being a reliable shape. grok-4.5 advertises both
+//     response_format and structured_outputs.
+//   - ENOUGH CONTEXT FOR judgeRequest. It renders every file of the fixture at
+//     Head AND at Base, plus the persona and every finding. grok-4.5 carries
+//     500k tokens, against 1.05M for the primary judge — comfortably above the
+//     largest fixture, and the multi-file corpus is the axis to re-check this on.
+//
+// It is also, unlike the primary judge, a model that accepts `temperature`. The
+// harness pins 0 on both; on the primary that pin is silently ignored, which is
+// one of the reasons the same cached findings scored 3.66, 3.90, 3.95 and 3.98
+// across four runs at "temperature 0".
+const SecondJudgeModel = "x-ai/grok-4.5"
 
 // EnvJudgeModel overrides the judge.
 const EnvJudgeModel = "NITPICK_EVAL_JUDGE"
+
+// EnvSecondJudge names the corroborating judge, and is the switch that turns
+// every judged figure from one opinion into two.
+//
+// Unset is a supported state and NOT a silent one: every figure then renders
+// with its disagreement marked UNMEASURED rather than omitted, so a
+// single-judge table cannot be mistaken for a corroborated one. See
+// JudgedFigure.
+const EnvSecondJudge = "NITPICK_EVAL_JUDGE2"
+
+// SecondJudgeFromEnv resolves the corroborating judge, returning "" when there
+// is none.
+//
+//	unset or empty   no second judge. Every judged figure renders "+?" and the
+//	                 report states that it is one opinion.
+//	"default"        SecondJudgeModel, with its vendor re-checked against the
+//	                 battery by the suite.
+//	anything else    that model id, used as given.
+//
+// The "default" spelling exists so the vetted id does not have to be copied
+// into the Makefile. A judge named in a Makefile is a judge no test can see: it
+// would not pass through VendorConflicts, and the conflict this whole path was
+// built to remove would be one shell variable away from coming back.
+func SecondJudgeFromEnv() string {
+	raw := strings.TrimSpace(os.Getenv(EnvSecondJudge))
+	if raw == "default" {
+		return SecondJudgeModel
+	}
+	return raw
+}
 
 // Verdict is the judge's assessment of one finding.
 type Verdict struct {
@@ -301,6 +390,107 @@ func numbered(content string) string {
 	return b.String()
 }
 
+// Stimulus is the finding list a judge was SHOWN, as an identity.
+//
+// It exists because a cross-judge delta is only a confidence interval when both
+// judges answered the SAME question, and this package published one that did
+// not. The nitpick axis judged the whole corpus once and handed the second
+// judge each level's FILTERED list, so GRADE, SIGNAL, TONE and MISSED compared
+// a whole-corpus judgement against a subset judgement and printed the
+// difference under a legend calling it the confidence interval on the figure
+// beside it. MISSED was biased in a known direction on top of that: filtering
+// more findings legitimately raises the second judge's missed count against a
+// primary frozen at the whole-corpus value.
+//
+// The identity is DERIVED FROM THE FINDINGS, not declared by the caller. A
+// boolean saying "these matched" is the kind of convention this package has
+// watched fail twice; a fingerprint cannot be wrong about what it covers, and
+// it self-corrects — two nitpick levels that filter to the same list produce
+// the same fingerprint and are corroborable, which is true of them rather than
+// assumed.
+//
+// The whole finding is hashed rather than review.Finding.Key(), which is only
+// path, line and title. A judge that is shown the same three findings with
+// different rationales is being shown a different prompt. Over-covering can
+// only refuse a delta that was legitimate; under-covering would publish one
+// that was not, and only one of those two errors is survivable.
+type Stimulus struct {
+	// n is how many findings were shown, and is the number of verdicts a
+	// judge owes back.
+	n int
+
+	// print is the fingerprint. EMPTY MEANS UNRECORDED, and an unrecorded
+	// stimulus matches NOTHING — not even another unrecorded one. That is the
+	// safe direction: a judgement folded in without stating what produced it
+	// costs a delta, where the alternative would let two unstated stimuli
+	// compare equal and publish exactly the fake confidence interval this type
+	// was built to stop.
+	print string
+}
+
+// JudgedOver fingerprints the findings one judge was shown for one fixture.
+func JudgedOver(fixture string, findings []review.Finding) Stimulus {
+	encoded, err := json.Marshal(findings)
+	if err != nil {
+		// Unrecorded, so it matches nothing and the delta is withheld. A
+		// fingerprint this function could not compute is not a fingerprint that
+		// happens to equal another.
+		return Stimulus{n: len(findings)}
+	}
+
+	sum := sha256.Sum256(append([]byte(fixture+"\x00"), encoded...))
+	return Stimulus{n: len(findings), print: hex.EncodeToString(sum[:])}
+}
+
+// Len is how many findings the judge was shown.
+func (s Stimulus) Len() int { return s.n }
+
+// Recorded reports whether this stimulus has a fingerprint at all.
+func (s Stimulus) Recorded() bool { return s.print != "" }
+
+// stimulusTrace is every stimulus behind one Aggregate, one per judgement
+// folded in.
+//
+// A multiset and not a single value: an aggregate spans a corpus, and two
+// judges have seen the same stimulus only when they have seen the same
+// fixtures with the same findings in each. Comparing a single rolled-up hash
+// would work as well, but the multiset also makes the LENGTHS visible, which is
+// how a second judge that failed on two fixtures is caught — its aggregate
+// covers six samples where the primary's covers eight, and the difference
+// between two rates over different sample sets is not a disagreement.
+type stimulusTrace struct {
+	prints []string
+}
+
+func (t *stimulusTrace) record(s Stimulus) { t.prints = append(t.prints, s.print) }
+
+// matches reports whether two traces are the same stimulus.
+//
+// It is deliberately conservative in three ways, each of which was a way to
+// publish a delta nobody measured: an EMPTY trace matches nothing, because an
+// aggregate assembled without stating its stimulus has not shown that it shares
+// one; traces of DIFFERENT LENGTHS match nothing, because the two judges did not
+// see the same number of samples; and an UNRECORDED entry on either side poisons
+// the whole comparison rather than being skipped.
+//
+// Sorted before comparing because the two sides are assembled in different
+// orders — the primary from a goroutine pool, the second from Rejudge's ordered
+// pass — and order of assembly is not a difference in stimulus.
+func (t stimulusTrace) matches(o stimulusTrace) bool {
+	if len(t.prints) == 0 || len(t.prints) != len(o.prints) {
+		return false
+	}
+
+	a := slices.Sorted(slices.Values(t.prints))
+	b := slices.Sorted(slices.Values(o.prints))
+	for i := range a {
+		if a[i] == "" || a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // Aggregate folds judge results into the numbers used to compare variants.
 type Aggregate struct {
 	Findings     int
@@ -364,7 +554,29 @@ type Aggregate struct {
 	// that reads the length calls that incomparable -- which it is not, and
 	// which fires as a false alarm the moment RUNS is raised on one side.
 	Fixtures map[string]bool
+
+	// shown is the finding list behind every judgement folded in here.
+	//
+	// UNEXPORTED, so no caller can set it to whatever would make its delta
+	// print. It is written only by sawStimulus, which Add calls, and read only
+	// by CrossJudged to decide whether a delta between two aggregates is a
+	// disagreement or a change of question.
+	shown stimulusTrace
 }
+
+// sawStimulus records the finding list one folded-in judgement was produced
+// from.
+//
+// It is called by Add, and directly by RejudgeReport, which folds the two sides
+// with countVerdicts rather than Add because it must validate one list and count
+// another. Both call sites record the SAME value on both sides in one place, so
+// there is no arrangement of them in which the two judges are attributed
+// different stimuli by accident.
+func (a *Aggregate) sawStimulus(s Stimulus) { a.shown.record(s) }
+
+// SameStimulusAs reports whether another aggregate was produced from the same
+// finding lists as this one.
+func (a Aggregate) SameStimulusAs(o Aggregate) bool { return a.shown.matches(o.shown) }
 
 // Saw records that this contender was judged on a fixture.
 func (a *Aggregate) Saw(fixture string) {
@@ -377,17 +589,28 @@ func (a *Aggregate) Saw(fixture string) {
 // Coverage is how many distinct fixtures this contender was judged on.
 func (a Aggregate) Coverage() int { return len(a.Fixtures) }
 
-// Add folds one judgement in.
+// Add folds one judgement in, over the finding list the judge was SHOWN.
 //
-// expected is how many findings were submitted. A judge that returns a
-// different number of verdicts, or repeats an index, would otherwise compute
-// precision over an arbitrary subset with no signal that it happened.
-func (a *Aggregate) Add(r *JudgeResult, expected int) []string {
+// shown is both halves of what a caller used to pass as a bare count. Its
+// length is how many findings were submitted, so a judge that returns a
+// different number of verdicts, or repeats an index, cannot compute precision
+// over an arbitrary subset without a signal. Its fingerprint is what lets
+// CrossJudged tell a disagreement between two judges from a difference in what
+// they were asked.
+//
+// The stimulus is a REQUIRED argument rather than an optional one recorded by a
+// second call, because the cheaper spelling is the one that gets used: a method
+// that folded a judgement in without stating its stimulus would leave every
+// future axis one forgotten line away from a delta the legend describes as a
+// confidence interval and that is nothing of the kind. Callers that genuinely
+// cannot state it pass a stimulus with no fingerprint and get no delta.
+func (a *Aggregate) Add(r *JudgeResult, shown Stimulus) []string {
 	if r == nil {
 		return []string{"judge returned no result"}
 	}
 
-	problems := a.AddVerdicts(r.Verdicts, expected)
+	a.sawStimulus(shown)
+	problems := a.AddVerdicts(r.Verdicts, shown.Len())
 
 	if r.SignalToNoise < 0 || r.SignalToNoise > 10 {
 		problems = append(problems, fmt.Sprintf("signal_to_noise %d is out of range", r.SignalToNoise))
@@ -820,3 +1043,944 @@ func (a Aggregate) GradeSpread() float64 {
 	}
 	return hi - lo
 }
+
+// ---------------------------------------------------------------------------
+// TWO JUDGES, AND THE DISAGREEMENT BETWEEN THEM.
+//
+// Everything below exists because a single number from a single judge is what
+// this harness has been publishing and it is not defensible. The judge shares a
+// vendor with three contenders it scores, and separately, the same cached
+// findings scored 3.66, 3.90, 3.95 and 3.98 across four runs at temperature 0 —
+// so a published GRADE carries both an untested preference and an unquantified
+// instability, and nothing on the row said either.
+//
+// The fix is not a better single number. It is that a judged figure and the
+// disagreement between the two judges who produced it are ONE VALUE, so a
+// reader cannot receive half of it. See JudgedFigure.
+// ---------------------------------------------------------------------------
+
+// ContenderVendors is the set of vendors the battery ranks, derived from
+// DefaultModels.
+//
+// Derived, never listed. The brief that commissioned the second judge named
+// "openai, anthropic, z-ai, moonshotai and qwen" as the contender vendors and
+// concluded that google, deepseek and minimax were therefore clean — while
+// DefaultModels carries google/gemini-3.5-flash, google/gemini-3.1-pro-preview,
+// deepseek/deepseek-v4-pro and minimax/minimax-m2.7. A judge picked from that
+// list would have re-created the exact conflict it was chosen to remove, and
+// nothing would have said so. A hand-written vendor list is wrong the first time
+// somebody edits the battery, which is the only time it matters.
+func ContenderVendors() []string {
+	seen := map[string]bool{}
+	for _, m := range DefaultModels() {
+		seen[contenderVendor(m.ID)] = true
+	}
+
+	out := make([]string, 0, len(seen))
+	for v := range seen {
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// VendorConflicts returns the contenders a judge would be scoring its own
+// vendor's work on.
+//
+// It answers the question the methodology gate has asked for three rounds, and
+// it answers it about whichever judge it is handed rather than about the one
+// that was current when someone wrote a comment. An empty result is the only
+// state in which a judged column is that judge's opinion of somebody else's
+// work.
+func VendorConflicts(judge string) []string {
+	vendor := contenderVendor(judge)
+
+	var out []string
+	for _, m := range DefaultModels() {
+		if contenderVendor(m.ID) == vendor {
+			out = append(out, m.ID)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// JudgedFigure is a number an LLM judge produced, BOUND TO the disagreement
+// between the judges who produced it.
+//
+// It is one value and not two columns, and that is the entire design. This
+// package has twice shipped a metric published without the thing that gives it
+// meaning — a severity triple with no coverage denominator, and a cross-tool
+// band with no vocabulary caveat — and both times the missing half existed,
+// correct, in a neighbouring function that the table did not call. A convention
+// that says "always print the delta beside it" is exactly the convention that
+// failed twice. So the delta is not beside the figure; it is INSIDE it, the
+// fields are unexported, and the type implements fmt.Formatter so that EVERY
+// verb — %v, %s, %f, %.2f — renders the pair. There is no formatting route to
+// the bare number, from this package or any other.
+//
+// The four states it can be in are deliberately four, not two:
+//
+//	0.74-0.06   two judges, ONE QUESTION. 0.74 is the primary judge's figure;
+//	            the second judge's is 0.68. |delta| is the reader's confidence
+//	            interval.
+//	0.74+?      ONE judge. The disagreement is UNMEASURED, which is not the
+//	            same claim as +0.00 and must not be able to render as it.
+//	0.74+NC     two judges, TWO DIFFERENT QUESTIONS. Both scored something; the
+//	            difference between them is not a disagreement, so there is no
+//	            delta to publish and the second judge's figure is not carried
+//	            out of this type at all. See Stimulus.
+//	n/a         undefined — no findings, no graded sample. There is no figure
+//	            to disagree about, and printing 0.00 here is the bug
+//	            Aggregate.Precision's doc comment already records shipping.
+//
+// The +NC state is the one this type was missing, and its absence is what let
+// the nitpick axis publish a change of stimulus wearing the costume of a
+// disagreement. It renders as neither zero nor blank for the reason the "+?"
+// state does not: this package has shipped a zero that read as agreement and a
+// blank that read as nothing-was-wrong, and the only rendering that can be
+// quoted as neither is one that is not a number.
+//
+// The delta is SIGNED, so the pair is lossless: the second judge's figure is
+// exactly primary+delta. An unsigned spread would hide direction, and direction
+// is what says whether a vendor's own judge scores that vendor high.
+type JudgedFigure struct {
+	// primary is the first judge's value, second the corroborating judge's.
+	// Unexported so that no caller outside this package can format either one
+	// alone; the in-package equivalent is enforced by
+	// TestNoReportFormatsAJudgedFigureDirectly, because a struct field is always
+	// reachable from its own package.
+	primary float64
+	second  float64
+
+	// defined separates "the judge scored this" from "there was nothing to
+	// score". corroborated separates "both judges scored it" from "one did".
+	// Two booleans rather than one tri-state because they are independent: a
+	// figure can be defined and uncorroborated, and a run with no second judge
+	// makes every figure that.
+	defined      bool
+	corroborated bool
+
+	// crossStimulus marks a figure two judges scored FROM DIFFERENT FINDING
+	// LISTS. It is mutually exclusive with corroborated by construction —
+	// NotComparable is the only thing that sets it, and it never sets the other
+	// — because a figure that reported itself as both would be one branch away
+	// from rendering a delta again.
+	//
+	// When it is set, second is left at zero and never read. Storing the other
+	// judge's number and merely declining to print it would leave the half-value
+	// in the struct for the next accessor to reach; not storing it is the
+	// version no future edit can undo.
+	crossStimulus bool
+}
+
+// SingleJudged builds a figure only one judge scored.
+//
+// It renders with its disagreement marked UNMEASURED rather than omitted, which
+// is the degradation this package wants: a run without a second judge still
+// publishes, and still cannot be mistaken for a corroborated one.
+func SingleJudged(v float64) JudgedFigure {
+	if math.IsNaN(v) {
+		return JudgedFigure{}
+	}
+	return JudgedFigure{primary: v, defined: true}
+}
+
+// Corroborated builds a figure two judges scored.
+//
+// A NaN on either side collapses to the state that is true: an undefined
+// primary is an undefined figure, and an undefined second is a figure one judge
+// scored. Substituting zero for either would publish a disagreement that was
+// never measured, which is the failure this whole type exists to make
+// impossible.
+func Corroborated(primary, second float64) JudgedFigure {
+	if math.IsNaN(primary) {
+		return JudgedFigure{}
+	}
+	if math.IsNaN(second) {
+		return SingleJudged(primary)
+	}
+	return JudgedFigure{primary: primary, second: second, defined: true, corroborated: true}
+}
+
+// NotComparable builds a figure BOTH judges scored, from different stimuli.
+//
+// It takes only the primary's value, and that is the point rather than an
+// omission. The second judge's number is a correct measurement of a different
+// question, and the one thing it must never be is the right-hand side of a
+// subtraction; a constructor that accepted it would be a constructor some later
+// edit could make render it.
+//
+// An undefined primary collapses to undefined, matching Corroborated: there is
+// no figure here to be uncomparable about.
+func NotComparable(primary float64) JudgedFigure {
+	if math.IsNaN(primary) {
+		return JudgedFigure{}
+	}
+	return JudgedFigure{primary: primary, defined: true, crossStimulus: true}
+}
+
+// String renders the figure and its cross-judge disagreement as one token.
+func (f JudgedFigure) String() string {
+	switch {
+	case !f.defined:
+		return "n/a"
+	case f.crossStimulus:
+		// "+NC" — NOT COMPARABLE. Two judges answered, about different finding
+		// lists, so there is no disagreement to size. Spelled without digits
+		// for the same reason "+?" is: nothing downstream can average it, and
+		// nobody can quote it as a small delta.
+		return fmt.Sprintf("%.2f+NC", f.primary)
+	case !f.corroborated:
+		// "+?" and not "+0.00". A second judge that was never asked agreed
+		// about nothing, and the only rendering that cannot be quoted as
+		// agreement is one that is not a number.
+		return fmt.Sprintf("%.2f+?", f.primary)
+	default:
+		return fmt.Sprintf("%.2f%+.2f", f.primary, f.second-f.primary)
+	}
+}
+
+// Format implements fmt.Formatter, and it IGNORES THE VERB ON PURPOSE.
+//
+// This is the lock. A judged figure reaches a report through fmt, and honouring
+// %f or %.2f would hand back the bare primary — the exact half-value the type
+// exists to prevent, obtainable by a format string nobody would look twice at.
+// Every verb therefore renders the same token. Width and the '-' flag ARE
+// honoured, because a table cell has to be padded and refusing that would push
+// callers back to formatting the parts by hand.
+func (f JudgedFigure) Format(s fmt.State, verb rune) {
+	// verb is read and discarded so that the reader of this function sees the
+	// discarding happen rather than inferring it from an unused parameter.
+	_ = verb
+
+	out := f.String()
+
+	if w, ok := s.Width(); ok && len(out) < w {
+		pad := strings.Repeat(" ", w-len(out))
+		if s.Flag('-') {
+			out += pad
+		} else {
+			out = pad + out
+		}
+	}
+
+	_, _ = io.WriteString(s, out)
+}
+
+// Defined reports whether there is a figure at all.
+//
+// It returns a BOOL and not the number. Ranking needs to know that a contender
+// with no judged finding sorts last — silence is not a perfect score — and that
+// question can be answered without letting the value escape.
+func (f JudgedFigure) Defined() bool { return f.defined }
+
+// Corroborated reports whether a second judge scored THE SAME QUESTION.
+//
+// A cross-stimulus figure answers false. Callers use this to decide whether a
+// derived comparison is available at all — the re-judge table's rank MOVE, the
+// model ranking's second-judge order — and every one of those comparisons is
+// exactly as invalid across two stimuli as it is with one judge.
+func (f JudgedFigure) Corroborated() bool { return f.corroborated }
+
+// NotComparable reports whether two judges scored this figure from different
+// stimuli.
+//
+// It is not the negation of Corroborated: a single-judge figure is neither
+// corroborated nor uncomparable, and a report that treated the two states as
+// one would tell a reader their run had no second judge when it had two.
+func (f JudgedFigure) NotComparable() bool { return f.crossStimulus }
+
+// Compare orders two figures by the PRIMARY judge's value, undefined last.
+//
+// It exists so a report can sort without ever holding the number, and it
+// compares primaries because the published ranking IS the primary judge's
+// ranking. That is a real limitation and the reports say so: a gap between two
+// rows that is smaller than either row's delta is not an ordering, and the
+// second judge's own order is printed underneath so a reader can see whether it
+// held.
+func (f JudgedFigure) Compare(o JudgedFigure) int {
+	switch {
+	case f.defined && !o.defined:
+		return -1
+	case !f.defined && o.defined:
+		return 1
+	case !f.defined && !o.defined:
+		return 0
+	}
+	// Descending: a higher judged figure sorts first, which is what every
+	// caller of this wants for GRADE and PREC. A column where lower is better
+	// is not ranked on in any published table.
+	switch {
+	case f.primary > o.primary:
+		return -1
+	case f.primary < o.primary:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// SplitCells renders the figure across the three cells of the re-judge
+// diagnostic table: the primary judge's value, the second judge's, and the
+// signed delta between them.
+//
+// It is the ONE table whose subject is the two judges themselves, so showing
+// both absolute values there is the point rather than a leak — a reader
+// comparing PREC-A against the published number needs the number, not a
+// difference. Three values from one call, matching
+// Aggregate.ObjectiveSeverityCells, because that is what stops a row rendering
+// two of them: you cannot ask for the primary here without also being handed
+// the disagreement.
+//
+// An uncorroborated figure yields "n/a" for the second and the delta rather
+// than a blank, so the diagnostic table cannot show a one-judge run as a
+// zero-difference one.
+func (f JudgedFigure) SplitCells() (primary, second, delta string) {
+	if !f.defined {
+		return "n/a", "n/a", "n/a"
+	}
+	// A cross-stimulus figure yields the primary and NOTHING ELSE. This is the
+	// one table that prints both absolute values, and printing them here would
+	// invite exactly the subtraction the figure exists to refuse — two numbers
+	// side by side in a table whose subject is the two judges read as a
+	// difference whatever the third cell says.
+	if f.crossStimulus {
+		return fmt.Sprintf("%.2f", f.primary), "NC", "NC"
+	}
+	if !f.corroborated {
+		return fmt.Sprintf("%.2f", f.primary), "n/a", "n/a"
+	}
+	return fmt.Sprintf("%.2f", f.primary),
+		fmt.Sprintf("%.2f", f.second),
+		fmt.Sprintf("%+.2f", f.second-f.primary)
+}
+
+// CrossJudged is one contender's aggregate under each judge.
+//
+// Every accessor returns a JudgedFigure, so a report holding one of these has
+// no route to a bare judged number. That is why the reports take this and not
+// an Aggregate: Aggregate's own accessors return float64 and its counters are
+// plain ints, and a table built from those is a table that can print half a
+// result. TestNoReportFormatsAJudgedFigureDirectly is what keeps them out.
+//
+// The accessors are named with a Figure suffix and NOT after the Aggregate
+// fields they derive from — GradeFigure, not Grade — so that a source scan for
+// the Aggregate spellings cannot be confused by a same-named method on this
+// type. The guard has no type information; the naming is what makes it exact.
+type CrossJudged struct {
+	// Primary is the judge that produced the published figure.
+	Primary Aggregate
+
+	// Second is the corroborating judge, zero and unused when HaveSecond is
+	// false.
+	Second Aggregate
+
+	// HaveSecond distinguishes "the second judge scored nothing" from "there was
+	// no second judge". Both leave Second empty and they are different claims:
+	// the first is a second judge that failed on every sample, which is a result
+	// worth failing a run over, and the second is an operator who did not set
+	// NITPICK_EVAL_JUDGE2.
+	HaveSecond bool
+}
+
+// primarySamples and secondSamples are the denominators each side's rates
+// divide by: how many samples that judge actually graded.
+//
+// They are separate because they CAN differ — a second judge that errored on
+// two fixtures graded fewer — and dividing both sides by one number would
+// publish a delta between a rate and something that is not one. Where they
+// differ, SamplesCell prints both.
+func (c CrossJudged) primarySamples() int { return len(c.Primary.Grades) }
+func (c CrossJudged) secondSamples() int  { return len(c.Second.Grades) }
+
+// figure pairs a value computed from each judge's aggregate.
+//
+// Every accessor goes through here so that the "was there a second judge"
+// question is answered once. Whether that judge produced anything is left to
+// the VALUE: each accessor returns NaN where it has nothing to report, and
+// Corroborated collapses a NaN second to an uncorroborated figure. Gating on a
+// sample count here instead would have been wrong for the re-judge path, which
+// carries verdicts and no grades at all — every figure would have declared
+// itself uncorroborated in the one report whose entire subject is two judges.
+func (c CrossJudged) figure(of func(Aggregate) float64) JudgedFigure {
+	if !c.HaveSecond {
+		return SingleJudged(of(c.Primary))
+	}
+	// THE STIMULUS GATE, and it is here — at the one function every accessor
+	// goes through — rather than at each accessor, so that a figure added later
+	// inherits it without anyone remembering to. A column that reached
+	// Corroborated directly would be a column publishing a confidence interval
+	// on a comparison nobody made, which is the defect this whole mechanism
+	// closes.
+	if !c.SameStimulus() {
+		return NotComparable(of(c.Primary))
+	}
+	return Corroborated(of(c.Primary), of(c.Second))
+}
+
+// SameStimulus reports whether the two judges behind this row answered the same
+// question.
+//
+// False has three causes and they are all the same defect: the two judges were
+// shown different finding lists, one of them was folded in without recording
+// what it was shown, or the second graded fewer samples than the primary. In
+// every case the difference between the two figures mixes a disagreement with a
+// change of question, and the legend beside them calls that difference a
+// confidence interval.
+//
+// A row with no second judge answers false as well, which no caller can
+// misread: HaveSecond is checked first everywhere it matters, and a figure with
+// one judge already renders as unmeasured.
+func (c CrossJudged) SameStimulus() bool {
+	return c.HaveSecond && c.Primary.SameStimulusAs(c.Second)
+}
+
+// rateFigure pairs a per-sample rate, each side over its OWN sample count.
+func (c CrossJudged) rateFigure(count func(Aggregate) int) JudgedFigure {
+	rate := func(a Aggregate) float64 {
+		n := len(a.Grades)
+		if n == 0 {
+			return math.NaN()
+		}
+		return float64(count(a)) / float64(n)
+	}
+	return c.figure(rate)
+}
+
+// GradeFigure is the judge's mean letter grade, with the disagreement.
+func (c CrossJudged) GradeFigure() JudgedFigure {
+	return c.figure(func(a Aggregate) float64 {
+		if len(a.Grades) == 0 {
+			// Undefined, not 0.00. A contender whose every review failed has no
+			// grade, and 0.00 reads as "graded, and terrible" — the state the
+			// benchmark reaches whenever the incumbent's every invocation errors.
+			return math.NaN()
+		}
+		return a.MeanGrade()
+	})
+}
+
+// SpreadFigure is the worst-to-best dispersion of the graded samples.
+//
+// Its delta answers a question this harness has never been able to ask: the
+// spread is the judge's dispersion over fixtures and runs, and the delta beside
+// it is how much the OTHER judge's dispersion differs. Two judges agreeing that
+// a contender is unstable is a different finding from one judge being unstable
+// about it.
+func (c CrossJudged) SpreadFigure() JudgedFigure {
+	return c.figure(func(a Aggregate) float64 {
+		if len(a.Grades) < 2 {
+			// Not 0.00, which would read as "perfectly stable" when it means
+			// "not measured".
+			return math.NaN()
+		}
+		return a.GradeSpread()
+	})
+}
+
+// PrecisionFigure is the share of findings a senior reviewer would raise.
+func (c CrossJudged) PrecisionFigure() JudgedFigure {
+	return c.figure(func(a Aggregate) float64 { return a.Precision() })
+}
+
+// SignalFigure is the judge's signal-to-noise grade.
+func (c CrossJudged) SignalFigure() JudgedFigure {
+	return c.figure(func(a Aggregate) float64 {
+		if len(a.SignalToNoise) == 0 {
+			return math.NaN()
+		}
+		return a.MeanSignal()
+	})
+}
+
+// ToneAdherenceFigure is the judge's tone-adherence grade.
+func (c CrossJudged) ToneAdherenceFigure() JudgedFigure {
+	return c.figure(func(a Aggregate) float64 {
+		if len(a.ToneAdherence) == 0 {
+			return math.NaN()
+		}
+		return a.MeanTone()
+	})
+}
+
+// FindFigure is findings per sample.
+//
+// It carries a delta even though DescriptiveColumns classes FIND as a count
+// rather than a score, because the number is COUNTED FROM VERDICTS: a judge that
+// returns fewer verdicts than there were findings lowers it. Leaving the one
+// judge-derived column in the table without a delta would be the same omission
+// in miniature.
+func (c CrossJudged) FindFigure() JudgedFigure {
+	return c.rateFigure(func(a Aggregate) int { return a.Findings })
+}
+
+// RealFigure is technically-correct findings per sample.
+func (c CrossJudged) RealFigure() JudgedFigure {
+	return c.rateFigure(func(a Aggregate) int { return a.Real })
+}
+
+// WorthFigure is worth-raising findings per sample.
+func (c CrossJudged) WorthFigure() JudgedFigure {
+	return c.rateFigure(func(a Aggregate) int { return a.WorthRaising })
+}
+
+// InflatedFigure is J-INFL: findings the judge called over-severe, per sample.
+func (c CrossJudged) InflatedFigure() JudgedFigure {
+	return c.rateFigure(func(a Aggregate) int { return a.Inflated })
+}
+
+// UnderstatedFigure is J-UNDER, and is printed only ever beside InflatedFigure:
+// counting over-claiming while ignoring under-claiming hands a free win to
+// whichever reviewer is quieter about severity.
+func (c CrossJudged) UnderstatedFigure() JudgedFigure {
+	return c.rateFigure(func(a Aggregate) int { return a.Understated })
+}
+
+// MisclassedFigure is findings the judge said carried the wrong class.
+func (c CrossJudged) MisclassedFigure() JudgedFigure {
+	return c.rateFigure(func(a Aggregate) int { return a.Misclassed })
+}
+
+// ToneOffFigure is findings whose wording missed the configured voice.
+func (c CrossJudged) ToneOffFigure() JudgedFigure {
+	return c.rateFigure(func(a Aggregate) int { return a.ToneOff })
+}
+
+// MissedFigure is defects the judge would have raised and the review did not.
+//
+// This is the column the re-judge path has never been able to measure — the
+// dump records no missed list — and it is also the column whose instability
+// motivated that path: the same cached findings were scored 2 missed on one run
+// and 5 on the next. Judging live with two judges is the first thing here that
+// puts a number on it.
+func (c CrossJudged) MissedFigure() JudgedFigure {
+	return c.rateFigure(func(a Aggregate) int { return a.Missed })
+}
+
+// SamplesCell renders N: how many samples each judge graded.
+//
+// One number when they agree, "8/6" when the second judge graded fewer. A
+// second judge that failed on two fixtures produces deltas computed from rates
+// over different denominators, and that is legitimate — each rate is correct
+// over its own sample — but it is not the same measurement, and a reader
+// comparing a delta against a spread has to be able to see it.
+func (c CrossJudged) SamplesCell() string {
+	n := c.primarySamples()
+	if !c.HaveSecond || c.secondSamples() == n {
+		return fmt.Sprintf("%d", n)
+	}
+	return fmt.Sprintf("%d/%d", n, c.secondSamples())
+}
+
+// VerdictCells renders how many verdicts each judge was COUNTED for.
+//
+// Two cells from one call, for the same reason SplitCells returns three: the
+// two counts differing is itself a result — a judge that answered nine of
+// twelve findings has a precision over a different population than one that
+// answered all twelve — and a row that printed one of them would be claiming a
+// shared denominator it does not have.
+func (c CrossJudged) VerdictCells() (primary, second string) {
+	if !c.HaveSecond {
+		return fmt.Sprintf("%d", c.Primary.Findings), "n/a"
+	}
+	return fmt.Sprintf("%d", c.Primary.Findings), fmt.Sprintf("%d", c.Second.Findings)
+}
+
+// Denominators renders every rate above as the counts it came from, for BOTH
+// judges.
+//
+// It lives here rather than at the table for the same reason the figures do.
+// The counts are the resolution behind the rates — PREC 0.74 and PREC 0.67 read
+// as a difference until you are told they are 17/23 and 2/3 — and a report that
+// formatted them itself would be a report holding the raw judged counters,
+// which is the state this type exists to keep it out of.
+func (c CrossJudged) Denominators(label string) string {
+	one := func(a Aggregate) string {
+		return fmt.Sprintf("%d sample(s) over %d fixture(s) | PREC %d/%d worth raising | "+
+			"%d inflated and %d understated of %d findings | MISCLASS %d | MISSED %d",
+			len(a.Grades), a.Coverage(), a.WorthRaising, a.Findings,
+			a.Inflated, a.Understated, a.Findings, a.Misclassed, a.Missed)
+	}
+
+	out := fmt.Sprintf("  %-36s primary judge: %s", truncate(label, 36), one(c.Primary))
+	if !c.HaveSecond {
+		return out + "\n" + fmt.Sprintf("  %-36s second judge:  NONE — every figure on this row is "+
+			"one opinion, and its delta is unmeasured", "")
+	}
+
+	out += "\n" + fmt.Sprintf("  %-36s second judge:  %s", "", one(c.Second))
+
+	// The reader who has come here to check a delta is told, in the same block,
+	// whether there is a delta to check. Printing the two judges' counts and
+	// leaving the comparability to be inferred from a "+NC" in a distant cell is
+	// how the previous version of this report managed to be individually correct
+	// everywhere and wrong as a whole.
+	if !c.SameStimulus() {
+		out += "\n" + fmt.Sprintf("  %-36s stimulus:      THE TWO JUDGES DID NOT SCORE THE SAME "+
+			"FINDING LISTS, so no figure on this row carries a delta. Either they were shown "+
+			"different lists, or one graded fewer samples than the other, or a judgement was folded "+
+			"in without recording what produced it", "")
+	}
+	return out
+}
+
+// JudgePanel is the judges a report was scored by, and the second judge's
+// aggregates keyed by contender.
+//
+// Reports take a panel rather than two maps so that "was there a second judge"
+// is answered in one place and cannot be answered differently by the banner and
+// by the cells. A report that decided per column would be one edit away from a
+// table whose header claims corroboration and whose rows do not.
+type JudgePanel struct {
+	// Primary is the judge that produced the published figures. Second is the
+	// corroborating judge, empty when there was none.
+	Primary string
+	Second  string
+
+	// SecondAggregates is the corroborating judge's tally per contender, keyed
+	// exactly as the primary map is. A contender missing from it was scored by
+	// one judge, and Pair renders it as such rather than as agreement.
+	SecondAggregates map[string]*Aggregate
+}
+
+// Corroborated reports whether a second judge was asked at all.
+func (p JudgePanel) Corroborated() bool { return strings.TrimSpace(p.Second) != "" }
+
+// Pair binds a contender's primary aggregate to the second judge's.
+//
+// A contender the second judge produced nothing for comes back UNCORROBORATED
+// rather than paired against an empty Aggregate. The difference matters: an
+// empty Aggregate has zero findings and zero grades, so pairing against it
+// would publish a delta of "the other judge scored this at nothing", which is a
+// measurement nobody made.
+func (p JudgePanel) Pair(contender string, primary Aggregate) CrossJudged {
+	if !p.Corroborated() {
+		return CrossJudged{Primary: primary}
+	}
+	second, ok := p.SecondAggregates[contender]
+	if !ok || second == nil {
+		return CrossJudged{Primary: primary}
+	}
+	return CrossJudged{Primary: primary, Second: *second, HaveSecond: true}
+}
+
+// Unpaired returns the contenders the second judge scored that no row claimed.
+//
+// A second aggregate nobody looked up is the SILENT form of a keying bug, and
+// this path has one available: Corroborate keys by contenderLabel — model and
+// variant together — while the persona tables identify their rows by variant
+// alone. Ask for "nitpick=off" when the aggregate is filed under
+// "z-ai/glm-5.2 [nitpick=off]" and Pair returns an uncorroborated figure, so the
+// judging is paid for, the answers exist, and every cell still prints "+?". The
+// run looks exactly like one where no second judge was configured.
+//
+// Nothing in the type system can catch that, because both sides are strings. A
+// report that states what it failed to claim can.
+func (p JudgePanel) Unpaired(claimed []string) []string {
+	seen := make(map[string]bool, len(claimed))
+	for _, c := range claimed {
+		seen[c] = true
+	}
+
+	var out []string
+	for key := range p.SecondAggregates {
+		if !seen[key] {
+			out = append(out, key)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Banner states, above the table, how many judges are behind every figure in it
+// and what each one's vendor conflict is.
+//
+// The single-judge case is the one this has to get right. It is the state every
+// run before this one was in, it is the state a run falls back to when
+// NITPICK_EVAL_JUDGE2 is unset, and a table that simply omitted the deltas
+// there would be indistinguishable from the tables this work was commissioned
+// to replace. So it prints, loudly, and names the command that fixes it.
+func (p JudgePanel) Banner() string {
+	conflict := func(judge string) string {
+		c := VendorConflicts(judge)
+		if len(c) == 0 {
+			return fmt.Sprintf("%s — shares a vendor with NO contender", judge)
+		}
+		return fmt.Sprintf("%s — SHARES A VENDOR WITH %d CONTENDER(S) IT SCORES: %s",
+			judge, len(c), strings.Join(c, ", "))
+	}
+
+	if !p.Corroborated() {
+		return "SINGLE JUDGE, UNCORROBORATED. Every judged figure below is one model's opinion and " +
+			"renders as `X+?`,\nwhere `?` is a cross-judge disagreement THAT WAS NOT MEASURED — not one " +
+			"that was measured at zero.\n  primary judge: " + conflict(p.Primary) + "\n  second judge:  " +
+			"none. Set " + EnvSecondJudge + "=default to score the same findings again with " +
+			SecondJudgeModel + ",\n                 which re-judges cached findings and runs no review."
+	}
+
+	return "TWO JUDGES. Every judged figure below is printed with the disagreement between them, as one " +
+		"value —\nor as `+NC` where the two judges did not score the same finding list, in which case " +
+		"there is no\ndisagreement to compute and none is published.\n  primary judge: " +
+		conflict(p.Primary) + "\n  second judge:  " + conflict(p.Second)
+}
+
+// judgedCellWidth is how wide a table cell must be to hold a corroborated
+// figure.
+//
+// The widest rendering is a two-decimal value with a two-decimal signed delta.
+// Eleven characters covers a rate that has gone into double digits against a
+// delta of the same size — "15.00-15.00", which a FIND column reaches the first
+// time a contender files fifteen findings a sample — and twelve leaves the
+// column from touching its neighbour. It is a constant rather than a measured
+// maximum because the header has to be built before any figure exists.
+const judgedCellWidth = 12
+
+// CorroboratedColumns are the columns whose value comes from a judge and must
+// therefore be printed as a JudgedFigure.
+//
+// It is JudgeOpinionColumns — the package's own register of what an LLM judge
+// supplies — plus the two counts that are TALLIED FROM VERDICTS. FIND and
+// FINDINGS are classed descriptive because no reviewer is better for a larger
+// one, and that classification is right about what they mean and wrong about
+// where they come from: Aggregate.countVerdicts increments Findings once per
+// verdict, so a judge that answers half the list halves the column.
+//
+// Derived from the register rather than listed, so a judged column added to
+// JudgeOpinionColumns is one that must carry a delta from the day it is added.
+func CorroboratedColumns() []string {
+	out := append([]string(nil), JudgeOpinionColumns()...)
+	out = append(out, "FIND", "FINDINGS")
+	sort.Strings(out)
+	return out
+}
+
+// tableColumn is one column of a header: its name and the field width the row
+// under it must pad to.
+type tableColumn struct {
+	name  string
+	width int
+}
+
+// tableColumns reads a header's columns and their widths.
+//
+// Columns are separated by runs of TWO OR MORE spaces, matching the rule the
+// package's own header guards use, because a single space occurs inside a column
+// name — "SEV A/I/U" is one column of SummaryTableHeader — and splitting on it
+// shatters the header rather than reading it.
+//
+// The width of every column but the last is the distance to the next column's
+// start, minus the one space that separates them; the last column is unbounded
+// and reports the width of its own name. Reading the widths OUT of the header,
+// rather than keeping a format string in step with it by hand, is what makes a
+// row that cannot drift out of line with the header above it — a defect the
+// judged tables have shipped once already.
+func tableColumns(header string) []tableColumn {
+	var (
+		names  []string
+		starts []int
+	)
+
+	for i := 0; i < len(header); {
+		if header[i] == ' ' {
+			i++
+			continue
+		}
+
+		start := i
+		for i < len(header) {
+			// A single interior space continues the column name; two end it.
+			if header[i] == ' ' && (i+1 >= len(header) || header[i+1] == ' ') {
+				break
+			}
+			i++
+		}
+		names = append(names, strings.TrimRight(header[start:i], " "))
+		starts = append(starts, start)
+	}
+
+	cols := make([]tableColumn, len(names))
+	for i, name := range names {
+		width := len(name)
+		if i+1 < len(starts) {
+			width = starts[i+1] - starts[i] - 1
+		}
+		cols[i] = tableColumn{name: name, width: width}
+	}
+	return cols
+}
+
+// WidenJudgedColumns rebuilds a header with every judge-supplied column wide
+// enough to hold a figure AND its cross-judge delta.
+//
+// The published headers were sized for a bare number, and a corroborated figure
+// does not fit: "3.66+0.24" in a six-character GRADE cell pushes every column
+// after it out of line, which is the failure mode this package has already
+// shipped once and describes as silent. Widening is done by DERIVING a new
+// header from the declared one, so the two carry identical columns in identical
+// order by construction — a hand-written second header is the maintained list
+// that this package's own registry comment calls the way a bad column ships.
+func WidenJudgedColumns(header string) string {
+	judged := map[string]bool{}
+	for _, c := range CorroboratedColumns() {
+		judged[c] = true
+	}
+
+	cols := tableColumns(header)
+
+	var b strings.Builder
+	for i, c := range cols {
+		width := c.width
+		if judged[c.name] {
+			width = max(width, judgedCellWidth)
+		}
+
+		if i == len(cols)-1 {
+			b.WriteString(c.name)
+			break
+		}
+		fmt.Fprintf(&b, "%-*s ", width, c.name)
+	}
+	return b.String()
+}
+
+// TableRow renders one row under a header, padding each cell to that header's
+// own column width.
+//
+// The row and the header therefore cannot disagree about widths, because there
+// is only one description of them. Both ways the pairing can still break are
+// reported ON THE ROW rather than fixed silently: a row with the wrong number of
+// cells, and a cell too wide for its column. Either one misaligns the table, and
+// a misaligned table is read as data.
+func TableRow(header string, cells []string) string {
+	cols := tableColumns(header)
+
+	var (
+		b        strings.Builder
+		overflow []string
+	)
+
+	for i, c := range cols {
+		cell := ""
+		if i < len(cells) {
+			cell = cells[i]
+		}
+		if len(cell) > c.width && i != len(cols)-1 {
+			overflow = append(overflow, c.name)
+		}
+
+		if i == len(cols)-1 {
+			b.WriteString(cell)
+			break
+		}
+		fmt.Fprintf(&b, "%-*s ", c.width, cell)
+	}
+
+	if len(cells) != len(cols) {
+		fmt.Fprintf(&b, "   !! ROW HAS %d CELL(S) FOR A %d-COLUMN HEADER", len(cells), len(cols))
+	}
+	if len(overflow) > 0 {
+		fmt.Fprintf(&b, "   !! CELL OVERFLOWS COLUMN: %s", strings.Join(overflow, ", "))
+	}
+
+	b.WriteString("\n")
+	return b.String()
+}
+
+// CrossJudgedModelTableHeader is JudgedModelTableHeader with room for the
+// disagreement, and is the header the judged model ranking is printed under.
+//
+// It is registered as a SCORED table, like the header it derives from, so every
+// column guard in this package runs over it too: same column names, same order,
+// wider cells. Deriving it is what guarantees that — a second hand-written
+// header is how a column gets added to one table and not the other.
+var CrossJudgedModelTableHeader = registerTableHeader(tableScored,
+	WidenJudgedColumns(JudgedModelTableHeader))
+
+// CrossJudgedVariantTableHeader is VariantTableHeader with the same treatment.
+// The persona axis is judged by the same judge on the same terms, so its figures
+// carry the same disagreement or the same admission that none was measured.
+var CrossJudgedVariantTableHeader = registerTableHeader(tableScored,
+	WidenJudgedColumns(VariantTableHeader))
+
+// JudgedModelRow renders one contender's row of the judged model ranking.
+//
+// IT LIVES IN NON-TEST CODE ON PURPOSE, for the reason score.go gives for
+// keeping the headers here: the reports are rendered from files behind the
+// `eval` build tag, and a guard that only compiles under that tag cannot run in
+// `go test ./...`. Putting the row here means the default build can render one
+// and assert that every judged cell carries its disagreement — which is the
+// claim, and which was previously unassertable without spending money.
+//
+// It takes a CrossJudged and not an Aggregate. That is the structural half: this
+// function has no bare judged number available to print, because CrossJudged
+// hands out nothing but JudgedFigures and JudgedFigure formats to a pair under
+// every verb.
+//
+// The objective severity cells are computed here rather than passed in, so the
+// gated renderer is always the one that produces them — a table that formatted
+// SevAccurate itself is the defect TestNoReportFormatsSeverityCountersDirectly
+// exists for, found the hard way.
+func JudgedModelRow(model string, c CrossJudged, failed int) string {
+	oInfl, oUnder, oAcc, oCov := c.Primary.ObjectiveSeverityCells(model, len(c.Primary.Grades))
+
+	return TableRow(CrossJudgedModelTableHeader, []string{
+		truncate(model, 36),
+		c.GradeFigure().String(),
+		c.SpreadFigure().String(),
+		c.PrecisionFigure().String(),
+		fmt.Sprintf("%d", c.Primary.Coverage()),
+		c.SamplesCell(),
+		fmt.Sprintf("%d", failed),
+		c.FindFigure().String(),
+		c.WorthFigure().String(),
+		c.InflatedFigure().String(),
+		c.UnderstatedFigure().String(),
+		oInfl, oUnder, oAcc, oCov,
+		c.MisclassedFigure().String(),
+		c.MissedFigure().String(),
+		c.SignalFigure().String(),
+	})
+}
+
+// JudgedVariantRow renders one variant's row of the persona comparison, on the
+// same terms and for the same reasons as JudgedModelRow.
+func JudgedVariantRow(variant string, c CrossJudged, failures int) string {
+	oInfl, oUnder, oAcc, oCov := c.Primary.ObjectiveSeverityCells(variant, len(c.Primary.Grades))
+
+	return TableRow(CrossJudgedVariantTableHeader, []string{
+		truncate(variant, 23),
+		c.SamplesCell(),
+		fmt.Sprintf("%d", failures),
+		c.FindFigure().String(),
+		c.RealFigure().String(),
+		c.WorthFigure().String(),
+		c.PrecisionFigure().String(),
+		c.InflatedFigure().String(),
+		c.UnderstatedFigure().String(),
+		oInfl, oUnder, oAcc, oCov,
+		c.MisclassedFigure().String(),
+		c.ToneOffFigure().String(),
+		c.MissedFigure().String(),
+		c.SignalFigure().String(),
+		c.GradeFigure().String(),
+	})
+}
+
+// CrossJudgeLegend is printed under every table carrying a JudgedFigure.
+//
+// A const in non-test code, matching SeverityColumnLegend, so that the
+// admission cannot be edited out of a report without a guard in the default
+// build seeing it go.
+const CrossJudgeLegend = "EVERY JUDGED FIGURE IS PRINTED WITH ITS CROSS-JUDGE DISAGREEMENT, AS ONE VALUE. " +
+	"`0.74-0.06` means BOTH JUDGES SCORED THE SAME FINDING LIST: the primary scored 0.74 and the second " +
+	"0.68; the delta is SIGNED, so the second judge's figure is exactly the two added. ONLY IN THAT " +
+	"FORM IS THE SIZE OF THE DELTA THE CONFIDENCE INTERVAL ON THE FIGURE BESIDE IT — there, a gap " +
+	"between two rows smaller than either row's delta is not a ranking. `0.74+?` means ONE judge scored " +
+	"it and the disagreement is UNMEASURED — which is not the same claim as +0.00, and is why it is not " +
+	"printed as a number. `0.74+NC` means TWO judges scored it FROM DIFFERENT FINDING LISTS and the " +
+	"comparison was NOT COMPARABLE, SO IT WAS NOT MADE: the difference between them would be a change " +
+	"of question wearing the costume of a disagreement, there is no confidence interval on that figure, " +
+	"and the second judge's number is not published at all. `n/a` means undefined: no finding, no graded " +
+	"sample, nothing to disagree about. THE O-* COLUMNS CARRY NO DELTA AND NEED NONE: they compare each " +
+	"located defect to the WantSeverity its fixture declares, with no model involved."

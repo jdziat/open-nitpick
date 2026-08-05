@@ -98,16 +98,23 @@ type Plan struct {
 	// Skipped: a windowed file was reviewed WITH file context, just not all of
 	// it, and reporting it as diff-only would understate the review.
 	//
-	// NOTHING RENDERS THIS YET, and that is a regression against what the
-	// published comment used to say. A file over review.max_file_bytes was
-	// previously refused its content outright and landed in Degraded, which
-	// internal/review/render.go prints under "Reviewed from the diff only".
-	// Such a file now gets a window and lands here instead, so a reader who
-	// was told something is now told nothing — even where 98% of the file was
-	// elided. The fix belongs in render.go, alongside degradedNotes: a
-	// "Reviewed with reduced file context" section over this list. Until then
-	// only Entry.ContextLines carries the fact, and it carries it to the model
-	// rather than to the human.
+	// IT MUST BE RENDERED, and this paragraph used to say it was not. A file
+	// over review.max_file_bytes was previously refused its content outright
+	// and landed in Degraded, which internal/review/render.go prints under
+	// "Reviewed from the diff only". Such a file now gets a window and lands
+	// here instead — a better review — so for as long as nothing printed this
+	// list, a reader who had been told something was told nothing, even where
+	// most of the file had been elided. Better context must not be paid for
+	// with worse disclosure.
+	//
+	// render.go closed that: renderSummary prints this list under "Reviewed
+	// with reduced file context", a heading kept distinct from both neighbours
+	// because a reader who concludes "not reviewed" re-reviews the file by hand
+	// and one who concludes "fully reviewed" trusts an absence of findings in
+	// the part that was elided. TestWindowedFilesAreDisclosed is the guard. The
+	// note here outlived the fix by two changes, which is its own small lesson:
+	// a comment naming an open regression is read as a task, and this one sent
+	// the next reader to implement something that already existed.
 	Windowed []Skip
 }
 

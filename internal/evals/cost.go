@@ -1092,7 +1092,9 @@ func incomparableCost(usd float64, format string, args ...any) Cost {
 	return Cost{USD: usd, Known: true, Reason: fmt.Sprintf(format, args...)}
 }
 
-// unknownCost is an amount that must not be printed as a number.
+// unknownCost is an amount that must not be printed as a number, which
+// TestAModelWithNoPriceEntryReportsUnknownAndNotZero pins across every reading a
+// row publishes.
 func unknownCost(format string, args ...any) Cost {
 	return Cost{Reason: fmt.Sprintf(format, args...)}
 }
@@ -2019,7 +2021,9 @@ func (l *CostLedger) ComparabilityNotes() []string {
 }
 
 // OrderingNotes names the pairs of rows a reader must NOT order on $/DEFECT
-// because their routing bands overlap.
+// because their routing bands overlap, which
+// TestTwoAmountsWithOverlappingBandsAreNotOrderable checks on two rows built to
+// overlap.
 //
 // This is the half of the routing disclosure that does work rather than
 // informing. A footnote saying "this amount is one point in a 3.9x band" leaves

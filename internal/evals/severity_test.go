@@ -329,6 +329,123 @@ func TestUnusableSeverityIsDegradedIdenticallyForEveryContender(t *testing.T) {
 	}
 }
 
+// crSeverityCases discovers the vocabulary crSeverity enumerates, by reading the
+// case literals out of its switch.
+//
+// Discovered rather than listed, for the reason the header registry had to learn
+// twice: a second list that somebody has to keep in step with the first is the
+// same defect one step removed. Adding a case and forgetting to extend a
+// hand-written list is precisely the silent widening the caller guards against.
+func crSeverityCases(t *testing.T) []string {
+	t.Helper()
+
+	parsed, err := parser.ParseFile(token.NewFileSet(), "incumbent.go", nil, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatalf("parsing incumbent.go: %v", err)
+	}
+
+	var out []string
+	ast.Inspect(parsed, func(n ast.Node) bool {
+		fn, ok := n.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != "crSeverity" {
+			return true
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			clause, ok := n.(*ast.CaseClause)
+			if !ok {
+				return true
+			}
+			for _, expr := range clause.List {
+				lit, ok := expr.(*ast.BasicLit)
+				if !ok || lit.Kind != token.STRING {
+					continue
+				}
+				word, err := strconv.Unquote(lit.Value)
+				if err != nil {
+					t.Fatalf("case literal %s in crSeverity: %v", lit.Value, err)
+				}
+				out = append(out, word)
+			}
+			return true
+		})
+		return false
+	})
+
+	sort.Strings(out)
+	return out
+}
+
+// TestForeignSeverityWordsAreTranslatedOnPurpose pins the enumerated half of
+// crSeverity, which the default-arm guard above cannot reach.
+//
+// crSeverity translates a foreign vocabulary. "major" and "warn" become warning
+// and "nitpick" becomes nit, where those same tokens on one of our own findings
+// would go through config.Severity.Normalize and land at info — so the identical
+// word is worth a different level depending on who said it. The asymmetry is
+// deliberate and it is load-bearing: "major" carries more than half the
+// incumbent's severity words in the shipped cache, and degrading it to info
+// would understate the incumbent on nearly every row of a comparison whose whole
+// point is to be like-for-like.
+//
+// THE REASON THIS TEST EXISTS AT ALL is that the comment beside crSeverity has
+// been citing it by name — "pins the enumerated set, so a fourth translation
+// cannot be added silently" — while nothing of the sort was ever written. A
+// citation reads as proof the claim beside it is checked, so that sentence was
+// worse than saying nothing: it told every reader to stop looking. The guard is
+// arriving late rather than the promise being withdrawn, because the promise is
+// the right one.
+func TestForeignSeverityWordsAreTranslatedOnPurpose(t *testing.T) {
+	words := crSeverityCases(t)
+	if len(words) == 0 {
+		t.Fatal("no case literals were discovered in crSeverity, so this test says nothing about " +
+			"what the incumbent's vocabulary is translated to")
+	}
+
+	// A word is TRANSLATED when the enumeration moves it somewhere Normalize
+	// would not have. Words the two paths agree on — "critical", "error",
+	// "minor" — cost nothing and need no argument: they are recorded, not
+	// re-decided.
+	translated := map[string]config.Severity{}
+	for _, word := range words {
+		ours, _ := config.Severity(word).Normalize()
+		if theirs := crSeverity(word); theirs != ours {
+			translated[word] = theirs
+		}
+	}
+
+	// The declared set. Each entry is a level this harness assigned on the
+	// reviewer's behalf, and each one is defensible on the record above.
+	want := map[string]config.Severity{
+		"major":   config.SeverityWarning,
+		"warn":    config.SeverityWarning,
+		"nitpick": config.SeverityNit,
+	}
+
+	for word, got := range translated {
+		expect, ok := want[word]
+		if !ok {
+			t.Errorf("crSeverity translates %q to %q and nothing here argues for it. A translation "+
+				"is a severity this harness assigns to a finding the reviewer worded differently, "+
+				"and it moves that reviewer's O-INFL and O-UNDR columns. Add it above with the "+
+				"reason, or let the word fall through to Normalize like any other", word, got)
+			continue
+		}
+		if got != expect {
+			t.Errorf("crSeverity translates %q to %q, and it is declared here as %q. The published "+
+				"columns move with this value", word, got, expect)
+		}
+	}
+
+	for word, expect := range want {
+		if _, ok := translated[word]; !ok {
+			t.Errorf("%q is declared a translation to %q and is no longer one. Either the case was "+
+				"removed — in which case the incumbent's most common severity word is now degraded "+
+				"to info and every row understates it — or Normalize learned the word and the "+
+				"translation is dead code", word, expect)
+		}
+	}
+}
+
 // TestCreditedFindingIsTheLoudestClaimNotThePrintOrder pins that a published
 // verdict does not turn on the order a reviewer printed its comments in.
 //
@@ -608,7 +725,7 @@ func TestAggregateKeepsBothSeverityOpinions(t *testing.T) {
 	if problems := a.Add(&JudgeResult{
 		Verdicts: []Verdict{{Index: 0, Real: true, WorthRaising: true, SeverityVerdict: "accurate"}},
 		Grade:    "B",
-	}, len(findings)); len(problems) > 0 {
+	}, JudgedOver(severityFixture().Name, findings)); len(problems) > 0 {
 		t.Fatalf("judge output reported suspect: %v", problems)
 	}
 	a.AddSeverity(severityFixture(), ScoreSeverity(severityFixture(), findings))
@@ -1997,10 +2114,10 @@ func radiusSpamReview(f Fixture) []review.Finding {
 // this comment is not, and a change here that breaks the inequality fails there.
 const terseGuessSpacing = 5
 
-// terseGuessReview is the reviewer that never says why: it names each planted
-// defect on its own line in as few words as it can, and scatters one-line
-// guesses through the rest of the file, each repeating that file's own
-// vocabulary.
+// terseGuessReview publishes a title and nothing else for every finding it
+// files: it names each planted defect on its own line in as few words as it can,
+// and scatters one-line guesses through the rest of the file, each repeating
+// that file's own vocabulary.
 //
 // It is the honest cheap-and-noisy strategy, and it replaced one that was not.
 // The row it stands in for was a line-by-line spammer justified as "forty

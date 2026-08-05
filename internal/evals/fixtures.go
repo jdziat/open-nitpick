@@ -174,10 +174,22 @@ func Fixtures() []Fixture {
 		pythonTimingUnsafeHMACFixture(),
 		redundantSnapshotCopyNitFixture(),
 		sortedForMinNitFixture(),
+
+		// Info plants. Three of the five are here and two are held out; see
+		// infoFixtures for why the level was authored at all, and
+		// HeldOutFixtures for which two went there. These three are the ones a
+		// tuning loop has to be able to measure repeatedly: Kotlin and PHP are
+		// languages nothing else in either corpus covers, and go-package-
+		// singleton is the only info plant in the language the prompt is most
+		// often read against.
+		kotlinWidenedInputFixture(),
+		phpForbiddenVsNotFoundFixture(),
+		goPackageSingletonFixture(),
 	}
 }
 
-// HeldOutFixtures is a second corpus the prompt tuning never sees.
+// HeldOutFixtures is a second corpus the prompt tuning never sees, which
+// TestHeldOutCorpusStaysHeldOut checks by intersecting the two accessors.
 //
 // Tuning a prompt against Fixtures() and then reporting a score on Fixtures()
 // measures nothing: with enough iterations any prompt can be shaped to eight
@@ -272,6 +284,14 @@ func HeldOutFixtures() []Fixture {
 		redundantSortNitFixture(),
 		duplicateTestCaseNitFixture(),
 		defensiveCopyOfLocalNitFixture(),
+
+		// The two info plants that are spent once. Rust and Ruby are languages
+		// NEITHER corpus contained, so a prompt tuned on Fixtures() has to reach
+		// the level in a language it was never shown — the same argument the C#,
+		// shell and Java plants above are here for. The Makefile's HELD_OUT line
+		// names both; TestTheMakefileSpendsTheWholeHeldOutCorpus pins that.
+		rustCrateForOneCallFixture(),
+		rubyDefaultPageSizeFixture(),
 	}
 }
 

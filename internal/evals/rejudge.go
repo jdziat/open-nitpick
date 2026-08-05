@@ -3,14 +3,17 @@ package evals
 // Re-judging recorded findings, so the judge can be changed without changing
 // anything else.
 //
-// The judge is an OpenAI model and three of the contenders are OpenAI models,
-// one of them the judge's own pro variant. Precision, MISSED and every J-*
-// column in the published tables are that model's opinion, and LLM-as-judge
-// self-preference is a documented effect, so a ranking built on it is a claim
-// nobody has tested. Swapping the judge and re-running the reviews cannot test
-// it either: that changes the findings AND the judge at once, and the two are
-// then inseparable. Judging the SAME recorded findings twice changes exactly
-// one thing.
+// The judge is an OpenAI model, three of the contenders are OpenAI models, and
+// ONE OF THEM IS THE JUDGE ITSELF — openai/gpt-5.6-terra appears in both
+// DefaultModels and DefaultJudgeModel. Precision, MISSED and every J-* column in
+// the published tables are that model's opinion of its own output among others',
+// and LLM-as-judge self-preference is a documented effect, so a ranking built on
+// it is a claim nobody has tested. VendorConflicts computes the current list
+// rather than trusting this paragraph.
+//
+// Swapping the judge and re-running the reviews cannot test it either: that
+// changes the findings AND the judge at once, and the two are then inseparable.
+// Judging the SAME recorded findings twice changes exactly one thing.
 //
 // The second thing this path is for is noise. The same cached Incumbent
 // findings were scored 2 missed on one benchmark run and 5 on the next — same
@@ -39,7 +42,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"sort"
 	"strings"
@@ -138,6 +140,19 @@ type RejudgeGroup struct {
 	// before DumpRecord.Silent existed has it inferred from a hole in the
 	// (contender, fixture, run) matrix, and GroupDump warns when it had to.
 	Silent bool
+
+	// Persona is the voice this review was CONFIGURED to use, and nil when it
+	// is not known.
+	//
+	// judgeRequest shows the persona to the judge and asks it to score tone
+	// against that voice, so re-judging a review under a different persona
+	// changes the prompt in two places and measures both. A dump never fills
+	// this in — it records no persona, and RejudgeReport says so — but the LIVE
+	// corroboration path knows exactly which voice each review was produced
+	// under, and the voice axis is four genuinely different personas. Judging
+	// all four against the default would have scored three of them for adhering
+	// to a voice they were never asked to use.
+	Persona *config.Persona
 }
 
 // shortHash renders a fixture fingerprint for an error message. The full 64 hex
@@ -357,7 +372,10 @@ func GroupDump(records []DumpRecord) ([]RejudgeGroup, []string, error) {
 				// judged differently is precisely the judge noise this path was
 				// built to measure, so it is the one collision that must not be
 				// resolved by file order. sameFinding cannot see it: it compares
-				// the finding and the verdict is not part of the finding.
+				// the finding and the verdict is not part of the finding, which
+				// TestGroupDumpRefusesTwoJudgementsOfOneFinding pins by
+				// submitting the identical finding under both verdicts in both
+				// orders.
 				if prev, seen := b.verdicts[rec.Index]; seen && prev != *rec.Verdict {
 					return nil, nil, fmt.Errorf(
 						"dump has two different verdicts on the same finding at %s/%s run %d index %d "+
@@ -655,12 +673,22 @@ func Rejudge(ctx context.Context, judge rejudger, persona config.Persona, groups
 
 			out[i].Group = g
 
+			// The group's own persona when it has one, the caller's otherwise.
+			// A dump carries none and the report says the voice section of the
+			// prompt therefore differs from the original; the live path carries
+			// the real one, which is the only way the voice axis can be
+			// corroborated without also changing what tone is scored against.
+			voice := persona
+			if g.Persona != nil {
+				voice = *g.Persona
+			}
+
 			// A silent group is judged too, rather than assumed to produce
 			// nothing. The original judge WAS called with an empty list, and a
 			// judge that answers an empty list with verdicts is a failure mode
 			// the report has to be able to show rather than one this code hides
 			// by never asking.
-			result, err := judge.Judge(ctx, g.Fixture, persona, g.Findings)
+			result, err := judge.Judge(ctx, g.Fixture, voice, g.Findings)
 			out[i].Result = result
 			out[i].Err = err
 		}(i, g)
@@ -669,6 +697,130 @@ func Rejudge(ctx context.Context, judge rejudger, persona config.Persona, groups
 	wg.Wait()
 
 	return out
+}
+
+// CorroborationGroups builds re-judge groups from samples a judge has just
+// scored LIVE.
+//
+// It is the bridge that lets the second judge cost judging only. The re-judge
+// path was built to re-score findings read back off a dump, and its property —
+// the findings go to the second judge in the positions the first judge saw them
+// in, with no review re-run — is exactly what a live battery needs to publish a
+// disagreement. Going out through a file and back would work and would add a
+// confound for nothing: the dump cannot carry a persona, and it attaches at most
+// one verdict per position, so a round trip through it would lose whatever the
+// first judge said twice.
+//
+// Sorted so that the notes a corroboration produces come out in the same order
+// twice. The aggregates do not care, and a report that reorders its own warnings
+// between runs is one nobody can diff.
+func CorroborationGroups(samples []DumpSample) []RejudgeGroup {
+	groups := make([]RejudgeGroup, 0, len(samples))
+
+	for _, s := range samples {
+		var baseline []Verdict
+		if s.Judged != nil {
+			baseline = s.Judged.Verdicts
+		}
+
+		groups = append(groups, RejudgeGroup{
+			Model:    s.Model,
+			Variant:  s.Variant,
+			Run:      s.Run,
+			Fixture:  s.Fixture,
+			Findings: s.Findings,
+			Baseline: baseline,
+
+			// Recorded, not inferred later. A review that reported nothing is
+			// still submitted to the second judge — see Rejudge — and a judge
+			// that answers an empty finding list is a failure this has to be
+			// able to show rather than one it hides by never asking.
+			Silent: len(s.Findings) == 0,
+		})
+	}
+
+	sort.Slice(groups, func(i, j int) bool {
+		a, b := groups[i], groups[j]
+		if a.Model != b.Model {
+			return a.Model < b.Model
+		}
+		if a.Variant != b.Variant {
+			return a.Variant < b.Variant
+		}
+		if a.Fixture.Name != b.Fixture.Name {
+			return a.Fixture.Name < b.Fixture.Name
+		}
+		return a.Run < b.Run
+	})
+
+	return groups
+}
+
+// Corroborate scores groups with a second judge and folds the answer into one
+// Aggregate per contender, keyed the way the report keys its rows.
+//
+// The returned aggregates are the SECOND half of every published figure. They
+// are built with Aggregate.Add — the same call the primary pass uses — so a
+// precision on one side of a delta and a precision on the other cannot come from
+// two implementations of the word.
+//
+// Severity is deliberately NOT folded in. The O-* columns compare each located
+// defect to the WantSeverity its fixture declares with no model involved, so
+// both judges would compute byte-identical values over the same findings;
+// carrying them twice would invite a reader to treat two copies of one
+// measurement as two measurements.
+//
+// A group the second judge could not assess is counted nowhere and reported.
+// Substituting a zero would publish a disagreement against a judgement that was
+// never made, which is the one thing a delta must never be able to mean.
+func Corroborate(
+	ctx context.Context,
+	judge rejudger,
+	persona config.Persona,
+	groups []RejudgeGroup,
+	concurrency int,
+) (map[string]*Aggregate, map[string][]string) {
+	var (
+		byContender = map[string]*Aggregate{}
+		notes       = map[string][]string{}
+	)
+
+	for _, o := range Rejudge(ctx, judge, persona, groups, concurrency) {
+		g := o.Group
+		label := contenderLabel(g.Model, g.Variant)
+		where := fmt.Sprintf("%s run %d", g.Fixture.Name, g.Run)
+
+		if o.Err != nil || o.Result == nil {
+			notes[label] = append(notes[label], fmt.Sprintf(
+				"%s: SECOND JUDGE FAILED. This sample is in the primary figure and not in the "+
+					"second's, so the two judges no longer scored the same lists and NO FIGURE ON "+
+					"THIS ROW CARRIES A DELTA — every judged cell reads `+NC`. That is the honest "+
+					"reading: a rate over eight samples minus a rate over seven is not a "+
+					"disagreement between judges. Re-run to recover the corroboration: %v",
+				where, o.Err))
+			continue
+		}
+
+		agg, ok := byContender[label]
+		if !ok {
+			agg = &Aggregate{}
+			byContender[label] = agg
+		}
+		agg.Saw(g.Fixture.Name)
+
+		// The stimulus is the group's finding list, which is BY CONSTRUCTION the
+		// list the second judge was shown — Rejudge passes g.Findings and
+		// nothing else. That makes this side of every delta self-reporting: if
+		// the primary was folded in over a different list, the two fingerprints
+		// differ and the figure refuses to publish a delta rather than
+		// publishing one that compares two questions.
+		for _, p := range agg.Add(o.Result, JudgedOver(g.Fixture.Name, g.Findings)) {
+			notes[label] = append(notes[label],
+				fmt.Sprintf("%s: SECOND JUDGE OUTPUT SUSPECT: %s", where, p))
+		}
+	}
+
+	return byContender, notes
 }
 
 // rejudgeStats is one contender's two judgements, side by side.
@@ -788,6 +940,22 @@ func RejudgeReport(baselineJudge, newJudge string, outcomes []RejudgeOutcome, wa
 		s.baseline.Saw(g.Fixture.Name)
 		s.updated.Saw(g.Fixture.Name)
 
+		// Both sides are attributed the SAME stimulus, in one statement, because
+		// in this report they genuinely have one: the group IS a finding list,
+		// the new judge was handed exactly it, and the recorded baseline is the
+		// verdicts the dump filed against exactly it. Recording them apart would
+		// be two chances to attribute one list two ways.
+		//
+		// What this cannot verify is the dump's own claim — DumpSample.Judged
+		// says it "assesses exactly these findings", and a producer that wrote a
+		// judgement formed over some other list would be believed here. The
+		// persona axis used to be such a producer: it judged the whole corpus
+		// once and dumped a filtered list beside those verdicts. It no longer
+		// does; see runLevels, which judges each distinct filtered list.
+		shown := JudgedOver(g.Fixture.Name, g.Findings)
+		s.baseline.sawStimulus(shown)
+		s.updated.sawStimulus(shown)
+
 		// Both sides are reduced by the SAME rule before either is counted.
 		//
 		// The recorded baseline has already been through this reduction, because
@@ -879,6 +1047,23 @@ func RejudgeReport(baselineJudge, newJudge string, outcomes []RejudgeOutcome, wa
 	fmt.Fprintf(&b, "new judge:               %s\n", newJudge)
 	fmt.Fprintf(&b, "groups:                  %d reconstructed, %d of them empty; %d paired, %d excluded after a failed re-judge\n",
 		len(outcomes), silent, paired, failed)
+
+	// Named, not described. "the judge shares a vendor with three contenders"
+	// is a sentence that was true when somebody wrote it; this is recomputed
+	// from the battery, so a contender added under either judge's vendor shows
+	// up in the report that the comparison is read from.
+	writeConflicts := func(role, judge string) {
+		conflicts := VendorConflicts(judge)
+		if len(conflicts) == 0 {
+			fmt.Fprintf(&b, "%s judge vendor conflict: NONE — %s shares a vendor with no contender in the battery\n",
+				role, judge)
+			return
+		}
+		fmt.Fprintf(&b, "%s judge vendor conflict: %s scores %d contender(s) of its own vendor: %s\n",
+			role, judge, len(conflicts), strings.Join(conflicts, ", "))
+	}
+	writeConflicts("baseline", baselineJudge)
+	writeConflicts("new     ", newJudge)
 
 	if baseVendor == newVendor {
 		fmt.Fprintf(&b, "\nBOTH JUDGES ARE %s. This run measures the judge's OWN VARIANCE, not vendor preference:\n"+
@@ -995,6 +1180,12 @@ func RejudgeReport(baselineJudge, newJudge string, outcomes []RejudgeOutcome, wa
 		"from the agreement rates and included in that judge's own precision, which is how the\n" +
 		"published tables count them.\n")
 
+	// The same legend the published tables carry. PREC-A/PREC-B/DELTA are three
+	// cells of ONE JudgedFigure here — see precisionRow — so a reader moving
+	// between this table and the ranking meets the same instrument described the
+	// same way, rather than two spellings of one idea.
+	b.WriteString("\n" + CrossJudgeLegend + "\n")
+
 	if len(notes) > 0 {
 		b.WriteString("\nNOTES\n")
 		for _, n := range notes {
@@ -1048,39 +1239,44 @@ func writeRows(b *strings.Builder, rows []string) {
 	}
 }
 
-// precisionRow renders one contender under both judges.
-func precisionRow(model string, s *rejudgeStats, before, after map[string]int) string {
-	pa, pb := s.baseline.Precision(), s.updated.Precision()
+// crossJudged is this contender's two judgements as ONE value.
+//
+// HaveSecond is unconditionally true: a re-judge that produced no second
+// judgement for a contender is a failed group, excluded from both sides before
+// it reaches here, so a stats row exists only where two judges were asked. What
+// the second judge had nothing to say about arrives as an undefined value and
+// renders as such.
+func (s *rejudgeStats) crossJudged() CrossJudged {
+	return CrossJudged{Primary: s.baseline, Second: s.updated, HaveSecond: true}
+}
 
-	delta := "n/a"
-	if !math.IsNaN(pa) && !math.IsNaN(pb) {
-		delta = fmt.Sprintf("%+.2f", pb-pa)
-	}
+// precisionRow renders one contender under both judges.
+//
+// PREC-A, PREC-B and DELTA come from ONE JudgedFigure, through SplitCells, and
+// V-A/V-B from one VerdictCells. This table is the one place both absolute
+// precisions belong on the page — its whole subject is the two judges, and a
+// reader checking PREC-A against the published number needs the number — but
+// they still cannot be obtained separately. Three cells arrive from one call or
+// none do.
+func precisionRow(model string, s *rejudgeStats, before, after map[string]int) string {
+	cj := s.crossJudged()
+
+	prec := cj.PrecisionFigure()
+	pa, pb, delta := prec.SplitCells()
+	va, vb := cj.VerdictCells()
 
 	// MOVE is a rank difference, so it is meaningless unless both ranks exist.
 	// A contender with no verdict under one judge has no precision to rank.
 	move := "n/a"
-	if !math.IsNaN(pa) && !math.IsNaN(pb) {
+	if prec.Corroborated() {
 		move = fmt.Sprintf("%+d", before[model]-after[model])
 	}
 
-	return fmt.Sprintf("%-*s %-4d %-4d %-5d %-5d %-5d %-5d %-7s %-7s %-7s %-7d %-7d %s\n",
+	return fmt.Sprintf("%-*s %-4d %-4d %-5d %-5s %-5s %-5d %-7s %-7s %-7s %-7d %-7d %s\n",
 		contenderWidth, truncate(model, contenderWidth), s.groups, s.silent, s.failed,
-		s.baseline.Findings, s.updated.Findings, s.phantom,
-		precision(pa), precision(pb), delta,
+		va, vb, s.phantom,
+		pa, pb, delta,
 		before[model], after[model], move)
-}
-
-// precision formats a precision, and prints an undefined one as undefined.
-//
-// Aggregate.Precision returns NaN for a contender with no judged finding
-// because silence is not perfection; printing that as 1.00 here would
-// reintroduce the bug at the last step.
-func precision(p float64) string {
-	if math.IsNaN(p) {
-		return "n/a"
-	}
-	return fmt.Sprintf("%.2f", p)
 }
 
 // share formats an agreement rate, blank when nothing was compared.

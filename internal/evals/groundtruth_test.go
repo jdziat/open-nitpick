@@ -3,11 +3,14 @@ package evals
 import (
 	"context"
 	"fmt"
+	"go/ast"
+	"go/token"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -88,6 +91,23 @@ func TestPlantedDefectsAreOnTheRightLine(t *testing.T) {
 		"python-timing-unsafe-hmac": {"== provided"},
 		"cross-file-copy-nit":       {"make([]store.Event"},
 		"sorted-for-min-nit":        {"sorted(readings"},
+
+		// Info plants, split across both corpora. Each needle was read back out
+		// of Head by a probe that printed the line.
+		//
+		// The Kotlin needle carries the PARAMETER NAME on purpose, and it is the
+		// only needle here that pins more than a location. Head used to rename
+		// that parameter from report to source, which compiles and reads like
+		// tidying and is a contract break in Kotlin: named arguments are part of
+		// the signature, so `summarize(report = r)` stopped compiling. That is a
+		// second, unplanted defect in a fixture whose whole claim is that it
+		// plants exactly one, and it falsified two sentences of the fixture's own
+		// SeverityNote. Renaming it again fails here.
+		"kotlin-widened-input":    {"fun summarize(report: Summarizable)"},
+		"php-forbidden-vs-404":    {"Response(403"},
+		"go-package-singleton":    {"var Default = Load("},
+		"rust-crate-for-one-call": {`humantime = "2"`},
+		"ruby-default-page-size":  {"DEFAULT_PER_PAGE = 100"},
 
 		// Held-out corpus.
 		"contract-break":      {`json:"createdAt"`},
@@ -170,16 +190,159 @@ func TestPlantedDefectsAreOnTheRightLine(t *testing.T) {
 // So the cases below are findings, and the assertion is matches(). Both
 // directions are pinned: without the must-match half, deleting every keyword
 // would turn this test green while making the corpus unscoreable.
+//
+// A THIRD CHECK RIDES ALONG, and it is here rather than in its own test because
+// it reads the same two lists. Being credited by SOME keyword is not evidence
+// that any PARTICULAR keyword is worth carrying: ten were added to the info
+// plants in one round and six survived deletion with the suite green, because a
+// keyword already on the list credited the same probe. checkSoleCreditors runs
+// that deletion for real. See soleCreditors for which keywords it binds and why
+// it is a list rather than an invariant.
 func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
-	type probe struct {
-		why     string
-		finding review.Finding
+	cases := declaredProbes()
+
+	byName := map[string]Fixture{}
+	for _, f := range AllFixtures() {
+		byName[f.Name] = f
 	}
 
-	cases := map[string]struct {
-		hit  []probe // reports the planted defect; must be credited
-		miss []probe // noticed something else; must not be
-	}{
+	for name, tc := range cases {
+		f, ok := byName[name]
+		if !ok {
+			t.Errorf("fixture %q no longer exists; update this test", name)
+			continue
+		}
+
+		for _, p := range tc.hit {
+			if !creditedByAnyDefect(f, p.finding) {
+				t.Errorf("%s: a finding that %s is NOT credited — the keywords no longer admit a real detection: %q / %q",
+					name, p.why, p.finding.Title, p.finding.Rationale)
+			}
+		}
+		for _, p := range tc.miss {
+			if creditedByAnyDefect(f, p.finding) {
+				t.Errorf("%s: a finding that %s IS credited with the planted defect: %q / %q",
+					name, p.why, p.finding.Title, p.finding.Rationale)
+			}
+		}
+	}
+
+	// Every fixture that plants something has to be exercised, or the next one
+	// added inherits the silence this test was written to end.
+	for _, f := range AllFixtures() {
+		if !f.Clean() && cases[f.Name].hit == nil {
+			t.Errorf("fixture %q plants defects but no finding is probed against it; add cases", f.Name)
+		}
+	}
+
+	checkSoleCreditors(t, byName, cases)
+}
+
+// soleCreditors is the set of keywords this corpus can PROVE it needs: each one
+// must be the only keyword crediting some hit probe, so deleting it turns a
+// green test red.
+//
+// THE HOLE IT CLOSES. Ten recall keywords were added to the info plants in one
+// round, and six of them survived deletion with the whole suite green: each was
+// pairwise-redundant with a keyword that already credited the same probe, so it
+// bought nothing measurable while widening what the corpus credits — and every
+// one of the six was separately shown to credit a finding that had noticed
+// nothing. Two mutations were named in that round's report and both did fail;
+// the other eight were never run. Under the house rule that a test must fail
+// under mutation, six of ten additions were unguarded, which is why the rule is
+// a list here rather than a sentence.
+//
+// IT IS NOT A CORPUS-WIDE INVARIANT AND CANNOT BE ONE TODAY. Measured over
+// AllFixtures, 345 of the corpus's 358 keywords are the sole creditor of no
+// probe: the probe table was written to catch false credit, so it holds a
+// handful of sentences per fixture and most keywords are synonyms no sentence
+// distinguishes. Asserting the property for all of them would demand roughly one
+// probe per keyword. What this list does instead is bind the keywords that have
+// been ARGUED FOR in prose — the ones a comment claims are load-bearing — to a
+// probe that fails without them.
+//
+// A stale entry fails as loudly as a missing one: deleting the keyword, or
+// widening another until it credits the same probe, both break this.
+func soleCreditors() map[string][]string {
+	return map[string][]string{
+		"kotlin-widened-input":   {"what summarize accepts", "parameter is wider"},
+		"ruby-default-page-size": {"rows by default"},
+		"php-forbidden-vs-404":   {"learns the project exists"},
+		"go-package-singleton":   {"answer for the whole"},
+	}
+}
+
+// checkSoleCreditors runs the deletion mutation for real: it removes one keyword
+// from the defect it belongs to and asserts some hit probe stops being credited.
+//
+// The mutation is applied to a COPY of the Defect and scored through matches(),
+// rather than reasoned about from the keyword strings, because the last round's
+// redundancy was invisible to anyone reading the list — "one binary" and "whole
+// binary" look independent and are not.
+func checkSoleCreditors(t *testing.T, byName map[string]Fixture, cases map[string]fixtureProbes) {
+	t.Helper()
+
+	for name, keywords := range soleCreditors() {
+		f, ok := byName[name]
+		if !ok {
+			t.Errorf("fixture %q no longer exists; update soleCreditors", name)
+			continue
+		}
+		for _, kw := range keywords {
+			held := false
+			for _, d := range f.Defects {
+				cut := d
+				cut.Keywords = nil
+				for _, k := range d.Keywords {
+					if k != kw {
+						cut.Keywords = append(cut.Keywords, k)
+					}
+				}
+				if len(cut.Keywords) == len(d.Keywords) {
+					continue // the keyword is not on this defect
+				}
+				for _, p := range cases[name].hit {
+					if matches(p.finding, d) && !matches(p.finding, cut) {
+						held = true
+					}
+				}
+			}
+			if !held {
+				t.Errorf("%s: deleting the keyword %q loses no hit probe, so nothing in this tree "+
+					"charges for it and it is pure widening of what the corpus credits. Either give it "+
+					"a probe only it can credit, or delete it and drop the soleCreditors entry",
+					name, kw)
+			}
+		}
+	}
+}
+
+// probe is one finding put in front of the scorer, with the sentence that says
+// what it is meant to demonstrate.
+type probe struct {
+	why     string
+	finding review.Finding
+}
+
+// fixtureProbes is what a fixture's keywords must and must not admit.
+type fixtureProbes struct {
+	hit  []probe // reports the planted defect; must be credited
+	miss []probe // noticed something else; must not be
+}
+
+// declaredProbes is the hand-authored half of the keyword evidence, hoisted out
+// of the test that consumes it because two other tests read it as DATA.
+//
+// The hit list is the negative set's raw material: a finding that reports
+// fixture A's plant, moved to fixture B's anchor, is review prose that says
+// nothing about B — so B's keywords must not credit it. Written as a literal
+// inside one test function, that material was reachable only by the assertions
+// beside it, and the sixteen leaks Round 7 removed were each found by hand
+// because nothing could enumerate them.
+//
+// Nothing here is generated. What reads it is.
+func declaredProbes() map[string]fixtureProbes {
+	return map[string]fixtureProbes{
 		"contract-break": {
 			hit: []probe{{
 				"names the consequence for deployed consumers",
@@ -673,6 +836,346 @@ func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
 			},
 		},
 
+		// The info plants. Every miss below was CREDITED when these five were
+		// written, and every one was found by running it through matches()
+		// rather than by reading the keyword list — which is the only way any
+		// of them could have been found, since each list had a paragraph beside
+		// it asserting the opposite. The fixtures' own comments name the
+		// objections; these are those objections, in the words a reviewer would
+		// use.
+		"kotlin-widened-input": {
+			hit: []probe{
+				{"names the widening and what has not arrived yet",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "info", Category: "maintainability",
+						Title:     "summarize accepts a wider type than anything calls it with",
+						Rationale: "There is only one implementation and no second caller in this change, and a public parameter cannot be narrowed back."}},
+				{"names the widening in the other common phrasing",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "info", Category: "maintainability",
+						Title:     "Is the abstraction needed yet?",
+						Rationale: "This widens summarize's parameter to an interface for a weekly mail that has not landed."}},
+				// The two below came back MISSED after Round 7's removals and are
+				// the receipts for the recall half of this change. Neither says
+				// anything a reviewer would have to be told: one names what
+				// summarize accepts, the other names its parameter. Round 7
+				// removed sixteen keywords with a miss probe each and probed the
+				// recall direction nowhere, so a reviewer that found this plant
+				// and said so plainly was scored a miss on both.
+				{"names the widening without using a compound the list happened to carry",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "info", Category: "design",
+						Title:     "Wider than it needs to be",
+						Rationale: "This widens what summarize accepts before anything but DailyReport needs it."}},
+				{"names the parameter and that nothing calls it that way",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "info", Category: "design",
+						Title:     "Abstraction ahead of a caller",
+						Rationale: "summarize's parameter is wider than anything that calls it today."}},
+			},
+			miss: []probe{
+				// The objection this fixture declines to credit, in its plainest
+				// form. "public api", "public surface" and "surface area" were
+				// all keywords, so it scored full recall while saying nothing
+				// about the parameter.
+				{"the pure visibility objection",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "nit", Category: "api",
+						Title:     "Make Summarizable internal",
+						Rationale: "This adds public API surface area for something the module uses itself; internal would keep the public surface smaller."}},
+				// The same objection reaching for the verb. It is why the bare
+				// stems "widen", "wider" and "widening" are gone: the public
+				// surface is a thing that gets wider too.
+				{"the visibility objection using the widening verb",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "nit", Category: "api",
+						Title:     "Keep Summarizable internal",
+						Rationale: "Publishing this type widens what the module exposes; internal costs nothing here."}},
+				{"the aliasing remark, which the generation scope excludes",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 21, Severity: "nit", Category: "style",
+						Title:     "Two names for the same field",
+						Rationale: "label, gained and lost are aliases of day, signups and cancellations; pick one set and rename the other."}},
+				// The visibility objection reaching for the third word for
+				// something getting bigger. "open set" survived the round that
+				// removed "public surface" and "widen" for exactly this reason
+				// and was credited here in full: a type published to the world is
+				// an open set, and this sentence has still noticed nothing about
+				// what summarize takes.
+				{"the visibility objection calling the published type an open set",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "nit", Category: "api",
+						Title:     "Do not publish Summarizable",
+						Rationale: "Publishing this interface exposes an open set of types to the world; keep it internal."}},
+				// The three below charge the recall keywords added for this
+				// plant, and each one was CREDITED by the first attempt at them.
+				// "summarize's parameter" and "wider than anything" went in
+				// under a comment claiming all the additions "name summarize's
+				// INPUT, which is the one thing the visibility objection never
+				// mentions"; the first two probes here are the visibility
+				// objection doing exactly that. The narrowed forms — "what
+				// summarize accepts" and "parameter is wider" — deny all three.
+				{"the visibility objection naming the parameter to say it is fine",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "nit", Category: "api",
+						Title:     "Mark Summarizable internal",
+						Rationale: "Summarizable is public with no consumer outside this module; mark it internal. summarize's parameter can stay as it is."}},
+				{"the visibility objection reaching for a bare comparative",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "nit", Category: "api",
+						Title:     "Narrow the published surface",
+						Rationale: "The public surface here is wider than anything the module needed; keep Summarizable internal."}},
+				{"a locale remark that names the call and not the input",
+					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "warning", Category: "correctness",
+						Title:     "String interpolation uses the default locale",
+						Rationale: "String.format uses the default locale here; summarize accepts a Summarizable and returns a String that changes per JVM."}},
+			},
+		},
+
+		"php-forbidden-vs-404": {
+			hit: []probe{
+				{"names what the denial confirms",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 23, Severity: "info", Category: "security",
+						Title:     "403 tells the caller the project is there",
+						Rationale: "Answering 403 confirms that a project with that id exists to anyone holding one; returning the same 404 as above would not."}},
+				{"names the disclosure without quoting a status code",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 23, Severity: "info", Category: "security",
+						Title:     "Denial reveals existence",
+						Rationale: "A non-member learns whether the project exists, because the two denials are distinguishable."}},
+				// The same finding without the word `whether`, which is all it
+				// took to lose it: both surviving "exists" forms require `that`
+				// or `whether`, so this plain statement of the disclosure came
+				// back MISSED after Round 7.
+				{"says what the non-member learns, in the plainest form",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 23, Severity: "info", Category: "security",
+						Title:     "403 answers a question the 404 did not",
+						Rationale: "A non-member now learns the project exists; the 404 above would not have told them."}},
+			},
+			miss: []probe{
+				// "exists" was a keyword. A remark about test coverage, in a
+				// fixture whose plant is an information disclosure, scored as a
+				// security detection on an ordinary English verb.
+				{"a missing-test remark using the bare verb",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 22, Severity: "nit", Category: "tests",
+						Title:     "No coverage for the new branch",
+						Rationale: "No test exists for the non-member path, so the new check could be inverted and nothing would fail."}},
+				// "enumerat" was a keyword, and this fixture's own comment says
+				// this finding must not be credited: the check it reports as
+				// missing is in the diff.
+				{"the IDOR hallucination about a check that is present",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 22, Severity: "critical", Category: "security",
+						Title:     "Insecure direct object reference",
+						Rationale: "Any signed-in caller can enumerate project ids and read projects they do not own; there is no authorization check on this endpoint."}},
+				{"the same hallucination without the word enumerate",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 22, Severity: "critical", Category: "security",
+						Title:     "Missing ownership check",
+						Rationale: "A caller can guess ids and read other people's projects; add an access control check before returning the payload."}},
+				// "hide" and "hides" were keywords, and this is the remark that
+				// types them: it asks the BODY to say less and leaves the
+				// disclosure exactly where it is.
+				{"the error-body consistency remark",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 23, Severity: "nit", Category: "api",
+						Title:     "Error bodies differ in shape",
+						Rationale: "The 403 body should hide internal details and match the 404 above; consider a shared error envelope."}},
+				// The same remark DESCRIBING the branch it is about, which is why
+				// "exists" survives only in forms that require the sentence to be
+				// about the disclosure.
+				{"the error-body remark describing when the branch runs",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 23, Severity: "nit", Category: "api",
+						Title:     "Two error shapes",
+						Rationale: "When the project exists but the viewer is not a member the body is {error: forbidden}, which does not match the envelope used elsewhere."}},
+				// The error-body remark in the words that make this plant's
+				// vocabulary problem visible. "same response" was a keyword, and
+				// this sentence is the SAME WORDS as the finding with the
+				// assertion reversed: the detection says the two denials are
+				// distinguishable, this asks that they be made the same. Nothing
+				// in either sentence separates them but intent.
+				{"the error-body remark asking for one envelope",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 23, Severity: "nit", Category: "api",
+						Title:     "One error envelope",
+						Rationale: "The two denials should return the same response envelope."}},
+				// The same remark in the wording that charges "identical
+				// response". That keyword was struck out beside "same response"
+				// and, restored alone, changed no verdict on this fixture — it
+				// was removed on a reading rather than on a run. The removal is
+				// right and this probe is what makes it cost something: putting
+				// the keyword back fails here.
+				{"the error-body remark asking for one body",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 23, Severity: "nit", Category: "api",
+						Title:     "Denials should look alike",
+						Rationale: "Both branches should send an identical response body so clients have one shape to parse."}},
+				// The two below charge the recall keyword added for this plant.
+				// "now learns" and "learns the project" went in under a comment
+				// claiming each "requires the sentence to say what the caller
+				// LEARNS"; neither does, and both of these were credited. What
+				// is left — "learns the project exists" — requires the sentence
+				// to name what is learned about EXISTENCE, which is the rule the
+				// surviving "whether"/"that" forms already follow.
+				{"an N+1 remark about the second repository call",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 23, Severity: "nit", Category: "performance",
+						Title:     "Two repository round trips",
+						Rationale: "find() and isMember() each hit the repository; the second now learns nothing the first did not already have, so pass the project through."}},
+				{"an input-validation nit about the router arguments",
+					review.Finding{Path: "src/Http/ProjectController.php", Line: 23, Severity: "nit", Category: "correctness",
+						Title:     "Ids arrive as bare strings",
+						Rationale: "show() learns the project id and the viewer id from the router with no type check beyond string."}},
+			},
+		},
+
+		"go-package-singleton": {
+			hit: []probe{
+				{"names the global and what it costs a test",
+					review.Finding{Path: "features/features.go", Line: 31, Severity: "info", Category: "maintainability",
+						Title:     "Default is global state",
+						Rationale: "This introduces a global variable fixed at process start, so a test that wants a different set has to reach into the package and put it back."}},
+				{"asks for the parameter back",
+					review.Finding{Path: "features/features.go", Line: 31, Severity: "info", Category: "maintainability",
+						Title:     "Prefer passing the Set",
+						Rationale: "Load already returns a *Set; passing it as a parameter costs one argument and keeps two consumers in one binary able to differ."}},
+				// The finding naming the SCOPE rather than the pattern, which is
+				// what a reviewer writes once "package-level" is off the list: it
+				// came back MISSED, because every remaining keyword names the
+				// shape of the thing and none names how far it reaches.
+				{"names what the default fixes and what to do instead",
+					review.Finding{Path: "features/features.go", Line: 31, Severity: "info", Category: "design",
+						Title:     "One answer for the process",
+						Rationale: "Adding a package-level default fixes the answer for the whole binary; keep returning a *Set and let callers hold it."}},
+			},
+			miss: []probe{
+				// "package-level" was a keyword AND is in the change's own added
+				// doc comment three lines from the plant, so this nit — which
+				// noticed nothing and asks for prose — scored full recall by
+				// quoting the diff back at it.
+				{"a docs nit quoting the change's own comment",
+					review.Finding{Path: "features/features.go", Line: 30, Severity: "nit", Category: "docs",
+						Title:     "Document what the package-level helpers read",
+						Rationale: "The comment says Default is the Set the package-level helpers read; say which variable a caller should set instead."}},
+				{"a docs nit using the phrase from its own vocabulary",
+					review.Finding{Path: "features/features.go", Line: 31, Severity: "nit", Category: "docs",
+						Title:     "Name the variable in the doc",
+						Rationale: "The doc for this package-level variable does not say which environment variable feeds it."}},
+				{"the configuration objection, which accepts the singleton",
+					review.Finding{Path: "features/features.go", Line: 31, Severity: "warning", Category: "config",
+						Title:     "FEATURES is read without validation",
+						Rationale: "os.Getenv returns an empty string when the variable is unset, so a typo in the deployment silently yields no features. Validate it or log the parsed set at startup."}},
+				{"a race the type's own doc rules out",
+					review.Finding{Path: "features/features.go", Line: 31, Severity: "error", Category: "concurrency",
+						Title:     "Concurrent map access",
+						Rationale: "The map inside Default is shared between goroutines with no mutex, which is a data race."}},
+				// The three below charge the recall keyword added for this
+				// plant. "whole binary", "one binary" and "reach into the
+				// package" went in under a comment claiming "none is reachable
+				// by quoting: each one names the standing cost rather than the
+				// location", and each of these was credited by one of them. The
+				// first is the configuration objection above wearing the scope
+				// word; the second is a naming nit reaching a ten-character
+				// substring; the third is the docs nit that already caught
+				// "package-level", quoting the diff's own added comment.
+				{"the configuration objection wearing the scope word",
+					review.Finding{Path: "features/features.go", Line: 31, Severity: "warning", Category: "config",
+						Title:     "A typo in FEATURES fails silently",
+						Rationale: "Load silently drops empty entries, so a typo in FEATURES turns a flag off for the whole binary with no error."}},
+				{"a naming nit about the function and the method",
+					review.Finding{Path: "features/features.go", Line: 34, Severity: "nit", Category: "style",
+						Title:     "Two Enabled symbols",
+						Rationale: "The package function Enabled and the method Enabled differ by one binary decision at the call site and will be confused."}},
+				{"a docs nit quoting the change's own comment a second way",
+					review.Finding{Path: "features/features.go", Line: 30, Severity: "nit", Category: "docs",
+						Title:     "Say what a caller should set",
+						Rationale: "The comment says a caller does not have to thread a *Set through every layer, but a caller that wants to reach into the package still can."}},
+			},
+		},
+
+		"rust-crate-for-one-call": {
+			hit: []probe{{
+				"names the ratio the decision turns on",
+				review.Finding{Path: "Cargo.toml", Line: 7, Severity: "info", Category: "maintainability",
+					Title:     "A whole crate for one call site",
+					Rationale: "humantime is used once, and every build and audit carries it from now on."},
+			}},
+			miss: []probe{
+				{"the version-pinning objection, which accepts the dependency",
+					review.Finding{Path: "Cargo.toml", Line: 7, Severity: "warning", Category: "supply-chain",
+						Title:     "Unpinned dependency",
+						Rationale: "humantime = \"2\" accepts any 2.x release; pin an exact version or commit the lockfile so the build is reproducible."}},
+				{"the output-format remark, which reports an intended consequence",
+					review.Finding{Path: "src/report.rs", Line: 14, Severity: "nit", Category: "ux",
+						Title:     "Sub-second components now render",
+						Rationale: "A job that took 5.2s renders as 5s 200ms, which is noisier than the old seconds count."}},
+			},
+		},
+
+		"ruby-default-page-size": {
+			hit: []probe{
+				{"names the consumers the change does not mention",
+					review.Finding{Path: "app/queries/comments_query.rb", Line: 9, Severity: "info", Category: "resource",
+						Title:     "Every consumer pays for the web client's default",
+						Rationale: "The mobile client and the RSS job never asked for this and now serialize four times the rows."}},
+				{"names the callers that do not pass it",
+					review.Finding{Path: "app/queries/comments_query.rb", Line: 9, Severity: "info", Category: "resource",
+						Title:     "A larger default for everyone",
+						Rationale: "Every caller that does not pass per_page now receives 100 rows instead of 25."}},
+				// This fixture's OWN PROPOSED FIX, which came back MISSED. The
+				// doc comment argues that the alternative is "one keyword
+				// argument at the one call site that wanted it"; a reviewer that
+				// proposes exactly that scored no recall, because every phrase
+				// naming the new default had been removed and nothing measured
+				// what their removal cost. "rows by default" is what credits it,
+				// and it is charged below by the offset objection wearing the
+				// bare "by default" that was tried first.
+				//
+				// The same fix stated as a LOCATION — "setting it at the call
+				// site leaves the mobile client alone" — was a fourth probe
+				// here, credited by "the call site". That keyword is a strict
+				// superset of the "at the call site" it replaced and is gone
+				// with it, so the sentence is uncredited and the probe would be
+				// asserting the opposite of what the scorer does.
+				// TestTheInfoRecallThisInstrumentCannotBuy runs it and records
+				// the price instead.
+				{"proposes the fix the fixture's own comment argues for",
+					review.Finding{Path: "app/queries/comments_query.rb", Line: 9, Severity: "info", Category: "design",
+						Title:     "Set this where it is needed",
+						Rationale: "Every consumer of CommentsQuery now gets 100 rows by default; the web client could pass per_page: 100 itself."}},
+			},
+			miss: []probe{
+				// "pass per_page", "rows per request" and "payload" were all
+				// keywords, and this objection — which accepts the new default
+				// entirely and argues about a ceiling the change did not touch —
+				// matched three at once, inside anchorTolerance of the plant.
+				{"the cap objection, about a line this change did not touch",
+					review.Finding{Path: "app/queries/comments_query.rb", Line: 9, Severity: "warning", Category: "resource",
+						Title:     "MAX_PER_PAGE is still 200",
+						Rationale: "A client can still pass per_page: 200 and get 200 rows per request; consider lowering the cap now that the payload is larger."}},
+				// The same objection opening the way a real detection opens,
+				// which is why the bare "every caller" and "all callers" are
+				// gone and the caller keywords are all negative.
+				{"the cap objection phrased about every caller",
+					review.Finding{Path: "app/queries/comments_query.rb", Line: 9, Severity: "warning", Category: "resource",
+						Title:     "The cap is too high",
+						Rationale: "Every caller can still request up to MAX_PER_PAGE, so the worst case is unchanged at 200 rows."}},
+				{"the offset-pagination objection about the same method",
+					review.Finding{Path: "app/queries/comments_query.rb", Line: 12, Severity: "warning", Category: "performance",
+						Title:     "Offset pagination scans discarded rows",
+						Rationale: "Deep pages make the database read and throw away every earlier row; keyset pagination would not."}},
+				// The cap objection one word narrower than the version "every
+				// caller" was removed for. "other caller" and "other consumer"
+				// replaced it and neither names a caller NEGATIVELY, which is
+				// the rule that list settles on: this sentence accepts the new
+				// default entirely and was credited in full.
+				{"the cap objection phrased about the other consumers",
+					review.Finding{Path: "app/queries/comments_query.rb", Line: 9, Severity: "warning", Category: "resource",
+						Title:     "The ceiling is the real problem",
+						Rationale: "Other consumers can still request up to MAX_PER_PAGE, so the cap is the real ceiling here."}},
+				// The two below charge the recall keyword added for this plant.
+				// The bare "by default" went in first and credited the offset
+				// objection, a frozen-string-literal nit and the cap objection
+				// with four ordinary words appended; "rows by default" denies
+				// all three, because no objection here can call 200 a default or
+				// count returned rows. The second probe charges "the call site",
+				// which replaced "at the call site" and credited a strict
+				// superset of it — every sentence below fired on the article
+				// alone.
+				{"the offset objection wearing the bare stem",
+					review.Finding{Path: "app/queries/comments_query.rb", Line: 12, Severity: "warning", Category: "performance",
+						Title:     "Deep pages scan what they discard",
+						Rationale: "OFFSET grows linearly with page number, so by default page 50 scans 5000 rows; consider keyset pagination."}},
+				{"a clamp remark about where the ceiling belongs",
+					review.Finding{Path: "app/queries/comments_query.rb", Line: 11, Severity: "nit", Category: "style",
+						Title:     "Clamp outside the constructor",
+						Rationale: "The clamp(1, MAX_PER_PAGE) expression belongs at the call site, not in the constructor."}},
+			},
+		},
+
 		"multi-defect": {
 			hit: []probe{
 				{"names the traversal",
@@ -696,40 +1199,6 @@ func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
 			}},
 		},
 	}
-
-	byName := map[string]Fixture{}
-	for _, f := range AllFixtures() {
-		byName[f.Name] = f
-	}
-
-	for name, tc := range cases {
-		f, ok := byName[name]
-		if !ok {
-			t.Errorf("fixture %q no longer exists; update this test", name)
-			continue
-		}
-
-		for _, p := range tc.hit {
-			if !creditedByAnyDefect(f, p.finding) {
-				t.Errorf("%s: a finding that %s is NOT credited — the keywords no longer admit a real detection: %q / %q",
-					name, p.why, p.finding.Title, p.finding.Rationale)
-			}
-		}
-		for _, p := range tc.miss {
-			if creditedByAnyDefect(f, p.finding) {
-				t.Errorf("%s: a finding that %s IS credited with the planted defect: %q / %q",
-					name, p.why, p.finding.Title, p.finding.Rationale)
-			}
-		}
-	}
-
-	// Every fixture that plants something has to be exercised, or the next one
-	// added inherits the silence this test was written to end.
-	for _, f := range AllFixtures() {
-		if !f.Clean() && cases[f.Name].hit == nil {
-			t.Errorf("fixture %q plants defects but no finding is probed against it; add cases", f.Name)
-		}
-	}
 }
 
 // creditedByAnyDefect reports whether the scorer would count this finding as
@@ -742,6 +1211,484 @@ func creditedByAnyDefect(f Fixture, finding review.Finding) bool {
 		}
 	}
 	return false
+}
+
+// TestReviewProseAboutAnotherFixtureIsNotCredited generates the negative set
+// instead of authoring it.
+//
+// WHY GENERATE IT. Round 7 removed sixteen keywords that were paying full recall
+// to findings which had noticed nothing, and every one was found by a person
+// reading a list and imagining a sentence. That method finds what its author
+// thought of, which is why the same fixtures had a paragraph beside each list
+// asserting the opposite of what matches() did. The material for a negative set
+// is already in this repository: a finding that reports fixture A's plant says
+// nothing about fixture B, so moving it to B's anchor produces review prose that
+// B's keywords must not credit. 56 such sentences against 29 plants is a little
+// over 1500 probes, none of which anyone has to think of.
+//
+// Two sources, both checked in:
+//
+//   - EVERY OTHER FIXTURE'S HIT PROBES. These are sentences already asserted to
+//     be correct detections of something else, so their status at this anchor is
+//     unambiguous.
+//   - THE SHIPPED INCUMBENT CACHE. Prose a real reviewer actually wrote, which
+//     is the half authored probes cannot supply: every hit probe in this file was
+//     written by someone who knew which keywords existed.
+//
+// WHAT A FAILURE HERE MEANS, stated because it is easy to over-read. The probe
+// text names the SOURCE fixture's identifiers, so no reviewer would ever write
+// it at this anchor: a credit is evidence that two keyword lists share
+// vocabulary, not that a reachable false credit exists. That is still the signal
+// worth having — every leak Round 7 removed was a keyword generic enough to be
+// typed by a sentence that had noticed something else — but this loop measures
+// OVERLAP and the declared miss probes measure REACHABILITY, and neither
+// substitutes for the other.
+//
+// WHAT ITS SILENCE DOES NOT MEAN, and the first version of this comment got
+// this wrong in a way worth keeping. It read the loop's output — every overlap
+// lands in a fixture file this change does not own, none in fixtures_info.go —
+// as evidence that the info keyword lists were clean. The loop CANNOT reach
+// them. Counted over the generated sources, each stem those lists carry appears
+// in one or two sentences and every one of those is the info fixture's own
+// recall probe, which the loop skips (`if s.fixture == f.Name { continue }`). So
+// 1500 probes run and not one can produce a credit against an info plant from a
+// keyword this file rewrote: zero collisions there was a property of the SOURCE
+// CORPUS, not a verdict on the keywords — and eleven hand-written sentences were
+// credited by them at the time. Reachability is what the declared miss probes
+// measure. This loop measures overlap. Neither reads on the other's behalf.
+//
+// The overlaps it finds today are listed below rather than fixed, and the list
+// says why for each. A stale entry fails as loudly as a new overlap, so the list
+// cannot outlive the keywords it excuses.
+func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
+	// knownOverlaps is keyed target|source|title. Each entry says what the
+	// credit fires on, because "these two collide" is not actionable and "these
+	// two collide on the bare stem `leak`" is.
+	//
+	// They fall into two kinds, and the difference is the whole reason this is a
+	// list rather than a count:
+	//
+	//   - SHARED MECHANISM. Two plants that are the same defect in two
+	//     languages, where the sentence describing one really does describe the
+	//     other. Asking the keywords to separate these would be asking them to
+	//     reject a correct description of the plant, which is the failure this
+	//     round is repairing in the other direction.
+	//   - BARE STEM. A keyword short and ordinary enough that prose about an
+	//     unrelated defect reaches it. These are defects, they are named here
+	//     with the exact stem, and each needs a change that owns the fixture
+	//     file it lives in.
+	knownOverlaps := map[string]string{
+		// Shared mechanism: interpolating an untrusted string into an
+		// interpreted context. `injection` and `concatenat` name that mechanism
+		// and all three plants have it, so a sentence about one names the next.
+		"go-sql-injection|python-command-injection|Do not interpolate name into a shell command.": "shared mechanism: `injection`",
+		"go-sql-injection|multi-defect|Path traversal in the upload name":                         "shared mechanism: `concatenat`",
+		"python-command-injection|go-sql-injection|SQL injection in SearchUsers":                  "shared mechanism: `injection`",
+		"multi-defect|python-command-injection|Do not interpolate name into a shell command.":     "shared mechanism: `../`, which the cached review types about its own traversal",
+
+		// Shared mechanism: a resource that is acquired and not released.
+		// multi-defect's descriptor leak and the goroutine leak are the same
+		// sentence about different resources.
+		"multi-defect|go-cancel-goroutine-leak|Unbuffered channel leaks the goroutine":  "shared mechanism: `leak`",
+		"multi-defect|go-cancel-goroutine-leak|Send has no receiver after a timeout":    "shared mechanism: `leak`",
+		"csharp-client-per-request|multi-defect|Close files and remove failed uploads.": "shared mechanism: `exhaust`",
+
+		// Bare stems. Each is a keyword in a fixture this change does not own,
+		// and each credits prose that has noticed something else entirely.
+		"go-nil-deref|ts-unawaited-async|saveAll resolves before anything is stored":             "bare stem `discard`: a discarded promise is not a discarded error",
+		"multi-defect|go-nil-deref|http.Get's error is discarded":                                "bare stems `close`/`defer`: a deferred Close that panics is not a file left open",
+		"multi-defect|go-nil-deref|Handle the http.Get error before accessing resp.":             "bare stems `close`/`defer`, from the cached review",
+		"contract-break|go-package-singleton|Prefer passing the Set":                             "bare stem `consumer`",
+		"contract-break|ruby-default-page-size|Every consumer pays for the web client's default": "bare stem `consumer`",
+		// Found BY this loop, on its first run, against a probe added in the
+		// same change: the recall probe restoring ruby's proposed fix reaches
+		// contract-break's `consumer` too. It is the receipt for the loop being
+		// worth having — nobody would have thought to write this pair down.
+		"contract-break|ruby-default-page-size|Set this where it is needed":                      "bare stem `consumer`",
+		"contract-break|clean-sql-allowlist|Validate and cap limit before the query.":            "bare stem `api contract`, reached by the cached review's \"the API contract\"",
+		"data-loss-migration|go-sql-injection|Use a parameterized query in SearchUsers.":         "bare stem `where clause`: changing a WHERE clause by injection is not a missing one, and this one is REACHABLE — an injection remark on a migration would be credited with the missing predicate",
+		"data-loss-migration|multi-defect|Reject traversal names and prevent target overwrites.": "bare stem `overwrite`",
+		"removed-guard|python-command-injection|Propagate archive failures.":                     "bare stem `permission`: a permission ERRNO is not a permission CHECK",
+		"go-sql-injection|clean-sql-allowlist|Validate and cap limit before the query.":          "bare stems `sql injection`/`parameteri`, reached by a sentence whose point is that parameterization is already present — the same shape as the `subprocess` leak Round 7 removed",
+		"python-command-injection|clean-sql-allowlist|Validate and cap limit before the query.":  "bare stem `injection`, from a sentence about a query",
+	}
+
+	type source struct {
+		fixture   string
+		fromCache bool
+		finding   review.Finding
+	}
+
+	var sources []source
+	for name, p := range declaredProbes() {
+		for _, h := range p.hit {
+			sources = append(sources, source{fixture: name, finding: h.finding})
+		}
+	}
+	for _, f := range AllFixtures() {
+		cached, ok := CachedIncumbent(crCacheDir, f)
+		if !ok {
+			continue
+		}
+		for _, c := range cached {
+			sources = append(sources, source{fixture: f.Name, fromCache: true, finding: c})
+		}
+	}
+
+	// A generator that silently produces nothing passes every assertion below.
+	// The two counts are what the loop is worth, so they are asserted rather
+	// than assumed: the cache is read off disk and could go missing, and the
+	// probe table is read through a function that could be emptied.
+	crSources := 0
+	for _, s := range sources {
+		if s.fromCache {
+			crSources++
+		}
+	}
+	if len(sources) < 40 {
+		t.Fatalf("only %d generated sources; the negative set is not being built", len(sources))
+	}
+	if crSources < 10 {
+		t.Fatalf("only %d sources came from the Incumbent cache; the half that is not authored "+
+			"against this keyword list has gone missing", crSources)
+	}
+
+	seen := map[string]bool{}
+	probes := 0
+	for _, f := range AllFixtures() {
+		for _, d := range f.Defects {
+			for _, s := range sources {
+				// A fixture's own findings are the recall direction, which the
+				// declared hit probes assert. Only prose about ANOTHER change is
+				// unambiguously wrong here.
+				if s.fixture == f.Name {
+					continue
+				}
+				probes++
+
+				// The anchor is the plant's own line, so nothing is excluded by
+				// distance and the keyword list is the only thing under test.
+				// Category rides along because mentionsAny reads it.
+				at := review.Finding{
+					Path: d.Path, Line: d.Line, Severity: "warning",
+					Category:  s.finding.Category,
+					Title:     s.finding.Title,
+					Rationale: s.finding.Rationale,
+				}
+				if !matches(at, d) {
+					continue
+				}
+
+				key := f.Name + "|" + s.fixture + "|" + s.finding.Title
+				if _, known := knownOverlaps[key]; known {
+					seen[key] = true
+					continue
+				}
+				t.Errorf("%s: a finding about %s is credited with the plant at %s:%d — %q / %q",
+					f.Name, s.fixture, d.Path, d.Line, s.finding.Title, s.finding.Rationale)
+			}
+		}
+	}
+
+	if probes < 1000 {
+		t.Errorf("only %d generated probes were run; the loop is not covering the corpus", probes)
+	}
+
+	for key, why := range knownOverlaps {
+		if !seen[key] {
+			t.Errorf("overlap %q no longer occurs (%s); delete the entry rather than carrying it", key, why)
+		}
+	}
+}
+
+// TestEveryPlantIsCreditedForItsOwnDescription is the recall half, which until
+// now did not exist.
+//
+// Sixteen keywords were removed in one round, each with a probe proving it no
+// longer credited an objection, and nothing anywhere asserted that what was left
+// still credited a DETECTION. Six plain statements of a correct finding came
+// back MISSED as a result — including one fixture's own proposed fix — and the
+// harness would have reported a reviewer that found the plant and said so as
+// having missed it. Every removal is cheap in that direction and nothing was
+// charging for it.
+//
+// Defect.Why is the generator, because it is the corpus's own one-sentence
+// statement of what a reviewer should report and it is written before the
+// keywords are. If a plant's keywords cannot credit its Why, the two have
+// drifted, and the Why is the half that was reviewed as ground truth.
+//
+// SeverityNote WAS MEASURED AS A SECOND SOURCE AND REJECTED, which is worth
+// recording because it is the obvious next field to reach for. Run through
+// matches() over every plant it is credited for 14, uncredited for 9, and absent
+// from 6 — and the first version of this paragraph said "credited for 14 and
+// uncredited for 15", which folded the six plants that carry NO NOTE AT ALL into
+// the evidence. An empty haystack is uncredited by construction, so 40 percent of
+// the count the argument rested on was never a measurement of anything. The
+// figures are recomputed below and this sentence is read back out of the source,
+// on the same argument TestTheFiguresTheseCommentsQuoteStillReproduce makes: a
+// corrected number is worth nothing if the next fixture makes it wrong in
+// silence.
+//
+// The argument survives the correction, on the nine that were really measured: a
+// SeverityNote argues about which ANCHOR in review.md a plant sits under and
+// quotes that anchor's words, so it is prose about the severity table rather than
+// about the code. Asserting it must be credited would pull keyword lists toward
+// the vocabulary of review.md's severity examples, which is not where a
+// reviewer's words come from.
+func TestEveryPlantIsCreditedForItsOwnDescription(t *testing.T) {
+	// Plants whose own Why their own keywords do not admit. Each is a real
+	// recall hole in a fixture file this change does not own, and each is
+	// recorded with the phrase that would close it so the next change to that
+	// file is not left to rediscover it.
+	//
+	// Note what these three have in common: the keyword list names the FIX
+	// (compare_digest, placeholder, "already returns a copy") and the Why names
+	// the DEFECT. A reviewer that reports the defect without proposing the
+	// canonical remedy is scored a miss on all three.
+	knownGaps := map[string]string{
+		"go-sql-injection|store.go|17": "the Why says `interpolated`; the list carries `concatenat` and not `interpolat`, " +
+			"so it credits python-command-injection's description of ITS plant and not its own",
+		"python-timing-unsafe-hmac|webhook.py|15": "the Why says `returns at the first differing byte`; the list carries " +
+			"`byte-by-byte` and `byte by byte`, neither of which that phrase contains",
+		"cross-file-copy-nit|report/summary.go|17": "the Why says `already returns a slice the caller owns` and `copying it " +
+			"again`; the list carries `already returns its own` and `copies it again`, which miss both by a word",
+	}
+
+	seen := map[string]bool{}
+	for _, f := range AllFixtures() {
+		for _, d := range f.Defects {
+			// Category is left empty on purpose. mentionsAny reads it, so
+			// putting the defect's Class there would let a plant whose keywords
+			// name its own class pass on the class name alone.
+			at := review.Finding{
+				Path: d.Path, Line: d.Line,
+				Severity:  string(d.WantSeverity),
+				Title:     "",
+				Rationale: d.Why,
+			}
+			key := fmt.Sprintf("%s|%s|%d", f.Name, d.Path, d.Line)
+			if matches(at, d) {
+				continue
+			}
+			if _, known := knownGaps[key]; known {
+				seen[key] = true
+				continue
+			}
+			t.Errorf("%s: the plant's own Why is not credited by its own keywords, so a reviewer "+
+				"reporting it in these words is scored a miss: %s:%d — %q",
+				f.Name, d.Path, d.Line, d.Why)
+		}
+	}
+
+	for key, why := range knownGaps {
+		if !seen[key] {
+			t.Errorf("recall gap %q is closed (%s); delete the entry rather than carrying it", key, why)
+		}
+	}
+
+	checkSeverityNoteCensus(t)
+}
+
+// checkSeverityNoteCensus recomputes the three figures the paragraph above
+// quotes and reads that paragraph back out of the source.
+//
+// The number that mattered was the one nobody separated: six plants carry no
+// SeverityNote, so they are uncredited because there is nothing to credit, and
+// counting them as evidence about severity-table vocabulary made a 14-to-9 split
+// look like 14-to-15. Recording the absent count is the whole repair — it is the
+// figure that says how much of the argument is measurement.
+func checkSeverityNoteCensus(t *testing.T) {
+	t.Helper()
+
+	credited, uncredited, absent := 0, 0, 0
+	for _, f := range AllFixtures() {
+		for _, d := range f.Defects {
+			switch {
+			case strings.TrimSpace(d.SeverityNote) == "":
+				absent++
+			case matches(review.Finding{Path: d.Path, Line: d.Line, Rationale: d.SeverityNote}, d):
+				credited++
+			default:
+				uncredited++
+			}
+		}
+	}
+
+	want := fmt.Sprintf("credited for %d, uncredited for %d, and absent\n// from %d", credited, uncredited, absent)
+	src, err := os.ReadFile("groundtruth_test.go")
+	if err != nil {
+		t.Fatalf("reading groundtruth_test.go: %v", err)
+	}
+	if !strings.Contains(string(src), want) {
+		t.Errorf("TestEveryPlantIsCreditedForItsOwnDescription no longer says %q. The corpus now measures "+
+			"%d credited, %d uncredited and %d with no SeverityNote at all; a paragraph quoting other "+
+			"figures is the same defect it was written to retract", want, credited, uncredited, absent)
+	}
+}
+
+// TestTheInfoRecallThisInstrumentCannotBuy records a limit of substring keywords
+// rather than moving the boundary a third time.
+//
+// Two rounds have now edited php-forbidden-vs-404's keyword list to separate its
+// finding from its false positive, and both edits moved which sentences fall on
+// which side without making the boundary sharper. This test says why, in a form
+// that is checked rather than asserted.
+//
+// THE FINDING and THE OBJECTION propose the SAME FIX. The plant is that a 403
+// and a 404 are distinguishable, so the fix is to make the two denials identical;
+// the excluded objection asks for the two error BODIES to share one envelope,
+// whose fix is also to make the two responses look the same. What separates them
+// is the reason, and a reviewer writing tersely does not always give one.
+//
+// For the pair below the separation is not merely hard, it is unavailable.
+// mentionsAny is strings.Contains over title+rationale+category, the objection
+// contains the finding as a substring, and containment is transitive: any keyword
+// matching the finding matches the objection too. No word list can credit the
+// first and deny the second, so this is a property of the PREDICATE and no amount
+// of editing Keywords reaches it.
+//
+// The corpus resolves the tie by denying both, and this test pins that choice so
+// it stays a choice. The price is stated in the assertion: a reviewer whose whole
+// finding is "make the two denials the same" has proposed exactly this plant's
+// fix and is scored a miss. Info recall on this fixture is therefore a LOWER
+// BOUND, not a measurement, and any number reported from it should say so.
+//
+// WHAT WOULD ACTUALLY FIX IT, none of which is a keyword:
+//
+//   - A CONJUNCTION. Let a defect require one phrase from each of two lists —
+//     here, a fix phrase AND a phrase naming what the caller learns — so "the
+//     same response" credits only when the finding also says why. This is a
+//     change to Defect and to matches().
+//   - A VETO. Let a defect name phrases that withdraw credit, which would also
+//     close ruby-default-page-size's "other consumers can still" case. Same
+//     surface, opposite sign, and it makes an unmatched veto silently
+//     unfalsifiable, so it needs its own probe direction.
+//   - THE JUDGE. Detection at info could be scored by the model judge against
+//     Defect.Why rather than by substring, keeping keywords for the levels whose
+//     vocabulary is distinctive — nil, injection, WHERE clause. It costs money
+//     per run and imports the judge's variance into recall, which is the column
+//     the harness is most often read for.
+//
+// A fourth option is not on the list and should be named so it is not chosen by
+// default: adding a keyword that encodes tense or modality — "now receives" as
+// against "can still receive" — would separate a looser version of this pair. It
+// is not impossible, it is a DIFFERENT KIND of keyword: every other entry in
+// this corpus names subject matter, and one that names grammar is a rule about
+// how a sentence is built rather than about what it says. That is the
+// boundary-moving this test exists instead of.
+//
+// RUBY IS THE SECOND CASE AND IT IS A CHOICE, NOT AN IMPOSSIBILITY, which is why
+// it is recorded here beside the proof rather than inside it. Its finding and
+// its cap objection are separable on subject matter after all — the cap is 200
+// and the new default is 100, so a keyword naming the ROWS reaches one and not
+// the other, and "rows by default" is that keyword. What stays out of reach is
+// the same fix stated as a LOCATION: "set it at the call site instead" is this
+// plant's proposed remedy, and every phrase that credits it is one a reviewer
+// types about any line in any file. The second half of this test runs that
+// sentence, runs the phrase that would credit it against three unrelated
+// remarks, and runs the one candidate that dodged the location and was still
+// rejected. Info recall on ruby is therefore a lower bound too, by one phrasing
+// rather than by all of them.
+func TestTheInfoRecallThisInstrumentCannotBuy(t *testing.T) {
+	byName := map[string]Fixture{}
+	for _, f := range AllFixtures() {
+		byName[f.Name] = f
+	}
+
+	fixture, ok := byName["php-forbidden-vs-404"]
+	if !ok {
+		t.Fatal("php-forbidden-vs-404 no longer exists; this limit was recorded against it")
+	}
+	d := fixture.Defects[0]
+
+	// The finding a terse reviewer writes once they have seen the disclosure:
+	// it proposes this plant's fix and nothing else.
+	detection := "The two denials should return the same response"
+
+	// The objection is READ OUT OF THE PROBE TABLE rather than built from the
+	// detection. It used to be `detection + " envelope; ..."` with a
+	// strings.Contains guard underneath, which is true for every possible value
+	// of detection — run with "", with unrelated prose and with a non-ASCII
+	// string, the guard passed each time. An unfalsifiable check inside the test
+	// whose stated purpose is to make an impossibility argument checkable is
+	// this round's own defect one level up. Now the objection is a sentence the
+	// corpus already asserts must not be credited, and rewording that probe
+	// fails here rather than silently making the proof vacuous.
+	objection := ""
+	for _, p := range declaredProbes()["php-forbidden-vs-404"].miss {
+		if p.finding.Title == "One error envelope" {
+			objection = p.finding.Rationale
+		}
+	}
+	if objection == "" {
+		t.Fatal(`the "One error envelope" miss probe is gone, so the objection this proof is about is ` +
+			`no longer asserted anywhere; restore it or retire this test`)
+	}
+	if !strings.Contains(objection, detection) {
+		t.Fatalf("the corpus's error-body objection no longer contains the terse detection, so the "+
+			"containment this test rests on is unproven:\n  detection %q\n  objection %q", detection, objection)
+	}
+
+	at := func(f Fixture, text string) review.Finding {
+		p := f.Defects[0]
+		return review.Finding{Path: p.Path, Line: p.Line, Severity: "info", Rationale: text}
+	}
+
+	if matches(at(fixture, detection), d) {
+		t.Errorf("the terse detection is credited, which by containment means the error-body objection is too; "+
+			"TestKeywordsAdmitOnlyRealDetections should be failing alongside this: %q", detection)
+	}
+	if matches(at(fixture, objection), d) {
+		t.Errorf("the error-body objection is credited, which this fixture's doc comment says it must not be: %q", objection)
+	}
+
+	ruby, ok := byName["ruby-default-page-size"]
+	if !ok {
+		t.Fatal("ruby-default-page-size no longer exists; the second half of this limit was recorded against it")
+	}
+
+	// This plant's proposed remedy, stated as a place to put the argument
+	// instead of as a number. It is a correct finding and it is scored a miss.
+	fix := "Raising DEFAULT_PER_PAGE changes what everyone gets; setting it at the call site leaves the mobile client alone."
+	if matches(at(ruby, fix), ruby.Defects[0]) {
+		t.Errorf("the location phrasing of ruby's fix is credited now, so this limit has been closed; "+
+			"delete this half of the test and the paragraph in fixtures_info.go that cites it: %q", fix)
+	}
+
+	// WHY it is a miss, run rather than argued. Any keyword crediting that
+	// sentence through its location clause is a substring of "at the call site",
+	// and these three remarks — about ordering, about an allocation, and about
+	// where the clamp belongs — contain it while noticing nothing.
+	for _, elsewhere := range []string{
+		"Set the ordering at the call site rather than in the query object.",
+		"This allocation happens at the call site, which is fine.",
+		"The clamp(1, MAX_PER_PAGE) expression belongs at the call site, not in the constructor.",
+	} {
+		if !strings.Contains(strings.ToLower(elsewhere), "the call site") {
+			t.Errorf("this remark no longer shares the location clause with ruby's fix, so it is not "+
+				"evidence for the trade above: %q", elsewhere)
+		}
+	}
+
+	// The one candidate that credited the fix without naming a call site. It
+	// leaks nothing across the probe table and was still rejected, because the
+	// cap objection reaches it in one ordinary sentence — which is the run that
+	// decided it, and the reason it is here rather than in the keyword list.
+	candidate := "what everyone gets"
+	capObjection := "The clamp is what everyone gets in the end, so MAX_PER_PAGE is the real ceiling, not this constant."
+	if !strings.Contains(strings.ToLower(fix), candidate) {
+		t.Errorf("%q no longer credits ruby's fix, so it is not the candidate this paragraph rejects", candidate)
+	}
+	if !strings.Contains(strings.ToLower(capObjection), candidate) {
+		t.Errorf("%q no longer reaches the cap objection, so the reason it was rejected is gone: %q",
+			candidate, capObjection)
+	}
+	for _, kw := range ruby.Defects[0].Keywords {
+		if strings.EqualFold(kw, candidate) {
+			t.Errorf("%q is in ruby's keyword list, which credits the cap objection %q — the objection "+
+				"this fixture's doc comment says it excludes", candidate, capObjection)
+		}
+	}
 }
 
 // TestEveryDefectDeclaresAUsableSeverity closes a silent hole in the ground
@@ -964,6 +1911,15 @@ func TestPlantedSeveritiesArePinned(t *testing.T) {
 		"cross-file-copy-nit/report/summary.go:17/resource": config.SeverityNit,
 		"sorted-for-min-nit/sensors.py:23/resource":         config.SeverityNit,
 
+		// The info plants, which took the corpus from four resolvable levels to
+		// five. Each is argued against the anchors in its own SeverityNote, and
+		// each is the FIRST plant of its class at this level — so unlike the
+		// levels above, nothing else in the corpus disagrees with them yet and
+		// the pin is the only record of what they were.
+		"kotlin-widened-input/src/main/kotlin/com/example/report/Summary.kt:27/maintainability": config.SeverityInfo,
+		"php-forbidden-vs-404/src/Http/ProjectController.php:23/security":                       config.SeverityInfo,
+		"go-package-singleton/features/features.go:31/maintainability":                          config.SeverityInfo,
+
 		// Held-out corpus. Pinned on the same terms: it is spent once, so a
 		// severity edit here is discovered at the moment the number it
 		// corrupted is already being reported.
@@ -979,6 +1935,9 @@ func TestPlantedSeveritiesArePinned(t *testing.T) {
 		"cross-file-sort-nit/src/roster.ts:6/resource":                                config.SeverityNit,
 		"duplicate-test-case-nit/slug/slug_test.go:16/tests":                          config.SeverityNit,
 		"defensive-copy-nit/src/main/java/com/example/report/Labels.java:26/resource": config.SeverityNit,
+
+		"rust-crate-for-one-call/Cargo.toml:7/maintainability":            config.SeverityInfo,
+		"ruby-default-page-size/app/queries/comments_query.rb:9/resource": config.SeverityInfo,
 	}
 
 	got := map[string]config.Severity{}
@@ -1085,11 +2044,19 @@ func renderHistogram(h map[config.Severity]int) string {
 // stops the cheapest version of that — dialling a single plant down to fill an
 // empty bucket — from ever being enough.
 //
-// INFO IS EMPTY, and deliberately visible in every message this prints. Three
-// levels were authored to fix the skew; the info level was assigned to an author
-// that produced nothing, so the corpus still cannot resolve a single claim about
-// it. Rule 1 means the next person to work on this cannot close the gap halfway:
-// one info plant fails this test, and two pass it.
+// INFO IS NO LONGER EMPTY, and the history is worth keeping because rule 1 is
+// what made it end properly. This comment used to say the level was assigned to
+// an author that produced nothing. Five plants were then written and wired into
+// neither corpus, so for a while the level was empty in exactly the way that
+// looks solved in a diff — the fixtures existed, and this test could not see
+// them, because it counts what the corpora contain rather than what the package
+// authors. It still counts only that; TestEveryAuthoredFixtureIsWiredIntoExactly
+// OneCorpus is what makes the two agree, and it had the same blind spot until it
+// was rewritten to discover rather than to list.
+//
+// Rule 1 is why the level could not be closed halfway: one info plant per corpus
+// fails this test and two pass it, so the split had to give BOTH corpora a pair
+// or give one of them none. The corpora now stand at 3 and 2.
 func TestTheSeverityDistributionStaysBalanced(t *testing.T) {
 	const (
 		minPerPresentLevel = 2
@@ -1153,25 +2120,73 @@ func TestTheSeverityDistributionStaysBalanced(t *testing.T) {
 // TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus closes the quietest way
 // this corpus has to lose a plant.
 //
-// warningFixtures and nitFixtures are the record of what was AUTHORED at each
-// level. Neither is a corpus: Fixtures() and HeldOutFixtures() name the
-// individual constructors, because the five warning plants and the five nit
-// plants are each split across both. That split is deliberate and is argued in
-// HeldOutFixtures — but it means the authored set and the measured set are two
-// different lists, and nothing else in the tree compares them.
-//
 // A fixture missing from both corpora is invisible in the worst way. It
 // compiles, it is exercised by every ground-truth test that iterates
 // AllFixtures... except that it is not IN AllFixtures, so it is exercised by
 // nothing at all: no line check, no keyword probe, no severity pin. It is a
 // plant that measures nothing while looking, in the diff that added it, exactly
 // like a plant that does. The reverse — the same fixture in both corpora — is
-// the leak TestHeldOutCorpusStaysHeldOut catches by name; this catches it by
-// count for the authored sets.
+// the leak TestHeldOutCorpusStaysHeldOut catches by name; this catches it for
+// everything this package authors.
+//
+// IT MISSED FIVE, AND THE REASON IS THE POINT. It used to read
+// warningFixtures() and nitFixtures() — a hand-written list of the authored sets
+// that existed on the day it was written. fixtures_info.go then added five info
+// plants and a sixth authored set, and this test was blind to them by
+// construction: golangci-lint reported six unused functions and this test
+// reported nothing, while five fixtures sat in the tree with unchecked lines and
+// unprobed keywords. A guard that has to be edited to keep working is a guard
+// that stops working, and the failure is silent in exactly the case it exists
+// for — the case where somebody authored a fixture and forgot a step.
+//
+// So it DISCOVERS instead. Every zero-argument function in this package's
+// non-test source that returns a Fixture is an authored fixture, and the Name it
+// plants is read out of the source rather than declared here. Nothing has to be
+// added to this test when the next set lands, and a fixture whose Name this scan
+// cannot read is a failure rather than a silent omission — because the one thing
+// a discovery-based guard must never do is discover nothing and pass.
 func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
-	authored := map[string][]Fixture{
+	// Fixtures deliberately in NEITHER corpus, with the reason each is out.
+	//
+	// An exemption is a claim, so both directions are checked below: an exempt
+	// fixture that turns up in a corpus makes the reason beside it stale, and an
+	// exemption naming a fixture this package no longer authors is a sentence
+	// about a file nobody has. Adding a name here is how a fixture opts out of
+	// being measured, which is a thing that should cost a paragraph.
+	exempt := map[string]string{
+		"cross-batch-replay": "its point is that ONE defect is reported TWICE, which a scored corpus " +
+			"would count as one detection and one false positive against a reviewer that did exactly " +
+			"the right thing; fixtures_dedup_test.go checks its lines, its batch split and its plant " +
+			"instead, so it is unmeasured rather than unchecked",
+	}
+
+	authored := authoredFixtureNames(t)
+
+	// The scan validated against runtime values.
+	//
+	// The authored sets are the record of INTENT — what somebody meant to write
+	// at each level — and the scan is the record of FACT. This map is not what
+	// drives the check above and adding a set to it is not what makes a new
+	// fixture visible: a set nobody lists here is still discovered constructor
+	// by constructor, which is the whole reason the test was rewritten. What it
+	// buys is a check on the SCAN. If constructors ever stop matching the shape
+	// buildsAFixture looks for, every loop driven by the scan quietly measures a
+	// smaller corpus, and cross-batch-replay is the one fixture where nothing
+	// else would notice — it is in no corpus, so the AllFixtures sweep below
+	// cannot see it either.
+	for set, fixtures := range map[string][]Fixture{
 		"warningFixtures": warningFixtures(),
 		"nitFixtures":     nitFixtures(),
+		"infoFixtures":    infoFixtures(),
+		"dedupFixtures":   dedupFixtures(),
+	} {
+		for _, f := range fixtures {
+			if _, ok := authored[f.Name]; !ok {
+				t.Errorf("%s() returns a fixture named %q that this scan did not discover in the "+
+					"package source, so the scan is reading fewer constructors than exist and every "+
+					"check driven by it is running over a subset", set, f.Name)
+			}
+		}
 	}
 
 	tuning := map[string]bool{}
@@ -1183,20 +2198,152 @@ func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 		held[f.Name] = true
 	}
 
-	for _, set := range []string{"warningFixtures", "nitFixtures"} {
-		for _, f := range authored[set] {
-			switch {
-			case tuning[f.Name] && held[f.Name]:
-				t.Errorf("%s authored %q and it is in BOTH corpora, so a fixture reported as held "+
-					"out is one the prompt is tuned on", set, f.Name)
-			case !tuning[f.Name] && !held[f.Name]:
-				t.Errorf("%s authored %q and NO corpus contains it, so it is not in AllFixtures and "+
-					"no ground-truth test touches it: its lines are unchecked, its keywords are "+
-					"unprobed, its severity is unpinned, and it measures nothing. Add it to "+
-					"Fixtures() or HeldOutFixtures()", set, f.Name)
-			}
+	for name, where := range authored {
+		reason, excused := exempt[name]
+
+		switch {
+		case tuning[name] && held[name]:
+			t.Errorf("%s authors %q and it is in BOTH corpora, so a fixture reported as held out is "+
+				"one the prompt is tuned on", where, name)
+
+		case excused && (tuning[name] || held[name]):
+			t.Errorf("%s authors %q, which is exempt from this check on the grounds that %s — and a "+
+				"corpus now contains it. Either the wiring is wrong or the reason is: a fixture that "+
+				"is measured does not get to keep an excuse for not being", where, name, reason)
+
+		case excused:
+			// Out of both corpora, on the record, for a reason that still holds.
+
+		case !tuning[name] && !held[name]:
+			t.Errorf("%s authors %q and NO corpus contains it, so it is not in AllFixtures and no "+
+				"ground-truth test touches it: its lines are unchecked, its keywords are unprobed, "+
+				"its severity is unpinned, and it measures nothing. Add it to Fixtures() or "+
+				"HeldOutFixtures(), or exempt it here with the reason", where, name)
 		}
 	}
+
+	for name, reason := range exempt {
+		if _, ok := authored[name]; !ok {
+			t.Errorf("this test exempts %q on the grounds that %s, and no function in this package "+
+				"authors a fixture by that name; delete the exemption or fix the name", name, reason)
+		}
+	}
+
+	// The other direction. A corpus fixture the scan did not find is one the
+	// scan is blind to, and a blind scan passes for the same reason the old
+	// list-driven version did.
+	for _, f := range AllFixtures() {
+		if _, ok := authored[f.Name]; !ok {
+			t.Errorf("%q is in a corpus and this scan did not discover it, so the scan cannot see "+
+				"whichever function builds it and would not notice that function being unwired. "+
+				"Fixtures are built by a zero-argument func returning a Fixture with a literal Name", f.Name)
+		}
+	}
+}
+
+// authoredFixtureNames reads every fixture this package authors out of its own
+// source: the constructor's file and function name, keyed by the Name the
+// fixture plants.
+//
+// It parses rather than calls, because a Go test cannot invoke a function it
+// only knows the name of — and the alternative, a written-down list of the
+// authored sets, is the thing that failed. Constructors in _test.go files are
+// skipped: severity_test.go and crossjudge_test.go build Fixture values for
+// unit tests, and those are not corpus plants and must not be reported as
+// unwired.
+func authoredFixtureNames(t *testing.T) map[string]string {
+	t.Helper()
+
+	out := map[string]string{}
+
+	for file, parsed := range packageAST(t) {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+
+		for _, decl := range parsed.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || !buildsAFixture(fn) {
+				continue
+			}
+
+			where := fmt.Sprintf("%s:%s", file, fn.Name.Name)
+
+			name, ok := plantedFixtureName(fn)
+			if !ok {
+				t.Errorf("%s returns a Fixture and this scan cannot read a literal Name out of it, "+
+					"so the fixture it builds is invisible to the wiring check — which is the exact "+
+					"silence that check exists to end. Give the Fixture literal a constant Name", where)
+				continue
+			}
+
+			if first, dup := out[name]; dup {
+				t.Errorf("%s and %s both author a fixture named %q. Corpora are keyed by name, so "+
+					"one of them is unreachable and this scan cannot say which", first, where, name)
+				continue
+			}
+			out[name] = where
+		}
+	}
+
+	if len(out) == 0 {
+		t.Fatal("no fixture constructors were discovered, so every check driven by this scan passes " +
+			"vacuously. Either the package moved or the shape being matched is wrong")
+	}
+	return out
+}
+
+// buildsAFixture reports whether a declaration is a fixture constructor: a
+// plain zero-argument function returning one Fixture.
+func buildsAFixture(fn *ast.FuncDecl) bool {
+	if fn.Recv != nil || fn.Body == nil || fn.Type.Params.NumFields() != 0 {
+		return false
+	}
+	if fn.Type.Results == nil || len(fn.Type.Results.List) != 1 {
+		return false
+	}
+	ident, ok := fn.Type.Results.List[0].Type.(*ast.Ident)
+	return ok && ident.Name == "Fixture"
+}
+
+// plantedFixtureName is the Name field of the Fixture literal a constructor
+// builds, when it is a plain string constant.
+func plantedFixtureName(fn *ast.FuncDecl) (string, bool) {
+	var name string
+	var found bool
+
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		lit, ok := n.(*ast.CompositeLit)
+		if !ok {
+			return true
+		}
+		if ident, ok := lit.Type.(*ast.Ident); !ok || ident.Name != "Fixture" {
+			return true
+		}
+
+		for _, el := range lit.Elts {
+			kv, ok := el.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			if key, ok := kv.Key.(*ast.Ident); !ok || key.Name != "Name" {
+				continue
+			}
+			value, ok := kv.Value.(*ast.BasicLit)
+			if !ok || value.Kind != token.STRING {
+				continue
+			}
+			unquoted, err := strconv.Unquote(value.Value)
+			if err != nil {
+				continue
+			}
+			name, found = unquoted, true
+			return false
+		}
+		return true
+	})
+
+	return name, found
 }
 
 // TestIncumbentSeverityIsRecordedNotRewritten pins the fix for the defect this
@@ -1330,13 +2477,13 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 	// list would silently move the pinned totals underneath them.
 	//
 	// WHAT THIS COSTS, stated because the number below is quoted elsewhere: the
-	// incumbent's severity reading now covers EIGHT of the thirteen tuning
-	// fixtures, not all of them, and the five it omits are exactly the warning
-	// and nit plants. Its 2/3/2 is therefore a statement about the corpus as it
-	// stood when it was collected — which was already the honest reading of it,
-	// since it was never a cross-tool score — and it is not evidence about how
-	// the incumbent rates the two levels this corpus previously could not
-	// resolve. Answering that takes a collection run.
+	// incumbent's severity reading now covers EIGHT of the sixteen tuning
+	// fixtures, not all of them, and the eight it omits are exactly the warning,
+	// nit and info plants. Its 2/3/2 is therefore a statement about the corpus
+	// as it stood when it was collected — which was already the honest reading
+	// of it, since it was never a cross-tool score — and it is not evidence
+	// about how the incumbent rates the three levels this corpus previously
+	// could not resolve. Answering that takes a collection run.
 	covered := map[string]bool{
 		"go-nil-deref": true, "go-sql-injection": true, "go-hardcoded-secret": true,
 		"python-command-injection": true, "clean-refactor": true, "style-only": true,

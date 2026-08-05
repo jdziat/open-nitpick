@@ -1514,9 +1514,21 @@ func dearFixture(f costFixture) bool {
 // without being short on coverage — the gap a set-based check could not see.
 const costRunsPerFixture = 2
 
-// costPrices prices the two models every strategy is run as. Deliberately a
-// literal rather than the shipped table: a degeneracy guard that moves when
-// somebody recaptures a rate is a guard nobody will trust.
+// costPrices is the rate table the degenerate-strategy rows are priced against.
+//
+// THIS COMMENT USED TO CLAIM it "prices the two models every strategy is run
+// as", and that was FALSE when it was written. The "a model nobody priced"
+// strategy sets costStrategy.model to test/unpriced precisely so that it is
+// absent from here — being unpriced IS that row's behaviour, and it is the one
+// strategy in the table whose whole argument depends on a missing entry. Read as
+// a guarantee of complete coverage, the old sentence said no such row could
+// exist, in a file where one does. Two of the three ids the strategies run as
+// are below; the third is deliberately missing, and
+// TestAModelWithNoPriceEntryReportsUnknownAndNotZero pins the reading its
+// absence has to produce.
+//
+// Deliberately a literal rather than the shipped table: a degeneracy guard that
+// moves when somebody recaptures a rate is a guard nobody will trust.
 func costPrices(t *testing.T) *PriceTable {
 	t.Helper()
 	return mustPrices(t, "models:\n"+

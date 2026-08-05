@@ -196,8 +196,16 @@ type DumpSample struct {
 	Findings []review.Finding
 
 	// Judged assesses exactly these findings, so Verdict.Index is a position in
-	// Findings. The persona path filters a shared corpus per level and must
-	// re-index its verdicts before handing them over.
+	// Findings — and "assesses" means the judge was SHOWN this list, not merely
+	// that the verdicts have been renumbered to fit it.
+	//
+	// The file cannot carry the difference, and a reader of it has no way to
+	// check: a producer that judged some larger list and filtered the verdicts
+	// down would look identical here, and every figure a re-judge derived from
+	// it would compare two questions. The persona path was that producer — it
+	// judged a shared corpus once and recorded each nitpick level's filtered
+	// list beside those verdicts — and it no longer is; runLevels judges each
+	// distinct filtered list. Any new producer owes the same.
 	Judged *JudgeResult
 }
 

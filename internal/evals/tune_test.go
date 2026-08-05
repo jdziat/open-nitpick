@@ -72,6 +72,13 @@ func voiceVariants() []variant {
 
 // scored is one variant's judged outcome.
 type scored struct {
+	// model is the reviewer the variant was produced by. It is not printed —
+	// the persona axis holds one model and the table identifies its rows by
+	// variant — and it is carried because Corroborate files the second judge's
+	// aggregate under contenderLabel(model, variant). Asking for it by variant
+	// alone finds nothing, pays for a corroboration, and prints "+?".
+	model string
+
 	variant  string
 	agg      Aggregate
 	failures int
@@ -128,28 +135,79 @@ func TestTunePersona(t *testing.T) {
 		config.NitpickOff, config.NitpickMinimal, config.NitpickNormal, config.NitpickPedantic,
 	}
 
-	t.Logf("judge: %s   reviewer: %s   fixtures: %d   levels: %d (one review each, filtered offline)",
+	t.Logf("judge: %s   reviewer: %s   fixtures: %d   levels: %d (one review each, filtered offline, "+
+		"then judged once per DISTINCT filtered list so both judges score the same stimulus)",
 		judge.Model(), model.ID, len(opts.Fixtures), len(levels))
 
-	results := runLevels(t, judge, model, levels, opts, dump)
-	reportVariants(t, results)
+	// The nitpick axis holds the persona constant except for its level, and the
+	// judge is shown the GENERATION persona each level was filtered out of, so
+	// one voice covers every group.
+	results, samples := runLevels(t, judge, model, levels, opts, dump)
+	reportVariants(t, results, corroborateVariants(t, judge, results, samples, nil))
 }
 
 // runLevels reviews each fixture once and derives every level from that corpus.
-func runLevels(t *testing.T, judge *Judge, model Model, levels []config.NitpickLevel, opts Options, dump *Dump) []scored {
+//
+// IT JUDGES WHAT EACH LEVEL ACTUALLY SHOWS, and that is a deliberate change of
+// cost. It used to judge the whole corpus once per fixture and reuse those
+// verdicts for every level, copying Grade, SignalToNoise, ToneAdherence and
+// Missed into all four rows verbatim. Two things were wrong with that and only
+// one of them was about the second judge.
+//
+// The second judge was handed each level's FILTERED list, so the delta printed
+// beside those four figures compared a whole-corpus judgement against a subset
+// judgement under a legend calling it the confidence interval on the figure
+// beside it. MISSED was biased in a known direction on top: filtering more
+// findings legitimately raises the second judge's missed count against a
+// primary frozen at the corpus value.
+//
+// The deeper problem is that the figure was wrong before any delta was computed.
+// A GRADE for nitpick=off produced by judging findings that nitpick=off
+// suppresses is not that level's grade under any reading, and MISSED for a level
+// that hides a defect's only finding cannot be measured by a judge that was
+// shown it. Refusing to publish the delta — the other honest fix — would have
+// left a wrong figure wearing an honest caveat. So the primary judges each level
+// on the list that level presents.
+//
+// WHAT IT COSTS: one judging call per DISTINCT filtered list per fixture,
+// against one per fixture before. The bound is the number of levels, so at worst
+// four times the primary judging on the default axis; the reviews are unchanged
+// at one per fixture, and the second judge already cost one call per level per
+// fixture. Levels that filter to the same list share one call, which is the
+// usual case at the top of the axis — the corpus is generated at
+// config.GenerationLevel, so every level at or above it keeps everything and
+// they are one stimulus, judged once. The sharing is decided by the fingerprint
+// of the list, not by a rule about levels, so a filter change cannot make two
+// different lists share a judgement.
+func runLevels(
+	t *testing.T, judge *Judge, model Model, levels []config.NitpickLevel, opts Options, dump *Dump,
+) ([]scored, []DumpSample) {
 	t.Helper()
 
 	ctx := context.Background()
 
 	out := make([]scored, len(levels))
 	for i, l := range levels {
-		out[i] = scored{variant: "nitpick=" + string(l)}
+		out[i] = scored{model: model.ID, variant: "nitpick=" + string(l)}
 	}
 
 	var (
 		mu  sync.Mutex
 		wg  sync.WaitGroup
 		sem = make(chan struct{}, 4)
+
+		// Every level's judged list, kept for the second judge. Each level is
+		// its own contender with its own finding list — the whole point of
+		// generate-once-then-filter — so corroborating the axis means judging
+		// four lists, not one. It is still judging only: no level is reviewed.
+		samples []DumpSample
+
+		// What the primary judging actually cost, counted rather than
+		// estimated. The doc comment above says the bound is one call per level
+		// per fixture and the usual case is fewer; a bound in a comment is the
+		// kind of claim that stops being true quietly, so the run prints the
+		// number it spent.
+		calls int
 	)
 
 	for _, f := range opts.Fixtures {
@@ -181,106 +239,165 @@ func runLevels(t *testing.T, judge *Judge, model Model, levels []config.NitpickL
 
 			corpus := result.Report.Findings
 
-			// One judgement of the whole corpus; each level reuses the verdicts
-			// for the findings it keeps.
-			assessment, err := judge.Judge(ctx, f, persona, corpus)
-
-			mu.Lock()
-			defer mu.Unlock()
-
-			if err != nil {
-				for i := range out {
-					out[i].failures++
-					out[i].notes = append(out[i].notes, fmt.Sprintf("%s: judge failed: %v", f.Name, err))
-				}
-				return
-			}
-
-			byIndex := map[int]Verdict{}
-			for _, v := range assessment.Verdicts {
-				byIndex[v.Index] = v
-			}
-
-			// The corpus position of each finding, so a filtered subset can find
-			// its own verdicts. Keyed the way review.dedupe keys them, which is
-			// what makes the key unique within a corpus.
-			corpusIndex := map[string]int{}
-			for idx, finding := range corpus {
-				corpusIndex[finding.Key()] = idx
-			}
-
+			// What each level actually publishes, and its identity. The
+			// identity is a fingerprint of the list, so two levels share a
+			// judgement only when they present the same review — which is a
+			// fact about those two levels, not an assumption about the axis.
+			kept := make([][]review.Finding, len(levels))
+			shown := make([]Stimulus, len(levels))
 			for i, level := range levels {
-				kept, _ := review.Filter(corpus, level, config.SeverityNit)
+				kept[i], _ = review.Filter(corpus, level, config.SeverityNit)
+				shown[i] = JudgedOver(f.Name, kept[i])
+			}
 
-				sub := &JudgeResult{
-					Missed:        assessment.Missed,
-					SignalToNoise: assessment.SignalToNoise,
-					ToneAdherence: assessment.ToneAdherence,
-					Grade:         assessment.Grade,
+			// One judging call per distinct list. An UNRECORDED stimulus is
+			// never shared: a fingerprint that could not be computed is not
+			// evidence that two lists are equal, and sharing on it would put a
+			// judgement of one level's findings into another level's row.
+			type call struct {
+				shown    Stimulus
+				findings []review.Finding
+				levels   []int
+			}
+			var batches []*call
+			byStimulus := map[Stimulus]*call{}
+			for i := range levels {
+				if c, ok := byStimulus[shown[i]]; ok && shown[i].Recorded() {
+					c.levels = append(c.levels, i)
+					continue
 				}
-				// Each verdict is re-indexed to its position in THIS level's
-				// list. The verdicts carry indices into the whole corpus, and
-				// Add validates them against the number of findings the level
-				// kept — so any level that dropped a finding before its last
-				// kept one reported "judge verdict index N is out of range"
-				// against a judge that had done nothing wrong, and the noisiest
-				// levels produced the most phantom complaints. Add's expected
-				// count is len(kept) for the same reason: passing
-				// len(sub.Verdicts) compared the slice against itself and could
-				// never detect a verdict the judge actually failed to return.
-				for pos, finding := range kept {
-					if v, ok := byIndex[corpusIndex[finding.Key()]]; ok {
-						v.Index = pos
-						sub.Verdicts = append(sub.Verdicts, v)
+				c := &call{shown: shown[i], findings: kept[i], levels: []int{i}}
+				batches = append(batches, c)
+				if shown[i].Recorded() {
+					byStimulus[shown[i]] = c
+				}
+			}
+
+			for _, c := range batches {
+				// A level that filters everything away is judged too, rather
+				// than assumed to score nothing. That is the level's actual
+				// output, its MISSED is the whole planted corpus, and a judge
+				// that answers an empty list with verdicts is a failure the
+				// report has to be able to show. Rejudge already judges silent
+				// groups for the same reason, so both judges treat silence
+				// alike.
+				assessment, err := judge.Judge(ctx, f, persona, c.findings)
+
+				mu.Lock()
+				calls++
+				if err != nil {
+					for _, i := range c.levels {
+						out[i].failures++
+						out[i].notes = append(out[i].notes,
+							fmt.Sprintf("%s: judge failed: %v", f.Name, err))
+					}
+					mu.Unlock()
+					continue
+				}
+
+				for _, i := range c.levels {
+					// The verdicts index into c.findings, which is this level's
+					// published list, so nothing is re-indexed and Add's
+					// expected count is the stimulus's own length. The previous
+					// version filtered whole-corpus verdicts into each level and
+					// had to renumber them; that renumbering is gone because the
+					// judgement is no longer borrowed from another list.
+					if problems := out[i].agg.Add(assessment, c.shown); len(problems) > 0 {
+						for _, p := range problems {
+							out[i].notes = append(out[i].notes,
+								fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", f.Name, p))
+						}
+					}
+					out[i].agg.AddSeverity(f, ScoreSeverity(f, c.findings))
+
+					sample := DumpSample{
+						Model:    model.ID,
+						Variant:  "nitpick=" + string(levels[i]),
+						Run:      1,
+						Fixture:  f,
+						Findings: c.findings,
+						Judged:   assessment,
+					}
+					samples = append(samples, sample)
+
+					if derr := dump.Record(sample); derr != nil {
+						out[i].notes = append(out[i].notes, fmt.Sprintf("%s: dump: %v", f.Name, derr))
+					}
+
+					if f.Clean() && len(c.findings) > 0 {
+						out[i].notes = append(out[i].notes,
+							fmt.Sprintf("%s: %d finding(s) on a clean change", f.Name, len(c.findings)))
 					}
 				}
-
-				if problems := out[i].agg.Add(sub, len(kept)); len(problems) > 0 {
-					for _, p := range problems {
-						out[i].notes = append(out[i].notes, fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", f.Name, p))
-					}
-				}
-				out[i].agg.AddSeverity(f, ScoreSeverity(f, kept))
-
-				if derr := dump.Record(DumpSample{
-					Model:    model.ID,
-					Variant:  "nitpick=" + string(level),
-					Run:      1,
-					Fixture:  f,
-					Findings: kept,
-					Judged:   sub,
-				}); derr != nil {
-					out[i].notes = append(out[i].notes, fmt.Sprintf("%s: dump: %v", f.Name, derr))
-				}
-
-				if f.Clean() && len(kept) > 0 {
-					out[i].notes = append(out[i].notes,
-						fmt.Sprintf("%s: %d finding(s) on a clean change", f.Name, len(kept)))
-				}
+				mu.Unlock()
 			}
 		}(f)
 	}
 
 	wg.Wait()
-	return out
+
+	t.Logf("primary judging: %d call(s) against a ceiling of %d (%d fixture(s) x %d level(s)). One per "+
+		"DISTINCT filtered list: levels that publish the same findings share a judgement, levels that "+
+		"do not get their own. %d call(s) were not spent — some shared, and some because a fixture "+
+		"whose review failed is never judged, which the failure counts beside each row separate out. "+
+		"This is what buys the second judge the SAME stimulus, and it is the difference between a "+
+		"delta that is a confidence interval and one that is a change of question",
+		calls, len(opts.Fixtures)*len(levels), len(opts.Fixtures), len(levels),
+		len(opts.Fixtures)*len(levels)-calls)
+
+	return out, samples
 }
 
 // reportVariants prints the comparison table.
-func reportVariants(t *testing.T, results []scored) {
+//
+// Same treatment as the judged model ranking: every judged cell is a
+// JudgedFigure carrying its cross-judge delta, and a run with no second judge
+// prints figures that say the disagreement was not measured. The persona axis is
+// scored by the same judge on the same terms as the model battery, so it inherits
+// the same vendor conflict and gets the same admission.
+func reportVariants(t *testing.T, results []scored, panel JudgePanel) {
 	t.Helper()
+
+	// Looked up under contenderLabel — the key Corroborate files under — and
+	// LABELLED by variant, which is what the table identifies its rows by. The
+	// two being different strings is the whole reason JudgePanel.Unpaired
+	// exists, and it is asserted below rather than assumed.
+	cross := make([]CrossJudged, len(results))
+	claimed := make([]string, 0, len(results))
+	for i, r := range results {
+		key := contenderLabel(r.model, r.variant)
+		claimed = append(claimed, key)
+		cross[i] = panel.Pair(key, r.agg)
+	}
+	if orphaned := panel.Unpaired(claimed); len(orphaned) > 0 {
+		t.Errorf("the second judge scored %d contender(s) that no row in this table claimed: %s.\n"+
+			"The judging was paid for and every figure below still says its disagreement was not "+
+			"measured, which is indistinguishable from a run with no second judge",
+			len(orphaned), strings.Join(orphaned, ", "))
+	}
 
 	// A variant with no findings has UNDEFINED precision, not perfect precision.
 	// Sorting it to the top would make silence look like the best strategy.
-	sort.Slice(results, func(i, j int) bool {
-		a, b := results[i].agg, results[j].agg
-		if a.HasFindings() != b.HasFindings() {
-			return a.HasFindings()
+	// Ordered through JudgedFigure.Compare, which puts an undefined figure last
+	// and never hands the caller the number.
+	order := make([]int, len(results))
+	for i := range order {
+		order[i] = i
+	}
+	sort.Slice(order, func(i, j int) bool {
+		a, b := cross[order[i]], cross[order[j]]
+		if c := a.PrecisionFigure().Compare(b.PrecisionFigure()); c != 0 {
+			return c < 0
 		}
-		if !a.HasFindings() {
-			return results[i].variant < results[j].variant
-		}
-		return a.Precision() > b.Precision()
+		return results[order[i]].variant < results[order[j]].variant
 	})
+
+	sorted := make([]scored, len(results))
+	sortedCross := make([]CrossJudged, len(results))
+	for i, idx := range order {
+		sorted[i], sortedCross[i] = results[idx], cross[idx]
+	}
+	results, cross = sorted, sortedCross
 
 	var b strings.Builder
 	b.WriteString("\n")
@@ -306,34 +423,29 @@ func reportVariants(t *testing.T, results []scored) {
 	// reviews, and one failed review silently gives that row a total over fewer
 	// samples than its neighbours. `failures` was counted and then read by
 	// nothing, so the reader had no way to see it happen.
-	b.WriteString(VariantTableHeader + "\n")
-	b.WriteString(strings.Repeat("-", len(VariantTableHeader)) + "\n")
+	b.WriteString(panel.Banner() + "\n\n")
+	b.WriteString(CrossJudgedVariantTableHeader + "\n")
+	b.WriteString(strings.Repeat("-", len(CrossJudgedVariantTableHeader)) + "\n")
 
-	for _, r := range results {
-		a := r.agg
-		precision := "n/a"
-		if a.HasFindings() {
-			precision = fmt.Sprintf("%.2f", a.Precision())
-		}
-
-		n := float64(max(len(a.Grades), 1))
-		rate := func(v int) string { return fmt.Sprintf("%.2f", float64(v)/n) }
-
-		// O-COV is printed with the triple, never without: severity is graded
-		// only over defects the reviewer LOCATED, and the triple alone is tied
-		// by a reviewer that reports only what it is already sure of. All four
-		// come from one function so a row cannot render three of them.
-		oInfl, oUnder, oAcc, oCov := a.ObjectiveSeverityCells(r.variant, len(a.Grades))
-
-		fmt.Fprintf(&b, "%-23s %-5d %-5d %-9s %-5s %-6s %-10s %-7s %-8s %-7s %-8s %-6s %-6s %-9s %-9s %-7s %-7.1f %.2f\n",
-			truncate(r.variant, 23), len(a.Grades), r.failures,
-			rate(a.Findings), rate(a.Real), rate(a.WorthRaising), precision,
-			rate(a.Inflated), rate(a.Understated), oInfl, oUnder, oAcc, oCov,
-			rate(a.Misclassed), rate(a.ToneOff), rate(a.Missed), a.MeanSignal(), a.MeanGrade())
+	for i, r := range results {
+		b.WriteString(JudgedVariantRow(r.variant, cross[i], r.failures))
 	}
 
 	t.Log(b.String())
+	t.Log(CrossJudgeLegend)
 	t.Log(SeverityColumnLegend)
+
+	// The counts behind every rate above, for BOTH judges. The variant table
+	// never printed denominators at all, which is the same omission the judged
+	// model ranking was fixed for: these are quotients of single-digit integers
+	// and a rate hides its own resolution.
+	var counts strings.Builder
+	counts.WriteString("DENOMINATORS — every rate above, as the counts it was computed from:\n")
+	for i, r := range results {
+		counts.WriteString(cross[i].Denominators(r.variant) + "\n")
+		fmt.Fprintf(&counts, "  %-36s objective:     %s\n", "", r.agg.ObjectiveSeverityCounts(r.variant))
+	}
+	t.Log(counts.String())
 
 	rows := make([]VocabularyRow, 0, len(results))
 	for _, r := range results {
@@ -423,6 +535,11 @@ func TestJudgeModels(t *testing.T) {
 		notes   = map[string][]string{}
 		wg      sync.WaitGroup
 		sem     = make(chan struct{}, evalConcurrency)
+
+		// Every judged review, kept so the second judge can be handed the SAME
+		// finding lists in the SAME positions. This is what makes the second
+		// opinion cost judging only: nothing here is reviewed twice.
+		samples []DumpSample
 	)
 
 	for _, j := range jobs {
@@ -464,19 +581,22 @@ func TestJudgeModels(t *testing.T) {
 				return
 			}
 
-			for _, p := range agg.Add(assessment, len(findings)) {
+			for _, p := range agg.Add(assessment, JudgedOver(j.fixture.Name, findings)) {
 				notes[j.model.ID] = append(notes[j.model.ID],
 					fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", j.fixture.Name, p))
 			}
 			agg.AddSeverity(j.fixture, ScoreSeverity(j.fixture, findings))
 
-			if derr := dump.Record(DumpSample{
+			sample := DumpSample{
 				Model:    j.model.ID,
 				Run:      1,
 				Fixture:  j.fixture,
 				Findings: findings,
 				Judged:   assessment,
-			}); derr != nil {
+			}
+			samples = append(samples, sample)
+
+			if derr := dump.Record(sample); derr != nil {
 				notes[j.model.ID] = append(notes[j.model.ID], fmt.Sprintf("%s: dump: %v", j.fixture.Name, derr))
 			}
 
@@ -488,35 +608,151 @@ func TestJudgeModels(t *testing.T) {
 	}
 
 	wg.Wait()
-	reportJudgedModels(t, opts.Fixtures, byModel, notes)
+
+	panel := corroborate(t, ctx, judge, persona, nil, samples, notes)
+	reportJudgedModels(t, opts.Fixtures, byModel, panel, notes)
+}
+
+// corroborate scores the SAME judged reviews again with a second judge from a
+// vendor no contender shares, and returns the panel the report renders from.
+//
+// It runs no review. Every finding it submits is one the primary judge was just
+// shown, in the position it was shown in, handed over through the re-judge
+// path — the mechanism this harness already had for changing exactly one thing.
+// The second judge therefore costs judging only, which is what makes publishing
+// a disagreement beside every figure affordable enough to be the default rather
+// than an occasional audit.
+//
+// With no second judge configured it returns a panel that says so, and every
+// figure in the report renders its disagreement as UNMEASURED. That is the
+// degradation this was asked for: weaker, and stated.
+// byVariant supplies the persona each variant was reviewed under, keyed by
+// variant name. It is nil everywhere the persona is held constant — the model
+// benchmark and the head-to-head — and populated on the voice axis, where four
+// variants ARE four personas and judging them all against the default would
+// score three of them against a voice they were never asked to use.
+func corroborate(
+	t *testing.T,
+	ctx context.Context,
+	primary *Judge,
+	persona config.Persona,
+	byVariant map[string]config.Persona,
+	samples []DumpSample,
+	notes map[string][]string,
+) JudgePanel {
+	t.Helper()
+
+	panel := JudgePanel{Primary: primary.Model()}
+
+	model := SecondJudgeFromEnv()
+	if model == "" {
+		t.Logf("NO SECOND JUDGE. %s is unset, so every judged figure below is one opinion from %s, "+
+			"which shares a vendor with %d contender(s) it scores. Set %s=default to corroborate "+
+			"with %s; it re-judges these findings and runs no review.",
+			EnvSecondJudge, primary.Model(), len(VendorConflicts(primary.Model())),
+			EnvSecondJudge, SecondJudgeModel)
+		return panel
+	}
+
+	second, err := NewJudge(model)
+	if err != nil {
+		// Not fatal. A run whose second judge could not be built is still a run,
+		// and failing it here would throw away the primary judgements that have
+		// already been paid for. It degrades to the stated single-judge case.
+		t.Errorf("SECOND JUDGE UNAVAILABLE, the table below is single-judge: build %s: %v", model, err)
+		return panel
+	}
+
+	// Stated before the calls rather than only in the table, because this is the
+	// line that says whether the corroboration is worth anything. A second judge
+	// sharing the primary's vendor measures that vendor's own variance, which is
+	// a real and useful number and is NOT an answer to the self-preference
+	// question.
+	if conflicts := VendorConflicts(second.Model()); len(conflicts) > 0 {
+		t.Logf("SECOND JUDGE %s SHARES A VENDOR WITH %d CONTENDER(S) IT SCORES: %s. The deltas below "+
+			"are still a disagreement, but they do not answer the self-preference question — for "+
+			"that the second judge must share a vendor with nothing in the battery.",
+			second.Model(), len(conflicts), strings.Join(conflicts, ", "))
+	}
+
+	groups := CorroborationGroups(samples)
+	for i := range groups {
+		if p, ok := byVariant[groups[i].Variant]; ok {
+			groups[i].Persona = &p
+		}
+	}
+	t.Logf("second judge: %s   re-judging %d recorded review(s), running no review", second.Model(), len(groups))
+
+	aggregates, secondNotes := Corroborate(ctx, second, persona, groups, evalConcurrency)
+	for contender, ns := range secondNotes {
+		notes[contender] = append(notes[contender], ns...)
+	}
+
+	if len(aggregates) == 0 {
+		// Distinct from "no second judge was configured", and worth failing over:
+		// the operator paid for a corroboration and received none, and a table
+		// that silently reverted to single-judge would look identical to one
+		// where they never asked.
+		t.Errorf("the second judge %s assessed none of the %d review(s); this is not a corroboration, "+
+			"it is an outage, and every figure below is uncorroborated", second.Model(), len(groups))
+		return panel
+	}
+
+	panel.Second = second.Model()
+	panel.SecondAggregates = aggregates
+	return panel
 }
 
 // reportJudgedModels prints the judged ranking.
-func reportJudgedModels(t *testing.T, fixtures []Fixture, byModel map[string]*Aggregate, notes map[string][]string) {
+//
+// It takes TWO judges' aggregates, and the second may be absent. Every judged
+// cell is a JudgedFigure carrying its cross-judge delta, so this function has no
+// route to a bare judged number and a reader has no route to half a result. When
+// there is no second judge the figures render "+?" and the table says so above
+// itself, which is a weaker publication rather than a quieter one.
+func reportJudgedModels(
+	t *testing.T,
+	fixtures []Fixture,
+	byModel map[string]*Aggregate,
+	panel JudgePanel,
+	notes map[string][]string,
+) {
 	t.Helper()
 
 	type row struct {
 		model string
 		agg   *Aggregate
+		cross CrossJudged
 	}
 
 	rows := make([]row, 0, len(byModel))
+	claimed := make([]string, 0, len(byModel))
 	for m, a := range byModel {
-		rows = append(rows, row{m, a})
+		claimed = append(claimed, m)
+		rows = append(rows, row{m, a, panel.Pair(m, *a)})
+	}
+	if orphaned := panel.Unpaired(claimed); len(orphaned) > 0 {
+		t.Errorf("the second judge scored %d contender(s) that no row in this table claimed: %s.\n"+
+			"The judging was paid for and every figure below still says its disagreement was not "+
+			"measured, which is indistinguishable from a run with no second judge",
+			len(orphaned), strings.Join(orphaned, ", "))
 	}
 
 	// Rank by the judge's overall grade, then by the share of findings a senior
 	// reviewer would actually raise. Silence does not win: a model with no
 	// findings has undefined precision and sorts last.
+	//
+	// Compared through JudgedFigure.Compare, which orders by the PRIMARY judge
+	// and never yields the number. That the primary judge decides the order is a
+	// limitation, not an oversight — it is the judge whose ranking has been
+	// published — and it is why the second judge's own order is printed below
+	// the table rather than left to a reader to reconstruct from the deltas.
 	sort.Slice(rows, func(i, j int) bool {
-		a, b := rows[i].agg, rows[j].agg
-		if a.HasFindings() != b.HasFindings() {
-			return a.HasFindings()
+		a, b := rows[i].cross, rows[j].cross
+		if c := a.GradeFigure().Compare(b.GradeFigure()); c != 0 {
+			return c < 0
 		}
-		if ag, bg := a.MeanGrade(), b.MeanGrade(); ag != bg {
-			return ag > bg
-		}
-		return a.Precision() > b.Precision()
+		return a.PrecisionFigure().Compare(b.PrecisionFigure()) < 0
 	})
 
 	var b strings.Builder
@@ -554,64 +790,94 @@ func reportJudgedModels(t *testing.T, fixtures []Fixture, byModel map[string]*Ag
 	// looks three times worse for having been measured three times as hard.
 	// COV is the fixture coverage that makes the comparison legitimate at all;
 	// N is what the rates divide by.
-	b.WriteString(JudgedModelTableHeader + "\n")
-	b.WriteString(strings.Repeat("-", len(JudgedModelTableHeader)) + "\n")
+	//
+	// The header is CrossJudgedModelTableHeader, which is JudgedModelTableHeader
+	// with the judge-supplied columns widened to hold a figure AND its
+	// cross-judge delta. Same columns, same order, derived from the declared
+	// header rather than written out again — see WidenJudgedColumns.
+	b.WriteString(panel.Banner() + "\n\n")
+	b.WriteString(CrossJudgedModelTableHeader + "\n")
+	b.WriteString(strings.Repeat("-", len(CrossJudgedModelTableHeader)) + "\n")
 
 	for _, r := range rows {
-		a := r.agg
-
-		prec := "n/a"
-		if a.HasFindings() {
-			prec = fmt.Sprintf("%.2f", a.Precision())
-		}
-
-		// A contender with no judged sample has no grade, and printing its
-		// MeanGrade zero value as 0.00 reads as "graded, and terrible". The
-		// benchmark reaches that state whenever Incumbent's every invocation
-		// errors — an exhausted allowance, or a fixture with no cached review —
-		// and the row it produced was a last-place entry in a table captioned as
-		// a head-to-head.
-		grade, signal := "n/a", "n/a"
-		if len(a.Grades) > 0 {
-			grade = fmt.Sprintf("%.2f", a.MeanGrade())
-			signal = fmt.Sprintf("%.1f", a.MeanSignal())
-		}
-
-		// Fixtures completed and failures are printed because MeanGrade is a mean
-		// over a VARIABLE denominator: a failed review contributes nothing, so a
-		// model that fails the hard fixtures and completes only the easy ones
-		// scores higher. Without these columns that artifact is invisible and
-		// reads as model quality.
-		failed := len(notes[r.model])
-
-		// Spread is blank for a single sample rather than printed as 0.00,
-		// which would read as "perfectly stable" when it means "not measured".
-		spread := "n/a"
-		if len(a.Grades) > 1 {
-			spread = fmt.Sprintf("%.2f", a.GradeSpread())
-		}
-
-		// Divide by the sample count so every count column is a rate. n is never
-		// zero here: a contender with no graded sample has no row.
-		n := float64(max(len(a.Grades), 1))
-		rate := func(v int) string { return fmt.Sprintf("%.2f", float64(v)/n) }
-
-		// n/a for a contender whose severity vocabulary is not ours, and the
-		// coverage denominator beside the triple for one whose is. This is the
-		// table the head-to-head is printed in, so it is the one where a
-		// cross-tool severity comparison was still on offer after the banded
-		// version was withdrawn — same columns, same sorted ranking, a prose
-		// note underneath. See PublishesOurSeverityLevels.
-		oInfl, oUnder, oAcc, oCov := a.ObjectiveSeverityCells(r.model, len(a.Grades))
-
-		fmt.Fprintf(&b, "%-36s %-6s %-7s %-6s %-4d %-4d %-5d %-5s %-6s %-7s %-8s %-7s %-8s %-6s %-6s %-9s %-7s %s\n",
-			truncate(r.model, 36), grade, spread, prec, a.Coverage(), len(a.Grades), failed,
-			rate(a.Findings), rate(a.WorthRaising), rate(a.Inflated), rate(a.Understated),
-			oInfl, oUnder, oAcc, oCov,
-			rate(a.Misclassed), rate(a.Missed), signal)
+		// Rendered by JudgedModelRow, in non-test code, which is the only thing
+		// that puts this table in front of a guard the default build can run.
+		// Fixtures completed and failures reach it because the mean grade is a
+		// mean over a VARIABLE denominator: a failed review contributes nothing,
+		// so a model that fails the hard fixtures and completes only the easy
+		// ones scores higher, and without those columns the artifact is
+		// invisible and reads as model quality.
+		b.WriteString(JudgedModelRow(r.model, r.cross, len(notes[r.model])))
 	}
 
 	t.Log(b.String())
+	t.Log(CrossJudgeLegend)
+
+	// WHETHER THE ORDER SURVIVES THE OTHER JUDGE.
+	//
+	// The rows above are ordered by the primary judge, which is the ranking this
+	// project has published. The deltas say how far each figure moves; they do
+	// not say whether the ORDER moves, and a reader cannot reliably recover that
+	// by eye from eighteen columns. So it is computed and printed: the second
+	// judge's own order, and how many contenders sit in a different place in it.
+	//
+	// It is a count and a list, not a correlation coefficient. Eight fixtures
+	// cannot support a statistic, and a number that looks like statistics gets
+	// quoted like statistics — the same reasoning GradeSpread records for not
+	// becoming a confidence interval.
+	//
+	// It is also a COMPARISON, and so it is subject to the same rule the deltas
+	// are: two orders built from different stimuli do not disagree, they answer
+	// different questions, and "3 of 6 contenders sit in a different position"
+	// would read as judge disagreement while measuring the change of question.
+	// So a contender whose two judges did not score the same finding lists
+	// suppresses the line entirely, and the report says which contenders and
+	// why. Printing the order for the rest would be worse than printing none:
+	// an order over a subset of the rows is not the order of the table.
+	var mismatched []string
+	for _, r := range rows {
+		if r.cross.HaveSecond && !r.cross.SameStimulus() {
+			mismatched = append(mismatched, r.model)
+		}
+	}
+
+	switch {
+	case !panel.Corroborated():
+		// Nothing to compare; the banner above has already said so.
+	case len(mismatched) > 0:
+		t.Logf("NO SECOND-JUDGE ORDER. %d of %d contender(s) were not scored on the same finding "+
+			"lists by the two judges (%s), so the second judge's ranking is not a re-ranking of "+
+			"this table and is not printed. Every judged cell on those rows reads `+NC` for the "+
+			"same reason. See the DENOMINATORS block below for which side is short.",
+			len(mismatched), len(rows), strings.Join(mismatched, ", "))
+	default:
+		second := make([]row, len(rows))
+		copy(second, rows)
+		sort.Slice(second, func(i, j int) bool {
+			a := CrossJudged{Primary: second[i].cross.Second, HaveSecond: false}
+			b := CrossJudged{Primary: second[j].cross.Second, HaveSecond: false}
+			if c := a.GradeFigure().Compare(b.GradeFigure()); c != 0 {
+				return c < 0
+			}
+			return a.PrecisionFigure().Compare(b.PrecisionFigure()) < 0
+		})
+
+		moved := 0
+		order := make([]string, 0, len(second))
+		for i, r := range second {
+			if rows[i].model != r.model {
+				moved++
+			}
+			order = append(order, fmt.Sprintf("%d. %s", i+1, r.model))
+		}
+
+		t.Logf("SECOND-JUDGE ORDER (%s), by the same rule the rows above are sorted by: %s\n"+
+			"%d of %d contender(s) sit in a different position. Both judges scored the same "+
+			"finding lists for every row, so this is a re-ranking and not a re-measurement. The "+
+			"rows above are the PRIMARY judge's ranking; this line is how much of it is that "+
+			"judge's opinion.",
+			panel.Second, strings.Join(order, "   "), moved, len(rows))
+	}
 
 	// EVERY RATE IN THE TABLE ABOVE, AS THE COUNTS IT CAME FROM.
 	//
@@ -628,21 +894,22 @@ func reportJudgedModels(t *testing.T, fixtures []Fixture, byModel map[string]*Ag
 	// count pair outgrows its cell the moment a contender files a hundred
 	// findings — at which point the table silently misaligns, which is a defect
 	// this file has already had once.
+	//
+	// Rendered by CrossJudged.Denominators, which prints BOTH judges' counts,
+	// rather than formatted here. Formatting them here is what would put this
+	// report back in possession of the raw judged counters — the state that
+	// makes half a result printable — and it would also have published one
+	// judge's denominators under a table of two judges' figures.
 	var counts strings.Builder
 	counts.WriteString("DENOMINATORS — every rate above, as the counts it was computed from:\n")
 	for _, r := range rows {
-		a := r.agg
+		counts.WriteString(r.cross.Denominators(r.model) + "\n")
+
 		// The objective-severity counts come from the gated renderer, not from
 		// the fields. A foreign contender's triple is withdrawn in the table, and
-		// printing it here would restore the comparison the cells refused.
-		fmt.Fprintf(&counts,
-			"  %-36s samples %d over %d fixture(s) | PREC %d/%d worth raising | judge called %d "+
-				"inflated and %d understated of %d findings | %s | MISSED %d | GRADE mean of %d\n",
-			truncate(r.model, 36), len(a.Grades), a.Coverage(),
-			a.WorthRaising, a.Findings,
-			a.Inflated, a.Understated, a.Findings,
-			a.ObjectiveSeverityCounts(r.model),
-			a.Missed, len(a.Grades))
+		// printing it here would restore the comparison the cells refused. They
+		// are judge-free, so they are printed once and not per judge.
+		fmt.Fprintf(&counts, "  %-36s objective:     %s\n", "", r.agg.ObjectiveSeverityCounts(r.model))
 	}
 	t.Log(counts.String())
 
@@ -808,6 +1075,12 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		// Incumbent's CLI has a free-tier allowance; keep concurrency low so a
 		// rate limit does not read as a quality result.
 		sem = make(chan struct{}, 3)
+
+		// The judged reviews, kept for the second judge. This is the table the
+		// head-to-head against the incumbent is printed in, so it is the one
+		// where a single judge's opinion carries the most weight — and the
+		// judge shares a vendor with three of the contenders on our side of it.
+		samples []DumpSample
 	)
 
 	record := func(name string, fx Fixture, run int, findings []review.Finding, err error) {
@@ -830,18 +1103,21 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 			notes[name] = append(notes[name], fmt.Sprintf("%s: judge failed: %v", fx.Name, jerr))
 			return
 		}
-		for _, p := range agg.Add(assessment, len(findings)) {
+		for _, p := range agg.Add(assessment, JudgedOver(fx.Name, findings)) {
 			notes[name] = append(notes[name], fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", fx.Name, p))
 		}
 		agg.AddSeverity(fx, ScoreSeverity(fx, findings))
 
-		if derr := dump.Record(DumpSample{
+		sample := DumpSample{
 			Model:    name,
 			Run:      run,
 			Fixture:  fx,
 			Findings: findings,
 			Judged:   assessment,
-		}); derr != nil {
+		}
+		samples = append(samples, sample)
+
+		if derr := dump.Record(sample); derr != nil {
 			notes[name] = append(notes[name], fmt.Sprintf("%s: dump: %v", fx.Name, derr))
 		}
 
@@ -929,7 +1205,9 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 	}
 
 	wg.Wait()
-	reportJudgedModels(t, opts.Fixtures, byName, notes)
+
+	panel := corroborate(t, ctx, judge, persona, nil, samples, notes)
+	reportJudgedModels(t, opts.Fixtures, byName, panel, notes)
 }
 
 // TestCollectIncumbent gathers Incumbent's reviews one fixture at a time,
@@ -985,14 +1263,23 @@ func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options, dump *D
 
 	out := make([]scored, len(variants))
 	for i, v := range variants {
-		out[i] = scored{variant: v.Name}
+		out[i] = scored{model: model.ID, variant: v.Name}
 	}
 
 	var (
 		mu  sync.Mutex
 		wg  sync.WaitGroup
 		sem = make(chan struct{}, evalConcurrency)
+
+		// Each voice variant is its own review AND its own persona, both of
+		// which the second judge has to be given: the tone verdict is scored
+		// against the voice the review was CONFIGURED to use.
+		samples  []DumpSample
+		personas = map[string]config.Persona{}
 	)
+	for _, v := range variants {
+		personas[v.Name] = v.Persona
+	}
 
 	for i, v := range variants {
 		for _, f := range opts.Fixtures {
@@ -1021,19 +1308,22 @@ func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options, dump *D
 					return
 				}
 
-				for _, p := range out[i].agg.Add(assessment, len(result.Report.Findings)) {
+				for _, p := range out[i].agg.Add(assessment, JudgedOver(f.Name, result.Report.Findings)) {
 					out[i].notes = append(out[i].notes, fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", f.Name, p))
 				}
 				out[i].agg.AddSeverity(f, ScoreSeverity(f, result.Report.Findings))
 
-				if derr := dump.Record(DumpSample{
+				sample := DumpSample{
 					Model:    model.ID,
 					Variant:  v.Name,
 					Run:      1,
 					Fixture:  f,
 					Findings: result.Report.Findings,
 					Judged:   assessment,
-				}); derr != nil {
+				}
+				samples = append(samples, sample)
+
+				if derr := dump.Record(sample); derr != nil {
 					out[i].notes = append(out[i].notes, fmt.Sprintf("%s: dump: %v", f.Name, derr))
 				}
 			}(i, v, f)
@@ -1041,5 +1331,28 @@ func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options, dump *D
 	}
 
 	wg.Wait()
-	reportVariants(t, out)
+	reportVariants(t, out, corroborateVariants(t, judge, out, samples, personas))
+}
+
+// corroborateVariants runs the second judge over a persona axis and folds its
+// complaints back onto the rows they belong to.
+//
+// The notes matter as much as the aggregates. A second judge that failed on two
+// fixtures produces a delta over fewer samples than the figure beside it, and
+// dropping the note that says so leaves a row whose N cell reads "8/6" with
+// nothing anywhere explaining the six. Both axes report per variant, and
+// Corroborate keys by contenderLabel, so the notes are translated back the same
+// way the aggregates are looked up.
+func corroborateVariants(
+	t *testing.T, judge *Judge, results []scored, samples []DumpSample, personas map[string]config.Persona,
+) JudgePanel {
+	t.Helper()
+
+	notes := map[string][]string{}
+	panel := corroborate(t, context.Background(), judge, config.DefaultPersona(), personas, samples, notes)
+
+	for i := range results {
+		results[i].notes = append(results[i].notes, notes[contenderLabel(results[i].model, results[i].variant)]...)
+	}
+	return panel
 }

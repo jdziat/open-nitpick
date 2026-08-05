@@ -77,7 +77,7 @@ clean:
 # generalization number over a subset, with nothing on the table saying which
 # fixtures were left out. TestTheMakefileSpendsTheWholeHeldOutCorpus compares
 # the two and fails when they drift.
-HELD_OUT := contract-break,data-loss-migration,ts-unawaited-async,timezone-boundary,clean-sql-allowlist,removed-guard,retry-no-backoff,csharp-client-per-request,bash-fixed-temp-path,cross-file-sort-nit,duplicate-test-case-nit,defensive-copy-nit
+HELD_OUT := contract-break,data-loss-migration,ts-unawaited-async,timezone-boundary,clean-sql-allowlist,removed-guard,retry-no-backoff,csharp-client-per-request,bash-fixed-temp-path,cross-file-sort-nit,duplicate-test-case-nit,defensive-copy-nit,rust-crate-for-one-call,ruby-default-page-size
 
 MODELS   ?=
 RUNS     ?=
@@ -85,6 +85,40 @@ FIXTURES ?=
 CAPTURE  ?=
 AXIS     ?=
 JUDGE    ?=
+
+# JUDGE2 adds a SECOND judge, and every judged figure in the resulting table is
+# then printed with the disagreement between the two as ONE value:
+#
+#   make judge-models JUDGE2=default
+#   make benchmark    JUDGE2=default
+#   make tune         JUDGE2=default
+#
+# `default` resolves to evals.SecondJudgeModel — x-ai/grok-4.5, a vendor NO
+# contender in the battery shares. It is spelled `default` rather than written
+# out here on purpose: a judge named in this file is a judge no test can see, and
+# the suite recomputes the vendor check from DefaultModels on every run. Any
+# other value is used as given, and is checked and reported the same way.
+#
+# WHY IT EXISTS. The judge is openai/gpt-5.6-terra and the battery contains three
+# OpenAI contenders — gpt-5.6-luna, gpt-5.4, and gpt-5.6-terra, WHICH IS THE
+# JUDGE. GRADE, PREC, MISSED, WORTH, J-INFL, J-UNDER and SIGNAL are all one
+# vendor's opinion of three of its own models, one of which is the grader. Separately, the same cached findings scored 3.66, 3.90, 3.95 and
+# 3.98 across four runs at temperature 0, and no column anywhere said so. One
+# number from one judge cannot express either problem; two numbers that disagree
+# express both, and the size of the disagreement is the reader's confidence
+# interval.
+#
+# WHAT IT COSTS. Judging, and nothing else. The second judge is handed the
+# findings the first judge was just shown, in the same positions, through the
+# same re-judge path `make rejudge` uses — no review is run a second time. On the
+# persona axis that is one judgement per VARIANT, because each nitpick level is a
+# different finding list and each voice variant is a different review.
+#
+# UNSET IS SUPPORTED AND IS NOT SILENT. Every judged figure then renders `X+?`,
+# where `?` is a disagreement that was NOT MEASURED rather than one measured at
+# zero, and the table says above itself that it is a single judge and names the
+# contenders that judge shares a vendor with.
+JUDGE2   ?=
 
 # DUMP writes every judged finding to a JSON Lines file: the finding, the
 # judge's verdict and reasoning, and the severity the fixture planted. The
@@ -148,6 +182,7 @@ tune:
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(AXIS),NITPICK_EVAL_AXIS='$(AXIS)') \
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
+	$(if $(JUDGE2),NITPICK_EVAL_JUDGE2='$(JUDGE2)') \
 	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
 	go test -tags=eval -count=1 -timeout=45m -v -run TestTunePersona ./internal/evals/
 
@@ -157,6 +192,7 @@ judge-models:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
+	$(if $(JUDGE2),NITPICK_EVAL_JUDGE2='$(JUDGE2)') \
 	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestJudgeModels ./internal/evals/
 
@@ -167,6 +203,7 @@ benchmark:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
+	$(if $(JUDGE2),NITPICK_EVAL_JUDGE2='$(JUDGE2)') \
 	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
 	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestBenchmarkAgainstIncumbent ./internal/evals/
