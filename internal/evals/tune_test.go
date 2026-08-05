@@ -189,6 +189,10 @@ func runLevels(
 	out := make([]scored, len(levels))
 	for i, l := range levels {
 		out[i] = scored{model: model.ID, variant: "nitpick=" + string(l)}
+		// Every level's findings come from our own engine under evalConfig, so
+		// the row declares our scale from the same place the run does rather
+		// than inheriting it by not being the incumbent.
+		out[i].agg.Scale = ourSeverityScale(evalConfig(model))
 	}
 
 	var (
@@ -449,7 +453,7 @@ func reportVariants(t *testing.T, results []scored, panel JudgePanel) {
 
 	rows := make([]VocabularyRow, 0, len(results))
 	for _, r := range results {
-		rows = append(rows, VocabularyRow{Name: r.variant, Usage: r.agg.SevUsage})
+		rows = append(rows, VocabularyRow{Name: r.variant, Usage: r.agg.SevUsage, Planted: r.agg.SevPlantedLevels})
 	}
 	t.Log(SeverityVocabularyBlock(rows))
 
@@ -558,6 +562,10 @@ func TestJudgeModels(t *testing.T) {
 				agg = &Aggregate{}
 				byModel[j.model.ID] = agg
 			}
+			// Every result's declaration, not just the first goroutine's: the
+			// row is withheld when two adapters disagree rather than attributed
+			// to whichever one won the race for the map.
+			agg.DeclareScale(result.Scale)
 			mu.Unlock()
 
 			if result.Err != nil {
@@ -919,7 +927,7 @@ func reportJudgedModels(
 
 	vocab := make([]VocabularyRow, 0, len(rows))
 	for _, r := range rows {
-		vocab = append(vocab, VocabularyRow{Name: r.model, Usage: r.agg.SevUsage})
+		vocab = append(vocab, VocabularyRow{Name: r.model, Usage: r.agg.SevUsage, Planted: r.agg.SevPlantedLevels})
 	}
 	t.Log(SeverityVocabularyBlock(vocab))
 
@@ -1083,7 +1091,11 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		samples []DumpSample
 	)
 
-	record := func(name string, fx Fixture, run int, findings []review.Finding, err error) {
+	// scale is declared by the CALLER, because the caller is the one that knows
+	// which adapter produced the findings. A contender whose adapter says
+	// nothing is withheld from the O-* columns rather than published at our
+	// resolution by virtue of not being named IncumbentModel; see SeverityScale.
+	record := func(name string, scale SeverityScale, fx Fixture, run int, findings []review.Finding, err error) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -1092,6 +1104,11 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 			agg = &Aggregate{}
 			byName[name] = agg
 		}
+		// Two adapters folded into one row: the row is on no single scale, so
+		// its severity cells are withheld rather than attributed to whichever
+		// declaration arrived first. This check used to be written out here and
+		// nowhere else, which is why the other judged path did not have it.
+		agg.DeclareScale(scale)
 		if err != nil {
 			notes[name] = append(notes[name], fmt.Sprintf("%s: %v", fx.Name, err))
 			return
@@ -1144,19 +1161,19 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 			// Prefer the cache: collection is rate-limited and resumable, so a
 			// previously collected review is both cheaper and more complete.
 			if cached, ok := CachedIncumbent(crCacheDir, fx); ok {
-				record(IncumbentModel, fx, 1, cached, nil)
+				record(IncumbentModel, IncumbentSeverityScale, fx, 1, cached, nil)
 				return
 			}
 
 			dir, err := os.MkdirTemp("", "cr-eval-")
 			if err != nil {
-				record(IncumbentModel, fx, 1, nil, err)
+				record(IncumbentModel, IncumbentSeverityScale, fx, 1, nil, err)
 				return
 			}
 			defer func() { _ = os.RemoveAll(dir) }()
 
 			if err := buildRepo(dir, fx); err != nil {
-				record(IncumbentModel, fx, 1, nil, err)
+				record(IncumbentModel, IncumbentSeverityScale, fx, 1, nil, err)
 				return
 			}
 
@@ -1164,7 +1181,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 			if IsRateLimited(err) {
 				// Never let an exhausted allowance masquerade as a low score.
 				if cached, ok := CachedIncumbent(crCacheDir, fx); ok {
-					record(IncumbentModel, fx, 1, cached, nil)
+					record(IncumbentModel, IncumbentSeverityScale, fx, 1, cached, nil)
 					return
 				}
 			}
@@ -1174,7 +1191,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 				// table printed anyway would be read as a result.
 				t.Errorf("%s: %v", fx.Name, err)
 			}
-			record(IncumbentModel, fx, 1, findings, err)
+			record(IncumbentModel, IncumbentSeverityScale, fx, 1, findings, err)
 		}(fx)
 
 		for _, m := range opts.Models {
@@ -1195,10 +1212,10 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 
 					result := RunWithPersona(ctx, m, fx, run, opts, persona)
 					if result.Err != nil {
-						record("nitpick/"+m.ID, fx, run, nil, result.Err)
+						record("nitpick/"+m.ID, result.Scale, fx, run, nil, result.Err)
 						return
 					}
-					record("nitpick/"+m.ID, fx, run, result.Report.Findings, nil)
+					record("nitpick/"+m.ID, result.Scale, fx, run, result.Report.Findings, nil)
 				}(m, fx, run)
 			}
 		}
@@ -1264,6 +1281,9 @@ func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options, dump *D
 	out := make([]scored, len(variants))
 	for i, v := range variants {
 		out[i] = scored{model: model.ID, variant: v.Name}
+		// Same declaration as the nitpick axis and from the same source: every
+		// variant is our own engine under evalConfig, differing only in persona.
+		out[i].agg.Scale = ourSeverityScale(evalConfig(model))
 	}
 
 	var (

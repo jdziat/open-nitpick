@@ -35,8 +35,8 @@ from the tree. Our own side is a live measurement and does not.
 
 ## What the instrument got wrong
 
-Sixteen measurement bugs have been found, listed below. Six of them scored
-against Incumbent and five flattered whichever behaviour this project would
+Eighteen measurement bugs have been found, listed below. Six of them scored
+against Incumbent and six flattered whichever behaviour this project would
 rather see — silence, selective reporting, or the author's own argument — which
 is why this section exists at all: none were bugs in open-nitpick, and every one
 would have produced a confident wrong number.
@@ -57,10 +57,12 @@ recomputed.
 | only `INFLATED` printed, never `UNDERSTATED` | severity error visible in one direction only | favoured the quieter reviewer |
 | `NOT COMPARABLE` guard read sample count | false alarm whenever one side ran more times | neutral |
 | raw sums compared across unequal `N` | a model measured 3× as hard looked 3× worse | against whoever ran more |
-| `O-ACC`/`O-INFL`/`O-UNDER` published with no coverage denominator | reporting only the plants already rated `critical`, and calling them `critical`, tied a perfectly calibrated reviewer on all three — 4 plants of 14 | favoured selective silence |
+| `O-ACC`/`O-INFL`/`O-UNDER` published with no coverage denominator | reporting only the plants already rated `critical`, and calling them `critical`, tied a perfectly calibrated reviewer on all three — 4 plants of 29 | favoured selective silence |
 | `RECALL`/`NOISE` published with no anchor width | one finding per file, spanning the file, titled with every keyword in it, tied a calibrated reviewer on both | favoured saying where nothing is |
 | full-resolution `O-*` left on Incumbent's row after the banded triple was withdrawn | the retracted comparison stayed on the page in the same sorted ranking, with a note asking the reader not to make it | against Incumbent |
 | the severity vocabulary block published OUR translation as the reviewer's words | the description offered in place of the withdrawn score was itself a function of the free `major` constant, captioned as observation | undetermined; it moved with our constant |
+| the vocabulary block omitted levels nobody located | the same selective reviewer's page was a proper SUBSTRING of a calibrated one — one clean line, beside a blank `O-COV` | favoured selective silence |
+| the severity withdrawal keyed on the reporter's NAME (`model != IncumbentModel`) | a contender added without anyone thinking about it was published at our resolution by default; `internal/linters` already folds four analyzers onto a codomain excluding `critical` and `nit` | latent |
 | the withdrawal applied to one of the metric's two renderings | `O-*` was gated on vocabulary and the `SEV a/i/u` cell was formatted inline, so "a foreign row prints `n/a`" held only because that table had no foreign row | latent |
 | `STABLE` returned `yes` for five silent runs | the column's best value went to a reviewer that never spoke; a wobbly correct one got `NO` | favoured silence |
 | the retraction's own figures (`10 of 10`, `0.62 → 0.88`, `O-ACC 0.63`) | none reproduced; each overstated the case it was making | favoured the author |
@@ -80,9 +82,16 @@ O-ACC is roughly 0.63 rather than 0.38, which puts it mid-pack: one model clearl
 ahead, two level, two behind."*
 
 Two things are wrong with it. The number is not reproducible: over the shipped
-cache the corrected parser scores Incumbent 2 accurate / 3 inflated / 2
-understated on the tuning fixtures and 2/4/4 over all of them — O-ACC 0.29 and
-0.20, not 0.63. And the *kind* of claim is the one Rule 6 withdraws: a cross-tool
+cache the corrected parser scores Incumbent 5 accurate / 3 inflated / 2
+understated on the tuning fixtures and 6/4/4 over all of them — O-ACC 0.50 and
+0.43, not 0.63. (The figures first printed here, 2/3/2 and 2/4/4 for O-ACC 0.29
+and 0.20, were themselves measured against a fourteen-plant corpus and are
+corrected in the same change that made them checkable:
+`TestTheSeverityFiguresTheseCommentsQuoteStillReproduce` now reads both readings
+back out of the cache and fails this paragraph when they move. A retraction
+argued from a figure nobody re-derives is the defect one level up, and this
+sentence has now been that defect twice.) And the *kind* of claim is the one
+Rule 6 withdraws: a cross-tool
 severity accuracy figure, used to rank a reviewer with roughly three levels
 against models with five. Ranking it "mid-pack" is exactly the sentence no number
 here supports.
@@ -97,9 +106,12 @@ published for it is the severity vocabulary block.
 And that is the third correction in this spot. `SeverityUsage` recorded the level
 `crSeverity` had translated each foreign word *to*, under a caption saying it was
 what the contender called the defect. Incumbent's vocabulary across the shipped
-cache is `{critical, major}` — it printed neither `error` nor `warning`. Swapping
-the free `major` constant re-rendered the same cached bytes with `error` in place
-of `warning`.
+cache is `{critical, major, minor}` — it printed neither `error` nor `warning`.
+Swapping the free `major` constant re-rendered the same cached bytes with `error`
+in place of `warning`. (`minor` is in that set and is credited with *no* plant:
+the one `minor` finding sits inside a planted span but names none of its
+keywords, so nothing grades it. Two of the three words are ever observed against
+a plant, and the credited observations total 14.)
 
 So the description offered *because* a score could not be justified was itself a
 function of the free parameter the withdrawal rested on. What is published now is
@@ -110,14 +122,20 @@ one instrument:**
     tuning corpus (Fixtures)
       before:  planted critical (2 located): critical x2
                planted error    (5 located): critical x3, warning x2
-      after:   planted critical (2 located): critical x2
-               planted error    (5 located): critical x3, major x2 [we read as warning]
+      after:   planted critical (2 of 2 located): critical x2
+               planted error    (5 of 5 located): critical x3, major x2 [we read as warning]
+               planted warning  (3 of 3 located): major x3 [we read as warning]
+               planted info     (0 of 3 located): nothing located
+               planted nit      (0 of 3 located): nothing located
 
     every fixture (AllFixtures)
       before:  planted critical (3 located): critical x2, warning x1
                planted error    (7 located): critical x4, warning x3
-      after:   planted critical (3 located): critical x2, major x1 [we read as warning]
-               planted error    (7 located): critical x4, major x3 [we read as warning]
+      after:   planted critical (3 of 4 located): critical x2, major x1 [we read as warning]
+               planted error    (7 of 8 located): critical x4, major x3 [we read as warning]
+               planted warning  (4 of 6 located): major x4 [we read as warning]
+               planted info     (0 of 5 located): nothing located
+               planted nit      (0 of 6 located): nothing located
 
 Printed both ways because the earlier version of this section did not, and that
 is the same error it corrects for the `precision` row thirty lines above: it
@@ -126,12 +144,25 @@ quoted `critical x4, warning x3` as the "before" and the tuning corpus as the
 `5 located`, `x4/x3` to `x3/x2` — and a reader takes the movement for an effect
 of the fix. **Only the word changed.** Read down a column, not across.
 
-The `after` blocks are pinned by
-`TestIncumbentObjectiveSeverityOnTheShippedCache` rather than quoted from
-memory. Read them as the whole argument: one word covering plants of both
-`critical` and `error` is the resolution difference no mapping repairs, and
-`major` is a word with no counterpart among our five whose placement this corpus
-cannot check.
+The `after` blocks carry two changes from the version above them and only one is
+about words. The denominators and the two empty rows are the second: the block
+used to omit levels nobody located, which made a reviewer that reports only the
+loud defects render a *proper substring* of a calibrated reviewer's page. Here
+the incumbent's silence on every `info` and `nit` plant is on the page rather
+than inferable from a column somewhere else.
+
+The words in the `after` blocks are pinned by
+`TestIncumbentObjectiveSeverityOnTheShippedCache` and the denominators by
+`TestEveryPlantedLevelAppearsWithItsDenominator`, rather than quoted from memory.
+Read them as the whole argument: one word covering plants of both `critical` and
+`error` is the resolution difference no mapping repairs, and `major` — credited
+on 8 plants here, landing 1 `critical`, 3 `error` and 4 `warning` — is a word
+with no counterpart among our five. The corpus is not silent about where it
+belongs: `warning` is its plurality landing, which is why `crSeverity` maps it
+there, and swapping the constant moves the published full-resolution triple from
+6/4/4 to 5/8/1. What the corpus cannot supply is a *single* level that is right
+for every plant the word lands on, which is the reason no cross-tool severity
+score is published — not an absence of evidence.
 
 The original mapping was not careless. It was written to stop Incumbent reading
 as *inflated*, since its `critical` spans what we split into `critical` and

@@ -78,7 +78,25 @@ func ScoreRun(r RunResult, f Fixture) Score {
 		RunResult: r,
 		Detected:  map[string]bool{},
 		Total:     len(f.Defects),
+		Severity:  SeverityScore{Planted: PlantedLevels{}},
 	}
+
+	// The census is a fact about the FIXTURE, so it is taken before anything
+	// that can return early. THE BUG THIS FIXES: it was taken inside
+	// ScoreSeverity, which the two returns below skip, so a run that failed
+	// contributed its plants to Total and nothing to the per-level census. Over
+	// AllFixtures with every third run failing, TallyScores reported a census
+	// summing to 17 against a planted total of 29 — and the block rendered
+	// beside that RECALL cell carried no "(0 of N located): nothing located"
+	// line anywhere, which is precisely the absence-is-invisible failure
+	// SeverityUsage.Lines exists to close, re-created by an ordinary provider
+	// error rather than by a degenerate reviewer.
+	//
+	// ScoreSeverity takes the same census again on the path that reaches it, and
+	// the duplication is deliberate: it is exported and its own contract is that
+	// a score carries its denominators, so neither caller may rely on the other
+	// having done it.
+	s.Severity.Planted.Add(f)
 
 	if r.Err != nil {
 		s.Violations = append(s.Violations, fmt.Sprintf("review failed: %v", r.Err))
@@ -152,48 +170,55 @@ const (
 // WITHDRAWN. It was not a mis-tuned constant, it was the wrong instrument, and
 // two measurements say so rather than two opinions:
 //
-//   - IT IS MAXIMISED BY THE WORST PRODUCTION BEHAVIOUR. This corpus bands 12
-//     blocking, 1 medium, 1 low, and every plant Incumbent locates is blocking.
-//     Reconstructed over AllFixtures, a reviewer that stamps one blocking word on
-//     every finding — always "critical", or always "error" — banded 12 accurate
-//     and 2 inflated of 14 located, against the incumbent's 6 accurate of 10; and
-//     the same strategy allowed to choose WHAT it reports — stay silent unless
-//     the defect is already blocking, then call it critical — banded 12 of 12,
-//     a PERFECT record no calibrated reviewer can beat. A number optimised by
-//     stamping "critical" on everything would, if anyone optimised it, produce
-//     exactly the review bot this project exists not to be.
+//   - IT IS MAXIMISED BY A REVIEWER THAT ALSO CHOOSES WHAT TO REPORT. This
+//     corpus plants 29 defects over 30 fixtures and bands them 12 blocking, 6
+//     medium, 11 low. Reconstructed over AllFixtures, the strategy that stays
+//     silent unless the defect is ALREADY blocking and then calls it critical
+//     bands a perfect 12/0/0 — an exact tie with a calibrated reviewer on the
+//     triple, over 12 of the 29 plants, because every defect it CHOOSES to
+//     report is one where its single word happens to land in the right band. A
+//     number optimised by stamping "critical" on everything a reviewer bothers
+//     to mention would, if anyone optimised it, produce exactly the review bot
+//     this project exists not to be.
 //
-//     THE FIGURE THIS COMMENT USED TO QUOTE — "always critical and always error
-//     both scored a perfect 10 of 10" — WAS WRONG, and wrong in the direction
-//     that made the argument easier. It scored those two strategies over the ten
-//     plants the INCUMBENT located rather than over what they actually report,
-//     so it credited them with a denominator they had not earned and hid the two
-//     inflations they do commit. The conclusion survives the correction; the
-//     number did not, and a retraction argued from an unreproducible measurement
-//     is the same defect one level up. The live receipt is the
-//     selective-reporting row in degenerateReviewers(), which is scored on every
-//     run rather than remembered here.
+//     TWO FIGURES THIS COMMENT USED TO QUOTE HAVE BEEN CORRECTED, and the second
+//     correction weakens half the argument rather than strengthening it, which
+//     is why it is written down. It first said "always critical and always error
+//     both scored a perfect 10 of 10", scoring those strategies over the plants
+//     the INCUMBENT located rather than over what they report. It then said they
+//     banded 12 accurate and 2 inflated of 14 against the incumbent's 6 of 10 —
+//     true of a fourteen-plant corpus that no longer exists. On the corpus in
+//     this tree the two stampers band 12/17/0 of 29 (B-ACC 0.414) against a
+//     calibrated reviewer's 29/0/0, so THE STAMPERS NO LONGER TIE and the
+//     maximisation argument now rests on the selective reviewer above, which
+//     does. Nor does the incumbent locate only blocking plants: it locates 3
+//     critical, 7 error and 4 warning, so 10 of the 14 are blocking, and it
+//     bands 10/0/4 over them.
+//     TestTheSeverityFiguresTheseCommentsQuoteStillReproduce reads every one of
+//     those numbers back out of the corpus.
 //
 //   - IT IS BLIND TO THE DEFECT IT WAS WRITTEN FOR. The parser bug behind the
 //     PREVIOUS retraction (crSeverity demoting Incumbent's "critical" to our
-//     "error") does not move it at all: buggy parser 6/0/4, fixed parser 6/0/4.
-//     The banded column cannot see the bug it was the remedy for, and by
-//     construction cannot see it recur.
+//     "error") does not move it at all: buggy parser 10/0/4, fixed parser
+//     10/0/4. At our full resolution the same bug moves the incumbent's triple
+//     from 6/4/4 to 8/0/6. The banded column could not see the bug it was the
+//     remedy for, and by construction could not see it recur.
 //
 // It was also a free parameter, and here too the figure first published was
 // wrong. crSeverity records Incumbent's "major" at warning; recording it at
-// error instead, with Incumbent's bytes byte-for-byte unchanged, moves the
-// banded figure from 0.600 to 1.000 over AllFixtures (6/0/4 to 10/0/0) and from
-// 0.714 to 1.000 over the tuning fixtures (5/0/2 to 7/0/0). The numbers quoted
-// before — "0.62 to 0.88" — reproduce from nothing in this tree; the real swing
-// is larger and ends at a perfect record, so the correction strengthens the
-// argument it was made for, which is exactly why it had to be checked rather
-// than reused. Every "major" this corpus credits sits on a plant we rate error
-// or critical and none on a plant of warning, so no observation here can choose
-// between the two placements.
-// TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered keeps the full-resolution
-// half of that measured rather than remembered; the banded half is quoted here
-// because the instrument that produced it is deleted.
+// error instead, with Incumbent's bytes byte-for-byte unchanged, leaves the
+// banded figure at B-ACC 0.714 either way (10/0/4 to 10/4/0) and moves the
+// FULL-RESOLUTION triple from 6/4/4 to 5/8/1 over AllFixtures. The numbers
+// quoted before — "0.62 to 0.88", then "0.600 to 1.000" — reproduce from
+// nothing in this tree. The corrected swing is at full resolution only, which
+// is where the published cells are, so the free parameter still moves a
+// published number; it is the banded column that turns out to be insensitive to
+// this too. TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered keeps the
+// full-resolution half measured rather than remembered, and
+// TestTheSeverityFiguresTheseCommentsQuoteStillReproduce pins both halves against the
+// corpus. The banded figures are reconstructed inside that test, because the
+// instrument that produced them is deleted and a retraction argued from an
+// unreproducible measurement is the same defect one level up.
 //
 // What replaces it is DESCRIPTION, not a score: SeverityUsage reports which
 // severity words each reviewer actually PRINTED, against which planted levels, so
@@ -217,18 +242,81 @@ const (
 // license a comparison.
 const NoCrossToolSeverityScore = "NO CROSS-TOOL SEVERITY ACCURACY IS OFFERED, BY CONSTRUCTION. " +
 	"Our five levels and " + IncumbentModel + "'s ~three are different RESOLUTIONS, and every " +
-	"reduction that makes them comparable is maximised by rating everything blocking: on this corpus " +
-	"(12 blocking plants, 1 medium, 1 low) 'always critical' and 'always error' banded 12 accurate of " +
-	"14 against the incumbent's 6 of 10, and a reviewer that also CHOOSES to mention only the " +
-	"already-blocking defects banded a perfect 12 of 12. The banded column also could not see the parser bug " +
-	"that caused the previous retraction — buggy and fixed parsers scored identically on it. So no such " +
-	"number is published, and the O-* cells on a row that does not publish our five levels are printed " +
-	"n/a rather than filled and annotated: telling a reader not to compare two numbers printed in one " +
-	"sorted ranking is the mitigation the previous retraction already found insufficient. " +
+	"reduction that makes them comparable is maximised by a reviewer that also picks what to mention: " +
+	"on this corpus (29 plants over 30 fixtures, banded 12 blocking, 6 medium, 11 low) a reviewer that " +
+	"stays silent unless the defect is already blocking and then calls it critical banded a perfect " +
+	"12/0/0 over 12 of the 29 plants — an exact tie with a calibrated reviewer's 29/0/0. The banded " +
+	"column also could not see the parser bug that caused the previous retraction — buggy and fixed " +
+	"parsers both banded 10/0/4 on the incumbent, while our full resolution moved 6/4/4 to 8/0/6. So no " +
+	"such number is published, and the O-* cells on a row that does not publish our five levels are " +
+	"printed n/a rather than filled and annotated: telling a reader not to compare two numbers printed " +
+	"in one sorted ranking is the mitigation the previous retraction already found insufficient. " +
 	"What IS published for such a row is the severity VOCABULARY it used against each planted level " +
 	"(see the SEVERITY VOCABULARY block): a description, which a reader may compare by eye and may not " +
 	"reduce to one figure. O-* remains a real score BETWEEN ROWS THAT PUBLISH OUR FIVE LEVELS and is " +
 	"what our own prompt is tuned on."
+
+// SeverityScale is DECLARED by whatever adapter produced a row's findings, and
+// it is not derivable from them.
+//
+// IT CANNOT BE DERIVED FROM THE WORD. incumbent/cli prints "critical", spelled
+// exactly like ours, and the shipped cache credits that word on 2 plants of
+// critical and 4 of error: a shared spelling is not a shared scale. A gate built
+// on strings.EqualFold(said, recorded) would score the incumbent's "critical"
+// findings at our resolution and withdraw only its "major" ones, publishing a
+// fraction of the retracted comparison.
+//
+// NOR FROM THE TRANSLATION FLAG. internal/linters marks EVERY analyzer finding
+// translated, and review.Engine marks a model's finding translated when it
+// writes "Critical" with a capital C, so the flag answers "was one word
+// rewritten" — a fact about a finding — where the question is "what scale did
+// this reviewer publish on", a fact about the reviewer. severityWasTranslated
+// answers the first question and is used for the [we read as X] marker; this
+// type answers the second and is used for the withdrawal.
+//
+// Undeclared is the zero value and prints n/a, so a contender added without a
+// declaration is withheld rather than ranked.
+//
+// IT REPLACES AN IDENTITY CHECK. The withdrawal used to be
+// PublishesOurSeverityLevels(model) == (model != IncumbentModel): a reporter's
+// NAME standing in for a fact about its vocabulary. That is live rather than
+// hypothetical — internal/linters' mapSeverity folds HIGH/ERROR/CRITICAL onto
+// our error and MEDIUM onto warning, a codomain excluding critical and nit,
+// which is the exact shape of the first retraction, and those findings are
+// spared today only because evalConfig sets cfg.Linters.Mode = LinterOff. Under
+// the name check they would have been published at our resolution the moment
+// anyone turned linters on. TestAnUndeclaredScaleIsWithheld and
+// TestEverySeverityCellIsWithdrawnForAForeignVocabulary pin the three states.
+type SeverityScale string
+
+const (
+	// UndeclaredSeverityScale is the zero value: nobody said what scale this
+	// row's severities are on, so nothing that reads them as our five levels is
+	// published for it.
+	UndeclaredSeverityScale SeverityScale = ""
+
+	// OurSeverityScale is a row whose severity words are the five this project
+	// defines, written by the reporter rather than translated into them.
+	OurSeverityScale SeverityScale = "our five levels"
+
+	// ForeignSeverityScale is a row whose reporter publishes some other
+	// vocabulary, whatever this package translated it into.
+	ForeignSeverityScale SeverityScale = "not our five levels"
+)
+
+// PublishesOurLevels reports whether a row's severity comparison against
+// Defect.WantSeverity is a score rather than a measurement of the vocabulary
+// gap.
+func (s SeverityScale) PublishesOurLevels() bool { return s == OurSeverityScale }
+
+// describe names the scale for a message, so a row that declared nothing says
+// so instead of reading as a row someone declared foreign.
+func (s SeverityScale) describe() string {
+	if s == UndeclaredSeverityScale {
+		return "undeclared"
+	}
+	return string(s)
+}
 
 // SeverityWord is one severity as a reviewer PRINTED it, beside the level this
 // package recorded it at.
@@ -258,12 +346,40 @@ type SeverityWord struct {
 // SeverityUsage tabulates which severity words a reviewer actually printed for
 // the defects it located, against the level each defect was planted at.
 //
-// It is the DESCRIPTION that replaces the withdrawn cross-tool score, and it is
-// deliberately not reducible to one number. A reader comparing two vocabularies
-// gets to see, for example, that one reviewer answered "critical" to plants of
-// critical AND to plants of error while another split them — and gets to decide
-// for themselves what that is worth, which is exactly the judgement a single
-// accuracy figure was making silently on their behalf and getting wrong.
+// Severity across two vocabularies is a CONTINGENCY TABLE, not a number.
+//
+// The unit is (planted level x the word the reviewer printed), counted, with the
+// planted total beside it. It is deliberately not reducible: on the shipped
+// cache incumbent/cli's "critical" is credited on plants of critical AND error,
+// and its "major" on plants of critical, error AND warning, so no single-valued
+// mapping of either word is right for every plant it lands on and no reduction
+// of both sides to a common resolution is right either. What a reader gets is
+// what was observed; what they do with it is theirs.
+//
+// TWO INSTRUMENTS PROPOSED IN PLACE OF THAT WERE REJECTED ON MEASUREMENT, and
+// the measurements are recorded so the next proposal starts from them.
+//
+//   - AN INTERVAL — credit a foreign word against the hull of the planted levels
+//     it is observed on — is fitted to the observations it is then scored
+//     against, so a perfect score is the definition of the fit. Over the shipped
+//     cache the incumbent scores 14 accurate / 0 not, and 14/0 BOTH with the
+//     crSeverity bug that demoted "critical" and without it, where the
+//     point-valued reading moves 6/4/4 to 8/0/6. It is blind to the bug that
+//     caused the first retraction.
+//   - AN ORDINAL AGREEMENT — score the ORDER a reviewer puts plants in rather
+//     than the level it names — is not computable within a review here: of the
+//     12 cached reviews that locate anything, exactly one locates defects at two
+//     or more distinct planted levels. Pooled over the corpus it is invariant
+//     under every order-preserving relabeling, so a reviewer that keeps the
+//     planted order and files everything at nit — below every fail_on this
+//     project defines — ties a calibrated one. Severity's production function is
+//     a threshold, not a permutation.
+//
+// A reader comparing two vocabularies gets to see, for example, that one
+// reviewer answered "critical" to plants of critical AND to plants of error
+// while another split them — and gets to decide for themselves what that is
+// worth, which is exactly the judgement a single accuracy figure was making
+// silently on their behalf and getting wrong.
 //
 // THE BUG: the inner key used to be the severity this package had RECORDED, and
 // the doc comment here claimed both keys were "recorded as the reviewer spelled
@@ -289,6 +405,51 @@ func (u SeverityUsage) Add(planted config.Severity, said SeverityWord) {
 		u[planted] = row
 	}
 	row[said]++
+}
+
+// PlantedLevels is how many defects the fixtures behind a row planted at each
+// level — the DENOMINATOR of the contingency table, and the half of it that has
+// nothing to do with what the reviewer said.
+//
+// It is a separate map rather than a field on SeverityUsage because the two are
+// counted over different things: a usage row exists only where a defect was
+// LOCATED, and this exists wherever a defect was PLANTED.
+//
+// Summing it gives the planted total the coverage cell divides by — Score.Total
+// on one run, Aggregate.SevPlanted on a judged row — so the description and the
+// coverage cell are read against the same number. THAT SENTENCE USED TO BE FALSE
+// FOR ANY RUN THAT PRODUCED NO REPORT: the census was taken inside
+// ScoreSeverity, which ScoreRun skips when a provider errors, so a failed run
+// added its plants to the total and nothing to the census. It is now taken from
+// the fixture before ScoreRun can return early, which is the only place both
+// halves are available whatever the provider did.
+// TestEveryPlantedLevelAppearsWithItsDenominator covers a failing corpus as well
+// as a clean one, because the flattering direction here is the one only a
+// failure produces.
+type PlantedLevels map[config.Severity]int
+
+// Add counts one fixture's plants.
+func (p PlantedLevels) Add(f Fixture) {
+	for _, d := range f.Defects {
+		p[d.WantSeverity]++
+	}
+}
+
+// Merge folds another census in, so a row summed over runs and fixtures carries
+// the denominator those runs and fixtures actually planted.
+func (p PlantedLevels) Merge(other PlantedLevels) {
+	for level, n := range other {
+		p[level] += n
+	}
+}
+
+// Total is how many defects were planted across every level.
+func (p PlantedLevels) Total() int {
+	out := 0
+	for _, n := range p {
+		out += n
+	}
+	return out
 }
 
 // Merge folds another tabulation in, so a per-run description can be summed
@@ -323,23 +484,64 @@ var severityOrder = []config.Severity{
 // whole block was rewritten to stop.
 const UnrecordedWord = "(word not recorded)"
 
-// Lines renders the tabulation, one line per planted level.
+// NothingLocated is printed on the row of a planted level the reviewer never
+// reached, in place of the words it did not say.
+// TestEveryPlantedLevelAppearsWithItsDenominator covers that row.
 //
-// Levels nobody located are absent rather than shown as zero: this describes
-// what a reviewer SAID about defects it found, and a defect it never mentioned
-// is a miss, which RECALL already reports. Printing it here as an empty row
-// would invite reading a miss as a severity result.
+// A phrase rather than a blank, for the reason UnrecordedWord is one: a reader
+// has to meet the row rather than skip past a gap that looks like formatting.
+const NothingLocated = "nothing located"
+
+// UndeclaredPlantedTotal is printed in place of a level's denominator when the
+// caller handed this block no census of what the corpus planted.
+//
+// It exists so that the one thing a row may not do is imply a denominator it
+// does not have. A row carrying it is a bug in the caller, and
+// TestEveryPlantedLevelAppearsWithItsDenominator is where that is caught over
+// the real corpus.
+const UndeclaredPlantedTotal = "PLANTED TOTAL NOT DECLARED"
+
+// Lines renders the tabulation, one line per level THE CORPUS PLANTS, present
+// whether or not anything was located there, with the planted count as its
+// denominator.
+//
+// THE BUG THIS FIXES: levels nobody located were omitted, on the reasoning that
+// a miss is RECALL's job. Measured, that made the worst strategy's page the
+// cleanest one. The reviewer that reports only the plants we rate critical and
+// calls them critical rendered
+//
+//	planted critical (4 located): critical x4
+//
+// and nothing else — a proper SUBSTRING of a calibrated reviewer's whole block,
+// with O-COV blanked in the cell on that same row. Absence is invisible; a
+// denominator is not. Under this rendering the same strategy prints four rows
+// reading "(0 of N located): nothing located" and stops resembling a calibrated
+// reviewer at a glance. TestEveryPlantedLevelAppearsWithItsDenominator asserts
+// the rule over AllFixtures, and restoring the omit-empty behaviour fails there.
 //
 // Each entry is the reviewer's own word. Where this package translated that word
 // into one of our five levels the level follows it, marked as ours, so the two
 // cannot be read as one statement by the reviewer — "major x2 [we read as
 // warning]" says who said what. Our own models translate nothing, so their lines
 // carry no marker at all.
-func (u SeverityUsage) Lines() []string {
+func (u SeverityUsage) Lines(planted PlantedLevels) []string {
 	var out []string
 
-	for _, planted := range orderedSeverities(u) {
-		row := u[planted]
+	// The union, so a level the corpus plants survives a reviewer that never
+	// reached it AND a word that landed on a level the census does not carry
+	// survives a caller that handed over the wrong census. Neither is silently
+	// dropped, because dropping either is how a denominator stops matching its
+	// numerator without anyone seeing it.
+	levels := map[config.Severity]bool{}
+	for level := range u {
+		levels[level] = true
+	}
+	for level := range planted {
+		levels[level] = true
+	}
+
+	for _, level := range orderedSeverities(levels) {
+		row := u[level]
 
 		located := 0
 		var parts []string
@@ -363,8 +565,17 @@ func (u SeverityUsage) Lines() []string {
 			parts = append(parts, part)
 		}
 
-		out = append(out, fmt.Sprintf("  planted %-8s (%d located): %s",
-			planted, located, strings.Join(parts, ", ")))
+		if len(parts) == 0 {
+			parts = []string{NothingLocated}
+		}
+
+		count := fmt.Sprintf("%d located, %s", located, UndeclaredPlantedTotal)
+		if total, ok := planted[level]; ok {
+			count = fmt.Sprintf("%d of %d located", located, total)
+		}
+
+		out = append(out, fmt.Sprintf("  planted %-8s (%s): %s",
+			level, count, strings.Join(parts, ", ")))
 	}
 
 	return out
@@ -490,6 +701,15 @@ type SeverityScore struct {
 	// that was inflated instead of only how many were. Aggregate counts are
 	// what a table shows; fixing the prompt needs the finding itself.
 	Calls []SeverityCall
+
+	// Planted is every level the fixture planted at, counted — including the
+	// levels this review located nothing at.
+	//
+	// It is carried on the SCORE rather than recomputed at the renderer because
+	// the renderer does not have the fixture, and a denominator derived from a
+	// different pass over the corpus than its numerator is how the two come to
+	// disagree. See SeverityUsage.Lines for what it is for.
+	Planted PlantedLevels
 }
 
 // Graded is how many planted defects were compared against a reported severity.
@@ -558,7 +778,12 @@ func severityAsSaid(f review.Finding) SeverityWord {
 // nothing about the severity of a bug the reviewer never mentioned, and a miss
 // is already reported as a miss.
 func ScoreSeverity(f Fixture, findings []review.Finding) SeverityScore {
-	var out SeverityScore
+	out := SeverityScore{Planted: PlantedLevels{}}
+
+	// Every planted level, before any finding is consulted: the census is of the
+	// FIXTURE, so a review that located nothing still carries the denominators
+	// its corpus defines.
+	out.Planted.Add(f)
 
 	for _, defect := range f.Defects {
 		idx, ok := reportingFinding(findings, defect)
@@ -666,8 +891,21 @@ func severityVerdict(got, want config.Severity) string {
 // "info" and "P1" both normalize to info and tie; [info, P1] published `planted
 // info: info x1` and [P1, info] published `planted info: p1 x1`. Same review,
 // same verdict, two different published descriptions of the reviewer's
-// vocabulary. A recognized spelling wins, then the lexicographically smaller one,
-// so the block is a function of the SET of findings.
+// vocabulary. A recognized spelling wins, then a RECORDED one, then the
+// lexicographically smaller one, so the block is a function of the SET of
+// findings.
+//
+// THE MIDDLE RULE IS A FIX, and the bug was that ordering on spelling alone let
+// a destroyed word beat a kept one. severityAsSaid returns an empty Said for a
+// finding something translated without keeping the original, and "" sorts before
+// every real spelling — so on a defect matched by one finding carrying
+// RawSeverity "Error" and one carrying none, BOTH report orders published
+// `(word not recorded) x1 [we read as error]` while the reviewer's word sat in
+// the finding list beside it. That is not hypothetical: internal/linters gives
+// every analyzer finding exactly that shape — translated, with no raw word — so
+// the configuration ourSeverityScale withdraws the SCORE for was still
+// publishing our gap phrase over a word the review kept. A gap is what this
+// block prints when there is nothing else; it may not outrank something.
 //
 // The word compared is severityAsSaid's, not Sev(). For a reviewer whose
 // severities we translate, Sev() is OUR word and several of the reviewer's words
@@ -708,10 +946,23 @@ func reportingFinding(findings []review.Finding, d Defect) (int, bool) {
 		case !found, sev.Rank() > loud.Rank():
 		case sev.Rank() < loud.Rank():
 			continue
-		// Equal rank: decide on the word that will be PUBLISHED, so the
-		// vocabulary block does not depend on the order the review arrived in.
+
+		// Equal rank from here: decide on the word that will be PUBLISHED, so
+		// the vocabulary block does not depend on the order the review arrived
+		// in.
 		case ok && !known:
-		case ok == known && spelling < raw:
+		case !ok && known:
+			continue
+
+		// A word the review KEPT beats a word that was destroyed. An empty
+		// spelling is not a spelling — it renders as UnrecordedWord — so
+		// comparing it lexicographically against a real one lets the gap win
+		// every time, since "" sorts before everything.
+		case spelling != "" && raw == "":
+		case spelling == "" && raw != "":
+			continue
+
+		case spelling < raw:
 		default:
 			continue
 		}
@@ -1114,6 +1365,15 @@ type Summary struct {
 	// see SeverityUsage and NoCrossToolSeverityScore.
 	SevUsage SeverityUsage
 
+	// SevPlantedLevels is the denominator SevUsage is read against: what these
+	// runs planted at each level, located or not.
+	SevPlantedLevels PlantedLevels
+
+	// Scale is what vocabulary this row's severities are on, DECLARED by the
+	// adapter that produced its findings and defaulting to withheld. See
+	// SeverityScale.
+	Scale SeverityScale
+
 	Violations []string
 
 	// WidestAnchor is the widest single region any finding claimed across these
@@ -1259,7 +1519,7 @@ func CorpusResolution(fixtures []Fixture) string {
 // rather than "nothing was measured". n/a is reserved for the vocabulary
 // withdrawal so the two reasons a cell is blank stay distinguishable.
 func (s Summary) SeverityCell() string {
-	if !PublishesOurSeverityLevels(s.Model) {
+	if !s.Scale.PublishesOurLevels() {
 		return "n/a"
 	}
 	if s.SevAccurate+s.SevInflated+s.SevUnderstated == 0 {
@@ -1270,7 +1530,12 @@ func (s Summary) SeverityCell() string {
 
 // Summarize folds per-run scores into one row.
 func Summarize(model, fixture string, scores []Score) Summary {
-	out := Summary{Model: model, Fixture: fixture, Runs: len(scores), SevUsage: SeverityUsage{}}
+	out := Summary{
+		Model: model, Fixture: fixture, Runs: len(scores),
+		SevUsage:         SeverityUsage{},
+		SevPlantedLevels: PlantedLevels{},
+		Scale:            commonScale(scores),
+	}
 
 	for _, s := range scores {
 		if s.Err != nil {
@@ -1283,11 +1548,35 @@ func Summarize(model, fixture string, scores []Score) Summary {
 		out.SevInflated += s.Severity.Inflated
 		out.SevUnderstated += s.Severity.Understated
 		out.SevUsage.Merge(s.Severity.Usage())
+		out.SevPlantedLevels.Merge(s.Severity.Planted)
 		out.Violations = append(out.Violations, s.Violations...)
 		out.WidestAnchor = max(out.WidestAnchor, s.WidestAnchor)
 		out.FindingCounts = append(out.FindingCounts, len(s.Findings()))
 	}
 
+	return out
+}
+
+// commonScale is the severity scale a set of runs agree on, and UNDECLARED when
+// they do not.
+//
+// Disagreement withdraws rather than picks a winner, and the two ways to reach
+// it are both real. A row folding one adapter's runs together with another's is
+// not on one scale at all, and a row folding a declared run with an undeclared
+// one is a row half of whose findings nobody has vouched for; publishing either
+// at our resolution states more than was declared.
+// TestASummaryOfMixedScalesIsWithheld pins it.
+func commonScale(scores []Score) SeverityScale {
+	if len(scores) == 0 {
+		return UndeclaredSeverityScale
+	}
+
+	out := scores[0].Scale
+	for _, s := range scores[1:] {
+		if s.Scale != out {
+			return UndeclaredSeverityScale
+		}
+	}
 	return out
 }
 
@@ -1307,6 +1596,11 @@ type CorpusTally struct {
 	Planted  int
 	Noise    int
 	Severity SeverityScore
+
+	// Scale is what vocabulary these severities are on, declared by the adapter
+	// that produced the findings. Undeclared is the zero value and withholds
+	// every cell that reads them as our five levels; see SeverityScale.
+	Scale SeverityScale
 
 	// WidestAnchor is the most distinct lines any one finding in the corpus
 	// claimed, counting all of its regions together. See anchoredLines.
@@ -1335,7 +1629,8 @@ type CorpusTally struct {
 
 // TallyScores folds scored runs into a CorpusTally.
 func TallyScores(scores []Score) CorpusTally {
-	out := CorpusTally{Samples: len(scores)}
+	out := CorpusTally{Samples: len(scores), Scale: commonScale(scores)}
+	out.Severity.Planted = PlantedLevels{}
 
 	for _, s := range scores {
 		out.Matched += s.Matched
@@ -1346,6 +1641,7 @@ func TallyScores(scores []Score) CorpusTally {
 		out.Severity.Inflated += s.Severity.Inflated
 		out.Severity.Understated += s.Severity.Understated
 		out.Severity.Calls = append(out.Severity.Calls, s.Severity.Calls...)
+		out.Severity.Planted.Merge(s.Severity.Planted)
 	}
 
 	return out
@@ -1513,10 +1809,10 @@ func PublishedMetrics() []PublishedMetric {
 					// calling them critical, scored O-ACC 1.000 with no
 					// inflation and no understatement — an exact tie with a
 					// perfectly calibrated reviewer over the whole corpus, on
-					// four of its fourteen plants. Selective silence is not
+					// four of its twenty-nine plants. Selective silence is not
 					// calibration, and the previous shape of this metric could
 					// not tell the two apart. The denominator makes the
-					// selection visible: 4/14 against 14/14.
+					// selection visible: 4/29 against 29/29.
 					float64(graded) / float64(t.Planted),
 				}, true
 			},
@@ -1524,28 +1820,58 @@ func PublishedMetrics() []PublishedMetric {
 	}
 }
 
-// PublishesOurSeverityLevels reports whether a contender's severity words are
-// drawn from the five levels this project defines.
+// PublishedDescription is a model-free artifact a report publishes that is NOT a
+// score. "What maximises this?" has no answer for a page of text, so the question
+// asked here is the one that does: CAN A REVIEWER NOBODY WOULD SHIP PRODUCE THE
+// DESCRIPTION A CALIBRATED ONE PRODUCES?
 //
-// It is false for the incumbent, and the report BLANKS its O-* cells rather than
-// filling them. The columns are a comparison against WantSeverity at our
-// resolution; a reviewer publishing roughly three levels cannot score accurate
-// on an error plant without over-claiming on a critical one, so the number it
-// gets measures the vocabulary gap and nothing about review quality.
+// It is registered for the same reason PublishedMetric is. The severity
+// vocabulary block is the artifact that REPLACED a withdrawn score, so it
+// inherits the question that score failed — and it inherits it unasked unless
+// something asks. TestNoDegenerateReviewerCanMaxOutAPublishedMetric crosses these
+// with the same table of reviewers nobody would ship, and a strategy whose page
+// is byte-identical to a calibrated reviewer's must be DECLARED there, exactly as
+// a metric it can max out must be.
 //
-// THE BUG: the banded cross-tool triple was withdrawn and the FULL-RESOLUTION
-// triple was left printed on the foreign row, in the same columns, in the same
-// sorted ranking as our own models — with a prose note underneath telling the
-// reader not to compare them. That note is exactly the mitigation the previous
-// retraction had already recorded as insufficient, and the surviving triple is
-// MORE sensitive to the free "major" constant than the banded one it replaced:
-// re-parsing the identical cached bytes with major recorded at error moves the
-// incumbent's published O-* from 2/4/4 to 5/4/1. A figure that moves when we
-// change our own constant, with no change in the reviewer's output, is not a
-// measurement of that reviewer, and printing it anyway is publishing the score
-// the retraction says is not offered.
-func PublishesOurSeverityLevels(model string) bool {
-	return model != IncumbentModel
+// Byte-identity rather than a distance: the artifact is compared by eye, so the
+// only question this mechanism can honestly ask of it is whether the two pages a
+// reader would compare are the same page.
+type PublishedDescription struct {
+	// Name is how the artifact is referred to in a failure message and in the
+	// degenerate table's declarations.
+	Name string
+
+	// Doc says what the artifact claims to describe. A degenerate strategy that
+	// produces a calibrated reviewer's page is a counterexample to this sentence.
+	Doc string
+
+	// Render produces the artifact for one reviewer's tally, with no model,
+	// judge or network — the same constraint PublishedMetric.Score is under, and
+	// for the same reason: a synthetic reviewer has to be able to produce one.
+	Render func(CorpusTally) string
+}
+
+// PublishedDescriptions is every model-free artifact these reports publish that
+// is not a score.
+func PublishedDescriptions() []PublishedDescription {
+	return []PublishedDescription{
+		{
+			Name: "severity vocabulary",
+			Doc: "which severity words the reviewer printed against each planted level, with the " +
+				"planted count per level beside them, so two vocabularies can be compared by eye " +
+				"without a figure pretending they are commensurable",
+			Render: func(t CorpusTally) string {
+				// One fixed row name, so two strategies' pages differ only where
+				// their severity behaviour does. A name in the output would make
+				// every comparison trivially unequal and the crossing vacuous.
+				return SeverityVocabularyBlock([]VocabularyRow{{
+					Name:    "reviewer",
+					Usage:   t.Severity.Usage(),
+					Planted: t.Severity.Planted,
+				}})
+			},
+		},
+	}
 }
 
 // SeverityCells maps every published column that states a severity reading in
@@ -1555,39 +1881,43 @@ func PublishesOurSeverityLevels(model string) bool {
 // that apply it, and that count was one. The objective-severity metric is
 // printed two ways — spread over O-ACC/O-INFL/O-UNDER/O-COV in the judged
 // tables, and folded into a single SEV a/i/u cell in the ground-truth table —
-// and only the first passed through PublishesOurSeverityLevels. The second
-// formatted the counters inline at the table, so "the foreign row prints n/a"
-// held in one rendering of one metric because a caller happened not to put a
-// foreign row in the other.
+// and only the first was gated. The second formatted the counters inline at the
+// table, so "the foreign row prints n/a" held in one rendering of one metric
+// because a caller happened not to put a foreign row in the other.
 //
 // TestEverySeverityCellIsWithdrawnForAForeignVocabulary derives the required
 // keys from PublishedMetrics rather than from a list here: a column of the
 // objective-severity metric that is not also part of a vocabulary-free metric
-// must have a renderer, and every renderer must answer n/a for a contender that
-// does not publish our levels. Adding a third rendering therefore fails until it
-// is gated, which is what "self-enforcing" has to mean after a hand-maintained
-// list shipped the banded column.
+// must have a renderer, and every renderer must answer n/a for a row whose scale
+// is not ours AND for a row that declared none. Adding a third rendering
+// therefore fails until it is gated, which is what "self-enforcing" has to mean
+// after a hand-maintained list shipped the banded column.
+//
+// THE ROW'S DECLARED SCALE IS WHAT THE RENDERERS READ, not the contender's name.
+// These took a model string and compared it against IncumbentModel, so the
+// withdrawal was an identity check standing in for a fact about a vocabulary;
+// see SeverityScale.
 //
 // The renderers call the SAME functions the tables call. That is the load-bearing
 // property and also the limit: this proves the gate is in the renderer, not that
 // a table used the renderer. TestEveryHeaderPrintsAWholeMetric ties a header to
 // its metric, and TestNoReportFormatsSeverityCountersDirectly ties the tables to
 // these functions.
-func SeverityCells() map[string]func(model string, t CorpusTally) string {
-	objective := func(pick int) func(string, CorpusTally) string {
-		return func(model string, t CorpusTally) string {
-			infl, under, acc, cov := severityAggregate(t).ObjectiveSeverityCells(model, t.Samples)
+func SeverityCells() map[string]func(t CorpusTally) string {
+	objective := func(pick int) func(CorpusTally) string {
+		return func(t CorpusTally) string {
+			infl, under, acc, cov := severityAggregate(t).ObjectiveSeverityCells(t.Samples)
 			return []string{acc, infl, under, cov}[pick]
 		}
 	}
 
-	return map[string]func(string, CorpusTally) string{
+	return map[string]func(CorpusTally) string{
 		"O-ACC":   objective(0),
 		"O-INFL":  objective(1),
 		"O-UNDER": objective(2),
 		"O-COV":   objective(3),
-		"SEV": func(model string, t CorpusTally) string {
-			return severitySummary(model, t).SeverityCell()
+		"SEV": func(t CorpusTally) string {
+			return severitySummary(t).SeverityCell()
 		},
 	}
 }
@@ -1599,23 +1929,31 @@ func SeverityCells() map[string]func(model string, t CorpusTally) string {
 // judge or a network — see CorpusTally — so it is the input a guard can drive
 // the real renderers with.
 func severityAggregate(t CorpusTally) Aggregate {
-	return Aggregate{
+	out := Aggregate{
 		SevAccurate:    t.Severity.Accurate,
 		SevInflated:    t.Severity.Inflated,
 		SevUnderstated: t.Severity.Understated,
 		SevPlanted:     t.Planted,
 	}
+
+	// Through DeclareScale rather than as a literal field. The tally's scale is
+	// already the fold commonScale produced, so this particular lift could set
+	// it directly and be right — but "this one is safe" is the reasoning that
+	// left one of the two judged paths without the disagreement check for a
+	// round. One way in, no exceptions to audit.
+	out.DeclareScale(t.Scale)
+	return out
 }
 
-func severitySummary(model string, t CorpusTally) Summary {
+func severitySummary(t CorpusTally) Summary {
 	return Summary{
-		Model:          model,
 		Runs:           t.Samples,
 		Matched:        t.Matched,
 		Total:          t.Planted,
 		SevAccurate:    t.Severity.Accurate,
 		SevInflated:    t.Severity.Inflated,
 		SevUnderstated: t.Severity.Understated,
+		Scale:          t.Scale,
 	}
 }
 
@@ -1809,12 +2147,15 @@ const SeverityColumnLegend = "SEVERITY IS MEASURED TWO WAYS, AND NEITHER IS A CR
 	"O-COV IS THE DENOMINATOR AND IS NOT OPTIONAL: severity is graded only over defects the reviewer " +
 	"LOCATED, so a reviewer that mentions only the defects it is already sure about is scored only on " +
 	"those — reporting nothing but this corpus's critical plants, and calling them critical, ties a " +
-	"perfectly calibrated reviewer on O-ACC/O-INFL/O-UNDER while covering 4 plants of 14. Read the " +
+	"perfectly calibrated reviewer on O-ACC/O-INFL/O-UNDER while covering 4 plants of 29. Read the " +
 	"triple only with O-COV beside it. " +
-	"ROWS THAT DO NOT PUBLISH OUR FIVE LEVELS PRINT n/a THERE: " + IncumbentModel + " publishes one " +
-	"'critical' spanning our critical AND error, so a figure for it would state a vocabulary gap rather " +
-	"than review quality in either direction — it cannot score O-ACC on an error plant without " +
-	"over-claiming on a critical one. " + NoCrossToolSeverityScore + " " +
+	"A ROW WHOSE SEVERITY SCALE IS NOT DECLARED AS OURS PRINTS n/a THERE, and the scale is declared by " +
+	"the adapter that produced the row rather than inferred from its words: " + IncumbentModel + " " +
+	"publishes one 'critical' spanning our critical AND error, so a figure for it would state a " +
+	"vocabulary gap rather than review quality in either direction — it cannot score O-ACC on an error " +
+	"plant without over-claiming on a critical one, and it prints our own spelling of 'critical' while " +
+	"doing it, which is why a shared spelling is not treated as a shared scale. " +
+	NoCrossToolSeverityScore + " " +
 	"The two groups are counted over DIFFERENT things — J-* per judged finding, O-* per planted " +
 	"defect the review actually found — so neither is a share of the other, and a defect nobody " +
 	"reported appears in neither. Every count column is divided by N on the same row."

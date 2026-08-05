@@ -1102,15 +1102,27 @@ func TestSeverityVocabularyRendersEveryCallItWasGiven(t *testing.T) {
 	// the reviewer.
 	usage.Add(config.SeverityCritical, said("major", config.SeverityWarning))
 
+	// The census the rows are read against, stated separately from the usage
+	// because the two are counted over different things: a level appears here
+	// whether or not any finding reached it. The warning row is the one that
+	// matters — nothing located there, and the corpus planted two.
+	planted := PlantedLevels{
+		config.SeverityCritical: 1,
+		config.SeverityError:    4,
+		config.SeverityWarning:  2,
+		config.SeverityNit:      1,
+	}
+
 	block := SeverityVocabularyBlock([]VocabularyRow{
-		{Name: "contender", Usage: usage},
+		{Name: "contender", Usage: usage, Planted: planted},
 		{Name: "found-nothing", Usage: SeverityUsage{}},
 	})
 
 	for _, want := range []string{
 		"planted error", "critical x2", "warning x1", "planted nit",
 		"major x1 [we read as warning]",
-		"(3 located)", "found-nothing: no located defect to describe",
+		"(3 of 4 located)", "found-nothing: no located defect to describe",
+		"planted warning  (0 of 2 located): " + NothingLocated,
 	} {
 		if !strings.Contains(block, want) {
 			t.Errorf("the vocabulary block does not contain %q:\n%s", want, block)
@@ -1128,8 +1140,9 @@ func TestSeverityVocabularyRendersEveryCallItWasGiven(t *testing.T) {
 	// Deterministic: a description a reader diffs between runs cannot depend on
 	// Go's map iteration order.
 	for range 20 {
-		if again := SeverityVocabularyBlock([]VocabularyRow{{Name: "contender", Usage: usage}}); !strings.Contains(again, "critical x2") ||
-			again != SeverityVocabularyBlock([]VocabularyRow{{Name: "contender", Usage: usage}}) {
+		row := []VocabularyRow{{Name: "contender", Usage: usage, Planted: planted}}
+		if again := SeverityVocabularyBlock(row); !strings.Contains(again, "critical x2") ||
+			again != SeverityVocabularyBlock(row) {
 			t.Fatalf("the block is not stable across renders:\n%s", again)
 		}
 	}
@@ -1415,7 +1428,8 @@ func TestOurOwnTranslationsAreNotPublishedAsOurContendersWords(t *testing.T) {
 	// Asserted on the ROWS rather than the whole block: the preamble explains
 	// both markers by naming them, so searching the block for either finds the
 	// legend rather than a row.
-	for _, line := range ScoreSeverity(fx, []review.Finding{verbatim}).Usage().Lines() {
+	verbatimScore := ScoreSeverity(fx, []review.Finding{verbatim})
+	for _, line := range verbatimScore.Usage().Lines(verbatimScore.Planted) {
 		if strings.Contains(line, "[we read as") || strings.Contains(line, UnrecordedWord) {
 			t.Errorf("a finding nothing translated is annotated as though something had: %q", line)
 		}
@@ -1437,7 +1451,13 @@ func TestOurOwnTranslationsAreNotPublishedAsOurContendersWords(t *testing.T) {
 		Source:   "ruff(E501)",
 		Severity: string(config.SeverityWarning), SeverityTranslated: true,
 	}
-	for _, line := range ScoreSeverity(fx, []review.Finding{analyzer}).Usage().Lines() {
+	analyzerScore := ScoreSeverity(fx, []review.Finding{analyzer})
+	for _, line := range analyzerScore.Usage().Lines(analyzerScore.Planted) {
+		if strings.Contains(line, NothingLocated) {
+			// The fixture plants at more than one level and this review reaches
+			// one of them; the rows for the rest carry no word to check.
+			continue
+		}
 		if !strings.Contains(line, UnrecordedWord) {
 			t.Errorf("a reporter that published NO severity is quoted as having said one: %q. The "+
 				"level is entirely this package's and there is no word to attribute", line)
@@ -1624,9 +1644,11 @@ func TestTheVocabularyBlockIsAFunctionOfTheWordsNotOfMapOrder(t *testing.T) {
 		return u
 	}
 
-	want := build().Lines()[0]
+	planted := PlantedLevels{config.SeverityError: 3}
+
+	want := build().Lines(planted)[0]
 	for range 200 {
-		if got := build().Lines()[0]; got != want {
+		if got := build().Lines(planted)[0]; got != want {
 			t.Fatalf("the same set of words rendered two ways:\n  %s\n  %s\nA reader diffing two "+
 				"reports would see a change that did not happen", want, got)
 		}
@@ -1819,12 +1841,403 @@ func TestTheFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 func numberWord(n int) string {
 	words := map[int]string{
 		13: "Thirteen", 14: "Fourteen", 15: "Fifteen", 20: "Twenty", 22: "Twenty-two",
-		28: "Twenty-eight", 33: "Thirty-three", 36: "Thirty-six",
+		28: "Twenty-eight", 29: "Twenty-nine", 33: "Thirty-three", 36: "Thirty-six",
 	}
 	if w, ok := words[n]; ok {
 		return w
 	}
 	return strconv.Itoa(n)
+}
+
+// TestAnUndeclaredScaleIsWithheld pins the three states of SeverityScale, and
+// the one that did not exist before it.
+//
+// The withdrawal used to be an identity check — a row was published at our
+// resolution unless its model string was IncumbentModel — so "undeclared" was
+// not a state a row could be in: a contender nobody had thought about got the
+// full five-level comparison by default, purely by not being the one reviewer
+// the check named. Now the default is withheld and somebody has to say what
+// scale a row is on.
+//
+// The word is not the scale, and this is the case that says so: a row spelling
+// its severities exactly like ours is still withheld when it declares the
+// foreign scale, because incumbent/cli prints "critical" for plants of both
+// critical and error.
+func TestAnUndeclaredScaleIsWithheld(t *testing.T) {
+	base := Aggregate{SevAccurate: 4, SevInflated: 1, SevUnderstated: 2, SevPlanted: 8}
+
+	for _, tc := range []struct {
+		scale     SeverityScale
+		published bool
+	}{
+		{UndeclaredSeverityScale, false},
+		{ForeignSeverityScale, false},
+		{IncumbentSeverityScale, false},
+		{OurSeverityScale, true},
+	} {
+		row := base
+		row.Scale = tc.scale
+
+		_, _, acc, _ := row.ObjectiveSeverityCells(4)
+		if published := acc != "n/a"; published != tc.published {
+			t.Errorf("a row on scale %q renders O-ACC %q; published=%v, want published=%v",
+				tc.scale.describe(), acc, published, tc.published)
+		}
+
+		cell := Summary{
+			SevAccurate: 4, SevInflated: 1, SevUnderstated: 2, Scale: tc.scale,
+		}.SeverityCell()
+		if published := cell != "n/a"; published != tc.published {
+			t.Errorf("a row on scale %q renders SEV %q; published=%v, want published=%v",
+				tc.scale.describe(), cell, published, tc.published)
+		}
+	}
+
+	// The zero value is the withheld one. A row someone forgot to declare has to
+	// fall on the safe side of the withdrawal, and "safe" here means the side
+	// that publishes nothing rather than the side that ranks a stranger.
+	var zero SeverityScale
+	if zero.PublishesOurLevels() {
+		t.Error("the zero value of SeverityScale publishes our five levels, so a contender added " +
+			"without a declaration is ranked on severity by default — which is the identity check " +
+			"this type replaced, with a different default")
+	}
+
+	// And the incumbent's own adapter declares the foreign scale rather than
+	// being recognized downstream by name.
+	if IncumbentSeverityScale.PublishesOurLevels() {
+		t.Errorf("%s declares %q, which publishes our five levels", IncumbentModel, IncumbentSeverityScale)
+	}
+}
+
+// TestASummaryOfMixedScalesIsWithheld pins what happens when one row's runs do
+// not agree about what vocabulary they are on.
+//
+// A row is a fold of several runs, and nothing structurally stops two adapters'
+// runs landing in one. Picking whichever declaration arrived first would publish
+// half a row's findings at a resolution nobody claimed for them, so disagreement
+// withdraws.
+func TestASummaryOfMixedScalesIsWithheld(t *testing.T) {
+	fx := severityFixture()
+	findings := calibratedReview(fx)
+
+	run := func(scale SeverityScale) Score {
+		return ScoreRun(RunResult{Report: &review.Report{Findings: findings}, Scale: scale}, fx)
+	}
+
+	ours := Summarize("m", fx.Name, []Score{run(OurSeverityScale), run(OurSeverityScale)})
+	if ours.Scale != OurSeverityScale || ours.SeverityCell() == "n/a" {
+		t.Errorf("two runs that agree on our scale produced a row on scale %q rendering %q; agreement "+
+			"has to keep the comparison the prompt is tuned on", ours.Scale.describe(), ours.SeverityCell())
+	}
+
+	for _, other := range []SeverityScale{ForeignSeverityScale, UndeclaredSeverityScale} {
+		mixed := Summarize("m", fx.Name, []Score{run(OurSeverityScale), run(other)})
+		if mixed.Scale != UndeclaredSeverityScale || mixed.SeverityCell() != "n/a" {
+			t.Errorf("a row folding a run on %q with a run on %q came out on scale %q rendering %q. "+
+				"Half its findings were never declared to be on our five levels, and publishing the "+
+				"row states more than was declared",
+				OurSeverityScale, other.describe(), mixed.Scale.describe(), mixed.SeverityCell())
+		}
+	}
+
+	// A row of no runs at all declares nothing either, rather than inheriting
+	// the zero value's meaning by accident.
+	if empty := Summarize("m", fx.Name, nil); empty.Scale != UndeclaredSeverityScale {
+		t.Errorf("a row folding no runs came out on scale %q", empty.Scale.describe())
+	}
+}
+
+// TestEveryPlantedLevelAppearsWithItsDenominator is guard 1 on the description
+// that replaced the withdrawn score: over the REAL corpus, every level the
+// fixtures plant appears on every reviewer's page with the count planted there.
+//
+// THE BUG IT PINS. Lines omitted the levels nobody located, on the reasoning
+// that a miss is RECALL's job. Measured, that made the worst strategy's page the
+// cleanest one: "report only the plants we rate critical, and call them
+// critical" rendered a single line — planted critical (4 located): critical x4 —
+// which is a proper SUBSTRING of a calibrated reviewer's whole block, on the
+// same row whose O-COV cell is blank. Absence was invisible. Restoring the
+// omit-empty rule fails here, and so does handing the block no census: a count
+// with no denominator is the same claim with the evidence removed.
+//
+// THE SECOND BUG IT PINS, and the reason every case below runs twice. The first
+// version of this test built its runs as RunResult{Report: ...}, which is a run
+// that always succeeded — so it could only ever ask whether the RENDERER omits a
+// level, never whether the census reached the renderer. It did not: ScoreRun
+// returns before ScoreSeverity when a provider errors, so a failed run
+// contributed its plants to the planted TOTAL and nothing to the per-level
+// census. Every third run failing over AllFixtures produced a census summing to
+// 17 against a total of 29 and a page with no "nothing located" line on it — the
+// same invisible absence, reached by an ordinary provider error instead of by a
+// reviewer strategy. deliveries() is what makes a failed run one of the cases.
+//
+// THE THIRD BUG IT PINS, and the reason every case runs once per row SHAPE. Both
+// halves above fold a CorpusTally, and the judged reports do not: they render
+// the block from an Aggregate. That shape was never folded here, so the line
+// that supplies its denominators could be deleted with this test — and the whole
+// default suite — green. vocabularyRowFolds carries the measurement.
+func TestEveryPlantedLevelAppearsWithItsDenominator(t *testing.T) {
+	corpus := AllFixtures()
+
+	census := PlantedLevels{}
+	for _, f := range corpus {
+		census.Add(f)
+	}
+	if len(census) < 2 {
+		t.Fatalf("the corpus plants at %d level(s), so a rule about levels nobody located cannot "+
+			"be tested against it", len(census))
+	}
+
+	for _, d := range append(degenerateReviewers(), degenerateReviewer{
+		name: "calibrated", review: calibratedReview,
+	}) {
+		for _, delivery := range deliveries() {
+			t.Run(d.name+"/"+delivery.name, func(t *testing.T) {
+				tally := delivery.tally(corpus, d.review)
+				lines := tally.Severity.Usage().Lines(tally.Severity.Planted)
+
+				// The census and O-COV's denominator have to be the same number, or
+				// a reader adding up the rows of the block gets a different corpus
+				// from the one the coverage cell divides by.
+				if got, want := tally.Severity.Planted.Total(), tally.Planted; got != want {
+					t.Errorf("the per-level census sums to %d and the coverage denominator is %d; the "+
+						"description and O-COV are being read against different corpora", got, want)
+				}
+
+				if len(lines) != len(census) {
+					t.Fatalf("the block renders %d line(s) for a corpus planting at %d level(s):\n%s",
+						len(lines), len(census), strings.Join(lines, "\n"))
+				}
+
+				for level, planted := range census {
+					want := fmt.Sprintf("planted %-8s (", level)
+					found := ""
+					for _, l := range lines {
+						if strings.Contains(l, want) {
+							found = l
+						}
+					}
+					if found == "" {
+						t.Errorf("no line for planted %s, which this corpus plants %d of. A level a "+
+							"reviewer never reached is the thing this denominator exists to show:\n%s",
+							level, planted, strings.Join(lines, "\n"))
+						continue
+					}
+					if !strings.Contains(found, fmt.Sprintf("of %d located", planted)) {
+						t.Errorf("the %s line does not carry its planted total of %d: %q",
+							level, planted, found)
+					}
+					if strings.Contains(found, UndeclaredPlantedTotal) {
+						t.Errorf("the %s line renders %s even though the tally carries a census: %q",
+							level, UndeclaredPlantedTotal, found)
+					}
+				}
+			})
+		}
+	}
+
+	// EVERY SHAPE A REPORT RENDERS THE BLOCK FROM, folded through the real
+	// builder for that shape, under both deliveries. See vocabularyRowFolds for
+	// the third bug this pins.
+	folds := vocabularyRowFolds()
+	for _, fold := range folds {
+		for _, delivery := range deliveries() {
+			for _, d := range append(degenerateReviewers(), degenerateReviewer{
+				name: "calibrated", review: calibratedReview,
+			}) {
+				t.Run(fold.name+"/"+delivery.name+"/"+d.name, func(t *testing.T) {
+					row, planted := fold.row(corpus, delivery.scores(corpus, d.review))
+
+					if got := row.Planted.Total(); got != planted {
+						t.Errorf("the per-level census sums to %d against this row's own planted "+
+							"total of %d; the block and the coverage denominator printed on the "+
+							"same row disagree about how big the corpus is", got, planted)
+					}
+					if len(row.Planted) < 2 {
+						t.Fatalf("this fold produced a census over %d level(s), so the checks below "+
+							"are satisfied by there being nothing to check", len(row.Planted))
+					}
+
+					lines := row.Usage.Lines(row.Planted)
+					if len(lines) != len(row.Planted) {
+						t.Fatalf("the block renders %d line(s) for a census over %d level(s):\n%s",
+							len(lines), len(row.Planted), strings.Join(lines, "\n"))
+					}
+					for level, n := range row.Planted {
+						found := ""
+						for _, l := range lines {
+							if strings.HasPrefix(strings.TrimSpace(l), strings.TrimSpace(
+								fmt.Sprintf("planted %-8s (", level))) {
+								found = l
+							}
+						}
+						if found == "" {
+							t.Errorf("no line for planted %s, which this row's census counts %d of. "+
+								"A level the reviewer never reached is what the denominator exists "+
+								"to show:\n%s", level, n, strings.Join(lines, "\n"))
+							continue
+						}
+						if !strings.Contains(found, fmt.Sprintf("of %d located", n)) {
+							t.Errorf("the %s line does not carry its planted total of %d: %q",
+								level, n, found)
+						}
+						if strings.Contains(found, UndeclaredPlantedTotal) {
+							t.Errorf("the %s line renders %s even though this row carries a census: "+
+								"%q", level, UndeclaredPlantedTotal, found)
+						}
+					}
+				})
+			}
+		}
+	}
+
+	// The folds cover every shape a row is rendered from, asserted BY TYPE
+	// IDENTITY for the reason TestTheCounterScanCoversEveryShapeAReportRendersFrom
+	// is: the three shapes agree on today's corpus, so dropping one changes no
+	// output and the omission is invisible from the results alone.
+	covered := map[reflect.Type]bool{}
+	for _, fold := range folds {
+		covered[fold.shape] = true
+	}
+	for _, shape := range reportRowShapes() {
+		if !carriesSeverityUsage(shape) {
+			continue
+		}
+		if !covered[shape] {
+			t.Errorf("%s carries a severity usage map and a report renders the vocabulary block "+
+				"from it, but no fold here exercises it. Its denominators are unguarded, and "+
+				"because the shapes agree on this corpus that is invisible in the output",
+				shape.Name())
+		}
+	}
+
+	// A caller that hands over no census gets told so on every line, rather than
+	// a bare count that reads like one.
+	tally := tallyOver(corpus, calibratedReview)
+	for _, line := range tally.Severity.Usage().Lines(nil) {
+		if !strings.Contains(line, UndeclaredPlantedTotal) {
+			t.Errorf("a row rendered with no planted census prints a count that reads as a "+
+				"denominator: %q", line)
+		}
+	}
+}
+
+// TestTheVocabularyBlockStatesWhatItCannotSay keeps the limits on the page.
+//
+// Every one of them is something a reader would otherwise supply for themselves
+// from a page of counts — that the reviewer under-claims, that a hedging
+// reviewer is visible, that these are per-review figures, that one block beats
+// another. A limitation recorded only in the source is a limitation nobody
+// outside the source knows about, and this block is what a reader is handed IN
+// PLACE OF a number, so it carries a heavier version of that duty than a column
+// does.
+func TestTheVocabularyBlockStatesWhatItCannotSay(t *testing.T) {
+	fx := severityFixture()
+	score := ScoreSeverity(fx, calibratedReview(fx))
+
+	block := SeverityVocabularyBlock([]VocabularyRow{{
+		Name: "some/model", Usage: score.Usage(), Planted: score.Planted,
+	}})
+
+	if !strings.Contains(block, VocabularyBlockLimits) {
+		t.Errorf("the block does not carry its own limits:\n%s", block)
+	}
+
+	// Each limit named, so deleting one of the five is a failure rather than a
+	// shorter paragraph that still contains the heading.
+	for _, limit := range []string{
+		"NOT DIRECTION", "NOT HEDGING", "NOT PER-REVIEW STRUCTURE",
+		"NOT AN ORDER BETWEEN REVIEWERS", "NOT THE DEFECTS NOBODY REPORTED",
+	} {
+		if !strings.Contains(VocabularyBlockLimits, limit) {
+			t.Errorf("the printed limits no longer state %q. Every one of them is a reading a "+
+				"reader would otherwise take from the counts", limit)
+		}
+	}
+
+	// THE HEDGING LIMIT, DEMONSTRATED RATHER THAN ASSERTED. The comment on
+	// SeverityVocabularyBlock says a reviewer answering all five severities
+	// renders exactly as one answering only the loudest, because
+	// reportingFinding credits the loudest claim. That is a property of this
+	// package, not of the corpus, so it is shown: the two strategies produce one
+	// page. If it stops being true the block has gained expressiveness and the
+	// paragraph naming this limit is what has to change.
+	corpus := AllFixtures()
+	pageOf := func(rev func(Fixture) []review.Finding) string {
+		tally := tallyOver(corpus, rev)
+		return strings.Join(tally.Severity.Usage().Lines(tally.Severity.Planted), "\n")
+	}
+
+	allFive := func(f Fixture) []review.Finding {
+		var out []review.Finding
+		for _, sev := range severityOrder {
+			out = append(out, oneCommentPerPlant(sev)(f)...)
+		}
+		return out
+	}
+	loudest := oneCommentPerPlant(config.SeverityCritical)
+
+	if hedged, loud := pageOf(allFive), pageOf(loudest); hedged != loud {
+		t.Errorf("a reviewer answering all five severities no longer renders as one answering only "+
+			"the loudest:\n--- all five\n%s\n--- loudest only\n%s\nThe block's own limits paragraph "+
+			"says it cannot show hedging; if it now can, say so there", hedged, loud)
+	}
+
+	// The printed list must not name a reviewer's word. The preamble beside it
+	// is DERIVED from the rows and says which words THIS block translated, so a
+	// fixed sentence quoting one would be the hand-maintained claim that was
+	// already removed from this block once — and would make a block containing
+	// no such word announce it. See TestTheVocabularyPreambleIsDerivedFromTheRows.
+	for _, word := range []string{"major", "minor", "incumbent"} {
+		if strings.Contains(strings.ToLower(VocabularyBlockLimits), word) {
+			t.Errorf("the printed limits name %q, a word a particular reviewer prints. The rows "+
+				"quote vocabularies; this paragraph states what the block cannot express", word)
+		}
+	}
+}
+
+// TestTurningLintersOnWithdrawsTheSeverityComparison pins the one configuration
+// question our own scale declaration depends on.
+//
+// review.Engine writes our five levels for a model's own findings, but a report
+// is the union of the model's findings and the analyzers', and
+// internal/linters' mapSeverity folds HIGH/ERROR/CRITICAL onto our error and
+// MEDIUM onto warning — a codomain excluding critical and nit, which is the
+// exact shape of the first retraction this package made. Those findings are
+// absent from the eval today only because evalConfig turns linters off. A
+// declaration that ASSERTED our scale would have published them at our
+// resolution the moment anyone changed that line; a declaration DERIVED from it
+// withdraws instead.
+func TestTurningLintersOnWithdrawsTheSeverityComparison(t *testing.T) {
+	cfg := evalConfig(Model{ID: "some/model"})
+
+	if cfg.Linters.Mode != config.LinterOff {
+		t.Fatalf("evalConfig no longer turns linters off (mode %q), so the eval's findings already "+
+			"include analyzer severities folded onto three of our five levels and the declaration "+
+			"below is measuring something else", cfg.Linters.Mode)
+	}
+	if got := ourSeverityScale(cfg); got != OurSeverityScale {
+		t.Errorf("a run with linters off declares scale %q; that is the configuration the whole "+
+			"O-* comparison is computed under", got.describe())
+	}
+
+	for _, mode := range []config.LinterMode{config.LinterAuto, config.LinterStrict, ""} {
+		mixed := evalConfig(Model{ID: "some/model"})
+		mixed.Linters.Mode = mode
+
+		if got := ourSeverityScale(mixed); got.PublishesOurLevels() {
+			t.Errorf("a run with linters %q declares scale %q, so analyzer findings whose severities "+
+				"were folded onto a codomain excluding critical and nit would be scored against "+
+				"WantSeverity at our full resolution", mode, got.describe())
+		}
+	}
+
+	// And a run declares what its own configuration says, rather than the
+	// harness asserting it once at the top of the file.
+	if got := ourSeverityScale(nil); got.PublishesOurLevels() {
+		t.Errorf("a run with no configuration at all declares %q", got.describe())
+	}
 }
 
 // TestSeverityCountsAreWithdrawnForAForeignVocabulary: the counts behind the O-*
@@ -1836,7 +2249,9 @@ func numberWord(n int) string {
 func TestSeverityCountsAreWithdrawnForAForeignVocabulary(t *testing.T) {
 	a := Aggregate{SevAccurate: 12, SevInflated: 2, SevUnderstated: 0, SevPlanted: 14}
 
-	foreign := a.ObjectiveSeverityCounts(IncumbentModel)
+	withheld := a
+	withheld.Scale = IncumbentSeverityScale
+	foreign := withheld.ObjectiveSeverityCounts(IncumbentModel)
 	if strings.Contains(foreign, "12 accurate") {
 		t.Errorf("the severity counts are published for a contender whose vocabulary is not ours: %q",
 			foreign)
@@ -1851,7 +2266,9 @@ func TestSeverityCountsAreWithdrawnForAForeignVocabulary(t *testing.T) {
 			"and it is what says how much of the corpus the rates cover: %q", foreign)
 	}
 
-	ours := a.ObjectiveSeverityCounts("nitpick/some-model")
+	published := a
+	published.Scale = OurSeverityScale
+	ours := published.ObjectiveSeverityCounts("nitpick/some-model")
 	if !strings.Contains(ours, "12 accurate") || !strings.Contains(ours, "14 planted") {
 		t.Errorf("our own row's counts are withheld, which withdraws the comparison the prompt is "+
 			"actually tuned on: %q", ours)
@@ -2170,23 +2587,35 @@ type degenerateReviewer struct {
 	why    string
 	review func(Fixture) []review.Finding
 
-	// maxes declares, for EVERY published metric by name, whether this strategy
-	// is expected to score at least as well as calibratedReview on it.
+	// maxes declares, for EVERY published metric AND every published description
+	// by name, whether this strategy is expected to be indistinguishable from
+	// calibratedReview on it.
+	//
+	// For a METRIC that means scoring at least as well on every component. For a
+	// DESCRIPTION there is no ordering, so it means producing a BYTE-IDENTICAL
+	// page: the artifact is compared by eye, and the only honest question a
+	// mechanism can ask of it is whether the two pages a reader would compare
+	// are the same page.
 	//
 	// Every cell must be filled. That is the structural part: publishing a new
-	// metric means answering, for each of these reviewers, "can this behaviour
-	// score as well as being right?" — and a metric where the answer is yes does
-	// not measure what its name claims.
+	// metric or description means answering, for each of these reviewers, "can
+	// this behaviour pass for being right?" — and one where the answer is yes
+	// does not measure what its name claims.
 	maxes map[string]bool
 }
 
-// degenerateReviewers is the table. The two names in each `maxes` map are
-// PublishedMetrics' names; a metric missing from any of them fails the test.
+// degenerateReviewers is the table. The names in each `maxes` map are
+// PublishedMetrics' and PublishedDescriptions' names; one missing from any of
+// them fails the test.
 func degenerateReviewers() []degenerateReviewer {
 	// Locating every defect perfectly and rating them all the same word is
 	// PERFECT DETECTION and NO severity opinion whatever. Detection is entitled
-	// to say so; a severity metric that agrees is not measuring severity.
-	oneWord := map[string]bool{"detection": true, "objective severity": false}
+	// to say so; a severity metric that agrees is not measuring severity, and
+	// the vocabulary block prints a different word on every row than a
+	// calibrated reviewer does, so it tells them apart.
+	oneWord := map[string]bool{
+		"detection": true, "objective severity": false, "severity vocabulary": false,
+	}
 
 	return []degenerateReviewer{
 		{
@@ -2239,16 +2668,19 @@ func degenerateReviewers() []degenerateReviewer {
 			// because detection is scored over what was PLANTED rather than over
 			// what the reviewer chose to mention. A severity metric is scored over
 			// what it located, which is the loophole this strategy walks through.
-			maxes: map[string]bool{"detection": false, "objective severity": false},
+			maxes: map[string]bool{"detection": false, "objective severity": false, "severity vocabulary": false},
 		},
 		{
 			name: "report only the plants we rate critical, and call them critical",
 			why: "the previous row stopped one level short and the metric survived it. This one " +
 				"reports nothing it is not already certain about, so every severity it states is " +
 				"exactly right: O-ACC 1.000 with no inflation and no understatement, an EXACT TIE " +
-				"with a perfectly calibrated reviewer, over four of the corpus's fourteen plants. " +
+				"with a perfectly calibrated reviewer, over four of the corpus's twenty-nine plants. " +
 				"Selective silence is not calibration. It is caught by O-COV, the denominator that " +
-				"was missing when this table was first written",
+				"was missing when this table was first written — and, since the denominators went " +
+				"onto the vocabulary block, by the block too: its page used to be a proper SUBSTRING " +
+				"of a calibrated reviewer's, one clean line reading 'planted critical (4 located)', " +
+				"and it now carries four more lines reading '(0 of N located): nothing located'",
 			review: func(f Fixture) []review.Finding {
 				var out []review.Finding
 				for _, d := range f.Defects {
@@ -2264,7 +2696,7 @@ func degenerateReviewers() []degenerateReviewer {
 				}
 				return out
 			},
-			maxes: map[string]bool{"detection": false, "objective severity": false},
+			maxes: map[string]bool{"detection": false, "objective severity": false, "severity vocabulary": false},
 		},
 		{
 			name: "one enormous anchor span per file",
@@ -2297,7 +2729,7 @@ func degenerateReviewers() []degenerateReviewer {
 			},
 			// Severity: it calls everything critical, so it inflates on every
 			// plant below critical exactly as "always critical" does.
-			maxes: map[string]bool{"detection": false, "objective severity": false},
+			maxes: map[string]bool{"detection": false, "objective severity": false, "severity vocabulary": false},
 		},
 		{
 			name: "a line-precise reviewer that also points at every other line",
@@ -2314,7 +2746,7 @@ func degenerateReviewers() []degenerateReviewer {
 			// severity metric is entitled to say so, and detection is left as the
 			// only thing that can catch it. That is the point of the row: it
 			// isolates ANCHOR instead of being caught three ways over.
-			maxes: map[string]bool{"detection": false, "objective severity": true},
+			maxes: map[string]bool{"detection": false, "objective severity": true, "severity vocabulary": true},
 		},
 		{
 			name: "the right words on every line",
@@ -2326,7 +2758,7 @@ func degenerateReviewers() []degenerateReviewer {
 				"lines, so ANCHOR cannot see it. NOISE is what sees it, and only once it asks where " +
 				"the comment is",
 			review: boilerplateGridReview,
-			maxes:  map[string]bool{"detection": false, "objective severity": false},
+			maxes:  map[string]bool{"detection": false, "objective severity": false, "severity vocabulary": false},
 		},
 		{
 			name: "the right words on every line NEAR a defect",
@@ -2344,7 +2776,7 @@ func degenerateReviewers() []degenerateReviewer {
 			// Severity is the calibrated reviewer's, so that metric is right to
 			// say so and detection is left as the only thing that can catch it —
 			// the same isolation the scattered-anchor row is built for.
-			maxes: map[string]bool{"detection": false, "objective severity": true},
+			maxes: map[string]bool{"detection": false, "objective severity": true, "severity vocabulary": true},
 		},
 		{
 			name: "every correct comment, five times",
@@ -2366,7 +2798,7 @@ func degenerateReviewers() []degenerateReviewer {
 			// to every model-free column by construction. Leaving the row out
 			// would have left the question unasked rather than answered; the
 			// judge's PRECISION is where verbosity is meant to be paid for.
-			maxes: map[string]bool{"detection": true, "objective severity": true},
+			maxes: map[string]bool{"detection": true, "objective severity": true, "severity vocabulary": true},
 		},
 		{
 			name: "one comment per severity, on every plant",
@@ -2379,7 +2811,7 @@ func degenerateReviewers() []degenerateReviewer {
 				}
 				return out
 			},
-			maxes: map[string]bool{"detection": true, "objective severity": false},
+			maxes: map[string]bool{"detection": true, "objective severity": false, "severity vocabulary": false},
 		},
 		{
 			name:   "one comment per line of the diff",
@@ -2388,7 +2820,7 @@ func degenerateReviewers() []degenerateReviewer {
 			// Severity is UNDEFINED for it rather than false: it grades no
 			// defect, and a reviewer that says nothing about severity inflates
 			// nothing. TestSilenceScoresUndefinedNotPerfect pins that separately.
-			maxes: map[string]bool{"detection": false, "objective severity": false},
+			maxes: map[string]bool{"detection": false, "objective severity": false, "severity vocabulary": false},
 		},
 		{
 			name: "one comment per line, plus the truth",
@@ -2400,13 +2832,13 @@ func degenerateReviewers() []degenerateReviewer {
 			// Its severity behaviour is NOT degenerate — it rates the defects it
 			// names correctly — so the severity metric is entitled to say so.
 			// Detection is the one it must not win, and noise is what stops it.
-			maxes: map[string]bool{"detection": false, "objective severity": true},
+			maxes: map[string]bool{"detection": false, "objective severity": true, "severity vocabulary": true},
 		},
 		{
 			name:   "silence",
 			why:    "the global optimum of any column that counts mistakes without a denominator",
 			review: func(Fixture) []review.Finding { return nil },
-			maxes:  map[string]bool{"detection": false, "objective severity": false},
+			maxes:  map[string]bool{"detection": false, "objective severity": false, "severity vocabulary": false},
 		},
 		{
 			name: "always the same class",
@@ -2422,20 +2854,93 @@ func degenerateReviewers() []degenerateReviewer {
 			// It maxes both, and that is the honest answer: no model-free metric
 			// reads Class at all. It is in this table so that publishing one
 			// forces someone to come here and change these two cells.
-			maxes: map[string]bool{"detection": true, "objective severity": true},
+			maxes: map[string]bool{"detection": true, "objective severity": true, "severity vocabulary": true},
 		},
 	}
 }
 
 // tallyOver scores one reviewer over a corpus, with no model, judge or network.
 func tallyOver(corpus []Fixture, reviewer func(Fixture) []review.Finding) CorpusTally {
-	scores := make([]Score, 0, len(corpus))
-	for _, f := range corpus {
-		scores = append(scores, ScoreRun(RunResult{
+	return scoresOver(corpus, reviewer, nil).tally()
+}
+
+// delivery is how a corpus of reviews REACHED the scorer, which is a separate
+// axis from what the reviewer said.
+//
+// It exists because every model-free guard in this file used to build its runs
+// as RunResult{Report: ...} — a run that always succeeded. That is the shape
+// nobody was thinking about, and a whole class of bug lives in it: ScoreRun has
+// two early returns for a run with no report, so anything derived from the
+// FIXTURE rather than from the findings can be silently skipped on exactly the
+// runs a real battery produces when a provider rate-limits. Running each case
+// under both deliveries is what makes those returns part of the tested surface.
+type delivery struct {
+	name string
+
+	// failing reports whether this delivery loses runs, so an assertion that
+	// only holds for complete data can say which case it is looking at.
+	failing bool
+
+	scores func([]Fixture, func(Fixture) []review.Finding) corpusScores
+	tally  func([]Fixture, func(Fixture) []review.Finding) CorpusTally
+}
+
+// corpusScores is one scored corpus, kept as the slice so a caller can fold it
+// through whichever of TallyScores and Summarize it is testing.
+type corpusScores []Score
+
+func (s corpusScores) tally() CorpusTally { return TallyScores(s) }
+
+// scoresOver scores a reviewer over a corpus. fails, when non-nil, decides which
+// fixtures come back as a provider error instead of a report.
+func scoresOver(corpus []Fixture, reviewer func(Fixture) []review.Finding, fails func(int) bool) corpusScores {
+	out := make(corpusScores, 0, len(corpus))
+	for i, f := range corpus {
+		r := RunResult{
 			Report: &review.Report{Findings: reviewer(f)},
-		}, f))
+			Scale:  OurSeverityScale,
+		}
+		if fails != nil && fails(i) {
+			// Deliberately NOT a report with no findings: an empty report is a
+			// review that ran and said nothing, and that is already covered by
+			// the silent reviewer. This is the run that never happened.
+			r = RunResult{Err: fmt.Errorf("provider 503"), Scale: OurSeverityScale}
+		}
+		out = append(out, ScoreRun(r, f))
 	}
-	return TallyScores(scores)
+	return out
+}
+
+// deliveries is the two ways a battery's runs arrive: all of them, and one in
+// three lost to the provider.
+//
+// One in three rather than one, so a failure is not confined to whichever
+// fixture happens to sit first and so the surviving runs still cover every
+// planted level. Every fixture failing would make the corpus empty and prove
+// nothing about a partial one.
+func deliveries() []delivery {
+	every3rd := func(i int) bool { return i%3 == 0 }
+	return []delivery{
+		{
+			name: "every run delivered",
+			scores: func(c []Fixture, r func(Fixture) []review.Finding) corpusScores {
+				return scoresOver(c, r, nil)
+			},
+			tally: func(c []Fixture, r func(Fixture) []review.Finding) CorpusTally {
+				return scoresOver(c, r, nil).tally()
+			},
+		},
+		{
+			name:    "every third run lost to the provider",
+			failing: true,
+			scores: func(c []Fixture, r func(Fixture) []review.Finding) corpusScores {
+				return scoresOver(c, r, every3rd)
+			},
+			tally: func(c []Fixture, r func(Fixture) []review.Finding) CorpusTally {
+				return scoresOver(c, r, every3rd).tally()
+			},
+		},
+	}
 }
 
 // TestNoDegenerateReviewerCanMaxOutAPublishedMetric asks, of every model-free
@@ -2443,31 +2948,44 @@ func tallyOver(corpus []Fixture, reviewer func(Fixture) []review.Finding) Corpus
 // retracted: WHAT MAXIMISES THIS?
 //
 // The failure this exists to prevent was not a bad constant. A banded cross-tool
-// severity accuracy figure was published, and 12 of the 14 plants sit in one
-// band: a reviewer that stamps one blocking word on every finding banded 12
-// accurate and 2 inflated of 14 against the incumbent's 6 of 10, and one that
-// also picks WHAT to report — stay silent unless the defect is already blocking,
-// then call it critical — banded a perfect 12 of 12. The column was maximised by
-// the worst production behaviour there is, and nothing in the tree asked. A
-// metric that rewards stamping "critical" on everything would, if anyone
-// optimised against it, produce exactly the review bot this project exists not
-// to be.
+// severity accuracy figure was published, and 12 of the 29 plants sit in the
+// blocking band: a reviewer that picks WHAT to report — stay silent unless the
+// defect is already blocking, then call it critical — banded a perfect 12/0/0
+// over those 12, an exact tie with a calibrated reviewer's 29/0/0. The column
+// was maximised by the worst production behaviour there is, and nothing in the
+// tree asked. A metric that rewards stamping "critical" on everything a reviewer
+// bothers to mention would, if anyone optimised against it, produce exactly the
+// review bot this project exists not to be.
 //
-// (This comment used to say "a PERFECT record — 10 of 10". That figure scored
-// the degenerate strategy over the plants the INCUMBENT located rather than over
-// what it reports, and does not reproduce. The correction did not change the
-// conclusion, and finding it is what added the selective-reporting row below.)
+// (TWO FIGURES IN THIS COMMENT HAVE BEEN CORRECTED. It said "a PERFECT record —
+// 10 of 10", which scored the degenerate strategy over the plants the INCUMBENT
+// located rather than over what it reports; finding that is what added the
+// selective-reporting row below. It then said the two stampers banded 12
+// accurate and 2 inflated of 14 against the incumbent's 6 of 10, which was true
+// of a fourteen-plant corpus and is not true of this one — on the corpus in this
+// tree they band 12/17/0 of 29 and no longer tie. The stamper half of the
+// argument is withdrawn; the selective half reproduces and is what the sentence
+// above now rests on. TestTheSeverityFiguresTheseCommentsQuoteStillReproduce
+// reads both back out of the corpus.)
 //
-// So every published metric is crossed with a table of reviewers nobody would
-// ship, and each cell is DECLARED. A metric a degenerate strategy can score as
-// well as a correct reviewer on does not measure what its name claims and must
-// not be published; the failure below names which metric and which strategy.
+// So every published metric AND every published description is crossed with a
+// table of reviewers nobody would ship, and each cell is DECLARED. A metric a
+// degenerate strategy can score as well as a correct reviewer on does not
+// measure what its name claims and must not be published; a description a
+// degenerate strategy can reproduce BYTE FOR BYTE is not telling a reader the
+// two reviewers apart. The failure below names which artifact and which strategy.
 func TestNoDegenerateReviewerCanMaxOutAPublishedMetric(t *testing.T) {
 	corpus := AllFixtures()
 	metrics := PublishedMetrics()
+	descriptions := PublishedDescriptions()
 
 	if len(metrics) == 0 {
 		t.Fatal("no published metric is registered, so this test proves nothing about the tables")
+	}
+	if len(descriptions) == 0 {
+		t.Fatal("no published description is registered. The severity vocabulary block is what " +
+			"REPLACED a withdrawn score, so it inherits that score's question; an unregistered one " +
+			"is the question going unasked again")
 	}
 
 	reference := tallyOver(corpus, calibratedReview)
@@ -2521,6 +3039,36 @@ func TestNoDegenerateReviewerCanMaxOutAPublishedMetric(t *testing.T) {
 						"for it — it produced nothing to measure", d.name, m.Name)
 				}
 			}
+
+			// The descriptions, on the same terms. There is no ordering on a
+			// page of text, so the comparison is byte-identity: the question is
+			// whether a reader diffing the two artifacts would see a difference
+			// at all.
+			for _, desc := range descriptions {
+				want, declared := d.maxes[desc.Name]
+				if !declared {
+					t.Errorf("description %q is published and this table does not say whether %q "+
+						"produces the same page as a calibrated reviewer. Fill the cell: if the "+
+						"answer is yes, the description does not distinguish them", desc.Name, d.name)
+					continue
+				}
+
+				same := desc.Render(got) == desc.Render(reference)
+
+				switch {
+				case same && !want:
+					t.Errorf("DESCRIPTION %q IS REPRODUCED BYTE FOR BYTE BY %q, which %s.\n%s\n"+
+						"A reader comparing the two pages by eye sees no difference, so this artifact "+
+						"does not describe %q for this strategy. Add what it is missing — the last "+
+						"time, that was the planted denominator on every level — or stop publishing "+
+						"it as a description of severity behaviour.",
+						desc.Name, d.name, d.why, desc.Render(got), desc.Doc)
+				case !same && want:
+					t.Errorf("this table declares that %q produces the calibrated page for %q and it "+
+						"does not:\n--- calibrated\n%s\n--- degenerate\n%s\nA stale declaration hides "+
+						"the next real one", d.name, desc.Name, desc.Render(reference), desc.Render(got))
+				}
+			}
 		})
 	}
 
@@ -2538,6 +3086,25 @@ func TestNoDegenerateReviewerCanMaxOutAPublishedMetric(t *testing.T) {
 			t.Errorf("every strategy in the degenerate table is declared able to max out %q, so the "+
 				"table asserts nothing about it. Either it is not a score, or a reviewer that would "+
 				"break it is missing from the table", m.Name)
+		}
+	}
+
+	// And the same for the descriptions, which is the assertion the crossing
+	// above would otherwise be missing entirely: a description every strategy is
+	// declared able to reproduce is a page that says nothing about any of them,
+	// and it would pass the loop above by being declared true everywhere.
+	for _, desc := range descriptions {
+		distinguishes := false
+		for _, d := range degenerateReviewers() {
+			if !d.maxes[desc.Name] {
+				distinguishes = true
+			}
+		}
+		if !distinguishes {
+			t.Errorf("every strategy in the degenerate table is declared to produce the calibrated "+
+				"page for %q, so the table asserts nothing about it. Either it is not a description "+
+				"of the reviewer, or a strategy it would distinguish is missing from the table",
+				desc.Name)
 		}
 	}
 }
@@ -2712,6 +3279,74 @@ func TestTheCreditedSpellingDoesNotDependOnReportOrder(t *testing.T) {
 		t.Errorf("reordering a translated review changed the published vocabulary block:\n%s\nversus\n%s\n"+
 			"Both words are recorded at warning and tie, so the tie-break decides which of the "+
 			"REVIEWER'S spellings is quoted", x, y)
+	}
+}
+
+// TestADestroyedWordDoesNotOutrankAKeptOne is the third state of the same
+// tie-break, and it was the one the ordering rule got backwards.
+//
+// severityAsSaid returns an EMPTY Said for a finding something translated
+// without keeping the original, and the block renders that as UnrecordedWord.
+// The tie-break compared spellings lexicographically, and "" sorts before every
+// real word — so a defect matched by one finding carrying RawSeverity "Error"
+// and one carrying none published `(word not recorded)` in BOTH report orders,
+// with the reviewer's word sitting in the finding list beside it. Order
+// independence held; it held on the wrong answer, which is why the test above
+// could not see this.
+//
+// The shape is not contrived. internal/linters marks every analyzer finding
+// translated and gives it no raw word, so a run with linters on is a run where
+// half the findings are the empty side of this tie. ourSeverityScale withdraws
+// the SCORE in that configuration, and the DESCRIPTION is published regardless —
+// so the gap phrase was reachable in exactly the configuration the withdrawal
+// was written for.
+func TestADestroyedWordDoesNotOutrankAKeptOne(t *testing.T) {
+	fx := Fixture{
+		Name: "destroyed",
+		Head: map[string]string{"a.go": "package a\n"},
+		Defects: []Defect{{
+			Path: "a.go", Line: 1, Why: "a kept word", WantSeverity: config.SeverityError,
+			Class: config.ClassCorrectness, Keywords: []string{"zebra"},
+		}},
+	}
+
+	// Both are translated and both are recorded at error, so they tie on rank
+	// and on our word: only the reviewer's spelling separates them.
+	comment := func(raw string) review.Finding {
+		return review.Finding{
+			Path: "a.go", Line: 1, Title: "zebra",
+			Severity: string(config.SeverityError), SeverityTranslated: true, RawSeverity: raw,
+			Class: string(config.ClassCorrectness),
+		}
+	}
+
+	for _, order := range [][]review.Finding{
+		{comment("Error"), comment("")},
+		{comment(""), comment("Error")},
+	} {
+		s := ScoreSeverity(fx, order)
+		lines := strings.Join(s.Usage().Lines(s.Planted), "\n")
+
+		if strings.Contains(lines, UnrecordedWord) {
+			t.Errorf("with findings arriving %q then %q, the block reports the reviewer's word as "+
+				"unrecoverable:\n%s\nOne of the two findings kept %q. %s is what this block prints "+
+				"when there is nothing else to print; it may not outrank something",
+				order[0].RawSeverity, order[1].RawSeverity, lines, "Error", UnrecordedWord)
+		}
+		if !strings.Contains(lines, "Error x1") {
+			t.Errorf("with findings arriving %q then %q, the block does not quote the word the "+
+				"review kept:\n%s", order[0].RawSeverity, order[1].RawSeverity, lines)
+		}
+	}
+
+	// A defect matched ONLY by findings whose word was destroyed still reports
+	// the gap: the fix is about which of two available answers wins, not about
+	// filling a gap in from our own reading.
+	only := ScoreSeverity(fx, []review.Finding{comment(""), comment("")})
+	if lines := strings.Join(only.Usage().Lines(only.Planted), "\n"); !strings.Contains(lines, UnrecordedWord) {
+		t.Errorf("with every matching finding's word destroyed, the block no longer reports the "+
+			"gap:\n%s\nQuoting the reviewer as having said a word we chose is the substitution this "+
+			"whole block was rewritten to stop", lines)
 	}
 }
 
@@ -3713,22 +4348,32 @@ func TestNoTableOffersACrossToolSeverityScore(t *testing.T) {
 	// column names, and the columns kept their names. What changed was which
 	// rows get a number in them.
 	a := Aggregate{SevAccurate: 4, SevInflated: 1, SevUnderstated: 2, SevPlanted: 8}
-	infl, under, acc, cov := a.ObjectiveSeverityCells(IncumbentModel, 4)
-	for name, cell := range map[string]string{"O-INFL": infl, "O-UNDER": under, "O-ACC": acc, "O-COV": cov} {
-		if cell != "n/a" {
-			t.Errorf("the %s cell for %s renders %q. A row whose vocabulary is not ours must print "+
-				"n/a there: the banded triple was withdrawn and the full-resolution one was left in "+
-				"the same columns of the same sorted ranking, annotated with a note telling the "+
-				"reader not to compare it — which is the mitigation the previous retraction had "+
-				"already recorded as insufficient", name, IncumbentModel, cell)
+
+	for _, withheld := range []SeverityScale{IncumbentSeverityScale, UndeclaredSeverityScale} {
+		row := a
+		row.Scale = withheld
+
+		infl, under, acc, cov := row.ObjectiveSeverityCells(4)
+		for name, cell := range map[string]string{
+			"O-INFL": infl, "O-UNDER": under, "O-ACC": acc, "O-COV": cov,
+		} {
+			if cell != "n/a" {
+				t.Errorf("the %s cell for a row on scale %q renders %q. A row that has not declared "+
+					"our five levels must print n/a there: the banded triple was withdrawn and the "+
+					"full-resolution one was left in the same columns of the same sorted ranking, "+
+					"annotated with a note telling the reader not to compare it — which is the "+
+					"mitigation the previous retraction had already recorded as insufficient",
+					name, withheld.describe(), cell)
+			}
 		}
 	}
 
-	ours := "nitpick/some-model"
-	if infl, _, _, cov := a.ObjectiveSeverityCells(ours, 4); infl == "n/a" || cov == "n/a" {
-		t.Errorf("the O-* cells for %q render n/a (%s, %s). Blanking them for OUR OWN rows would "+
-			"withdraw the comparison the prompt is actually tuned on, which is not what was retracted",
-			ours, infl, cov)
+	ours := a
+	ours.Scale = OurSeverityScale
+	if infl, _, _, cov := ours.ObjectiveSeverityCells(4); infl == "n/a" || cov == "n/a" {
+		t.Errorf("the O-* cells for a row declared on our own scale render n/a (%s, %s). Blanking "+
+			"them for OUR OWN rows would withdraw the comparison the prompt is actually tuned on, "+
+			"which is not what was retracted", infl, cov)
 	}
 
 	// The legend must SAY so, where a reader meets the numbers. A silent
@@ -3795,6 +4440,21 @@ func TestEverySeverityCellIsWithdrawnForAForeignVocabulary(t *testing.T) {
 		Severity: SeverityScore{Accurate: 4, Inflated: 1, Understated: 2},
 	}
 
+	// UNDECLARED IS TESTED BESIDE FOREIGN, and it is the state that did not exist
+	// while the gate was a name check. A contender added without a declaration
+	// used to be published at our resolution by default, because it was not
+	// spelled IncumbentModel; now it is withheld by default and someone has to
+	// say what scale it is on. See SeverityScale.
+	withheld := map[SeverityScale]CorpusTally{}
+	for _, scale := range []SeverityScale{IncumbentSeverityScale, UndeclaredSeverityScale} {
+		t := tally
+		t.Scale = scale
+		withheld[scale] = t
+	}
+
+	published := tally
+	published.Scale = OurSeverityScale
+
 	for _, col := range severity.Columns() {
 		if by, ok := elsewhere[col]; ok {
 			t.Logf("%s is also published by the %q metric, so it is not gated on vocabulary", col, by)
@@ -3810,21 +4470,310 @@ func TestEverySeverityCellIsWithdrawnForAForeignVocabulary(t *testing.T) {
 			continue
 		}
 
-		if got := render(IncumbentModel, tally); got != "n/a" {
-			t.Errorf("the %s cell for %s renders %q. A row whose vocabulary is not ours must print "+
-				"n/a: %s publishes one 'critical' spanning our critical AND error, so the figure "+
-				"states the vocabulary gap and not review quality in either direction",
-				col, IncumbentModel, got, IncumbentModel)
+		for scale, row := range withheld {
+			if got := render(row); got != "n/a" {
+				t.Errorf("the %s cell for a row on scale %q renders %q. A row that has not declared "+
+					"our five levels must print n/a: %s publishes one 'critical' spanning our critical "+
+					"AND error, so the figure states the vocabulary gap and not review quality in "+
+					"either direction, and a row nobody declared has not even said that much",
+					col, scale.describe(), got, IncumbentModel)
+			}
 		}
 
 		// And the gate must not be satisfied by blanking the column for
 		// everybody, which would withdraw the comparison our own prompt is tuned
 		// on and pass this test by deleting the measurement.
-		if got := render("nitpick/some-model", tally); got == "n/a" || got == "" {
+		if got := render(published); got == "n/a" || got == "" {
 			t.Errorf("the %s cell renders %q for one of our own models. Blanking it for every row "+
 				"passes the withdrawal by removing the score, which is not what was retracted", col, got)
 		}
 	}
+}
+
+// TestAFailedRunStillDeclaresItsScale pins where the declaration is made, which
+// turns out to be a question about which severity cell a reader is shown.
+//
+// The declaration depends only on the configuration, and the configuration is
+// fully determined before RunWithPersona does anything that can fail. It was
+// nonetheless assigned after the temp-directory and fixture-build returns, so a
+// run that died in either carried none — and commonScale withdraws a row whose
+// runs disagree. Folded with a good run, a failure carrying the declaration
+// leaves the row on our scale; a failure carrying none takes the row to n/a.
+// One class of infrastructure failure, two different published cells, decided by
+// which side of one line the provider happened to break on.
+//
+// The fold is exercised rather than the harness, because RunWithPersona reaches
+// a provider and this suite does not. What is asserted is the CONSEQUENCE — that
+// a failed run's declaration decides a published cell — plus the source fact
+// that the assignment precedes the returns.
+func TestAFailedRunStillDeclaresItsScale(t *testing.T) {
+	fx := severityFixture()
+	good := ScoreRun(RunResult{
+		Report: &review.Report{Findings: calibratedReview(fx)},
+		Scale:  OurSeverityScale,
+	}, fx)
+
+	declared := ScoreRun(RunResult{Err: fmt.Errorf("mkdir temp: read-only"), Scale: OurSeverityScale}, fx)
+	silent := ScoreRun(RunResult{Err: fmt.Errorf("mkdir temp: read-only")}, fx)
+
+	withDecl := Summarize("m", fx.Name, []Score{good, declared}).SeverityCell()
+	without := Summarize("m", fx.Name, []Score{good, silent}).SeverityCell()
+	if withDecl == without {
+		t.Fatalf("a failed run's declaration makes no difference to the published cell (%q both "+
+			"ways), so this test cannot show that where it is assigned matters. Check the fold "+
+			"before concluding the harness is safe", withDecl)
+	}
+
+	// The source fact that makes the consequence unreachable: nothing that can
+	// fail runs before the declaration.
+	src, err := os.ReadFile("harness.go")
+	if err != nil {
+		t.Fatalf("reading harness.go: %v", err)
+	}
+	// Anchored on the CALL, not on the syntax around it: whether the
+	// declaration is a composite-literal field or an assignment is a style
+	// question, and pinning the spelling would make a refactor look like the
+	// regression while letting the regression through under the other spelling.
+	body := string(src)
+	decl := strings.Index(body, "ourSeverityScale(cfg)")
+	if decl < 0 {
+		t.Fatal("RunWithPersona no longer calls ourSeverityScale(cfg); if the declaration moved, " +
+			"this test is checking a line that does not exist")
+	}
+	for _, canFail := range []string{`os.MkdirTemp("", "nitpick-eval-")`, "buildRepo(dir, f)"} {
+		at := strings.Index(body, canFail)
+		if at < 0 {
+			t.Errorf("harness.go no longer contains %q, so this test cannot show the declaration "+
+				"precedes it", canFail)
+			continue
+		}
+		if at < decl {
+			t.Errorf("%q runs before the severity scale is declared. A run that dies there carries no "+
+				"declaration, and commonScale then withdraws the whole row — so an infrastructure "+
+				"failure decides which severity cell a reader is shown, differently depending on "+
+				"where it happened", canFail)
+		}
+	}
+}
+
+// TestARowWithdrawsWhenItsAdaptersDisagree pins Aggregate.DeclareScale against
+// the first-declaration-wins rule it replaced.
+//
+// Both judged paths build their rows one result at a time. One wrote out the
+// disagreement check by hand; the other constructed `&Aggregate{Scale:
+// result.Scale}` on whichever goroutine reached the map first and never looked
+// again. That is the rule commonScale refuses on the un-judged path, live on the
+// judged one, in a shape no test covered — a row folding two adapters was
+// published at whichever resolution won the race.
+func TestARowWithdrawsWhenItsAdaptersDisagree(t *testing.T) {
+	fold := func(scales ...SeverityScale) SeverityScale {
+		var a Aggregate
+		for _, s := range scales {
+			a.DeclareScale(s)
+		}
+		return a.Scale
+	}
+
+	for _, c := range []struct {
+		name   string
+		scales []SeverityScale
+		want   SeverityScale
+	}{
+		{"a single declaration stands", []SeverityScale{OurSeverityScale}, OurSeverityScale},
+		{"agreeing declarations stand", []SeverityScale{
+			OurSeverityScale, OurSeverityScale, OurSeverityScale,
+		}, OurSeverityScale},
+		{"a foreign row stays foreign", []SeverityScale{
+			IncumbentSeverityScale, IncumbentSeverityScale,
+		}, IncumbentSeverityScale},
+		{"two adapters withdraw", []SeverityScale{
+			OurSeverityScale, IncumbentSeverityScale,
+		}, UndeclaredSeverityScale},
+		{"order does not decide it", []SeverityScale{
+			IncumbentSeverityScale, OurSeverityScale,
+		}, UndeclaredSeverityScale},
+		{"an undeclared result withdraws a declared row", []SeverityScale{
+			OurSeverityScale, UndeclaredSeverityScale,
+		}, UndeclaredSeverityScale},
+		{"withdrawal is sticky", []SeverityScale{
+			OurSeverityScale, IncumbentSeverityScale, OurSeverityScale, OurSeverityScale,
+		}, UndeclaredSeverityScale},
+		{"declaring nothing first does not withdraw a row on its own", []SeverityScale{
+			UndeclaredSeverityScale, UndeclaredSeverityScale,
+		}, UndeclaredSeverityScale},
+	} {
+		if got := fold(c.scales...); got != c.want {
+			t.Errorf("%s: folding %v gives scale %q, want %q", c.name, c.scales,
+				got.describe(), c.want.describe())
+		}
+	}
+
+	// The first declaration on a fresh row is not a disagreement with the zero
+	// value. Without the separate "has anybody declared yet" bit both states are
+	// the empty string and every row would withdraw.
+	var a Aggregate
+	a.DeclareScale(OurSeverityScale)
+	if !a.Scale.PublishesOurLevels() {
+		t.Errorf("a row's first declaration left it on scale %q; the zero value and a declaration "+
+			"of undeclared are the same string, so telling them apart is what keeps this from "+
+			"withdrawing everything", a.Scale.describe())
+	}
+}
+
+// TestNoAggregateLiteralSetsItsOwnScale keeps the fold in one place.
+//
+// A row's scale is the fold of what its results declared, and DeclareScale is
+// where that fold lives. A composite literal that sets Scale directly bypasses
+// it, which is how one of the two judged paths came to have the disagreement
+// check and the other not. The scan is over the AST rather than the text so that
+// the field name appearing in a comment or a message is not a violation.
+func TestNoAggregateLiteralSetsItsOwnScale(t *testing.T) {
+	literals := 0
+	for name, file := range packageAST(t) {
+		ast.Inspect(file, func(n ast.Node) bool {
+			lit, ok := n.(*ast.CompositeLit)
+			if !ok {
+				return true
+			}
+			ident, ok := lit.Type.(*ast.Ident)
+			if !ok || ident.Name != "Aggregate" {
+				return true
+			}
+			literals++
+
+			for _, elt := range lit.Elts {
+				kv, ok := elt.(*ast.KeyValueExpr)
+				if !ok {
+					continue
+				}
+				if key, ok := kv.Key.(*ast.Ident); ok && key.Name == "Scale" {
+					t.Errorf("%s builds an Aggregate literal that sets Scale directly. A row's scale "+
+						"is folded from what each result DECLARED — call DeclareScale, which withdraws "+
+						"the row when two adapters disagree. Setting it in the literal takes whichever "+
+						"declaration arrived first, which is the rule commonScale refuses and which "+
+						"one judged path had for a whole round", name)
+				}
+			}
+			return true
+		})
+	}
+
+	if literals == 0 {
+		t.Fatal("no Aggregate literal was found in this package, so this scan checked nothing")
+	}
+}
+
+// TestAWithdrawnRowsProseDoesNotLeakASeverityVerdict closes the one position
+// TestNoReportFormatsSeverityCountersDirectly cannot see: INSIDE the gated
+// renderer.
+//
+// That scan looks for a counter named in a file that draws a table. judge.go
+// draws none — it is where the gated renderers live, and it names the counters
+// legitimately, in the branch that publishes them. So the withdrawn branch of
+// ObjectiveSeverityCounts is a blind spot on both guards at once, and it is the
+// most attractive place in the tree to put a cross-tool figure: it is the prose
+// line printed under the table for precisely the row whose four O-* cells read
+// n/a. Appending `; B-ACC %d/%d` there put the retracted banded triple back on
+// the incumbent's row with the whole default suite green.
+//
+// THE RULE IS NOT A LIST OF FORBIDDEN FIELDS, because that is what returned
+// three times. It is: a withdrawn row's line may depend on HOW MANY defects were
+// graded and not on HOW they were graded. Two aggregates are rendered whose
+// verdicts are distributed differently and whose SevGraded is identical, and the
+// withdrawn output must be byte-identical between them. SevGraded survives the
+// withdrawal on its own argument — how many planted defects a reviewer LOCATED
+// is a detection fact in nobody's severity vocabulary — so holding it constant
+// is what isolates the part that does not.
+//
+// Every verdict-naming int on Aggregate is varied, not just today's three, so a
+// counter added at a coarser resolution is covered by existing. The published
+// branch is required to DIFFER between the same two aggregates, or the whole
+// test would pass on a renderer that prints nothing at all.
+func TestAWithdrawnRowsProseDoesNotLeakASeverityVerdict(t *testing.T) {
+	// spread and lump grade the same number of defects — three — and disagree
+	// about every verdict. Fields beyond the core triple are varied too, at a
+	// value SevGraded does not sum, so a new counter changes the output without
+	// changing the quantity that is allowed to reach the page.
+	build := func(accurate, inflated, understated, others int) Aggregate {
+		a := Aggregate{
+			SevAccurate: accurate, SevInflated: inflated, SevUnderstated: understated,
+			SevPlanted: 29,
+		}
+
+		v := reflect.ValueOf(&a).Elem()
+		typ := v.Type()
+		varied := 0
+		for i := range typ.NumField() {
+			f := typ.Field(i)
+			if f.Type.Kind() != reflect.Int || !namesAVerdict(f.Name) {
+				continue
+			}
+			varied++
+			switch f.Name {
+			case "SevAccurate", "SevInflated", "SevUnderstated":
+			default:
+				v.Field(i).SetInt(int64(others))
+			}
+		}
+		if varied < 3 {
+			t.Fatalf("only %d verdict-naming int field(s) on Aggregate; this test varies the "+
+				"counters by reflection and has stopped finding them", varied)
+		}
+		return a
+	}
+
+	spread := build(1, 1, 1, 0)
+	lump := build(3, 0, 0, 41)
+
+	if spread.SevGraded() != lump.SevGraded() {
+		t.Fatalf("the two aggregates grade %d and %d defects; they have to agree, or a difference "+
+			"in the withdrawn line would be the legitimate one", spread.SevGraded(), lump.SevGraded())
+	}
+
+	for _, scale := range []SeverityScale{IncumbentSeverityScale, UndeclaredSeverityScale} {
+		a, b := spread, lump
+		a.Scale, b.Scale = scale, scale
+
+		if x, y := a.ObjectiveSeverityCounts("some/model"), b.ObjectiveSeverityCounts("some/model"); x != y {
+			t.Errorf("on scale %q the counts line changes with how the located defects were GRADED:\n"+
+				"%s\nversus\n%s\nBoth graded %d defects. The cells on that row read n/a because our five "+
+				"levels and this reviewer's are not commensurable; restating the comparison in prose "+
+				"under the table publishes it in a form that is easier to quote",
+				scale.describe(), x, y, a.SevGraded())
+		}
+
+		ai, au, aa, ac := a.ObjectiveSeverityCells(1)
+		bi, bu, ba, bc := b.ObjectiveSeverityCells(1)
+		if ai != bi || au != bu || aa != ba || ac != bc {
+			t.Errorf("on scale %q the O-* cells change with the verdict distribution: %s/%s/%s/%s "+
+				"against %s/%s/%s/%s", scale.describe(), ai, au, aa, ac, bi, bu, ba, bc)
+		}
+	}
+
+	// The gate is not satisfied by a renderer that says nothing. On our own
+	// scale the same two aggregates must be distinguishable, or the equality
+	// above is measuring a function that ignores its input.
+	ours, theirs := spread, lump
+	ours.Scale, theirs.Scale = OurSeverityScale, OurSeverityScale
+	if x, y := ours.ObjectiveSeverityCounts("ours"), theirs.ObjectiveSeverityCounts("ours"); x == y {
+		t.Errorf("on our own scale the counts line is the same for two different verdict "+
+			"distributions (%s). The equality checked above then proves nothing: it would hold for a "+
+			"renderer that prints no severity reading at all", x)
+	}
+}
+
+// namesAVerdict reports whether a field name states one of the published
+// severity verdicts, which is what makes a counter a counter rather than a
+// denominator. Derived from the constants for the reason severityCounterSpellings
+// derives its spellings from them.
+func namesAVerdict(field string) bool {
+	lower := strings.ToLower(field)
+	for _, v := range []string{SevAccurate, SevInflated, SevUnderstated} {
+		if strings.Contains(lower, v) {
+			return true
+		}
+	}
+	return false
 }
 
 // TestNoReportFormatsSeverityCountersDirectly ties the tables to the gated
@@ -3852,8 +4801,24 @@ func TestEverySeverityCellIsWithdrawnForAForeignVocabulary(t *testing.T) {
 // rendered `incumbent/cli  4/1/2` — the withdrawn full-resolution cross-tool
 // severity triple, on the foreign row, where the gated renderer returns "n/a"
 // for the identical tally — and the whole suite stayed green. A list of what to
-// guard guards what was on the list; reflecting over the types the counters
-// actually live on covers a spelling nobody thought of, including the next one.
+// guard guards what was on the list; reflecting over the types the counters live
+// on covers spellings nobody thought of.
+//
+// WHAT IT DOES NOT COVER, stated here because the previous version of this
+// paragraph claimed it covered "the next one" and two next ones got past it.
+//
+//   - A SHAPE MISSING FROM THE WALK. severityCounterSpellings reflects over
+//     reportRowShapes, and Aggregate was absent from it for two rounds while
+//     this scan passed, because Summary spells the same three counters
+//     identically. Nothing in the scan's OUTPUT can show that;
+//     TestTheCounterScanCoversEveryShapeAReportRendersFrom asserts the list by
+//     type identity instead.
+//   - THE INSIDE OF THE GATED RENDERER. This scan skips judge.go, which draws no
+//     table and is where ObjectiveSeverityCells and ObjectiveSeverityCounts
+//     legitimately name the counters. Appending a banded triple to the WITHDRAWN
+//     branch of ObjectiveSeverityCounts — the prose line under the table for the
+//     row whose four O-* cells read n/a — is therefore invisible here.
+//     TestAWithdrawnRowsProseDoesNotLeakASeverityVerdict is that position.
 func TestNoReportFormatsSeverityCountersDirectly(t *testing.T) {
 	counters := severityCounterSpellings()
 	if len(counters) < 6 {
@@ -3889,45 +4854,275 @@ func TestNoReportFormatsSeverityCountersDirectly(t *testing.T) {
 }
 
 // severityCounterSpellings derives every way a report could name one of the
-// three severity counters, from the types that hold them.
+// severity counters, from the types that hold them.
 //
-// Two spellings exist because the counters live on two shapes: Summary and
-// Aggregate flatten them as SevAccurate/SevInflated/SevUnderstated, and
+// EVERY SHAPE A REPORT READS IS REFLECTED OVER, and the omission was the bug.
+// This walked Summary and CorpusTally only. Aggregate — the type judge.go
+// records the withdrawn B-INFL/B-UNDER/B-ACC triple as having lived on, and the
+// one whose four O-* cells read n/a for the incumbent — was never walked, so its
+// counters were covered purely because Summary happens to spell them
+// identically. Adding `SevBandedAccurate int` to Aggregate and printing it from
+// ObjectiveSeverityCounts's WITHDRAWN branch put the retracted cross-tool figure
+// back on the incumbent's row with the whole default suite green. A guard over
+// two of the three shapes guards the two.
+//
+// Spellings come in two forms because the counters are reached two ways: Summary
+// and Aggregate flatten them as SevAccurate/SevInflated/SevUnderstated, and
 // CorpusTally nests a SeverityScore whose fields are Accurate/Inflated/
 // Understated. The nested ones are qualified with the field that reaches them
 // (".Severity.Accurate") rather than searched for bare: "Accurate" on its own
 // matches the flattened spelling too, and matches SevAccurate's own declaration
 // in score.go, so an unqualified scan reports the definitions as violations.
 //
-// SeverityScore.Calls is skipped by type: it is the per-finding detail a report
-// legitimately names, and it is not a counter.
-func severityCounterSpellings() []string {
-	var out []string
+// WHAT IS AND IS NOT A COUNTER IS DECIDED BY THE VERDICT VOCABULARY PLUS THE
+// TYPE, and neither half is sufficient alone. It was once "every Sev* field
+// except SevUsage" — a name-shaped rule with a hand-written exception — which
+// fired on SevPlantedLevels the day that field existed. Narrowing that to "Sev*
+// and an int" fixed the map case and re-broke the same way on Aggregate, whose
+// SevPlanted is an int and is a DENOMINATOR: how many defects the corpus planted
+// is a fact about the fixtures that a report is supposed to print. A counter
+// counts VERDICTS, so the names are derived from the verdict constants
+// themselves — SevAccurate, SevInflated, SevUnderstated — which means a counter
+// added at a new resolution (SevBandedAccurate, a nested BandedUnderstated) is
+// caught by the word it must contain to be one, while a census, a usage map or
+// the per-finding Calls slice is not.
+func severityCounterSpellings() []string { return counterSpellingsOver(reportRowShapes()) }
 
-	flat := reflect.TypeOf(Summary{})
-	for i := range flat.NumField() {
-		if name := flat.Field(i).Name; strings.HasPrefix(name, "Sev") && name != "SevUsage" {
-			out = append(out, name)
+// reportRowShapes is every type a published row is rendered from.
+//
+// It is a named list rather than an inline one because the omission it exists to
+// prevent is INVISIBLE FROM THE OUTSIDE: Summary and Aggregate spell the
+// counters identically today, so dropping Aggregate changes nothing about the
+// derived spellings and no behavioural assertion can tell a walked shape from an
+// unwalked one. TestTheCounterScanCoversEveryShapeAReportRendersFrom checks this
+// list by type identity for exactly that reason.
+func reportRowShapes() []reflect.Type {
+	return []reflect.Type{
+		reflect.TypeOf(Summary{}),
+		reflect.TypeOf(Aggregate{}),
+		reflect.TypeOf(CorpusTally{}),
+	}
+}
+
+// carriesSeverityUsage reports whether a row shape holds a severity vocabulary
+// tabulation, directly or through the SeverityScore it nests.
+//
+// Derived rather than listed because it decides which shapes
+// TestEveryPlantedLevelAppearsWithItsDenominator is REQUIRED to fold through: a
+// shape that gains a usage map gains a denominator to keep honest, and a list
+// would go stale exactly when that happened.
+func carriesSeverityUsage(shape reflect.Type) bool {
+	for i := range shape.NumField() {
+		switch f := shape.Field(i); {
+		case f.Type == reflect.TypeOf(SeverityUsage{}):
+			return true
+		case f.Type == reflect.TypeOf(SeverityScore{}):
+			// SeverityScore reaches its tabulation through a method rather than
+			// a field, so the nesting is what identifies it.
+			return true
+		}
+	}
+	return false
+}
+
+// vocabularyRowFold is one shape's real path from a scored corpus to the row the
+// vocabulary block is rendered from, beside the planted total that shape
+// publishes as its own denominator.
+type vocabularyRowFold struct {
+	name  string
+	shape reflect.Type
+	row   func([]Fixture, corpusScores) (VocabularyRow, int)
+}
+
+// vocabularyRowFolds is every way a published row reaches SeverityVocabularyBlock.
+//
+// THE BUG THIS PINS. The census that makes a level with nothing located visible
+// was checked on CorpusTally and on Summary, and Aggregate — the shape BOTH
+// judged reports render the block from, including the head-to-head against the
+// incumbent — was never folded. Deleting `a.SevPlantedLevels.Add(f)` from
+// Aggregate.AddSeverity, the one line that supplies those denominators on that
+// path, left the entire default suite green. Under that deletion the most
+// selective strategy's judged page collapses back to one line reading
+// "planted critical (4 located, PLANTED TOTAL NOT DECLARED): critical x4" —
+// a proper substring of a calibrated reviewer's page, which is precisely the
+// absence-is-invisible failure the census exists to close, restored on the only
+// path a reader actually reads.
+//
+// It is the same omission twice: the counter scan walked two of these three
+// shapes for two rounds for the same reason, that Summary and Aggregate agree on
+// today's corpus so dropping either changes no output. Coverage is asserted
+// against reportRowShapes by type identity for that reason.
+//
+// Each fold returns the shape's OWN planted denominator rather than the corpus
+// census, because the two legitimately differ: TallyScores and Summarize count a
+// failed run's plants (the review never happened, but the defects were still
+// planted), while the judged path calls AddSeverity only for a sample that was
+// also judged, so numerator and denominator drop together there. The invariant
+// that holds for all three is that a row's per-level census sums to the
+// denominator that row publishes beside it.
+func vocabularyRowFolds() []vocabularyRowFold {
+	return []vocabularyRowFold{
+		{
+			name:  "CorpusTally",
+			shape: reflect.TypeOf(CorpusTally{}),
+			row: func(_ []Fixture, scores corpusScores) (VocabularyRow, int) {
+				t := scores.tally()
+				return VocabularyRow{
+					Name:    "reviewer",
+					Usage:   t.Severity.Usage(),
+					Planted: t.Severity.Planted,
+				}, t.Planted
+			},
+		},
+		{
+			name:  "Summary",
+			shape: reflect.TypeOf(Summary{}),
+			row: func(_ []Fixture, scores corpusScores) (VocabularyRow, int) {
+				s := Summarize("m", "corpus", scores)
+				return VocabularyRow{
+					Name:    "reviewer",
+					Usage:   s.SevUsage,
+					Planted: s.SevPlantedLevels,
+				}, s.Total
+			},
+		},
+		{
+			name:  "Aggregate",
+			shape: reflect.TypeOf(Aggregate{}),
+			// Built exactly the way the judged paths build it: AddSeverity is
+			// called for a sample that produced findings and nowhere else, so a
+			// lost run contributes to neither half. Writing the fold any other
+			// way would test a path no report takes.
+			row: func(corpus []Fixture, scores corpusScores) (VocabularyRow, int) {
+				var a Aggregate
+				a.DeclareScale(OurSeverityScale)
+				for i, f := range corpus {
+					if s := scores[i]; s.Err == nil && s.Report != nil {
+						a.AddSeverity(f, ScoreSeverity(f, s.Report.Findings))
+					}
+				}
+				return VocabularyRow{
+					Name:    "reviewer",
+					Usage:   a.SevUsage,
+					Planted: a.SevPlantedLevels,
+				}, a.SevPlanted
+			},
+		},
+	}
+}
+
+// counterSpellingsOver applies the rule to a given set of shapes, so the rule can
+// be asked about counters nobody has written yet.
+func counterSpellingsOver(shapes []reflect.Type) []string {
+	// The published verdict vocabulary, from the constants rather than as
+	// literals: a fourth verdict gets guarded by being declared.
+	counts := namesAVerdict
+
+	seen := map[string]bool{}
+	var out []string
+	add := func(s string) {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
 		}
 	}
 
-	nested := reflect.TypeOf(CorpusTally{})
-	for i := range nested.NumField() {
-		f := nested.Field(i)
-		if f.Type != reflect.TypeOf(SeverityScore{}) {
-			continue
-		}
-		for j := range f.Type.NumField() {
-			inner := f.Type.Field(j)
-			if inner.Type.Kind() != reflect.Int {
+	for _, shape := range shapes {
+		for i := range shape.NumField() {
+			f := shape.Field(i)
+
+			if f.Type.Kind() == reflect.Int && counts(f.Name) {
+				add(f.Name)
 				continue
 			}
-			out = append(out, "."+f.Name+"."+inner.Name)
+
+			if f.Type != reflect.TypeOf(SeverityScore{}) {
+				continue
+			}
+			for j := range f.Type.NumField() {
+				inner := f.Type.Field(j)
+				if inner.Type.Kind() == reflect.Int && counts(inner.Name) {
+					add("." + f.Name + "." + inner.Name)
+				}
+			}
 		}
 	}
 
 	sort.Strings(out)
 	return out
+}
+
+// syntheticRow is a shape nobody renders, used to ask the derivation about
+// counters that do not exist in the tree.
+//
+// It carries one of each thing the rule has to tell apart: a counter at today's
+// resolution, a counter at the coarser one the withdrawn B-ACC came back as, a
+// nested triple, and three quantities that are NOT verdicts — the corpus census,
+// its per-level split, and a detection count.
+type syntheticRow struct {
+	SevAccurate       int
+	SevBandedAccurate int
+	SevPlanted        int
+	SevPlantedLevels  PlantedLevels
+	Matched           int
+	Severity          SeverityScore
+}
+
+// TestTheCounterScanCoversEveryShapeAReportRendersFrom is the falsifiability
+// half of severityCounterSpellings, and it is in two parts because the bug had
+// two halves that no single assertion can see at once.
+//
+// THE SHAPE LIST IS CHECKED BY TYPE IDENTITY, not behaviourally, and that is
+// forced rather than lazy. The scan walked Summary and CorpusTally and not
+// Aggregate for two rounds; Summary and Aggregate spell the counters
+// identically, so removing Aggregate from the walk changes NOT ONE derived
+// spelling. Coverage and non-coverage are indistinguishable in the output, and
+// the only statement that separates them is "this type is in the list".
+//
+// THE RULE IS CHECKED OVER A SHAPE THAT DOES NOT EXIST, because the question
+// that matters is what happens to the next counter rather than to today's three.
+func TestTheCounterScanCoversEveryShapeAReportRendersFrom(t *testing.T) {
+	got := severityCounterSpellings()
+	if len(got) == 0 {
+		t.Fatal("the scan derives no counter spellings at all, so TestNoReportFormatsSeverityCounters" +
+			"Directly is scanning report sources for nothing and passes on any tree")
+	}
+
+	walked := map[reflect.Type]bool{}
+	for _, s := range reportRowShapes() {
+		walked[s] = true
+	}
+	for _, want := range []struct {
+		name string
+		typ  reflect.Type
+	}{
+		{"Summary", reflect.TypeOf(Summary{})},
+		{"Aggregate", reflect.TypeOf(Aggregate{})},
+		{"CorpusTally", reflect.TypeOf(CorpusTally{})},
+	} {
+		if !walked[want.typ] {
+			t.Errorf("%s is not among the shapes the counter scan walks, so a severity counter "+
+				"named on it is unguarded. Its spellings coincide with another shape's today, which "+
+				"is exactly why this is asserted about the LIST and not about the output: dropping it "+
+				"is invisible in the derived spellings and was invisible for two rounds", want.name)
+		}
+	}
+
+	// The rule, over a shape nobody renders. Exact set, not "contains": guarding
+	// a denominator makes the scan cry wolf, and a scan that cries wolf gets
+	// exemptions until it guards nothing.
+	rule := counterSpellingsOver([]reflect.Type{reflect.TypeOf(syntheticRow{})})
+	want := []string{
+		".Severity.Accurate", ".Severity.Inflated", ".Severity.Understated",
+		"SevAccurate", "SevBandedAccurate",
+	}
+	if !slices.Equal(rule, want) {
+		t.Errorf("over a synthetic row the derivation returns %v, want %v.\n"+
+			"SevBandedAccurate is the field the withdrawn cross-tool triple came back as and has to "+
+			"be guarded by the verdict it names. SevPlanted, SevPlantedLevels and Matched are "+
+			"denominators and detection counts — quantities a report is supposed to print — and "+
+			"guarding them is how the previous two versions of this rule broke", rule, want)
+	}
 }
 
 // TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered is the third measurement
@@ -3941,10 +5136,23 @@ func severityCounterSpellings() []string {
 //   - the severity result MOVES. A published figure that changes when we change
 //     our own constant, with no change whatever in the reviewer's output, is not
 //     a measurement of the reviewer.
-//   - the corpus cannot say which guess is right. Every plant a "major" is
-//     credited on is planted ABOVE warning, so no observation here distinguishes
-//     "major means warning" from "major means error" — one is understated on
-//     every observation and the other is accurate or understated on every one.
+//   - the corpus cannot settle the guess, because the word STRADDLES. 'major' is
+//     credited on 8 plants, landing 1 critical, 3 error and 4 warning, so no
+//     single level of ours is right for every plant it lands on and neither
+//     candidate mapping is a description of the word.
+//
+// THE SECOND BULLET USED TO SAY SOMETHING STRONGER AND FALSE: that every plant a
+// 'major' is credited on is planted ABOVE warning, so no observation here
+// distinguishes the two mappings. Measured, half of them land AT warning, and
+// the corpus distinguishes the mappings sharply — the full-resolution triple
+// moves 6/4/4 to 5/8/1 when the constant is swapped, which is this test's own
+// first bullet. The body below had already asserted the opposite
+// ("warning is the PLURALITY landing"), so the comment and the code it
+// introduces disagreed about the evidence. What survives is the conclusion, on
+// better grounds: the reason to publish no cross-tool score is that the word
+// spans three of our levels, not that the corpus is silent about it.
+// TestTheSeverityFiguresTheseCommentsQuoteStillReproduce reads the split back
+// out of the cache, which is what the previous version of this sentence lacked.
 //
 // The remedy is NOT to re-tune the constant, which would move the number our way
 // on no evidence for the fourth time. It is to publish no cross-tool severity
@@ -4053,4 +5261,745 @@ func TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered(t *testing.T) {
 		shipped.Accurate, shipped.Inflated, shipped.Understated,
 		swapped.Accurate, swapped.Inflated, swapped.Understated,
 		IncumbentModel, len(majorPlants), spread)
+}
+
+// TestTheDescriptionDoesNotMoveWhenOurConstantDoes is guard 4 on the artifact
+// that replaced a withdrawn score, and it is the one that already failed once in
+// a different form.
+//
+// The block was published INSTEAD of a figure that was withdrawn for being a
+// function of crSeverity's free "major" constant. Its first version printed the
+// level that constant translated each foreign word TO, so the replacement was a
+// function of the same constant, presented as an observation. The words are now
+// quoted from the retained review; this asserts the consequence — that changing
+// the constant, with the cached bytes untouched, changes only the part of the
+// page LABELLED AS OURS.
+//
+// The normalization is exactly that labelling: every "read as <level>" is
+// replaced, which covers both the "[we read as X]" marker on each word and the
+// derived preamble naming what this block translated. Nothing else in the page
+// may move.
+//
+// IT CAN FAIL, and the mechanism is worth stating because it is not obvious.
+// reportingFinding credits the MOST SEVERE matching finding and ranks on our
+// TRANSLATED level, so a different constant can promote a different finding to
+// the credit and change which WORD is printed. On the shipped cache it does not.
+// If it ever does, the description has become a function of the constant it was
+// published in place of, which is the failure that already happened here.
+func TestTheDescriptionDoesNotMoveWhenOurConstantDoes(t *testing.T) {
+	// Every "read as <one of our five levels>", wherever it appears, is our
+	// reading and is allowed to move. Anchored on our own level names rather than
+	// on `\w+` so that a reviewer's word is never swallowed by the pattern.
+	ourReading := regexp.MustCompile(`read as (critical|error|warning|info|nit)`)
+
+	block := func(recordMajorAt config.Severity) string {
+		usage := SeverityUsage{}
+		planted := PlantedLevels{}
+		majors := 0
+
+		for _, f := range AllFixtures() {
+			c, ok := readCRCache(crCacheDir, f)
+			if !ok || c.Raw == "" {
+				continue
+			}
+			findings, err := parseIncumbent([]byte(c.Raw))
+			if err != nil {
+				t.Fatalf("%s: the shipped review no longer parses: %v", f.Name, err)
+			}
+
+			// The ONLY change: the level OUR parser records the reviewer's word
+			// at. The bytes, the findings, the anchors and the printed words are
+			// identical, which is what makes any difference in the page ours.
+			for i := range findings {
+				if strings.EqualFold(findings[i].RawSeverity, "major") {
+					findings[i].Severity = string(recordMajorAt)
+					majors++
+				}
+			}
+
+			s := ScoreSeverity(f, findings)
+			usage.Merge(s.Usage())
+			planted.Merge(s.Planted)
+		}
+
+		if majors == 0 {
+			t.Skip("no cached review uses the word this constant translates; there is nothing to move")
+		}
+		return SeverityVocabularyBlock([]VocabularyRow{{
+			Name: IncumbentModel, Usage: usage, Planted: planted,
+		}})
+	}
+
+	shipped := block(config.SeverityWarning)
+	swapped := block(config.SeverityError)
+
+	if shipped == swapped {
+		t.Fatalf("moving the constant did not change the page AT ALL, including the part marked as "+
+			"our reading. The marker is what makes our translation visible, so a page that ignores "+
+			"the constant entirely has stopped publishing it:\n%s", shipped)
+	}
+
+	got := ourReading.ReplaceAllString(shipped, "read as OUR-READING")
+	want := ourReading.ReplaceAllString(swapped, "read as OUR-READING")
+
+	if got != want {
+		t.Errorf("re-recording the incumbent's word at a different level of OURS changed the "+
+			"description beyond the readings marked as ours:\n--- major recorded at warning\n%s\n"+
+			"--- major recorded at error\n%s\n"+
+			"The block was published INSTEAD of a figure withdrawn for being a function of this "+
+			"constant. reportingFinding credits the most severe matching finding and ranks on our "+
+			"TRANSLATED level, so a different constant can credit a different finding and change "+
+			"which of the reviewer's words is printed — that is the mechanism to look at first",
+			got, want)
+	}
+}
+
+// TestTheSeverityFiguresTheseCommentsQuoteStillReproduce is the same rule as the
+// test above, applied to the numbers the SEVERITY retraction rests on.
+//
+// Those figures were the ones that went stale, and they went stale in the
+// direction that flattered this project. "This corpus bands 12 blocking, 1
+// medium, 1 low" and "every plant Incumbent locates is blocking" described a
+// fourteen-plant corpus; the corpus is now twenty-nine plants over thirty
+// fixtures, and on it the two stampers no longer tie a calibrated reviewer at
+// all, so half the maximisation argument had to be withdrawn rather than
+// restated. Nothing in the tree noticed, because the anchor-width test above was
+// the only thing reading figures back out of the corpus and it read only
+// anchors.
+//
+// THE BANDED VERDICT IS RECONSTRUCTED HERE, inside this function, and nowhere
+// else. It is the instrument that was deleted, so no report may compute it — but
+// a retraction whose own evidence cannot be recomputed is the defect this
+// package has now corrected three times, and quoting a banded figure that
+// nothing can check is exactly that. A closure is the narrowest scope Go
+// offers: it exists for the length of this test and no caller outside it can
+// reach it.
+func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
+	corpus := AllFixtures()
+
+	// blocking / medium / low, the reduction the withdrawn column used.
+	band := func(s config.Severity) int {
+		n, _ := s.Normalize()
+		switch {
+		case n.Rank() >= config.SeverityError.Rank():
+			return 2
+		case n.Rank() >= config.SeverityWarning.Rank():
+			return 1
+		default:
+			return 0
+		}
+	}
+
+	type triple struct{ a, i, u int }
+	render := func(x triple) string { return fmt.Sprintf("%d/%d/%d", x.a, x.i, x.u) }
+	acc := func(x triple) float64 {
+		if n := x.a + x.i + x.u; n > 0 {
+			return float64(x.a) / float64(n)
+		}
+		return 0
+	}
+
+	bandedOver := func(f Fixture, findings []review.Finding) triple {
+		var out triple
+		for _, c := range ScoreSeverity(f, findings).Calls {
+			switch got, want := band(c.Finding.Sev()), band(c.Defect.WantSeverity); {
+			case got > want:
+				out.i++
+			case got < want:
+				out.u++
+			default:
+				out.a++
+			}
+		}
+		return out
+	}
+	fullOver := func(f Fixture, findings []review.Finding) triple {
+		s := ScoreSeverity(f, findings)
+		return triple{s.Accurate, s.Inflated, s.Understated}
+	}
+
+	sum := func(over []Fixture, per func(Fixture) triple) triple {
+		var out triple
+		for _, f := range over {
+			x := per(f)
+			out.a, out.i, out.u = out.a+x.a, out.i+x.i, out.u+x.u
+		}
+		return out
+	}
+
+	// --- the corpus census ------------------------------------------------
+	plants, bands := 0, map[int]int{}
+	for _, f := range corpus {
+		for _, d := range f.Defects {
+			plants++
+			bands[band(d.WantSeverity)]++
+		}
+	}
+
+	// --- the incumbent, from the shipped cache ----------------------------
+	//
+	// Read through readCRCache and re-parsed rather than through
+	// CachedIncumbent, because three of these readings need the RAW bytes
+	// altered — the free constant moved, and the parser bug reintroduced — and
+	// all four have to come from the same entries or they are not comparable.
+	var (
+		crLocated                                  = map[config.Severity]int{}
+		crBands                                    = map[int]int{}
+		crFull, crSwapped, crDemoted               triple
+		crBanded, crBandedSwapped, crBandedDemoted triple
+		cached                                     int
+	)
+	for _, f := range corpus {
+		c, ok := readCRCache(crCacheDir, f)
+		if !ok || c.Raw == "" {
+			continue
+		}
+		cached++
+
+		shipped, err := parseIncumbent([]byte(c.Raw))
+		if err != nil {
+			t.Fatalf("%s: the shipped review no longer parses: %v", f.Name, err)
+		}
+
+		// The free constant moved: our recorded level for the reviewer's own
+		// word, with its bytes untouched.
+		swapped := append([]review.Finding(nil), shipped...)
+		for i := range swapped {
+			if strings.EqualFold(swapped[i].RawSeverity, "major") {
+				swapped[i].Severity = string(config.SeverityError)
+			}
+		}
+
+		// The parser bug behind the FIRST retraction: crSeverity demoted every
+		// "critical" the CLI printed to our error.
+		demoted := append([]review.Finding(nil), shipped...)
+		for i := range demoted {
+			if strings.EqualFold(demoted[i].RawSeverity, "critical") {
+				demoted[i].Severity = string(config.SeverityError)
+			}
+		}
+
+		for _, call := range ScoreSeverity(f, shipped).Calls {
+			crLocated[call.Defect.WantSeverity]++
+			crBands[band(call.Defect.WantSeverity)]++
+		}
+
+		one := []Fixture{f}
+		add := func(dst *triple, x triple) { dst.a, dst.i, dst.u = dst.a+x.a, dst.i+x.i, dst.u+x.u }
+		add(&crFull, sum(one, func(f Fixture) triple { return fullOver(f, shipped) }))
+		add(&crSwapped, sum(one, func(f Fixture) triple { return fullOver(f, swapped) }))
+		add(&crDemoted, sum(one, func(f Fixture) triple { return fullOver(f, demoted) }))
+		add(&crBanded, sum(one, func(f Fixture) triple { return bandedOver(f, shipped) }))
+		add(&crBandedSwapped, sum(one, func(f Fixture) triple { return bandedOver(f, swapped) }))
+		add(&crBandedDemoted, sum(one, func(f Fixture) triple { return bandedOver(f, demoted) }))
+	}
+	if cached == 0 {
+		t.Fatalf("no cached review under %s, so every incumbent figure below is measured over "+
+			"nothing and this test would pass on an empty cache", crCacheDir)
+	}
+
+	crGraded := crLocated[config.SeverityCritical] + crLocated[config.SeverityError] +
+		crLocated[config.SeverityWarning] + crLocated[config.SeverityInfo] + crLocated[config.SeverityNit]
+
+	// --- the INTERVAL instrument, rejected on measurement -------------------
+	//
+	// Reconstructed here for the same reason the banded verdict is: the comment
+	// on SeverityUsage rejects it with a number, and a rejection argued from a
+	// figure nothing recomputes is the defect this package keeps correcting.
+	// Each raw word is credited against the HULL of the planted levels it is
+	// observed on — fitted over the very observations it is then scored against,
+	// which is why a perfect score is the definition of the fit rather than a
+	// result.
+	interval := func(mutate func([]review.Finding)) (accurate, not int) {
+		type obs struct {
+			word    string
+			planted config.Severity
+		}
+		var seen []obs
+
+		for _, f := range corpus {
+			c, ok := readCRCache(crCacheDir, f)
+			if !ok || c.Raw == "" {
+				continue
+			}
+			findings, err := parseIncumbent([]byte(c.Raw))
+			if err != nil {
+				t.Fatalf("%s: %v", f.Name, err)
+			}
+			mutate(findings)
+			for _, call := range ScoreSeverity(f, findings).Calls {
+				seen = append(seen, obs{strings.ToLower(call.Finding.RawSeverity), call.Defect.WantSeverity})
+			}
+		}
+
+		lo, hi := map[string]int{}, map[string]int{}
+		for _, x := range seen {
+			r := x.planted.Rank()
+			if _, ok := lo[x.word]; !ok {
+				lo[x.word], hi[x.word] = r, r
+			}
+			lo[x.word], hi[x.word] = min(lo[x.word], r), max(hi[x.word], r)
+		}
+		for _, x := range seen {
+			if r := x.planted.Rank(); r >= lo[x.word] && r <= hi[x.word] {
+				accurate++
+			} else {
+				not++
+			}
+		}
+		return accurate, not
+	}
+
+	fitAcc, fitNot := interval(func([]review.Finding) {})
+	demotedAcc, demotedNot := interval(func(fs []review.Finding) {
+		for i := range fs {
+			if strings.EqualFold(fs[i].RawSeverity, "critical") {
+				fs[i].Severity = string(config.SeverityError)
+			}
+		}
+	})
+	if fitNot != 0 {
+		t.Errorf("the interval fit scores %d observation(s) inaccurate; it is fitted to the "+
+			"observations it is scored against, so anything but a perfect record means the "+
+			"reconstruction has stopped matching the instrument the comment rejects", fitNot)
+	}
+	if fitAcc != demotedAcc || fitNot != demotedNot {
+		t.Errorf("the interval instrument moves under the parser bug (%d/%d against %d/%d); "+
+			"SeverityUsage rejects it for being blind to exactly that, and that rejection no "+
+			"longer reproduces", fitAcc, fitNot, demotedAcc, demotedNot)
+	}
+
+	// --- the strategies -----------------------------------------------------
+	strategy := func(name string) func(Fixture) []review.Finding {
+		for _, d := range degenerateReviewers() {
+			if d.name == name {
+				return d.review
+			}
+		}
+		t.Fatalf("the degenerate table no longer contains %q, so the figure quoted for it cannot "+
+			"be reproduced and the sentence quoting it is unchecked", name)
+		return nil
+	}
+
+	selective := strategy("always critical, and only about defects we already rate error or critical")
+
+	const critOnlyName = "report only the plants we rate critical, and call them critical"
+	critOnly := strategy(critOnlyName)
+
+	calibratedBanded := sum(corpus, func(f Fixture) triple { return bandedOver(f, calibratedReview(f)) })
+	selectiveBanded := sum(corpus, func(f Fixture) triple { return bandedOver(f, selective(f)) })
+	stampCritical := sum(corpus, func(f Fixture) triple {
+		return bandedOver(f, oneCommentPerPlant(config.SeverityCritical)(f))
+	})
+	stampError := sum(corpus, func(f Fixture) triple {
+		return bandedOver(f, oneCommentPerPlant(config.SeverityError)(f))
+	})
+	if stampCritical != stampError {
+		t.Errorf("'always critical' and 'always error' no longer band alike (%s against %s); the "+
+			"comments quote ONE figure for both", render(stampCritical), render(stampError))
+	}
+
+	critOnlyGraded := 0
+	for _, f := range corpus {
+		critOnlyGraded += len(ScoreSeverity(f, critOnly(f)).Calls)
+	}
+
+	// The two claims the vocabulary block's own "what this cannot say" paragraph
+	// rests on: what the incumbent's one straddling word lands on, and how many
+	// cached reviews could support a within-review reading at all. Both are
+	// stated in judge.go as facts about this cache, so both are measured here.
+	majorPlants, majorBlocking := 0, 0
+	locating, multiLevel := 0, 0
+
+	// The per-level split of what 'major' lands on. It is measured here because
+	// the sentence that used to describe it — "every plant a 'major' is credited
+	// on is planted ABOVE warning" — was false and unchecked, in the same file
+	// as this test and 75 lines above a body asserting the opposite.
+	majorSpread := map[config.Severity]int{}
+
+	for _, f := range corpus {
+		findings, ok := CachedIncumbent(crCacheDir, f)
+		if !ok {
+			continue
+		}
+		calls := ScoreSeverity(f, findings).Calls
+		if len(calls) == 0 {
+			continue
+		}
+		locating++
+
+		levels := map[config.Severity]bool{}
+		for _, c := range calls {
+			levels[c.Defect.WantSeverity] = true
+			if !strings.EqualFold(c.Finding.RawSeverity, "major") {
+				continue
+			}
+			majorPlants++
+			majorSpread[c.Defect.WantSeverity]++
+			if band(c.Defect.WantSeverity) == 2 {
+				majorBlocking++
+			}
+		}
+		if len(levels) >= 2 {
+			multiLevel++
+		}
+	}
+
+	if len(majorSpread) < 2 {
+		t.Fatalf("'major' lands on %d planted level(s) %v, so it no longer straddles and the "+
+			"sentences below describe a corpus that moved", len(majorSpread), majorSpread)
+	}
+
+	// --- the tuning half ----------------------------------------------------
+	tuning := sum(Fixtures(), func(f Fixture) triple {
+		findings, ok := CachedIncumbent(crCacheDir, f)
+		if !ok {
+			return triple{}
+		}
+		return fullOver(f, findings)
+	})
+
+	selectiveGraded := selectiveBanded.a + selectiveBanded.i + selectiveBanded.u
+	stampGraded := stampCritical.a + stampCritical.i + stampCritical.u
+
+	// --- the sentences ------------------------------------------------------
+	//
+	// Checked against the prose a reader reads rather than the bytes gofmt
+	// produced: a claim that fails only because a line was rewrapped is a false
+	// alarm, and a guard that cries wolf gets exemptions until it guards nothing.
+	quoted := map[string][]string{
+		"score.go": {
+			fmt.Sprintf("plants %d defects over %d fixtures and bands them %d blocking, %d medium, %d low",
+				plants, len(corpus), bands[2], bands[1], bands[0]),
+			fmt.Sprintf("bands a perfect %s", render(selectiveBanded)),
+			fmt.Sprintf("over %d of the %d plants", selectiveGraded, plants),
+			fmt.Sprintf("the two stampers band %s of %d (B-ACC %.3f)", render(stampCritical), stampGraded, acc(stampCritical)),
+			fmt.Sprintf("calibrated reviewer's %s", render(calibratedBanded)),
+			fmt.Sprintf("it locates %d critical, %d error and %d warning",
+				crLocated[config.SeverityCritical], crLocated[config.SeverityError], crLocated[config.SeverityWarning]),
+			fmt.Sprintf("so %d of the %d are blocking", crBands[2], crGraded),
+			fmt.Sprintf("bands %s over them", render(crBanded)),
+			fmt.Sprintf("buggy parser %s, fixed parser %s", render(crBandedDemoted), render(crBanded)),
+			fmt.Sprintf("moves the incumbent's triple from %s to %s", render(crFull), render(crDemoted)),
+			fmt.Sprintf("B-ACC %.3f either way (%s to %s)", acc(crBanded), render(crBanded), render(crBandedSwapped)),
+			fmt.Sprintf("FULL-RESOLUTION triple from %s to %s", render(crFull), render(crSwapped)),
+			fmt.Sprintf("%d/%d against %d/%d", critOnlyGraded, plants, plants, plants),
+		},
+		"score.go?interval": {
+			fmt.Sprintf("the incumbent scores %d accurate / %d not, and %d/%d BOTH with the",
+				fitAcc, fitNot, demotedAcc, demotedNot),
+		},
+		"incumbent.go": {
+			fmt.Sprintf("triple from %s to %s", render(crFull), render(crSwapped)),
+		},
+		"judge.go": {
+			fmt.Sprintf("is credited on %d plants, %d of them blocking", majorPlants, majorBlocking),
+			fmt.Sprintf("Of the %d cached reviews that locate anything, exactly one locates defects at two or more distinct planted levels",
+				locating),
+		},
+		"severity_test.go": {
+			fmt.Sprintf("%d of the %d plants sit in the blocking band", bands[2], plants),
+			fmt.Sprintf("they band %s of %d", render(stampCritical), plants),
+			fmt.Sprintf("banded a perfect %s over those %d", render(selectiveBanded), selectiveGraded),
+
+			// The straddle, per level. This claim exists because the sentence it
+			// replaces — that every plant a 'major' lands on is above warning —
+			// was false, sat in this file, and was not among the figures
+			// anything read back out of the corpus.
+			fmt.Sprintf("credited on %d plants, landing %d critical, %d error and %d warning",
+				majorPlants, majorSpread[config.SeverityCritical],
+				majorSpread[config.SeverityError], majorSpread[config.SeverityWarning]),
+			fmt.Sprintf("the full-resolution triple moves %s to %s when the constant is swapped",
+				render(crFull), render(crSwapped)),
+		},
+	}
+	for file, claims := range quoted {
+		// One file carries two independent groups of claims, so the key names
+		// the group and the path is taken from in front of the "?".
+		prose := commentProse(t, strings.SplitN(file, "?", 2)[0])
+		for _, claim := range claims {
+			if !strings.Contains(prose, claim) {
+				t.Errorf("%s no longer says %q. That figure reproduces from this corpus today, and a "+
+					"sentence quoting any other number is evidence nobody can check — which is the "+
+					"defect this package has now retracted three times", file, claim)
+			}
+		}
+	}
+
+	// A "SEE X" BESIDE A PINNED FIGURE HAS TO NAME THE GUARD THAT PINS IT.
+	//
+	// Two paragraphs of NoCrossToolSeverityScore cited
+	// TestTheFiguresTheseCommentsQuoteStillReproduce — a real test, one word
+	// different from this one, which reads anchor-width and grid figures and
+	// whose claim list contains no severity figure at all. Changing "bands
+	// 10/0/4 over them" to "bands 11/0/4" left the cited guard green and turned
+	// this one red. A citation pointing at a guard that does not check the
+	// sentence is worse than no citation: it tells the next reader the number is
+	// covered, which is how the banded column stayed on the page for as long as
+	// it did.
+	//
+	// The unit is the COMMENT GROUP — one contiguous run of comment lines — and
+	// the rule admits no "but it also cites the right one somewhere" exemption.
+	// Both attempts at something narrower failed on a real case: naming the
+	// wrong guard is excused per-group by a correct citation elsewhere in the
+	// same paragraph, which is exactly the state score.go was in, and a
+	// sentence-proximity window missed the second occurrence entirely because
+	// three sentences separated the figure from the citation that claimed it.
+	//
+	// Guard names are derived from the package, so renaming either keeps this
+	// honest. If a paragraph ever needs to discuss the other guard for a good
+	// reason, the answer is to split the paragraph — a "see X" is a promise
+	// about the sentences around it.
+	const self = "TestTheSeverityFiguresTheseCommentsQuoteStillReproduce"
+	guards := figurePinningGuards(t)
+	if !slices.Contains(guards, self) {
+		t.Fatalf("this test is not among the derived figure-pinning guards %v, so the rule below "+
+			"is checking citations against a set that does not contain the right answer", guards)
+	}
+
+	for file, claims := range quoted {
+		path := strings.SplitN(file, "?", 2)[0]
+		for _, group := range commentGroups(t, path) {
+			var quotes []string
+			for _, claim := range claims {
+				if strings.Contains(group, claim) {
+					quotes = append(quotes, claim)
+				}
+			}
+			if len(quotes) == 0 {
+				continue
+			}
+
+			for _, g := range guards {
+				if g == self || !strings.Contains(group, g) {
+					continue
+				}
+				t.Errorf("%s: a paragraph quoting %v cites %s, which does not read those figures. "+
+					"The guard that does is %s. A 'see X' pointing at a test that passes when the "+
+					"sentence is wrong is worse than no citation — it tells the next reader the "+
+					"number is covered, which is how the banded column kept its place on the page",
+					path, quotes, g, self)
+			}
+		}
+	}
+
+	// The two published constants carry the same numbers and are checked as
+	// VALUES, because they are what a reader of a report actually meets.
+	for _, want := range []string{
+		fmt.Sprintf("%d plants over %d fixtures, banded %d blocking, %d medium, %d low",
+			plants, len(corpus), bands[2], bands[1], bands[0]),
+		fmt.Sprintf("banded a perfect %s over %d of the %d plants", render(selectiveBanded), selectiveGraded, plants),
+		fmt.Sprintf("calibrated reviewer's %s", render(calibratedBanded)),
+		fmt.Sprintf("both banded %s on the incumbent", render(crBanded)),
+		fmt.Sprintf("full resolution moved %s to %s", render(crFull), render(crDemoted)),
+	} {
+		if !strings.Contains(NoCrossToolSeverityScore, want) {
+			t.Errorf("NoCrossToolSeverityScore no longer says %q; it is the sentence printed under "+
+				"every severity table, so a stale figure there is one a reader is handed", want)
+		}
+	}
+	if want := fmt.Sprintf("covering %d plants of %d", critOnlyGraded, plants); !strings.Contains(SeverityColumnLegend, want) {
+		t.Errorf("SeverityColumnLegend no longer says %q", want)
+	}
+
+	// The degenerate table's own prose is a VALUE, not a comment, and it is
+	// printed in this test's failure messages — so it is checked against the
+	// table rather than against the file.
+	for _, d := range degenerateReviewers() {
+		if d.name != critOnlyName {
+			continue
+		}
+		want := fmt.Sprintf("over four of the corpus's %s plants", strings.ToLower(numberWord(plants)))
+		if !strings.Contains(d.why, want) {
+			t.Errorf("the %q row no longer says %q; that sentence is printed verbatim whenever this "+
+				"strategy defeats a metric, so a stale number in it is one a failure message hands "+
+				"to whoever is debugging", critOnlyName, want)
+		}
+	}
+
+	if multiLevel != 1 {
+		t.Errorf("%d cached review(s) locate defects at two or more distinct planted levels, not 1. "+
+			"Both the block's own limits paragraph and the argument against an ordinal instrument "+
+			"say 'exactly one'; a corpus that moved makes a within-review reading newly possible and "+
+			"that decision has to be revisited deliberately", multiLevel)
+	}
+
+	t.Logf("corpus %d plants over %d fixtures (%d blocking, %d medium, %d low); incumbent located %d "+
+		"(%d blocking) scoring %s full / %s banded; major->error %s full / %s banded; demoted parser "+
+		"%s full / %s banded; stampers %s banded, selective %s banded over %d, calibrated %s banded; "+
+		"tuning half %s full",
+		plants, len(corpus), bands[2], bands[1], bands[0], crGraded, crBands[2],
+		render(crFull), render(crBanded), render(crSwapped), render(crBandedSwapped),
+		render(crDemoted), render(crBandedDemoted),
+		render(stampCritical), render(selectiveBanded), selectiveGraded, render(calibratedBanded),
+		render(tuning))
+
+	// docs/findings.md quotes the incumbent's two full-resolution readings with
+	// their accuracies, and the per-level split of the one word that straddles.
+	// It is checked here rather than left to a reader because the paragraph it
+	// sits in is a RETRACTION, and the previous retraction in that same spot was
+	// itself argued from figures that did not reproduce. The straddle line is
+	// checked for the narrower reason that its predecessor — that the corpus
+	// could not check the word's placement at all — was an overstatement of what
+	// nothing here measured.
+	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "findings.md"))
+	if err != nil {
+		t.Fatalf("reading docs/findings.md: %v", err)
+	}
+	for _, want := range []string{
+		fmt.Sprintf("%d accurate / %d inflated / %d\nunderstated on the tuning fixtures and %s over all of them — O-ACC %.2f and\n%.2f",
+			tuning.a, tuning.i, tuning.u, render(crFull), acc(tuning), acc(crFull)),
+		fmt.Sprintf("credited\non %d plants here, landing %d `critical`, %d `error` and %d `warning`",
+			majorPlants, majorSpread[config.SeverityCritical],
+			majorSpread[config.SeverityError], majorSpread[config.SeverityWarning]),
+	} {
+		if !strings.Contains(string(doc), want) {
+			t.Errorf("docs/findings.md no longer says %q. The retraction there is argued from these "+
+				"two readings, and a retraction argued from an unreproducible measurement is the "+
+				"same defect one level up", want)
+		}
+	}
+
+	// docs/measurement.md's Rule 6 IS the retraction, and it ended a paragraph
+	// claiming "every figure in this rule is read back out of the corpus by
+	// TestTheSeverityFiguresTheseCommentsQuoteStillReproduce".
+	//
+	// THAT SENTENCE WAS FALSE. This test read four source files and
+	// docs/findings.md and never opened docs/measurement.md. Changing "stampers
+	// band 12/17/0 of 29" to 13/17/0, "it bands 10/0/4 over them" to 11/0/4 and
+	// "buggy 10/0/4, fixed 10/0/4" to 9/0/4 left the whole default suite green.
+	// It is the same defect the citation rule above was written for — a "see X"
+	// naming a guard that does not check the sentence — one level out, in the
+	// document a reader is actually handed, and stated there as a positive
+	// guarantee rather than a pointer.
+	calibratedFull := sum(corpus, func(f Fixture) triple { return fullOver(f, calibratedReview(f)) })
+	for _, want := range []string{
+		fmt.Sprintf("plants %d defects over %d fixtures and bands them %d blocking, %d medium, %d low",
+			plants, len(corpus), bands[2], bands[1], bands[0]),
+		fmt.Sprintf("banded %s — a perfect record, an exact tie with a calibrated reviewer's %s, over %d of the %d plants",
+			render(selectiveBanded), render(calibratedBanded), selectiveGraded, plants),
+		fmt.Sprintf("the stampers band %s of %d (B-ACC %.3f)", render(stampCritical), plants, acc(stampCritical)),
+		fmt.Sprintf("it locates %d critical, %d error and %d warning, so %d of its %d are blocking, and it bands %s over them",
+			crLocated[config.SeverityCritical], crLocated[config.SeverityError],
+			crLocated[config.SeverityWarning], crBands[2], crGraded, render(crBanded)),
+		fmt.Sprintf("buggy %s, fixed %s", render(crBandedDemoted), render(crBanded)),
+		fmt.Sprintf("moves the incumbent's triple from %s to %s", render(crFull), render(crDemoted)),
+		fmt.Sprintf("banded figure at B-ACC %.3f either way (%s to %s) and moves the full-resolution triple from %s to %s",
+			acc(crBanded), render(crBanded), render(crBandedSwapped), render(crFull), render(crSwapped)),
+		fmt.Sprintf("O-ACC over the shipped cache is %.3f, against %.3f for a calibrated reviewer",
+			acc(crFull), acc(calibratedFull)),
+	} {
+		if !strings.Contains(docProse(t, filepath.Join("..", "..", "docs", "measurement.md")), want) {
+			t.Errorf("docs/measurement.md no longer says %q. Rule 6 there ends by claiming every "+
+				"figure in it is read back out of the corpus by this test, so a figure it states "+
+				"that nothing recomputes makes that sentence the thing it warns about", want)
+		}
+	}
+}
+
+// commentProse is a source file's COMMENTS as continuous prose: the leading
+// slashes stripped and every run of whitespace collapsed to one space.
+//
+// The claims above are sentences, and gofmt decides where they break. Comparing
+// raw bytes makes a re-wrap look identical to a corrected figure, and the guard
+// that cries wolf is the guard that gets exemptions. Code lines are dropped
+// rather than merged in, so a phrase cannot be satisfied by an identifier that
+// happens to sit next to a comment.
+func commentProse(t *testing.T, name string) string {
+	t.Helper()
+	return strings.Join(commentGroups(t, name), " \x00 ")
+}
+
+// docProse is a markdown file as continuous prose: emphasis and code markers
+// removed and every run of whitespace collapsed to one space.
+//
+// The same reasoning as commentProse. A figure in these documents is a sentence,
+// and the author's line wrapping and their choice to write `critical` or
+// **12/0/0** are formatting — a guard that goes red when a paragraph is re-flowed
+// or a word is emphasised is a guard that earns exemptions until it guards
+// nothing.
+func docProse(t *testing.T, path string) string {
+	t.Helper()
+
+	src, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading %s: %v", path, err)
+	}
+	return strings.Join(strings.Fields(
+		strings.NewReplacer("`", "", "*", "", "_", "").Replace(string(src))), " ")
+}
+
+// commentGroups is a source file's comments as one collapsed string PER
+// CONTIGUOUS RUN of comment lines — a doc comment, a block above a case, a
+// trailing note.
+//
+// The group is the unit a claim and its "see X" share. Checking a citation
+// against the whole file would let a guard named anywhere in a 5000-line file
+// vouch for a figure quoted anywhere else in it, which is not a check.
+func commentGroups(t *testing.T, name string) []string {
+	t.Helper()
+
+	src, err := os.ReadFile(name)
+	if err != nil {
+		t.Fatalf("reading %s: %v", name, err)
+	}
+
+	var (
+		out     []string
+		current strings.Builder
+	)
+	flush := func() {
+		if g := strings.Join(strings.Fields(current.String()), " "); g != "" {
+			out = append(out, g)
+		}
+		current.Reset()
+	}
+
+	for _, line := range strings.Split(string(src), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if after, ok := strings.CutPrefix(trimmed, "//"); ok {
+			current.WriteString(after)
+			current.WriteString(" ")
+			continue
+		}
+		// A code line ends the run, so two comment groups either side of a
+		// declaration cannot be read as one sentence.
+		flush()
+	}
+	flush()
+
+	return out
+}
+
+// figurePinningGuards names every test in this package that reads quoted figures
+// back out of the corpus, derived from the package rather than listed.
+//
+// Derived because the defect it serves is a citation naming the WRONG one of
+// them, and a hand-written list of guards would go stale in exactly the way the
+// citations did.
+func figurePinningGuards(t *testing.T) []string {
+	t.Helper()
+
+	const mark = "TheseCommentsQuoteStillReproduce"
+
+	var out []string
+	for _, file := range packageAST(t) {
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || !strings.HasPrefix(fn.Name.Name, "Test") {
+				continue
+			}
+			if strings.Contains(fn.Name.Name, mark) {
+				out = append(out, fn.Name.Name)
+			}
+		}
+	}
+
+	if len(out) < 2 {
+		t.Fatalf("found %d figure-pinning guard(s) %v; the rule below is about a citation naming "+
+			"the wrong one of them, which needs at least two to be a real question", len(out), out)
+	}
+
+	sort.Strings(out)
+	return out
 }

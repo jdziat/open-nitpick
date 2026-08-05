@@ -73,34 +73,57 @@ retracted. The second attempt corrected for it at comparison time, coarsening
 both vocabularies into bands and publishing `B-ACC`. It is also retracted, for two
 measured reasons:
 
-- **The banded column was maximised by the worst production behaviour.** This
-  corpus bands 12 plants blocking, 1 medium, 1 low, and every plant Incumbent
-  locates is blocking. A reviewer that stamps one blocking word on every finding —
-  always `critical`, or always `error` — banded 12 accurate and 2 inflated of 14,
-  against the incumbent's 6 of 10. A reviewer that also picks *what to report* —
-  stay silent unless the defect is already blocking, then call it `critical` —
-  banded **12 of 12, a perfect record**.
+- **The banded column was maximised by a reviewer that also picks what to
+  report.** This corpus plants 29 defects over 30 fixtures and bands them 12
+  blocking, 6 medium, 11 low. A reviewer that stays silent unless the defect is
+  already blocking and then calls it `critical` banded **12/0/0 — a perfect
+  record**, an exact tie with a calibrated reviewer's 29/0/0, over 12 of the 29
+  plants.
 
-  The figure first published here, *"a perfect 10/10"* for always-`critical`, was
-  wrong and is corrected above. It scored those strategies over the ten plants the
-  *incumbent* located rather than over what they actually report, which credited
-  them with a denominator they had not earned. The conclusion survives; the number
-  did not, and a retraction argued from an unreproducible measurement repeats the
-  defect it is retracting. The live receipt is now the selective-reporting row in
-  `degenerateReviewers()`, scored on every run.
+  Two figures published here have been corrected, and the second correction
+  *weakens* half the argument. The first, *"a perfect 10/10"* for
+  always-`critical`, scored those strategies over the ten plants the *incumbent*
+  located rather than over what they actually report. The second — that the two
+  stampers banded 12 accurate and 2 inflated of 14 against the incumbent's 6 of
+  10 — was true of a fourteen-plant corpus that no longer exists. On the corpus
+  in the tree the stampers band 12/17/0 of 29 (`B-ACC` 0.414) and **no longer
+  tie**, so the stamper half of this argument is withdrawn and the selective
+  reviewer above is what it now rests on. Nor does the incumbent locate only
+  blocking plants: it locates 3 `critical`, 7 `error` and 4 `warning`, so 10 of
+  its 14 are blocking, and it bands 10/0/4 over them.
 - **It could not see the defect it was written for.** The parser bug behind the
-  first retraction moves it not at all: buggy 6/0/4, fixed 6/0/4.
+  first retraction moves it not at all: buggy 10/0/4, fixed 10/0/4. At our full
+  resolution the same bug moves the incumbent's triple from 6/4/4 to 8/0/6.
 
 It was also a free parameter. `crSeverity` records Incumbent's `major` at
-`warning`; recording it at `error`, with Incumbent's bytes unchanged, moves the
-banded figure from 0.600 to **1.000** over all fixtures (6/0/4 to 10/0/0) and from
-0.714 to 1.000 over the tuning set. Every `major` this corpus credits sits on a
-plant we rate blocking, so the corpus contains no evidence for either placement.
+`warning`; recording it at `error`, with Incumbent's bytes unchanged, leaves the
+banded figure at `B-ACC` 0.714 either way (10/0/4 to 10/4/0) and moves the
+full-resolution triple from 6/4/4 to **5/8/1**. Across the shipped cache `major`
+is credited on plants of `critical`, `error` *and* `warning` — it straddles three
+of our five levels, so no single value is right for every plant it lands on.
 
-(The figure first published here, *"0.62 to 0.88"*, reproduces from nothing in the
-tree and is corrected above. The real swing is larger and ends at a perfect
-record — the correction strengthens the argument, which is precisely why it had to
-be recomputed rather than reused.)
+(Two swings were published here before, *"0.62 to 0.88"* and then *"0.600 to
+1.000"*. Neither reproduces from the tree. The corrected swing is at full
+resolution only — which is where the published cells are, so the free parameter
+still moves a published number; the banded column turns out to be insensitive to
+this too.)
+
+Every figure in this rule is read back out of the corpus by
+`TestTheSeverityFiguresTheseCommentsQuoteStillReproduce`, including the banded
+ones, which it reconstructs inside itself because the instrument that produced
+them is deleted. A retraction whose own evidence cannot be recomputed is the
+defect one level up, and this rule has been that defect twice.
+
+**What the abstention costs, and one sentence nobody may write from it.** The
+withdrawal withholds a number: the incumbent's full-resolution O-ACC over the
+shipped cache is 0.429, against 1.000 for a calibrated reviewer, in a sorted
+ranking. That is the first move in this sequence that costs the comparison
+rather than paying for it, which is the reason to keep it — but it is *not*
+licence for "we withheld a number we would have won". **Our own models' O-* under
+the same instrument is not computable from this tree**: `internal/evals/testdata/`
+holds only `incumbent/`, so our side needs a live paid run. Anyone tempted by
+that sentence has to compute ours first; asserting it from the incumbent's figure
+alone is a claim of exactly the shape this rule keeps retracting.
 
 **Do not re-tune the boundaries.** That would be the fourth attempt, and each of
 the first three moved a number toward the author's side on no new evidence. What
@@ -115,15 +138,19 @@ Incumbent's row, in the same columns of the same sorted ranking as our models,
 with a note underneath telling the reader not to compare them — the mitigation
 this very rule records as insufficient. The surviving triple is *more* sensitive
 to the free `major` constant than the banded one it replaced: re-parsing the
-identical cached bytes with `major` at `error` moves it from 2/4/4 to 5/4/1.
-Those cells now print `n/a` for any row that does not publish our five levels.
+identical cached bytes with `major` at `error` moves it from 6/4/4 to 5/8/1.
+Those cells now print `n/a` for any row that has not **declared** our five
+levels — a three-state scale carried on the row, zero value undeclared. The gate
+used to be `model != IncumbentModel`, a reporter's identity standing in for a
+fact about its vocabulary, so a contender added without anyone thinking about it
+was published at our resolution by default.
 
 **Rule 6b — a description published in place of a score must be a quotation.**
 The vocabulary block was not one, and this is the third correction in the same
 place. It printed the level `crSeverity` had translated each foreign word *to*,
 under a caption saying it was what the contender called the defect. Incumbent
-prints `critical` and `major`; it printed neither `error` nor `warning` anywhere
-in the shipped cache, and the block read
+prints `critical`, `major` and `minor`; it printed neither `error` nor `warning`
+anywhere in the shipped cache, and the block read
 
     planted error (7 located): critical x4, warning x3
 
@@ -142,6 +169,52 @@ reported as `(word not recorded)` rather than filled in from our reading.
 `TestPublishedVocabularyIsQuotedFromTheRetainedReview` reads the words straight
 out of `crCache.Raw`, independently of the scoring path, and fails if the block
 publishes one the CLI never printed.
+
+**Rule 6b-ii — a description omitting what nobody said is a description of the
+loudest half.** The block printed only the levels a reviewer had located
+something at, on the reasoning that a miss is `RECALL`'s job. Measured, that made
+the worst strategy's page the cleanest: the reviewer that reports only the plants
+we rate `critical` and calls them `critical` rendered one line, a proper
+**substring** of a calibrated reviewer's block, on a row whose `O-COV` cell was
+blank. Every line now carries the count planted at that level whether or not
+anything was located there —
+
+    planted error   (7 of 8 located): critical x4, major x3 [we read as warning]
+    planted info    (0 of 5 located): nothing located
+
+— and `TestEveryPlantedLevelAppearsWithItsDenominator` fails if a level the
+corpus plants goes missing from any reviewer's page.
+
+The census is taken from the **fixture**, before scoring can return early, and
+that detail is the rule rather than an implementation note. It was taken inside
+the severity scorer, which a run with no report never reaches, so a corpus with
+one review in three lost to the provider rendered a census summing to 17 against
+a planted total of 29 — and a page with no `nothing located` line anywhere on it.
+The same invisible absence, produced by a rate limit instead of by a reviewer
+strategy, and flattering in the same direction. Every case in that test now runs
+twice: once with every run delivered, once with one in three lost.
+
+**Rule 6b-iv — a gap may not outrank a word the review kept.** Where a word was
+translated and the original discarded, the block prints `(word not recorded)`
+rather than our reading. When two findings tie for the credit and only one has
+kept its word, the kept one wins. It did not: the tie-break ordered spellings
+lexicographically and the empty string sorts before every real word, so a defect
+matched by one finding carrying `Error` and one carrying nothing published the
+gap phrase in **both** report orders. Order-independence held, on the wrong
+answer. The shape is ordinary — `internal/linters` marks every analyzer finding
+translated and keeps no raw word — so this was reachable in exactly the
+configuration the scale withdrawal exists for.
+
+**Rule 6b-iii — what the description cannot say is printed with it.** It cannot
+say DIRECTION (which words landed on which plants is not whether the reviewer
+under- or over-claims against our ladder), cannot show HEDGING (a reviewer
+answering all five severities renders exactly as one answering only the loudest,
+because the loudest claim is the credited one), cannot show PER-REVIEW STRUCTURE
+(the counts are pooled; of the 12 cached reviews that locate anything, exactly
+one locates at two or more distinct planted levels), and states no ORDER between
+reviewers. Those five sentences are in the block itself rather than in this file,
+because a limitation only the source records is a limitation only its author
+knows about.
 
 **Rule 6b-i — the same rule applies to our own side, and did not.** The fix above
 was made for the incumbent and reintroduced for every contender this project
@@ -173,9 +246,16 @@ stale by two rounds.
 `O-ACC`/`O-INFL`/`O-UNDER` are graded only over defects the reviewer **located**.
 A reviewer that reports nothing except this corpus's `critical` plants, and calls
 them `critical`, therefore scores `O-ACC` 1.000 with no inflation and no
-understatement — an exact tie with a perfectly calibrated reviewer, on 4 of 14
+understatement — an exact tie with a perfectly calibrated reviewer, on 4 of 29
 plants. Selective silence is not calibration. `O-COV` is the share of planted
 defects the triple covers and is printed with it, never without.
+
+The same strategy defeated the *description* too, and for the same reason. The
+vocabulary block omitted levels nobody located, so this reviewer's page was one
+clean line — `planted critical (4 located): critical x4` — a proper **substring**
+of a calibrated reviewer's block, beside a blank `O-COV`. Every line now carries
+the count planted at that level, located or not, so the four levels it never
+reached print `(0 of N located): nothing located`.
 
 `RECALL` and `NOISE` have the same shape. One finding per file, spanning the whole
 file, titled with every keyword in it, scores `RECALL` 1.000 and `NOISE` 0 — a tie

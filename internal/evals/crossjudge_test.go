@@ -1470,6 +1470,17 @@ func sampleAggregateOver(seed int, shown []shownList) Aggregate {
 		SevPlanted:     8,
 	}
 
+	// Declared, so the rows these tests render carry O-* cells rather than four
+	// n/a. The scale is what gates that cell now; an undeclared sample aggregate
+	// would leave every judged-row test above checking the withdrawal instead of
+	// the columns it is about. See SeverityScale.
+	//
+	// Through DeclareScale rather than as a literal field, for the reason
+	// TestNoAggregateLiteralSetsItsOwnScale gives: a row's scale is folded from
+	// declarations, and a helper that sets it directly is a helper that can
+	// build a row no fold could produce.
+	a.DeclareScale(OurSeverityScale)
+
 	// Grades and signal move with the seed too, so two of these disagree in
 	// EVERY judged column and not only in the counted ones. Holding them equal
 	// would let a renderer that paired an aggregate with itself pass the GRADE,

@@ -538,9 +538,34 @@ type Aggregate struct {
 	//
 	// A banded cross-tool accuracy triple used to be carried here and printed as
 	// B-INFL/B-UNDER/B-ACC. It is withdrawn: it was maximised by a reviewer that
-	// stamped one blocking word on every finding, and it could not see the parser
-	// bug it was written in response to. See NoCrossToolSeverityScore.
+	// picked which defects to mention and stamped one blocking word on those,
+	// and it could not see the parser bug it was written in response to. See
+	// NoCrossToolSeverityScore.
 	SevUsage SeverityUsage
+
+	// SevPlantedLevels is SevPlanted split by level: the denominator each row of
+	// the vocabulary block is read against, including the levels this contender
+	// located nothing at.
+	//
+	// Without it the block omitted the levels nobody reached, which made the most
+	// selective reviewer's page a proper substring of a calibrated one. See
+	// SeverityUsage.Lines.
+	SevPlantedLevels PlantedLevels
+
+	// Scale is the severity vocabulary this contender publishes on, DECLARED by
+	// whatever adapter produced its findings. Undeclared is the zero value and
+	// withholds every O-* cell; see SeverityScale.
+	//
+	// Set it through DeclareScale rather than by assignment. A row is fed one
+	// result at a time and a literal takes whichever declaration arrived first,
+	// which is precisely what commonScale refuses on the un-judged path.
+	Scale SeverityScale
+
+	// scaleDeclared distinguishes "nobody has declared anything yet" from
+	// "somebody declared undeclared", which a SeverityScale cannot: both are the
+	// empty string. Without it the first declaration on a fresh row would be
+	// read as a disagreement with the zero value and withdraw every row.
+	scaleDeclared bool
 
 	SignalToNoise []int
 	ToneAdherence []int
@@ -717,7 +742,9 @@ func (a *Aggregate) countVerdicts(verdicts []Verdict) {
 // than the judge's and make the two unreadable side by side.
 // The fixture is taken rather than only the score so that O-COV has a
 // denominator: how many defects were AVAILABLE to grade, not just how many the
-// reviewer happened to reach.
+// reviewer happened to reach. It supplies the vocabulary block's per-level
+// denominators from the same pass, so the coverage cell and the description
+// cannot be read against two different censuses of the same corpus.
 func (a *Aggregate) AddSeverity(f Fixture, s SeverityScore) {
 	a.SevAccurate += s.Accurate
 	a.SevInflated += s.Inflated
@@ -728,6 +755,38 @@ func (a *Aggregate) AddSeverity(f Fixture, s SeverityScore) {
 		a.SevUsage = SeverityUsage{}
 	}
 	a.SevUsage.Merge(s.Usage())
+
+	if a.SevPlantedLevels == nil {
+		a.SevPlantedLevels = PlantedLevels{}
+	}
+	a.SevPlantedLevels.Add(f)
+}
+
+// DeclareScale folds one result's declared severity vocabulary into this row,
+// withdrawing the row when two results disagree.
+//
+// It is the Aggregate-shaped twin of commonScale, and it exists because the two
+// paths that build these rows had drifted apart. commonScale folds a Summary and
+// withdraws on disagreement; the judged path built `&Aggregate{Scale:
+// result.Scale}` on whichever goroutine reached the map first and never looked
+// at another result's declaration again. First-declaration-wins is exactly the
+// rule commonScale refuses: a row folding one adapter's runs together with
+// another's is on no single scale, and publishing it at our resolution states
+// more than anybody declared. One of the two judged call sites had grown its own
+// copy of the check and the other had not, which is the shape of a rule that is
+// written down twice.
+//
+// Withdrawal is sticky. Once two declarations have disagreed the row is on no
+// scale, and a third result agreeing with one of them does not restore it.
+// TestARowWithdrawsWhenItsAdaptersDisagree pins that.
+func (a *Aggregate) DeclareScale(s SeverityScale) {
+	if !a.scaleDeclared {
+		a.Scale, a.scaleDeclared = s, true
+		return
+	}
+	if a.Scale != s {
+		a.Scale = UndeclaredSeverityScale
+	}
 }
 
 // SevGraded is how many located defects the objective severity columns cover.
@@ -738,14 +797,26 @@ func (a Aggregate) SevGraded() int {
 // ObjectiveSeverityCells renders this contender's O-INFL/O-UNDER/O-ACC/O-COV,
 // per sample for the first three and as a share of planted defects for O-COV.
 //
-// It returns "n/a" in all four for a contender whose severity vocabulary is not
-// ours. That is the retraction, applied where the numbers are printed rather
+// It returns "n/a" in all four for a row that has not declared our severity
+// scale. That is the retraction, applied where the numbers are printed rather
 // than only stated beneath them: filling the cells and adding a note saying not
 // to compare them is the mitigation the previous retraction had already recorded
 // as insufficient, and the row sits in a sorted ranking beside our models.
-// PublishesOurSeverityLevels carries the reasoning.
-func (a Aggregate) ObjectiveSeverityCells(model string, samples int) (infl, under, acc, cov string) {
-	if !PublishesOurSeverityLevels(model) {
+// SeverityScale carries the reasoning, including why the row declares it rather
+// than being recognized by name.
+//
+// O-COV IS BLANKED HERE AND PRINTED BY ObjectiveSeverityCounts, and the two are
+// not asserting opposite rules about one quantity. What O-COV measures — how
+// many planted defects the reviewer LOCATED — is a detection fact in nobody's
+// severity vocabulary, so it survives the gate as a NUMBER. What it does not
+// survive is this position: a CELL in a sorted ranking, on a row whose other
+// three severity cells read n/a, where a filled fourth invites reading the row
+// as partly scored on severity after all. The same quantity is published as
+// prose beneath the table, where it is not rankable and where RECALL already
+// states it. TestSeverityCountsAreWithdrawnForAForeignVocabulary pins both
+// halves.
+func (a Aggregate) ObjectiveSeverityCells(samples int) (infl, under, acc, cov string) {
+	if !a.Scale.PublishesOurLevels() {
 		return "n/a", "n/a", "n/a", "n/a"
 	}
 
@@ -773,24 +844,66 @@ func (a Aggregate) ObjectiveSeverityCells(model string, samples int) (infl, unde
 // TestNoReportFormatsSeverityCountersDirectly exists to catch, and it caught this
 // function's first draft.
 //
-// O-COV's denominator survives the gate for a foreign row because it is not a
-// severity claim: how many planted defects a reviewer LOCATED is a statement
-// about detection, in nobody's severity vocabulary.
+// O-COV's denominator survives the gate HERE while the O-COV CELL is blanked,
+// and the difference between the two positions is the whole rule. How many
+// planted defects a reviewer LOCATED is a statement about detection, in nobody's
+// severity vocabulary, so nothing about the withdrawal argues for suppressing
+// the number. What the withdrawal argues against is a filled cell sitting in a
+// sorted ranking beside three cells reading n/a, which reads as a partial score.
+// This line is prose under the table, it is not ranked, and it restates a
+// detection fact RECALL already publishes. Aggregate.ObjectiveSeverityCells says
+// the same thing from the other side, so the two stop appearing to disagree
+// about one quantity.
 func (a Aggregate) ObjectiveSeverityCounts(model string) string {
 	located := fmt.Sprintf("%d located of %d planted", a.SevGraded(), a.SevPlanted)
 
-	if !PublishesOurSeverityLevels(model) {
-		return "O-* withdrawn (severity vocabulary is not ours); " + located
+	if !a.Scale.PublishesOurLevels() {
+		return fmt.Sprintf("O-* withdrawn for %s (severity scale %q is not ours); %s",
+			model, a.Scale.describe(), located)
 	}
 	return fmt.Sprintf("O-* %d accurate + %d inflated + %d understated over %s",
 		a.SevAccurate, a.SevInflated, a.SevUnderstated, located)
 }
+
+// VocabularyBlockLimits is the list of things the vocabulary block cannot
+// express, printed inside the block.
+// TestTheVocabularyBlockStatesWhatItCannotSay checks that it reaches the page.
+//
+// It is printed rather than left in a doc comment because the block is what a
+// reader is handed in place of a withdrawn number, and every limit here is one
+// they would otherwise supply for themselves. The rule this repository keeps
+// relearning is that a limitation recorded only in the source is a limitation
+// nobody outside the source knows about.
+//
+// A const in non-test code, matching SeverityColumnLegend, so a guard in the
+// default build sees it if it is edited out.
+const VocabularyBlockLimits = "WHAT THIS BLOCK CANNOT SAY, so a reader does not read it in: " +
+	"NOT DIRECTION — it shows which words landed on which plants, not whether the reviewer under- or " +
+	"over-claims against our ladder, because ranking a word that has no rank in our ladder is the " +
+	"reduction being refused. " +
+	"NOT HEDGING — a reviewer answering all five severities renders exactly as one answering only the " +
+	"loudest, because the loudest claim about a defect is the one credited (fail_on gates on the worst " +
+	"thing said). " +
+	"NOT PER-REVIEW STRUCTURE — the counts are pooled over the corpus, so a reviewer that split two " +
+	"levels within one review and one that met them in different reviews render alike. " +
+	"NOT AN ORDER BETWEEN REVIEWERS — two blocks are compared by eye, nothing here says which is " +
+	"better, and no caller may compute one. " +
+	"NOT THE DEFECTS NOBODY REPORTED, beyond the (0 of N located) denominators on each line."
 
 // VocabularyRow is one contender's severity vocabulary, for the block printed
 // under every table that compares reviewers.
 type VocabularyRow struct {
 	Name  string
 	Usage SeverityUsage
+
+	// Planted is what the corpus behind this row planted at each level — the
+	// denominator every line is read against.
+	//
+	// A row that omits it renders UndeclaredPlantedTotal rather than a bare
+	// count, because a count with no denominator is what made the most selective
+	// reviewer's page look like a clean version of a calibrated one. See
+	// SeverityUsage.Lines.
+	Planted PlantedLevels
 }
 
 // SeverityVocabularyBlock renders what each contender CALLED the defects it
@@ -810,21 +923,51 @@ type VocabularyRow struct {
 // itself a function of the free constant the withdrawal rested on. Where a word
 // was translated the reading is now printed beside it and marked as ours; see
 // SeverityUsage.
+//
+// WHAT THIS DESCRIPTION CANNOT SAY, stated here and printed in the block so a
+// reader does not read it in:
+//
+//   - DIRECTION. It shows which words landed on which plants, not whether the
+//     reviewer under- or over-claims against our ladder. On the shipped cache
+//     the incumbent's "major" is credited on 8 plants, 4 of them blocking, and
+//     our reading of it sits below every one of those 4. That is a real
+//     one-directional pattern this block leaves the reader to see for
+//     themselves, because ranking a word that has no rank in our ladder is the
+//     reduction being refused.
+//   - HEDGING. A reviewer answering all five severities renders exactly as one
+//     answering only the loudest: reportingFinding credits the loudest claim,
+//     and measured, "one comment per severity, on every plant" produces the same
+//     page as "always critical". That is defensible — fail_on gates on the worst
+//     thing said — and it is still a thing this page cannot show.
+//   - PER-REVIEW STRUCTURE. The table is pooled over the corpus. Of the 12
+//     cached reviews that locate anything, exactly one locates defects at two or
+//     more distinct planted levels, and no line here says so.
+//   - AN ORDER BETWEEN REVIEWERS. Two blocks are compared by eye. Nothing in
+//     this artifact says which is better, and no caller may compute one.
+//   - THE DEFECTS NOBODY REPORTED, beyond the (0 of N located) denominators.
+//
+// The printed version of that list names no reviewer's word, because the
+// preamble beneath it names exactly the words THESE rows translated and a fixed
+// sentence quoting one would be the hand-maintained claim this block already
+// removed once. TestTheVocabularyBlockStatesWhatItCannotSay pins that it is
+// printed.
 func SeverityVocabularyBlock(rows []VocabularyRow) string {
 	var b strings.Builder
 
 	b.WriteString("SEVERITY VOCABULARY — the severity word each contender PRINTED for the defects it " +
-		"located, against the level planted. A DESCRIPTION, NOT A SCORE: the vocabularies differ in " +
-		"resolution, and every reduction that makes them comparable is maximised by rating everything " +
-		"blocking.\n" +
+		"located, against the level planted, with the number of defects PLANTED at that level beside " +
+		"it. A DESCRIPTION, NOT A SCORE: the vocabularies differ in resolution, and every reduction " +
+		"that makes them comparable is maximised by a reviewer that picks which defects to mention " +
+		"and calls those blocking.\n" +
 		"THE WORDS ARE VERBATIM AND THE READINGS ARE OURS: where this project translates a word into " +
 		"its own five levels, the level follows it as [we read as X] and is our reading, not the " +
 		"reviewer's claim. A word shown as " + UnrecordedWord + " was destroyed before it reached here, " +
 		"or was never printed at all, and is reported missing rather than filled in from our reading.\n" +
+		VocabularyBlockLimits + "\n" +
 		translatedWordsNote(rows))
 
 	for _, r := range rows {
-		lines := r.Usage.Lines()
+		lines := r.Usage.Lines(r.Planted)
 		if len(lines) == 0 {
 			// Distinct from a reviewer that rated things badly: it located
 			// nothing, so it said nothing about severity and has no vocabulary
@@ -1922,7 +2065,7 @@ var CrossJudgedVariantTableHeader = registerTableHeader(tableScored,
 // SevAccurate itself is the defect TestNoReportFormatsSeverityCountersDirectly
 // exists for, found the hard way.
 func JudgedModelRow(model string, c CrossJudged, failed int) string {
-	oInfl, oUnder, oAcc, oCov := c.Primary.ObjectiveSeverityCells(model, len(c.Primary.Grades))
+	oInfl, oUnder, oAcc, oCov := c.Primary.ObjectiveSeverityCells(len(c.Primary.Grades))
 
 	return TableRow(CrossJudgedModelTableHeader, []string{
 		truncate(model, 36),
@@ -1946,7 +2089,7 @@ func JudgedModelRow(model string, c CrossJudged, failed int) string {
 // JudgedVariantRow renders one variant's row of the persona comparison, on the
 // same terms and for the same reasons as JudgedModelRow.
 func JudgedVariantRow(variant string, c CrossJudged, failures int) string {
-	oInfl, oUnder, oAcc, oCov := c.Primary.ObjectiveSeverityCells(variant, len(c.Primary.Grades))
+	oInfl, oUnder, oAcc, oCov := c.Primary.ObjectiveSeverityCells(len(c.Primary.Grades))
 
 	return TableRow(CrossJudgedVariantTableHeader, []string{
 		truncate(variant, 23),

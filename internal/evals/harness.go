@@ -480,6 +480,20 @@ type RunResult struct {
 	// that matters here is where the meter is installed: below.
 	Usage TokenUsage
 
+	// Scale is the severity vocabulary this run's findings are on, DECLARED
+	// here because this is the adapter that produced them. See SeverityScale for
+	// why it is declared rather than inferred, and ourSeverityScale for the one
+	// configuration question the declaration depends on.
+	//
+	// IT IS SET EVEN WHEN Err IS, and that is not tidiness. commonScale
+	// withdraws a row whose runs disagree, so a failed run carrying no
+	// declaration drags an otherwise-declared row to n/a — meaning a provider
+	// error would decide which severity cell a reader is shown. The declaration
+	// is a fact about the adapter, not about whether this particular attempt
+	// reached a provider.
+	// TestAFailedRunStillDeclaresItsScale pins it.
+	Scale SeverityScale
+
 	Err      error
 	Duration time.Duration
 }
@@ -494,7 +508,25 @@ func Run(ctx context.Context, model Model, f Fixture, runIndex int, opts Options
 // and nitpick-level variants are compared.
 func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, opts Options, persona config.Persona) RunResult {
 	started := time.Now()
-	out := RunResult{Model: model.ID, Fixture: f.Name, Run: runIndex}
+
+	// The declaration is made BEFORE anything that can fail, because it depends
+	// on nothing that can. ourSeverityScale reads the configuration and the
+	// configuration is fully determined by evalConfig; a temp directory that
+	// cannot be made says nothing about which vocabulary this adapter publishes
+	// on. THE BUG THIS FIXES: it was assigned after the MkdirTemp and buildRepo
+	// returns, so a run that died there carried no declaration — and the two
+	// halves of one infrastructure failure then published DIFFERENT severity
+	// cells. Folded with a good run, a failure carrying the declaration renders
+	// SEV as the good run's own triple; a failure carrying none withdraws the
+	// whole row to n/a. Which of the two a reader sees depended on where in this
+	// function the provider happened to break.
+	cfg := evalConfig(model)
+	cfg.Persona = persona.Resolve()
+
+	out := RunResult{
+		Model: model.ID, Fixture: f.Name, Run: runIndex,
+		Scale: ourSeverityScale(cfg),
+	}
 
 	dir, err := os.MkdirTemp("", "nitpick-eval-")
 	if err != nil {
@@ -507,9 +539,6 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		out.Err = fmt.Errorf("build fixture repo: %w", err)
 		return out
 	}
-
-	cfg := evalConfig(model)
-	cfg.Persona = persona.Resolve()
 
 	build := opts.buildClient
 	if build == nil {
@@ -616,6 +645,27 @@ func evalConfig(model Model) *config.Config {
 	cfg.Review.FailOn = config.SeverityNone
 
 	return cfg
+}
+
+// ourSeverityScale declares the severity vocabulary a run under this
+// configuration publishes on.
+//
+// It is DERIVED FROM THE CONFIGURATION RATHER THAN ASSERTED, and the one
+// question it asks is the one that can make the assertion false. review.Engine
+// writes our five levels for a model's own findings, but a report is the union
+// of the model's findings and the analyzers', and internal/linters' mapSeverity
+// folds HIGH/ERROR/CRITICAL onto our error and MEDIUM onto warning — a codomain
+// excluding critical and nit, which is the exact shape of the first retraction
+// this package made. Those findings are absent today only because evalConfig
+// turns linters off. Deriving the declaration means turning them back on
+// WITHDRAWS the severity comparison instead of quietly publishing analyzer
+// levels at our resolution; asserting it would have published them.
+// TestTurningLintersOnWithdrawsTheSeverityComparison pins that.
+func ourSeverityScale(cfg *config.Config) SeverityScale {
+	if cfg == nil || cfg.Linters.Mode != config.LinterOff {
+		return UndeclaredSeverityScale
+	}
+	return OurSeverityScale
 }
 
 func floatPtr(v float64) *float64 { return &v }

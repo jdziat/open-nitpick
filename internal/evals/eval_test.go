@@ -314,10 +314,17 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 	// what our own models call each planted level is worth reading on its own.
 	vocab := make([]VocabularyRow, 0, len(summaries))
 	for _, s := range summaries {
-		if len(s.SevUsage) == 0 {
+		// A row that located nothing still belongs here once the denominators
+		// are on it: it renders every planted level as "(0 of N located)", which
+		// is the information the previous filter threw away. Only a row with
+		// nothing planted AND nothing said is skipped — a clean fixture, which
+		// has no severity to describe in either direction.
+		if len(s.SevUsage) == 0 && len(s.SevPlantedLevels) == 0 {
 			continue
 		}
-		vocab = append(vocab, VocabularyRow{Name: s.Model + " / " + s.Fixture, Usage: s.SevUsage})
+		vocab = append(vocab, VocabularyRow{
+			Name: s.Model + " / " + s.Fixture, Usage: s.SevUsage, Planted: s.SevPlantedLevels,
+		})
 	}
 	if len(vocab) > 0 {
 		t.Log(SeverityVocabularyBlock(vocab))

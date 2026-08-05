@@ -109,6 +109,25 @@ var crRule = regexp.MustCompile(`^[\x{2500}-\x{257F}=_-]{4,}$`)
 // clean bill of health. See the check in parseIncumbent.
 var crDeclaredCount = regexp.MustCompile(`(?m)^\s*(\d+)\s+findings?\b`)
 
+// IncumbentSeverityScale is this adapter's DECLARATION that the reviewer it
+// parses does not publish our five levels.
+//
+// It sits beside crSeverity because crSeverity is the reason: the words arriving
+// here are translated into ours, and the incumbent's own vocabulary across the
+// shipped corpus is {critical, major, minor}. Declaring it here rather than
+// recognizing the reviewer by name downstream is the whole point — the
+// withdrawal used to be `model != IncumbentModel`, a reporter's identity
+// standing in for a fact about its vocabulary, and it would have kept holding
+// for exactly one reviewer however many others were added. See SeverityScale.
+//
+// SPELLING IS NOT SCALE, and this reviewer is the counterexample: it prints
+// "critical", identical to ours, and the shipped cache credits that one word on
+// 2 plants of critical and 4 of error. A gate that compared the printed word
+// against our five levels would have scored those findings at our resolution
+// and withheld only the ones spelled "major", which publishes a fraction of the
+// retracted comparison and calls the remainder a withdrawal.
+const IncumbentSeverityScale = ForeignSeverityScale
+
 // crSeverity records the severity Incumbent assigned, in our vocabulary.
 //
 // It USED to demote "critical" to our "error", on the reasoning that
@@ -135,23 +154,28 @@ var crDeclaredCount = regexp.MustCompile(`(?m)^\s*(\d+)\s+findings?\b`)
 //     It is recorded at warning — the weakest anchor in review.md that still
 //     asserts a defect ("likely a bug, or a genuine hazard under plausible
 //     conditions") — because a foreign token we cannot resolve should not be
-//     handed the benefit of the doubt. THAT IS A GUESS AND THE CORPUS CONTAINS
-//     NO EVIDENCE FOR IT: every "major" finding it credits sits on a plant we
-//     rate error or critical and none on a plant of warning, and recording it at
-//     error instead moved the withdrawn banded figure from 0.600 to a PERFECT
-//     1.000 with Incumbent's bytes unchanged. (That swing was published as
-//     "0.62 to 0.88"; the figures reproduce from nothing in the tree and are
-//     corrected here — see NoCrossToolSeverityScore.)
-//     That is why no such figure is published any longer, and why this constant
-//     is left alone rather than re-tuned: re-tuning it moves a number our way
-//     with no new evidence, which is the mistake three times over.
+//     handed the benefit of the doubt. THAT IS A GUESS, AND THE CORPUS CANNOT
+//     SETTLE IT: across the shipped cache "major" is credited on plants of
+//     critical, error AND warning, so it straddles three of our levels and no
+//     single value is right for every plant it lands on. Recording it at error
+//     instead, with Incumbent's bytes unchanged, moves the full-resolution
+//     triple from 6/4/4 to 5/8/1. (The swing was published first as "0.62 to
+//     0.88" and then as a banded "0.600 to 1.000"; neither reproduces from this
+//     tree, and the banded column turns out not to move at all — see
+//     NoCrossToolSeverityScore.) Warning is the PLURALITY landing, which is why
+//     the constant is left where it is; a plurality of a straddling word is
+//     still an approximation, which is why no cross-tool figure is published
+//     from it and why re-tuning it is not the remedy.
 //     TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered measures it.
-//   - "minor" is the same judgement one step down.
+//   - "minor" is the same judgement one step down. It is credited with NO plant
+//     in the shipped cache: the one "minor" finding there sits inside a planted
+//     span but names none of its keywords, so matches() rejects it and nothing
+//     grades it. The arm is a translation with no observation behind it at all.
 //
-// The vocabulary observed across the whole shipped corpus is {critical, major}
-// — the two words above. Every other arm is defensive: the CLI's tiers are not
-// contractual, and an unrecognized word still has to produce a finding, which
-// is what the default is for.
+// The vocabulary observed across the whole shipped corpus is {critical, major,
+// minor} — the three words above, of which two are ever credited. Every other
+// arm is defensive: the CLI's tiers are not contractual, and an unrecognized
+// word still has to produce a finding, which is what the default is for.
 func crSeverity(s string) config.Severity {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "critical":
