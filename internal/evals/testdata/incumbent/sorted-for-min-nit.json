@@ -1,0 +1,8 @@
+{
+  "fixture": "sorted-for-min-nit",
+  "findings": null,
+  "at": "2026-08-05T01:54:10Z",
+  "mode": "plaintext",
+  "fingerprint": "fceb2407d5fe715195cdf2a066ff7e24fc99db6a835d72a7f57d89793b26493d",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-4065362063\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n- sensors.py\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 6s elapsed\nWriting review comments... 8s elapsed\n"
+}

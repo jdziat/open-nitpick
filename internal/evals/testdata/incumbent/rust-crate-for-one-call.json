@@ -1,0 +1,8 @@
+{
+  "fixture": "rust-crate-for-one-call",
+  "findings": null,
+  "at": "2026-08-05T02:07:30Z",
+  "mode": "plaintext",
+  "fingerprint": "c917af4ec02a0e256101c8e646ebf368c88ef68fcd0b1fe00b63c1c583699101",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1107552804\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n2 files reviewed:\n- Cargo.toml\n- src/report.rs\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 3s elapsed\nPreparing sandbox... 6s elapsed\nSummarizing changes... 9s elapsed\nWriting review comments... 12s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

@@ -1,0 +1,8 @@
+{
+  "fixture": "cross-file-copy-nit",
+  "findings": null,
+  "at": "2026-08-05T01:52:57Z",
+  "mode": "plaintext",
+  "fingerprint": "f621901ce23480ae47635e8d10f015f84e76368bceed3693a261c6b67aa0f0d5",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3733638771\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n2 files reviewed:\n- report/summary.go\n- store/store.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 5s elapsed\nWriting review comments... 8s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

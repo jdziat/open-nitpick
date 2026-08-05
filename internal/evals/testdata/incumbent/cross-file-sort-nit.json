@@ -1,0 +1,8 @@
+{
+  "fixture": "cross-file-sort-nit",
+  "findings": null,
+  "at": "2026-08-05T02:03:49Z",
+  "mode": "plaintext",
+  "fingerprint": "1a24990e1074fd9eabac5accf1568e95996fab36f6349aec40134646c0f0a6ef",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2869551626\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n2 files reviewed:\n- src/members.ts\n- src/roster.ts\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 4s elapsed\nWriting review comments... 7s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

@@ -1,0 +1,8 @@
+{
+  "fixture": "bash-fixed-temp-path",
+  "findings": null,
+  "at": "2026-08-05T02:01:59Z",
+  "mode": "plaintext",
+  "fingerprint": "32d81db99a806d5b8d2518c1706b6a5d65282930cfdfc2c1822fb3fd0ddc0f84",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3490298167\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n- scripts/release-notes.sh\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 4s elapsed\nPreparing sandbox... 5s elapsed\nSummarizing changes... 7s elapsed\nWriting review comments... 9s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

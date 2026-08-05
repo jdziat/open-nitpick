@@ -1,0 +1,20 @@
+{
+  "fixture": "go-package-singleton",
+  "findings": [
+    {
+      "path": "features/features.go",
+      "line": 29,
+      "end_line": 34,
+      "severity": "info",
+      "category": "Stability \u0026 Availability",
+      "class": "concurrency",
+      "title": "Prevent Enabled from panicking when Default is nil.",
+      "rationale": "Default is an exported *Set, so callers can assign nil. A later call to Enabled then dereferences nil through Default.Enabled(name) and panics. Keep the default set unexported, or provide a setter that rejects nil and controls concurrent replacement.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-05T01:57:26Z",
+  "mode": "plaintext",
+  "fingerprint": "e4ac46ae0862a72f2873df33a5f9df4ac5c5c05d2d8457df0b85f0f02d5be608",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3662901814\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  minor [Stability \u0026 Availability]\n  → features/features.go:29-34\n\n  Prevent Enabled from panicking when Default is nil.\n\n  Default is an exported *Set, so callers can assign nil. A later call\n  to Enabled then dereferences nil through Default.Enabled(name) and\n  panics. Keep the default set unexported, or provide a setter that rejects\n  nil and controls concurrent replacement.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMinor    1\n\n1 file reviewed:\n- features/features.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 4s elapsed\nWriting review comments... 8s elapsed\n"
+}

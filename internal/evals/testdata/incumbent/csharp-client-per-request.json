@@ -1,0 +1,20 @@
+{
+  "fixture": "csharp-client-per-request",
+  "findings": [
+    {
+      "path": "src/Notifier.cs",
+      "line": 16,
+      "end_line": 20,
+      "severity": "warning",
+      "category": "Stability \u0026 Availability",
+      "class": "resource",
+      "title": "Reuse HttpClient across notifications.",
+      "rationale": "NotifyAsync creates and disposes a HttpClient for every request. Under load, this prevents connection reuse and can exhaust sockets or ephemeral ports.\n\nInject a long-lived HttpClient, or use IHttpClientFactory. Configure BaseAddress once.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-05T01:59:48Z",
+  "mode": "plaintext",
+  "fingerprint": "20ca9f885b623e38cf5239a0086904b0002eea82f062f68ebb5b458b9efdab9d",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1677959885\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Stability \u0026 Availability]\n  → src/Notifier.cs:16-20\n\n  Reuse HttpClient across notifications.\n\n  NotifyAsync creates and disposes a HttpClient for every request. Under\n  load, this prevents connection reuse and can exhaust sockets or ephemeral\n  ports.\n\n  Inject a long-lived HttpClient, or use IHttpClientFactory. Configure\n  BaseAddress once.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n- src/Notifier.cs\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 4s elapsed\nWriting review comments... 9s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

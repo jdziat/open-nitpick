@@ -1,0 +1,8 @@
+{
+  "fixture": "ruby-default-page-size",
+  "findings": null,
+  "at": "2026-08-05T02:08:34Z",
+  "mode": "plaintext",
+  "fingerprint": "0cde77168e99d784532730e951ef87ce717bb50c99ffe3f913dde88a7c9020b0",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-791421034\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n- app/queries/comments_query.rb\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 6s elapsed\nWriting review comments... 8s elapsed\n"
+}

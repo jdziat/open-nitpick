@@ -1,0 +1,8 @@
+{
+  "fixture": "defensive-copy-nit",
+  "findings": null,
+  "at": "2026-08-05T02:05:38Z",
+  "mode": "plaintext",
+  "fingerprint": "2afcb3163236fd0c15fe2313c052bc156f365be20092628a3abff7e753492616",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3534628844\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n- src/main/java/com/example/report/Labels.java\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 5s elapsed\nWriting review comments... 8s elapsed\n"
+}

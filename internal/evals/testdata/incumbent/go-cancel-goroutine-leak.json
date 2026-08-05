@@ -1,0 +1,20 @@
+{
+  "fixture": "go-cancel-goroutine-leak",
+  "findings": [
+    {
+      "path": "resolve.go",
+      "line": 23,
+      "end_line": 35,
+      "severity": "warning",
+      "category": "Stability \u0026 Availability",
+      "class": "concurrency",
+      "title": "Prevent the lookup goroutine from blocking after cancellation.",
+      "rationale": "If ctx.Done() wins, ResolveContext returns with no receiver on done. When d.Lookup(name) later returns, Line 28 blocks forever on the unbuffered send. Use a channel with capacity one. This lets the goroutine exit after the lookup completes.\n\nProposed fix\n\n-\tdone := make(chan result) +\tdone := make(chan result, 1)",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-05T01:49:56Z",
+  "mode": "plaintext",
+  "fingerprint": "63216a1e8c597493606c197946e36da9b2d181692f980cd45a322d21859bba31",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-614178415\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Stability \u0026 Availability]\n  → resolve.go:23-35\n\n  Prevent the lookup goroutine from blocking after cancellation.\n\n  If ctx.Done() wins, ResolveContext returns with no receiver on done.\n  When d.Lookup(name) later returns, Line 28 blocks forever on the\n  unbuffered send. Use a channel with capacity one. This lets the goroutine\n  exit after the lookup completes.\n\n\n  Proposed fix\n\n  -\tdone := make(chan result)\n  +\tdone := make(chan result, 1)\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n- resolve.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 3s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 7s elapsed\nWriting review comments... 11s elapsed\n"
+}

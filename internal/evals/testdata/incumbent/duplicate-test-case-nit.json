@@ -1,0 +1,8 @@
+{
+  "fixture": "duplicate-test-case-nit",
+  "findings": null,
+  "at": "2026-08-05T02:04:30Z",
+  "mode": "plaintext",
+  "fingerprint": "5f475aec22a5e63cad1eb657f036a1a30ed691cc538e937f3d05d20dc03a0663",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1483509985\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n- slug/slug_test.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 5s elapsed\nWriting review comments... 7s elapsed\n"
+}

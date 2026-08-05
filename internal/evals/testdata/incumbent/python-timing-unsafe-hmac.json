@@ -1,0 +1,20 @@
+{
+  "fixture": "python-timing-unsafe-hmac",
+  "findings": [
+    {
+      "path": "webhook.py",
+      "line": 13,
+      "end_line": 15,
+      "severity": "warning",
+      "category": "Security \u0026 Privacy",
+      "class": "security",
+      "title": "Use hmac.compare_digest for signature verification.",
+      "rationale": "== can expose timing information when it compares the expected signature with provided.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-05T01:51:03Z",
+  "mode": "plaintext",
+  "fingerprint": "cfdcd7d46b50f6800848a7a7fb54914b905fc32a73b66e73cd9aa8503e272cf2",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1738617726\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Security \u0026 Privacy]\n  → webhook.py:13-15\n\n  Use hmac.compare_digest for signature verification.\n\n  == can expose timing information when it compares the expected signature\n  with provided.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n- webhook.py\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 6s elapsed\nWriting review comments... 9s elapsed\n"
+}

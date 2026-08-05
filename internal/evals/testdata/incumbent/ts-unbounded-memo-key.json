@@ -1,0 +1,30 @@
+{
+  "fixture": "ts-unbounded-memo-key",
+  "findings": [
+    {
+      "path": "src/search.ts",
+      "line": 13,
+      "severity": "warning",
+      "category": "Data Integrity \u0026 Integration",
+      "class": "correctness",
+      "title": "Include the Search source in cache identity.",
+      "rationale": "remember uses a module-global table, but Line 13 keys only by q. If two searchHandler instances use different Search functions, the second handler receives the first handler's result for the same query. Scope the cache to each handler or include a stable source namespace in the key.",
+      "suggestion": ""
+    },
+    {
+      "path": "src/search.ts",
+      "line": 12,
+      "end_line": 13,
+      "severity": "warning",
+      "category": "Stability \u0026 Availability",
+      "class": "resource",
+      "title": "Use a bounded cache for query results.",
+      "rationale": "remember retains every entry until process exit. q comes from the request and has unbounded cardinality, so distinct queries permanently grow the process-global table. A caller can drive memory growth until the process becomes unstable.\n\nRemove this cache for arbitrary queries or use a bounded cache with eviction and expiry.\n\nSafe baseline\n\n-import { remember } from \"./cache\"; - -    // Repeated searches are common, so answer them from the table. -    const hits = await remember(\"q:\" + q, () =\u003e search(q)); +    const hits = await search(q);",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-08-05T01:49:10Z",
+  "mode": "plaintext",
+  "fingerprint": "a9cd4b6d2949000804082cd9251ae8a259ff90c11c73f3cc472119c6411e662f",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-992348091\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Data Integrity \u0026 Integration]\n  → src/search.ts:13\n\n  Include the Search source in cache identity.\n\n  remember uses a module-global table, but Line 13 keys only by q. If\n  two searchHandler instances use different Search functions, the second\n  handler receives the first handler's result for the same query. Scope the\n  cache to each handler or include a stable source namespace in the key.\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Stability \u0026 Availability]\n  → src/search.ts:12-13\n\n  Use a bounded cache for query results.\n\n  remember retains every entry until process exit. q comes from the\n  request and has unbounded cardinality, so distinct queries permanently\n  grow the process-global table. A caller can drive memory growth until the\n  process becomes unstable.\n\n  Remove this cache for arbitrary queries or use a bounded cache with\n  eviction and expiry.\n\n\n  Safe baseline\n\n  -import { remember } from \"./cache\";\n  -\n  -    // Repeated searches are common, so answer them from the table.\n  -    const hits = await remember(\"q:\" + q, () =\u003e search(q));\n  +    const hits = await search(q);\n\n\n────────────────────────────────────────\nReview complete\n2 findings ✔\n\nMajor    2\n\n7 files reviewed:\n- src/cache.ts\n- src/errors.ts\n- src/index.ts\n- src/limits.ts\n- src/plans.ts\n- src/search.ts\n- src/types.ts\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 7s elapsed\nWriting review comments... 13s elapsed\nWriting review comments... 1m 00s elapsed - still working\nWriting review comments... 2m 00s elapsed - still working\nWriting review comments... 3m 00s elapsed - still working\n"
+}

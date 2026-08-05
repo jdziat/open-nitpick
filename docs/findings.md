@@ -140,36 +140,42 @@ inflation bias for an understatement bias. The vocabularies differ in
 **resolution**, and no choice of constant fixes a resolution mismatch — hence
 Rule 6.
 
-## Generalisation
+## The incumbent's baseline, on the full corpus
 
-Incumbent on the 7 held-out fixtures, scored deterministically — every figure
-below re-derives from the shipped cache and the fixtures, with no model and no
-network:
+Incumbent was re-collected over all 30 fixtures after the corpus grew, because
+its cached reviews covered only the original 15 — the set the prompt had been
+tuned against for seven rounds. Scored deterministically, no judge:
 
-| | tuning | held-out |
-|---|---|---|
-| detection | 7/8 (88%) | **3/6 (50%)** |
-| findings raised | 8 | 5 |
-| unexplained (`NOISE`) | 1 | **2** |
+| | detection | findings | unexplained | precision |
+|---|---|---|---|---|
+| tuning | 10/16 | 13 | 3 | 0.77 |
+| **held-out** | **4/13** | 6 | 2 | **0.67** |
+| all | 14/29 | 19 | 5 | 0.74 |
 
-The `precision` row here read `1.00` against `0.60`. The held-out cell was the
-deterministic share of findings explaining a plant; the tuning cell was the
-*judge's* precision, and the deterministic reading of the same reviews is 0.88.
-One row, two instruments, and the difference between them read as a drop in
-Incumbent's precision. `NOISE` is a count of the same thing with nothing derived
-from it.
+By planted severity, across all 30:
 
-It missed three of the six outright — the contract break, the deleted
-authorization guard, and the un-backed-off retry loop — and raised two findings
-explaining no plant, one of them on `clean-sql-allowlist`, the fixture built
-specifically to tempt a false positive. (This paragraph said "missed the contract
-break and the deleted authorization guard"; it named two of three misses, which
-made a 3/6 read like a 4/6.)
+| level | located |
+|---|---|
+| critical | 3/4 |
+| error | 7/8 |
+| warning | 4/6 |
+| info | **0/5** |
+| nit | **0/6** |
 
-The honest reading is **not** "Incumbent is weaker than it looked". The held-out
-corpus is harder by construction — its defect classes were chosen to be — and our
-models will likely drop on it too. What it does show is that the original 8
-fixtures flattered *everyone's* generalisation.
+**It reports nothing below `warning` — 0 of 11.** Every one of those eleven
+fixtures returned zero findings rather than a wrong finding, across two severity
+levels, five languages and both corpora.
+
+Two readings remain open and this measurement cannot separate them: either the
+incumbent suppresses low-severity findings deliberately, which is a defensible
+product choice, or the `info` and `nit` plants are too subtle to be worth
+reporting, which would be a finding about this corpus rather than about the
+reviewer. The judged pass separates them — if a senior-reviewer judge rates our
+low-severity findings as worth raising, the plants are real.
+
+The earlier figures published here (7/8 tuning, 3/6 held-out, precision 1.00 and
+0.60) came from the 15-fixture corpus, which planted 12 of 14 defects at blocking
+severity and therefore could not see this floor at all. They are superseded.
 
 ## Judge instability
 

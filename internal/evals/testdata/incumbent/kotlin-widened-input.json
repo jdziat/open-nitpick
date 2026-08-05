@@ -1,0 +1,8 @@
+{
+  "fixture": "kotlin-widened-input",
+  "findings": null,
+  "at": "2026-08-05T01:55:50Z",
+  "mode": "plaintext",
+  "fingerprint": "c97b730791cb4d7089371c36fba30607a3bfb796119e8f7dabd9bf2da138efee",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-856056464\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n- src/main/kotlin/com/example/report/Summary.kt\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 5s elapsed\nWriting review comments... 11s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}
