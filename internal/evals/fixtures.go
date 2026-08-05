@@ -883,9 +883,17 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		},
 		Defects: []Defect{
 			{
-				Path:         "handler.go",
-				Line:         19,
-				Keywords:     []string{"path traversal", "traversal", "sanitiz", "arbitrary", "../", "untrusted", "user-controlled path"},
+				Path: "handler.go",
+				Line: 19,
+				Keywords: []string{
+					// "arbitrary" alone was here and was credited to a finding about
+					// another fixture's unbounded cache -- "remove this cache for
+					// arbitrary queries". The adjective is common; what is specific
+					// is WHAT is arbitrary, so it now has to carry its noun.
+					"path traversal", "traversal", "sanitiz", "../", "untrusted",
+					"user-controlled path", "arbitrary file", "arbitrary path",
+					"escapes the upload", "outside the upload",
+				},
 				Class:        config.ClassSecurity,
 				WantSeverity: config.SeverityCritical,
 				SeverityNote: "critical under \"a security breach\", above the two injection plants, and the " +
@@ -896,17 +904,32 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 				Why: "the query parameter is concatenated into a filesystem path, so ../ escapes the upload directory",
 			},
 			{
-				Path:         "handler.go",
-				Line:         25,
-				Keywords:     []string{"race", "data race", "mutex", "unsynchron", "concurrent", "atomic"},
+				Path: "handler.go",
+				Line: 25,
+				Keywords: []string{
+					// "concurrent" was here and was credited to a finding about
+					// another fixture's package-level default. What is left names
+					// the mechanism -- a race, the mutex this struct already
+					// carries, the counter itself -- rather than the topic.
+					"race", "data race", "mutex", "unsynchron", "atomic", "h.count",
+				},
 				Class:        config.ClassConcurrency,
 				WantSeverity: config.SeverityError,
 				Why:          "h.count is incremented from a goroutine with no synchronization despite the struct carrying a mutex",
 			},
 			{
-				Path:         "handler.go",
-				Line:         19,
-				Keywords:     []string{"close", "leak", "file descriptor", "not closed", "defer"},
+				Path: "handler.go",
+				Line: 19,
+				Keywords: []string{
+					// "close", "defer" and bare "leak" were here. Every one is a
+					// word an ordinary Go review types about any deferred close
+					// anywhere -- including a nil-deref finding in another fixture
+					// that says "the deferred Close still runs". What survives
+					// names the descriptor that is lost, not the mechanism that
+					// would have released it.
+					"never closed", "not closed", "file descriptor",
+					"descriptor leak", "leaks a descriptor", "fd leak",
+				},
 				Class:        config.ClassResource,
 				WantSeverity: config.SeverityError,
 				SeverityNote: "error under \"a real bug that produces incorrect behavior on a reachable path\": " +
@@ -976,9 +999,15 @@ func MovingAverage(samples []float64, n int) []float64 {
 `,
 		},
 		Defects: []Defect{{
-			Path:     "window.go",
-			Line:     17,
-			Keywords: []string{"capacity", "len(samples)-n+1", "reallocat"},
+			Path: "window.go",
+			Line: 17,
+			Keywords: []string{
+				// "capacity" alone was credited to a finding about a channel's
+				// buffer size in another fixture. This plant is about the slice
+				// being ONE short, so the surviving words say that.
+				"len(samples)-n+1", "reallocat", "one short", "capacity is one",
+				"initial capacity", "grow the backing", "one too small",
+			},
 			// `resource` is the least-wrong box, not a correct answer: the class
 			// means "leaks and unbounded growth" and this is a single bounded
 			// reallocation. The closed set has no home for an allocation that is
@@ -1034,10 +1063,20 @@ func Fetch(url string) (int, error) {
 `,
 		},
 		Defects: []Defect{{
-			Path:     "fetch.go",
-			Line:     10, // resp, _ := http.Get(url)
-			Keywords: []string{"nil", "panic", "ignored error", "unchecked", "discard", "error return", "dereference"},
-			Class:    config.ClassCorrectness,
+			Path: "fetch.go",
+			Line: 10, // resp, _ := http.Get(url)
+			Keywords: []string{
+				// "nil", "panic" and "dereference" were here and were credited to
+				// a finding about another fixture's exported *Set -- prose that
+				// noticed nothing in this file. A keyword must be a phrase only a
+				// reviewer that saw THIS discarded error would write, so what is
+				// left names the error, the variable it leaves nil, or the
+				// deferred call that then runs on it.
+				"ignored error", "unchecked", "discard", "error return",
+				"resp is nil", "resp may be nil", "resp will be nil", "nil resp",
+				"deferred close", "defer resp", "http.get",
+			},
+			Class: config.ClassCorrectness,
 			// error, not critical: the panic needs http.Get to fail first, so
 			// it is not the "guaranteed production failure" the critical anchor
 			// describes, and calibration rule 2 — when torn, take the lower —

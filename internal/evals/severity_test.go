@@ -4011,18 +4011,46 @@ func TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered(t *testing.T) {
 			"parameter is pinned down", shipped.Accurate, shipped.Inflated, shipped.Understated)
 	}
 
+	// THE REVISIT THIS TEST USED TO DEMAND, DONE.
+	//
+	// It previously errored the moment a 'major' landed on a plant of warning,
+	// because until the corpus grew none ever had and the mapping was therefore
+	// a guess with nothing to check it against. Evidence now exists, so the
+	// question changes from "is this arbitrary" to "what does the evidence say".
+	//
+	// It says the word straddles. Across both corpora 'major' is credited on
+	// plants of critical, error AND warning, and 'critical' is credited on
+	// plants of critical AND error. Neither vendor word corresponds to one of
+	// ours, which is the same conclusion that withdrew the cross-tool severity
+	// score -- now held up by measurement rather than by the absence of it.
+	//
+	// Within that, warning is the PLURALITY landing for 'major', so the shipped
+	// mapping is the best single answer available. Recording that is not a
+	// licence to publish a score built on it: a plurality of a straddling word
+	// is still an approximation, and the previous three attempts here each moved
+	// a number toward this project's side on less evidence than this.
+	spread := map[config.Severity]int{}
 	for _, planted := range majorPlants {
-		if planted == config.SeverityWarning {
-			t.Errorf("a 'major' is credited on a plant of warning, so the corpus DOES now contain " +
-				"evidence about where 'major' belongs. That is new information: revisit crSeverity's " +
-				"guess deliberately, in a diff that says so")
-		}
+		spread[planted]++
+	}
+
+	if len(spread) < 2 {
+		t.Errorf("'major' now lands on a single planted level %v, so it no longer straddles and the "+
+			"reason no cross-tool severity score is offered has changed. Revisit that decision "+
+			"deliberately rather than leaving this comment describing a corpus that moved", spread)
+	}
+
+	if spread[config.SeverityWarning] <= spread[config.SeverityError] {
+		t.Errorf("warning is no longer the plurality landing for 'major' (%v); crSeverity maps it "+
+			"to warning on exactly that basis, so the constant and its evidence have parted company",
+			spread)
 	}
 
 	t.Logf("'major' -> warning: %d/%d/%d accurate/inflated/understated; 'major' -> error: %d/%d/%d. "+
-		"Same bytes from %s, %d credited observation(s), none of them on a plant of warning: this "+
-		"corpus cannot choose between the two, which is why no cross-tool severity score is published",
+		"Same bytes from %s over %d credited observation(s), landing %v: the word straddles, which is "+
+		"why no cross-tool severity score is published, and warning is its plurality, which is why "+
+		"crSeverity maps it there",
 		shipped.Accurate, shipped.Inflated, shipped.Understated,
 		swapped.Accurate, swapped.Inflated, swapped.Understated,
-		IncumbentModel, len(majorPlants))
+		IncumbentModel, len(majorPlants), spread)
 }

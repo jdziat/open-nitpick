@@ -473,6 +473,21 @@ func declaredProbes() map[string]fixtureProbes {
 				review.Finding{Path: "fetch.go", Line: 10, Severity: "error", Category: "correctness",
 					Title:     "http.Get's error is discarded",
 					Rationale: "On a transport failure resp is nil, so the deferred Close panics."},
+			}, {
+				// "nil", "panic" and "dereference" were removed from this
+				// fixture's keywords because they credited prose about another
+				// file entirely. Removing a keyword can silently cost recall --
+				// that happened once and nothing caught it -- so each natural
+				// phrasing of the REAL detection is pinned here.
+				"says the error is unchecked without using the removed words",
+				review.Finding{Path: "fetch.go", Line: 10, Severity: "error", Category: "correctness",
+					Title:     "The error return is unchecked",
+					Rationale: "http.Get can fail and the second value is discarded."},
+			}, {
+				"names the variable and the deferred call instead",
+				review.Finding{Path: "fetch.go", Line: 10, Severity: "error", Category: "correctness",
+					Title:     "resp may be nil here",
+					Rationale: "When the request fails resp is nil and the deferred Close still runs."},
 			}},
 			miss: []probe{{
 				"a docs request about the same function",
@@ -1289,15 +1304,11 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 		// Shared mechanism: a resource that is acquired and not released.
 		// multi-defect's descriptor leak and the goroutine leak are the same
 		// sentence about different resources.
-		"multi-defect|go-cancel-goroutine-leak|Unbuffered channel leaks the goroutine":  "shared mechanism: `leak`",
-		"multi-defect|go-cancel-goroutine-leak|Send has no receiver after a timeout":    "shared mechanism: `leak`",
 		"csharp-client-per-request|multi-defect|Close files and remove failed uploads.": "shared mechanism: `exhaust`",
 
 		// Bare stems. Each is a keyword in a fixture this change does not own,
 		// and each credits prose that has noticed something else entirely.
 		"go-nil-deref|ts-unawaited-async|saveAll resolves before anything is stored":             "bare stem `discard`: a discarded promise is not a discarded error",
-		"multi-defect|go-nil-deref|http.Get's error is discarded":                                "bare stems `close`/`defer`: a deferred Close that panics is not a file left open",
-		"multi-defect|go-nil-deref|Handle the http.Get error before accessing resp.":             "bare stems `close`/`defer`, from the cached review",
 		"contract-break|go-package-singleton|Prefer passing the Set":                             "bare stem `consumer`",
 		"contract-break|ruby-default-page-size|Every consumer pays for the web client's default": "bare stem `consumer`",
 		// Found BY this loop, on its first run, against a probe added in the
@@ -1419,7 +1430,7 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 //
 // SeverityNote WAS MEASURED AS A SECOND SOURCE AND REJECTED, which is worth
 // recording because it is the obvious next field to reach for. Run through
-// matches() over every plant it is credited for 14, uncredited for 9, and absent
+// matches() over every plant it is credited for 13, uncredited for 10, and absent
 // from 6 — and the first version of this paragraph said "credited for 14 and
 // uncredited for 15", which folded the six plants that carry NO NOTE AT ALL into
 // the evidence. An empty haystack is uncredited by construction, so 40 percent of
@@ -2484,10 +2495,19 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 	// of it, since it was never a cross-tool score — and it is not evidence
 	// about how the incumbent rates the three levels this corpus previously
 	// could not resolve. Answering that takes a collection run.
+	// Every tuning fixture the incumbent has a cached review for. It was the
+	// original eight until the corpus was re-collected over all thirty; leaving
+	// it stale would compute the totals below over a corpus that no longer
+	// exists and read as the incumbent having changed, which is exactly what
+	// this guard refuses.
 	covered := map[string]bool{
 		"go-nil-deref": true, "go-sql-injection": true, "go-hardcoded-secret": true,
 		"python-command-injection": true, "clean-refactor": true, "style-only": true,
 		"multi-defect": true, "capacity-hint-nit": true,
+		"ts-unbounded-memo-key": true, "go-cancel-goroutine-leak": true,
+		"python-timing-unsafe-hmac": true, "cross-file-copy-nit": true,
+		"sorted-for-min-nit": true, "kotlin-widened-input": true,
+		"php-forbidden-vs-404": true, "go-package-singleton": true,
 	}
 
 	var (
@@ -2538,7 +2558,10 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 			"edited without re-collecting %s", cached, len(covered), crCacheDir)
 	}
 
-	want := SeverityScore{Accurate: 2, Inflated: 3, Understated: 2}
+	// Pinned over the sixteen tuning fixtures the incumbent now has reviews for.
+	// It was 2/3/2 over the original eight; the corpus was re-collected, not the
+	// reviewer re-run, so a change here means the corpus moved underneath it.
+	want := SeverityScore{Accurate: 5, Inflated: 3, Understated: 2}
 
 	if got.Accurate != want.Accurate || got.Inflated != want.Inflated || got.Understated != want.Understated {
 		t.Errorf("exact acc/infl/under = %d/%d/%d, want %d/%d/%d. This is EVIDENCE about this cache, "+
