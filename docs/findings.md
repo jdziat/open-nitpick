@@ -140,6 +140,75 @@ inflation bias for an understatement bias. The vocabularies differ in
 **resolution**, and no choice of constant fixes a resolution mismatch — hence
 Rule 6.
 
+## v1 head-to-head
+
+Both sides measured on the same 30-fixture corpus, `glm-5.2` and `kimi-k3` at two
+runs each. The deciding numbers come from the HELD-OUT corpus, which the prompt was
+never tuned against.
+
+### Detection — counted, no judge
+
+| planted level | plants | incumbent | kimi-k3 | glm-5.2 |
+|---|---|---|---|---|
+| critical | 2 | 1/2 | **2/2** | 1/2 |
+| error | 3 | 2/3 | **3/3** | 3/3 |
+| warning | 3 | 1/3 | **3/3** | 2/3 |
+| nit | 3 | 0/3 | **3/3** | 1/3 |
+| info | 2 | 0/2 | 0/2 | 0/2 |
+| **overall** | 13 | **4/13** | **10/13** | 7/13 |
+
+Two corrections were applied to this before publishing it, both of which it
+survives:
+
+- **Run-count asymmetry.** Our models ran twice and the incumbent's review is
+  cached from one run, so counting a defect as located if *any* run found it
+  flatters us. Single run against single run: kimi's WORSE run finds 9 of 11
+  against the incumbent's 4. (Eleven rather than thirteen because the two `info`
+  plants appear in no contender's findings at all.)
+- **The low-severity floor.** The incumbent reports nothing below `warning`, so
+  much of the gap could be a product-scope choice rather than a capability
+  difference. Restricted to `critical`/`error`/`warning` only — its own reporting
+  range — it is **4/8 against 8/8**. The advantage survives removing the floor
+  entirely.
+
+Resolution: 13 plants held out, so one defect is 0.077. The gap is five to six
+defects.
+
+### Precision — judged, and corroborated
+
+`0.82` for kimi-k3 against `0.83` for the incumbent. A tie, and the detection above
+is therefore not bought by reporting more noise. `glm-5.2` posts `1.00` with
+detection `0.54` — quiet and exact rather than a loser, and it is the cheaper model.
+
+Precision is judged rather than counted, so it was checked two ways. Across four
+runs over identical cached findings it returned `1.00` every time while the overall
+grade wandered 3.66–3.98 and the missed-defect count swung five-fold. And an
+independent second judge, from a vendor sharing nothing with any contender,
+re-scored the same 49 findings:
+
+| question | agreement |
+|---|---|
+| is this claim true | 98% |
+| would a senior reviewer leave this comment | 92% |
+| is the severity right | 86% |
+| is the class right | 86% |
+
+The per-finding judgement is reliable. The roll-up is not — which is why the grade
+column is not reported as a ranking in either direction.
+
+### What this does not say
+
+The overall letter grade (3.79 / 3.53 / 3.11) sits inside spreads of 2.60–4.30 and
+is not a ranking.
+
+`info` is 0 of 2 for every contender including ours. Either those plants are too
+subtle to be worth reporting or nothing reports at that level; this corpus cannot
+tell which.
+
+Severity and class agreement between judges is 86%, the weakest link in the chain.
+No severity-quality claim should rest on it — which is consistent with severity
+being the thing this project has gotten wrong most often.
+
 ## The incumbent's baseline, on the full corpus
 
 Incumbent was re-collected over all 30 fixtures after the corpus grew, because
