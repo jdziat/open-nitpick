@@ -39,6 +39,16 @@ const (
 	// EnvCapture names a directory to write every raw model response into.
 	// Those responses become offline regression fixtures.
 	EnvCapture = "NITPICK_EVAL_CAPTURE"
+
+	// EnvTimeout overrides how long a single review may take.
+	//
+	// The default suits a one-file fixture. It is not enough for a multi-file
+	// one: collecting the seven-file ts-unbounded-memo-key against the incumbent
+	// CLI exceeded four minutes and was refused -- correctly, since a truncated
+	// review must never be cached, but the run then had no way to ask for more
+	// time without editing this file. A corpus that now contains fixtures of very
+	// different sizes needs the bound to be settable per run.
+	EnvTimeout = "NITPICK_EVAL_TIMEOUT"
 )
 
 // The endpoint constant that used to live here is gone. internal/llm registers
@@ -257,6 +267,19 @@ func OptionsFromEnv() (Options, error) {
 		}
 
 		opts.Fixtures = kept
+	}
+
+	if raw := strings.TrimSpace(os.Getenv(EnvTimeout)); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil {
+			return opts, fmt.Errorf("%s=%q: %w", EnvTimeout, raw, err)
+		}
+		if d <= 0 {
+			// Zero would disable the bound entirely rather than widen it, and a
+			// review that never returns stalls the whole collection silently.
+			return opts, fmt.Errorf("%s=%q must be positive", EnvTimeout, raw)
+		}
+		opts.Timeout = d
 	}
 
 	opts.CaptureDir = strings.TrimSpace(os.Getenv(EnvCapture))

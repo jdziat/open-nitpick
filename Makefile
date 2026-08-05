@@ -133,6 +133,7 @@ JUDGE2   ?=
 # and edit the prompt. Records from the held-out corpus carry "held_out":true so
 # a file that ended up mixed can still be filtered.
 DUMP     ?=
+TIMEOUT  ?=
 
 # REJUDGE re-scores an ALREADY-COLLECTED dump with a different judge, running
 # no review at all:
@@ -184,6 +185,7 @@ tune:
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
 	$(if $(JUDGE2),NITPICK_EVAL_JUDGE2='$(JUDGE2)') \
 	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
+	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
 	go test -tags=eval -count=1 -timeout=45m -v -run TestTunePersona ./internal/evals/
 
 # Rank every model in the battery by JUDGED quality, not keyword recall.
@@ -194,6 +196,7 @@ judge-models:
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
 	$(if $(JUDGE2),NITPICK_EVAL_JUDGE2='$(JUDGE2)') \
 	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
+	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestJudgeModels ./internal/evals/
 
 # Head-to-head against Incumbent on identical fixtures, same judge.
@@ -206,6 +209,7 @@ benchmark:
 	$(if $(JUDGE2),NITPICK_EVAL_JUDGE2='$(JUDGE2)') \
 	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
 	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
+	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestBenchmarkAgainstIncumbent ./internal/evals/
 
 # Re-judge findings that were already collected, with a different judge.
