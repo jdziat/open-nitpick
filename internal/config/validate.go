@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -178,7 +179,62 @@ func (l Linters) validate() []error {
 		}
 	}
 
+	// A relative analyzer config is refused HERE rather than at run time,
+	// because relative to the working directory means relative to the tree under
+	// review — the one place a configuration may not come from. Rejecting it
+	// before a review starts is the difference between an operator learning they
+	// typed a path wrong and an operator learning nothing, since the runtime
+	// answer to a bad path is a skipped analyzer.
+	//
+	// Whether an absolute path actually lands outside the repository is decided
+	// by internal/linters, which is the only layer that knows where the
+	// repository is.
+	for _, c := range []struct{ key, path string }{
+		{"linters.golangci_config", l.GolangciConfig},
+		{"linters.ruff_config", l.RuffConfig},
+		{"linters.eslint_config", l.ESLintConfig},
+	} {
+		if err := checkAnalyzerConfigPath(c.key, c.path); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	// semgrep is the one that also accepts a registry reference, because a
+	// registry rule set is a fetch the operator asked for BY NAME. That is not
+	// the same as the `--config auto` this replaced, which was a network fetch
+	// of rules nobody chose.
+	if ref := strings.TrimSpace(l.SemgrepConfig); ref != "" && !SemgrepRegistryRef(ref) {
+		if err := checkAnalyzerConfigPath("linters.semgrep_config", ref); err != nil {
+			errs = append(errs, fmt.Errorf("%w, or a semgrep registry reference (p/... or r/...)", err))
+		}
+	}
+
 	return errs
+}
+
+// checkAnalyzerConfigPath requires an absolute path, or nothing.
+func checkAnalyzerConfigPath(key, path string) error {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil
+	}
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("%s %q must be an absolute path outside the repository under review", key, path)
+	}
+	return nil
+}
+
+// SemgrepRegistryRef reports whether a semgrep config value names a registry
+// rule set rather than a local file.
+//
+// Exported so that internal/linters, which decides containment, and this
+// package, which decides validity, cannot drift on what counts as a path. A
+// value that is not a registry reference has to be an absolute path outside the
+// repository, and getting that wrong in one place only would let `rules/x.yml`
+// pass validation and then be read out of the tree under review.
+func SemgrepRegistryRef(ref string) bool {
+	ref = strings.TrimSpace(ref)
+	return strings.HasPrefix(ref, "p/") || strings.HasPrefix(ref, "r/")
 }
 
 // prefixAll qualifies each error with its configuration path so a validation

@@ -114,3 +114,60 @@ linters:
 		t.Errorf("mode = %q; naming one linters key must not clear the others", cfg.Linters.Mode)
 	}
 }
+
+// TestAnalyzerConfigMustBeAbsolute rejects a relative analyzer config before a
+// review starts.
+//
+// Relative means relative to the working directory, which is the tree under
+// review — the one place analyzer configuration may not come from. Catching it
+// here rather than at run time is the difference between an operator learning
+// they typed a path wrong and learning nothing at all, because the runtime
+// answer to a bad path is an analyzer that quietly did not run.
+func TestAnalyzerConfigMustBeAbsolute(t *testing.T) {
+	for _, key := range []string{"golangci_config", "ruff_config", "eslint_config", "semgrep_config"} {
+		l := Defaults().Linters
+
+		switch key {
+		case "golangci_config":
+			l.GolangciConfig = ".golangci.yml"
+		case "ruff_config":
+			l.RuffConfig = "cfg/ruff.toml"
+		case "eslint_config":
+			l.ESLintConfig = "eslint.config.js"
+		case "semgrep_config":
+			l.SemgrepConfig = "rules/mine.yml"
+		}
+
+		errs := l.validate()
+		if len(errs) == 0 {
+			t.Errorf("linters.%s accepted a relative path; it would be read out of the tree "+
+				"under review", key)
+			continue
+		}
+		if !strings.Contains(errs[0].Error(), key) {
+			t.Errorf("error should name the key an operator has to edit, got: %v", errs[0])
+		}
+	}
+}
+
+// TestSemgrepConfigAcceptsARegistryReference: a registry rule set is named, not
+// discovered, which is what separates it from the `--config auto` it replaced.
+func TestSemgrepConfigAcceptsARegistryReference(t *testing.T) {
+	for _, ref := range []string{"p/python", "r/go.lang.security"} {
+		l := Defaults().Linters
+		l.SemgrepConfig = ref
+
+		if errs := l.validate(); len(errs) != 0 {
+			t.Errorf("linters.semgrep_config %q rejected: %v", ref, errs)
+		}
+		if !SemgrepRegistryRef(ref) {
+			t.Errorf("SemgrepRegistryRef(%q) = false; internal/linters would then treat it as a "+
+				"path and refuse it, so the two layers would disagree", ref)
+		}
+	}
+
+	// A bare name is a path, and a relative one.
+	if SemgrepRegistryRef("rules/mine.yml") {
+		t.Error("a relative path must not read as a registry reference")
+	}
+}

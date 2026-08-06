@@ -215,6 +215,61 @@ type Linters struct {
 	// cannot describe: one triage reworded past recognition, which is published
 	// with no analyzer attribution at all.
 	MaxSeverity Severity `yaml:"max_severity"`
+
+	// The four keys below name an analyzer configuration that must resolve
+	// OUTSIDE the repository under review. Empty is the default and means the
+	// analyzer runs with no configuration at all — isolated for golangci-lint
+	// and ruff, not run at all for eslint and semgrep.
+	//
+	// WHY THERE IS NO "read it from the repository" OPTION. This project
+	// already refuses to execute an analyzer binary that resolves inside the
+	// tree under review, on the reasoning that the tree is written by the change
+	// being reviewed. Analyzer configuration is the same object: it is policy,
+	// and a change may not supply the policy it is reviewed under — the
+	// invariant internal/config/basepolicy.go enforces for .nitpick.yaml. A
+	// .golangci.yml carrying `linters: {default: none}` switches off the entire
+	// deterministic half of its own review; a ruff `select = []` in
+	// pyproject.toml does the same for Python; adding an eslint.config.js is
+	// arbitrary JavaScript that eslint loads and EXECUTES with the review's
+	// credentials in the environment.
+	//
+	// These keys are not scrubbed by Config.sanitize, unlike base_url and
+	// persona.custom. Those name a network endpoint or free text that reaches a
+	// model, both of which a change can supply outright. A value here can only
+	// name a file the change cannot write, because internal/linters refuses any
+	// configuration that resolves inside the repository — so the worst a merged
+	// value does is point at a file the operator's own environment already has.
+
+	// GolangciConfig is an absolute path to a .golangci.yml outside the
+	// repository. Empty runs golangci-lint with --no-config.
+	GolangciConfig string `yaml:"golangci_config"`
+
+	// RuffConfig is an absolute path to a ruff.toml or pyproject.toml outside
+	// the repository. Empty runs ruff with --isolated.
+	RuffConfig string `yaml:"ruff_config"`
+
+	// ESLintConfig is an absolute path to an eslint flat config outside the
+	// repository. Empty means eslint does not run.
+	//
+	// It is off rather than isolated because eslint has no useful isolated mode:
+	// --no-config-lookup yields zero configured rules and therefore zero
+	// findings, for every repository, forever — which is the silencing this
+	// change exists to prevent, executed globally by our own hand. An external
+	// config also has to resolve its own plugin imports, so pointing this at a
+	// bare file is not enough; see the README.
+	ESLintConfig string `yaml:"eslint_config"`
+
+	// SemgrepConfig is an absolute path to a rule file outside the repository,
+	// or a registry reference (`p/...`, `r/...`). Empty means semgrep does not
+	// run.
+	//
+	// It is off rather than isolated because semgrep has no default ruleset:
+	// with no --config it analyzes nothing. Keying detection on this rather than
+	// on files in the tree is also what closes ENABLEMENT — semgrep used to
+	// switch itself on when the tree contained .semgrep.yml or .semgrepignore,
+	// so a pull request that ADDED one turned semgrep on with rules the pull
+	// request wrote, in the run reviewing it.
+	SemgrepConfig string `yaml:"semgrep_config"`
 }
 
 // CapSeverity reduces an analyzer-reported severity to the ceiling this

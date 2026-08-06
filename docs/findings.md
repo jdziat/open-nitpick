@@ -317,9 +317,76 @@ Escaping rather than rejecting: refusing a hostile filename would let a
 contributor hide a file from review by choosing that name, trading an injection
 hole for a silent-omission one.
 
-**Still open:** linter config in the tree (`.golangci.yml` with
-`linters: {default: none}` silences the deterministic half of the review), config
-deletion, and symlinked config. See the task list.
+**Analyzer configuration was the same hole, one layer down.** Every analyzer ran
+in the tree under review and read its configuration from it, so a `.golangci.yml`
+with `linters: {default: none}` silenced the deterministic half of the review, a
+`.semgrep.yml` a change ADDED switched semgrep on with rules that change wrote,
+and an `eslint.config.js` a change added executed arbitrary JavaScript in CI —
+the very thing `resolveBinary` already refused to do with the analyzer binary.
+Worse than any of those: golangci-lint's `forbidigo` prints a `msg` from the
+config file verbatim as finding text, so a change could author the words of a
+deterministic finding addressed to the reviewing model.
+
+Fixed by isolating rather than resolving from base. golangci-lint and ruff run
+with `--no-config` / `--isolated`; eslint and semgrep do not run until an
+operator names a configuration outside the repository. Base-revision
+materialisation was rejected: an eslint config is a *loader*, so an unmodified
+base config still executes files the change wrote, and for golangci-lint it would
+mean enumerating four filenames across every ancestor of every attacker-chosen
+target directory, where each miss fails quiet.
+
+**Isolating the configuration was not enough, because configuration was not the
+only channel.** golangci-lint reports a failure to LOAD the packages inside the
+same JSON envelope it reports issues in — `{"Issues":[],"Report":{"Error":
+"typechecking error: ..."}}` with exit 7 — and the parser declared only `Issues`.
+So a pull request that added a `go.work` not listing the module, or a
+`//go:build ignore` line, switched off the whole Go arm of its own review by
+adding one file, with the run reporting success in `strict` as well as `auto`.
+Fixed by reading the failure the tool reports, and by refusing any report from a
+process that exited non-zero — golangci-lint runs with `--issues-exit-code 0`,
+so a non-zero exit there cannot mean "found something". The same shape existed
+one analyzer over: semgrep reports a rule set it cannot compile in `errors[]`
+beside an empty `results[]`.
+
+**And those two guards still missed the member of that class nobody has to
+attack: code that does not compile.** Both key on a signal golangci-lint does not
+send for it. A package that fails to type-check is reported as an ordinary
+`typecheck` Issue — exit **0**, `Report.Error` **empty**, and anchored to line 1
+of the alphabetically first file in the package rather than the file that failed.
+Measured against 2.8.0: one broken file abandons the entire invocation, so a
+second healthy package in the same run reports nothing either, and under the
+default `only_changed_lines` the single issue is dropped by `normalize` because
+line 1 was not touched. End to end that was zero published findings, a nil error,
+and status `ran: isolated` — byte-identical to a clean review, in `strict` as
+well as `auto`. The sharpest form is a broken `_test.go`, which `go build ./...`
+does not catch, so CI stays green while the Go review of everything else in the
+change silently reports nothing; the everyday form is any work-in-progress pull
+request that does not build. Fixed by reading a `typecheck` issue as what it is —
+the loader saying it could not analyze the code, not a lint result — and quoting
+the failure's own `Text`, which names the file that actually failed where `Pos`
+names one that compiled.
+
+**Detection was answering the wrong question, and then guessing about it.** It
+required `go.mod` and `package.json` at the CHECKOUT ROOT, so in a monorepo the
+Go and JavaScript analyzers never ran at all — for any change, with nothing in
+any diff to show it — and the status line said "its binary is not on PATH, or
+this repository has none of the files it looks for", which was a guess between
+two causes that were both false. Detection now asks whether the change contains
+files the analyzer reads and whether they sit in a module it can lint, runners
+report their own reason, and "nothing of its kind in this change" is a separate
+outcome from "it could not run" so that `strict` does not fail over the former.
+
+**And the disclosure did not reach the reader it was for.** The per-analyzer
+statuses went to stderr — a CI log — while the documentation said they appeared
+beside the `.nitpick.yaml` substitution notice, which is published on the pull
+request. They are now published there too.
+
+**Still open:** `go.mod` deletion (a change that deletes it stops the Go
+analyzer; that is visible in the diff and reported as `did not run`), hard-linked
+analyzer configs (`EvalSymlinks` cannot see one; git cannot create one either),
+and in-source suppression — `//nolint`, `# noqa`, `# nosemgrep`,
+`eslint-disable` on the change's own lines. golangci-lint offers no way to
+disable its own. See the task list.
 
 ## What is not yet known
 

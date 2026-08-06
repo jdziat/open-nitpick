@@ -169,7 +169,7 @@ func reviewSemgrepReport(t *testing.T, out string, tune func(*config.Config)) (*
 func reviewSemgrepReportWith(t *testing.T, out string, model *scriptedTriage, tune func(*config.Config)) (*review.Report, *scriptedTriage) {
 	t.Helper()
 
-	found, err := (&semgrep{}).findings([]byte(out))
+	found, err := (&semgrep{}).findings([]byte(out), 0)
 	if err != nil {
 		t.Fatalf("parse semgrep output: %v", err)
 	}
@@ -455,7 +455,7 @@ const golangciNit = `{"Issues":[{"FromLinter":"govet",` +
 // the second half of this test shows the operator's own floor is what decides
 // it.
 func TestAnAnalyzerNitIsBelowTheDefaultPublicationFloor(t *testing.T) {
-	found, err := (&golangciLint{}).findings([]byte(golangciNit))
+	found, err := (&golangciLint{}).findings([]byte(golangciNit), 0)
 	if err != nil {
 		t.Fatalf("parse golangci-lint output: %v", err)
 	}

@@ -207,15 +207,17 @@ func fenceFor(s string) string {
 
 // renderSummary builds the walkthrough comment.
 //
-// The policy notice and the withheld list are the two parts review.summary does
-// not switch off. That setting asks for less narration; it is not permission to
-// change what a review means without saying so. Everything else here describes
-// FILES, and suppressing those costs a reader context — while these two describe
-// a finding the reviewer produced and something else then removed, and a
-// configuration the change supplied and this run refused. With summaries off and
-// these suppressed too, a run whose only finding an expert overruled, or whose
-// policy came from somewhere other than the file in the change, publishes
-// nothing at all and is indistinguishable from a clean review.
+// The policy notice, the analyzer roster and the withheld list are the three
+// parts review.summary does not switch off. That setting asks for less
+// narration; it is not permission to change what a review means without saying
+// so. Everything else here describes FILES, and suppressing those costs a reader
+// context — while these three describe a finding the reviewer produced and
+// something else then removed, a configuration the change supplied and this run
+// refused, and a deterministic analyzer that did not run. With summaries off and
+// these suppressed too, a run whose only finding an expert overruled, whose
+// policy came from somewhere other than the file in the change, or whose Go
+// analyzer never produced a report, publishes nothing at all and is
+// indistinguishable from a clean review.
 func renderSummary(report *Report, cfg *config.Config) string {
 	var b strings.Builder
 
@@ -223,6 +225,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// findings, these skips and these budgets are the product of a policy that
 	// is not the one in the change.
 	b.WriteString(policyNotice(report))
+	b.WriteString(linterNotice(report))
 
 	if cfg == nil || cfg.Review.Summary {
 		b.WriteString(walkthrough(report))
@@ -275,6 +278,67 @@ func policyNotice(report *Report) string {
 			"for reviews after it lands. To try it out first, pass `-config` a copy kept\n"+
 			"outside the repository.",
 		inline(report.Policy.Modified), report.Policy.Source()))
+}
+
+// linterNotice states, ON THE PULL REQUEST, what each deterministic analyzer
+// did.
+//
+// THE BUG: these statuses reached os.Stderr and nowhere else, while the README
+// said they appeared "beside the notice about a substituted .nitpick.yaml". They
+// did not, and the difference is the whole point of both. policyNotice is
+// published where the reviewer reads; a Fprintf into a CI log is not, so a
+// reviewer could not tell a clean Go review from one whose Go analyzer never
+// produced a report — which a pull request could arrange by adding a go.work.
+//
+// The headline goes in the <summary>, which forges render whether or not anyone
+// expands the block: a reader who never opens it still learns that something did
+// not run. The roster inside is COMPLETE rather than only the degradations,
+// because a shorter list next run tells nobody which line went missing.
+func linterNotice(report *Report) string {
+	if len(report.Linters) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "\n<details>\n<summary>%s</summary>\n\n", linterHeadline(report.Linters))
+	b.WriteString("Analyzer configuration is policy, and a change may not supply the policy it is\n" +
+		"reviewed under, so no analyzer read this repository's own lint settings.\n\n")
+
+	// inline on both, because State carries an analyzer's own words and those
+	// quote the tree under review — golangci-lint's typechecking errors name
+	// paths from it. A reason spanning two lines, or carrying markup, would be
+	// text the change wrote rendering as markup in a comment posted under this
+	// bot's name.
+	for _, s := range report.Linters {
+		fmt.Fprintf(&b, "- %s — %s: %s\n", inline(s.Linter), s.Outcome, inline(s.State))
+	}
+
+	b.WriteString("\n</details>\n")
+	return b.String()
+}
+
+// linterHeadline counts the outcomes for the one line a reader sees collapsed.
+//
+// It counts rather than names, and it never says "all clear": the summary of a
+// run where nothing ran has to read as a run where nothing ran.
+func linterHeadline(statuses []LinterStatus) string {
+	counts := map[LinterOutcome]int{}
+	for _, s := range statuses {
+		counts[s.Outcome]++
+	}
+
+	var parts []string
+	for _, outcome := range []LinterOutcome{LinterRan, LinterFailed, LinterSkipped} {
+		if n := counts[outcome]; n > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n, outcome))
+		}
+	}
+	if len(parts) == 0 {
+		return "Deterministic analyzers"
+	}
+
+	return "Deterministic analyzers: " + strings.Join(parts, ", ")
 }
 
 // policyFailureNotice explains, on the pull request, why no review ran at all.
@@ -414,8 +478,26 @@ func overruledNotes(report *Report) string {
 // oneLine collapses text onto a single line.
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
-// inline prepares model-authored text for a bullet: one line, and unable to
-// leave the element it is rendered inside.
+// inline prepares untrusted text for a bullet: one line, and no raw HTML.
+//
+// IT DOES NOT NEUTRALIZE MARKDOWN, and the comment here used to say it made
+// text "unable to leave the element it is rendered inside", which is false in a
+// forge comment where markdown IS the rendering language. `<b>` is escaped;
+// `[text](https://example)` is not, and renders as a live link.
+//
+// That matters because some of what reaches here is written by the change under
+// review, not by a model: an analyzer's failure reason quotes the tree, and a
+// Go compile error quotes source verbatim — `var X int = "[CLICK](https://...)"`
+// puts that string in golangci-lint's message, measured against 2.8.0. The
+// result is a link the change authored, rendered inside a comment posted under
+// this bot's name.
+//
+// Not fixed here because the fix is not this function: two call sites already
+// wrap it in a code span, where backslash escapes would render literally and
+// corrupt the paths they show. Neutralizing markdown means deciding per call
+// site whether the text is prose or a code span, and giving the code-span cases
+// a backtick-safe fence like fenceFor does for blocks. Recorded in the README's
+// security section rather than half-done.
 func inline(s string) string { return html.EscapeString(oneLine(s)) }
 
 // skipNotes lists files that were not reviewed, grouped by reason.

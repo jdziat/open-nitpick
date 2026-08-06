@@ -31,9 +31,25 @@ var DefaultIgnore = []string{
 	"**/*.pdf",
 }
 
-// DefaultLinters lists runners considered in auto mode. Only those actually
-// detected in the repository are executed.
-var DefaultLinters = []string{"golangci-lint", "ruff", "eslint", "semgrep"}
+// DefaultLinters lists the runners enabled out of the box. Only those with
+// something to read in the change are executed.
+//
+// eslint and semgrep are NOT here, and their absence is the whole point: both
+// refuse to run without an operator configuration outside the repository —
+// eslint because its config is JavaScript it would execute, semgrep because it
+// has no default rule set — so neither can ever run under the shipped defaults.
+//
+// THE BUG THAT CAUSED: with all four listed, `mode: strict` failed EVERY review
+// out of the box, on "linter semgrep is enabled but not available: not
+// configured". Strict means "an analyzer I asked for did not run", and nobody
+// asked for these two — the default list did. Listing an analyzer that cannot
+// run also spent a line of the published roster, on every pull request forever,
+// saying nothing; that is how a reader learns to skip the block where a real
+// absence is announced.
+//
+// Naming either in linters.enabled still works and still means it: strict then
+// does catch an operator who enabled one without configuring it.
+var DefaultLinters = []string{"golangci-lint", "ruff"}
 
 // Defaults returns the built-in configuration. The default model reads
 // LLM_PROVIDER/LLM_MODEL-style environment configuration only after validation

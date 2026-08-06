@@ -69,6 +69,59 @@ type LinterRunner interface {
 	Run(ctx context.Context, files diff.Files) ([]Finding, error)
 }
 
+// LinterStatusReporter is a LinterRunner that can say how each analyzer was
+// configured. Optional, so a driver wiring its own runner is not forced to.
+type LinterStatusReporter interface {
+	Statuses() []LinterStatus
+}
+
+// LinterStatus is how one deterministic analyzer was configured for a run, and
+// whether it ran at all.
+//
+// It is reported for the same reason Plan.Skipped and Plan.Degraded are: an
+// analyzer that did not run, or ran under a reduced ruleset, produces the same
+// silence as one that found nothing. Analyzers do not read configuration from
+// the branch under review — a change may not supply the policy it is reviewed
+// under — and that containment costs the repository's own lint settings, so the
+// cost is stated rather than left for someone to notice.
+type LinterStatus struct {
+	// Linter is the analyzer's name, as it appears in linters.enabled.
+	Linter string
+
+	// Outcome is what happened, for a reader who needs to sort a degradation
+	// from a non-event without parsing State.
+	Outcome LinterOutcome
+
+	// State says which of the three it was, in the words a human reads:
+	// "isolated" or "operator config <path>" when it ran, and the reason
+	// otherwise.
+	State string
+}
+
+// LinterOutcome is what happened to one analyzer.
+//
+// The three are separate because two of them look identical in a report and are
+// not the same fact. An analyzer that was ENABLED AND APPLICABLE and did not run
+// is a hole in the review; one that had nothing of its kind to read — ruff in a
+// Go-only change — is a non-event. Collapsing them is what made a status block
+// worth skipping: three lines of "did not run" on every pull request, of which
+// only one ever meant anything.
+type LinterOutcome string
+
+// The outcomes an analyzer can have.
+const (
+	// LinterRan means the analyzer produced a report. State says under what
+	// configuration.
+	LinterRan LinterOutcome = "ran"
+
+	// LinterSkipped means the change contained no files this analyzer reads.
+	LinterSkipped LinterOutcome = "skipped"
+
+	// LinterFailed means it was expected to run and did not, or ran and could
+	// not produce a usable report. State says why.
+	LinterFailed LinterOutcome = "did not run"
+)
+
 // Report is the outcome of a review.
 type Report struct {
 	// Findings are the published findings, most severe first.
@@ -105,6 +158,10 @@ type Report struct {
 	// aside for the review, and anything downstream still reading the file
 	// hands one of those keys back.
 	Policy Policy
+
+	// Linters records how each deterministic analyzer was configured, and which
+	// did not run. See LinterStatus.
+	Linters []LinterStatus
 }
 
 // Complete reports whether every planned file was actually reviewed.
@@ -235,6 +292,12 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 			// Linters are evidence, not a gate. Losing the whole review
 			// because a linter misbehaved would be a bad trade.
 			e.log().Warn("linters failed", "error", err)
+		}
+		// Read AFTER Run and regardless of its error: the statuses are how the
+		// analyzers were configured and which of them did not run, which is
+		// most worth publishing exactly when something went wrong.
+		if reporter, ok := runner.(LinterStatusReporter); ok {
+			report.Linters = reporter.Statuses()
 		}
 		findings = append(findings, lint...)
 	}
@@ -1042,12 +1105,19 @@ func renderForTriage(pr *vcs.PullRequest, findings []Finding) string {
 	fmt.Fprintf(&b, "%d findings were reported across separate batches:\n\n", len(findings))
 	for i, f := range findings {
 		// The title is flattened onto one line. An analyzer message can contain
-		// newlines -- golangci-lint's typecheck emits ": # pkg\n./main.go:8:2:
-		// undefined: x" verbatim -- and an unflattened one breaks the numbered
-		// list the triage model answers against, so its reply cannot be matched
-		// back through Finding.Key(). The finding then arrives at the gate with no
-		// Source and no RawSeverity, which is how a capped analyzer finding
-		// escaped the operator's ceiling and failed a critical gate.
+		// newlines -- a semgrep rule whose `message:` is a YAML block scalar
+		// arrives as "shell=True passes the string to /bin/sh.\nUse a list
+		// argument instead.\n", measured against semgrep 1.172.0 -- and an
+		// unflattened one breaks the numbered list the triage model answers
+		// against, so its reply cannot be matched back through Finding.Key().
+		// The finding then arrives at the gate with no Source and no
+		// RawSeverity, which is how a capped analyzer finding escaped the
+		// operator's ceiling and failed a critical gate.
+		//
+		// golangci-lint's typecheck output was the example here and is no longer
+		// reachable: a compile failure is now a runner error rather than a
+		// finding, because the analysis it reports did not happen. See
+		// golangciLint.findings.
 		fmt.Fprintf(&b, "%d. [%s] %s:%d — %s\n", i+1, f.Severity, f.Path, f.Line, oneLineTitle(f.Title))
 		if f.Category != "" {
 			fmt.Fprintf(&b, "   category: %s\n", f.Category)

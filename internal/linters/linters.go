@@ -11,8 +11,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -50,13 +52,43 @@ type Runner interface {
 	// Name identifies the runner in configuration and logs.
 	Name() string
 
-	// Detect reports whether this analyzer is usable in the repository: its
-	// binary is on PATH and the project actually looks like one it applies to.
-	Detect(ctx context.Context, repoRoot string) bool
+	// Detect reports why this analyzer will not run over the given changed
+	// files, and nil when it will. errNoTargets means the change contains
+	// nothing it reads, which is not a degradation.
+	//
+	// IT RETURNS THE REASON RATHER THAN A BOOL because the caller was inventing
+	// one. A false used to be reported to the operator as "its binary is not on
+	// PATH, or this repository has none of the files it looks for" — a guess
+	// between two causes, printed where the real cause (a config refused, a
+	// module the old detection could not see, no Python in a Go change) was
+	// already known here and thrown away.
+	Detect(ctx context.Context, repoRoot string, files []string) error
 
 	// Run analyzes the given repository-relative files.
 	Run(ctx context.Context, repoRoot string, files []string) ([]Finding, error)
 }
+
+// errNoTargets is Detect's answer when the change contains no files this
+// analyzer reads.
+//
+// It is a distinct answer from "it could not run" because the two are different
+// facts about the review and only one of them is a degradation: ruff sitting out
+// a Go-only change is not a Python review that went missing, and reporting it as
+// one both fails strict mode for nothing and teaches a reader to skip the block
+// where real absences are announced.
+var errNoTargets = errors.New("the change contains no files it analyzes")
+
+// notOnPath is the reason an analyzer whose binary is missing did not run.
+func notOnPath(name string) error {
+	return fmt.Errorf("%s is not on PATH", name)
+}
+
+// stateful is a runner that can describe where its configuration came from.
+//
+// It is separate from Runner so that a test double is not forced to have an
+// opinion about analyzer configuration, and because the string is for a human
+// reading the run's report rather than for anything in this package's logic.
+type stateful interface{ State() string }
 
 // Set runs the configured analyzers. It implements review.LinterRunner.
 type Set struct {
@@ -64,6 +96,9 @@ type Set struct {
 	cfg      *config.Config
 	log      *slog.Logger
 	runners  []Runner
+
+	mu       sync.Mutex
+	statuses []review.LinterStatus
 }
 
 // New builds the analyzer set described by the configuration.
@@ -73,7 +108,7 @@ func New(repoRoot string, cfg *config.Config, log *slog.Logger) *Set {
 	}
 
 	available := map[string]Runner{}
-	for _, r := range builtins() {
+	for _, r := range builtins(repoRoot, cfg) {
 		available[r.Name()] = r
 	}
 
@@ -90,14 +125,69 @@ func New(repoRoot string, cfg *config.Config, log *slog.Logger) *Set {
 	return &Set{repoRoot: repoRoot, cfg: cfg, log: log, runners: selected}
 }
 
-// builtins lists the analyzers shipped with open-nitpick.
-func builtins() []Runner {
+// builtins lists the analyzers shipped with open-nitpick, each holding its
+// operator-supplied configuration already resolved against repoRoot.
+//
+// Resolution happens once, here, rather than per Run: whether a configuration is
+// outside the repository is a property of the operator's setting and the
+// checkout, not of the file list, and deciding it at construction is what lets
+// Detect refuse a runner whose configuration was rejected.
+func builtins(repoRoot string, cfg *config.Config) []Runner {
 	return []Runner{
-		&golangciLint{},
-		&ruff{},
-		&eslint{},
-		&semgrep{},
+		&golangciLint{cfg: fileConfig(repoRoot, cfg.Linters.GolangciConfig)},
+		&ruff{cfg: fileConfig(repoRoot, cfg.Linters.RuffConfig)},
+		&eslint{cfg: fileConfig(repoRoot, cfg.Linters.ESLintConfig)},
+		&semgrep{cfg: semgrepConfig(repoRoot, cfg.Linters.SemgrepConfig)},
 	}
+}
+
+// Statuses reports how each configured analyzer was set up and whether it ran.
+// It is populated by Run and empty before it.
+//
+// It exists because analyzer isolation is a DEGRADATION a reader has to be told
+// about, in the same way .nitpick.yaml substitution is: under the default no
+// analyzer reads the repository's own lint settings, and eslint and semgrep do
+// not run at all. A review that quietly ran less than the operator believes is
+// the failure mode this whole change is about, so it must not be reproduced by
+// the fix.
+//
+// "Your linter did not run" must never be only a slog.Warn in a CI log — and for
+// one release it was only a Fprintf to the same CI log, which is the letter of
+// that sentence and not its point. The reader who has to know is the one reading
+// the pull request, so review.Render publishes these; see linterNotice.
+func (s *Set) Statuses() []review.LinterStatus {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	out := append([]review.LinterStatus(nil), s.statuses...)
+
+	// By name, because the recording order is whichever goroutine finished
+	// first. This ends up in a published comment, and a block that reshuffles
+	// itself between runs reads as something having changed when nothing did.
+	slices.SortFunc(out, func(a, b review.LinterStatus) int {
+		return strings.Compare(a.Linter, b.Linter)
+	})
+	return out
+}
+
+// record stores one analyzer's outcome for Statuses.
+func (s *Set) record(linter string, outcome review.LinterOutcome, state string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.statuses = append(s.statuses, review.LinterStatus{
+		Linter:  linter,
+		Outcome: outcome,
+		State:   state,
+	})
+}
+
+// state describes a runner's configuration, for runners that have one.
+func state(r Runner) string {
+	if s, ok := r.(stateful); ok {
+		return s.State()
+	}
+	return "configured"
 }
 
 // Run analyzes the changed files and returns findings as review findings.
@@ -128,13 +218,32 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 	)
 
 	for _, r := range s.runners {
-		if !r.Detect(ctx, s.repoRoot) {
+		if err := r.Detect(ctx, s.repoRoot, paths); err != nil {
+			// The runner's OWN reason, never a reconstruction. What was here
+			// sniffed the runner's state string for "not configured" and
+			// replaced everything else with a guess between a missing binary
+			// and missing project files — so the commonest real cause, a
+			// module the detection could not see, was reported as one of two
+			// things that were not true.
+			reason := oneLine(err.Error())
+
+			if errors.Is(err, errNoTargets) {
+				// Not a degradation, so it is recorded and nothing else: an
+				// analyzer with nothing to read has not gone missing, and
+				// failing strict mode over it would make strict unusable in
+				// every repository that is not polyglot.
+				s.record(r.Name(), review.LinterSkipped, reason)
+				continue
+			}
+
+			s.record(r.Name(), review.LinterFailed, reason)
+
 			if s.cfg.Linters.Mode == config.LinterStrict {
 				mu.Lock()
-				errs = append(errs, fmt.Errorf("linter %s is enabled but not available", r.Name()))
+				errs = append(errs, fmt.Errorf("linter %s is enabled but not available: %s", r.Name(), reason))
 				mu.Unlock()
 			} else {
-				s.log.Debug("linter not detected; skipping", "linter", r.Name())
+				s.log.Warn("linter did not run", "linter", r.Name(), "reason", reason)
 			}
 			continue
 		}
@@ -156,6 +265,7 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 			defer mu.Unlock()
 
 			if err != nil {
+				s.record(r.Name(), review.LinterFailed, oneLine(err.Error()))
 				s.log.Warn("linter failed", "linter", r.Name(), "error", err)
 				if s.cfg.Linters.Mode == config.LinterStrict {
 					errs = append(errs, fmt.Errorf("linter %s: %w", r.Name(), err))
@@ -163,6 +273,7 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 				return
 			}
 
+			s.record(r.Name(), review.LinterRan, state(r))
 			s.log.Debug("linter finished", "linter", r.Name(), "findings", len(found))
 			for _, f := range found {
 				f.Rule = prefixRule(r.Name(), f.Rule)
@@ -391,20 +502,71 @@ func safePaths(paths []string) (kept, rejected []string) {
 	return kept, rejected
 }
 
-// runCommand executes an analyzer and returns stdout.
+// analyzerEnv returns this process's environment with set applied and unset
+// removed, for analyzers whose behaviour an environment variable can change.
+//
+// A nil result means "inherit unchanged", which is what exec does with a nil
+// Cmd.Env; callers that need no adjustment pass nil directly.
+func analyzerEnv(set map[string]string, unset ...string) []string {
+	drop := map[string]bool{}
+	for _, k := range unset {
+		drop[k] = true
+	}
+	for k := range set {
+		drop[k] = true
+	}
+
+	env := make([]string, 0, len(os.Environ())+len(set))
+	for _, kv := range os.Environ() {
+		name, _, ok := strings.Cut(kv, "=")
+		if ok && drop[name] {
+			continue
+		}
+		env = append(env, kv)
+	}
+	for k, v := range set {
+		env = append(env, k+"="+v)
+	}
+
+	return env
+}
+
+// oneLine collapses text onto a single line, for a status a human reads.
+func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+// runCommand executes an analyzer and returns its stdout and exit status.
 //
 // Analyzers conventionally exit non-zero when they find problems, which is the
 // normal case here, so a non-zero exit with usable stdout is not treated as a
-// failure. Only an exit with no output at all is.
-func runCommand(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
+// failure HERE. It is not therefore harmless, and this function is not the place
+// that decides: whether a given exit code means "found something" or "did not
+// run" is the analyzer's own convention, so the code is returned and the runner
+// that knows reads it. golangci-lint is invoked with --issues-exit-code 0 and
+// semgrep documents 0 and 1 as success, and both of them report a failed
+// analysis with a non-zero exit AND a well-formed report on stdout — which used
+// to arrive here as success and decode to zero findings.
+//
+// An exit of ZERO with no output is caught downstream by decodeJSON, which
+// requires a payload.
+//
+// env replaces the whole environment when non-nil; see analyzerEnv.
+//
+// repoRoot and workDir are separate arguments because they stopped being the
+// same thing: golangci-lint is invoked inside the module that owns the changed
+// package, which in a monorepo is a subdirectory. Containment has to stay
+// anchored to the CHECKOUT, since the whole checkout is what the change wrote —
+// keyed on the working directory instead, a binary the pull request added at
+// <repo>/tools would be refused for a root module and accepted for a nested one.
+func runCommand(ctx context.Context, repoRoot, workDir, name string, env []string, args ...string) ([]byte, int, error) {
 	// Resolve against PATH and refuse anything inside the tree under review.
-	bin, err := resolveBinary(name, dir)
+	bin, err := resolveBinary(name, repoRoot)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", name, err)
+		return nil, 0, fmt.Errorf("%s: %w", name, err)
 	}
 
 	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Dir = dir
+	cmd.Dir = workDir
+	cmd.Env = env
 
 	// Kill the process group if it ignores cancellation, so a wedged analyzer
 	// cannot outlive the review.
@@ -416,20 +578,36 @@ func runCommand(ctx context.Context, dir, name string, args ...string) ([]byte, 
 
 	runErr := cmd.Run()
 	out := []byte(stdout.String())
-	err = runErr
 
-	if err != nil && len(strings.TrimSpace(stdout.String())) == 0 {
+	if runErr != nil && len(strings.TrimSpace(stdout.String())) == 0 {
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, fmt.Errorf("%s: %w", name, ctxErr)
+			return nil, 0, fmt.Errorf("%s: %w", name, ctxErr)
 		}
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
-			msg = err.Error()
+			msg = runErr.Error()
 		}
-		return nil, fmt.Errorf("%s: %s", name, truncate(msg, 400))
+		return nil, 0, fmt.Errorf("%s: %s", name, truncate(msg, 400))
 	}
 
-	return out, nil
+	return out, exitCode(runErr), nil
+}
+
+// exitCode reads a process's exit status out of the error Run returned.
+//
+// A failure that is not an exit at all — the process was signalled, or never
+// started — reports -1 rather than 0, so that a caller reading "did it exit
+// cleanly" cannot be told yes by something that never exited.
+func exitCode(runErr error) int {
+	if runErr == nil {
+		return 0
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) {
+		return exitErr.ExitCode()
+	}
+	return -1
 }
 
 func truncate(s string, max int) string {

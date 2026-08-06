@@ -3,6 +3,8 @@ package linters
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -32,15 +34,26 @@ func parse(t *testing.T, d string) diff.Files {
 
 // fakeRunner is a scripted analyzer.
 type fakeRunner struct {
-	name     string
-	detected bool
-	findings []Finding
-	err      error
-	ran      bool
+	name      string
+	detected  bool
+	detectErr error
+	findings  []Finding
+	err       error
+	ran       bool
 }
 
-func (f *fakeRunner) Name() string                        { return f.name }
-func (f *fakeRunner) Detect(context.Context, string) bool { return f.detected }
+func (f *fakeRunner) Name() string { return f.name }
+
+func (f *fakeRunner) Detect(context.Context, string, []string) error {
+	if f.detected {
+		return nil
+	}
+	if f.detectErr != nil {
+		return f.detectErr
+	}
+	return errors.New("scripted as undetected")
+}
+
 func (f *fakeRunner) Run(context.Context, string, []string) ([]Finding, error) {
 	f.ran = true
 	return f.findings, f.err
@@ -418,18 +431,31 @@ func TestDecodeJSONIgnoresSurroundingNoise(t *testing.T) {
 	}
 }
 
-func TestDecodeJSONWithNoPayload(t *testing.T) {
-	// An analyzer that printed only prose found nothing; that is not an error.
+// TestDecodeJSONRequiresAPayload pins the assertion that an analyzer actually
+// reported.
+//
+// THE BUG IT REPLACES: this test used to assert the opposite — that output with
+// no JSON in it is "the analyzer found nothing and said so in prose", and
+// therefore not an error. None of the four analyzers behaves that way:
+// golangci-lint prints {"Issues":[]}, ruff and eslint print [], semgrep prints
+// its envelope. So the only things reaching that branch were failures, and
+// combined with runCommand — which errors only when stdout is empty AND the exit
+// was non-zero — an analyzer that exited 0 printing nothing was indistinguishable
+// from clean code. `semgrep --config auto --metrics off` had been shipping in
+// exactly that state.
+func TestDecodeJSONRequiresAPayload(t *testing.T) {
 	var parsed golangciOutput
 
-	if err := decodeJSON([]byte("   "), &parsed); err != nil {
-		t.Errorf("empty output should not error: %v", err)
-	}
-	if err := decodeJSON([]byte("no issues found"), &parsed); err != nil {
-		t.Errorf("prose-only output should not error: %v", err)
-	}
-	if len(parsed.Issues) != 0 {
-		t.Errorf("issues = %+v, want none", parsed.Issues)
+	for _, out := range []string{"", "   ", "no issues found"} {
+		err := decodeJSON([]byte(out), &parsed)
+		if err == nil {
+			t.Errorf("decodeJSON(%q) returned no error. An analyzer that printed no report has "+
+				"not reported zero findings; it has not reported", out)
+			continue
+		}
+		if !strings.Contains(err.Error(), "no JSON report") {
+			t.Errorf("error should say the report is missing, got: %v", err)
+		}
 	}
 }
 
@@ -447,10 +473,21 @@ func TestDecodeJSONReportsMalformedPayload(t *testing.T) {
 	}
 }
 
-func TestGoPackageDirsDeduplicates(t *testing.T) {
-	got := goPackageDirs([]string{"a/b/x.go", "a/b/y.go", "c/z.go", "readme.md"})
-	if len(got) != 2 {
-		t.Fatalf("dirs = %v, want 2 unique package directories", got)
+func TestGoTargetsDeduplicatesWithinAModule(t *testing.T) {
+	repo := t.TempDir()
+	if err := os.WriteFile(filepath.Join(repo, "go.mod"), []byte("module probe\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := goTargets(repo, []string{"a/b/x.go", "a/b/y.go", "c/z.go", "readme.md"})
+	if len(got) != 1 {
+		t.Fatalf("targets = %+v, want one invocation for the single module", got)
+	}
+	if got[0].Module != "" {
+		t.Errorf("module = %q, want the repository root", got[0].Module)
+	}
+	if len(got[0].Dirs) != 2 {
+		t.Errorf("dirs = %v, want 2 unique package directories", got[0].Dirs)
 	}
 }
 

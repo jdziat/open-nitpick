@@ -131,6 +131,7 @@ func runReview(ctx context.Context, args []string) error {
 
 	fmt.Fprintf(os.Stderr, "\nReviewed %d file(s): %s\n", report.Plan.Files(), report.Counts)
 	printPolicy(report)
+	printLinters(report)
 	printOverruled(report)
 
 	if report.Failed(gate(report, f.failOn, cfg)) {
@@ -228,6 +229,34 @@ func printPolicy(report *review.Report) {
 		fmt.Fprintf(os.Stderr,
 			"Ignored endpoint settings from that policy: %s (set %s=1 where you control the file).\n",
 			strings.Join(policy.Dropped, ", "), config.EnvTrustConfigEndpoints)
+	}
+}
+
+// printLinters reports how each deterministic analyzer was configured, and
+// which of them did not run.
+//
+// It sits beside printPolicy because it says the same kind of thing: the review
+// did not use configuration that lives in the repository. .nitpick.yaml
+// substitution has been announced here since it was introduced; analyzer
+// isolation announced nothing, so a run where eslint and semgrep never
+// executed, and golangci-lint ignored the repository's own .golangci.yml,
+// looked exactly like a run where all four were clean.
+//
+// It is NOT the disclosure, though it was briefly the only one. An operator
+// running this locally reads stderr; the person who has to know that a review
+// covered less than it looks like is reading the pull request, and
+// review.linterNotice is what reaches them.
+//
+// Everything is printed, not only the degradations. "golangci-lint: isolated"
+// is the fact that the repository's lint settings did not apply, and a reader
+// who sees a shorter list next run has no way to tell which line went missing.
+func printLinters(report *review.Report) {
+	if len(report.Linters) == 0 {
+		return
+	}
+
+	for _, s := range report.Linters {
+		fmt.Fprintf(os.Stderr, "Analyzer %s %s: %s.\n", s.Linter, s.Outcome, s.State)
 	}
 }
 

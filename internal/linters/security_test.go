@@ -46,7 +46,7 @@ func TestEslintRefusesRepoLocalBinary(t *testing.T) {
 	e := &eslint{}
 
 	// Detect must not be satisfied by the repository-local binary alone.
-	if e.Detect(context.Background(), repo) && !available("eslint") {
+	if err := e.Detect(context.Background(), repo, []string{"app.js"}); err == nil && !available("eslint") {
 		t.Error("Detect should not be satisfied by a repo-supplied binary")
 	}
 
@@ -107,23 +107,8 @@ func TestSafePathsDropsFlagLikePaths(t *testing.T) {
 	}
 }
 
-func TestRunnersUseEndOfOptions(t *testing.T) {
-	// Every runner must terminate its own flags before the file list, so a
-	// path that survives safePaths still cannot be read as an option.
-	src, err := os.ReadFile("runners.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	body := string(src)
-
-	for _, want := range []string{
-		`"--issues-exit-code", "0", "--"`, // golangci-lint
-		`"--quiet", "--"`,                 // ruff
-		`"--no-color", "--"`,              // eslint
-		`"--metrics", "off", "--"`,        // semgrep
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("missing end-of-options separator: expected to find %s", want)
-		}
-	}
-}
+// The end-of-options property moved to TestRunnersTerminateTheirFlagsBeforeThe
+// FileList in containment_test.go. What used to be here grepped runners.go for
+// literal argument strings, which broke whenever an argument moved and never
+// showed that any of it reached a process. The replacement drives each runner
+// and reads the argv its binary received.
