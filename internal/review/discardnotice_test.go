@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -241,13 +242,21 @@ func TestAModelFindingDroppedByAnchoringIsNotCounted(t *testing.T) {
 	}
 }
 
-// uncovered is the ledger of a run where golangci-lint ran, reported nothing,
-// and had not read the change: one file the build excludes, and one suppression
-// the change added.
+// uncovered is the ledger of a run where golangci-lint ran and covered less of
+// the change than "ran" implies: one file the build excludes, one suppression
+// the change added, and one module whose go directive switched off checks that
+// would otherwise have run.
+//
+// The third is here because it is the one that does not describe a file of the
+// change at all. It anchors to the module's go.mod, which the change need not
+// have touched, and it is the one entry that means REDUCED coverage rather than
+// absent coverage — so a renderer that assumed every entry names an unread file
+// of the diff is wrong about it.
 func uncovered() []LinterUncovered {
 	return []LinterUncovered{
 		{Linter: "golangci-lint", Path: "app_windows.go", Reason: UncoveredBuildExcluded},
 		{Linter: "golangci-lint", Path: "app.go", Line: 1, Reason: UncoveredSuppressed},
+		{Linter: "golangci-lint", Path: "go.mod", Line: 3, Reason: UncoveredLanguageVersion},
 	}
 }
 
@@ -268,10 +277,14 @@ func TestTheUncoveredPartsOfAChangeArePublished(t *testing.T) {
 	for _, want := range []string{
 		string(UncoveredBuildExcluded),
 		string(UncoveredSuppressed),
-		// Named individually, because both are things a reviewer has to go and
-		// look at and a count would leave nobody able to find them.
+		string(UncoveredLanguageVersion),
+		// Named individually, because each is something a reviewer has to go and
+		// look at and a count would leave nobody able to find them. go.mod:3 most
+		// of all: it is nowhere in the diff, so a reader cannot reach it by
+		// opening the change.
 		"app_windows.go",
 		"app.go:1",
+		"go.mod:3",
 	} {
 		if !strings.Contains(published, want) {
 			t.Errorf("the published review never says %q:\n%s", want, published)
@@ -295,8 +308,18 @@ func TestTheUncoveredHeadlineIsVisibleWithoutExpandingIt(t *testing.T) {
 	if !ok {
 		t.Fatalf("no collapsed heading at all:\n%s", summary)
 	}
-	if !strings.Contains(headline, "2 file") {
+	if !strings.Contains(headline, "3 file") {
 		t.Errorf("the collapsed heading does not carry the file count:\n%s", headline)
+	}
+
+	// And it does not overstate what it found. Two of the three entries mean the
+	// file went unread; the go directive means the file was read under a reduced
+	// ruleset, and a headline saying an analyzer reported nothing about it would
+	// be false about that one. A block that overstates is a block readers learn
+	// to discount, which costs the entries that are not overstated.
+	if strings.Contains(headline, "reported nothing about") {
+		t.Errorf("the collapsed heading claims every entry went unreported, which is false of a "+
+			"module whose go directive merely narrowed the ruleset:\n%s", headline)
 	}
 }
 
@@ -455,5 +478,106 @@ func TestTheEngineCarriesUncoveredPartsThroughToThePullRequest(t *testing.T) {
 	if !strings.Contains(provider.published.Summary, "app_windows.go") {
 		t.Errorf("the published review reports a clean Go run over a file no analyzer read:\n%s",
 			provider.published.Summary)
+	}
+}
+
+// TestTheUncoveredListIsBoundedPerReason: an ordinary pull request can produce
+// hundreds of entries for ONE reason, and a body the forge rejects is worse than
+// a shorter list.
+//
+// `go mod vendor` adds a directory of Go files that review.ignore withholds from
+// every analyzer, and a port adds a directory of _windows.go. GitHub caps a
+// review body at 65536 bytes — summaryFallback exists because a pull request
+// deleting thousands of files already produced an enormous skipped-files section
+// — so an unbounded list here would trade the coverage notice for the whole
+// review.
+//
+// The bound is per reason so that a bulk route cannot push the others off the
+// end, and the headline still counts every file: the total a reader sees is
+// never the truncated one.
+func TestTheUncoveredListIsBoundedPerReason(t *testing.T) {
+	const vendored = maxUncoveredPerReason * 3
+
+	entries := []LinterUncovered{
+		{Linter: "golangci-lint", Path: "app_windows.go", Reason: UncoveredBuildExcluded},
+	}
+	for i := range vendored {
+		entries = append(entries, LinterUncovered{
+			Linter: "golangci-lint",
+			Path:   fmt.Sprintf("vendor/example.com/pkg%d/token.go", i),
+			Reason: UncoveredNotSelected,
+		})
+	}
+
+	published := renderSummary(&Report{Plan: &bundle.Plan{}, Uncovered: entries}, nil)
+
+	if !strings.Contains(published, string(UncoveredNotSelected)) {
+		t.Errorf("the notice never says why the vendored files went unanalyzed:\n%s", published)
+	}
+	if got := strings.Count(published, "vendor/example.com/"); got != maxUncoveredPerReason {
+		t.Errorf("the notice lists %d vendored paths, want %d and a count for the rest",
+			got, maxUncoveredPerReason)
+	}
+	if want := fmt.Sprintf("…and %d more", vendored-maxUncoveredPerReason); !strings.Contains(published, want) {
+		t.Errorf("the notice never says %q, so the list reads as complete:\n%s", want, published)
+	}
+	// The other reason is one entry and must survive the flood intact: it is the
+	// one nobody would find on their own.
+	if !strings.Contains(published, "app_windows.go") {
+		t.Errorf("the bulk reason pushed the single build-excluded file out of the notice:\n%s", published)
+	}
+	// And the headline counts what was there, not what was printed.
+	if !strings.Contains(published, fmt.Sprintf("%d file(s)", vendored+1)) {
+		t.Errorf("the collapsed heading reports the truncated count rather than the real one:\n%s", published)
+	}
+}
+
+// TestAChangeNothingReviewedSaysSoRatherThanReadingClean is the emptiest review
+// there is, and it used to be the cleanest-looking one.
+//
+// When every changed file is set aside there are no batches to send, so the
+// engine returns before any model or analyzer is asked anything and the summary
+// renders empty — at which point the forge publishes its own default body,
+// "open-nitpick found nothing to comment on", for a change nothing read. One
+// file under vendor/ reaches it, and vendored code is compiled into the binary.
+func TestAChangeNothingReviewedSaysSoRatherThanReadingClean(t *testing.T) {
+	report := &Report{Plan: &bundle.Plan{Skipped: []bundle.Skip{
+		{Path: "vendor/example.com/evil/evil.go", Reason: bundle.ReasonIgnored},
+		{Path: "logo.png", Reason: bundle.ReasonIgnored},
+	}}}
+
+	cfg := config.Defaults()
+	cfg.Review.Summary = false
+
+	published := Render(report, diff.Files{}, cfg).Summary
+
+	if !strings.Contains(published, "Nothing in this change was reviewed") {
+		t.Fatalf("a change nothing looked at publishes no summary at all, so the forge's default "+
+			"body reports it as clean:\n%q", published)
+	}
+	// Counted rather than named: `go mod vendor` is hundreds of files, and the
+	// reader owns the ignore list that produced them.
+	if !strings.Contains(published, bundle.ReasonIgnored+": 2 file(s)") {
+		t.Errorf("the notice does not say how much was set aside, or why:\n%s", published)
+	}
+	if strings.Contains(published, "evil.go") {
+		t.Errorf("the notice names files it promised to count, which is what a vendor bump makes "+
+			"unpublishable:\n%s", published)
+	}
+}
+
+// TestAReviewThatRanSaysNothingAboutHavingReviewedNothing is the other
+// direction: the notice above must not appear on an ordinary review.
+//
+// A false "nothing was reviewed" is worse than the silence it replaced — it
+// tells a reader to discount findings that were produced by a real review.
+func TestAReviewThatRanSaysNothingAboutHavingReviewedNothing(t *testing.T) {
+	report := &Report{Plan: &bundle.Plan{
+		Batches: []bundle.Batch{{}},
+		Skipped: []bundle.Skip{{Path: "logo.png", Reason: bundle.ReasonIgnored}},
+	}}
+
+	if published := renderSummary(report, nil); strings.Contains(published, "Nothing in this change was reviewed") {
+		t.Errorf("a review with batches to send claims nothing was reviewed:\n%s", published)
 	}
 }

@@ -8,11 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"go/build"
+	"go/parser"
 	"go/scanner"
 	"go/token"
+	"go/version"
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -721,11 +724,97 @@ func positionsRewritten(repoRoot string, targets []goTarget) string {
 // already says so in the roster, and adding "and by the way it did not read this
 // file" underneath is noise about a thing the reader has already been told.
 type covering interface {
-	Uncovered(repoRoot string, files []string, diffs diff.Files) []review.LinterUncovered
+	Uncovered(ctx context.Context, repoRoot string, files []string, diffs diff.Files) []review.LinterUncovered
 }
 
-// Uncovered names the changed Go files golangci-lint's report says nothing
-// about, and the suppression directives this change added.
+// goBuildContext is the part of the go tool's configuration that decides what
+// the analyzer's package loader will actually read.
+//
+// IT IS ASKED OF THE GO TOOL, and that is the whole point of the type. Both
+// fields were read out of this process before — build.Default.CgoEnabled for
+// cgo, a constant for the language floor — and both were wrong for the same
+// reason: they answer a question about OUR process while the analysis happens in
+// a child that resolves its configuration differently. cmd/go reads CGO_ENABLED
+// from the environment AND from the go env config file ($(go env GOENV), what
+// `go env -w` writes and what a builder image ordinarily uses); go/build reads
+// only os.Getenv and never that file. See cgoExcluded.
+type goBuildContext struct {
+	// CgoEnabled is the child's CGO_ENABLED, which decides whether a file
+	// importing "C" is part of its package or dropped from it.
+	CgoEnabled bool
+
+	// Language is the language version of the toolchain that will load the
+	// packages, in go/version's form ("go1.25"), or "" when it could not be
+	// read. It is the ceiling on the version-gated checks any module here can
+	// receive; see golangciLint.Uncovered.
+	Language string
+}
+
+// goEnvironment asks the go tool for the build context the analyzer will run
+// under.
+//
+// One invocation per review, in the environment the analyzer child is given —
+// GOTOOLCHAIN=local included, so this reports the toolchain that will actually
+// load the packages rather than one go.mod could ask to be downloaded. `go env`
+// reads configuration and builds nothing, so it does not execute the tree the
+// way `go list` would.
+//
+// A FAILURE FALLS BACK TO THIS PROCESS'S OWN VIEW, which is what the two
+// callers used unconditionally before. That path is close to unreachable in a
+// run that gets this far: golangci-lint's package loader shells out to the same
+// go tool, so a missing or broken one has already produced a report findings()
+// refuses, and Uncovered is asked only of an analyzer that ran without error.
+func goEnvironment(ctx context.Context, repoRoot string) goBuildContext {
+	fallback := goBuildContext{
+		CgoEnabled: build.Default.CgoEnabled,
+		Language:   version.Lang(runtime.Version()),
+	}
+
+	out, _, err := runCommand(ctx, repoRoot, repoRoot, "go",
+		analyzerEnv(map[string]string{"GOTOOLCHAIN": "local"}), "env", "CGO_ENABLED", "GOVERSION")
+	if err != nil {
+		return fallback
+	}
+
+	got, ok := parseGoEnv(out)
+	if !ok {
+		return fallback
+	}
+	return got
+}
+
+// parseGoEnv reads the output of `go env CGO_ENABLED GOVERSION`.
+//
+// `go env` prints each named variable on its own line, in the order asked for.
+// This splits by LINE rather than by field, which is not a stylistic choice:
+// GOVERSION carries spaces on a development toolchain ("devel go1.26-abc123
+// ..."), and a variable with no value prints an EMPTY line, so a whitespace
+// split would slide the second answer into the first one's place and report the
+// Go version as the cgo setting.
+func parseGoEnv(out []byte) (goBuildContext, bool) {
+	lines := strings.Split(strings.ReplaceAll(string(out), "\r\n", "\n"), "\n")
+	if len(lines) < 2 {
+		return goBuildContext{}, false
+	}
+
+	got := goBuildContext{
+		CgoEnabled: strings.TrimSpace(lines[0]) == "1",
+		Language:   version.Lang(strings.TrimSpace(lines[1])),
+	}
+	if !version.IsValid(got.Language) {
+		// A development toolchain reports a GOVERSION with no language version
+		// in it. Empty rather than a guess, because the caller must be able to
+		// tell "not known" from "known to be X" — it names a module on a pull
+		// request for the second.
+		got.Language = ""
+	}
+	return got, true
+}
+
+// Uncovered names the parts of the change golangci-lint covered less of than
+// its roster line implies: files its report says nothing about, files this
+// review never offered it, the suppression directives this change added, and the
+// modules whose declared language version narrowed the ruleset.
 //
 // THE ATTACK IT CLOSES, reproduced against golangci-lint 2.8.0. The package-load
 // failures findings() catches are the LOUD shape of a tree silencing the Go
@@ -754,11 +843,24 @@ type covering interface {
 // //go:build grammar are the toolchain's, and an approximation of them is a list
 // of the cases somebody thought of.
 //
-// The build context is the process's own — golangci-lint inherits the same
-// GOOS/GOARCH and is given no build tags — so this answers the question the run
-// actually depends on. It cannot see cgo: with CGO_ENABLED=0 the go tool ignores
-// a file importing "C" and MatchFile still matches it, so that one file shape is
-// a residual rather than a covered case.
+// GOOS/GOARCH come from this process, which golangci-lint inherits and is given
+// no build tags on top of, so MatchFile answers the constraint question the run
+// depends on. It could not answer the cgo one: with cgo off the go tool drops a
+// file importing "C" from the package and MatchFile still matches it, because
+// MatchFile reads build constraints and filename suffixes and never the import
+// list. That was disclosed as a residual and disclosure is not the reader of a
+// review seeing it, so it is detected here; see cgoExcluded. Whether cgo is off
+// is asked of the go tool rather than of this process — see goEnvironment.
+//
+// A CHANGED FILE WITH NO MODULE ABOVE IT IS THE THIRD SHAPE, and it was the
+// quietest of the three because nothing in this file was even asked about it.
+// goTargets drops such a file, correctly — there is no module to run
+// golangci-lint in — and Detect turns that into a published reason only when NO
+// changed Go file has a module. In a monorepo with backend/go.mod, a change
+// touching backend/app.go and tools/evil.go analyzed the first and said nothing
+// whatever about the second: one published finding, the roster saying the
+// analyzer ran, and an empty coverage list. Partial coverage now names the part
+// that was not covered.
 //
 // SUPPRESSION IS THE OTHER HALF, and it is here because it is the same fact
 // about the same run: the analyzer read the file and was told to say nothing.
@@ -775,12 +877,66 @@ type covering interface {
 // comments are its own policy and listing them on every pull request is how a
 // notice gets collapsed and never opened again; a directive that arrived in this
 // diff is the thing a reviewer has to weigh.
-func (g *golangciLint) Uncovered(repoRoot string, files []string, diffs diff.Files) []review.LinterUncovered {
+//
+// A CHANGED FILE THIS REVIEW NEVER OFFERED TO AN ANALYZER IS THE FOURTH, and it
+// arrives from our own side of the fence rather than from the tree. reviewablePaths
+// drops every path matching review.ignore before any runner is handed a path, and
+// `**/vendor/**` and `**/testdata/**` are in the shipped defaults. Measured: a
+// change touching app.go and vendor/token.go with an IDENTICAL errcheck violation
+// in each published only app.go's, with the roster saying the analyzer ran and an
+// empty coverage list — a changed Go file carrying a real violation that nothing
+// looked for and nothing mentioned. Vendored code is compiled into the binary, so
+// "nobody reviews vendor" is a policy about review effort, not about whether the
+// code runs.
+//
+// It is reported only when NO ANALYZED PACKAGE COVERED THE FILE ANYWAY, because
+// the ignore list decides which paths are SELECTED and golangci-lint analyzes
+// whole package directories. Measured, same fixture: token.gen.go, token.pb.go
+// and token_generated.go all match the default ignore list and all had their
+// findings published, because app.go put their directory on the target list.
+// Naming those would be a coverage gap that is not there, which is the same
+// defect as missing one.
+//
+// AND THE LAST ONE IS NOT ABOUT A FILE OF THE CHANGE AT ALL. Every entry above
+// says a file went unread; a module's `go` directive says the file WAS read and
+// part of the ruleset was not applied to it, which is a reduced analysis rather
+// than an absent one. It is here because it is the same question — how much of
+// this change did the analyzer actually cover — and it is the only answer to it
+// that a reader cannot reach by opening the diff. See analyzedLanguageCeiling.
+func (g *golangciLint) Uncovered(ctx context.Context, repoRoot string, files []string, diffs diff.Files) []review.LinterUncovered {
 	var out []review.LinterUncovered
+
+	// Once per review, and asked of the go tool rather than of this process:
+	// both the cgo question and the language-version ceiling are decided in the
+	// child, and answering them from build.Default and a constant is what two
+	// separate silencings went through. See goEnvironment.
+	goEnv := goEnvironment(ctx, repoRoot)
+
+	// The modules that own at least one changed Go file, in first-seen order.
+	// They are collected here rather than taken from goTargets so that the loop
+	// which decides "this file had no module" and the loop which reads each
+	// module's go.mod cannot disagree about which modules were involved.
+	seen := map[string]bool{}
+	var modules []string
 
 	for _, f := range filterExt(files, ".go") {
 		rel := filepath.ToSlash(f)
 		full := filepath.Join(repoRoot, filepath.FromSlash(f))
+
+		module, owned := goModuleFor(repoRoot, goPackageDir(rel))
+		if !owned {
+			out = append(out, review.LinterUncovered{
+				Linter: g.Name(), Path: rel, Reason: review.UncoveredNoModule,
+			})
+			// Nothing below applies: a file no invocation was given cannot be
+			// build-excluded from an analysis that never included it, and its
+			// comments suppress nothing.
+			continue
+		}
+		if !seen[module] {
+			seen[module] = true
+			modules = append(modules, module)
+		}
 
 		// (false, err) is a file we could not read, which is not the same claim
 		// as a file the build excludes; golangci-lint reports its own read
@@ -794,6 +950,13 @@ func (g *golangciLint) Uncovered(repoRoot string, files []string, diffs diff.Fil
 			})
 			// No suppression scan: nothing read the file, so what its comments
 			// say about the analyzer is beside the point.
+			continue
+		}
+
+		if cgoExcluded(full, goEnv.CgoEnabled) {
+			out = append(out, review.LinterUncovered{
+				Linter: g.Name(), Path: rel, Reason: review.UncoveredCgoDisabled,
+			})
 			continue
 		}
 
@@ -816,7 +979,303 @@ func (g *golangciLint) Uncovered(repoRoot string, files []string, diffs diff.Fil
 		}
 	}
 
+	out = append(out, g.notSelected(repoRoot, files, diffs)...)
+
+	// Per MODULE and not per file, because that is the scope of the fact: one
+	// `go` line decides which version-gated checks ran over every package under
+	// it. Reported whether or not the change touched go.mod — unlike a //nolint,
+	// which is listed only when the change added it. The two are different
+	// because of volume and because of visibility: a repository can hold hundreds
+	// of pre-existing nolint comments, where this is one entry per module, and a
+	// reader can see a //nolint by opening the file the review already points at,
+	// while a `go` directive three directories up is nowhere in the diff.
+	for _, module := range modules {
+		mod := path.Join(module, "go.mod")
+
+		declared, line, ok := moduleLanguageVersion(filepath.Join(repoRoot, filepath.FromSlash(mod)))
+		if !ok || !belowAnalyzedLanguage(declared, goEnv.Language) {
+			continue
+		}
+		out = append(out, review.LinterUncovered{
+			Linter: g.Name(), Path: mod, Line: line, Reason: review.UncoveredLanguageVersion,
+		})
+	}
+
 	return out
+}
+
+// notSelected names the changed Go files this review never handed to an
+// analyzer, and that no analyzed package covered anyway.
+//
+// files is what the runner was given — reviewablePaths' output, with review.ignore
+// already applied — and diffs is the whole change, so the difference between them
+// is precisely what the review withheld. Two things put a path there: the ignore
+// list, which is the ordinary cause, and safePaths, which withholds a path an
+// analyzer would read as a flag. Neither is written by the change (a change may
+// not supply the policy it is reviewed under), which is why this reads as an
+// entry about the review rather than an accusation about the diff — and why the
+// reason string names neither cause as though it were the only one.
+//
+// The directory check is what keeps the entries true. golangci-lint is given
+// package directories, so an ignored file sharing one with a selected file IS
+// analyzed: measured, token.gen.go beside app.go had its errcheck violation
+// published. Only a file in a directory nothing analyzed went unread.
+//
+// Deletions and files with no added lines are skipped. There is nothing left to
+// analyze in the first, and no line of the second belongs to this change, so
+// silence about either is not a gap this change opened.
+func (g *golangciLint) notSelected(repoRoot string, files []string, diffs diff.Files) []review.LinterUncovered {
+	selected := map[string]bool{}
+	for _, f := range files {
+		selected[filepath.ToSlash(f)] = true
+	}
+
+	analyzed := map[string]bool{}
+	for _, t := range goTargets(repoRoot, files) {
+		for _, dir := range t.Dirs {
+			analyzed[path.Join(t.Module, strings.TrimPrefix(dir, "./"))] = true
+		}
+	}
+
+	var out []review.LinterUncovered
+	for _, f := range diffs {
+		rel := filepath.ToSlash(f.Path)
+		switch {
+		case path.Ext(rel) != ".go", selected[rel],
+			f.Binary, f.Kind == diff.ChangeDeleted, len(f.ChangedLines()) == 0,
+			analyzed[goPackageDir(rel)]:
+			continue
+		}
+		out = append(out, review.LinterUncovered{
+			Linter: g.Name(), Path: rel, Reason: review.UncoveredNotSelected,
+		})
+	}
+	return out
+}
+
+// cgoExcluded reports whether the go tool drops this file from its package
+// because it imports "C" while cgo is off.
+//
+// THE RESIDUAL IT CLOSES, reproduced against golangci-lint 2.8.0 and go1.25.5.
+// With CGO_ENABLED=0, a file importing "C" and one ordinary sibling beside it:
+// zero findings, exit 0, a nil error, the roster line "ran", and — before this —
+// an empty coverage list. It is the same shape as the build-constraint gap and
+// it was reachable without writing anything unusual, because CGO_ENABLED=0 is
+// the default in most Go CI images: the errcheck violation in the cgo file is
+// reported with cgo on and silent with it off, measured both ways.
+//
+// It parses rather than asking build.Default.MatchFile, because MatchFile CANNOT
+// answer this: it reads build constraints and the filename, and the fact that
+// decides a cgo file's fate is in the import list. Measured — MatchFile returns
+// true for this file with CGO_ENABLED=0 and with it set to 1.
+//
+// ImportsOnly stops at the import block, so the cost is bounded by the top of
+// the file rather than by its size, and a body that does not parse — cgo files
+// carry C in a comment, not in Go — cannot make this lie. A file that does not
+// parse AT ALL returns false: golangci-lint reports its own parse failures
+// through typecheck, findings() turns that into a refusal, and a second opinion
+// invented here would be a guess about a run that already failed loudly.
+// cgoEnabled is the CHILD'S, read from the go tool by goEnvironment, and the
+// argument exists because reading it from this process was a second silencing of
+// exactly the file this function was written for. build.Default.CgoEnabled is
+// filled in at go/build's package init from os.Getenv alone; cmd/go resolves
+// CGO_ENABLED from the environment AND from the go env config file at
+// $(go env GOENV), which is what `go env -w CGO_ENABLED=0` writes and the
+// ordinary way to configure a builder image without exporting variables.
+// Measured against golangci-lint 2.8.0, CGO_ENABLED absent from the process
+// environment: with the key in that file the child reported CGO_ENABLED=0, the
+// cgo file's errcheck violation vanished, build.Default.CgoEnabled was still
+// true so this returned false, and the coverage list was empty — the state the
+// function exists to prevent, reached through the config file instead of the
+// variable. It was the same mistake as the MatchFile one diagnosed above: the
+// detector keyed to a proxy for the child's build context rather than to the
+// child's build context.
+func cgoExcluded(file string, cgoEnabled bool) bool {
+	if cgoEnabled {
+		return false
+	}
+
+	parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
+	if err != nil {
+		return false
+	}
+	for _, spec := range parsed.Imports {
+		// Unquoted rather than compared as a literal: the spec makes an import
+		// path any string literal, so `C` in back quotes is the same import and
+		// a comparison against "\"C\"" would miss it.
+		if p, err := strconv.Unquote(spec.Path.Value); err == nil && p == "C" {
+			return true
+		}
+	}
+	return false
+}
+
+// goAssumedLanguageVersion is what the go tool assumes for a module whose go.mod
+// carries no `go` directive at all.
+//
+// Measured rather than taken from the documentation: a go.mod reading only
+// `module probe` reports the same nothing as `go 1.16` on a file using
+// strings.Title, io/ioutil and rand.Seed, where `go 1.20` reports all three. A
+// missing directive is therefore a declared version like any other and is
+// reported like one, with line 0 because there is no line to send a reader to.
+const goAssumedLanguageVersion = "1.16"
+
+// belowAnalyzedLanguage reports whether a module's declared Go language version
+// is below the toolchain analyzing it, so that version-gated checks this run
+// could have applied were not applied to it.
+//
+// WHAT THE `go` DIRECTIVE DOES, measured against golangci-lint 2.8.0 and go1.25.5 on
+// a file importing io/ioutil. With `go 1.24` in go.mod the review publishes
+// SA1019, `"io/ioutil" has been deprecated`. Change that one line to `go 1.15`
+// and the finding is gone: zero findings, the roster saying golangci-lint ran,
+// an empty discard list and an empty coverage list — byte-identical to a clean
+// review, from one line in a file the change can edit.
+//
+// IT IS NOT CLOSABLE FROM THE CONFIG WE OWN, which is why it is named rather
+// than fixed. Both routes were tried against 2.8.0: `run.go: "1.25"` does not
+// restore the finding, and neither does `linters.settings.staticcheck.checks:
+// ["all"]` — with `checks: all` staticcheck demonstrably runs, because ST1000
+// appears, and SA1019 still does not. The module's declared language version
+// wins over anything the analyzer is configured with, and we may not edit go.mod
+// to raise it: it is the tree under review.
+//
+// THIS USED TO BE A CONSTANT FLOOR OF 1.21 AND THE FLOOR WAS THE BUG. The
+// argument for it was volume — every Go release deprecates something, so
+// "below the newest" is true of nearly every module, and a notice that fires on
+// ordinary code is one reviewers learn to collapse. What it actually bought was
+// silence at the modal directive. Measured, one file using reflect.PtrTo
+// (deprecated in 1.22) and cipher.NewCFBEncrypter (deprecated in 1.24), sweeping
+// the directive: `go 1.22` publishes the first, `go 1.24` publishes both, and
+// `go 1.21` and `go 1.21.4` publish NEITHER while the coverage list stays empty
+// — the review byte-identical to a clean one. Run as an attack it is a diff that
+// edits go.mod from `go 1.25` to `go 1.21` and adds the file; go 1.21 to 1.23 are
+// the ordinary directives in live repositories, so the floor was silent in the
+// common case, and its entire disclosed cost was a paragraph like this one, which
+// nobody reading a pull request ever sees.
+//
+// THE CLAIM THAT BOUNDED IT WAS FALSE, and it is worth saying which one, because
+// it is the sentence that made the floor look safe: "the compiler gates language
+// FEATURES on this same directive, so lowering it below what the code uses does
+// not go quiet, it fails". True at `go 1.15` — generics there produce `type
+// parameter requires go1.18 or later`, which findings() turns into "the code did
+// not compile". It is nothing at the floor: at `go 1.21` every language feature
+// through 1.21 compiles, generics included, and every deprecation issued since is
+// off. A bound that only holds far below the threshold does not bound the
+// threshold.
+//
+// WHAT THE CEILING GIVES UP, in the other direction, because a false coverage gap
+// is as much a defect as a missed one. The gate staticcheck applies is its own
+// table of deprecations, not the toolchain's standard library, so a module
+// declaring one release behind a toolchain whose deprecations the analyzer does
+// not yet know about is named for a reduction that is currently empty. That is
+// the same over-report goNolintLines accepts for `//nolint:nosuchlinter`, in the
+// same direction: the entry claims the ruleset was narrower than this run could
+// apply, which is exactly the state of the run, and the alternative was measured
+// to hide real findings. A module that keeps its directive current — this
+// repository's own does — is named on no review at all.
+//
+// The comparison is go/version's, which is the toolchain's own, for the reason
+// goDirectiveLine is go/scanner's: an ordering hand-written over "1.9" and
+// "1.10" is a list of the cases somebody thought of. Lang() first because a
+// go.mod may carry a full release (`go 1.21.4`) and it is the language version
+// that gates the checks.
+//
+// EITHER SIDE UNREADABLE REPORTS FALSE — say nothing rather than guess, in both
+// directions. A go.mod version go/version cannot read does not load either, and
+// golangci-lint reports that failure itself through the channel findings()
+// already refuses on. An unreadable ceiling is a development toolchain, whose
+// GOVERSION carries no language version at all; naming every module in the
+// checkout because we could not read our own toolchain would be a wall of
+// coverage gaps invented out of an unanswered question.
+func belowAnalyzedLanguage(declared, ceiling string) bool {
+	v := "go" + declared
+	if !version.IsValid(v) || !version.IsValid(ceiling) {
+		return false
+	}
+	return version.Compare(version.Lang(v), version.Lang(ceiling)) < 0
+}
+
+// moduleLanguageVersion reads the Go language version a go.mod declares, with
+// the 1-based line of the `go` directive.
+//
+// It reads the file rather than running `go list -m`, because go.mod is part of
+// the tree under review and asking the go tool about it is another way to
+// execute what the change wrote — the same reasoning that put GOTOOLCHAIN=local
+// on every golangci-lint invocation.
+//
+// The accepted grammar is go.mod's, which is small and is why this is hand-read
+// rather than given to a parser: the file is line-oriented, `//` is its only
+// comment form, and the `go` directive is a top-level line `go <version>`. The
+// first one wins, matching the go tool, which rejects a second with "repeated go
+// statement".
+//
+// TOP-LEVEL IS ENFORCED HERE AND USED NOT TO BE. The comment that stood here
+// said the directive "cannot appear inside a parenthesized block. Nothing else
+// can be mistaken for it", and offered as the reason that `go` is a reserved
+// module path, so no require line begins with that word. The premise is about
+// what the go tool ACCEPTS; this function runs before anything has accepted
+// anything, over a file the change is free to write. Measured, the go.mod
+//
+//	module probe
+//
+//	require (
+//		go 1.99
+//	)
+//
+//	go 1.25
+//
+// returned ("1.99", 4, true) — the block entry read as the directive, and the
+// real one on line 7 never reached. Reserved-ness is checked by the loader, and
+// the loader's answer arrives after this.
+//
+// It was not exploitable at the time it was found, because that go.mod does not
+// load and the review says so in the loader's own words. That is a property of
+// the surrounding run rather than of this function, and it is not one to leave
+// load-bearing: the same misread with a version the loader tolerates would put
+// an attacker-chosen number where the ceiling comparison reads it. Depth is
+// counted instead, which costs two lines and removes the class rather than the
+// instance.
+//
+// A go.mod that cannot be read reports false: goModuleFor found the file, so a
+// read failure here means something is wrong with the checkout, and every
+// analyzer in the run is about to say so in its own words.
+func moduleLanguageVersion(modFile string) (declared string, line int, ok bool) {
+	src, err := os.ReadFile(modFile)
+	if err != nil {
+		return "", 0, false
+	}
+
+	// Parenthesis depth, so that a `go` line inside require/exclude/replace/
+	// retract/godebug/tool is read as what it is — a block entry — and not as the
+	// module's directive. Indentation cannot stand in for this: go.mod permits a
+	// top-level directive to be indented, which is why the scan below uses Fields
+	// in the first place.
+	depth := 0
+
+	for i, raw := range strings.Split(string(src), "\n") {
+		if comment := strings.Index(raw, "//"); comment >= 0 {
+			raw = raw[:comment]
+		}
+
+		// Fields rather than a split on " ": it absorbs leading indentation,
+		// which go.mod permits, and the trailing \r of a file written on Windows.
+		if fields := strings.Fields(raw); depth == 0 && len(fields) >= 2 && fields[0] == "go" {
+			return fields[1], i + 1, true
+		}
+
+		// After the check and not before it: `require (` opens the block on the
+		// line that names it, and the directive itself never carries a paren, so
+		// no top-level `go` is ever hidden by its own line.
+		depth += strings.Count(raw, "(") - strings.Count(raw, ")")
+		if depth < 0 {
+			// Unbalanced. The file does not load either, and guessing which of
+			// the two readings the author meant is how a misread becomes a
+			// number the ceiling comparison trusts.
+			return "", 0, false
+		}
+	}
+
+	return goAssumedLanguageVersion, 0, true
 }
 
 // goNolintLines returns the lines carrying a golangci-lint nolint directive.
@@ -902,22 +1361,31 @@ type goTarget struct {
 //
 // Files with no go.mod above them are dropped rather than guessed at: there is
 // no module to run in, and inventing one gets "no go files to analyze" with an
-// empty report. Detect reports that case as a reason a reader sees.
+// empty report.
+//
+// THE SENTENCE THAT USED TO BE HERE SAID DETECT REPORTS THAT CASE, and Detect
+// only reports it when EVERY changed Go file lands in it — the whole-analyzer
+// reason "no go.mod at or above the changed Go files". A monorepo makes the
+// partial case ordinary, and the partial case is the dangerous one: with
+// backend/go.mod present, a change touching backend/app.go and tools/evil.go
+// analyzed the first, published its finding, and said nothing at all about the
+// second. That is the same bare-continue shape Set.normalize was fixed for, one
+// directory over, and the answer is the same one — the file is named in
+// golangciLint.Uncovered rather than merely dropped.
 func goTargets(repoRoot string, files []string) []goTarget {
 	byModule := map[string][]string{}
 	var order []string
 
-	for _, f := range files {
-		if filepath.Ext(f) != ".go" {
-			continue
-		}
+	for _, f := range filterExt(files, ".go") {
+		dir := goPackageDir(filepath.ToSlash(f))
 
-		dir := path.Dir(filepath.ToSlash(f))
-		if dir == "." {
-			dir = ""
-		}
 		module, ok := goModuleFor(repoRoot, dir)
 		if !ok {
+			// Dropped because there is nowhere to run: inventing a module gets
+			// "no go files to analyze" and an empty report. It is not dropped
+			// SILENTLY — golangciLint.Uncovered asks the same question of the
+			// same files and names every one that lands here, which is what was
+			// missing while this was a bare continue.
 			continue
 		}
 
@@ -940,6 +1408,21 @@ func goTargets(repoRoot string, files []string) []goTarget {
 		targets = append(targets, goTarget{Module: module, Dirs: byModule[module]})
 	}
 	return targets
+}
+
+// goPackageDir reduces a repository-relative Go file to the package directory
+// holding it, with "" for the repository root.
+//
+// Shared by goTargets and golangciLint.Uncovered so that the two cannot disagree
+// about which module owns a file. They have to answer identically: one decides
+// what is analyzed and the other decides what is REPORTED as not analyzed, and a
+// file both of them skip is the gap this whole mechanism exists to close.
+func goPackageDir(file string) string {
+	dir := path.Dir(file)
+	if dir == "." {
+		return ""
+	}
+	return dir
 }
 
 // goModuleFor finds the module directory owning a repository-relative package

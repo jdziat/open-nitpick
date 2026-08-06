@@ -276,13 +276,30 @@ finding that did not reach the pull request": triage sits between the two anchor
 passes and may merge one finding into another or drop it as noise, which is the
 job it is there to do, and nothing enumerates those.
 
-**And every review says which parts of the change an analyzer ran over and
-reported nothing about**, in a third collapsed block: *Analyzed less than it ran
-over*. `golangci-lint — ran` is true and gets read as "the Go analyzer looked at
-this change", which is a different claim. Two things break it — a changed Go file
-the build excludes, and a `//nolint` this change added — and both are described
-in the security section. Files are named individually, because a count would
-leave nobody able to go and look.
+**And every review says which parts of the change the analyzers did not fully
+cover**, in a third collapsed block: *Analyzed less than it ran over*.
+`golangci-lint — ran` is true and gets read as "the Go analyzer looked at this
+change", which is a different claim. Six things break it, each described in the
+security section: a changed Go file the build excludes, a `//nolint` this change
+added, a changed `.go` file with no `go.mod` above it, a file importing `"C"`
+while cgo is off, a changed `.go` file this review's own ignore list withheld
+from every analyzer, and a module whose `go` directive is below the toolchain
+analyzing it — which switches off every check gated on a later version, most
+visibly the standard library's deprecations. Files are named individually — with
+a line where one decided the gap — because a count would leave nobody able to go
+and look; individually up to twenty per reason, after which the rest are counted,
+because `go mod vendor` is hundreds of files and a body the forge rejects is
+worse than a shorter list. The last of the six is the only one that means
+*reduced* coverage rather than none, which is why the block says "did not fully
+cover" rather than "reported nothing about".
+
+The ignore list is also how a change can be reviewed by *nothing*, and that case
+does not reach the block above at all: with every changed file set aside there
+are no batches to send, so the run ends before a model or an analyzer is asked
+anything. One file under `vendor/` is enough, and vendored code is compiled into
+your binary. Such a review opens with **Nothing in this change was reviewed**,
+counting what was set aside and why, instead of the forge's default "found
+nothing to comment on".
 
 Analyzer severities are translated onto the five levels above, and the analyzer's
 own word is kept beside the result: `HIGH` and `ERROR` both become error (they are
@@ -567,6 +584,18 @@ including `.nitpick.yaml`. Three consequences:
   the pull request. Deleting `go.mod` still stops the analyzer too —
   that one is at least visible in the diff, and it is reported as
   `did not run: no go.mod at or above the changed Go files`.
+
+  **That reason only covers the all-or-nothing case, and a monorepo makes the
+  partial one ordinary.** golangci-lint has to be run from inside a module, so a
+  changed `.go` file with no `go.mod` at or above it is dropped — correctly,
+  because there is nowhere to run. The roster line above appears only when
+  *every* changed Go file lands there. With `backend/go.mod` present, a change
+  touching `backend/app.go` and `tools/evil.go` — an identical unchecked error in
+  each — published the backend finding, recorded `golangci-lint — ran`, and said
+  nothing whatever about the second file. One finding and an empty coverage list
+  reads as a change that was analyzed in full and was clean everywhere except
+  that one line. Each such file is now named on the pull request under *Analyzed
+  less than it ran over*.
 - **A load failure is the loud shape of that; the quiet one needs one extra
   file.** A constraint has to empty the whole *directory* to fail the load. Put
   one unconstrained sibling next to the changed file and the package loads
@@ -584,8 +613,105 @@ including `.nitpick.yaml`. Three consequences:
   the pull request under *Analyzed less than it ran over*, so `ran` can no longer
   be read as "the analyzer looked at this change". Exclusion is decided by
   `go/build`'s own matcher under the process's `GOOS`/`GOARCH`, which is the one
-  golangci-lint inherits. It does not see cgo: with `CGO_ENABLED=0` the go tool
-  ignores a file importing `"C"` and the matcher still matches it.
+  golangci-lint inherits.
+- **cgo is the same gap through a door that matcher cannot see, and it is the
+  common case rather than an exotic one.** `CGO_ENABLED=0` is the default in most
+  Go CI images. With it off, the go tool drops a file importing `"C"` from its
+  package while an ordinary sibling keeps the package loading — measured against
+  golangci-lint 2.8.0, the unchecked error in that file is reported with cgo on
+  and silent with it off, exit 0 and the roster line `ran` either way.
+  `go/build`'s matcher cannot answer this, because it reads build constraints and
+  the filename and the deciding fact is in the import list: it matches the file
+  in *both* states. This was disclosed here and in the code for a while, and a
+  disclosure is not the reader of a review seeing it. The file is now read with
+  `go/parser` in imports-only mode and named on the pull request like any other
+  build exclusion — and only when cgo is actually off, because naming a file the
+  analyzer had just reported on is its own defect.
+
+  **Whether cgo is off is asked of the go tool, not of this process**, and the
+  first version got that wrong. `go/build` fills in `CgoEnabled` from the
+  environment alone, while `cmd/go` also reads the go env config file — what
+  `go env -w CGO_ENABLED=0` writes, and the ordinary way to configure a builder
+  image without exporting anything. Measured with `CGO_ENABLED` absent from the
+  environment: the key in that file took the child to `CGO_ENABLED=0`, the
+  finding vanished, `go/build` still said cgo was on, and the coverage list was
+  empty — the same silence, through the config file instead of the variable.
+- **`go.mod`'s `go` directive is policy, and it is one line the change can
+  edit.** Measured against golangci-lint 2.8.0: with `go 1.24` in `go.mod` the
+  review publishes `SA1019: "io/ioutil" has been deprecated`. Change that line to
+  `go 1.15` and the run is byte-identical to a clean one — zero findings, roster
+  `ran`, empty discard list. staticcheck reports a deprecation only for a module
+  declaring the release that issued it or later, and the module's declared
+  language version wins over anything the analyzer is configured with: neither
+  `run.go` nor `staticcheck.checks: ["all"]` restores the check, and under
+  `checks: all` staticcheck demonstrably runs (ST1000 appears) while `SA1019`
+  still does not.
+
+  It therefore cannot be closed from the configuration open-nitpick owns — and
+  `go.mod` is the tree under review, so raising it is not ours to do either — so
+  it is named instead: the module's `go.mod` and the line of the directive, under
+  *Analyzed less than it ran over*.
+
+  **The measure is the toolchain that loads the packages, and it used to be a
+  constant floor of `go 1.21`.** The floor's argument was volume — every Go
+  release deprecates something, so "below the newest" is true of nearly every
+  module, and a notice that fires on ordinary code is one reviewers learn to
+  collapse. What it bought was silence at the commonest directives. Measured on
+  one file using `reflect.PtrTo` (deprecated in 1.22) and `cipher.NewCFBEncrypter`
+  (deprecated in 1.24): `go 1.22` publishes the first, `go 1.24` publishes both,
+  and `go 1.21` publishes neither while the coverage list stays empty. As an
+  attack that is a diff editing `go.mod` from `go 1.25` to `go 1.21` and adding
+  the file, and `go 1.21`–`1.23` are ordinary directives in live repositories.
+  The sentence that had made the floor look safe was false at the floor: the
+  compiler does gate language *features* on this directive — generics under
+  `go 1.15` fail with `type parameter requires go1.18 or later`, reported as
+  `did not run: the code did not compile` — but at `go 1.21` every feature
+  through 1.21 compiles and every deprecation since is off.
+
+  A module is now named whenever it declares less than the toolchain analyzing
+  it, which is exactly the set of runs where version-gated checks were narrower
+  than this one could apply.
+
+  **What that gives up, measured, because a false coverage gap is as much a
+  defect as a missed one.** The gate is staticcheck's own deprecation table, and
+  that table lags the toolchain. On golangci-lint 2.8.0 and go1.25.5 over a file
+  using `runtime.GOROOT` (deprecated in 1.24) and `ast.NewPackage` (deprecated in
+  1.22), `go 1.24` and `go 1.25` publish an identical three findings; `go 1.23`
+  publishes two. So a module one release behind is named for a reduction that is
+  empty — and one release behind is where most live repositories sit, on a
+  `go.mod` the change never touched. That is the floor's own argument about
+  volume, pointed back at the ceiling, and it is not answered by saying the entry
+  is rare, because it isn't.
+
+  What it is answered by is the entry claiming less. It says the version gate was
+  closed, not that anything was behind it, which is true whether or not the table
+  has caught up. Moving the ceiling down to the newest version that really gates
+  something was rejected: that number can only be a constant measured against one
+  analyzer release, and when the table moves past it the error turns into
+  silence — which is the failure this whole list exists to prevent, and the
+  reason the `go 1.21` floor above was removed.
+- **Your own ignore list is a silencing channel, and it is the one that is not
+  the change's doing.** Changed paths matching `review.ignore` are dropped before
+  any analyzer is handed a path, and `**/vendor/**` and `**/testdata/**` are
+  shipped defaults. Measured: an identical unchecked error in `app.go` and
+  `vendor/token.go` published only `app.go`'s, with the roster saying the
+  analyzer ran and an empty coverage list — and vendored code is compiled into
+  your binary. Each such file is now named under *Analyzed less than it ran
+  over*, but only when no analyzed package covered it anyway: `**/*.gen.go`
+  matches the ignore list too, and a `token.gen.go` sitting beside `app.go` is
+  analyzed with the rest of its directory and has its findings published, so
+  naming it would report a gap that is not there.
+
+  **The case that closes it is the one where no Go file survives at all**, and
+  the first version of this fix missed it, because the coverage question was
+  asked only of an analyzer that ran. A `go mod vendor` bump touches `go.mod` and
+  `vendor/example.com/dep/dep.go`; the ignore list withholds the second, so
+  golangci-lint is handed one path it does not read, declines to run, and the
+  entire published review was a single line reading *"the change contains no
+  files it analyzes"* — over a change containing a Go file with a real unchecked
+  error. An analyzer that is handed nothing is now asked what it did not cover
+  just as one that ran is, and the line it prints says *no files it analyzes were
+  **selected for review***, which is the fact it actually has.
 - **Code that does not compile is the same silencing, and needs no attack at
   all.** Go is analyzed a package at a time, so one file that does not build
   stops every linter for every package in that invocation. golangci-lint reports
@@ -673,9 +799,15 @@ hard-coding the strict path would exclude them.
 diff → select and batch files → review each batch → triage → render → publish
 ```
 
-- **Select** drops ignored, binary, deleted, and generated files, and reports
-  every exclusion. A review that quietly skipped half the diff would otherwise
-  look identical to a clean one.
+- **Select** drops ignored, binary, deleted, and generated files. A review that
+  quietly skipped half the diff would otherwise look identical to a clean one, so
+  the exclusions are reported — with one deliberate exception and two places to
+  look. *Files not reviewed* lists them all except the ones matching your ignore
+  list, because `go mod vendor` is hundreds of files and those patterns are your
+  own. An ignored file is still not silent where it matters: a changed `.go` file
+  an analyzer would otherwise have read is named under *Analyzed less than it ran
+  over*, and a change where **everything** was set aside opens by saying that
+  nothing in it was reviewed.
 - **Batch** groups files under a token budget, attaching whole file contents
   where they fit and a window around the changes where they do not.
 - **Review** runs batches concurrently. One failed batch is logged and skipped;

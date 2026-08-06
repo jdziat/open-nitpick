@@ -227,6 +227,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// findings, these skips and these budgets are the product of a policy that
 	// is not the one in the change.
 	b.WriteString(policyNotice(report))
+	b.WriteString(nothingReviewedNotice(report))
 	b.WriteString(linterNotice(report))
 	b.WriteString(uncoveredNotice(report))
 	b.WriteString(discardNotice(report))
@@ -249,6 +250,53 @@ func renderSummary(report *Report, cfg *config.Config) string {
 		return ""
 	}
 	return out + "\n\n<sub>Reviewed by open-nitpick.</sub>"
+}
+
+// nothingReviewedNotice states that a change reached the end of a run without
+// any of it being reviewed.
+//
+// THE BUG IT ANSWERS is the emptiest possible review reading as the cleanest.
+// When every changed file is set aside, there are no batches to send, so the
+// engine returns before a model or an analyzer is asked anything — and the
+// summary rendered as "", which the forge replaces with its default body:
+// "open-nitpick found nothing to comment on." Measured on a report whose only
+// changed file was `vendor/evil.go`. Vendored code is compiled into the binary,
+// and `**/vendor/**` and `**/testdata/**` are in the shipped ignore list, so
+// this is one file move away from any change that wants to go unlooked-at.
+//
+// Reasons are COUNTED and the files are not named, unlike the coverage block.
+// `go mod vendor` is hundreds of files, and the reader can enumerate them from
+// the ignore list, which is their own configuration rather than something the
+// change wrote — a change may not supply the policy it is reviewed under. What
+// they cannot reconstruct is that this run looked at nothing, which is the one
+// sentence here.
+//
+// It is neither collapsed nor gated on review.summary, for policyNotice's
+// reason: a reader who turned the walkthrough off asked for less narration, not
+// to be left with a clean bill of health for a change nothing read.
+func nothingReviewedNotice(report *Report) string {
+	if report.Plan == nil || len(report.Plan.Batches) > 0 || len(report.Plan.Skipped) == 0 {
+		return ""
+	}
+
+	counts := map[string]int{}
+	var order []string
+	for _, s := range report.Plan.Skipped {
+		if _, seen := counts[s.Reason]; !seen {
+			order = append(order, s.Reason)
+		}
+		counts[s.Reason]++
+	}
+
+	var b strings.Builder
+	b.WriteString("**Nothing in this change was reviewed.**\n" +
+		"Every changed file was set aside before the review began, so the absence of\n" +
+		"findings below says nothing about this change:\n")
+	for _, reason := range order {
+		fmt.Fprintf(&b, "- %s: %d file(s)\n", inline(reason), counts[reason])
+	}
+
+	return blockquote(b.String())
 }
 
 // policyNotice states that the change's own configuration was not applied, and
@@ -447,7 +495,7 @@ func discardHeadline(discarded []LinterDiscard) string {
 }
 
 // uncoveredNotice states, ON THE PULL REQUEST, which parts of the change a
-// deterministic analyzer ran over and reported nothing about.
+// deterministic analyzer ran over and did not fully cover.
 //
 // THE BUG IT ANSWERS: the roster said "golangci-lint — ran", and that was true
 // and was read as "the Go analyzer looked at this change". It had not. A build
@@ -469,9 +517,10 @@ func discardHeadline(discarded []LinterDiscard) string {
 //
 // Files are named individually and suppressions are listed with their line,
 // because both are things a reviewer has to go and look at — a two-line count
-// would leave nobody able to find them. The path is inline-escaped for the
-// reason every other path in this file is: it comes from the diff, and a
-// filename can carry markdown.
+// would leave nobody able to find them. Individually up to a bound: see
+// maxUncoveredPerReason. The path is inline-escaped for the reason every other
+// path in this file is: it comes from the diff, and a filename can carry
+// markdown.
 func uncoveredNotice(report *Report) string {
 	if len(report.Uncovered) == 0 {
 		return ""
@@ -480,7 +529,12 @@ func uncoveredNotice(report *Report) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "\n<details>\n<summary>%s</summary>\n\n", uncoveredHeadline(report.Uncovered))
-	b.WriteString("An analyzer ran over this change and reported nothing about these. " +
+	// "reported nothing about these" was the wording, and it stopped being true
+	// when the list grew a reason that is a REDUCED analysis rather than an
+	// absent one: a module's old `go` directive leaves the file read and part of
+	// the ruleset switched off. Not covered fully is the claim every entry
+	// supports.
+	b.WriteString("The analyzers did not fully cover these parts of the change. " +
 		"That is not the same as reporting them clean.\n\n")
 
 	var order []UncoveredReason
@@ -493,13 +547,18 @@ func uncoveredNotice(report *Report) string {
 	}
 
 	for _, reason := range order {
+		entries := grouped[reason]
 		fmt.Fprintf(&b, "- %s\n", reason)
-		for _, u := range grouped[reason] {
+
+		for _, u := range entries[:min(len(entries), maxUncoveredPerReason)] {
 			if u.Line > 0 {
 				fmt.Fprintf(&b, "  - `%s:%d` (`%s`)\n", inline(u.Path), u.Line, inline(u.Linter))
 				continue
 			}
 			fmt.Fprintf(&b, "  - `%s` (`%s`)\n", inline(u.Path), inline(u.Linter))
+		}
+		if rest := len(entries) - maxUncoveredPerReason; rest > 0 {
+			fmt.Fprintf(&b, "  - …and %d more\n", rest)
 		}
 	}
 
@@ -507,20 +566,45 @@ func uncoveredNotice(report *Report) string {
 	return b.String()
 }
 
+// maxUncoveredPerReason bounds how many entries one reason lists before the
+// remainder is counted instead.
+//
+// A BODY THIS TOOL CANNOT PUBLISH IS WORSE THAN A SHORTER LIST, and every reason
+// here can arrive in bulk from an ordinary pull request: `go mod vendor` adds
+// hundreds of Go files that review.ignore withholds, and a port adds a directory
+// of _windows.go. GitHub caps a review body at 65536 bytes — summaryFallback
+// already exists because "a PR deleting thousands of files produces an enormous
+// skipped-files section" — so an unbounded list here would trade a coverage
+// notice for the whole review.
+//
+// PER REASON rather than overall, so one bulk route cannot push the others off
+// the end: the vendored files and the one platform-specific file in the same
+// change are different facts, and the second is the one nobody would find alone.
+// The headline still counts every file, so the total is never the truncated one.
+const maxUncoveredPerReason = 20
+
 // uncoveredHeadline is the one line a reader sees collapsed.
 //
 // It counts FILES rather than entries, because a file with three added //nolint
 // comments is one file the analyzer said nothing about and "3 uncovered" would
 // overstate it. It never says "all covered": this block is absent when there is
 // nothing to report, and a headline claiming full coverage would be a promise
-// about cgo and about every analyzer that has no Uncovered implementation.
+// about every analyzer that has no Uncovered implementation, and about whatever
+// coverage gap nobody has measured yet.
+//
+// It says "did not fully cover" rather than "reported nothing about", which is
+// what it used to say. That was accurate while every entry meant the file went
+// unread, and became false when UncoveredLanguageVersion arrived: there the file
+// IS read and a version-gated part of the ruleset is not applied. A headline
+// that overstates the gap teaches a reader to discount the block, which costs
+// the entries that do mean the file went unread.
 func uncoveredHeadline(uncovered []LinterUncovered) string {
 	files := map[string]struct{}{}
 	for _, u := range uncovered {
 		files[u.Path] = struct{}{}
 	}
 
-	return fmt.Sprintf("Analyzed less than it ran over: %d file(s) an analyzer reported nothing about", len(files))
+	return fmt.Sprintf("Analyzed less than it ran over: %d file(s) the analyzers did not fully cover", len(files))
 }
 
 // policyFailureNotice explains, on the pull request, why no review ran at all.

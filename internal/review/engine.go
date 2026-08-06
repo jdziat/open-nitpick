@@ -176,24 +176,36 @@ type LinterUncoveredReporter interface {
 	Uncovered() []LinterUncovered
 }
 
-// LinterUncovered is a part of the change that a deterministic analyzer reported
-// nothing about, for a reason that is not "the code is clean".
+// LinterUncovered is a part of the change a deterministic analyzer did not fully
+// cover, for a reason that is not "the code is clean".
 //
 // It is the third list in this family and it is a different fact from either of
 // the others. A LinterStatus says whether an analyzer RAN. A LinterDiscard says
 // a finding was produced and then dropped. This one says the analyzer ran, was
-// not dropped from, and still had nothing to say about part of the change —
-// because the tree arranged for it not to look. Both routes were measured
-// against golangci-lint 2.8.0 and both left the roster reporting a clean Go
-// review: a build constraint on the changed file with an unconstrained sibling
-// beside it, and a //nolint attached to the package clause.
+// not dropped from, and still covered less of the change than "ran" implies.
+// Every route in UncoveredReason was measured against golangci-lint 2.8.0 and
+// every one of them left the roster reporting a clean Go review.
+//
+// NOT EVERY ROUTE MEANS THE FILE WENT UNREAD, and the wording here has to hold
+// for all of them. It said "reported nothing about ... because the tree arranged
+// for it not to look" while every entry was a file nobody read. Two entries have
+// since arrived that the sentence is false of: UncoveredLanguageVersion, where
+// the analyzer read the file and applied a narrower ruleset to it, and
+// UncoveredNotSelected, where what arranged it was this review's own ignore
+// list and not the tree at all.
 type LinterUncovered struct {
 	// Linter is the analyzer whose coverage this describes.
 	Linter string
 
-	// Path is the repository-relative file, and Line the directive's line. Line
-	// is 0 when the gap is the whole file, which is what a build constraint
-	// produces.
+	// Path is the repository-relative file this is about, and Line the line
+	// inside it that decided the gap. Line is 0 when the gap is the whole file
+	// and nothing in it chose that — which is what a build constraint, a missing
+	// module and a disabled cgo build all produce.
+	//
+	// Path is not always a file of the change. For UncoveredLanguageVersion it is
+	// the module's go.mod, which the change need not have touched: the reader has
+	// to be sent to the line that decided the coverage, and for that one it is
+	// not in the diff at all.
 	Path string
 	Line int
 
@@ -201,8 +213,8 @@ type LinterUncovered struct {
 	Reason UncoveredReason
 }
 
-// UncoveredReason says why an analyzer reported nothing about part of the
-// change.
+// UncoveredReason says why an analyzer covered part of the change less than
+// fully.
 //
 // Separate values rather than one string for the reason DiscardReason's are: a
 // reader has to sort a file the build legitimately excludes on this platform
@@ -224,6 +236,53 @@ const (
 	// the declaration it is attached to, and attached to the package clause it
 	// covers the whole file — including lines the change never touched.
 	UncoveredSuppressed UncoveredReason = "suppressed by a directive this change added, which covers the whole declaration it is attached to"
+
+	// UncoveredNoModule means the changed Go file has no go.mod at or above it,
+	// so there was no module to run the analyzer in and it was never passed to
+	// one. Distinct from UncoveredBuildExcluded because the file is not excluded
+	// from anything — it is outside the part of the checkout the analyzer knows
+	// how to enter, which is a fact about the repository's layout rather than
+	// about this platform.
+	UncoveredNoModule UncoveredReason = "outside every Go module in this checkout, so no analyzer ran over it"
+
+	// UncoveredCgoDisabled means the file imports "C" while cgo is off in this
+	// environment, so the go tool drops it from the package and the rest of the
+	// package analyzes normally around the hole. CGO_ENABLED=0 is the default in
+	// most Go CI images, which makes this the common case rather than an exotic
+	// one.
+	UncoveredCgoDisabled UncoveredReason = `imports "C" while cgo is disabled here, so the package excludes it and no analyzer read it`
+
+	// UncoveredNotSelected means this review never handed the changed file to an
+	// analyzer, and no analyzed package covered it either. review.ignore is the
+	// ordinary cause — `**/vendor/**` and `**/testdata/**` are in the shipped
+	// defaults, and vendored code is compiled into the binary — and a path an
+	// analyzer would read as a flag is the other. It is the one reason here that
+	// is about this review's own configuration rather than about the tree, which
+	// is also why the change cannot cause it: a change may not supply the policy
+	// it is reviewed under.
+	UncoveredNotSelected UncoveredReason = "not offered to an analyzer by this review's file selection, and no analyzed package covered it"
+
+	// UncoveredLanguageVersion means the module's go.mod declares a language
+	// version below the toolchain analyzing it, so the version-gated part of the
+	// ruleset was not applied to it. It is the one reason here that is a REDUCED
+	// analysis rather than an absent one: the file was read, and part of the
+	// ruleset was held off it. See linters.belowAnalyzedLanguage for what the
+	// ceiling is and why it is not a fixed floor.
+	//
+	// It says the gate was CLOSED, not that anything was behind it, and the
+	// difference is the modal case rather than a corner. The gate is
+	// staticcheck's own deprecation table, which lags the toolchain: measured on
+	// golangci-lint 2.8.0 and go1.25.5 over a file using runtime.GOROOT and
+	// ast.NewPackage, `go 1.24` and `go 1.25` publish an identical three findings
+	// while `go 1.23` publishes two. So a module one release behind — which is
+	// where most live repositories sit, on a go.mod the change never touched — is
+	// named for a reduction that is currently empty. The earlier wording said
+	// such checks "never ran", which reads as a claim that some existed; this one
+	// is true either way. Narrowing the ceiling to the newest version that really
+	// gates something was rejected: it would have to be a constant measured
+	// against one analyzer release, and when the table moved ahead of it the
+	// error would become silence, which this list exists to prevent.
+	UncoveredLanguageVersion UncoveredReason = "declares a Go language version below the toolchain analyzing it, which held back any check gated above that version"
 )
 
 // LinterStatus is how one deterministic analyzer was configured for a run, and
@@ -318,9 +377,8 @@ type Report struct {
 	// before anything judged them. See LinterDiscard.
 	Discarded []LinterDiscard
 
-	// Uncovered lists the parts of the change an analyzer ran over and reported
-	// nothing about because the tree arranged for it not to look. See
-	// LinterUncovered.
+	// Uncovered lists the parts of the change an analyzer ran over and did not
+	// fully cover. See LinterUncovered.
 	Uncovered []LinterUncovered
 }
 
@@ -470,8 +528,8 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 			discarded = append(discarded, reporter.Discarded()...)
 		}
 		// And the third fact, which neither of the other two carries: the
-		// analyzer ran, nothing was dropped, and it still said nothing about
-		// part of the change because the tree arranged for it not to look.
+		// analyzer ran, nothing was dropped, and part of the change was still
+		// covered less than the roster line implies.
 		if reporter, ok := runner.(LinterUncoveredReporter); ok {
 			report.Uncovered = reporter.Uncovered()
 		}

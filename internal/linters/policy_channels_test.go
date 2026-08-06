@@ -13,10 +13,19 @@ package linters
 //     so findings are reported at a path that is not in the diff, or worse, at
 //     one that is and did not earn them. Refused; the detector is go/scanner
 //     rather than a pattern, because a pattern missed two spellings.
-//  3. Build constraints on the changed file. A load failure is caught already,
-//     but one unconstrained sibling keeps the package loading while the changed
-//     file goes unread. Named, not refused: the report is right about what it
-//     did cover.
+//  3. Coverage the roster does not describe: the analyzer ran, the report is
+//     accurate about what it covered, and part of the change is not in it. Five
+//     shapes, all named rather than refused, because refusing would throw away
+//     real findings about the rest of the change. A build constraint with one
+//     unconstrained sibling keeping the package loading; a file importing "C"
+//     while cgo is off, which go/build's matcher cannot see because the deciding
+//     fact is in the import list AND which the go env config file can turn off
+//     without touching the environment; a changed .go file with no go.mod above
+//     it, which is ordinary in a monorepo and was dropped with a bare continue;
+//     a changed .go file review.ignore withheld from every analyzer, which is
+//     ordinary under vendor/ and testdata/; and a module whose `go` directive is
+//     below the toolchain analyzing it, which switches off every check gated on
+//     a later version.
 //  4. In-source suppression. golangci-lint has no flag that disables its own
 //     //nolint, and a //nolint is not per-line — attached to the package clause
 //     it covers the whole file. Counted, because it cannot be prevented.
@@ -25,7 +34,11 @@ package linters
 
 import (
 	"context"
+	"fmt"
+	"go/build"
+	"go/version"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -40,27 +53,64 @@ import (
 // goProbe writes a single-module repository containing app.go with the given
 // source, and returns the repository root together with a diff that adds every
 // line of that file.
-//
-// Every line is added on purpose: only_changed_lines is on by default, and a
-// test about what an analyzer reports must not be able to pass or fail on which
-// lines the fixture happened to mark as changed.
 func goProbe(t *testing.T, source string) (string, diff.Files) {
 	t.Helper()
 
 	repo := t.TempDir()
-	writeFile(t, repo, "go.mod", "module probe\n\ngo 1.24\n")
+	writeFile(t, repo, "go.mod", "module probe\n\ngo "+currentGoDirective()+"\n")
 	writeFile(t, repo, "app.go", source)
 
+	return repo, parse(t, addedFile("app.go", source))
+}
+
+// currentGoDirective is the `go` line a fixture declares when the directive is
+// not the thing under test: the language version of the toolchain that will
+// analyze it.
+//
+// A LITERAL HERE WOULD PUT A COVERAGE GAP IN EVERY FIXTURE the day the toolchain
+// moves past it. golangciLint.Uncovered names a module declaring less than the
+// toolchain analyzing it, so `go 1.24` on a go1.25 machine makes tests about
+// build constraints and suppressions fail over the one line they do not care
+// about.
+func currentGoDirective() string {
+	if lang := version.Lang(runtime.Version()); lang != "" {
+		return strings.TrimPrefix(lang, "go")
+	}
+	// A development toolchain reports no language version, so nothing can be
+	// measured below it and any loadable directive will do.
+	return "1.21"
+}
+
+// addedFile renders a diff that adds every line of source at path.
+//
+// Every line is added on purpose: only_changed_lines is on by default, and a
+// test about what an analyzer reports must not be able to pass or fail on which
+// lines the fixture happened to mark as changed.
+//
+// It is separate from goProbe because the monorepo cases need TWO added files in
+// one diff, and the file that is dropped for having no module above it cannot be
+// expressed by a fixture that only ever writes one.
+func addedFile(path, source string) string {
 	lines := strings.Split(strings.TrimSuffix(source, "\n"), "\n")
 
 	var b strings.Builder
-	b.WriteString("diff --git a/app.go b/app.go\n--- /dev/null\n+++ b/app.go\n")
-	b.WriteString("@@ -0,0 +1," + strconv.Itoa(len(lines)) + " @@\n")
+	fmt.Fprintf(&b, "diff --git a/%s b/%s\n--- /dev/null\n+++ b/%s\n", path, path, path)
+	fmt.Fprintf(&b, "@@ -0,0 +1,%d @@\n", len(lines))
 	for _, l := range lines {
 		b.WriteString("+" + l + "\n")
 	}
+	return b.String()
+}
 
-	return repo, parse(t, b.String())
+// uncoveredFor returns the coverage gaps recorded for one reason.
+func uncoveredFor(gaps []review.LinterUncovered, reason review.UncoveredReason) []review.LinterUncovered {
+	var out []review.LinterUncovered
+	for _, g := range gaps {
+		if g.Reason == reason {
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 // renameProbeFile moves the probe's app.go, on disk and in the diff.
@@ -202,7 +252,7 @@ func TestOpenNitpickAnalyzerConfigIsNeverWrittenIntoTheRepository(t *testing.T) 
 	}
 
 	// And the runner must report that rather than analyze anyway.
-	writeFile(t, repo, "go.mod", "module probe\n\ngo 1.24\n")
+	writeFile(t, repo, "go.mod", "module probe\n\ngo "+currentGoDirective()+"\n")
 	writeFile(t, repo, "app.go", goSource("", uncheckedError("F")))
 
 	if _, err := (&golangciLint{}).Run(context.Background(), repo, []string{"app.go"}); err == nil {
@@ -730,6 +780,644 @@ func TestAFileTheBuildIncludesIsNotReportedAsUncovered(t *testing.T) {
 	}
 }
 
+// TestACgoFileIsUnreadWhenCgoIsOffAndIsNamed is the build-exclusion gap through
+// the one door go/build's matcher cannot see, and it is the COMMON case rather
+// than an exotic one: CGO_ENABLED=0 is the default in most Go CI images.
+//
+// A file importing "C" with cgo off is dropped from the package by the go tool
+// while an ordinary sibling keeps the package loading — the same shape as
+// //go:build windows, reached without writing a constraint at all. Measured
+// against golangci-lint 2.8.0: the errcheck violation in that file is reported
+// with cgo on and silent with it off, exit 0 and roster "ran" either way.
+//
+// The enabled half is not decoration. MatchFile matches this file in BOTH
+// states, so a detector keyed on it alone would be silent; one keyed on the
+// import alone would name a file the analyzer had just read and reported on,
+// which is a wrong sentence on a pull request and its own defect.
+//
+// THE THIRD ROW IS THE ONE THAT MOVED THE DETECTOR OFF build.Default. cmd/go
+// resolves CGO_ENABLED from the environment and then from the go env config
+// file; go/build reads only os.Getenv and never that file, so `go env -w
+// CGO_ENABLED=0` — how a builder image is ordinarily configured — silenced the
+// file while build.Default.CgoEnabled stayed true and the coverage list stayed
+// empty. Nothing about the row is exotic: the process environment carries no
+// CGO_ENABLED at all, which is the normal state of a machine.
+func TestACgoFileIsUnreadWhenCgoIsOffAndIsNamed(t *testing.T) {
+	requireTool(t, "golangci-lint")
+
+	// The C preamble is a comment, so the errcheck violation below it is
+	// ordinary Go that the analyzer reports whenever it reads the file.
+	const source = "package probe\n\n" +
+		"/*\n#include <stdlib.h>\n*/\n" +
+		"import \"C\"\n\n" +
+		"import (\n\t\"fmt\"\n\t\"os\"\n)\n\n" +
+		"func F() {\n\t_ = C.malloc(1)\n\tfmt.Fprintln(os.Stdout, \"x\")\n}\n"
+
+	cases := []struct {
+		name          string
+		cgo           bool
+		viaGoEnvFile  bool
+		wantFindings  bool
+		wantUncovered bool
+	}{
+		{name: "cgo off, so the go tool never reads the file", cgo: false, wantFindings: false, wantUncovered: true},
+		{name: "cgo on, so the file is analyzed and there is nothing to report", cgo: true, wantFindings: true, wantUncovered: false},
+		{name: "cgo off in the go env config file, which go/build cannot see",
+			cgo: false, viaGoEnvFile: true, wantFindings: false, wantUncovered: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.cgo {
+				// cgo compiles C, so without a C compiler this half would fail
+				// the package load and prove nothing about coverage.
+				requireTool(t, "cc")
+			}
+
+			// build.Default is deliberately NOT moved. It snapshots CGO_ENABLED at
+			// go/build's package init, long before any test runs, so a detector
+			// that consulted it would answer "cgo is on" in both of the off rows
+			// below — which is what this row exists to catch.
+			if tc.viaGoEnvFile {
+				if !build.Default.CgoEnabled {
+					t.Skip("this test binary started with cgo off, so build.Default already agrees with the " +
+						"config file and the row cannot tell the two detectors apart")
+				}
+				goenv := filepath.Join(t.TempDir(), "env")
+				if err := os.WriteFile(goenv, []byte("CGO_ENABLED=0\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				t.Setenv("GOENV", goenv)
+				// Empty rather than absent, which is as close to unset as t.Setenv
+				// reaches; cmd/go falls through to the config file for either.
+				t.Setenv("CGO_ENABLED", "")
+			} else {
+				t.Setenv("CGO_ENABLED", map[bool]string{true: "1", false: "0"}[tc.cgo])
+			}
+
+			repo, files := goProbe(t, source)
+			// Without the sibling the package fails to load with cgo off, and
+			// findings() already refuses that loudly; the quiet shape needs it.
+			writeFile(t, repo, "sibling.go", "package probe\n\nfunc Sibling() int { return 1 }\n")
+
+			cfg := baseConfig()
+			cfg.Linters.Enabled = []string{"golangci-lint"}
+			cfg.Linters.Mode = config.LinterStrict
+
+			set := New(repo, cfg, nil)
+			published, err := set.Run(context.Background(), files)
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if got := len(published) > 0; got != tc.wantFindings {
+				t.Fatalf("findings = %+v, want any = %v: the fixture no longer measures what it claims to",
+					published, tc.wantFindings)
+			}
+			if s := set.Statuses(); len(s) != 1 || s[0].Outcome != review.LinterRan {
+				t.Fatalf("statuses = %+v, want golangci-lint recorded as having run", s)
+			}
+
+			gaps := uncoveredFor(set.Uncovered(), review.UncoveredCgoDisabled)
+			switch {
+			case tc.wantUncovered && (len(gaps) != 1 || gaps[0].Path != "app.go"):
+				t.Fatalf("uncovered = %+v, want app.go named as unread because cgo is off", set.Uncovered())
+			case !tc.wantUncovered && len(gaps) != 0:
+				t.Fatalf("uncovered = %+v, want nothing: the analyzer read the file and reported on it", gaps)
+			}
+		})
+	}
+}
+
+// TestAChangedGoFileOutsideEveryModuleIsNamed is the gap that needs a monorepo,
+// which is the exact shape goTargets was written for.
+//
+// goTargets drops a changed .go file with no go.mod at or above it, correctly —
+// there is no module to run golangci-lint in. Detect turns that into a published
+// reason only when EVERY changed Go file lands there; the README's
+// "did not run: no go.mod at or above the changed Go files" describes the
+// all-or-nothing case. With backend/go.mod present, the partial case published
+// the backend finding, recorded the analyzer as having run, and said nothing
+// whatever about the file nobody analyzed — one bare continue, the same shape
+// Set.normalize was fixed for.
+func TestAChangedGoFileOutsideEveryModuleIsNamed(t *testing.T) {
+	requireTool(t, "golangci-lint")
+
+	owned := goSource("", uncheckedError("F"))
+	orphan := goSource("", uncheckedError("G"))
+
+	repo := t.TempDir()
+	writeFile(t, repo, "backend/go.mod", "module backend\n\ngo "+currentGoDirective()+"\n")
+	writeFile(t, repo, "backend/app.go", owned)
+	// No go.mod at or above it, and none at the checkout root either.
+	writeFile(t, repo, "tools/evil.go", orphan)
+
+	files := parse(t, addedFile("backend/app.go", owned)+addedFile("tools/evil.go", orphan))
+
+	cfg := baseConfig()
+	cfg.Linters.Enabled = []string{"golangci-lint"}
+	cfg.Linters.Mode = config.LinterStrict
+
+	set := New(repo, cfg, nil)
+	published, err := set.Run(context.Background(), files)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	// The fixture is only worth anything while the analyzer really does cover
+	// one file and miss the other: an identical violation in each.
+	if len(published) != 1 || published[0].Path != "backend/app.go" {
+		t.Fatalf("findings = %+v, want exactly the one from the module that was analyzed", published)
+	}
+	if s := set.Statuses(); len(s) != 1 || s[0].Outcome != review.LinterRan {
+		t.Fatalf("statuses = %+v, want golangci-lint recorded as having run", s)
+	}
+	if d := set.Discarded(); len(d) != 0 {
+		t.Fatalf("discarded = %+v, want nothing: the unanalyzed file produced no finding to drop, "+
+			"which is why the discard ledger cannot carry this", d)
+	}
+
+	gaps := uncoveredFor(set.Uncovered(), review.UncoveredNoModule)
+	if len(gaps) != 1 || gaps[0].Path != "tools/evil.go" {
+		t.Fatalf("uncovered = %+v, want tools/evil.go named as outside every module", set.Uncovered())
+	}
+}
+
+// TestAChangedGoFileTheIgnoreListWithheldIsNamed is the silencing route that
+// comes from our own side of the fence rather than from the tree.
+//
+// reviewablePaths drops every path matching review.ignore before a runner is
+// handed anything, and `**/vendor/**` and `**/testdata/**` are shipped defaults.
+// Measured: an identical errcheck violation in app.go and vendor/token.go
+// published only app.go's, with the roster saying the analyzer ran and an empty
+// coverage list — a changed Go file with a real violation that nothing looked
+// for and nothing mentioned. Vendored code is compiled into the binary, so
+// "nobody reviews vendor" is a statement about review effort and not about
+// whether the code runs.
+//
+// THE LAST ROWS ARE THE OTHER DIRECTION AND THEY ARE NOT DECORATION. The ignore
+// list decides which paths are SELECTED, and golangci-lint analyzes whole
+// package directories: token.gen.go matches `**/*.gen.go`, sits beside app.go,
+// and has its findings published anyway. Naming it as uncovered would report a
+// gap that is not there, which is as much a defect as missing one.
+func TestAChangedGoFileTheIgnoreListWithheldIsNamed(t *testing.T) {
+	requireTool(t, "golangci-lint")
+
+	app := goSource("", uncheckedError("F"))
+	hidden := goSource("", uncheckedError("G"))
+
+	cases := []struct {
+		name          string
+		path          string
+		wantUncovered bool
+	}{
+		{name: "vendored, a directory nothing analyzed", path: "vendor/token.go", wantUncovered: true},
+		{name: "testdata, the same shape", path: "testdata/token.go", wantUncovered: true},
+		// Ignored by pattern but inside a directory app.go put on the target
+		// list, so the analyzer read it and published its finding.
+		{name: "generated, beside a file that was analyzed", path: "token.gen.go", wantUncovered: false},
+		{name: "protobuf, beside a file that was analyzed", path: "token.pb.go", wantUncovered: false},
+	}
+
+	// Every row above keeps app.go, so every row runs the analyzer — which is
+	// why they all passed while the commonest shape of this bug did not work.
+	// See TestAChangedGoFileIsNamedWhenTheIgnoreListWithheldThemAll.
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			writeFile(t, repo, "go.mod", "module probe\n\ngo "+currentGoDirective()+"\n")
+			writeFile(t, repo, "app.go", app)
+			writeFile(t, repo, tc.path, hidden)
+
+			files := parse(t, addedFile("app.go", app)+addedFile(tc.path, hidden))
+
+			cfg := baseConfig()
+			cfg.Linters.Enabled = []string{"golangci-lint"}
+			cfg.Linters.Mode = config.LinterStrict
+
+			set := New(repo, cfg, nil)
+			published, err := set.Run(context.Background(), files)
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+
+			// The fixture is worth something only while the analyzer really does
+			// cover app.go: an identical violation sits in both files.
+			if !hasPath(published, "app.go") {
+				t.Fatalf("findings = %+v, want the one from the file that was analyzed", published)
+			}
+			if s := set.Statuses(); len(s) != 1 || s[0].Outcome != review.LinterRan {
+				t.Fatalf("statuses = %+v, want golangci-lint recorded as having run", s)
+			}
+
+			gaps := uncoveredFor(set.Uncovered(), review.UncoveredNotSelected)
+			switch {
+			case tc.wantUncovered && (len(gaps) != 1 || gaps[0].Path != tc.path):
+				t.Fatalf("uncovered = %+v, want %s named as never offered to an analyzer",
+					set.Uncovered(), tc.path)
+			case !tc.wantUncovered:
+				if len(gaps) != 0 {
+					t.Fatalf("uncovered = %+v, want nothing: the analyzer read %s and reported on it",
+						gaps, tc.path)
+				}
+				if !hasPath(published, tc.path) {
+					t.Fatalf("findings = %+v, want %s reported too — this row only means something "+
+						"while its finding really is published", published, tc.path)
+				}
+			}
+		})
+	}
+}
+
+// TestAChangedGoFileIsNamedWhenTheIgnoreListWithheldThemAll is the half of the
+// ignore-list route the first fix left open, and it is the ordinary half.
+//
+// The coverage question used to be asked only of an analyzer that RAN. Detect is
+// handed reviewablePaths' output, so when review.ignore withholds every changed
+// Go file and some non-Go file survives, golangci-lint is offered nothing it
+// reads, returns errNoTargets, and the arm that records the skip used to
+// `continue` without ever asking what went uncovered.
+//
+// Measured before the fix, `go.mod` + `vendor/example.com/dep/dep.go` carrying a
+// real unchecked error: `findings=0 statuses=[{golangci-lint skipped "the change
+// contains no files it analyzes"}] uncovered=[]`. Rendered, the whole published
+// body was that one line, and it was false — the change contained a Go file with
+// a violation. nothingReviewedNotice cannot fire either, because go.mod is a
+// batch, so nothing anywhere said a Go file went unread.
+//
+// The first two rows are `go mod vendor` and a docs-plus-testdata change, which
+// is what makes this the ordinary case rather than a corner. The last row is the
+// other direction: a change with no Go file in it at all must still produce
+// nothing, or every Python pull request grows an invented Go coverage gap.
+func TestAChangedGoFileIsNamedWhenTheIgnoreListWithheldThemAll(t *testing.T) {
+	requireTool(t, "golangci-lint")
+
+	hidden := goSource("", uncheckedError("G"))
+	gomod := "module probe\n\ngo " + currentGoDirective() + "\n"
+
+	cases := []struct {
+		name     string
+		survivor string // the changed path review.ignore lets through
+		body     string
+		withheld string // the changed .go file it does not, "" for none
+	}{
+		{
+			name:     "go mod vendor: go.mod survives, the vendored package does not",
+			survivor: "go.mod", body: gomod,
+			withheld: "vendor/example.com/dep/dep.go",
+		},
+		{
+			name:     "docs change beside a testdata fixture",
+			survivor: "docs/notes.md", body: "# notes\n",
+			withheld: "testdata/evil.go",
+		},
+		{
+			name:     "no Go file in the change at all",
+			survivor: "docs/notes.md", body: "# notes\n",
+			withheld: "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			writeFile(t, repo, "go.mod", gomod)
+			writeFile(t, repo, tc.survivor, tc.body)
+
+			raw := addedFile(tc.survivor, tc.body)
+			if tc.withheld != "" {
+				writeFile(t, repo, tc.withheld, hidden)
+				raw += addedFile(tc.withheld, hidden)
+			}
+			files := parse(t, raw)
+
+			cfg := baseConfig()
+			cfg.Linters.Enabled = []string{"golangci-lint"}
+
+			set := New(repo, cfg, nil)
+			published, err := set.Run(context.Background(), files)
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if len(published) != 0 {
+				t.Fatalf("findings = %+v, want none: nothing it reads was selected", published)
+			}
+
+			// The skip itself is correct and stays a skip: an analyzer with
+			// nothing to read has not gone missing. What it may not do is
+			// describe the CHANGE, which it cannot see, rather than the
+			// selection, which is what it was handed.
+			s := set.Statuses()
+			if len(s) != 1 || s[0].Outcome != review.LinterSkipped {
+				t.Fatalf("statuses = %+v, want golangci-lint recorded as skipped", s)
+			}
+			if strings.Contains(s[0].State, "the change contains") {
+				t.Errorf("state = %q, want a reason about the file selection: the change "+
+					"does contain files it analyzes, they were withheld from it", s[0].State)
+			}
+
+			gaps := uncoveredFor(set.Uncovered(), review.UncoveredNotSelected)
+			switch {
+			case tc.withheld == "":
+				if len(gaps) != 0 {
+					t.Fatalf("uncovered = %+v, want nothing: no Go file was in the change", gaps)
+				}
+			case len(gaps) != 1 || gaps[0].Path != tc.withheld:
+				t.Fatalf("uncovered = %+v, want %s named as never offered to an analyzer",
+					set.Uncovered(), tc.withheld)
+			}
+		})
+	}
+}
+
+// hasPath reports whether any finding was published for a path.
+func hasPath(found []review.Finding, path string) bool {
+	for _, f := range found {
+		if f.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+// TestAModuleUnderAnOldGoDirectiveIsNamed is one line in a file the change can
+// edit, and before this it was disclosed nowhere at all.
+//
+// Measured against golangci-lint 2.8.0. With `go 1.24` in go.mod the review
+// publishes SA1019, `"io/ioutil" has been deprecated`. Change that line to
+// `go 1.15` and the run is byte-identical to a clean one: zero findings, roster
+// "ran", empty discard list, empty coverage list.
+//
+// It is named rather than fixed because it cannot be fixed from the
+// configuration this project owns — `run.go` does not restore the check, and
+// neither does `staticcheck.checks: ["all"]`, which demonstrably starts
+// staticcheck (ST1000 appears) without starting this. The module's declared
+// language version wins, and go.mod is the tree under review.
+//
+// THE TABLE IS A GRADIENT AND THAT IS THE POINT. Each deprecation appears only
+// once the declared version reaches the release that issued it, so the rows
+// below measure three of them at once — io/ioutil (1.19), reflect.PtrTo (1.22)
+// and cipher.NewCFBEncrypter (1.24) — and the `go 1.21` row is the attack a
+// constant floor of 1.21 used to let through: two real deprecations silenced, one
+// reported, and before this an empty coverage list. See belowAnalyzedLanguage.
+func TestAModuleUnderAnOldGoDirectiveIsNamed(t *testing.T) {
+	requireTool(t, "golangci-lint")
+
+	// Three deprecations with three different gates. The C-free imports keep this
+	// independent of cgo, and every call is on one line so the file stays small.
+	const source = "package probe\n\nimport (\n\t\"crypto/aes\"\n\t\"crypto/cipher\"\n" +
+		"\t\"io/ioutil\"\n\t\"reflect\"\n)\n\n" +
+		"func F(key, iv []byte) (cipher.Stream, reflect.Type, []byte, error) {\n" +
+		"\tb, err := aes.NewCipher(key)\n\tif err != nil {\n\t\treturn nil, nil, nil, err\n\t}\n" +
+		"\tdata, err := ioutil.ReadFile(\"x\")\n" +
+		"\treturn cipher.NewCFBEncrypter(b, iv), reflect.PtrTo(reflect.TypeOf(0)), data, err\n}\n"
+
+	const (
+		ioutilDeprecated = "io/ioutil"
+		ptrToDeprecated  = "reflect.PtrTo"
+		cfbDeprecated    = "NewCFBEncrypter"
+	)
+
+	// The toolchain that loads the packages is the ceiling, so the row that must
+	// report NO gap is written from the toolchain rather than from a literal —
+	// otherwise this test would start failing on the next Go release for a
+	// reason that has nothing to do with what it measures.
+	if version.Lang(runtime.Version()) == "" {
+		t.Skip("this toolchain reports no language version, so there is no ceiling to measure against")
+	}
+	current := currentGoDirective()
+
+	cases := []struct {
+		name          string
+		directive     string
+		want          []string
+		notWant       []string
+		wantUncovered bool
+	}{
+		// The silencing in its purest form: every deprecation postdates the
+		// declared version, so the run is byte-identical to a clean one.
+		{name: "old enough to switch every check off", directive: "go 1.15",
+			notWant:       []string{ioutilDeprecated, ptrToDeprecated, cfbDeprecated},
+			wantUncovered: true},
+		// Reporting one of the three, which is the honest shape of the notice:
+		// reduced coverage rather than absent coverage.
+		{name: "reporting the oldest deprecation and none since", directive: "go 1.19",
+			want:          []string{ioutilDeprecated},
+			notWant:       []string{ptrToDeprecated, cfbDeprecated},
+			wantUncovered: true},
+		// THE ATTACK THE OLD FLOOR ALLOWED. 1.21 was the floor, so this row
+		// reported no gap at all while two deprecations were switched off.
+		{name: "at the old floor, silently missing two deprecations", directive: "go 1.21",
+			want:          []string{ioutilDeprecated},
+			notWant:       []string{ptrToDeprecated, cfbDeprecated},
+			wantUncovered: true},
+		{name: "one release later, still missing one", directive: "go 1.22",
+			want:          []string{ioutilDeprecated, ptrToDeprecated},
+			notWant:       []string{cfbDeprecated},
+			wantUncovered: true},
+		// The boundary, and the direction that guards against a notice which
+		// fires on everything: a module level with the toolchain has nothing
+		// switched off and is named on no review.
+		{name: "level with the toolchain analyzing it", directive: "go " + current,
+			want:          []string{ioutilDeprecated, ptrToDeprecated, cfbDeprecated},
+			wantUncovered: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, files := goProbe(t, source)
+			// Line 3 of go.mod, which is what the notice has to send a reader to.
+			writeFile(t, repo, "go.mod", "module probe\n\n"+tc.directive+"\n")
+
+			cfg := baseConfig()
+			cfg.Linters.Enabled = []string{"golangci-lint"}
+			cfg.Linters.Mode = config.LinterStrict
+
+			set := New(repo, cfg, nil)
+			published, err := set.Run(context.Background(), files)
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			for _, want := range tc.want {
+				if !reportsAbout(published, want) {
+					t.Fatalf("findings = %+v, want one about %q under %q", published, want, tc.directive)
+				}
+			}
+			for _, notWant := range tc.notWant {
+				if reportsAbout(published, notWant) {
+					t.Fatalf("findings = %+v, want nothing about %q under %q: the fixture no longer "+
+						"measures the gate it was built for", published, notWant, tc.directive)
+				}
+			}
+			if s := set.Statuses(); len(s) != 1 || s[0].Outcome != review.LinterRan {
+				t.Fatalf("statuses = %+v, want golangci-lint recorded as having run", s)
+			}
+
+			gaps := uncoveredFor(set.Uncovered(), review.UncoveredLanguageVersion)
+			switch {
+			case tc.wantUncovered && (len(gaps) != 1 || gaps[0].Path != "go.mod" || gaps[0].Line != 3):
+				t.Fatalf("uncovered = %+v, want go.mod:3 named as the line that narrowed the ruleset",
+					set.Uncovered())
+			case !tc.wantUncovered && len(gaps) != 0:
+				t.Fatalf("uncovered = %+v, want nothing: %q leaves no version-gated check unapplied, and a "+
+					"coverage gap reported where coverage was complete is as much a defect as a missed one",
+					gaps, tc.directive)
+			}
+		})
+	}
+}
+
+// reportsAbout reports whether any finding's text mentions the symbol.
+func reportsAbout(found []review.Finding, symbol string) bool {
+	for _, f := range found {
+		if strings.Contains(f.Title, symbol) || strings.Contains(f.Rationale, symbol) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestTheLanguageVersionComparisonIsTheToolchainsOwnOrdering pins the two halves
+// the end-to-end test above cannot reach cheaply: how two versions are compared,
+// and what happens when either side cannot be read.
+//
+// The ordering is go/version's rather than a comparison written here, for the
+// reason goDirectiveLine is go/scanner's: "1.9" against "1.10" is where a
+// hand-written one goes wrong, and it goes wrong silently.
+func TestTheLanguageVersionComparisonIsTheToolchainsOwnOrdering(t *testing.T) {
+	cases := []struct {
+		name     string
+		declared string
+		ceiling  string
+		below    bool
+	}{
+		{name: "far below", declared: "1.15", ceiling: "go1.25", below: true},
+		{name: "one release below", declared: "1.24", ceiling: "go1.25", below: true},
+		{name: "level", declared: "1.25", ceiling: "go1.25", below: false},
+		// A full release on either side: the LANGUAGE version is what gates the
+		// checks, so the patch component decides nothing.
+		{name: "declared with a patch", declared: "1.25.4", ceiling: "go1.25", below: false},
+		{name: "ceiling with a patch", declared: "1.25", ceiling: "go1.25.4", below: false},
+		// Above the ceiling: such a module does not build under GOTOOLCHAIN=local
+		// and golangci-lint says so itself; nothing is claimed here.
+		{name: "above", declared: "1.26", ceiling: "go1.25", below: false},
+		// String ordering would put this above "1.10" and it is not.
+		{name: "double digits", declared: "1.9", ceiling: "go1.10", below: true},
+		{name: "triple digits", declared: "1.100", ceiling: "go1.25", below: false},
+		// Unreadable, either side: say nothing rather than guess. An unreadable
+		// go.mod does not load either, and an unreadable ceiling is a development
+		// toolchain — naming every module in the checkout over that would be a
+		// wall of gaps invented out of an unanswered question.
+		{name: "declared unreadable", declared: "banana", ceiling: "go1.25", below: false},
+		{name: "declared empty", declared: "", ceiling: "go1.25", below: false},
+		{name: "ceiling unreadable", declared: "1.15", ceiling: "devel +abc123", below: false},
+		{name: "ceiling empty", declared: "1.15", ceiling: "", below: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := belowAnalyzedLanguage(tc.declared, tc.ceiling); got != tc.below {
+				t.Errorf("belowAnalyzedLanguage(%q, %q) = %v, want %v", tc.declared, tc.ceiling, got, tc.below)
+			}
+		})
+	}
+}
+
+// TestTheAnalyzedLanguageCeilingIsTheChildsToolchain pins where the ceiling comes
+// from: the go tool that will load the packages, not this process.
+//
+// It is the same mistake the cgo detector was moved off build.Default for, and
+// the reason it matters here is that the ceiling decides what gets named on a
+// pull request. A ceiling read from a constant was measured silent at the modal
+// `go` directive.
+func TestTheAnalyzedLanguageCeilingIsTheChildsToolchain(t *testing.T) {
+	requireTool(t, "go")
+
+	got := goEnvironment(context.Background(), t.TempDir())
+
+	out, err := exec.Command("go", "env", "GOVERSION").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := version.Lang(strings.TrimSpace(string(out))); got.Language != want {
+		t.Errorf("goEnvironment reported language %q, want the go tool's own %q", got.Language, want)
+	}
+}
+
+// TestTheGoDirectiveIsReadFromGoModTheWayTheGoToolReadsIt covers the spellings a
+// go.mod can carry, and the one that carries no directive at all.
+//
+// The missing case is measured rather than taken from the documentation: a
+// go.mod reading only `module probe` reports the same nothing as `go 1.16` on a
+// file using strings.Title, io/ioutil and rand.Seed, where `go 1.20` reports all
+// three. Line 0 goes with it because there is no line to send a reader to.
+func TestTheGoDirectiveIsReadFromGoModTheWayTheGoToolReadsIt(t *testing.T) {
+	cases := []struct {
+		name     string
+		src      string
+		declared string
+		line     int
+	}{
+		{name: "the ordinary shape", src: "module probe\n\ngo 1.15\n", declared: "1.15", line: 3},
+		{name: "with a trailing comment", src: "module probe\n\ngo 1.15 // pinned\n", declared: "1.15", line: 3},
+		{name: "indented, which go.mod permits", src: "module probe\n\n\tgo 1.15\n", declared: "1.15", line: 3},
+		{name: "CRLF, which git stores verbatim", src: "module probe\r\n\r\ngo 1.15\r\n", declared: "1.15", line: 3},
+		// Not directives. A commented-out one is the shape that would make this
+		// report a version the go tool never saw.
+		{name: "commented out", src: "module probe\n\n// go 1.15\ngo 1.24\n", declared: "1.24", line: 4},
+		{name: "absent", src: "module probe\n", declared: "1.16", line: 0},
+		// The go tool rejects a repeated go statement, so the first one is the
+		// only one that can be in force.
+		{name: "repeated", src: "module probe\n\ngo 1.24\ngo 1.15\n", declared: "1.24", line: 3},
+
+		// A `go` line inside a parenthesized block is a block entry, not the
+		// module's directive, and this used to read it as one: the first row
+		// returned ("1.99", 4) with the real directive on line 7 never reached.
+		// The comment justifying that said `go` is a reserved module path so no
+		// require line can begin with it — true of what the LOADER accepts, and
+		// this runs over a file the change wrote, before anything has loaded it.
+		{
+			name:     "a go line inside a require block is not the directive",
+			src:      "module probe\n\nrequire (\n\tgo 1.99\n)\n\ngo 1.25\n",
+			declared: "1.25", line: 7,
+		},
+		{
+			name:     "a block entry with no directive after it leaves the directive absent",
+			src:      "module probe\n\nrequire (\n\tgo 1.99\n)\n",
+			declared: "1.16", line: 0,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			file := writeFile(t, t.TempDir(), "go.mod", tc.src)
+
+			declared, line, ok := moduleLanguageVersion(file)
+			if !ok {
+				t.Fatalf("moduleLanguageVersion(%q) reported no answer", tc.src)
+			}
+			if declared != tc.declared || line != tc.line {
+				t.Errorf("moduleLanguageVersion = (%q, %d), want (%q, %d)", declared, line, tc.declared, tc.line)
+			}
+		})
+	}
+
+	if _, _, ok := moduleLanguageVersion(filepath.Join(t.TempDir(), "go.mod")); ok {
+		t.Error("a go.mod that is not there reported a version; a coverage notice built on a guess " +
+			"sends an operator to the wrong file")
+	}
+
+	// Unbalanced parentheses say nothing rather than pick a reading. Such a
+	// go.mod does not load, and the review says so in the loader's own words —
+	// but which reading was meant is exactly the question this must not answer
+	// by guessing, since the answer becomes the number the ceiling compares.
+	unbalanced := writeFile(t, t.TempDir(), "go.mod", "module probe\n\n)\ngo 1.25\n")
+	if _, _, ok := moduleLanguageVersion(unbalanced); ok {
+		t.Error("an unbalanced go.mod reported a version; the two readings of it differ and " +
+			"choosing one is how a misread becomes a coverage claim")
+	}
+}
+
 // TestASuppressionThisChangeAddedIsNamed closes the last channel, and the
 // disclosure it corrects was wrong by a whole file.
 //
@@ -747,7 +1435,7 @@ func TestASuppressionThisChangeAddedIsNamed(t *testing.T) {
 
 	body := goSource("", uncheckedError("F"), uncheckedError("G"))
 	repo := t.TempDir()
-	writeFile(t, repo, "go.mod", "module probe\n\ngo 1.24\n")
+	writeFile(t, repo, "go.mod", "module probe\n\ngo "+currentGoDirective()+"\n")
 	writeFile(t, repo, "app.go", nolint+"\n"+body)
 
 	// A diff that adds ONLY the suppression, on top of a file whose violations
@@ -791,7 +1479,7 @@ func TestASuppressionTheChangeDidNotAddIsNotReported(t *testing.T) {
 	const nolint = "//nolint:all"
 
 	repo := t.TempDir()
-	writeFile(t, repo, "go.mod", "module probe\n\ngo 1.24\n")
+	writeFile(t, repo, "go.mod", "module probe\n\ngo "+currentGoDirective()+"\n")
 	writeFile(t, repo, "app.go", "package probe\n\n"+
 		"// Quoted, not applied: \""+nolint+"\".\n"+
 		"var Doc = \""+nolint+"\"\n\n"+
@@ -833,10 +1521,19 @@ func TestASuppressionTheChangeDidNotAddIsNotReported(t *testing.T) {
 // linter NAMES, so a bare `//nolint:` and a name it does not know suppress
 // nothing; matching that would mean shipping a copy of its linter registry and
 // keeping it in step with whatever binary is on PATH.
+//
+// THE `suppresses` COLUMN WAS NEVER ASSERTED ON, which made this the one place
+// in this file that did not drive the tool it documents. The column said "what
+// golangci-lint 2.8.0 does with it" and nothing here ran golangci-lint, so the
+// table could only ever confirm the belief it was written from — and the whole
+// point of the column is to catch the row where that belief is wrong. It is a
+// measurement now: each row runs the binary over a file whose only violation is
+// an unchecked error, and asks whether the comment made it disappear.
 func TestTheSuppressionDetectorMatchesGolangciLintsOwnRule(t *testing.T) {
 	cases := []struct {
 		comment string
-		// suppresses is what golangci-lint 2.8.0 does with it.
+		// suppresses is what golangci-lint 2.8.0 does with it, MEASURED by the
+		// subtest below rather than recorded from memory.
 		suppresses bool
 		// want is what this detector reports, which differs from suppresses
 		// only where the reason is written down above.
@@ -857,20 +1554,45 @@ func TestTheSuppressionDetectorMatchesGolangciLintsOwnRule(t *testing.T) {
 
 		// Reported although it suppresses nothing: the name is not validated
 		// here. Over-reporting a typo'd suppression the author meant to work is
-		// the better failure.
+		// the better failure. golangci-lint prints
+		// "Found unknown linters in //nolint directives" on stderr and reports
+		// the violation as usual.
 		{comment: "//nolint:", suppresses: false, want: true},
 		{comment: "//nolint:nosuchlinter", suppresses: false, want: true},
 	}
 
+	// Without this every row would read as a suppression the moment the fixture
+	// stopped producing a violation, and the table would go green describing a
+	// binary that had done nothing at all.
+	t.Run("the fixture still produces a violation to suppress", func(t *testing.T) {
+		requireTool(t, "golangci-lint")
+
+		if suppressedByGolangciLint(t, "// An ordinary comment.") {
+			t.Fatal("the errcheck violation the rows are measured by is gone; every row below would " +
+				"pass by describing an analyzer that reported nothing for an unrelated reason")
+		}
+	})
+
 	for _, tc := range cases {
 		t.Run(tc.comment, func(t *testing.T) {
-			src := tc.comment + "\npackage probe\n\nfunc F() int { return 1 }\n"
+			t.Run("this detector", func(t *testing.T) {
+				src := tc.comment + "\n" + goSource("", uncheckedError("F"))
 
-			got := len(goNolintLines("app.go", []byte(src))) == 1
-			if got != tc.want {
-				t.Errorf("goNolintLines reports %v, want %v (golangci-lint 2.8.0 suppresses: %v)",
-					got, tc.want, tc.suppresses)
-			}
+				if got := len(goNolintLines("app.go", []byte(src))) == 1; got != tc.want {
+					t.Errorf("goNolintLines reports %v, want %v", got, tc.want)
+				}
+			})
+
+			// Its own subtest so that a run without the binary SKIPS this half
+			// visibly, rather than passing while measuring nothing.
+			t.Run("golangci-lint", func(t *testing.T) {
+				requireTool(t, "golangci-lint")
+
+				if got := suppressedByGolangciLint(t, tc.comment); got != tc.suppresses {
+					t.Errorf("the binary suppresses = %v, want %v: the table records what golangci-lint "+
+						"does and golangci-lint disagrees, so the table is wrong", got, tc.suppresses)
+				}
+			})
 		})
 	}
 
@@ -880,5 +1602,72 @@ func TestTheSuppressionDetectorMatchesGolangciLintsOwnRule(t *testing.T) {
 	if lines := goNolintLines("app.go", []byte(quoted)); len(lines) != 0 {
 		t.Errorf("lines = %v, want none: a suppression quoted in a string literal or inside a "+
 			"sentence is not one", lines)
+	}
+}
+
+// suppressedByGolangciLint reports whether a comment placed at column 1 above
+// the package clause makes golangci-lint stop reporting the one violation in the
+// file.
+//
+// It goes through the runner rather than shelling out directly so that the
+// measurement is taken under the configuration open-nitpick actually ships —
+// a comment that suppresses nothing under stock defaults but everything under
+// ours would be a fact about a run nobody has.
+func suppressedByGolangciLint(t *testing.T, comment string) bool {
+	t.Helper()
+
+	repo := t.TempDir()
+	writeFile(t, repo, "go.mod", "module probe\n\ngo "+currentGoDirective()+"\n")
+	writeFile(t, repo, "app.go", comment+"\n"+goSource("", uncheckedError("F")))
+
+	found, err := (&golangciLint{}).Run(context.Background(), repo, []string{"app.go"})
+	if err != nil {
+		t.Fatalf("golangci-lint: %v", err)
+	}
+	return !hasRule(found, "errcheck")
+}
+
+// TestTheGoEnvironmentIsReadOneLinePerVariable pins the parse against the two
+// shapes that would make it answer with the wrong variable.
+//
+// Both are real `go env` output. A development toolchain prints a GOVERSION
+// with spaces in it, and a variable with no value prints an empty line — either
+// one slides the answers along under a whitespace split, at which point the cgo
+// question is answered with a Go version and a file importing "C" goes unnamed.
+func TestTheGoEnvironmentIsReadOneLinePerVariable(t *testing.T) {
+	cases := []struct {
+		name     string
+		out      string
+		ok       bool
+		cgo      bool
+		language string
+	}{
+		{name: "the ordinary shape", out: "1\ngo1.25.5\n", ok: true, cgo: true, language: "go1.25"},
+		{name: "cgo off", out: "0\ngo1.25.5\n", ok: true, cgo: false, language: "go1.25"},
+		// A GOVERSION with spaces: the language version is unreadable, and that
+		// must not turn into an answer about cgo.
+		{name: "a development toolchain", out: "1\ndevel go1.26-abc123 Mon Jan 1\n", ok: true, cgo: true},
+		// An empty first line is what a variable with no value prints.
+		{name: "cgo empty", out: "\ngo1.25.5\n", ok: true, cgo: false, language: "go1.25"},
+		{name: "CRLF, which a Windows go tool writes", out: "1\r\ngo1.25.5\r\n", ok: true, cgo: true, language: "go1.25"},
+		// Not two lines at all: say nothing rather than read a truncated answer.
+		{name: "truncated", out: "1", ok: false},
+		{name: "empty", out: "", ok: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := parseGoEnv([]byte(tc.out))
+			if ok != tc.ok {
+				t.Fatalf("parseGoEnv(%q) ok = %v, want %v", tc.out, ok, tc.ok)
+			}
+			if !ok {
+				return
+			}
+			if got.CgoEnabled != tc.cgo || got.Language != tc.language {
+				t.Errorf("parseGoEnv(%q) = %+v, want cgo %v and language %q",
+					tc.out, got, tc.cgo, tc.language)
+			}
+		})
 	}
 }

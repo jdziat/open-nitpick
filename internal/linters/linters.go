@@ -70,15 +70,25 @@ type Runner interface {
 	Run(ctx context.Context, repoRoot string, files []string) ([]Finding, error)
 }
 
-// errNoTargets is Detect's answer when the change contains no files this
-// analyzer reads.
+// errNoTargets is Detect's answer when nothing this analyzer reads survived the
+// review's file selection.
 //
 // It is a distinct answer from "it could not run" because the two are different
 // facts about the review and only one of them is a degradation: ruff sitting out
 // a Go-only change is not a Python review that went missing, and reporting it as
 // one both fails strict mode for nothing and teaches a reader to skip the block
 // where real absences are announced.
-var errNoTargets = errors.New("the change contains no files it analyzes")
+//
+// It says "was selected for review" and not "the change contains" because the
+// two come apart, and the wording that claimed the stronger one was measured
+// false. Detect is handed reviewablePaths' output — review.ignore already
+// applied — so a `go mod vendor` bump touching go.mod and vendor/dep/dep.go
+// arrives as a one-element list holding go.mod, and the sentence "the change
+// contains no files it analyzes" was published over a change containing a Go
+// file with a real violation. The selection is the honest subject: this analyzer
+// was offered nothing it reads. Which files were withheld, and whether that
+// mattered, is the coverage list's job — see Set.Run's errNoTargets arm.
+var errNoTargets = errors.New("no files it analyzes were selected for review")
 
 // notOnPath is the reason an analyzer whose binary is missing did not run.
 func notOnPath(name string) error {
@@ -210,9 +220,8 @@ func (s *Set) Discarded() []review.LinterDiscard {
 	return out
 }
 
-// Uncovered reports the parts of the change an analyzer ran over and said
-// nothing about because the tree arranged for it not to look. It is populated by
-// Run and empty before it.
+// Uncovered reports the parts of the change an analyzer ran over and did not
+// fully cover. It is populated by Run and empty before it.
 //
 // It exists because "the analyzer ran" and "the analyzer read the change" are
 // different claims, and only the first one was being published. A build
@@ -294,11 +303,28 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 			reason := oneLine(err.Error())
 
 			if errors.Is(err, errNoTargets) {
-				// Not a degradation, so it is recorded and nothing else: an
-				// analyzer with nothing to read has not gone missing, and
-				// failing strict mode over it would make strict unusable in
-				// every repository that is not polyglot.
+				// Not a degradation, so it is not a failure and does not fail
+				// strict mode: an analyzer with nothing to read has not gone
+				// missing, and treating it as missing would make strict mode
+				// unusable in every repository that is not polyglot.
 				s.record(r.Name(), review.LinterSkipped, reason)
+
+				// But "nothing to read" and "nothing to say" are different
+				// claims, and this arm used to publish the first while meaning
+				// the second. Detect answers from the SELECTED paths, so a
+				// change whose every Go file is withheld by review.ignore —
+				// `go mod vendor`, where go.mod survives and vendor/dep/dep.go
+				// does not — reached here and produced a review whose entire
+				// body was one skipped line. Measured: a real errcheck
+				// violation in the withheld file, findings=0, uncovered=[].
+				//
+				// The gap is the same gap the ran-path reports and needs no
+				// mechanism of its own: notSelected compares the diff against
+				// the selection, and with no Go file selected there is no
+				// analyzed package to excuse one, so every withheld Go file is
+				// named. A change this analyzer genuinely has no stake in still
+				// produces nothing, because notSelected filters on extension.
+				s.uncover(s.coverage(ctx, r, paths, files))
 				continue
 			}
 
@@ -327,19 +353,19 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 
 			found, err := r.Run(runCtx, s.repoRoot, paths)
 
-			// Asked only of a runner that RAN — an analyzer already recorded as
-			// failed has told the reader more than a coverage note would — and
-			// asked whether or not it found anything, because an analyzer that
-			// reported nothing about a file it never read is exactly the state
-			// this answers.
+			// Asked whether or not the analyzer found anything, because an
+			// analyzer with nothing to say about a file it never read is
+			// exactly the state this answers. Not asked when it FAILED: an
+			// analyzer recorded as failed has told the reader more than a
+			// coverage note would, and every file would be uncovered anyway.
 			//
 			// Outside the lock below, because it reads files: the mutex
 			// serializes the result tails of every analyzer in the run, and
 			// holding it across file I/O would make each analyzer wait on the
 			// last one's directory reads.
 			var gaps []review.LinterUncovered
-			if c, ok := r.(covering); ok && err == nil {
-				gaps = c.Uncovered(s.repoRoot, paths, files)
+			if err == nil {
+				gaps = s.coverage(ctx, r, paths, files)
 			}
 
 			mu.Lock()
@@ -485,6 +511,35 @@ func (s *Set) discard(f Finding, reason review.DiscardReason) {
 	s.log.Info("analyzer finding not published",
 		"rule", f.Rule, "path", f.Path, "line", f.Line, "reason", reason)
 }
+
+// coverage asks a runner which parts of the change it did not cover, and
+// answers nothing for a runner that cannot be asked.
+//
+// The deadline is its own and not the analyzer's. Uncovered shells out to `go
+// env` to decide the cgo and language-version questions from the child's build
+// context rather than from this process's; sharing runCtx meant an analyzer that
+// returned with the timeout already spent left `go env` no time to answer, and
+// the fallback is build.Default — the exact guessed-build-context state two
+// separate silencing routes were fixed for, arrived at silently and with nothing
+// on the review saying the answer was assumed. A coverage question is cheap and
+// bounded by directory reads, so it gets a deadline sized for itself.
+func (s *Set) coverage(ctx context.Context, r Runner, paths []string, files diff.Files) []review.LinterUncovered {
+	c, ok := r.(covering)
+	if !ok {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, coverageTimeout)
+	defer cancel()
+
+	return c.Uncovered(ctx, s.repoRoot, paths, files)
+}
+
+// coverageTimeout bounds the coverage question. It is not configurable with
+// linters.timeout because it is not the same quantity: that one sizes a whole
+// analyzer run over a repository, where this is `go env` plus a walk of the
+// changed files' directories.
+const coverageTimeout = 30 * time.Second
 
 // uncover records the parts of the change an analyzer did not cover.
 //
