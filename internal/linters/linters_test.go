@@ -198,20 +198,22 @@ func TestFindingsAreAttributedToTheirLinter(t *testing.T) {
 // TestALinterFindingNeverClaimsOurSeverityAsItsOwn pins the provenance of a
 // severity nobody but this package chose.
 //
-// mapSeverity collapses four analyzers' vocabularies onto three of our levels —
-// "HIGH", "ERROR" and "CRITICAL" all land on error — and ruff publishes no
-// severity at all, so the level on a linter finding is never the analyzer's own
-// spelling. Nothing recorded that, and internal/evals answered "was this
-// translated?" from the reporter's identity, so a report captioned as each
-// contender's severity vocabulary would quote gosec as having printed a word
-// gosec never used.
+// mapSeverity folds foreign vocabularies onto our levels — "HIGH" and "ERROR"
+// both land on error — and ruff publishes no severity at all, so a linter
+// finding's level is our reading rather than the analyzer's own claim. It holds
+// even where the spelling coincides: semgrep documents ERROR as the older
+// spelling of HIGH, so it is a word inside SEMGREP'S scale, and
+// linters.max_severity can reduce the result afterwards. Nothing recorded that,
+// and internal/evals answered "was this translated?" from the reporter's
+// identity, so a report captioned as each contender's severity vocabulary would
+// quote semgrep as having printed a word semgrep never used.
 func TestALinterFindingNeverClaimsOurSeverityAsItsOwn(t *testing.T) {
 	cfg := baseConfig()
 
 	set := New(".", cfg, nil)
-	set.runners = []Runner{&fakeRunner{name: "gosec", detected: true, findings: []Finding{
-		{Path: "app.go", Line: 1, Rule: "G404", Message: "weak rng",
-			Severity: mapSeverity("HIGH"), RawSeverity: "HIGH"},
+	set.runners = []Runner{&fakeRunner{name: "semgrep", detected: true, findings: []Finding{
+		{Path: "app.go", Line: 1, Rule: "go.lang.security.audit.weak-rand",
+			Message: "weak rng", Severity: mapSeverity("HIGH"), RawSeverity: "HIGH"},
 		// ruff's shape: no severity published, so this package chose one and
 		// there is no word to quote.
 		{Path: "app.go", Line: 2, Rule: "E501", Message: "line too long",
@@ -235,8 +237,8 @@ func TestALinterFindingNeverClaimsOurSeverityAsItsOwn(t *testing.T) {
 	}
 
 	if got[0].RawSeverity != "HIGH" {
-		t.Errorf("RawSeverity = %q, want %q: mapSeverity folds HIGH, ERROR and CRITICAL onto one "+
-			"level, so the analyzer's word cannot be recovered from ours", got[0].RawSeverity, "HIGH")
+		t.Errorf("RawSeverity = %q, want %q: mapSeverity folds HIGH and ERROR onto one level, so "+
+			"the analyzer's word cannot be recovered from ours", got[0].RawSeverity, "HIGH")
 	}
 	if got[1].RawSeverity != "" {
 		t.Errorf("RawSeverity = %q for an analyzer that published no severity; there is no word to "+
@@ -244,8 +246,14 @@ func TestALinterFindingNeverClaimsOurSeverityAsItsOwn(t *testing.T) {
 	}
 }
 
-func TestUnknownSeverityBecomesWarning(t *testing.T) {
-	// An unrecognized analyzer severity must not be able to trip the gate.
+// TestAnUnusableSeverityFromARunnerBecomesWarning covers normalize's last-ditch
+// guard: a RUNNER handing over a value that is not a level at all, which is our
+// own bug rather than a vocabulary we failed to read.
+//
+// It lands on the same level mapSeverity gives an unreadable analyzer word and
+// ruff's runner gives no word at all, because all three are the same state —
+// this project has no usable severity and picks one.
+func TestAnUnusableSeverityFromARunnerBecomesWarning(t *testing.T) {
 	cfg := baseConfig()
 
 	set := New(".", cfg, nil)
@@ -281,18 +289,91 @@ deleted file mode 100644
 	}
 }
 
+// TestMapSeverity pins the whole table, including the entry that was wrong.
+//
+// Every level in config's vocabulary appears in the codomain here. That is the
+// property the old table failed: critical was unreachable, so `fail_on: critical`
+// gated on nothing an analyzer could ever produce.
 func TestMapSeverity(t *testing.T) {
 	cases := map[string]config.Severity{
-		"ERROR":   config.SeverityError,
-		"high":    config.SeverityError,
-		"WARNING": config.SeverityWarning,
-		"info":    config.SeverityInfo,
+		// Analyzer vocabularies, folded onto ours. Semgrep documents
+		// ERROR/WARNING/INFO as the older spellings of HIGH/MEDIUM/LOW, so the
+		// pairs below are synonyms inside one scale rather than a foreign word
+		// and one of ours — and the fold is why RawSeverity exists.
+		"HIGH":     config.SeverityError,
+		"high":     config.SeverityError,
+		"ERROR":    config.SeverityError,
+		"MEDIUM":   config.SeverityWarning,
+		"WARNING":  config.SeverityWarning,
+		"WARN":     config.SeverityWarning,
+		"LOW":      config.SeverityInfo,
+		"info":     config.SeverityInfo,
+		"CRITICAL": config.SeverityCritical,
+		"critical": config.SeverityCritical,
+
+		// Spellings only some of these tools use.
+		"NOTE":        config.SeverityInfo,
+		"INFORMATION": config.SeverityInfo,
+
+		// Reachable only from the literal word, which golangci-lint's operator
+		// text can supply. Nothing foreign folds up or down onto it.
+		"nit": config.SeverityNit,
+
+		// The three states in which this project has no usable severity from
+		// the analyzer and picks one. "none" belongs here: it is a gate
+		// threshold, not a level a finding can carry, so as an analyzer's word
+		// it is unreadable like any other.
 		"":        config.SeverityWarning,
 		"weird":   config.SeverityWarning,
+		"blocker": config.SeverityWarning,
+		"none":    config.SeverityWarning,
 	}
 	for in, want := range cases {
 		if got := mapSeverity(in); got != want {
 			t.Errorf("mapSeverity(%q) = %q, want %q", in, got, want)
+		}
+	}
+
+	seen := map[config.Severity]bool{}
+	for in := range cases {
+		seen[mapSeverity(in)] = true
+	}
+	for _, level := range []config.Severity{
+		config.SeverityNit, config.SeverityInfo, config.SeverityWarning,
+		config.SeverityError, config.SeverityCritical,
+	} {
+		if !seen[level] {
+			t.Errorf("no analyzer word maps to %q. A level outside this codomain is a level "+
+				"review.fail_on accepts and no analyzer finding can ever reach", level)
+		}
+	}
+}
+
+// TestAnUnreadableAnalyzerWordIsRankedWhereSilenceIs pins the floor against the
+// only other case that means the same thing, so moving one without the other
+// fails.
+//
+// THE BUG IT REPLACES: this floor was briefly aligned with
+// config.Severity.Normalize's info instead — the level an unrecognized word from
+// a MODEL gets. The symmetry is false. A model is handed our enum and writing
+// outside it is that reporter misbehaving; an analyzer was never given our
+// vocabulary, so an unreadable word is our translation failing, and quietening
+// our own failure deletes real findings under any review.min_severity above
+// info. It also ranked "the tool said something we could not read" below "the
+// tool said nothing", which is incoherent — those are the same state, and this
+// test is what says so.
+func TestAnUnreadableAnalyzerWordIsRankedWhereSilenceIs(t *testing.T) {
+	silence := mapSeverity("")
+
+	for _, word := range []string{"P1", "blocker", "major", "trivial", "S3", "EXPERIMENT"} {
+		if config.Severity(word).Valid() {
+			t.Fatalf("%q is a level this project recognizes; it does not test the unreadable floor", word)
+		}
+
+		if got := mapSeverity(word); got != silence {
+			t.Errorf("an analyzer saying %q lands on %q while one that published no severity at "+
+				"all lands on %q. Both mean we have no usable severity, so both are this "+
+				"project's choice and it is the same choice", word, got, silence)
 		}
 	}
 }

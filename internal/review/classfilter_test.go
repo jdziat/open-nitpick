@@ -226,31 +226,39 @@ func TestLinterAttributionSurvivesTriage(t *testing.T) {
 // that echoes what it was shown normalizes to itself and the call returns early.
 // Every finding that survived triage was published claiming nobody had
 // translated it. internal/evals' severityAsSaid reads that as "Severity is the
-// reporter's own word" and quotes it unmarked, so the eval report said gosec
-// printed "error" when gosec printed "HIGH", and said a review model printed
+// reporter's own word" and quotes it unmarked, so the eval report said semgrep
+// printed "error" when semgrep printed "HIGH", and said a review model printed
 // "info" when it printed "P1". That is the defect recordSeverity's doc comment
 // says it fixes, alive one pass downstream of the fix and on the path the eval
 // battery runs.
 //
-// Both directions are asserted. The second is what keeps the restore honest: if
-// triage MOVES the level, the published word is triage's own and the earlier
-// reporter's spelling is stale beside it, exactly as applyOutcomes treats an
-// expert's re-rate.
+// The second case is a triage RE-RATING, and who reported the finding decides
+// the answer. THE BUG: it did not. Both kinds were treated as a model's — the
+// word dropped, on the theory that a level somebody else chose makes the
+// reporter's spelling stale — which for an analyzer is wrong twice over. semgrep
+// does not retract "HIGH" because triage re-rated the impact, and the finding is
+// still published as "flagged by semgrep(...)", so dropping the pair leaves the
+// report asserting semgrep's own word for it is our "warning". An analyzer's
+// level is never its own claim, whatever the level ends up being. The model case
+// is TestAModelsOwnWordIsStaleAfterATriageRerate below.
 func TestSeverityProvenanceSurvivesTriage(t *testing.T) {
 	lint := Finding{
 		Path: "app.go", Line: 4, Severity: "error",
 		Class: string(config.ClassSecurity), Category: "lint",
-		Title: "Potential file inclusion via variable", Rationale: "Reported by golangci-lint(gosec).",
-		Source: "golangci-lint(gosec)", SeverityTranslated: true, RawSeverity: "HIGH",
+		Title:              "Potential file inclusion via variable",
+		Rationale:          "Reported by semgrep(go.lang.security.audit.file-inclusion).",
+		Source:             "semgrep(go.lang.security.audit.file-inclusion)",
+		SeverityTranslated: true, RawSeverity: "HIGH", FromAnalyzer: true,
 	}
 
-	// `echoed` is what triage's decode actually yields: the two unserialized
-	// fields cleared. Passing `lint` itself would let the struct smuggle the
-	// provenance across a boundary that cannot carry it, and the test would pass
-	// against the broken code.
+	// `echoed` is what triage's decode actually yields: the unserialized fields
+	// cleared. Passing `lint` itself would let the struct smuggle the provenance
+	// across a boundary that cannot carry it, and the test would pass against
+	// the broken code.
 	echoed := lint
 	echoed.SeverityTranslated = false
 	echoed.RawSeverity = ""
+	echoed.FromAnalyzer = false
 
 	report := runWithLinter(t, config.NitpickNormal, nil, []Finding{lint}, []Finding{echoed})
 	if len(report.Findings) != 1 {
@@ -259,12 +267,12 @@ func TestSeverityProvenanceSurvivesTriage(t *testing.T) {
 
 	got := report.Findings[0]
 	if !got.SeverityTranslated || got.RawSeverity != "HIGH" {
-		t.Errorf("published as translated=%v raw=%q; gosec printed \"HIGH\" and this finding is "+
-			"attributed to gosec (%s), so our word is being quoted as the analyzer's",
+		t.Errorf("published as translated=%v raw=%q; semgrep printed \"HIGH\" and this finding is "+
+			"attributed to semgrep (%s), so our word is being quoted as the analyzer's",
 			got.SeverityTranslated, got.RawSeverity, got.Source)
 	}
 
-	// Triage re-rating it: the level published is triage's, so "HIGH" must go.
+	// Triage re-rating it. The level moved; what semgrep printed did not.
 	moved := echoed
 	moved.Severity = string(config.SeverityWarning)
 
@@ -278,10 +286,47 @@ func TestSeverityProvenanceSurvivesTriage(t *testing.T) {
 		t.Fatalf("Severity = %q, want triage's warning; the rest of this case is about that move",
 			got.Severity)
 	}
+	if !got.SeverityTranslated || got.RawSeverity != "HIGH" {
+		t.Errorf("translated=%v raw=%q after a triage re-rate to %q, on a finding still published "+
+			"as %s. A re-rating is not a retraction, and dropping the analyzer's word leaves the "+
+			"report quoting ours in its place", got.SeverityTranslated, got.RawSeverity,
+			got.Severity, got.Source)
+	}
+}
+
+// TestAModelsOwnWordIsStaleAfterATriageRerate is why the rule above is a rule
+// rather than "always restore".
+//
+// A model's RawSeverity is the level IT assigned. Once triage rates the finding
+// differently, that word describes a rating nobody now holds, and a report
+// quoting it beside the published level describes a finding that never existed —
+// the same judgement applyOutcomes makes about an expert's re-rate.
+func TestAModelsOwnWordIsStaleAfterATriageRerate(t *testing.T) {
+	found := Finding{
+		Path: "app.go", Line: 4, Severity: "info",
+		Class: string(config.ClassCorrectness), Category: "correctness",
+		Title: "Potential file inclusion via variable", Rationale: "y",
+		SeverityTranslated: true, RawSeverity: "P1",
+	}
+
+	echoed := found
+	echoed.SeverityTranslated = false
+	echoed.RawSeverity = ""
+	echoed.Severity = string(config.SeverityWarning)
+
+	report := runWithClasses(t, config.NitpickNormal, []Finding{found}, []Finding{echoed})
+	if len(report.Findings) != 1 {
+		t.Fatalf("findings = %d, want the model's finding published", len(report.Findings))
+	}
+
+	got := report.Findings[0]
+	if got.Severity != string(config.SeverityWarning) {
+		t.Fatalf("Severity = %q, want triage's warning", got.Severity)
+	}
 	if got.SeverityTranslated || got.RawSeverity != "" {
-		t.Errorf("translated=%v raw=%q survived a triage re-rate to %q. The analyzer never said "+
-			"\"HIGH\" about a warning, and a report quoting it beside one describes a finding that "+
-			"never existed", got.SeverityTranslated, got.RawSeverity, got.Severity)
+		t.Errorf("translated=%v raw=%q survived a triage re-rate to %q. The model rated this "+
+			"\"P1\" and nothing is now published at the level it meant",
+			got.SeverityTranslated, got.RawSeverity, got.Severity)
 	}
 }
 

@@ -161,6 +161,17 @@ func (l Linters) validate() []error {
 	if l.Timeout < 0 {
 		errs = append(errs, fmt.Errorf("linters.timeout must not be negative, got %s", l.Timeout))
 	}
+	// Checked rather than tolerated because CapSeverity treats an unusable
+	// ceiling as no ceiling, which is the safe runtime behavior and the wrong
+	// answer to give an operator who meant to cap something.
+	if !l.MaxSeverity.Valid() {
+		errs = append(errs, fmt.Errorf("linters.max_severity %q is not a severity", l.MaxSeverity))
+	}
+	if l.MaxSeverity == SeverityNone {
+		errs = append(errs, errors.New(
+			"linters.max_severity: none is a gate threshold, not a level a finding can carry; "+
+				"use linters.mode: off to stop running analyzers"))
+	}
 	for i, name := range l.Enabled {
 		if strings.TrimSpace(name) == "" {
 			errs = append(errs, fmt.Errorf("linters.enabled[%d]: name is empty", i))

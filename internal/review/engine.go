@@ -259,6 +259,10 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// threshold in either direction.
 	findings, overruled := e.validateFindings(ctx, findings, plan)
 
+	// After every pass that can raise a severity, and before the gate reads
+	// one. This is the application of linters.max_severity that binds.
+	findings = e.capAnalyzerFindings(findings)
+
 	findings = e.applyGate(findings)
 	sortFindings(findings)
 
@@ -533,14 +537,28 @@ func (e *Engine) recordSeverity(f *Finding) {
 	f.Severity = string(normalized)
 }
 
-// restoreSeverityProvenance puts back the reporter's own severity word on a
-// finding that came back through a pass which cannot carry it.
+// restoreSeverityProvenance puts back who reported a finding and, where it
+// still describes something, the word that reporter used — both lost by a pass
+// that decodes findings from JSON, where they carry `json:"-"`.
 //
-// Only when the LEVEL is unchanged. If the pass moved the severity, the word now
-// published is that pass's own choice and the earlier reporter's spelling is
-// stale beside it — the same rule applyOutcomes applies when an expert re-rates,
-// and for the same reason: a review model's "P1" travelling beside a level
-// somebody else chose describes a finding that never existed.
+// For any finding still recognized, FromAnalyzer comes back whatever else
+// changed, because it is a fact about the finding's ORIGIN and no re-rating
+// touches it. The two other fields then follow different rules depending on it:
+//
+// A MODEL's raw word is its own rating. If the pass moved the severity, that
+// word describes a rating nobody now holds and is dropped — the same rule
+// applyOutcomes applies when an expert re-rates: a review model's "P1"
+// travelling beside a level somebody else chose describes a finding that never
+// existed.
+//
+// An ANALYZER's raw word is not a rating we are publishing, it is what the tool
+// PRINTED, and semgrep still printed CRITICAL however triage re-rated the
+// finding afterwards. THE BUG: dropping it on a re-rating published
+// Source="semgrep(rule)" with SeverityTranslated false and no raw word, which
+// asserts "semgrep's own word for this is <our level>" — verbatim the
+// substitution RawSeverity exists to prevent, and only reachable for findings
+// this report attributes to a named analyzer. SeverityTranslated is likewise
+// always true for one: the level is never the analyzer's claim.
 //
 // It is keyed on Finding.Key(), so a genuinely reworded finding is not
 // recognized and keeps whatever the pass itself said. That is the conservative
@@ -549,7 +567,18 @@ func (e *Engine) recordSeverity(f *Finding) {
 // it did not — the failure this whole field pair exists to prevent.
 func (e *Engine) restoreSeverityProvenance(f *Finding, before map[string]Finding) {
 	original, ok := before[f.Key()]
-	if !ok || original.Severity != f.Severity {
+	if !ok {
+		return
+	}
+	f.FromAnalyzer = original.FromAnalyzer
+
+	if original.FromAnalyzer {
+		f.SeverityTranslated = true
+		f.RawSeverity = original.RawSeverity
+		return
+	}
+
+	if original.Severity != f.Severity {
 		return
 	}
 	f.SeverityTranslated = original.SeverityTranslated
@@ -717,6 +746,51 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 	}
 
 	return strings.TrimSpace(result.Summary), kept, nil
+}
+
+// capAnalyzerFindings applies linters.max_severity to the findings a
+// deterministic analyzer reported.
+//
+// THE BUG IT FIXES: the ceiling was applied once, in linters' normalize, which
+// runs BEFORE triage and before the expert pass. Both of those may raise a
+// severity — triage.md instructs the model to "raise anything whose blast radius
+// is larger than the original reviewer could see", and Validator.revise runs in
+// both directions on purpose — and neither reapplied the ceiling. So an operator
+// who wrote `linters.max_severity: warning` to keep analyzers away from their
+// gate still had a build failed at `fail_on: critical` by a semgrep finding
+// triage had re-rated. The ceiling capped what triage was SHOWN and nothing
+// else, while the configuration reference said it capped what the run acts on.
+//
+// It sits after validation and before applyGate because the gate is the first
+// reader of a severity that matters: min_severity decides publication and
+// fail_on decides the exit code, and a ceiling that does not reach both is
+// decoration. Reducing here can carry a finding below min_severity and delete
+// it, which is the correct reading of "an analyzer's word is worth at most a
+// warning here" combined with "do not show me warnings".
+//
+// It binds every finding still recognizable as the analyzer's. A triage
+// rewording that changes Finding.Key() loses FromAnalyzer exactly as it already
+// loses Source and Class — the finding is then published as triage's own, with
+// no analyzer named — so the ceiling no longer describes it either. That is the
+// same conservative direction the other restorations take, and it is why the
+// ceiling is documented as a ceiling on what is attributed to an analyzer.
+func (e *Engine) capAnalyzerFindings(findings []Finding) []Finding {
+	for i, f := range findings {
+		if !f.FromAnalyzer {
+			continue
+		}
+
+		capped := e.Config.Linters.CapSeverity(f.Sev())
+		if string(capped) == f.Severity {
+			continue
+		}
+
+		e.log().Debug("capped an analyzer finding at linters.max_severity",
+			"source", f.Source, "from", f.Severity, "to", string(capped),
+			"path", f.Path, "title", f.Title)
+		findings[i].Severity = string(capped)
+	}
+	return findings
 }
 
 // applyGate drops findings the configuration does not publish.
@@ -946,6 +1020,12 @@ func pullRequestContext(pr *vcs.PullRequest) string {
 	return b.String()
 }
 
+// oneLineTitle collapses a title onto a single line.
+//
+// Analyzer messages are not guaranteed to be one line and the triage prompt is a
+// numbered list, so a title carrying a newline silently splits an entry in two.
+func oneLineTitle(s string) string { return strings.Join(strings.Fields(s), " ") }
+
 // renderForTriage formats findings for the triage model.
 func renderForTriage(pr *vcs.PullRequest, findings []Finding) string {
 	var b strings.Builder
@@ -961,7 +1041,14 @@ func renderForTriage(pr *vcs.PullRequest, findings []Finding) string {
 
 	fmt.Fprintf(&b, "%d findings were reported across separate batches:\n\n", len(findings))
 	for i, f := range findings {
-		fmt.Fprintf(&b, "%d. [%s] %s:%d — %s\n", i+1, f.Severity, f.Path, f.Line, f.Title)
+		// The title is flattened onto one line. An analyzer message can contain
+		// newlines -- golangci-lint's typecheck emits ": # pkg\n./main.go:8:2:
+		// undefined: x" verbatim -- and an unflattened one breaks the numbered
+		// list the triage model answers against, so its reply cannot be matched
+		// back through Finding.Key(). The finding then arrives at the gate with no
+		// Source and no RawSeverity, which is how a capped analyzer finding
+		// escaped the operator's ceiling and failed a critical gate.
+		fmt.Fprintf(&b, "%d. [%s] %s:%d — %s\n", i+1, f.Severity, f.Path, f.Line, oneLineTitle(f.Title))
 		if f.Category != "" {
 			fmt.Fprintf(&b, "   category: %s\n", f.Category)
 		}

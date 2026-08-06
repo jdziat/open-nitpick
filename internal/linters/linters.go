@@ -30,8 +30,13 @@ type Finding struct {
 	Message  string
 	Severity config.Severity
 
-	// RawSeverity is the token the ANALYZER printed, when Severity above is
-	// mapSeverity's translation of it rather than the analyzer's own word.
+	// RawSeverity is the token the ANALYZER printed, whenever it printed one.
+	//
+	// It is recorded even when the spelling coincides with one of our level
+	// names, because Severity above is still read on OUR scale: semgrep's ERROR
+	// is a level in semgrep's vocabulary — its own documentation makes it a
+	// synonym for HIGH — and has not thereby adopted this project's meaning.
+	// The operator's ceiling can move the level afterwards anyway.
 	//
 	// Empty means the analyzer published no severity at all and this package
 	// chose one — ruff is the case, and there the level is entirely ours.
@@ -201,19 +206,42 @@ func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 			severity = config.SeverityWarning
 		}
 
-		// EVERY analyzer finding's severity is this project's word. mapSeverity
-		// translated it, or the runner had nothing to translate and we picked
-		// one, or the fallback just above overwrote an unusable value — there is
-		// no path here on which the level is the analyzer's own spelling. Marking
-		// them all is therefore correct rather than conservative, and it is what
-		// stops a report captioning "gosec said error" over a word gosec never
-		// printed. RawSeverity carries the original where there was one.
+		// The operator's ceiling, applied here so that TRIAGE is not shown a
+		// level the operator has already declined — a triage walkthrough calling
+		// something critical while the published comment says warning would be
+		// this project disagreeing with itself in one report.
+		//
+		// It is NOT true that no model is ever shown a declined level: this
+		// comment said so and was false. The expert validation pass reads
+		// Finding.Severity in validationRequest, downstream of this and of
+		// triage, so with a ceiling of warning and a triage that raises to
+		// critical the expert prompt reads "Claimed severity: critical". Every
+		// assertion about what a model was shown inspected the triage prompt
+		// only, which is why the claim survived. Narrowed to what is verified;
+		// capping before the expert is a separate change with its own test.
+		//
+		// This application does not bind. Triage and the expert pass both run
+		// downstream and both may raise, so review.Engine applies the same
+		// ceiling again after them; that is the one that decides the gate. See
+		// Engine.capAnalyzerFindings.
+		severity = s.cfg.Linters.CapSeverity(severity)
+
+		// EVERY analyzer finding's severity is this project's word, including
+		// the ones whose spelling happens to match ours. A shared spelling is not
+		// a shared scale: semgrep's ERROR is a rule author's judgement inside
+		// semgrep's own four-level vocabulary — where it is a synonym for HIGH,
+		// not for this project's error — and the ceiling above can move it again
+		// afterwards. Marking them all is therefore correct rather than
+		// conservative, and it is what stops a report captioning "semgrep said
+		// error" over a word semgrep never printed. RawSeverity carries the
+		// original where there was one.
 		out = append(out, review.Finding{
 			Path:               f.Path,
 			Line:               f.Line,
 			Severity:           string(severity),
 			SeverityTranslated: true,
 			RawSeverity:        f.RawSeverity,
+			FromAnalyzer:       true,
 			Category:           "lint",
 			Class:              string(classForRule(f.Rule)),
 			Title:              strings.TrimSpace(f.Message),

@@ -160,13 +160,24 @@ func applyOutcomes(outcomes []outcome) (kept []Finding, overruled []Overruled) {
 			revised := o.finding
 			revised.Severity = string(o.revised)
 
-			// The expert WROTE this level, so it is a reporter's own word again
-			// and any record of an earlier translation is now stale. Left in
-			// place, a review model's "P1" would keep travelling beside a
-			// severity the expert chose, and the eval report would quote the
-			// finding as saying "P1" while publishing the expert's warning.
-			revised.SeverityTranslated = false
-			revised.RawSeverity = ""
+			// The expert WROTE this level, so for a MODEL's finding it is a
+			// reporter's own word again and any record of an earlier translation
+			// is now stale. Left in place, a review model's "P1" would keep
+			// travelling beside a severity the expert chose, and the eval report
+			// would quote the finding as saying "P1" while publishing the
+			// expert's warning.
+			//
+			// An analyzer's finding is the opposite case and clearing it there
+			// was a bug. The finding is still published as "flagged by
+			// semgrep(rule)", the level is still ours rather than semgrep's, and
+			// semgrep still printed whatever it printed — an expert re-rating
+			// does not retract the tool's output. Zeroing the pair there asserts
+			// the analyzer said our word, which is the substitution these two
+			// fields exist to make impossible.
+			if !revised.FromAnalyzer {
+				revised.SeverityTranslated = false
+				revised.RawSeverity = ""
+			}
 
 			kept = append(kept, revised)
 

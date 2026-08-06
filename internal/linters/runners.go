@@ -48,6 +48,17 @@ func (g *golangciLint) Run(ctx context.Context, repoRoot string, files []string)
 		return nil, err
 	}
 
+	return g.findings(out)
+}
+
+// findings converts one golangci-lint report into findings.
+//
+// Split from Run for the reason semgrep's is: what this repository does with a
+// severity is decided from the analyzer's real output, and a test that
+// hand-builds the Finding has already made the decision under test. It matters
+// more here than anywhere else, because golangci-lint's Severity is not a
+// vocabulary at all — it is whatever text the operator wrote in .golangci.yml.
+func (g *golangciLint) findings(out []byte) ([]Finding, error) {
 	var parsed golangciOutput
 	if err := decodeJSON(out, &parsed); err != nil {
 		return nil, fmt.Errorf("parse golangci-lint output: %w", err)
@@ -251,6 +262,16 @@ func (s *semgrep) Run(ctx context.Context, repoRoot string, files []string) ([]F
 		return nil, err
 	}
 
+	return s.findings(out)
+}
+
+// findings converts one semgrep report into findings.
+//
+// Split from Run so that the step which decides what this repository does with
+// a severity semgrep printed can be exercised from the analyzer's real output
+// rather than from a hand-built Finding. A test that assembles the Finding
+// itself has already made the decision under test.
+func (s *semgrep) findings(out []byte) ([]Finding, error) {
 	var parsed semgrepOutput
 	if err := decodeJSON(out, &parsed); err != nil {
 		return nil, fmt.Errorf("parse semgrep output: %w", err)
@@ -270,23 +291,79 @@ func (s *semgrep) Run(ctx context.Context, repoRoot string, files []string) ([]F
 	return findings, nil
 }
 
-// mapSeverity translates an analyzer's severity vocabulary to ours. Analyzers
-// disagree wildly here, and an unknown value becoming "critical" would poison
-// the gate, so anything unrecognized becomes a warning.
+// mapSeverity translates an analyzer's severity vocabulary to ours.
 //
-// It DESTROYS the analyzer's word, which is why every caller records the
-// original in Finding.RawSeverity beside the result. Four analyzers' spellings
-// collapse onto three levels here — "HIGH", "ERROR" and "CRITICAL" all land on
-// error — so the mapped value cannot be un-mapped, and a report that quotes it
-// as the analyzer's own has invented a quotation.
+// EVERY word here is foreign, including the ones spelled like our levels. There
+// is no branch for "the analyzer used our own word, so nothing needs
+// translating": semgrep's documented vocabulary is LOW/MEDIUM/HIGH/CRITICAL with
+// "the older levels ERROR, WARNING and INFO match HIGH, MEDIUM and LOW", so
+// semgrep's ERROR *is* semgrep's HIGH — one level, two spellings, both inside
+// semgrep's scale and neither one a statement about ours. Sorting the two into
+// "translated" and "untranslated" branches described a distinction that does not
+// exist. It is a translation table, so it DESTROYS the analyzer's word: ERROR
+// and HIGH both land on error and the result cannot be un-mapped, which is why
+// every caller records the original in Finding.RawSeverity and why
+// review.Finding.SeverityTranslated is set for all of them.
+//
+// THE BUG: "CRITICAL" folded onto error, so the codomain excluded critical and
+// no analyzer finding could ever BE critical. review.fail_on accepts "critical",
+// so a repository configured that way got zero gating from semgrep — the only
+// one of the four analyzers whose scale HAS a critical — and from any
+// golangci-lint whose severity settings name one. The build went green on a
+// finding the analyzer itself called critical, and nothing said so. The
+// justification given was that "an unknown value becoming critical would poison
+// the gate", which is an argument about UNRECOGNIZED input. An analyzer that
+// printed the word critical is not an analyzer that printed something we could
+// not parse, and treating the two as one case is what opened the hole.
+//
+// THE RULE NOW: translate for fidelity, reduce at policy time. The codomain
+// covers all five levels review.fail_on accepts, so no gate threshold is
+// unreachable by construction. Whether a deterministic tool may fail a build is
+// the operator's question and config.Linters.MaxSeverity is where they answer
+// it; answering it here answered it for every repository at once and
+// permanently. That cuts both ways and the wide side is golangci-lint, whose
+// Severity field is whatever text an operator put in .golangci.yml: with
+// `severity.default: CRITICAL` a misspell or a typecheck compile error arrives
+// as a critical, and only max_severity stops it reaching a critical gate.
+//
+// NIT is reachable from the literal word and nothing else. golangci-lint emits
+// operator text, so "nit" genuinely arrives, and folding it up to info would be
+// the same unjustified reduction pointed the other way. It carries a cost the
+// operator should know about, because nit is the one level BELOW the default
+// review.min_severity of info: a repository with `severity.default: nit` in
+// .golangci.yml publishes no Go analyzer findings at all under the default gate.
+// That is both configurations doing what they say, and it is why nothing FOREIGN
+// is folded onto nit — LOW, INFO and NOTE are the weakest thing these analyzers
+// can say and still mean "a rule fired", where nit means "take it or leave it",
+// so inventing nits from an analyzer's floor would silence findings nobody asked
+// to silence.
+//
+// AN UNREADABLE WORD is warning, the same as no word at all, because they are
+// the same state: this project has no usable severity from the analyzer and
+// picks one. Semgrep prints values outside its own documented four (EXPERIMENT),
+// and golangci-lint prints anything. Flooring those at info instead — to match
+// config.Severity.Normalize, which is where a MODEL's unrecognized word lands —
+// looks symmetric and is not: a model was handed our enum and writing outside it
+// is that reporter misbehaving, whereas an analyzer was never given our
+// vocabulary and an unreadable word is our translation failing. Making our
+// failure quieter deletes real findings under any min_severity above info, and
+// it would rank "the tool said something we could not read" BELOW "the tool said
+// nothing", which is incoherent.
 func mapSeverity(s string) config.Severity {
 	switch strings.ToUpper(strings.TrimSpace(s)) {
-	case "ERROR", "HIGH", "CRITICAL":
+	case "CRITICAL":
+		return config.SeverityCritical
+	// Synonyms within one analyzer's scale, not one foreign word and one of
+	// ours: semgrep documents ERROR/WARNING/INFO as the older spellings of
+	// HIGH/MEDIUM/LOW.
+	case "ERROR", "HIGH":
 		return config.SeverityError
 	case "WARNING", "WARN", "MEDIUM":
 		return config.SeverityWarning
 	case "INFO", "INFORMATION", "LOW", "NOTE":
 		return config.SeverityInfo
+	case "NIT":
+		return config.SeverityNit
 	default:
 		return config.SeverityWarning
 	}

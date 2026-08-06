@@ -194,6 +194,53 @@ type Linters struct {
 
 	// OnlyChangedLines drops linter findings on lines the diff did not touch.
 	OnlyChangedLines bool `yaml:"only_changed_lines"`
+
+	// MaxSeverity is the highest severity a finding attributed to a
+	// deterministic analyzer is published and gated at, whatever the analyzer
+	// called it. It defaults to critical, which reduces nothing.
+	//
+	// It is the operator's answer to a question that used to be answered by a
+	// constant. The sharpest case is not a security scanner: golangci-lint's
+	// severity is arbitrary text an operator wrote in .golangci.yml, applied by
+	// `severity.default` to every issue it reports including typecheck compile
+	// errors, so one line there can make lll or misspell speak at the same
+	// volume as an injection. `linters.max_severity: warning` is where a team
+	// says a deterministic tool's opinion is worth a warning and no more, and
+	// review.fail_on keeps its meaning for the model's own findings.
+	//
+	// The ceiling reaches the gate. review.Engine applies it after triage and
+	// the expert pass, both of which may raise a severity, so the level it
+	// caps is the one min_severity and fail_on read — see
+	// Engine.capAnalyzerFindings, which also documents the one finding it
+	// cannot describe: one triage reworded past recognition, which is published
+	// with no analyzer attribution at all.
+	MaxSeverity Severity `yaml:"max_severity"`
+}
+
+// CapSeverity reduces an analyzer-reported severity to the ceiling this
+// repository lets a deterministic tool claim.
+//
+// It is POLICY, applied after parsing, and the split is the point. What the
+// analyzer said is a fact to record; what this repository will act on is a
+// decision. mapSeverity used to make the second decision by destroying the first
+// — folding "CRITICAL" onto error — which took the choice away from every
+// operator at once and left `fail_on: critical` gating on nothing, since no
+// analyzer finding could reach the level it names.
+//
+// An unset or unrecognized ceiling caps nothing. Config.Validate rejects both
+// before a review runs, so the only way to arrive here with one is a Config
+// assembled in code; the alternative reading of an empty ceiling is Rank()'s
+// unknown floor, which would silently reduce every analyzer finding to info —
+// the same class of invisible severity loss this exists to end.
+func (l Linters) CapSeverity(s Severity) Severity {
+	ceiling := l.MaxSeverity.normalized()
+	if !ceiling.IsFinding() {
+		return s
+	}
+	if s.Rank() > ceiling.Rank() {
+		return ceiling
+	}
+	return s
 }
 
 // LinterMode selects linter execution behavior.

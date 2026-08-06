@@ -132,6 +132,21 @@ type Finding struct {
 	// Triager records which model triaged the finding, so Source can keep
 	// naming the original reporter.
 	Triager string `json:"-"`
+
+	// FromAnalyzer records that a deterministic analyzer reported this finding
+	// rather than a model. Source already names WHICH one, but Source is free
+	// text a later pass may have rewritten, and two policies need the fact
+	// itself rather than a string to pattern-match: linters.max_severity caps
+	// what an analyzer's finding is acted on at, and the severity provenance
+	// rules below are different for a tool that writes in its own vocabulary
+	// than for a model that was handed ours.
+	//
+	// It is not serialized, for the same reason RawSeverity is not: every pass
+	// that decodes a finding from a model's JSON gets it back zeroed, and a
+	// consumer that recovered "reported by an analyzer" from a model's output
+	// would be recovering the model's claim rather than the fact. Engine.triage
+	// restores it from the pre-triage set instead.
+	FromAnalyzer bool `json:"-"`
 }
 
 // Sev returns the parsed severity.

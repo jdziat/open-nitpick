@@ -137,7 +137,37 @@ linters:
   mode: auto                       # auto | strict | off
   enabled: [golangci-lint, ruff, eslint, semgrep]
   only_changed_lines: true
+  max_severity: critical           # ceiling on findings attributed to an analyzer
 ```
+
+Analyzer severities are translated onto the five levels above, and the analyzer's
+own word is kept beside the result: `HIGH` and `ERROR` both become error (they are
+the same level in semgrep's scale), `MEDIUM` becomes warning, `CRITICAL` becomes
+critical, and a word we cannot read — like an unrecognized string in your
+`.golangci.yml` — becomes warning, the same as no severity at all.
+
+Whether a deterministic tool should be able to fail your build at
+`fail_on: critical` is your decision, not this tool's. `linters.max_severity` is
+where you make it: `warning` means nothing reported by an analyzer is published or
+gated above warning, however the analyzer rated it and however the reviewing model
+re-rates it afterwards. It does not touch the model's own findings.
+
+It has one hole, and you should know it rather than discover it. The ceiling
+recognises an analyzer's finding by its attribution. If triage rewrites a finding
+far enough that it can no longer be matched back — which happens when an analyzer
+message spans several lines, as golangci-lint's `typecheck` output does — the
+result is treated as the model's own and the ceiling does not apply to it. Titles
+are flattened before triage sees them so this is rare, but "rare" is not "cannot",
+and a reworded finding can be published and gated above your ceiling.
+
+Two consequences worth knowing before you set them:
+
+- golangci-lint's `Severity` is whatever text you put in `.golangci.yml`, and
+  `severity.default` applies it to every issue including compile errors surfaced
+  by `typecheck`. `severity.default: critical` therefore lets `misspell` fail a
+  `fail_on: critical` build unless `max_severity` says otherwise.
+- `nit` is below the default `review.min_severity` of `info`, so
+  `severity.default: nit` publishes no Go analyzer findings at all.
 
 Unknown keys are rejected at load time, so a typo fails immediately instead of
 being silently ignored.

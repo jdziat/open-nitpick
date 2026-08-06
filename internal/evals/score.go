@@ -280,12 +280,15 @@ const NoCrossToolSeverityScore = "NO CROSS-TOOL SEVERITY ACCURACY IS OFFERED, BY
 // IT REPLACES AN IDENTITY CHECK. The withdrawal used to be
 // PublishesOurSeverityLevels(model) == (model != IncumbentModel): a reporter's
 // NAME standing in for a fact about its vocabulary. That is live rather than
-// hypothetical — internal/linters' mapSeverity folds HIGH/ERROR/CRITICAL onto
-// our error and MEDIUM onto warning, a codomain excluding critical and nit,
-// which is the exact shape of the first retraction, and those findings are
-// spared today only because evalConfig sets cfg.Linters.Mode = LinterOff. Under
-// the name check they would have been published at our resolution the moment
-// anyone turned linters on. TestAnUndeclaredScaleIsWithheld and
+// hypothetical — internal/linters' mapSeverity translates semgrep's HIGH onto
+// our error and its MEDIUM onto warning, which is the exact shape of the first
+// retraction, and semgrep's CRITICAL now reaches our critical with the spelling
+// unchanged, which is worse rather than better: semgrep's own documentation
+// makes ERROR a synonym for HIGH inside ITS scale, so a matching spelling is
+// never evidence of a matching scale. Those findings are spared today only
+// because evalConfig sets cfg.Linters.Mode = LinterOff. Under the name check
+// they would have been published at our resolution the moment anyone turned
+// linters on. TestAnUndeclaredScaleIsWithheld and
 // TestEverySeverityCellIsWithdrawnForAForeignVocabulary pin the three states.
 type SeverityScale string
 
@@ -901,11 +904,13 @@ func severityVerdict(got, want config.Severity) string {
 // every real spelling — so on a defect matched by one finding carrying
 // RawSeverity "Error" and one carrying none, BOTH report orders published
 // `(word not recorded) x1 [we read as error]` while the reviewer's word sat in
-// the finding list beside it. That is not hypothetical: internal/linters gives
-// every analyzer finding exactly that shape — translated, with no raw word — so
-// the configuration ourSeverityScale withdraws the SCORE for was still
-// publishing our gap phrase over a word the review kept. A gap is what this
-// block prints when there is nothing else; it may not outrank something.
+// the finding list beside it. That is not hypothetical: internal/linters
+// produces findings in exactly that shape — translated, with no raw word —
+// whenever the analyzer publishes no severity of its own, which is ruff always
+// and golangci-lint until someone configures severity rules. So the
+// configuration ourSeverityScale withdraws the SCORE for was still publishing
+// our gap phrase over a word the review kept. A gap is what this block prints
+// when there is nothing else; it may not outrank something.
 //
 // The word compared is severityAsSaid's, not Sev(). For a reviewer whose
 // severities we translate, Sev() is OUR word and several of the reviewer's words

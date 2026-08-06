@@ -80,6 +80,13 @@ func Defaults() *Config {
 			Mode:             LinterAuto,
 			Timeout:          2 * time.Minute,
 			OnlyChangedLines: true,
+			// No reduction by default: an analyzer that named a level we have
+			// is reported at that level. Capping here by default would be the
+			// old fold wearing a configuration key — the same silent policy for
+			// every repository, just spelled differently. A team that does not
+			// want semgrep, or a line in someone's .golangci.yml, deciding its
+			// gate says so.
+			MaxSeverity: SeverityCritical,
 		},
 	}
 }

@@ -314,6 +314,39 @@ func TestAnExpertRerateClearsTheEarlierTranslation(t *testing.T) {
 	}
 }
 
+// TestAnExpertRerateKeepsAnAnalyzersWord is the opposite rule for the opposite
+// kind of reporter, and clearing the pair for both was a bug.
+//
+// A model's raw word is its own RATING, so an expert re-rating makes it stale.
+// An analyzer's raw word is what the tool PRINTED, and semgrep does not retract
+// CRITICAL because an expert disagreed about impact. The finding is still
+// published as "flagged by semgrep(...)" with a level that is ours rather than
+// semgrep's, so zeroing the pair here made the report assert semgrep's own word
+// for it was "warning" — the substitution these two fields exist to prevent, on
+// the one class of finding that names a third party.
+func TestAnExpertRerateKeepsAnAnalyzersWord(t *testing.T) {
+	f := Finding{
+		Path: "app.go", Line: 4, Class: string(config.ClassSecurity),
+		Severity: "critical", SeverityTranslated: true, RawSeverity: "CRITICAL",
+		FromAnalyzer: true, Source: "semgrep(go.lang.security.audit.dangerous-exec-command)",
+		Title: "Command built from user input",
+	}
+
+	kept, _ := applyOutcomes([]outcome{{finding: f, revised: config.SeverityWarning, expert: "go"}})
+
+	if len(kept) != 1 {
+		t.Fatalf("kept = %d, want 1", len(kept))
+	}
+	if kept[0].Severity != "warning" {
+		t.Fatalf("severity = %q, want warning", kept[0].Severity)
+	}
+	if !kept[0].SeverityTranslated || kept[0].RawSeverity != "CRITICAL" {
+		t.Errorf("the re-rated finding is published as %s with translated=%v raw=%q, which reads "+
+			"as that analyzer having printed our level", kept[0].Source,
+			kept[0].SeverityTranslated, kept[0].RawSeverity)
+	}
+}
+
 func TestFindingsOutsideTheDiffAreDropped(t *testing.T) {
 	// Anchoring a comment to a line the change did not touch produces a
 	// comment on unrelated code, which the forge may reject outright.
