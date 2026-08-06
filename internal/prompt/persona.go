@@ -104,9 +104,38 @@ func nitpickScope(level config.NitpickLevel) string {
 	default: // normal
 		return "Report defects in " + core + ", contract breakage, and missing tests where new " +
 			"branching logic is genuinely risky.\n\n" +
+			// THE EXAMPLE USED TO BE A CORRECTNESS BUG. It read "not 'this is
+			// complex', but 'this shadows err, so the outer error is silently
+			// discarded'" — and an error being silently discarded is not a
+			// maintainability cost, it is something going wrong. It is the only
+			// example given for what "concretely" means, so it set the bar for
+			// reporting a maintainability problem at the warning definition:
+			// "likely a bug, or a genuine hazard under plausible conditions".
+			//
+			// The replacement is duplication rather than either of the two
+			// illustrations in the severity ladder, and deliberately: those are
+			// "widening an exported type's accepted input" and "adding a dependency
+			// for one helper function", which are two of the three maintainability
+			// plants stated almost verbatim. Repeating them here would tune the
+			// prompt to the corpus. Duplication costs a future change and matches
+			// nothing planted.
+			//
+			// THE CHANGE BOUGHT NOTHING MEASURABLE AND IS KEPT ONLY BECAUSE THE OLD
+			// EXAMPLE WAS WRONG. Measured, kimi-k3, three runs over each of the five
+			// info fixtures, before and after: 3 of 15 both times, every hit the
+			// security plant, and the three maintainability plants 0 of 9 under both
+			// wordings. The prediction was that the mis-anchored example suppressed
+			// them and that correcting it would move go-package-singleton, the one
+			// maintainability plant the severity ladder does not name. It did not
+			// move. A first version of this also added "nothing has to go wrong for
+			// it to be worth raising", which lowers the reporting bar; that sentence
+			// was removed rather than kept, because the measurement that was meant
+			// to justify it came back flat and invented findings went 1 to 2 over
+			// the same 15 reviews. Loosening a bar on a prediction the numbers did
+			// not support is how a prompt acquires noise it cannot account for.
 			"You may report a maintainability problem only when you can name what it will cost " +
-			"concretely — not \"this is complex\", but \"this shadows err, so the outer error is " +
-			"silently discarded\".\n\n" +
+			"concretely — not \"this is complex\", but \"this is the third place the retry policy " +
+			"is written, so the next change to it has three sites to find\".\n\n" +
 			"Do NOT report: naming preferences, documentation wording, formatting, import order, " +
 			"or anything a formatter or linter already enforces. An empty findings list is a " +
 			"common and correct outcome.\n"
