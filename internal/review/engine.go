@@ -4,10 +4,12 @@
 package review
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -74,6 +76,155 @@ type LinterRunner interface {
 type LinterStatusReporter interface {
 	Statuses() []LinterStatus
 }
+
+// LinterDiscardReporter is a LinterRunner that can say which findings its
+// analyzers produced and it did not publish. Optional, for the same reason
+// LinterStatusReporter is.
+type LinterDiscardReporter interface {
+	Discarded() []LinterDiscard
+}
+
+// LinterDiscard is one finding a deterministic analyzer reported that this
+// review did not publish.
+//
+// It is a separate list from Report.Overruled because the two describe different
+// events. An overruled finding was judged: a domain expert read it and said no,
+// and the reader can weigh that. A discarded one was never judged at all — it
+// was removed by ANCHORING, because no comment could be attached to the line it
+// named — and until this existed nothing recorded that it had been reported.
+//
+// "Before triage" is what that used to say, and it stopped being true when the
+// anchor pass that runs AFTER triage started reporting its own drops. The
+// distinction survives the correction — these were not weighed and rejected,
+// they were never weighed — but the list now spans the whole pipeline rather
+// than its first stage.
+//
+// Path is the path THE ANALYZER PRINTED, not a path this tool resolved. For the
+// reason that separates DiscardNotInChange from DiscardPathNotInCheckout, that
+// distinction is the whole content of the record: a forged path is evidence
+// exactly because it is what the analyzer was made to say.
+type LinterDiscard struct {
+	// Rule is the analyzer-qualified rule id, as it would have appeared in the
+	// published finding's attribution.
+	Rule string
+
+	// Path and Line are where the analyzer said the finding was.
+	Path string
+	Line int
+
+	// Reason is why it was not published.
+	Reason DiscardReason
+}
+
+// DiscardReason says why an analyzer finding was not published.
+//
+// They are separate values rather than one string because a reader has to sort
+// this repository's own publication policy from something having gone wrong, and
+// the counts are published together. Two of these are policy working exactly as
+// configured; the third is not a policy outcome at all.
+type DiscardReason string
+
+// The reasons an analyzer finding is not published.
+const (
+	// DiscardNotInChange means the analyzer reported a real file in the checkout
+	// that this change does not touch. Ordinary: Go is analyzed a package at a
+	// time, so a finding on a sibling file the change never edited is the normal
+	// case rather than a fault.
+	DiscardNotInChange DiscardReason = "for a file this change does not touch"
+
+	// DiscardUnchangedLine means the file is in the change but the line is not,
+	// and linters.only_changed_lines is on. Also policy: pre-existing lint debt
+	// on untouched lines belongs to whoever wrote it.
+	DiscardUnchangedLine DiscardReason = "on a line this change did not touch"
+
+	// DiscardUnanchorable means the line is not present in the diff at all, so
+	// no comment can be attached to it. Rare, and not policy: it is the forge's
+	// constraint, not a setting.
+	DiscardUnanchorable DiscardReason = "on a line the diff does not carry, so no comment can be anchored to it"
+
+	// DiscardPathNotInCheckout is the one that is not a drop but a finding about
+	// the run itself: the analyzer reported a path that does not exist in this
+	// checkout. Nothing in a healthy Go tree produces one. A line directive
+	// does, and the same directive aimed at a real file relocates a finding onto
+	// code the change did not write instead of merely losing it.
+	DiscardPathNotInCheckout DiscardReason = "for a path that is not in this checkout, which nothing in a healthy tree reports"
+)
+
+// SortDiscards puts a discard list into the order it is published in.
+//
+// It is exported because Report.Discarded has TWO producers and one renderer.
+// The analyzer set contributes the findings it dropped while normalizing, and
+// Engine.Run contributes the ones its own anchor filter dropped afterwards; both
+// end up in the same collapsed block, and two orderings for one block would
+// reshuffle it between runs for no reason a reader could see. Reason leads
+// because the renderer groups by it.
+func SortDiscards(discarded []LinterDiscard) {
+	slices.SortFunc(discarded, func(a, b LinterDiscard) int {
+		return cmp.Or(
+			cmp.Compare(a.Reason, b.Reason),
+			cmp.Compare(a.Path, b.Path),
+			cmp.Compare(a.Line, b.Line),
+			cmp.Compare(a.Rule, b.Rule),
+		)
+	})
+}
+
+// LinterUncoveredReporter is a LinterRunner that can say which parts of the
+// change its analyzers did not cover. Optional, for the same reason
+// LinterStatusReporter is.
+type LinterUncoveredReporter interface {
+	Uncovered() []LinterUncovered
+}
+
+// LinterUncovered is a part of the change that a deterministic analyzer reported
+// nothing about, for a reason that is not "the code is clean".
+//
+// It is the third list in this family and it is a different fact from either of
+// the others. A LinterStatus says whether an analyzer RAN. A LinterDiscard says
+// a finding was produced and then dropped. This one says the analyzer ran, was
+// not dropped from, and still had nothing to say about part of the change —
+// because the tree arranged for it not to look. Both routes were measured
+// against golangci-lint 2.8.0 and both left the roster reporting a clean Go
+// review: a build constraint on the changed file with an unconstrained sibling
+// beside it, and a //nolint attached to the package clause.
+type LinterUncovered struct {
+	// Linter is the analyzer whose coverage this describes.
+	Linter string
+
+	// Path is the repository-relative file, and Line the directive's line. Line
+	// is 0 when the gap is the whole file, which is what a build constraint
+	// produces.
+	Path string
+	Line int
+
+	// Reason is why the analyzer said nothing about it.
+	Reason UncoveredReason
+}
+
+// UncoveredReason says why an analyzer reported nothing about part of the
+// change.
+//
+// Separate values rather than one string for the reason DiscardReason's are: a
+// reader has to sort a file the build legitimately excludes on this platform
+// from a suppression the change itself added, and the counts are published
+// together.
+type UncoveredReason string
+
+// The reasons an analyzer covered less of the change than the roster implies.
+const (
+	// UncoveredBuildExcluded means a build constraint or a GOOS/GOARCH filename
+	// suffix keeps the file out of this build, so the package loaded and the
+	// file was never read. Ordinary in a repository with platform-specific code,
+	// and indistinguishable from an attack from here, which is why it is named
+	// rather than refused.
+	UncoveredBuildExcluded UncoveredReason = "excluded from this build, so no analyzer read it"
+
+	// UncoveredSuppressed means this change ADDED an in-source directive that
+	// turns the analyzer off. Not per-line: golangci-lint expands a //nolint to
+	// the declaration it is attached to, and attached to the package clause it
+	// covers the whole file — including lines the change never touched.
+	UncoveredSuppressed UncoveredReason = "suppressed by a directive this change added, which covers the whole declaration it is attached to"
+)
 
 // LinterStatus is how one deterministic analyzer was configured for a run, and
 // whether it ran at all.
@@ -162,6 +313,15 @@ type Report struct {
 	// Linters records how each deterministic analyzer was configured, and which
 	// did not run. See LinterStatus.
 	Linters []LinterStatus
+
+	// Discarded lists findings an analyzer produced that this review removed
+	// before anything judged them. See LinterDiscard.
+	Discarded []LinterDiscard
+
+	// Uncovered lists the parts of the change an analyzer ran over and reported
+	// nothing about because the tree arranged for it not to look. See
+	// LinterUncovered.
+	Uncovered []LinterUncovered
 }
 
 // Complete reports whether every planned file was actually reviewed.
@@ -282,6 +442,10 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		findings = append(findings, style...)
 	}
 
+	// Collected across every stage that can drop an analyzer finding, not just
+	// the first one. See the assembly below.
+	var discarded []LinterDiscard
+
 	// Built here, from the policy this review resolved, rather than handed in
 	// ready-made: an analyzer set constructed from the change's own
 	// configuration reads its ignore list and would go quiet on exactly the
@@ -299,10 +463,23 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		if reporter, ok := runner.(LinterStatusReporter); ok {
 			report.Linters = reporter.Statuses()
 		}
+		// Same rule, same reason: a finding an analyzer produced and this run
+		// dropped before anything judged it is the one thing nothing else in
+		// this report would ever mention.
+		if reporter, ok := runner.(LinterDiscardReporter); ok {
+			discarded = append(discarded, reporter.Discarded()...)
+		}
+		// And the third fact, which neither of the other two carries: the
+		// analyzer ran, nothing was dropped, and it still said nothing about
+		// part of the change because the tree arranged for it not to look.
+		if reporter, ok := runner.(LinterUncoveredReporter); ok {
+			report.Uncovered = reporter.Uncovered()
+		}
 		findings = append(findings, lint...)
 	}
 
-	findings = e.filterAnchors(findings, files)
+	findings, dropped := e.filterAnchors(findings, files)
+	discarded = append(discarded, dropped...)
 
 	summary, findings, err := e.triage(ctx, pr, findings)
 	if err != nil {
@@ -313,7 +490,22 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// validated again afterwards. Without this a triage model can move a
 	// comment onto a line that is not in the diff, which the forge rejects —
 	// taking every inline comment in the review down with it.
-	findings = e.filterAnchors(findings, files)
+	findings, dropped = e.filterAnchors(findings, files)
+	discarded = append(discarded, dropped...)
+
+	// Assembled here rather than where the analyzer set was read, BECAUSE
+	// READING IT THERE WAS THE BUG. Report.Discarded was frozen before the first
+	// filterAnchors call, and filterAnchors is a second sink for exactly the
+	// same kind of finding: with linters.only_changed_lines off, an analyzer
+	// finding on a diff CONTEXT line passes normalize's remaining gate — the
+	// diff carries the line, so a comment could be anchored to it — and is then
+	// dropped here because it is neither a changed line nor within snapping
+	// distance of one. Measured: normalize returned it and recorded nothing,
+	// filterAnchors took 1 in and gave 0 out at Debug level, and the published
+	// headline said "Analyzer findings not published: 0" about a run that had
+	// not published one.
+	SortDiscards(discarded)
+	report.Discarded = discarded
 
 	// Validation sits here, and nowhere else: it sees exactly the deduped,
 	// anchored set that is about to be published, so no duplicate and no
@@ -648,21 +840,60 @@ func (e *Engine) restoreSeverityProvenance(f *Finding, before map[string]Finding
 	f.RawSeverity = original.RawSeverity
 }
 
-// filterAnchors drops findings that cannot be placed and snaps near-misses onto
-// a real changed line.
+// filterAnchors drops findings that cannot be placed, snaps near-misses onto a
+// real changed line, AND RETURNS THE ANALYZER FINDINGS IT DROPPED.
 //
 // Models routinely anchor a finding a line or two off. Discarding those loses
 // genuine issues; snapping them recovers the comment while keeping the
 // guarantee that every published comment lands on a line in the diff.
-func (e *Engine) filterAnchors(findings []Finding, files diff.Files) []Finding {
+//
+// THE SECOND RETURN VALUE IS THE FIX FOR THE SAME DEFECT THIS PROJECT ALREADY
+// FIXED ONE FUNCTION UPSTREAM. Set.normalize's bare `continue` statements were
+// replaced with counted, named discards; this function kept two of its own, and
+// it runs immediately after — so a finding that survived normalize and died here
+// was still invisible, and the published headline still said zero. It is
+// reachable on a non-default setting: with linters.only_changed_lines off, an
+// analyzer finding on a diff CONTEXT line passes normalize (the diff carries the
+// line) and is dropped here (it is not a CHANGED line, and nothing within
+// snapDistance is either).
+//
+// Only analyzer findings are returned. A model finding that cannot be anchored
+// is the model guessing at a line number, which is ordinary and is not evidence
+// somebody produced and this tool threw away; LinterDiscard says "an analyzer
+// reported this", and filling it with model output would make the count mean
+// two different things.
+func (e *Engine) filterAnchors(findings []Finding, files diff.Files) ([]Finding, []LinterDiscard) {
 	const snapDistance = 3
 
 	out := make([]Finding, 0, len(findings))
+	var dropped []LinterDiscard
+
+	// The reason has to describe what actually happened to THIS finding, and
+	// the two cases here are different facts. A line the diff carries as
+	// context is a line this change did not touch; a line the diff does not
+	// carry at all cannot be commented on by anyone.
+	drop := func(f Finding, file *diff.File) {
+		if !f.FromAnalyzer {
+			return
+		}
+		reason := DiscardUnanchorable
+		if file != nil {
+			if _, ok := file.Position(f.Line); ok {
+				reason = DiscardUnchangedLine
+			}
+		} else {
+			reason = DiscardNotInChange
+		}
+		dropped = append(dropped, LinterDiscard{
+			Rule: f.Source, Path: f.Path, Line: f.Line, Reason: reason,
+		})
+	}
 
 	for _, f := range findings {
 		file := files.Find(f.Path)
 		if file == nil {
 			e.log().Debug("dropped finding for unknown path", "path", f.Path, "title", f.Title)
+			drop(f, nil)
 			continue
 		}
 
@@ -675,6 +906,7 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) []Finding {
 		if !ok {
 			e.log().Debug("dropped finding outside the diff",
 				"path", f.Path, "line", f.Line, "title", f.Title)
+			drop(f, file)
 			continue
 		}
 
@@ -696,7 +928,7 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) []Finding {
 		out = append(out, f)
 	}
 
-	return out
+	return out, dropped
 }
 
 // triage merges and filters findings with the cheap model, and writes the

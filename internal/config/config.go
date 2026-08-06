@@ -218,8 +218,14 @@ type Linters struct {
 
 	// The four keys below name an analyzer configuration that must resolve
 	// OUTSIDE the repository under review. Empty is the default and means the
-	// analyzer runs with no configuration at all — isolated for golangci-lint
-	// and ruff, not run at all for eslint and semgrep.
+	// analyzer runs isolated from the tree: golangci-lint under a config
+	// open-nitpick ships, ruff under --isolated, and eslint and semgrep not at
+	// all.
+	//
+	// "No configuration at all" is what golangci-lint used to get, and it was
+	// not neutral. Its own defaults let the tree decide — a generated-file
+	// header on line 1 of the file under review skipped that file entirely —
+	// so open-nitpick now owns those defaults; see internal/linters/golangci.yml.
 	//
 	// WHY THERE IS NO "read it from the repository" OPTION. This project
 	// already refuses to execute an analyzer binary that resolves inside the
@@ -241,7 +247,8 @@ type Linters struct {
 	// value does is point at a file the operator's own environment already has.
 
 	// GolangciConfig is an absolute path to a .golangci.yml outside the
-	// repository. Empty runs golangci-lint with --no-config.
+	// repository. Empty runs golangci-lint under open-nitpick's own config,
+	// materialized outside the repository.
 	GolangciConfig string `yaml:"golangci_config"`
 
 	// RuffConfig is an absolute path to a ruff.toml or pyproject.toml outside

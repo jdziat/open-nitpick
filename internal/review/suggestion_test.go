@@ -102,7 +102,7 @@ func TestSnappedFindingDropsSuggestion(t *testing.T) {
 	// the anchor relocates to the nearest added line.
 	const anchored = 8
 
-	got := e.filterAnchors([]Finding{{
+	got, _ := e.filterAnchors([]Finding{{
 		Path: "app.go", Line: anchored, Severity: "error", Title: "Close may panic",
 		Suggestion: "\tdefer resp.Body.Close()",
 	}}, files)
@@ -129,7 +129,7 @@ func TestUnrelocatedFindingKeepsSuggestion(t *testing.T) {
 
 	// Line 4 is an added line, so the anchor stands and the suggestion is
 	// still valid for it.
-	got := e.filterAnchors([]Finding{{
+	got, _ := e.filterAnchors([]Finding{{
 		Path: "app.go", Line: 4, Severity: "error", Title: "x",
 		Suggestion: "\tresp, err := http.Get(u)",
 	}}, files)

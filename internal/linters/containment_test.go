@@ -335,7 +335,14 @@ func TestGolangciLintDoesNotReadAFailedAnalysisAsCleanCode(t *testing.T) {
 			want: "go.work",
 		},
 		{
-			name: "build constraint excluding the changed file",
+			// The name says EVERY file, and the precision matters: this is
+			// golangci-lint failing to load a package, which needs the
+			// constraint to empty the whole directory. A constraint on the
+			// changed file with an unconstrained sibling beside it loads fine
+			// and reports nothing about the changed file, which is a different
+			// failure with a different answer — see
+			// TestAChangedFileTheBuildExcludesIsNamed.
+			name: "a build constraint excluding every file in the directory",
 			apply: func(t *testing.T, repo string) {
 				writeFile(t, repo, "app.go", "//go:build ignore\n\npackage probe\n\nfunc F() {}\n")
 			},
@@ -1086,9 +1093,23 @@ func TestStatusesRecordHowEachAnalyzerWasConfigured(t *testing.T) {
 		statuses[st.Linter] = st
 	}
 
-	if got := statuses["golangci-lint"]; got.State != "isolated" || got.Outcome != review.LinterRan {
-		t.Errorf("golangci-lint = %+v, want it recorded as having run isolated: the repository's "+
-			"own .golangci.yml did not apply and a reader has to be told so", got)
+	// The state has to say BOTH halves. "Isolated" alone was true and it hid the
+	// half that mattered: the run was isolated from the tree AND left to
+	// golangci-lint's stock defaults, one of which let a `// Code generated`
+	// line in the diff switch the analyzer off for that file. A reader deciding
+	// whether to trust an empty Go report needs to know whose rules produced it.
+	got := statuses["golangci-lint"]
+	if got.Outcome != review.LinterRan {
+		t.Errorf("golangci-lint = %+v, want it recorded as having run", got)
+	}
+	if !strings.Contains(got.State, "isolated") {
+		t.Errorf("golangci-lint state = %q, want it to say the repository's own .golangci.yml "+
+			"did not apply", got.State)
+	}
+	if !strings.Contains(got.State, "open-nitpick") {
+		t.Errorf("golangci-lint state = %q, want it to name whose defaults decided what was "+
+			"reported; under golangci-lint's own, a generated-file header in the diff silences "+
+			"the file and the report is empty for a reason nothing here would state", got.State)
 	}
 
 	eslint := statuses["eslint"]
@@ -1146,9 +1167,11 @@ func TestTheRecordedReasonIsTheRunnersOwn(t *testing.T) {
 // TestStrictModeDoesNotFailOverAnAnalyzerWithNothingToRead is the cost of not
 // separating the two absences.
 //
-// strict means "an enabled analyzer that could not run is a failed review". An
+// strict means "an enabled analyzer that could not run is an error from this
+// package" — published on the pull request as `did not run`, not an exit status;
+// review.fail_on decides that, from the findings that were published. An
 // analyzer with no files of its kind in the change did not fail to run — it had
-// nothing to do — and treating that as a failure makes strict unusable in every
+// nothing to do — and treating that as an error makes strict unusable in every
 // repository that is not polyglot, which is most of them.
 func TestStrictModeDoesNotFailOverAnAnalyzerWithNothingToRead(t *testing.T) {
 	s := newStubs(t)

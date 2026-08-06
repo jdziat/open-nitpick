@@ -247,9 +247,10 @@ func printPolicy(report *review.Report) {
 // covered less than it looks like is reading the pull request, and
 // review.linterNotice is what reaches them.
 //
-// Everything is printed, not only the degradations. "golangci-lint: isolated"
-// is the fact that the repository's lint settings did not apply, and a reader
-// who sees a shorter list next run has no way to tell which line went missing.
+// Everything is printed, not only the degradations. An analyzer reported as
+// having run isolated is the fact that the repository's lint settings did not
+// apply, and a reader who sees a shorter list next run has no way to tell which
+// line went missing.
 func printLinters(report *review.Report) {
 	if len(report.Linters) == 0 {
 		return

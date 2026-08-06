@@ -385,8 +385,13 @@ request. They are now published there too.
 analyzer; that is visible in the diff and reported as `did not run`), hard-linked
 analyzer configs (`EvalSymlinks` cannot see one; git cannot create one either),
 and in-source suppression — `//nolint`, `# noqa`, `# nosemgrep`,
-`eslint-disable` on the change's own lines. golangci-lint offers no way to
-disable its own. See the task list.
+`eslint-disable`. golangci-lint offers no way to disable its own, and the scope
+of that was understated: a `//nolint` covers the declaration it is attached to,
+and attached to the package clause it covers the whole file, so one added line
+removes a whole pre-existing file from Go analysis. It cannot be prevented from
+outside the tree, so a `//nolint` the change adds is now named on the pull
+request. The other three analyzers' inline configuration is neither disabled nor
+counted. See the task list.
 
 ## What is not yet known
 

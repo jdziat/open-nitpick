@@ -207,17 +207,19 @@ func fenceFor(s string) string {
 
 // renderSummary builds the walkthrough comment.
 //
-// The policy notice, the analyzer roster and the withheld list are the three
-// parts review.summary does not switch off. That setting asks for less
-// narration; it is not permission to change what a review means without saying
-// so. Everything else here describes FILES, and suppressing those costs a reader
-// context — while these three describe a finding the reviewer produced and
+// The policy notice, the analyzer roster, the discard notice and the withheld
+// list are the four parts review.summary does not switch off. That setting asks
+// for less narration; it is not permission to change what a review means without
+// saying so. Everything else here describes FILES, and suppressing those costs a
+// reader context — while these four describe a finding the reviewer produced and
 // something else then removed, a configuration the change supplied and this run
-// refused, and a deterministic analyzer that did not run. With summaries off and
+// refused, a deterministic analyzer that did not run, and a deterministic
+// finding this tool discarded before anything judged it. With summaries off and
 // these suppressed too, a run whose only finding an expert overruled, whose
-// policy came from somewhere other than the file in the change, or whose Go
-// analyzer never produced a report, publishes nothing at all and is
-// indistinguishable from a clean review.
+// policy came from somewhere other than the file in the change, whose Go
+// analyzer never produced a report, or whose analyzer findings were all thrown
+// away for a forged path, publishes nothing at all and is indistinguishable from
+// a clean review.
 func renderSummary(report *Report, cfg *config.Config) string {
 	var b strings.Builder
 
@@ -226,6 +228,8 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// is not the one in the change.
 	b.WriteString(policyNotice(report))
 	b.WriteString(linterNotice(report))
+	b.WriteString(uncoveredNotice(report))
+	b.WriteString(discardNotice(report))
 
 	if cfg == nil || cfg.Review.Summary {
 		b.WriteString(walkthrough(report))
@@ -339,6 +343,184 @@ func linterHeadline(statuses []LinterStatus) string {
 	}
 
 	return "Deterministic analyzers: " + strings.Join(parts, ", ")
+}
+
+// discardNotice states, ON THE PULL REQUEST, how many findings a deterministic
+// analyzer produced that this review threw away, and why.
+//
+// THE BUG: they were dropped by a bare `continue` in the analyzer set's
+// normalize step. No counter, no log, no status — a finding entered and nothing
+// recorded that it had gone. That single line silently absorbed a line directive
+// forging the reported path, and it silently absorbed every finding from an
+// operator's own analyzer config, whose paths arrived relative to the wrong
+// directory. Both looked exactly like a clean Go review.
+//
+// It is counted per reason and not listed per finding, with ONE exception. Two
+// of the reasons are this repository's publication policy working as configured
+// and are routinely in the dozens on a normal pull request — a per-finding list
+// of those is a wall of text that teaches a reader to collapse the block and
+// never open it again, which is how the interesting line gets missed. The
+// exception is the reason that is not policy: a path that is not in this
+// checkout is evidence about the run, there is no healthy tree that produces
+// one, and a count alone would not let anyone go and look.
+func discardNotice(report *Report) string {
+	if len(report.Discarded) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "\n<details>\n<summary>%s</summary>\n\n", discardHeadline(report.Discarded))
+	// It used to say "removed before triage, so nothing judged them", which
+	// stopped being true when the anchor filter downstream of triage began
+	// reporting its own drops. The distinction the sentence was making — these
+	// were not weighed and rejected, they were never weighed — survives the
+	// correction; where in the pipeline that happened does not change it.
+	b.WriteString("A deterministic analyzer reported these and this review did not publish them. " +
+		"They were removed by anchoring, not by judgement: nothing weighed them and decided against them.\n\n")
+
+	counts := map[DiscardReason]int{}
+	var order []DiscardReason
+	for _, d := range report.Discarded {
+		if _, seen := counts[d.Reason]; !seen {
+			order = append(order, d.Reason)
+		}
+		counts[d.Reason]++
+	}
+
+	for _, reason := range order {
+		fmt.Fprintf(&b, "- %d %s\n", counts[reason], reason)
+
+		if reason != DiscardPathNotInCheckout {
+			continue
+		}
+		// inline, because Path is what the ANALYZER printed and the point of
+		// this branch is that the change chose it. It is wrapped in a code span
+		// for the same reason every other path here is, and that span is why
+		// this text can still carry markdown; see inline.
+		for _, d := range report.Discarded {
+			if d.Reason != reason {
+				continue
+			}
+			fmt.Fprintf(&b, "  - `%s` said `%s:%d`\n", inline(d.Rule), inline(d.Path), d.Line)
+		}
+		b.WriteString("\n  Nothing in a healthy tree reports a path that is not in the checkout. " +
+			"A Go line directive does, and the same directive aimed at a file that DOES exist moves a " +
+			"finding onto code this change did not write.\n")
+	}
+
+	b.WriteString("\n</details>\n")
+	return b.String()
+}
+
+// discardHeadline is the one line a reader sees collapsed.
+//
+// It leads with the total rather than the breakdown, because the number that
+// matters to somebody scrolling past is how many deterministic findings did not
+// make it, and it names the not-in-checkout count separately whenever there is
+// one — that reason is the only one here that means something went wrong.
+//
+// WHAT THE TOTAL COUNTS, stated because it was wrong once and read as complete.
+// It is every analyzer finding removed by ANCHORING: the analyzer set's
+// normalize step and both of Engine.filterAnchors' passes. It was the first of
+// those alone until filterAnchors was found dropping analyzer findings on a diff
+// context line at Debug level, after this number had already been computed.
+// It is still not "every analyzer finding that did not reach the pull request":
+// triage sits between the two anchor passes and may merge one finding into
+// another or drop it as noise, which is the job it is there to do and is a
+// judgement, not silence — but nothing enumerates those either, so a reader
+// comparing this total against a count of published findings will not balance
+// the books.
+func discardHeadline(discarded []LinterDiscard) string {
+	forged := 0
+	for _, d := range discarded {
+		if d.Reason == DiscardPathNotInCheckout {
+			forged++
+		}
+	}
+
+	headline := fmt.Sprintf("Analyzer findings not published: %d", len(discarded))
+	if forged > 0 {
+		headline += fmt.Sprintf(", %d for a path that is not in this checkout", forged)
+	}
+	return headline
+}
+
+// uncoveredNotice states, ON THE PULL REQUEST, which parts of the change a
+// deterministic analyzer ran over and reported nothing about.
+//
+// THE BUG IT ANSWERS: the roster said "golangci-lint — ran", and that was true
+// and was read as "the Go analyzer looked at this change". It had not. A build
+// constraint on the changed file with one unconstrained sibling beside it leaves
+// the package loading perfectly while the changed file is never read, and a
+// //nolint attached to the package clause has the analyzer read it and say
+// nothing. Both produced zero findings, a nil error and a roster line saying the
+// analyzer ran — the byte-identical shape of a clean Go review — and the
+// silencing that reaches this state without an attack is the commoner one: an
+// ordinary `foo_windows.go` reviewed on a Linux runner.
+//
+// It sits between the roster and the discard block because that is the order the
+// three facts are read in: whether the analyzer ran, what it did not look at,
+// and what it reported that this review then dropped.
+//
+// It is NOT gated on review.summary, for linterNotice's reason: a reader turning
+// the walkthrough off is asking for less narration, not for the report to stop
+// saying which parts of their change were never analyzed.
+//
+// Files are named individually and suppressions are listed with their line,
+// because both are things a reviewer has to go and look at — a two-line count
+// would leave nobody able to find them. The path is inline-escaped for the
+// reason every other path in this file is: it comes from the diff, and a
+// filename can carry markdown.
+func uncoveredNotice(report *Report) string {
+	if len(report.Uncovered) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "\n<details>\n<summary>%s</summary>\n\n", uncoveredHeadline(report.Uncovered))
+	b.WriteString("An analyzer ran over this change and reported nothing about these. " +
+		"That is not the same as reporting them clean.\n\n")
+
+	var order []UncoveredReason
+	grouped := map[UncoveredReason][]LinterUncovered{}
+	for _, u := range report.Uncovered {
+		if _, seen := grouped[u.Reason]; !seen {
+			order = append(order, u.Reason)
+		}
+		grouped[u.Reason] = append(grouped[u.Reason], u)
+	}
+
+	for _, reason := range order {
+		fmt.Fprintf(&b, "- %s\n", reason)
+		for _, u := range grouped[reason] {
+			if u.Line > 0 {
+				fmt.Fprintf(&b, "  - `%s:%d` (`%s`)\n", inline(u.Path), u.Line, inline(u.Linter))
+				continue
+			}
+			fmt.Fprintf(&b, "  - `%s` (`%s`)\n", inline(u.Path), inline(u.Linter))
+		}
+	}
+
+	b.WriteString("\n</details>\n")
+	return b.String()
+}
+
+// uncoveredHeadline is the one line a reader sees collapsed.
+//
+// It counts FILES rather than entries, because a file with three added //nolint
+// comments is one file the analyzer said nothing about and "3 uncovered" would
+// overstate it. It never says "all covered": this block is absent when there is
+// nothing to report, and a headline claiming full coverage would be a promise
+// about cgo and about every analyzer that has no Uncovered implementation.
+func uncoveredHeadline(uncovered []LinterUncovered) string {
+	files := map[string]struct{}{}
+	for _, u := range uncovered {
+		files[u.Path] = struct{}{}
+	}
+
+	return fmt.Sprintf("Analyzed less than it ran over: %d file(s) an analyzer reported nothing about", len(files))
 }
 
 // policyFailureNotice explains, on the pull request, why no review ran at all.

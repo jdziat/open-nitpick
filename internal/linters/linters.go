@@ -7,12 +7,14 @@
 package linters
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -97,8 +99,10 @@ type Set struct {
 	log      *slog.Logger
 	runners  []Runner
 
-	mu       sync.Mutex
-	statuses []review.LinterStatus
+	mu        sync.Mutex
+	statuses  []review.LinterStatus
+	discarded []review.LinterDiscard
+	uncovered []review.LinterUncovered
 }
 
 // New builds the analyzer set described by the configuration.
@@ -166,6 +170,68 @@ func (s *Set) Statuses() []review.LinterStatus {
 	// itself between runs reads as something having changed when nothing did.
 	slices.SortFunc(out, func(a, b review.LinterStatus) int {
 		return strings.Compare(a.Linter, b.Linter)
+	})
+	return out
+}
+
+// Discarded reports the findings an analyzer produced that this review did not
+// publish, and why. It is populated by Run and empty before it.
+//
+// It exists because Set.normalize used to drop them with a bare `continue`: no
+// counter, no log, no status. That single line was the sink for the line
+// directive attack — golangci-lint reports real findings at a forged path, and
+// they arrive here as "a path not in the diff" — and it was also where the
+// opt-in analyzer config lost EVERY finding, because an operator config outside
+// the repository made golangci-lint print paths relative to that config's
+// directory.
+//
+// Neither of those looked like anything. A finding the reviewer produced and
+// this tool discarded is the class this project keeps shipping, so it is counted
+// and published for the same reason Plan.Skipped and Plan.Degraded are: silence
+// from a review that ran less than you think is indistinguishable from silence
+// from clean code.
+//
+// This is NOT the whole published list. review.Engine's anchor filter runs after
+// normalize and drops analyzer findings of its own — it was found doing so
+// silently, downstream of this fix and with the same three symptoms — so the
+// engine merges its drops into the same block. See review.SortDiscards.
+func (s *Set) Discarded() []review.LinterDiscard {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Sorted for the reason Statuses is: the recording order follows whichever
+	// analyzer goroutine finished first, and this ends up in a published
+	// comment. A block that reshuffles itself between runs reads as something
+	// having changed when nothing did. The comparator lives in review because
+	// review.Engine has to merge its OWN drops into the same list before it is
+	// rendered, and two orderings for one published block is a bug waiting.
+	out := append([]review.LinterDiscard(nil), s.discarded...)
+	review.SortDiscards(out)
+	return out
+}
+
+// Uncovered reports the parts of the change an analyzer ran over and said
+// nothing about because the tree arranged for it not to look. It is populated by
+// Run and empty before it.
+//
+// It exists because "the analyzer ran" and "the analyzer read the change" are
+// different claims, and only the first one was being published. A build
+// constraint on the changed file with an ordinary sibling beside it, or a
+// //nolint on the package clause, both produce a run with zero findings, a nil
+// error and a roster line saying golangci-lint ran — which is what a clean Go
+// review looks like. See golangciLint.Uncovered.
+func (s *Set) Uncovered() []review.LinterUncovered {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	out := append([]review.LinterUncovered(nil), s.uncovered...)
+	slices.SortFunc(out, func(a, b review.LinterUncovered) int {
+		return cmp.Or(
+			cmp.Compare(a.Reason, b.Reason),
+			cmp.Compare(a.Path, b.Path),
+			cmp.Compare(a.Line, b.Line),
+			cmp.Compare(a.Linter, b.Linter),
+		)
 	})
 	return out
 }
@@ -261,6 +327,21 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 
 			found, err := r.Run(runCtx, s.repoRoot, paths)
 
+			// Asked only of a runner that RAN — an analyzer already recorded as
+			// failed has told the reader more than a coverage note would — and
+			// asked whether or not it found anything, because an analyzer that
+			// reported nothing about a file it never read is exactly the state
+			// this answers.
+			//
+			// Outside the lock below, because it reads files: the mutex
+			// serializes the result tails of every analyzer in the run, and
+			// holding it across file I/O would make each analyzer wait on the
+			// last one's directory reads.
+			var gaps []review.LinterUncovered
+			if c, ok := r.(covering); ok && err == nil {
+				gaps = c.Uncovered(s.repoRoot, paths, files)
+			}
+
 			mu.Lock()
 			defer mu.Unlock()
 
@@ -275,6 +356,8 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 
 			s.record(r.Name(), review.LinterRan, state(r))
 			s.log.Debug("linter finished", "linter", r.Name(), "findings", len(found))
+			s.uncover(gaps)
+
 			for _, f := range found {
 				f.Rule = prefixRule(r.Name(), f.Rule)
 				all = append(all, f)
@@ -292,13 +375,29 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 }
 
 // normalize converts analyzer findings into review findings, dropping those
-// that cannot be anchored to the change.
+// that cannot be anchored to the change AND RECORDING EVERY ONE IT DROPS.
+//
+// What was here was three bare `continue` statements. They are the correct
+// behaviour — a comment cannot be published on a line the forge will not accept
+// — and they were the wrong accounting: an analyzer finding entered this
+// function and nothing anywhere said it had left. Two live defects hid in that
+// gap, one of them an attack (a line directive forging the reported path) and
+// one of them our own (an operator's config making every path unresolvable), and
+// both presented as a review that ran, reported no findings, and looked clean.
+//
+// So every drop is now counted, named with the reason it was dropped, and
+// carried out to the report. The reasons are separated because they are
+// different facts: two of them are this repository's own publication policy
+// working as configured, and one of them is an analyzer describing a file that
+// is not in this checkout, which is not a drop at all but evidence. See
+// reasonForUnknownPath.
 func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 	out := make([]review.Finding, 0, len(found))
 
 	for _, f := range found {
 		file := files.Find(f.Path)
 		if file == nil {
+			s.discard(f, s.reasonForUnknownPath(f.Path))
 			continue
 		}
 
@@ -306,9 +405,11 @@ func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 		// Pre-existing lint debt on untouched lines is somebody else's problem
 		// and reporting it is the fastest way to get the bot switched off.
 		if s.cfg.Linters.OnlyChangedLines && !file.IsChangedLine(f.Line) {
+			s.discard(f, review.DiscardUnchangedLine)
 			continue
 		}
 		if _, ok := file.Position(f.Line); !ok {
+			s.discard(f, review.DiscardUnanchorable)
 			continue
 		}
 
@@ -362,6 +463,93 @@ func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 	}
 
 	return out
+}
+
+// discard records one analyzer finding this review produced and did not
+// publish.
+//
+// It logs as well as counting. The complaint against the bare `continue` was
+// three things — no counter, no log, no status — and a reader debugging a
+// missing finding reaches for the log first, while the reader who never knew a
+// finding existed is reached only by the status.
+func (s *Set) discard(f Finding, reason review.DiscardReason) {
+	s.mu.Lock()
+	s.discarded = append(s.discarded, review.LinterDiscard{
+		Rule:   f.Rule,
+		Path:   f.Path,
+		Line:   f.Line,
+		Reason: reason,
+	})
+	s.mu.Unlock()
+
+	s.log.Info("analyzer finding not published",
+		"rule", f.Rule, "path", f.Path, "line", f.Line, "reason", reason)
+}
+
+// uncover records the parts of the change an analyzer did not cover.
+//
+// It logs for the reason discard does: a maintainer wondering why the Go review
+// said nothing about their new _windows.go file reaches for the log first, and
+// the reader who never knew the file went unread is reached only by the report.
+func (s *Set) uncover(gaps []review.LinterUncovered) {
+	if len(gaps) == 0 {
+		return
+	}
+
+	s.mu.Lock()
+	s.uncovered = append(s.uncovered, gaps...)
+	s.mu.Unlock()
+
+	for _, g := range gaps {
+		s.log.Info("analyzer covered less of the change than it ran over",
+			"linter", g.Linter, "path", g.Path, "line", g.Line, "reason", g.Reason)
+	}
+}
+
+// reasonForUnknownPath decides which of the two "not in the diff" answers a
+// path deserves, and IT IS THE ONE DECISION HERE THAT IS NOT BOOKKEEPING.
+//
+// A path that is not in the change is ordinary. Go is analyzed a package at a
+// time, so golangci-lint routinely reports on a sibling file the change never
+// touched, and dropping those is what only_changed_lines is for.
+//
+// A path that is not in the CHECKOUT is not ordinary and is not a lint result at
+// all: the analyzer was made to describe a file that does not exist. The only
+// way to reach it from a Go tree is a line directive, and the same directive
+// pointed at a real file relocates a finding onto code the change did not write
+// — so this is the visible half of a thing whose invisible half puts this bot's
+// name on an accusation about somebody else's line.
+//
+// WHAT IS DONE WITH IT, AND WHY THAT AND NOT MORE. It is recorded under its own
+// reason and published, rather than being turned into a finding of its own or
+// used to fail the analyzer from here. Two reasons. Publishing it as a finding
+// would mean anchoring it, and the only honest anchor is the file carrying the
+// directive, which this function cannot see: it holds a forged path and nothing
+// else. And failing the analyzer at this point would be late and partial —
+// Set.Run has already recorded the analyzer as having run, and the SILENCING
+// variant of the attack produces no findings for this function to inspect at
+// all. The analyzer has to refuse before it reports, which is where the refusal
+// now is; see positionsRewritten. This is the backstop that names it if one
+// arrives anyway — from an analyzer with no such check, or along a path nobody
+// has thought of yet — and a named, published count is the minimum that makes
+// such a run distinguishable from a clean one.
+func (s *Set) reasonForUnknownPath(reported string) review.DiscardReason {
+	if reported == "" {
+		return review.DiscardPathNotInCheckout
+	}
+
+	// Cleaned and containment-checked before touching the filesystem: the path
+	// is analyzer output, so "../../etc/passwd" is a thing it can say, and this
+	// must not become a way to ask whether an arbitrary absolute path exists.
+	clean := path.Clean(filepath.ToSlash(reported))
+	if path.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, "../") {
+		return review.DiscardPathNotInCheckout
+	}
+
+	if _, err := os.Lstat(filepath.Join(s.repoRoot, filepath.FromSlash(clean))); err != nil {
+		return review.DiscardPathNotInCheckout
+	}
+	return review.DiscardNotInChange
 }
 
 // classForRule maps an analyzer rule to a finding class.
