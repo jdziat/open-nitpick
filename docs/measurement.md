@@ -453,3 +453,53 @@ misses half the defects is not cheap.
 - [ ] Do the guard tests behind it fail under mutation?
 - [ ] Would this number look different if the instrument favoured the author?
       Four instrument bugs found here did exactly that.
+
+## Rule 14: the v1 ship decision, pre-registered
+
+Written while the battery it governs was running and before any of its output was
+read. Timestamps are checkable: this section's commit against the run log's
+completion line.
+
+**Not written blind, and pretending otherwise would be the failure this rule
+exists to prevent.** An earlier narrow run over the held-out split had already
+reported kimi-k3 locating 10 of 13 plants against Incumbent's 4. So a threshold
+chosen now is chosen by an author who expects to pass it. The margin below is
+argued from the corpus's resolution rather than from that expectation, and the
+argument has to survive the reader knowing the expectation existed.
+
+### The decision
+
+Ship v1 if ALL of these hold on the fixtures BOTH reviewers covered:
+
+1. **Locate count.** Plants we located ≥ plants Incumbent located.
+2. **Margin ≥ 2 plants.** One plant is the smallest difference this corpus can
+   express, so a one-plant lead is a tie reported as a win. This is Rule 6c
+   applied to the ship decision rather than to a table cell.
+3. **Noise.** Our invented findings per review ≤ 1.5× Incumbent's. Recall bought
+   by commenting on everything is not capability, and NOISE is the only column
+   that sees it.
+4. **Anchors.** Our worst-case anchored span is no wider than Incumbent's. A
+   finding naming a whole file is credited with every plant inside it and is
+   noise for none; ANCHOR is the only column that sees THAT.
+
+Any one failing means do not ship, and the report says which.
+
+### What will not be claimed either way
+
+- **No cross-tool severity accuracy.** The two vocabularies are different
+  resolutions and every reduction that makes them comparable is maximised by a
+  reviewer that also picks what to mention (Rule 6). The severity VOCABULARY
+  block is a description and may not be reduced to a figure.
+- **No generalisation claim from the pooled number.** The held-out figure is
+  published beside it. If they disagree in direction, the held-out one governs
+  what is said about generalisation, and the disagreement is reported.
+- **No cost ranking across routing bands.** Amounts marked `~` sit inside a band
+  and may be ordered only if the bands are disjoint.
+
+### What a passing result does NOT establish
+
+That the corpus is a fair sample of real pull requests. It is 29 plants chosen by
+this project, and four of its five `info` plants are reported by NEITHER reviewer
+— measured, ours 0–1 of 10–16 runs each and Incumbent 0 — which says those
+fixtures sit below every tested reviewer's threshold rather than that anyone
+failed. A win here is a win on this corpus. Say that when quoting it.
