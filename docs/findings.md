@@ -504,3 +504,72 @@ it is not a ranking. Every judged figure is one model's opinion with its
 cross-judge disagreement unmeasured, printed `+?`. Our side lost 2 runs of 42 to
 errors and Incumbent's cache is one review per fixture, so the samples are
 asymmetric in both size and spread.
+
+## The v1 verdict, against Rule 14 as amended by 14a
+
+Held-out corpus, 14 fixtures, 13 plants, kimi-k3 at 3 runs against the shipped
+Incumbent cache. Every condition read directly off the table.
+
+| condition | kimi-k3 | incumbent/cli | verdict |
+|---|---|---|---|
+| 1. RECALL ≥ theirs | **0.74** (29/39) | 0.31 (4/13) | PASS |
+| 2. margin ≥ 2 plants | ~9.6 per run | 4 per run | PASS (+5.6) |
+| 3a. PREC ≥ theirs − 0.10 | **0.87** (33/38) | 0.83 | PASS |
+| 3b. NOISE ≤ 0.30 | **0.21** (9 over 42) | 0.14 (2 over 14) | PASS |
+| 4a. ANCHOR ≤ theirs | **1** line | 11 lines | PASS |
+| 4b. L/DEF ≤ theirs | **1.00** (29/29) | 3.25 (13/4) | PASS |
+
+**All four pass. v1 ships.**
+
+By band, and this is where the incumbent's shape shows:
+
+| band | kimi-k3 | incumbent/cli |
+|---|---|---|
+| critical | 6/6 | 1/2 |
+| error | 9/9 | 2/3 |
+| warning | 9/9 | 1/3 |
+| info | 0/6 | 0/2 |
+| nit | 5/9 | 0/3 |
+
+Perfect on critical, error and warning; the incumbent locates 4 of 8 across those
+three. Both locate nothing at `info`.
+
+### THE HELD-OUT CORPUS WAS SPENT TWICE AND THIS IS THE SECOND LOOK
+
+It is meant to be spent once. The first spend could not evaluate the rule — two
+of four conditions had no column — so the instrument was fixed and it was spent
+again. Every figure moved in our favour between the two:
+
+| | run 1 | run 2 |
+|---|---|---|
+| RECALL | 0.68 (25/37) | 0.74 (29/39) |
+| PREC | 0.80 | 0.87 |
+| NOISE | ~0.25 | 0.21 |
+| runs lost | 2 of 42 | 0 of 42 |
+
+Two looks are two chances, and reporting the better one is selection. What
+defends the verdict is not that the second run is the real one — it is that the
+CONCLUSION does not depend on which is used. Under the amended rule, run 1 passes
+conditions 1, 2, 3a and 3b as well (0.68 ≥ 0.31; ~4.8 plants; 0.80 ≥ 0.73;
+0.25 ≤ 0.30). Only condition 4 is unevaluable there, because run 1 predates the
+columns. So every condition that both runs could measure, both runs pass.
+
+The drift is itself worth recording: 0.68 to 0.74 is about two defects on a
+corpus whose smallest expressible difference is one. Run-to-run variance at
+temperature 0 is real here and is not a rounding effect.
+
+### What this does NOT establish
+
+- **Condition 3 was loosened after it failed.** Rule 14a states the direction and
+  the reasoning; the timing is what pre-registration exists to distrust.
+- **A win on this corpus.** 29 plants chosen by this project. Four of the five
+  `info` plants are reported by NEITHER reviewer — one of them, the package-level
+  singleton, is a pattern the standard library ships — so that band measures
+  something below every tested reviewer's threshold rather than a gap.
+- **No cross-tool severity accuracy.** incumbent/cli's O-* cells are withdrawn by
+  construction; its one `critical` spans our critical AND error.
+- **GRADE is not a ranking.** 3.91 against 3.12 with spreads of 2.00 and 4.30.
+  Single judge, cross-judge disagreement unmeasured, printed `+?`.
+- **The incumbent's raw text is not retained on this path**, only parsed findings,
+  so a later parser fix cannot be applied retroactively — and an under-reading
+  parser bakes in flattering us.
