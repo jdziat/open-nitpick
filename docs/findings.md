@@ -410,3 +410,83 @@ counted. See the task list.
 - Cost per detected defect across the battery — pricing spans ~165× on input.
 - Whether the expert-validation stage helps or costs recall. It ships disabled
   for exactly that reason.
+
+## The v1 gate, run against Rule 14
+
+Two batteries, kimi-k3, 3 runs each, against the shipped Incumbent cache.
+
+### Held-out corpus (14 fixtures, 13 plants, spent once)
+
+| band | kimi-k3 | incumbent/cli |
+|---|---|---|
+| critical | 6/6 | 1/2 |
+| error | 6/9 | 2/3 |
+| warning | 7/7 | 1/3 |
+| info | 0/6 | 0/2 |
+| nit | 6/9 | 0/3 |
+| **located** | **25/37 = 0.68** | **4/13 = 0.31** |
+
+### Tuning corpus (16 fixtures, 16 plants)
+
+| band | kimi-k3 | incumbent/cli |
+|---|---|---|
+| critical | 6/6 | 2/2 |
+| error | 15/15 | 5/5 |
+| warning | 9/9 | 3/3 |
+| info | 3/9 | 0/3 |
+| nit | 5/9 | 0/3 |
+| **located** | **38/48 = 0.79** | **10/16 = 0.62** |
+
+THE TWO SPLITS TELL DIFFERENT STORIES AND THE DIFFERENCE IS THE POINT. On the
+tuning corpus the blocking bands are a dead heat — 10 of 10 each on
+critical+error+warning — and the whole margin is info and nit, where Incumbent
+locates nothing and may not publish at all. Quoting the tuning total alone would
+be true arithmetic and a misleading sentence. On held-out the lead is real where
+it counts: critical 1.00 against 0.50, warning 1.00 against 0.33, error tied.
+
+### The verdict against the pre-registered rule
+
+| condition | result |
+|---|---|
+| 1. located ≥ Incumbent's | PASS — 0.68 against 0.31 |
+| 2. margin ≥ 2 plants | PASS — ~4.8 plants per run |
+| 3. noise ≤ 1.5× Incumbent's | **FAIL** — 1.75× to 2.45× depending on reading |
+| 4. anchors no wider | **NOT MEASURED** — the benchmark table has no ANCHOR column |
+
+Rule 14 says any one failing means do not ship. **Do not ship v1 yet.**
+
+WHY CONDITION 3 FAILS, AND WHAT IT DOES AND DOES NOT SAY. Judged precision is
+0.80 for us and 0.83 for Incumbent — within a hair, and well inside a
+single-judge figure whose cross-judge disagreement was never measured. What
+differs is VOLUME: 0.88 findings per review against 0.43. At near-equal
+precision, filing twice as many findings means twice the absolute noise, and the
+rule was written per review rather than per finding. So the failure is real under
+the rule as written, and it is a statement about how much we say, not about how
+often we are wrong.
+
+TWO DEFECTS IN THE RULE ITSELF, recorded rather than repaired, because repairing
+a pre-registered threshold after seeing the number it failed is the whole thing
+pre-registration exists to prevent.
+
+  - Condition 3 is multiplicative against a baseline that can be zero. On the
+    TUNING corpus Incumbent's judged precision was 13/13, so 1.5x0 = 0 and any
+    noise at all fails. A threshold that a perfect-precision incumbent makes
+    unsatisfiable is not a threshold. It needs an absolute floor.
+  - Condition 4 named a column the benchmark does not print. ANCHOR appears in
+    the prompt-battery cost table, not in the head-to-head. A condition that
+    cannot be evaluated by the run it governs is a condition that was never
+    checked.
+
+Both were written by an author who had already seen a favourable narrow result,
+which is disclosed in Rule 14 and is the reason to read them sceptically rather
+than to trust that they were merely unlucky.
+
+### What is NOT claimed
+
+No cross-tool severity accuracy: incumbent/cli's O-* columns are withdrawn by
+construction, its one `critical` spanning our critical AND error. GRADE is 3.77
+against 3.14 with spreads of 2.30 and 4.30 — a gap far inside either spread, so
+it is not a ranking. Every judged figure is one model's opinion with its
+cross-judge disagreement unmeasured, printed `+?`. Our side lost 2 runs of 42 to
+errors and Incumbent's cache is one review per fixture, so the samples are
+asymmetric in both size and spread.
