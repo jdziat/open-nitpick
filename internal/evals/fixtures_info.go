@@ -21,15 +21,60 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // deadlocks or breaches. Authoring one is a matter of choosing the failure and
 // then choosing how much has to go right for it not to happen. Info has no
 // failure. The shipped anchor is "`info` — a defensible concern the author
-// should consciously accept or reject", and its two published examples —
-// "widening an exported type's accepted input" and "adding a dependency for one
-// helper function" — name no input that breaks. So the usual authoring move,
-// take a defect and turn the dial down, produces something that is not an info
-// finding at all: it is a warning whose consequence has been made small, and it
-// is discovered by asking whether the AUTHOR COULD BE WRONG. If the author
-// could be wrong, the finding is at least a warning. Info is the level where
-// reasonable engineers split, and where the reviewable fact is that the author
-// should have DECIDED rather than drifted.
+// should consciously accept or reject", and what a published example of it has
+// to do is name a cost WITHOUT naming an input that breaks.
+//
+// This paragraph deliberately does not quote the ladder's current examples, for
+// the reason fixtures_warning.go stopped quoting them: a comment keyed to prompt
+// prose goes stale every time the prompt is edited, and the property argued here
+// is a property of the LEVEL. It went stale twice already. The version before
+// this one quoted an example reading "so a rise in failures reads as a fall in
+// traffic" and asserted in the same sentence that the ladder's examples "name no
+// input that breaks" — the quotation names the input, a failure, and the wrong
+// output, traffic reading as falling. Both the example and the claim about it
+// were wrong, and the claim was refuted by the text it quoted.
+//
+// THE AUTHORING TEST, which is what survives when the quotations are removed and
+// is the reason both of those examples were replaced: ask whether the AUTHOR
+// COULD BE WRONG. If the author could be wrong, the finding is at least a
+// warning. The usual move — take a defect and turn the dial down — therefore
+// does not produce an info finding at all; it produces a warning whose
+// consequence has been made small. Info is the level where reasonable engineers
+// split, and where the reviewable fact is that the author should have DECIDED
+// rather than drifted.
+//
+// The test cuts both ways, and the ladder has now failed it in each direction.
+// An example may not state a wrong answer as a fact, because then the author IS
+// wrong and the rung is a warning. And an example may not name a mere DIFFERENCE
+// either: one earlier version was "a subcommand configured on the command line
+// where the tool's other subcommands read a config file", which named no cost at
+// all, failed review.md's own bar ("report a finding only when you can name a
+// concrete consequence"), and was besides a consistency observation —
+// config.ClassStyle, which allowedClasses drops below pedantic, so a reader of
+// the default configuration could never have seen the finding it illustrated.
+//
+// THE LADDER'S TWO INFO EXAMPLES USED TO BE TWO OF THESE PLANTS AND WERE
+// REPLACED, which is why two SeverityNotes below argue from a clause rather
+// than from an example. review.md illustrated `info` with "Widening an exported
+// type's accepted input is info. Adding a dependency for one helper function is
+// info." — kotlin-widened-input and rust-crate-for-one-call stated almost
+// verbatim — three lines above "These examples ... are deliberately drawn from
+// defect classes you are unlikely to meet in this change; do not go looking for
+// them." So the prompt named two planted defects and then told the reviewer to
+// ignore them. Measured, kimi-k3, two independent three-run batteries: both
+// fixtures 0 of 3 every time, usually with an empty findings list.
+//
+// THE FIX WAS ON THE PROMPT AND NOT ON THESE PLANTS, and the reason is not the
+// corpus. Every other rung illustrates with a SCENARIO — "Writing a decrypted
+// secret to a log that ships off-host", "A check-then-act on a file that
+// another process can replace between the two steps" — while those two were
+// CATEGORIES, and the anti-anchoring sentence's claim of rarity was therefore
+// false of them for any reader: widening an exported signature and adding a
+// dependency for one helper are among the most ordinary things a reviewer
+// meets, so in a real repository the prompt was suppressing two legitimate
+// findings. Nothing here moved: the diffs, anchors, keywords, classes and
+// levels are untouched, and testdata/incumbent stays keyed to them. What could
+// not stay is a note deriving its level from a sentence that no longer exists.
 //
 // Every plant below was tested against that question before it was written:
 // name the case FOR the change, in one sentence, and refuse to plant it unless
@@ -62,13 +107,13 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // fixtures.go at a single level with no notes at all, so an info plant in any
 // of them turns green plants red in a file this change does not own —
 // correctness alone would need notes on three. That is a real cost and it lands
-// on the most natural home for two of these: "widening an exported type's
-// accepted input" is the anchor's own contract-flavoured example, and it is
-// planted here as `maintainability` instead. The declared class is honest on
-// its own terms — ClassContract is "a change that breaks existing callers", and
-// nothing below breaks a caller, which is precisely why these are info and not
-// error — but a reader should know the taxonomy was not the only pressure.
-// Closing that needs notes on contract-break, in a change that owns fixtures.go.
+// on the most natural home for two of these: widening an exported type's
+// accepted input is contract-flavoured, and it is planted here as
+// `maintainability` instead. The declared class is honest on its own terms —
+// ClassContract is "a change that breaks existing callers", and nothing below
+// breaks a caller, which is precisely why these are info and not error — but a
+// reader should know the taxonomy was not the only pressure. Closing that needs
+// notes on contract-break, in a change that owns fixtures.go.
 //
 // LANGUAGES. Rust, Kotlin, Ruby and PHP are all new to the corpus; one plant is
 // Go. Before these, fourteen of twenty-five fixtures were Go — counted rather
@@ -154,11 +199,12 @@ func infoFixtures() []Fixture {
 
 // rustCrateForOneCallFixture adds a crate to format one string.
 //
-// This is the anchor's own second example — "adding a dependency for one helper
-// function is info" — in the language where a manifest change is most visible.
-// The change is small and entirely reasonable: the nightly report printed
-// durations as a seconds count, someone on the rota misread 150 as minutes, and
-// the fix spells them "2m 30s".
+// This was the anchor's own second example — the ladder read "adding a
+// dependency for one helper function is info" until that illustration was
+// replaced, for the reason in this file's header — planted in the language
+// where a manifest change is most visible. The change is small and entirely
+// reasonable: the nightly report printed durations as a seconds count, someone
+// on the rota misread 150 as minutes, and the fix spells them "2m 30s".
 //
 // THE CASE FOR IT, which is why this is not a warning with the dial turned
 // down: humantime is small, widely used, and formats plural units and unit
@@ -321,13 +367,15 @@ pub fn render(jobs: &[Job]) -> String {
 			// audit for one call.
 			Class:        config.ClassMaintainability,
 			WantSeverity: config.SeverityInfo,
-			SeverityNote: "info under the anchor's own second example, \"adding a dependency for one helper " +
-				"function is info\", and under the clause it illustrates: \"a defensible concern the author " +
-				"should consciously accept or reject\". Not warning — \"likely a bug, or a genuine hazard " +
-				"under plausible conditions\" — because there is no condition to name: the crate compiles, " +
-				"formats correctly, and no input makes render answer wrongly. Not nit: \"an unnecessary " +
-				"intermediate copy is a nit\" is a local waste that dies with the call, and a dependency is " +
-				"a standing commitment that every future build and audit pays. It is one of the three " +
+			SeverityNote: "info under the clause \"a defensible concern the author should consciously " +
+				"accept or reject\". The ladder used to illustrate that clause with this plant itself — " +
+				"\"adding a dependency for one helper function is info\" — and the illustration was " +
+				"replaced rather than the plant, so the level now rests on the clause alone. Not warning " +
+				"— \"likely a bug, or a genuine hazard under plausible conditions\" — because there is no " +
+				"condition to name: the crate compiles, formats correctly, and no input makes render " +
+				"answer wrongly. Not nit: \"minor and optional\" describes a local waste that dies with " +
+				"the call, and a dependency is a standing commitment that every future build and audit " +
+				"pays. It is one of the three " +
 				"maintainability plants, which arrived together and all sit at this level, so nothing in " +
 				"the corpus disagrees with it yet.",
 			Why: "a crate is added to the manifest for a single call site whose output the standard library expresses in a few lines, so every build, lockfile bump and audit carries it for one formatted string",
@@ -338,14 +386,16 @@ pub fn render(jobs: &[Job]) -> String {
 // kotlinWidenedInputFixture lifts an exported function off the type it was
 // written for.
 //
-// The anchor's own first example — "widening an exported type's accepted input
-// is info" — and the reason it is planted in Kotlin rather than Go is that
-// Kotlin's non-null types make the widening carry NO new failure. Widening a Go
-// parameter from a struct to an interface makes nil a newly reachable input,
-// and a reviewer reporting the nil panic would be reporting a real defect this
-// fixture never meant to plant. Here summarize cannot be handed null, iterates
-// nothing, and reads only members every implementer must provide, so the change
-// is exactly the design decision and nothing else.
+// The anchor's own first example until that illustration was replaced — the
+// ladder read "widening an exported type's accepted input is info", which is
+// this plant, for the reason in this file's header. The reason it is planted in
+// Kotlin rather than Go is that Kotlin's non-null types make the widening carry
+// NO new failure. Widening a Go parameter from a struct to an interface makes
+// nil a newly reachable input, and a reviewer reporting the nil panic would be
+// reporting a real defect this fixture never meant to plant. Here summarize
+// cannot be handed null, iterates nothing, and reads only members every
+// implementer must provide, so the change is exactly the design decision and
+// nothing else.
 //
 // THE CASE FOR IT: the weekly mail is the next thing on the board, it has no
 // day to report, and an interface introduced now can be shaped by the caller
@@ -447,8 +497,8 @@ fun summarize(report: Summarizable): String =
 			Path: "src/main/kotlin/com/example/report/Summary.kt",
 			Line: 27, // the widened signature
 			// Anchored at the SIGNATURE rather than at the interface
-			// declaration, because the accepted input is what the anchor's
-			// example is about and it is the line that cannot be taken back:
+			// declaration, because the accepted input is what the decision IS
+			// and it is the line that cannot be taken back:
 			// Summarizable could be deleted tomorrow, summarize's parameter
 			// could not.
 			//
@@ -532,10 +582,11 @@ fun summarize(report: Summarizable): String =
 			},
 			Class:        config.ClassMaintainability,
 			WantSeverity: config.SeverityInfo,
-			SeverityNote: "info under the anchor's own first example, \"widening an exported type's accepted " +
-				"input is info\", and under the clause it illustrates: \"a defensible concern the author " +
-				"should consciously accept or reject\". Not warning: there is no \"genuine hazard under " +
-				"plausible conditions\" to name, because Kotlin's non-null types mean no new input is " +
+			SeverityNote: "info under the clause \"a defensible concern the author should consciously " +
+				"accept or reject\". The ladder used to illustrate that clause with this plant itself — " +
+				"\"widening an exported type's accepted input is info\" — and the illustration was " +
+				"replaced rather than the plant, so the level now rests on the clause alone. Not " +
+				"warning: there is no \"genuine hazard under plausible conditions\" to name, because Kotlin's non-null types mean no new input is " +
 				"reachable — every caller that compiled before compiles now and produces the same string. " +
 				"Not contract either, which is the class a reader may expect: ClassContract is \"a change " +
 				"that breaks existing callers\" and this breaks none, which is exactly why it is not an " +

@@ -2722,7 +2722,7 @@ func TestEveryPlantIsCreditedForItsOwnDescription(t *testing.T) {
 //
 // SeverityNote is NOT a source, and it is the obvious second one to reach for, so
 // the refusal is measured rather than asserted. Split into sentences it runs
-// 15 credited, 61 uncredited — because a note argues which anchor in review.md a
+// 15 credited, 63 uncredited — because a note argues which anchor in review.md a
 // level sits under and compares the plant to others BY NAME, so most of its
 // sentences are prose about the severity table. Requiring them would pull every
 // keyword list toward that table's vocabulary, which is not where a reviewer's

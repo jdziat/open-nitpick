@@ -53,15 +53,18 @@ Assign severity by what you can demonstrate, using these anchors:
   migration that drops a column before the code that reads it is retired is
   critical.*
 - `error` — a real bug that produces incorrect behavior on a reachable path.
-  *Comparing timestamps from two different timezones is an error. A cache key
-  that omits a field the value depends on is an error.*
+  *Rounding a currency amount at each line rather than once on the total is
+  an error. A cache key that omits a field the value depends on is an error.*
 - `warning` — likely a bug, or a genuine hazard under plausible conditions.
   *A check-then-act on a file that another process can replace between the two
   steps is a warning. Retrying a non-idempotent request is a warning.*
 - `info` — a defensible concern the author should consciously accept or reject.
-  *Widening an exported type's accepted input is info. Adding a dependency for
-  one helper function is info.*
-- `nit` — minor and optional. *An unnecessary intermediate copy is a nit.*
+  *Dropping the request id from a log line, so joining it to the rest of one
+  request's output later has one less key, is info. Counting a metric only on the
+  success path, so anyone reading it later has to know that is what it counts, is
+  info.*
+- `nit` — minor and optional. *A test that asserts on an error's exact wording
+  rather than its type is a nit.*
 
 These examples are illustrative, not a checklist. They are deliberately drawn
 from defect classes you are unlikely to meet in this change; do not go looking

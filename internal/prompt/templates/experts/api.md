@@ -67,8 +67,9 @@ Stay on the reviewer's scale:
   a different answer to the same request.
 - `warning` — likely to break a caller under plausible use, such as a struct
   that unkeyed literals may construct.
-- `info` — a change the author should accept knowingly: widened input, a new
-  optional field, a default that moved within its documented range.
+- `info` — a change the author should accept knowingly, such as a response that
+  gains a field today's clients ignore and tomorrow's will depend on, or a
+  header the service must now keep sending.
 - `nit` — naming or documentation on a surface whose behavior is unchanged.
 
 Rate the consequence you can demonstrate, not the worst one imaginable, and when

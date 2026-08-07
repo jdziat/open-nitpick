@@ -552,8 +552,20 @@ func StartOfDay(t time.Time) time.Time {
 			// location the result carries" — a documentation nit — matched.
 			Keywords: []string{"utc", "timezone", "time zone", "local midnight", "dst", "daylight", "zone offset", "wrong day"},
 			Class:    config.ClassCorrectness,
-			// The error anchor's own worked example is "comparing timestamps
-			// from two different timezones", which is this defect exactly.
+			// error under "a real bug that produces incorrect behavior on a
+			// reachable path": every caller outside UTC gets the wrong day
+			// boundary, on every call, with no condition to meet.
+			//
+			// THE ERROR ANCHOR USED TO ILLUSTRATE WITH THIS DEFECT'S CLASS, and
+			// the illustration was replaced rather than this plant. review.md
+			// read "Comparing timestamps from two different timezones is an
+			// error" — which this fixture's earlier comment called "this defect
+			// exactly" — three lines above "do not go looking for them", and the
+			// keyword `timezone` sat verbatim in that sentence. That is the same
+			// shape as the info pair fixtures_info.go's header describes, on a
+			// HELD-OUT plant, where a contaminated number cannot be re-run
+			// clean. Unmeasured here: no battery was run against this fixture
+			// under either wording, so the direction is argued, not counted.
 			WantSeverity: config.SeverityError,
 			Why:          "Truncate rounds relative to the zero time in UTC, so StartOfDay returns UTC midnight rather than midnight in t's location",
 		}},
@@ -937,7 +949,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 					"descriptor, with no condition to be met and no bound on the total. That is what " +
 					"separates it from retry-no-backoff, a warning because it is \"a genuine hazard under " +
 					"plausible conditions\" that has not gone wrong yet, and from capacity-hint-nit, whose " +
-					"one reallocation is the anchor's own nit example.",
+					"one reallocation is bounded and freed with the call.",
 				Why: "the created file is never closed, leaking a descriptor on every request",
 			},
 		},
@@ -1015,8 +1027,8 @@ func MovingAverage(samples []float64, n int) []float64 {
 			// against Class.
 			Class:        config.ClassResource,
 			WantSeverity: config.SeverityNit,
-			SeverityNote: "nit under the anchor's own nit example, \"an unnecessary intermediate copy\" — a " +
-				"reallocation is exactly that — while the descriptor leak it shares a class with is an error. " +
+			SeverityNote: "nit under \"minor and optional\" — one reallocation, bounded by the window's " +
+				"length and freed with the call — while the descriptor leak it shares a class with is an error. " +
 				"Nothing here produces a wrong result, so no higher clause applies.",
 			Why: "the loop bound is correct, but make() reserves capacity len(samples)-n for len(samples)-n+1 appends, forcing one reallocation",
 		}},

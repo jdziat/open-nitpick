@@ -400,6 +400,17 @@ refuted.
 
 Do not restate the code. One or two sentences.`
 
+// ValidationContract returns the task text every expert is given.
+//
+// Exported for the same reason as prompt.ScopeText: the guard in internal/evals
+// scans the words this project ships to a model for eval-corpus keywords, and a
+// surface it cannot read is a surface nobody checks. This one is shared by
+// every expert call rather than being one domain's checklist, which is what
+// makes it worth scanning — see the survey in
+// internal/evals/promptcollision_test.go for why the 14 per-domain prompts are
+// not.
+func ValidationContract() string { return validationContract }
+
 // expertSystem places the task contract after the expert's own persona.
 //
 // Later text is weighted most heavily, and the contract is the part that must

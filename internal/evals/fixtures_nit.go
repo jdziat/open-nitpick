@@ -18,8 +18,30 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // descriptor leak, and the number beside it now says nit. Nothing here was
 // moved. Every defect below is newly authored and is one a senior reviewer
 // would rate nit on its own terms, against the anchor the model is actually
-// given: "`nit` — minor and optional. *An unnecessary intermediate copy is a
-// nit.*"
+// given: "`nit` — minor and optional."
+//
+// THE ANCHOR'S ILLUSTRATION CHANGED UNDER THESE PLANTS, and every note below
+// was rewritten in the same commit rather than left quoting it. The rung used
+// to read "`nit` — minor and optional. *An unnecessary intermediate copy is a
+// nit.*", and five plants — cross-file-copy-nit, cross-file-sort-nit,
+// sorted-for-min-nit, defensive-copy-nit and capacity-hint-nit in fixtures.go —
+// derived their level from that one sentence. It was a CATEGORY where every
+// other rung illustrates with a scenario, and three lines below it review.md
+// says the examples are "drawn from defect classes you are unlikely to meet in
+// this change; do not go looking for them" — which is plainly false of an
+// unnecessary copy for any reviewer of any repository, and named the class of
+// three of the plants below. So the illustration was replaced and the plants
+// were not: their level now rests on "minor and optional", which is the clause
+// the sentence only ever illustrated.
+//
+// TWO THINGS ARE UNMEASURED HERE AND ARE NOT CLAIMED. No battery was run at
+// this rung under either wording, so nothing here says what the old sentence
+// did to nit recall. Its measurable half was also weaker than the info pair's:
+// the info line contained two crediting keywords verbatim ("accepted input",
+// "for one helper") while the nit line contained none — cross-file-copy-nit's
+// keyword is "unnecessary copy" and the intervening word "intermediate" breaks
+// the substring — so the argument for replacing it was the user-facing one
+// above, not a leak.
 //
 // Two constraints shaped what could honestly be planted here, and both are
 // worth writing down because they eliminate most of what the word "nit"
@@ -217,7 +239,7 @@ func Build(s *store.Store) Summary {
 			// wasted, which is why nothing scores a model against Class.
 			Class:        config.ClassResource,
 			WantSeverity: config.SeverityNit,
-			SeverityNote: "nit under the anchor's own example, \"an unnecessary intermediate copy is a nit\" — " +
+			SeverityNote: "nit under \"minor and optional\" — " +
 				"Snapshot's contract is in the same change, so the second slice defends against nothing " +
 				"and no input makes Build answer differently. Not info: \"a defensible concern the author " +
 				"should consciously accept or reject\" needs a trade-off to weigh, and a copy that buys " +
@@ -344,8 +366,8 @@ export function rosterHeading(teamName: string, count: number): string {
 			},
 			Class:        config.ClassResource,
 			WantSeverity: config.SeverityNit,
-			SeverityNote: "nit under \"minor and optional\", and the anchor's own example — \"an unnecessary " +
-				"intermediate copy is a nit\" — covers the spread on the same line. Not warning: sort " +
+			SeverityNote: "nit under \"minor and optional\", which covers the spread on the same line as " +
+				"the sort: both are work the render throws away. Not warning: sort " +
 				"runs on an array listMembers already spread, so nothing shared is reordered and there " +
 				"is no \"genuine hazard under plausible conditions\" to raise it for. Not info: a second " +
 				"sort of an already-sorted array is not a concern \"the author should consciously accept " +
@@ -436,8 +458,8 @@ def coldest(readings):
 			},
 			Class:        config.ClassResource,
 			WantSeverity: config.SeverityNit,
-			SeverityNote: "nit under the anchor's own example: sorted() is \"an unnecessary intermediate copy\" " +
-				"of the list, and ordering all of it to read one element is the copy plus the sort. Not " +
+			SeverityNote: "nit under \"minor and optional\": sorted() copies the list and orders all of " +
+				"it to read one element, which is a copy plus a sort that the call throws away. Not " +
 				"error — \"a real bug that produces incorrect behavior on a reachable path\" — because " +
 				"sorted() is stable and min() returns the first minimum too, so no input makes coldest " +
 				"answer differently. Not warning: the list is one request's readings, the cost is bounded " +
@@ -602,8 +624,8 @@ func TestSlug(t *testing.T) {
 // defensiveCopyOfLocalNitFixture copies a list that nothing else can reach, in
 // Java.
 //
-// A fourth language, and the anchor's example in the form it most often takes
-// in review: a defensive copy that is genuinely defensive everywhere except
+// A fourth language, and a wasted copy in the form it most often takes in
+// review: a defensive copy that is genuinely defensive everywhere except
 // here. labels is created inside forIds, is never stored, and is unreachable
 // once the method returns, so wrapping it directly is as immutable as wrapping
 // a copy of it. The comment above the return states the reason a real pull
@@ -692,7 +714,7 @@ public final class Labels {
 			},
 			Class:        config.ClassResource,
 			WantSeverity: config.SeverityNit,
-			SeverityNote: "nit under the anchor's own example, \"an unnecessary intermediate copy is a nit\": " +
+			SeverityNote: "nit under \"minor and optional\": " +
 				"labels is local and unreachable after the return, so unmodifiableList over it is exactly " +
 				"as immutable as unmodifiableList over a copy of it. Not warning: there is no \"genuine " +
 				"hazard under plausible conditions\" — for the caller to mutate labels it would need a " +

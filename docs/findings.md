@@ -234,7 +234,15 @@ is not a ranking.
 
 `info` is 0 of 2 for every contender including ours. Either those plants are too
 subtle to be worth reporting or nothing reports at that level; this corpus cannot
-tell which.
+tell which — and for our own column there is now a third reading it also cannot
+separate. The two held-out `info` plants are rust-crate-for-one-call and
+ruby-default-page-size, and the shipped severity ladder illustrated `info` with
+"Adding a dependency for one helper function is info" three lines above "do not
+go looking for them": the prompt named one of the two plants and then told the
+reviewer to ignore it. That illustration has since been replaced and the figure
+above has NOT been re-measured under the new wording, so this row is stale in a
+known direction for our column only. The incumbent's column is unaffected — it
+never reads our prompt.
 
 Severity and class agreement between judges is 86%, the weakest link in the chain.
 No severity-quality claim should rest on it — which is consistent with severity

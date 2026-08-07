@@ -113,21 +113,36 @@ func nitpickScope(level config.NitpickLevel) string {
 			// "likely a bug, or a genuine hazard under plausible conditions".
 			//
 			// The replacement is duplication rather than either of the two
-			// illustrations in the severity ladder, and deliberately: those are
-			// "widening an exported type's accepted input" and "adding a dependency
-			// for one helper function", which are two of the three maintainability
-			// plants stated almost verbatim. Repeating them here would tune the
-			// prompt to the corpus. Duplication costs a future change and matches
-			// nothing planted.
+			// illustrations the severity ladder carried at the time, and
+			// deliberately: those were "widening an exported type's accepted input"
+			// and "adding a dependency for one helper function", which are two of
+			// the three maintainability plants in the eval corpus stated almost
+			// verbatim. Repeating them here would tune the prompt to the corpus.
+			// Duplication costs a future change and matches nothing planted.
+			//
+			// Both of those ladder illustrations have since been replaced, because
+			// naming a planted defect three lines above "do not go looking for
+			// them" measured 0 of 3 on each — and because the sentence was false
+			// for a user with no corpus at all. See review.md's `info` rung and
+			// internal/evals/promptcollision_test.go, which is now the guard
+			// against a prompt example naming what the corpus plants.
 			//
 			// THE CHANGE BOUGHT NOTHING MEASURABLE AND IS KEPT ONLY BECAUSE THE OLD
 			// EXAMPLE WAS WRONG. Measured, kimi-k3, three runs over each of the five
 			// info fixtures, before and after: 3 of 15 both times, every hit the
 			// security plant, and the three maintainability plants 0 of 9 under both
 			// wordings. The prediction was that the mis-anchored example suppressed
-			// them and that correcting it would move go-package-singleton, the one
-			// maintainability plant the severity ladder does not name. It did not
-			// move. A first version of this also added "nothing has to go wrong for
+			// them and that correcting it would move go-package-singleton, which was
+			// then the one maintainability plant the severity ladder did not name. It
+			// did not move.
+			//
+			// THAT CONTROL NO LONGER EXISTS, and the number above was taken while it
+			// did. review.md's ladder has since been rewritten and now names none of
+			// the three maintainability plants, so nothing separates
+			// go-package-singleton from its two neighbours any more. Re-running the
+			// comparison would measure a different ladder; the 3-of-15 stands as a
+			// record of what was measured, not as a claim about the prompt that ships
+			// today. A first version of this also added "nothing has to go wrong for
 			// it to be worth raising", which lowers the reporting bar; that sentence
 			// was removed rather than kept, because the measurement that was meant
 			// to justify it came back flat and invented findings went 1 to 2 over
@@ -141,6 +156,16 @@ func nitpickScope(level config.NitpickLevel) string {
 			"common and correct outcome.\n"
 	}
 }
+
+// ScopeText renders the scope instructions for one nitpick level.
+//
+// Persona always renders GenerationLevel, so the text of the other three
+// branches is unreachable from outside this package. It is exported for the
+// guard in internal/evals that scans the shipped words for eval-corpus
+// keywords: a branch that nothing renders today still ships the day
+// GenerationLevel moves, and a guard that could only see today's branch would
+// not notice the collision until then.
+func ScopeText(level config.NitpickLevel) string { return nitpickScope(level) }
 
 // voice renders the wording axes.
 func voice(p config.Persona) string {

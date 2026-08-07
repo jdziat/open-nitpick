@@ -33,10 +33,19 @@ import "github.com/jdziat/open-nitpick/internal/config"
 //
 // The distance DOWNWARD is stated per plant too, because it is the easier one
 // to get wrong. `info` is "a defensible concern the author should consciously
-// accept or reject", and its shipped examples — widening an exported type,
-// adding a dependency — are design choices with no named failure. Every plant
-// here names a mechanism and a failing input, so none of them is a matter of
-// taste the author may simply decline.
+// accept or reject": a design choice with a cost the author may knowingly
+// accept and no failing input to point at. Every plant here names a mechanism
+// AND a failing input, so none of them is a matter of taste the author may
+// simply decline.
+//
+// That argument deliberately does not quote the ladder's current info examples,
+// which is a repair rather than a style choice. This comment used to name them
+// — "widening an exported type, adding a dependency" — and those two sentences
+// were deleted from review.md for naming two plants; the quotation outlived
+// them because it sat in an em-dash aside rather than in double quotes, where
+// the sweep that fixed every other stale reference was looking. A comment keyed
+// to prompt prose goes stale every time the prompt is edited, and the property
+// this paragraph needs is a property of the LEVEL.
 //
 // TWO CLASSES, AND WHY NOT MORE. Every plant here is `security` or `resource`.
 // That is not because warnings only occur there — the natural home for several
