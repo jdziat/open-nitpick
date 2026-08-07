@@ -287,9 +287,19 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 			anchor = fmt.Sprintf("%d", s.WidestAnchor)
 		}
 
-		fmt.Fprintf(&b, "%-36s %-25s %-5d %-8s %-10s %-6d %-7s %-7s %d\n",
+		// L/DEF is the same anchor measurement summed per LOCATED defect rather
+		// than maxed, which is what separates a reviewer that gestured once from
+		// one that gestures everywhere — a distinction ANCHOR cannot make. n/a
+		// rather than a number when the row located nothing: zero is the best
+		// value here and finding nothing has not earned it. See Summary.Spread.
+		spread := "n/a"
+		if v, ok := s.Spread(); ok {
+			spread = fmt.Sprintf("%.2f", v)
+		}
+
+		fmt.Fprintf(&b, "%-36s %-25s %-5d %-8s %-10s %-6d %-7s %-6s %-7s %d\n",
 			truncate(s.Model, 36), truncate(s.Fixture, 25), s.Runs, recall, sev,
-			s.NoiseTotal, anchor, stable, s.Failed)
+			s.NoiseTotal, anchor, spread, stable, s.Failed)
 	}
 
 	t.Log(b.String())

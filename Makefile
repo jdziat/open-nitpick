@@ -132,6 +132,21 @@ JUDGE2   ?=
 # planted defect's own prose, and the documented workflow is to read the dump
 # and edit the prompt. Records from the held-out corpus carry "held_out":true so
 # a file that ended up mixed can still be filtered.
+#
+# SETTING IT IS OPTIONAL FOR `make benchmark` AND `make judge-models`, which both
+# retain their findings either way: with DUMP unset each writes
+# internal/evals/.eval-runs/<battery>-<corpus>-<utc>-<pid>.jsonl and logs the
+# path. That default is created exclusively and refuses rather than overwriting,
+# and it is written under a .partial suffix that Close renames away, so a file
+# under the final name is one whose run finished. Both are covered because both
+# print the judged table and both can be pointed at the held-out corpus —
+# `make judge-models FIXTURES=$(HELD_OUT)` is the invocation that makes the
+# second one a spend.
+# The reason it is a default at all: the held-out battery that produced the Rule
+# 14 evidence ran with this unset, so its findings were never written down and
+# two of the four pre-registered conditions needed a re-run of a corpus that is
+# spent once. RECALL, NOISE, ANCHOR and L/DEF recompute from a retained file with
+# no judge and no network; GRADE, MISSED and SIGNAL still need `make rejudge`.
 DUMP     ?=
 TIMEOUT  ?=
 

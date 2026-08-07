@@ -513,11 +513,27 @@ func TestJudgeModels(t *testing.T) {
 	t.Logf("corpus: %s", CorpusLabel(opts.Fixtures))
 	t.Logf("judge: %s   models: %d   fixtures: %d", judge.Model(), len(opts.Models), len(opts.Fixtures))
 
-	dump, err := OpenDump()
+	// RETAINED WHETHER OR NOT ANYBODY ASKED, exactly as the head-to-head is. This
+	// battery was described as a tuning axis over a corpus that can be reviewed
+	// again, and it is not one: it prints the same reportJudgedModels table, and
+	// `make judge-models FIXTURES=$(HELD_OUT)` — a documented invocation, with
+	// HELD_OUT defined in the Makefile for it — points it at the corpus whose own
+	// label says it is spent once. With DUMP unset that run used to retain
+	// nothing, which is the original incident verbatim.
+	dump, dumpPath, err := OpenRunDump("judge-models", opts.Fixtures)
 	if err != nil {
-		t.Fatalf("open %s: %v", EnvDump, err)
+		t.Fatalf("open the run dump: %v", err)
 	}
-	defer func() { _ = dump.Close() }()
+	defer func() {
+		if cerr := dump.Close(); cerr != nil {
+			t.Errorf("closing the run dump: %v; the retained evidence for this run may be "+
+				"incomplete, and this run spent the corpus to produce it", cerr)
+		}
+	}()
+	t.Logf("RETAINING EVERY REVIEW to %s. The model-free columns — RECALL, NOISE, ANCHOR and L/DEF "+
+		"— are recomputable from this file with no judge and no network. GRADE, MISSED and SIGNAL "+
+		"are the judge's opinion and are NOT re-derivable from it without a judging pass "+
+		"(`make rejudge REJUDGE=%s`).", dumpPath, dumpPath)
 
 	ctx := context.Background()
 	persona := config.DefaultPersona()
@@ -566,6 +582,10 @@ func TestJudgeModels(t *testing.T) {
 			// row is withheld when two adapters disagree rather than attributed
 			// to whichever one won the race for the map.
 			agg.DeclareScale(result.Scale)
+			// Counted before the failure paths below, for the reason the
+			// head-to-head's fold site gives: it is the only counter that knows
+			// what did not arrive.
+			agg.Attempted(j.fixture.Name)
 			mu.Unlock()
 
 			if result.Err != nil {
@@ -583,30 +603,51 @@ func TestJudgeModels(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 
+			// Saw, which this battery did not call at all. Aggregate.Fixtures is
+			// written only here, so every row's Coverage() was 0 and
+			// reportJudgedModels' zero-coverage branch — the one that fails a run
+			// in which a contender was never successfully judged — fired on every
+			// row of every run. A guard that fires on everything reports nothing,
+			// and this battery shares that guard with the head-to-head.
+			agg.Saw(j.fixture.Name)
+
+			// Retained before the judge is asked, for the reason spelled out at
+			// the head-to-head's fold site: the review is paid for and the
+			// model-free columns need no judge. Registered after `defer
+			// mu.Unlock()` so it runs with the lock still held, and after the
+			// review-error return above so an empty list is never written down as
+			// a reviewer that said nothing.
+			var judged *JudgeResult
+			defer func() {
+				if derr := dump.Record(DumpSample{
+					Model: j.model.ID, Run: 1, Fixture: j.fixture, Findings: findings, Judged: judged,
+				}); derr != nil {
+					notes[j.model.ID] = append(notes[j.model.ID],
+						fmt.Sprintf("%s: dump: %v", j.fixture.Name, derr))
+				}
+			}()
+
 			if err != nil {
 				notes[j.model.ID] = append(notes[j.model.ID],
 					fmt.Sprintf("%s: judge failed: %v", j.fixture.Name, err))
 				return
 			}
+			judged = assessment
 
 			for _, p := range agg.Add(assessment, JudgedOver(j.fixture.Name, findings)) {
 				notes[j.model.ID] = append(notes[j.model.ID],
 					fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", j.fixture.Name, p))
 			}
 			agg.AddSeverity(j.fixture, ScoreSeverity(j.fixture, findings))
+			agg.AddDetection(ScoreDetection(j.fixture, findings))
 
-			sample := DumpSample{
+			samples = append(samples, DumpSample{
 				Model:    j.model.ID,
 				Run:      1,
 				Fixture:  j.fixture,
 				Findings: findings,
 				Judged:   assessment,
-			}
-			samples = append(samples, sample)
-
-			if derr := dump.Record(sample); derr != nil {
-				notes[j.model.ID] = append(notes[j.model.ID], fmt.Sprintf("%s: dump: %v", j.fixture.Name, derr))
-			}
+			})
 
 			if j.fixture.Clean() && len(findings) > 0 {
 				notes[j.model.ID] = append(notes[j.model.ID],
@@ -815,7 +856,13 @@ func reportJudgedModels(
 		// so a model that fails the hard fixtures and completes only the easy
 		// ones scores higher, and without those columns the artifact is
 		// invisible and reads as model quality.
-		b.WriteString(JudgedModelRow(r.model, r.cross, len(notes[r.model])))
+		//
+		// FAIL is the row's LOST-REVIEW count and not the length of its notes
+		// list, which is what it used to be: notes are appended for a clean-change
+		// finding, a suspect judge output and a dump error as well, none of which
+		// is a lost review and all of which fold normally. The notes themselves
+		// are printed under the table.
+		b.WriteString(JudgedModelRow(r.model, r.cross, r.agg.Lost()))
 	}
 
 	t.Log(b.String())
@@ -918,6 +965,22 @@ func reportJudgedModels(
 		// printing it here would restore the comparison the cells refused. They
 		// are judge-free, so they are printed once and not per judge.
 		fmt.Fprintf(&counts, "  %-36s objective:     %s\n", "", r.agg.ObjectiveSeverityCounts(r.model))
+
+		// RECALL, NOISE, ANCHOR and L/DEF, as the counts they came from. Rendered by
+		// Aggregate.DetectionCounts for the same reason the line above is
+		// rendered by a method: a report that formatted these itself would be a
+		// report holding the raw counters, and the RECALL pair printed here has
+		// to be the one the cell was divided by rather than a second reading of
+		// the same corpus.
+		fmt.Fprintf(&counts, "  %-36s detection:     %s\n", "", r.agg.DetectionCounts())
+
+		// The footnote the "*" on this row's detection cells points at. Rendered
+		// by the aggregate through the same sentence the cost table prints, so
+		// the two reports cannot describe one loss two ways — which is what they
+		// did while this table printed no sentence at all.
+		if why := r.agg.CoverageShortfall(r.model); why != "" {
+			fmt.Fprintf(&counts, "  %-36s %s: %s\n", "", shortSampleMark, why)
+		}
 	}
 	t.Log(counts.String())
 
@@ -952,6 +1015,30 @@ func reportJudgedModels(
 			t.Logf("NOT COMPARABLE: %s was judged on %d of %d fixtures; its grade is a mean over a "+
 				"smaller, easier sample and must not be ranked against the others", r.model, n, most)
 		}
+
+		// A row that was judged and never had its detection folded prints n/a in
+		// RECALL, NOISE, ANCHOR and L/DEF — the columns the ship decision is read off
+		// — and an n/a is otherwise the honest rendering of "no review here". The
+		// two spellings of a blank are indistinguishable to a reader, so the one
+		// that means "a caller forgot to wire this" is failed rather than
+		// printed. This function is shared by two batteries and both fold; a
+		// third would inherit the table and not the fold.
+		if len(r.agg.Grades) > 0 && r.agg.DetReviews == 0 {
+			t.Errorf("%s was judged on %d sample(s) and had its detection folded for none of them, "+
+				"so RECALL, NOISE, ANCHOR and L/DEF read n/a on its row for a reason that is not "+
+				"about the reviewer. Call AddDetection beside AddSeverity at this battery's fold site",
+				r.model, len(r.agg.Grades))
+		}
+
+		// A row that never said what it ATTEMPTED cannot be short of it, so its
+		// cells go unmarked however many reviews it lost. That is a silent
+		// blind spot rather than a clean row, and silence is what this whole
+		// note is about.
+		if r.agg.DetReviews > 0 && r.agg.Attempts() == 0 {
+			t.Errorf("%s folded %d review(s) and stated no attempted count, so a lost run cannot "+
+				"mark its cells. Call Attempted at the TOP of this battery's fold site, before the "+
+				"error return", r.model, r.agg.DetReviews)
+		}
 	}
 
 	// Printed with the table, not left to a reader's memory of a commit message.
@@ -966,6 +1053,49 @@ func reportJudgedModels(
 		t.Logf("ASYMMETRIC SAMPLE: %s is served from a cache of one review per fixture, so its "+
 			"spread is unmeasured rather than zero. Our side may have several runs per fixture.",
 			IncumbentModel)
+
+		// WHAT THAT ASYMMETRY DOES TO THE THREE DETECTION COLUMNS, stated on the
+		// row because this is the table the head-to-head is read off and because
+		// two headlines quoted from here have already been retracted.
+		//
+		// RECALL and NOISE are rates over each side's own counts, so one review
+		// per fixture and three answer the same question and the counts are
+		// printed. ANCHOR is a MAXIMUM, and a maximum over more draws is weakly
+		// larger — our side draws runs x fixtures where the cache draws fixtures
+		// — so with RUNS above 1 the column is biased AGAINST us. That is the
+		// conservative direction for a "no wider than theirs" reading, and it is
+		// a bias rather than a comparability, which is why it is written down
+		// instead of left for a reader to derive.
+		//
+		// NONE OF THE FOUR IS WITHDRAWN FOR THE CACHED SIDE, and the reason is
+		// that all four are defined on one review: the cache retains the raw
+		// text and is re-parsed through the current parser, so the secondary
+		// spans an "Also applies to" line carries reach anchorDistance and
+		// anchoredLines exactly as they did live. What is genuinely undefined for
+		// a one-review side is any VARIANCE of them, and no such reading is
+		// offered here — the same refusal the ASYMMETRIC VOCABULARY note makes
+		// about severity, for the same reason.
+		//
+		// THE RATES SURVIVE A DIFFERENT NUMBER OF REVIEWS PER ROW ONLY WHILE EACH
+		// ROW'S REVIEWS ARE BALANCED ACROSS FIXTURES, and this note used to assert
+		// their survival unconditionally. A rate over reviews is a mean weighted
+		// by how many reviews of each fixture SURVIVED, so an unbalanced loss
+		// reweights the fixture mix — and the FAIL column beside this line is the
+		// proof that losses happen. Only our side can lose depth without losing
+		// coverage (the cache is one review per fixture, so any loss there removes
+		// the fixture and moves COV), so the reweighting runs in the challenger's
+		// favour. A row short of the reviews it attempted marks all four cells and
+		// prints the reason in the DENOMINATORS block.
+		t.Logf("ASYMMETRIC DRAW COUNT: RECALL, NOISE and L/DEF are per-defect and per-review RATES "+
+			"and survive the one-review-per-fixture cache — the counts are in the DENOMINATORS "+
+			"block — PROVIDED each row folded every review it attempted. ANCHOR IS A WORST CASE, "+
+			"NOT A RATE: it is the maximum over the reviews behind each row, so a row folded from "+
+			"more reviews took its maximum over more chances, and with more than one run per fixture "+
+			"this column is biased AGAINST us and IN FAVOUR of %s. A ROW THAT LOST RUNS IS MARKED "+
+			"%q ON ALL FOUR CELLS: the survivors are not a random subset, and only our side can lose "+
+			"depth without losing coverage, so that bias runs the other way. No variance of any of "+
+			"the four is published: a spread over one cached review is undefined, and none is "+
+			"offered rather than printed as zero.", IncumbentModel, shortSampleMark)
 
 		// Stated on the row rather than left to the legend, because this is the
 		// specific comparison the table is captioned as making and the specific
@@ -1028,13 +1158,31 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		t.Fatalf("build judge: %v", err)
 	}
 
-	dump, err := OpenDump()
+	// RETAINED WHETHER OR NOT ANYBODY ASKED. The two batteries that produced the
+	// Rule 14 evidence both ran with NITPICK_EVAL_DUMP unset, so their findings
+	// were held in memory for the whole paid run and written nowhere — and two of
+	// Rule 14's four conditions then needed a re-run of a corpus whose own label
+	// says it is spent once. RECALL, NOISE, ANCHOR and L/DEF are pure functions of
+	// (findings, fixture), so a retained file answers them offline for nothing.
+	dump, dumpPath, err := OpenRunDump("benchmark", opts.Fixtures)
 	if err != nil {
-		t.Fatalf("open %s: %v", EnvDump, err)
+		t.Fatalf("open the run dump: %v", err)
 	}
-	defer func() { _ = dump.Close() }()
+	defer func() {
+		if cerr := dump.Close(); cerr != nil {
+			t.Errorf("closing the run dump: %v; the retained evidence for this run may be "+
+				"incomplete, and this run spent the corpus to produce it", cerr)
+		}
+	}()
 
 	t.Logf("corpus: %s", CorpusLabel(opts.Fixtures))
+	t.Logf("RETAINING EVERY REVIEW THAT PRODUCED FINDINGS to %s, whether or not the judge could "+
+		"grade it. RECALL, NOISE, ANCHOR and L/DEF are recomputable from this file with no judge and "+
+		"no network, so the columns in the table below can be re-derived — and any new model-free "+
+		"column can be answered — without reviewing this corpus again. A review that FAILED is not "+
+		"in the file and has nothing to retain. GRADE, MISSED and SIGNAL are the judge's opinion and "+
+		"are NOT in the record: re-deriving those still costs a judging pass "+
+		"(`make rejudge REJUDGE=%s`).", dumpPath, dumpPath)
 
 	// Which fixtures Incumbent has a cached review for, stated BEFORE the run
 	// rather than inferred from a low row afterwards. Anything listed here has
@@ -1104,6 +1252,14 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 			agg = &Aggregate{}
 			byName[name] = agg
 		}
+		// BEFORE THE ERROR RETURN, because this is the only counter that knows
+		// what did not arrive. Every other column on the row is folded over the
+		// reviews that survived, and a lost run is not a random one — so without
+		// this the three rates would be means over a reweighted fixture mix with
+		// nothing on the cells saying so, and the coverage guard below cannot see
+		// it: it reads a set of fixture NAMES, and losing two of three runs of a
+		// fixture leaves that set alone.
+		agg.Attempted(fx.Name)
 		// Two adapters folded into one row: the row is on no single scale, so
 		// its severity cells are withheld rather than attributed to whichever
 		// declaration arrived first. This check used to be written out here and
@@ -1115,28 +1271,57 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		}
 		agg.Saw(fx.Name)
 
+		// RETAINED BEFORE THE JUDGE IS ASKED, and retained whatever it answers.
+		// This review is already paid for — a model call on our side, an
+		// invocation of a rate-limited free allowance on the incumbent's — and
+		// RECALL, NOISE, ANCHOR and L/DEF are pure functions of (findings, fixture).
+		// Recording it after the judge, as this did, meant a judge failure
+		// discarded the one artifact that needs no judge to be re-read. Deferred
+		// rather than written out on both branches so that no future branch can
+		// be added without it, and registered AFTER `defer mu.Unlock()` so it
+		// runs while the lock is still held: it appends to notes.
+		//
+		// It is registered after the review-error return above, which is
+		// deliberate and is the one path that must NOT record: there are no
+		// findings there, and Record writes a `silent: true` line for an empty
+		// list — a review that never ran would go into the file as a reviewer
+		// that said nothing. TestEveryPaidReviewIsRetainedWhateverTheJudgeSays
+		// draws the line in exactly that place.
+		var judged *JudgeResult
+		defer func() {
+			if derr := dump.Record(DumpSample{
+				Model: name, Run: run, Fixture: fx, Findings: findings, Judged: judged,
+			}); derr != nil {
+				notes[name] = append(notes[name], fmt.Sprintf("%s: dump: %v", fx.Name, derr))
+			}
+		}()
+
 		assessment, jerr := judge.Judge(ctx, fx, persona, findings)
 		if jerr != nil {
 			notes[name] = append(notes[name], fmt.Sprintf("%s: judge failed: %v", fx.Name, jerr))
 			return
 		}
+		judged = assessment
 		for _, p := range agg.Add(assessment, JudgedOver(fx.Name, findings)) {
 			notes[name] = append(notes[name], fmt.Sprintf("%s: JUDGE OUTPUT SUSPECT: %s", fx.Name, p))
 		}
 		agg.AddSeverity(fx, ScoreSeverity(fx, findings))
 
-		sample := DumpSample{
+		// Beside AddSeverity rather than beside agg.Saw above, so RECALL, NOISE,
+		// ANCHOR and L/DEF are folded over exactly the reviews every other column on
+		// the row is folded over. The cost is stated where it lands: a review
+		// whose JUDGE call failed returned above and is scored by nothing, for
+		// four columns that need no judge, and the reviews actually behind them
+		// are printed as the DENOMINATORS block's review count.
+		agg.AddDetection(ScoreDetection(fx, findings))
+
+		samples = append(samples, DumpSample{
 			Model:    name,
 			Run:      run,
 			Fixture:  fx,
 			Findings: findings,
 			Judged:   assessment,
-		}
-		samples = append(samples, sample)
-
-		if derr := dump.Record(sample); derr != nil {
-			notes[name] = append(notes[name], fmt.Sprintf("%s: dump: %v", fx.Name, derr))
-		}
+		})
 
 		if fx.Clean() && len(findings) > 0 {
 			notes[name] = append(notes[name],

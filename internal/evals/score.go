@@ -51,6 +51,11 @@ type Score struct {
 	// to look" become the same number. One means the reviewer anchored precisely.
 	WidestAnchor int
 
+	// AnchoredLines is the same measurement summed rather than maxed, over the
+	// defects this run LOCATED. See DetectionScore.AnchoredLines, which is this
+	// same number and carries the argument for publishing both folds.
+	AnchoredLines int
+
 	// Severity compares the severities this run assigned against the ones the
 	// fixture planted, with no judge involved.
 	Severity SeverityScore
@@ -115,41 +120,133 @@ func ScoreRun(r RunResult, f Fixture) Score {
 				len(r.Report.Incomplete), strings.Join(r.Report.Incomplete, ", ")))
 	}
 
-	for _, finding := range r.Report.Findings {
-		s.WidestAnchor = max(s.WidestAnchor, anchoredLines(finding))
+	// EVERY DETECTION READING COMES FROM ScoreDetection, including the located
+	// set this function used to compute for itself. Two reasons, and the second
+	// is the one that matters: the judged batteries hold a finding list and never
+	// build a RunResult for the incumbent, so they must read these off the same
+	// code; and "which defects were located" was written out twice, here and
+	// inside the anchor arithmetic, which is two expressions for one integer and
+	// free to drift under an edit to either.
+	det := ScoreDetection(f, r.Report.Findings)
+	s.WidestAnchor = det.WidestAnchor
+	s.Unmatched = det.Unmatched
+	s.Detected = det.Detected
+	s.Matched = det.Matched
+	s.AnchoredLines = det.AnchoredLines
+
+	s.Severity = ScoreSeverity(f, r.Report.Findings)
+
+	s.Violations = append(s.Violations, checkInvariants(r)...)
+
+	return s
+}
+
+// DetectionScore is what a review INVENTED and how vaguely it pointed, with no
+// judge, no model, no token accounting and no RunResult involved.
+//
+// It exists because the two readings it carries were computable only through
+// ScoreRun, and ScoreRun takes a RunResult. The judged batteries hold a bare
+// (fixture, findings) pair for both contenders — Incumbent is shelled out to and
+// has no RunResult at all — so for those tables NOISE and ANCHOR were not
+// discarded, they were never computed. Splitting the computation out is what lets
+// the head-to-head fill the columns from the SAME functions the ground-truth
+// battery fills them from. Rule 6c-i in docs/measurement.md records the cost of
+// the alternative: hand-written Detections literals declared Noise 40 and
+// WidestAnchor 900 for behaviours the real scorer answered 0 and 1 for.
+type DetectionScore struct {
+	// Detected maps a planted defect's Why to whether some finding matched it,
+	// and Matched counts the defects that were. They are ScoreRun's Detected and
+	// Matched: that function read them off its own copy of the matches() loop
+	// until this type needed the same set for AnchoredLines.
+	Detected map[string]bool
+	Matched  int
+
+	// Unmatched are the findings that explain no planted defect. On a clean
+	// fixture every finding is unmatched by definition.
+	Unmatched []review.Finding
+
+	// WidestAnchor is the most DISTINCT LINES this review pointed at about any
+	// one thing. See Score.WidestAnchor, which is this same number.
+	WidestAnchor int
+
+	// AnchoredLines is how many DISTINCT LINES this review pointed at in total
+	// while claiming the defects it LOCATED — the same per-defect union
+	// WidestAnchor takes the MAXIMUM of, summed instead.
+	//
+	// THE MAXIMUM AND THE SUM CATCH DIFFERENT REVIEWERS AND NEITHER SUBSUMES THE
+	// OTHER. A max is what sees one blob among precise findings, which is what
+	// CorpusTally.WidestAnchor was added for and remains right about. A max is
+	// also blind to UNIFORM vagueness: a reviewer line-precise on 28 plants with
+	// one 13-line comment and a reviewer that smears every one of its 29 anchors
+	// over 13 lines are the same maximum, and to a reader they are 41 lines to
+	// read against 377. Read per located defect, they are 1.41 and 13.
+	//
+	// It matters most where a threshold is read off the max RELATIVE TO ANOTHER
+	// REVIEWER, because that reviewer's worst single finding then becomes a width
+	// every finding may spend. See docs/measurement.md's Rule 14 note, which
+	// records that reading as a defect in the rule rather than retuning a
+	// pre-registered threshold.
+	//
+	// Restricted to LOCATED defects because it is published as a per-defect rate
+	// and this is its numerator: lines a reader is pointed at, per defect the
+	// review actually found. Every located defect contributes at least one line —
+	// matches() implies explainsAny(), so the union claiming it is never empty —
+	// so the rate is at least 1.00 for any reviewer that found anything, and is
+	// undefined rather than zero for one that found nothing.
+	AnchoredLines int
+}
+
+// Noise is how many findings explained nothing the fixture planted.
+func (d DetectionScore) Noise() int { return len(d.Unmatched) }
+
+// ScoreDetection measures a finding list against the defects a fixture plants.
+//
+// It is a pure function of its two arguments, which is what makes it usable on
+// the cached incumbent's side of the head-to-head and re-runnable offline over a
+// retained dump: no run index, no usage record and no judge verdict is consulted.
+func ScoreDetection(f Fixture, findings []review.Finding) DetectionScore {
+	out := DetectionScore{Detected: map[string]bool{}}
+
+	for _, finding := range findings {
+		out.WidestAnchor = max(out.WidestAnchor, anchoredLines(finding))
 	}
+
 	// Per FINDING is not enough on its own: it cannot tell one comment claiming
 	// seventeen regions from seventeen comments claiming one line each about the
 	// same defect, and for a reader those are the same seventeen lines. Both are
 	// taken because neither subsumes the other — a wide finding on a fixture that
 	// plants NOTHING belongs to no defect and would vanish from the second.
-	s.WidestAnchor = max(s.WidestAnchor, defectAnchoredLines(r.Report.Findings, f.Defects))
+	claimed := defectAnchoredLines(findings, f.Defects)
 
-	s.Severity = ScoreSeverity(f, r.Report.Findings)
+	for i, d := range f.Defects {
+		out.WidestAnchor = max(out.WidestAnchor, claimed[i])
 
-	for _, defect := range f.Defects {
-		for _, finding := range r.Report.Findings {
-			if matches(finding, defect) {
-				s.Detected[defect.Why] = true
-				s.Matched++
+		found := false
+		for _, finding := range findings {
+			if matches(finding, d) {
+				found = true
 				break
 			}
 		}
-		if !s.Detected[defect.Why] {
-			s.Detected[defect.Why] = false
+
+		// OR rather than assignment: two defects may share a Why, and one of them
+		// being located is what the map is asked about.
+		out.Detected[d.Why] = out.Detected[d.Why] || found
+		if !found {
+			continue
 		}
+		out.Matched++
+		out.AnchoredLines += claimed[i]
 	}
 
 	// Anything not explaining a planted defect is noise on this corpus.
-	for _, finding := range r.Report.Findings {
+	for _, finding := range findings {
 		if !explainsAny(finding, f.Defects) {
-			s.Unmatched = append(s.Unmatched, finding)
+			out.Unmatched = append(out.Unmatched, finding)
 		}
 	}
 
-	s.Violations = append(s.Violations, checkInvariants(r)...)
-
-	return s
+	return out
 }
 
 // The objective severity vocabulary. It is deliberately the judge's own
@@ -1107,7 +1204,14 @@ func coverInto(claimed map[int]bool, f review.Finding) {
 
 // defectAnchoredLines is the same measurement one level up: for each planted
 // defect, how many DISTINCT LINES did the whole review point at while claiming
-// that defect, counting every finding that names and sits near it as one set.
+// that defect, counting every finding that names and sits near it as one set. It
+// returns one count per defect, in the order they are planted.
+//
+// PER DEFECT RATHER THAN AS A MAXIMUM, and the maximum is taken by the caller.
+// Both published readings of it are folds over this slice — ANCHOR maxes it,
+// L/DEF sums the located entries — and computing them from one slice is what
+// stops the pair being two answers to "how many lines is this review pointing
+// at" that an edit to either can part.
 //
 // THE BUG IT FIXES, and it is the SAME BUG anchoredLines fixed, spelled as a
 // count of findings instead of a count of regions. anchoredLines made a finding
@@ -1139,10 +1243,10 @@ func coverInto(claimed map[int]bool, f review.Finding) {
 // rises. Recorded because a scoring change that only ever moves numbers our way
 // is one nobody should believe, and this one was measured against the competitor
 // before it was adopted.
-func defectAnchoredLines(findings []review.Finding, defects []Defect) int {
-	widest := 0
+func defectAnchoredLines(findings []review.Finding, defects []Defect) []int {
+	out := make([]int, len(defects))
 
-	for _, d := range defects {
+	for i, d := range defects {
 		claimed := map[int]bool{}
 		for _, f := range findings {
 			if f.Path != d.Path || !explainsAny(f, []Defect{d}) {
@@ -1150,10 +1254,10 @@ func defectAnchoredLines(findings []review.Finding, defects []Defect) int {
 			}
 			coverInto(claimed, f)
 		}
-		widest = max(widest, len(claimed))
+		out[i] = len(claimed)
 	}
 
-	return widest
+	return out
 }
 
 // noiseTolerance is how far from a planted defect a finding may sit and still
@@ -1386,9 +1490,28 @@ type Summary struct {
 	// diagnostic: see CorpusTally.WidestAnchor.
 	WidestAnchor int
 
+	// AnchoredLines is the total lines pointed at while claiming the defects
+	// these runs located, printed as L/DEF against Matched. See
+	// DetectionScore.AnchoredLines.
+	AnchoredLines int
+
 	// FindingCounts is the number of findings produced per run, which is how
 	// run-to-run stability is judged.
 	FindingCounts []int
+}
+
+// Spread is how many lines this row pointed at per defect it LOCATED, and
+// whether that question has an answer.
+//
+// Undefined rather than zero when nothing was located: zero is the best value
+// this reading can take and a reviewer that found nothing has not earned it. The
+// rate is at least 1.00 for anything that located a defect, because a located
+// defect is claimed by at least one line.
+func (s Summary) Spread() (float64, bool) {
+	if s.Matched == 0 {
+		return 0, false
+	}
+	return float64(s.AnchoredLines) / float64(s.Matched), true
 }
 
 // Stable reports whether every run produced the same number of findings, and
@@ -1465,10 +1588,18 @@ const RateLegend = "EVERY RATE HERE IS A QUOTIENT OF TWO SMALL INTEGERS, AND THE
 // RECALL is per (model, fixture) and its denominator is that fixture's plants
 // times the run count — eleven of these fifteen fixtures plant exactly one, so
 // the coarsest cell moves in steps of 1.000, fourteen times what the note
-// claimed. Under the judged table there is no RECALL column at all. The
-// corpus-wide figure is the right one for the totals a reader adds up, and
-// saying so is the part that was missing; so both are stated now, and the
-// per-cell floor is derived from the same fixtures rather than asserted.
+// claimed. Under the judged table RECALL is per CONTENDER, pooled over every
+// review folded into the row, so its step is 1/(the plants those reviews saw):
+// the corpus-wide figure TIMES THE RUN COUNT for a contender that covered the
+// corpus once per fixture, larger with more runs and smaller with less coverage.
+// The run multiplier is stated because the sentence here used to offer a
+// dichotomy — equal, or smaller — that omitted the case the benchmark is
+// documented to run: `make benchmark RUNS=2` folds two reviews per fixture into
+// one row, so the step is 1/58 where this note says 1/29. The per-row count is
+// in the DENOMINATORS block and is the authority for the judged cells; the
+// figure below is the CORPUS's resolution, which is the right one for the totals
+// a reader adds up, and the per-cell floor is derived from the same fixtures
+// rather than asserted.
 func CorpusResolution(fixtures []Fixture) string {
 	planted := 0
 	clean := 0
@@ -1496,7 +1627,11 @@ func CorpusResolution(fixtures []Fixture) string {
 	return fmt.Sprintf("RESOLUTION: %d planted defect(s) across %d fixture(s), %d of them clean. "+
 		"A RECALL TOTAL over the whole corpus moves in steps of 1/%d = %.3f — ONE DEFECT is the "+
 		"smallest difference this corpus can express, and two reviewers within one defect of each "+
-		"other are TIED as far as anything here can tell. A PER-FIXTURE RECALL CELL is far coarser: "+
+		"other are TIED as far as anything here can tell. THIS IS THE CORPUS'S RESOLUTION AND NOT "+
+		"ANY ROW'S: a judged row pools every review folded into it, so its RECALL divides by the "+
+		"plants THOSE reviews saw — the figure here times the run count for a contender that covered "+
+		"everything once, less for one that covered less — and the DENOMINATORS block under the "+
+		"table is the authority for each row. A PER-FIXTURE RECALL CELL is far coarser: "+
 		"the thinnest fixture here plants %d, so that cell moves in steps of 1/%d = %.3f per run, and "+
 		"a table of such cells is a table of very small integers however many decimals it prints. A "+
 		"severity column is scored only over what a reviewer LOCATED, so its denominator is smaller "+
@@ -1556,6 +1691,7 @@ func Summarize(model, fixture string, scores []Score) Summary {
 		out.SevPlantedLevels.Merge(s.Severity.Planted)
 		out.Violations = append(out.Violations, s.Violations...)
 		out.WidestAnchor = max(out.WidestAnchor, s.WidestAnchor)
+		out.AnchoredLines += s.AnchoredLines
 		out.FindingCounts = append(out.FindingCounts, len(s.Findings()))
 	}
 
@@ -1627,9 +1763,36 @@ type CorpusTally struct {
 	// on the behaviour it was added to catch. anchoredLines is why it now reads
 	// 36.
 	//
-	// The MAX rather than the mean: one blob anywhere in the corpus is the
-	// behaviour being caught, and a mean over precise findings hides it.
+	// THE MAX AND THE SUM ARE BOTH PUBLISHED, and the argument for the max used
+	// to be written one-sidedly: "one blob anywhere in the corpus is the
+	// behaviour being caught, and a mean over precise findings hides it." That
+	// half is true and is why this field exists. The converse is equally true and
+	// went unsaid — a MAX hides UNIFORM vagueness, because a reviewer that is
+	// line-precise except for one 13-line comment and a reviewer that smears
+	// every anchor over 13 lines report the same 13. Neither fold subsumes the
+	// other, so both are published: see AnchoredLines, which is the same
+	// per-defect measurement summed over located defects.
 	WidestAnchor int
+
+	// AnchoredLines is the total lines pointed at while claiming the defects
+	// these reviews located, published as L/DEF against Matched.
+	//
+	// It is the fold that sees a reviewer hedging everywhere rather than blobbing
+	// once, which is the shape a MAX is blind to and the shape a threshold read
+	// against ANOTHER reviewer's max invites: that reviewer's single worst
+	// finding becomes a width every finding may spend. See
+	// DetectionScore.AnchoredLines.
+	AnchoredLines int
+}
+
+// Spread is how many lines these reviews pointed at per defect they LOCATED, and
+// whether the question has an answer. See Summary.Spread, which is the same
+// reading on the other row type.
+func (t CorpusTally) Spread() (float64, bool) {
+	if t.Matched == 0 {
+		return 0, false
+	}
+	return float64(t.AnchoredLines) / float64(t.Matched), true
 }
 
 // TallyScores folds scored runs into a CorpusTally.
@@ -1642,6 +1805,7 @@ func TallyScores(scores []Score) CorpusTally {
 		out.Planted += s.Total
 		out.Noise += len(s.Unmatched)
 		out.WidestAnchor = max(out.WidestAnchor, s.WidestAnchor)
+		out.AnchoredLines += s.AnchoredLines
 		out.Severity.Accurate += s.Severity.Accurate
 		out.Severity.Inflated += s.Severity.Inflated
 		out.Severity.Understated += s.Severity.Understated
@@ -1762,9 +1926,10 @@ func PublishedMetrics() []PublishedMetric {
 	return []PublishedMetric{
 		{
 			Name:       "detection",
-			Renderings: [][]string{{"RECALL", "NOISE", "ANCHOR"}},
-			Doc: "how much of what was planted the reviewer found, how much it invented, and how " +
-				"precisely it said where to look",
+			Renderings: [][]string{{"RECALL", "NOISE", "ANCHOR", "L/DEF"}},
+			Doc: "how much of what was planted the reviewer found, how much it invented, how " +
+				"precisely it said where to look at its vaguest, and how much of the file it asked " +
+				"a reader to read per defect it found",
 			Score: func(t CorpusTally) ([]float64, bool) {
 				if t.Planted == 0 || t.Samples == 0 {
 					return nil, false
@@ -1776,10 +1941,21 @@ func PublishedMetrics() []PublishedMetric {
 				// The anchor width is negated for the same reason and NOT
 				// divided: it is a worst case, not a rate. See
 				// CorpusTally.WidestAnchor for the strategy it exists to catch.
+				//
+				// The spread is negated and IS divided, per defect located. It
+				// is zero exactly when nothing was located, since every located
+				// defect is claimed by at least one line — so the one strategy
+				// that scores its best value here is one scoring 0 on the
+				// component beside it, which is what makes the group a group.
+				// The rendered cell says n/a there rather than 0.00: a cell is
+				// read alone and a component never is.
+				spread, _ := t.Spread()
+
 				return []float64{
 					float64(t.Matched) / float64(t.Planted),
 					-float64(t.Noise) / float64(t.Samples),
 					-float64(t.WidestAnchor),
+					-spread,
 				}, true
 			},
 		},
@@ -2035,7 +2211,7 @@ var (
 	// foreign reviewer, one row per model and fixture.
 	SummaryTableHeader = registerTableHeader(tableScored,
 		"MODEL                                FIXTURE                   RUNS  RECALL   "+
-			"SEV A/I/U  NOISE  ANCHOR  STABLE  FAILED")
+			"SEV A/I/U  NOISE  ANCHOR  L/DEF  STABLE  FAILED")
 
 	// VariantTableHeader is the prompt-variant comparison.
 	VariantTableHeader = registerTableHeader(tableScored,
@@ -2046,7 +2222,8 @@ var (
 	// against the incumbent is printed in.
 	JudgedModelTableHeader = registerTableHeader(tableScored,
 		"MODEL                                GRADE  SPREAD  PREC   COV  N    FAIL  "+
-			"FIND  WORTH  J-INFL  J-UNDER  O-INFL  O-UNDER  O-ACC  O-COV  MISCLASS  MISSED  SIGNAL")
+			"FIND  WORTH  J-INFL  J-UNDER  O-INFL  O-UNDER  O-ACC  O-COV  RECALL  NOISE  ANCHOR  "+
+			"L/DEF  MISCLASS  MISSED  SIGNAL")
 )
 
 // The cost and judge-swap tables, registered from here rather than beside their
@@ -2071,6 +2248,18 @@ var (
 // RECALL without NOISE/ANCHOR, with every test green — which is the shape those
 // rules exist to stop. It is checked by hand at the declaration site, and a
 // declaration site is not a mechanism.
+//
+// ONE SUCH GAP IS OPEN NOW AND IS DISCLOSED RATHER THAN CLOSED. The detection
+// metric gained a fourth column, L/DEF, and the cost table carries RECALL, NOISE
+// and ANCHOR without it. Under tableScored that would fail the whole-metric
+// guard; under this kind nothing asks. The cost columns are the cost track's own
+// reading — PublishedCostReadings scores them against its own degenerate table,
+// over PRICED reviews rather than over judged ones — and threading a per-defect
+// anchor sum through modelSpend means extending priced-run accounting and its
+// comparability machinery to carry a number that is not about dollars. That is
+// the named cost of closing it. The direction of the gap: a reviewer hedging
+// every anchor is charged for it in the two SCORED tables and not in the cost
+// one, so a reader who ranks on $/DEFECT alone is the one who cannot see it.
 //
 // Registering them here keeps their files untouched. Go initializes these after
 // the values they name, so the registry is complete before any test reads it.

@@ -451,7 +451,7 @@ it counts: critical 1.00 against 0.50, warning 1.00 against 0.33, error tied.
 | 1. located ≥ Incumbent's | PASS — 0.68 against 0.31 |
 | 2. margin ≥ 2 plants | PASS — ~4.8 plants per run |
 | 3. noise ≤ 1.5× Incumbent's | **FAIL** — 1.75× to 2.45× depending on reading |
-| 4. anchors no wider | **NOT MEASURED** — the benchmark table has no ANCHOR column |
+| 4. anchors no wider | **NOT MEASURED IN THIS RUN** — the head-to-head did not carry ANCHOR at the time; it does now, and this run's findings were not retained, so the number cannot be recovered without re-spending the corpus |
 
 Rule 14 says any one failing means do not ship. **Do not ship v1 yet.**
 
@@ -472,14 +472,28 @@ pre-registration exists to prevent.
     TUNING corpus Incumbent's judged precision was 13/13, so 1.5x0 = 0 and any
     noise at all fails. A threshold that a perfect-precision incumbent makes
     unsatisfiable is not a threshold. It needs an absolute floor.
-  - Condition 4 named a column the benchmark does not print. ANCHOR appears in
-    the prompt-battery cost table, not in the head-to-head. A condition that
-    cannot be evaluated by the run it governs is a condition that was never
-    checked.
+  - Condition 4 named a column the benchmark DID NOT PRINT AT THE TIME. ANCHOR
+    appeared in the prompt-battery cost table and not in the head-to-head, so a
+    condition could not be evaluated by the run it governs. **The instrument has
+    since been repaired and this row is history, not current state:** the
+    head-to-head prints RECALL, NOISE, ANCHOR and L/DEF for both contenders with
+    their counts beneath it, and the batteries retain their findings by default
+    so the next held-out spend is re-readable offline. What is NOT recovered is
+    this run's evidence — those findings were never written down — so the number
+    for the run above is gone and re-deriving it means re-spending a corpus that
+    is spent once. See docs/measurement.md's Rule 14 section.
+  - Condition 4's THRESHOLD has a further defect, found after the repair and also
+    recorded rather than repaired. ANCHOR is a maximum, so "no wider than
+    Incumbent's" makes the incumbent's single worst finding a width every one of
+    our findings may spend: a reviewer right about every defect that smears each
+    anchor over that span passes all four conditions while pointing a reader at
+    several times as many lines. It flatters us. The L/DEF column is the reading
+    that shows it; no threshold is proposed for it, because inventing one after
+    the battery has been read is the move pre-registration exists to prevent.
 
-Both were written by an author who had already seen a favourable narrow result,
-which is disclosed in Rule 14 and is the reason to read them sceptically rather
-than to trust that they were merely unlucky.
+All three were written or read by an author who had already seen a favourable
+narrow result, which is disclosed in Rule 14 and is the reason to read them
+sceptically rather than to trust that they were merely unlucky.
 
 ### What is NOT claimed
 

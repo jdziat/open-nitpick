@@ -2779,6 +2779,26 @@ func degenerateReviewers() []degenerateReviewer {
 			maxes: map[string]bool{"detection": false, "objective severity": true, "severity vocabulary": true},
 		},
 		{
+			name: "right about everything, and pointing at a block every time",
+			why: "THE SHAPE THIS TABLE DID NOT CONTAIN. Every vague row above is vague ENORMOUSLY — a " +
+				"whole file, a whole grid, thirty-eight regions — and each is caught by width alone. " +
+				"This one is the calibrated reviewer with each anchor widened to a modest block, the " +
+				"'somewhere in this function' behaviour anchorDistance's own comment warns about, and " +
+				"it needs no oracle a real reviewer lacks: widening is STRICTLY FREE, because " +
+				"spanDistance is zero anywhere inside a span, so matches() and explainsAny() can only " +
+				"improve. It ties a calibrated reviewer on RECALL and on NOISE and differs from it on " +
+				"the worst case by exactly the width it chose — which is the point. ANCHOR is a " +
+				"MAXIMUM, so a reviewer line-precise except for one wide comment reports the same " +
+				"number, and any threshold read off another reviewer's maximum hands this strategy " +
+				"that reviewer's single worst finding as a budget for all of its own. L/DEF is the " +
+				"fold that charges it: lines pointed at per defect found",
+			review: hedgedTo(hedgeSpan),
+			// Severity is the calibrated reviewer's — same words on the same
+			// plants — so that metric and the vocabulary block are entitled to
+			// say so, and detection is left as the only thing that can catch it.
+			maxes: map[string]bool{"detection": false, "objective severity": true, "severity vocabulary": true},
+		},
+		{
 			name: "every correct comment, five times",
 			why: "restates a good review five times over. Not a reviewer anyone would ship, and the " +
 				"honest answer is that no model-free column here counts findings",

@@ -484,6 +484,70 @@ Ship v1 if ALL of these hold on the fixtures BOTH reviewers covered:
 
 Any one failing means do not ship, and the report says which.
 
+**The instrument did not carry two of these when the rule was first applied, and
+the thresholds above are unchanged by the fix.** Conditions 3 and 4 name NOISE
+and ANCHOR, and `TestBenchmarkAgainstIncumbent` printed neither: both columns
+existed in the prompt-battery cost table and nowhere in the head-to-head, because
+that path never called the scorer that produces them. Condition 3 was therefore
+estimated by hand from FIND and the objective denominators — which is not the
+same quantity, since `FindFigure` counts VERDICTS per sample rather than findings
+— and condition 4 was not measured at all. The head-to-head now prints RECALL,
+NOISE, ANCHOR and L/DEF as cells with their counts in the DENOMINATORS block
+beneath it, for both contenders. Four columns rather than the two the rule names,
+because `PublishedMetrics` renders detection as one group: NOISE, ANCHOR and
+L/DEF are each maximised by silence, so a table publishing them without RECALL
+would rank a reviewer that says nothing at the top of three columns.
+
+Read the rate columns and the worst case differently. RECALL, NOISE and L/DEF are
+rates over each row's own counts and survive the one-review-per-fixture cache the
+incumbent is served from — provided each row folded every review it attempted. A
+row short of that marks all four cells and prints why; only our side can lose
+depth without losing coverage, so an unmarked short row would flatter us. ANCHOR
+is a maximum, so a row folded from more reviews took it over more chances: with
+more than one run per fixture, condition 4's column is biased against us, which is
+the conservative direction for that condition and is stated on the row rather than
+left to be derived.
+
+**The cells are not restricted to the intersection the preamble names.** "On the
+fixtures BOTH reviewers covered" is the rule's own scope clause, and all four
+detection cells are folded over each contender's OWN reviews. Two rows of unequal
+COV therefore divide by two different populations, with nothing on the cells
+saying so — the coverage note under the table is about GRADE, and the counts in
+the DENOMINATORS block are what a reader has to compare by hand. Applying
+conditions 1–4 to rows of unequal coverage compares two corpora. The direction is
+unsigned: it flatters whichever row is short.
+
+**Two corrections to the wording of conditions 3 and 4. The four conditions and
+their thresholds are unchanged, because they were pre-registered and this is the
+run they govern; what is corrected is a justification that was wrong, recorded
+rather than edited into the rule.**
+
+- *Condition 3 says NOISE is "the only column that sees" recall bought by
+  commenting on everything. It is not, and on the strategy that matters it sees
+  nothing at all.* `explainsAny` credits any finding within `noiseTolerance` of a
+  plant whose keywords it names, so a reviewer filing thirteen comments per defect
+  — all of them inside the radius — renders NOISE 0.00, the value a perfectly
+  calibrated reviewer earns. That is `radiusSpamReview` in the degenerate table,
+  and it is caught by ANCHOR (which unions every finding claiming one defect) and
+  by L/DEF, not by NOISE.
+- *Condition 4 thresholds a MAXIMUM against another reviewer's maximum, and a
+  maximum is not a bound on the behaviour the condition names.* The incumbent's
+  ANCHOR is its single worst finding. Read as "no wider than theirs", that one
+  finding becomes a width every one of our findings may spend: a reviewer that is
+  right about every defect and smears each anchor over exactly that span passes
+  all four conditions while pointing a reader at several times as many lines. The
+  prose of condition 4 is true as written — a whole-file finding does fail it —
+  and the residual is the reading, not the sentence. **The direction flatters
+  us.**
+  `TestTheIncumbentsWorstAnchorIsNotABudgetEveryFindingMaySpend` runs that
+  strategy against the real cached incumbent, and the instrument's answer is the
+  L/DEF column: the same per-defect anchor measurement summed over located defects
+  instead of maxed, which separates "vague once" from "vague everywhere" where the
+  maximum cannot. It is published beside ANCHOR for both contenders, with its
+  counts in the DENOMINATORS block. It is **not** wired into the four conditions,
+  and no threshold is proposed for it here — inventing one now, after the battery
+  has been read, is precisely the move pre-registration exists to prevent.
+
 ### What will not be claimed either way
 
 - **No cross-tool severity accuracy.** The two vocabularies are different
@@ -503,3 +567,69 @@ this project, and four of its five `info` plants are reported by NEITHER reviewe
 — measured, ours 0–1 of 10–16 runs each and Incumbent 0 — which says those
 fixtures sit below every tested reviewer's threshold rather than that anyone
 failed. A win here is a win on this corpus. Say that when quoting it.
+
+## Rule 14a: the two amendments, and which way each moves the bar
+
+Rule 14 was applied once, to the held-out battery, and could not yield a verdict:
+condition 3 failed for a reason that turned out to be a defect in the condition,
+and condition 4 named a column the run did not print. Both are amended here.
+
+**Amended AFTER seeing which conditions failed, which is the thing Rule 14 was
+written to prevent.** That is why each amendment states its direction. One
+loosens the bar and one tightens it, and only the second is safe on its face; the
+first has to be argued.
+
+### Condition 3, LOOSENED — precision plus an absolute floor
+
+Was: our invented findings per review ≤ 1.5× Incumbent's.
+Now: our judged precision ≥ Incumbent's − 0.10 absolute, AND our `NOISE`
+≤ 0.30 invented findings per review.
+
+The old form fired on VOLUME AT EQUAL PRECISION. Measured held-out: precision
+0.80 against 0.83 — inside a single-judge figure whose cross-judge disagreement
+was never measured — while findings per review were 0.88 against 0.43 and located
+defects 0.68 against 0.31. Recall rose 2.2× on volume up 2.0×, so the extra
+findings were not bought at a worse hit rate. The reviewer condition 3 exists to
+catch is the one with high volume and LOW precision; the old form caught
+thoroughness with the same net.
+
+It was also degenerate. On the tuning corpus Incumbent's judged precision was
+13/13, so `1.5 × 0` made any noise at all a failure. A threshold a
+perfect-precision incumbent renders unsatisfiable is not a threshold.
+
+The two halves answer different questions on purpose: precision is how often we
+are wrong, the absolute cap is how much we say. Neither alone is the bar.
+
+**0.30 is chosen knowing we sit near 0.25, and the reasoning is the defence.**
+0.50 would leave 2× headroom and constrain nothing — a bar that cannot fail is
+decoration. 0.20 fails today, so picking it would be choosing to force work
+rather than to state a standard. 0.30 binds: it passes now and a 20% noise
+regression breaks it. A reader who thinks that is too generous should move it;
+what may not happen is moving it again after the next number.
+
+`NOISE` means the column — findings matching no plant — and NOT the judge's
+"worth raising" figure. The two gave 0.25 and 0.175 on the same run, and leaving
+which one unstated is how a condition gets evaluated twice and reported once.
+
+### Condition 4, TIGHTENED — the worst case was a budget
+
+Was: our worst-case anchored span no wider than Incumbent's.
+Now: additionally, our `L/DEF` ≤ Incumbent's.
+
+A worst case alone is a ceiling every finding may spend. If the incumbent's worst
+anchor is 13 lines, the old condition let EVERY one of our findings be 13 lines
+wide and still pass — while a finding naming a whole region is credited with
+every plant inside it and is noise for none. That is Rule 6d: the column is
+topped by a reviewer nobody would ship. L/DEF — lines claimed per located defect
+— is what sees it, and the two together bound both the worst finding and the
+habit.
+
+This one needs no defence from its timing: it makes the bar strictly harder, and
+an amendment that can only cost the author the decision is not the kind
+pre-registration guards against.
+
+### Unchanged
+
+Conditions 1 and 2 stand as written, and so does every non-claim: no cross-tool
+severity accuracy, no generalisation from a pooled figure without the held-out
+one beside it, no cost ranking across overlapping routing bands.

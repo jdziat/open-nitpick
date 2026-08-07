@@ -43,6 +43,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -85,6 +87,16 @@ func ReadDump(path string) ([]DumpRecord, error) {
 // json.Encoder and this is its exact inverse: a bufio.Scanner has a 64 KiB
 // line ceiling, and one finding with a long rationale beside a long judge
 // reasoning would turn into a parse error on a file that is perfectly valid.
+//
+// A MALFORMED RECORD IS STILL AN ERROR AND THE RECORDS ABOVE IT ARE STILL
+// RETURNED. This discarded everything it had decoded, which was defensible while
+// a dump was an opt-in diagnostic and is not now that a battery retains its own
+// findings by default: the file is the only record of a corpus that is spent
+// once, and a short write is the ordinary way to damage one — Record returns the
+// encode error, the battery demotes it to a line in its notes, and the run keeps
+// appending after the mangled record. Every caller checks err, so refusing the
+// file is unchanged; what changes is that refusing it costs the tail rather than
+// the run. TestATruncatedTailCostsTheTailAndNotTheFile pins both halves.
 func DecodeDump(r io.Reader) ([]DumpRecord, error) {
 	dec := json.NewDecoder(r)
 
@@ -96,7 +108,7 @@ func DecodeDump(r io.Reader) ([]DumpRecord, error) {
 			return out, nil
 		}
 		if err != nil {
-			return nil, fmt.Errorf("dump record %d: %w", len(out)+1, err)
+			return out, fmt.Errorf("dump record %d: %w", len(out)+1, err)
 		}
 		out = append(out, rec)
 	}
@@ -584,21 +596,87 @@ func GroupDump(records []DumpRecord) ([]RejudgeGroup, []string, error) {
 	return groups, warnings, nil
 }
 
+// RejudgeInputProblem reports why re-judging a dump would measure something
+// other than the judge, or "" when there is no such reason.
+// TestAPartialDumpIsRefusedAsARejudgeInput exercises both of them.
+//
+// TWO WAYS TO BE HANDED A FILE SOMEBODY IS STILL WRITING, and until a battery
+// retained its own findings there was only one. The first is the operator's:
+// NewDump truncates on open and the environment that produced a dump is usually
+// still exported in the shell that re-judges it, so writing and reading one path
+// is the expected accident. The second arrived with retention — a battery that
+// resolves its own path leaves EnvDump empty, so a check comparing the two
+// variables reads "" and skips exactly when a default file is being filled.
+// Dump.Close renames a retained run out of its in-progress suffix, which puts
+// that answer in the name; this function reads it.
+//
+// It lives in non-test code so the default build can exercise it: the re-judge
+// entry point is behind the `eval` build tag and a guard compiled only under
+// that tag cannot run in `go test ./...`.
+// TestAPartialDumpIsRefusedAsARejudgeInput covers both branches.
+//
+// writing is whatever EnvDump holds, passed in rather than read here so the
+// refusal is a function of its arguments.
+func RejudgeInputProblem(input, writing string) string {
+	input = strings.TrimSpace(input)
+
+	if strings.HasSuffix(input, dumpPartialSuffix) {
+		// The recovery half is here because "wait for it to appear" is advice
+		// that never comes true for the case an operator most often has: a run
+		// that was killed leaves its partial behind and no process will ever
+		// rename it. Renaming it by hand is the right move THEN and the wrong one
+		// while a battery is still appending, so the condition is stated rather
+		// than the instruction alone.
+		return fmt.Sprintf("%s names %s, which is a dump still being written: a retained run writes "+
+			"under %q and Dump.Close renames it away when the run finishes. Re-judging it would "+
+			"measure whatever had been flushed. Wait for the run and point %s at %s once it appears; "+
+			"if the run was killed and nothing is still writing that file, rename it to %s yourself "+
+			"and re-judge that",
+			EnvRejudgeDump, input, dumpPartialSuffix, EnvRejudgeDump,
+			strings.TrimSuffix(input, dumpPartialSuffix), strings.TrimSuffix(input, dumpPartialSuffix))
+	}
+
+	if writing = strings.TrimSpace(writing); writing != "" {
+		in, _ := filepath.Abs(input)
+		out, _ := filepath.Abs(writing)
+		if in == out {
+			return fmt.Sprintf("%s and %s both name %s: the dump writer truncates on open, so this "+
+				"would re-judge a file being emptied. Point %s at a different path, or unset it",
+				EnvRejudgeDump, EnvDump, input, EnvDump)
+		}
+	}
+
+	return ""
+}
+
 // sameFinding reports whether two records describe the same finding, ignoring
 // the ground-truth fields that legitimately differ between the duplicate lines
 // one finding gets when it is credited with several planted defects.
+// The secondary spans are compared with the rest. They reach no prompt, so
+// leaving them out would be defensible for a re-judge and is not defensible for
+// the file: two runs that differed only in which further regions a finding named
+// would collide under one key, and the collision would be silent in exactly the
+// field the detection columns are computed from.
 func sameFinding(a, b DumpRecord) bool {
 	return a.Path == b.Path && a.Line == b.Line && a.EndLine == b.EndLine &&
+		slices.Equal(a.AlsoAt, b.AlsoAt) &&
 		a.Severity == b.Severity && a.Class == b.Class && a.Category == b.Category &&
 		a.Title == b.Title && a.Rationale == b.Rationale && a.Suggestion == b.Suggestion
 }
 
 // findingFromRecord rebuilds the finding a dump line was written from.
 //
-// Every field judgeRequest renders is here. AlsoAt is not, and does not need to
-// be: the judge is shown one location per finding, so a secondary span changes
-// the scorer's recall arithmetic and not one character of the prompt. Source
-// and Triager are excluded for the same reason — the judge never sees them.
+// Every field judgeRequest renders is here, and so is AlsoAt, which it does not
+// render. Source and Triager are excluded because the judge never sees them and
+// nothing else reads them; the secondary spans used to be excluded on that same
+// argument, and the argument was half right. The judge is shown one location per
+// finding, so a secondary span changes not one character of the prompt — the
+// previous comment here said so and then said it therefore "does not need to be"
+// recorded, which followed only if re-judging were the sole thing done to a
+// rebuilt finding. A rebuilt finding is also SCORED, and anchorDistance,
+// anchoredLines and defectAnchoredLines all read this field, so dropping it made
+// the two columns the dump exists to make re-derivable un-re-derivable.
+// TestASecondarySpanSurvivesTheDump scores the round trip.
 //
 // The severity provenance IS restored, even though the judge never sees that
 // either. A rebuilt finding is scored as well as judged, and a finding that came
@@ -612,6 +690,7 @@ func findingFromRecord(r DumpRecord) review.Finding {
 		Path:               r.Path,
 		Line:               r.Line,
 		EndLine:            r.EndLine,
+		AlsoAt:             r.AlsoAt,
 		Severity:           r.Severity,
 		SeverityTranslated: r.SeverityTranslated,
 		RawSeverity:        r.SeveritySaid,

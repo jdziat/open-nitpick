@@ -1513,6 +1513,42 @@ func (s ShortFixture) String() string {
 	return fmt.Sprintf("%s (%d of %d)", s.Fixture, s.Priced, s.Peer)
 }
 
+// ShallowSampleWarning is the sentence a table prints when a row measured every
+// fixture but measured some of them fewer times than the standard it is held to.
+//
+// ONE WORDING FOR TWO TABLES. The cost ledger reached this reading first and got
+// it right — the shortfall is not merely a smaller sample, it is a sample the row
+// did not choose — while the judged report grew the identical failure and printed
+// nothing at all about it, so one loss was described two ways by two tables seven
+// hundred lines apart. The parts that genuinely differ between the two are
+// arguments, not a second sentence.
+//
+// standard is what the row fell short OF, and the two callers differ here for a
+// reason: the cost table compares against its PEERS, because a row priced on
+// fewer runs than another row is the shape that reading is maxed out by; the
+// judged table compares against the row's OWN attempted depth, because the
+// incumbent is served at depth one by design and a peer-max test would mark it
+// short on every run with RUNS>1.
+//
+// dropped names what the missing runs have in common, which is the whole content
+// of the warning: a random shortfall costs precision and a selected one costs the
+// result. readings names the figures a reader must not rank.
+func ShallowSampleWarning(model, standard, dropped, readings string, short []ShortFixture) string {
+	if len(short) == 0 {
+		return ""
+	}
+
+	named := make([]string, 0, len(short))
+	for _, s := range short {
+		named = append(named, s.String())
+	}
+
+	return fmt.Sprintf("%s covers every fixture but was measured on fewer runs of %s than %s: the "+
+		"runs missing are %s, which is a subset it did not choose at random, so its %s describe the "+
+		"runs that went well and must not be ranked",
+		model, strings.Join(named, ", "), standard, dropped, readings)
+}
+
 // CostRow is one model's spend across a run, and the two ratios a default is
 // chosen on.
 type CostRow struct {
@@ -1658,14 +1694,11 @@ func (r CostRow) coverageReason() string {
 		// unreported, and nothing here can rule out that they are also the ones
 		// that found nothing. Read as "n=2 instead of n=3" a reader shrugs; read
 		// as "priced on the runs that went well" they do not.
-		short := make([]string, 0, len(r.Shallow))
-		for _, s := range r.Shallow {
-			short = append(short, s.String())
-		}
-		return fmt.Sprintf("%s covers every fixture but was priced on fewer runs of %s than its peers were: "+
-			"the runs missing from its cost are the ones that reported no usage, which is a subset it did not "+
-			"choose at random, so its RECALL and $/DEFECT describe the runs that went well and must not be ranked",
-			r.Model, strings.Join(short, ", "))
+		//
+		// Rendered by ShallowSampleWarning, which the judged tables now print
+		// too. The wording was right and was reachable from one table only.
+		return ShallowSampleWarning(r.Model, "its peers were",
+			"the ones that reported no usage", "RECALL and $/DEFECT", r.Shallow)
 	}
 
 	return ""

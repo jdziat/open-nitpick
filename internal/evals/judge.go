@@ -531,6 +531,48 @@ type Aggregate struct {
 	// of the objective severity metric in PublishedMetrics.
 	SevPlanted int
 
+	// DetReviews, DetNoise and DetWidestAnchor are the detection reading:
+	// invented findings, the widest span claimed about any one thing, and the
+	// number of reviews both were folded over.
+	//
+	// They are model-free and judge-free — ScoreDetection consults neither — and
+	// they carry their OWN review count rather than dividing by len(Grades).
+	//
+	// The two agree on the common path and are not the same quantity. Both folds
+	// sit at one site, so a review that reached them contributes to both; but Add
+	// appends no grade for a judge that returned a nil result without an error,
+	// and a battery that later moved one fold relative to the other would part
+	// them further. A counter that moves with its own fold is what keeps the
+	// printed denominator true through either, where a report dividing by
+	// len(Grades) would go on claiming a denominator the fold does not have.
+	//
+	// DetWidestAnchor is folded with max and printed undivided, because it is a
+	// WORST CASE rather than a rate: one blob anywhere in the corpus is the
+	// behaviour being caught, and a mean over precise findings hides it. See
+	// CorpusTally.WidestAnchor for the two degenerate strategies it exists to
+	// make visible, and Aggregate.DetectionCounts for the draw count it is a
+	// maximum over.
+	//
+	// THAT ARGUMENT IS ONE-SIDED AND WAS PUBLISHED AS THOUGH IT WERE THE WHOLE
+	// ONE. A mean hides one blob; a MAX hides uniform vagueness just as
+	// completely, because a reviewer precise on every plant but one and a
+	// reviewer hedging every anchor to that same width report the identical
+	// number. Both folds are therefore published, and the second is
+	// DetAnchoredLines.
+	//
+	// DetAnchoredLines is the SAME per-defect measurement summed instead of
+	// maxed, over the defects these reviews located, and it is published as L/DEF
+	// beside the max because neither fold subsumes the other: a max hides uniform
+	// vagueness exactly as a mean hides one blob. Its denominator is SevGraded()
+	// — the located-defect count RECALL is also divided by — rather than a second
+	// counter folded here, because two integers for "how many defects this
+	// contender found" are two answers free to drift.
+	// TestRecallAndCoverageAreOneReadingOfOneCorpus pins them as one.
+	DetReviews       int
+	DetNoise         int
+	DetWidestAnchor  int
+	DetAnchoredLines int
+
 	// SevUsage is which severity words this contender used against which planted
 	// levels. It is a DESCRIPTION printed beside the table, not a column, and it
 	// is what a reader comparing two vocabularies gets instead of a cross-tool
@@ -578,7 +620,37 @@ type Aggregate struct {
 	// both with identical coverage and very different len(Grades), and a guard
 	// that reads the length calls that incomparable -- which it is not, and
 	// which fires as a false alarm the moment RUNS is raised on one side.
+	//
+	// THAT REASONING IS CORRECT FOR THE COLUMNS IT WAS WRITTEN FOR AND IS NOT
+	// SUFFICIENT FOR A PER-REVIEW RATE. GRADE is a mean over judged samples and
+	// coverage is the right question for it. RECALL, NOISE and L/DEF are folded
+	// over the reviews that SURVIVED, and losing runs of a fixture that other
+	// runs still cover leaves this set — and therefore Coverage() — unchanged
+	// while reweighting the fixture mix every one of those rates is a mean over.
+	// The depth counters below are what sees that; Coverage() is deliberately
+	// left as the set count so the guard this comment governs is untouched.
 	Fixtures map[string]bool
+
+	// attempted and folded are how many reviews of each fixture this row TRIED
+	// and how many reached the scorer.
+	//
+	// The gap is not a smaller sample, it is a NON-RANDOM smaller sample: a run
+	// drops out because its review errored or its judge call failed, and nothing
+	// here can rule out that those correlate with what the review said. The
+	// direction is one-sided — the incumbent is served at depth one per fixture,
+	// so any loss on its side removes the fixture and moves Coverage, while our
+	// side at RUNS>1 loses depth without losing coverage. Only the challenger can
+	// be silently flattered, which is why the shortfall marks the cells rather
+	// than only appearing in a note.
+	//
+	// Judged against this row's OWN attempted depth rather than against the peer
+	// maximum, which is where CostLedger.referenceCorpus' rule cannot be copied:
+	// the cache is at depth one BY DESIGN, so a peer-max test would mark the
+	// incumbent short on every run with RUNS>1 and teach a reader to ignore the
+	// marker. A row that reviewed what it meant to review is whole at depth one
+	// and at depth three.
+	attempted map[string]int
+	folded    map[string]int
 
 	// shown is the finding list behind every judgement folded in here.
 	//
@@ -613,6 +685,143 @@ func (a *Aggregate) Saw(fixture string) {
 
 // Coverage is how many distinct fixtures this contender was judged on.
 func (a Aggregate) Coverage() int { return len(a.Fixtures) }
+
+// Attempted records that a review of a fixture was STARTED for this contender.
+//
+// It belongs at the top of a battery's fold site, before any error return, so
+// the row knows the denominator it meant to have. Everything else here counts
+// what arrived; this is the only counter that knows what did not.
+func (a *Aggregate) Attempted(fixture string) {
+	if a.attempted == nil {
+		a.attempted = map[string]int{}
+	}
+	a.attempted[fixture]++
+}
+
+// foldedOne records that one review of a fixture reached the scorer. It is
+// called by AddSeverity, which is the fold the detection columns share a site
+// with, so the two counters cannot be wired to different sets of reviews.
+func (a *Aggregate) foldedOne(fixture string) {
+	if a.folded == nil {
+		a.folded = map[string]int{}
+	}
+	a.folded[fixture]++
+}
+
+// Attempts is how many reviews this row set out to fold, across every fixture.
+// Zero means the battery never stated it, which is what makes ShortFixtures
+// silent rather than clean.
+func (a Aggregate) Attempts() int {
+	total := 0
+	for _, n := range a.attempted {
+		total += n
+	}
+	return total
+}
+
+// Lost is how many attempted reviews never reached the scorer, which is what the
+// FAIL cell prints.
+//
+// THAT CELL USED TO BE A NOTE COUNT. It was len(notes[model]), and notes are
+// appended for four things, three of which are not lost reviews and all of which
+// fold normally: findings on a clean change, a suspect judge output, a dump
+// error. A row that folded every review it attempted could render FAIL 3, which
+// is the one cell a reader would subtract from fixtures x RUNS. FAIL is in
+// DescriptiveColumns, so no degenerate-strategy guard asks what maximises it, and
+// nothing else was going to notice.
+//
+// Non-negative by construction: it sums only the fixtures where the fold fell
+// short of the attempt.
+func (a Aggregate) Lost() int {
+	lost := 0
+	for fixture, tried := range a.attempted {
+		if got := a.folded[fixture]; got < tried {
+			lost += tried - got
+		}
+	}
+	return lost
+}
+
+// ShortFixtures names the fixtures this row attempted more reviews of than it
+// folded, with both counts, in fixture-name order.
+//
+// Empty when the battery never called Attempted: a row that does not state what
+// it tried cannot be short of it, and inferring a shortfall from silence would
+// mark every row of a battery that has not been wired up. That is a real blind
+// spot rather than a safe default — TestEveryJudgedBatteryStatesWhatItAttempted
+// is what stops a battery staying in it.
+// A fixture folded ZERO times is not short, it is absent, and it is returned by
+// UnmeasuredFixtures instead. The split is the cost ledger's — see CostRow's
+// Missing beside its Shallow — and this function was extracted from that one
+// without it, which made ShallowSampleWarning open "covers every fixture" over a
+// row that covered nothing of the fixture it then named "(0 of 1)". Reproduced
+// at Coverage() 3 of 5. A not-comparable row reading as merely thin is the wrong
+// direction: the reader is told to discount a number rather than to refuse it.
+func (a Aggregate) ShortFixtures() []ShortFixture {
+	var out []ShortFixture
+	for fixture, tried := range a.attempted {
+		if got := a.folded[fixture]; got > 0 && got < tried {
+			out = append(out, ShortFixture{Fixture: fixture, Priced: got, Peer: tried})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Fixture < out[j].Fixture })
+	return out
+}
+
+// UnmeasuredFixtures names the fixtures this row attempted and folded nothing
+// from, in fixture-name order.
+//
+// Separate from ShortFixtures because the two license different readings. A row
+// short on a fixture measured that fixture and measured it thinly, so its
+// figures describe the whole corpus at uneven depth. A row that folded nothing
+// for a fixture did not measure that fixture at all, so its figures describe a
+// SMALLER CORPUS — and on this corpus the fixtures that fail are not a random
+// subset, since a review that errored or a judge call that failed correlates
+// with the reviews that were hard.
+func (a Aggregate) UnmeasuredFixtures() []string {
+	var out []string
+	for fixture, tried := range a.attempted {
+		if tried > 0 && a.folded[fixture] == 0 {
+			out = append(out, fixture)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// CoverageShortfall is the footnote behind the marker on this row's detection
+// cells, or "" when there is nothing to say.
+func (a Aggregate) CoverageShortfall(model string) string {
+	var says []string
+
+	// Absence first, because it is the stronger claim and the one that changes
+	// what the reader may do with the row. ShallowSampleWarning's sentence opens
+	// "covers every fixture", which is false of a row with any of these, so it
+	// may not be the only thing said and may not be said alone.
+	if missing := a.UnmeasuredFixtures(); len(missing) > 0 {
+		says = append(says, fmt.Sprintf("%s DOES NOT cover every fixture: it folded no review at all "+
+			"for %s, so its RECALL, NOISE and L/DEF describe a smaller corpus than the row beside it "+
+			"and the two are not comparable. The fixtures missing are the ones whose review or whose "+
+			"judge call failed, which is not a subset it chose at random",
+			model, strings.Join(missing, ", ")))
+	}
+
+	if short := a.ShortFixtures(); len(short) > 0 {
+		says = append(says, ShallowSampleWarning(model, "it attempted",
+			"the ones whose review or whose judge call failed", "RECALL, NOISE and L/DEF", short))
+	}
+
+	return strings.Join(says, ". ")
+}
+
+// shortSampleMark flags a cell folded over fewer reviews than its row attempted.
+//
+// One character, for the reason the cost table's "*" is one character: a table
+// cell is width-formatted and a marker that widens the column moves every number
+// beside it. It is the same character as the cost table's, deliberately — it
+// means the same thing in both places, and a second symbol for one condition is
+// how two tables come to disagree about one loss.
+const shortSampleMark = "*"
 
 // Add folds one judgement in, over the finding list the judge was SHOWN.
 //
@@ -746,6 +955,14 @@ func (a *Aggregate) countVerdicts(verdicts []Verdict) {
 // denominators from the same pass, so the coverage cell and the description
 // cannot be read against two different censuses of the same corpus.
 func (a *Aggregate) AddSeverity(f Fixture, s SeverityScore) {
+	// The folded-review counter lives here rather than in Saw, and the
+	// difference is a review whose JUDGE call failed: Saw runs before the judge
+	// and this runs after it, so a row counted at Saw would report a depth its
+	// detection columns were never folded over. It is here rather than in
+	// AddDetection because this is the call that carries the fixture, and the
+	// two are called at one site.
+	a.foldedOne(f.Name)
+
 	a.SevAccurate += s.Accurate
 	a.SevInflated += s.Inflated
 	a.SevUnderstated += s.Understated
@@ -760,6 +977,28 @@ func (a *Aggregate) AddSeverity(f Fixture, s SeverityScore) {
 		a.SevPlantedLevels = PlantedLevels{}
 	}
 	a.SevPlantedLevels.Add(f)
+}
+
+// AddDetection folds one review's detection reading in.
+//
+// It is the judge-free twin of AddSeverity and is called beside it, at the same
+// site and for the same reason: the report divides the count columns on a row by
+// one sample count, and folding detection over a different set of reviews would
+// put NOISE over a larger denominator than every column beside it. That choice
+// costs a review whose judge call failed — its findings are scored by nothing,
+// for two columns that need no judge — and the loss is reported rather than
+// hidden, as the review count in DetectionCounts and as a note on the row.
+//
+// It takes only the score, where AddSeverity also takes the fixture: O-COV needs
+// a plant census and these three columns do not, since a review that located
+// nothing still invented what it invented and still anchored where it anchored.
+// RECALL's denominator comes from AddSeverity's census — see locatedShare, which
+// is the one expression RECALL and O-COV are both rendered from.
+func (a *Aggregate) AddDetection(d DetectionScore) {
+	a.DetReviews++
+	a.DetNoise += d.Noise()
+	a.DetWidestAnchor = max(a.DetWidestAnchor, d.WidestAnchor)
+	a.DetAnchoredLines += d.AnchoredLines
 }
 
 // DeclareScale folds one result's declared severity vocabulary into this row,
@@ -794,6 +1033,135 @@ func (a Aggregate) SevGraded() int {
 	return a.SevAccurate + a.SevInflated + a.SevUnderstated
 }
 
+// locatedShare is the share of planted defects this contender LOCATED, and the
+// single expression both RECALL and O-COV are rendered from.
+//
+// The two cells sit three columns apart in one table and mean the same thing, so
+// they are computed once. ScoreSeverity grades a defect exactly when some
+// finding matches() it — the same predicate ScoreRun counts a detection with —
+// so SevGraded IS the located-defect count, and two expressions for it would be
+// two answers free to drift apart under an edit to either.
+// TestRecallAndCoverageAreOneReadingOfOneCorpus pins the identity against the
+// scorer itself rather than against this comment.
+//
+// ok is false when the reviews behind the row planted nothing: 0.00 there reads
+// as "found none of them" rather than "there were none to find".
+func (a Aggregate) locatedShare() (float64, bool) {
+	if a.SevPlanted == 0 {
+		return 0, false
+	}
+	return float64(a.SevGraded()) / float64(a.SevPlanted), true
+}
+
+// DetectionCells renders this contender's RECALL/NOISE/ANCHOR.
+//
+// THEY ARE NOT GATED ON THE SEVERITY VOCABULARY, and that is the difference
+// between this renderer and ObjectiveSeverityCells beside it. What was withdrawn
+// for a foreign contender is the comparison of two severity LADDERS; how many
+// planted defects a review located, how many findings it invented and how many
+// lines it pointed at are counted against the fixtures' own defects and say
+// nothing in anybody's severity vocabulary. Blanking them for the incumbent
+// would withdraw a measurement that is defined, computed and comparable, which
+// is the opposite error from the one the severity withdrawal fixed.
+//
+// THE TEST THAT PINS THIS IS TestTheDetectionColumnsAreFilledForAForeignVocabulary,
+// and naming the right one took a mutation to establish. This comment used to
+// cite TestEverySeverityCellIsWithdrawnForAForeignVocabulary as deriving the
+// exemption from PublishedMetrics — that test iterates the SEVERITY metric's
+// columns, and NOISE and ANCHOR are columns of neither rendering of it, so it
+// never examines them. Gating this whole function on the severity vocabulary
+// leaves it green. It does still cover RECALL, which is a column of both
+// metrics, and that narrower claim is the one it can carry.
+//
+// RECALL is a rate over planted defects, NOISE a rate over reviews, ANCHOR a
+// worst case that is not divided at all, and L/DEF a rate over the defects the
+// row LOCATED. The counts behind all four are printed by DetectionCounts, below
+// the table, because a count pair does not fit a six-character cell and
+// overflowing one silently misaligns every column to its right.
+//
+// A ROW SHORT OF THE REVIEWS IT ATTEMPTED CARRIES A MARKER ON ALL FOUR, and the
+// marker is not withholding: every cell is still a defined reading of the
+// reviews that arrived. What it says is that those reviews are not the ones the
+// row set out to measure, and the ones missing are a subset it did not choose at
+// random. All four are marked rather than only the two rates, because all four
+// are folded over the survivors — a MAXIMUM over fewer draws is weakly SMALLER,
+// which is the flattering direction for ANCHOR, not the safe one.
+// Aggregate.CoverageShortfall is the footnote the marker points at.
+func (a Aggregate) DetectionCells() (recall, noise, anchor, spread string) {
+	// Either shortfall marks the row, and the ABSENT case matters more: it is
+	// the one where the cells describe a smaller corpus rather than a thinner
+	// sample of the same one. Splitting ShortFixtures out of a single list is
+	// what made this two conditions, and asking only the first here would have
+	// left a row that folded NOTHING for a fixture printing four unmarked cells
+	// — quieter than the defect the split was fixing.
+	mark := ""
+	if len(a.ShortFixtures()) > 0 || len(a.UnmeasuredFixtures()) > 0 {
+		mark = shortSampleMark
+	}
+	measured := func(s string) string { return s + mark }
+
+	recall = "n/a"
+	if share, ok := a.locatedShare(); ok {
+		recall = measured(fmt.Sprintf("%.2f", share))
+	}
+
+	// A row no review was folded into has no noise RATE and no widest anchor,
+	// and 0 in either is the BEST value in its column — the reading a reviewer
+	// that said nothing would earn. n/a is what distinguishes the two.
+	noise, anchor = "n/a", "n/a"
+	if a.DetReviews > 0 {
+		noise = measured(fmt.Sprintf("%.2f", float64(a.DetNoise)/float64(a.DetReviews)))
+		anchor = measured(fmt.Sprintf("%d", a.DetWidestAnchor))
+	}
+
+	// L/DEF is undefined for a row that LOCATED nothing, which is a stricter
+	// condition than the two above and is the whole reason it is spelled
+	// separately. Its numerator only accumulates over located defects, so a
+	// reviewer that found none renders 0/0 — and 0.00 is the best value the
+	// column can take, so printing it would put silence at the top of a third
+	// column. The metric's own component is 0 there and says why: a component is
+	// read beside RECALL by construction and a cell is read alone.
+	spread = "n/a"
+	if located := a.SevGraded(); located > 0 {
+		spread = measured(fmt.Sprintf("%.2f", float64(a.DetAnchoredLines)/float64(located)))
+	}
+
+	return recall, noise, anchor, spread
+}
+
+// DetectionCounts renders the COUNTS behind RECALL, NOISE, ANCHOR and L/DEF, for
+// the DENOMINATORS block under the table.
+//
+// It is the judged tables' copy of the block the cost table already prints, in
+// the same shape and for the same reason: a rate over a single-digit denominator
+// is a quotient of two small integers, and 0.68 says less than 25/37 does.
+//
+// ANCHOR's "denominator" is the number of DRAWS its maximum was taken over,
+// which is why the review count is repeated after it. A maximum over more draws
+// is weakly larger, so two rows folded from different numbers of reviews are not
+// drawing from the same number of chances, and a reader comparing them needs
+// both counts in the same line.
+//
+// L/DEF's denominator is the LOCATED count, which is RECALL's numerator on the
+// same line. That is deliberate and is the point of printing them together: the
+// two readings share an integer, so a reader can see that a low spread bought by
+// finding almost nothing is a low spread over almost nothing.
+func (a Aggregate) DetectionCounts() string {
+	if a.DetReviews == 0 {
+		return fmt.Sprintf("RECALL %d/%d defects | NOISE, ANCHOR and L/DEF undefined: no review was "+
+			"folded into this row", a.SevGraded(), a.SevPlanted)
+	}
+
+	spread := fmt.Sprintf("L/DEF %d line(s) over %d located defect(s)", a.DetAnchoredLines, a.SevGraded())
+	if a.SevGraded() == 0 {
+		spread = "L/DEF undefined: this row located no defect to have pointed at"
+	}
+
+	return fmt.Sprintf("RECALL %d/%d defects | NOISE %d invented finding(s) over %d review(s) | "+
+		"ANCHOR %d line(s), a worst case over those %d review(s) | %s",
+		a.SevGraded(), a.SevPlanted, a.DetNoise, a.DetReviews, a.DetWidestAnchor, a.DetReviews, spread)
+}
+
 // ObjectiveSeverityCells renders this contender's O-INFL/O-UNDER/O-ACC/O-COV,
 // per sample for the first three and as a share of planted defects for O-COV.
 //
@@ -812,9 +1180,9 @@ func (a Aggregate) SevGraded() int {
 // survive is this position: a CELL in a sorted ranking, on a row whose other
 // three severity cells read n/a, where a filled fourth invites reading the row
 // as partly scored on severity after all. The same quantity is published as
-// prose beneath the table, where it is not rankable and where RECALL already
-// states it. TestSeverityCountsAreWithdrawnForAForeignVocabulary pins both
-// halves.
+// prose beneath the table, and as the RECALL cell, which is ungated and rendered
+// from the same locatedShare expression this one is.
+// TestSeverityCountsAreWithdrawnForAForeignVocabulary pins both halves.
 func (a Aggregate) ObjectiveSeverityCells(samples int) (infl, under, acc, cov string) {
 	if !a.Scale.PublishesOurLevels() {
 		return "n/a", "n/a", "n/a", "n/a"
@@ -824,10 +1192,11 @@ func (a Aggregate) ObjectiveSeverityCells(samples int) (infl, under, acc, cov st
 	rate := func(v int) string { return fmt.Sprintf("%.2f", float64(v)/n) }
 
 	// A row with nothing planted behind it has no coverage to report; printing
-	// 0.00 would read as "found none of them".
+	// 0.00 would read as "found none of them". Through locatedShare, which is
+	// also what the RECALL cell three columns to the right is rendered from.
 	cov = "n/a"
-	if a.SevPlanted > 0 {
-		cov = fmt.Sprintf("%.2f", float64(a.SevGraded())/float64(a.SevPlanted))
+	if share, ok := a.locatedShare(); ok {
+		cov = fmt.Sprintf("%.2f", share)
 	}
 	return rate(a.SevInflated), rate(a.SevUnderstated), rate(a.SevAccurate), cov
 }
@@ -851,9 +1220,12 @@ func (a Aggregate) ObjectiveSeverityCells(samples int) (infl, under, acc, cov st
 // the number. What the withdrawal argues against is a filled cell sitting in a
 // sorted ranking beside three cells reading n/a, which reads as a partial score.
 // This line is prose under the table, it is not ranked, and it restates a
-// detection fact RECALL already publishes. Aggregate.ObjectiveSeverityCells says
-// the same thing from the other side, so the two stop appearing to disagree
-// about one quantity.
+// detection fact the RECALL cell publishes on the same row. That sentence used
+// to point at a column this table did not have — RECALL was absent from the
+// judged header while two doc comments cited it as the place a reader could
+// already see the number — and the fix was to print the column rather than to
+// delete the justification. Aggregate.ObjectiveSeverityCells says the same thing
+// from the other side, so the two stop appearing to disagree about one quantity.
 func (a Aggregate) ObjectiveSeverityCounts(model string) string {
 	located := fmt.Sprintf("%d located of %d planted", a.SevGraded(), a.SevPlanted)
 
@@ -2067,6 +2439,13 @@ var CrossJudgedVariantTableHeader = registerTableHeader(tableScored,
 func JudgedModelRow(model string, c CrossJudged, failed int) string {
 	oInfl, oUnder, oAcc, oCov := c.Primary.ObjectiveSeverityCells(len(c.Primary.Grades))
 
+	// Read off c.Primary for the reason the O-* cells are: Corroborate folds only
+	// Saw and Add into the second judge's aggregate, so a detection counter on
+	// c.Second is zero by construction. These four carry no delta and need none
+	// — ScoreDetection consults no judge — which CrossJudgeLegend states beside
+	// the same admission for O-*.
+	recall, noise, anchor, spread := c.Primary.DetectionCells()
+
 	return TableRow(CrossJudgedModelTableHeader, []string{
 		truncate(model, 36),
 		c.GradeFigure().String(),
@@ -2080,6 +2459,7 @@ func JudgedModelRow(model string, c CrossJudged, failed int) string {
 		c.InflatedFigure().String(),
 		c.UnderstatedFigure().String(),
 		oInfl, oUnder, oAcc, oCov,
+		recall, noise, anchor, spread,
 		c.MisclassedFigure().String(),
 		c.MissedFigure().String(),
 		c.SignalFigure().String(),
@@ -2126,4 +2506,17 @@ const CrossJudgeLegend = "EVERY JUDGED FIGURE IS PRINTED WITH ITS CROSS-JUDGE DI
 	"of question wearing the costume of a disagreement, there is no confidence interval on that figure, " +
 	"and the second judge's number is not published at all. `n/a` means undefined: no finding, no graded " +
 	"sample, nothing to disagree about. THE O-* COLUMNS CARRY NO DELTA AND NEED NONE: they compare each " +
-	"located defect to the WantSeverity its fixture declares, with no model involved."
+	"located defect to the WantSeverity its fixture declares, with no model involved. " +
+	"RECALL, NOISE, ANCHOR AND L/DEF CARRY NO DELTA FOR THE SAME REASON: they are counted by the " +
+	"scorer against the defects the fixture plants, so there is no judge opinion in them for a second " +
+	"judge to disagree with. RECALL, NOISE and L/DEF are RATES over each row's own counts and are " +
+	"therefore comparable between rows measured different numbers of times. ANCHOR IS NOT A RATE — it " +
+	"is the WORST CASE over the reviews behind the row, so a row folded from more reviews took its " +
+	"maximum over more chances and is weakly disadvantaged. Read it beside the review count in the " +
+	"DENOMINATORS block, which prints it for exactly that reason. " +
+	"ANCHOR AND L/DEF ARE TWO FOLDS OF ONE MEASUREMENT AND NEITHER REPLACES THE OTHER: ANCHOR is the " +
+	"widest thing the row pointed at about any one defect, L/DEF is how much it pointed at per defect " +
+	"it found. A reviewer precise everywhere but once, and a reviewer uniformly vague at that same " +
+	"width, are the same ANCHOR and very different L/DEF — which matters whenever ANCHOR is read as a " +
+	"threshold against another row, because that row's single worst finding is not a width every " +
+	"finding may spend."

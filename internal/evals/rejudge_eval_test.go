@@ -5,7 +5,6 @@ package evals
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -35,19 +34,11 @@ func TestRejudgeDump(t *testing.T) {
 			EnvRejudgeDump, EnvDump)
 	}
 
-	// Refusing to read the file another run is writing. NewDump truncates on
-	// open, and the environment that produced a dump is usually still exported
-	// in the shell that re-judges it, so this collision is the expected
-	// accident rather than an exotic one. Re-judging a half-written file
-	// silently measures whatever had been flushed.
-	if writing := strings.TrimSpace(os.Getenv(EnvDump)); writing != "" {
-		in, _ := filepath.Abs(path)
-		out, _ := filepath.Abs(writing)
-		if in == out {
-			t.Fatalf("%s and %s both name %s: the dump writer truncates on open, so this would "+
-				"re-judge a file being emptied. Point %s at a different path, or unset it.",
-				EnvRejudgeDump, EnvDump, path, EnvDump)
-		}
+	// Refusing to read a file another run is writing, both ways that can happen.
+	// The check is in RejudgeInputProblem rather than here so the default build
+	// can exercise it; this file compiles only under the `eval` tag.
+	if why := RejudgeInputProblem(path, os.Getenv(EnvDump)); why != "" {
+		t.Fatal(why)
 	}
 
 	records, err := ReadDump(path)

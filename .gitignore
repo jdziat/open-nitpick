@@ -1,6 +1,14 @@
 /bin/
 coverage.out
 
+# Retained eval runs. A battery that prints the judged table writes its findings
+# here when NITPICK_EVAL_DUMP is UNSET; with it set they go to the path it names
+# instead and nothing lands here. That default is what lets the columns a
+# held-out run could not be read for be re-derived without spending the corpus
+# again. They are run artifacts, not collected evidence — the committed evidence
+# lives in internal/evals/testdata.
+.eval-runs/
+
 # Never commit credentials. This repo is a CI tool that holds model API keys
 # and forge tokens; a leaked .env is the whole ballgame.
 .env

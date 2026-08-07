@@ -2,9 +2,14 @@ package evals
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jdziat/open-nitpick/internal/review"
 )
@@ -104,6 +109,35 @@ type DumpRecord struct {
 	Path    string `json:"path"`
 	Line    int    `json:"line"`
 	EndLine int    `json:"end_line,omitempty"`
+
+	// AlsoAt are the further regions the finding claimed.
+	//
+	// IT IS RECORDED FOR THE SCORER, NOT FOR THE JUDGE, and it was omitted for
+	// exactly that reason: judgeRequest shows one location per finding, so a
+	// secondary span changes nothing about the prompt a re-judge rebuilds. What
+	// it does change is every detection number. anchorDistance takes the minimum
+	// over the primary span AND every region here, and coverInto unions them, so
+	// ANCHOR and NOISE are both computed from this field — and Incumbent is the
+	// reviewer that fills it, from its "Also applies to" lines.
+	//
+	// Without it a dump is not a sufficient record of a run: ANCHOR replays
+	// understated and NOISE overstated, because a finding whose only near span
+	// was secondary comes back as invented. Nothing distinguishes a dropped span
+	// from a finding that had none, so the loss is silent in both directions.
+	// TestASecondarySpanSurvivesTheDump scores a round trip rather than
+	// inspecting the field, since the field matters only for what it changes.
+	//
+	// open-nitpick's own reviews leave it empty — review.Finding.AlsoAt says the
+	// schema does not offer it — so this is omitempty on every one of our
+	// records. The incumbent is the only reviewer here whose records can carry
+	// it, and "can" is the accurate word: it is filled only where a review
+	// printed an "Also applies to" line, which most of them do not. An earlier
+	// version of this sentence said the field was "present on the incumbent's"
+	// records, which reads as a property of all of them and is a property of a
+	// small minority. That matters in the direction that decides whether the
+	// round trip is worth testing: the field is exercised by few records, so its
+	// loss would be invisible in most of the file and decisive in the rest.
+	AlsoAt []review.LineSpan `json:"also_at,omitempty"`
 
 	// Severity is the level THIS PROJECT recorded the finding at. It is not
 	// necessarily a word the reviewer used, and the two fields below say which.
@@ -214,6 +248,15 @@ type Dump struct {
 	mu   sync.Mutex
 	file *os.File
 	enc  *json.Encoder
+
+	// finalPath is the name this dump takes on when it is complete, empty for a
+	// dump written straight to the path the operator named.
+	//
+	// A retained run writes to finalPath+dumpPartialSuffix and is renamed by
+	// Close, so a file sitting under the final name has a writer that finished.
+	// That is what a concurrent reader can check, and it holds for a run that was
+	// killed as well as for one that is still going.
+	finalPath string
 }
 
 // OpenDump opens the dump named by EnvDump, returning nil when it is unset.
@@ -236,6 +279,158 @@ func NewDump(path string) (*Dump, error) {
 		return nil, err
 	}
 	return &Dump{file: f, enc: json.NewEncoder(f)}, nil
+}
+
+// runDumpDir is where a run's own dump lands when the operator named no path.
+//
+// It sits beside the package rather than under testdata: testdata holds
+// collected evidence that is committed and read back — the Incumbent cache —
+// and a run artifact written on every invocation does not belong in it.
+const runDumpDir = ".eval-runs"
+
+// OpenRunDump opens the dump a battery writes its own findings to, whether or
+// not anybody asked for one.
+//
+// THE RUN IT EXISTS FOR HAS ALREADY HAPPENED. The held-out battery that produced
+// the Rule 14 evidence ran with EnvDump unset, so OpenDump returned nil, every
+// Record call was a no-op, and the finding lists sat in memory for the whole of
+// a paid run and were written nowhere. Two of Rule 14's four conditions then
+// needed a re-run to evaluate — against a corpus whose own label says it is
+// spent once. Retention is not a diagnostic convenience here; it is what makes
+// the next held-out spend the last one required for a model-free column, because
+// RECALL, NOISE, ANCHOR and L/DEF are pure functions of (findings, fixture) and
+// need no judge and no network to recompute.
+//
+// THE RECORDING IS NOT GATED ON THE JUDGE, and saying so is load-bearing rather
+// than decorative: the arithmetic needing no judge is worth nothing if the write
+// happens after a judge call that can fail. It did, and a review whose judge call
+// errored was discarded — findings already paid for, and on the incumbent's side
+// drawn from a rate-limited allowance the benchmark's live path does not even
+// cache. TestEveryPaidReviewIsRetainedWhateverTheJudgeSays holds the write above
+// every return that follows the judge.
+//
+// It does NOT change OpenDump. That function's nil-on-unset contract is shared
+// by the remaining callers and pinned by TestDumpDisabledCostsNothing, and the
+// nil no-op is what lets every call site drop a record unconditionally; a
+// default resolved inside it would also leave EnvDump empty, which is what the
+// re-judge path's collision check used to be the whole of. Batteries that want
+// retention ask for it here.
+//
+// WHICH BATTERIES THOSE ARE IS DERIVED, NOT LISTED, and the earlier version of
+// this sentence is why. It said the tuning axes still used OpenDump deliberately
+// because "their corpus can be reviewed again" — true of TestTunePersona, the
+// one battery that remains on OpenDump, and false of TestJudgeModels, which
+// prints the same judged table the head-to-head does and which
+// `make judge-models FIXTURES=$(HELD_OUT)` points at the spent-once corpus. A
+// class of caller was named where a property of one was meant.
+// TestEveryJudgedBatteryRetainsItsFindingsWithoutBeingAsked now derives the list
+// from the table: anything calling reportJudgedModels must open through here.
+//
+// battery names the caller, so a directory of retained runs says which produced
+// each file.
+func OpenRunDump(battery string, fixtures []Fixture) (*Dump, string, error) {
+	return openRunDumpAt(runDumpDir, battery, fixtures, time.Now().UTC(), os.Getpid())
+}
+
+// openRunDumpAt is OpenRunDump with the directory, clock and pid supplied, so
+// the naming and the refusal are testable without waiting for a second to pass.
+func openRunDumpAt(dir, battery string, fixtures []Fixture, now time.Time, pid int) (*Dump, string, error) {
+	// An operator who named a path gets exactly that path, truncation and all:
+	// the Makefile documents it, and second-guessing an explicit argument is how
+	// a tool becomes unpredictable.
+	if path := strings.TrimSpace(os.Getenv(EnvDump)); path != "" {
+		d, err := NewDump(path)
+		return d, path, err
+	}
+
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, "", err
+	}
+
+	final := filepath.Join(dir, runDumpName(battery, fixtures, now, pid))
+
+	// O_EXCL, not os.Create. The name makes a collision improbable and this makes
+	// it impossible to be SILENT, which is the property that matters: the file a
+	// second run would land on may be the only record of a held-out run, and
+	// os.Create would truncate it and report success. A refusal costs a rerun with
+	// a different name and is raised before this battery has spent anything.
+	f, err := os.OpenFile(final+dumpPartialSuffix, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, fs.ErrExist) {
+		return nil, "", fmt.Errorf("a run is already being written to %s%s; this one would have to "+
+			"overwrite it, and the corpus behind it may not be re-collectable",
+			final, dumpPartialSuffix)
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	if _, err := os.Stat(final); err == nil {
+		_ = f.Close()
+		_ = os.Remove(final + dumpPartialSuffix)
+		return nil, "", fmt.Errorf("a finished run is already retained at %s; this run would have "+
+			"to overwrite it, and the corpus behind it may not be re-collectable", final)
+	}
+	return &Dump{file: f, enc: json.NewEncoder(f), finalPath: final}, final, nil
+}
+
+// dumpPartialSuffix marks a dump that is still being written.
+//
+// A file under it is one whose writer has not finished, so a reader handed one
+// is reading a prefix of a run. Close renames it away, which makes completeness
+// a property of the NAME rather than of an environment variable the writer no
+// longer sets. See RejudgeInputProblem, which refuses one.
+const dumpPartialSuffix = ".partial"
+
+// runDumpName is the file name a retained run gets.
+//
+// Every part of it is load-bearing against ONE hazard: NewDump truncates, for a
+// reason its own comment gives, so a fixed default name would let the second
+// held-out benchmark destroy the first one's evidence with no warning and no
+// test failure. The corpus token is here because held-out and tuning runs are
+// the distinction the Makefile's truncation warning is actually about, and the
+// timestamp and pid are what make two runs land on two files.
+//
+// Uniqueness by name is not relied on alone: openRunDumpAt creates the file
+// exclusively, so a collision is a refusal rather than an overwrite.
+// TestARetainedRunRefusesToOverwriteAnEarlierOne covers the residual.
+func runDumpName(battery string, fixtures []Fixture, now time.Time, pid int) string {
+	corpus := "empty"
+	held, tuning := 0, 0
+	for _, f := range fixtures {
+		if HeldOut(f.Name) {
+			held++
+			continue
+		}
+		tuning++
+	}
+	switch {
+	case held > 0 && tuning > 0:
+		corpus = "mixed"
+	case held > 0:
+		corpus = "heldout"
+	case tuning > 0:
+		corpus = "tuning"
+	}
+
+	return fmt.Sprintf("%s-%s-%s-%d.jsonl",
+		sanitizeDumpName(battery), corpus, now.UTC().Format("20060102T150405Z"), pid)
+}
+
+// sanitizeDumpName reduces a caller-supplied label to something safe in a file
+// name, so a battery named with a slash cannot write outside the run directory.
+func sanitizeDumpName(s string) string {
+	var b strings.Builder
+	for _, r := range strings.TrimSpace(s) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('-')
+		}
+	}
+	if b.Len() == 0 {
+		return "run"
+	}
+	return b.String()
 }
 
 // Record writes one line per finding in the sample, and one line per credited
@@ -312,6 +507,7 @@ func (d *Dump) Record(s DumpSample) error {
 		rec.Path = f.Path
 		rec.Line = f.Line
 		rec.EndLine = f.EndLine
+		rec.AlsoAt = f.AlsoAt
 		rec.Severity = f.Severity
 
 		// Routed through severityAsSaid so this file and the published
@@ -359,7 +555,25 @@ func (d *Dump) Record(s DumpSample) error {
 	return nil
 }
 
-// Close releases the file.
+// Close releases the file, and for a retained run promotes it out of its
+// in-progress name.
+//
+// The rename is the completeness marker. A dump is written by a battery that
+// takes tens of minutes and is read by `make rejudge`, and the only guard
+// against reading one mid-write compares two environment variables — which a
+// path this file resolved for itself does not set. Renaming on Close moves that
+// guarantee into the file name, where a reader can check it. See
+// RejudgeInputProblem.
+//
+// THE DESTINATION IS CHECKED HERE TOO, and not because openRunDumpAt's check is
+// insufficient at the moment it runs. Between that check and this one sits a
+// battery that takes tens of minutes, and os.Rename is silent: a run that landed
+// on this name in the meantime would be replaced with no error and no trace. The
+// window is not reachable from anything in this package — that is why the
+// refusal below is a latent guard rather than an observed bug — but the argument
+// for the open-time check ("the file it would land on may be the only copy of a
+// held-out run") does not weaken while the run is going.
+// TestAFinishedRunIsNotRenamedOverAnother covers it.
 func (d *Dump) Close() error {
 	if d == nil {
 		return nil
@@ -368,5 +582,16 @@ func (d *Dump) Close() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	return d.file.Close()
+	if err := d.file.Close(); err != nil {
+		return err
+	}
+	if d.finalPath == "" {
+		return nil
+	}
+	if _, err := os.Stat(d.finalPath); err == nil {
+		return fmt.Errorf("a run appeared at %s while this one was writing; %s%s is left in place "+
+			"rather than renamed over it, because the corpus behind either may not be re-collectable",
+			d.finalPath, d.finalPath, dumpPartialSuffix)
+	}
+	return os.Rename(d.finalPath+dumpPartialSuffix, d.finalPath)
 }
