@@ -99,6 +99,17 @@ type Comment struct {
 
 	// Body is markdown.
 	Body string
+
+	// Fingerprint identifies the finding this comment reports independently
+	// of its wording and line, so a later run on the same pull request can
+	// recognise it as already posted. A provider that can carry it embeds it
+	// in the published comment; empty means the comment is not recognisable
+	// on a later run.
+	Fingerprint string
+
+	// Class is the finding's class, carried beside the fingerprint so a later
+	// run can match a reworded finding of the same kind at the same place.
+	Class string
 }
 
 // Diff sides for a review comment, matching GitHub's LEFT/RIGHT parameter.
@@ -117,6 +128,71 @@ type Review struct {
 
 	// Event selects how the review is submitted.
 	Event ReviewEvent
+
+	// Head is the revision this review looked at. A provider that can carry
+	// it records it with the review, which is how the next run on the same
+	// pull request knows what has already been reviewed.
+	Head string
+}
+
+// DirLister is implemented by providers that can name the entries of a
+// directory at the reviewed revision. It is what lets a review find the file
+// a Go package or a Python module lives in without guessing filenames.
+//
+// Separate from Provider for BaseResolver's reason: a provider that cannot
+// list must be unable to, and the caller then attaches no related context
+// rather than probing for files by name.
+type DirLister interface {
+	// ListDir returns the names of the entries directly under dir, with a
+	// trailing slash on subdirectories. It returns ErrNotFound when dir does
+	// not exist at the ref's head.
+	ListDir(ctx context.Context, ref Ref, dir string) ([]string, error)
+}
+
+// PriorReview is what earlier runs of this tool left on a pull request.
+type PriorReview struct {
+	// Head is the revision the most recent earlier run reviewed, or empty
+	// when no earlier run recorded one.
+	Head string
+
+	// Comments are the inline comments earlier runs published and that this
+	// tool can recognise as its own.
+	Comments []PriorComment
+}
+
+// PriorComment is one inline comment an earlier run published.
+type PriorComment struct {
+	Path string
+
+	// Line is where the forge currently shows the comment, which moves as
+	// the pull request is pushed to; zero when the forge no longer places it
+	// on the diff.
+	Line int
+
+	// Fingerprint and Class are read back from the marker the comment was
+	// published with. See Comment.Fingerprint.
+	Fingerprint string
+	Class       string
+}
+
+// PriorReviewer is implemented by providers that can read back what this tool
+// published on a pull request earlier.
+//
+// It is separate from Provider for BaseResolver's reason: a provider or test
+// double that cannot answer must be unable to, so the engine reviews the whole
+// change rather than assuming that nothing was posted before.
+type PriorReviewer interface {
+	PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
+}
+
+// IncrementalDiffer is implemented by providers that can say which files
+// changed between an earlier revision of the change and its current head.
+type IncrementalDiffer interface {
+	// ChangedSince returns the paths that differ between since and the ref's
+	// current head. ok is false when the question cannot be answered — since
+	// is no longer reachable from the head, as after a force push — in which
+	// case the whole change has to be reviewed again.
+	ChangedSince(ctx context.Context, ref Ref, since string) (paths []string, ok bool, err error)
 }
 
 // ReviewEvent selects the review disposition.

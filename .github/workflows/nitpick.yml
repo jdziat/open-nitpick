@@ -2,11 +2,11 @@
 name: Review
 
 on:
-  # Deliberately NOT synchronize: reviews are not yet deduplicated against
-  # comments already on the pull request, so every push would re-post the same
-  # findings. Add synchronize once incremental re-review lands.
+  # synchronize is safe: a run on a pull request this tool has reviewed before
+  # reads only the files changed since, and withholds findings already posted
+  # (review.incremental, on by default).
   pull_request:
-    types: [opened, reopened]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read

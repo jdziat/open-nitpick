@@ -376,6 +376,25 @@ func (d *dryRunProvider) BaseRevision(ctx context.Context, ref vcs.Ref) (string,
 	return resolver.BaseRevision(ctx, ref)
 }
 
+// PriorReview and ChangedSince forward for BaseRevision's reason: a dry run
+// has to preview the incremental review the real run would make, not a full
+// one that will never be published.
+func (d *dryRunProvider) PriorReview(ctx context.Context, ref vcs.Ref) (*vcs.PriorReview, error) {
+	reader, ok := d.source.(vcs.PriorReviewer)
+	if !ok {
+		return nil, fmt.Errorf("%s: cannot read earlier reviews", d.Name())
+	}
+	return reader.PriorReview(ctx, ref)
+}
+
+func (d *dryRunProvider) ChangedSince(ctx context.Context, ref vcs.Ref, since string) ([]string, bool, error) {
+	differ, ok := d.source.(vcs.IncrementalDiffer)
+	if !ok {
+		return nil, false, nil
+	}
+	return differ.ChangedSince(ctx, ref, since)
+}
+
 func (d *dryRunProvider) PublishReview(_ context.Context, ref vcs.Ref, review vcs.Review) error {
 	var b strings.Builder
 

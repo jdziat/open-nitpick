@@ -169,6 +169,23 @@ type Review struct {
 
 	// Summary emits a walkthrough summary alongside inline comments.
 	Summary bool `yaml:"summary"`
+
+	// Incremental makes a run on a pull request this tool has reviewed before
+	// read only the files changed since that review, and withhold findings it
+	// has already posted. It has no effect on a first review, on a local
+	// review, or when the earlier revision is no longer reachable — a force
+	// push reviews the whole change again.
+	Incremental bool `yaml:"incremental"`
+
+	// RelatedContext attaches, beside each changed file, the definitions it
+	// imports from elsewhere in the repository and uses on a changed line, so
+	// the model can read what a called function does instead of guessing.
+	RelatedContext bool `yaml:"related_context"`
+
+	// RelatedContextTokens bounds how much related context is attached per
+	// batch. It is spent from the request budget, so a large value narrows
+	// the window each changed file itself gets.
+	RelatedContextTokens int `yaml:"related_context_tokens"`
 }
 
 // Instruction is a path-scoped prompt addition. Every instruction whose Path

@@ -85,6 +85,15 @@ func Defaults() *Config {
 			MaxFileBytes:     256 * 1024,
 			SkipGenerated:    true,
 			Summary:          true,
+			// On by default because it only does anything on a pull request
+			// this tool has already reviewed, where the alternative is posting
+			// the same findings again on every push.
+			Incremental: true,
+			// Off until measured; see docs/findings.md. Reading a called
+			// function's definition is the kind of context that can just as
+			// easily hand a model something new to be wrong about.
+			RelatedContext:       false,
+			RelatedContextTokens: 8000,
 		},
 		Persona: DefaultPersona(),
 		// Stated rather than left to the zero value, because "off" here is a

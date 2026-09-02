@@ -86,9 +86,20 @@ jobs:
           fail-on: none
 ```
 
-Reviews are **not** deduplicated against comments already on the pull request,
-so `synchronize` would re-post the same findings on every push. Until that
-lands, trigger on `[opened, reopened]` only.
+A push to a pull request this tool has already reviewed is reviewed
+**incrementally**: only the files changed since the last review are read, and a
+finding an earlier run already posted is withheld rather than posted again. The
+review says which files it read and how many findings it withheld. A force push
+that makes the earlier revision unreachable reviews the whole change again. Set
+`review.incremental: false` to review the whole change on every push.
+
+How a finding is recognised as already posted: every comment carries a
+fingerprint of its path, class and title, and a review carries the revision it
+read. A finding matches an earlier comment when the fingerprints agree — which
+survives the line moving — or when the class and file agree and the line is
+within two of where the forge now shows the earlier comment, which survives a
+rewording. Deleting the bot's comment is how a reviewer says "do not post this
+again"; it will not come back.
 
 Exit codes: `0` clean, `1` findings at or above `fail_on`, `2` the review could
 not run. CI can tell "this change has problems" apart from "the reviewer broke".
@@ -122,6 +133,8 @@ models:
 review:
   fail_on: none                    # default: advisory. Set to error/critical to gate CI.
   min_severity: info               # drop anything below this entirely
+  incremental: true                # on a re-run, read only what changed since the last review
+  related_context: false           # attach imported definitions used on changed lines (see below)
   max_files: 60
   token_budget_per_request: 60000
   include_full_files: true         # send whole files, not just hunks
@@ -338,6 +351,34 @@ two are complementary and neither substitutes for the other.
 
 Unknown keys are rejected at load time, so a typo fails immediately instead of
 being silently ignored.
+
+### Related context
+
+A change is reviewed with the diff and the changed files. What the model does
+not see is the function the change calls: the prompt tells it not to speculate
+about code it was not shown, so a defect that turns on a callee's contract — a
+helper documented as "must be called with a deadline", a converter that takes
+dollars and is handed cents — is one it can only guess at.
+
+`review.related_context: true` attaches, beside each changed file, the
+definitions it imports from elsewhere in the repository and uses on a changed
+line: Go package-level functions, types and constants reached through the
+module's own import path; TypeScript and JavaScript exports reached through a
+relative import; Python module-level `def`, `class` and assignments reached
+through `from x import y` or `import x`. Each definition is attached with its
+doc comment, from its real line number, under a heading that says the file is
+not under review. Nothing under `node_modules`, a module cache or outside the
+checkout is ever read, and a file the change itself touches is never attached,
+because the model already has it.
+
+It is bounded by `review.related_context_tokens` per batch, spent only from
+what the request budget has left after the changed files themselves, so it can
+narrow nothing the file under review would have got. The summary lists every
+file read for context.
+
+It ships **off** until the measurement in [docs/findings.md](docs/findings.md)
+says otherwise. Context is not free: the same definitions that let a model
+confirm a defect give it more to be confidently wrong about.
 
 ### Personality and how much it nitpicks
 
@@ -881,6 +922,16 @@ The report separates three things that are easy to confuse:
   (`clean-refactor`, `style-only`) contain no bugs at all, so every finding
   there is noise by construction.
 
+**Three corpora.** `make eval` reads the tuning corpus. The held-out corpus is
+spent once at the end of a tuning round and is selected only by naming its
+fixtures. The multi-file corpus, `make benchmark-multifile`, is ten changes
+whose defect is only visible by reading a file the change does not touch; it
+measures `review.related_context` with the feature off and on, against every
+hosted reviewer with a cached or collectable review — Incumbent's CLI, and
+Contender's once `contender login` has been run. It lives outside the
+ground-truth registries the other two corpora carry, and its numbers should be
+read with that in mind; see `EveryFixture` in `internal/evals`.
+
 **Cost.** The default matrix is **17 models x 8 fixtures = 136 reviews**, plus a
 judge call each for `make judge-models`. That is not a cheap command. Pass
 `MODELS=` to narrow it:
@@ -904,8 +955,9 @@ a second, independent implementation.
 ## Status
 
 Early. The engine, both providers, structured output, linters, and the Action
-work end to end. Not yet done: incremental re-review on push, resolving
-superseded comments, `@nitpick` command handling, and a GitLab provider.
+work end to end, and a push to a reviewed pull request is reviewed
+incrementally. Not yet done: resolving superseded comments, `@nitpick` command
+handling, and a GitLab provider.
 
 ## License
 

@@ -43,6 +43,7 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 	review := vcs.Review{
 		Event:    vcs.EventComment,
 		Comments: make([]vcs.Comment, 0, len(report.Findings)),
+		Head:     report.Head,
 	}
 
 	for _, f := range report.Findings {
@@ -59,10 +60,12 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 		}
 
 		review.Comments = append(review.Comments, vcs.Comment{
-			Path: f.Path,
-			Line: f.Line,
-			Side: side,
-			Body: renderComment(f, emoji),
+			Path:        f.Path,
+			Line:        f.Line,
+			Side:        side,
+			Body:        renderComment(f, emoji),
+			Fingerprint: Fingerprint(f),
+			Class:       f.Class,
 		})
 	}
 
@@ -227,6 +230,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// findings, these skips and these budgets are the product of a policy that
 	// is not the one in the change.
 	b.WriteString(policyNotice(report))
+	b.WriteString(incrementalNotice(report))
 	b.WriteString(nothingReviewedNotice(report))
 	b.WriteString(linterNotice(report))
 	b.WriteString(uncoveredNotice(report))
@@ -250,6 +254,44 @@ func renderSummary(report *Report, cfg *config.Config) string {
 		return ""
 	}
 	return out + "\n\n<sub>Reviewed by open-nitpick.</sub>"
+}
+
+// incrementalNotice states that this run read only part of the change, and
+// why, and how many of its findings were withheld as already posted.
+//
+// It is not collapsed and not gated on review.summary, for the same reason as
+// policyNotice: a review of three files on a pull request that touches twenty
+// has to say it read three, or an absence of findings on the other seventeen
+// reads as seventeen clean files this run looked at.
+func incrementalNotice(report *Report) string {
+	inc := report.Incremental
+	if inc == nil && len(report.AlreadyReported) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	if inc != nil {
+		since := inc.Since
+		if len(since) > 7 {
+			since = since[:7]
+		}
+		switch {
+		case len(inc.Reviewed) == 0:
+			fmt.Fprintf(&b, "**Nothing in this change has moved since the review at `%s`.**\n", since)
+		default:
+			fmt.Fprintf(&b, "**Reviewed the %d file(s) changed since the review at `%s`.**\n",
+				len(inc.Reviewed), since)
+		}
+		if n := len(inc.Unchanged); n > 0 {
+			fmt.Fprintf(&b, "%d other changed file(s) in this pull request were reviewed on an earlier\n"+
+				"push and were not re-read; findings on them are in the earlier review.\n", n)
+		}
+	}
+	if n := len(report.AlreadyReported); n > 0 {
+		fmt.Fprintf(&b, "%d finding(s) from this run were already posted by an earlier review and\n"+
+			"were not posted again.\n", n)
+	}
+	return blockquote(b.String())
 }
 
 // nothingReviewedNotice states that a change reached the end of a run without

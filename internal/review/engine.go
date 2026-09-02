@@ -380,6 +380,33 @@ type Report struct {
 	// Uncovered lists the parts of the change an analyzer ran over and did not
 	// fully cover. See LinterUncovered.
 	Uncovered []LinterUncovered
+
+	// Head is the revision this review looked at, when the provider knows
+	// it. It is published with the review so the next run can tell what has
+	// already been read.
+	Head string
+
+	// Incremental records that this run reviewed only the files changed since
+	// an earlier run, and which. Nil when the whole change was reviewed.
+	Incremental *Incremental
+
+	// AlreadyReported lists findings this run produced and withheld because an
+	// earlier run had already posted them. Kept, not dropped: the summary says
+	// how many, so a push whose only defects were already on the pull request
+	// does not read as a push that introduced none.
+	AlreadyReported []Finding
+}
+
+// Incremental describes a run that reviewed part of a change because the rest
+// had been reviewed before.
+type Incremental struct {
+	// Since is the revision the earlier review looked at.
+	Since string
+
+	// Reviewed and Unchanged are the changed files this run read and the
+	// ones it did not, because nothing in them moved since Since.
+	Reviewed  []string
+	Unchanged []string
 }
 
 // Complete reports whether every planned file was actually reviewed.
@@ -461,19 +488,32 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	}
 	e = next
 
+	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA}
+
+	// What an earlier run left on the pull request, read AFTER the policy is
+	// settled because review.incremental is policy. A provider that cannot
+	// answer — the local one, every test double that does not opt in — leaves
+	// prior nil and the whole change is reviewed, which is also what happens
+	// on a first run.
+	prior := e.priorReview(ctx, ref)
+	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, prior)
+
 	fetch := func(ctx context.Context, path string) ([]byte, error) {
 		return e.Provider.FileContent(ctx, ref, path)
 	}
 
-	plan, err := bundle.Assemble(ctx, e.Config, files, fetch)
+	plan, err := bundle.AssembleWith(ctx, e.Config, files, fetch, bundle.ListerFrom(e.Provider, ref))
 	if err != nil {
 		return nil, fmt.Errorf("assemble review: %w", err)
+	}
+	if plan.RelatedDefinitions > 0 {
+		e.log().Info("attached related context", "definitions", plan.RelatedDefinitions, "files", len(plan.RelatedFiles))
 	}
 	for _, s := range plan.Skipped {
 		e.log().Debug("skipped file", "path", s.Path, "reason", s.Reason)
 	}
 
-	report := &Report{Plan: plan, Policy: policy, Incomplete: unrenderable}
+	report.Plan = plan
 
 	if len(plan.Batches) == 0 {
 		e.log().Info("nothing to review")
@@ -579,12 +619,111 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings = e.applyGate(findings)
 	sortFindings(findings)
 
+	// After the gate, so what is counted as "already posted" is what would
+	// otherwise have been posted, and nothing below min_severity is.
+	findings, report.AlreadyReported = withholdAlreadyReported(findings, prior)
+
 	report.Overruled = e.gateOverruled(overruled)
 	report.Findings = findings
 	report.Summary = summary
 	report.Counts = counts(findings)
 
 	return report, e.publish(ctx, ref, report, files)
+}
+
+// priorReview asks the provider what earlier runs left on the pull request.
+//
+// Any failure is logged and treated as "nothing known": the cost of a wrong
+// answer here is a full re-review with duplicate comments, which is exactly
+// what every run did before this existed, while the cost of guessing would be
+// a review that skipped files on the strength of a request that failed.
+func (e *Engine) priorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview {
+	if !e.Config.Review.Incremental {
+		return nil
+	}
+	reader, ok := e.Provider.(vcs.PriorReviewer)
+	if !ok {
+		return nil
+	}
+	prior, err := reader.PriorReview(ctx, ref)
+	if err != nil {
+		e.log().Warn("could not read earlier reviews; reviewing the whole change", "error", err)
+		return nil
+	}
+	return prior
+}
+
+// narrowToChangedSince restricts a diff to the files that moved since the last
+// run this tool made on the pull request.
+//
+// It returns the files unchanged, and no note, whenever the question cannot be
+// answered: no earlier run, an earlier run that did not record its head, the
+// same head as before, a provider that cannot compare, or a force push that
+// made the earlier head unreachable. Every one of those is a full review, and
+// the note is what tells the reader the difference.
+func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, files diff.Files, prior *vcs.PriorReview) (diff.Files, *Incremental) {
+	if prior == nil || prior.Head == "" || pr == nil {
+		return files, nil
+	}
+	if prior.Head == pr.HeadSHA {
+		// The same commit reviewed again — a reopen, or a re-run. Nothing
+		// moved, so nothing is re-read; the findings already posted are
+		// withheld below and the run says so.
+		return nil, &Incremental{Since: prior.Head, Unchanged: files.Paths()}
+	}
+	differ, ok := e.Provider.(vcs.IncrementalDiffer)
+	if !ok {
+		return files, nil
+	}
+
+	changed, ok, err := differ.ChangedSince(ctx, ref, prior.Head)
+	if err != nil {
+		e.log().Warn("could not compare against the earlier review; reviewing the whole change",
+			"since", prior.Head, "error", err)
+		return files, nil
+	}
+	if !ok {
+		e.log().Info("earlier reviewed revision is not an ancestor of this one; reviewing the whole change",
+			"since", prior.Head)
+		return files, nil
+	}
+
+	moved := make(map[string]bool, len(changed))
+	for _, p := range changed {
+		moved[p] = true
+	}
+
+	note := &Incremental{Since: prior.Head}
+	var kept diff.Files
+	for _, f := range files {
+		// A rename since the last review shows up under either name.
+		if moved[f.Path] || (f.OldPath != "" && moved[f.OldPath]) {
+			kept = append(kept, f)
+			note.Reviewed = append(note.Reviewed, f.Path)
+			continue
+		}
+		note.Unchanged = append(note.Unchanged, f.Path)
+	}
+
+	e.log().Info("incremental review", "since", prior.Head,
+		"files", len(kept), "unchanged", len(note.Unchanged))
+	return kept, note
+}
+
+// withholdAlreadyReported splits findings into those to publish and those an
+// earlier run already posted.
+func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publish, withheld []Finding) {
+	if prior == nil || len(prior.Comments) == 0 {
+		return findings, nil
+	}
+	for _, f := range findings {
+		if alreadyReported(f, prior) {
+			withheld = append(withheld, f)
+			continue
+		}
+		publish = append(publish, f)
+	}
+	return publish, withheld
 }
 
 // analyze reviews every batch, bounded by the configured concurrency.

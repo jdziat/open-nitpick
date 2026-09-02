@@ -170,6 +170,45 @@ func (g *GitHub) FileContent(ctx context.Context, ref Ref, path string) ([]byte,
 	return data, nil
 }
 
+// ListDir names the entries of a directory at the pull request's head.
+func (g *GitHub) ListDir(ctx context.Context, ref Ref, dir string) ([]string, error) {
+	if err := validateRef(ref); err != nil {
+		return nil, err
+	}
+
+	sha := ref.Head
+	if sha == "" {
+		pr, err := g.PullRequest(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		sha = pr.HeadSHA
+	}
+
+	file, entries, resp, err := g.client.Repositories.GetContents(ctx, ref.Owner, ref.Repo, strings.Trim(dir, "/"),
+		&github.RepositoryContentGetOptions{Ref: sha})
+	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("%s at %s: %w", dir, sha, ErrNotFound)
+		}
+		return nil, fmt.Errorf("github: list %s: %w", dir, err)
+	}
+	if file != nil {
+		return nil, fmt.Errorf("%s is a file: %w", dir, ErrNotFound)
+	}
+
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		switch e.GetType() {
+		case "dir":
+			names = append(names, e.GetName()+"/")
+		case "file":
+			names = append(names, e.GetName())
+		}
+	}
+	return names, nil
+}
+
 // maxCommentsPerReview bounds a single published review.
 //
 // GitHub rejects oversized review payloads, and a pull request buried under a
@@ -201,6 +240,12 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	if body != "" {
 		body += "\n" + g.Bot
 	}
+	// The head marker goes on the review body rather than on each comment
+	// because a review with no comments still has to record what it read: the
+	// next push must not re-review files this one found clean.
+	if marker := headMarker(review.Head); marker != "" {
+		body += "\n" + marker
+	}
 
 	drafts := make([]*github.DraftReviewComment, 0, len(comments))
 	for _, c := range comments {
@@ -209,11 +254,16 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 			side = SideRight
 		}
 
+		body := c.Body + "\n" + g.Bot
+		if marker := fingerprintMarker(c.Fingerprint, c.Class); marker != "" {
+			body += "\n" + marker
+		}
+
 		drafts = append(drafts, &github.DraftReviewComment{
 			Path: github.Ptr(c.Path),
 			Line: github.Ptr(c.Line),
 			Side: github.Ptr(side),
-			Body: github.Ptr(c.Body + "\n" + g.Bot),
+			Body: github.Ptr(body),
 		})
 	}
 
@@ -227,6 +277,9 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	// with review.summary disabled.
 	if strings.TrimSpace(body) == "" {
 		body = defaultReviewBody(len(comments), g.Bot)
+		if marker := headMarker(review.Head); marker != "" {
+			body += "\n" + marker
+		}
 	}
 
 	request := &github.PullRequestReviewRequest{
@@ -254,6 +307,149 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	}
 
 	return fmt.Errorf("github: create review on %s: %w", ref, err)
+}
+
+// PriorReview reads back what earlier runs of this tool published on the pull
+// request: the revision the latest run looked at, and every inline comment
+// still carrying this tool's marker.
+//
+// Both come from the forge rather than from state kept anywhere else, because
+// a GitHub Actions job has nowhere else. A comment a human deleted is gone from
+// the answer, which is the right reading — deleting the bot's comment is how a
+// reviewer asks for it not to be there, not for it to be re-posted.
+func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error) {
+	if err := validateRef(ref); err != nil {
+		return nil, err
+	}
+
+	out := &PriorReview{}
+
+	// The head of the LATEST review this tool submitted. Reviews arrive oldest
+	// first and a run on a stale commit may finish after a run on a newer one,
+	// so the highest review id wins rather than the last page's last entry.
+	var latestID int64
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		reviews, resp, err := g.client.PullRequests.ListReviews(ctx, ref.Owner, ref.Repo, ref.Number, opts)
+		if err != nil {
+			return nil, fmt.Errorf("github: list reviews on %s: %w", ref, err)
+		}
+		for _, r := range reviews {
+			body := r.GetBody()
+			if !strings.Contains(body, g.Bot) {
+				continue
+			}
+			head, ok := parseHead(body)
+			if !ok || r.GetID() < latestID {
+				continue
+			}
+			latestID = r.GetID()
+			out.Head = head
+		}
+		if resp == nil || resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	copts := &github.PullRequestListCommentsOptions{ListOptions: github.ListOptions{PerPage: 100}}
+	for {
+		comments, resp, err := g.client.PullRequests.ListComments(ctx, ref.Owner, ref.Repo, ref.Number, copts)
+		if err != nil {
+			return nil, fmt.Errorf("github: list review comments on %s: %w", ref, err)
+		}
+		for _, c := range comments {
+			body := c.GetBody()
+			if !strings.Contains(body, g.Bot) {
+				continue
+			}
+			fp, class, ok := parseFingerprint(body)
+			if !ok {
+				continue
+			}
+			out.Comments = append(out.Comments, PriorComment{
+				Path:        c.GetPath(),
+				Line:        c.GetLine(),
+				Fingerprint: fp,
+				Class:       class,
+			})
+		}
+		if resp == nil || resp.NextPage == 0 {
+			break
+		}
+		copts.Page = resp.NextPage
+	}
+
+	return out, nil
+}
+
+// ChangedSince names the files that differ between an earlier reviewed
+// revision and the pull request's current head.
+//
+// A force push is the case that matters. The earlier head may no longer be
+// reachable at all, in which case the API answers 404, or the branch may have
+// been rebased so that the comparison reads "diverged"; either way the honest
+// answer is that the question cannot be answered, and the caller reviews the
+// whole change again rather than a guess at part of it.
+func (g *GitHub) ChangedSince(ctx context.Context, ref Ref, since string) ([]string, bool, error) {
+	if err := validateRef(ref); err != nil {
+		return nil, false, err
+	}
+	since = strings.TrimSpace(since)
+	if since == "" {
+		return nil, false, nil
+	}
+
+	head := ref.Head
+	if head == "" {
+		pr, err := g.PullRequest(ctx, ref)
+		if err != nil {
+			return nil, false, err
+		}
+		head = pr.HeadSHA
+	}
+
+	var paths []string
+	seen := map[string]bool{}
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		cmp, resp, err := g.client.Repositories.CompareCommits(ctx, ref.Owner, ref.Repo, since, head, opts)
+		if err != nil {
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
+				// The earlier head is gone: rewritten away by a force push.
+				return nil, false, nil
+			}
+			return nil, false, fmt.Errorf("github: compare %s...%s: %w", since, head, err)
+		}
+
+		switch cmp.GetStatus() {
+		case "ahead", "identical":
+			// The earlier head is an ancestor of this one (or is this one),
+			// so the files between them are exactly what the pushes since
+			// touched.
+		default:
+			// "diverged" or "behind": the branch was rewritten, and a file
+			// list between two unrelated commits says nothing about what the
+			// pull request's diff now contains.
+			return nil, false, nil
+		}
+
+		for _, f := range cmp.Files {
+			for _, p := range []string{f.GetFilename(), f.GetPreviousFilename()} {
+				if p != "" && !seen[p] {
+					seen[p] = true
+					paths = append(paths, p)
+				}
+			}
+		}
+
+		if resp == nil || resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return paths, true, nil
 }
 
 // defaultReviewBody is used when summaries are disabled, since GitHub requires

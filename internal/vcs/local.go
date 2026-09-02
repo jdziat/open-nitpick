@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -168,6 +169,94 @@ func (l *Local) FileContent(ctx context.Context, ref Ref, path string) ([]byte, 
 		return nil, err
 	}
 	return out, nil
+}
+
+// ListDir names the entries of a directory at the ref's head, confined to the
+// repository the same way FileContent is.
+func (l *Local) ListDir(ctx context.Context, ref Ref, dir string) ([]string, error) {
+	dir = strings.Trim(strings.TrimSpace(dir), "/")
+
+	if ref.Head == Worktree {
+		root, err := os.OpenRoot(l.Dir)
+		if err != nil {
+			return nil, fmt.Errorf("open repository root: %w", err)
+		}
+		defer func() { _ = root.Close() }()
+
+		target := "."
+		if dir != "" {
+			target = filepath.FromSlash(dir)
+		}
+		f, err := root.Open(target)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", dir, ErrNotFound)
+		}
+		defer func() { _ = f.Close() }()
+
+		entries, err := f.ReadDir(-1)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", dir, ErrNotFound)
+		}
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			// Symlinks are refused for the reason readContained refuses
+			// them: nothing here should follow a link anywhere.
+			if e.Type()&os.ModeSymlink != 0 {
+				continue
+			}
+			if e.IsDir() {
+				names = append(names, e.Name()+"/")
+				continue
+			}
+			names = append(names, e.Name())
+		}
+		sort.Strings(names)
+		return names, nil
+	}
+
+	spec := ref.Head + ":" + dir
+	if dir == "" {
+		spec = ref.Head + ":"
+	}
+	out, err := l.gitRaw(ctx, "ls-tree", "--name-only", spec)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return nil, fmt.Errorf("%s at %s: %w", dir, ref.Head, ErrNotFound)
+		}
+		return nil, err
+	}
+	// ls-tree prints names without a type marker in this form; a second call
+	// with the long form is not worth it, so directories are told apart by
+	// asking the tree whether each entry has children — cheaply, by mode.
+	long, err := l.gitRaw(ctx, "ls-tree", spec)
+	if err != nil {
+		return nil, err
+	}
+	dirs := map[string]bool{}
+	for line := range strings.SplitSeq(strings.TrimSpace(string(long)), "\n") {
+		// "<mode> <type> <hash>\t<name>"
+		meta, name, ok := strings.Cut(line, "\t")
+		if !ok {
+			continue
+		}
+		if fields := strings.Fields(meta); len(fields) >= 2 && fields[1] == "tree" {
+			dirs[name] = true
+		}
+	}
+	var names []string
+	for name := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		if name == "" {
+			continue
+		}
+		if dirs[name] {
+			names = append(names, name+"/")
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names, nil
 }
 
 // readContained reads a repository-relative path, refusing anything that

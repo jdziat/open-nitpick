@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -47,6 +48,10 @@ type Entry struct {
 
 	// Instructions are the configured path-scoped prompts that apply here.
 	Instructions []string
+
+	// Related are definitions from files the change does not touch, attached
+	// because a changed line uses them. See related.go.
+	Related []Related
 
 	// Tokens is the estimated cost of rendering this entry.
 	Tokens int
@@ -116,6 +121,13 @@ type Plan struct {
 	// a comment naming an open regression is read as a task, and this one sent
 	// the next reader to implement something that already existed.
 	Windowed []Skip
+
+	// RelatedFiles names the files the change does not touch that related
+	// context was read from, and RelatedDefinitions counts what was attached.
+	// Disclosed so a reader knows the model saw more than the diff and its
+	// files — and which files, since a finding may lean on one.
+	RelatedFiles       []string
+	RelatedDefinitions int
 }
 
 // Skip records one excluded file.
@@ -166,12 +178,25 @@ func diffOnlyReason(limit string) string {
 // failure for one file downgrades that file to diff-only rather than failing
 // the run, since a partial review is far more useful than none.
 func Assemble(ctx context.Context, cfg *config.Config, files diff.Files, fetch ContentFetcher) (*Plan, error) {
+	return AssembleWith(ctx, cfg, files, fetch, nil)
+}
+
+// AssembleWith is Assemble with a directory lister, which related context
+// needs to find the file a Go package or Python module defines a name in.
+// A nil lister attaches related context for the languages that can be
+// resolved without one and none for Go.
+func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fetch ContentFetcher, list DirLister) (*Plan, error) {
 	if cfg == nil {
 		return nil, errors.New("bundle: nil config")
 	}
 
 	plan := &Plan{}
 	estimator := llms.DefaultTokenEstimator()
+
+	var related *relatedCollector
+	if cfg.Review.RelatedContext && fetch != nil {
+		related = newRelatedCollector(ctx, files, fetch, list)
+	}
 
 	// Selection and content run in one pass so that review.max_files counts
 	// files that were actually reviewed. Selecting first meant a generated file
@@ -234,6 +259,20 @@ func Assemble(ctx context.Context, cfg *config.Config, files diff.Files, fetch C
 				plan.Windowed = append(plan.Windowed, Skip{Path: f.Path, Reason: reason})
 			} else {
 				plan.Degraded = append(plan.Degraded, Skip{Path: f.Path, Reason: reason})
+			}
+		}
+
+		// After fitEntry, so the file's own window is decided first and the
+		// related context takes only what the request has left — never the
+		// other way round.
+		if related != nil {
+			budget := min(cfg.Review.RelatedContextTokens, cfg.Review.TokenBudgetPerRequest-entry.Tokens)
+			entry.Tokens += related.collect(&entry, budget, estimator)
+			for _, r := range entry.Related {
+				plan.RelatedDefinitions++
+				if !slices.Contains(plan.RelatedFiles, r.Path) {
+					plan.RelatedFiles = append(plan.RelatedFiles, r.Path)
+				}
 			}
 		}
 		entries = append(entries, entry)
@@ -520,6 +559,18 @@ func Render(e Entry) string {
 			b.WriteString(numberLines(e.Content))
 		}
 		b.WriteString("```\n")
+	}
+
+	if len(e.Related) > 0 {
+		// Stated as context and not as a file under review, twice: the heading
+		// says so, and the anchoring rule already confines findings to the
+		// paths listed for the batch. A finding placed on one of these files
+		// is dropped by the anchor filter, so the model is told not to try.
+		b.WriteString("\n#### Definitions this change uses, from files it does not touch\n\n")
+		b.WriteString("Context only. These files are not under review: judge the change by them, but do not report findings on them.\n\n")
+		for _, r := range e.Related {
+			b.WriteString(renderRelated(r))
+		}
 	}
 
 	return b.String()
