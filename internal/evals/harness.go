@@ -40,6 +40,11 @@ const (
 	// Those responses become offline regression fixtures.
 	EnvCapture = "NITPICK_EVAL_CAPTURE"
 
+	// EnvRelatedContext switches review.related_context on for every review in
+	// the run, so the feature can be measured against the same corpus with it
+	// off. Any non-empty value other than "0" or "false" enables it.
+	EnvRelatedContext = "NITPICK_EVAL_RELATED_CONTEXT"
+
 	// EnvTimeout overrides how long a single review may take.
 	//
 	// The default suits a one-file fixture. It is not enough for a multi-file
@@ -138,6 +143,11 @@ type Options struct {
 	// Timeout bounds a single review.
 	Timeout time.Duration
 
+	// Tune, when set, adjusts the configuration every review in the run is
+	// built with, after the environment has been read. It is how one process
+	// measures two variants of the engine against the same corpus.
+	Tune func(*config.Config)
+
 	// buildClient constructs the model client. It is unexported and nil in
 	// every real run, where llm.Build is used.
 	//
@@ -233,7 +243,7 @@ func OptionsFromEnv() (Options, error) {
 		// no tuning run picks up the held-out corpus by accident — spending it
 		// takes saying its name, spelled correctly.
 		known := map[string]Fixture{}
-		for _, f := range AllFixtures() {
+		for _, f := range EveryFixture() {
 			known[f.Name] = f
 		}
 
@@ -259,7 +269,7 @@ func OptionsFromEnv() (Options, error) {
 
 		if len(unknown) > 0 {
 			names := make([]string, 0, len(known))
-			for _, f := range AllFixtures() {
+			for _, f := range EveryFixture() {
 				names = append(names, f.Name)
 			}
 			return opts, fmt.Errorf("%s names %d fixture(s) that do not exist: %s (known: %s)",
@@ -315,25 +325,40 @@ func HeldOut(fixture string) bool {
 // header. A mixed selection is called out as mixed rather than rounded to
 // whichever half is larger.
 func CorpusLabel(fixtures []Fixture) string {
-	var held, tuning int
+	var held, tuning, multi int
 	for _, f := range fixtures {
-		if HeldOut(f.Name) {
+		switch {
+		case HeldOut(f.Name):
 			held++
-			continue
+		case MultiFile(f.Name):
+			multi++
+		default:
+			tuning++
 		}
-		tuning++
 	}
 
 	switch {
-	case held == 0 && tuning == 0:
+	case held == 0 && tuning == 0 && multi == 0:
 		return "EMPTY (no fixtures selected)"
-	case held == 0:
+	case held == 0 && multi == 0:
 		return fmt.Sprintf("TUNING corpus (%d fixture(s))", tuning)
-	case tuning == 0:
+	case tuning == 0 && multi == 0:
 		return fmt.Sprintf("HELD-OUT corpus (%d fixture(s)) — spent once; a gain measured here is a generalization claim", held)
+	case tuning == 0 && held == 0:
+		return fmt.Sprintf("MULTI-FILE corpus (%d fixture(s)) — the contract is in a file the change does not touch", multi)
 	default:
-		return fmt.Sprintf("MIXED corpus (%d tuning + %d HELD-OUT fixture(s)) — not a generalization measurement", tuning, held)
+		return fmt.Sprintf("MIXED corpus (%d tuning + %d HELD-OUT + %d multi-file fixture(s)) — not a generalization measurement", tuning, held, multi)
 	}
+}
+
+// MultiFile reports whether a fixture belongs to the multi-file corpus.
+func MultiFile(fixture string) bool {
+	for _, f := range MultiFileFixtures() {
+		if f.Name == fixture {
+			return true
+		}
+	}
+	return false
 }
 
 // buildRepo materializes a fixture as a git repository whose working tree
@@ -522,6 +547,9 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	// function the provider happened to break.
 	cfg := evalConfig(model)
 	cfg.Persona = persona.Resolve()
+	if opts.Tune != nil {
+		opts.Tune(cfg)
+	}
 
 	out := RunResult{
 		Model: model.ID, Fixture: f.Name, Run: runIndex,
@@ -639,6 +667,14 @@ func evalConfig(model Model) *config.Config {
 	// Linters are deterministic and separately tested; excluding them keeps the
 	// score a measurement of the prompt.
 	cfg.Linters.Mode = config.LinterOff
+
+	// Off unless the run asks, matching the shipped default; the harness is
+	// how the default gets decided. See docs/findings.md.
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvRelatedContext))) {
+	case "", "0", "false", "off":
+	default:
+		cfg.Review.RelatedContext = true
+	}
 
 	// Report everything the model says so precision can actually be measured.
 	cfg.Review.MinSeverity = config.SeverityNit

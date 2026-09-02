@@ -633,3 +633,20 @@ pre-registration guards against.
 Conditions 1 and 2 stand as written, and so does every non-claim: no cross-tool
 severity accuracy, no generalisation from a pooled figure without the held-out
 one beside it, no cost ranking across overlapping routing bands.
+
+## The third corpus
+
+`MultiFileFixtures` is a corpus of changes whose defect is only visible by
+reading a file the change does not touch. It exists to measure
+`review.related_context` and to compare against hosted reviewers on the shape
+of change they index a repository for.
+
+**Rule 15 — it is neither tuning nor held-out, and it is outside the
+registries.** It is re-runnable, so a gain on it is not a generalization claim
+(Rule 14 does not apply). It is also outside `AllFixtures`, so none of the
+cross-fixture keyword sweeps in `groundtruth_test.go` run over it; its own test
+checks anchors, self-credit, and that no keyword is a token of the change, and
+nothing more. A number from it is a measurement of this corpus by this
+instrument, and the sentence that reports it should say so. Its first spend is
+recorded in [findings.md](findings.md#related-context-on-the-multi-file-corpus).
+

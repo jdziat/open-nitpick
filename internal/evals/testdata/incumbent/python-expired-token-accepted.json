@@ -1,0 +1,19 @@
+{
+  "fixture": "python-expired-token-accepted",
+  "findings": [
+    {
+      "path": "app/api.py",
+      "line": 14,
+      "severity": "info",
+      "category": "Functional Correctness",
+      "class": "correctness",
+      "title": "Match the Bearer scheme case-insensitively.",
+      "rationale": "current_user rejects valid case variants before token verification. Compare only the scheme case-insensitively, then pass the token unchanged to verify().",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-02T23:42:46Z",
+  "mode": "plaintext",
+  "fingerprint": "7c51b0231d8e83d811da7e85cc6104631983eb2b749af106d5f604fa8bc2196c",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1706472606\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  minor [Functional Correctness]\n  → app/api.py:14\n\n  Match the Bearer scheme case-insensitively.\n\n  current_user rejects valid case variants before token verification.\n  Compare only the scheme case-insensitively, then pass the token unchanged\n  to verify().\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMinor    1\n\n1 file reviewed:\n  - app/api.py\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 8s elapsed\nFinishing analysis tools... 19s elapsed\nWriting review comments... 19s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

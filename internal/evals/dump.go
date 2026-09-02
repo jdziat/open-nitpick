@@ -394,19 +394,24 @@ const dumpPartialSuffix = ".partial"
 // TestARetainedRunRefusesToOverwriteAnEarlierOne covers the residual.
 func runDumpName(battery string, fixtures []Fixture, now time.Time, pid int) string {
 	corpus := "empty"
-	held, tuning := 0, 0
+	held, tuning, multi := 0, 0, 0
 	for _, f := range fixtures {
-		if HeldOut(f.Name) {
+		switch {
+		case HeldOut(f.Name):
 			held++
-			continue
+		case MultiFile(f.Name):
+			multi++
+		default:
+			tuning++
 		}
-		tuning++
 	}
 	switch {
-	case held > 0 && tuning > 0:
+	case (held > 0 && tuning > 0) || (multi > 0 && (held > 0 || tuning > 0)):
 		corpus = "mixed"
 	case held > 0:
 		corpus = "heldout"
+	case multi > 0:
+		corpus = "multifile"
 	case tuning > 0:
 		corpus = "tuning"
 	}

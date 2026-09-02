@@ -1,0 +1,8 @@
+{
+  "fixture": "ts-money-units",
+  "findings": null,
+  "at": "2026-09-02T23:36:25Z",
+  "mode": "plaintext",
+  "fingerprint": "5e8375c149e7bfd5b79bec4306940aac20c935d9681285973b6eaaa01d701845",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1487718289\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - src/checkout.ts\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 8s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

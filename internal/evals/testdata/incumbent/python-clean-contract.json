@@ -1,0 +1,8 @@
+{
+  "fixture": "python-clean-contract",
+  "findings": null,
+  "at": "2026-09-02T23:44:39Z",
+  "mode": "plaintext",
+  "fingerprint": "2958b64a81d2d2786518e3c48ff6ca30aabb45c0a46633a90c6fe18ad12ca879",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3817948951\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - app/ledger.py\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 6s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\n"
+}

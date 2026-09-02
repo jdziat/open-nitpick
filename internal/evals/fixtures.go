@@ -307,6 +307,21 @@ func AllFixtures() []Fixture {
 	return append(all, HeldOutFixtures()...)
 }
 
+// EveryFixture is AllFixtures plus the multi-file corpus, for name lookup.
+//
+// The multi-file corpus is deliberately NOT in AllFixtures. The ground-truth
+// suite that iterates AllFixtures carries hand-maintained registries for every
+// plant — anchor assertions, hit and miss probes, severity pins, and
+// cross-fixture prose sweeps — and the multi-file corpus is validated by its
+// own, narrower test (TestMultiFileCorpusIsWellFormed) instead. That is a
+// weaker guarantee, and a claim about that corpus should be read with it in
+// mind: its keywords have not been swept against every other fixture's
+// recorded prose.
+func EveryFixture() []Fixture {
+	all := AllFixtures()
+	return append(all, MultiFileFixtures()...)
+}
+
 // contractBreakFixture renames the wire name of a field on a public payload.
 //
 // Nothing in the tuning corpus tests the contract class, and this is the shape

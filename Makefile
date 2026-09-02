@@ -188,6 +188,7 @@ eval:
 	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(CAPTURE),NITPICK_EVAL_CAPTURE='$(CAPTURE)') \
+	$(if $(RELATED),NITPICK_EVAL_RELATED_CONTEXT='$(RELATED)') \
 	go test -tags=eval -count=1 -timeout=60m -v -run 'TestPrompts|TestPlanted|TestKeywords' ./internal/evals/
 
 # Compare persona variants, judged by a strong model standing in for a senior
@@ -235,6 +236,26 @@ rejudge:
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
 	$(if $(BASELINE),NITPICK_EVAL_BASELINE_JUDGE='$(BASELINE)') \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestRejudgeDump ./internal/evals/
+
+# Judge-free head-to-head on the MULTI-FILE corpus: every model with related
+# context off and on, against every incumbent with a cached or collectable
+# review (Incumbent, and Contender once `contender login` has been run).
+# FIXTURES= points it at any other corpus, e.g. the tuning corpus, to see what
+# related context costs where the defect is in the diff.
+.PHONY: benchmark-multifile
+benchmark-multifile:
+	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
+	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
+	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
+	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
+	go test -tags=eval -count=1 -timeout=120m -v -run TestBenchmarkMultiFile ./internal/evals/
+
+# Collect Contender reviews for the multi-file corpus (or FIXTURES=), caching
+# each. Requires the contender CLI, signed in: contender login
+.PHONY: collect-contender
+collect-contender:
+	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
+	go test -tags=eval -count=1 -timeout=120m -v -run TestCollectContender ./internal/evals/
 
 # Collect Incumbent reviews one fixture at a time, caching each.
 # The free CLI allowance is small; re-run until nothing is outstanding.

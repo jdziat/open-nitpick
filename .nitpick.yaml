@@ -25,6 +25,10 @@ review:
   fail_on: none
   min_severity: info
   concurrency: 4
+  # Off in the shipped defaults until measured more widely; on here, where
+  # reviews are advisory, because docs/findings.md's multi-file table is the
+  # evidence that it finds what a diff-only review cannot.
+  related_context: true
 
 instructions:
   - path: "**/*.go"

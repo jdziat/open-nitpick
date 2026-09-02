@@ -401,9 +401,107 @@ outside the tree, so a `//nolint` the change adds is now named on the pull
 request. The other three analyzers' inline configuration is neither disabled nor
 counted. See the task list.
 
+## Related context, on the multi-file corpus
+
+`review.related_context` attaches the definitions a changed line uses from
+files the change does not touch. The multi-file corpus (`MultiFileFixtures`,
+ten fixtures, eight plants, two clean controls) is the first corpus where that
+can matter: in every fixture the contract the change breaks is a doc comment in
+a file that is byte-identical between Base and Head. Rule 15 applies — this
+corpus is re-runnable, is outside the ground-truth registries, and was
+authored by the same hand that wrote the feature, on the same day.
+
+One run, `anthropic/claude-sonnet-4.6` at two runs per fixture, both variants
+in the same process against the same shipped Incumbent cache. Counted, no
+judge:
+
+| contender | RECALL | NOISE / review | ANCHOR | critical | error | warning |
+|---|---|---|---|---|---|---|
+| sonnet-4.6 + related context | **1.00** (16/16) | 0.40 (8/20) | 1 | 4/4 | 8/8 | 4/4 |
+| sonnet-4.6, diff only | 0.88 (14/16) | 0.40 (8/20) | 1 | 4/4 | 6/8 | 4/4 |
+| incumbent/cli | 0.12 (1/8) | 0.40 (4/10) | 2 | 1/2 | 0/4 | 0/2 |
+| contender/cli | not collected | | | | | |
+
+Resolution: 8 plants at two runs is 16 observations, so one defect is 0.0625.
+The gap is two observations, and they are the same fixture twice.
+
+**What the gain is.** All of it is `python-expired-token-accepted`: the
+change trusts `verify()`'s claims after a `None` check, and `verify`'s
+docstring — in a file the diff does not carry — says it checks the signature
+only and that callers must call `is_expired`. Diff-only, both runs reported a
+`KeyError` hazard on the same line and said in so many words that whether it
+is reachable "depends on what `verify` guarantees"; with the docstring
+attached, both runs reported the expired-token acceptance and quoted the
+docstring. That is the shape the feature was built for, and it happened
+exactly once in eight plants.
+
+**Why only once.** Six of the other seven plants were found without the
+callee, and reading the reviews says why: the diff itself carried enough. The
+`priceCents` field is named and documented in the changed file, so the unit
+mismatch is visible from the call site alone; the retry wrapper's name says
+what it does; the empty `Filter` passes two optional parameters straight
+through. A corpus of contracts that a competent reviewer could infer from the
+call site is a corpus that does not need the callee, and seven of these eight
+turned out to be that. The one that was not is the one the feature moved.
+
+**What it costs.** Noise per review is identical, 0.40 against 0.40, and the
+identical figure hides a trade. Diff-only, the noise was one finding per run
+on `python-expired-token-accepted` (the `KeyError` guess) and one on the
+`ts-clean-contract` control; with context, those two `KeyError` findings
+became detections and two new findings appeared on the `python-clean-contract`
+control — that `with_retry` retries every exception, which is a remark about
+the helper's design rather than about the change wrapping a balance read in
+it. So related context moved one guess into a detection and bought one
+finding about a file the change does not touch, on the control built to
+catch exactly that. The review prompt tells the model to judge the change and
+not the file; with more file in front of it, it judged more file.
+
+**Corpus artifacts, disclosed rather than repaired.** Two noise findings are
+the corpus's fault and land on both variants identically, so they do not move
+the comparison. `ts-clean-contract` answers a validation-only request with
+`201`, which both variants and Incumbent flag; and `go-query-without-deadline`
+writes an error after starting a JSON body and echoes the database error to
+the client, which both variants flag. An earlier spend of this corpus had two
+more — a `render` stub that discarded its rows and a doc comment claiming a
+tip was "recorded" — which were repaired, and the corpus re-run whole so the
+table above is one run. Every stub in a ten-file repository is a finding
+waiting to happen, and the honest reading of the NOISE column on this corpus
+is that most of it is the corpus.
+
+**The incumbent.** Incumbent's CLI, which indexes the repository, located 1
+of 8 — the plaintext key passed to the audit log, which it rated `critical` —
+and nothing whose contract sat in the unchanged file. Its other four findings
+on this corpus are the `201`, two notes that a raw database error is echoed
+to the client, and a case-insensitive `Bearer` remark; on the empty-filter
+fixture it commented on the error path and not on the delete. This is
+one CLI review per fixture against a free allowance, in plain-text mode, on
+the same day; nothing here says what the hosted product with a learned
+codebase does.
+
+**Contender was not measured.** The adapter is written and tested against the
+CLI's documented `--json` shape, and `make collect-contender` will collect
+once `contender login` has been run on the machine that runs it. Bugbot has no
+CLI and reviews only pull requests on a repository it is installed on, so
+there is no adapter and no number.
+
+**What this does and does not license.** Related context found one defect a
+diff-only review could not, on the one fixture whose contract was not
+inferable from the call site, and cost one finding on a control. The shipped
+default stays **off**, because a single model on a corpus its author wrote
+today is what Rule 15 exists to name — and this repository's own
+`.nitpick.yaml` turns it **on**, where reviews are advisory, because that is
+how the second spend gets made on changes nobody authored to be found.
+
+On the tuning corpus the feature is inert: sonnet-4.6 with and without it
+posted byte-identical detection (0.88, 14/16) and noise (0.19 per review)
+over sixteen fixtures, because a single-file fixture imports nothing from the
+repository and nothing is attached. That is not a precision measurement; it is
+a check that the switch does nothing where it has nothing to do.
+
 ## What is not yet known
 
-- Whether batching costs detection. Every fixture is one file; the packer has
+- Whether batching costs detection. The multi-file corpus now assembles
+  several files per fixture, but each fits one batch; the packer has still
   never been exercised by a measurement.
 - Whether the judge favours its own vendor. It is `openai/gpt-5.6-terra` and the
   battery includes `gpt-5.6-sol`, `sol-pro` and `terra-pro`.

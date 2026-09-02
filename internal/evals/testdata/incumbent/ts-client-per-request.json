@@ -1,0 +1,8 @@
+{
+  "fixture": "ts-client-per-request",
+  "findings": null,
+  "at": "2026-09-02T23:37:24Z",
+  "mode": "plaintext",
+  "fingerprint": "df302e5427851b465ee61b719bfcb3c1d243f3b4b9e058ca1b0d844699b14df3",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3051589259\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - src/quote.ts\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 15s elapsed\nWriting review comments... 15s elapsed\n"
+}

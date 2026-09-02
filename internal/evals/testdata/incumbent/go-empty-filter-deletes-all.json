@@ -1,0 +1,19 @@
+{
+  "fixture": "go-empty-filter-deletes-all",
+  "findings": [
+    {
+      "path": "api/admin.go",
+      "line": 39,
+      "severity": "warning",
+      "category": "Security \u0026 Privacy",
+      "class": "security",
+      "title": "Do not return the raw store error.",
+      "rationale": "err.Error() can expose internal database or infrastructure details to the caller. Return a stable generic message and log the original error on the server.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-02T23:34:47Z",
+  "mode": "plaintext",
+  "fingerprint": "407f6f3e6c3088ea123271d2917b723818f6accedb677f551d7584283a59e883",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2971768937\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Security \u0026 Privacy]\n  → api/admin.go:39\n\n  Do not return the raw store error.\n\n  err.Error() can expose internal database or infrastructure details to\n  the caller. Return a stable generic message and log the original error on\n  the server.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - api/admin.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 9s elapsed\nFinishing analysis tools... 22s elapsed\nWriting review comments... 22s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

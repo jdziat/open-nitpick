@@ -3660,16 +3660,20 @@ func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 	for _, f := range HeldOutFixtures() {
 		held[f.Name] = true
 	}
+	multi := map[string]bool{}
+	for _, f := range MultiFileFixtures() {
+		multi[f.Name] = true
+	}
 
 	for name, where := range authored {
 		reason, excused := exempt[name]
 
 		switch {
-		case tuning[name] && held[name]:
-			t.Errorf("%s authors %q and it is in BOTH corpora, so a fixture reported as held out is "+
-				"one the prompt is tuned on", where, name)
+		case tuning[name] && held[name], multi[name] && (tuning[name] || held[name]):
+			t.Errorf("%s authors %q and it is in MORE THAN ONE corpus, so a fixture reported as held out "+
+				"or multi-file is one the prompt is tuned on", where, name)
 
-		case excused && (tuning[name] || held[name]):
+		case excused && (tuning[name] || held[name] || multi[name]):
 			t.Errorf("%s authors %q, which is exempt from this check on the grounds that %s — and a "+
 				"corpus now contains it. Either the wiring is wrong or the reason is: a fixture that "+
 				"is measured does not get to keep an excuse for not being", where, name, reason)
@@ -3677,11 +3681,11 @@ func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 		case excused:
 			// Out of both corpora, on the record, for a reason that still holds.
 
-		case !tuning[name] && !held[name]:
+		case !tuning[name] && !held[name] && !multi[name]:
 			t.Errorf("%s authors %q and NO corpus contains it, so it is not in AllFixtures and no "+
 				"ground-truth test touches it: its lines are unchecked, its keywords are unprobed, "+
-				"its severity is unpinned, and it measures nothing. Add it to Fixtures() or "+
-				"HeldOutFixtures(), or exempt it here with the reason", where, name)
+				"its severity is unpinned, and it measures nothing. Add it to Fixtures(), "+
+				"HeldOutFixtures() or MultiFileFixtures(), or exempt it here with the reason", where, name)
 		}
 	}
 

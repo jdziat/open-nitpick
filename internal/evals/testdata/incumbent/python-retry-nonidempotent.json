@@ -1,0 +1,8 @@
+{
+  "fixture": "python-retry-nonidempotent",
+  "findings": null,
+  "at": "2026-09-02T23:40:29Z",
+  "mode": "plaintext",
+  "fingerprint": "368ee1267084a796426a6f5bffef524692fdb67eaaa4cc61831ece4d529a6236",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1453396639\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - app/billing.py\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 6s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}
