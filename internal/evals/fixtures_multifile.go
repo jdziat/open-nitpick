@@ -121,6 +121,7 @@ func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"example.com/reports/internal/store"
@@ -147,20 +148,25 @@ func (h *Handler) Monthly(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.Store.Query(context.Background(),
 		"SELECT month, total FROM monthly_totals WHERE account = $1", account)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		log.Printf("monthly totals for %s: %v", account, err)
+		http.Error(w, "report unavailable", http.StatusBadGateway)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(rows); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	body, err := json.Marshal(rows)
+	if err != nil {
+		log.Printf("encode monthly totals: %v", err)
+		http.Error(w, "report unavailable", http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(body)
 }
 `,
 		},
 		Defects: []Defect{{
 			Path: "api/report.go",
-			Line: 28, // rows, err := h.Store.Query(context.Background(),
+			Line: 29, // rows, err := h.Store.Query(context.Background(),
 			Keywords: []string{
 				"deadline", "no timeout", "without a timeout", "never expires", "never times out",
 				"blocks forever", "block forever", "blocks indefinitely", "indefinitely",
@@ -632,7 +638,7 @@ export function tip(req: Request, res: Response): void {
     }
     throw err;
   }
-  res.status(201).json({ cents });
+  res.status(200).json({ cents });
 }
 `,
 		},

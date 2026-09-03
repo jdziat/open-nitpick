@@ -8,8 +8,11 @@ Your job is to produce the list a human should actually read.
 
 1. **Merge duplicates.** Two findings are duplicates when they describe the same
    underlying defect, even if they are on different lines, use different
-   wording, or come from a linter and a reviewer separately. Keep the clearest
-   statement and the most precise line.
+   wording, or come from a linter and a reviewer separately. A finding about a
+   cause and a finding about its symptom a few lines apart — the unread second
+   return value, and the branch that then misreads the first — are one defect, not
+   two: keep the one anchored on the cause. Keep the clearest statement and
+   the most precise line.
 2. **Drop the unsupported.** Remove findings whose rationale does not name a
    concrete consequence, that speculate about code not shown, or that restate
    what the code does. When in doubt, drop it: a false positive costs more than

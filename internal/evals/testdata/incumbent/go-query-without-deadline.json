@@ -3,22 +3,27 @@
   "findings": [
     {
       "path": "api/report.go",
-      "line": 32,
-      "also_at": [
-        {
-          "line": 38
-        }
-      ],
+      "line": 30,
       "severity": "warning",
+      "category": "Stability \u0026 Availability",
+      "class": "correctness",
+      "title": "Propagate request cancellation to the store query.",
+      "rationale": "context.Background() remains active after the client disconnects or the request context is canceled. The store can continue the query and retain database resources for abandoned reports. Pass r.Context() to h.Store.Query.\n\nProposed fix\n\n-\trows, err := h.Store.Query(context.Background(), +\trows, err := h.Store.Query(r.Context(),",
+      "suggestion": ""
+    },
+    {
+      "path": "api/report.go",
+      "line": 33,
+      "severity": "info",
       "category": "Security \u0026 Privacy",
       "class": "security",
-      "title": "Return generic client errors instead of raw internal errors.",
-      "rationale": "Both branches expose err.Error() to the caller. Database errors can disclose SQL, schema, host, or driver details. Return a stable public message and log the original error through the server-side logger.\n\nProposed fix\n\n-\t\thttp.Error(w, err.Error(), http.StatusBadGateway) +\t\thttp.Error(w, \"failed to load monthly totals\", http.StatusBadGateway) ... -\t\thttp.Error(w, err.Error(), http.StatusInternalServerError) +\t\thttp.Error(w, \"failed to encode monthly totals\", http.StatusInternalServerError)",
+      "title": "Do not log the raw account query value.",
+      "rationale": "account is untrusted input. %s preserves decoded line breaks and control characters, so a failed request can inject misleading log lines. The value may also expose an account identifier. Omit it, or log a validated and escaped identifier.\n\nProposed fix\n\n-\t\tlog.Printf(\"monthly totals for %s: %v\", account, err) +\t\tlog.Printf(\"monthly totals query failed: %v\", err)",
       "suggestion": ""
     }
   ],
-  "at": "2026-09-02T23:49:57Z",
+  "at": "2026-09-03T16:23:32Z",
   "mode": "plaintext",
-  "fingerprint": "3c511bfcb3adc264a900080a46cf5abf28cf8246d9063a957369c02fe3f1ca34",
-  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-234745045\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Security \u0026 Privacy]\n  → api/report.go:32\n\n  Return generic client errors instead of raw internal errors.\n\n  Both branches expose err.Error() to the caller. Database errors can\n  disclose SQL, schema, host, or driver details. Return a stable public\n  message and log the original error through the server-side logger.\n\n\n\n\n\n\n  Proposed fix\n\n  -\t\thttp.Error(w, err.Error(), http.StatusBadGateway)\n  +\t\thttp.Error(w, \"failed to load monthly totals\", http.StatusBadGateway)\n  ...\n  -\t\thttp.Error(w, err.Error(), http.StatusInternalServerError)\n  +\t\thttp.Error(w, \"failed to encode monthly totals\", http.StatusInternalServerError)\n\n  Also applies to: 38-38\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - api/report.go\n\nEstimated review cost: $0.25 (1 file × $0.25/file, usage-based billing)\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 8s elapsed\nFinishing analysis tools... 20s elapsed\nWriting review comments... 20s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+  "fingerprint": "2196b0194bf8bfef8b0aef3c8b88f7d6262b72021decd8549dca08f14075cfdc",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-4101408650\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Stability \u0026 Availability]\n  → api/report.go:30\n\n  Propagate request cancellation to the store query.\n\n  context.Background() remains active after the client disconnects or the\n  request context is canceled. The store can continue the query and retain\n  database resources for abandoned reports. Pass r.Context() to\n  h.Store.Query.\n\n\n\n\n\n\n  Proposed fix\n\n  -\trows, err := h.Store.Query(context.Background(),\n  +\trows, err := h.Store.Query(r.Context(),\n\n\n────────────────────────────────────────────────────────────────────────\n  minor [Security \u0026 Privacy]\n  → api/report.go:33\n\n  Do not log the raw account query value.\n\n  account is untrusted input. %s preserves decoded line breaks and\n  control characters, so a failed request can inject misleading log lines.\n  The value may also expose an account identifier. Omit it, or log a\n  validated and escaped identifier.\n\n\n\n\n\n\n  Proposed fix\n\n  -\t\tlog.Printf(\"monthly totals for %s: %v\", account, err)\n  +\t\tlog.Printf(\"monthly totals query failed: %v\", err)\n\n\n────────────────────────────────────────\nReview complete\n2 findings ✔\n\nMajor    1\nMinor    1\n\n1 file reviewed:\n  - api/report.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 3s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 11s elapsed\nFinishing analysis tools... 25s elapsed\nWriting review comments... 25s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
 }

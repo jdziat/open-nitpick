@@ -45,6 +45,10 @@ const (
 	// off. Any non-empty value other than "0" or "false" enables it.
 	EnvRelatedContext = "NITPICK_EVAL_RELATED_CONTEXT"
 
+	// EnvValidation switches validation (the expert pass) on for every review
+	// in the run, so its effect on recall and noise can be measured.
+	EnvValidation = "NITPICK_EVAL_VALIDATION"
+
 	// EnvTimeout overrides how long a single review may take.
 	//
 	// The default suits a one-file fixture. It is not enough for a multi-file
@@ -688,6 +692,11 @@ func evalConfig(model Model) *config.Config {
 	case "", "0", "false", "off":
 	default:
 		cfg.Review.RelatedContext = true
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvValidation))) {
+	case "", "0", "false", "off":
+	default:
+		cfg.Validation.Enabled = true
 	}
 
 	// Report everything the model says so precision can actually be measured.

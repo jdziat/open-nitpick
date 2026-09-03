@@ -286,9 +286,13 @@ def health():
 
 
 def upload(user_id: str, filename: str, data: bytes):
-    """upload stores an attachment under the user's directory."""
+    """upload stores an attachment under the user's directory.
+
+    user_id is the caller's own id from the session, already validated as
+    [a-z0-9]+ by the authentication layer.
+    """
     name = os.path.basename(filename)
-    if not name:
+    if not name or name in (".", ".."):
         return {"error": "filename required"}, 400
     save(os.path.join(UPLOAD_DIR, user_id, name), data)
     return {"stored": name}, 201
@@ -296,7 +300,7 @@ def upload(user_id: str, filename: str, data: bytes):
 		},
 		Defects: []Defect{{
 			Path: "app/uploads.py",
-			Line: 17, // save(os.path.join(UPLOAD_DIR, user_id, name), data)
+			Line: 21, // save(os.path.join(UPLOAD_DIR, user_id, name), data)
 			Keywords: []string{
 				"overwrit", "overwrote", "clobber", "silently replace", "replaces the existing", "replaces an existing",
 				"same filename", "same name", "existing file", "existing attachment", "already exists", "exists()",
