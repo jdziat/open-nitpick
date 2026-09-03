@@ -568,8 +568,10 @@ answer came back cut off into prose. The JSON fallback then re-asked and died
 on the per-call HTTP timeout — two minutes in the shipped defaults, three in
 the harness — while the model was still generating. Neither is a property of
 the model; both were defaults chosen before a reasoning model was in the
-battery. The defaults are now 32,768 tokens and ten minutes per call, the
-harness matches, and a re-probe of the five fixtures that lost reviews, three
+battery. `max_tokens` is now unset by default so the model's own output
+maximum applies (the direct Anthropic path, whose SDK would substitute 4,096,
+is sent 32,768 as a floor), the call timeout is ten minutes, the harness
+matches, and a re-probe of the five fixtures that lost reviews, three
 runs each with related context on, completed 15 of 15. The rates in the tables
 above were computed over completed reviews and stand; the LOST columns are
 what the old limits cost.

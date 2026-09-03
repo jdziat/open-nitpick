@@ -10,10 +10,10 @@ models:
   default:
     provider: openrouter
     model: anthropic/claude-sonnet-4.6
-    # No max_tokens and no timeout here: the built-in defaults (32k tokens,
-    # ten minutes) are set so that a reasoning model's thinking does not
-    # truncate its answer or time it out, and lowering them is how reviews
-    # get lost rather than a saving.
+    # No max_tokens and no timeout here: unset, the model's own output
+    # maximum applies and the call has ten minutes, so a reasoning model's
+    # thinking neither truncates its answer nor times it out. Setting a
+    # lower cap is how reviews get lost, not a saving.
 
   # Triage only merges and filters findings, so it does not need the expensive
   # model. Splitting the roles is most of the cost saving available here.

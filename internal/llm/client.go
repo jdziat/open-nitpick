@@ -180,12 +180,28 @@ func (c *Client) CallOptions() []llms.CallOption {
 	if c.Spec.Temperature != nil {
 		opts = append(opts, llms.WithTemperature(*c.Spec.Temperature))
 	}
-	if c.Spec.MaxTokens > 0 {
+	switch {
+	case c.Spec.MaxTokens > 0:
 		opts = append(opts, llms.WithMaxTokens(c.Spec.MaxTokens))
+	case strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "anthropic"):
+		// Anthropic's API requires max_tokens, and the SDK fills an unset
+		// one with 4,096 — a cap a reasoning model's thinking exhausts on
+		// an ordinary review. Every other provider is sent no cap at all
+		// when none is configured, so the model's own maximum applies;
+		// this is the closest the direct Anthropic path can get without
+		// asking the API what each model's maximum is.
+		opts = append(opts, llms.WithMaxTokens(anthropicUnsetMaxTokens))
 	}
 
 	return opts
 }
+
+// anthropicUnsetMaxTokens is sent to the direct Anthropic provider when no
+// max_tokens is configured, in place of the SDK's 4,096. It is below the
+// output maximum of every current Claude model, so it never causes a
+// request to be rejected, and it is a floor against the SDK's default, not
+// a ceiling this project chose for the model.
+const anthropicUnsetMaxTokens = 32768
 
 // Timeout returns the per-request timeout, or zero when unset.
 func (c *Client) Timeout() time.Duration { return c.Spec.Timeout }

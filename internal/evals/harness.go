@@ -668,10 +668,10 @@ func evalConfig(model Model) *config.Config {
 		// Reviews should be reproducible; run-to-run variance is measured
 		// separately and deliberately, not left to the provider default.
 		Temperature: floatPtr(0),
-		// Not a cap a model under test can hit: see config.Defaults. The
-		// battery's own losses on glm-5.3-flash were these two limits.
-		MaxTokens: 32768,
-		Timeout:   10 * time.Minute,
+		// No max_tokens: the model's own output maximum applies, for
+		// config.Defaults' reasons. The battery's own losses on
+		// glm-5.3-flash were the old 8k cap and the three-minute timeout.
+		Timeout: 10 * time.Minute,
 
 		// Auto exercises the real negotiation: schema first, JSON fallback for
 		// providers that reject it. That path is the point of the matrix.

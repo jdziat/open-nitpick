@@ -123,7 +123,8 @@ models:
   default:
     provider: openrouter
     model: anthropic/claude-sonnet-4.6
-    max_tokens: 32768                # default; reasoning tokens count against it on most providers
+    # max_tokens is unset by default: the model's own output maximum applies,
+    # and reasoning tokens count against whatever you set here on most providers.
     timeout: 10m                     # default; per model call, not per review
 
   triage:                          # cheap model for merging and filtering
