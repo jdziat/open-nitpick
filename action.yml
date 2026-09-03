@@ -10,7 +10,9 @@ inputs:
   github-token:
     description: >-
       Token used to read the pull request and publish the review. The default
-      GITHUB_TOKEN is enough; it needs pull-requests: write.
+      GITHUB_TOKEN is enough; it needs pull-requests: write. On a pull request
+      from a fork that token is read-only, and the review then goes to the job
+      summary and the log instead of the pull request.
     required: false
     default: ${{ github.token }}
 
@@ -46,11 +48,29 @@ inputs:
     required: false
 
   pr-number:
-    description: Pull request to review. Defaults to the triggering pull request.
+    description: >-
+      Pull request to review. Defaults to the triggering pull request; set it
+      on workflow_dispatch or issue_comment runs.
     required: false
 
+  dry-run:
+    description: >-
+      Print the review to the log and the job summary instead of publishing
+      it. The way to try the reviewer on a repository before it posts anything.
+    required: false
+    default: "false"
+
+  skip-drafts:
+    description: Do nothing on a draft pull request.
+    required: false
+    default: "false"
+
   version:
-    description: Version of open-nitpick to install.
+    description: >-
+      Version of open-nitpick to install: a release tag such as v1.0.0, or
+      latest. The release binary for the runner is downloaded and its checksum
+      verified; when no release matches, the binary is built from source with
+      go install.
     required: false
     default: latest
 
@@ -59,29 +79,102 @@ inputs:
     required: false
 
 outputs:
+  result:
+    description: >-
+      One of "clean" (no findings at or above fail-on), "findings" (the gate
+      was tripped), "skipped" (a draft, with skip-drafts), or "error" (the
+      review could not run). Distinguishing the last is the point: a broken
+      reviewer must not read as a passing one.
+    value: ${{ steps.review.outputs.result }}
+
   findings:
     description: Number of findings published.
     value: ${{ steps.review.outputs.findings }}
 
-  result:
-    description: >-
-      One of "clean" (no findings), "findings" (the gate was tripped), or
-      "error" (the review could not run). Distinguishing the last is the point:
-      a broken reviewer must not read as a passing one.
-    value: ${{ steps.review.outputs.result }}
+  critical:
+    description: Findings at critical.
+    value: ${{ steps.review.outputs.critical }}
+
+  error:
+    description: Findings at error.
+    value: ${{ steps.review.outputs.error }}
+
+  warning:
+    description: Findings at warning.
+    value: ${{ steps.review.outputs.warning }}
+
+  files:
+    description: Files reviewed.
+    value: ${{ steps.review.outputs.files }}
+
+  withheld:
+    description: Findings withheld because an earlier review already posted them.
+    value: ${{ steps.review.outputs.withheld }}
 
 runs:
   using: composite
   steps:
+    - name: Install open-nitpick
+      id: install
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: jdziat/open-nitpick
+        API: ${{ github.api_url }}
+      run: |
+        set -euo pipefail
+        bin="$RUNNER_TEMP/nitpick-bin"
+        mkdir -p "$bin"
+
+        os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        arch="$(uname -m)"
+        case "$arch" in
+          x86_64)  arch=amd64 ;;
+          aarch64|arm64) arch=arm64 ;;
+        esac
+
+        version="$VERSION"
+        if [ "$version" = "latest" ]; then
+          # Releases live on github.com even when the workflow runs on GHES.
+          version="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+            | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n1 || true)"
+        fi
+
+        if [ -n "$version" ]; then
+          asset="nitpick_${version}_${os}_${arch}"
+          base="https://github.com/$REPO/releases/download/$version"
+          if curl -fsSL -o "$bin/nitpick" "$base/$asset" && curl -fsSL -o "$bin/checksums.txt" "$base/checksums.txt"; then
+            expected="$(grep " $asset\$" "$bin/checksums.txt" | awk '{print $1}')"
+            actual="$(sha256sum "$bin/nitpick" | awk '{print $1}')"
+            if [ -n "$expected" ] && [ "$expected" = "$actual" ]; then
+              chmod +x "$bin/nitpick"
+              echo "$bin" >> "$GITHUB_PATH"
+              echo "source=release $version" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::warning::open-nitpick: checksum mismatch for $asset; building from source instead"
+          fi
+        fi
+        echo "source=go-install" >> "$GITHUB_OUTPUT"
+
     - name: Set up Go
+      if: steps.install.outputs.source == 'go-install'
       uses: actions/setup-go@v5
       with:
         go-version: stable
         cache: false
 
-    - name: Install open-nitpick
+    - name: Build open-nitpick from source
+      if: steps.install.outputs.source == 'go-install'
       shell: bash
-      run: go install github.com/jdziat/open-nitpick/cmd/nitpick@${{ inputs.version }}
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        go install "github.com/jdziat/open-nitpick/cmd/nitpick@$VERSION"
+        echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
     - name: Review
       id: review
@@ -99,14 +192,16 @@ runs:
         NITPICK_CONFIG: ${{ inputs.config }}
         NITPICK_FAIL_ON: ${{ inputs.fail-on }}
         NITPICK_INSTRUCTION: ${{ inputs.instruction }}
+        NITPICK_DRY_RUN: ${{ inputs.dry-run }}
+        NITPICK_SKIP_DRAFTS: ${{ inputs.skip-drafts }}
         NITPICK_ARGS: ${{ inputs.args }}
+        EVENT_NAME: ${{ github.event_name }}
+        EVENT_BEFORE: ${{ github.event.before }}
+        HEAD_SHA: ${{ github.sha }}
+        IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
       run: |
         set -uo pipefail
 
-        # Build the flag list conditionally. The previous form appended -config
-        # unconditionally and then tried to remove it with a substitution,
-        # which left an EMPTY array element — Go's flag package stops parsing
-        # at that element, so -fail-on and -instruction were silently ignored.
         flags=(-repo "$GITHUB_WORKSPACE")
 
         if [ -n "$NITPICK_CONFIG" ] && [ -f "$GITHUB_WORKSPACE/$NITPICK_CONFIG" ]; then
@@ -118,30 +213,65 @@ runs:
         if [ -n "$NITPICK_INSTRUCTION" ]; then
           flags+=(-instruction "$NITPICK_INSTRUCTION")
         fi
+        if [ "$NITPICK_DRY_RUN" = "true" ]; then
+          flags+=(-dry-run)
+        fi
+        if [ "$NITPICK_SKIP_DRAFTS" = "true" ]; then
+          flags+=(-skip-draft)
+        fi
+
+        # What to review depends on the event. A pull request event names its
+        # pull request through the environment; a dispatch or a comment names
+        # one through pr-number; a push has no pull request and is reviewed as
+        # the pushed range, printed rather than posted.
+        case "$EVENT_NAME" in
+          pull_request|pull_request_target|merge_group)
+            ;;
+          push)
+            base="$EVENT_BEFORE"
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              base="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD~1 2>/dev/null || true)"
+            fi
+            if [ -z "$base" ]; then
+              echo "::error::open-nitpick: a push with no reachable parent commit cannot be reviewed"
+              echo "result=error" >> "$GITHUB_OUTPUT"
+              exit 2
+            fi
+            flags+=(-base "$base" -head "$HEAD_SHA")
+            echo "Reviewing the pushed range $base..$HEAD_SHA; nothing is posted on a push."
+            ;;
+          *)
+            if [ -z "$PR_NUMBER" ]; then
+              echo "::error::open-nitpick: $EVENT_NAME names no pull request; set the pr-number input"
+              echo "result=error" >> "$GITHUB_OUTPUT"
+              exit 2
+            fi
+            ;;
+        esac
+        if [ -n "$PR_NUMBER" ]; then
+          flags+=(-pr "$PR_NUMBER")
+        fi
+        if [ "$IS_FORK" = "true" ]; then
+          echo "::notice::open-nitpick: pull request from a fork; if the token cannot post, the review goes to the job summary"
+        fi
 
         # Extra args are split on whitespace deliberately; they are an escape
         # hatch for flags, not a place to pass a shell command.
         read -r -a extra <<< "$NITPICK_ARGS"
 
+        # The CLI writes result, findings and the per-severity counts to
+        # GITHUB_OUTPUT itself, and the review to GITHUB_STEP_SUMMARY.
         set +e
-        nitpick review "${flags[@]}" ${extra+"${extra[@]}"} | tee "$RUNNER_TEMP/nitpick.out"
-        status=${PIPESTATUS[0]}
+        nitpick review "${flags[@]}" ${extra+"${extra[@]}"}
+        status=$?
         set -e
-
-        # Findings are counted from the run's own summary line so the declared
-        # output is actually populated.
-        findings=$(grep -oE '[0-9]+ (nit|info|warning|error|critical)' "$RUNNER_TEMP/nitpick.out" \
-          | awk '{s+=$1} END {print s+0}')
-        echo "findings=$findings" >> "$GITHUB_OUTPUT"
 
         # Exit 1 means the review ran and tripped the configured gate, which
         # should fail the job. Exit 2 means the review could not run at all —
         # a materially different outcome that must not read as "found issues".
         case "$status" in
-          0) echo "result=clean"    >> "$GITHUB_OUTPUT" ;;
-          1) echo "result=findings" >> "$GITHUB_OUTPUT" ;;
-          *) echo "result=error"    >> "$GITHUB_OUTPUT"
-             echo "::error::open-nitpick failed to run (exit $status)" ;;
+          0|1) ;;
+          *) echo "::error::open-nitpick failed to run (exit $status)"
+             grep -q '^result=' "$GITHUB_OUTPUT" 2>/dev/null || echo "result=error" >> "$GITHUB_OUTPUT" ;;
         esac
-
         exit "$status"

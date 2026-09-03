@@ -306,7 +306,22 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 		}
 	}
 
+	if isForbidden(err) {
+		return fmt.Errorf("github: create review on %s: %w: %w", ref, ErrForbidden, err)
+	}
 	return fmt.Errorf("github: create review on %s: %w", ref, err)
+}
+
+// isForbidden reports whether the API refused the token's authority to write.
+// 403 is the documented answer; 404 is what GitHub returns for a private
+// repository the token cannot see at all, and for the review endpoint on a
+// fork's pull request under a read-only token in some configurations.
+func isForbidden(err error) bool {
+	var apiErr *github.ErrorResponse
+	if errors.As(err, &apiErr) && apiErr.Response != nil {
+		return apiErr.Response.StatusCode == http.StatusForbidden || apiErr.Response.StatusCode == http.StatusNotFound
+	}
+	return false
 }
 
 // PriorReview reads back what earlier runs of this tool published on the pull

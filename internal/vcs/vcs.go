@@ -18,6 +18,11 @@ import (
 // deleted file legitimately has no new-side content.
 var ErrNotFound = errors.New("vcs: not found")
 
+// ErrForbidden reports that the forge refused to let this token publish: on
+// GitHub, the read-only GITHUB_TOKEN a pull_request event from a fork gets.
+// A caller can still show the review somewhere the token can write.
+var ErrForbidden = errors.New("vcs: the token may not publish here")
+
 // ErrNoBaseRevision reports that a provider cannot name the revision a change
 // is measured against.
 //

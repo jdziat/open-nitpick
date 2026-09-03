@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -189,5 +190,28 @@ func TestPublishedCommentsCarryFingerprints(t *testing.T) {
 	c := provider.published.Comments[0]
 	if c.Fingerprint == "" || c.Class != "correctness" {
 		t.Errorf("comment = %+v; without a fingerprint the next run cannot recognise it", c)
+	}
+}
+
+// TestAReviewThatCannotBePublishedIsStillReturned: the review has happened and
+// been paid for by the time publishing fails, so the caller gets the whole
+// report beside ErrPublish and can print, gate and summarise it.
+func TestAReviewThatCannotBePublishedIsStillReturned(t *testing.T) {
+	f := Finding{Path: "app.go", Line: 4, Severity: "error", Class: "correctness", Title: "Ignored error"}
+	model := &scriptedLLM{byPrompt: map[string]string{
+		"triaging findings":            mustJSON(t, Result{Summary: "s", Findings: []Finding{f}}),
+		"Review the following changes": mustJSON(t, Result{Findings: []Finding{f}}),
+	}}
+	provider := &stubProvider{diff: engineDiff, err: errors.New("403 forbidden")}
+	report, err := newEngine(t, model, provider, nil).Review(context.Background(), vcs.Ref{})
+	if !errors.Is(err, ErrPublish) {
+		t.Fatalf("err = %v, want ErrPublish", err)
+	}
+	if report == nil || len(report.Findings) != 1 || len(report.Files) == 0 {
+		t.Fatalf("report = %+v; the completed review must accompany the error", report)
+	}
+	rendered := Render(report, report.Files, nil)
+	if len(rendered.Comments) != 1 {
+		t.Errorf("the report's own diff must render its comments, got %d", len(rendered.Comments))
 	}
 }

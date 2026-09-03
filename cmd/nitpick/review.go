@@ -30,6 +30,7 @@ type reviewFlags struct {
 	instruction string
 	failOn      string
 	dryRun      bool
+	skipDraft   bool
 	verbose     bool
 	logFormat   string
 	noLinters   bool
@@ -55,6 +56,7 @@ func runReview(ctx context.Context, args []string) error {
 	fs.StringVar(&f.repoName, "repo-name", "", "GitHub repository name")
 	fs.IntVar(&f.pr, "pr", 0, "pull request number to review and comment on")
 	fs.BoolVar(&f.dryRun, "dry-run", false, "print the review instead of publishing it")
+	fs.BoolVar(&f.skipDraft, "skip-draft", false, "do nothing when the pull request is a draft")
 	fs.BoolVar(&f.noLinters, "no-linters", false, "skip linters even when configured")
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
 	fs.StringVar(&f.logFormat, "log-format", "text", "log format: text or json")
@@ -124,8 +126,43 @@ func runReview(ctx context.Context, args []string) error {
 	}
 	log.Info("reviewing", "provider", provider.Name(), "ref", ref.String())
 
+	actions := actionsFromEnv()
+
+	if f.skipDraft && ref.Number > 0 {
+		pr, err := provider.PullRequest(ctx, ref)
+		if err != nil {
+			return err
+		}
+		if pr.Draft {
+			fmt.Fprintln(os.Stderr, "Draft pull request; not reviewed (-skip-draft).")
+			actions.setOutputs(resultSkipped, nil)
+			actions.writeSummary(resultSkipped, nil, nil, ref, "Draft pull request; not reviewed. Mark it ready for review to have it reviewed.")
+			return nil
+		}
+	}
+
 	report, err := newEngine(&f, repo, cfg, provider, log).Review(ctx, ref)
-	if err != nil {
+	var note string
+	switch {
+	case err == nil:
+	case errors.Is(err, review.ErrPublish) && report != nil:
+		// The review happened; only the delivery failed. Print it where the
+		// log can show it and carry on to the gate, so a fork's pull request
+		// is still reviewed and still gated, and the failure to post is a
+		// warning rather than a broken run.
+		reason := "the review could not be published"
+		if errors.Is(err, vcs.ErrForbidden) {
+			reason = "the token may not post reviews on this pull request (a pull request from a fork under the default GITHUB_TOKEN is read-only)"
+		}
+		note = reason + "; the review is below instead."
+		log.Warn("could not publish the review; printing it instead", "error", err)
+		if actions.active() {
+			fmt.Printf("::warning::open-nitpick: %s\n", reason)
+		}
+		_ = (&dryRunProvider{source: provider, out: os.Stdout}).PublishReview(ctx, ref,
+			review.Render(report, report.Files, cfg))
+	default:
+		actions.setOutputs(resultError, nil)
 		return err
 	}
 
@@ -134,7 +171,12 @@ func runReview(ctx context.Context, args []string) error {
 	printLinters(report)
 	printOverruled(report)
 
-	if report.Failed(gate(report, f.failOn, cfg)) {
+	result := resultFor(report, gate(report, f.failOn, cfg))
+	rendered := review.Render(report, report.Files, cfg)
+	actions.setOutputs(result, report)
+	actions.writeSummary(result, report, &rendered, ref, note)
+
+	if result == resultFindings {
 		return errFindings
 	}
 	return nil

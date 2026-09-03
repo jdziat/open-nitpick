@@ -43,7 +43,7 @@ jobs:
               -o "dist/${name}${ext}" ./cmd/nitpick
           done
 
-          cd dist && sha256sum * > checksums.txt
+          cd dist && sha256sum -- * > checksums.txt
 
       - name: Publish
         env:

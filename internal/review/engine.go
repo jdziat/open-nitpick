@@ -381,6 +381,11 @@ type Report struct {
 	// fully cover. See LinterUncovered.
 	Uncovered []LinterUncovered
 
+	// Files is the diff this review was made against, after any incremental
+	// narrowing, so a caller that could not publish can still render the
+	// review's comments against the lines they anchor to.
+	Files diff.Files
+
 	// Head is the revision this review looked at, when the provider knows
 	// it. It is published with the review so the next run can tell what has
 	// already been read.
@@ -497,6 +502,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// on a first run.
 	prior := e.priorReview(ctx, ref)
 	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, prior)
+	report.Files = files
 
 	fetch := func(ctx context.Context, path string) ([]byte, error) {
 		return e.Provider.FileContent(ctx, ref, path)
@@ -628,8 +634,20 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	report.Summary = summary
 	report.Counts = counts(findings)
 
-	return report, e.publish(ctx, ref, report, files)
+	// The report is returned WITH a publish error rather than instead of
+	// it: by this point the review has happened and been paid for, and a
+	// caller that cannot post it — a token without write access on a fork's
+	// pull request — can still print it, gate on it, and put it in the job
+	// summary.
+	if err := e.publish(ctx, ref, report, files); err != nil {
+		return report, err
+	}
+	return report, nil
 }
+
+// ErrPublish marks a review that completed and could not be delivered. The
+// report that accompanies it is whole.
+var ErrPublish = errors.New("the review could not be published")
 
 // priorReview asks the provider what earlier runs left on the pull request.
 //
@@ -1435,7 +1453,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	}
 
 	if err := e.Provider.PublishReview(ctx, ref, review); err != nil {
-		return fmt.Errorf("publish review: %w", err)
+		return fmt.Errorf("%w: %w", ErrPublish, err)
 	}
 	return nil
 }

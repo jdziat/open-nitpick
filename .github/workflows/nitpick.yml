@@ -6,7 +6,7 @@ on:
   # reads only the files changed since, and withholds findings already posted
   # (review.incremental, on by default).
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -43,3 +43,4 @@ jobs:
           api-key: ${{ secrets.OPENROUTER_API_KEY }}
           # Advisory until the reviewer has earned the right to block merges.
           fail-on: none
+          skip-drafts: true
