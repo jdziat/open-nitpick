@@ -41,6 +41,25 @@ jobs:
       - name: Build
         run: go build ./...
 
+  # Binaries for every push and pull request, built by the same target the
+  # release uses, so a change can be tried on a runner before it is tagged.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Build binaries
+        run: make dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nitpick-binaries
+          path: dist/
+          retention-days: 14
+
   lint:
     runs-on: ubuntu-latest
     steps:

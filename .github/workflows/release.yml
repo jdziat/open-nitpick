@@ -26,24 +26,7 @@ jobs:
           go test -race ./...
 
       - name: Build binaries
-        run: |
-          version="${GITHUB_REF_NAME}"
-          mkdir -p dist
-
-          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
-            os="${target%/*}"
-            arch="${target#*/}"
-            name="nitpick_${version}_${os}_${arch}"
-
-            ext=""
-            [ "$os" = "windows" ] && ext=".exe"
-
-            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build \
-              -ldflags "-s -w -X main.version=${version}" \
-              -o "dist/${name}${ext}" ./cmd/nitpick
-          done
-
-          cd dist && sha256sum -- * > checksums.txt
+        run: make dist VERSION="$GITHUB_REF_NAME"
 
       - name: Publish
         env:

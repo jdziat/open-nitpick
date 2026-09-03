@@ -14,3 +14,6 @@ coverage.out
 .env
 .env.*
 !.env.example
+
+# make dist output
+dist/

@@ -15,6 +15,25 @@ build:
 install:
 	go install -ldflags '$(LDFLAGS)' $(PKG)
 
+# Cross-compiled release binaries, named the way action.yml downloads them:
+#   dist/nitpick_<version>_<os>_<arch>[.exe]  plus dist/checksums.txt
+# The release workflow and CI both run this target, so a binary built for a
+# pull request is byte-for-byte the process a release uses.
+TARGETS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
+
+.PHONY: dist
+dist:
+	rm -rf dist && mkdir -p dist
+	@for target in $(TARGETS); do \
+		os=$${target%/*}; arch=$${target#*/}; ext=""; \
+		[ "$$os" = windows ] && ext=.exe; \
+		echo "building $$os/$$arch"; \
+		GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' \
+			-o "dist/$(BINARY)_$(VERSION)_$${os}_$${arch}$$ext" $(PKG) || exit 1; \
+	done
+	cd dist && sha256sum -- * > checksums.txt
+	@ls -1 dist
+
 .PHONY: test
 test:
 	go test ./...
