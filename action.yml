@@ -69,8 +69,9 @@ inputs:
     description: >-
       Version of open-nitpick to install: a release tag such as v1.0.0, or
       latest. The release binary for the runner is downloaded and its checksum
-      verified; when no release matches, the binary is built from source with
-      go install.
+      verified; when no release matches — or the repository is private and
+      its releases cannot be fetched — the binary is built from the Action's
+      own checkout, which is the ref the workflow named.
     required: false
     default: latest
 
@@ -157,24 +158,31 @@ runs:
             echo "::warning::open-nitpick: checksum mismatch for $asset; building from source instead"
           fi
         fi
-        echo "source=go-install" >> "$GITHUB_OUTPUT"
+        echo "source=build" >> "$GITHUB_OUTPUT"
 
     - name: Set up Go
-      if: steps.install.outputs.source == 'go-install'
+      if: steps.install.outputs.source == 'build'
       uses: actions/setup-go@v5
       with:
         go-version: stable
         cache: false
 
-    - name: Build open-nitpick from source
-      if: steps.install.outputs.source == 'go-install'
+    # The Action's own files are on the runner at the ref the workflow named,
+    # so the binary can be built from them without fetching the module — which
+    # is what makes the Action usable from a private copy of this repository.
+    - name: Build open-nitpick from the Action's checkout
+      if: steps.install.outputs.source == 'build'
       shell: bash
       env:
-        VERSION: ${{ inputs.version }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
         set -euo pipefail
-        go install "github.com/jdziat/open-nitpick/cmd/nitpick@$VERSION"
-        echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+        bin="$RUNNER_TEMP/nitpick-bin"
+        mkdir -p "$bin"
+        version="$(git -C "$ACTION_PATH" describe --tags --always 2>/dev/null || echo source)"
+        (cd "$ACTION_PATH" && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$bin/nitpick" ./cmd/nitpick)
+        echo "$bin" >> "$GITHUB_PATH"
+        echo "built open-nitpick $version from $ACTION_PATH"
 
     - name: Review
       id: review

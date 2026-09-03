@@ -93,8 +93,9 @@ jobs:
 ```
 
 **What a run does.** The release binary for the runner is downloaded and its
-checksum verified (built from source with `go install` when no release
-matches `version`). The pull request is reviewed and the review is posted as
+checksum verified; when no release matches `version`, or the repository is a
+private copy whose releases cannot be fetched, the binary is built from the
+Action's own checkout. The pull request is reviewed and the review is posted as
 one GitHub review with inline comments. The same review — walkthrough,
 findings table, analyzer roster — is written to the job summary, and the
 step sets outputs a later step can read:
