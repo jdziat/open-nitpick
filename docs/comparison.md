@@ -81,3 +81,36 @@ fixture's author calls defensible.
 **Cost.** $0.019 per review for the default reviewer, $0.0018 for
 glm-5.3-flash with related context (R 34/40, N 11/44). The incumbent's CLI
 review is not priced.
+
+### Iteration 2: the expert pass, measured and left off
+
+`validation.enabled` — a second model pass in which a domain expert can
+refute or re-rate each finding — has shipped disabled and unmeasured since it
+was written. Measured here for the first time, sonnet-4.6 with related
+context, same corpora, same day:
+
+| corpus | without | with the expert pass | cost per review |
+|---|---|---|---|
+| tuning | R 0.88, N 0.19 | R 0.81, N 0.12 | $0.019 to $0.029 |
+| multi-file | R 1.00, N 0.14 | R 1.00, N 0.18 | $0.019 to $0.031 |
+
+It buys one fewer noise finding on the tuning corpus at the price of one
+plant, adds noise on the multi-file corpus, and costs half again per review.
+It stays off. The noise it removed was a defensible objection, and the plant
+it lost was a real one.
+
+### Where this stops
+
+On this project's corpora the default reviewer leads the incumbent's CLI on
+recall in every language that plants a defect, by two to one overall; on
+anchor width everywhere; on noise per review overall and in Go and Python;
+and on cost, which the incumbent does not publish per review. It does not
+lead on TypeScript noise, by one finding in nine reviews, and that finding
+is one the fixture's own author lists as a reasonable objection. Measurement
+.md's rules say a gap inside the corpus's resolution is not a result in
+either direction, so the iteration stops here rather than tuning a prompt to
+suppress an objection the corpus itself calls defensible. What would move it
+honestly is a larger TypeScript corpus, not a narrower reviewer.
+
+Nothing above is a claim about the hosted product with a learned codebase,
+about Contender or Bugbot, or about a corpus anyone else wrote.

@@ -951,6 +951,8 @@ produced is part of the product.
 - [docs/measurement.md](docs/measurement.md) — what has to hold before a number
   out of the eval harness is worth acting on. Thirteen rules, each written
   because the harness produced a confident wrong number and something believed it.
+- [docs/comparison.md](docs/comparison.md) — capabilities and measured results
+  against Incumbent, by language, with what each iteration changed.
 - [docs/findings.md](docs/findings.md) — what has actually been measured, what it
   supports, and the nine instrument bugs found so far. Four of them flattered one
   side of a comparison; one produced a published claim that had to be retracted.
