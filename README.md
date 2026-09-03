@@ -123,7 +123,8 @@ models:
   default:
     provider: openrouter
     model: anthropic/claude-sonnet-4.6
-    max_tokens: 8192
+    max_tokens: 32768                # default; reasoning tokens count against it on most providers
+    timeout: 10m                     # default; per model call, not per review
 
   triage:                          # cheap model for merging and filtering
     provider: openrouter
@@ -136,7 +137,7 @@ review:
   incremental: true                # on a re-run, read only what changed since the last review
   related_context: false           # attach imported definitions used on changed lines (see below)
   max_files: 60
-  token_budget_per_request: 60000
+  token_budget_per_request: 60000  # per model CALL; raise it for large-context models
   include_full_files: true         # send whole files, not just hunks
   ignore: ["**/vendor/**", "**/*.pb.go"]
 

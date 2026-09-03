@@ -66,7 +66,19 @@ func Defaults() *Config {
 		Models: Models{
 			Default: ModelSpec{
 				StructuredOutput: StructuredAuto,
-				Timeout:          2 * time.Minute,
+
+				// Generous on purpose. A reasoning model spends its thinking
+				// inside max_tokens on most providers and inside the wall
+				// clock on all of them, and the two-minute, 8k-token defaults
+				// this used to ship lost one review in five on glm-5.3-flash:
+				// the schema-path answer came back truncated to prose, and
+				// the JSON fallback then died on the HTTP timeout while the
+				// model was still generating. A limit a model can hit on an
+				// ordinary review is not a safeguard, it is a silent way to
+				// lose the review. A model whose output cap is lower than
+				// this rejects the request and says so.
+				Timeout:   10 * time.Minute,
+				MaxTokens: 32768,
 
 				// Reviews should be reproducible. Left unset, providers apply
 				// their own default (1.0 on Anthropic), and identical runs over
@@ -99,7 +111,7 @@ func Defaults() *Config {
 			// function's definition is the kind of context that can just as
 			// easily hand a model something new to be wrong about.
 			RelatedContext:       false,
-			RelatedContextTokens: 8000,
+			RelatedContextTokens: 16000,
 		},
 		Persona: DefaultPersona(),
 		// Stated rather than left to the zero value, because "off" here is a

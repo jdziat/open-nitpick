@@ -552,16 +552,27 @@ is the resolution) and its noise rose from 0.19 to 0.25, where an earlier
 single-model run had shown no difference at all. Run-to-run variance at
 temperature zero is real, and this is inside it.
 
-**What it costs in lost reviews.** glm-5.3-flash lost 2 of 16 reviews on the
-tuning corpus and 3 of 40 on the multi-file corpus to "all review batches
-failed"; neither other model lost any. The loss is counted in the table and
-excluded from the rates. The cause is not established: every lost review
-recorded NO model response at all, so the call itself failed rather than the
-answer being unreadable, and a probe of 22 further reviews on the three
-fixtures that lost one (`TestProbeModel`, which now retains the engine's log)
-reproduced none. Read it as an intermittent provider-side failure on a model
-served by 23 endpoints, at a rate of about one review in fifteen on the day,
-and re-run the probe when it happens again — the log will name the error.
+**What it costs in lost reviews, and why — found and fixed.** glm-5.3-flash
+lost 2 of 16 reviews on the tuning corpus and 3 of 40 on the multi-file
+corpus in this run, and 11 of 88 the next evening, to "all review batches
+failed" with no response recorded. `TestProbeModel` caught one with the
+engine's log:
+
+    schema path failed (structured output is not valid JSON: invalid character 'L' ...);
+    json fallback failed: failed to decode response: context deadline exceeded
+    (Client.Timeout or context cancellation while reading body)
+
+Two limits, stacked. glm-5.3-flash is a reasoning model, and on OpenRouter its
+thinking counts against `max_tokens`; at the shipped 8,192 the schema-path
+answer came back cut off into prose. The JSON fallback then re-asked and died
+on the per-call HTTP timeout — two minutes in the shipped defaults, three in
+the harness — while the model was still generating. Neither is a property of
+the model; both were defaults chosen before a reasoning model was in the
+battery. The defaults are now 32,768 tokens and ten minutes per call, the
+harness matches, and a re-probe of the five fixtures that lost reviews, three
+runs each with related context on, completed 15 of 15. The rates in the tables
+above were computed over completed reviews and stand; the LOST columns are
+what the old limits cost.
 
 **Not established.** One run per corpus, a corpus the author wrote, no
 judge, and a cost figure from the provider's reported usage at today's rate
@@ -624,12 +635,10 @@ other.
 
 **glm-5.3-flash lost reviews at a worse rate this time.** Nine of 56 on the
 multi-file corpus and two of 32 on the tuning corpus, all "all review
-batches failed" with no response recorded, against one in fifteen the day
-before. Its rates are computed over the reviews that completed, which is
-the honest reading of a model's quality and a dishonest reading of its
-usefulness: a reviewer that fails to answer a fifth of the time is one CI
-retries, and the retry costs the time it saved. The cause is still not
-captured; `TestProbeModel` is the instrument for the next occurrence.
+batches failed" with no response recorded. The cause was the shipped
+`max_tokens` and per-call timeout, which a reasoning model's thinking
+exhausts; see the glm-5.3-flash section above for the log line and the fix.
+The rates here are over completed reviews and stand.
 
 **The incumbent found none of the four new plants.** Its cache holds a
 zero-finding review for each. On the fourteen it locates one plant of

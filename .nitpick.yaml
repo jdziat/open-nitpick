@@ -10,7 +10,10 @@ models:
   default:
     provider: openrouter
     model: anthropic/claude-sonnet-4.6
-    max_tokens: 8192
+    # No max_tokens and no timeout here: the built-in defaults (32k tokens,
+    # ten minutes) are set so that a reasoning model's thinking does not
+    # truncate its answer or time it out, and lowering them is how reviews
+    # get lost rather than a saving.
 
   # Triage only merges and filters findings, so it does not need the expensive
   # model. Splitting the roles is most of the cost saving available here.
@@ -27,6 +30,10 @@ review:
   fail_on: none
   min_severity: info
   concurrency: 4
+  # A million-token model can read far more than 60k tokens per request; the
+  # budget is about how much one call is asked to judge at once, not what
+  # the model can hold. Raised here, where the reviewer is a frontier model.
+  token_budget_per_request: 120000
   # Off in the shipped defaults until measured more widely; on here, where
   # reviews are advisory, because docs/findings.md's multi-file table is the
   # evidence that it finds what a diff-only review cannot.

@@ -219,7 +219,7 @@ func OptionsFromEnv() (Options, error) {
 		Models:   DefaultModels(),
 		Fixtures: Fixtures(),
 		Runs:     1,
-		Timeout:  4 * time.Minute,
+		Timeout:  15 * time.Minute,
 	}
 
 	if raw := strings.TrimSpace(os.Getenv(EnvModels)); raw != "" {
@@ -668,8 +668,10 @@ func evalConfig(model Model) *config.Config {
 		// Reviews should be reproducible; run-to-run variance is measured
 		// separately and deliberately, not left to the provider default.
 		Temperature: floatPtr(0),
-		MaxTokens:   8192,
-		Timeout:     3 * time.Minute,
+		// Not a cap a model under test can hit: see config.Defaults. The
+		// battery's own losses on glm-5.3-flash were these two limits.
+		MaxTokens: 32768,
+		Timeout:   10 * time.Minute,
 
 		// Auto exercises the real negotiation: schema first, JSON fallback for
 		// providers that reject it. That path is the point of the matrix.
