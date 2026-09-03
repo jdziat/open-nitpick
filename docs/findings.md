@@ -498,6 +498,75 @@ over sixteen fixtures, because a single-file fixture imports nothing from the
 repository and nothing is attached. That is not a precision measurement; it is
 a check that the switch does nothing where it has nothing to do.
 
+## The iteration model: glm-5.3-flash against the default reviewer
+
+`z-ai/glm-5.3-flash` is priced at $0.075 per million input tokens and $0.25
+per million output on OpenRouter's cheapest endpoint, against $3 and $15 for
+`anthropic/claude-sonnet-4.6`. The question was whether it is good enough to
+iterate against, and whether it is good enough to review with. One run per
+corpus, all three models in the same process, judge-free, with related
+context off and on. Rule 15 applies to the multi-file half.
+
+### Tuning corpus, 16 fixtures, one run each
+
+| contender | RECALL | NOISE / review | $ / review | $ / located |
+|---|---|---|---|---|
+| sonnet-4.6 | **0.88** (14/16) | 0.19 | $0.0185 | $0.021 |
+| sonnet-4.6 + related context | 0.81 (13/16) | 0.25 | $0.0186 | $0.023 |
+| glm-5.3-flash | 0.71 (10/14, 2 lost) | **0.07** | **$0.0011** | **$0.0015** |
+| glm-5.3-flash + related context | 0.71 (10/14, 2 lost) | 0.07 | $0.0008 | $0.0011 |
+| qwen3.7-flash + related context | 0.62 (10/16) | 0.19 | $0.0007 | $0.0011 |
+| incumbent/cli | 0.62 (10/16) | 0.19 | | |
+| qwen3.7-flash | 0.56 (9/16) | 0.06 | $0.0007 | $0.0013 |
+
+### Multi-file corpus, 10 fixtures, two runs each
+
+| contender | RECALL | NOISE / review | $ / review | $ / located |
+|---|---|---|---|---|
+| sonnet-4.6 + related context | **1.00** (16/16) | 0.45 | $0.0194 | $0.024 |
+| glm-5.3-flash + related context | 0.93 (13/14, 2 lost) | 0.39 | **$0.0015** | **$0.0021** |
+| qwen3.7-flash + related context | 0.81 (13/16) | 0.30 | $0.0008 | $0.0012 |
+| sonnet-4.6 | 0.81 (13/16) | 0.50 | $0.0179 | $0.028 |
+| glm-5.3-flash | 0.60 (9/15, 1 lost) | 0.58 | $0.0017 | $0.0036 |
+| qwen3.7-flash | 0.50 (8/16) | 0.55 | $0.0008 | $0.0019 |
+| incumbent/cli | 0.12 (1/8) | 0.40 | | |
+
+Resolution: one plant is 0.0625 on the tuning corpus and the same on the
+multi-file corpus at two runs.
+
+**What it supports.** glm-5.3-flash is the iteration model: it locates most
+of what the default reviewer locates, at a sixteenth of the price per review
+and a fourteenth per located defect, with the lowest noise of any contender
+on the tuning corpus. `make quick` is built on it and this repository's own
+config triages with it. It is not the default reviewer: three plants behind
+sonnet on the tuning corpus, and it finds none of the two `nit` plants there
+without related context.
+
+**Related context is worth more to a cheap model than to an expensive one.**
+On the multi-file corpus it moves glm-5.3-flash from 0.60 to 0.93 and
+qwen3.7-flash from 0.50 to 0.81, against sonnet's 0.81 to 1.00. A model that
+cannot infer a contract from the call site is the model the callee's
+docstring helps most. On the tuning corpus the picture is mixed: sonnet
+dropped one plant with it on (an `info` plant, on a corpus where one plant
+is the resolution) and its noise rose from 0.19 to 0.25, where an earlier
+single-model run had shown no difference at all. Run-to-run variance at
+temperature zero is real, and this is inside it.
+
+**What it costs in lost reviews.** glm-5.3-flash lost 2 of 16 reviews on the
+tuning corpus and 3 of 40 on the multi-file corpus to "all review batches
+failed"; neither other model lost any. The loss is counted in the table and
+excluded from the rates. The cause is not established: every lost review
+recorded NO model response at all, so the call itself failed rather than the
+answer being unreadable, and a probe of 22 further reviews on the three
+fixtures that lost one (`TestProbeModel`, which now retains the engine's log)
+reproduced none. Read it as an intermittent provider-side failure on a model
+served by 23 endpoints, at a rate of about one review in fifteen on the day,
+and re-run the probe when it happens again — the log will name the error.
+
+**Not established.** One run per corpus, a corpus the author wrote, no
+judge, and a cost figure from the provider's reported usage at today's rate
+table. The multi-file half is outside the ground-truth registries.
+
 ## What is not yet known
 
 - Whether batching costs detection. The multi-file corpus now assembles

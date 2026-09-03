@@ -21,7 +21,7 @@
     "captured_on, source, endpoint and routing in pricing.yaml are a CLAIM; this file",
     "is the evidence for it, and TestShippedPricesMatchTheCapturedVendorResponse",
     "re-derives one from the other on every `go test` and fails on drift in either",
-    "direction — including the routing minima and maxima, which are derived from the",
+    "direction \u2014 including the routing minima and maxima, which are derived from the",
     "endpoints array here rather than typed.",
     "",
     "Provenance is per model because rates are refreshed one model at a time. To",
@@ -39,7 +39,7 @@
     "silence.",
     "",
     "THE ENDPOINTS ARRAY IS NOT SORTED BY PRICE and its order carries no pricing",
-    "meaning at all — it is unsorted for 8 of the 20 models, in every case because a",
+    "meaning at all \u2014 it is unsorted for 8 of the 20 models, in every case because a",
     "half-price `/flex` service tier is listed after the standard one. Reading",
     "`cheapest` off it named, for those eight, an endpoint costing exactly 2.00x the",
     "band floor recorded beside it, and never one below. Derive `cheapest` and",
@@ -48,8 +48,8 @@
     "  jq -r '.data.endpoints | sort_by(.pricing.prompt|tonumber) |",
     "         (first|\"cheapest \\(.tag)\"), (last|\"dearest \\(.tag)\")'",
     "",
-    "Ties at either extreme are normal — six of claude-opus-5's seven endpoints share",
-    "its floor — so any endpoint AT the extreme is a correct label. One merely near it",
+    "Ties at either extreme are normal \u2014 six of claude-opus-5's seven endpoints share",
+    "its floor \u2014 so any endpoint AT the extreme is a correct label. One merely near it",
     "is not."
   ],
   "models": {
@@ -2617,6 +2617,248 @@
             "prompt": "0.00000231",
             "completion": "0.00000726",
             "input_cache_read": "0.000000462",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "z-ai/glm-5.3-flash": {
+      "captured_on": "2026-09-02",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/z-ai/glm-5.3-flash/endpoints",
+      "pricing": {
+        "prompt": "0.000000075",
+        "completion": "0.00000025",
+        "input_cache_read": "0.000000015"
+      },
+      "endpoints": [
+        {
+          "tag": "gmicloud/fp8",
+          "provider_name": "GMICloud",
+          "pricing": {
+            "prompt": "0.000000075",
+            "completion": "0.00000025",
+            "input_cache_read": "0.000000015",
+            "discount": 0.5
+          }
+        },
+        {
+          "tag": "novita/fp8",
+          "provider_name": "Novita",
+          "pricing": {
+            "prompt": "0.000000075",
+            "completion": "0.00000025",
+            "input_cache_read": "0.000000015",
+            "discount": 0.5
+          }
+        },
+        {
+          "tag": "deepinfra/fp8",
+          "provider_name": "DeepInfra",
+          "pricing": {
+            "prompt": "0.000000075",
+            "completion": "0.00000025",
+            "input_cache_read": "0.000000015",
+            "discount": 0.5
+          }
+        },
+        {
+          "tag": "z-ai/fp8",
+          "provider_name": "Z.AI",
+          "pricing": {
+            "prompt": "0.000000075",
+            "completion": "0.00000025",
+            "input_cache_read": "0.000000015",
+            "discount": 0.5
+          }
+        },
+        {
+          "tag": "wafer",
+          "provider_name": "Wafer",
+          "pricing": {
+            "prompt": "0.0000001",
+            "completion": "0.00000035",
+            "input_cache_read": "0.00000002",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "morph/fp8",
+          "provider_name": "Morph",
+          "pricing": {
+            "prompt": "0.00000013",
+            "completion": "0.00000045",
+            "input_cache_read": "0.00000002",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "makora",
+          "provider_name": "Makora",
+          "pricing": {
+            "prompt": "0.00000014",
+            "completion": "0.00000047",
+            "input_cache_read": "0.000000024",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "modal/fp8",
+          "provider_name": "Modal",
+          "pricing": {
+            "prompt": "0.000000149985",
+            "completion": "0.00000049995",
+            "input_cache_read": "0.000000029997",
+            "discount": 0.6667
+          }
+        },
+        {
+          "tag": "sail-research/fp8",
+          "provider_name": "Sail Research",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "streamlake",
+          "provider_name": "StreamLake",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "nextbit/fp8",
+          "provider_name": "NextBit",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "phala/fp8",
+          "provider_name": "Phala",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "friendli",
+          "provider_name": "Friendli",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "siliconflow/fp8",
+          "provider_name": "SiliconFlow",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "digitalocean",
+          "provider_name": "DigitalOcean",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "together",
+          "provider_name": "Together",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "reka/fp8",
+          "provider_name": "Reka",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "parasail/fp8",
+          "provider_name": "Parasail",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "baseten/fp8",
+          "provider_name": "BaseTen",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "venice",
+          "provider_name": "Venice",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "io-net/fp8",
+          "provider_name": "Io Net",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "cloudflare",
+          "provider_name": "Cloudflare",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.0000005",
+            "input_cache_read": "0.00000003",
             "discount": 0
           }
         }

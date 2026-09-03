@@ -127,7 +127,7 @@ models:
 
   triage:                          # cheap model for merging and filtering
     provider: openrouter
-    model: qwen/qwen3.7-flash
+    model: z-ai/glm-5.3-flash
     temperature: 0
 
 review:
@@ -148,7 +148,8 @@ instructions:                      # path-scoped, and they compose
 
 linters:
   mode: auto                       # auto | strict | off
-  enabled: [golangci-lint, ruff]   # add eslint/semgrep once you have configured them
+  enabled: [golangci-lint, ruff]   # named analyzers; strict mode fails when one is missing
+  auto_detect: true                # also run any installed catalog analyzer (see the table below)
   only_changed_lines: true
   max_severity: critical           # ceiling on findings attributed to an analyzer
 
@@ -158,7 +159,72 @@ linters:
   ruff_config: ""                  # empty: ruff runs with --isolated
   eslint_config: ""                # empty: eslint does not run
   semgrep_config: ""               # empty: semgrep does not run
+  configs:                         # the same, for every catalog analyzer, by name
+    rubocop: /etc/nitpick/rubocop.yml
+  trusted: []                      # analyzers allowed to execute the tree's code: clippy, phpstan
 ```
+
+### Analyzers
+
+Thirty-one deterministic analyzers, covering the languages the hosted reviewers
+list. Two are enabled by name out of the box; twenty-two more run whenever they
+are installed and the change contains files they read; the rest need a
+configuration or an explicit grant. `nitpick linters` prints this table from
+the binary.
+
+| analyzer | covers | runs | configuration |
+|---|---|---|---|
+| golangci-lint | Go | enabled | open-nitpick's own config; `golangci_config` overrides |
+| ruff | Python | enabled | `--isolated`; `ruff_config` overrides |
+| shellcheck | shell | auto | `--norc` |
+| hadolint | Dockerfile | auto | shipped config |
+| yamllint | YAML | auto | shipped config |
+| actionlint | GitHub Actions | auto | shipped config |
+| zizmor | GitHub Actions (security) | auto | shipped config |
+| gitleaks | secrets in any file | auto | shipped config; secrets are redacted from the finding |
+| cppcheck | C, C++ | auto | none; inline suppressions not honoured |
+| luacheck | Lua | auto | `--no-config` |
+| dotenv-linter | .env files | auto | none |
+| checkmake | Makefile | auto | shipped config |
+| sqlfluff | SQL | auto | shipped config (ANSI); set your dialect via `configs` |
+| biome | JS, TS, JSON, CSS | auto | shipped config |
+| oxlint | JS, TS | auto | shipped config |
+| htmlhint | HTML | auto | shipped config |
+| rubocop | Ruby | auto | shipped config |
+| detekt | Kotlin | auto | shipped config on the tool's defaults |
+| swiftlint | Swift | auto | shipped config |
+| pmd | Java | auto | the bundled quickstart ruleset |
+| checkov | Terraform, Kubernetes, Helm, Compose, Dockerfile, ARM, Bicep | auto | shipped config, no downloads |
+| tflint | Terraform | auto | shipped config, bundled ruleset |
+| buf | Protocol Buffers | auto | shipped config |
+| psscriptanalyzer | PowerShell | auto | none |
+| eslint | JS, TS | opt-in | `eslint_config` required |
+| semgrep | any | opt-in | `semgrep_config` required |
+| stylelint | CSS, SCSS, Less | opt-in | `configs.stylelint` required; a config may be code |
+| markdownlint | Markdown | opt-in | shipped config; noisy, so not auto |
+| osv-scanner | lockfiles | opt-in | shipped config; queries osv.dev, so not auto |
+| phpstan | PHP | opt-in | `configs.phpstan` and `trusted`: loads the project's autoloader |
+| clippy | Rust | opt-in | `trusted`: cargo runs build scripts and proc macros |
+
+The rules are the ones the first four already follow. A binary is resolved
+from `PATH` and refused inside the repository. Configuration is the shipped
+file, written outside the repository, or the operator's `configs.<name>`,
+which must resolve outside it; a tool with neither useful default nor
+operator config does not run and says so. A tool that has to execute the
+tree's code to analyze it is refused until named in `trusted`, because no
+configuration outside the tree makes that safe on a stranger's pull request.
+In-source suppression (`# noqa`, `// NOLINT`, `# rubocop:disable`) is not
+closed for any of them.
+
+**Auto-detected analyzers make no roster entry unless they run or fail.** A
+tool that is not installed, or has nothing to read, is not listed, so the
+block on the pull request stays short enough to be read. Naming a tool in
+`enabled` is how to be told when it is missing, and how to make strict mode
+fail on it.
+
+Not covered: Vale and LanguageTool (prose), Presidio (PII), Verilator, Fortran,
+Rego, Smarty, Shopify themes, Ember templates, Windows batch, CircleCI and
+oasdiff.
 
 **Analyzers do not read configuration from the branch under review.**
 golangci-lint runs isolated under a config open-nitpick ships and ruff runs
@@ -365,7 +431,12 @@ definitions it imports from elsewhere in the repository and uses on a changed
 line: Go package-level functions, types and constants reached through the
 module's own import path; TypeScript and JavaScript exports reached through a
 relative import; Python module-level `def`, `class` and assignments reached
-through `from x import y` or `import x`. Each definition is attached with its
+through `from x import y` or `import x`; Rust items reached through
+`use crate::…` and `mod`; Ruby top-level definitions reached through
+`require_relative` and `require`; Java and Kotlin classes and Kotlin top-level
+functions reached through `import`, resolved from the importing file's own
+package declaration; C and C++ declarations reached through a quoted
+`#include`. Each definition is attached with its
 doc comment, from its real line number, under a heading that says the file is
 not under review. Nothing under `node_modules`, a module cache or outside the
 checkout is ever read, and a file the change itself touches is never attached,
@@ -881,7 +952,17 @@ temperature 0 and still scores byte-identical input anywhere from 3.66 to 3.98.
 ```bash
 go test ./...        # no network or credentials required
 go test -race ./...
+make quick           # measure a prompt or analyzer change for a few cents (see below)
 ```
+
+### Iterating cheaply
+
+`make quick` runs the tuning corpus and the multi-file corpus, judge-free,
+with related context off and on, against `z-ai/glm-5.3-flash` — about a
+thirtieth of the default reviewer's price per review. It is the model to
+iterate against, and the triage model this repository's own config uses;
+[docs/findings.md](docs/findings.md) records how it compares as a reviewer.
+`QUICK=<openrouter id>` swaps it.
 
 ### Evaluating the prompts against real models
 

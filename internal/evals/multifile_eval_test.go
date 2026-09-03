@@ -61,6 +61,8 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		findings int
 		noise    int
 		anchor   int
+		usd      float64
+		priced   int                        // reviews whose cost is known
 		byBand   map[config.Severity][2]int // located, plants
 		perFix   map[string]string          // fixture -> "located/plants (noise)"
 	}
@@ -68,7 +70,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		mu   sync.Mutex
 		rows = map[string]*row{}
 	)
-	record := func(name string, f Fixture, findings []review.Finding, runErr error) {
+	record := func(name string, f Fixture, findings []review.Finding, runErr error, cost Cost) {
 		mu.Lock()
 		defer mu.Unlock()
 		r, ok := rows[name]
@@ -82,6 +84,10 @@ func TestBenchmarkMultiFile(t *testing.T) {
 			return
 		}
 		r.reviews++
+		if cost.Known {
+			r.usd += cost.USD
+			r.priced++
+		}
 		d := ScoreDetection(f, findings)
 		r.plants += len(f.Defects)
 		r.located += d.Matched
@@ -146,10 +152,10 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		for _, f := range opts.Fixtures {
 			findings, ok := inc.cached(inc.cacheDir, f)
 			if !ok {
-				record(inc.name, f, nil, fmt.Errorf("no review"))
+				record(inc.name, f, nil, fmt.Errorf("no review"), Cost{})
 				continue
 			}
-			record(inc.name, f, findings, nil)
+			record(inc.name, f, findings, nil, Cost{})
 			_ = dump.Record(DumpSample{Model: inc.name, Fixture: f, Run: 0, Findings: findings})
 		}
 	}
@@ -186,7 +192,11 @@ func TestBenchmarkMultiFile(t *testing.T) {
 						if res.Err == nil && res.Report != nil {
 							findings = res.Report.Findings
 						}
-						record(name, f, findings, res.Err)
+						var cost Cost
+						if price, ok := opts.Prices.Price(model.ID); ok && res.Usage.Complete() {
+							cost = Cost{USD: price.Cost(res.Usage), Known: true}
+						}
+						record(name, f, findings, res.Err, cost)
 						if res.Err != nil {
 							t.Logf("%s on %s run %d: %v", name, f.Name, i, res.Err)
 							return
@@ -214,7 +224,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 	})
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "\n%-42s %7s %7s %7s %6s %6s  %s\n", "contender", "RECALL", "NOISE", "ANCHOR", "REV", "LOST", "critical/error/warning/info/nit")
+	fmt.Fprintf(&b, "\n%-42s %7s %7s %7s %6s %6s %9s %10s  %s\n", "contender", "RECALL", "NOISE", "ANCHOR", "REV", "LOST", "$/REVIEW", "$/LOCATED", "critical/error/warning/info/nit")
 	for _, n := range names {
 		r := rows[n]
 		bands := make([]string, 0, 5)
@@ -226,10 +236,18 @@ func TestBenchmarkMultiFile(t *testing.T) {
 			}
 			bands = append(bands, fmt.Sprintf("%d/%d", c[0], c[1]))
 		}
-		fmt.Fprintf(&b, "%-42s %7s %7s %7d %6d %6d  %s\n", n,
-			ratio(r.located, r.plants), ratio(r.noise, r.reviews), r.anchor, r.reviews, r.lost, strings.Join(bands, " "))
+		perReview, perLocated := "n/a", "n/a"
+		if r.priced > 0 {
+			perReview = fmt.Sprintf("$%.4f", r.usd/float64(r.priced))
+			if r.located > 0 && r.priced == r.reviews {
+				perLocated = fmt.Sprintf("$%.4f", r.usd/float64(r.located))
+			}
+		}
+		fmt.Fprintf(&b, "%-42s %7s %7s %7d %6d %6d %9s %10s  %s\n", n,
+			ratio(r.located, r.plants), ratio(r.noise, r.reviews), r.anchor, r.reviews, r.lost, perReview, perLocated, strings.Join(bands, " "))
 	}
 	b.WriteString("\nRECALL = located/plants over every review; NOISE = findings explaining no plant, per review; ANCHOR = widest anchor in lines.\n")
+	b.WriteString("$/REVIEW is the provider-reported spend per review at the shipped rate table; $/LOCATED divides the run's spend by the plants it located, and is n/a when any review went unpriced.\n")
 	b.WriteString("Our side is listed once per model without related context and once with it (+ctx).\n\n")
 
 	fmt.Fprintf(&b, "%-32s", "fixture")

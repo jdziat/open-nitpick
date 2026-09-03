@@ -3,6 +3,7 @@ package evals
 import (
 	"context"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -159,4 +160,39 @@ func importsFile(source, p string) bool {
 		}
 	}
 	return false
+}
+
+// TestTheMakefileNamesTheWholeTuningCorpus pins the Makefile's TUNING line,
+// which `make quick` spends, to Fixtures(), for
+// TestTheMakefileSpendsTheWholeHeldOutCorpus's reasons.
+func TestTheMakefileNamesTheWholeTuningCorpus(t *testing.T) {
+	src, err := os.ReadFile("../../Makefile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var line string
+	for _, l := range strings.Split(string(src), "\n") {
+		if strings.HasPrefix(l, "TUNING :=") {
+			line = strings.TrimSpace(strings.TrimPrefix(l, "TUNING :="))
+		}
+	}
+	if line == "" {
+		t.Fatal("the Makefile has no TUNING line")
+	}
+	named := map[string]bool{}
+	for _, n := range strings.Split(line, ",") {
+		named[strings.TrimSpace(n)] = true
+	}
+	tuning := map[string]bool{}
+	for _, f := range Fixtures() {
+		tuning[f.Name] = true
+		if !named[f.Name] {
+			t.Errorf("%s is in Fixtures() and not in the Makefile's TUNING line", f.Name)
+		}
+	}
+	for n := range named {
+		if !tuning[n] {
+			t.Errorf("the Makefile's TUNING line names %q, which is not a tuning fixture", n)
+		}
+	}
 }

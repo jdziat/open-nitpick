@@ -72,6 +72,9 @@ clean:
 # A name that resolves to nothing is now an error rather than a silent fallback
 # to the tuning corpus, and every table prints which corpus it measured.
 #
+# Every fixture in evals.Fixtures(), for `make quick`; TestTheMakefileNamesTheWholeTuningCorpus pins it.
+TUNING := go-nil-deref,go-sql-injection,go-hardcoded-secret,python-command-injection,clean-refactor,style-only,multi-defect,capacity-hint-nit,ts-unbounded-memo-key,go-cancel-goroutine-leak,python-timing-unsafe-hmac,cross-file-copy-nit,sorted-for-min-nit,kotlin-widened-input,php-forbidden-vs-404,go-package-singleton
+
 # This list must name EVERY fixture in evals.HeldOutFixtures. A name missing
 # from it is not an error — it is a shorter held-out run reporting a
 # generalization number over a subset, with nothing on the table saying which
@@ -236,6 +239,19 @@ rejudge:
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
 	$(if $(BASELINE),NITPICK_EVAL_BASELINE_JUDGE='$(BASELINE)') \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestRejudgeDump ./internal/evals/
+
+# The iteration model. Cheap enough to run the whole tuning corpus for a few
+# cents, so a prompt or analyzer change can be measured before it is committed
+# rather than after; docs/findings.md records how it compares with the default
+# reviewer. Override with QUICK=<openrouter id>.
+QUICK ?= z-ai/glm-5.3-flash
+
+# One cheap pass over the tuning corpus and the multi-file corpus, judge-free,
+# with related context off and on. What to run after editing a prompt.
+.PHONY: quick
+quick:
+	$(MAKE) benchmark-multifile MODELS='$(QUICK)' RUNS='$(or $(RUNS),1)' FIXTURES='$(or $(FIXTURES),$(TUNING))'
+	$(MAKE) benchmark-multifile MODELS='$(QUICK)' RUNS='$(or $(RUNS),1)'
 
 # Judge-free head-to-head on the MULTI-FILE corpus: every model with related
 # context off and on, against every incumbent with a cached or collectable

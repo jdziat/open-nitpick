@@ -14,9 +14,11 @@ models:
 
   # Triage only merges and filters findings, so it does not need the expensive
   # model. Splitting the roles is most of the cost saving available here.
+  # glm-5.3-flash is also the iteration model (`make quick`); docs/findings.md
+  # records how it compares as a reviewer.
   triage:
     provider: openrouter
-    model: qwen/qwen3.7-flash
+    model: z-ai/glm-5.3-flash
     temperature: 0
 
 review:

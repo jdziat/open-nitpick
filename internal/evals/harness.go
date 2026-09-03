@@ -90,6 +90,7 @@ func DefaultModels() []Model {
 
 		// Carried forward as benchmarks: the best of the previous battery on
 		// each axis, so the two runs are comparable.
+		{ID: "z-ai/glm-5.3-flash", Kind: "value"},       // the iteration model; see Makefile `quick`
 		{ID: "z-ai/glm-5.2", Kind: "incumbent"},         // best combined rank
 		{ID: "minimax/minimax-m2.7", Kind: "incumbent"}, // best judged, full volume
 		{ID: "qwen/qwen3.7-flash", Kind: "incumbent"},   // best value at $0.03
@@ -142,6 +143,10 @@ type Options struct {
 
 	// Timeout bounds a single review.
 	Timeout time.Duration
+
+	// Log, when set, receives the engine's log for every review in the run.
+	// Nil discards it, which is right for a battery and wrong for a probe.
+	Log *slog.Logger
 
 	// Tune, when set, adjusts the configuration every review in the run is
 	// built with, after the environment has been read. It is how one process
@@ -608,7 +613,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		// triaging another model's findings.
 		Roles:    &llm.Roles{Review: client, Triage: client},
 		Provider: provider,
-		Log:      slog.New(slog.DiscardHandler),
+		Log:      cmpLogger(opts.Log),
 	}
 
 	runCtx := ctx
@@ -633,6 +638,13 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	out.Duration = time.Since(started)
 
 	return out
+}
+
+func cmpLogger(l *slog.Logger) *slog.Logger {
+	if l != nil {
+		return l
+	}
+	return slog.New(slog.DiscardHandler)
 }
 
 // evalConfig builds a configuration pointed at OpenRouter.
