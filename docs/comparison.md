@@ -143,3 +143,73 @@ through GitHub's diff, the review API, the comment cap, and the fingerprint
 markers. It is also a single run, on fixtures this project wrote, against no
 incumbent — the private repository is where Incumbent's hosted app can be
 installed for the comparison the CLI cannot give.
+
+### Head to head with Incumbent's hosted app, on GitHub (2026-09-03)
+
+Incumbent's GitHub App was already installed on the account, so it reviewed
+the same 44 pull requests as they opened. This is the comparison the CLI
+cache could not give: the hosted product, with the repository to index, its
+own analyzers, and no free-allowance caveat. Both reviewers saw identical
+diffs at identical times. `cmd/benchrepo score` scores each reviewer's
+inline comments with the harness's scorer; a review with no inline comment
+counts as located nothing, which is what it is.
+
+| language | open-nitpick | Incumbent (hosted) |
+|---|---|---|
+| Go | R 16/18, N 0/19 | R 14/18, N 4/19 |
+| Python | R 6/8, N 1/9 | R 7/8, N 0/9 |
+| TypeScript | R 5/6, N 0/7 | R 5/6, N 1/7 |
+| Ruby | R 1/2, N 0/2 | R 1/2, N 0/2 |
+| Java | R 1/1, N 0/1 | R 0/1, N 0/1 |
+| PHP | R 1/1, N 0/1 | R 0/1, N 0/1 |
+| C#, shell, SQL | R 3/3, N 0/3 | R 3/3, N 0/3 |
+| Kotlin, Rust | R 0/2 | R 0/2 |
+| **all** | **R 33/41, N 1/44, 34 comments** | **R 30/41, N 5/44, 37 comments** |
+| clean fixtures commented on | 0 of 5 | 0 of 5 |
+| median time to first review | 96 s | 101 s |
+
+R is located/plants, N is noise findings over pull requests.
+
+**Read by hand, because the scorer is a keyword list.** Every difference
+between the two columns was checked against the actual comments:
+
+- `ts-unawaited-async`: Incumbent found the plant and worded it "does not
+  await … can resolve before", which the keyword list scored as a miss. The
+  list now admits that phrasing; the table above is after the fix. A gap
+  that only costs the other side is a thumb on the scale.
+- `multi-defect` (three plants): Incumbent reported all three and is
+  scored 2 of 3, because it anchored the descriptor leak at the `return`
+  where the close belongs (line 34) rather than at the `os.Create` (line 19),
+  fifteen lines from the plant. Its three "noise" findings there are a
+  partial-file-on-error remark, an unbounded-request-body remark, and that
+  same leak at the other anchor — two of the three are defensible.
+- `go-empty-filter-deletes-all`: its extra finding is golangci-lint's
+  `errcheck` on an ignored `fmt.Fprintf`, which it ran and this run did
+  not: the benchmark runner has no golangci-lint installed, so
+  open-nitpick's analyzer auto-detection had nothing to run. That is a real
+  difference in the hosted product's favour — it brings its analyzers.
+- `go-hardcoded-secret`, `php-forbidden-vs-404`, `defensive-copy-nit`:
+  Incumbent posted a walkthrough and no inline comment on all three. The
+  committed `sk-live-` key is the one miss that matters.
+- `python-secret-to-audit-log`, `retry-no-backoff`: Incumbent found what
+  open-nitpick's single noise finding sat next to; on Python it is one
+  plant ahead.
+
+**What the hosted product does that this does not.** Every Incumbent
+comment carries a category, an effort label, a proposed fix as a diff, a
+committable suggestion, and a prompt for an agent; several carry the shell
+script it ran to verify the finding against the repository. open-nitpick's
+comment carries the severity, the class, the title, the consequence, and
+which model found and triaged it. On a defect both found, both comments were
+right; theirs is longer and more actionable, ours is shorter and says who
+said it.
+
+**What this establishes.** On these 44 pull requests, at the same moment, the
+shipped Action located three more plants than the hosted incumbent, posted a
+fifth of its noise, and answered five seconds faster at the median. It missed
+the same `info` and `nit` plants everyone misses, plus one `nit`. Rule 15
+applies: this corpus is this project's, and 41 plants resolve nothing finer
+than one plant. What it retires is the sentence that the CLI cache was the
+wrong instrument — the hosted product on the same pull requests locates 30
+where the cache located 14 of 29 on an earlier corpus, and still fewer than
+this reviewer.

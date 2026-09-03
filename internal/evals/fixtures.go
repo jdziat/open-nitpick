@@ -507,7 +507,13 @@ export async function saveAll(items: Item[], save: Save): Promise<void> {
 			Keywords: []string{
 				"unhandled rejection", "fire-and-forget", "not awaited", "never awaited",
 				"discards the promise", "ignores the returned promise",
-				"resolves before", "returns before", "does not wait",
+				"resolves before", "resolve before", "returns before", "does not wait",
+				// "does not await" and "can resolve before" are how the hosted
+				// incumbent worded a correct finding on the benchmark
+				// repository, and the list scored it as a miss. A phrasing
+				// gap that only ever costs the other side is a thumb on the
+				// scale, so both are admitted.
+				"does not await", "not propagated to the caller",
 			},
 			Class:        config.ClassCorrectness,
 			WantSeverity: config.SeverityError,

@@ -4,7 +4,8 @@
 //	benchrepo init <dir>            write every fixture's base state under fixtures/<name>/ and commit it
 //	benchrepo branches <dir>        create one branch per fixture with its head state committed
 //	benchrepo prs <owner/repo>      open a pull request for every fixture branch
-//	benchrepo score <owner/repo>    read the reviews back off the pull requests and score them
+//	benchrepo trigger <owner/repo>  ask Incumbent's hosted app to review every fixture pull request
+//	benchrepo score <owner/repo>    read every reviewer's comments back off the pull requests and score them
 //
 // The pull request bodies say nothing about what is planted: the description
 // reaches the reviewer, and a description that names the defect measures
@@ -12,7 +13,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -44,6 +44,8 @@ func main() {
 		err = branches(os.Args[2])
 	case "prs":
 		err = openPRs(os.Args[2])
+	case "trigger":
+		err = trigger(os.Args[2])
 	case "score":
 		err = score(os.Args[2])
 	default:
@@ -242,41 +244,97 @@ func openPRs(repo string) error {
 	return nil
 }
 
-// score reads every fixture pull request's review comments and scores them
-// against the plants, with the same deterministic scorer the harness uses.
-func score(repo string) error {
-	type comment struct {
-		Path string `json:"path"`
-		Line int    `json:"line"`
-		Body string `json:"body"`
-		User struct {
-			Login string `json:"login"`
-		} `json:"user"`
-	}
-	type pr struct {
-		Number  int    `json:"number"`
-		HeadRef string `json:"headRefName"`
-	}
-
-	raw, err := gh("pr", "list", "--repo", repo, "--state", "all", "--limit", "200", "--json", "number,headRefName")
+// trigger asks Incumbent to review every fixture pull request. The app only
+// reviews on events it sees after installation, so pull requests opened
+// before it was installed need to be asked; a comment is the documented way.
+func trigger(repo string) error {
+	numbers, err := prNumbers(repo)
 	if err != nil {
 		return err
 	}
-	var prs []pr
+	for _, f := range corpus() {
+		number, ok := numbers[branchPrefix+f.Name]
+		if !ok {
+			continue
+		}
+		if _, err := gh("pr", "comment", "--repo", repo, strconv.Itoa(number), "--body", "@incumbentai full review"); err != nil {
+			return err
+		}
+		fmt.Println("asked", f.Name)
+	}
+	return nil
+}
+
+func prNumbers(repo string) (map[string]int, error) {
+	raw, err := gh("pr", "list", "--repo", repo, "--state", "all", "--limit", "200", "--json", "number,headRefName")
+	if err != nil {
+		return nil, err
+	}
+	var prs []struct {
+		Number  int    `json:"number"`
+		HeadRef string `json:"headRefName"`
+	}
 	if err := json.Unmarshal([]byte(raw), &prs); err != nil {
+		return nil, err
+	}
+	out := map[string]int{}
+	for _, p := range prs {
+		out[p.HeadRef] = p.Number
+	}
+	return out, nil
+}
+
+// reviewers are the contenders a comment can belong to, told apart by what
+// posted it: open-nitpick by the marker it leaves in every comment,
+// Incumbent by its app account. Anything else is a human and is not scored.
+var reviewers = []string{"open-nitpick", "incumbent"}
+
+func reviewerOf(login, body string) string {
+	switch {
+	case strings.Contains(body, "<!-- open-nitpick"):
+		return "open-nitpick"
+	case strings.HasPrefix(login, "incumbentai"):
+		return "incumbent"
+	}
+	return ""
+}
+
+// score reads every fixture pull request's review comments and scores each
+// reviewer's against the plants, with the same deterministic scorer the
+// harness uses. Only inline comments are scored: Incumbent folds what it
+// calls nitpicks into the review body, and those are neither anchored nor
+// counted here — for it or against it.
+func score(repo string) error {
+	type comment struct {
+		Path      string `json:"path"`
+		Line      int    `json:"line"`
+		StartLine int    `json:"start_line"`
+		Body      string `json:"body"`
+		User      struct {
+			Login string `json:"login"`
+		} `json:"user"`
+	}
+	numbers, err := prNumbers(repo)
+	if err != nil {
 		return err
 	}
-	byBranch := map[string]int{}
-	for _, p := range prs {
-		byBranch[p.HeadRef] = p.Number
+
+	totals := map[string]*tally{}
+	byLang := map[string]map[string]*tally{}
+	for _, r := range reviewers {
+		totals[r] = &tally{}
+		byLang[r] = map[string]*tally{}
 	}
 
-	fmt.Printf("%-36s %8s %8s %8s\n", "fixture", "located", "noise", "comments")
-	totPlants, totLocated, totNoise, reviews := 0, 0, 0, 0
+	fmt.Printf("%-36s", "fixture")
+	for _, r := range reviewers {
+		fmt.Printf("  %-20s", r)
+	}
+	fmt.Println()
 	for _, f := range corpus() {
-		number, ok := byBranch[branchPrefix+f.Name]
+		number, ok := numbers[branchPrefix+f.Name]
 		if !ok {
-			fmt.Printf("%-36s %8s\n", f.Name, "no PR")
+			fmt.Printf("%-36s  no PR\n", f.Name)
 			continue
 		}
 		raw, err := gh("api", "--paginate", fmt.Sprintf("repos/%s/pulls/%d/comments", repo, number))
@@ -284,7 +342,6 @@ func score(repo string) error {
 			return err
 		}
 		var comments []comment
-		// --paginate concatenates arrays; decode each.
 		dec := json.NewDecoder(strings.NewReader(raw))
 		for dec.More() {
 			var page []comment
@@ -295,29 +352,106 @@ func score(repo string) error {
 		}
 
 		prefix := fixtureRoot + "/" + f.Name + "/"
-		var findings []review.Finding
+		findings := map[string][]review.Finding{}
 		for _, c := range comments {
-			if !strings.Contains(c.Body, "open-nitpick") {
+			r := reviewerOf(c.User.Login, c.Body)
+			if r == "" {
 				continue
 			}
 			title, rationale, _ := strings.Cut(strings.TrimSpace(c.Body), "\n")
-			findings = append(findings, review.Finding{
-				Path: strings.TrimPrefix(c.Path, prefix), Line: c.Line,
-				Title: title, Rationale: rationale,
-			})
+			fnd := review.Finding{Path: strings.TrimPrefix(c.Path, prefix), Line: c.Line, Title: title, Rationale: rationale}
+			if c.StartLine > 0 && c.StartLine < c.Line {
+				fnd.Line, fnd.EndLine = c.StartLine, c.Line
+			}
+			findings[r] = append(findings[r], fnd)
 		}
-		// No comments is either no review yet or a clean one; the summary
-		// on the pull request says which, and a clean review posts none.
-		d := evals.ScoreDetection(f, findings)
-		reviews++
-		totPlants += len(f.Defects)
-		totLocated += d.Matched
-		totNoise += d.Noise()
-		fmt.Printf("%-36s %8s %8d %8d\n", f.Name, strconv.Itoa(d.Matched)+"/"+strconv.Itoa(len(f.Defects)), d.Noise(), len(findings))
+
+		lang := fixtureLanguage(f)
+		fmt.Printf("%-36s", f.Name)
+		for _, r := range reviewers {
+			d := evals.ScoreDetection(f, findings[r])
+			cell := fmt.Sprintf("%d/%d", d.Matched, len(f.Defects))
+			if n := d.Noise(); n > 0 {
+				cell += fmt.Sprintf(" +%dn", n)
+			}
+			fmt.Printf("  %-20s", cell)
+			for _, t := range []*tally{totals[r], langTally(byLang[r], lang)} {
+				t.reviews++
+				t.plants += len(f.Defects)
+				t.located += d.Matched
+				t.noise += d.Noise()
+				t.comments += len(findings[r])
+			}
+		}
+		fmt.Println()
 	}
-	if reviews > 0 {
-		fmt.Printf("\nlocated %d/%d, noise %d over %d pull requests\n", totLocated, totPlants, totNoise, reviews)
+
+	fmt.Printf("\n%-12s", "language")
+	for _, r := range reviewers {
+		fmt.Printf("  %-28s", r)
 	}
-	_ = context.Background
+	fmt.Println()
+	langs := map[string]bool{}
+	for _, r := range reviewers {
+		for l := range byLang[r] {
+			langs[l] = true
+		}
+	}
+	var names []string
+	for l := range langs {
+		names = append(names, l)
+	}
+	sort.Strings(names)
+	for _, l := range append(names, "all") {
+		fmt.Printf("%-12s", l)
+		for _, r := range reviewers {
+			t := totals[r]
+			if l != "all" {
+				t = langTally(byLang[r], l)
+			}
+			fmt.Printf("  %-28s", fmt.Sprintf("R %d/%d N %d/%d C %d", t.located, t.plants, t.noise, t.reviews, t.comments))
+		}
+		fmt.Println()
+	}
+	fmt.Println("\nR = located/plants, N = noise findings/pull requests, C = inline comments scored.")
 	return nil
+}
+
+type tally struct{ reviews, plants, located, noise, comments int }
+
+func langTally(m map[string]*tally, lang string) *tally {
+	if m[lang] == nil {
+		m[lang] = &tally{}
+	}
+	return m[lang]
+}
+
+// fixtureLanguage names a fixture's language from the extension of the files
+// its change touches, majority wins; the same rule as the harness report.
+func fixtureLanguage(f evals.Fixture) string {
+	counts := map[string]int{}
+	for p, head := range f.Head {
+		if base, ok := f.Base[p]; ok && base == head {
+			continue
+		}
+		ext := strings.TrimPrefix(filepath.Ext(p), ".")
+		switch ext {
+		case "tsx":
+			ext = "ts"
+		case "kts":
+			ext = "kt"
+		case "cc", "cpp":
+			ext = "c"
+		}
+		if ext != "" {
+			counts[ext]++
+		}
+	}
+	best, n := "other", 0
+	for ext, c := range counts {
+		if c > n || (c == n && ext < best) {
+			best, n = ext, c
+		}
+	}
+	return best
 }
