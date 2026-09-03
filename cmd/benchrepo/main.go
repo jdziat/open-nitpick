@@ -306,10 +306,8 @@ func score(repo string) error {
 				Title: title, Rationale: rationale,
 			})
 		}
-		if len(comments) == 0 {
-			// No review yet, or a clean review; the summary would say which,
-			// and a summary-only review posts no comments.
-		}
+		// No comments is either no review yet or a clean one; the summary
+		// on the pull request says which, and a clean review posts none.
 		d := evals.ScoreDetection(f, findings)
 		reviews++
 		totPlants += len(f.Defects)

@@ -19,10 +19,10 @@ import (
 // ContenderModel is the pseudo-model id used for Contender in reports.
 const ContenderModel = "contender/cli"
 
-// contenderCacheDir holds one cached Contender review per fixture, beside the
+// ContenderCacheDir holds one cached Contender review per fixture, beside the
 // Incumbent cache and in the same shape, so the two incumbents are read by
 // one loader.
-const contenderCacheDir = "testdata/contender"
+const ContenderCacheDir = "testdata/contender"
 
 // ContenderSeverityScale declares that the Contender adapter translates a
 // foreign severity vocabulary onto ours, for the same reason

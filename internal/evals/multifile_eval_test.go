@@ -127,7 +127,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 			_, _, err := CollectIncumbent(ctx, fx, dir, opts.Timeout, log)
 			return err
 		}},
-		{ContenderModel, contenderCacheDir, CachedContender, ContenderAvailable, func(ctx context.Context, fx []Fixture, dir string, log func(string)) error {
+		{ContenderModel, ContenderCacheDir, CachedContender, ContenderAvailable, func(ctx context.Context, fx []Fixture, dir string, log func(string)) error {
 			_, _, err := CollectContender(ctx, fx, dir, opts.Timeout, log)
 			return err
 		}},
@@ -309,7 +309,7 @@ func TestCollectContender(t *testing.T) {
 		opts.Fixtures = MultiFileFixtures()
 	}
 
-	collected, remaining, err := CollectContender(ctx, opts.Fixtures, contenderCacheDir, opts.Timeout,
+	collected, remaining, err := CollectContender(ctx, opts.Fixtures, ContenderCacheDir, opts.Timeout,
 		func(line string) { t.Log(line) })
 	if err != nil {
 		t.Fatalf("collect: %v", err)

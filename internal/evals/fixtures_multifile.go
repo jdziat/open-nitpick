@@ -2,8 +2,8 @@ package evals
 
 import "github.com/jdziat/open-nitpick/internal/config"
 
-// The multi-file corpus: changes whose defect is only visible by reading a file
-// the change does not touch.
+// MultiFileFixtures is the multi-file corpus: changes whose defect is only
+// visible by reading a file the change does not touch.
 //
 // Every fixture in the other two corpora is judged from the diff and the files
 // it names. That is also what a hosted reviewer with the whole repository

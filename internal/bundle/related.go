@@ -863,7 +863,7 @@ func renderRelated(r Related) string {
 	return b.String()
 }
 
-// listerFrom adapts a provider that can list directories into a DirLister, or
+// ListerFrom adapts a provider that can list directories into a DirLister, or
 // returns nil when it cannot.
 func ListerFrom(p vcs.Provider, ref vcs.Ref) DirLister {
 	l, ok := p.(vcs.DirLister)

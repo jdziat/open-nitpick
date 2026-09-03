@@ -2,6 +2,7 @@ package linters
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -124,7 +125,7 @@ func TestCatalogDetectRefusesWhatItMust(t *testing.T) {
 
 	// No targets is not a refusal.
 	sc := &catalogTool{spec: ptr(specByName(t, "shellcheck"))}
-	if err := sc.Detect(ctx, t.TempDir(), []string{"main.go"}); err != errNoTargets {
+	if err := sc.Detect(ctx, t.TempDir(), []string{"main.go"}); !errors.Is(err, errNoTargets) {
 		t.Errorf("shellcheck on a Go change: %v, want errNoTargets", err)
 	}
 
