@@ -70,6 +70,13 @@ type Runner interface {
 	Run(ctx context.Context, repoRoot string, files []string) ([]Finding, error)
 }
 
+// isAutoDetected reports whether a runner was added by auto-detection rather
+// than named by the operator.
+func isAutoDetected(r Runner) bool {
+	t, ok := r.(*catalogTool)
+	return ok && t.detected
+}
+
 // errNoTargets is Detect's answer when nothing this analyzer reads survived the
 // review's file selection.
 //
@@ -136,6 +143,21 @@ func New(repoRoot string, cfg *config.Config, log *slog.Logger) *Set {
 		selected = append(selected, r)
 	}
 
+	// Auto-detected catalog tools come after the named ones and never
+	// duplicate one: a tool the operator named is a promise; the same tool
+	// detected is a courtesy.
+	if cfg.Linters.AutoDetects() {
+		named := map[string]bool{}
+		for _, r := range selected {
+			named[r.Name()] = true
+		}
+		for _, r := range autoDetected(repoRoot, cfg) {
+			if !named[r.Name()] {
+				selected = append(selected, r)
+			}
+		}
+	}
+
 	return &Set{repoRoot: repoRoot, cfg: cfg, log: log, runners: selected}
 }
 
@@ -147,12 +169,13 @@ func New(repoRoot string, cfg *config.Config, log *slog.Logger) *Set {
 // checkout, not of the file list, and deciding it at construction is what lets
 // Detect refuse a runner whose configuration was rejected.
 func builtins(repoRoot string, cfg *config.Config) []Runner {
-	return []Runner{
+	runners := []Runner{
 		&golangciLint{cfg: fileConfig(repoRoot, cfg.Linters.GolangciConfig)},
 		&ruff{cfg: fileConfig(repoRoot, cfg.Linters.RuffConfig)},
 		&eslint{cfg: fileConfig(repoRoot, cfg.Linters.ESLintConfig)},
 		&semgrep{cfg: semgrepConfig(repoRoot, cfg.Linters.SemgrepConfig)},
 	}
+	return append(runners, catalogRunners(repoRoot, cfg)...)
 }
 
 // Statuses reports how each configured analyzer was set up and whether it ran.
@@ -301,6 +324,19 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 			// module the detection could not see, was reported as one of two
 			// things that were not true.
 			reason := oneLine(err.Error())
+
+			// An auto-detected tool that was not asked for makes no entry
+			// in the roster unless it ran or failed: twenty "skipped" lines
+			// for tools with nothing to read, or not installed, on every
+			// pull request is how a roster gets collapsed and never opened.
+			// Naming a tool in linters.enabled is how to be told about it.
+			if errors.Is(err, errNotInstalled) {
+				s.log.Debug("auto-detected analyzer not installed", "linter", r.Name())
+				continue
+			}
+			if errors.Is(err, errNoTargets) && isAutoDetected(r) {
+				continue
+			}
 
 			if errors.Is(err, errNoTargets) {
 				// Not a degradation, so it is not a failure and does not fail

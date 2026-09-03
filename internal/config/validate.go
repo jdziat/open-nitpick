@@ -199,6 +199,21 @@ func (l Linters) validate() []error {
 		}
 	}
 
+	for name, path := range l.Configs {
+		if strings.TrimSpace(name) == "" {
+			errs = append(errs, errors.New("linters.configs: an analyzer name is empty"))
+			continue
+		}
+		if err := checkAnalyzerConfigPath("linters.configs."+name, path); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	for i, name := range l.Trusted {
+		if strings.TrimSpace(name) == "" {
+			errs = append(errs, fmt.Errorf("linters.trusted[%d]: name is empty", i))
+		}
+	}
+
 	// semgrep is the one that also accepts a registry reference, because a
 	// registry rule set is a fetch the operator asked for BY NAME. That is not
 	// the same as the `--config auto` this replaced, which was a network fetch

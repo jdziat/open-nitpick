@@ -1,0 +1,4 @@
+# open-nitpick's actionlint config: nothing but the defaults, stated in a file
+# so no .github/actionlint.yaml from the tree under review is read instead.
+self-hosted-runner:
+  labels: []

@@ -47,6 +47,8 @@ func run() int {
 		err = runReview(ctx, os.Args[2:])
 	case "explain-config":
 		err = runExplainConfig(os.Args[2:])
+	case "linters":
+		err = runLinters()
 	case "providers":
 		err = runProviders()
 	case "version", "--version", "-v":
@@ -90,6 +92,7 @@ Usage:
   nitpick review [flags]           Review a change
   nitpick explain-config [flags]   Show the resolved configuration and prompts
   nitpick providers                List available model providers
+  nitpick linters                  List the deterministic analyzers and how each is configured
   nitpick version                  Print the version
 
 Run "nitpick <command> -h" for a command's flags.

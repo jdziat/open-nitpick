@@ -1,0 +1,7 @@
+# open-nitpick's gitleaks config: the tool's built-in rules, stated in a file
+# so no .gitleaks.toml (with its allowlists) from the tree under review is
+# read instead.
+title = "open-nitpick"
+
+[extend]
+useDefault = true

@@ -1,0 +1,3 @@
+# open-nitpick's yamllint config: the tool's default ruleset, stated in a file
+# so no .yamllint in the tree under review is read instead.
+extends: default

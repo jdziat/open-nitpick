@@ -1,0 +1,4 @@
+# open-nitpick's checkov config: the defaults, stated so no .checkov.yaml in
+# the tree under review is read instead.
+quiet: true
+compact: true

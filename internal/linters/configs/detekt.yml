@@ -1,0 +1,4 @@
+# open-nitpick's detekt config: empty, layered on the tool's defaults with
+# --build-upon-default-config, so no detekt.yml in the tree is read instead.
+build:
+  maxIssues: -1

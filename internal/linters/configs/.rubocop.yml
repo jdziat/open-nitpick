@@ -1,0 +1,4 @@
+# open-nitpick's rubocop config: the defaults, with no extension nagging.
+AllCops:
+  SuggestExtensions: false
+  NewCops: disable

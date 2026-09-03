@@ -51,6 +51,12 @@ var DefaultIgnore = []string{
 // does catch an operator who enabled one without configuring it.
 var DefaultLinters = []string{"golangci-lint", "ruff"}
 
+// The catalog analyzers (internal/linters) are not listed here because they
+// are not ENABLED by default: they are auto-detected. Naming one in
+// linters.enabled makes it a promise strict mode checks; leaving it to
+// linters.auto_detect runs it when it is installed and skips it when it is
+// not.
+
 // Defaults returns the built-in configuration. The default model reads
 // LLM_PROVIDER/LLM_MODEL-style environment configuration only after validation
 // confirms a provider was supplied, so defaults intentionally leave the model

@@ -1,0 +1,3 @@
+# open-nitpick's hadolint config: the tool's defaults, stated in a file so no
+# .hadolint.yaml in the tree under review is read instead.
+ignored: []

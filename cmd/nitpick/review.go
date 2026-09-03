@@ -611,6 +611,46 @@ func runProviders() error {
 	return nil
 }
 
+// runLinters prints the analyzer catalog: what each tool reads, whether it
+// is on by default, and where its configuration comes from.
+func runLinters() error {
+	fmt.Println("Deterministic analyzers. Each runs only when its binary is on PATH and the change contains")
+	fmt.Println("files it reads; configuration never comes from the tree under review.")
+	fmt.Println("  enabled  in linters.enabled out of the box; strict mode fails when it is missing")
+	fmt.Println("  auto     runs when installed (linters.auto_detect); name it in linters.enabled to make it a promise")
+	fmt.Println("  opt-in   runs only when named, and configured or trusted as the last column says")
+	fmt.Println()
+	fmt.Printf("  %-18s %-8s %-52s %s\n", "name", "runs", "covers", "configuration")
+	fixed := []linters.CatalogEntry{
+		{Name: "golangci-lint", Languages: "Go", Configuration: "open-nitpick's own config; linters.golangci_config overrides", Default: true},
+		{Name: "ruff", Languages: "Python", Configuration: "--isolated; linters.ruff_config overrides", Default: true},
+		{Name: "eslint", Languages: "JavaScript, TypeScript (via an operator config)", Configuration: "linters.eslint_config required"},
+		{Name: "semgrep", Languages: "any (rules of your choosing)", Configuration: "linters.semgrep_config required"},
+	}
+	for _, e := range append(fixed, linters.Catalog()...) {
+		def := "opt-in"
+		switch {
+		case e.Default:
+			def = "enabled"
+		case e.Auto:
+			def = "auto"
+		}
+		conf := e.Configuration
+		if e.Trusted {
+			conf += "; executes tree code: needs linters.trusted"
+		}
+		fmt.Printf("  %-18s %-8s %-52s %s\n", e.Name, def, truncateTo(e.Languages, 52), conf)
+	}
+	return nil
+}
+
+func truncateTo(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n-1] + "…"
+}
+
 // describeClasses renders a validation class list. The empty case is spelled
 // out rather than printed blank: "" and "every class" mean the same thing here
 // and only one of them says so.

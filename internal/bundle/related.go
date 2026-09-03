@@ -193,6 +193,16 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 		wants = c.tsWants(e)
 	case ".py":
 		wants = c.pyWants(e)
+	case ".rs":
+		wants = c.rustWants(e)
+	case ".rb":
+		wants = c.rubyWants(e)
+	case ".java":
+		wants = c.jvmWants(e, ".java")
+	case ".kt", ".kts":
+		wants = c.jvmWants(e, ".kt")
+	case ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx":
+		wants = c.cWants(e)
 	default:
 		return 0
 	}

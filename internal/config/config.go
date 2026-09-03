@@ -294,7 +294,32 @@ type Linters struct {
 	// so a pull request that ADDED one turned semgrep on with rules the pull
 	// request wrote, in the run reviewing it.
 	SemgrepConfig string `yaml:"semgrep_config"`
+
+	// Configs names an analyzer configuration per catalog tool, keyed by the
+	// tool's name in linters.enabled — an absolute path that must resolve
+	// outside the repository, for the four keys' reasons. A tool with no
+	// entry runs under the configuration open-nitpick ships for it, under
+	// its own isolation flag, or not at all; `nitpick linters` says which.
+	Configs map[string]string `yaml:"configs"`
+
+	// AutoDetect runs every catalog analyzer that is installed, isolated from
+	// the tree, and executes nothing from it, whenever the change contains
+	// files it reads — without each being named in Enabled. One that is not
+	// installed is skipped, silently in auto mode and in strict mode alike:
+	// strict is a promise about the analyzers an operator NAMED, and naming
+	// one here is how to make its absence fail the run. Defaults to on.
+	AutoDetect *bool `yaml:"auto_detect"`
+
+	// Trusted names analyzers that EXECUTE the tree's own code in order to
+	// analyze it — cargo clippy runs build scripts and procedural macros,
+	// phpstan loads the project's autoloader — and that are therefore
+	// refused by default. Name one here only where every change reviewed
+	// comes from people who could already run code in this CI job.
+	Trusted []string `yaml:"trusted"`
 }
+
+// AutoDetects reports whether catalog analyzers run without being named.
+func (l Linters) AutoDetects() bool { return l.AutoDetect == nil || *l.AutoDetect }
 
 // CapSeverity reduces an analyzer-reported severity to the ceiling this
 // repository lets a deterministic tool claim.
