@@ -156,11 +156,18 @@ func stubTool(t *testing.T, bin, out string, toStderr bool, exit int) string {
 	if toStderr {
 		stream = " >&2"
 	}
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argv + "\ncat <<'REPORT'" + stream + "\n" + out + "\nREPORT\nexit " + itoa(exit) + "\n"
+	// The report is read with a bash builtin so the stub needs nothing on
+	// PATH but itself: the tests that use it set PATH to the stub's own
+	// directory, so that what is "installed" is exactly what they say.
+	report := filepath.Join(dir, "report")
+	if err := os.WriteFile(report, []byte(out+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	script := "#!/bin/bash\nprintf '%s\\n' \"$@\" > " + argv + "\nprintf '%s' \"$(<" + report + ")\"" + stream + "\nexit " + itoa(exit) + "\n"
 	if err := os.WriteFile(filepath.Join(dir, bin), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("PATH", dir)
 	return argv
 }
 
@@ -371,7 +378,7 @@ func TestAutoDetectedToolsSkipWhenAbsentAndRunWhenPresent(t *testing.T) {
 
 	cfg := baseConfig()
 	cfg.Linters.Mode = config.LinterStrict
-	t.Setenv("PATH", t.TempDir()+string(os.PathListSeparator)+"/usr/bin:/bin") // no analyzers installed
+	t.Setenv("PATH", t.TempDir()) // nothing installed at all, whatever the machine has
 	set := New(repo, cfg, nil)
 	if _, err := set.Run(context.Background(), files); err != nil {
 		t.Fatalf("strict mode must not fail over an auto-detected tool that is not installed: %v", err)

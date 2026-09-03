@@ -299,11 +299,14 @@ func (g *golangciLint) Detect(_ context.Context, repoRoot string, files []string
 	if len(filterExt(files, ".go")) == 0 {
 		return errNoTargets
 	}
-	if !available("golangci-lint") {
-		return notOnPath("golangci-lint")
-	}
+	// The change's own shape is judged before the machine's: a change with
+	// no module to analyze has that reason whether or not the binary is
+	// installed, and the more specific reason is the one worth reporting.
 	if len(goTargets(repoRoot, files)) == 0 {
 		return errors.New("no go.mod at or above the changed Go files, so there is no module to analyze")
+	}
+	if !available("golangci-lint") {
+		return notOnPath("golangci-lint")
 	}
 	return nil
 }

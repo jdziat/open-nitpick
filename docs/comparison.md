@@ -114,3 +114,32 @@ honestly is a larger TypeScript corpus, not a narrower reviewer.
 
 Nothing above is a claim about the hosted product with a learned codebase,
 about Contender or Bugbot, or about a corpus anyone else wrote.
+
+### End to end, on GitHub (2026-09-03)
+
+The corpora were materialised into a private repository
+(`jdziat/nitpick-bench`, one branch and one pull request per fixture, 44 in
+all) and reviewed by the shipped GitHub Action — release install, incremental
+review, the job summary, the lot — with `anthropic/claude-sonnet-4.6`, related
+context on, and `min_severity: nit`. `cmd/benchrepo score` reads the posted
+review comments back and scores them with the harness's own scorer.
+
+| | |
+|---|---|
+| pull requests reviewed | 44 of 44, every workflow run green |
+| plants located | 33 of 41 |
+| noise findings | 1 over 44 pull requests |
+| clean fixtures with a comment | 0 of 5 |
+
+The eight misses are the corpus's known floor: the four `info` plants nobody
+locates (go-package-singleton, kotlin-widened-input, ruby-default-page-size,
+rust-crate-for-one-call), two `nit` plants (cross-file-copy-nit,
+sorted-for-min-nit), cross-file-sort-nit, and retry-no-backoff, where the one
+noise finding landed. Every `critical`, `error` and `warning` plant in the
+three corpora was located on the real pull request.
+
+This is the number a user of the Action gets, not a harness number: it went
+through GitHub's diff, the review API, the comment cap, and the fingerprint
+markers. It is also a single run, on fixtures this project wrote, against no
+incumbent — the private repository is where Incumbent's hosted app can be
+installed for the comparison the CLI cannot give.
