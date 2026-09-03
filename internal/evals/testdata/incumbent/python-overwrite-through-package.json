@@ -1,0 +1,8 @@
+{
+  "fixture": "python-overwrite-through-package",
+  "findings": null,
+  "at": "2026-09-03T03:54:56Z",
+  "mode": "plaintext",
+  "fingerprint": "5f1f05feb9d15f385e24b5ec44ee822c61e641097c24f7b87c37e0bbede560f3",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1435860537\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - app/uploads.py\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 8s elapsed\nFinishing analysis tools... 20s elapsed\nWriting review comments... 20s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

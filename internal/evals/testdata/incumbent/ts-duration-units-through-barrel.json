@@ -1,0 +1,8 @@
+{
+  "fixture": "ts-duration-units-through-barrel",
+  "findings": null,
+  "at": "2026-09-03T03:53:15Z",
+  "mode": "plaintext",
+  "fingerprint": "aca71bb271e9d37e71589e09c7c7df78516230ce7640c68a6e4d4da38e0dec5e",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1406559412\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - src/jobs.ts\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 8s elapsed\nFinishing analysis tools... 21s elapsed\nWriting review comments... 21s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

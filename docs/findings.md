@@ -567,6 +567,79 @@ and re-run the probe when it happens again — the log will name the error.
 judge, and a cost figure from the provider's reported usage at today's rate
 table. The multi-file half is outside the ground-truth registries.
 
+## kimi-k3, and the second half of the multi-file corpus
+
+`moonshotai/kimi-k3` is priced at $3 per million input tokens and $15 per
+million output — the same list price as sonnet-4.6, on a cheapest endpoint
+of $2.55. It was the model the v1 gate was measured with. Two runs on the
+same day as the glm-5.3-flash measurement above, three models in each
+process, judge-free. The multi-file corpus had grown to fourteen fixtures:
+four were added with the contract one hop further away — behind a Go method
+rather than its type, a TypeScript path alias and a barrel, a Python package
+re-export, and a Rails constant with no `require` — and the resolvers were
+extended to follow each. Rule 15 applies.
+
+### Tuning corpus, 16 fixtures, one run each
+
+| contender | RECALL | NOISE / review | $ / review |
+|---|---|---|---|
+| kimi-k3 + related context | **0.81** (13/16) | 0.19 | $0.028 |
+| sonnet-4.6 | 0.81 (13/16) | 0.25 | $0.019 |
+| sonnet-4.6 + related context | 0.81 (13/16) | 0.25 | $0.019 |
+| kimi-k3 | 0.75 (12/16) | 0.19 | $0.033 |
+| glm-5.3-flash | 0.69 (11/15, 1 lost) | 0.13 | $0.0007 |
+| incumbent/cli | 0.62 (10/16) | 0.19 | |
+| glm-5.3-flash + related context | 0.62 (10/15, 1 lost) | 0.27 | $0.0006 |
+
+### Multi-file corpus, 14 fixtures, two runs each
+
+| contender | RECALL | NOISE / review | $ / review | $ / located |
+|---|---|---|---|---|
+| glm-5.3-flash + related context | **1.00** (19/19, 6 lost) | **0.23** | **$0.0013** | **$0.0015** |
+| sonnet-4.6 + related context | 1.00 (24/24) | 0.36 | $0.0196 | $0.023 |
+| kimi-k3 + related context | 1.00 (24/24) | 0.50 | $0.0372 | $0.043 |
+| sonnet-4.6 | 0.83 (20/24) | 0.39 | $0.0184 | $0.026 |
+| glm-5.3-flash | 0.55 (12/22, 3 lost) | 0.80 | $0.0011 | $0.0024 |
+| kimi-k3 | 0.52 (12/23, 1 lost) | 0.48 | $0.0383 | $0.086 |
+| incumbent/cli | 0.08 (1/12) | 0.29 | | |
+
+**kimi-k3 is not the bang for the buck.** With related context it ties
+sonnet on both corpora, at one and a half to two times the price per review
+and with the highest noise of the three on the multi-file corpus; without
+it, it trails sonnet on both. Its cost per located defect on the multi-file
+corpus is twice sonnet's and thirty times glm's. The battery dropped it
+once before for "74s and $3.00 for a mid-tier grade", and this confirms the
+price half of that sentence at least. Per dollar the order is glm-5.3-flash,
+then sonnet-4.6, then kimi-k3, on every column that prices.
+
+**Related context now moves every model to 1.00 on the multi-file corpus.**
+The four new fixtures are where the second hop was tested. sonnet found the
+Go method contract and the aliased-barrel contract without the callee — the
+call sites give them away — and missed the package re-export in both runs
+until the resolver followed `from .disk import save` through
+`app/storage/__init__.py`, after which it found it in both. kimi missed three
+of the four without context and found all four with it. That is what the
+second hop bought, measured: one plant for the strong model, three for the
+other.
+
+**glm-5.3-flash lost reviews at a worse rate this time.** Nine of 56 on the
+multi-file corpus and two of 32 on the tuning corpus, all "all review
+batches failed" with no response recorded, against one in fifteen the day
+before. Its rates are computed over the reviews that completed, which is
+the honest reading of a model's quality and a dishonest reading of its
+usefulness: a reviewer that fails to answer a fifth of the time is one CI
+retries, and the retry costs the time it saved. The cause is still not
+captured; `TestProbeModel` is the instrument for the next occurrence.
+
+**The incumbent found none of the four new plants.** Its cache holds a
+zero-finding review for each. On the fourteen it locates one plant of
+twelve.
+
+**Not established.** Rule 15 throughout; sonnet's own tuning-corpus recall
+moved from 0.88 to 0.81 between two same-week runs on identical input, which
+is the resolution of this corpus and is a reminder that one plant is not a
+result.
+
 ## What is not yet known
 
 - Whether batching costs detection. The multi-file corpus now assembles

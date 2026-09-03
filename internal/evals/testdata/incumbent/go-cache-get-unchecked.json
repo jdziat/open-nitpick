@@ -1,0 +1,8 @@
+{
+  "fixture": "go-cache-get-unchecked",
+  "findings": null,
+  "at": "2026-09-03T03:51:49Z",
+  "mode": "plaintext",
+  "fingerprint": "6bebacae6db2bd7496b98f2c9f9b403ad52c8b4b8f89744313ef59d75e1b995d",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-221082848\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - web/pages.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 10s elapsed\nFinishing analysis tools... 36s elapsed\nWriting review comments... 36s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}
