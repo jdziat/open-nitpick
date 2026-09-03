@@ -699,3 +699,24 @@ models:
       max_cache_read: 0.03
       min_cache_write: 0.075
       max_cache_write: 0.15
+
+  "moonshotai/kimi-k3":
+    captured_on: "2026-09-02"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "phala"
+    input: 3
+    output: 15
+    cache_read: 0.3
+    routing:
+      source: "https://openrouter.ai/api/v1/models/moonshotai/kimi-k3/endpoints"
+      endpoints: 18
+      cheapest: "makora"
+      dearest: "morph/fast"
+      min_input: 2.55
+      max_input: 6
+      min_output: 12.75
+      max_output: 22.5
+      min_cache_read: 0.25599999
+      max_cache_read: 0.6
+      min_cache_write: 2.55
+      max_cache_write: 6

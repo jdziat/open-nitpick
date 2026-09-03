@@ -166,8 +166,8 @@ linters:
 
 ### Analyzers
 
-Thirty-one deterministic analyzers, covering the languages the hosted reviewers
-list. Two are enabled by name out of the box; twenty-two more run whenever they
+Thirty-three deterministic analyzers, covering the languages the hosted reviewers
+list. Two are enabled by name out of the box; twenty-four more run whenever they
 are installed and the change contains files they read; the rest need a
 configuration or an explicit grant. `nitpick linters` prints this table from
 the binary.
@@ -176,6 +176,8 @@ the binary.
 |---|---|---|---|
 | golangci-lint | Go | enabled | open-nitpick's own config; `golangci_config` overrides |
 | ruff | Python | enabled | `--isolated`; `ruff_config` overrides |
+| pylint | Python (errors and warnings only) | auto | shipped rcfile |
+| brakeman | Ruby on Rails (security) | auto | shipped config and an empty ignore file |
 | shellcheck | shell | auto | `--norc` |
 | hadolint | Dockerfile | auto | shipped config |
 | yamllint | YAML | auto | shipped config |
@@ -436,7 +438,14 @@ through `from x import y` or `import x`; Rust items reached through
 `require_relative` and `require`; Java and Kotlin classes and Kotlin top-level
 functions reached through `import`, resolved from the importing file's own
 package declaration; C and C++ declarations reached through a quoted
-`#include`. Each definition is attached with its
+`#include`. For the four languages most changes are written in it goes one
+hop further: a Go method called on a value of an imported type is attached
+with its doc comment, not just the type; a TypeScript import through a
+`tsconfig.json` path alias or a barrel `index.ts` is followed to the file
+that defines the name; a Python name re-exported by a package `__init__.py`
+is followed to its module; a Ruby constant that a Rails autoloader would
+resolve is found under `app/*` and `lib/` by Zeitwerk's naming rule with no
+`require` at all. Each definition is attached with its
 doc comment, from its real line number, under a heading that says the file is
 not under review. Nothing under `node_modules`, a module cache or outside the
 checkout is ever read, and a file the change itself touches is never attached,

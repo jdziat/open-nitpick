@@ -268,8 +268,10 @@ func (c *relatedCollector) rubyWants(e *Entry) []want {
 			}
 		}
 	}
+	// Constants a Rails autoloader would resolve need no require at all.
+	wants := c.rubyAutoloadWants(e, added)
 	if len(files) == 0 {
-		return nil
+		return wants
 	}
 	seen := map[string]bool{}
 	files = slices.DeleteFunc(files, func(f string) bool {
@@ -284,7 +286,6 @@ func (c *relatedCollector) rubyWants(e *Entry) []want {
 	// level is in scope. The names worth attaching are the constants and
 	// methods the change actually uses, so each required file's top-level
 	// definitions are read and matched against the added lines.
-	var wants []want
 	for _, file := range files {
 		content, ok := c.read(file)
 		if !ok {

@@ -26,6 +26,108 @@ func catalog() []toolSpec {
 		sqlfluffSpec(), biomeSpec(), oxlintSpec(), rubocopSpec(), detektSpec(), swiftlintSpec(),
 		pmdSpec(), checkovSpec(), tflintSpec(), htmlhintSpec(), bufSpec(), psScriptAnalyzerSpec(),
 		markdownlintSpec(), stylelintSpec(), phpstanSpec(), clippySpec(), osvScannerSpec(),
+		pylintSpec(), brakemanSpec(),
+	}
+}
+
+// --- Python and Ruby, second analyzers ------------------------------------------
+
+func pylintSpec() toolSpec {
+	type msg struct {
+		Type      string `json:"type"`
+		Path      string `json:"path"`
+		Line      int    `json:"line"`
+		Symbol    string `json:"symbol"`
+		MessageID string `json:"message-id"`
+		Message   string `json:"message"`
+	}
+	return toolSpec{
+		name: "pylint", auto: true, languages: "Python (a second opinion beside ruff)",
+		exts:      []string{".py"},
+		isolation: isolatedByShipped, shipped: "pylintrc",
+		args: func(inv invocation) []string {
+			// --rcfile is the isolation: no pylintrc or pyproject from the
+			// tree; --disable=all --enable=E,W keeps it to errors and warnings
+			// so it does not duplicate ruff's style opinions.
+			return append([]string{"--rcfile", inv.config, "--output-format=json", "--score=n", "--reports=n",
+				"--disable=all", "--enable=E,W", "--"}, inv.files...)
+		},
+		parse: func(inv invocation, report []byte, exit int) ([]Finding, error) {
+			if strings.TrimSpace(string(report)) == "" {
+				return nil, nil
+			}
+			var msgs []msg
+			if err := decodeJSON(report, &msgs); err != nil {
+				return nil, fmt.Errorf("parse pylint output: %w", err)
+			}
+			var findings []Finding
+			for _, m := range msgs {
+				rule := m.Symbol
+				if rule == "" {
+					rule = m.MessageID
+				}
+				sev := config.SeverityWarning
+				switch m.Type {
+				case "error", "fatal":
+					sev = config.SeverityError
+				case "convention", "refactor":
+					sev = config.SeverityNit
+				case "info":
+					sev = config.SeverityInfo
+				}
+				findings = append(findings, Finding{Path: m.Path, Line: m.Line, Rule: rule, Message: m.Message, Severity: sev, RawSeverity: m.Type})
+			}
+			return findings, nil
+		},
+	}
+}
+
+func brakemanSpec() toolSpec {
+	type warning struct {
+		WarningType string `json:"warning_type"`
+		Code        int    `json:"warning_code"`
+		Message     string `json:"message"`
+		File        string `json:"file"`
+		Line        int    `json:"line"`
+		Confidence  string `json:"confidence"`
+	}
+	return toolSpec{
+		name: "brakeman", auto: true, languages: "Ruby on Rails (security)",
+		exts: []string{".rb", ".erb", ".haml", ".slim"},
+		// Brakeman scans an application, not a file list; it is asked for
+		// the whole app and the diff's own filter keeps what landed on a
+		// changed line. --config-file and --ignore-config point at shipped
+		// files so neither config/brakeman.yml nor config/brakeman.ignore
+		// from the tree is read.
+		isolation: isolatedByShipped, shipped: "brakeman.yml",
+		args: func(inv invocation) []string {
+			return []string{"--quiet", "--no-pager", "--no-color", "--no-exit-on-warn", "--no-exit-on-error",
+				"--format", "json", "--config-file", inv.config, "--ignore-config", inv.report("brakeman.ignore"),
+				"--only-files", strings.Join(inv.files, ","), "--path", inv.repoRoot}
+		},
+		parse: func(inv invocation, report []byte, exit int) ([]Finding, error) {
+			var out struct {
+				Warnings []warning `json:"warnings"`
+			}
+			if err := decodeJSON(report, &out); err != nil {
+				return nil, fmt.Errorf("parse brakeman output: %w", err)
+			}
+			var findings []Finding
+			for _, w := range out.Warnings {
+				if w.Line <= 0 {
+					continue
+				}
+				sev := config.SeverityWarning
+				switch w.Confidence {
+				case "High":
+					sev = config.SeverityError
+				case "Weak":
+					sev = config.SeverityInfo
+				}
+				findings = append(findings, Finding{Path: w.File, Line: w.Line, Rule: w.WarningType, Message: w.Message, Severity: sev, RawSeverity: w.Confidence})
+			}
+			return findings, nil
+		},
 	}
 }
 

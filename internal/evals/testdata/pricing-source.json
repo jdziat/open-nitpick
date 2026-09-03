@@ -2863,6 +2863,198 @@
           }
         }
       ]
+    },
+    "moonshotai/kimi-k3": {
+      "captured_on": "2026-09-02",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/moonshotai/kimi-k3/endpoints",
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "input_cache_read": "0.0000003"
+      },
+      "endpoints": [
+        {
+          "tag": "makora",
+          "provider_name": "Makora",
+          "pricing": {
+            "prompt": "0.00000255",
+            "completion": "0.00001275",
+            "input_cache_read": "0.00000025599999",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "sail-research/fp4",
+          "provider_name": "Sail Research",
+          "pricing": {
+            "prompt": "0.0000026",
+            "completion": "0.000013",
+            "input_cache_read": "0.00000029",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "morph/fp4",
+          "provider_name": "Morph",
+          "pricing": {
+            "prompt": "0.0000028",
+            "completion": "0.000014",
+            "input_cache_read": "0.00000029",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "deepinfra/bf16",
+          "provider_name": "DeepInfra",
+          "pricing": {
+            "prompt": "0.00000285",
+            "completion": "0.00001425",
+            "input_cache_read": "0.000000285",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "digitalocean",
+          "provider_name": "DigitalOcean",
+          "pricing": {
+            "prompt": "0.00000285",
+            "completion": "0.00001425",
+            "input_cache_read": "0.000000285",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "wafer",
+          "provider_name": "Wafer",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.00001275",
+            "input_cache_read": "0.0000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "phala",
+          "provider_name": "Phala",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "chutes/mxfp4",
+          "provider_name": "Chutes",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "parasail/fp4",
+          "provider_name": "Parasail",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "modal/mxfp4",
+          "provider_name": "Modal",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "together",
+          "provider_name": "Together",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "baseten/fp8",
+          "provider_name": "BaseTen",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "moonshotai/mxfp4",
+          "provider_name": "Moonshot AI",
+          "pricing": {
+            "prompt": "0.000003",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000003",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks/us",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.0000033",
+            "completion": "0.0000165",
+            "input_cache_read": "0.00000033",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "alibaba",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.00000345",
+            "completion": "0.00001725",
+            "input_cache_read": "0.000000345",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks/fast",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.0000045",
+            "completion": "0.0000225",
+            "input_cache_read": "0.00000045",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "morph/fast",
+          "provider_name": "Morph",
+          "pricing": {
+            "prompt": "0.000006",
+            "completion": "0.0000225",
+            "input_cache_read": "0.0000006",
+            "discount": 0
+          }
+        }
+      ]
     }
   }
 }

@@ -142,15 +142,29 @@ func TestMultiFileCorpusIsWellFormed(t *testing.T) {
 func importsFile(source, p string) bool {
 	stem := strings.TrimSuffix(strings.TrimSuffix(p, ".go"), ".py")
 	stem = strings.TrimSuffix(strings.TrimSuffix(stem, ".ts"), ".tsx")
-	stem = strings.TrimSuffix(stem, "/__init__")
+	stem = strings.TrimSuffix(strings.TrimSuffix(stem, ".rb"), "/__init__")
 	dotted := strings.ReplaceAll(stem, "/", ".")
 	base := stem[strings.LastIndex(stem, "/")+1:]
 	dir := stem[:strings.LastIndex(stem, "/")+1]
 
+	// A Rails constant needs no require: the camelised basename is the use.
+	camel := ""
+	for part := range strings.SplitSeq(base, "_") {
+		if part != "" {
+			camel += strings.ToUpper(part[:1]) + part[1:]
+		}
+	}
+	// TS: a tsconfig alias (@/* -> src/*) to a barrel or a module.
+	aliased := strings.TrimPrefix(dir, "src/")
+	alias := `from "@/` + strings.TrimSuffix(aliased, "/") + `"`
+	if base != "index" {
+		alias = `from "@/` + aliased + base + `"`
+	}
 	for _, needle := range []string{
 		"/" + dir[:max(len(dir)-1, 0)] + `"`, // Go: "module/pkg/dir"
-		"from " + dotted + " import",         // Python absolute
-		"from ." + base + " import",          // Python relative
+		alias, camel + ".",
+		"from " + dotted + " import", // Python absolute
+		"from ." + base + " import",  // Python relative
 		"import " + dotted,
 		`from "./` + base + `"`, `from "../` + base + `"`, // TS relative
 		`from "./` + base + `.js"`,

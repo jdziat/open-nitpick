@@ -1,0 +1,4 @@
+# open-nitpick's pylint config: the defaults, stated in a file so no pylintrc
+# or pyproject.toml from the tree under review is read instead.
+[MAIN]
+persistent=no

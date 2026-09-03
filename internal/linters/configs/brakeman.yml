@@ -1,0 +1,4 @@
+# open-nitpick's brakeman config: the defaults. The ignore file it is paired
+# with is empty, so config/brakeman.ignore from the tree is not consulted.
+---
+:quiet: true

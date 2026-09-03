@@ -45,7 +45,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // makes when they have not read the callee — and unrealistic in the sense that
 // every corpus is: the repository is ten files, not ten thousand.
 func MultiFileFixtures() []Fixture {
-	return []Fixture{
+	fixtures := []Fixture{
 		goQueryWithoutDeadlineFixture(),
 		goEmptySlugPathFixture(),
 		goEmptyFilterDeletesAllFixture(),
@@ -57,6 +57,7 @@ func MultiFileFixtures() []Fixture {
 		pythonSecretToAuditLogFixture(),
 		pythonCleanContractFixture(),
 	}
+	return append(fixtures, deepMultiFileFixtures()...)
 }
 
 // goQueryWithoutDeadlineFixture: the store's Query documents that ctx must

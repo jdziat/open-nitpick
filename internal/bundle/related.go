@@ -420,8 +420,40 @@ func (c *relatedCollector) goWants(e *Entry) []want {
 				wants = append(wants, want{file: file, name: name, uses: n, extract: goDefinition})
 			}
 		}
+
+		// Methods called on values of this package's types. The struct
+		// declaration is rarely where the contract is written; the method's
+		// doc comment is.
+		var unchanged []string
+		for _, file := range goFiles {
+			if !c.changed[file] {
+				unchanged = append(unchanged, file)
+			}
+		}
+		for _, typeName := range c.goTypeNames(unchanged) {
+			wants = append(wants, c.goMethodWants(added, unchanged, typeName)...)
+		}
 	}
 	return wants
+}
+
+// goTypeNames lists the types the given package files declare.
+func (c *relatedCollector) goTypeNames(files []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, file := range files {
+		content, ok := c.read(file)
+		if !ok {
+			continue
+		}
+		for _, m := range regexp.MustCompile(`(?m)^type\s+([A-Z]\w*)\b`).FindAllStringSubmatch(content, -1) {
+			if !seen[m[1]] {
+				seen[m[1]] = true
+				out = append(out, m[1])
+			}
+		}
+	}
+	return out
 }
 
 // goPackageName guesses a package's name from its import path: the last
@@ -510,35 +542,21 @@ func tsBindings(clause string) (named []tsBinding, ns string) {
 
 // tsResolve turns a relative import specifier into a repository path, or "".
 func (c *relatedCollector) tsResolve(from, spec string) string {
-	if !strings.HasPrefix(spec, "./") && !strings.HasPrefix(spec, "../") {
-		return ""
-	}
-	base := path.Join(path.Dir(from), spec)
-	base = strings.TrimPrefix(base, "./")
-	// An import that climbs out of the repository names nothing this review
-	// may read. The fetcher would refuse it too; not asking is the point.
-	if base == ".." || strings.HasPrefix(base, "../") || strings.HasPrefix(base, "/") {
-		return ""
-	}
-
-	var candidates []string
-	if ext := path.Ext(base); ext != "" {
-		candidates = append(candidates, base)
-		// TypeScript lets an ESM import name the .js the .ts will compile to.
-		if ext == ".js" || ext == ".mjs" || ext == ".cjs" {
-			stem := strings.TrimSuffix(base, ext)
-			candidates = append(candidates, stem+".ts", stem+".tsx")
+	if strings.HasPrefix(spec, "./") || strings.HasPrefix(spec, "../") {
+		base := path.Join(path.Dir(from), spec)
+		base = strings.TrimPrefix(base, "./")
+		// An import that climbs out of the repository names nothing this
+		// review may read. The fetcher would refuse it too; not asking is
+		// the point.
+		if base == ".." || strings.HasPrefix(base, "../") || strings.HasPrefix(base, "/") {
+			return ""
 		}
+		return c.tsResolveBase(base)
 	}
-	for _, ext := range tsExts {
-		candidates = append(candidates, base+ext)
-	}
-	for _, ext := range tsExts {
-		candidates = append(candidates, path.Join(base, "index"+ext))
-	}
-	for _, cand := range candidates {
-		if c.exists(cand) {
-			return cand
+	// A bare specifier is a package unless the nearest tsconfig maps it.
+	for _, base := range c.tsConfigFor(from).tsAliasCandidates(spec) {
+		if file := c.tsResolveBase(base); file != "" {
+			return file
 		}
 	}
 	return ""
@@ -556,7 +574,16 @@ func (c *relatedCollector) tsWants(e *Entry) []want {
 		named, ns := tsBindings(clause)
 		for _, b := range named {
 			if n := countUses(added, b.local); n > 0 {
-				wants = append(wants, want{file: target, name: b.exported, uses: n, extract: tsDefinition})
+				// A barrel that re-exports the name is followed to the file
+				// that defines it.
+				file := c.tsDefiningFile(target, b.exported)
+				if file == "" {
+					file = target
+				}
+				if c.changed[file] {
+					continue
+				}
+				wants = append(wants, want{file: file, name: b.exported, uses: n, extract: tsDefinition})
 			}
 		}
 		if ns != "" {
@@ -703,7 +730,16 @@ func (c *relatedCollector) pyWants(e *Entry) []want {
 				exported, local = strings.TrimSpace(a), strings.TrimSpace(b)
 			}
 			if n := countUses(added, local); n > 0 {
-				wants = append(wants, want{file: target, name: exported, uses: n, extract: pyDefinition})
+				// A package __init__ that re-exports the name is followed
+				// to the module that defines it.
+				file := c.pyDefiningFile(target, exported)
+				if file == "" {
+					file = target
+				}
+				if c.changed[file] {
+					continue
+				}
+				wants = append(wants, want{file: file, name: exported, uses: n, extract: pyDefinition})
 			}
 		}
 	}
