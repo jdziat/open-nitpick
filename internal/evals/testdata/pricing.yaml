@@ -1027,3 +1027,44 @@ models:
       max_cache_read: 0.04
       min_cache_write: 0.15
       max_cache_write: 0.15
+
+  "google/gemma-4-31b-it":
+    captured_on: "2026-09-04"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "deepinfra/turbo"
+    input: 0.09
+    output: 0.34
+    cache_read: 0.05
+    routing:
+      source: "https://openrouter.ai/api/v1/models/google/gemma-4-31b-it/endpoints"
+      endpoints: 15
+      cheapest: "deepinfra/turbo"
+      dearest: "cerebras/fp16"
+      min_input: 0.09
+      max_input: 0.99
+      min_output: 0.34
+      max_output: 1.49
+      min_cache_read: 0.012
+      max_cache_read: 0.99
+      min_cache_write: 0.09
+      max_cache_write: 0.99
+
+  "google/gemma-4-26b-a4b-it":
+    captured_on: "2026-09-04"
+    source: "https://openrouter.ai/api/v1/models"
+    endpoint: "deepinfra/fp8"
+    input: 0.07
+    output: 0.34
+    routing:
+      source: "https://openrouter.ai/api/v1/models/google/gemma-4-26b-a4b-it/endpoints"
+      endpoints: 9
+      cheapest: "darkbloom"
+      dearest: "google-vertex/global"
+      min_input: 0.042
+      max_input: 0.15
+      min_output: 0.22
+      max_output: 0.6
+      min_cache_read: 0.042
+      max_cache_read: 0.15
+      min_cache_write: 0.042
+      max_cache_write: 0.15
