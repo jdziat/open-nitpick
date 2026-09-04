@@ -291,3 +291,42 @@ tables: two runs of sonnet on the tuning corpus since the change locate
 
 **Not re-spent:** the held-out corpus. **Not run:** the judged pass for
 workstream 4, and the benchmark re-run under the new code, which is next.
+
+## The benchmark re-run under the remediated code (2026-09-04)
+
+All 44 pull requests re-reviewed by the Action at the new `v1`, whole review
+each, `analyzers: auto`, `min_severity: nit`; each reviewer's latest review
+scored, so earlier reviews on the same pull request do not count.
+
+| | before (2026-09-03) | after |
+|---|---|---|
+| plants located | 33 of 41 | **36 of 41** |
+| of the eight misses, recovered | — | cross-file-copy-nit, cross-file-sort-nit, sorted-for-min-nit, retry-no-backoff |
+| still missed | — | go-package-singleton, kotlin-widened-input, ruby-default-page-size, rust-crate-for-one-call |
+| noise findings over 44 | 5 | 17 |
+| inline comments | 38 | 53 |
+
+Three of the four recovered misses are the triage drops workstream 1
+answered; the fourth is retry-no-backoff, which workstream 2 answered. The
+four still missed are the original `info` plants, on which the info corpus
+now says the reviewer is capable (sonnet 11–13 of 20) and these four
+particular plants stay hard: two runs of the tuning corpus since the change
+located `go-package-singleton` once.
+
+**The noise is mostly the analyzers, and it is honest noise.** Of the twelve
+extra noise findings, nine are analyzer output that `min_severity: nit`
+publishes: biome's "template literals are preferred" on three TypeScript
+lines, sqlfluff's capitalisation rule and an "unparsable SQL" on a valid
+migration, golangci-lint's `errcheck` on an ignored `Fprintf`. The hosted
+incumbent posted the same `errcheck`. Two of those are now fixed at the
+source — sqlfluff's parse failures are configuration and are no longer
+findings, and biome's shipped config drops its style group — and none of the
+nine would be published under the shipped `min_severity: info`. The other
+three are the reviewer's: two `warning`s about unshown code that the third
+prompt revision rates `nit`, and one on the Ruby mailer fixture.
+
+**The incumbent's column is incomplete.** Incumbent's app was throttled
+after reviewing the first 44 the day before, and reviewed 22 of the 44
+re-opened ones by the time of scoring: 15 of 41 located, 6 noise, on the
+subset it reached. It is not a comparison until it catches up, and this
+document does not make one.

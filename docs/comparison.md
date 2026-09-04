@@ -213,3 +213,15 @@ than one plant. What it retires is the sentence that the CLI cache was the
 wrong instrument — the hosted product on the same pull requests locates 30
 where the cache located 14 of 29 on an earlier corpus, and still fewer than
 this reviewer.
+
+### After the remediation plan (2026-09-04)
+
+See [remediation.md](remediation.md) for the plan and what each step
+measured. On the benchmark repository, re-laid-out so nothing tells either
+reviewer it is reading a fixture, the shipped Action moved from 33 to 36 of
+41 plants, recovering four of the eight misses; the four still missed are
+the `info` plants, on which the new info corpus puts the default reviewer at
+11–13 of 20 against 4 of 20 before the change. Noise rose from 5 to 17 over
+44 pull requests, nine of them analyzer nits that `min_severity: nit`
+publishes and the default `info` would not. Incumbent's app had reviewed
+half of the re-opened pull requests when scored, so its column waits.
