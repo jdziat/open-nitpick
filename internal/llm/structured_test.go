@@ -86,9 +86,10 @@ func (f *fakeLLM) call(i int) recordedCall {
 // newTestClient wires a fake LLM into a Client with the given strategy.
 func newTestClient(fake *fakeLLM, mode config.StructuredMode) *Client {
 	return &Client{
-		LLM:  fake,
-		Spec: config.ModelSpec{Provider: "fake", Model: "fake-model", StructuredOutput: mode},
-		mode: mode,
+		LLM:          fake,
+		Spec:         config.ModelSpec{Provider: "fake", Model: "fake-model", StructuredOutput: mode},
+		mode:         mode,
+		stallRetries: defaultMaxRetries,
 	}
 }
 
@@ -391,31 +392,45 @@ func (stallErr) Error() string {
 func (stallErr) Timeout() bool   { return true }
 func (stallErr) Temporary() bool { return true }
 
-func TestExtractRetriesOnceWhenTheRequestStalled(t *testing.T) {
+func TestExtractRetriesStalledRequestsUpToMaxRetries(t *testing.T) {
+	stall := func() turn { return turn{err: fmt.Errorf("openai: generate content: %w", stallErr{})} }
+
 	for _, mode := range []config.StructuredMode{config.StructuredAuto, config.StructuredSchema, config.StructuredJSON} {
-		fake := newFakeLLM(turn{err: fmt.Errorf("openai: generate content: %w", stallErr{})}, turn{content: validJSON})
+		// max_retries stalls, then an answer: the budget is spent and the review survives.
+		fake := newFakeLLM(stall(), stall(), stall(), turn{content: validJSON})
 		client := newTestClient(fake, mode)
 
 		got, err := Extract[result](context.Background(), client, nil)
 		if err != nil {
-			t.Fatalf("%s: a stalled request is retried once, got %v", mode, err)
+			t.Fatalf("%s: %d stalls are within the budget, got %v", mode, defaultMaxRetries, err)
 		}
 		assertOneFinding(t, got)
-		if fake.callCount() != 2 {
-			t.Errorf("%s: calls = %d, want 2", mode, fake.callCount())
+		if fake.callCount() != defaultMaxRetries+1 {
+			t.Errorf("%s: calls = %d, want %d", mode, fake.callCount(), defaultMaxRetries+1)
 		}
 	}
 
-	// Two stalls in a row are the provider's answer, not a routing accident.
-	fake := newFakeLLM(turn{err: stallErr{}}, turn{err: stallErr{}}, turn{content: validJSON})
+	// One more stall than the budget is the provider's answer.
+	fake := newFakeLLM(stall(), stall(), stall(), stall(), turn{content: validJSON})
 	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredSchema), nil); err == nil {
-		t.Fatal("a second stall is not retried")
+		t.Fatal("a stall past max_retries is not retried")
+	}
+	if fake.callCount() != defaultMaxRetries+1 {
+		t.Errorf("calls = %d, want %d", fake.callCount(), defaultMaxRetries+1)
+	}
+
+	// max_retries: 0 means what it says.
+	fake = newFakeLLM(stall(), turn{content: validJSON})
+	client := newTestClient(fake, config.StructuredSchema)
+	client.stallRetries = 0
+	if _, err := Extract[result](context.Background(), client, nil); err == nil || fake.callCount() != 1 {
+		t.Fatalf("max_retries 0: calls = %d, err = %v; want 1 call and an error", fake.callCount(), err)
 	}
 
 	// A caller that gave up is not a stall.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	fake = newFakeLLM(turn{err: stallErr{}}, turn{content: validJSON})
+	fake = newFakeLLM(stall(), turn{content: validJSON})
 	if _, err := Extract[result](ctx, newTestClient(fake, config.StructuredSchema), nil); err == nil || fake.callCount() != 1 {
 		t.Fatalf("cancelled context: calls = %d, err = %v; want 1 call and an error", fake.callCount(), err)
 	}

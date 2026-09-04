@@ -113,30 +113,36 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 	}
 }
 
-// generateTyped is llms.GenerateTyped with one retry when the request stalled.
+// generateTyped is llms.GenerateTyped with stall retries.
 //
 // A stall is the HTTP client's own timeout firing while the body was still
 // being read: the request left, the provider accepted it, and the answer never
 // finished arriving. Behind a router that is one upstream hanging, and the
-// same request sent again is routed afresh; on the eval battery gemma-4-31b
-// lost 9 of 42 reviews this way on one-file fixtures, and each fixture passed
-// alone. One retry, and only while the caller's own context is still live —
-// a cancelled review is not a stalled request.
+// same request sent again is routed afresh. On the eval battery gemma-4-31b
+// lost 9 of 42 reviews this way on one-file fixtures, every one of which
+// passed alone; with one retry it still lost 21 of 168, because the second
+// attempt lands on the same hung upstream often enough. So the budget is
+// max_retries (default 3), the same number the SDK spends on 429s and 5xx —
+// a stall is a transient failure that happens to cost a full timeout to
+// detect. Only while the caller's own context is live: a cancelled review is
+// not a stalled request.
 func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (T, *llms.Response, error) {
-	value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
-	if stalled(ctx, err) {
-		value, raw, err = llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+	for attempt := 0; ; attempt++ {
+		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+		if !stalled(ctx, err) || attempt >= c.stallRetries {
+			return value, raw, err
+		}
 	}
-	return value, raw, err
 }
 
-// generateContent is GenerateContent with generateTyped's stall retry.
+// generateContent is GenerateContent with generateTyped's stall retries.
 func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (*llms.Response, error) {
-	resp, err := c.LLM.GenerateContent(ctx, msgs, call...)
-	if stalled(ctx, err) {
-		resp, err = c.LLM.GenerateContent(ctx, msgs, call...)
+	for attempt := 0; ; attempt++ {
+		resp, err := c.LLM.GenerateContent(ctx, msgs, call...)
+		if !stalled(ctx, err) || attempt >= c.stallRetries {
+			return resp, err
+		}
 	}
-	return resp, err
 }
 
 // stalled reports a client-side timeout on a request whose caller is still

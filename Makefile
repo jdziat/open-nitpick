@@ -286,7 +286,7 @@ benchmark-multifile:
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
 	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
-	go test -tags=eval -count=1 -timeout=120m -v -run TestBenchmarkMultiFile ./internal/evals/
+	go test -tags=eval -count=1 -timeout=300m -v -run TestBenchmarkMultiFile ./internal/evals/
 
 # Collect Contender reviews for the multi-file corpus (or FIXTURES=), caching
 # each. Requires the contender CLI, signed in: contender login

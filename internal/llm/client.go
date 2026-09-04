@@ -37,6 +37,13 @@ type Client struct {
 	// single client from concurrent workers.
 	mode   config.StructuredMode
 	modeMu sync.RWMutex
+
+	// stallRetries is how many times a request whose answer never finished
+	// arriving is sent again; see generateTyped. It shares max_retries with
+	// the SDK's transient-failure retries, because both answer the same
+	// question — how many times this deployment is willing to pay for one
+	// batch — and a config that lowers one has no reason to want the other.
+	stallRetries int
 }
 
 // Provider returns the configured provider name.
@@ -88,7 +95,7 @@ func Build(spec config.ModelSpec) (*Client, error) {
 		mode = config.StructuredAuto
 	}
 
-	return &Client{LLM: resilient, Spec: spec, mode: mode}, nil
+	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries}, nil
 }
 
 // NewClientForTest wraps an arbitrary SDK client, bypassing provider
@@ -100,7 +107,11 @@ func NewClientForTest(client llms.LLM, spec config.ModelSpec) *Client {
 	if mode == "" {
 		mode = config.StructuredAuto
 	}
-	return &Client{LLM: client, Spec: spec, mode: mode}
+	retries := defaultMaxRetries
+	if spec.MaxRetries != nil {
+		retries = *spec.MaxRetries
+	}
+	return &Client{LLM: client, Spec: spec, mode: mode, stallRetries: retries}
 }
 
 // validateProvider checks a provider name against the SDK registry and reports

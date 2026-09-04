@@ -264,7 +264,11 @@ func OptionsFromEnv() (Options, error) {
 		Models:   DefaultModels(),
 		Fixtures: Fixtures(),
 		Runs:     1,
-		Timeout:  15 * time.Minute,
+		// A review's ceiling has to hold the model timeout times the retry
+		// budget: a batch that stalls three times and answers on the fourth
+		// has spent forty minutes and produced a review, and a ceiling that
+		// cut it off at fifteen would record the loss as the model's.
+		Timeout: 45 * time.Minute,
 	}
 
 	if raw := strings.TrimSpace(os.Getenv(EnvModels)); raw != "" {
