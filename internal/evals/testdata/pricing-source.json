@@ -3055,6 +3055,292 @@
           }
         }
       ]
+    },
+    "qwen/qwen3.8-flash": {
+      "captured_on": "2026-09-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/qwen/qwen3.8-flash/endpoints",
+      "pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.00000047",
+        "input_cache_read": "0.000000016",
+        "input_cache_write": "0.0000002"
+      },
+      "endpoints": [
+        {
+          "tag": "alibaba",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.00000015",
+            "completion": "0.00000047",
+            "input_cache_read": "0.000000016",
+            "input_cache_write": "0.0000002",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "z-ai/glm-5.3": {
+      "captured_on": "2026-09-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/z-ai/glm-5.3/endpoints",
+      "pricing": {
+        "prompt": "0.0000014",
+        "completion": "0.0000044",
+        "input_cache_read": "0.00000014"
+      },
+      "endpoints": [
+        {
+          "tag": "reka/fp8",
+          "provider_name": "Reka",
+          "pricing": {
+            "prompt": "0.00000115",
+            "completion": "0.0000035",
+            "input_cache_read": "0.0000001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "decart/fp4",
+          "provider_name": "Decart",
+          "pricing": {
+            "prompt": "0.000001162",
+            "completion": "0.000003652",
+            "input_cache_read": "0.0000001909",
+            "discount": 0.17
+          }
+        },
+        {
+          "tag": "akashml/fp8",
+          "provider_name": "AkashML",
+          "pricing": {
+            "prompt": "0.00000117",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000234",
+            "discount": 0.1
+          }
+        },
+        {
+          "tag": "io-net/fp8",
+          "provider_name": "Io Net",
+          "pricing": {
+            "prompt": "0.0000011875",
+            "completion": "0.00000418",
+            "input_cache_read": "0.000000247",
+            "discount": 0.05
+          }
+        },
+        {
+          "tag": "wafer",
+          "provider_name": "Wafer",
+          "pricing": {
+            "prompt": "0.00000119",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "deepinfra/fp4",
+          "provider_name": "DeepInfra",
+          "pricing": {
+            "prompt": "0.0000012",
+            "completion": "0.000004",
+            "input_cache_read": "0.00000012",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "inceptron/fp4",
+          "provider_name": "Inceptron",
+          "pricing": {
+            "prompt": "0.00000125",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "morph/fp4",
+          "provider_name": "Morph",
+          "pricing": {
+            "prompt": "0.00000125",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "friendli",
+          "provider_name": "Friendli",
+          "pricing": {
+            "prompt": "0.00000126",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000234",
+            "discount": 0.1
+          }
+        },
+        {
+          "tag": "makora/fp4",
+          "provider_name": "Makora",
+          "pricing": {
+            "prompt": "0.00000135",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000023",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "sail-research/fp8",
+          "provider_name": "Sail Research",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "siliconflow/fp8",
+          "provider_name": "SiliconFlow",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "phala",
+          "provider_name": "Phala",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "novita/fp8",
+          "provider_name": "Novita",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "together",
+          "provider_name": "Together",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "digitalocean",
+          "provider_name": "DigitalOcean",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "parasail/fp8",
+          "provider_name": "Parasail",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "modal",
+          "provider_name": "Modal",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "gmicloud/fp8",
+          "provider_name": "GMICloud",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "baseten/fp4",
+          "provider_name": "BaseTen",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000014",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "cloudflare",
+          "provider_name": "Cloudflare",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "z-ai/fp8",
+          "provider_name": "Z.AI",
+          "pricing": {
+            "prompt": "0.0000014",
+            "completion": "0.0000044",
+            "input_cache_read": "0.00000026",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "venice",
+          "provider_name": "Venice",
+          "pricing": {
+            "prompt": "0.00000175",
+            "completion": "0.0000055",
+            "input_cache_read": "0.000000325",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "baseten/fp8",
+          "provider_name": "BaseTen",
+          "pricing": {
+            "prompt": "0.0000021",
+            "completion": "0.0000066",
+            "input_cache_read": "0.00000021",
+            "discount": 0
+          }
+        }
+      ]
     }
   }
 }
