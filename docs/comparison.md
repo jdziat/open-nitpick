@@ -259,3 +259,75 @@ above.
 The seat-priced plan is a different arithmetic and depends on how many pull
 requests a seat reviews a month; at $24 a seat and one review a day it is
 roughly $1 a review, at ten a day roughly $0.10.
+
+### Twelve models, three corpora: the cost/performance sweep (2026-09-04)
+
+Every model below ran on the tuning corpus (16 fixtures, 16 plants), the
+multi-file corpus (14 fixtures, 12 plants) and the info corpus (12 fixtures,
+10 plants), through the shipped pipeline, once each unless noted. Recall is
+plants located over plants; the weighted column is the sum over all three
+corpora, 38 plants. Noise is the share of published findings that are not a
+plant. `$/review` is the provider-reported spend at the shipped rate table.
+Rows are the `+ctx` variant, which is the shipped default
+(`review.related_context: true`); the variant without related context is
+noted where it changed the answer.
+
+**One run is one run.** On these corpora a single fixture is 0.06 to 0.08 of
+recall, so differences under about 0.10 are inside the noise of a single
+pass. The three models marked `×2` ran twice.
+
+| model (+ctx) | tuning R / N | multi-file R / N | info R / N | weighted recall | $/review |
+|---|---|---|---|---|---|
+| openai/gpt-5.6-luna | 0.81 / 0.50 | 0.83 / 0.21 | 0.70 / 0.17 | 0.79 | **$0.0006** |
+| z-ai/glm-5.3-flash | 0.81 / 0.31 | 0.92 / 0.64 | 0.70 / 0.33 | 0.82 | $0.0017 |
+| qwen/qwen3.8-flash ×2 | 0.75 / 0.62 | 0.92 / 0.41 | 0.68 / 0.48 | 0.80 | $0.0034 |
+| openai/gpt-5.6-terra | 0.69 / 0.38 | 1.00 / 0.14 | 0.60 / 0.17 | 0.76 | $0.0044 |
+| deepseek/deepseek-v4-pro-0813 | 0.69 / 0.40 | 0.92 / 0.54 | 0.40 / 0.25 | 0.63 | $0.013 |
+| qwen/qwen3.8-27b | 0.69 / 0.19 | 1.00 / 0.07 | 0.80 / 0.17 | 0.82 | $0.017 |
+| x-ai/grok-4.6 | 0.69 / 0.00 | 0.92 / 0.00 | 0.60 / 0.08 | 0.74 | $0.020 |
+| anthropic/claude-sonnet-4.6 (shipped default) | 0.81 / 0.25 | 1.00 / 0.43 | 0.50 / 0.33 | 0.79 | $0.021 |
+| openai/gpt-5.6-sol ×2 | 0.88 / 0.38 | 1.00 / 0.29 | 0.65 / 0.29 | 0.85 | $0.027 |
+| z-ai/glm-5.3 ×2 | 0.88 / 0.56 | 1.00 / 0.61 | 0.70 / 0.25 | 0.87 | $0.033 |
+| qwen/qwen3.8-max | 0.71 / 0.36 | 1.00 / 0.33 | 0.78 / 0.00 | ~0.78 | $0.044 |
+| openrouter/auto ×2 | 0.81 / 0.19 | 1.00 / 0.79 | 0.75 / 0.21 | 0.87 | unknown |
+| moonshotai/kimi-k3 (earlier sweep) | ties sonnet | ties sonnet | — | — | 1.5 – 2× sonnet |
+| Incumbent CLI | 0.62 / 0.19 | 0.17 / 0.21 | 0.40 / 0.00 | 0.42 | $0.25 – $0.36 on demand |
+
+Not measured:
+
+- **meta/muse-spark-1.3-contributor** returns 404 on every call: its only
+  OpenRouter endpoint trains on prompts, and the account's privacy setting
+  excludes such endpoints. It can be measured only by changing that setting.
+- **openrouter/auto** reports no price, because the router picks a different
+  model per call and the rate table has no entry for the mix. Its recall is
+  the best in the table and its multi-file noise the worst; the number is
+  whatever it routed to that hour and is not reproducible.
+- **qwen3.8-max** lost 5 of 42 reviews (empty or malformed responses);
+  **deepseek-v4-pro** lost 2; **qwen3.8-flash** lost 11 of 16 tuning
+  reviews on the run without related context, and 1 to 2 with it. Their
+  rows are over the reviews that survived.
+
+Related context is not free for every model. It lifts every model on the
+multi-file corpus, which is what it was built for, but three models fell on
+the single-file tuning corpus when it was on: deepseek-v4-pro 0.94 → 0.69,
+qwen3.8-27b 0.81 → 0.69, grok-4.6 0.75 → 0.69. deepseek without related
+context is the best single-file result in the sweep, 0.94 recall at 0.12
+noise for $0.013, and the worst info-corpus result with it. Sonnet moved the
+other way on the info corpus, 0.60 → 0.50. One run cannot separate a real
+interaction from a coin flip, so this is recorded and not acted on.
+
+**Where the money goes.** Against the shipped default:
+
+| tier | pick | why |
+|---|---|---|
+| cheapest that holds the line | gpt-5.6-luna | sonnet's weighted recall at 1/35 of the price; tuning noise 0.50 is the cost |
+| cheapest with the fewest surprises | glm-5.3-flash | best cheap recall, no lost reviews across 100+ runs since the timeout fix; multi-file noise 0.64 |
+| best quality per dollar | qwen3.8-27b | beats sonnet on every corpus, lowest noise of any model under $0.03, at 80% of sonnet's price |
+| quietest | grok-4.6 | 0.00 noise on two corpora; pays for it in recall |
+| frontier | gpt-5.6-sol | 0.85 weighted at $0.027; glm-5.3 edges it on recall and doubles its noise |
+| poor value | qwen3.8-max, deepseek-v4-pro with context | most expensive and least stable; deepseek only earns its price with related context off |
+
+The shipped default stays sonnet-4.6 until a model beats it on the held-out
+corpus under Rule 14, which none of these has been asked to do; this sweep
+is on the tuning and multi-file corpora, both of which the prompt was tuned
+against. The candidates worth that spend are qwen3.8-27b and gpt-5.6-luna.

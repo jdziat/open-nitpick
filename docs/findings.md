@@ -824,3 +824,28 @@ temperature 0 is real here and is not a rounding effect.
 - **The incumbent's raw text is not retained on this path**, only parsed findings,
   so a later parser fix cannot be applied retroactively — and an under-reading
   parser bakes in flattering us.
+
+## The twelve-model sweep (2026-09-04)
+
+Every model the operator named ran once on all three corpora
+(`docs/comparison.md`, "Twelve models, three corpora"). What it adds to the
+earlier findings:
+
+- **The price floor moved again.** gpt-5.6-luna matches sonnet's weighted
+  recall (0.79) at $0.0006 a review, a third of glm-5.3-flash's price and
+  1/35 of sonnet's. Its tuning-corpus noise (0.50) is the highest of the
+  cheap tier.
+- **A mid-priced model beats the default.** qwen3.8-27b with related context
+  is above sonnet on all three corpora with lower noise, for $0.017 against
+  $0.021. It is the first candidate to put through the held-out gate.
+- **Related context is model-dependent on single-file diffs.** Three models
+  lost 0.06 to 0.25 of tuning recall when it was on, and deepseek-v4-pro
+  swung from the best single-file result (0.94) to one of the worst. One run
+  each; not acted on.
+- **Two models could not be measured honestly.** muse-spark is blocked by
+  the account's OpenRouter privacy setting (its endpoint trains on prompts);
+  openrouter/auto has no price and no reproducible identity.
+- **Lost reviews are back for some models.** qwen3.8-max, deepseek-v4-pro
+  and qwen3.8-flash each dropped reviews on empty or malformed responses
+  after the timeout and max_tokens fixes; glm-5.3-flash, luna, terra,
+  sonnet, grok and qwen3.8-27b dropped none.
