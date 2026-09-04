@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -378,5 +379,44 @@ func TestStripCodeFenceVariants(t *testing.T) {
 		if got := stripCodeFence(tc.in); got != tc.want {
 			t.Errorf("stripCodeFence(%q) = %q, want %q", tc.in, got, tc.want)
 		}
+	}
+}
+
+// stallErr is what net/http reports when its own Timeout fires mid-body.
+type stallErr struct{}
+
+func (stallErr) Error() string {
+	return "context deadline exceeded (Client.Timeout or context cancellation while reading body)"
+}
+func (stallErr) Timeout() bool   { return true }
+func (stallErr) Temporary() bool { return true }
+
+func TestExtractRetriesOnceWhenTheRequestStalled(t *testing.T) {
+	for _, mode := range []config.StructuredMode{config.StructuredAuto, config.StructuredSchema, config.StructuredJSON} {
+		fake := newFakeLLM(turn{err: fmt.Errorf("openai: generate content: %w", stallErr{})}, turn{content: validJSON})
+		client := newTestClient(fake, mode)
+
+		got, err := Extract[result](context.Background(), client, nil)
+		if err != nil {
+			t.Fatalf("%s: a stalled request is retried once, got %v", mode, err)
+		}
+		assertOneFinding(t, got)
+		if fake.callCount() != 2 {
+			t.Errorf("%s: calls = %d, want 2", mode, fake.callCount())
+		}
+	}
+
+	// Two stalls in a row are the provider's answer, not a routing accident.
+	fake := newFakeLLM(turn{err: stallErr{}}, turn{err: stallErr{}}, turn{content: validJSON})
+	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredSchema), nil); err == nil {
+		t.Fatal("a second stall is not retried")
+	}
+
+	// A caller that gave up is not a stall.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	fake = newFakeLLM(turn{err: stallErr{}}, turn{content: validJSON})
+	if _, err := Extract[result](ctx, newTestClient(fake, config.StructuredSchema), nil); err == nil || fake.callCount() != 1 {
+		t.Fatalf("cancelled context: calls = %d, err = %v; want 1 call and an error", fake.callCount(), err)
 	}
 }

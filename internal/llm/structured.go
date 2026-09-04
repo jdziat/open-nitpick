@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"reflect"
 	"sort"
 	"strings"
@@ -42,7 +43,7 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 		return extractJSON[T](ctx, c, msgs, call)
 
 	case config.StructuredSchema:
-		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+		value, raw, err := generateTyped[T](ctx, c, msgs, call)
 		if err == nil {
 			err = requireSchemaEnforced(raw, value)
 		}
@@ -52,7 +53,7 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 		return value, nil
 
 	default: // auto
-		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+		value, raw, err := generateTyped[T](ctx, c, msgs, call)
 		if err == nil {
 			err = requireSchemaEnforced(raw, value)
 			if err == nil {
@@ -67,7 +68,7 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 		// that fits, and say so, rather than lose the review.
 		if creditCapped(err) && !hasMaxTokens(call) {
 			capped := append(append([]llms.CallOption(nil), call...), llms.WithMaxTokens(creditCappedMaxTokens))
-			value, raw, err = llms.GenerateTyped[T](ctx, c.LLM, msgs, capped...)
+			value, raw, err = generateTyped[T](ctx, c, msgs, capped)
 			if err == nil {
 				if err = requireSchemaEnforced(raw, value); err == nil {
 					return value, nil
@@ -110,6 +111,47 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 		}
 		return result, nil
 	}
+}
+
+// generateTyped is llms.GenerateTyped with one retry when the request stalled.
+//
+// A stall is the HTTP client's own timeout firing while the body was still
+// being read: the request left, the provider accepted it, and the answer never
+// finished arriving. Behind a router that is one upstream hanging, and the
+// same request sent again is routed afresh; on the eval battery gemma-4-31b
+// lost 9 of 42 reviews this way on one-file fixtures, and each fixture passed
+// alone. One retry, and only while the caller's own context is still live —
+// a cancelled review is not a stalled request.
+func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (T, *llms.Response, error) {
+	value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+	if stalled(ctx, err) {
+		value, raw, err = llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+	}
+	return value, raw, err
+}
+
+// generateContent is GenerateContent with generateTyped's stall retry.
+func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (*llms.Response, error) {
+	resp, err := c.LLM.GenerateContent(ctx, msgs, call...)
+	if stalled(ctx, err) {
+		resp, err = c.LLM.GenerateContent(ctx, msgs, call...)
+	}
+	return resp, err
+}
+
+// stalled reports a client-side timeout on a request whose caller is still
+// waiting. The HTTP client reports its own deadline as a net.Error with
+// Timeout() true, wrapped in whatever the SDK adds; the string check is for
+// the SDK paths that flatten the error before wrapping it.
+func stalled(ctx context.Context, err error) bool {
+	if err == nil || ctx.Err() != nil {
+		return false
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return true
+	}
+	return strings.Contains(err.Error(), "Client.Timeout")
 }
 
 // creditCappedMaxTokens is the output cap retried with when the provider
@@ -203,7 +245,7 @@ func extractJSON[T any](ctx context.Context, c *Client, msgs []llms.Message, opt
 	prompted := withSchemaInstruction(msgs, schema)
 	call := append(append([]llms.CallOption(nil), opts...), llms.WithJSONMode())
 
-	resp, err := c.LLM.GenerateContent(ctx, prompted, call...)
+	resp, err := generateContent(ctx, c, prompted, call)
 	if err != nil {
 		return zero, fmt.Errorf("%s: %w", c, err)
 	}
@@ -228,7 +270,7 @@ func extractJSON[T any](ctx context.Context, c *Client, msgs []llms.Message, opt
 			parseErr)},
 	)
 
-	retry, err := c.LLM.GenerateContent(ctx, repair, call...)
+	retry, err := generateContent(ctx, c, repair, call)
 	if err != nil {
 		return zero, fmt.Errorf("%s: repair attempt failed: %w (original parse error: %w)", c, err, parseErr)
 	}
