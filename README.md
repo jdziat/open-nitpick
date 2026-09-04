@@ -684,8 +684,11 @@ aliases work too and follow whatever they currently recommend. `SYNTHETIC_API_KE
 wins over `LLM_API_KEY`, and `OPENAI_API_KEY` is not accepted, for the reasons
 given under OpenRouter. The eval harness reaches it with a `synthetic:` prefix
 on the model id (`MODELS=synthetic:hf:Qwen/Qwen3.8-27B`), which keeps the
-same weights on two hosts as two rows. Cost per review is reported as unknown:
-the subscription has no per-token price to multiply.
+same weights on two hosts as two rows. Cost per review is priced at
+Synthetic's usage-based rates, which the operator transcribed into
+`internal/evals/testdata/pricing.yaml` from the vendor's pricing page; the
+subscription tier bills nothing per token, so on it the column is what the
+same tokens would cost when paying per token.
 
 ### Other OpenAI-compatible gateways (vLLM, LiteLLM)
 

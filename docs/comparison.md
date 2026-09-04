@@ -402,17 +402,27 @@ What that says:
   high draw, not that the change cost it.
 
 **Synthetic as a second host.** The same two models ran through
-[Synthetic](https://synthetic.new)'s subscription endpoint under a new
-`synthetic` provider. Six parallel runs lost most of GLM's reviews there;
-the same fixtures passed alone, so the losses are rate limiting under load,
-not the model. Run one corpus at a time, one run each, related context on:
+[Synthetic](https://synthetic.new) under a new `synthetic` provider. Six
+parallel runs lost most of GLM's reviews there; the same fixtures passed
+alone, so the losses are rate limiting under load, not the model. Both models
+then ran sequentially, one corpus at a time, one run each, twice for GLM;
+related context on. `$/review` is at Synthetic's usage-based rates
+(`testdata/pricing.yaml`), which the operator read off the vendor's pricing
+page and pasted, since Synthetic publishes no pricing JSON. The subscription
+tier bills nothing per token; the column is what the same tokens cost when
+paying per token.
 
-| model on Synthetic | tuning R / N | multi-file R / N | info R / N | lost |
-|---|---|---|---|---|
-| hf:zai-org/GLM-5.3-Flash | 0.88 / 0.12 | 0.92 / 0.14 | 0.70 / 0.00 | 0 |
-| hf:Qwen/Qwen3.8-27B | 0.81 / 0.06 | 0.91 / 0.25 | 0.67 / 0.00 | 3 of 42 |
+| model on Synthetic | tuning R / N | multi-file R / N | info R / N | $/review | lost |
+|---|---|---|---|---|---|
+| hf:zai-org/GLM-5.3-Flash, run 1 | 0.88 / 0.12 | 0.92 / 0.14 | 0.70 / 0.00 | — | 0 |
+| hf:zai-org/GLM-5.3-Flash, run 2 | 0.69 / 0.19 | 0.92 / 0.21 | 0.78 / 0.09 | $0.0025 – $0.0031 | 1 of 42 |
+| hf:Qwen/Qwen3.8-27B | 0.75 / 0.00 | 0.83 / 0.14 | 0.60 / 0.08 | $0.010 – $0.023 | 0 |
 
-Those are the OpenRouter numbers or better. Cost per review is unknown by
-construction: a subscription has no per-token price to multiply, so the
-column reads n/a. A review took two to three minutes on Synthetic against
-under a minute on OpenRouter, which is the trade.
+GLM's two sequential runs differ by 0.19 on the tuning corpus, which is
+three plants and a reminder of what one run is worth. Taken together the
+Synthetic numbers sit on top of the OpenRouter ones for the same weights,
+at about twice the price for GLM (Synthetic's rate is $0.15/$0.50 against
+OpenRouter's cheapest endpoint at $0.075/$0.25) and about the same price for
+Qwen. A review took two to three minutes on Synthetic against under a minute
+on OpenRouter, and the endpoint drops reviews under parallel load, which is
+the trade.
