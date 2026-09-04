@@ -27,9 +27,77 @@ import (
 )
 
 const (
-	fixtureRoot  = "fixtures"
-	branchPrefix = "fixture/"
+	// The layout says nothing about what the code is for. `fixtures/` and a
+	// pull request titled `fixture: …` told both reviewers they were reading
+	// test scaffolding, and both said so in their walkthroughs.
+	fixtureRoot  = "services"
+	branchPrefix = "change/"
 )
+
+// pullRequests is how each fixture is presented: a title an engineer would
+// write and a one-sentence body in the author's voice, naming the intent
+// and never the defect. Fixtures missing here get a title from their name
+// with the giveaway words stripped.
+var pullRequests = map[string][2]string{
+	"bash-fixed-temp-path":             {"Stage the export in a temp file before uploading", "Writes the export to a temp file first so a failed upload leaves nothing half-written."},
+	"capacity-hint-nit":                {"Pre-size the sample window", "Reserves the slice up front so the append loop does not regrow it."},
+	"clean-refactor":                   {"Tidy the config loader", "Splits the loader into smaller functions; no behaviour change."},
+	"clean-sql-allowlist":              {"Allow sorting by more columns", "Adds the remaining sortable columns to the allowlist."},
+	"contract-break":                   {"Make the payload tags consistent", "Aligns the JSON field names and adds an updated timestamp."},
+	"cross-file-copy-nit":              {"Build the summary from a snapshot", "Summary now reads from a snapshot instead of live state."},
+	"cross-file-sort-nit":              {"Render the roster", "Adds the roster view, listing members alphabetically."},
+	"csharp-client-per-request":        {"Send alerts over HTTP", "The notifier posts each alert to the alerts service."},
+	"data-loss-migration":              {"Backfill the plan column", "Gives legacy accounts an explicit plan and makes the column required."},
+	"defensive-copy-nit":               {"Expose the request headers", "Returns the headers to callers that need them."},
+	"duplicate-test-case-nit":          {"More slug test cases", "Extends the table with additional inputs."},
+	"go-cache-get-unchecked":           {"Serve rendered pages from the cache", "Pages are rendered on a miss and cached for the next request."},
+	"go-cancel-goroutine-leak":         {"Resolve with a context", "Lookups now honour cancellation."},
+	"go-empty-filter-deletes-all":      {"Add the upload cleanup endpoint", "Operators can delete uploads by owner and age."},
+	"go-empty-slug-path":               {"Readable post URLs", "Posts are published under a slug instead of a numeric id."},
+	"go-hardcoded-secret":              {"Fall back to a default API key", "Local runs work without configuring a key."},
+	"go-nil-deref":                     {"Return the body length from Fetch", "Fetch now reports how many bytes it read."},
+	"go-package-singleton":             {"Read feature flags at startup", "Flags come from the environment once, at program start."},
+	"go-query-without-deadline":        {"Monthly totals endpoint", "Adds the monthly report for an account."},
+	"go-sql-injection":                 {"Search users by name", "Adds a name search to the user store."},
+	"kotlin-widened-input":             {"Accept any collection of ids", "Callers no longer have to convert to a list first."},
+	"multi-defect":                     {"Upload handler", "Accepts uploads and writes them to the uploads directory."},
+	"php-forbidden-vs-404":             {"Hide documents the caller may not see", "Requests for another user's document no longer reveal it exists."},
+	"python-clean-contract":            {"Retry balance reads", "The processor times out a few times a day; a balance read is safe to repeat."},
+	"python-command-injection":         {"Archive uploads with tar", "Uploaded directories are packed into an archive on request."},
+	"python-expired-token-accepted":    {"Resolve the current user from the bearer token", "Adds current_user for the API handlers."},
+	"python-overwrite-through-package": {"Store attachments per user", "Uploads land under the user's own directory."},
+	"python-retry-nonidempotent":       {"Retry card charges on timeout", "The processor times out a few times a day; rather than fail the order, try again."},
+	"python-secret-to-audit-log":       {"Audit API key creation", "Key minting is recorded in the audit log."},
+	"python-timing-unsafe-hmac":        {"Verify webhook signatures", "Rejects webhooks whose signature does not match."},
+	"removed-guard":                    {"Simplify project deletion", "Drops a redundant check on the delete path."},
+	"retry-no-backoff":                 {"Retry failed fetches", "Transient network errors no longer fail the whole job."},
+	"ruby-default-page-size":           {"Larger pages by default", "Most clients page through everything; a bigger default saves round trips."},
+	"ruby-mailer-in-transaction":       {"Send the receipt at checkout", "Customers get their receipt as soon as the order is placed."},
+	"rust-crate-for-one-call":          {"Parse durations with a crate", "Replaces the hand-written parser."},
+	"sorted-for-min-nit":               {"Find the coldest reading", "Reports the lowest temperature in a batch."},
+	"style-only":                       {"Formatting", "gofmt and a few renames; no behaviour change."},
+	"timezone-boundary":                {"Daily report boundaries", "Reports now cover a calendar day."},
+	"ts-clean-contract":                {"Validate tip amounts", "Rejects malformed amounts with a 400."},
+	"ts-client-per-request":            {"Quote endpoint", "Answers GET /quote/:sku with the current price."},
+	"ts-duration-units-through-barrel": {"Delayed job registration", "Jobs can be registered to run after a delay such as 5m."},
+	"ts-money-units":                   {"Cart totals", "Adds the total to charge for a cart."},
+	"ts-unawaited-async":               {"Save all items", "saveAll stores every item in the batch."},
+	"ts-unbounded-memo-key":            {"Memoize search results", "Repeated searches are common, so answer them from a table."},
+}
+
+func presentation(f evals.Fixture) (title, body string) {
+	if p, ok := pullRequests[f.Name]; ok {
+		return p[0], p[1]
+	}
+	title = strings.NewReplacer("-nit", "", "-", " ").Replace(f.Name)
+	return strings.ToUpper(title[:1]) + title[1:], "Small change; see the diff."
+}
+
+// manifestPath is where `prs` records which pull request holds which fixture,
+// on THIS side, so the benchmark repository never carries the answer key.
+func manifestPath(repo string) string {
+	return filepath.Join("cmd", "benchrepo", "manifests", strings.ReplaceAll(repo, "/", "__")+".json")
+}
 
 func main() {
 	if len(os.Args) < 3 {
@@ -123,10 +191,9 @@ func scaffold() map[string]string {
 
 A private benchmark repository for [open-nitpick](https://github.com/jdziat/open-nitpick).
 
-Every directory under ` + "`fixtures/`" + ` is one fixture from open-nitpick's eval corpora in its
-BASE state. Every pull request applies one fixture's HEAD state. Some plant a defect and some
-are clean; which is which is recorded in open-nitpick's ` + "`internal/evals`" + ` and nowhere in this
-repository, so that nothing here tells a reviewer what to find.
+Every directory under ` + "`services/`" + ` is one small service in its base state. Every pull request
+changes one of them. Some changes carry a defect and some are clean; which is which is recorded
+outside this repository, so that nothing here tells a reviewer what to find.
 
 To score the reviews posted here against the plants:
 
@@ -183,9 +250,11 @@ jobs:
 	}
 }
 
+func branchFor(i int) string { return fmt.Sprintf("%s%03d", branchPrefix, i+1) }
+
 func branches(dir string) error {
-	for _, f := range corpus() {
-		branch := branchPrefix + f.Name
+	for i, f := range corpus() {
+		branch := branchFor(i)
 		if _, err := git(dir, "checkout", "-q", "-B", branch, "main"); err != nil {
 			return err
 		}
@@ -203,10 +272,11 @@ func branches(dir string) error {
 		if _, err := git(dir, "add", "-A"); err != nil {
 			return err
 		}
-		if _, err := git(dir, "commit", "-qm", "fixture "+f.Name); err != nil {
+		title, _ := presentation(f)
+		if _, err := git(dir, "commit", "-qm", title); err != nil {
 			return err
 		}
-		fmt.Println("branch", branch)
+		fmt.Println("branch", branch, "=", f.Name)
 	}
 	_, err := git(dir, "checkout", "-q", "main")
 	return err
@@ -222,9 +292,10 @@ func gh(args ...string) (string, error) {
 }
 
 func openPRs(repo string) error {
-	for _, f := range corpus() {
-		branch := branchPrefix + f.Name
-		// One pull request per branch; skip the ones already open.
+	manifest := map[string]string{} // branch -> fixture
+	for i, f := range corpus() {
+		branch := branchFor(i)
+		manifest[branch] = f.Name
 		existing, err := gh("pr", "list", "--repo", repo, "--head", branch, "--state", "all", "--json", "number", "--jq", "length")
 		if err != nil {
 			return err
@@ -233,15 +304,35 @@ func openPRs(repo string) error {
 			fmt.Println("exists", branch)
 			continue
 		}
-		body := fmt.Sprintf("Change under review: `%s`, one fixture of the open-nitpick eval corpus applied as a pull request.", f.Name)
-		out, err := gh("pr", "create", "--repo", repo, "--head", branch, "--base", "main",
-			"--title", "fixture: "+f.Name, "--body", body)
+		title, body := presentation(f)
+		out, err := gh("pr", "create", "--repo", repo, "--head", branch, "--base", "main", "--title", title, "--body", body)
 		if err != nil {
 			return err
 		}
-		fmt.Println("opened", out)
+		fmt.Println("opened", out, "=", f.Name)
 	}
-	return nil
+	blob, _ := json.MarshalIndent(manifest, "", "  ")
+	if err := os.MkdirAll(filepath.Dir(manifestPath(repo)), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(manifestPath(repo), append(blob, '\n'), 0o644)
+}
+
+// fixtureBranches reads the manifest `prs` wrote: fixture -> branch.
+func fixtureBranches(repo string) (map[string]string, error) {
+	data, err := os.ReadFile(manifestPath(repo))
+	if err != nil {
+		return nil, fmt.Errorf("no manifest for %s (run `benchrepo prs` first): %w", repo, err)
+	}
+	var byBranch map[string]string
+	if err := json.Unmarshal(data, &byBranch); err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for branch, fixture := range byBranch {
+		out[fixture] = branch
+	}
+	return out, nil
 }
 
 // trigger asks Incumbent to review every fixture pull request. The app only
@@ -252,8 +343,12 @@ func trigger(repo string) error {
 	if err != nil {
 		return err
 	}
+	branchOf, err := fixtureBranches(repo)
+	if err != nil {
+		return err
+	}
 	for _, f := range corpus() {
-		number, ok := numbers[branchPrefix+f.Name]
+		number, ok := numbers[branchOf[f.Name]]
 		if !ok {
 			continue
 		}
@@ -318,6 +413,10 @@ func score(repo string) error {
 	if err != nil {
 		return err
 	}
+	branchOf, err := fixtureBranches(repo)
+	if err != nil {
+		return err
+	}
 
 	totals := map[string]*tally{}
 	byLang := map[string]map[string]*tally{}
@@ -332,7 +431,7 @@ func score(repo string) error {
 	}
 	fmt.Println()
 	for _, f := range corpus() {
-		number, ok := numbers[branchPrefix+f.Name]
+		number, ok := numbers[branchOf[f.Name]]
 		if !ok {
 			fmt.Printf("%-36s  no PR\n", f.Name)
 			continue
