@@ -3341,6 +3341,602 @@
           }
         }
       ]
+    },
+    "meta/muse-spark-1.3-contributor": {
+      "captured_on": "2026-09-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/meta/muse-spark-1.3-contributor/endpoints",
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000002",
+        "web_search": "0.0025",
+        "input_cache_read": "0.000000002"
+      },
+      "endpoints": [
+        {
+          "tag": "meta",
+          "provider_name": "Meta",
+          "pricing": {
+            "prompt": "0.0000001",
+            "completion": "0.0000002",
+            "web_search": "0.0025",
+            "input_cache_read": "0.000000002",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "qwen/qwen3.8-27b": {
+      "captured_on": "2026-09-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/qwen/qwen3.8-27b/endpoints",
+      "pricing": {
+        "prompt": "0.00000042",
+        "completion": "0.000003",
+        "input_cache_read": "0.000000085"
+      },
+      "endpoints": [
+        {
+          "tag": "darkbloom/fp4",
+          "provider_name": "Darkbloom",
+          "pricing": {
+            "prompt": "0.00000022",
+            "completion": "0.00000242",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "reka/fp8",
+          "provider_name": "Reka",
+          "pricing": {
+            "prompt": "0.00000024",
+            "completion": "0.00000255",
+            "input_cache_read": "0.00000015",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "akashml/fp8",
+          "provider_name": "AkashML",
+          "pricing": {
+            "prompt": "0.00000025",
+            "completion": "0.0000022",
+            "input_cache_read": "0.00000005",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "parasail/fp8",
+          "provider_name": "Parasail",
+          "pricing": {
+            "prompt": "0.00000028",
+            "completion": "0.0000022",
+            "input_cache_read": "0.00000005",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "chutes/fp8",
+          "provider_name": "Chutes",
+          "pricing": {
+            "prompt": "0.00000032",
+            "completion": "0.0000025",
+            "input_cache_read": "0.000000032",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "ionstream/fp8",
+          "provider_name": "Ionstream",
+          "pricing": {
+            "prompt": "0.00000035",
+            "completion": "0.00000255",
+            "input_cache_read": "0.00000005",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "phala",
+          "provider_name": "Phala",
+          "pricing": {
+            "prompt": "0.0000004",
+            "completion": "0.000003",
+            "input_cache_read": "0.00000005",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "coreweave/fp8",
+          "provider_name": "CoreWeave",
+          "pricing": {
+            "prompt": "0.0000004",
+            "completion": "0.000003",
+            "input_cache_read": "0.00000015",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "novita",
+          "provider_name": "Novita",
+          "pricing": {
+            "prompt": "0.00000042",
+            "completion": "0.000003",
+            "input_cache_read": "0.000000085",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "alibaba",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.000000425",
+            "completion": "0.00000255",
+            "input_cache_read": "0.000000085",
+            "input_cache_write": "0.00000053125",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "io-net/fp8",
+          "provider_name": "Io Net",
+          "pricing": {
+            "prompt": "0.000000432",
+            "completion": "0.00000306",
+            "input_cache_read": "0.000000225",
+            "discount": 0.1
+          }
+        },
+        {
+          "tag": "cloudflare",
+          "provider_name": "Cloudflare",
+          "pricing": {
+            "prompt": "0.00000045",
+            "completion": "0.0000032",
+            "input_cache_read": "0.00000005",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "venice/fp8",
+          "provider_name": "Venice",
+          "pricing": {
+            "prompt": "0.00000045",
+            "completion": "0.0000032",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "x-ai/grok-4.6": {
+      "captured_on": "2026-09-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/x-ai/grok-4.6/endpoints",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000006",
+        "web_search": "0.005",
+        "input_cache_read": "0.0000005",
+        "overrides": [
+          {
+            "min_prompt_tokens": 200000,
+            "prompt": "0.000004",
+            "completion": "0.000012",
+            "input_cache_read": "0.000001"
+          }
+        ]
+      },
+      "endpoints": [
+        {
+          "tag": "xai/zdr",
+          "provider_name": "xAI",
+          "pricing": {
+            "prompt": "0.000002",
+            "completion": "0.000006",
+            "web_search": "0.005",
+            "input_cache_read": "0.0000005",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.000004",
+                "completion": "0.000012",
+                "input_cache_read": "0.000001"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "xai",
+          "provider_name": "xAI",
+          "pricing": {
+            "prompt": "0.000002",
+            "completion": "0.000006",
+            "web_search": "0.005",
+            "input_cache_read": "0.0000005",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.000004",
+                "completion": "0.000012",
+                "input_cache_read": "0.000001"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "amazon-bedrock/us-west-2",
+          "provider_name": "Amazon Bedrock",
+          "pricing": {
+            "prompt": "0.0000022",
+            "completion": "0.0000066",
+            "web_search": "0.01",
+            "input_cache_read": "0.00000055",
+            "input_cache_write": "0",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.0000044",
+                "completion": "0.0000132",
+                "input_cache_read": "0.0000011",
+                "input_cache_write": "0"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "xai/zdr/priority",
+          "provider_name": "xAI",
+          "pricing": {
+            "prompt": "0.000004",
+            "completion": "0.000012",
+            "web_search": "0.005",
+            "input_cache_read": "0.000001",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.000008",
+                "completion": "0.000024",
+                "input_cache_read": "0.000002"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "xai/priority",
+          "provider_name": "xAI",
+          "pricing": {
+            "prompt": "0.000004",
+            "completion": "0.000012",
+            "web_search": "0.005",
+            "input_cache_read": "0.000001",
+            "discount": 0,
+            "overrides": [
+              {
+                "min_prompt_tokens": 200000,
+                "prompt": "0.000008",
+                "completion": "0.000024",
+                "input_cache_read": "0.000002"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "deepseek/deepseek-v4-pro-0813": {
+      "captured_on": "2026-09-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/deepseek/deepseek-v4-pro-0813/endpoints",
+      "pricing": {
+        "prompt": "0.0000011154",
+        "completion": "0.0000033462",
+        "input_cache_read": "0.00000003718"
+      },
+      "endpoints": [
+        {
+          "tag": "streamlake",
+          "provider_name": "StreamLake",
+          "pricing": {
+            "prompt": "0.0000011154",
+            "completion": "0.0000033462",
+            "input_cache_read": "0.00000003718",
+            "discount": 0.155
+          }
+        },
+        {
+          "tag": "alibaba",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.000001122",
+            "completion": "0.000003366",
+            "input_cache_read": "0.0000001122",
+            "discount": 0,
+            "overrides": [
+              {
+                "utc_start": 0,
+                "utc_end": 1400,
+                "prompt": "0.000001122",
+                "completion": "0.000003366",
+                "input_cache_read": "0.0000001122"
+              },
+              {
+                "utc_start": 1400,
+                "utc_end": 0,
+                "prompt": "0.0000005808",
+                "completion": "0.0000017424",
+                "input_cache_read": "0.00000005808"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "gmicloud/fp8",
+          "provider_name": "GMICloud",
+          "pricing": {
+            "prompt": "0.000001122",
+            "completion": "0.000003366",
+            "input_cache_read": "0.0000000374",
+            "discount": 0.15
+          }
+        },
+        {
+          "tag": "deepinfra/fp8",
+          "provider_name": "DeepInfra",
+          "pricing": {
+            "prompt": "0.0000013",
+            "completion": "0.0000026",
+            "input_cache_read": "0.0000001",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "coreweave/fp8",
+          "provider_name": "CoreWeave",
+          "pricing": {
+            "prompt": "0.00000131",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000044",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "nextbit/fp8",
+          "provider_name": "NextBit",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000045",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "sail-research/fp4",
+          "provider_name": "Sail Research",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000044",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "baseten/fp4",
+          "provider_name": "BaseTen",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000132",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "parasail/fp8",
+          "provider_name": "Parasail",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000044",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "together",
+          "provider_name": "Together",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.00000013",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "digitalocean",
+          "provider_name": "DigitalOcean",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000044",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "novita/fp8",
+          "provider_name": "Novita",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000132",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "siliconflow/fp8",
+          "provider_name": "SiliconFlow",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000044",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "baseten/fp4",
+          "provider_name": "BaseTen",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000132",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "cloudflare",
+          "provider_name": "Cloudflare",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000044",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "fireworks",
+          "provider_name": "Fireworks",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000044",
+            "discount": 0
+          }
+        },
+        {
+          "tag": "deepseek",
+          "provider_name": "DeepSeek",
+          "pricing": {
+            "prompt": "0.00000132",
+            "completion": "0.00000396",
+            "input_cache_read": "0.000000044",
+            "discount": 0,
+            "overrides": [
+              {
+                "utc_days": [
+                  "saturday",
+                  "sunday"
+                ],
+                "prompt": "0.00000066",
+                "completion": "0.00000198",
+                "input_cache_read": "0.000000022"
+              },
+              {
+                "utc_start": 0,
+                "utc_end": 100,
+                "utc_days": [
+                  "monday",
+                  "tuesday",
+                  "wednesday",
+                  "thursday",
+                  "friday"
+                ],
+                "prompt": "0.00000066",
+                "completion": "0.00000198",
+                "input_cache_read": "0.000000022"
+              },
+              {
+                "utc_start": 100,
+                "utc_end": 400,
+                "utc_days": [
+                  "monday",
+                  "tuesday",
+                  "wednesday",
+                  "thursday",
+                  "friday"
+                ],
+                "prompt": "0.00000132",
+                "completion": "0.00000396",
+                "input_cache_read": "0.000000044"
+              },
+              {
+                "utc_start": 400,
+                "utc_end": 600,
+                "utc_days": [
+                  "monday",
+                  "tuesday",
+                  "wednesday",
+                  "thursday",
+                  "friday"
+                ],
+                "prompt": "0.00000066",
+                "completion": "0.00000198",
+                "input_cache_read": "0.000000022"
+              },
+              {
+                "utc_start": 600,
+                "utc_end": 1000,
+                "utc_days": [
+                  "monday",
+                  "tuesday",
+                  "wednesday",
+                  "thursday",
+                  "friday"
+                ],
+                "prompt": "0.00000132",
+                "completion": "0.00000396",
+                "input_cache_read": "0.000000044"
+              },
+              {
+                "utc_start": 1000,
+                "utc_end": 0,
+                "utc_days": [
+                  "monday",
+                  "tuesday",
+                  "wednesday",
+                  "thursday",
+                  "friday"
+                ],
+                "prompt": "0.00000066",
+                "completion": "0.00000198",
+                "input_cache_read": "0.000000022"
+              }
+            ]
+          }
+        },
+        {
+          "tag": "phala",
+          "provider_name": "Phala",
+          "pricing": {
+            "prompt": "0.00000145",
+            "completion": "0.00000436",
+            "input_cache_read": "0.00000015",
+            "discount": 0
+          }
+        }
+      ]
+    },
+    "qwen/qwen3.8-max": {
+      "captured_on": "2026-09-03",
+      "source": "https://openrouter.ai/api/v1/models",
+      "endpoints_source": "https://openrouter.ai/api/v1/models/qwen/qwen3.8-max/endpoints",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000006",
+        "input_cache_read": "0.00000025",
+        "input_cache_write": "0.0000025"
+      },
+      "endpoints": [
+        {
+          "tag": "alibaba",
+          "provider_name": "Alibaba",
+          "pricing": {
+            "prompt": "0.000002",
+            "completion": "0.000006",
+            "input_cache_read": "0.00000025",
+            "input_cache_write": "0.0000025",
+            "discount": 0
+          }
+        }
+      ]
     }
   }
 }
