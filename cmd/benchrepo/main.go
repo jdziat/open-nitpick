@@ -215,6 +215,9 @@ review:
   min_severity: nit
   related_context: true
   token_budget_per_request: 120000
+  # Every push is a fresh, whole review here: this repository measures the
+  # reviewer, and an incremental review of an empty commit would be no review.
+  incremental: false
 
 linters:
   mode: auto
@@ -245,6 +248,7 @@ jobs:
           model: anthropic/claude-sonnet-4.6
           api-key: ${{ secrets.OPENROUTER_API_KEY }}
           fail-on: none
+          analyzers: auto
 `,
 		".gitignore": "dist/\n",
 	}
