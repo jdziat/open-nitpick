@@ -874,3 +874,156 @@ models:
       max_cache_read: 0.25
       min_cache_write: 2.5
       max_cache_write: 2.5
+
+# Synthetic (https://synthetic.new). One endpoint per model, usage-based billing;
+# the subscription tier bills nothing per token and these rates apply only when
+# usage-based billing is on. Rates were read off the vendor's pricing page by
+# the operator on the capture date and pasted, not fetched by a script: there is
+# no public JSON to capture, so the receipt records the same seven rows.
+
+  "synthetic:hf:moonshotai/Kimi-K3":
+    captured_on: "2026-09-04"
+    source: "https://synthetic.new/pricing"
+    endpoint: "synthetic"
+    input: 3
+    output: 15
+    cache_read: 0.45
+    routing:
+      source: "https://dev.synthetic.new/docs/api/models"
+      endpoints: 1
+      cheapest: "synthetic"
+      dearest: "synthetic"
+      min_input: 3
+      max_input: 3
+      min_output: 15
+      max_output: 15
+      min_cache_read: 0.45
+      max_cache_read: 0.45
+      min_cache_write: 3
+      max_cache_write: 3
+
+  "synthetic:hf:nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4":
+    captured_on: "2026-09-04"
+    source: "https://synthetic.new/pricing"
+    endpoint: "synthetic"
+    input: 0.3
+    output: 1
+    cache_read: 0.06
+    routing:
+      source: "https://dev.synthetic.new/docs/api/models"
+      endpoints: 1
+      cheapest: "synthetic"
+      dearest: "synthetic"
+      min_input: 0.3
+      max_input: 0.3
+      min_output: 1
+      max_output: 1
+      min_cache_read: 0.06
+      max_cache_read: 0.06
+      min_cache_write: 0.3
+      max_cache_write: 0.3
+
+  "synthetic:hf:openai/gpt-oss-120b":
+    captured_on: "2026-09-04"
+    source: "https://synthetic.new/pricing"
+    endpoint: "synthetic"
+    input: 0.1
+    output: 0.1
+    cache_read: 0.02
+    routing:
+      source: "https://dev.synthetic.new/docs/api/models"
+      endpoints: 1
+      cheapest: "synthetic"
+      dearest: "synthetic"
+      min_input: 0.1
+      max_input: 0.1
+      min_output: 0.1
+      max_output: 0.1
+      min_cache_read: 0.02
+      max_cache_read: 0.02
+      min_cache_write: 0.1
+      max_cache_write: 0.1
+
+  "synthetic:hf:Qwen/Qwen3.8-27B":
+    captured_on: "2026-09-04"
+    source: "https://synthetic.new/pricing"
+    endpoint: "synthetic"
+    input: 0.45
+    output: 2.2
+    cache_read: 0.09
+    routing:
+      source: "https://dev.synthetic.new/docs/api/models"
+      endpoints: 1
+      cheapest: "synthetic"
+      dearest: "synthetic"
+      min_input: 0.45
+      max_input: 0.45
+      min_output: 2.2
+      max_output: 2.2
+      min_cache_read: 0.09
+      max_cache_read: 0.09
+      min_cache_write: 0.45
+      max_cache_write: 0.45
+
+  "synthetic:hf:zai-org/GLM-4.7-Flash":
+    captured_on: "2026-09-04"
+    source: "https://synthetic.new/pricing"
+    endpoint: "synthetic"
+    input: 0.1
+    output: 0.5
+    cache_read: 0.02
+    routing:
+      source: "https://dev.synthetic.new/docs/api/models"
+      endpoints: 1
+      cheapest: "synthetic"
+      dearest: "synthetic"
+      min_input: 0.1
+      max_input: 0.1
+      min_output: 0.5
+      max_output: 0.5
+      min_cache_read: 0.02
+      max_cache_read: 0.02
+      min_cache_write: 0.1
+      max_cache_write: 0.1
+
+  "synthetic:hf:zai-org/GLM-5.2":
+    captured_on: "2026-09-04"
+    source: "https://synthetic.new/pricing"
+    endpoint: "synthetic"
+    input: 1
+    output: 3
+    cache_read: 0.16
+    routing:
+      source: "https://dev.synthetic.new/docs/api/models"
+      endpoints: 1
+      cheapest: "synthetic"
+      dearest: "synthetic"
+      min_input: 1
+      max_input: 1
+      min_output: 3
+      max_output: 3
+      min_cache_read: 0.16
+      max_cache_read: 0.16
+      min_cache_write: 1
+      max_cache_write: 1
+
+  "synthetic:hf:zai-org/GLM-5.3-Flash":
+    captured_on: "2026-09-04"
+    source: "https://synthetic.new/pricing"
+    endpoint: "synthetic"
+    input: 0.15
+    output: 0.5
+    cache_read: 0.04
+    routing:
+      source: "https://dev.synthetic.new/docs/api/models"
+      endpoints: 1
+      cheapest: "synthetic"
+      dearest: "synthetic"
+      min_input: 0.15
+      max_input: 0.15
+      min_output: 0.5
+      max_output: 0.5
+      min_cache_read: 0.04
+      max_cache_read: 0.04
+      min_cache_write: 0.15
+      max_cache_write: 0.15
