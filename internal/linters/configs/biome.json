@@ -1,6 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
-  "linter": { "enabled": true, "rules": { "recommended": true } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": false,
+      "correctness": "on",
+      "suspicious": "on",
+      "security": "on",
+      "performance": "on"
+    }
+  },
   "formatter": { "enabled": false },
   "vcs": { "enabled": false }
 }

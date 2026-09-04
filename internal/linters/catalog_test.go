@@ -408,3 +408,17 @@ func TestAutoDetectedToolsSkipWhenAbsentAndRunWhenPresent(t *testing.T) {
 		}
 	}
 }
+
+// TestSQLFluffParseFailuresAreNotFindings: a PRS violation is sqlfluff saying
+// the dialect is wrong for this file, and "unparsable SQL" on a valid
+// migration is not a review finding.
+func TestSQLFluffParseFailuresAreNotFindings(t *testing.T) {
+	report := `[{"filepath":"m.sql","violations":[{"start_line_no":10,"code":"PRS","description":"Unparsable section"},{"start_line_no":3,"code":"CP02","description":"Unquoted identifiers must be consistently lower case","name":"capitalisation.identifiers"}]}]`
+	findings, err := specByName(t, "sqlfluff").parse(invocation{}, []byte(report), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 1 || findings[0].Rule != "CP02" {
+		t.Errorf("findings = %+v; the parse failure must be dropped and the real rule kept", findings)
+	}
+}
