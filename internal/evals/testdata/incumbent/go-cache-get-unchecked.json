@@ -1,8 +1,19 @@
 {
   "fixture": "go-cache-get-unchecked",
-  "findings": null,
-  "at": "2026-09-03T03:51:49Z",
+  "findings": [
+    {
+      "path": "web/pages.go",
+      "line": 26,
+      "severity": "info",
+      "category": "Performance \u0026 Scalability",
+      "class": "correctness",
+      "title": "Distinguish cached empty content from a cache miss.",
+      "rationale": "Line 26 treats \"\" as a miss. If Render returns an empty page, line 32 caches it, but every later request renders it again. Use the cache presence result, or an equivalent API, to distinguish a missing key from a cached empty page.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-04T12:06:48Z",
   "mode": "plaintext",
-  "fingerprint": "6bebacae6db2bd7496b98f2c9f9b403ad52c8b4b8f89744313ef59d75e1b995d",
-  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-221082848\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - web/pages.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 10s elapsed\nFinishing analysis tools... 36s elapsed\nWriting review comments... 36s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+  "fingerprint": "2f1453b5896527442f369528a32b7454c3537b027c1a9879594580f335637907",
+  "raw": "╔═══════════════════════════════════════════╗\n║                                           ║\n║   New update available! 0.7.5 -\u003e 0.7.6    ║\n║          Run: incumbent update           ║\n║                                           ║\n╚═══════════════════════════════════════════╝\n\n────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3455893958\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  minor [Performance \u0026 Scalability]\n  → web/pages.go:26\n\n  Distinguish cached empty content from a cache miss.\n\n  Line 26 treats \"\" as a miss. If Render returns an empty page, line 32\n  caches it, but every later request renders it again. Use the cache\n  presence result, or an equivalent API, to distinguish a missing key from a\n  cached empty page.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMinor    1\n\n1 file reviewed:\n  - web/pages.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 9s elapsed\nFinishing analysis tools... 24s elapsed\nWriting review comments... 24s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
 }

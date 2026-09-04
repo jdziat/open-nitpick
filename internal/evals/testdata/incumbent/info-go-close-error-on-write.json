@@ -6,14 +6,14 @@
       "line": 15,
       "severity": "warning",
       "category": "Data Integrity \u0026 Integration",
-      "class": "correctness",
-      "title": "Propagate the f.Close() error.",
-      "rationale": "os.File.Close can report delayed write errors. The deferred call discards this error, so Write can return nil after an unsuccessful write. Preserve earlier errors and return the f.Close() error when no earlier error exists.",
+      "class": "resource",
+      "title": "Return the file-close error.",
+      "rationale": "Write discards the error from os.File.Close(). If io.Copy and w.Flush() succeed but f.Close() fails, Write still returns nil. Close the file explicitly or use a named return while preserving earlier errors.",
       "suggestion": ""
     }
   ],
-  "at": "2026-09-04T00:53:52Z",
+  "at": "2026-09-04T12:06:50Z",
   "mode": "plaintext",
-  "fingerprint": "0efa8c643193abc3537d0762ae72dee98a8f385863994f9e526f34e7fb391cc5",
-  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-4074118173\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Data Integrity \u0026 Integration]\n  → export/write.go:15\n\n  Propagate the f.Close() error.\n\n  os.File.Close can report delayed write errors. The deferred call\n  discards this error, so Write can return nil after an unsuccessful\n  write. Preserve earlier errors and return the f.Close() error when no\n  earlier error exists.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - export/write.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+  "fingerprint": "d624083b73496fae9dc20be284f73ab93fa313a35dae2e12ae3e0cb4b2bd60e5",
+  "raw": "╔═══════════════════════════════════════════╗\n║                                           ║\n║   New update available! 0.7.5 -\u003e 0.7.6    ║\n║          Run: incumbent update           ║\n║                                           ║\n╚═══════════════════════════════════════════╝\n\n────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1230617483\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Data Integrity \u0026 Integration]\n  → export/write.go:15\n\n  Return the file-close error.\n\n  Write discards the error from os.File.Close(). If io.Copy and\n  w.Flush() succeed but f.Close() fails, Write still returns nil.\n  Close the file explicitly or use a named return while preserving earlier\n  errors.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - export/write.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 9s elapsed\nFinishing analysis tools... 22s elapsed\nWriting review comments... 22s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
 }
