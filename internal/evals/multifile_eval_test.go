@@ -61,6 +61,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		findings int
 		noise    int
 		anchor   int
+		near     int
 		usd      float64
 		priced   int                        // reviews whose cost is known
 		byBand   map[config.Severity][2]int // located, plants
@@ -94,6 +95,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		r.findings += len(findings)
 		r.noise += d.Noise()
 		r.anchor = max(r.anchor, d.WidestAnchor)
+		r.near += d.NearMisses
 		for _, def := range f.Defects {
 			b := r.byBand[def.WantSeverity]
 			b[1]++
@@ -224,7 +226,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 	})
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "\n%-42s %7s %7s %7s %6s %6s %9s %10s  %s\n", "contender", "RECALL", "NOISE", "ANCHOR", "REV", "LOST", "$/REVIEW", "$/LOCATED", "critical/error/warning/info/nit")
+	fmt.Fprintf(&b, "\n%-42s %7s %7s %5s %7s %6s %6s %9s %10s  %s\n", "contender", "RECALL", "NOISE", "NEAR", "ANCHOR", "REV", "LOST", "$/REVIEW", "$/LOCATED", "critical/error/warning/info/nit")
 	for _, n := range names {
 		r := rows[n]
 		bands := make([]string, 0, 5)
@@ -243,10 +245,10 @@ func TestBenchmarkMultiFile(t *testing.T) {
 				perLocated = fmt.Sprintf("$%.4f", r.usd/float64(r.located))
 			}
 		}
-		fmt.Fprintf(&b, "%-42s %7s %7s %7d %6d %6d %9s %10s  %s\n", n,
-			ratio(r.located, r.plants), ratio(r.noise, r.reviews), r.anchor, r.reviews, r.lost, perReview, perLocated, strings.Join(bands, " "))
+		fmt.Fprintf(&b, "%-42s %7s %7s %5d %7d %6d %6d %9s %10s  %s\n", n,
+			ratio(r.located, r.plants), ratio(r.noise, r.reviews), r.near, r.anchor, r.reviews, r.lost, perReview, perLocated, strings.Join(bands, " "))
 	}
-	b.WriteString("\nRECALL = located/plants over every review; NOISE = findings explaining no plant, per review; ANCHOR = widest anchor in lines.\n")
+	b.WriteString("\nRECALL = located/plants over every review; NOISE = findings explaining no plant, per review; NEAR = of those, findings naming a plant's keywords in its file beyond the anchor tolerance; ANCHOR = widest anchor in lines.\n")
 	b.WriteString("$/REVIEW is the provider-reported spend per review at the shipped rate table; $/LOCATED divides the run's spend by the plants it located, and is n/a when any review went unpriced.\n")
 	b.WriteString("Our side is listed once per model without related context and once with it (+ctx).\n\n")
 

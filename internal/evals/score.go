@@ -161,6 +161,13 @@ type DetectionScore struct {
 	Detected map[string]bool
 	Matched  int
 
+	// NearMisses counts findings that name a plant's keywords in the plant's
+	// file but sit beyond the anchor tolerance — a reviewer that found the
+	// defect and pointed at the wrong line. They are noise by the rules, and
+	// counted separately so that a near miss is visible instead of folded
+	// into the same column as a fabrication.
+	NearMisses int
+
 	// Unmatched are the findings that explain no planted defect. On a clean
 	// fixture every finding is unmatched by definition.
 	Unmatched []review.Finding
@@ -243,10 +250,24 @@ func ScoreDetection(f Fixture, findings []review.Finding) DetectionScore {
 	for _, finding := range findings {
 		if !explainsAny(finding, f.Defects) {
 			out.Unmatched = append(out.Unmatched, finding)
+			if nearMiss(finding, f.Defects) {
+				out.NearMisses++
+			}
 		}
 	}
 
 	return out
+}
+
+// nearMiss reports whether a finding names a plant's keywords in its file
+// but anchors beyond the tolerance.
+func nearMiss(f review.Finding, defects []Defect) bool {
+	for _, d := range defects {
+		if f.Path == d.Path && mentionsAny(f, d.Keywords) {
+			return true
+		}
+	}
+	return false
 }
 
 // The objective severity vocabulary. It is deliberately the judge's own

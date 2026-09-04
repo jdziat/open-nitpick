@@ -111,6 +111,15 @@ Exit codes: `0` clean, `1` findings at or above `fail_on`, `2` the review could
 not run. CI can tell "this change has problems" apart from "the reviewer
 broke", and `result` says which without parsing the log.
 
+**Analyzers on the runner.** A stock runner has none of the deterministic
+analyzers installed, so the roster says "not on PATH" for every one. Set
+`analyzers: auto` and the Action installs, at pinned versions and cached, the
+analyzers for the languages the change touches — golangci-lint for Go, ruff
+and pylint for Python, shellcheck, hadolint, yamllint, actionlint and zizmor,
+tflint and checkov, sqlfluff, rubocop and brakeman, cppcheck, biome, buf, and
+gitleaks always. A comma-separated list installs exactly those. This is what
+the hosted reviewers do implicitly; here it is a line in the workflow.
+
 **Try it first.** `dry-run: true` prints the review to the log and the job
 summary and posts nothing. `nitpick explain-config` shows the prompt a path
 would get before a token is spent.

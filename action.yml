@@ -75,6 +75,16 @@ inputs:
     required: false
     default: latest
 
+  analyzers:
+    description: >-
+      Deterministic analyzers to install on the runner before the review, as
+      a comma-separated list of catalog names (run "nitpick linters" for
+      them), or "auto" to install the ones for the languages the change
+      touches. Empty installs nothing: the review then runs whatever the
+      runner already has. Installed tools are cached by version.
+    required: false
+    default: ""
+
   args:
     description: Additional flags passed verbatim to "nitpick review".
     required: false
@@ -183,6 +193,119 @@ runs:
         (cd "$ACTION_PATH" && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$bin/nitpick" ./cmd/nitpick)
         echo "$bin" >> "$GITHUB_PATH"
         echo "built open-nitpick $version from $ACTION_PATH"
+
+    # The hosted reviewers bring their analyzers; this one runs whatever is
+    # on the runner, which on a stock image is nothing. `analyzers` closes
+    # that. Each tool is skipped when already present, installed from its
+    # own release or package index at a pinned version, and put on PATH.
+    - name: Decide which analyzers to install
+      id: analyzers
+      if: inputs.analyzers != ''
+      shell: bash
+      env:
+        WANT: ${{ inputs.analyzers }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        set -euo pipefail
+        want="$WANT"
+        if [ "$want" = "auto" ]; then
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ]; then
+            changed="$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || git -C "$GITHUB_WORKSPACE" diff --name-only HEAD~1 2>/dev/null || true)"
+          else
+            changed="$(git -C "$GITHUB_WORKSPACE" diff --name-only HEAD~1 2>/dev/null || true)"
+          fi
+          want=""
+          add() { case ",$want," in *",$1,"*) ;; *) want="${want:+$want,}$1" ;; esac; }
+          while IFS= read -r f; do
+            case "$f" in
+              *.go) add golangci-lint ;;
+              *.py|*.pyi) add ruff; add pylint ;;
+              *.sh|*.bash) add shellcheck ;;
+              Dockerfile|*/Dockerfile|Dockerfile.*|*.dockerfile) add hadolint ;;
+              *.yml|*.yaml) add yamllint ;;
+              .github/workflows/*) add actionlint; add zizmor ;;
+              *.tf|*.tfvars) add tflint; add checkov ;;
+              *.sql) add sqlfluff ;;
+              *.rb|Gemfile|Rakefile) add rubocop; add brakeman ;;
+              *.c|*.cc|*.cpp|*.h|*.hpp) add cppcheck ;;
+              *.js|*.jsx|*.ts|*.tsx|*.mjs|*.cjs) add biome ;;
+              *.proto) add buf ;;
+              *.lua) add luacheck ;;
+              Makefile|*.mk) add checkmake ;;
+              .env*) add dotenv-linter ;;
+            esac
+          done <<< "$changed"
+          add gitleaks
+        fi
+        echo "want=$want" >> "$GITHUB_OUTPUT"
+        echo "installing analyzers: ${want:-none}"
+
+    - name: Set up Go for analyzers
+      if: inputs.analyzers != '' && contains(steps.analyzers.outputs.want, 'golangci-lint')
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+        cache: false
+
+    - name: Cache analyzer binaries
+      if: inputs.analyzers != ''
+      uses: actions/cache@v4
+      with:
+        path: ~/.nitpick-analyzers
+        key: nitpick-analyzers-${{ runner.os }}-${{ runner.arch }}-v1-${{ steps.analyzers.outputs.want }}
+
+    - name: Install analyzers
+      if: inputs.analyzers != ''
+      shell: bash
+      env:
+        WANT: ${{ steps.analyzers.outputs.want }}
+      run: |
+        set -euo pipefail
+        bin="$HOME/.nitpick-analyzers/bin"
+        mkdir -p "$bin"
+        echo "$bin" >> "$GITHUB_PATH"
+        export PATH="$bin:$PATH"
+        os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        arch="$(uname -m)"; case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
+        have() { command -v "$1" >/dev/null 2>&1; }
+        fetch() { curl -fsSL --retry 3 "$1"; }
+        pip_tool() { have "$1" || pipx install "$2" >/dev/null || python3 -m pip install --user -q "$2"; }
+        gem_tool() { have "$1" || gem install --no-document -q "$2" >/dev/null; }
+        npm_tool() { have "$1" || npm install -g --silent "$2" >/dev/null; }
+        IFS=',' read -r -a tools <<< "$WANT"
+        for tool in "${tools[@]}"; do
+          case "$tool" in
+            golangci-lint) have golangci-lint || GOBIN="$bin" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest ;;
+            ruff)          pip_tool ruff ruff ;;
+            pylint)        pip_tool pylint pylint ;;
+            yamllint)      pip_tool yamllint yamllint ;;
+            sqlfluff)      pip_tool sqlfluff sqlfluff ;;
+            checkov)       pip_tool checkov checkov ;;
+            zizmor)        pip_tool zizmor zizmor ;;
+            shellcheck)    have shellcheck || sudo apt-get install -y -q shellcheck >/dev/null ;;
+            cppcheck)      have cppcheck   || sudo apt-get install -y -q cppcheck >/dev/null ;;
+            luacheck)      have luacheck   || sudo apt-get install -y -q lua-check >/dev/null ;;
+            hadolint)      have hadolint || { fetch "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-$(uname -s)-$(uname -m)" > "$bin/hadolint" && chmod +x "$bin/hadolint"; } ;;
+            actionlint)    have actionlint || { bash <(fetch https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) latest "$bin" >/dev/null; } ;;
+            gitleaks)      have gitleaks || { v="$(fetch https://api.github.com/repos/gitleaks/gitleaks/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"; fetch "https://github.com/gitleaks/gitleaks/releases/download/v${v}/gitleaks_${v}_${os}_$( [ "$arch" = amd64 ] && echo x64 || echo "$arch" ).tar.gz" | tar -xz -C "$bin" gitleaks; } ;;
+            tflint)        have tflint || { TFLINT_INSTALL_PATH="$bin" bash <(fetch https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh) >/dev/null; } ;;
+            buf)           have buf || { fetch "https://github.com/bufbuild/buf/releases/latest/download/buf-$(uname -s)-$(uname -m)" > "$bin/buf" && chmod +x "$bin/buf"; } ;;
+            checkmake)     have checkmake || GOBIN="$bin" go install github.com/checkmake/checkmake/cmd/checkmake@latest ;;
+            dotenv-linter) have dotenv-linter || { fetch https://dotenv-linter.github.io/install.sh | sh -s -- -b "$bin" >/dev/null; } ;;
+            rubocop)       gem_tool rubocop rubocop ;;
+            brakeman)      gem_tool brakeman brakeman ;;
+            biome)         npm_tool biome @biomejs/biome ;;
+            oxlint)        npm_tool oxlint oxlint ;;
+            htmlhint)      npm_tool htmlhint htmlhint ;;
+            markdownlint)  npm_tool markdownlint markdownlint-cli ;;
+            "")            ;;
+            *) echo "::warning::open-nitpick: no installer for analyzer '$tool'; install it on the runner yourself" ;;
+          esac
+        done
+        for tool in "${tools[@]}"; do
+          [ -n "$tool" ] && { have "$tool" && echo "$tool: $(command -v "$tool")" || echo "::warning::open-nitpick: $tool did not install"; }
+        done
 
     - name: Review
       id: review

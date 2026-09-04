@@ -473,12 +473,16 @@ func score(repo string) error {
 			if n := d.Noise(); n > 0 {
 				cell += fmt.Sprintf(" +%dn", n)
 			}
+			if d.NearMisses > 0 {
+				cell += fmt.Sprintf(" ~%d", d.NearMisses)
+			}
 			fmt.Printf("  %-20s", cell)
 			for _, t := range []*tally{totals[r], langTally(byLang[r], lang)} {
 				t.reviews++
 				t.plants += len(f.Defects)
 				t.located += d.Matched
 				t.noise += d.Noise()
+				t.near += d.NearMisses
 				t.comments += len(findings[r])
 			}
 		}
@@ -487,7 +491,7 @@ func score(repo string) error {
 
 	fmt.Printf("\n%-12s", "language")
 	for _, r := range reviewers {
-		fmt.Printf("  %-28s", r)
+		fmt.Printf("  %-32s", r)
 	}
 	fmt.Println()
 	langs := map[string]bool{}
@@ -508,15 +512,15 @@ func score(repo string) error {
 			if l != "all" {
 				t = langTally(byLang[r], l)
 			}
-			fmt.Printf("  %-28s", fmt.Sprintf("R %d/%d N %d/%d C %d", t.located, t.plants, t.noise, t.reviews, t.comments))
+			fmt.Printf("  %-32s", fmt.Sprintf("R %d/%d N %d/%d ~%d C %d", t.located, t.plants, t.noise, t.reviews, t.near, t.comments))
 		}
 		fmt.Println()
 	}
-	fmt.Println("\nR = located/plants, N = noise findings/pull requests, C = inline comments scored.")
+	fmt.Println("\nR = located/plants, N = noise findings/pull requests, ~ = near misses (a plant's keywords in its file, beyond the anchor tolerance; counted in N), C = inline comments scored.")
 	return nil
 }
 
-type tally struct{ reviews, plants, located, noise, comments int }
+type tally struct{ reviews, plants, located, noise, near, comments int }
 
 func langTally(m map[string]*tally, lang string) *tally {
 	if m[lang] == nil {
