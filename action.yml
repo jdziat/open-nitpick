@@ -273,9 +273,12 @@ runs:
         have() { command -v "$1" >/dev/null 2>&1; }
         fetch() { curl -fsSL --retry 3 "$1"; }
         pip_tool() { have "$1" || pipx install "$2" >/dev/null || python3 -m pip install --user -q "$2"; }
-        gem_tool() { have "$1" || gem install --no-document -q "$2" >/dev/null; }
-        npm_tool() { have "$1" || npm install -g --silent "$2" >/dev/null; }
+        gem_tool() { have "$1" || gem install --no-document -q "$2" >/dev/null || sudo gem install --no-document -q "$2" >/dev/null; }
+        npm_tool() { have "$1" || npm install -g --silent "$2" >/dev/null || sudo npm install -g --silent "$2" >/dev/null; }
         IFS=',' read -r -a tools <<< "$WANT"
+        # An analyzer that fails to install is a warning and a roster line,
+        # never a failed review: the review runs with whatever installed.
+        set +e
         for tool in "${tools[@]}"; do
           case "$tool" in
             golangci-lint) have golangci-lint || GOBIN="$bin" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest ;;
@@ -306,8 +309,11 @@ runs:
           esac
         done
         for tool in "${tools[@]}"; do
-          [ -n "$tool" ] && { have "$tool" && echo "$tool: $(command -v "$tool")" || echo "::warning::open-nitpick: $tool did not install"; }
+          [ -z "$tool" ] && continue
+          bin_name="$tool"; [ "$tool" = psscriptanalyzer ] && bin_name=pwsh
+          if have "$bin_name"; then echo "$tool: $(command -v "$bin_name")"; else echo "::warning::open-nitpick: $tool did not install"; fi
         done
+        exit 0
 
     - name: Review
       id: review

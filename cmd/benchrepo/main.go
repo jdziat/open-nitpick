@@ -409,6 +409,7 @@ func score(repo string) error {
 		Line      int    `json:"line"`
 		StartLine int    `json:"start_line"`
 		Body      string `json:"body"`
+		ReviewID  int64  `json:"pull_request_review_id"`
 		User      struct {
 			Login string `json:"login"`
 		} `json:"user"`
@@ -454,11 +455,22 @@ func score(repo string) error {
 			comments = append(comments, page...)
 		}
 
+		// Only each reviewer's LATEST review counts. A pull request that has
+		// been re-reviewed carries every earlier review's comments too, and
+		// scoring them all would credit a reviewer for its own history and
+		// charge it noise for findings it no longer makes.
+		latest := map[string]int64{}
+		for _, c := range comments {
+			if r := reviewerOf(c.User.Login, c.Body); r != "" && c.ReviewID > latest[r] {
+				latest[r] = c.ReviewID
+			}
+		}
+
 		prefix := fixtureRoot + "/" + f.Name + "/"
 		findings := map[string][]review.Finding{}
 		for _, c := range comments {
 			r := reviewerOf(c.User.Login, c.Body)
-			if r == "" {
+			if r == "" || c.ReviewID != latest[r] {
 				continue
 			}
 			title, rationale, _ := strings.Cut(strings.TrimSpace(c.Body), "\n")
