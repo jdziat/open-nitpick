@@ -245,3 +245,49 @@ than GitHub — and it does not add a judge to the benchmark scorer. It also
 does not promise that the four `info` plants will be found: workstream 6 is
 written so that "nobody can find these" is an acceptable answer, recorded,
 rather than a number left on the page.
+
+## Status, 2026-09-03 evening
+
+Every workstream is implemented. What each did when measured, on the
+corpora named in its gate, sonnet-4.6 with related context unless said
+otherwise; one run per table, Rule 15 throughout.
+
+| step | done | measured |
+|---|---|---|
+| 0 benchmark layout | yes — `services/`, engineer-written titles, opaque branches, answer key on our side | re-run: ours 33/41 again; Incumbent's app throttled at 8 of 44 reviews after the earlier batch, so its column waits |
+| 1 triage keeps small findings | yes, on the second attempt (below) | tuning 0.88 → 0.88; multi-file 1.00 → 1.00 |
+| 2 noticed consequences become findings | yes | info corpus 0.20 → 0.55–0.65 (4 → 11–13 of 20) |
+| 3 Action installs analyzers | yes — `analyzers: auto` | not yet exercised on the benchmark repository |
+| 4 committable multi-line fixes | yes, validated against the diff | judged pass not run |
+| 5 near-miss column | yes | in every table above as NEAR |
+| 6 info corpus | yes — ten plants, two controls | see 2 |
+
+**Workstream 1 took two attempts, and the first was a regression.** The
+first version let triage list a dropped finding with a reason. Triage then
+dropped a correct milliseconds-versus-seconds finding as "the rationale
+contradicts itself" and a correct redundant copy as naming "no concrete cost
+beyond a future reader" — which is the cost. sonnet's multi-file recall fell
+from 1.00 to 0.88 and tuning from 0.88 to 0.75 in one run. A reason channel
+is a rationalisation channel. The second version lets triage merge duplicates
+(naming the survivor) and re-rate, and never drop; everything else it leaves
+out is restored. Recall returned to 1.00 and 0.88.
+
+**What that costs.** Findings triage used to remove as speculative are now
+published as `nit` when the prompt is obeyed and as `warning` when it is not.
+On the multi-file corpus sonnet's noise per review went from 0.14 to 0.29
+at the shipped `min_severity: info` (0.36 counting nits); on the tuning
+corpus it did not move. Five of the ten extra findings are guesses about
+unshown code the third prompt revision rates `nit`; the rest are secondary
+observations on the fixtures. The plan's gate — noise inside the corpus
+resolution — is not met on multi-file, and that is recorded rather than
+tuned away.
+
+**The info band was the reviewer, not the plants.** glm-5.3-flash located
+14 of 20 on the info corpus before and after; sonnet went from 4 to 11–13.
+sonnet's triage had been deleting what its reviewer found. Incumbent's CLI
+locates 4 of 10 with no noise. The four original `info` plants stay in their
+tables: two runs of sonnet on the tuning corpus since the change locate
+`go-package-singleton` in one run and not the other.
+
+**Not re-spent:** the held-out corpus. **Not run:** the judged pass for
+workstream 4, and the benchmark re-run under the new code, which is next.
