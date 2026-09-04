@@ -1001,6 +1001,8 @@ produced is part of the product.
   because the harness produced a confident wrong number and something believed it.
 - [docs/comparison.md](docs/comparison.md) — capabilities and measured results
   against Incumbent, by language, with what each iteration changed.
+- [docs/remediation.md](docs/remediation.md) — every miss on the benchmark
+  repository, its cause read from the pull request, and the plan.
 - [docs/findings.md](docs/findings.md) — what has actually been measured, what it
   supports, and the nine instrument bugs found so far. Four of them flattered one
   side of a comparison; one produced a published claim that had to be retracted.
