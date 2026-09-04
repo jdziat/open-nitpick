@@ -59,6 +59,22 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 				return value, nil
 			}
 		}
+		// OpenRouter reserves the whole output cap against the key's balance
+		// before the call, so with no max_tokens set a model whose cap is
+		// 64k needs a dollar of headroom per request, and a key near its
+		// daily limit answers 402 with "fewer max_tokens". That is the
+		// remaining balance talking, not the model: retry once with a cap
+		// that fits, and say so, rather than lose the review.
+		if creditCapped(err) && !hasMaxTokens(call) {
+			capped := append(append([]llms.CallOption(nil), call...), llms.WithMaxTokens(creditCappedMaxTokens))
+			value, raw, err = llms.GenerateTyped[T](ctx, c.LLM, msgs, capped...)
+			if err == nil {
+				if err = requireSchemaEnforced(raw, value); err == nil {
+					return value, nil
+				}
+			}
+			call = capped
+		}
 		// A cancelled context is not a capability problem; retrying under a
 		// different strategy would only produce a second, more confusing error.
 		if ctx.Err() != nil {
@@ -94,6 +110,31 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 		}
 		return result, nil
 	}
+}
+
+// creditCappedMaxTokens is the output cap retried with when the provider
+// refuses to reserve the model's full cap against the key's balance. Large
+// enough for any review this tool asks for; small enough to fit a key with a
+// few dollars left.
+const creditCappedMaxTokens = 16384
+
+// creditCapped reports whether an error is OpenRouter's 402 asking for a
+// smaller max_tokens.
+func creditCapped(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "402") && strings.Contains(msg, "max_tokens")
+}
+
+// hasMaxTokens reports whether the call already names an output cap.
+func hasMaxTokens(opts []llms.CallOption) bool {
+	var co llms.CallOptions
+	for _, o := range opts {
+		o(&co)
+	}
+	return co.MaxTokens != nil
 }
 
 // errSchemaNotEnforced marks a response that came back through the
