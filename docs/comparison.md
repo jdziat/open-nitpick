@@ -241,3 +241,21 @@ the incumbent's run predates the four fixtures it never reviewed at all.
 | noise, everything published at `nit` | 17 over 44 | 5 over 44 |
 | clean fixtures commented on | 0 of 5 | 0 of 5 |
 | `info` plants located | 0 of 4 | 0 of 4 |
+
+### Price per review
+
+Incumbent's on-demand pricing is $0.25 per file reviewed. The corpora here
+change 1.0 to 1.44 files per pull request, so its price on them is $0.25 to
+$0.36 per review; a real pull request touching ten files is $2.50. Ours is
+the model provider's bill, from the provider-reported usage in the tables
+above.
+
+| reviewer | $ per review on these corpora | ratio |
+|---|---|---|
+| Incumbent, on demand | $0.25 – $0.36 | 1× |
+| open-nitpick, sonnet-4.6 with related context | $0.019 – $0.022 | 12 – 19× cheaper |
+| open-nitpick, glm-5.3-flash with related context | $0.0011 – $0.0018 | 140 – 330× cheaper |
+
+The seat-priced plan is a different arithmetic and depends on how many pull
+requests a seat reviews a month; at $24 a seat and one review a day it is
+roughly $1 a review, at ten a day roughly $0.10.
