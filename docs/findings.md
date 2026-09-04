@@ -870,3 +870,18 @@ Read the run dumps first; most of the noise was ours.
 - **Synthetic hosts both models at OpenRouter quality or better**, with no
   per-review price and a two-to-three-minute review. Under six parallel
   runs it dropped most of GLM's reviews; sequentially it dropped none.
+
+## Gemma 4, and the stall retry (2026-09-04)
+
+- **gemma-4-31b-it** matches qwen3.8-27b on multi-file recall with the
+  lowest noise of any cheap model, at a third of glm-5.3-flash's price, and
+  loses one review in eight to upstream stalls behind OpenRouter. The
+  stalls are not the model: every lost fixture passes alone.
+- **A stall is now retried once** (`internal/llm/structured.go`,
+  `generateTyped`): the HTTP client's own timeout firing mid-body, with the
+  caller's context still live. This is the first retry in the client that
+  is not a 402, and it is bounded to one attempt because two stalls in a
+  row are the provider's answer. It halved Gemma's losses and changes
+  nothing for a model that does not stall.
+- **gemma-4-26b-a4b-it** is not a contender: half the 31b's recall at the
+  same price.

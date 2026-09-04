@@ -426,3 +426,31 @@ OpenRouter's cheapest endpoint at $0.075/$0.25) and about the same price for
 Qwen. A review took two to three minutes on Synthetic against under a minute
 on OpenRouter, and the endpoint drops reviews under parallel load, which is
 the trade.
+
+### Two Gemma 4 variants (2026-09-04)
+
+Run after the tuning pass, so against the current prompt; related context
+on; two runs per corpus for the 31b after its first run lost reviews, one run
+for the 26b.
+
+| model | tuning R / N | multi-file R / N | info R / N | $/review | lost |
+|---|---|---|---|---|---|
+| google/gemma-4-31b-it | 0.70 / 0.22 | 0.89 / 0.05 | 0.50 / 0.32 | $0.0003 – $0.0011 | 21 of 168 |
+| google/gemma-4-26b-a4b-it | 0.47 / 0.07 | 0.67 / 0.07 | 0.30 / 0.08 | $0.0004 – $0.0006 | 1 of 42 |
+
+The 31b is the cheapest model in these tables to reach qwen3.8-27b's
+multi-file recall, and its multi-file noise (0.05) is the lowest of any
+model under $0.01. It also does not finish. Its first run lost 9 of 42
+reviews, every one to the HTTP client's ten-minute timeout firing while the
+body was still being read, on one-file fixtures that passed when run alone.
+That is an upstream stalling behind the router, so `internal/llm` now
+retries a request once when that specific error fires and the caller's own
+context is still live. With the retry the loss rate halved (21 of 168) and
+did not go to zero: the second attempt stalls too, often enough to matter.
+Every lost fixture passed when probed on its own afterwards, twice. Until
+OpenRouter's Gemma endpoints stop doing this, the 31b is a model to watch,
+not to ship; a deployment that wants it should pin a provider through
+OpenRouter's routing preferences and measure the loss rate there.
+
+The 26b MoE finishes and is not good enough: half the 31b's recall on every
+corpus at the same price.
