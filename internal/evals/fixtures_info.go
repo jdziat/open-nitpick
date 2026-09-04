@@ -1171,6 +1171,7 @@ func Enabled(name string) bool { return Default.Enabled(name) }
 				"global state", "global variable",
 				"global mutable", "process-wide", "process wide", "one per process",
 				"singleton", "hidden dependency", "implicit dependency",
+				"exported mutable", "replace the shared",
 				"hard to test", "harder to test", "cannot be overridden",
 				"override it", "swap it out", "as a parameter", "as an argument",
 				"pass the set", "passing the set", "explicit dependency",

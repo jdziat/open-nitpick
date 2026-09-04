@@ -111,7 +111,7 @@ func (p *Pages) Show(w http.ResponseWriter, r *http.Request) {
 	if page == "" {
 		rendered, err := p.Render(slug)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 		p.Cache.Put(slug, rendered)
