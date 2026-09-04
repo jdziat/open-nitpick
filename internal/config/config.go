@@ -182,6 +182,11 @@ type Review struct {
 	// the model can read what a called function does instead of guessing.
 	RelatedContext bool `yaml:"related_context"`
 
+	// ModelNotes adds the prompt layer addressed to the reviewing model's
+	// family (prompt.ModelGuidance). On unless set to false; the switch
+	// exists so the layer's contribution can be measured on its own.
+	ModelNotes *bool `yaml:"model_notes"`
+
 	// RelatedContextTokens bounds how much related context is attached per
 	// batch. It is spent from the request budget, so a large value narrows
 	// the window each changed file itself gets.
@@ -452,6 +457,9 @@ func (c *Config) merge(data []byte) error {
 
 // ResolveModel returns the effective spec for a role, falling back to the
 // default model for any field the role does not set.
+// ModelNotesOn reports whether the model-family prompt layer is in force.
+func (r Review) ModelNotesOn() bool { return r.ModelNotes == nil || *r.ModelNotes }
+
 func (m Models) ResolveModel(role Role) ModelSpec {
 	var override *ModelSpec
 	switch role {

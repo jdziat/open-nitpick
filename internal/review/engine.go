@@ -1583,9 +1583,13 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 // untrusted data, not in the system prompt where the repository's own
 // instructions live.
 func (e *Engine) reviewPrompt() (string, error) {
+	var modelText string
+	if e.Config.Review.ModelNotesOn() {
+		modelText = prompt.ModelGuidance(e.Config.Models.ResolveModel(config.RoleReview).Model)
+	}
 	p, err := prompt.Build(prompt.NameReview, prompt.Options{
 		PersonaText: prompt.Persona(e.Config.Persona),
-		ModelText:   prompt.ModelGuidance(e.Config.Models.ResolveModel(config.RoleReview).Model),
+		ModelText:   modelText,
 		Run:         e.Instruction,
 	})
 	if err != nil {

@@ -36,6 +36,10 @@ const (
 	// EnvFixtures limits the run to named fixtures.
 	EnvFixtures = "NITPICK_EVAL_FIXTURES"
 
+	// EnvModelNotes set to "off" removes the model-family prompt layer, so a
+	// run can measure the layer against its absence.
+	EnvModelNotes = "NITPICK_EVAL_MODEL_NOTES"
+
 	// EnvCapture names a directory to write every raw model response into.
 	// Those responses become offline regression fixtures.
 	EnvCapture = "NITPICK_EVAL_CAPTURE"
@@ -726,6 +730,14 @@ func evalConfig(model Model) *config.Config {
 	// Linters are deterministic and separately tested; excluding them keeps the
 	// score a measurement of the prompt.
 	cfg.Linters.Mode = config.LinterOff
+
+	// On unless the run asks, matching the shipped default; the switch is
+	// how the layer's own contribution gets measured.
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvModelNotes))) {
+	case "0", "false", "off":
+		off := false
+		cfg.Review.ModelNotes = &off
+	}
 
 	// Off unless the run asks, matching the shipped default; the harness is
 	// how the default gets decided. See docs/findings.md.
