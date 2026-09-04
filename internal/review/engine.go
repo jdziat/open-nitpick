@@ -1585,6 +1585,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 func (e *Engine) reviewPrompt() (string, error) {
 	p, err := prompt.Build(prompt.NameReview, prompt.Options{
 		PersonaText: prompt.Persona(e.Config.Persona),
+		ModelText:   prompt.ModelGuidance(e.Config.Models.ResolveModel(config.RoleReview).Model),
 		Run:         e.Instruction,
 	})
 	if err != nil {

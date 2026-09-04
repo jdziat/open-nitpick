@@ -23,6 +23,14 @@ as one depends on the level you are claiming:
 If you cannot describe the consequence at the level you are claiming, lower
 the level until you can; if you cannot at any level, it is not a finding.
 
+A consequence has to be reachable with what you were shown: the inputs the
+declared types admit, the callers that exist, the code as it is. If it needs a
+caller that was not shown, a value the type excludes, or a change nobody has
+made, it is not a finding at any level. When the rationale you are about to
+write says the harm is latent, hypothetical, or depends on code you have not
+seen, that sentence is the reason to leave the finding out, not a reason to
+file it at `nit`.
+
 Reporting nothing is a valid and common outcome. An empty findings list is
 better than a padded one: every false positive costs a reviewer more time than
 it saves, and a reviewer who cries wolf gets muted.
@@ -36,6 +44,11 @@ it saves, and a reviewer who cries wolf gets muted.
 
 Judge the change, not the file. Pre-existing problems on lines this change did
 not touch are somebody else's pull request.
+
+A helper this change did not touch is judged by its documented contract, not
+re-reviewed through its callers. A call that uses it as documented is not a
+finding about the call, however the helper is built; a call that breaks the
+contract is.
 
 ## Anchoring
 

@@ -125,6 +125,43 @@ type Model struct {
 	// Kind records why the model is in the matrix, so a report says what a
 	// failure actually implies.
 	Kind string
+
+	// Provider is the shipped provider the model is reached through, empty
+	// for OpenRouter. It is the prefix before the first ":" in an EnvModels
+	// entry, so "synthetic:hf:Qwen/Qwen3.8-27B" runs Qwen through Synthetic
+	// and reports under that full id, which is what keeps two hosts of the
+	// same weights as two rows.
+	Provider string
+
+	// Name is the model id sent to the provider: ID with the provider prefix
+	// removed. Empty means ID.
+	Name string
+}
+
+// ParseModel reads an EnvModels entry into a Model.
+func ParseModel(id string) Model {
+	id = strings.TrimSpace(id)
+	m := Model{ID: id, Kind: "custom"}
+	if provider, rest, ok := strings.Cut(id, ":"); ok && provider == llm.ProviderSynthetic {
+		m.Provider, m.Name = provider, rest
+	}
+	return m
+}
+
+// modelName is the id the provider sees.
+func (m Model) modelName() string {
+	if m.Name != "" {
+		return m.Name
+	}
+	return m.ID
+}
+
+// provider is the shipped provider the run goes through.
+func (m Model) provider() string {
+	if m.Provider != "" {
+		return m.Provider
+	}
+	return llm.ProviderOpenRouter
 }
 
 // Options configure a run.
@@ -230,7 +267,7 @@ func OptionsFromEnv() (Options, error) {
 		var models []Model
 		for id := range strings.SplitSeq(raw, ",") {
 			if id = strings.TrimSpace(id); id != "" {
-				models = append(models, Model{ID: id, Kind: "custom"})
+				models = append(models, ParseModel(id))
 			}
 		}
 		if len(models) > 0 {
@@ -670,8 +707,8 @@ func evalConfig(model Model) *config.Config {
 		// for anyone who only exported LLM_API_KEY, while `nitpick review`
 		// succeeded for them — a difference between the harness and the thing
 		// it measures.
-		Provider: llm.ProviderOpenRouter,
-		Model:    model.ID,
+		Provider: model.provider(),
+		Model:    model.modelName(),
 
 		// Reviews should be reproducible; run-to-run variance is measured
 		// separately and deliberately, not left to the provider default.

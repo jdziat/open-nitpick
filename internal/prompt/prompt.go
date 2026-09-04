@@ -96,6 +96,11 @@ type Options struct {
 	// repository can still override it.
 	PersonaText string
 
+	// ModelText is guidance addressed to the model family doing the review,
+	// from ModelGuidance. It follows the persona and precedes the repository's
+	// instructions for the same reason the persona does.
+	ModelText string
+
 	// Data is exposed to the template as `.`.
 	Data any
 }
@@ -121,6 +126,10 @@ func Build(name string, opts Options) (Prompt, error) {
 
 	if strings.TrimSpace(opts.PersonaText) != "" {
 		p.Layers = append(p.Layers, Layer{Name: LayerPersona, Text: opts.PersonaText})
+	}
+
+	if strings.TrimSpace(opts.ModelText) != "" {
+		p.Layers = append(p.Layers, Layer{Name: LayerModel, Text: opts.ModelText})
 	}
 
 	if strings.TrimSpace(opts.Repository) != "" {
