@@ -51,16 +51,11 @@ func FamilyOf(model string) Family {
 // told "you tend to X" tends to X.
 func ModelGuidance(model string) string {
 	switch FamilyOf(model) {
-	case FamilyGLM:
-		return "## Notes for this reviewer\n\n" +
-			"- Before filing a finding at `info` or `nit`, reread its rationale. If it says the " +
-			"harm needs a caller not shown, a future change, or an input the types do not admit, " +
-			"the finding is not filed. That sentence in a rationale is a decision, not a caveat.\n" +
-			"- On a change touching several files, every finding is about a line this change " +
-			"added or altered. Behaviour the change left alone is not reported, at any level.\n" +
-			"- One consequence, one finding. A second finding that restates the first consequence " +
-			"from another line or another angle is a duplicate.\n"
-	case FamilyQwen, FamilyDeepSeek:
+	case FamilyQwen:
+		// Measured on the tuning, multi-file and info corpora with related
+		// context on, two runs each, against the same prompt without this
+		// layer: recall 0.72 → 0.81, 0.92 → 0.96 and 0.60 → 0.65, noise equal
+		// or lower on every corpus. See docs/comparison.md.
 		return "## Notes for this reviewer\n\n" +
 			"- Read every hunk of the diff and decide about each before reading the definitions " +
 			"section that may follow it. Those definitions resolve names the diff uses; they do not " +
@@ -68,6 +63,14 @@ func ModelGuidance(model string) string {
 			"the definitions are long.\n" +
 			"- A small change with one hunk gets the same reading as a large one. The first file in " +
 			"the batch is not the only file in the batch.\n"
+	case FamilyGLM, FamilyDeepSeek:
+		// GLM had a note here and it was measured against its absence on the
+		// same three corpora: no recall change, and noise moved both ways
+		// (0.12 → 0.00 on info, 0.19 → 0.30 on multi-file). A layer that
+		// cannot show its contribution does not ship. DeepSeek's habit looks
+		// like Qwen's in the sweep, but its note was never measured, and an
+		// unmeasured note is the same thing.
+		return ""
 	}
 	return ""
 }

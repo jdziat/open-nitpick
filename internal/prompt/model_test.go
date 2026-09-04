@@ -32,7 +32,11 @@ func TestModelGuidanceIsALayerOnlyForFamiliesThatHaveOne(t *testing.T) {
 		t.Fatal("a family without guidance gets no layer")
 	}
 
-	p, err := Build(NameReview, Options{ModelText: ModelGuidance("z-ai/glm-5.3-flash")})
+	if ModelGuidance("z-ai/glm-5.3-flash") != "" || ModelGuidance("deepseek/deepseek-v4-pro-0813") != "" {
+		t.Fatal("GLM and DeepSeek notes were measured out or never measured; see ModelGuidance")
+	}
+
+	p, err := Build(NameReview, Options{ModelText: ModelGuidance("qwen/qwen3.8-27b")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +53,7 @@ func TestModelGuidanceIsALayerOnlyForFamiliesThatHaveOne(t *testing.T) {
 
 	// The guidance never restates the bar: it may say what not to file, never
 	// what to look for.
-	for _, model := range []string{"z-ai/glm-5.3-flash", "qwen/qwen3.8-27b"} {
+	for _, model := range []string{"qwen/qwen3.8-27b", "hf:Qwen/Qwen3.8-27B"} {
 		g := strings.ToLower(ModelGuidance(model))
 		for _, banned := range []string{"look for", "check for", "report any", "watch for"} {
 			if strings.Contains(g, banned) {

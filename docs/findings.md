@@ -849,3 +849,24 @@ earlier findings:
   and qwen3.8-flash each dropped reviews on empty or malformed responses
   after the timeout and max_tokens fixes; glm-5.3-flash, luna, terra,
   sonnet, grok and qwen3.8-27b dropped none.
+
+## Tuning for two cheap models (2026-09-04)
+
+Read the run dumps first; most of the noise was ours.
+
+- **Two unplanted defects shipped in the corpus** and were scored as noise
+  against every model that found them (a 0600 → 0666 file mode, an error
+  string written to an HTTP response). Fixed at the fixture. This is the
+  tenth instrument bug, and the first found by three models agreeing.
+- **Two base-prompt rules cut noise for every model measured**, the default
+  included: a consequence must be reachable with what was shown, and an
+  untouched helper is judged by its contract. Multi-file noise: glm 0.64 →
+  0.19, sonnet 0.43 → 0.18, recall flat.
+- **A model-family layer was added and ablated.** The Qwen note raised
+  recall on all three corpora with no noise cost and ships. The GLM note
+  showed nothing and was removed. A DeepSeek note was never measured and
+  was removed for that. The switch (`review.model_notes`) stays, because the
+  next note needs the same test.
+- **Synthetic hosts both models at OpenRouter quality or better**, with no
+  per-review price and a two-to-three-minute review. Under six parallel
+  runs it dropped most of GLM's reviews; sequentially it dropped none.

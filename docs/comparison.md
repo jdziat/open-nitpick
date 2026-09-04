@@ -331,3 +331,88 @@ The shipped default stays sonnet-4.6 until a model beats it on the held-out
 corpus under Rule 14, which none of these has been asked to do; this sweep
 is on the tuning and multi-file corpora, both of which the prompt was tuned
 against. The candidates worth that spend are qwen3.8-27b and gpt-5.6-luna.
+
+### Tuning for glm-5.3-flash and qwen3.8-27b (2026-09-04)
+
+The sweep above made two cheap models the candidates. This pass read their
+noise off the run dumps before touching anything, and most of what it found
+was not the models.
+
+**The corpus shipped two defects it did not plant.** Three unrelated models
+flagged the same two lines: `info-go-close-error-on-write` rewrote a file
+that had been created with mode 0600 through `os.Create`, which is 0666, and
+`go-cache-get-unchecked` wrote the render error's text into the HTTP
+response. Both were real, both were unplanted, and both were scored as
+noise against every model that saw them. The fixtures now keep the mode and
+return a generic 500. Two more phrasings the scorer would not credit were
+added as keywords: "keyed on a user-controlled search query" for the memo
+table, "exported mutable" for the package singleton. The keyword sweep
+against the shipped prompt rejected a third ("every other caller"), which
+the prompt itself says.
+
+**Two rules went into the base prompt**, for every model:
+
+- A consequence has to be reachable with what was shown: the inputs the
+  types admit, the callers that exist. A rationale that says the harm is
+  latent or needs a caller not shown is the reason to drop the finding, not
+  to file it at `nit`. (GLM's `nit`-level "contract" findings said exactly
+  that in their own rationales and were filed anyway.)
+- A helper the change did not touch is judged by its documented contract.
+  Using it as documented is not a finding about the call; breaking the
+  contract is. (Three models re-reviewed an unchanged retry helper through
+  the clean fixture that calls it; the plant that misuses the same helper is
+  a contract violation and is still found.)
+
+**A prompt layer keyed on the model family** was added, with a switch
+(`review.model_notes`) so it could be measured against its absence. The
+before column is the sweep's run rescored on the corrected keywords; the
+after column is two runs each with related context on. Recall is over the
+36 plants both share, noise is findings that are not a plant, per review.
+
+| model | before recall / noise | after, notes off | after, notes on |
+|---|---|---|---|
+| glm-5.3-flash | 0.83 / 0.35 | — / — | 0.80 / 0.18 |
+| qwen3.8-27b | 0.83 / 0.10 | — / — | 0.83 / 0.04 |
+| sonnet-4.6 (guard) | 0.83 / 0.25 | — / — | 0.83 / 0.18 |
+
+Per corpus, related context on, two runs each:
+
+| corpus | glm before → base rules only → with GLM note | qwen before → base rules only → with Qwen note | sonnet before → after |
+|---|---|---|---|
+| tuning | 0.81/0.31 → 0.78/0.25 → 0.77/0.23 | 0.69/0.19 → 0.72/0.00 → 0.81/0.03 | 0.81/0.25 → 0.88/0.16 |
+| multi-file | 0.92/0.64 → 0.96/0.19 → 1.00/0.30 | 1.00/0.07 → 0.92/0.07 → 0.96/0.07 | 1.00/0.43 → 1.00/0.18 |
+| info | 0.70/0.33 → 0.65/0.12 → 0.65/0.00 | 0.80/0.17 → 0.60/0.12 → 0.65/0.00 | 0.50/0.33 → 0.55/0.21 |
+
+What that says:
+
+- **The base rules did the denoising.** With no family note at all, GLM's
+  multi-file noise fell from 0.64 to 0.19 and sonnet's from 0.43 to 0.18,
+  with recall flat. The default model got quieter too, which is the guard
+  the pass was run with.
+- **The Qwen note earns its place.** Recall rose on all three corpora
+  (0.72 → 0.81, 0.92 → 0.96, 0.60 → 0.65) and noise did not rise on any.
+  It ships.
+- **The GLM note does not.** Recall did not move and noise went both ways
+  (0.12 → 0.00 on info, 0.19 → 0.30 on multi-file). It was removed, and
+  GLM runs on the base prompt alone. A DeepSeek note was drafted with the
+  Qwen wording and never measured; it was removed for that reason.
+- **Qwen's info recall is the one number that fell** against the sweep
+  (0.80 → 0.65). The sweep's figure was one run; the ablation's two runs
+  without the note read 0.60. The likelier reading is that 0.80 was the
+  high draw, not that the change cost it.
+
+**Synthetic as a second host.** The same two models ran through
+[Synthetic](https://synthetic.new)'s subscription endpoint under a new
+`synthetic` provider. Six parallel runs lost most of GLM's reviews there;
+the same fixtures passed alone, so the losses are rate limiting under load,
+not the model. Run one corpus at a time, one run each, related context on:
+
+| model on Synthetic | tuning R / N | multi-file R / N | info R / N | lost |
+|---|---|---|---|---|
+| hf:zai-org/GLM-5.3-Flash | 0.88 / 0.12 | 0.92 / 0.14 | 0.70 / 0.00 | 0 |
+| hf:Qwen/Qwen3.8-27B | 0.81 / 0.06 | 0.91 / 0.25 | 0.67 / 0.00 | 3 of 42 |
+
+Those are the OpenRouter numbers or better. Cost per review is unknown by
+construction: a subscription has no per-token price to multiply, so the
+column reads n/a. A review took two to three minutes on Synthetic against
+under a minute on OpenRouter, which is the trade.

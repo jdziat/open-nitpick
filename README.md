@@ -574,18 +574,19 @@ produces.
 
 The review prompt carries one more layer, chosen by the reviewing model's
 name: a short list of habits to avoid, written for a model family whose eval
-reviews showed the habit. Today two families have one. GLM models are told
-that a rationale saying the harm "requires a caller not shown" or is "latent"
-is the reason to drop the finding, not to file it at `nit`, and to report
-nothing about behaviour a multi-file change did not alter. Qwen and DeepSeek
-models are told to decide about every hunk of the diff before reading the
-related-context definitions, which is where their single-file recall went
-when related context was on. Every other family gets no layer.
+reviews showed the habit and kept only when measured against its absence.
+Today one family has one. Qwen models are told to decide about every hunk of
+the diff before reading the related-context definitions, which is where their
+single-file recall went when related context was on; with the note, recall
+rose on all three corpora and noise did not. A GLM note was tried and measured
+out (no recall change, noise moved both ways), so GLM gets none, and so does
+every other family.
 
 The text lives in `internal/prompt/model.go`, never widens what a model is
 asked to look for, and shows up in `nitpick explain-config` as the `model`
-layer so it can be read without spending tokens. The measurements that
-motivated each note are in [docs/comparison.md](docs/comparison.md).
+layer so it can be read without spending tokens. `review.model_notes: false`
+removes it. The measurements are in
+[docs/comparison.md](docs/comparison.md#tuning-for-glm-53-flash-and-qwen38-27b-2026-09-04).
 
 ### Severities
 
