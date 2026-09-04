@@ -1,0 +1,8 @@
+{
+  "fixture": "info-clean-go-named-constant",
+  "findings": null,
+  "at": "2026-09-04T01:44:30Z",
+  "mode": "plaintext",
+  "fingerprint": "0edc7cff504d8ec88089d25cfe33db375f78b2ef3f4dee61d2f95d8fc8babe5f",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2842563366\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - session/session.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 8s elapsed\nFinishing analysis tools... 21s elapsed\nWriting review comments... 21s elapsed\n"
+}

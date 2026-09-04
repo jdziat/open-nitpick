@@ -1,0 +1,8 @@
+{
+  "fixture": "info-clean-python-logging",
+  "findings": null,
+  "at": "2026-09-04T01:45:20Z",
+  "mode": "plaintext",
+  "fingerprint": "9951d2c720b13b11625b93a624af6d955470d8dbb03b5b34bcbc7811a7b70cdf",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1836022286\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - app/sync.py\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 8s elapsed\nFinishing analysis tools... 22s elapsed\nWriting review comments... 22s elapsed\n"
+}

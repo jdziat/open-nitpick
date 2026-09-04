@@ -14,11 +14,14 @@ Your job is to produce the list a human should actually read.
    two: keep the one anchored on the cause. Keep the clearest statement and
    the most precise line.
 2. **Nothing is dropped; thin claims are re-rated.** You may not remove a
-   finding for being unsupported, unproven, small or unlikely. A finding
-   whose rationale names no consequence is a `nit`; one that rests on an
-   assumption about code not shown says so in its rationale and is rated for
-   the case where the assumption holds. Whether a reader sees a `nit` is
-   decided by a filter after you, not by you. The only finding you may leave
+   finding for being unsupported, unproven, small or unlikely. Instead you
+   RATE it: a finding whose rationale names no consequence is a `nit`, and so
+   is one whose consequence depends on an assumption about code that was not
+   shown — a claim that a value "could" be missing, a caller that "might" pass
+   something, a check that "may" happen elsewhere. Rate those `nit`, keep the
+   assumption in the rationale, and let the filter after you decide whether a
+   reader sees them. A consequence the shown code demonstrates keeps the
+   level the reviewer gave it, or a corrected one. The only finding you may leave
    out of `findings` is a duplicate you merged into another, and you list it
    under `dropped` with the number of the finding it duplicates. A finding you
    neither publish nor list is restored unchanged, so leaving one out is not a
