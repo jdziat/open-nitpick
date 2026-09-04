@@ -325,8 +325,7 @@ nine would be published under the shipped `min_severity: info`. The other
 three are the reviewer's: two `warning`s about unshown code that the third
 prompt revision rates `nit`, and one on the Ruby mailer fixture.
 
-**The incumbent's column is incomplete.** Incumbent's app was throttled
-after reviewing the first 44 the day before, and reviewed 22 of the 44
-re-opened ones by the time of scoring: 15 of 41 located, 6 noise, on the
-subset it reached. It is not a comparison until it catches up, and this
-document does not make one.
+**The incumbent's number is its first full run.** Incumbent's app reviewed
+all 44 once before its plan throttled it and reached about half of the
+re-opened ones. Its first run — 30 of 41, 5 noise — is the comparison
+figure; see comparison.md.

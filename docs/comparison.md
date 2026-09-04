@@ -223,5 +223,21 @@ reviewer it is reading a fixture, the shipped Action moved from 33 to 36 of
 the `info` plants, on which the new info corpus puts the default reviewer at
 11–13 of 20 against 4 of 20 before the change. Noise rose from 5 to 17 over
 44 pull requests, nine of them analyzer nits that `min_severity: nit`
-publishes and the default `info` would not. Incumbent's app had reviewed
-half of the re-opened pull requests when scored, so its column waits.
+publishes and the default `info` would not.
+
+**The incumbent's number is its first full run.** Incumbent's app reviewed
+all 44 pull requests once, on the original layout, before its plan throttled
+it; on the re-laid-out repository it reached about half. That first run —
+30 of 41 located, 5 noise findings, hand-checked above — is taken as its
+result, and the comparison stands on it rather than on a partial second
+pass. Two things it does not control for, both of which cut the same way for
+both reviewers: the first layout told the model it was reading fixtures, and
+the incumbent's run predates the four fixtures it never reviewed at all.
+
+| | open-nitpick, after remediation | Incumbent (hosted), first full run |
+|---|---|---|
+| plants located | **36 of 41** | 30 of 41 |
+| noise, at the shipped `min_severity: info` | 8 over 44 | 5 over 44 |
+| noise, everything published at `nit` | 17 over 44 | 5 over 44 |
+| clean fixtures commented on | 0 of 5 | 0 of 5 |
+| `info` plants located | 0 of 4 | 0 of 4 |
