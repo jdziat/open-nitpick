@@ -239,6 +239,8 @@ runs:
           add gitleaks
         fi
         echo "want=$want" >> "$GITHUB_OUTPUT"
+        # A cache key may not contain commas.
+        echo "key=$(printf '%s' "$want" | tr ',' '-')" >> "$GITHUB_OUTPUT"
         echo "installing analyzers: ${want:-none}"
 
     - name: Set up Go for analyzers
@@ -253,7 +255,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ~/.nitpick-analyzers
-        key: nitpick-analyzers-${{ runner.os }}-${{ runner.arch }}-v1-${{ steps.analyzers.outputs.want }}
+        key: nitpick-analyzers-${{ runner.os }}-${{ runner.arch }}-v1-${{ steps.analyzers.outputs.key }}
 
     - name: Install analyzers
       if: inputs.analyzers != ''
