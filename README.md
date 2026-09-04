@@ -570,6 +570,23 @@ different register.
 `nitpick explain-config` prints the resolved persona and the exact prompt it
 produces.
 
+### Notes addressed to the model family
+
+The review prompt carries one more layer, chosen by the reviewing model's
+name: a short list of habits to avoid, written for a model family whose eval
+reviews showed the habit. Today two families have one. GLM models are told
+that a rationale saying the harm "requires a caller not shown" or is "latent"
+is the reason to drop the finding, not to file it at `nit`, and to report
+nothing about behaviour a multi-file change did not alter. Qwen and DeepSeek
+models are told to decide about every hunk of the diff before reading the
+related-context definitions, which is where their single-file recall went
+when related context was on. Every other family gets no layer.
+
+The text lives in `internal/prompt/model.go`, never widens what a model is
+asked to look for, and shows up in `nitpick explain-config` as the `model`
+layer so it can be read without spending tokens. The measurements that
+motivated each note are in [docs/comparison.md](docs/comparison.md).
+
 ### Severities
 
 `nit` < `info` < `warning` < `error` < `critical`. `fail_on: none` never fails
@@ -634,6 +651,32 @@ The default stays sonnet-4.6 because the sweep ran on the corpora the prompt
 was tuned against; a candidate replaces it only by beating it on the held-out
 corpus under the rule in [docs/measurement.md](docs/measurement.md).
 `qwen/qwen3.8-27b` and `openai/gpt-5.6-luna` are the two worth that spend.
+
+### Synthetic
+
+[Synthetic](https://synthetic.new) hosts open-weight models (GLM-5.3-Flash,
+Qwen3.8-27B, Kimi-K3 and others) behind an OpenAI-compatible endpoint on a
+subscription rather than per-token billing. Like `openrouter`, it is a provider
+with a compiled-in endpoint, so a committed config can name it:
+
+```yaml
+models:
+  default:
+    provider: synthetic
+    model: hf:zai-org/GLM-5.3-Flash
+```
+
+```bash
+export SYNTHETIC_API_KEY=...
+```
+
+Model ids are Synthetic's `hf:<org>/<name>` form; their `syn:large:text`
+aliases work too and follow whatever they currently recommend. `SYNTHETIC_API_KEY`
+wins over `LLM_API_KEY`, and `OPENAI_API_KEY` is not accepted, for the reasons
+given under OpenRouter. The eval harness reaches it with a `synthetic:` prefix
+on the model id (`MODELS=synthetic:hf:Qwen/Qwen3.8-27B`), which keeps the
+same weights on two hosts as two rows. Cost per review is reported as unknown:
+the subscription has no per-token price to multiply.
 
 ### Other OpenAI-compatible gateways (vLLM, LiteLLM)
 
