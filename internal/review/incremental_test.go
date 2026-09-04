@@ -215,3 +215,41 @@ func TestAReviewThatCannotBePublishedIsStillReturned(t *testing.T) {
 		t.Errorf("the report's own diff must render its comments, got %d", len(rendered.Comments))
 	}
 }
+
+// TestTriageMayNotLoseAFindingSilently: a finding triage neither publishes
+// nor lists under dropped with a reason is restored; one it lists is withheld
+// and disclosed as an overrule.
+func TestTriageMayNotLoseAFindingSilently(t *testing.T) {
+	kept := Finding{Path: "app.go", Line: 4, Severity: "error", Class: "correctness", Title: "Ignored error", Rationale: "resp is nil on failure."}
+	lost := Finding{Path: "app.go", Line: 6, Severity: "nit", Class: "maintainability", Title: "Redundant copy", Rationale: "The slice is copied twice, costing an allocation per call."}
+	listed := Finding{Path: "app.go", Line: 5, Severity: "warning", Class: "concurrency", Title: "Speculative", Rationale: "Might race if Get is called concurrently."}
+	model := &scriptedLLM{byPrompt: map[string]string{
+		"triaging findings": mustJSON(t, Result{Summary: "s", Findings: []Finding{kept},
+			Dropped: []Drop{{Number: 2, Reason: "asserts Get is called concurrently, which the change does not show"}}}),
+		"Review the following changes": mustJSON(t, Result{Findings: []Finding{kept, lost, listed}}),
+	}}
+	provider := &stubProvider{diff: engineDiff}
+	report, err := newEngine(t, model, provider, func(c *config.Config) { c.Review.MinSeverity = config.SeverityNit }).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	titles := map[string]bool{}
+	for _, f := range report.Findings {
+		titles[f.Title] = true
+	}
+	if !titles["Ignored error"] || !titles["Redundant copy"] {
+		t.Errorf("published = %v; the finding triage lost without a reason must be restored", titles)
+	}
+	if titles["Speculative"] {
+		t.Error("a finding triage dropped with a reason was published")
+	}
+	found := false
+	for _, o := range report.Overruled {
+		if o.Finding.Title == "Speculative" && strings.HasPrefix(o.Expert, "triage") && o.Reason != "" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the triage drop is not disclosed as an overrule: %+v", report.Overruled)
+	}
+}

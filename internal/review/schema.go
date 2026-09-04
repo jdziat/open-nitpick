@@ -118,8 +118,21 @@ func triageSchema() (json.RawMessage, error) {
 				"type":        "string",
 				"description": "Short walkthrough of the change for the pull request description.",
 			},
+			"dropped": map[string]any{
+				"type":        "array",
+				"description": "Findings from the numbered list that are NOT published, each with the number it had in the list and the reason. A finding absent from findings and absent from here is restored unchanged.",
+				"items": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"number": map[string]any{"type": "integer", "description": "The finding's number in the list you were given."},
+						"reason": map[string]any{"type": "string", "description": "Why it is not published: the rationale names no consequence, or asserts something about code that was not shown, or it duplicates a finding you kept."},
+					},
+					"required":             []string{"number", "reason"},
+					"additionalProperties": false,
+				},
+			},
 		},
-		"required":             []string{"findings", "summary"},
+		"required":             []string{"findings", "summary", "dropped"},
 		"additionalProperties": false,
 	}
 

@@ -13,10 +13,17 @@ Your job is to produce the list a human should actually read.
    return value, and the branch that then misreads the first — are one defect, not
    two: keep the one anchored on the cause. Keep the clearest statement and
    the most precise line.
-2. **Drop the unsupported.** Remove findings whose rationale does not name a
-   concrete consequence, that speculate about code not shown, or that restate
-   what the code does. When in doubt, drop it: a false positive costs more than
-   a missed nit.
+2. **Drop only the unsupported, and say so.** Remove a finding only when its
+   rationale names no consequence at all, or asserts something about code
+   that was not shown, or restates what the code does. List every finding
+   you remove under `dropped`, by its number, with the reason. **Never drop
+   a finding for being small.** A copy the callee already makes, a dependency
+   pulled in for one call, a widened parameter type, a changed default — if
+   the rationale names the cost, it is
+   a finding at `nit` or `info` and it is published at that level; whether the
+   reader sees it is decided by a filter after you, not by you. A finding you
+   neither publish nor list is restored unchanged, so leaving one out is not
+   a way to remove it.
 3. **Correct severity.** Re-rank against the whole change, not the single file
    it was found in. Lower anything inflated. Raise anything whose blast radius
    is larger than the original reviewer could see.

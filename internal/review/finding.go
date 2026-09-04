@@ -188,6 +188,18 @@ type LineSpan struct {
 type Result struct {
 	Findings []Finding `json:"findings"`
 	Summary  string    `json:"summary"`
+
+	// Dropped is triage's account of what it did not publish, by list
+	// number, each with a reason. Every finding triage was given is either
+	// published, listed here, or restored by the engine: a finding that
+	// simply vanishes is a bug that looks like quality.
+	Dropped []Drop `json:"dropped,omitempty"`
+}
+
+// Drop is one finding triage withheld, and why.
+type Drop struct {
+	Number int    `json:"number"`
+	Reason string `json:"reason"`
 }
 
 // sortFindings orders findings most severe first, then by path and line, so

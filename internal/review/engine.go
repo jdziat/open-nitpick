@@ -585,7 +585,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings, dropped := e.filterAnchors(findings, files)
 	discarded = append(discarded, dropped...)
 
-	summary, findings, err := e.triage(ctx, pr, findings)
+	summary, findings, withheldByTriage, err := e.triage(ctx, pr, findings)
 	if err != nil {
 		return nil, err
 	}
@@ -629,7 +629,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// otherwise have been posted, and nothing below min_severity is.
 	findings, report.AlreadyReported = withholdAlreadyReported(findings, prior)
 
-	report.Overruled = e.gateOverruled(overruled)
+	// Triage's drops are disclosed exactly as an expert's refutations are:
+	// on the pull request, under "reported, then withheld", with the reason.
+	report.Overruled = append(e.gateOverruled(overruled), withheldByTriage...)
 	report.Findings = findings
 	report.Summary = summary
 	report.Counts = counts(findings)
@@ -1151,16 +1153,16 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) ([]Finding,
 //
 // When triage fails the run continues with locally deduped findings: a
 // duplicated review is worth more than no review.
-func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Finding) (string, []Finding, error) {
+func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Finding) (string, []Finding, []Overruled, error) {
 	findings = dedupe(findings)
 
 	if len(findings) == 0 && !e.Config.Review.Summary {
-		return "", nil, nil
+		return "", nil, nil, nil
 	}
 
 	base, err := e.triagePrompt()
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
 	msgs := []llms.Message{
@@ -1170,16 +1172,16 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 
 	schema, err := schemaOption(triageSchemaName, triageSchema)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
 	result, err := llm.Extract[Result](ctx, e.Roles.Triage, msgs, schema)
 	if err != nil {
 		if ctx.Err() != nil {
-			return "", nil, err
+			return "", nil, nil, err
 		}
 		e.log().Warn("triage failed; publishing deduplicated findings", "error", err)
-		return "", findings, nil
+		return "", findings, nil, nil
 	}
 
 	// Triage may reword and merge, but must not invent findings for files that
@@ -1255,7 +1257,57 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		kept = append(kept, f)
 	}
 
-	return strings.TrimSpace(result.Summary), kept, nil
+	// Every finding triage was given is accounted for: published (possibly
+	// merged or reworded — same file, within a few lines), dropped with a
+	// reason, or restored. THE BUG THIS CLOSES: three of eight misses on the
+	// benchmark repository were findings the reviewer made and triage threw
+	// away as "an info-level nit" or "a harmless redundancy", and the
+	// walkthrough said so — triage had been told a false positive costs more
+	// than a missed nit, and took it as written. Severity is the nitpick
+	// filter's decision, not triage's; a drop needs a reason about the
+	// claim, and a drop without one is a loss the engine reverses.
+	var withheld []Overruled
+	dropReason := map[int]string{}
+	for _, d := range result.Dropped {
+		if d.Number >= 1 && d.Number <= len(findings) && strings.TrimSpace(d.Reason) != "" {
+			dropReason[d.Number] = strings.TrimSpace(d.Reason)
+		}
+	}
+	for i, f := range findings {
+		if triageAccountedFor(f, kept) {
+			continue
+		}
+		if reason, ok := dropReason[i+1]; ok {
+			withheld = append(withheld, Overruled{Finding: f, Expert: "triage (" + e.Roles.Triage.String() + ")", Reason: reason})
+			continue
+		}
+		e.log().Info("triage lost a finding without a reason; restoring it", "path", f.Path, "line", f.Line, "title", f.Title)
+		f.Triager = e.Roles.Triage.String()
+		kept = append(kept, f)
+	}
+
+	return strings.TrimSpace(result.Summary), kept, withheld, nil
+}
+
+// triageAccountedFor reports whether a finding triage was given survives in
+// its output, allowing for the rewording and the small anchor moves a merge
+// makes. The tolerance is the anchor filter's snap distance: further than
+// that and the published finding is about something else.
+func triageAccountedFor(f Finding, kept []Finding) bool {
+	for _, k := range kept {
+		if k.Path != f.Path {
+			continue
+		}
+		if k.Line == f.Line {
+			return true
+		}
+		// A merge moves a line but not a class: two findings of different
+		// classes three lines apart are two findings.
+		if abs(k.Line-f.Line) <= 3 && k.Class == f.Class {
+			return true
+		}
+	}
+	return false
 }
 
 // capAnalyzerFindings applies linters.max_severity to the findings a
