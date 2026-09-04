@@ -94,6 +94,9 @@ clean:
 # Every fixture in evals.Fixtures(), for `make quick`; TestTheMakefileNamesTheWholeTuningCorpus pins it.
 TUNING := go-nil-deref,go-sql-injection,go-hardcoded-secret,python-command-injection,clean-refactor,style-only,multi-defect,capacity-hint-nit,ts-unbounded-memo-key,go-cancel-goroutine-leak,python-timing-unsafe-hmac,cross-file-copy-nit,sorted-for-min-nit,kotlin-widened-input,php-forbidden-vs-404,go-package-singleton
 
+# Every fixture in evals.InfoFixtures(): the band no reviewer had located.
+INFO := info-go-timeout-halved,info-python-pin-loosened,info-ts-any-widening,info-go-context-string-key,info-java-mutable-constant,info-sql-column-unindexed,info-bash-hardcoded-region,info-python-print-diagnostics,info-ts-magic-duration,info-go-close-error-on-write,info-clean-go-named-constant,info-clean-python-logging
+
 # This list must name EVERY fixture in evals.HeldOutFixtures. A name missing
 # from it is not an error — it is a shorter held-out run reporting a
 # generalization number over a subset, with nothing on the table saying which

@@ -3664,6 +3664,9 @@ func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 	for _, f := range MultiFileFixtures() {
 		multi[f.Name] = true
 	}
+	for _, f := range InfoFixtures() {
+		multi[f.Name] = true // a third re-runnable corpus, outside AllFixtures like the multi-file one
+	}
 
 	for name, where := range authored {
 		reason, excused := exempt[name]

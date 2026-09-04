@@ -394,26 +394,26 @@ const dumpPartialSuffix = ".partial"
 // TestARetainedRunRefusesToOverwriteAnEarlierOne covers the residual.
 func runDumpName(battery string, fixtures []Fixture, now time.Time, pid int) string {
 	corpus := "empty"
-	held, tuning, multi := 0, 0, 0
+	kinds := map[string]int{}
 	for _, f := range fixtures {
 		switch {
 		case HeldOut(f.Name):
-			held++
+			kinds["heldout"]++
 		case MultiFile(f.Name):
-			multi++
+			kinds["multifile"]++
+		case Info(f.Name):
+			kinds["info"]++
 		default:
-			tuning++
+			kinds["tuning"]++
 		}
 	}
 	switch {
-	case (held > 0 && tuning > 0) || (multi > 0 && (held > 0 || tuning > 0)):
+	case len(kinds) > 1:
 		corpus = "mixed"
-	case held > 0:
-		corpus = "heldout"
-	case multi > 0:
-		corpus = "multifile"
-	case tuning > 0:
-		corpus = "tuning"
+	case len(kinds) == 1:
+		for k := range kinds {
+			corpus = k
+		}
 	}
 
 	return fmt.Sprintf("%s-%s-%s-%d.jsonl",
