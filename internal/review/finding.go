@@ -115,8 +115,20 @@ type Finding struct {
 	// Rationale explains the consequence and the reasoning.
 	Rationale string `json:"rationale"`
 
-	// Suggestion is optional replacement code for the anchored lines.
+	// Suggestion is optional replacement code for the anchored line, or for
+	// the lines Line through FixEndLine when FixEndLine is set.
 	Suggestion string `json:"suggestion"`
+
+	// FixEndLine is the last line, inclusive, that Suggestion replaces. Zero
+	// means the single anchored line. The engine validates the range against
+	// the diff before a multi-line suggestion is rendered as committable
+	// (see validateSuggestions); a range that fails is rendered as a
+	// described change instead, never as one click.
+	FixEndLine int `json:"fix_end_line,omitempty"`
+
+	// FixValidated is set by the engine when a multi-line suggestion's range
+	// passed validation. Not serialized: a model does not get to claim it.
+	FixValidated bool `json:"-"`
 
 	// Source names where the finding came from: a linter's rule id, or the
 	// reviewing model. It is not part of the model-facing schema — the model

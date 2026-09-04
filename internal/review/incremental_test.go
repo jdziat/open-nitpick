@@ -253,3 +253,48 @@ func TestTriageMayNotLoseAFindingSilently(t *testing.T) {
 		t.Errorf("the triage drop is not disclosed as an overrule: %+v", report.Overruled)
 	}
 }
+
+// TestMultiLineSuggestionsAreCommittableOnlyWhenValidated: a fix whose range
+// sits inside one hunk is published as a comment on that range with a
+// suggestion block; one that leaves the hunk, or replaces lines with
+// themselves, is published as a described change on the anchor alone.
+func TestMultiLineSuggestionsAreCommittableOnlyWhenValidated(t *testing.T) {
+	good := Finding{Path: "app.go", Line: 4, Severity: "error", Class: "correctness", Title: "Check the error",
+		Suggestion: "\tresp, err := http.Get(\"http://x\")\n\tif err != nil {\n\t\treturn err\n\t}", FixEndLine: 5}
+	outside := Finding{Path: "app.go", Line: 6, Severity: "warning", Class: "correctness", Title: "Leaves the hunk",
+		Suggestion: "x\ny\nz\nw\nv", FixEndLine: 10}
+	same := Finding{Path: "app.go", Line: 4, Severity: "info", Class: "maintainability", Title: "Identical",
+		Suggestion: "\tresp, _ := http.Get(\"http://x\")\n\tdefer resp.Body.Close()", FixEndLine: 5}
+	model := &scriptedLLM{byPrompt: map[string]string{
+		"triaging findings":            mustJSON(t, Result{Summary: "s", Findings: []Finding{good, outside, same}}),
+		"Review the following changes": mustJSON(t, Result{Findings: []Finding{good, outside, same}}),
+	}}
+	provider := &stubProvider{diff: engineDiff}
+	report, err := newEngine(t, model, provider, func(c *config.Config) { c.Review.MinSeverity = config.SeverityNit }).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byTitle := map[string]Finding{}
+	for _, f := range report.Findings {
+		byTitle[f.Title] = f
+	}
+	if !byTitle["Check the error"].FixValidated {
+		t.Error("a range inside one hunk must validate")
+	}
+	if byTitle["Leaves the hunk"].FixValidated || byTitle["Identical"].FixValidated {
+		t.Error("a range leaving the hunk, or a no-op replacement, must not validate")
+	}
+
+	for _, c := range provider.published.Comments {
+		switch {
+		case strings.Contains(c.Body, "Check the error"):
+			if c.StartLine != 4 || c.Line != 5 || !strings.Contains(c.Body, "```suggestion\n") {
+				t.Errorf("validated fix not published on its range as a suggestion: start=%d line=%d\n%s", c.StartLine, c.Line, c.Body)
+			}
+		case strings.Contains(c.Body, "Leaves the hunk"):
+			if c.StartLine != 0 || strings.Contains(c.Body, "```suggestion\n") {
+				t.Errorf("an unvalidated fix was published as committable: start=%d\n%s", c.StartLine, c.Body)
+			}
+		}
+	}
+}

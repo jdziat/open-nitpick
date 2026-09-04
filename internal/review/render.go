@@ -59,14 +59,20 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 			continue
 		}
 
-		review.Comments = append(review.Comments, vcs.Comment{
+		c := vcs.Comment{
 			Path:        f.Path,
 			Line:        f.Line,
 			Side:        side,
 			Body:        renderComment(f, emoji),
 			Fingerprint: Fingerprint(f),
 			Class:       f.Class,
-		})
+		}
+		if f.FixValidated {
+			// A committable multi-line suggestion is a comment on the range
+			// it replaces: start_line at the anchor, line at the end.
+			c.StartLine, c.Line = f.Line, f.FixEndLine
+		}
+		review.Comments = append(review.Comments, c)
 	}
 
 	review.Summary = renderSummary(report, cfg)
@@ -103,7 +109,7 @@ func renderComment(f Finding, emoji bool) string {
 	// IS code for a single line; anything else is shown as an ordinary quote so
 	// a reader can act on it deliberately.
 	if s := strings.TrimRight(f.Suggestion, "\n"); strings.TrimSpace(s) != "" {
-		if suggestionIsApplicable(s) {
+		if f.FixValidated || suggestionIsApplicable(s) {
 			fence := fenceFor(s)
 			fmt.Fprintf(&b, "\n%ssuggestion\n%s\n%s\n", fence, s, fence)
 		} else {

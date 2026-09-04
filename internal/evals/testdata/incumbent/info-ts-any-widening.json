@@ -1,0 +1,20 @@
+{
+  "fixture": "info-ts-any-widening",
+  "findings": [
+    {
+      "path": "src/audit.ts",
+      "line": 2,
+      "end_line": 3,
+      "severity": "warning",
+      "category": "Data Integrity \u0026 Integration",
+      "class": "data-loss",
+      "title": "Reject unsupported actor values instead of silently coercing them.",
+      "rationale": "actor: any allows objects and nullish values. String(actor) stores `{ id: \"alice\" } as \"[object Object]\", and stores null or undefined` as literal actor names. This loses actor identity and can corrupt audit attribution. Some objects can also make String() throw before the event is appended.\n\nKeep actor string-only, or validate documented actor shapes and reject unsupported values.\n\nProposed fix\n\n-export function record(event: string, actor: any): void { -  events.push({ event, actor: String(actor) }); +export function record(event: string, actor: string): void { +  events.push({ event, actor }); }",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-04T00:43:42Z",
+  "mode": "plaintext",
+  "fingerprint": "313daf84ef7289e605587c8957154a0bc508ab814b370bae99913974c2e83292",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-187658234\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Data Integrity \u0026 Integration]\n  → src/audit.ts:2-3\n\n  Reject unsupported actor values instead of silently coercing them.\n\n  actor: any allows objects and nullish values. String(actor) stores `{\n  id: \"alice\" } as \"[object Object]\", and stores null or undefined` as\n  literal actor names. This loses actor identity and can corrupt audit\n  attribution. Some objects can also make String() throw before the event\n  is appended.\n\n  Keep actor string-only, or validate documented actor shapes and reject\n  unsupported values.\n\n\n  Proposed fix\n\n  -export function record(event: string, actor: any): void {\n  -  events.push({ event, actor: String(actor) });\n  +export function record(event: string, actor: string): void {\n  +  events.push({ event, actor });\n   }\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - src/audit.ts\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 6s elapsed\nFinishing analysis tools... 14s elapsed\nWriting review comments... 14s elapsed\n"
+}

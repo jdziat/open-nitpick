@@ -259,12 +259,17 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 			body += "\n" + marker
 		}
 
-		drafts = append(drafts, &github.DraftReviewComment{
+		draft := &github.DraftReviewComment{
 			Path: github.Ptr(c.Path),
 			Line: github.Ptr(c.Line),
 			Side: github.Ptr(side),
 			Body: github.Ptr(body),
-		})
+		}
+		if c.StartLine > 0 && c.StartLine < c.Line {
+			draft.StartLine = github.Ptr(c.StartLine)
+			draft.StartSide = github.Ptr(side)
+		}
+		drafts = append(drafts, draft)
 	}
 
 	event := string(review.Event)

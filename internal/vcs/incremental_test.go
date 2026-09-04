@@ -150,3 +150,26 @@ func TestGitHubChangedSince(t *testing.T) {
 		t.Errorf("a vanished earlier head must be unanswerable, not an error: ok=%v err=%v", ok, err)
 	}
 }
+
+func TestGitHubPublishesRangeComments(t *testing.T) {
+	var raw map[string]any
+	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&raw)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": 1})
+	})
+	err := gh.PublishReview(context.Background(), testRef(), Review{Summary: "s", Comments: []Comment{
+		{Path: "a.go", StartLine: 4, Line: 6, Body: "range"},
+		{Path: "a.go", Line: 9, Body: "single"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	comments := raw["comments"].([]any)
+	first := comments[0].(map[string]any)
+	if first["start_line"] != float64(4) || first["line"] != float64(6) || first["start_side"] != "RIGHT" {
+		t.Errorf("range comment = %v", first)
+	}
+	if _, has := comments[1].(map[string]any)["start_line"]; has {
+		t.Error("a single-line comment must not carry start_line")
+	}
+}

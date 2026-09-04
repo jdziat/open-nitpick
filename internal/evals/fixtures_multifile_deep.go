@@ -127,7 +127,7 @@ func (p *Pages) Show(w http.ResponseWriter, r *http.Request) {
 			Path: "web/pages.go",
 			Line: 24, // page, _ := p.Cache.Get(slug)
 			Keywords: []string{
-				"discarded ok", "discards ok", "ignores ok", "ignoring ok", "ok value", "second return",
+				"discarded ok", "discards ok", "ignores ok", "ignoring ok", "ok value", "second value",
 				"boolean", "miss from", "empty page", "empty string is", "legitimately empty",
 				"re-render", "rerender", "renders again", "rendered again", "every request", "cache is never hit",
 				"cache never", "sentinel",
@@ -304,7 +304,7 @@ def upload(user_id: str, filename: str, data: bytes):
 			Keywords: []string{
 				"overwrit", "overwrote", "clobber", "silently replace", "replaces the existing", "replaces an existing",
 				"same filename", "same name", "existing file", "existing attachment", "already exists", "exists()",
-				"exists check", "check exists", "data loss", "destroys", "previous upload", "earlier upload",
+				"exists check", "check exists", "destroys", "previous upload", "earlier upload",
 			},
 			Class:        config.ClassDataLoss,
 			WantSeverity: config.SeverityCritical,

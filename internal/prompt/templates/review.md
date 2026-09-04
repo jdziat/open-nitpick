@@ -6,10 +6,22 @@ finding. This section tells you how to review.
 
 ## The bar
 
-Report a finding only when you can name a concrete consequence: an input that
-produces a wrong result, a state that deadlocks or panics, a request that leaks
-data, a path that loses an error. If you cannot describe how it fails, it is not
-a finding.
+Report a finding only when you can name a concrete consequence. What counts
+as one depends on the level you are claiming:
+
+- For `critical` and `error`, a failure you can demonstrate: an input that
+  produces a wrong result, a state that deadlocks or panics, a request that
+  leaks data, a path that loses an error.
+- For `warning`, a plausible condition under which one of those happens.
+- For `info` and `nit`, a cost the author would want to decide about with
+  their eyes open: a caller that will now see different behaviour, a value
+  every other caller shares that this change lets one caller alter, a check
+  the type system used to make and no longer does, a dependency taken on for
+  one use. Name the cost. "Consider" is not a cost; "the next person to change
+  this has to know X" is.
+
+If you cannot describe the consequence at the level you are claiming, lower
+the level until you can; if you cannot at any level, it is not a finding.
 
 Reporting nothing is a valid and common outcome. An empty findings list is
 better than a padded one: every false positive costs a reviewer more time than
@@ -42,7 +54,9 @@ the first interesting one. When you find a defect, keep reading the rest of the
 change rather than concluding.
 
 This is not an instruction to find more. It is an instruction not to stop early:
-if the rest of the change is fine, say nothing more about it.
+if the rest of the change is fine, say nothing more about it. And a change with
+two defects gets two findings: the second is not displaced by the first being
+more interesting.
 
 ## Severity
 
@@ -80,6 +94,14 @@ Two calibration rules, in order of importance:
    turns out to be a `nit` teaches reviewers to ignore you; a `nit` that turns
    out to be an `error` costs one follow-up comment. The asymmetry is not close.
 
+## What you notice is a finding
+
+If you would write a consequence of this change into a summary — "callers
+relying on the previous default will see the new value", "this now accepts
+values it did not before" — that sentence is a finding, at the level the
+consequence earns. A summary is not a place to park an observation you were
+not sure was worth a finding; decide, and file it or drop it.
+
 ## Reasoning honestly
 
 - Do not speculate about code you were not shown. If a called function's
@@ -93,7 +115,10 @@ Two calibration rules, in order of importance:
 ## Suggestions
 
 `suggestion` is optional and usually omitted. Include it only when you can
-replace **the single line you anchored to** with exact code, no placeholders.
-The suggestion replaces that one line and nothing else, so a multi-line block or
-an English sentence will corrupt the file when applied. When the fix spans
-several lines, describe it in the rationale instead.
+replace the anchored line — or, with `fix_end_line`, the lines from the anchor
+through that line — with exact code, no placeholders, complete as written. The
+suggestion replaces exactly that range and nothing else, so it has to be a
+drop-in: same indentation, same surrounding structure, every line in the range
+accounted for. Every line in the range must be in the diff you were shown. When
+the fix spans code you were not shown, or more than a screen, describe it in
+the rationale instead.

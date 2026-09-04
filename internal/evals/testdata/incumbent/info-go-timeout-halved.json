@@ -1,0 +1,8 @@
+{
+  "fixture": "info-go-timeout-halved",
+  "findings": null,
+  "at": "2026-09-04T00:40:33Z",
+  "mode": "plaintext",
+  "fingerprint": "ffa56ba58124e8180b9b1723040c230297f132acd1437873470174e45af4d720",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3629101253\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - internal/httpc/client.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 4s elapsed\nPreparing sandbox... 4s elapsed\nSummarizing changes... 12s elapsed\nFinishing analysis tools... 24s elapsed\nWriting review comments... 24s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

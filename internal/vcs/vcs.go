@@ -98,6 +98,11 @@ type Comment struct {
 	// according to Side.
 	Line int
 
+	// StartLine, when set, makes the comment span StartLine through Line,
+	// which is how a suggestion replacing several lines is delivered. Zero
+	// is a single-line comment.
+	StartLine int
+
 	// Side selects the diff side: SideRight for additions and unchanged
 	// lines, SideLeft for deletions.
 	Side string

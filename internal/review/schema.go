@@ -66,8 +66,12 @@ func findingProperties() map[string]any {
 		},
 		"suggestion": map[string]any{
 			"type": "string",
-			"description": "OPTIONAL. Exact replacement code for the single anchored line, with no placeholders and no prose. " +
-				"Omit entirely unless you can replace that one line correctly.",
+			"description": "OPTIONAL. Exact replacement code for the anchored line — or for lines line through fix_end_line when fix_end_line is given — with no placeholders and no prose. " +
+				"Omit entirely unless the replacement is complete and correct as written.",
+		},
+		"fix_end_line": map[string]any{
+			"type":        "integer",
+			"description": "OPTIONAL. With suggestion: the last line, inclusive, that the suggestion replaces, when it replaces more than the anchored line. Every line from line to fix_end_line must be in the diff.",
 		},
 	}
 }

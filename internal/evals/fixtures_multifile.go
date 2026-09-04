@@ -396,7 +396,7 @@ func (a *Admin) Cleanup(w http.ResponseWriter, r *http.Request) {
 			Line: 37, // n, err := a.Store.DeleteWhere(r.Context(), store.Filter{...})
 			Keywords: []string{
 				"every row", "all rows", "every upload", "all uploads", "empty filter", "zero filter",
-				"entire table", "whole table", "everything", "wipes", "wipes the",
+				"entire table", "whole table", "everything", "wipes", "wipes the", "destroys",
 				"deletes all", "delete all", "unfiltered", "no constraint", "unconstrained",
 				"both parameters", "neither parameter", "no parameters", "without parameters",
 			},
@@ -724,8 +724,13 @@ def settle(gateway: Gateway, card_token: str, amount_cents: int) -> str:
 		Defects: []Defect{{
 			Path: "app/billing.py",
 			Line: 11, // return with_retry(lambda: gateway.charge(card_token, amount_cents))
+			// Not "idempotent" in any spelling: review.md's warning anchor says
+			// "retrying a non-idempotent request is a warning", so a reviewer
+			// could earn this plant by quoting the prompt. The collision was
+			// found when the prompt-collision sweep was widened to this corpus,
+			// and it re-scores every recorded review of this fixture.
 			Keywords: []string{
-				"idempoten", "not idempotent", "non-idempotent", "charged twice", "charge twice", "double charge",
+				"charged twice", "charge twice", "double charge",
 				"double-charge", "charged again", "duplicate charge", "more than once", "multiple times",
 				"already succeeded", "already been processed", "already processed", "may have succeeded",
 			},
@@ -882,7 +887,7 @@ def mint(user_id: str) -> tuple[str, str]:
 			Path: "app/keys.py",
 			Line: 13, // audit("api_key.minted", user=user_id, key_id=key_id, key=key)
 			Keywords: []string{
-				"off-host", "off host", "shipped", "ships the", "external", "retained",
+				"shipped", "ships the", "external", "retained",
 				"plaintext", "plain text", "cleartext", "clear text", "logs the key", "logged", "logging the",
 				"in the log", "into the log", "to the log", "secret in", "leaks the", "exposes the",
 				"key id", "key_id only", "fingerprint", "last four",

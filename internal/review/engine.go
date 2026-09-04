@@ -622,6 +622,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// one. This is the application of linters.max_severity that binds.
 	findings = e.capAnalyzerFindings(findings)
 
+	findings = validateSuggestions(findings, files)
 	findings = e.applyGate(findings)
 	sortFindings(findings)
 
@@ -650,6 +651,57 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 // ErrPublish marks a review that completed and could not be delivered. The
 // report that accompanies it is whole.
 var ErrPublish = errors.New("the review could not be published")
+
+// maxFixLines bounds a multi-line suggestion. Past this a fix is a rewrite,
+// and a rewrite applied with one click is not something a reviewer should
+// be offering.
+const maxFixLines = 40
+
+// validateSuggestions decides which multi-line suggestions may be rendered
+// as committable. A range is accepted when every line from the anchor to
+// fix_end_line is in the same hunk of the file's diff — GitHub rejects a
+// multi-line suggestion that spans hunks, and a comment it rejects takes the
+// whole review with it — when it is no longer than maxFixLines, and when the
+// replacement is not byte-identical to what it replaces. A range that fails
+// is not dropped: the suggestion is kept and rendered as a described change,
+// which is what a single-line suggestion that does not look like code gets.
+func validateSuggestions(findings []Finding, files diff.Files) []Finding {
+	for i := range findings {
+		f := &findings[i]
+		f.FixValidated = false
+		if f.FixEndLine <= f.Line || strings.TrimSpace(f.Suggestion) == "" {
+			f.FixEndLine = 0
+			continue
+		}
+		if f.FixEndLine-f.Line+1 > maxFixLines {
+			continue
+		}
+		file := files.Find(f.Path)
+		if file == nil {
+			continue
+		}
+		var current []string
+		for _, h := range file.Hunks {
+			if f.Line < h.NewStart || f.FixEndLine > h.NewStart+h.NewLines-1 {
+				continue
+			}
+			for _, l := range h.Lines {
+				if l.NewLine >= f.Line && l.NewLine <= f.FixEndLine && l.Kind != diff.LineRemoved {
+					current = append(current, l.Content)
+				}
+			}
+			break
+		}
+		if len(current) != f.FixEndLine-f.Line+1 {
+			continue // not wholly inside one hunk
+		}
+		if strings.TrimRight(strings.Join(current, "\n"), "\n") == strings.TrimRight(f.Suggestion, "\n") {
+			continue // replaces the lines with themselves
+		}
+		f.FixValidated = true
+	}
+	return findings
+}
 
 // priorReview asks the provider what earlier runs left on the pull request.
 //

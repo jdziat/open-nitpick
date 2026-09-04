@@ -270,6 +270,10 @@ func nearMiss(f review.Finding, defects []Defect) bool {
 	return false
 }
 
+// maxFixLinesForScoring mirrors the engine's maxFixLines, duplicated on
+// purpose so the invariant does not agree with a regression in it.
+const maxFixLinesForScoring = 40
+
 // The objective severity vocabulary. It is deliberately the judge's own
 // (accurate | inflated | understated): the two measurements are printed side by
 // side and disagree, and a reader comparing them should not have to translate
@@ -1413,15 +1417,25 @@ func checkInvariants(r RunResult) []string {
 
 	for _, c := range r.Review.Comments {
 		// Every published comment must be applicable code or clearly not a
-		// one-click suggestion. A multi-line or prose suggestion rendered as
-		// applicable corrupts the file when clicked.
+		// one-click suggestion. A prose suggestion rendered as applicable
+		// corrupts the file when clicked, and a multi-line one does unless
+		// the comment spans exactly the lines it replaces — which is what the
+		// engine's validation guarantees, and what StartLine says.
 		if idx := strings.Index(c.Body, "```suggestion\n"); idx >= 0 {
 			rest := c.Body[idx+len("```suggestion\n"):]
 			block, _, _ := strings.Cut(rest, "\n```")
 
-			if strings.Contains(strings.TrimRight(block, "\n"), "\n") {
-				out = append(out, fmt.Sprintf("%s:%d publishes a MULTI-LINE applicable suggestion; "+
+			if strings.Contains(strings.TrimRight(block, "\n"), "\n") && c.StartLine == 0 {
+				out = append(out, fmt.Sprintf("%s:%d publishes a MULTI-LINE applicable suggestion on a single-line comment; "+
 					"GitHub replaces only the anchored line, so applying it corrupts the file", c.Path, c.Line))
+			}
+			if c.StartLine > 0 {
+				want := c.Line - c.StartLine + 1
+				if got := strings.Count(strings.TrimRight(block, "\n"), "\n") + 1; got > maxFixLinesForScoring {
+					out = append(out, fmt.Sprintf("%s:%d-%d publishes a %d-line suggestion", c.Path, c.StartLine, c.Line, got))
+				} else if want <= 0 {
+					out = append(out, fmt.Sprintf("%s:%d-%d spans no lines", c.Path, c.StartLine, c.Line))
+				}
 			}
 			if !looksLikeCodeForScoring(block) {
 				out = append(out, fmt.Sprintf("%s:%d publishes prose as an applicable suggestion: %q",

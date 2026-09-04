@@ -523,7 +523,10 @@ func TestNoPlantedKeywordAppearsInTheShippedPrompt(t *testing.T) {
 
 	found := map[string][]string{} // fixture\x00keyword -> sorted source labels
 
-	corpus := append(append([]Fixture{}, AllFixtures()...), dedupFixtures()...)
+	// EveryFixture rather than AllFixtures: the info corpus is where the
+	// review prompt's restated bar was measured, and a prompt that names one
+	// of its keywords would be scored for quoting itself there too.
+	corpus := append(append([]Fixture{}, EveryFixture()...), dedupFixtures()...)
 	for _, f := range corpus {
 		for _, d := range f.Defects {
 			for _, kw := range d.Keywords {
