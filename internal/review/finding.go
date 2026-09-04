@@ -208,10 +208,11 @@ type Result struct {
 	Dropped []Drop `json:"dropped,omitempty"`
 }
 
-// Drop is one finding triage withheld, and why.
+// Drop is one finding triage merged into another, and why.
 type Drop struct {
-	Number int    `json:"number"`
-	Reason string `json:"reason"`
+	Number      int    `json:"number"`
+	DuplicateOf int    `json:"duplicate_of"`
+	Reason      string `json:"reason"`
 }
 
 // sortFindings orders findings most severe first, then by path and line, so

@@ -1,0 +1,8 @@
+{
+  "fixture": "info-bash-hardcoded-region",
+  "findings": null,
+  "at": "2026-09-04T00:50:06Z",
+  "mode": "plaintext",
+  "fingerprint": "41388ddfb7c15fe71435b9ae1ab83ce9d6d0401b5d23ccefb5d50009fb44667b",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3708339456\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - scripts/deploy.sh\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

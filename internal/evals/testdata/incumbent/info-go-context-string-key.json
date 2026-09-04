@@ -1,0 +1,19 @@
+{
+  "fixture": "info-go-context-string-key",
+  "findings": [
+    {
+      "path": "mw/user.go",
+      "line": 10,
+      "severity": "warning",
+      "category": "Security \u0026 Privacy",
+      "class": "security",
+      "title": "Use an unexported context key type.",
+      "rationale": "context.WithValue compares keys by equality. Another middleware can set \"user\" after WithUser, causing FromContext to read the wrong User. This can cause incorrect authorization decisions.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-04T00:45:26Z",
+  "mode": "plaintext",
+  "fingerprint": "ac7f5925b7a1458fc16f437c4a1a9b1df10b79f1d1c290cd4436e024dfa26ebb",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1562893083\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Security \u0026 Privacy]\n  → mw/user.go:10\n\n  Use an unexported context key type.\n\n  context.WithValue compares keys by equality. Another middleware can set\n  \"user\" after WithUser, causing FromContext to read the wrong User.\n  This can cause incorrect authorization decisions.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - mw/user.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 1s elapsed\nPreparing review... 3s elapsed\nPreparing sandbox... 3s elapsed\nSummarizing changes... 9s elapsed\nFinishing analysis tools... 20s elapsed\nWriting review comments... 20s elapsed\nWriting review comments... 1m 01s elapsed - still working\n"
+}

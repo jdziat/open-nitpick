@@ -29,7 +29,19 @@ func TestProbeModel(t *testing.T) {
 				logs.Reset()
 				res := Run(context.Background(), m, f, i, opts)
 				if res.Err == nil {
-					t.Logf("%s %s run %d: ok, %d finding(s), %d call(s)", m.ID, f.Name, i, len(res.Report.Findings), res.Usage.Calls())
+					d := ScoreDetection(f, res.Report.Findings)
+					t.Logf("%s %s run %d: ok, located %d/%d, %d finding(s), %d withheld", m.ID, f.Name, i, d.Matched, len(f.Defects), len(res.Report.Findings), len(res.Report.Overruled))
+					for _, fnd := range res.Report.Findings {
+						t.Logf("    published %s:%d [%s] %s", fnd.Path, fnd.Line, fnd.Severity, fnd.Title)
+					}
+					for _, o := range res.Report.Overruled {
+						t.Logf("    withheld  %s:%d [%s] %s — %s: %s", o.Finding.Path, o.Finding.Line, o.Finding.Severity, o.Finding.Title, o.Expert, o.Reason)
+					}
+					for line := range strings.SplitSeq(logs.String(), "\n") {
+						if strings.Contains(line, "restoring it") {
+							t.Log("    " + line[strings.Index(line, "msg="):])
+						}
+					}
 					continue
 				}
 				t.Logf("%s %s run %d: FAILED: %v", m.ID, f.Name, i, res.Err)

@@ -222,10 +222,12 @@ func TestAReviewThatCannotBePublishedIsStillReturned(t *testing.T) {
 func TestTriageMayNotLoseAFindingSilently(t *testing.T) {
 	kept := Finding{Path: "app.go", Line: 4, Severity: "error", Class: "correctness", Title: "Ignored error", Rationale: "resp is nil on failure."}
 	lost := Finding{Path: "app.go", Line: 6, Severity: "nit", Class: "maintainability", Title: "Redundant copy", Rationale: "The slice is copied twice, costing an allocation per call."}
-	listed := Finding{Path: "app.go", Line: 5, Severity: "warning", Class: "concurrency", Title: "Speculative", Rationale: "Might race if Get is called concurrently."}
+	// A duplicate of kept, by triage's account: same defect, other wording,
+	// listed with the number it merges into. Line 5 is #2 after sorting.
+	listed := Finding{Path: "app.go", Line: 5, Severity: "warning", Class: "concurrency", Title: "Speculative", Rationale: "The nil response from the failed Get is closed."}
 	model := &scriptedLLM{byPrompt: map[string]string{
 		"triaging findings": mustJSON(t, Result{Summary: "s", Findings: []Finding{kept},
-			Dropped: []Drop{{Number: 2, Reason: "asserts Get is called concurrently, which the change does not show"}}}),
+			Dropped: []Drop{{Number: 2, DuplicateOf: 1, Reason: "same nil response, one line down"}}}),
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{kept, lost, listed}}),
 	}}
 	provider := &stubProvider{diff: engineDiff}
@@ -241,16 +243,16 @@ func TestTriageMayNotLoseAFindingSilently(t *testing.T) {
 		t.Errorf("published = %v; the finding triage lost without a reason must be restored", titles)
 	}
 	if titles["Speculative"] {
-		t.Error("a finding triage dropped with a reason was published")
+		t.Error("a finding triage merged into another was published")
 	}
 	found := false
 	for _, o := range report.Overruled {
-		if o.Finding.Title == "Speculative" && strings.HasPrefix(o.Expert, "triage") && o.Reason != "" {
+		if o.Finding.Title == "Speculative" && strings.HasPrefix(o.Expert, "triage") && strings.Contains(o.Reason, "merged into") {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("the triage drop is not disclosed as an overrule: %+v", report.Overruled)
+		t.Errorf("the merge is not disclosed as an overrule: %+v", report.Overruled)
 	}
 }
 

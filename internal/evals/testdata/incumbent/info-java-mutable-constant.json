@@ -1,0 +1,19 @@
+{
+  "fixture": "info-java-mutable-constant",
+  "findings": [
+    {
+      "path": "src/main/java/com/acme/cfg/Defaults.java",
+      "line": 13,
+      "severity": "warning",
+      "category": "Data Integrity \u0026 Integration",
+      "class": "correctness",
+      "title": "Make REGIONS immutable.",
+      "rationale": "public static final does not make the list immutable. Arrays.asList allows callers to replace elements with set, which can alter shared deployment defaults globally.\n\nWrap the list with Collections.unmodifiableList(...) before exposing it.\n\nProposed fix\n\n+import java.util.Collections; import java.util.List; @@ -    public static final List\u003cString\u003e REGIONS = Arrays.asList(\"us-east-1\", \"eu-west-1\"); +    public static final List\u003cString\u003e REGIONS = +            Collections.unmodifiableList(Arrays.asList(\"us-east-1\", \"eu-west-1\"));",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-04T00:46:35Z",
+  "mode": "plaintext",
+  "fingerprint": "446f0bda64165797c13f69fbc8b53d30a6cdacd03e7e76f7345019249e40c3f1",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-787531523\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Data Integrity \u0026 Integration]\n  → src/main/java/com/acme/cfg/Defaults.java:13\n\n  Make REGIONS immutable.\n\n  public static final does not make the list immutable. Arrays.asList\n  allows callers to replace elements with set, which can alter shared\n  deployment defaults globally.\n\n  Wrap the list with Collections.unmodifiableList(...) before exposing it.\n\n\n\n\n\n  Proposed fix\n\n  +import java.util.Collections;\n   import java.util.List;\n  @@\n  -    public static final List\u003cString\u003e REGIONS = Arrays.asList(\"us-east-1\", \"eu-west-1\");\n  +    public static final List\u003cString\u003e REGIONS =\n  +            Collections.unmodifiableList(Arrays.asList(\"us-east-1\", \"eu-west-1\"));\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - src/main/java/com/acme/cfg/Defaults.java\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 8s elapsed\nFinishing analysis tools... 18s elapsed\nWriting review comments... 18s elapsed\n"
+}

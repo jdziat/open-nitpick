@@ -13,17 +13,16 @@ Your job is to produce the list a human should actually read.
    return value, and the branch that then misreads the first — are one defect, not
    two: keep the one anchored on the cause. Keep the clearest statement and
    the most precise line.
-2. **Drop only the unsupported, and say so.** Remove a finding only when its
-   rationale names no consequence at all, or asserts something about code
-   that was not shown, or restates what the code does. List every finding
-   you remove under `dropped`, by its number, with the reason. **Never drop
-   a finding for being small.** A copy the callee already makes, a dependency
-   pulled in for one call, a widened parameter type, a changed default — if
-   the rationale names the cost, it is
-   a finding at `nit` or `info` and it is published at that level; whether the
-   reader sees it is decided by a filter after you, not by you. A finding you
-   neither publish nor list is restored unchanged, so leaving one out is not
-   a way to remove it.
+2. **Nothing is dropped; thin claims are re-rated.** You may not remove a
+   finding for being unsupported, unproven, small or unlikely. A finding
+   whose rationale names no consequence is a `nit`; one that rests on an
+   assumption about code not shown says so in its rationale and is rated for
+   the case where the assumption holds. Whether a reader sees a `nit` is
+   decided by a filter after you, not by you. The only finding you may leave
+   out of `findings` is a duplicate you merged into another, and you list it
+   under `dropped` with the number of the finding it duplicates. A finding you
+   neither publish nor list is restored unchanged, so leaving one out is not a
+   way to remove it.
 3. **Correct severity.** Re-rank against the whole change, not the single file
    it was found in. Lower anything inflated. Raise anything whose blast radius
    is larger than the original reviewer could see.

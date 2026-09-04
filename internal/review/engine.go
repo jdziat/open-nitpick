@@ -1310,33 +1310,47 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 	}
 
 	// Every finding triage was given is accounted for: published (possibly
-	// merged or reworded — same file, within a few lines), dropped with a
-	// reason, or restored. THE BUG THIS CLOSES: three of eight misses on the
-	// benchmark repository were findings the reviewer made and triage threw
-	// away as "an info-level nit" or "a harmless redundancy", and the
-	// walkthrough said so — triage had been told a false positive costs more
-	// than a missed nit, and took it as written. Severity is the nitpick
-	// filter's decision, not triage's; a drop needs a reason about the
-	// claim, and a drop without one is a loss the engine reverses.
-	var withheld []Overruled
-	dropReason := map[int]string{}
+	// merged or reworded — same file, within a few lines), merged into a
+	// finding that was published, or restored. THE BUG THIS CLOSES, twice
+	// over. Three of eight misses on the benchmark repository were findings
+	// the reviewer made and triage threw away as "an info-level nit" or "a
+	// harmless redundancy". The first repair let triage drop with a stated
+	// reason, and it then dropped a correct milliseconds-versus-seconds
+	// finding as "the rationale contradicts itself" and a correct redundant
+	// copy as naming "no concrete cost beyond a future reader" — which is
+	// the cost. A reason channel is a rationalisation channel. So triage may
+	// not drop at all: it merges duplicates, naming the survivor, and it
+	// re-rates; severity is what says a claim is thin, and the nitpick
+	// filter decides who sees it. Anything else that went missing comes
+	// back.
+	var merged []Overruled
+	keptNumber := map[int]bool{}
+	for i, f := range findings {
+		if triageAccountedFor(f, kept) {
+			keptNumber[i+1] = true
+		}
+	}
+	mergedInto := map[int]Drop{}
 	for _, d := range result.Dropped {
-		if d.Number >= 1 && d.Number <= len(findings) && strings.TrimSpace(d.Reason) != "" {
-			dropReason[d.Number] = strings.TrimSpace(d.Reason)
+		if d.Number >= 1 && d.Number <= len(findings) && keptNumber[d.DuplicateOf] && d.DuplicateOf != d.Number {
+			mergedInto[d.Number] = d
 		}
 	}
 	for i, f := range findings {
-		if triageAccountedFor(f, kept) {
+		if keptNumber[i+1] {
 			continue
 		}
-		if reason, ok := dropReason[i+1]; ok {
-			withheld = append(withheld, Overruled{Finding: f, Expert: "triage (" + e.Roles.Triage.String() + ")", Reason: reason})
+		if d, ok := mergedInto[i+1]; ok {
+			e.log().Debug("triage merged a finding", "path", f.Path, "line", f.Line, "into", d.DuplicateOf)
+			merged = append(merged, Overruled{Finding: f, Expert: "triage (" + e.Roles.Triage.String() + ")",
+				Reason: fmt.Sprintf("merged into the finding at %s:%d: %s", findings[d.DuplicateOf-1].Path, findings[d.DuplicateOf-1].Line, strings.TrimSpace(d.Reason))})
 			continue
 		}
-		e.log().Info("triage lost a finding without a reason; restoring it", "path", f.Path, "line", f.Line, "title", f.Title)
+		e.log().Info("triage lost a finding; restoring it", "path", f.Path, "line", f.Line, "title", f.Title)
 		f.Triager = e.Roles.Triage.String()
 		kept = append(kept, f)
 	}
+	withheld := merged
 
 	return strings.TrimSpace(result.Summary), kept, withheld, nil
 }

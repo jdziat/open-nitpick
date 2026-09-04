@@ -1,0 +1,8 @@
+{
+  "fixture": "info-ts-magic-duration",
+  "findings": null,
+  "at": "2026-09-04T00:52:09Z",
+  "mode": "plaintext",
+  "fingerprint": "b7deb70ef81d95f4f5a53f217234e15a6e91ae8b8f2e2863e865d49254e937cf",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2342239048\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - src/session.ts\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\n"
+}
