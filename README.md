@@ -113,11 +113,19 @@ broke", and `result` says which without parsing the log.
 
 **Analyzers on the runner.** A stock runner has none of the deterministic
 analyzers installed, so the roster says "not on PATH" for every one. Set
-`analyzers: auto` and the Action installs, at pinned versions and cached, the
-analyzers for the languages the change touches — golangci-lint for Go, ruff
+`analyzers: auto` and the Action installs and caches, at whatever version each
+tool's own installer serves that day, the analyzers for the languages the
+change touches — golangci-lint for Go, ruff
 and pylint for Python, shellcheck, hadolint, yamllint, actionlint and zizmor,
 tflint and checkov, sqlfluff, rubocop and brakeman, cppcheck, biome, buf, and
-gitleaks always. A comma-separated list installs exactly those. This is what
+gitleaks always. A comma-separated list installs exactly those. The installs
+are not pinned: they run `go install ...@latest`, package-manager installs,
+"latest" release downloads, and for actionlint, tflint and dotenv-linter the
+vendor's install script fetched from its default branch, inside a job that
+holds the model key and a write-scoped `GITHUB_TOKEN`. That is the same
+exposure as any workflow that installs tools from upstream, and it is the
+reason the roster names the tool and version it ran; pin by preinstalling
+the tools you trust and listing them, or leave `analyzers` unset. This is what
 the hosted reviewers do implicitly; here it is a line in the workflow.
 
 **Try it first.** `dry-run: true` prints the review to the log and the job

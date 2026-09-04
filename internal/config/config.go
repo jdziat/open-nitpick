@@ -455,11 +455,11 @@ func (c *Config) merge(data []byte) error {
 	return nil
 }
 
-// ResolveModel returns the effective spec for a role, falling back to the
-// default model for any field the role does not set.
 // ModelNotesOn reports whether the model-family prompt layer is in force.
 func (r Review) ModelNotesOn() bool { return r.ModelNotes == nil || *r.ModelNotes }
 
+// ResolveModel returns the effective spec for a role, falling back to the
+// default model for any field the role does not set.
 func (m Models) ResolveModel(role Role) ModelSpec {
 	var override *ModelSpec
 	switch role {
