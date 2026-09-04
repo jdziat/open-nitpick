@@ -608,6 +608,33 @@ What the compiled-in endpoint does **not** buy you: `provider` and `model` still
 come from the config file, and for a router the model id chooses which upstream
 receives the code. See [Trust model](#trust-model).
 
+### Choosing a model by price
+
+Twelve models were run through the shipped pipeline on all three eval corpora
+(tuning, multi-file, info; 38 planted defects) with related context on. The
+full table, per-corpus numbers and caveats are in
+[docs/comparison.md](docs/comparison.md#twelve-models-three-corpora-the-costperformance-sweep-2026-09-04);
+this is the short version. Recall is planted defects located; `$/review` is
+the provider-reported spend per pull request on those corpora. Most rows are
+a single run, so gaps under about 0.10 are inside the noise.
+
+| tier | model | weighted recall | $/review | trade |
+|---|---|---|---|---|
+| cheapest that holds the line | `openai/gpt-5.6-luna` | 0.79 | $0.0006 | highest noise of the cheap tier on single-file diffs |
+| cheapest with no surprises | `z-ai/glm-5.3-flash` | 0.82 | $0.0017 | noisy on multi-file diffs; never lost a review |
+| best quality per dollar | `qwen/qwen3.8-27b` | 0.82 | $0.017 | above the default on every corpus with lower noise |
+| quietest | `x-ai/grok-4.6` | 0.74 | $0.020 | zero noise on two corpora, pays in recall |
+| shipped default | `anthropic/claude-sonnet-4.6` | 0.79 | $0.021 | the only model measured on the held-out corpus |
+| frontier | `openai/gpt-5.6-sol` | 0.85 | $0.027 | `z-ai/glm-5.3` edges it on recall at double the noise |
+| skip | `qwen/qwen3.8-max`, `deepseek/deepseek-v4-pro-0813` | 0.63 – 0.78 | $0.013 – $0.044 | most expensive, and both dropped reviews |
+
+Incumbent's on-demand price on the same corpora is $0.25 to $0.36 a review.
+
+The default stays sonnet-4.6 because the sweep ran on the corpora the prompt
+was tuned against; a candidate replaces it only by beating it on the held-out
+corpus under the rule in [docs/measurement.md](docs/measurement.md).
+`qwen/qwen3.8-27b` and `openai/gpt-5.6-luna` are the two worth that spend.
+
 ### Other OpenAI-compatible gateways (vLLM, LiteLLM)
 
 Any other OpenAI-compatible endpoint works through the `openai` provider:
