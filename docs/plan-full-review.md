@@ -6,6 +6,15 @@ must meet before the next starts. Nothing here is implemented yet.
 
 ## 1. `nitpick full-review [path...]`
 
+Status 2026-09-05: the command exists (`cmd/nitpick/fullreview.go`,
+`internal/vcs/tree.go`). It reviews the tree as one all-additions change
+through the unchanged engine, with `-budget`, path arguments, the
+remediation plan and the coverage notice. Smoke-run on `internal/diff`
+with Kimi-K3 on Synthetic. Still open from this section: the grouped
+output sections (bugs, security, CVEs as a deterministic list), and the
+fixture repository with its acceptance test. The walkthrough summary for
+a tree review reads as a diff summary and needs its own wording.
+
 Review a whole repository, or the paths given, rather than a change. The
 engine already reviews batches of files with analyzers as evidence and
 related context attached; a full review is that engine run over the tree
