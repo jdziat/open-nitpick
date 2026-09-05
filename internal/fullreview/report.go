@@ -113,6 +113,11 @@ func RemediationPlan(findings []review.Finding) string {
 		}
 		g.files[f.Path] = true
 		g.count++
+		// The earliest anchor by path and line, whatever order the findings
+		// arrived in, so the plan's order is a function of its contents.
+		if at := fmt.Sprintf("%s:%d", f.Path, f.Line); at < g.first {
+			g.first = at
+		}
 	}
 	ordered := make([]*group, 0, len(groups))
 	for _, g := range groups {

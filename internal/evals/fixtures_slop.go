@@ -277,7 +277,7 @@ def test_slug_runs_on_empty():
 `},
 		Defects: []Defect{{
 			Path: "tests/test_slug.py", Line: 6, // assert True
-			Keywords:     []string{"test_slug", "test_slug_runs_on_empty", "slug(\"Hello World\")", "never checks", "unused result", "whatever slug returns"},
+			Keywords:     []string{"test_slug", "test_slug_runs_on_empty", "never checks", "unused result", "whatever slug returns"},
 			Class:        config.ClassSlop,
 			WantSeverity: config.SeverityWarning,
 			Why:          "neither test checks a result; both pass whatever slug returns",

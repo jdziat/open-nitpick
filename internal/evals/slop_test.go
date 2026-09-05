@@ -58,6 +58,21 @@ func TestSlopCorpusIsWellFormed(t *testing.T) {
 			t.Errorf("%s: Slop() does not recognise it", f.Name)
 		}
 	}
+	// A plant's keywords name what only the planted file holds, so none may
+	// appear in its control's files: a finding on the control that quoted
+	// them would otherwise be credited to the plant's mechanism.
+	for i := 0; i+1 < len(fixtures); i += 2 {
+		control := fixtures[i+1]
+		for _, d := range fixtures[i].Defects {
+			for _, k := range d.Keywords {
+				for p, content := range control.Head {
+					if strings.Contains(strings.ToLower(content), strings.ToLower(k)) {
+						t.Errorf("%s: keyword %q appears in control %s (%s)", fixtures[i].Name, k, control.Name, p)
+					}
+				}
+			}
+		}
+	}
 	every := map[string]bool{}
 	for _, f := range EveryFixture() {
 		every[f.Name] = true
