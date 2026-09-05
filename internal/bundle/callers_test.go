@@ -642,10 +642,24 @@ SEP = '"""'
 
 def handler(conn):
     return fetch_orders(conn, 0, 10)
+
+
+def report(conn):
+    sql = '''
+    -- fetch_orders(conn, 0, 10) was the old way
+    '''
+    return sql
+
+
+def later(conn):
+    return fetch_orders(conn, 10, 10)
 `
 	tree := fakeTree{"app/__init__.py": "", "app/db.py": db, "app/svc.py": svc}
 	got := callerNames(assembleCallers(t, tree, true, modifiedFile("app/db.py", db, 2)))
-	if want := "app/svc.py:handler calls db.fetch_orders"; strings.Join(got, ",") != want {
+	// report mentions the call only inside a ''' string, so it is not a
+	// caller, and the string does not swallow later.
+	want := []string{"app/svc.py:handler calls db.fetch_orders", "app/svc.py:later calls db.fetch_orders"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("callers = %v, want %v", got, want)
 	}
 }

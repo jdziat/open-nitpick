@@ -331,10 +331,16 @@ func (c *relatedCollector) attach(e *Entry, wants []want, budget int, est *llms.
 
 // key identifies a want for dedupe across a plan. A definition is its file
 // and name; a caller is also its line, since one file can define two
-// methods of one name on two receivers.
+// methods of one name on two receivers; a constant is its file and text,
+// so one literal two callers pass is attached once. NUL is the separator
+// because a name can be a whole source line, and NUL is the one byte a
+// source line cannot hold.
 func (w want) key() string {
-	if w.calls == "" {
+	switch {
+	case w.calls == "":
 		return w.file + "\x00" + w.name
+	case w.constant:
+		return w.file + "\x00" + w.name + "\x00" + w.calls
 	}
 	return w.file + "\x00" + w.name + "\x00" + strconv.Itoa(w.line) + "\x00" + w.calls
 }

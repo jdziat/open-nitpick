@@ -229,7 +229,12 @@ func codeLines(lines []string, hashComments bool) []string {
 			// quote and still counts one.
 			probe := line
 			if !inDoc {
-				probe = hashTail.ReplaceAllString(quotedSpan.ReplaceAllString(line, `""`), "")
+				// Each quoted span keeps its own quote characters, so an
+				// empty `''` is not rewritten to `""` and a `'''` fence
+				// still counts as one.
+				probe = hashTail.ReplaceAllString(quotedSpan.ReplaceAllStringFunc(line, func(q string) string {
+					return q[:1] + q[len(q)-1:]
+				}), "")
 			}
 			fences := strings.Count(probe, `"""`) + strings.Count(probe, `'''`)
 			if inDoc {
@@ -791,12 +796,12 @@ var (
 	tsTopDef = regexp.MustCompile(`^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?\s*|class\s+|const\s+|let\s+|var\s+)([A-Za-z_$][\w$]*)`)
 	// tsMethodDef is a class member with a body: a method, an accessor, or a
 	// property holding a function, at any indentation.
-	// The parameter list admits no nested paren or quote, so a call whose
-	// last argument is a function (`setTimeout(function () {`,
+	// Neither parameter list admits a nested paren or quote, so a call
+	// whose last argument is a function (`setTimeout(function () {`,
 	// `it('x', function () {`) is not read as a method header; a default
 	// value holding a call falls back to the enclosing function, which is
-	// the safe direction.
-	tsMethodDef = regexp.MustCompile(`^\s+(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*(?:\*\s*)?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*(?:\([^()'"]*\)\s*(?::[^{=]+)?\s*\{|=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)`)
+	// the safe direction. The arrow branch is also anchored by its `=>`.
+	tsMethodDef = regexp.MustCompile(`^\s+(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*(?:\*\s*)?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*(?:\([^()'"]*\)\s*(?::[^{=]+)?\s*\{|=\s*(?:async\s*)?(?:\([^()'"]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)`)
 )
 
 // tsRedefined names the exported top-level definitions whose lines the diff

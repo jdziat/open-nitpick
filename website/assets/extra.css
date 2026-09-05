@@ -34,7 +34,7 @@
 }
 [data-md-color-scheme="slate"] {
   --md-primary-fg-color: #2dd4bf;
-  --md-primary-fg-color--dark: #14b8a6;
+  --md-primary-fg-color--dark: #5eead4;
   --md-primary-bg-color: #0b1220;
   --md-primary-bg-color--light: rgba(11, 18, 32, 0.7);
   --md-accent-fg-color: #2dd4bf;
@@ -63,14 +63,19 @@
 .md-tabs__link--active, .md-tabs__link:hover { opacity: 1; }
 .md-tabs__item--active { box-shadow: inset 0 -2px 0 var(--md-primary-fg-color); }
 .md-tabs__link--active { color: var(--md-primary-fg-color); }
-.md-search__form { background-color: rgba(127, 127, 127, 0.12); }
+.md-search__form { background-color: rgba(127, 127, 127, 0.12); border-radius: 0.4rem; }
 .md-search__input { color: var(--np-ink); }
 .md-search__input::placeholder, .md-search__icon { color: var(--np-muted); }
 [data-md-toggle="search"]:checked ~ .md-header .md-search__form { background-color: var(--np-card); }
 .md-grid { max-width: 72rem; }
 
-/* Buttons: the same hue darkens on hover; it does not change. */
-.md-typeset .md-button { border-color: var(--md-primary-fg-color); color: var(--md-primary-fg-color); }
+/* The mobile drawer takes the page background like the header does. */
+.md-nav--primary .md-nav__title, .md-nav__source { background-color: var(--md-default-bg-color); color: var(--np-ink); }
+
+/* Buttons: one radius with the cards; the primary shifts within its hue on
+   hover, the secondary tints and keeps its text, so the hierarchy holds
+   through the interaction. */
+.md-typeset .md-button { border-radius: 0.4rem; border-color: var(--md-primary-fg-color); color: var(--md-primary-fg-color); }
 .md-typeset .md-button--primary { background-color: var(--md-primary-fg-color); color: var(--md-primary-bg-color); }
 .md-typeset .md-button--primary:hover,
 .md-typeset .md-button--primary:focus-visible {
@@ -80,9 +85,9 @@
 }
 .md-typeset .md-button:not(.md-button--primary):hover,
 .md-typeset .md-button:not(.md-button--primary):focus-visible {
-  background-color: var(--md-primary-fg-color);
+  background-color: var(--md-accent-fg-color--transparent);
   border-color: var(--md-primary-fg-color);
-  color: var(--md-primary-bg-color);
+  color: var(--md-primary-fg-color);
 }
 
 /* Type */
@@ -105,13 +110,18 @@
 
 .np-stat { display: flex; gap: 2.5rem; flex-wrap: wrap; margin: 0 0 0.4rem; }
 .np-stat div { min-width: 8rem; }
+/* On a phone the three stats share the width rather than wrapping 2 + 1. */
+@media (max-width: 44rem) {
+  .np-stat { gap: 1rem; }
+  .np-stat div { min-width: 0; flex: 1 1 0; }
+}
 .np-stat p { margin: 0; }
 .np-stat strong { display: block; font-size: 1.7rem; line-height: 1; letter-spacing: -0.02em; color: var(--np-ink); font-variant-numeric: tabular-nums; }
 .np-stat span { color: var(--np-muted); font-size: 0.72rem; }
 
 .np-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr));
   gap: 1rem;
   margin: 1.5rem 0 2rem;
 }
@@ -119,11 +129,15 @@
   position: relative;
   background: var(--np-card);
   border: 1px solid var(--np-line);
-  border-radius: 0.6rem;
+  border-radius: 0.4rem;
   padding: 1rem 1.1rem;
   transition: border-color 120ms ease;
 }
 .np-card:hover, .np-card:focus-within { border-color: var(--md-primary-fg-color); }
+/* The ring means keyboard: it follows the link's focus-visible, not a click.
+   Where :has() is unsupported the border colour from :focus-within remains. */
+.np-card a:focus-visible { outline: none; }
+.np-card:has(a:focus-visible) { outline: 2px solid var(--md-primary-fg-color); outline-offset: 2px; }
 .np-card .np-card-title { margin: 0 0 0.4rem; font-size: 0.95rem; font-weight: 600; color: var(--np-ink); }
 .np-card p { margin: 0; color: var(--np-muted); }
 .np-card a { font-weight: 600; }
@@ -133,22 +147,5 @@
 @media (max-width: 44rem) {
   .np-hero h1 { font-size: 1.8rem; }
   .np-hero p.np-lede { font-size: 0.95rem; }
-  .np-stat { gap: 1.5rem; }
 }
 
-/* Round 3: one radius, keyboard focus on the card, mobile stat row. */
-.md-typeset .md-button, .np-card, .md-search__form { border-radius: 0.4rem; }
-.np-card a:focus-visible { outline: none; }
-.np-card:focus-within { outline: 2px solid var(--md-primary-fg-color); outline-offset: 2px; }
-.np-grid { grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr)); }
-.md-typeset .md-button:not(.md-button--primary):hover,
-.md-typeset .md-button:not(.md-button--primary):focus-visible {
-  background-color: var(--md-accent-fg-color--transparent);
-  border-color: var(--md-primary-fg-color);
-  color: var(--md-primary-fg-color);
-}
-[data-md-color-scheme="slate"] { --md-primary-fg-color--dark: #5eead4; }
-@media (max-width: 44rem) {
-  .np-stat { gap: 1rem; }
-  .np-stat div { min-width: 0; flex: 1 1 0; }
-}
