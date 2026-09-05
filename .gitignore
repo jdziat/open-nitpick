@@ -17,3 +17,4 @@ coverage.out
 
 # make dist output
 dist/
+resume.md
