@@ -122,6 +122,12 @@ confusion matrices for two task splits and the verdict against
 `GoMargin` 0.15 over the majority baseline. The command is built only
 on a go.
 
+Result 2026-09-05, evening (`docs/findings.md`, "Which model wrote it"):
+no-go for Go and Python, go for TypeScript. `nitpick identify-model`
+exists for TypeScript, answers "most similar to" with the classifier's
+confidence, and "unknown" with the reason otherwise. The corpus is
+embedded in the binary from `internal/modelid/corpus`.
+
 Which model wrote a file. This is the one command whose premise needs a
 measurement before code: it is not known that current models leave a
 stylistic signature that survives a human edit, and a confident wrong
