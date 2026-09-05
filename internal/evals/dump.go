@@ -405,6 +405,8 @@ func runDumpName(battery string, fixtures []Fixture, now time.Time, pid int) str
 			kinds["info"]++
 		case Caller(f.Name):
 			kinds["callers"]++
+		case Slop(f.Name):
+			kinds["slop"]++
 		default:
 			kinds["tuning"]++
 		}

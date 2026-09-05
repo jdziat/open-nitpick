@@ -313,7 +313,7 @@ quick:
 .PHONY: eval-fullreview
 eval-fullreview:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
-	go test -tags=eval -count=1 -timeout=30m -v -run TestFullReviewFixture ./internal/evals/
+	go test -tags=eval -count=1 -timeout=45m -v -run 'TestFullReviewFixture|TestRepoScoreFixture' ./internal/evals/
 
 # The slop corpus, judge-free, with review.slop on: recall over the plants
 # and, above all, silence on the controls.

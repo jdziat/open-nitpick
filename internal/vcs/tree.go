@@ -43,6 +43,10 @@ type Tree struct {
 	Covered    []string
 	Unbudgeted []string
 	Skipped    []TreeSkip
+
+	// Lines is the line count of each covered file, the denominator a score
+	// per thousand lines needs.
+	Lines map[string]int
 }
 
 // TreeSkip is one file the tree review left out on purpose.
@@ -95,6 +99,7 @@ func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 	}
 
 	t.Covered, t.Unbudgeted, t.Skipped = nil, nil, nil
+	t.Lines = map[string]int{}
 	var out bytes.Buffer
 	spent := 0
 	for _, name := range names {
@@ -124,6 +129,7 @@ func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 		}
 		spent += len(content) / 4
 		t.Covered = append(t.Covered, name)
+		t.Lines[name] = len(strings.Split(strings.TrimSuffix(string(content), "\n"), "\n"))
 		writeAddition(&out, name, content)
 	}
 	return out.Bytes(), nil

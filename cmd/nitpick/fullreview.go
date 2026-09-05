@@ -22,10 +22,19 @@ import (
 // and by what the review did not cover, since a review of half a tree must
 // not read as a review of the tree.
 func runFullReview(ctx context.Context, args []string) error {
+	return runTreeReview(ctx, "full-review", args, false)
+}
+
+// runRepoScore is full-review with the scorecard after the report.
+func runRepoScore(ctx context.Context, args []string) error {
+	return runTreeReview(ctx, "repo-score", args, true)
+}
+
+func runTreeReview(ctx context.Context, name string, args []string, score bool) error {
 	var f reviewFlags
 	var budget int
 
-	fs := flag.NewFlagSet("full-review", flag.ContinueOnError)
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.StringVar(&f.repo, "repo", ".", "repository root")
 	fs.StringVar(&f.configPath, "config", "", "path to .nitpick.yaml (default: <repo>/.nitpick.yaml)")
 	fs.StringVar(&f.instruction, "instruction", "", "extra instruction for this run only")
@@ -34,7 +43,11 @@ func runFullReview(ctx context.Context, args []string) error {
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
 	fs.StringVar(&f.logFormat, "log-format", "text", "log format: text or json")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: nitpick full-review [flags] [path...]\n\nReviews the whole working tree, or the paths given, and prints a remediation plan.\nThe default is the whole tree with the model on every batch; -budget bounds it and the report says what was left out.\n\nFlags:")
+		extra := ""
+		if score {
+			extra = " and the repository score"
+		}
+		fmt.Fprintf(os.Stderr, "Usage: nitpick %s [flags] [path...]\n\nReviews the whole working tree, or the paths given, and prints a remediation plan%s.\nThe default is the whole tree with the model on every batch; -budget bounds it and the report says what was left out.\n\nFlags:\n", name, extra)
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -90,5 +103,8 @@ func runFullReview(ctx context.Context, args []string) error {
 	fmt.Print(fullreview.Sections(report))
 	fmt.Print(fullreview.RemediationPlan(report.Findings))
 	fmt.Print(fullreview.CoverageNotice(tree))
+	if score {
+		fmt.Print(fullreview.Score(report, tree).String())
+	}
 	return nil
 }

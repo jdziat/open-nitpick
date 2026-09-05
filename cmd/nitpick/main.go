@@ -47,6 +47,8 @@ func run() int {
 		err = runReview(ctx, os.Args[2:])
 	case "full-review":
 		err = runFullReview(ctx, os.Args[2:])
+	case "repo-score":
+		err = runRepoScore(ctx, os.Args[2:])
 	case "explain-config":
 		err = runExplainConfig(os.Args[2:])
 	case "linters":
@@ -94,6 +96,8 @@ Usage:
   nitpick review [flags]           Review a change
   nitpick full-review [flags] [path...]
                                    Review the whole tree, or the paths given, with a remediation plan
+  nitpick repo-score [flags] [path...]
+                                   The same, plus slop, bug and security findings per thousand lines, by language
   nitpick explain-config [flags]   Show the resolved configuration and prompts
   nitpick providers                List available model providers
   nitpick linters                  List the deterministic analyzers and how each is configured

@@ -28,6 +28,66 @@ import (
 // puts the secret first in the remediation plan. Judge-free: a finding is
 // credited by the keyword rule the other corpora use.
 func TestFullReviewFixture(t *testing.T) {
+	report, tree, model := reviewTree(t, FullReviewFixture)
+	out := fullreview.Sections(report) + fullreview.RemediationPlan(report.Findings) + fullreview.CoverageNotice(tree)
+	t.Logf("model %s reviewed %d file(s), %d finding(s):\n%s", model.ID, len(tree.Covered), len(report.Findings), out)
+
+	for _, plant := range FullReviewPlants {
+		if !located(report.Findings, plant) {
+			t.Errorf("planted %s at %s:%d not located (%s)", plant.Class, plant.Path, plant.Line, plant.Why)
+		}
+	}
+	for _, f := range report.Findings {
+		if f.Path == FullReviewClean {
+			t.Errorf("finding on the clean control %s:%d: %s", f.Path, f.Line, f.Title)
+		}
+	}
+
+	if _, err := exec.LookPath("osv-scanner"); err == nil {
+		if !strings.Contains(out, "golang.org/x/text") && !strings.Contains(out, "GO-20") && !strings.Contains(out, "GHSA-") {
+			t.Errorf("osv-scanner is installed but no advisory for golang.org/x/text v0.3.0 is listed:\n%s", out)
+		}
+	} else {
+		t.Logf("osv-scanner not installed; the advisories section is unverified")
+	}
+
+	plan := fullreview.RemediationPlan(report.Findings)
+	first := strings.SplitN(strings.TrimSpace(strings.TrimPrefix(plan, "\nRemediation plan, most severe first; findings that share a fix are grouped:\n")), "\n", 2)[0]
+	if !strings.Contains(first, "/security]") {
+		t.Errorf("the remediation plan does not put the secret first:\n%s", plan)
+	}
+}
+
+// TestRepoScoreFixture is the acceptance for `nitpick repo-score`, section 3
+// of the plan: the fixture with its slop file scores above SlopThreshold,
+// and the same fixture without it scores below.
+func TestRepoScoreFixture(t *testing.T) {
+	with, tree, model := reviewTree(t, FullReviewFixture)
+	withCard := fullreview.Score(with, tree)
+	t.Logf("model %s, with the slop file:%s", model.ID, withCard)
+
+	without := map[string]string{}
+	for p, c := range FullReviewFixture {
+		if !strings.HasPrefix(p, "internal/slop/") {
+			without[p] = c
+		}
+	}
+	report, tree, _ := reviewTree(t, without)
+	withoutCard := fullreview.Score(report, tree)
+	t.Logf("without the slop file:%s", withoutCard)
+
+	if got := withCard.Total.PerKLOC(withCard.Total.SlopWeighted); got <= fullreview.SlopThreshold {
+		t.Errorf("with the slop file, slop per KLOC = %.2f, want above %.1f", got, fullreview.SlopThreshold)
+	}
+	if got := withoutCard.Total.PerKLOC(withoutCard.Total.SlopWeighted); got >= fullreview.SlopThreshold {
+		t.Errorf("without the slop file, slop per KLOC = %.2f, want below %.1f", got, fullreview.SlopThreshold)
+	}
+}
+
+// reviewTree materialises files as a git repository and reviews it whole,
+// the way runTreeReview does, under the eval model.
+func reviewTree(t *testing.T, files map[string]string) (*review.Report, *vcs.Tree, Model) {
+	t.Helper()
 	opts, err := OptionsFromEnv()
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +95,7 @@ func TestFullReviewFixture(t *testing.T) {
 	model := opts.Models[0]
 
 	dir := t.TempDir()
-	for p, content := range FullReviewFixture {
+	for p, content := range files {
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, p)), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -84,34 +144,7 @@ func TestFullReviewFixture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("review: %v", err)
 	}
-
-	out := fullreview.Sections(report) + fullreview.RemediationPlan(report.Findings) + fullreview.CoverageNotice(tree)
-	t.Logf("model %s reviewed %d file(s), %d finding(s):\n%s", model.ID, len(tree.Covered), len(report.Findings), out)
-
-	for _, plant := range FullReviewPlants {
-		if !located(report.Findings, plant) {
-			t.Errorf("planted %s at %s:%d not located (%s)", plant.Class, plant.Path, plant.Line, plant.Why)
-		}
-	}
-	for _, f := range report.Findings {
-		if f.Path == FullReviewClean {
-			t.Errorf("finding on the clean control %s:%d: %s", f.Path, f.Line, f.Title)
-		}
-	}
-
-	if _, err := exec.LookPath("osv-scanner"); err == nil {
-		if !strings.Contains(out, "golang.org/x/text") && !strings.Contains(out, "GO-20") && !strings.Contains(out, "GHSA-") {
-			t.Errorf("osv-scanner is installed but no advisory for golang.org/x/text v0.3.0 is listed:\n%s", out)
-		}
-	} else {
-		t.Logf("osv-scanner not installed; the advisories section is unverified")
-	}
-
-	plan := fullreview.RemediationPlan(report.Findings)
-	first := strings.SplitN(strings.TrimSpace(strings.TrimPrefix(plan, "\nRemediation plan, most severe first; findings that share a fix are grouped:\n")), "\n", 2)[0]
-	if !strings.Contains(first, "/security]") {
-		t.Errorf("the remediation plan does not put the secret first:\n%s", plan)
-	}
+	return report, tree, model
 }
 
 // located reports whether a finding on the plant's file, within the anchor
