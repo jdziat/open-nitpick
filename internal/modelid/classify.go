@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -32,11 +33,11 @@ func LoadCorpus(dir string) ([]Sample, error) {
 			return err
 		}
 		parts := strings.Split(filepath.ToSlash(rel), "/")
-		if len(parts) != 3 {
+		if len(parts) != 3 || !corpusName.MatchString(parts[2]) {
 			return nil
 		}
 		var task int
-		if _, err := fmt.Sscanf(strings.SplitN(parts[2], ".", 2)[0], "%d", &task); err != nil {
+		if _, err := fmt.Sscanf(parts[2][:2], "%d", &task); err != nil {
 			return nil
 		}
 		data, err := os.ReadFile(p)
@@ -48,6 +49,9 @@ func LoadCorpus(dir string) ([]Sample, error) {
 	})
 	return out, err
 }
+
+// corpusName is the file shape the generator writes: NN.<ext>.txt.
+var corpusName = regexp.MustCompile(`^\d{2}\.[a-z]+\.txt$`)
 
 // Classifier is a nearest-centroid classifier over standardised features,
 // one per language. It is the simplest thing that can find a signature if
@@ -184,6 +188,10 @@ func Experiment(samples []Sample, trainTask func(task int) bool) []Result {
 		c := Train(train)
 		r := Result{Language: lang, Train: len(train), Test: len(test), Confusion: map[string]map[string]int{}}
 		counts := map[string]int{}
+		authors := map[string]bool{}
+		for _, s := range train {
+			authors[s.Author] = true
+		}
 		for _, s := range test {
 			got, _ := c.Predict(s.Features)
 			if r.Confusion[s.Author] == nil {
@@ -194,9 +202,16 @@ func Experiment(samples []Sample, trainTask func(task int) bool) []Result {
 				r.Correct++
 			}
 			counts[s.Author]++
+			authors[s.Author] = true
+			authors[got] = true
 		}
-		for a, n := range counts {
+		// Every author that appears as an actual or a prediction gets a
+		// column, so a prediction of an author absent from the test set is
+		// shown rather than dropped.
+		for a := range authors {
 			r.Authors = append(r.Authors, a)
+		}
+		for _, n := range counts {
 			if n > r.Majority {
 				r.Majority = n
 			}
