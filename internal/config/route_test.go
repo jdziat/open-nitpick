@@ -43,3 +43,21 @@ func TestRouteMatchAndValidation(t *testing.T) {
 		t.Error("a route naming kinds needs the router")
 	}
 }
+
+func TestAPinFollowsItsModel(t *testing.T) {
+	base := ModelSpec{Provider: "openrouter", Model: "google/gemma-4-31b-it", Providers: []string{"deepinfra/turbo"}}
+	if got := base.overlay(ModelSpec{Model: "qwen/qwen3.8-27b"}); got.Providers != nil {
+		t.Errorf("a different model does not inherit the pin: %v", got.Providers)
+	}
+	if got := base.overlay(ModelSpec{Temperature: floatPtr(0)}); len(got.Providers) != 1 {
+		t.Errorf("the same model keeps the pin: %v", got.Providers)
+	}
+	if got := base.overlay(ModelSpec{Providers: []string{}}); got.Providers != nil && len(got.Providers) != 0 {
+		t.Errorf("an explicit empty list clears the pin: %v", got.Providers)
+	}
+	if got := base.overlay(ModelSpec{Model: "x", Providers: []string{"together"}}); len(got.Providers) != 1 || got.Providers[0] != "together" {
+		t.Errorf("an override's own pin wins: %v", got.Providers)
+	}
+}
+
+func floatPtr(f float64) *float64 { return &f }

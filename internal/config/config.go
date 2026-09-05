@@ -666,8 +666,16 @@ func (base ModelSpec) overlay(over ModelSpec) ModelSpec {
 	if over.Model != "" {
 		out.Model = over.Model
 	}
-	if len(over.Providers) > 0 {
+	// A pin names the upstreams that serve ONE model. It follows the model:
+	// an override that changes the model starts with no pin, and one that
+	// keeps the model keeps the pin unless it sets its own. Inherited across
+	// models it sent qwen to an endpoint that only serves gemma, and the
+	// router answered "no endpoints found" for every batch.
+	switch {
+	case over.Providers != nil:
 		out.Providers = append([]string(nil), over.Providers...)
+	case over.Model != "" && over.Model != base.Model:
+		out.Providers = nil
 	}
 	if over.BaseURL != "" {
 		out.BaseURL = over.BaseURL
