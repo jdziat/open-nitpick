@@ -94,7 +94,11 @@ controls are silent.
 Status 2026-09-05: built (`internal/fullreview/score.go`, the command in
 `cmd/nitpick/fullreview.go`). Three numbers per language with their
 denominators; `SlopThreshold` 2.0 weighted findings per thousand lines;
-acceptance `TestRepoScoreFixture` under `make eval-fullreview`.
+acceptance `TestRepoScoreFixture` under `make eval-fullreview`. First
+run, Kimi-K3 on Synthetic: with the slop file 57 weighted slop findings
+per thousand lines (5 findings over 70 lines), without it 0.00, both
+sides of the threshold; the full-review acceptance passed in the same
+run with the slop class on.
 
 A number from `full-review` with the `slop` class on: slop findings per
 thousand lines, weighted by severity, reported with the count and the
