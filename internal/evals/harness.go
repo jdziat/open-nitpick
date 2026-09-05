@@ -145,18 +145,40 @@ type Model struct {
 	Provider string
 
 	// Name is the model id sent to the provider: ID with the provider prefix
-	// removed. Empty means ID.
+	// and any routing pin removed. Empty means ID.
 	Name string
+
+	// Pin is the OpenRouter upstream the run is pinned to, from an "@slug"
+	// suffix on the entry ("google/gemma-4-31b-it@deepinfra/turbo"). The
+	// full id stays the row's name, so a pinned run and the default routing
+	// of the same weights are two rows.
+	Pin string
 }
 
 // ParseModel reads an EnvModels entry into a Model.
 func ParseModel(id string) Model {
 	id = strings.TrimSpace(id)
 	m := Model{ID: id, Kind: "custom"}
-	if provider, rest, ok := strings.Cut(id, ":"); ok && provider == llm.ProviderSynthetic {
-		m.Provider, m.Name = provider, rest
+	name := id
+	if provider, rest, ok := strings.Cut(name, ":"); ok && provider == llm.ProviderSynthetic {
+		m.Provider, name = provider, rest
+	}
+	if base, pin, ok := strings.Cut(name, "@"); ok && pin != "" {
+		m.Pin, name = pin, base
+	}
+	if name != id {
+		m.Name = name
 	}
 	return m
+}
+
+// PriceID is the price-table key for the model: the id without a routing
+// pin, because the table records the model's rate at the endpoint it names
+// and a pinned run that names a different one is priced as unknown by
+// PriceTable.Price rather than at the wrong endpoint's rate.
+func (m Model) PriceID() string {
+	base, _, _ := strings.Cut(m.ID, "@")
+	return base
 }
 
 // modelName is the id the provider sees.
@@ -708,6 +730,14 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	return out
 }
 
+// pinList is the providers list for a pin, nil for none.
+func pinList(pin string) []string {
+	if pin == "" {
+		return nil
+	}
+	return []string{pin}
+}
+
 func cmpLogger(l *slog.Logger) *slog.Logger {
 	if l != nil {
 		return l
@@ -730,8 +760,9 @@ func evalConfig(model Model) *config.Config {
 		// for anyone who only exported LLM_API_KEY, while `nitpick review`
 		// succeeded for them — a difference between the harness and the thing
 		// it measures.
-		Provider: model.provider(),
-		Model:    model.modelName(),
+		Provider:  model.provider(),
+		Model:     model.modelName(),
+		Providers: pinList(model.Pin),
 
 		// Reviews should be reproducible; run-to-run variance is measured
 		// separately and deliberately, not left to the provider default.

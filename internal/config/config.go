@@ -105,6 +105,15 @@ type ModelSpec struct {
 
 	// MaxRetries bounds SDK-level retries for transient failures.
 	MaxRetries *int `yaml:"max_retries"`
+
+	// Providers pins a router to these upstream providers, tried in order,
+	// with no fallback beyond them. OpenRouter only; slugs are OpenRouter's,
+	// with an endpoint suffix where one exists ("deepinfra/turbo"). It is
+	// what makes a model whose default routing stalls usable: the eval
+	// battery measured gemma-4-31b losing one review in five across
+	// OpenRouter's fifteen endpoints for it, and a pin names the one that
+	// answers.
+	Providers []string `yaml:"providers"`
 }
 
 // StructuredMode selects a structured-output strategy.
@@ -497,6 +506,9 @@ func (base ModelSpec) overlay(over ModelSpec) ModelSpec {
 	}
 	if over.Model != "" {
 		out.Model = over.Model
+	}
+	if len(over.Providers) > 0 {
+		out.Providers = append([]string(nil), over.Providers...)
 	}
 	if over.BaseURL != "" {
 		out.BaseURL = over.BaseURL

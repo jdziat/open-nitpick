@@ -219,6 +219,15 @@ func (c *Client) CallOptions() []llms.CallOption {
 	if c.Spec.Temperature != nil {
 		opts = append(opts, llms.WithTemperature(*c.Spec.Temperature))
 	}
+	if len(c.Spec.Providers) > 0 {
+		// OpenRouter's provider routing: order alone only prioritises, and
+		// the router falls back past the list unless told not to, so a pin
+		// is order plus allow_fallbacks false.
+		opts = append(opts, llms.WithExtraBodyParam("provider", map[string]any{
+			"order":           append([]string(nil), c.Spec.Providers...),
+			"allow_fallbacks": false,
+		}))
+	}
 	switch {
 	case c.Spec.MaxTokens > 0:
 		opts = append(opts, llms.WithMaxTokens(c.Spec.MaxTokens))

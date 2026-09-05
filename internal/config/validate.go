@@ -77,6 +77,16 @@ func (s ModelSpec) validate(required bool) []error {
 	if s.MaxTokens < 0 {
 		errs = append(errs, fmt.Errorf("max_tokens must not be negative, got %d", s.MaxTokens))
 	}
+	if len(s.Providers) > 0 {
+		if p := strings.ToLower(strings.TrimSpace(s.Provider)); p != "" && p != "openrouter" {
+			errs = append(errs, fmt.Errorf("providers pins a router's upstreams and provider %q is not a router", s.Provider))
+		}
+		for _, slug := range s.Providers {
+			if strings.TrimSpace(slug) == "" {
+				errs = append(errs, errors.New("providers contains an empty slug"))
+			}
+		}
+	}
 	if s.Timeout < 0 {
 		errs = append(errs, fmt.Errorf("timeout must not be negative, got %s", s.Timeout))
 	}

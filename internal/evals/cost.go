@@ -1027,6 +1027,17 @@ func (p *PriceTable) Price(model string) (Price, bool) {
 	if p == nil {
 		return Price{}, false
 	}
+	if base, pin, ok := strings.Cut(model, "@"); ok {
+		// A run pinned to one endpoint is billed at that endpoint's rate,
+		// and the table records exactly one endpoint's rate per model. The
+		// pin that matches is priced; any other is unknown rather than
+		// wrong.
+		price, found := p.Models[base]
+		if !found || price.Endpoint != pin {
+			return Price{}, false
+		}
+		return price, true
+	}
 	price, ok := p.Models[model]
 	return price, ok
 }
