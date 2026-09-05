@@ -95,16 +95,22 @@ a margin that survives Rule 15, and then only as "most similar to", with
 the confidence shown and "unknown" as the default answer. If the
 experiment fails, the finding is published and the command is not built.
 
-## Decisions for Jordan
+## Decisions, taken 2026-09-05
 
-1. Is `slop` a finding class in the review (so it appears on pull
-   requests too), or only in `full-review` and the score? The plan says
-   both, off by default in the review.
-2. Should `full-review` run the model at all when `--budget` is small, or
-   fall back to analyzers only and say so?
-3. The model-identification experiment costs a corpus: roughly twelve
-   models by three languages by twenty files. Approve the spend before
-   step 4 starts.
+1. `slop` is a finding class in pull request reviews too, **off by default**
+   in the review; it may be switched on once it is built and its controls
+   are seen to be silent. It is always on inside `full-review` and the score.
+2. `full-review` supports a small `--budget`, but the default is the big
+   lift: the whole tree, the model on every batch, analyzers as evidence.
+   A small budget runs what it can and the report says what it did not
+   cover, in the caller-walk notice's voice.
+3. The model-identification corpus spend is approved. Step 4's experiment
+   may start once 1 through 3 are built.
+4. The repository stays private until this plan's steps are done.
+5. Related context was split on main (`related_context` on,
+   `related_context_callers` off) before this branch starts; `full-review`
+   turns both on by default, since a whole-tree review has already read
+   every file.
 
 ## Order
 
