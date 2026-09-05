@@ -1,0 +1,20 @@
+{
+  "fixture": "ts-clean-doc-comment",
+  "findings": [
+    {
+      "path": "src/duration.ts",
+      "line": 15,
+      "end_line": 16,
+      "severity": "info",
+      "category": "Functional Correctness",
+      "class": "correctness",
+      "title": "Enforce the documented unit boundary.",
+      "rationale": "formatDuration(90_000) returns \"90s\", and formatDuration(3_600_000) returns \"60m\". Both outputs violate the documented requirement that the whole-number unit stays below 60. parseDuration accepts these values, so this is a reachable behavior. Either enforce the boundary with a defined fallback or update the contract and add boundary tests.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-05T20:45:37Z",
+  "mode": "plaintext",
+  "fingerprint": "5472c1cb0fe22bd512b73cd44093d24f7790541b2dbebe3a735ead5b896c8b0e",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1537496272\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  minor [Functional Correctness]\n  → src/duration.ts:15-16\n\n  Enforce the documented unit boundary.\n\n  formatDuration(90_000) returns \"90s\", and formatDuration(3_600_000)\n  returns \"60m\". Both outputs violate the documented requirement that the\n  whole-number unit stays below 60. parseDuration accepts these values, so\n  this is a reachable behavior. Either enforce the boundary with a defined\n  fallback or update the contract and add boundary tests.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMinor    1\n\n1 file reviewed:\n  - src/duration.ts\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 6s elapsed\nFinishing analysis tools... 14s elapsed\nWriting review comments... 14s elapsed\n"
+}

@@ -1,0 +1,20 @@
+{
+  "fixture": "python-slop-swallowed-exception",
+  "findings": [
+    {
+      "path": "app/orders.py",
+      "line": 19,
+      "end_line": 20,
+      "severity": "warning",
+      "category": "Data Integrity \u0026 Integration",
+      "class": "correctness",
+      "title": "Do not silently discard charge failures.",
+      "rationale": "charge_all() catches every Exception from charge() and returns only successful receipts. This hides both gateway failures and programming errors, and callers cannot identify failed orders. Handle the defined gateway failure contract and return failure details or re-raise after recording the failed order. Do not retry a failed charge unless the gateway supports idempotency.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-05T20:41:41Z",
+  "mode": "plaintext",
+  "fingerprint": "4f12cc852798fc0790ca33f15c2788d51e22c265fa6b1e4190f457cc4aa6f943",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1106663849\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Data Integrity \u0026 Integration]\n  → app/orders.py:19-20\n\n  Do not silently discard charge failures.\n\n  charge_all() catches every Exception from charge() and returns only\n  successful receipts. This hides both gateway failures and programming\n  errors, and callers cannot identify failed orders. Handle the defined\n  gateway failure contract and return failure details or re-raise after\n  recording the failed order. Do not retry a failed charge unless the\n  gateway supports idempotency.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - app/orders.py\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 18s elapsed\nWriting review comments... 18s elapsed\n"
+}
