@@ -1118,7 +1118,7 @@ TypeScript by six models from the sweep through OpenRouter at temperature
 sampled with a fixed seed from the Go and Python standard libraries on the
 generating machine. TypeScript has no human control: there is no
 human-written TypeScript on that machine that is not itself a dependency.
-Nineteen generations came back empty twice and were left out, so the
+Seventeen generations came back empty twice and were left out, so the
 corpus is 223 files, not 240.
 
 **The instrument.** Twenty-two features a reader could notice without
