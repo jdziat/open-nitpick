@@ -337,15 +337,19 @@ func extractJSON[T any](ctx context.Context, c *Client, msgs []llms.Message, opt
 	}
 
 	prompted := withSchemaInstruction(msgs, schema)
+	// Read once: batches share the client, and one batch downgrading it
+	// between this call's construction and its error check made the other
+	// batch skip the fallback for a rejection it had just received.
+	textMode := c.structuredMode() == config.StructuredText
 	call := append([]llms.CallOption(nil), opts...)
-	if c.structuredMode() != config.StructuredText {
-		call = append(call, llms.WithJSONMode())
-	} else {
+	if textMode {
 		call = append(call, withoutResponseFormat())
+	} else {
+		call = append(call, llms.WithJSONMode())
 	}
 
 	resp, err := generateContent(ctx, c, prompted, call)
-	if err != nil && c.structuredMode() != config.StructuredText && isCapabilityError(err) && ctx.Err() == nil {
+	if err != nil && !textMode && isCapabilityError(err) && ctx.Err() == nil {
 		// json_object rejected too. The schema is already in the prompt and
 		// the decoder already tolerates prose around the object, so the
 		// request goes again with no response_format, and the client
@@ -442,6 +446,20 @@ func decodeLenient[T any](content string) (T, error) {
 			return zero, err
 		}
 		return value, nil
+	}
+	// A model writing a rationale with a real tab or newline inside the
+	// string, rather than the escape, produces JSON that no parser accepts
+	// and every reader understands. Escape those and try once more before
+	// hunting for candidates: gemma-4-31b did this on most replies when no
+	// response_format was constraining it.
+	if escaped := escapeControlChars(trimmed); escaped != trimmed {
+		if err := json.Unmarshal([]byte(escaped), &value); err == nil {
+			if err := requirePopulated(escaped, value); err != nil {
+				return zero, err
+			}
+			return value, nil
+		}
+		trimmed = escaped
 	}
 
 	// Otherwise consider every candidate object in the text, preferring the
@@ -572,6 +590,39 @@ func stripReasoning(s string) string {
 	}
 
 	return strings.TrimSpace(s)
+}
+
+// escapeControlChars rewrites raw control characters that sit inside JSON
+// string literals as their escapes, and leaves everything outside strings
+// alone. It tracks the backslash so an existing escape is not doubled.
+func escapeControlChars(s string) string {
+	var b strings.Builder
+	inString, escaped := false, false
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		switch {
+		case escaped:
+			escaped = false
+		case inString && ch == '\\':
+			escaped = true
+		case ch == '"':
+			inString = !inString
+		case inString && ch < 0x20:
+			switch ch {
+			case '\t':
+				b.WriteString(`\t`)
+			case '\n':
+				b.WriteString(`\n`)
+			case '\r':
+				b.WriteString(`\r`)
+			default:
+				fmt.Fprintf(&b, `\u%04x`, ch)
+			}
+			continue
+		}
+		b.WriteByte(ch)
+	}
+	return b.String()
 }
 
 // extractJSONCandidates returns every balanced top-level JSON object or array

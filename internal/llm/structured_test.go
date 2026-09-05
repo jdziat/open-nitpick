@@ -519,3 +519,19 @@ func TestExtractFallsBackToPlainTextWhenJSONModeIsRejected(t *testing.T) {
 		t.Error("text mode sent a response_format")
 	}
 }
+
+func TestDecodeLenientEscapesControlCharactersInsideStrings(t *testing.T) {
+	raw := "{\"findings\":[{\"path\":\"a.go\",\"line\":7,\"severity\":\"warning\",\"title\":\"tab\there\nand newline\"}]}"
+	got, err := decodeLenient[result](raw)
+	if err != nil {
+		t.Fatalf("a raw tab inside a string literal is escaped, not fatal: %v", err)
+	}
+	if got.Findings[0].Title != "tab\there\nand newline" {
+		t.Errorf("title = %q", got.Findings[0].Title)
+	}
+
+	// Existing escapes are not doubled, and structure outside strings is untouched.
+	if s := escapeControlChars("{\"a\":\"x\\ty\"}\n"); s != "{\"a\":\"x\\ty\"}\n" {
+		t.Errorf("escapeControlChars altered valid JSON: %q", s)
+	}
+}
