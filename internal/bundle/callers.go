@@ -28,22 +28,28 @@ import (
 // repository's own tree holds. It is also bounded in a fourth way that
 // related context is not: finding callers means reading files that were not
 // named by anything, so the walk over the tree has a ceiling of its own
-// (maxCallerFiles), and a repository above it attaches whichever callers the
-// first files held.
+// (maxCallerFiles, per plan), and a repository above it attaches whichever
+// callers the first files held.
 //
 // Each language follows the same three steps: name the exported declarations
 // whose lines the diff touched, find files whose imports resolve to the
 // changed file, and cut out the enclosing function of every call site there.
 // A call that cannot be traced to an import of the changed file is not a
-// caller; the walk fails closed.
+// caller; the walk fails closed. A call site is matched in code only: a
+// comment or a string that names the symbol is not a call.
 
-// maxCallerFiles caps how many candidate files one plan reads looking for
-// callers. Each read is one fetch, which on a hosted provider is one request.
+// maxCallerFiles caps how many candidate files one plan lists looking for
+// callers, across every changed file and language. Each candidate is at most
+// one fetch, which on a hosted provider is one request.
 const maxCallerFiles = 150
 
 // maxCallersPerSymbol caps how many call sites of one redefined symbol are
-// attached. Three callers show a contract; thirty show a popular helper.
+// attached across the whole walk. Three callers show a contract; thirty show
+// a popular helper.
 const maxCallersPerSymbol = 3
+
+// maxCallerConstants caps how many constant lines one caller brings along.
+const maxCallerConstants = 3
 
 // callerSkipDirs are directory names the walk never descends into: vendored
 // or generated trees, and test data, where a caller says nothing about the
@@ -63,12 +69,22 @@ type redefined struct {
 }
 
 // callerWants returns a want for each untouched function that calls a symbol
-// the change redefined in e.
+// the change redefined in e, followed by the constants those functions pass.
 func (c *relatedCollector) callerWants(e *Entry) []want {
-	if e.File.Kind == diff.ChangeAdded {
+	if e.File.Kind == diff.ChangeAdded || !e.HasContent() {
 		// A new file has no callers that predate it that the diff did not
-		// also write.
+		// also write. A deleted file never gets here: the assembler skips
+		// it as unreviewable, and a finding about its orphaned callers
+		// would have no line to sit on.
 		return nil
+	}
+	// A rename's old path is what the callers still import, and it is
+	// absent at head. The resolvers probe by existence, so it is seeded
+	// with the content; it is never attached, being a changed path.
+	if e.File.OldPath != "" && e.File.OldPath != e.File.Path {
+		if _, ok := c.files[e.File.OldPath]; !ok {
+			c.files[e.File.OldPath] = e.Content
+		}
 	}
 	switch strings.ToLower(path.Ext(e.File.Path)) {
 	case ".go":
@@ -81,19 +97,23 @@ func (c *relatedCollector) callerWants(e *Entry) []want {
 	return nil
 }
 
-// touchedRanges lists the new-side line ranges each hunk spans. A declaration
-// that overlaps one was redefined, in the loose sense the walk wants: its doc
-// comment, signature or body changed.
+// redefinedSource is the text the redefined declarations are read from, the
+// head content, and the new-side line ranges the diff touched in it.
+func redefinedSource(e *Entry) (content string, ranges [][2]int) {
+	return e.Content, touchedRanges(e.File)
+}
+
+// touchedRanges lists the new-side line ranges each hunk changed. A
+// declaration that overlaps one was redefined, in the loose sense the walk
+// wants: its doc comment, signature or body changed.
 func touchedRanges(f *diff.File) [][2]int {
 	var out [][2]int
 	for _, h := range f.Hunks {
 		lo, hi := 0, 0
 		for _, l := range h.Lines {
-			if l.Kind == diff.LineRemoved {
-				continue
-			}
-			if l.Kind == diff.LineContext {
-				// Context lines position the hunk but were not changed.
+			if l.Kind != diff.LineAdded {
+				// Context lines position the hunk but were not changed, and
+				// removed lines have no new-side number.
 				continue
 			}
 			if lo == 0 || l.NewLine < lo {
@@ -122,15 +142,26 @@ func overlaps(ranges [][2]int, lo, hi int) bool {
 	return false
 }
 
-// walkFiles lists files under root with one of the given extensions, in a
+// sourcePaths are the paths a caller's import may resolve to: the file's
+// current path and, for a rename, the path callers still import.
+func sourcePaths(e *Entry) map[string]bool {
+	out := map[string]bool{e.File.Path: true}
+	if e.File.OldPath != "" {
+		out[e.File.OldPath] = true
+	}
+	return out
+}
+
+// walkFiles lists files under root that isCandidate accepts, in a
 // breadth-first order so the shallow, central packages come before the deep
-// ones, stopping at the file ceiling. Test files and the changed files
-// themselves are left out.
+// ones, stopping when the plan's ceiling is reached. The changed files
+// themselves are left out. The ceiling is shared by every walk in the plan,
+// so a change touching three languages does not triple it.
 func (c *relatedCollector) walkFiles(root string, isCandidate func(name string) bool) []string {
 	var out []string
 	queue := []string{strings.Trim(root, "/")}
 	seen := map[string]bool{}
-	for len(queue) > 0 && len(out) < maxCallerFiles {
+	for len(queue) > 0 && c.walked < maxCallerFiles {
 		dir := queue[0]
 		queue = queue[1:]
 		if seen[dir] {
@@ -154,7 +185,8 @@ func (c *relatedCollector) walkFiles(root string, isCandidate func(name string) 
 				continue
 			}
 			out = append(out, p)
-			if len(out) >= maxCallerFiles {
+			c.walked++
+			if c.walked >= maxCallerFiles {
 				break
 			}
 		}
@@ -162,13 +194,59 @@ func (c *relatedCollector) walkFiles(root string, isCandidate func(name string) 
 	return out
 }
 
-// callSites returns the 0-based line indexes in lines where re matches, in
-// order, and the enclosing top-level definition of each as found by
-// enclosing, deduplicated and capped at maxCallersPerSymbol.
-func callSites(lines []string, re *regexp.Regexp, enclosing func(lines []string, i int) int) []int {
+// --- Matching call sites in code, not in prose ---------------------------------
+
+var (
+	quotedSpan  = regexp.MustCompile("\"(?:[^\"\\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\\n]|\\\\.)*'|`[^`\\n]*`")
+	slashTail   = regexp.MustCompile(`//.*$`)
+	hashTail    = regexp.MustCompile(`#.*$`)
+	blockSpan   = regexp.MustCompile(`/\*.*?\*/`)
+	pyDocFence  = regexp.MustCompile(`^\s*(?:"""|''')`)
+	pyDocInline = regexp.MustCompile(`^\s*(?:"""|''').*(?:"""|''')\s*$`)
+)
+
+// codeLines returns a copy of lines with string literals and comments
+// blanked, so a regex for a call site cannot match a doc comment that names
+// the symbol or a string that mentions it. Line-local: a multi-line block
+// comment is not tracked, but a Python docstring is, since one that mentions
+// the function it documents is the common case.
+func codeLines(lines []string, hashComments bool) []string {
+	out := make([]string, len(lines))
+	inDoc := false
+	for i, line := range lines {
+		if hashComments {
+			if inDoc {
+				if strings.Contains(line, `"""`) || strings.Contains(line, `'''`) {
+					inDoc = false
+				}
+				continue
+			}
+			if pyDocFence.MatchString(line) && !pyDocInline.MatchString(line) {
+				inDoc = true
+				continue
+			}
+		}
+		s := quotedSpan.ReplaceAllString(line, `""`)
+		s = blockSpan.ReplaceAllString(s, "")
+		if hashComments {
+			s = hashTail.ReplaceAllString(s, "")
+		} else {
+			s = slashTail.ReplaceAllString(s, "")
+		}
+		out[i] = s
+	}
+	return out
+}
+
+// callSites returns the enclosing-definition line index of each call site in
+// code where re matches, deduplicated, in order. code is the blanked copy
+// from codeLines; lines is the real text the enclosing function is found in.
+// A definition of name itself (another type's method of the same name, or a
+// shadowing function) is not a call of it.
+func callSites(code, lines []string, name string, re *regexp.Regexp, enclosing func(lines []string, i int) int) []int {
 	var starts []int
 	seen := map[int]bool{}
-	for i, line := range lines {
+	for i, line := range code {
 		if !re.MatchString(line) {
 			continue
 		}
@@ -176,56 +254,103 @@ func callSites(lines []string, re *regexp.Regexp, enclosing func(lines []string,
 		if s < 0 || seen[s] {
 			continue
 		}
+		if s == i && callerName(lines[s]) == name {
+			continue
+		}
 		seen[s] = true
 		starts = append(starts, s)
-		if len(starts) >= maxCallersPerSymbol {
-			break
-		}
 	}
 	return starts
 }
+
+// callRegexp matches name as a call, not preceded by a dot (which would make
+// it a member of something else) and not part of a longer identifier.
+func callRegexp(name string) *regexp.Regexp {
+	return regexp.MustCompile(`(?:^|[^.\w$])` + regexp.QuoteMeta(name) + `\s*\(`)
+}
+
+// memberCallRegexp matches receiver.name( with the same identifier guard.
+func memberCallRegexp(receiver, name string) *regexp.Regexp {
+	return regexp.MustCompile(`(?:^|[^.\w$])` + regexp.QuoteMeta(receiver) + `\.` + regexp.QuoteMeta(name) + `\s*\(`)
+}
+
+// --- Constants a caller passes -------------------------------------------------
+
+var identWord = regexp.MustCompile(`\b[A-Za-z_$][\w$]*\b`)
 
 // callerConstants finds the single-line, top-level constants of a file that
 // the body at lines[start:end] names, and returns their line indexes. A
 // caller that passes BATCH where the new precondition is on the page size
 // tells the model nothing unless BATCH's value comes along; the definition
 // is one line and sits outside the function, so it is attached beside it.
-// Capped at maxCallerConstants per caller.
-func callerConstants(lines []string, start, end int, def *regexp.Regexp) []int {
+// constAt reports the name a line defines at top level, or "".
+func callerConstants(lines []string, start, end int, constAt func(i int) string) []int {
 	body := strings.Join(lines[start:min(end, len(lines))], "\n")
 	used := map[string]bool{}
 	for _, m := range identWord.FindAllString(body, -1) {
 		used[m] = true
 	}
 	var out []int
-	for i, line := range lines {
+	for i := range lines {
 		if i >= start && i < end {
 			continue
 		}
-		m := def.FindStringSubmatch(line)
-		if m == nil || !used[m[1]] {
-			continue
-		}
-		out = append(out, i)
-		if len(out) >= maxCallerConstants {
-			break
+		if name := constAt(i); name != "" && used[name] {
+			out = append(out, i)
+			if len(out) >= maxCallerConstants {
+				break
+			}
 		}
 	}
 	return out
 }
 
-// maxCallerConstants caps how many constant lines one caller brings along.
-const maxCallerConstants = 3
-
 var (
-	identWord = regexp.MustCompile(`\b[A-Za-z_$][\w$]*\b`)
-	// One-line top-level constant or variable, per language: the name is
-	// the first group. Block members in Go (`\tNAME = ...` inside const (...))
-	// are matched by the indented form.
-	goConstLine = regexp.MustCompile(`^(?:(?:const|var)\s+|\t)([A-Z]\w*)\s*(?:\w+\s*)?=\s*\S`)
-	pyConstLine = regexp.MustCompile(`^([A-Z][A-Z0-9_]*)\s*(?::\s*[\w\[\], ]+)?\s*=\s*\S`)
-	tsConstLine = regexp.MustCompile(`^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*\S`)
+	goConstDecl  = regexp.MustCompile(`^(?:const|var)\s+([A-Z]\w*)\s*(?:\w+\s*)?=\s*\S`)
+	goConstBlock = regexp.MustCompile(`^(?:const|var)\s*\(\s*$`)
+	goConstItem  = regexp.MustCompile(`^\t([A-Z]\w*)\s*(?:\w+\s*)?=\s*\S`)
+	pyConstLine  = regexp.MustCompile(`^([A-Z][A-Z0-9_]*)\s*(?::\s*[\w\[\], ]+)?\s*=\s*\S`)
+	tsConstLine  = regexp.MustCompile(`^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*\S`)
 )
+
+// goConstAt returns a predicate naming the top-level constant or variable a
+// line declares: a one-line `const X = ...`, or a member of a `const (`
+// block. An indented assignment inside a function body is not one, which is
+// why block membership is tracked rather than inferred from the tab.
+func goConstAt(lines []string) func(i int) string {
+	inBlock := make([]bool, len(lines))
+	open := false
+	for i, line := range lines {
+		switch {
+		case goConstBlock.MatchString(line):
+			open = true
+		case open && strings.HasPrefix(line, ")"):
+			open = false
+		default:
+			inBlock[i] = open
+		}
+	}
+	return func(i int) string {
+		if m := goConstDecl.FindStringSubmatch(lines[i]); m != nil {
+			return m[1]
+		}
+		if inBlock[i] {
+			if m := goConstItem.FindStringSubmatch(lines[i]); m != nil {
+				return m[1]
+			}
+		}
+		return ""
+	}
+}
+
+func regexpConstAt(lines []string, re *regexp.Regexp) func(i int) string {
+	return func(i int) string {
+		if m := re.FindStringSubmatch(lines[i]); m != nil {
+			return m[1]
+		}
+		return ""
+	}
+}
 
 // constantExtract returns the one line at index i with its leading comments.
 func constantExtract(i int, commentPrefixes ...string) func(content, name string) (Related, bool) {
@@ -253,17 +378,42 @@ func callerExtract(start int, commentPrefixes ...string) func(content, name stri
 	}
 }
 
+// callerName reads a display name for the definition on a line, for the
+// dedupe key and the log: the identifier the declaration binds.
+func callerName(line string) string {
+	if m := callerNameDef.FindStringSubmatch(line); m != nil {
+		return m[1]
+	}
+	if m := callerNameBinding.FindStringSubmatch(line); m != nil {
+		return m[1]
+	}
+	if m := callerNameMethod.FindStringSubmatch(line); m != nil {
+		return m[1]
+	}
+	return strings.TrimSpace(line)
+}
+
+var (
+	callerNameDef     = regexp.MustCompile(`^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function|func|def|class)\b\s*\*?\s*(?:\([^)]*\)\s*)?([A-Za-z_$][\w$]*)`)
+	callerNameBinding = regexp.MustCompile(`^\s*(?:export\s+)?(?:default\s+)?(?:const|let|var)\s+(?:async\s+)?(?:function\s+)?([A-Za-z_$][\w$]*)`)
+	callerNameMethod  = regexp.MustCompile(`^\s*(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*(?:=\s*(?:async\s*)?)?\(`)
+)
+
+// indentOf returns the leading whitespace of a line.
+func indentOf(line string) string {
+	return line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+}
+
 // --- Go ----------------------------------------------------------------------
 
-// goRedefined names the exported functions and methods in e whose lines the
-// diff touched, from a full parse of the head content.
-func goRedefined(e *Entry) []redefined {
+// goRedefined names the exported functions and methods whose lines the diff
+// touched, from a full parse of the source.
+func goRedefined(filename, content string, ranges [][2]int) []redefined {
 	fset := token.NewFileSet()
-	parsed, err := parser.ParseFile(fset, e.File.Path, e.Content, parser.ParseComments)
+	parsed, err := parser.ParseFile(fset, filename, content, parser.ParseComments)
 	if err != nil || parsed == nil {
 		return nil
 	}
-	ranges := touchedRanges(e.File)
 	var out []redefined
 	for _, d := range parsed.Decls {
 		fn, ok := d.(*ast.FuncDecl)
@@ -319,7 +469,8 @@ func (c *relatedCollector) goCallerWants(e *Entry) []want {
 	if c.list == nil {
 		return nil
 	}
-	syms := goRedefined(e)
+	source, ranges := redefinedSource(e)
+	syms := goRedefined(e.File.Path, source, ranges)
 	if len(syms) == 0 {
 		return nil
 	}
@@ -332,30 +483,46 @@ func (c *relatedCollector) goCallerWants(e *Entry) []want {
 	if mod.Path == "" {
 		return nil
 	}
-	rel := strings.TrimPrefix(strings.TrimPrefix(dir, mod.Dir), "/")
-	importPath := mod.Path
-	if rel != "" {
-		importPath = mod.Path + "/" + rel
+	importPathOf := func(d string) string {
+		rel := strings.TrimPrefix(strings.TrimPrefix(d, mod.Dir), "/")
+		if rel == "" {
+			return mod.Path
+		}
+		return mod.Path + "/" + rel
 	}
-	pkgName := goPackageName(importPath)
+	importPaths := map[string]bool{}
+	for p := range sourcePaths(e) {
+		d := path.Dir(p)
+		if d == "." {
+			d = ""
+		}
+		importPaths[importPathOf(d)] = true
+	}
+	pkgName := goPackageName(importPathOf(dir))
 
 	files := c.walkFiles(mod.Dir, func(name string) bool {
 		return strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go")
 	})
 
 	var wants []want
+	attached := map[string]int{}
 	for _, file := range files {
 		content, ok := c.read(file)
 		if !ok {
 			continue
 		}
-		local := goImportsAs(content, importPath, pkgName)
+		local := goImportsAs(content, importPaths, pkgName)
 		samePkg := path.Dir(file) == path.Dir(e.File.Path)
 		if local == "" && !samePkg {
 			continue
 		}
 		lines := splitLines(content)
+		code := codeLines(lines, false)
+		constAt := goConstAt(lines)
 		for _, s := range syms {
+			if attached[s.name] >= maxCallersPerSymbol {
+				continue
+			}
 			var re *regexp.Regexp
 			var calls string
 			switch {
@@ -367,22 +534,20 @@ func (c *relatedCollector) goCallerWants(e *Entry) []want {
 				re = regexp.MustCompile(`\.` + regexp.QuoteMeta(s.name) + `\s*\(`)
 				calls = pkgName + "." + s.receiver + "." + s.name
 			case samePkg:
-				re = regexp.MustCompile(`\b` + regexp.QuoteMeta(s.name) + `\s*\(`)
+				re = callRegexp(s.name)
 				calls = s.name
 			default:
-				re = regexp.MustCompile(`\b` + regexp.QuoteMeta(local) + `\.` + regexp.QuoteMeta(s.name) + `\s*\(`)
+				re = memberCallRegexp(local, s.name)
 				calls = pkgName + "." + s.name
 			}
-			for _, start := range callSites(lines, re, goEnclosingFunc) {
-				wants = append(wants, want{
-					file:    file,
-					name:    callerName(lines[start]),
-					calls:   calls,
-					uses:    1,
-					extract: callerExtract(start, "//"),
-				})
-				for _, i := range callerConstants(lines, start, braceExtent(lines, start), goConstLine) {
-					wants = append(wants, want{file: file, name: callerName(lines[start]) + ":" + strings.TrimSpace(lines[i]), calls: calls, extract: constantExtract(i, "//")})
+			for _, start := range callSites(code, lines, s.name, re, goEnclosingFunc) {
+				if attached[s.name] >= maxCallersPerSymbol {
+					break
+				}
+				attached[s.name]++
+				wants = append(wants, want{file: file, name: callerName(lines[start]), calls: calls, uses: 1, extract: callerExtract(start, "//")})
+				for _, i := range callerConstants(lines, start, braceExtent(lines, start), constAt) {
+					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, extract: constantExtract(i, "//")})
 				}
 			}
 		}
@@ -390,16 +555,16 @@ func (c *relatedCollector) goCallerWants(e *Entry) []want {
 	return wants
 }
 
-// goImportsAs returns the local name a file binds importPath to, or empty
-// when it does not import it.
-func goImportsAs(content, importPath, pkgName string) string {
+// goImportsAs returns the local name a file binds one of importPaths to, or
+// empty when it imports none of them.
+func goImportsAs(content string, importPaths map[string]bool, pkgName string) string {
 	fset := token.NewFileSet()
 	parsed, err := parser.ParseFile(fset, "", content, parser.ImportsOnly)
 	if err != nil || parsed == nil {
 		return ""
 	}
 	for _, spec := range parsed.Imports {
-		if strings.Trim(spec.Path.Value, `"`) != importPath {
+		if !importPaths[strings.Trim(spec.Path.Value, `"`)] {
 			continue
 		}
 		if spec.Name != nil {
@@ -413,43 +578,24 @@ func goImportsAs(content, importPath, pkgName string) string {
 	return ""
 }
 
-// callerName reads a display name for the definition on a line, for the
-// dedupe key and the log: the identifier after the keyword, best effort.
-func callerName(line string) string {
-	m := regexp.MustCompile(`(?:func|def|function|class)\s+(?:\([^)]*\)\s*)?(?:async\s+)?([A-Za-z_$][\w$]*)`).FindStringSubmatch(line)
-	if m != nil {
-		return m[1]
-	}
-	m = regexp.MustCompile(`(?:const|let|var|export)\s+(?:async\s+)?(?:function\s+)?([A-Za-z_$][\w$]*)`).FindStringSubmatch(line)
-	if m != nil {
-		return m[1]
-	}
-	return strings.TrimSpace(line)
-}
-
 // --- Python --------------------------------------------------------------------
 
-var pyTopDef = regexp.MustCompile(`^(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)`)
+var (
+	pyTopDef = regexp.MustCompile(`^(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)`)
+	pyAnyDef = regexp.MustCompile(`^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)`)
+)
 
 // pyRedefined names the module-level defs and classes whose lines the diff
 // touched. A def's extent runs to the next unindented, non-blank line.
-func pyRedefined(e *Entry) []redefined {
-	lines := splitLines(e.Content)
-	ranges := touchedRanges(e.File)
+func pyRedefined(content string, ranges [][2]int) []redefined {
+	lines := splitLines(content)
 	var out []redefined
 	for i := 0; i < len(lines); i++ {
 		m := pyTopDef.FindStringSubmatch(lines[i])
 		if m == nil || strings.HasPrefix(m[1], "_") {
 			continue
 		}
-		end := i + 1
-		for end < len(lines) {
-			t := lines[end]
-			if strings.TrimSpace(t) != "" && !strings.HasPrefix(t, " ") && !strings.HasPrefix(t, "\t") {
-				break
-			}
-			end++
-		}
+		end := pyBlockEnd(lines, i, "")
 		// Decorators above the def belong to it.
 		lo := i
 		for lo > 0 && strings.HasPrefix(lines[lo-1], "@") {
@@ -463,35 +609,48 @@ func pyRedefined(e *Entry) []redefined {
 	return out
 }
 
-// pyEnclosingDef finds the module-level def or class line i sits in.
-func pyEnclosingDef(lines []string, i int) int {
-	for j := i; j >= 0; j-- {
-		if pyTopDef.MatchString(lines[j]) {
-			return j
-		}
-		if j < i && strings.TrimSpace(lines[j]) != "" && !strings.HasPrefix(lines[j], " ") && !strings.HasPrefix(lines[j], "\t") && !strings.HasPrefix(lines[j], "@") {
-			return -1
-		}
-	}
-	return -1
-}
-
-// pyDefEnd returns the index one past the last line of the def starting at
-// start, by indentation, with trailing blank lines left out.
-func pyDefEnd(lines []string, start int) int {
+// pyBlockEnd returns the index one past the last line of the block whose
+// header at start has the given indentation: lines more indented than the
+// header, or blank, belong to it. Trailing blank lines are left out.
+func pyBlockEnd(lines []string, start int, indent string) int {
 	end := start + 1
 	for end < len(lines) && end-start < maxDefinitionLines {
 		t := lines[end]
-		if strings.TrimSpace(t) != "" && !strings.HasPrefix(t, " ") && !strings.HasPrefix(t, "\t") {
+		if strings.TrimSpace(t) != "" && len(indentOf(t)) <= len(indent) {
 			break
 		}
 		end++
 	}
-	// Trailing blank lines are the gap to the next def, not the body.
 	for end > start+1 && strings.TrimSpace(lines[end-1]) == "" {
 		end--
 	}
 	return end
+}
+
+// pyEnclosingDef finds the nearest def line i sits in, at any indentation,
+// so a call inside a method attaches the method rather than its class.
+func pyEnclosingDef(lines []string, i int) int {
+	if pyAnyDef.MatchString(lines[i]) {
+		return i
+	}
+	indent := indentOf(lines[i])
+	for j := i - 1; j >= 0; j-- {
+		line := lines[j]
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if len(indentOf(line)) >= len(indent) {
+			continue
+		}
+		indent = indentOf(line)
+		if pyAnyDef.MatchString(line) {
+			return j
+		}
+		if indent == "" {
+			return -1
+		}
+	}
+	return -1
 }
 
 // pyExtract cuts a def out by indentation, since Python has no braces.
@@ -501,34 +660,39 @@ func pyExtract(start int) func(content, name string) (Related, bool) {
 		if start < 0 || start >= len(lines) {
 			return Related{}, false
 		}
+		indent := indentOf(lines[start])
 		from := start
-		for from > 0 && strings.HasPrefix(lines[from-1], "@") {
+		for from > 0 && strings.HasPrefix(strings.TrimSpace(lines[from-1]), "@") && indentOf(lines[from-1]) == indent {
 			from--
 		}
-		return Related{Line: from + 1, Snippet: join(lines[from:pyDefEnd(lines, start)])}, true
+		return Related{Line: from + 1, Snippet: join(lines[from:pyBlockEnd(lines, start, indent)])}, true
 	}
 }
 
 func (c *relatedCollector) pyCallerWants(e *Entry) []want {
-	syms := pyRedefined(e)
+	source, ranges := redefinedSource(e)
+	syms := pyRedefined(source, ranges)
 	if len(syms) == 0 {
 		return nil
 	}
+	targets := sourcePaths(e)
 	files := c.walkFiles("", func(name string) bool { return strings.HasSuffix(name, ".py") && !strings.HasPrefix(name, "test_") })
 
 	var wants []want
+	attached := map[string]int{}
+	modName := strings.TrimSuffix(path.Base(e.File.Path), ".py")
 	for _, file := range files {
 		content, ok := c.read(file)
 		if !ok {
 			continue
 		}
 		// locals maps a redefined name to what this file calls it, when an
-		// import binds it; module maps to the local name of the module
+		// import binds it; modules lists the local names of the module
 		// itself when it is imported whole.
 		locals := map[string]string{}
 		var modules []string
 		for _, m := range pyFrom.FindAllStringSubmatch(content, -1) {
-			if c.pyResolve(file, m[1]) != e.File.Path {
+			if !targets[c.pyResolve(file, m[1])] {
 				continue
 			}
 			for part := range strings.SplitSeq(strings.Trim(m[2], "()"), ",") {
@@ -543,7 +707,7 @@ func (c *relatedCollector) pyCallerWants(e *Entry) []want {
 			}
 		}
 		for _, m := range pyImport.FindAllStringSubmatch(content, -1) {
-			if c.pyResolve(file, m[1]) != e.File.Path {
+			if !targets[c.pyResolve(file, m[1])] {
 				continue
 			}
 			if m[2] != "" {
@@ -556,29 +720,32 @@ func (c *relatedCollector) pyCallerWants(e *Entry) []want {
 			continue
 		}
 		lines := splitLines(content)
-		modName := strings.TrimSuffix(path.Base(e.File.Path), ".py")
+		code := codeLines(lines, true)
+		constAt := regexpConstAt(lines, pyConstLine)
 		for _, s := range syms {
+			if attached[s.name] >= maxCallersPerSymbol {
+				continue
+			}
 			var alts []string
 			if local, ok := locals[s.name]; ok {
-				alts = append(alts, `\b`+regexp.QuoteMeta(local)+`\s*\(`)
+				alts = append(alts, callRegexp(local).String())
 			}
 			for _, mod := range modules {
-				alts = append(alts, `\b`+regexp.QuoteMeta(mod)+`\.`+regexp.QuoteMeta(s.name)+`\s*\(`)
+				alts = append(alts, memberCallRegexp(mod, s.name).String())
 			}
 			if len(alts) == 0 {
 				continue
 			}
 			re := regexp.MustCompile(strings.Join(alts, "|"))
-			for _, start := range callSites(lines, re, pyEnclosingDef) {
-				wants = append(wants, want{
-					file:    file,
-					name:    callerName(lines[start]),
-					calls:   modName + "." + s.name,
-					uses:    1,
-					extract: pyExtract(start),
-				})
-				for _, i := range callerConstants(lines, start, pyDefEnd(lines, start), pyConstLine) {
-					wants = append(wants, want{file: file, name: callerName(lines[start]) + ":" + strings.TrimSpace(lines[i]), calls: modName + "." + s.name, extract: constantExtract(i, "#")})
+			calls := modName + "." + s.name
+			for _, start := range callSites(code, lines, s.name, re, pyEnclosingDef) {
+				if attached[s.name] >= maxCallersPerSymbol {
+					break
+				}
+				attached[s.name]++
+				wants = append(wants, want{file: file, name: callerName(lines[start]), calls: calls, uses: 1, extract: pyExtract(start)})
+				for _, i := range callerConstants(lines, start, pyBlockEnd(lines, start, indentOf(lines[start])), constAt) {
+					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, extract: constantExtract(i, "#")})
 				}
 			}
 		}
@@ -588,15 +755,19 @@ func (c *relatedCollector) pyCallerWants(e *Entry) []want {
 
 // --- TypeScript / JavaScript --------------------------------------------------
 
-var tsTopDef = regexp.MustCompile(`^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?\s*|class\s+|const\s+|let\s+|var\s+)([A-Za-z_$][\w$]*)`)
+var (
+	tsTopDef = regexp.MustCompile(`^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?\s*|class\s+|const\s+|let\s+|var\s+)([A-Za-z_$][\w$]*)`)
+	// tsMethodDef is a class member with a body: a method, an accessor, or a
+	// property holding a function, at any indentation.
+	tsMethodDef = regexp.MustCompile(`^\s+(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*(?:\*\s*)?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*(?:\([^)]*\)\s*(?::[^{=]+)?\s*\{|=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)`)
+)
 
 // tsRedefined names the exported top-level definitions whose lines the diff
 // touched.
-func tsRedefined(e *Entry) []redefined {
-	lines := splitLines(e.Content)
-	ranges := touchedRanges(e.File)
+func tsRedefined(content string, ranges [][2]int) []redefined {
+	lines := splitLines(content)
 	exported := map[string]bool{}
-	for _, m := range regexp.MustCompile(`(?m)^export\s+\{([^}]*)\}`).FindAllStringSubmatch(e.Content, -1) {
+	for _, m := range regexp.MustCompile(`(?m)^export\s+\{([^}]*)\}`).FindAllStringSubmatch(content, -1) {
 		for part := range strings.SplitSeq(m[1], ",") {
 			name := strings.TrimSpace(part)
 			if a, _, ok := strings.Cut(name, " as "); ok {
@@ -626,13 +797,29 @@ func tsRedefined(e *Entry) []redefined {
 	return out
 }
 
-// tsEnclosingDef finds the top-level definition line i sits in.
+// tsEnclosingDef finds the definition line i sits in: the nearest class
+// member with a body above it at a shallower indentation, else the
+// top-level definition.
 func tsEnclosingDef(lines []string, i int) int {
-	for j := i; j >= 0; j-- {
-		if tsTopDef.MatchString(lines[j]) {
+	if tsTopDef.MatchString(lines[i]) || tsMethodDef.MatchString(lines[i]) {
+		return i
+	}
+	indent := indentOf(lines[i])
+	for j := i - 1; j >= 0; j-- {
+		line := lines[j]
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if tsTopDef.MatchString(line) {
 			return j
 		}
-		if j < i && len(lines[j]) > 0 && lines[j][0] == '}' {
+		if len(indentOf(line)) < len(indent) {
+			indent = indentOf(line)
+			if tsMethodDef.MatchString(line) {
+				return j
+			}
+		}
+		if len(line) > 0 && line[0] == '}' {
 			return -1
 		}
 	}
@@ -640,10 +827,12 @@ func tsEnclosingDef(lines []string, i int) int {
 }
 
 func (c *relatedCollector) tsCallerWants(e *Entry) []want {
-	syms := tsRedefined(e)
+	source, ranges := redefinedSource(e)
+	syms := tsRedefined(source, ranges)
 	if len(syms) == 0 {
 		return nil
 	}
+	targets := sourcePaths(e)
 	files := c.walkFiles("", func(name string) bool {
 		for _, ext := range tsExts {
 			if strings.HasSuffix(name, ext) && !strings.Contains(name, ".test.") && !strings.Contains(name, ".spec.") && !strings.HasSuffix(name, ".d.ts") {
@@ -654,6 +843,8 @@ func (c *relatedCollector) tsCallerWants(e *Entry) []want {
 	})
 
 	var wants []want
+	attached := map[string]int{}
+	modName := strings.TrimSuffix(path.Base(e.File.Path), path.Ext(e.File.Path))
 	for _, file := range files {
 		content, ok := c.read(file)
 		if !ok {
@@ -662,7 +853,7 @@ func (c *relatedCollector) tsCallerWants(e *Entry) []want {
 		locals := map[string]string{}
 		var namespaces []string
 		consider := func(clause, spec string) {
-			if c.tsResolve(file, spec) != e.File.Path {
+			if !targets[c.tsResolve(file, spec)] {
 				return
 			}
 			named, ns := tsBindings(clause)
@@ -683,29 +874,32 @@ func (c *relatedCollector) tsCallerWants(e *Entry) []want {
 			continue
 		}
 		lines := splitLines(content)
-		modName := strings.TrimSuffix(path.Base(e.File.Path), path.Ext(e.File.Path))
+		code := codeLines(lines, false)
+		constAt := regexpConstAt(lines, tsConstLine)
 		for _, s := range syms {
+			if attached[s.name] >= maxCallersPerSymbol {
+				continue
+			}
 			var alts []string
 			if local, ok := locals[s.name]; ok {
-				alts = append(alts, `\b`+regexp.QuoteMeta(local)+`\s*\(`)
+				alts = append(alts, callRegexp(local).String())
 			}
 			for _, ns := range namespaces {
-				alts = append(alts, `\b`+regexp.QuoteMeta(ns)+`\.`+regexp.QuoteMeta(s.name)+`\s*\(`)
+				alts = append(alts, memberCallRegexp(ns, s.name).String())
 			}
 			if len(alts) == 0 {
 				continue
 			}
 			re := regexp.MustCompile(strings.Join(alts, "|"))
-			for _, start := range callSites(lines, re, tsEnclosingDef) {
-				wants = append(wants, want{
-					file:    file,
-					name:    callerName(lines[start]),
-					calls:   modName + "." + s.name,
-					uses:    1,
-					extract: callerExtract(start, "//", "/*", "*"),
-				})
-				for _, i := range callerConstants(lines, start, braceExtent(lines, start), tsConstLine) {
-					wants = append(wants, want{file: file, name: callerName(lines[start]) + ":" + strings.TrimSpace(lines[i]), calls: modName + "." + s.name, extract: constantExtract(i, "//", "/*", "*")})
+			calls := modName + "." + s.name
+			for _, start := range callSites(code, lines, s.name, re, tsEnclosingDef) {
+				if attached[s.name] >= maxCallersPerSymbol {
+					break
+				}
+				attached[s.name]++
+				wants = append(wants, want{file: file, name: callerName(lines[start]), calls: calls, uses: 1, extract: callerExtract(start, "//", "/*", "*")})
+				for _, i := range callerConstants(lines, start, braceExtent(lines, start), constAt) {
+					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, extract: constantExtract(i, "//", "/*", "*")})
 				}
 			}
 		}
@@ -714,11 +908,18 @@ func (c *relatedCollector) tsCallerWants(e *Entry) []want {
 }
 
 // sortCallers orders caller wants by file then name so attachment is
-// deterministic across runs.
+// deterministic across runs, with each file's constants after its callers.
 func sortCallers(wants []want) {
 	sort.SliceStable(wants, func(i, j int) bool {
 		if wants[i].file != wants[j].file {
 			return wants[i].file < wants[j].file
+		}
+		if wants[i].constant != wants[j].constant {
+			return !wants[i].constant
+		}
+		if wants[i].constant {
+			// File order, which the collector produced them in.
+			return false
 		}
 		return wants[i].name < wants[j].name
 	})

@@ -55,6 +55,11 @@ type Related struct {
 	// is a caller attached by callers.go rather than a definition the
 	// change uses. Empty for a definition.
 	Calls string
+
+	// Constant marks a one-line constant a caller passes, attached beside
+	// that caller (Calls names the same symbol) and rendered apart from it,
+	// because a constant calls nothing.
+	Constant bool
 }
 
 // DirLister names the entries of a directory at the reviewed revision, with a
@@ -94,6 +99,15 @@ type relatedCollector struct {
 	// attached records definitions already given to an earlier entry, so a
 	// plan attaches each once.
 	attached map[string]bool
+
+	// walked counts the candidate files the caller walk has listed for this
+	// plan, against maxCallerFiles. See callers.go.
+	walked int
+
+	// maxBytes refuses a file larger than this, so the caller walk cannot
+	// fetch and scan a generated bundle that escaped callerSkipDirs. Zero
+	// means no limit.
+	maxBytes int
 }
 
 // goModule is one go.mod's answer: the module path and the directory it sits
@@ -128,6 +142,9 @@ func (c *relatedCollector) read(p string) (string, bool) {
 		return "", false
 	}
 	data, err := c.fetch(c.ctx, p)
+	if err == nil && c.maxBytes > 0 && len(data) > c.maxBytes {
+		err = errors.New("larger than max_file_bytes")
+	}
 	if err != nil || !isText(data) {
 		c.missing[p] = true
 		return "", false
@@ -171,6 +188,9 @@ func (c *relatedCollector) entries(dir string) []string {
 // exists reports whether a file exists, by listing its directory when that is
 // possible and by reading it when it is not.
 func (c *relatedCollector) exists(p string) bool {
+	if _, ok := c.files[p]; ok {
+		return true
+	}
 	if c.list != nil {
 		for _, name := range c.entries(path.Dir(p)) {
 			if name == path.Base(p) {
@@ -186,10 +206,48 @@ func (c *relatedCollector) exists(p string) bool {
 // collect attaches related definitions to e, spending at most budget tokens
 // as estimated by est. It returns the tokens spent.
 func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimator) int {
-	if budget <= 0 || !e.HasContent() || e.File.Kind == diff.ChangeDeleted {
+	if budget <= 0 {
 		return 0
 	}
 
+	if !e.HasContent() || e.File.Kind == diff.ChangeDeleted {
+		return 0
+	}
+	wants := c.definitionWants(e)
+
+	// Most-used first, so the cap keeps the definitions the change leans on.
+	sort.SliceStable(wants, func(i, j int) bool {
+		if wants[i].uses != wants[j].uses {
+			return wants[i].uses > wants[j].uses
+		}
+		if wants[i].file != wants[j].file {
+			return wants[i].file < wants[j].file
+		}
+		return wants[i].name < wants[j].name
+	})
+
+	// Callers come after every definition the change uses: the callee is
+	// what the changed line means, the caller is what it breaks, and when
+	// the budget holds only one the first is the one to keep. The walk is
+	// skipped when nothing it finds could be attached.
+	if len(e.Related)+len(wants) < maxRelatedPerFile && budget >= minCallerBudget {
+		callers := c.callerWants(e)
+		sortCallers(callers)
+		wants = append(wants, callers...)
+	}
+	if len(wants) == 0 {
+		return 0
+	}
+
+	return c.attach(e, wants, budget, est)
+}
+
+// minCallerBudget is the fewest tokens worth walking the tree for: one
+// short caller. Below it the walk would fetch files and attach nothing.
+const minCallerBudget = 200
+
+// definitionWants resolves the definitions the changed lines of e use.
+func (c *relatedCollector) definitionWants(e *Entry) []want {
 	var wants []want
 	switch strings.ToLower(path.Ext(e.File.Path)) {
 	case ".go":
@@ -209,29 +267,13 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 	case ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx":
 		wants = c.cWants(e)
 	default:
-		return 0
+		return nil
 	}
-	// Most-used first, so the cap keeps the definitions the change leans on.
-	sort.SliceStable(wants, func(i, j int) bool {
-		if wants[i].uses != wants[j].uses {
-			return wants[i].uses > wants[j].uses
-		}
-		if wants[i].file != wants[j].file {
-			return wants[i].file < wants[j].file
-		}
-		return wants[i].name < wants[j].name
-	})
+	return wants
+}
 
-	// Callers come after every definition the change uses: the callee is
-	// what the changed line means, the caller is what it breaks, and when
-	// the budget holds only one the first is the one to keep.
-	callers := c.callerWants(e)
-	sortCallers(callers)
-	wants = append(wants, callers...)
-	if len(wants) == 0 {
-		return 0
-	}
-
+// attach reads and renders wants into e.Related in order, within budget.
+func (c *relatedCollector) attach(e *Entry, wants []want, budget int, est *llms.TokenEstimator) int {
 	spent := 0
 	for _, w := range wants {
 		if len(e.Related) >= maxRelatedPerFile {
@@ -252,6 +294,7 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 		def.Path = w.file
 		def.Name = w.name
 		def.Calls = w.calls
+		def.Constant = w.constant
 
 		cost := est.EstimateTokens(renderRelated(def))
 		if spent+cost > budget {
@@ -274,6 +317,9 @@ type want struct {
 
 	// calls is set on a caller want: the redefined symbol the snippet calls.
 	calls string
+
+	// constant marks a one-line constant a caller passes.
+	constant bool
 }
 
 // addedText joins the lines the change added, which is where a used name has
@@ -870,9 +916,12 @@ func join(lines []string) string {
 // renderRelated formats one attached definition for the prompt.
 func renderRelated(r Related) string {
 	var b strings.Builder
-	if r.Calls != "" {
+	switch {
+	case r.Constant:
+		fmt.Fprintf(&b, "##### %s (line %d), a constant the caller above passes\n\n```\n", promptSafe(r.Path), r.Line)
+	case r.Calls != "":
 		fmt.Fprintf(&b, "##### %s (from line %d), calls %s\n\n```\n", promptSafe(r.Path), r.Line, promptSafe(r.Calls))
-	} else {
+	default:
 		fmt.Fprintf(&b, "##### %s (from line %d)\n\n```\n", promptSafe(r.Path), r.Line)
 	}
 	for i, line := range strings.Split(r.Snippet, "\n") {

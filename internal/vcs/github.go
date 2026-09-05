@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -206,6 +207,10 @@ func (g *GitHub) ListDir(ctx context.Context, ref Ref, dir string) ([]string, er
 			names = append(names, e.GetName())
 		}
 	}
+	// The API's order is not documented; sorted, the same tree lists the
+	// same way on every run, which is what makes a capped walk over it
+	// deterministic.
+	sort.Strings(names)
 	return names, nil
 }
 

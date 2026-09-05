@@ -196,6 +196,7 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 	var related *relatedCollector
 	if cfg.Review.RelatedContext && fetch != nil {
 		related = newRelatedCollector(ctx, files, fetch, list)
+		related.maxBytes = cfg.Review.MaxFileBytes
 	}
 
 	// Selection and content run in one pass so that review.max_files counts
@@ -598,7 +599,7 @@ func Render(e Entry) string {
 			// The instruction names the check because the model otherwise
 			// reads them as more of the same context.
 			b.WriteString("\n#### Callers of what this change redefines, from files it does not touch\n\n")
-			b.WriteString("Context only. These files are not under review and are unchanged: they still assume the old behaviour. Check each against the new definition it calls, and report any break on the changed line that causes it, not on the caller.\n\n")
+			b.WriteString("Context only. These files are not under review and are unchanged: they still assume the old behaviour. Check each against the new definition it calls, and report any break on the changed line that causes it, not on the caller. A constant listed after a caller is one that caller passes, shown so its value is known.\n\n")
 			for _, r := range callers {
 				b.WriteString(renderRelated(r))
 			}
