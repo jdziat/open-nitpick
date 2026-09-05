@@ -21,6 +21,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
@@ -52,6 +53,8 @@ func main() {
 	}
 
 	ctx := context.Background()
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 	done := 0
 	for _, id := range strings.Split(models, ",") {
 		id = strings.TrimSpace(id)
@@ -60,33 +63,49 @@ func main() {
 			fmt.Fprintln(os.Stderr, id, err)
 			os.Exit(1)
 		}
-		for _, lang := range modelid.Languages {
-			for i, task := range modelid.Tasks {
-				if limit > 0 && done >= limit {
-					return
+		// One goroutine per model: the models are independent providers'
+		// worth of latency, and a reasoning model can take minutes a file.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, lang := range modelid.Languages {
+				for i, task := range modelid.Tasks {
+					mu.Lock()
+					stop := limit > 0 && done >= limit
+					mu.Unlock()
+					if stop {
+						return
+					}
+					path := filepath.Join(out, modelid.Slug(id), lang.Name, fmt.Sprintf("%02d%s", i, lang.Ext))
+					if _, err := os.Stat(path); err == nil {
+						continue
+					}
+					var code string
+					var err error
+					for attempt := 0; attempt < 2 && len(code) < 50; attempt++ {
+						code, err = generate(ctx, client, lang, task)
+					}
+					if err != nil || len(code) < 50 {
+						fmt.Fprintf(os.Stderr, "%s %s %02d: %v (%d bytes)\n", id, lang.Name, i, err, len(code))
+						continue
+					}
+					if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+						fmt.Fprintln(os.Stderr, err)
+						return
+					}
+					if err := os.WriteFile(path, []byte(code), 0o644); err != nil {
+						fmt.Fprintln(os.Stderr, err)
+						return
+					}
+					mu.Lock()
+					done++
+					mu.Unlock()
+					fmt.Printf("%s %s %02d: %d bytes\n", id, lang.Name, i, len(code))
 				}
-				path := filepath.Join(out, modelid.Slug(id), lang.Name, fmt.Sprintf("%02d%s", i, lang.Ext))
-				if _, err := os.Stat(path); err == nil {
-					continue
-				}
-				code, err := generate(ctx, client, lang, task)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "%s %s %02d: %v\n", id, lang.Name, i, err)
-					continue
-				}
-				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-					fmt.Fprintln(os.Stderr, err)
-					os.Exit(1)
-				}
-				if err := os.WriteFile(path, []byte(code), 0o644); err != nil {
-					fmt.Fprintln(os.Stderr, err)
-					os.Exit(1)
-				}
-				done++
-				fmt.Printf("%s %s %02d: %d bytes\n", id, lang.Name, i, len(code))
 			}
-		}
+		}()
 	}
+	wg.Wait()
 }
 
 func floatPtr(f float64) *float64 { return &f }
