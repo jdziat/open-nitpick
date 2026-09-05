@@ -1,5 +1,4 @@
 ---
-title: open-nitpick
 hide:
   - navigation
   - toc
@@ -44,7 +43,7 @@ nitpick review          # reviews your uncommitted changes
 
 <div class="np-card" markdown>
 <p class="np-card-title">Any model, different models per job</p>
-Seventeen providers, Synthetic and OpenRouter built in, any OpenAI-compatible endpoint, Ollama and llama.cpp. A cheap model triages; a strong one reviews; an expert pass can overrule either. [Configuration →](guide.md#configuration)
+Eighteen providers, Synthetic and OpenRouter built in, any OpenAI-compatible endpoint, Ollama and llama.cpp. A cheap model triages; a strong one reviews; an expert pass can overrule either. [Configuration →](guide.md#configuration)
 </div>
 
 <div class="np-card" markdown>
@@ -54,7 +53,7 @@ Path-scoped instructions live next to the code they describe. `nitpick explain-c
 
 <div class="np-card" markdown>
 <p class="np-card-title">Context in both directions</p>
-The definitions a changed line calls, and the untouched callers of what a change redefines, attached from the repository with their real line numbers. [Related context →](guide.md#related-context)
+The definitions a changed line calls, and the untouched callers of what a change redefines, attached from the repository with their real line numbers. Off by default until measured more widely. [Related context →](guide.md#related-context)
 </div>
 
 <div class="np-card" markdown>
@@ -69,14 +68,14 @@ golangci-lint, ruff, eslint, semgrep and 29 more, auto-detected, isolated from t
 
 <div class="np-card" markdown>
 <p class="np-card-title">Measured, mistakes included</p>
-Three corpora, a judge-free harness, and a findings document that records its own instrument bugs, including the one that forced a retraction. [Findings →](docs/findings.md)
+Five corpora, a judge-free harness, and a findings document that records its own instrument bugs, including the one that forced a retraction. [Findings →](docs/findings.md)
 </div>
 
 </div>
 
 <div class="np-prose" markdown>
 
-<p class="np-fine">The quickstart uses <a href="https://synthetic.new/?referral=KBc4DHaHWcig6zR">Synthetic</a>, the recommended route: open-weight models on a flat subscription. That link carries the author's referral code; <a href="https://synthetic.new">synthetic.new</a> without it is the same service. <a href="guide/#synthetic-recommended">Why, and the alternatives →</a></p>
+<p class="np-fine" markdown>The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR), the recommended route: open-weight models on a flat subscription, $30 a month for one pack as of 2026-09-05. That link carries the author's referral code, and the author receives referral credit if you sign up through it; [synthetic.new](https://synthetic.new) without it is the same service at the same price. [Why, and the alternatives →](guide.md#synthetic-recommended)</p>
 
 ## How a review runs
 

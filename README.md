@@ -22,22 +22,27 @@ nitpick review          # reviews your uncommitted changes
 ```
 
 The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR),
-the recommended route: open-weight models on a flat subscription, so a review
+the recommended route: open-weight models on a flat subscription ($30 a month
+for one pack, as read from their pricing page on 2026-09-05), so a review
 costs nothing per token and a busy day of pull requests does not turn into a
-bill. That link carries the author's referral code; the plain
-<https://synthetic.new> works the same. OpenRouter, any OpenAI-compatible
-endpoint and local models are all one config line away — see
-[Configuration](#configuration).
+bill. That link carries the author's referral code, and the author receives
+referral credit if you sign up through it; the plain <https://synthetic.new>
+is the same service at the same price. To spend nothing at all first,
+`nitpick explain-config` prints what a review would send without sending it,
+and `LLM_PROVIDER=ollama` runs against a local model. OpenRouter, any
+OpenAI-compatible endpoint and local models are all one config line away —
+see [Configuration](#configuration).
 
 ## Why this exists
 
 Most review bots are a hosted service wrapping one vendor's model, with a prompt
 you cannot see and pricing per seat. open-nitpick inverts that:
 
-- **Any model.** 17 providers via [llm-go-sdk][sdk], plus built-in
+- **Any model.** 16 providers via [llm-go-sdk][sdk], plus built-in
   `synthetic` (open-weight models on a subscription) and `openrouter` (the rest
-  of the catalogue on one key), plus any OpenAI-compatible endpoint through
-  `base_url`, plus local models via `ollama` and `llamacpp`.
+  of the catalogue on one key) for 18 in all, plus any OpenAI-compatible
+  endpoint through `base_url`, plus local models via `ollama` and `llamacpp`.
+  `nitpick providers` prints the list.
 - **Different models for different jobs.** A cheap model triages and deduplicates;
   an expensive one does the actual reviewing. That split is most of the cost
   saving available.
@@ -245,8 +250,9 @@ linters:
 
 Thirty-three deterministic analyzers, covering the languages the hosted reviewers
 list. Two are enabled by name out of the box; twenty-four more run whenever they
-are installed and the change contains files they read; the rest need a
-configuration or an explicit grant. `nitpick linters` prints this table from
+are installed and the change contains files they read; the remaining seven run
+only when named, and most of those also need a configuration or an explicit
+grant. `nitpick linters` prints this table from
 the binary.
 
 | analyzer | covers | runs | configuration |
@@ -536,13 +542,18 @@ definition. This is the defect class a diff-only review cannot see by
 construction: an error that stops matching a sentinel a handler compares
 with `errors.Is`, a return value that changes unit, a precondition a caller
 already violates. Callers are found by resolving each candidate file's imports
-back to the changed file, capped at three per symbol and 150 file reads per
-review, and a call that cannot be traced to an import is not attached.
+back to the changed file, in code rather than in comments or strings, capped
+at three call sites per symbol and 150 candidate files per review, and a call
+that cannot be traced to an import is not attached. A one-line constant the
+caller passes comes along with it. Measured on its own corpus in
+[docs/findings.md](docs/findings.md#callers-2026-09-05): a cheap model went
+from finding none of the planted contract breaks to seven of eight.
 
 It is bounded by `review.related_context_tokens` per batch, spent only from
 what the request budget has left after the changed files themselves, so it can
 narrow nothing the file under review would have got. The summary lists every
-file read for context.
+file attached as context; a file read by the caller walk and found to hold no
+caller is not listed.
 
 It ships **off** until the measurement in [docs/findings.md](docs/findings.md)
 says otherwise. Context is not free: the same definitions that let a model
@@ -627,12 +638,28 @@ the build.
 [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR) hosts open-weight
 models (Kimi-K3, GLM-5.3-Flash, Qwen3.8-27B and others) behind an
 OpenAI-compatible endpoint on a flat subscription rather than per-token
-billing. That fits a reviewer better than metered pricing does: the cost of a
-review is zero at the margin, so nothing argues for reviewing fewer pull
-requests, and the models it hosts are the ones this project's measurements
-found to do the work — Kimi-K3 as the reviewer, GLM-5.3-Flash for triage.
-The link above carries the author's referral code; <https://synthetic.new>
-without it is the same service.
+billing: $30 a month for one pack, 500 requests per five hours, one concurrent
+request per model, as read from their pricing page on 2026-09-05. Usage-based
+billing is offered separately. That fits a reviewer better than metered
+pricing does: the cost of a review is zero at the margin, so nothing argues
+for reviewing fewer pull requests.
+
+What the measurements say, in full: Kimi-K3 with related context ties the
+shipped default, `anthropic/claude-sonnet-4.6`, on recall on both tuned
+corpora ([docs/findings.md](docs/findings.md#kimi-k3-and-the-second-half-of-the-multi-file-corpus)),
+and was marked down there on one column only, price per review, which is why
+it is absent from the twelve-model price table below. A flat subscription
+does not charge that column. GLM-5.3-Flash is the triage and iteration model
+this repository's own configuration uses, and with Kimi-K3 as the expert pass
+over it, noise on the tuning corpus halved at the same recall
+([docs/findings.md](docs/findings.md#callers-2026-09-05)). Neither of those is
+a claim that Kimi-K3 is the best reviewer measured; `qwen/qwen3.8-27b` and
+`openai/gpt-5.6-luna` are, per dollar on metered pricing, and the table says
+so.
+
+The link above carries the author's referral code, and the author receives
+referral credit if you sign up through it. <https://synthetic.new> without it
+is the same service at the same price.
 
 `synthetic` is a provider with a compiled-in endpoint, so a committed config
 can name it and nothing else is needed:
@@ -725,6 +752,9 @@ a single run, so gaps under about 0.10 are inside the noise.
 | skip | `qwen/qwen3.8-max`, `deepseek/deepseek-v4-pro-0813` | 0.63 – 0.78 | $0.013 – $0.044 | most expensive, and both dropped reviews |
 
 Incumbent's on-demand price on the same corpora is $0.25 to $0.36 a review.
+
+Every row was measured with `review.related_context: true`. It is off by
+default; set it to reproduce these numbers.
 
 The default stays sonnet-4.6 because the sweep ran on the corpora the prompt
 was tuned against; a candidate replaces it only by beating it on the held-out
@@ -1218,7 +1248,7 @@ This project makes empirical claims about review quality, so how those numbers a
 produced is part of the product.
 
 - [docs/measurement.md](docs/measurement.md) — what has to hold before a number
-  out of the eval harness is worth acting on. Thirteen rules, each written
+  out of the eval harness is worth acting on. Fifteen rules, each written
   because the harness produced a confident wrong number and something believed it.
 - [docs/comparison.md](docs/comparison.md) — capabilities and measured results
   against Incumbent, by language, with what each iteration changed.
@@ -1261,7 +1291,7 @@ fine. `make eval` measures that.
 ```bash
 echo 'OPENROUTER_API_KEY=sk-or-...' > .env    # gitignored
 
-make eval                                     # 17-model matrix — see the cost note below
+make eval                                     # 18-model matrix — see the cost note below
 make eval MODELS=openai/gpt-4o-mini           # one model
 make eval RUNS=5                              # run-to-run stability
 make eval FIXTURES=go-nil-deref               # one fixture
@@ -1290,22 +1320,25 @@ The report separates three things that are easy to confuse:
   (`clean-refactor`, `style-only`) contain no bugs at all, so every finding
   there is noise by construction.
 
-**Three corpora.** `make eval` reads the tuning corpus. The held-out corpus is
+**Five corpora.** `make eval` reads the tuning corpus. The held-out corpus is
 spent once at the end of a tuning round and is selected only by naming its
-fixtures. The multi-file corpus, `make benchmark-multifile`, is ten changes
-whose defect is only visible by reading a file the change does not touch; it
-measures `review.related_context` with the feature off and on, against every
-hosted reviewer with a cached or collectable review — Incumbent's CLI, and
-Contender's once `contender login` has been run. It lives outside the
-ground-truth registries the other two corpora carry, and its numbers should be
-read with that in mind; see `EveryFixture` in `internal/evals`.
+fixtures. The multi-file corpus, `make benchmark-multifile`, is fourteen
+changes whose defect is only visible by reading a file the change does not
+touch; it measures `review.related_context` with the feature off and on,
+against every hosted reviewer with a cached or collectable review —
+Incumbent's CLI, and Contender's once `contender login` has been run. The
+callers corpus (`FIXTURES='$(CALLERS)'`) is six changes where the file the
+change breaks is an untouched caller, and the info corpus is the severity band
+no reviewer had located. The last three live outside the ground-truth
+registries the first two carry, and their numbers should be read with that in
+mind; see `EveryFixture` in `internal/evals`.
 
-**Cost.** The default matrix is **17 models x 8 fixtures = 136 reviews**, plus a
+**Cost.** The default matrix is **18 models x 16 fixtures = 288 reviews**, plus a
 judge call each for `make judge-models`. That is not a cheap command. Pass
 `MODELS=` to narrow it:
 
 ```bash
-make eval MODELS=qwen/qwen3.7-flash            # one model, 8 reviews
+make eval MODELS=qwen/qwen3.7-flash            # one model, 16 reviews
 ```
 
 The matrix spans providers and price tiers deliberately, including models with

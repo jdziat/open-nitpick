@@ -21,7 +21,7 @@ run here.
 | Forges | GitHub, GitLab, Bitbucket, Azure DevOps | GitHub, local |
 | Incremental review on push | yes | yes; fingerprints withhold findings already posted, files unchanged since the last review are not re-read, force push falls back to full |
 | Static analyzers | ~50 tools, auto-selected | 33 tools, auto-detected when installed, every one isolated from the tree; see the README table |
-| Repository context | indexes the repository | attaches the definitions a changed line uses: Go (types and methods), TypeScript (aliases, barrels), Python (package re-exports), Ruby (Rails autoload), Rust, Java, Kotlin, C/C++ |
+| Repository context | indexes the repository | attaches the definitions a changed line uses: Go (types and methods), TypeScript (aliases, barrels), Python (package re-exports), Ruby (Rails autoload), Rust, Java, Kotlin, C/C++; and the untouched callers of what a change redefines, with the constants they pass: Go, Python, TypeScript |
 | Disclosure | summary and walkthrough | every file not reviewed, every analyzer that did not run, every finding an analyzer produced and the review discarded, every part of the change an analyzer did not cover, every finding a domain expert overruled |
 | Chat, `@mention` commands | yes | no |
 | Learnings from human feedback | yes | no |
@@ -570,3 +570,25 @@ What that says:
 instead of qwen if the triage cost matters more than the last point of
 noise. It beats every single model on price per located defect except
 gemma alone, and gemma alone finds a quarter fewer.
+
+### The callers corpus (2026-09-05)
+
+Six fixtures, four planted and two clean controls, where the change is the
+contract and the file it breaks is an untouched caller: an error that stops
+matching a sentinel a handler compares with `errors.Is`, a return value that
+changes unit, a precondition a caller already violates. Keywords credit only a
+finding that names the caller. `z-ai/glm-5.3-flash`, two runs, judge-free.
+Rule 15 applies: the corpus and the collector are the same day's work.
+
+| contender | RECALL | NOISE / review | $ / review |
+|---|---|---|---|
+| glm-5.3-flash + callers | **0.88** (7/8) | 0.08 | $0.0005 |
+| glm-5.3-flash | 0.00 (0/8) | 0.50 | $0.0007 |
+| incumbent/cli | 0.00 (0/4) | 0.33 | |
+
+Both clean controls were silent in every run on our side. Incumbent's one
+finding on `go-error-identity-changed` says the sentinel should be wrapped
+so callers can keep using `errors.Is`, which is the right fix and a
+diff-only inference: it names no caller, and the keyword rule does not
+credit it. Its finding on the clean Python control is noise.
+

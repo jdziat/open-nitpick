@@ -918,3 +918,82 @@ Read the run dumps first; most of the noise was ours.
 - **A pin leaked across models** on the first run: the triage and router
   specs inherited gemma's `providers` and every qwen call got "no
   endpoints". A pin now follows its model through overlays.
+
+## Callers (2026-09-05)
+
+Related context attached what a changed line calls. The other direction, the
+untouched callers of what a change redefines, is the defect class a diff-only
+review cannot see by construction, and it needed a corpus before it needed
+code.
+
+**The corpus.** Six fixtures (`CallerFixtures`): four planted, two clean
+controls. Go: an error that loses its identity so a handler's `errors.Is`
+stops matching (control: the same change with `%w`); a return value that
+changes from bytes to megabytes under a caller that compares it with a body
+length. Python: a page-size precondition under an exporter that passes 500
+(control: a positivity precondition the caller satisfies). TypeScript: a
+duration that changes from milliseconds to seconds under a caller that hands
+it to `AbortSignal.timeout`.
+
+**The rule the floor forced.** Three floor runs credited one to four of eight
+plants before a single caller was ever attached, and every credited finding
+was a diff-only inference that happened to match a consequence word
+("callers", "breaks"). Keywords now credit only a finding that names the
+caller: its file, its function, or a detail that exists only there. Under
+that rule `z-ai/glm-5.3-flash` alone scores 0/8 on both arms, two runs, with
+the controls silent all four times. That is the floor the collector had to
+move.
+
+**The collector.** Fetcher-based, like the rest of related context, so it
+runs on every provider with no checkout and no type checker: for each
+exported function, method or top-level export whose lines the diff touched,
+the files whose imports resolve back to the changed file are read, and the
+enclosing function of each call site is attached under its own heading with
+the instruction to check it against the new definition. Matched in code, not
+in comments or strings; three call sites per symbol; 150 candidate files per
+review; a call that cannot be traced to an import is not a caller. A Go
+method binds by name alone, the importing file being the evidence for the
+receiver type. Receiver resolution proper needs `go/packages`, which needs a
+checkout that type-checks, which production has only in the Action.
+
+**Two runs, glm-5.3-flash, judge-free.**
+
+| contender | RECALL | NOISE / review | $ / review |
+|---|---|---|---|
+| glm + callers, first cut | 0.62 (5/8) | 0.17 | $0.0007 |
+| glm + callers, constants attached | **0.88** (7/8) | 0.08 | $0.0005 |
+| glm, diff only | 0.00 (0/8) | 0.50 – 0.58 | $0.0007 |
+| incumbent/cli | 0.00 (0/4) | 0.33 | |
+
+The first cut missed the Python fixture in both runs: the exporter passes
+`BATCH`, a module constant defined outside the attached function, so the
+model saw a name where the precondition needed a number. Each attached
+caller now brings the one-line top-level constants its body names. The
+remaining miss is one run of the TypeScript fixture, where the review
+reported the unit change on the callee without naming the caller. The
+controls were silent in every run of every variant.
+
+**What else the day measured.**
+
+- **A strong model as triage is a null result.** Kimi-K3, sonnet-4.6 and
+  opus-5 in the `triage` role over the routed and ensemble configs all
+  landed inside the run-to-run spread of the qwen baseline. The reason is
+  structural: rule 2 of the triage template forbids dropping a finding, so
+  triage cannot denoise. The pass that can refute is validation, the
+  `validate` role, and the six route files now put the strong model there.
+- **Kimi-K3 as the expert pass over glm-5.3-flash** is the first denoise
+  configuration that moved the noise floor without paying recall. Tuning
+  corpus, two runs, validation on: recall 0.78 / 0.75 (no context / with)
+  against glm alone at 0.74 / 0.75 the day before; noise 0.22 against
+  0.40 – 0.45; $0.011 – $0.014 a review. Ten times glm alone, and still
+  under the cheapest metered competitor.
+- **Cost reporting checks out.** One fixture on an isolated OpenRouter key:
+  the harness said $0.0658, the dashboard showed $0.06 for Kimi and $0.01
+  for GLM. Rates are priced at the captured endpoint, a point estimate, so
+  the figure is a floor if the router sends a request elsewhere.
+
+Rule 15 applies to the callers corpus in full: six fixtures, written the
+same day as the collector by the same hand, outside the ground-truth
+registries. The multi-file corpus is the regression check, and it has not
+been rerun with the collector on yet.
+
