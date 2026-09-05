@@ -464,6 +464,10 @@ export function handler(req: Request, timeout: string) {
 export class Client {
   constructor(private base = 'http://x') {}
 
+  run(cb: () => void) {
+    cb();
+  }
+
   async get(url: string, timeout: string = "30s"): Promise<Response> {
     while (true) {
       const signal = AbortSignal.timeout(parseDuration(timeout));
@@ -482,6 +486,11 @@ export class Client {
 	for _, r := range plan.Batches[0].Entries[0].Related {
 		if !strings.Contains(r.Snippet, "(") || strings.HasPrefix(strings.TrimSpace(r.Snippet), "if") || strings.HasPrefix(strings.TrimSpace(r.Snippet), "while") {
 			t.Errorf("snippet starts at a control-flow header, not a definition:\n%s", r.Snippet)
+		}
+		// A method with a string default and a callback-typed neighbour is
+		// attached as the method, not as the class around it.
+		if r.Name == "get" && (strings.Contains(r.Snippet, "run(cb") || strings.Contains(r.Snippet, "constructor")) {
+			t.Errorf("get attached its class rather than itself:\n%s", r.Snippet)
 		}
 	}
 }
