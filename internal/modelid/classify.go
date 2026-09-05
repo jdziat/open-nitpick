@@ -185,42 +185,47 @@ func Experiment(samples []Sample, trainTask func(task int) bool) []Result {
 				test = append(test, s)
 			}
 		}
-		c := Train(train)
-		r := Result{Language: lang, Train: len(train), Test: len(test), Confusion: map[string]map[string]int{}}
-		counts := map[string]int{}
-		authors := map[string]bool{}
-		for _, s := range train {
-			authors[s.Author] = true
-		}
-		for _, s := range test {
-			got, _ := c.Predict(s.Features)
-			if r.Confusion[s.Author] == nil {
-				r.Confusion[s.Author] = map[string]int{}
-			}
-			r.Confusion[s.Author][got]++
-			if got == s.Author {
-				r.Correct++
-			}
-			counts[s.Author]++
-			authors[s.Author] = true
-			authors[got] = true
-		}
-		// Every author that appears as an actual or a prediction gets a
-		// column, so a prediction of an author absent from the test set is
-		// shown rather than dropped.
-		for a := range authors {
-			r.Authors = append(r.Authors, a)
-		}
-		for _, n := range counts {
-			if n > r.Majority {
-				r.Majority = n
-			}
-		}
-		sort.Strings(r.Authors)
-		results = append(results, r)
+		results = append(results, score(lang, train, test))
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].Language < results[j].Language })
 	return results
+}
+
+// score trains on train and tests on test for one language.
+func score(lang string, train, test []Sample) Result {
+	c := Train(train)
+	r := Result{Language: lang, Train: len(train), Test: len(test), Confusion: map[string]map[string]int{}}
+	counts := map[string]int{}
+	authors := map[string]bool{}
+	for _, s := range train {
+		authors[s.Author] = true
+	}
+	for _, s := range test {
+		got, _ := c.Predict(s.Features)
+		if r.Confusion[s.Author] == nil {
+			r.Confusion[s.Author] = map[string]int{}
+		}
+		r.Confusion[s.Author][got]++
+		if got == s.Author {
+			r.Correct++
+		}
+		counts[s.Author]++
+		authors[s.Author] = true
+		authors[got] = true
+	}
+	// Every author that appears as an actual or a prediction gets a
+	// column, so a prediction of an author absent from the test set is
+	// shown rather than dropped.
+	for a := range authors {
+		r.Authors = append(r.Authors, a)
+	}
+	for _, n := range counts {
+		if n > r.Majority {
+			r.Majority = n
+		}
+	}
+	sort.Strings(r.Authors)
+	return r
 }
 
 // Render prints the results as the findings document will carry them.
@@ -265,4 +270,30 @@ func Verdict(r Result) string {
 		return "go"
 	}
 	return "no-go"
+}
+
+// CrossExperiment trains on one corpus and tests on another, per language:
+// the second corpus is the same tasks generated again, so a signature that
+// holds here holds across samplings.
+func CrossExperiment(train, test []Sample) []Result {
+	byLang := map[string][2][]Sample{}
+	for _, s := range train {
+		e := byLang[s.Language]
+		e[0] = append(e[0], s)
+		byLang[s.Language] = e
+	}
+	for _, s := range test {
+		e := byLang[s.Language]
+		e[1] = append(e[1], s)
+		byLang[s.Language] = e
+	}
+	var results []Result
+	for lang, e := range byLang {
+		if len(e[0]) == 0 || len(e[1]) == 0 {
+			continue
+		}
+		results = append(results, score(lang, e[0], e[1]))
+	}
+	sort.Slice(results, func(i, j int) bool { return results[i].Language < results[j].Language })
+	return results
 }

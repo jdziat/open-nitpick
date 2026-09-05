@@ -67,3 +67,30 @@ func TestModelIdentificationExperiment(t *testing.T) {
 		}
 	}
 }
+
+// TestModelIdentificationAcrossGenerations trains on the first corpus and
+// tests on a second, independent generation of the same tasks by the same
+// models (corpus2, from a later run of cmd/modelid-corpus). Every task is in
+// both, so what this measures is whether the signature holds from one
+// sampling to the next, which the task split cannot ask.
+func TestModelIdentificationAcrossGenerations(t *testing.T) {
+	if _, err := os.Stat("corpus2"); err != nil {
+		t.Skip("no second corpus")
+	}
+	first, err := LoadCorpus("corpus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := LoadCorpus("corpus2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second) == 0 {
+		t.Skip("empty second corpus")
+	}
+	results := CrossExperiment(first, second)
+	t.Logf("train on corpus, test on corpus2:%s", Render(results))
+	for _, r := range results {
+		t.Logf("%s: margin over majority %.2f (%s)", r.Language, r.Accuracy()-r.Baseline(), Verdict(r))
+	}
+}
