@@ -652,6 +652,7 @@ func TestCallersPythonFencesInCommentsAndStringsDoNotOpenADocstring(t *testing.T
 # Docstrings in this project use """ style.
 SEP = '"""'
 PAIR = 'a''b'
+STYLE = '''Docstrings use """ style.'''
 
 
 def handler(conn):

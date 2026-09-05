@@ -104,24 +104,67 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 			t.Errorf("prose does not name %s among the fixtures that went the other way", f)
 		}
 	}
-	// The python-retry loss is a finding on the plant line, not an anchor miss.
-	if r := g.finding("python-retry-nonidempotent", "+ctx", 0); r == nil || r.Line != 11 || r.Matched {
-		t.Errorf("python-retry-nonidempotent walk-on run 0: %+v", r)
-	} else if !strings.Contains(prose, "anchored on the plant itself") {
+	// The python-retry loss is a finding on the plant line whose wording
+	// misses the keywords: the quoted phrases must be in the finding, the
+	// quoted keywords in the plant, and no keyword in the finding.
+	r := g.finding("python-retry-nonidempotent", "+ctx", 0)
+	if r == nil || r.Line != 11 || r.Matched {
+		t.Fatalf("python-retry-nonidempotent walk-on run 0: %+v", r)
+	}
+	if !strings.Contains(prose, "anchored on the plant itself") {
 		t.Errorf("prose does not describe the python-retry loss as anchored on the plant")
+	}
+	text := strings.ToLower(deref(r.Title) + " " + r.Rationale)
+	for _, phrase := range []string{"double-charging", "issued again"} {
+		if !strings.Contains(prose, `"`+phrase+`"`) || !strings.Contains(text, phrase) {
+			t.Errorf("quoted wording %q: in prose %v, in finding %v", phrase, strings.Contains(prose, phrase), strings.Contains(text, phrase))
+		}
+	}
+	var keywords []string
+	for _, f := range MultiFileFixtures() {
+		if f.Name == "python-retry-nonidempotent" {
+			keywords = f.Defects[0].Keywords
+		}
+	}
+	for _, k := range []string{"double-charge", "charged again"} {
+		if !strings.Contains(prose, `"`+k+`"`) || !contains(keywords, k) {
+			t.Errorf("quoted keyword %q: in prose %v, in plant %v", k, strings.Contains(prose, k), contains(keywords, k))
+		}
+	}
+	for _, k := range keywords {
+		if strings.Contains(text, strings.ToLower(k)) {
+			t.Errorf("finding mentions plant keyword %q; the prose calls it a vocabulary miss", k)
+		}
 	}
 }
 
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func contains(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
 type gridRow struct {
-	Fixture string  `json:"fixture"`
-	Run     int     `json:"run"`
-	Variant string  `json:"variant"`
-	Model   string  `json:"model"`
-	Silent  *bool   `json:"silent"`
-	Path    string  `json:"path"`
-	Line    int     `json:"line"`
-	Matched bool    `json:"matched"`
-	Title   *string `json:"title"`
+	Fixture   string  `json:"fixture"`
+	Run       int     `json:"run"`
+	Variant   string  `json:"variant"`
+	Model     string  `json:"model"`
+	Silent    *bool   `json:"silent"`
+	Path      string  `json:"path"`
+	Line      int     `json:"line"`
+	Matched   bool    `json:"matched"`
+	Title     *string `json:"title"`
+	Rationale string  `json:"rationale"`
 }
 
 type grid struct {
@@ -145,8 +188,8 @@ func readGrid(t *testing.T, path string, runs int) *grid {
 		if err := json.Unmarshal(sc.Bytes(), &r); err != nil {
 			t.Fatal(err)
 		}
-		g.fixtures[r.Fixture] = true
 		if strings.HasPrefix(r.Model, "z-ai/") {
+			g.fixtures[r.Fixture] = true
 			g.rows = append(g.rows, r)
 		}
 	}

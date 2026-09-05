@@ -209,9 +209,11 @@ var (
 	slashTail  = regexp.MustCompile(`//.*$`)
 	hashTail   = regexp.MustCompile(`#.*$`)
 	blockSpan  = regexp.MustCompile(`/\*.*?\*/`)
-	// fenceOrSpan matches a Python triple-quote fence before it can be
-	// read as an empty string plus a quote.
-	fenceOrSpan = regexp.MustCompile(`"""|'''|` + quotedSpan.String())
+	// fenceOrSpan matches, in order, a closed one-line triple-quoted string
+	// (blanked like any literal, so a `'''` holding a `"""` is not three
+	// fences), then a bare fence (passed through to be counted), then any
+	// other quoted span, before an empty `''` can pair with a neighbour.
+	fenceOrSpan = regexp.MustCompile(`"""[^\n]*?"""|'''[^\n]*?'''|"""|'''|` + quotedSpan.String())
 )
 
 // codeLines returns a copy of lines with string literals and comments
@@ -805,14 +807,14 @@ var (
 	// property holding a function, at any indentation.
 	// The parameter list admits one level of nested parens, so a callback
 	// type (`run(cb: () => void) {`) is a method. A call whose last
-	// argument is a callback is not: with an arrow (`it('x', () => {`) the
-	// outer paren never closes on the line, and with `function` the
-	// keyword sits inside the header, which tsMethodAt rejects. Quoted
-	// spans are blanked before matching, so a string default is fine. Two
-	// shapes still fall back to the enclosing class, the safe direction:
-	// two levels of nesting in a parameter type, and a function-typed
-	// return annotation (`make(): (a: number) => string {`). The arrow
-	// branch is anchored by its `=>`.
+	// argument is a callback, arrow or `function`, is not: its outer paren
+	// never closes on the line. Quoted spans are blanked before matching,
+	// so a string default is fine. Three shapes still fall back to the
+	// enclosing class, the safe direction: two levels of nesting in a
+	// parameter type, a function-typed return annotation
+	// (`make(): (a: number) => string {`), and a parameter list that
+	// mentions `function` (`wrap(f = function () {}) {`), which tsMethodAt
+	// rejects. The arrow branch is anchored by its `=>`.
 	tsMethodDef = regexp.MustCompile(`^\s+(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*(?:\*\s*)?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*(?:\((?:[^()]|\([^()]*\))*\)\s*(?::[^{=]+)?\s*\{|=\s*(?:async\s*)?(?:\((?:[^()]|\([^()]*\))*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)`)
 )
 
