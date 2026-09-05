@@ -496,3 +496,20 @@ related context than with it. It is the cheap pick for a repository whose
 pull requests touch several files, and the pin is not optional: the same
 weights through OpenRouter's default routing lose one request in five to
 stalls and take an hour to say so.
+
+### gpt-5.6-luna on the current prompt (2026-09-04)
+
+The sweep's luna numbers predate the tuning pass. Re-run, two runs per
+corpus, related context on, no stalls, no lost reviews:
+
+| gpt-5.6-luna | tuning R / N | multi-file R / N | info R / N | $/review |
+|---|---|---|---|---|
+| old prompt, one run | 0.81 / 0.50 | 0.83 / 0.21 | 0.70 / 0.17 | $0.0004 – $0.0007 |
+| current prompt, two runs | 0.81 / 0.28 | 0.92 / 0.04 | 0.50 / 0.04 | $0.0005 – $0.0023 |
+
+Tuning noise roughly halved and multi-file noise fell to 0.04 with recall
+up, which is the same shape the base-prompt rules produced for every other
+model. Info recall fell 0.70 → 0.50; the old figure was one run and the
+new one is two, so the likelier reading is that 0.70 was the high draw.
+Weighted recall over the 38 plants is 0.76, beside gemma-4-31b pinned
+(0.75) and under glm-5.3-flash (0.80), at a price between the two.

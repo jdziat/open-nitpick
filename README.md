@@ -647,7 +647,7 @@ a single run, so gaps under about 0.10 are inside the noise.
 | tier | model | weighted recall | $/review | trade |
 |---|---|---|---|---|
 | cheapest of all | `google/gemma-4-31b-it` pinned to `deepinfra/turbo` | 0.75 | $0.0003 | needs `providers: [deepinfra/turbo]`; weak on the info corpus; best on multi-file diffs |
-| cheapest that holds the line | `openai/gpt-5.6-luna` | 0.79 | $0.0006 | highest noise of the cheap tier on single-file diffs |
+| cheapest without a pin | `openai/gpt-5.6-luna` | 0.76 | $0.0005 – $0.0023 | quiet on multi-file diffs (0.04 noise); weak on the info corpus |
 | cheapest with no surprises | `z-ai/glm-5.3-flash` | 0.82 | $0.0017 | noisy on multi-file diffs; never lost a review |
 | best quality per dollar | `qwen/qwen3.8-27b` | 0.82 | $0.017 | above the default on every corpus with lower noise |
 | quietest | `x-ai/grok-4.6` | 0.74 | $0.020 | zero noise on two corpora, pays in recall |
