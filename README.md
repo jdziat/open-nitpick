@@ -71,6 +71,25 @@ nitpick providers                       # available model providers
 Local reviews print to stdout as `path:line`, which most terminals and editors
 turn into a clickable link.
 
+### The whole repository
+
+```bash
+nitpick full-review                     # every file git knows about, the model on every batch
+nitpick full-review internal/vcs cmd    # only these paths
+nitpick full-review -budget 200000      # stop after ~200k tokens of source, and say what was left
+```
+
+`full-review` reads the working tree as one change that adds every file, so
+the same engine, analyzers and prompts that review a pull request review a
+repository: bugs, security findings, and whatever the installed analyzers
+report (`osv-scanner` on lockfiles gives the known advisories). Both
+directions of related context are on, since every file is already in the
+review. The output is the review, then a remediation plan ordered most
+severe first with findings that share a fix grouped and the files each
+touches counted, then what was not covered: files past the budget, and
+files left out for being binary, empty or oversized. The default is the
+whole tree; `-budget` is for a first look, and its report says so.
+
 ### GitHub Actions
 
 ```yaml
