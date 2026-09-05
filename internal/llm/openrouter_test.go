@@ -206,7 +206,7 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 func TestDefaultConfigSurvivesSanitize(t *testing.T) {
 	clearModelEnv(t)
 	t.Setenv(config.EnvTrustConfigEndpoints, "")
-	t.Setenv(envOpenRouterAPIKey, "sk-or-test")
+	t.Setenv(envSyntheticAPIKey, "syn_test")
 
 	// Relative to the package directory, which is where go test runs.
 	cfg, err := config.LoadFile("../../.nitpick.yaml")
@@ -221,8 +221,8 @@ func TestDefaultConfigSurvivesSanitize(t *testing.T) {
 
 	for _, role := range []config.Role{config.RoleReview, config.RoleTriage} {
 		spec := cfg.Models.ResolveModel(role)
-		if spec.Provider != ProviderOpenRouter {
-			t.Errorf("%s provider = %q, want %q", role, spec.Provider, ProviderOpenRouter)
+		if spec.Provider != ProviderSynthetic {
+			t.Errorf("%s provider = %q, want %q", role, spec.Provider, ProviderSynthetic)
 		}
 		if spec.BaseURL != "" || spec.APIKeyEnv != "" {
 			t.Errorf("%s names base_url=%q api_key_env=%q; the compiled-in endpoint is "+
@@ -232,6 +232,6 @@ func TestDefaultConfigSurvivesSanitize(t *testing.T) {
 	}
 
 	if _, err := BuildRoles(cfg); err != nil {
-		t.Fatalf("the shipped default must build with only %s set: %v", envOpenRouterAPIKey, err)
+		t.Fatalf("the shipped default must build with only %s set: %v", envSyntheticAPIKey, err)
 	}
 }

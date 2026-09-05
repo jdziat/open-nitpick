@@ -453,7 +453,7 @@ models:
 	})
 
 	t.Run("the shipped default discards nothing", func(t *testing.T) {
-		// The whole point of the openrouter provider, asserted through the CLI
+		// The whole point of a compiled-in provider, asserted through the CLI
 		// rather than through config.LoadFile: a committed default that leaned
 		// on base_url would work only for whoever exported the trust variable.
 		out := captureStdout(t, func() {
@@ -465,8 +465,8 @@ models:
 		if strings.Contains(out, "Ignored (untrusted config") {
 			t.Errorf("this repository's own config depends on keys an untrusted config cannot supply:\n%s", out)
 		}
-		if !strings.Contains(out, "openrouter/") {
-			t.Errorf("the default no longer resolves to openrouter:\n%s", out)
+		if !strings.Contains(out, "synthetic/") {
+			t.Errorf("the default no longer resolves to synthetic:\n%s", out)
 		}
 	})
 }
