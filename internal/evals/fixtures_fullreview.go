@@ -94,7 +94,7 @@ func Helper2(x int) int {
 var FullReviewPlants = []Defect{
 	{
 		Path: "internal/fetch/fetch.go", Line: 11, // defer resp.Body.Close() before the error check
-		Keywords: []string{"nil pointer", "nil resp", "resp is nil", "before the error", "before checking", "panic", "nil dereference", "defer"},
+		Keywords: []string{"nil pointer", "nil resp", "resp is nil", "before the error", "before checking", "nil dereference", "resp.Body.Close on a nil"},
 		Class:    "correctness", WantSeverity: "error",
 		Why: "resp is nil when http.Get fails, and the deferred Close dereferences it",
 	},

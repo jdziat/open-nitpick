@@ -97,15 +97,17 @@ func RemediationPlan(findings []review.Finding) string {
 		class    string
 		title    string
 		files    map[string]bool
-		first    string
-		count    int
+		// The earliest anchor: path, then line as a number.
+		firstPath string
+		firstLine int
+		count     int
 	}
 	groups := map[string]*group{}
 	for _, f := range findings {
 		key := f.Class + "\x00" + strings.ToLower(strings.Join(strings.Fields(f.Title), " "))
 		g, ok := groups[key]
 		if !ok {
-			g = &group{severity: config.Severity(f.Severity), class: f.Class, title: f.Title, files: map[string]bool{}, first: fmt.Sprintf("%s:%d", f.Path, f.Line)}
+			g = &group{severity: config.Severity(f.Severity), class: f.Class, title: f.Title, files: map[string]bool{}, firstPath: f.Path, firstLine: f.Line}
 			groups[key] = g
 		}
 		if config.Severity(f.Severity).Rank() > g.severity.Rank() {
@@ -115,8 +117,8 @@ func RemediationPlan(findings []review.Finding) string {
 		g.count++
 		// The earliest anchor by path and line, whatever order the findings
 		// arrived in, so the plan's order is a function of its contents.
-		if at := fmt.Sprintf("%s:%d", f.Path, f.Line); at < g.first {
-			g.first = at
+		if f.Path < g.firstPath || (f.Path == g.firstPath && f.Line < g.firstLine) {
+			g.firstPath, g.firstLine = f.Path, f.Line
 		}
 	}
 	ordered := make([]*group, 0, len(groups))
@@ -130,8 +132,11 @@ func RemediationPlan(findings []review.Finding) string {
 		if ordered[i].class != ordered[j].class {
 			return classOrder(ordered[i].class) < classOrder(ordered[j].class)
 		}
-		if ordered[i].first != ordered[j].first {
-			return ordered[i].first < ordered[j].first
+		if ordered[i].firstPath != ordered[j].firstPath {
+			return ordered[i].firstPath < ordered[j].firstPath
+		}
+		if ordered[i].firstLine != ordered[j].firstLine {
+			return ordered[i].firstLine < ordered[j].firstLine
 		}
 		return ordered[i].title < ordered[j].title
 	})
