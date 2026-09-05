@@ -1,0 +1,86 @@
+import threading
+import time
+
+
+class TokenBucket:
+    """A thread-safe token-bucket rate limiter.
+
+    Tokens accumulate at `refill_rate` tokens per second, up to a maximum of
+    `capacity`. The bucket starts full.
+
+    All methods are safe to call from multiple threads concurrently.
+    """
+
+    def __init__(self, capacity: float, refill_rate: float):
+        if capacity <= 0:
+            raise ValueError("capacity must be positive")
+        if refill_rate <= 0:
+            raise ValueError("refill_rate must be positive")
+        self._capacity = float(capacity)
+        self._refill_rate = float(refill_rate)
+        self._tokens = float(capacity)
+        self._last_refill = time.monotonic()
+        self._lock = threading.Lock()
+
+    def _refill_locked(self) -> None:
+        """Refill based on elapsed time. Caller must hold the lock."""
+        now = time.monotonic()
+        elapsed = now - self._last_refill
+        self._tokens = min(
+            self._capacity, self._tokens + elapsed * self._refill_rate
+        )
+        self._last_refill = now
+
+    def _validate_request(self, tokens: float) -> None:
+        if tokens <= 0:
+            raise ValueError("must request a positive number of tokens")
+        if tokens > self._capacity:
+            raise ValueError(
+                "requested tokens exceed bucket capacity"
+            )
+
+    def try_acquire(self, tokens: float = 1.0) -> bool:
+        """Attempt to take `tokens` without blocking.
+
+        Returns True if the tokens were taken, False if the bucket
+        currently has fewer than `tokens` available.
+        """
+        self._validate_request(tokens)
+        with self._lock:
+            self._refill_locked()
+            if self._tokens >= tokens:
+                self._tokens -= tokens
+                return True
+            return False
+
+    def acquire(self, tokens: float = 1.0) -> None:
+        """Block until `tokens` are available, then take them.
+
+        Sleeps outside the lock so other threads can make progress
+        while this one waits.
+        """
+        self._validate_request(tokens)
+        while True:
+            with self._lock:
+                self._refill_locked()
+                if self._tokens >= tokens:
+                    self._tokens -= tokens
+                    return
+                wait = (tokens - self._tokens) / self._refill_rate
+            time.sleep(wait)
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+if __name__ == "__main__":
+    # Demo: allow bursts of up to 5, sustained at 2 events per second.
+    bucket = TokenBucket(capacity=5, refill_rate=2.0)
+    start = time.monotonic()
+    for i in range(10):
+        bucket.acquire()
+        print(f"event {i + 1} at {time.monotonic() - start:.2f}s")

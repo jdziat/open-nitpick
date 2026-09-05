@@ -1,0 +1,57 @@
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+type DateRangeIterator struct {
+	current    time.Time
+	end        time.Time
+	skipWeekends bool
+}
+
+func NewDateRangeIterator(start, end time.Time, skipWeekends bool) *DateRangeIterator {
+	return &DateRangeIterator{
+		current:    start,
+		end:        end,
+		skipWeekends: skipWeekends,
+	}
+}
+
+func (it *DateRangeIterator) Next() (time.Time, bool) {
+	for {
+		if it.current.After(it.end) {
+			return time.Time{}, false
+		}
+
+		day := it.current
+		it.current = it.current.AddDate(0, 0, 1)
+
+		if it.skipWeekends {
+			weekday := day.Weekday()
+			if weekday == time.Saturday || weekday == time.Sunday {
+				continue
+			}
+		}
+
+		return day, true
+	}
+}
+
+func main() {
+	start := time.Date(2023, time.October, 20, 0, 0, 0, 0, time.UTC) // Friday
+	end := time.Date(2023, time.October(25), 0, 0, 0, 0, 0, time.UTC) // Thursday
+
+	fmt.Println("All days:")
+	itAll := NewDateRangeIterator(start, end, false)
+	for d, ok := itAll.Next(); ok; d, ok = itAll.Next() {
+		fmt.Println(d.Format("2006-01-02 (%s)", d.Weekday()))
+	}
+
+	fmt.Println("\nSkipping weekends:")
+	itWork := NewDateRangeIterator(start, end, true)
+	for d, ok := itWork.Next(); ok; d, ok = itWork.Next() {
+		fmt.Println(d.Format("2006-01-02 (%s)", d.Weekday()))
+	}
+}

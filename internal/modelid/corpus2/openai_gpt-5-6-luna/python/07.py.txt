@@ -1,0 +1,187 @@
+import argparse
+import copy
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Any, Iterable, Mapping, MutableMapping, Optional, Sequence, Union
+
+
+class ConfigError(Exception):
+    """Raised when configuration loading or validation fails."""
+
+
+PathLike = Union[str, os.PathLike]
+
+
+def _merge_dicts(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict:
+    result = copy.deepcopy(dict(base))
+
+    for key, value in override.items():
+        if (
+            key in result
+            and isinstance(result[key], Mapping)
+            and isinstance(value, Mapping)
+        ):
+            result[key] = _merge_dicts(result[key], value)
+        else:
+            result[key] = copy.deepcopy(value)
+
+    return result
+
+
+def _flatten_paths(value: Any, prefix: str = "") -> set:
+    paths = set()
+
+    if isinstance(value, Mapping):
+        if prefix:
+            paths.add(prefix)
+        for key, child in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            paths.update(_flatten_paths(child, path))
+    elif prefix:
+        paths.add(prefix)
+
+    return paths
+
+
+def _environment_name(prefix: str, path: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9]+", "_", path)
+    return f"{prefix}{normalized.upper()}"
+
+
+def _parse_environment_value(value: str) -> Any:
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
+
+
+def _set_path(config: MutableMapping[str, Any], path: str, value: Any) -> None:
+    parts = path.split(".")
+    current: MutableMapping[str, Any] = config
+
+    for part in parts[:-1]:
+        child = current.get(part)
+        if not isinstance(child, MutableMapping):
+            child = {}
+            current[part] = child
+        current = child
+
+    current[parts[-1]] = value
+
+
+def _get_path(config: Mapping[str, Any], path: str) -> tuple:
+    current: Any = config
+
+    for part in path.split("."):
+        if not isinstance(current, Mapping) or part not in current:
+            return False, None
+        current = current[part]
+
+    return True, current
+
+
+def load_config(
+    path: PathLike,
+    defaults: Optional[Mapping[str, Any]] = None,
+    required_keys: Optional[Iterable[str]] = None,
+    env_prefix: str = "APP_",
+) -> dict:
+    """
+    Load and validate a JSON configuration.
+
+    Environment variables use uppercase, underscore-separated paths. For
+    example, ``APP_DATABASE_HOST`` overrides ``database.host``. Environment
+    values are parsed as JSON when possible, allowing values such as
+    ``true``, ``42``, and ``["a", "b"]``.
+    """
+    defaults = defaults or {}
+    required_keys = tuple(required_keys or ())
+
+    if not isinstance(defaults, Mapping):
+        raise ConfigError("defaults must be a mapping")
+
+    config_path = Path(path)
+
+    try:
+        with config_path.open("r", encoding="utf-8") as config_file:
+            file_config = json.load(config_file)
+    except FileNotFoundError as exc:
+        raise ConfigError(f"configuration file not found: {config_path}") from exc
+    except OSError as exc:
+        raise ConfigError(f"unable to read configuration file: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise ConfigError(
+            f"invalid JSON in configuration file at line {exc.lineno}, "
+            f"column {exc.colno}: {exc.msg}"
+        ) from exc
+
+    if not isinstance(file_config, Mapping):
+        raise ConfigError("configuration file must contain a JSON object")
+
+    config = _merge_dicts(defaults, file_config)
+    known_paths = _flatten_paths(config)
+
+    for required_key in required_keys:
+        if not isinstance(required_key, str) or not required_key:
+            raise ConfigError("required keys must be non-empty strings")
+        known_paths.add(required_key)
+
+    for path_name in sorted(known_paths, key=lambda item: item.count(".")):
+        environment_name = _environment_name(env_prefix, path_name)
+        if environment_name in os.environ:
+            _set_path(
+                config,
+                path_name,
+                _parse_environment_value(os.environ[environment_name]),
+            )
+
+    missing_keys = []
+    for required_key in required_keys:
+        exists, value = _get_path(config, required_key)
+        if not exists or value is None:
+            missing_keys.append(required_key)
+
+    if missing_keys:
+        raise ConfigError(
+            "missing required configuration keys: " + ", ".join(missing_keys)
+        )
+
+    return config
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description="Load a JSON configuration file")
+    parser.add_argument("path", help="path to the JSON configuration file")
+    parser.add_argument(
+        "--env-prefix",
+        default="APP_",
+        help="prefix for environment variable overrides (default: APP_)",
+    )
+    parser.add_argument(
+        "--required",
+        action="append",
+        default=[],
+        metavar="KEY",
+        help="required key, using dotted paths for nested values; repeatable",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        config = load_config(
+            args.path,
+            required_keys=args.required,
+            env_prefix=args.env_prefix,
+        )
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    print(json.dumps(config, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

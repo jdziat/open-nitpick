@@ -1,0 +1,123 @@
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+// DateRangeIterator iterates over each day between two dates inclusive.
+type DateRangeIterator struct {
+	current     time.Time
+	end         time.Time
+	skipWeekend bool
+}
+
+// NewDateRangeIterator creates a new DateRangeIterator.
+// start and end are inclusive. If skipWeekend is true, Saturday and Sunday are skipped.
+func NewDateRangeIterator(start, end time.Time, skipWeekend bool) *DateRangeIterator {
+	// Normalize to midnight
+	s := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
+	e := time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, end.Location())
+	iter := &DateRangeIterator{
+		current:     s,
+		end:         e,
+		skipWeekend: skipWeekend,
+	}
+	// If skipWeekend is true and the start day is a weekend, advance to the next weekday.
+	if skipWeekend {
+		iter.advanceIfWeekend()
+	}
+	return iter
+}
+
+// advanceIfWeekend moves current forward until it lands on a weekday.
+func (d *DateRangeIterator) advanceIfWeekend() {
+	for !d.current.After(d.end) {
+		wd := d.current.Weekday()
+		if wd != time.Saturday && wd != time.Sunday {
+			break
+		}
+		d.current = d.current.AddDate(0, 0, 1)
+	}
+}
+
+// HasNext returns true if there are more dates to iterate over.
+func (d *DateRangeIterator) HasNext() bool {
+	return !d.current.After(d.end)
+}
+
+// Next returns the next date in the range and advances the iterator.
+func (d *DateRangeIterator) Next() (time.Time, bool) {
+	if !d.HasNext() {
+		return time.Time{}, false
+	}
+	val := d.current
+	d.current = d.current.AddDate(0, 0, 1)
+	if d.skipWeekend {
+		d.advanceIfWeekend()
+	}
+	return val, true
+}
+
+// Collect returns all dates in the range as a slice.
+func (d *DateRangeIterator) Collect() []time.Time {
+	var dates []time.Time
+	for d.HasNext() {
+		date, _ := d.Next()
+		dates = append(dates, date)
+	}
+	return dates
+}
+
+func main() {
+	start := time.Date(2024, time.March, 28, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2024, time.April, 5, 0, 0, 0, 0, time.UTC)
+
+	fmt.Println("=== All days (including weekends) ===")
+	iter := NewDateRangeIterator(start, end, false)
+	for iter.HasNext() {
+		date, _ := iter.Next()
+		fmt.Printf("%s (%s)\n", date.Format("2006-01-02"), date.Weekday())
+	}
+
+	fmt.Println()
+	fmt.Println("=== Weekdays only (skip weekends) ===")
+	iter2 := NewDateRangeIterator(start, end, true)
+	for iter2.HasNext() {
+		date, _ := iter2.Next()
+		fmt.Printf("%s (%s)\n", date.Format("2006-01-02"), date.Weekday())
+	}
+
+	fmt.Println()
+	fmt.Println("=== Collect all weekdays into a slice ===")
+	iter3 := NewDateRangeIterator(start, end, true)
+	dates := iter3.Collect()
+	fmt.Printf("Collected %d weekdays:\n", len(dates))
+	for _, d := range dates {
+		fmt.Printf("  %s (%s)\n", d.Format("2006-01-02"), d.Weekday())
+	}
+
+	fmt.Println()
+	fmt.Println("=== Single day range ===")
+	singleDay := time.Date(2024, time.April, 1, 0, 0, 0, 0, time.UTC)
+	iter4 := NewDateRangeIterator(singleDay, singleDay, false)
+	for iter4.HasNext() {
+		date, _ := iter4.Next()
+		fmt.Printf("%s (%s)\n", date.Format("2006-01-02"), date.Weekday())
+	}
+
+	fmt.Println()
+	fmt.Println("=== Weekend-only range with skip (should yield nothing) ===")
+	weekendStart := time.Date(2024, time.March, 30, 0, 0, 0, 0, time.UTC) // Saturday
+	weekendEnd := time.Date(2024, time.March, 31, 0, 0, 0, 0, time.UTC)   // Sunday
+	iter5 := NewDateRangeIterator(weekendStart, weekendEnd, true)
+	count := 0
+	for iter5.HasNext() {
+		date, _ := iter5.Next()
+		fmt.Printf("%s (%s)\n", date.Format("2006-01-02"), date.Weekday())
+		count++
+	}
+	if count == 0 {
+		fmt.Println("No weekdays found in range (as expected).")
+	}
+}

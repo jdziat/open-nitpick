@@ -1,0 +1,118 @@
+import { Mutex } from "async-mutex";
+
+export class TokenBucket {
+  private capacity: number;
+  private refillRate: number; // tokens per second
+  private tokens: number;
+  private lastRefillTime: number; // in milliseconds
+  private mutex: Mutex;
+
+  constructor(capacity: number, refillRatePerSecond: number) {
+    if (capacity <= 0) {
+      throw new Error("Capacity must be greater than 0");
+    }
+    if (refillRatePerSecond <= 0) {
+      throw new Error("Refill rate must be greater than 0");
+    }
+
+    this.capacity = capacity;
+    this.refillRate = refillRatePerSecond;
+    this.tokens = capacity;
+    this.lastRefillTime = Date.now();
+    this.mutex = new Mutex();
+  }
+
+  private refill(): void {
+    const now = Date.now();
+    const elapsedSeconds = (now - this.lastRefillTime) / 1000;
+    const tokensToAdd = elapsedSeconds * this.refillRate;
+
+    this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
+    this.lastRefillTime = now;
+  }
+
+  /**
+   * Attempt to consume `count` tokens from the bucket.
+   * Returns true if the tokens were available and consumed, false otherwise.
+   */
+  async tryConsume(count: number = 1): Promise<boolean> {
+    if (count <= 0) {
+      throw new Error("Count must be greater than 0");
+    }
+    if (count > this.capacity) {
+      throw new Error("Count exceeds bucket capacity");
+    }
+
+    return this.mutex.runExclusive(() => {
+      this.refill();
+
+      if (this.tokens >= count) {
+        this.tokens -= count;
+        return true;
+      }
+
+      return false;
+    });
+  }
+
+  /**
+   * Consume `count` tokens, waiting until they are available.
+   */
+  async consume(count: number = 1): Promise<void> {
+    if (count <= 0) {
+      throw new Error("Count must be greater than 0");
+    }
+    if (count > this.capacity) {
+      throw new Error("Count exceeds bucket capacity");
+    }
+
+    while (true) {
+      const acquired = await this.tryConsume(count);
+      if (acquired) {
+        return;
+      }
+
+      // Calculate how long to wait for enough tokens to become available
+      const waitMs = await this.mutex.runExclusive(() => {
+        this.refill();
+        const deficit = count - this.tokens;
+        if (deficit <= 0) {
+          return 0;
+        }
+        return (deficit / this.refillRate) * 1000;
+      });
+
+      if (waitMs > 0) {
+        await sleep(waitMs);
+      }
+    }
+  }
+
+  /**
+   * Returns the current number of available tokens (approximate, not locked).
+   */
+  async availableTokens(): Promise<number> {
+    return this.mutex.runExclusive(() => {
+      this.refill();
+      return this.tokens;
+    });
+  }
+
+  /**
+   * Returns the bucket capacity.
+   */
+  getCapacity(): number {
+    return this.capacity;
+  }
+
+  /**
+   * Returns the refill rate in tokens per second.
+   */
+  getRefillRate(): number {
+    return this.refillRate;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

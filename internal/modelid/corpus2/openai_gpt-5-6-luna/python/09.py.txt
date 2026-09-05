@@ -1,0 +1,18 @@
+from datetime import date, timedelta
+from collections.abc import Iterator
+
+
+def date_range(
+    start_date: date,
+    end_date: date,
+    skip_weekends: bool = False,
+) -> Iterator[date]:
+    """Yield each date from start_date through end_date, inclusive."""
+    if end_date < start_date:
+        raise ValueError("end_date must not be earlier than start_date")
+
+    current_date = start_date
+    while current_date <= end_date:
+        if not skip_weekends or current_date.weekday() < 5:
+            yield current_date
+        current_date += timedelta(days=1)

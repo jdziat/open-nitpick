@@ -1,0 +1,38 @@
+package main
+
+import (
+	"fmt"
+	"regexp"
+	"strings"
+	"unicode"
+)
+
+var nonAlphaNum = regexp.MustCompile(`[^a-z0-9]+`)
+
+func Slugify(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(unicode.ToLower(r))
+		} else {
+			b.WriteRune(' ')
+		}
+	}
+
+	result := nonAlphaNum.ReplaceAllString(b.String(), "-")
+	return strings.Trim(result, "-")
+}
+
+func main() {
+	tests := []string{
+		"Hello World!",
+		"Go language is AWESOME!!!",
+		"Unicode test: 你好 世界 123",
+		"---Trim me---",
+		"Multiple   Spaces & Symbols @#$%^",
+	}
+
+	for _, t := range tests {
+		fmt.Printf("%q -> %q\n", t, Slugify(t))
+	}
+}

@@ -1,0 +1,42 @@
+export class LRUCache<K, V> {
+  private readonly capacity: number;
+  private readonly entries = new Map<K, V>();
+
+  constructor(capacity: number) {
+    if (!Number.isInteger(capacity) || capacity < 0) {
+      throw new Error("Capacity must be a non-negative integer");
+    }
+    this.capacity = capacity;
+  }
+
+  get(key: K): V | undefined {
+    if (!this.entries.has(key)) {
+      return undefined;
+    }
+
+    const value = this.entries.get(key)!;
+    this.entries.delete(key);
+    this.entries.set(key, value);
+
+    return value;
+  }
+
+  put(key: K, value: V): void {
+    if (this.capacity === 0) {
+      return;
+    }
+
+    if (this.entries.has(key)) {
+      this.entries.delete(key);
+    } else if (this.entries.size >= this.capacity) {
+      const leastRecentlyUsedKey = this.entries.keys().next().value as K;
+      this.entries.delete(leastRecentlyUsedKey);
+    }
+
+    this.entries.set(key, value);
+  }
+
+  get size(): number {
+    return this.entries.size;
+  }
+}

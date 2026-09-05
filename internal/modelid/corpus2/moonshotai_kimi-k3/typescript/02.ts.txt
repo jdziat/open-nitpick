@@ -1,0 +1,229 @@
+/**
+ * token-bucket.ts
+ *
+ * A token-bucket rate limiter with a fixed capacity and a constant refill
+ * rate (tokens per second).
+ *
+ * Concurrency safety:
+ *   JavaScript/TypeScript runs on a single-threaded event loop with
+ *   run-to-completion semantics. Every critical section in this class is
+ *   fully synchronous (there is no `await` between reading and mutating
+ *   state), so each operation is atomic with respect to any number of
+ *   concurrent async callers. Callers that must wait are queued and served
+ *   in FIFO order from a synchronous drain loop, which prevents both races
+ *   and starvation. Works in Node.js, Deno, Bun, and browsers.
+ */
+
+type Resolve = () => void;
+type Reject = (reason: unknown) => void;
+
+interface Waiter {
+  readonly tokens: number;
+  readonly resolve: Resolve;
+  readonly reject: Reject;
+}
+
+export class TokenBucketDisposedError extends Error {
+  constructor(message = "TokenBucket has been disposed") {
+    super(message);
+    this.name = "TokenBucketDisposedError";
+  }
+}
+
+export class TokenBucket {
+  private readonly capacity: number;
+  private readonly refillRatePerSecond: number;
+  private readonly now: () => number;
+
+  private tokens: number;
+  private lastRefillMs: number;
+  private waiters: Waiter[] = [];
+  private drainTimer: ReturnType<typeof setTimeout> | null = null;
+  private disposed = false;
+
+  /**
+   * @param capacity            Maximum number of tokens the bucket can hold.
+   * @param refillRatePerSecond Tokens added per second (may be fractional).
+   * @param now                 Clock returning milliseconds (injectable for tests).
+   */
+  constructor(
+    capacity: number,
+    refillRatePerSecond: number,
+    now: () => number = () => Date.now(),
+  ) {
+    if (!Number.isFinite(capacity) || capacity <= 0) {
+      throw new RangeError(`capacity must be a positive finite number, got ${capacity}`);
+    }
+    if (!Number.isFinite(refillRatePerSecond) || refillRatePerSecond <= 0) {
+      throw new RangeError(
+        `refillRatePerSecond must be a positive finite number, got ${refillRatePerSecond}`,
+      );
+    }
+    this.capacity = capacity;
+    this.refillRatePerSecond = refillRatePerSecond;
+    this.now = now;
+    this.tokens = capacity; // the bucket starts full
+    this.lastRefillMs = now();
+  }
+
+  /** Maximum number of tokens the bucket can hold. */
+  get maxCapacity(): number {
+    return this.capacity;
+  }
+
+  /** Tokens added per second. */
+  get refillRate(): number {
+    return this.refillRatePerSecond;
+  }
+
+  /** Current number of tokens in the bucket (after applying lazy refill). */
+  get availableTokens(): number {
+    this.refill();
+    return this.tokens;
+  }
+
+  /** Number of callers currently waiting for tokens. */
+  get pending(): number {
+    return this.waiters.length;
+  }
+
+  /**
+   * Attempt to consume `tokens` immediately.
+   * Returns true (consuming the tokens) or false (consuming nothing).
+   * Fully synchronous, therefore atomic under the event loop.
+   */
+  tryAcquire(tokens = 1): boolean {
+    this.assertUsable(tokens);
+    if (tokens > this.capacity) return false;
+    this.refill();
+    // Fairness: never let a new caller jump ahead of queued waiters.
+    if (this.waiters.length > 0) return false;
+    if (this.tokens < tokens) return false;
+    this.tokens -= tokens;
+    return true;
+  }
+
+  /**
+   * Consume `tokens`, waiting (in FIFO order) until enough are available.
+   * The returned promise rejects if `tokens` exceeds the bucket capacity
+   * or if the bucket is disposed while waiting.
+   *
+   * Note: although declared `async`, the body contains no `await`, so it
+   * executes synchronously up to the point where the caller is either
+   * satisfied or enqueued — the check-and-deduct section cannot be
+   * interleaved by other tasks.
+   */
+  async acquire(tokens = 1): Promise<void> {
+    this.assertUsable(tokens);
+    if (tokens > this.capacity) {
+      throw new RangeError(
+        `requested ${tokens} tokens but bucket capacity is ${this.capacity}`,
+      );
+    }
+    // Fast path: no queue and enough tokens right now.
+    if (this.waiters.length === 0) {
+      this.refill();
+      if (this.tokens >= tokens) {
+        this.tokens -= tokens;
+        return;
+      }
+    }
+    return new Promise<void>((resolve, reject) => {
+      this.waiters.push({ tokens, resolve, reject });
+      this.scheduleDrain();
+    });
+  }
+
+  /**
+   * Reject every pending waiter and cancel all timers.
+   * The bucket must not be used after disposal.
+   */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    if (this.drainTimer !== null) {
+      clearTimeout(this.drainTimer);
+      this.drainTimer = null;
+    }
+    const pending = this.waiters;
+    this.waiters = [];
+    const error = new TokenBucketDisposedError();
+    for (const waiter of pending) waiter.reject(error);
+  }
+
+  // ------------------------------------------------------------------ //
+  // Internals                                                          //
+  // ------------------------------------------------------------------ //
+
+  private assertUsable(tokens: number): void {
+    if (this.disposed) throw new TokenBucketDisposedError();
+    if (!Number.isFinite(tokens) || tokens <= 0) {
+      throw new RangeError(`tokens must be a positive finite number, got ${tokens}`);
+    }
+  }
+
+  /** Lazily add the tokens earned since the last refill. Synchronous/atomic. */
+  private refill(): void {
+    const nowMs = this.now();
+    const elapsedMs = nowMs - this.lastRefillMs;
+    if (elapsedMs <= 0) return; // also guards against backwards clock jumps
+    this.tokens = Math.min(
+      this.capacity,
+      this.tokens + (elapsedMs / 1000) * this.refillRatePerSecond,
+    );
+    this.lastRefillMs = nowMs;
+  }
+
+  /**
+   * Serve queued waiters in FIFO order for as long as tokens allow.
+   * The whole loop is synchronous, so no other task can interleave and
+   * observe or mutate bucket state mid-drain. Resolved promise
+   * continuations run later, as microtasks.
+   */
+  private drain(): void {
+    this.refill();
+    while (this.waiters.length > 0) {
+      const head = this.waiters[0];
+      if (this.tokens < head.tokens) break;
+      this.tokens -= head.tokens;
+      this.waiters.shift();
+      head.resolve();
+    }
+    if (this.waiters.length > 0) this.scheduleDrain();
+  }
+
+  /** Arm a timer for the earliest moment the head waiter can be served. */
+  private scheduleDrain(): void {
+    if (this.drainTimer !== null || this.disposed) return;
+    const head = this.waiters[0];
+    if (head === undefined) return;
+    this.refill();
+    const deficit = Math.max(0, head.tokens - this.tokens);
+    const waitMs = (deficit / this.refillRatePerSecond) * 1000;
+    this.drainTimer = setTimeout(() => {
+      this.drainTimer = null;
+      this.drain();
+    }, waitMs);
+    // In Node.js, don't keep the process alive solely for this timer.
+    const timer = this.drainTimer as unknown as { unref?: () => void };
+    if (typeof timer === "object" && timer !== null && typeof timer.unref === "function") {
+      timer.unref();
+    }
+  }
+}
+
+/*
+ * Example:
+ *
+ *   const limiter = new TokenBucket(10, 5); // burst of 10, then 5 req/s
+ *
+ *   if (limiter.tryAcquire()) {
+ *     await handleRequest();
+ *   } else {
+ *     respond429();
+ *   }
+ *
+ *   // Or block until allowed, safe under any number of concurrent callers:
+ *   await limiter.acquire();
+ *   await handleRequest();
+ */

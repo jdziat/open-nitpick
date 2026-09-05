@@ -1,0 +1,103 @@
+/**
+ * word-frequency.ts
+ *
+ * A word-frequency counter that reads text, normalises case and
+ * punctuation, and returns the top K words with their counts.
+ *
+ * Usage (CLI):
+ *   node word-frequency.js [input-file] [k]
+ *   cat input.txt | node word-frequency.js "" [k]
+ *
+ * If no input file is given, text is read from standard input.
+ * K defaults to 10.
+ */
+
+import * as fs from "fs";
+
+export interface WordFrequency {
+  word: string;
+  count: number;
+}
+
+/**
+ * Splits raw text into normalised word tokens.
+ *
+ * Normalisation rules:
+ *  - Everything is converted to lower case.
+ *  - Any run of characters that are not Unicode letters, numbers or
+ *    apostrophes is treated as a separator (so punctuation, whitespace
+ *    and symbols are discarded).
+ *  - Leading and trailing apostrophes are stripped ("'tis" -> "tis"),
+ *    while internal ones are kept ("don't" stays "don't").
+ */
+export function tokenize(text: string): string[] {
+  const tokens = text.toLowerCase().split(/[^\p{L}\p{N}']+/u);
+  const words: string[] = [];
+  for (const token of tokens) {
+    const word = token.replace(/^'+|'+$/g, "");
+    if (word.length > 0) {
+      words.push(word);
+    }
+  }
+  return words;
+}
+
+/**
+ * Counts how many times each normalised word occurs in the text.
+ */
+export function countWords(text: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const word of tokenize(text)) {
+    counts.set(word, (counts.get(word) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Returns the top K most frequent words in the text.
+ * Ties are broken alphabetically so the output is deterministic.
+ */
+export function topKWords(text: string, k: number): WordFrequency[] {
+  if (!Number.isFinite(k) || k <= 0) {
+    return [];
+  }
+  return Array.from(countWords(text).entries())
+    .map(([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
+    .slice(0, Math.floor(k));
+}
+
+/** Reads input text from the file given on the command line, or stdin. */
+function readInput(): Promise<string> {
+  const filePath = process.argv[2];
+  if (filePath) {
+    return fs.promises.readFile(filePath, "utf8");
+  }
+  return new Promise<string>((resolve, reject) => {
+    let data = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk: string) => {
+      data += chunk;
+    });
+    process.stdin.on("end", () => resolve(data));
+    process.stdin.on("error", reject);
+  });
+}
+
+async function main(): Promise<void> {
+  const k = Number.parseInt(process.argv[3] ?? "10", 10);
+  if (Number.isNaN(k)) {
+    throw new Error(`Invalid value for K: "${process.argv[3]}"`);
+  }
+  const text = await readInput();
+  for (const { word, count } of topKWords(text, k)) {
+    console.log(`${count}\t${word}`);
+  }
+}
+
+if (require.main === module) {
+  main().catch((err: unknown) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

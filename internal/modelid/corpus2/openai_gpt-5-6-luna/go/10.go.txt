@@ -1,0 +1,87 @@
+package shortener
+
+import (
+	"errors"
+	"strings"
+	"sync"
+	"time"
+)
+
+var (
+	ErrEmptyURL  = errors.New("url must not be empty")
+	ErrInvalidTTL = errors.New("expiry must be greater than zero")
+	ErrNotFound  = errors.New("short code not found")
+	ErrExpired   = errors.New("short code expired")
+)
+
+type URLShortener struct {
+	mu      sync.Mutex
+	nextID  uint64
+	entries map[string]entry
+}
+
+type entry struct {
+	url       string
+	expiresAt time.Time
+}
+
+func New() *URLShortener {
+	return &URLShortener{
+		entries: make(map[string]entry),
+	}
+}
+
+func (s *URLShortener) Shorten(rawURL string, ttl time.Duration) (string, error) {
+	if strings.TrimSpace(rawURL) == "" {
+		return "", ErrEmptyURL
+	}
+	if ttl <= 0 {
+		return "", ErrInvalidTTL
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.nextID++
+	code := encodeBase62(s.nextID)
+	s.entries[code] = entry{
+		url:       rawURL,
+		expiresAt: time.Now().Add(ttl),
+	}
+
+	return code, nil
+}
+
+func (s *URLShortener) Resolve(code string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	item, ok := s.entries[code]
+	if !ok {
+		return "", ErrNotFound
+	}
+
+	if !time.Now().Before(item.expiresAt) {
+		delete(s.entries, code)
+		return "", ErrExpired
+	}
+
+	return item.url, nil
+}
+
+func encodeBase62(value uint64) string {
+	const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	if value == 0 {
+		return string(alphabet[0])
+	}
+
+	var buf [11]byte
+	i := len(buf)
+	for value > 0 {
+		i--
+		buf[i] = alphabet[value%62]
+		value /= 62
+	}
+	return string(buf[i:])
+}

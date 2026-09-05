@@ -1,0 +1,145 @@
+package matrix
+
+import (
+	"errors"
+	"fmt"
+)
+
+// Matrix represents a 2D matrix of float64 values.
+type Matrix struct {
+	rows int
+	cols int
+	data [][]float64
+}
+
+// New creates a new Matrix from a 2D slice.
+// Returns an error if the input is empty or rows have inconsistent lengths.
+func New(data [][]float64) (*Matrix, error) {
+	if len(data) == 0 {
+		return nil, errors.New("matrix: data must not be empty")
+	}
+	cols := len(data[0])
+	if cols == 0 {
+		return nil, errors.New("matrix: rows must not be empty")
+	}
+	for i, row := range data {
+		if len(row) != cols {
+			return nil, fmt.Errorf("matrix: row %d has length %d, expected %d", i, len(row), cols)
+		}
+	}
+	// Deep copy
+	d := make([][]float64, len(data))
+	for i, row := range data {
+		d[i] = make([]float64, cols)
+		copy(d[i], row)
+	}
+	return &Matrix{rows: len(data), cols: cols, data: d}, nil
+}
+
+// Rows returns the number of rows.
+func (m *Matrix) Rows() int { return m.rows }
+
+// Cols returns the number of columns.
+func (m *Matrix) Cols() int { return m.cols }
+
+// At returns the element at row i, column j.
+func (m *Matrix) At(i, j int) float64 { return m.data[i][j] }
+
+// Data returns a deep copy of the underlying data.
+func (m *Matrix) Data() [][]float64 {
+	d := make([][]float64, m.rows)
+	for i, row := range m.data {
+		d[i] = make([]float64, m.cols)
+		copy(d[i], row)
+	}
+	return d
+}
+
+// Multiply multiplies m by other and returns the result.
+// Returns an error if the number of columns of m does not equal the number of rows of other.
+func (m *Matrix) Multiply(other *Matrix) (*Matrix, error) {
+	if m.cols != other.rows {
+		return nil, fmt.Errorf(
+			"matrix: cannot multiply (%dx%d) by (%dx%d): inner dimensions must match",
+			m.rows, m.cols, other.rows, other.cols,
+		)
+	}
+	result := make([][]float64, m.rows)
+	for i := range result {
+		result[i] = make([]float64, other.cols)
+		for j := 0; j < other.cols; j++ {
+			sum := 0.0
+			for k := 0; k < m.cols; k++ {
+				sum += m.data[i][k] * other.data[k][j]
+			}
+			result[i][j] = sum
+		}
+	}
+	return &Matrix{rows: m.rows, cols: other.cols, data: result}, nil
+}
+
+// Transpose returns the transpose of m.
+func (m *Matrix) Transpose() *Matrix {
+	data := make([][]float64, m.cols)
+	for i := range data {
+		data[i] = make([]float64, m.rows)
+		for j := 0; j < m.rows; j++ {
+			data[i][j] = m.data[j][i]
+		}
+	}
+	return &Matrix{rows: m.cols, cols: m.rows, data: data}
+}
+
+// Determinant computes the determinant of a square matrix.
+// Returns an error if the matrix is not square.
+func (m *Matrix) Determinant() (float64, error) {
+	if m.rows != m.cols {
+		return 0, fmt.Errorf(
+			"matrix: determinant requires a square matrix, got (%dx%d)",
+			m.rows, m.cols,
+		)
+	}
+	return determinant(m.data, m.rows), nil
+}
+
+// determinant recursively computes the determinant using cofactor expansion.
+func determinant(data [][]float64, n int) float64 {
+	if n == 1 {
+		return data[0][0]
+	}
+	if n == 2 {
+		return data[0][0]*data[1][1] - data[0][1]*data[1][0]
+	}
+	det := 0.0
+	for col := 0; col < n; col++ {
+		minor := minor(data, n, 0, col)
+		sign := 1.0
+		if col%2 != 0 {
+			sign = -1.0
+		}
+		det += sign * data[0][col] * determinant(minor, n-1)
+	}
+	return det
+}
+
+// minor returns the (n-1)x(n-1) submatrix obtained by removing row skipRow and column skipCol.
+func minor(data [][]float64, n, skipRow, skipCol int) [][]float64 {
+	result := make([][]float64, n-1)
+	ri := 0
+	for i := 0; i < n; i++ {
+		if i == skipRow {
+			continue
+		}
+		result[ri] = make([]float64, n-1)
+		ci := 0
+		for j := 0; j < n; j++ {
+			if j == skipCol {
+				continue
+			}
+			result[ri][ci] = data[i][j]
+			ci++
+		}
+		ri++
+	}
+	return result
+}

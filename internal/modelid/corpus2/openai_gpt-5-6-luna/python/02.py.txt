@@ -1,0 +1,90 @@
+import math
+import threading
+import time
+
+
+class TokenBucket:
+    """Thread-safe token-bucket rate limiter."""
+
+    def __init__(self, capacity: float, refill_rate: float):
+        if not math.isfinite(capacity) or capacity <= 0:
+            raise ValueError("capacity must be a finite positive number")
+        if not math.isfinite(refill_rate) or refill_rate <= 0:
+            raise ValueError("refill_rate must be a finite positive number")
+
+        self.capacity = float(capacity)
+        self.refill_rate = float(refill_rate)
+        self._tokens = float(capacity)
+        self._last_refill = time.monotonic()
+        self._lock = threading.Lock()
+
+    def _validate_amount(self, tokens: float) -> float:
+        if not math.isfinite(tokens) or tokens <= 0:
+            raise ValueError("tokens must be a finite positive number")
+        if tokens > self.capacity:
+            raise ValueError("tokens cannot exceed bucket capacity")
+        return float(tokens)
+
+    def _refill(self, now: float) -> None:
+        elapsed = now - self._last_refill
+        if elapsed > 0:
+            self._tokens = min(
+                self.capacity,
+                self._tokens + elapsed * self.refill_rate,
+            )
+            self._last_refill = now
+
+    def try_acquire(self, tokens: float = 1) -> bool:
+        """Consume tokens immediately, returning whether the request succeeded."""
+        amount = self._validate_amount(tokens)
+        with self._lock:
+            self._refill(time.monotonic())
+            if self._tokens < amount:
+                return False
+            self._tokens -= amount
+            return True
+
+    def acquire(self, tokens: float = 1, timeout: float | None = None) -> bool:
+        """
+        Consume tokens, waiting for them to become available.
+
+        Returns False if the timeout expires before the tokens are available.
+        """
+        amount = self._validate_amount(tokens)
+
+        if timeout is not None:
+            if not math.isfinite(timeout) or timeout < 0:
+                raise ValueError("timeout must be a finite non-negative number")
+            deadline = time.monotonic() + timeout
+        else:
+            deadline = None
+
+        while True:
+            with self._lock:
+                now = time.monotonic()
+                self._refill(now)
+
+                if self._tokens >= amount:
+                    self._tokens -= amount
+                    return True
+
+                wait_for = (amount - self._tokens) / self.refill_rate
+
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                wait_for = min(wait_for, remaining)
+
+            time.sleep(wait_for)
+
+    @property
+    def available_tokens(self) -> float:
+        """Return the current number of available tokens."""
+        with self._lock:
+            self._refill(time.monotonic())
+            return self._tokens
+
+    def consume(self, tokens: float = 1) -> bool:
+        """Alias for try_acquire."""
+        return self.try_acquire(tokens)

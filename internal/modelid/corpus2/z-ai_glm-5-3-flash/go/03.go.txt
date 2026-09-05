@@ -1,0 +1,82 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+const (
+	multiplier     = 2.0              // growth factor between attempts
+	jitterFraction = 0.25             // ±25% randomization around each computed delay
+	maxDelay       = 30 * time.Second // ceiling for any single sleep
+)
+
+// Retry calls fn up to maxAttempts times, sleeping between attempts with
+// exponential backoff and jitter. It returns nil as soon as an attempt
+// succeeds; if every attempt fails, it returns the error from the final one.
+func Retry(maxAttempts int, baseDelay time.Duration, fn func(attempt int) error) error {
+	if maxAttempts < 1 {
+		return errors.New("retry: maxAttempts must be at least 1")
+	}
+	if baseDelay <= 0 {
+		baseDelay = 100 * time.Millisecond
+	}
+
+	delay := baseDelay
+	var err error
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		err = fn(attempt)
+		if err == nil {
+			return nil
+		}
+		if attempt == maxAttempts {
+			break
+		}
+
+		time.Sleep(jittered(delay))
+
+		delay = time.Duration(float64(delay) * multiplier)
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+	}
+	return err
+}
+
+// jittered scales d by a uniformly random factor in
+// [1-jitterFraction, 1+jitterFraction] and caps it at maxDelay, so that many
+// callers retrying in parallel do not all wake up at the same instant.
+func jittered(d time.Duration) time.Duration {
+	factor := 1 - jitterFraction + 2*jitterFraction*rand.Float64()
+	d = time.Duration(float64(d) * factor)
+	if d < 0 {
+		d = 0
+	}
+	if d > maxDelay {
+		d = maxDelay
+	}
+	return d
+}
+
+func main() {
+	// Flaky operation that succeeds on the third attempt.
+	calls := 0
+	err := Retry(5, 100*time.Millisecond, func(attempt int) error {
+		calls++
+		if calls < 3 {
+			return fmt.Errorf("flaky attempt %d: transient failure", attempt)
+		}
+		fmt.Printf("flaky attempt %d: success\n", attempt)
+		return nil
+	})
+	fmt.Println("flaky result:", err)
+
+	// Operation that never succeeds: the last error is surfaced.
+	err = Retry(4, 50*time.Millisecond, func(attempt int) error {
+		return fmt.Errorf("attempt %d: still failing", attempt)
+	})
+	fmt.Println("doomed result:", err)
+}

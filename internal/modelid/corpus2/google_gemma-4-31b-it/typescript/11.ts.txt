@@ -1,0 +1,67 @@
+type Matrix = number[][];
+
+class MatrixOps {
+    static create(rows: number, cols: number, fill = 0): Matrix {
+        return Array.from({ length: rows }, () => new Array(cols).fill(fill));
+    }
+
+    static transpose(m: Matrix): Matrix {
+        const rows = m.length;
+        const cols = m[0]?.length || 0;
+        const result = this.create(cols, rows);
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                result[c][r] = m[r][c];
+            }
+        }
+        return result;
+    }
+
+    static multiply(a: Matrix, b: Matrix): Matrix {
+        const aRows = a.length;
+        const aCols = a[0]?.length || 0;
+        const bRows = b.length;
+        const bCols = b[0]?.length || 0;
+
+        if (aCols !== bRows) {
+            throw new Error(`Shape mismatch: Cannot multiply ${aRows}x${aCols} by ${bRows}x${bCols}`);
+        }
+
+        const result = this.create(aRows, bCols);
+        for (let i = 0; i < aRows; i++) {
+            for (let j = 0; j < bCols; j++) {
+                let sum = 0;
+                for (let k = 0; k < aCols; k++) {
+                    sum += a[i][k] * b[k][j];
+                }
+                result[i][j] = sum;
+            }
+        }
+        return result;
+    }
+
+    static determinant(m: Matrix): number {
+        const rows = m.length;
+        const cols = m[0]?.length || 0;
+
+        if (rows !== cols) {
+            throw new Error(`Shape mismatch: Determinant requires a square matrix, got ${rows}x${cols}`);
+        }
+
+        if (rows === 0) return 1;
+        if (rows === 1) return m[0][0];
+        if (rows === 2) return m[0][0] * m[1][1] - m[0][1] * m[1][0];
+
+        let det = 0;
+        for (let i = 0; i < rows; i++) {
+            det += Math.pow(-1, i) * m[0][i] * this.determinant(this.getMinor(m, 0, i));
+        }
+        return det;
+    }
+
+    private static getMinor(m: Matrix, row: number, col: number): Matrix {
+        return m
+            .filter((_, r) => r !== row)
+            .map(r => r.filter((_, c) => c !== col));
+    }
+}

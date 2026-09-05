@@ -1186,6 +1186,25 @@ survives a human edit, or that holds for models outside these six, or that
 holds on files longer than the corpus's: it is a same-day, same-hand
 experiment on 223 files, and Rule 15 applies to every number above.
 
+**The second run, across generations.** The task split cannot ask whether
+a signature holds from one sampling to the next, so the corpus was
+generated a second time (`internal/modelid/corpus2`, 197 files: qwen3.8-27b
+returned empty output twice for nineteen of its slots and has thirteen;
+the human control is not regenerated and stays in the training side). The
+classifier is trained on the first corpus and tested on the whole of the
+second:
+
+| language | authors | accuracy | majority | margin |
+|---|---|---|---|---|
+| go | 7 | 0.33 (22/66) | 0.18 | 0.15 |
+| python | 7 | 0.32 (21/66) | 0.18 | 0.14 |
+| typescript | 6 | 0.48 (31/65) | 0.18 | 0.29 |
+
+TypeScript holds its margin across generations at the same level as
+across tasks; Go sits on the line, as it did on one of the two task
+splits, and Python stays under it. The verdict does not move: TypeScript
+only. The matrices are in `internal/modelid/RESULTS.md`.
+
 So `nitpick identify-model` exists for TypeScript only, answers "most
 similar to" with the confidence the classifier reports, and answers
 "unknown" below a confidence of 0.2 or for any other language, saying

@@ -1,0 +1,71 @@
+export interface ParseCsvOptions {
+  delimiter?: string;
+}
+
+export function parseCsv(input: string, options: ParseCsvOptions = {}): string[][] {
+  const delimiter = options.delimiter ?? ',';
+
+  if (delimiter.length === 0) {
+    throw new Error('Delimiter must not be empty');
+  }
+
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  let index = 0;
+
+  while (index < input.length) {
+    const char = input.charAt(index);
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (input.charAt(index + 1) === '"') {
+          field += '"';
+          index += 2;
+        } else {
+          inQuotes = false;
+          index += 1;
+        }
+      } else {
+        field += char;
+        index += 1;
+      }
+    } else {
+      if (input.startsWith(delimiter, index)) {
+        row.push(field);
+        field = '';
+        index += delimiter.length;
+      } else if (char === '"' && field === '') {
+        inQuotes = true;
+        index += 1;
+      } else if (char === '\r') {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = '';
+        index += 1;
+
+        if (input.charAt(index) === '\n') {
+          index += 1;
+        }
+      } else if (char === '\n') {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = '';
+        index += 1;
+      } else {
+        field += char;
+        index += 1;
+      }
+    }
+  }
+
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  return rows;
+}

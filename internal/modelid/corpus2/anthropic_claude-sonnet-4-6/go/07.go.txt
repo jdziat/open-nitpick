@@ -1,0 +1,267 @@
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"reflect"
+	"strconv"
+	"strings"
+)
+
+// Config holds all application configuration values.
+// Field tags:
+//   env:"ENV_VAR"        – environment variable name to override this field
+//   default:"value"      – default value used when neither file nor env provides one
+//   required:"true"      – the final value must be non-zero / non-empty
+type Config struct {
+	AppName  string `json:"app_name"  env:"APP_NAME"   default:"MyApp"      required:"false"`
+	Host     string `json:"host"      env:"HOST"        default:"localhost"   required:"true"`
+	Port     int    `json:"port"      env:"PORT"        default:"8080"        required:"true"`
+	Debug    bool   `json:"debug"     env:"DEBUG"       default:"false"       required:"false"`
+	LogLevel string `json:"log_level" env:"LOG_LEVEL"   default:"info"        required:"true"`
+	DSN      string `json:"dsn"       env:"DSN"                              required:"true"`
+}
+
+// loadConfig loads configuration in the following priority order (highest wins):
+//  1. Environment variables
+//  2. JSON config file (path provided)
+//  3. Struct field defaults
+//
+// After merging all sources the required fields are validated.
+func loadConfig(filePath string) (*Config, error) {
+	cfg := &Config{}
+
+	// Step 1 – apply defaults from struct tags.
+	if err := applyDefaults(cfg); err != nil {
+		return nil, fmt.Errorf("applying defaults: %w", err)
+	}
+
+	// Step 2 – overlay values from the JSON file (if provided).
+	if filePath != "" {
+		if err := loadFromFile(filePath, cfg); err != nil {
+			return nil, fmt.Errorf("loading file %q: %w", filePath, err)
+		}
+	}
+
+	// Step 3 – overlay values from environment variables.
+	if err := applyEnv(cfg); err != nil {
+		return nil, fmt.Errorf("applying env vars: %w", err)
+	}
+
+	// Step 4 – validate required fields.
+	if err := validate(cfg); err != nil {
+		return nil, fmt.Errorf("validation: %w", err)
+	}
+
+	return cfg, nil
+}
+
+// applyDefaults sets each field to its `default` tag value when present.
+func applyDefaults(cfg *Config) error {
+	rv := reflect.ValueOf(cfg).Elem()
+	rt := rv.Type()
+
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		val := rv.Field(i)
+
+		def, ok := field.Tag.Lookup("default")
+		if !ok {
+			continue
+		}
+
+		if err := setField(val, def); err != nil {
+			return fmt.Errorf("field %s: %w", field.Name, err)
+		}
+	}
+	return nil
+}
+
+// loadFromFile reads a JSON file and unmarshals it into cfg.
+// Only keys present in the file will overwrite the current values.
+func loadFromFile(path string, cfg *Config) error {
+	f, err := os.Open(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			// Missing file is not fatal; just skip.
+			return nil
+		}
+		return err
+	}
+	defer f.Close()
+
+	decoder := json.NewDecoder(f)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(cfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+// applyEnv iterates over fields with an `env` tag and, if the variable is set
+// in the environment, overrides the current value.
+func applyEnv(cfg *Config) error {
+	rv := reflect.ValueOf(cfg).Elem()
+	rt := rv.Type()
+
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		val := rv.Field(i)
+
+		envKey, ok := field.Tag.Lookup("env")
+		if !ok || envKey == "" {
+			continue
+		}
+
+		envVal, set := os.LookupEnv(envKey)
+		if !set {
+			continue
+		}
+
+		if err := setField(val, envVal); err != nil {
+			return fmt.Errorf("env var %s (field %s): %w", envKey, field.Name, err)
+		}
+	}
+	return nil
+}
+
+// validate checks that every field tagged `required:"true"` has a non-zero value.
+func validate(cfg *Config) error {
+	rv := reflect.ValueOf(cfg).Elem()
+	rt := rv.Type()
+
+	var missing []string
+
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		val := rv.Field(i)
+
+		req := strings.ToLower(field.Tag.Get("required"))
+		if req != "true" {
+			continue
+		}
+
+		if val.IsZero() {
+			name := field.Tag.Get("json")
+			if name == "" {
+				name = field.Name
+			}
+			missing = append(missing, name)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("required fields are missing or zero-valued: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+// setField converts the string s to the appropriate type and assigns it to v.
+func setField(v reflect.Value, s string) error {
+	switch v.Kind() {
+	case reflect.String:
+		v.SetString(s)
+
+	case reflect.Bool:
+		b, err := strconv.ParseBool(s)
+		if err != nil {
+			return fmt.Errorf("cannot parse %q as bool: %w", s, err)
+		}
+		v.SetBool(b)
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return fmt.Errorf("cannot parse %q as int: %w", s, err)
+		}
+		v.SetInt(n)
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		n, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return fmt.Errorf("cannot parse %q as uint: %w", s, err)
+		}
+		v.SetUint(n)
+
+	case reflect.Float32, reflect.Float64:
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return fmt.Errorf("cannot parse %q as float: %w", s, err)
+		}
+		v.SetFloat(f)
+
+	default:
+		return fmt.Errorf("unsupported field kind %s", v.Kind())
+	}
+	return nil
+}
+
+// -------------------------------------------------------------------------
+// Demo / main
+// -------------------------------------------------------------------------
+
+func main() {
+	// Create a temporary JSON config file for demonstration purposes.
+	const sampleJSON = `{
+		"app_name":  "DemoApp",
+		"host":      "0.0.0.0",
+		"port":      9090,
+		"debug":     true,
+		"log_level": "debug",
+		"dsn":       "postgres://user:pass@localhost/demo"
+	}`
+
+	tmpFile, err := os.CreateTemp("", "config-*.json")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "create temp file: %v\n", err)
+		os.Exit(1)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(sampleJSON); err != nil {
+		fmt.Fprintf(os.Stderr, "write temp file: %v\n", err)
+		os.Exit(1)
+	}
+	tmpFile.Close()
+
+	fmt.Println("=== Load from file only ===")
+	cfg, err := loadConfig(tmpFile.Name())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+	printConfig(cfg)
+
+	// Override PORT and DSN via environment variables.
+	os.Setenv("PORT", "7777")
+	os.Setenv("DSN", "mysql://root:secret@localhost/override")
+
+	fmt.Println("\n=== After env-var overrides (PORT=7777, DSN=mysql://...) ===")
+	cfg, err = loadConfig(tmpFile.Name())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+	printConfig(cfg)
+
+	// Demonstrate validation failure: no file, no env DSN set.
+	os.Unsetenv("DSN")
+	fmt.Println("\n=== Validation failure (no file, DSN unset) ===")
+	cfg, err = loadConfig("")
+	if err != nil {
+		fmt.Printf("Expected error: %v\n", err)
+	} else {
+		printConfig(cfg)
+	}
+}
+
+func printConfig(cfg *Config) {
+	fmt.Printf("  AppName:  %s\n", cfg.AppName)
+	fmt.Printf("  Host:     %s\n", cfg.Host)
+	fmt.Printf("  Port:     %d\n", cfg.Port)
+	fmt.Printf("  Debug:    %v\n", cfg.Debug)
+	fmt.Printf("  LogLevel: %s\n", cfg.LogLevel)
+	fmt.Printf("  DSN:      %s\n", cfg.DSN)
+}

@@ -1,0 +1,44 @@
+package main
+
+import (
+	"sync"
+	"time"
+)
+
+type RateLimiter struct {
+	capacity   float64
+	rate       float64
+	tokens     float64
+	lastUpdate time.Time
+	mu         sync.Mutex
+}
+
+func NewRateLimiter(capacity, rate float64) *RateLimiter {
+	return &RateLimiter{
+		capacity:   capacity,
+		rate:       rate,
+		tokens:     capacity,
+		lastUpdate: time.Now(),
+	}
+}
+
+func (rl *RateLimiter) Allow() bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	elapsed := now.Sub(rl.lastUpdate).Seconds()
+	rl.tokens += elapsed * rl.rate
+
+	if rl.tokens > rl.capacity {
+		rl.tokens = rl.capacity
+	}
+	rl.lastUpdate = now
+
+	if rl.tokens >= 1.0 {
+		rl.tokens -= 1.0
+		return true
+	}
+
+	return false
+}

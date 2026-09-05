@@ -1,0 +1,28 @@
+import csv
+import io
+
+def parse_csv(data, delimiter=',', quotechar='"', escapechar=None):
+    """
+    Parses a subset of CSV: handles quoted fields and escaped quotes.
+    Returns a generator of rows (lists of strings).
+    """
+    # Use the built-in csv module which implements the RFC 4180 standard
+    # and handles complex quoting/escaping logic.
+    stream = io.StringIO(data)
+    reader = csv.reader(
+        stream, 
+        delimiter=delimiter, 
+        quotechar=quotechar, 
+        escapechar=escapechar, 
+        doublequote=True
+    )
+    for row in reader:
+        yield row
+
+if __name__ == "__main__":
+    # Test case: Configurable delimiter, quoted fields, and escaped quotes
+    test_data = 'Name|City|Note\n"John ""The Boss"" Doe"|New York|"Likes | symbols"\nJane|London|Simple'
+    
+    print(f"Parsing data with delimiter '|':")
+    for row in parse_csv(test_data, delimiter='|'):
+        print(row)

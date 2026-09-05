@@ -1,0 +1,99 @@
+package main
+
+type Node struct {
+	Key         int
+	Left, Right *Node
+}
+
+type BST struct {
+	Root *Node
+}
+
+func (t *BST) Insert(key int) {
+	t.Root = insert(t.Root, key)
+}
+
+func insert(node *Node, key int) *Node {
+	if node == nil {
+		return &Node{Key: key}
+	}
+
+	if key < node.Key {
+		node.Left = insert(node.Left, key)
+	} else if key > node.Key {
+		node.Right = insert(node.Right, key)
+	}
+
+	return node
+}
+
+func (t *BST) Search(key int) bool {
+	node := t.Root
+
+	for node != nil {
+		if key == node.Key {
+			return true
+		}
+		if key < node.Key {
+			node = node.Left
+		} else {
+			node = node.Right
+		}
+	}
+
+	return false
+}
+
+func (t *BST) Delete(key int) {
+	t.Root = deleteNode(t.Root, key)
+}
+
+func deleteNode(node *Node, key int) *Node {
+	if node == nil {
+		return nil
+	}
+
+	if key < node.Key {
+		node.Left = deleteNode(node.Left, key)
+		return node
+	}
+	if key > node.Key {
+		node.Right = deleteNode(node.Right, key)
+		return node
+	}
+
+	if node.Left == nil {
+		return node.Right
+	}
+	if node.Right == nil {
+		return node.Left
+	}
+
+	successor := node.Right
+	for successor.Left != nil {
+		successor = successor.Left
+	}
+
+	node.Key = successor.Key
+	node.Right = deleteNode(node.Right, successor.Key)
+
+	return node
+}
+
+func (t *BST) InOrder() []int {
+	result := make([]int, 0)
+	inOrder(t.Root, &result)
+	return result
+}
+
+func inOrder(node *Node, result *[]int) {
+	if node == nil {
+		return
+	}
+
+	inOrder(node.Left, result)
+	*result = append(*result, node.Key)
+	inOrder(node.Right, result)
+}
+
+func main() {}

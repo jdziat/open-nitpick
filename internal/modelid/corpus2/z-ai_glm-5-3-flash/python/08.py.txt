@@ -1,0 +1,101 @@
+"""A priority queue backed by a binary heap.
+
+Items are ordered by a caller-supplied comparison function:
+
+    compare(a, b) -> int
+
+It must return a negative number if ``a`` has higher priority than ``b``,
+zero if the items are equivalent, and a positive number if ``a`` has
+lower priority than ``b``.
+"""
+
+
+class PriorityQueue:
+    """A binary-heap priority queue ordered by a comparison function."""
+
+    def __init__(self, compare):
+        if not callable(compare):
+            raise TypeError("compare must be callable")
+        self._compare = compare
+        self._heap = []
+
+    def __len__(self):
+        return len(self._heap)
+
+    def __bool__(self):
+        return bool(self._heap)
+
+    def __repr__(self):
+        return "{}({!r})".format(type(self).__name__, self._heap)
+
+    def push(self, item):
+        """Insert ``item`` into the queue."""
+        self._heap.append(item)
+        self._sift_up(len(self._heap) - 1)
+
+    def pop(self):
+        """Remove and return the item with the highest priority.
+
+        Raises IndexError if the queue is empty.
+        """
+        heap = self._heap
+        if not heap:
+            raise IndexError("pop from an empty priority queue")
+        top = heap[0]
+        last = heap.pop()
+        if heap:
+            heap[0] = last
+            self._sift_down(0)
+        return top
+
+    def peek(self):
+        """Return the item with the highest priority without removing it.
+
+        Raises IndexError if the queue is empty.
+        """
+        if not self._heap:
+            raise IndexError("peek from an empty priority queue")
+        return self._heap[0]
+
+    def _sift_up(self, index):
+        heap = self._heap
+        compare = self._compare
+        while index > 0:
+            parent = (index - 1) // 2
+            if compare(heap[index], heap[parent]) < 0:
+                heap[index], heap[parent] = heap[parent], heap[index]
+                index = parent
+            else:
+                break
+
+    def _sift_down(self, index):
+        heap = self._heap
+        compare = self._compare
+        size = len(heap)
+        while True:
+            left = 2 * index + 1
+            right = left + 1
+            highest = index
+            if left < size and compare(heap[left], heap[highest]) < 0:
+                highest = left
+            if right < size and compare(heap[right], heap[highest]) < 0:
+                highest = right
+            if highest == index:
+                return
+            heap[index], heap[highest] = heap[highest], heap[index]
+            index = highest
+
+
+if __name__ == "__main__":
+    # Min-heap on numeric values: negative when a < b.
+    pq = PriorityQueue(lambda a, b: a - b)
+    for value in (5, 1, 9, 3, 7):
+        pq.push(value)
+    print(pq.peek())                            # 1
+    print([pq.pop() for _ in range(len(pq))])   # [1, 3, 5, 7, 9]
+
+    # Max-heap on strings: negative when a > b.
+    words = PriorityQueue(lambda a, b: (a < b) - (a > b))
+    for word in ("apple", "pear", "fig"):
+        words.push(word)
+    print(words.pop())                          # pear

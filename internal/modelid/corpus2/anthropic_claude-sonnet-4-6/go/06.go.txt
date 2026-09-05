@@ -1,0 +1,119 @@
+package main
+
+import "fmt"
+
+type Node struct {
+	Value       int
+	Left, Right *Node
+}
+
+type BST struct {
+	Root *Node
+}
+
+func (b *BST) Insert(value int) {
+	b.Root = insertNode(b.Root, value)
+}
+
+func insertNode(node *Node, value int) *Node {
+	if node == nil {
+		return &Node{Value: value}
+	}
+	if value < node.Value {
+		node.Left = insertNode(node.Left, value)
+	} else if value > node.Value {
+		node.Right = insertNode(node.Right, value)
+	}
+	return node
+}
+
+func (b *BST) Search(value int) bool {
+	return searchNode(b.Root, value)
+}
+
+func searchNode(node *Node, value int) bool {
+	if node == nil {
+		return false
+	}
+	if value == node.Value {
+		return true
+	} else if value < node.Value {
+		return searchNode(node.Left, value)
+	} else {
+		return searchNode(node.Right, value)
+	}
+}
+
+func (b *BST) Delete(value int) {
+	b.Root = deleteNode(b.Root, value)
+}
+
+func deleteNode(node *Node, value int) *Node {
+	if node == nil {
+		return nil
+	}
+	if value < node.Value {
+		node.Left = deleteNode(node.Left, value)
+	} else if value > node.Value {
+		node.Right = deleteNode(node.Right, value)
+	} else {
+		// Node to delete found
+		if node.Left == nil {
+			return node.Right
+		} else if node.Right == nil {
+			return node.Left
+		}
+		// Node has two children: find in-order successor (smallest in right subtree)
+		successor := findMin(node.Right)
+		node.Value = successor.Value
+		node.Right = deleteNode(node.Right, successor.Value)
+	}
+	return node
+}
+
+func findMin(node *Node) *Node {
+	current := node
+	for current.Left != nil {
+		current = current.Left
+	}
+	return current
+}
+
+func (b *BST) InOrder() []int {
+	result := []int{}
+	inOrderTraversal(b.Root, &result)
+	return result
+}
+
+func inOrderTraversal(node *Node, result *[]int) {
+	if node == nil {
+		return
+	}
+	inOrderTraversal(node.Left, result)
+	*result = append(*result, node.Value)
+	inOrderTraversal(node.Right, result)
+}
+
+func main() {
+	bst := &BST{}
+
+	values := []int{5, 3, 7, 1, 4, 6, 8, 2}
+	fmt.Println("Inserting values:", values)
+	for _, v := range values {
+		bst.Insert(v)
+	}
+
+	fmt.Println("In-order traversal:", bst.InOrder())
+
+	searchValues := []int{4, 9}
+	for _, v := range searchValues {
+		fmt.Printf("Search %d: %v\n", v, bst.Search(v))
+	}
+
+	deleteValues := []int{3, 5, 9}
+	for _, v := range deleteValues {
+		fmt.Printf("Deleting %d\n", v)
+		bst.Delete(v)
+		fmt.Println("In-order traversal after delete:", bst.InOrder())
+	}
+}

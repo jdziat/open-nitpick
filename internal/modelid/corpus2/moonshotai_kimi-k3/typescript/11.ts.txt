@@ -1,0 +1,159 @@
+export class MatrixError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MatrixError";
+    Object.setPrototypeOf(this, MatrixError.prototype);
+  }
+}
+
+export class Matrix {
+  readonly rows: number;
+  readonly cols: number;
+  private readonly data: readonly (readonly number[])[];
+
+  constructor(data: number[][]) {
+    if (data.length === 0) {
+      throw new MatrixError("Matrix must have at least one row.");
+    }
+    const cols = data[0].length;
+    if (cols === 0) {
+      throw new MatrixError("Matrix must have at least one column.");
+    }
+    for (let i = 0; i < data.length; i++) {
+      if (data[i].length !== cols) {
+        throw new MatrixError(
+          `Ragged matrix: row 0 has ${cols} columns but row ${i} has ${data[i].length}.`
+        );
+      }
+    }
+    this.rows = data.length;
+    this.cols = cols;
+    this.data = data.map((row) => Object.freeze([...row]));
+    Object.freeze(this.data);
+  }
+
+  static zeros(rows: number, cols: number): Matrix {
+    if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows <= 0 || cols <= 0) {
+      throw new MatrixError(`Invalid dimensions: ${rows}x${cols}.`);
+    }
+    return new Matrix(
+      Array.from({ length: rows }, () => new Array<number>(cols).fill(0))
+    );
+  }
+
+  static identity(size: number): Matrix {
+    if (!Number.isInteger(size) || size <= 0) {
+      throw new MatrixError(`Invalid identity matrix size: ${size}.`);
+    }
+    return new Matrix(
+      Array.from({ length: size }, (_, i) =>
+        Array.from({ length: size }, (_, j) => (i === j ? 1 : 0))
+      )
+    );
+  }
+
+  get(row: number, col: number): number {
+    if (row < 0 || row >= this.rows || col < 0 || col >= this.cols) {
+      throw new MatrixError(
+        `Index out of bounds: (${row}, ${col}) in a ${this.rows}x${this.cols} matrix.`
+      );
+    }
+    return this.data[row][col];
+  }
+
+  toArray(): number[][] {
+    return this.data.map((row) => [...row]);
+  }
+
+  multiply(other: Matrix): Matrix;
+  multiply(scalar: number): Matrix;
+  multiply(arg: Matrix | number): Matrix {
+    if (typeof arg === "number") {
+      return new Matrix(this.data.map((row) => row.map((v) => v * arg)));
+    }
+    const other = arg;
+    if (this.cols !== other.rows) {
+      throw new MatrixError(
+        `Shape mismatch: cannot multiply a ${this.rows}x${this.cols} matrix ` +
+          `by a ${other.rows}x${other.cols} matrix ` +
+          `(inner dimensions ${this.cols} and ${other.rows} differ).`
+      );
+    }
+    const result: number[][] = Array.from({ length: this.rows }, () =>
+      new Array<number>(other.cols).fill(0)
+    );
+    for (let i = 0; i < this.rows; i++) {
+      for (let k = 0; k < this.cols; k++) {
+        const a = this.data[i][k];
+        if (a === 0) continue;
+        for (let j = 0; j < other.cols; j++) {
+          result[i][j] += a * other.data[k][j];
+        }
+      }
+    }
+    return new Matrix(result);
+  }
+
+  transpose(): Matrix {
+    const result: number[][] = Array.from({ length: this.cols }, () =>
+      new Array<number>(this.rows).fill(0)
+    );
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        result[j][i] = this.data[i][j];
+      }
+    }
+    return new Matrix(result);
+  }
+
+  determinant(): number {
+    if (this.rows !== this.cols) {
+      throw new MatrixError(
+        `Determinant is undefined for a non-square ${this.rows}x${this.cols} matrix.`
+      );
+    }
+    // Gaussian elimination with partial pivoting, O(n^3).
+    const n = this.rows;
+    const a = this.toArray();
+    let det = 1;
+    for (let col = 0; col < n; col++) {
+      let pivot = col;
+      for (let r = col + 1; r < n; r++) {
+        if (Math.abs(a[r][col]) > Math.abs(a[pivot][col])) {
+          pivot = r;
+        }
+      }
+      if (a[pivot][col] === 0) {
+        return 0;
+      }
+      if (pivot !== col) {
+        [a[col], a[pivot]] = [a[pivot], a[col]];
+        det = -det;
+      }
+      det *= a[col][col];
+      for (let r = col + 1; r < n; r++) {
+        const factor = a[r][col] / a[col][col];
+        for (let c = col; c < n; c++) {
+          a[r][c] -= factor * a[col][c];
+        }
+      }
+    }
+    return det;
+  }
+
+  equals(other: Matrix): boolean {
+    return (
+      this.rows === other.rows &&
+      this.cols === other.cols &&
+      this.data.every((row, i) => row.every((v, j) => v === other.data[i][j]))
+    );
+  }
+
+  toString(): string {
+    return (
+      `Matrix(${this.rows}x${this.cols})[\n  ` +
+      this.data.map((row) => `[${row.join(", ")}]`).join(",\n  ") +
+      "\n]"
+    );
+  }
+}

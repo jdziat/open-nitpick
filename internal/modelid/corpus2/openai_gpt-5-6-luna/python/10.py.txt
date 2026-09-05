@@ -1,0 +1,82 @@
+import secrets
+import threading
+import time
+from typing import Optional, Dict, Tuple
+
+
+class URLShortener:
+    def __init__(self, default_ttl: float = 3600):
+        if default_ttl < 0:
+            raise ValueError("default_ttl must be non-negative")
+        self.default_ttl = default_ttl
+        self._links: Dict[str, Tuple[str, float]] = {}
+        self._lock = threading.RLock()
+
+    def shorten(
+        self,
+        url: str,
+        ttl_seconds: Optional[float] = None,
+        *,
+        expires_in: Optional[float] = None,
+        ttl: Optional[float] = None,
+    ) -> str:
+        if not isinstance(url, str) or not url:
+            raise ValueError("url must be a non-empty string")
+
+        provided = [value for value in (expires_in, ttl) if value is not None]
+        if len(provided) > 1:
+            raise ValueError("specify only one expiry value")
+
+        lifetime = (
+            provided[0]
+            if provided
+            else self.default_ttl if ttl_seconds is None else ttl_seconds
+        )
+
+        if lifetime < 0:
+            raise ValueError("expiry must be non-negative")
+
+        expires_at = time.monotonic() + lifetime
+
+        with self._lock:
+            while True:
+                code = secrets.token_urlsafe(5)
+                if code not in self._links:
+                    self._links[code] = (url, expires_at)
+                    return code
+
+    def resolve(self, code: str) -> Optional[str]:
+        with self._lock:
+            entry = self._links.get(code)
+            if entry is None:
+                return None
+
+            url, expires_at = entry
+            if time.monotonic() >= expires_at:
+                del self._links[code]
+                return None
+
+            return url
+
+
+Shortener = URLShortener
+_default_shortener = URLShortener()
+
+
+def shorten(
+    url: str,
+    ttl_seconds: Optional[float] = None,
+    *,
+    expires_in: Optional[float] = None,
+    ttl: Optional[float] = None,
+) -> str:
+    return _default_shortener.shorten(
+        url,
+        ttl_seconds,
+        expires_in=expires_in,
+        ttl=ttl,
+    )
+
+
+def resolve(code: str) -> Optional[str]:
+    return _default_shortener.resolve(code)

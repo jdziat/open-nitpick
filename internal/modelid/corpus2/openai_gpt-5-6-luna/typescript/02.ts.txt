@@ -1,0 +1,120 @@
+export class TokenBucketRateLimiter {
+  private readonly capacity: number;
+  private readonly refillRatePerSecond: number;
+
+  private tokens: number;
+  private lastRefillTime: number;
+  private lockTail: Promise<void> = Promise.resolve();
+
+  constructor(capacity: number, refillRatePerSecond: number) {
+    if (!Number.isFinite(capacity) || capacity <= 0) {
+      throw new RangeError("capacity must be a finite number greater than zero");
+    }
+
+    if (!Number.isFinite(refillRatePerSecond) || refillRatePerSecond <= 0) {
+      throw new RangeError(
+        "refillRatePerSecond must be a finite number greater than zero",
+      );
+    }
+
+    this.capacity = capacity;
+    this.refillRatePerSecond = refillRatePerSecond;
+    this.tokens = capacity;
+    this.lastRefillTime = this.now();
+  }
+
+  tryAcquire(tokens = 1): boolean {
+    this.validateAmount(tokens);
+    this.refill();
+
+    if (this.tokens < tokens) {
+      return false;
+    }
+
+    this.tokens -= tokens;
+    return true;
+  }
+
+  async acquire(tokens = 1): Promise<void> {
+    this.validateAmount(tokens);
+
+    for (;;) {
+      const waitMilliseconds = await this.enqueue(() => {
+        this.refill();
+
+        if (this.tokens >= tokens) {
+          this.tokens -= tokens;
+          return 0;
+        }
+
+        return ((tokens - this.tokens) / this.refillRatePerSecond) * 1000;
+      });
+
+      if (waitMilliseconds <= 0) {
+        return;
+      }
+
+      await this.sleep(waitMilliseconds);
+    }
+  }
+
+  get availableTokens(): number {
+    this.refill();
+    return this.tokens;
+  }
+
+  private validateAmount(amount: number): void {
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      amount > this.capacity
+    ) {
+      throw new RangeError(
+        "token amount must be greater than zero and no greater than capacity",
+      );
+    }
+  }
+
+  private refill(): void {
+    const currentTime = this.now();
+    const elapsedSeconds = (currentTime - this.lastRefillTime) / 1000;
+
+    if (elapsedSeconds > 0) {
+      this.tokens = Math.min(
+        this.capacity,
+        this.tokens + elapsedSeconds * this.refillRatePerSecond,
+      );
+      this.lastRefillTime = currentTime;
+    }
+  }
+
+  private enqueue<T>(operation: () => T | PromiseLike<T>): Promise<T> {
+    let release!: () => void;
+    const next = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const previous = this.lockTail;
+    this.lockTail = next;
+
+    return previous.then(async () => {
+      try {
+        return await operation();
+      } finally {
+        release();
+      }
+    });
+  }
+
+  private sleep(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => {
+      setTimeout(resolve, Math.min(milliseconds, 2_147_483_647));
+    });
+  }
+
+  private now(): number {
+    return typeof globalThis.performance?.now === "function"
+      ? globalThis.performance.now()
+      : Date.now();
+  }
+}

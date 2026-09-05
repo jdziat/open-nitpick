@@ -1,0 +1,128 @@
+"""Thread-safe token-bucket rate limiter.
+
+The bucket holds up to `capacity` tokens and refills at `rate` tokens per
+second. Refill is computed lazily from elapsed time, so no background thread
+is required. All public methods are safe to call from multiple threads.
+"""
+
+import threading
+import time
+
+
+class TokenBucket:
+    """A token-bucket rate limiter safe for concurrent use."""
+
+    def __init__(self, capacity, rate):
+        """Create a bucket.
+
+        Args:
+            capacity: Maximum number of tokens the bucket can hold. This is
+                also the maximum burst size.
+            rate: Number of tokens added per second.
+
+        Raises:
+            ValueError: If capacity or rate is not positive.
+        """
+        if capacity <= 0:
+            raise ValueError("capacity must be positive")
+        if rate <= 0:
+            raise ValueError("rate must be positive")
+        self.capacity = float(capacity)
+        self.rate = float(rate)
+        self._tokens = float(capacity)
+        self._last_refill = time.monotonic()
+        self._lock = threading.Lock()
+
+    def _refill(self, now):
+        elapsed = now - self._last_refill
+        if elapsed > 0:
+            self._tokens = min(self.capacity, self._tokens + elapsed * self.rate)
+            self._last_refill = now
+
+    def try_acquire(self, tokens=1.0):
+        """Attempt to consume tokens without blocking.
+
+        Args:
+            tokens: Number of tokens to consume (default 1).
+
+        Returns:
+            True if the tokens were available and consumed, False otherwise.
+        """
+        if tokens <= 0:
+            raise ValueError("tokens must be positive")
+        with self._lock:
+            now = time.monotonic()
+            self._refill(now)
+            if self._tokens >= tokens:
+                self._tokens -= tokens
+                return True
+            return False
+
+    def acquire(self, tokens=1.0, timeout=None):
+        """Consume tokens, blocking until they are available.
+
+        Args:
+            tokens: Number of tokens to consume (default 1).
+            timeout: Maximum seconds to wait, or None to wait forever.
+
+        Returns:
+            True if the tokens were acquired, False if the timeout expired.
+
+        Raises:
+            ValueError: If more tokens are requested than the bucket capacity.
+        """
+        if tokens <= 0:
+            raise ValueError("tokens must be positive")
+        if tokens > self.capacity:
+            raise ValueError("requested tokens exceed bucket capacity")
+
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while True:
+            with self._lock:
+                now = time.monotonic()
+                self._refill(now)
+                if self._tokens >= tokens:
+                    self._tokens -= tokens
+                    return True
+                wait = (tokens - self._tokens) / self.rate
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                wait = min(wait, remaining)
+            time.sleep(wait)
+
+    @property
+    def available(self):
+        """Current number of tokens in the bucket (approximate)."""
+        with self._lock:
+            self._refill(time.monotonic())
+            return self._tokens
+
+    def __call__(self, func):
+        """Use as a decorator to rate-limit calls to a function."""
+        def wrapper(*args, **kwargs):
+            self.acquire()
+            return func(*args, **kwargs)
+        return wrapper
+
+
+if __name__ == "__main__":
+    import concurrent.futures
+
+    bucket = TokenBucket(capacity=5, rate=2.0)
+
+    def worker(n):
+        allowed = sum(1 for _ in range(n) if bucket.try_acquire())
+        return allowed
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(worker, [10] * 8))
+
+    print("allowed immediately:", sum(results), "(expected at most 5)")
+
+    start = time.monotonic()
+    for _ in range(6):
+        bucket.acquire()
+    elapsed = time.monotonic() - start
+    print("acquired 6 more in %.2fs (expected ~3s)" % elapsed)

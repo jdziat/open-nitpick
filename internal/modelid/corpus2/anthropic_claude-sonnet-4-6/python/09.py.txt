@@ -1,0 +1,59 @@
+from datetime import date, timedelta
+from typing import Iterator
+
+
+def date_range(
+    start: date,
+    end: date,
+    skip_weekends: bool = False,
+) -> Iterator[date]:
+    """Yield each day between start and end (inclusive).
+
+    Args:
+        start: The first date in the range.
+        end: The last date in the range (inclusive).
+        skip_weekends: If True, Saturday and Sunday are not yielded.
+
+    Yields:
+        date objects for each day in the range.
+    """
+    if start > end:
+        return
+
+    current = start
+    while current <= end:
+        # weekday() returns 5 for Saturday, 6 for Sunday
+        if not skip_weekends or current.weekday() < 5:
+            yield current
+        current += timedelta(days=1)
+
+
+def main() -> None:
+    start = date(2024, 1, 1)
+    end = date(2024, 1, 14)
+
+    print("All days from 2024-01-01 to 2024-01-14:")
+    for d in date_range(start, end):
+        print(f"  {d}  ({d.strftime('%A')})")
+
+    print()
+    print("Weekdays only from 2024-01-01 to 2024-01-14:")
+    for d in date_range(start, end, skip_weekends=True):
+        print(f"  {d}  ({d.strftime('%A')})")
+
+    print()
+    print("Edge case – single day (weekend):")
+    single = date(2024, 1, 6)  # Saturday
+    results = list(date_range(single, single))
+    print(f"  Without skip: {results}")
+    results = list(date_range(single, single, skip_weekends=True))
+    print(f"  With skip:    {results}")
+
+    print()
+    print("Edge case – start after end (empty range):")
+    results = list(date_range(end, start))
+    print(f"  Result: {results}")
+
+
+if __name__ == "__main__":
+    main()

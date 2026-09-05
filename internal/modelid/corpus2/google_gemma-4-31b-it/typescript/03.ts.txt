@@ -1,0 +1,37 @@
+export async function retry<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxAttempts: number;
+    initialDelayMs: number;
+    maxDelayMs: number;
+    backoffFactor: number;
+  } = {
+    maxAttempts: 3,
+    initialDelayMs: 1000,
+    maxDelayMs: 10000,
+    backoffFactor: 2,
+  }
+): Promise<T> {
+  let lastError: any;
+  let currentDelay = options.initialDelayMs;
+
+  for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt === options.maxAttempts) {
+        break;
+      }
+
+      const jitter = Math.random() * 0.1 * currentDelay;
+      const sleepTime = currentDelay + jitter;
+
+      await new Promise((resolve) => setTimeout(resolve, sleepTime));
+      currentDelay = Math.min(currentDelay * options.backoffFactor, options.maxDelayMs);
+    }
+  }
+
+  throw lastError;
+}

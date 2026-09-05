@@ -1,0 +1,113 @@
+package csvparser
+
+import (
+	"fmt"
+	"strings"
+)
+
+func Parse(data string, delimiter rune) ([][]string, error) {
+	if delimiter == 0 {
+		return nil, fmt.Errorf("delimiter cannot be NUL")
+	}
+	if delimiter == '"' {
+		return nil, fmt.Errorf("delimiter cannot be a quote")
+	}
+	if delimiter == '\r' || delimiter == '\n' {
+		return nil, fmt.Errorf("delimiter cannot be a newline")
+	}
+
+	input := []rune(data)
+	rows := make([][]string, 0)
+	row := make([]string, 0)
+	var field strings.Builder
+
+	inQuotes := false
+	afterQuote := false
+	rowStarted := false
+
+	appendField := func() {
+		row = append(row, field.String())
+		field.Reset()
+	}
+
+	appendRow := func() {
+		appendField()
+		rows = append(rows, row)
+		row = nil
+		rowStarted = false
+		afterQuote = false
+	}
+
+	for i := 0; i < len(input); i++ {
+		ch := input[i]
+
+		if inQuotes {
+			if ch == '"' {
+				if i+1 < len(input) && input[i+1] == '"' {
+					field.WriteRune('"')
+					i++
+				} else {
+					inQuotes = false
+					afterQuote = true
+				}
+			} else {
+				field.WriteRune(ch)
+			}
+			continue
+		}
+
+		if afterQuote {
+			switch ch {
+			case delimiter:
+				appendField()
+				rowStarted = true
+				afterQuote = false
+			case '\r', '\n':
+				if ch == '\r' && i+1 < len(input) && input[i+1] == '\n' {
+					i++
+				}
+				appendRow()
+			default:
+				return nil, fmt.Errorf("unexpected character %q after closing quote at position %d", ch, i)
+			}
+			continue
+		}
+
+		switch ch {
+		case '"':
+			if field.Len() != 0 {
+				return nil, fmt.Errorf("unexpected quote at position %d", i)
+			}
+			inQuotes = true
+			rowStarted = true
+
+		case delimiter:
+			appendField()
+			rowStarted = true
+
+		case '\r', '\n':
+			if ch == '\r' && i+1 < len(input) && input[i+1] == '\n' {
+				i++
+			}
+			appendRow()
+
+		default:
+			field.WriteRune(ch)
+			rowStarted = true
+		}
+	}
+
+	if inQuotes {
+		return nil, fmt.Errorf("unterminated quoted field")
+	}
+
+	if afterQuote || field.Len() != 0 || rowStarted || len(row) != 0 {
+		appendRow()
+	}
+
+	return rows, nil
+}
+
+func ParseBytes(data []byte, delimiter rune) ([][]string, error) {
+	return Parse(string(data), delimiter)
+}

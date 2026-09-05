@@ -1,0 +1,21 @@
+"""Utilities for generating URL-friendly slugs."""
+
+import re
+import unicodedata
+
+_NON_ALNUM_RUN = re.compile(r"[^\w]+")
+_HYPHEN_RUN = re.compile(r"-+")
+
+
+def slugify(text):
+    """Convert *text* to a URL-friendly slug.
+
+    The text is Unicode-normalized and lowercased (via case folding),
+    each run of non-alphanumeric characters is replaced with a single
+    hyphen, and leading/trailing hyphens are stripped. Unicode letters
+    and digits are preserved, e.g.
+    ``slugify("Crème Brûlée — 100%!") == "crème-brûlée-100"``.
+    """
+    text = unicodedata.normalize("NFKC", str(text)).casefold()
+    text = _NON_ALNUM_RUN.sub("-", text).replace("_", "-")
+    return _HYPHEN_RUN.sub("-", text).strip("-")

@@ -1,0 +1,169 @@
+"""retry_with_backoff.py
+
+A retry helper that calls a function up to N times, sleeping between
+failed attempts with an exponentially increasing delay plus random
+jitter. On success the function's return value is returned; if every
+attempt fails, the last exception instance is returned (not raised).
+"""
+
+from __future__ import annotations
+
+import functools
+import random
+import time
+from typing import Any, Callable, Optional, Tuple, Type, TypeVar, Union
+
+T = TypeVar("T")
+
+# Called after each failed attempt that will be followed by another one.
+# Receives (attempt_number, exception, seconds_about_to_sleep).
+RetryCallback = Callable[[int, BaseException, float], None]
+
+
+def retry(
+    func: Callable[..., T],
+    *args: Any,
+    attempts: int = 5,
+    base_delay: float = 0.5,
+    backoff_factor: float = 2.0,
+    max_delay: float = 30.0,
+    jitter: float = 0.5,
+    exceptions: Tuple[Type[BaseException], ...] = (Exception,),
+    on_retry: Optional[RetryCallback] = None,
+    sleep: Callable[[float], None] = time.sleep,
+    **kwargs: Any,
+) -> Union[T, BaseException]:
+    """Call ``func(*args, **kwargs)`` up to ``attempts`` times.
+
+    Parameters
+    ----------
+    func:
+        The callable to invoke.
+    *args, **kwargs:
+        Arguments passed through to ``func`` on every attempt.
+    attempts:
+        Total number of tries (including the first). Must be >= 1.
+    base_delay:
+        Seconds to sleep before the second attempt (first retry).
+    backoff_factor:
+        Multiplier applied to the delay after each failed attempt.
+        The delay before retry k (1-based) is
+        ``min(max_delay, base_delay * backoff_factor ** (k - 1))``.
+    max_delay:
+        Upper bound on any single computed delay, before jitter.
+    jitter:
+        Fraction in [0.0, 1.0]. The computed delay is reduced by a
+        random amount so the actual sleep lies in
+        ``[delay * (1 - jitter), delay]``, spreading out retries
+        across callers (thundering-herd mitigation).
+    exceptions:
+        Exception classes that should trigger a retry. Any other
+        exception propagates immediately.
+    on_retry:
+        Optional callback invoked as ``on_retry(attempt, exc, delay)``
+        after each failed attempt that will be retried.
+    sleep:
+        Time-sleep function; injectable for tests.
+
+    Returns
+    -------
+    The value returned by ``func`` on success, otherwise the last
+    exception raised by ``func`` if all ``attempts`` attempts fail.
+    """
+    if attempts < 1:
+        raise ValueError("attempts must be at least 1")
+    if base_delay < 0.0 or max_delay < 0.0:
+        raise ValueError("base_delay and max_delay must be non-negative")
+    if backoff_factor < 1.0:
+        raise ValueError("backoff_factor must be >= 1.0")
+    if not 0.0 <= jitter <= 1.0:
+        raise ValueError("jitter must be between 0.0 and 1.0")
+
+    last_error: Optional[BaseException] = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            return func(*args, **kwargs)
+        except exceptions as exc:
+            last_error = exc
+            if attempt == attempts:
+                break
+
+            delay = min(max_delay, base_delay * (backoff_factor ** (attempt - 1)))
+            delay = delay * random.uniform(1.0 - jitter, 1.0)
+            if delay < 0.0:
+                delay = 0.0
+
+            if on_retry is not None:
+                on_retry(attempt, exc, delay)
+            sleep(delay)
+
+    # All attempts failed: return the last error instead of raising.
+    assert last_error is not None
+    return last_error
+
+
+def retryable(
+    _func: Optional[Callable[..., T]] = None,
+    *,
+    attempts: int = 5,
+    base_delay: float = 0.5,
+    backoff_factor: float = 2.0,
+    max_delay: float = 30.0,
+    jitter: float = 0.5,
+    exceptions: Tuple[Type[BaseException], ...] = (Exception,),
+    on_retry: Optional[RetryCallback] = None,
+) -> Callable[..., Union[T, BaseException]]:
+    """Decorator form of :func:`retry`.
+
+    Can be used bare (@retryable) or with options (@retryable(attempts=3)).
+    All keyword arguments are fixed retry settings; arguments passed to the
+    decorated function are forwarded untouched.
+    """
+
+    def decorate(fn: Callable[..., T]) -> Callable[..., Union[T, BaseException]]:
+        @functools.wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any) -> Union[T, BaseException]:
+            return retry(
+                fn,
+                *args,
+                attempts=attempts,
+                base_delay=base_delay,
+                backoff_factor=backoff_factor,
+                max_delay=max_delay,
+                jitter=jitter,
+                exceptions=exceptions,
+                on_retry=on_retry,
+                **kwargs,
+            )
+
+        return wrapper
+
+    if _func is not None:
+        return decorate(_func)
+    return decorate
+
+
+if __name__ == "__main__":
+    # Example 1: a flaky call that succeeds on the third attempt.
+    calls = {"n": 0}
+
+    @retryable(attempts=5, base_delay=0.05, jitter=0.5)
+    def flaky() -> str:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise ConnectionError(f"transient failure #{calls['n']}")
+        return f"success on call {calls['n']}"
+
+    print(flaky())
+
+    # Example 2: a call that always fails; the last error is returned.
+    def log_retry(attempt: int, exc: BaseException, delay: float) -> None:
+        print(f"attempt {attempt} failed ({exc!r}); retrying in {delay:.3f}s")
+
+    @retryable(attempts=3, base_delay=0.05, on_retry=log_retry)
+    def hopeless() -> None:
+        raise ValueError("always fails")
+
+    result = hopeless()
+    print(f"final result: {type(result).__name__}: {result}")

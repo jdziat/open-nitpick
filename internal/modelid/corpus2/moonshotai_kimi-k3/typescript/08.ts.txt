@@ -1,0 +1,89 @@
+export type Comparator<T> = (a: T, b: T) => number;
+
+export class PriorityQueue<T> {
+  private heap: T[] = [];
+  private readonly compare: Comparator<T>;
+
+  /**
+   * The comparator determines priority: it should return a negative number
+   * when `a` has higher priority than `b`, zero when they are equal, and a
+   * positive number when `b` has higher priority. With the natural numeric
+   * ordering `(a, b) => a - b`, the queue behaves as a min-heap.
+   */
+  constructor(compare: Comparator<T>) {
+    this.compare = compare;
+  }
+
+  get size(): number {
+    return this.heap.length;
+  }
+
+  isEmpty(): boolean {
+    return this.heap.length === 0;
+  }
+
+  /** Returns the highest-priority element without removing it. */
+  peek(): T | undefined {
+    return this.heap[0];
+  }
+
+  /** Inserts an element, restoring the heap invariant. O(log n). */
+  push(item: T): void {
+    this.heap.push(item);
+    this.siftUp(this.heap.length - 1);
+  }
+
+  /** Removes and returns the highest-priority element. O(log n). */
+  pop(): T | undefined {
+    const heap = this.heap;
+    if (heap.length === 0) {
+      return undefined;
+    }
+    const top = heap[0];
+    const last = heap.pop() as T;
+    if (heap.length > 0) {
+      heap[0] = last;
+      this.siftDown(0);
+    }
+    return top;
+  }
+
+  private siftUp(start: number): void {
+    const heap = this.heap;
+    const item = heap[start];
+    let index = start;
+    while (index > 0) {
+      const parent = (index - 1) >> 1;
+      if (this.compare(item, heap[parent]) >= 0) {
+        break;
+      }
+      heap[index] = heap[parent];
+      index = parent;
+    }
+    heap[index] = item;
+  }
+
+  private siftDown(start: number): void {
+    const heap = this.heap;
+    const length = heap.length;
+    const item = heap[start];
+    let index = start;
+    for (;;) {
+      const left = index * 2 + 1;
+      if (left >= length) {
+        break;
+      }
+      const right = left + 1;
+      let child = left;
+      if (right < length && this.compare(heap[right], heap[left]) < 0) {
+        child = right;
+      }
+      if (this.compare(heap[child], item) >= 0) {
+        break;
+      }
+      heap[index] = heap[child];
+      index = child;
+    }
+    heap[index] = item;
+  }
+}

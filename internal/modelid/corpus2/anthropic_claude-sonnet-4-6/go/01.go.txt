@@ -1,0 +1,115 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
+
+// ParseCSV parses a CSV string with a configurable delimiter.
+// It supports quoted fields and escaped quotes ("" inside a quoted field).
+func ParseCSV(input string, delimiter rune) ([][]string, error) {
+	var rows [][]string
+	var currentRow []string
+	var field strings.Builder
+
+	runes := []rune(input)
+	n := len(runes)
+	i := 0
+
+	for i <= n {
+		// End of input: finalize last row if any
+		if i == n {
+			if len(currentRow) > 0 || field.Len() > 0 {
+				currentRow = append(currentRow, field.String())
+				rows = append(rows, currentRow)
+			}
+			break
+		}
+
+		ch := runes[i]
+
+		if ch == '"' {
+			// Quoted field
+			i++ // skip opening quote
+			for {
+				if i >= n {
+					return nil, errors.New("unterminated quoted field")
+				}
+				c := runes[i]
+				if c == '"' {
+					// Check for escaped quote ""
+					if i+1 < n && runes[i+1] == '"' {
+						field.WriteRune('"')
+						i += 2
+					} else {
+						// End of quoted field
+						i++ // skip closing quote
+						break
+					}
+				} else {
+					field.WriteRune(c)
+					i++
+				}
+			}
+			// After closing quote, expect delimiter, newline, or end of input
+			if i < n && runes[i] != delimiter && runes[i] != '\n' && runes[i] != '\r' {
+				return nil, fmt.Errorf("unexpected character %q after closing quote at position %d", runes[i], i)
+			}
+		} else if ch == delimiter {
+			currentRow = append(currentRow, field.String())
+			field.Reset()
+			i++
+		} else if ch == '\r' {
+			// Handle \r\n or standalone \r
+			currentRow = append(currentRow, field.String())
+			field.Reset()
+			rows = append(rows, currentRow)
+			currentRow = nil
+			i++
+			if i < n && runes[i] == '\n' {
+				i++
+			}
+		} else if ch == '\n' {
+			currentRow = append(currentRow, field.String())
+			field.Reset()
+			rows = append(rows, currentRow)
+			currentRow = nil
+			i++
+		} else {
+			field.WriteRune(ch)
+			i++
+		}
+	}
+
+	return rows, nil
+}
+
+func main() {
+	examples := []struct {
+		input     string
+		delimiter rune
+	}{
+		{`name,age,city`, ','},
+		{`"John","30","New York"`, ','},
+		{`"John ""Johnny"" Doe",30,"New York"`, ','},
+		{"name,age\nAlice,30\nBob,25", ','},
+		{"name;age;city\nAlice;30;\"New York\"\nBob;25;London", ';'},
+		{`field1,"field with , comma",field3`, ','},
+		{"\"line1\r\nline2\",field2", ','},
+	}
+
+	for _, ex := range examples {
+		fmt.Printf("Input:     %q\n", ex.input)
+		fmt.Printf("Delimiter: %q\n", ex.delimiter)
+		rows, err := ParseCSV(ex.input, ex.delimiter)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		} else {
+			for rowIdx, row := range rows {
+				fmt.Printf("  Row %d: %v\n", rowIdx, row)
+			}
+		}
+		fmt.Println()
+	}
+}

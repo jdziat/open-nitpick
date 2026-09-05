@@ -1,0 +1,44 @@
+package main
+
+import (
+	"fmt"
+	"strings"
+	"unicode"
+)
+
+// Slugify lowercases s, replaces each run of non-alphanumeric characters
+// with a single hyphen, and trims leading and trailing hyphens.
+// Unicode letters and digits are preserved.
+func Slugify(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+
+	afterHyphen := true // treat start of string as if it followed a hyphen
+	for _, r := range strings.ToLower(s) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			afterHyphen = false
+		} else if !afterHyphen {
+			b.WriteByte('-')
+			afterHyphen = true
+		}
+		// Non-alphanumeric rune with a hyphen already pending: skip it.
+	}
+
+	return strings.Trim(b.String(), "-")
+}
+
+func main() {
+	for _, s := range []string{
+		"Hello, World!",
+		"  Multiple   Spaces &---Symbols!!  ",
+		"Héllo Wörld — Ünïcode Attaqué",
+		"Grüße aus München",
+		"日本語 テスト 123",
+		"!!leading and trailing!!",
+		"---",
+		"",
+	} {
+		fmt.Printf("%-40q -> %q\n", s, Slugify(s))
+	}
+}

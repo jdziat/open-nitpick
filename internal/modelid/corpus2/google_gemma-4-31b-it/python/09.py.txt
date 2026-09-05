@@ -1,0 +1,42 @@
+import datetime
+
+class DateRangeIterator:
+    def __init__(self, start_date, end_date, skip_weekends=False):
+        """
+        An iterator that yields dates between start_date and end_date inclusive.
+        :param start_date: datetime.date object
+        :param end_date: datetime.date object
+        :param skip_weekends: Boolean, if True, Saturday and Sunday are skipped.
+        """
+        self.current_date = start_date
+        self.end_date = end_date
+        self.skip_weekends = skip_weekends
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        while self.current_date <= self.end_date:
+            date_to_yield = self.current_date
+            self.current_date += datetime.timedelta(days=1)
+            
+            if self.skip_weekends:
+                # weekday() returns 0 for Monday and 6 for Sunday
+                if date_to_yield.weekday() >= 5:
+                    continue
+            
+            return date_to_yield
+        
+        raise StopIteration
+
+if __name__ == "__main__":
+    start = datetime.date(2023, 10, 6) # Friday
+    end = datetime.date(2023, 10, 10)   # Tuesday
+    
+    print("All days:")
+    for d in DateRangeIterator(start, end):
+        print(d)
+        
+    print("\nBusiness days only:")
+    for d in DateRangeIterator(start, end, skip_weekends=True):
+        print(d)

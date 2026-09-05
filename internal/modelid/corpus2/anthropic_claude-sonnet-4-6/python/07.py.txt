@@ -1,0 +1,178 @@
+import os
+import json
+import sys
+from typing import Any, Dict, Optional
+
+
+# Default configuration values
+DEFAULTS: Dict[str, Any] = {
+    "app_name": "MyApp",
+    "debug": False,
+    "log_level": "INFO",
+    "host": "0.0.0.0",
+    "port": 8080,
+    "database_url": None,
+    "secret_key": None,
+    "max_connections": 10,
+    "timeout": 30,
+}
+
+# Required keys that must have non-None values after all overrides
+REQUIRED_KEYS = ["app_name", "host", "port", "database_url", "secret_key"]
+
+# Mapping of environment variable names to config keys
+ENV_VAR_MAP: Dict[str, str] = {
+    "APP_NAME": "app_name",
+    "DEBUG": "debug",
+    "LOG_LEVEL": "log_level",
+    "HOST": "host",
+    "PORT": "port",
+    "DATABASE_URL": "database_url",
+    "SECRET_KEY": "secret_key",
+    "MAX_CONNECTIONS": "max_connections",
+    "TIMEOUT": "timeout",
+}
+
+# Type coercion mapping for environment variables
+TYPE_MAP: Dict[str, type] = {
+    "debug": bool,
+    "port": int,
+    "max_connections": int,
+    "timeout": int,
+}
+
+
+def coerce_value(key: str, value: str) -> Any:
+    """Coerce a string value to the appropriate type based on the key."""
+    target_type = TYPE_MAP.get(key)
+    if target_type is None:
+        return value
+    if target_type == bool:
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    try:
+        return target_type(value)
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            f"Cannot coerce environment variable for key '{key}' "
+            f"with value '{value}' to type {target_type.__name__}: {exc}"
+        ) from exc
+
+
+def load_json_file(filepath: str) -> Dict[str, Any]:
+    """Load and parse a JSON file, returning an empty dict if the file doesn't exist."""
+    if not filepath:
+        return {}
+    if not os.path.exists(filepath):
+        print(f"[config] Warning: Config file '{filepath}' not found. Using defaults.")
+        return {}
+    with open(filepath, "r", encoding="utf-8") as fh:
+        try:
+            data = json.load(fh)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSON in config file '{filepath}': {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"Config file '{filepath}' must contain a JSON object at the top level."
+        )
+    return data
+
+
+def apply_env_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Override config values with environment variables where present."""
+    for env_var, config_key in ENV_VAR_MAP.items():
+        raw_value = os.environ.get(env_var)
+        if raw_value is not None:
+            config[config_key] = coerce_value(config_key, raw_value)
+    return config
+
+
+def validate_config(config: Dict[str, Any]) -> None:
+    """Validate that all required keys are present and non-None."""
+    missing = []
+    for key in REQUIRED_KEYS:
+        value = config.get(key)
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            missing.append(key)
+    if missing:
+        raise ValueError(
+            f"Configuration validation failed. "
+            f"The following required keys are missing or empty: {missing}\n"
+            f"Provide them in the config file or via environment variables: "
+            f"{[k for k, v in ENV_VAR_MAP.items() if v in missing]}"
+        )
+
+
+def load_config(filepath: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Load configuration from defaults, then a JSON file, then environment variables.
+
+    Priority (highest to lowest):
+        1. Environment variables
+        2. JSON config file
+        3. Built-in defaults
+
+    Args:
+        filepath: Path to the JSON configuration file. If None or empty,
+                  only defaults and environment variables are used.
+
+    Returns:
+        A validated configuration dictionary.
+
+    Raises:
+        ValueError: If the JSON file is invalid or required keys are missing.
+    """
+    # Start with defaults
+    config: Dict[str, Any] = dict(DEFAULTS)
+
+    # Overlay with JSON file values
+    file_config = load_json_file(filepath or "")
+    for key, value in file_config.items():
+        if key in config or key in DEFAULTS:
+            config[key] = value
+        else:
+            # Allow unknown keys from the file but warn
+            print(f"[config] Warning: Unknown config key '{key}' in file will be included.")
+            config[key] = value
+
+    # Overlay with environment variables
+    config = apply_env_overrides(config)
+
+    # Validate required keys
+    validate_config(config)
+
+    return config
+
+
+def print_config(config: Dict[str, Any]) -> None:
+    """Pretty-print the configuration, masking sensitive values."""
+    sensitive_keys = {"secret_key", "database_url"}
+    print("\n=== Loaded Configuration ===")
+    for key, value in sorted(config.items()):
+        if key in sensitive_keys and value:
+            display_value = "***MASKED***"
+        else:
+            display_value = value
+        print(f"  {key}: {display_value!r}")
+    print("============================\n")
+
+
+def main() -> None:
+    """Entry point for testing the config loader."""
+    # Accept an optional path argument from the command line
+    filepath = sys.argv[1] if len(sys.argv) > 1 else None
+
+    print(f"[config] Loading configuration from: {filepath or '(no file)'}")
+    print(f"[config] Checking environment variables: {list(ENV_VAR_MAP.keys())}")
+
+    try:
+        config = load_config(filepath)
+    except ValueError as exc:
+        print(f"\n[config] ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print_config(config)
+    print("[config] Configuration loaded and validated successfully.")
+
+
+if __name__ == "__main__":
+    main()

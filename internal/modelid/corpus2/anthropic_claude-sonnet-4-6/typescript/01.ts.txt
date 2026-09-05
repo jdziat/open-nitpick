@@ -1,0 +1,90 @@
+export interface CsvParserOptions {
+  delimiter?: string;
+  quoteChar?: string;
+  lineEnding?: string;
+}
+
+export function parseCsv(input: string, options: CsvParserOptions = {}): string[][] {
+  const delimiter = options.delimiter ?? ',';
+  const quoteChar = options.quoteChar ?? '"';
+
+  if (delimiter.length !== 1) {
+    throw new Error('Delimiter must be a single character');
+  }
+  if (quoteChar.length !== 1) {
+    throw new Error('Quote character must be a single character');
+  }
+
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentField = '';
+  let inQuotes = false;
+  let i = 0;
+
+  const len = input.length;
+
+  while (i < len) {
+    const ch = input[i];
+
+    if (inQuotes) {
+      if (ch === quoteChar) {
+        // Check for escaped quote (doubled quote)
+        if (i + 1 < len && input[i + 1] === quoteChar) {
+          currentField += quoteChar;
+          i += 2;
+        } else {
+          // End of quoted field
+          inQuotes = false;
+          i++;
+        }
+      } else {
+        currentField += ch;
+        i++;
+      }
+    } else {
+      if (ch === quoteChar) {
+        inQuotes = true;
+        i++;
+      } else if (ch === delimiter) {
+        currentRow.push(currentField);
+        currentField = '';
+        i++;
+      } else if (ch === '\r') {
+        // Handle \r\n or standalone \r
+        currentRow.push(currentField);
+        currentField = '';
+        rows.push(currentRow);
+        currentRow = [];
+        i++;
+        if (i < len && input[i] === '\n') {
+          i++;
+        }
+      } else if (ch === '\n') {
+        currentRow.push(currentField);
+        currentField = '';
+        rows.push(currentRow);
+        currentRow = [];
+        i++;
+      } else {
+        currentField += ch;
+        i++;
+      }
+    }
+  }
+
+  // Push the last field and row if there's any content
+  // Always push if currentRow has fields, or if currentField is non-empty,
+  // or if we haven't pushed anything yet (single row with no newline)
+  currentRow.push(currentField);
+
+  // Only add the last row if it's not empty (i.e., not just a trailing newline)
+  if (currentRow.length > 1 || currentRow[0] !== '') {
+    rows.push(currentRow);
+  }
+
+  return rows;
+}
+
+// Example usage (can be removed or kept for testing):
+// const csv = `name,age,"city"\n"Alice",30,"New York"\n"Bob ""The Builder""",25,Chicago`;
+// console.log(parseCsv(csv));

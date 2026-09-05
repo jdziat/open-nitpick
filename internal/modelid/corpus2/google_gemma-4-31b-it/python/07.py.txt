@@ -1,0 +1,67 @@
+import os
+import json
+from typing import Any, Dict, List
+
+class ConfigLoader:
+    def __init__(self, defaults: Dict[str, Any], required_keys: List[str] = None, env_prefix: str = "APP_"):
+        self.defaults = defaults
+        self.required_keys = required_keys or []
+        self.env_prefix = env_prefix
+
+    def load(self, json_path: str = None) -> Dict[str, Any]:
+        # 1. Start with defaults
+        config = self.defaults.copy()
+
+        # 2. Override with JSON file if provided
+        if json_path and os.path.exists(json_path):
+            with open(json_path, 'r') as f:
+                file_config = json.load(f)
+                config.update(file_config)
+
+        # 3. Override with environment variables
+        for key in config.keys():
+            env_key = f"{self.env_prefix}{key.upper()}"
+            env_val = os.environ.get(env_key)
+            if env_val is not None:
+                # Attempt to cast env var to the type of the default value
+                default_type = type(config[key])
+                try:
+                    if default_type == bool:
+                        config[key] = env_val.lower() in ("true", "1", "yes")
+                    elif default_type == int:
+                        config[key] = int(env_val)
+                    elif default_type == float:
+                        config[key] = float(env_val)
+                    else:
+                        config[key] = env_val
+                except ValueError:
+                    config[key] = env_val
+
+        # 4. Validate required keys
+        missing = [key for key in self.required_keys if key not in config or config[key] is None]
+        if missing:
+            raise KeyError(f"Missing required configuration keys: {', '.join(missing)}")
+
+        return config
+
+if __name__ == "__main__":
+    # Example Usage
+    defaults = {
+        "port": 8080,
+        "debug": False,
+        "db_url": "sqlite:///default.db",
+        "api_key": None
+    }
+    required = ["api_key"]
+    
+    loader = ConfigLoader(defaults, required_keys=required)
+    
+    # Simulate environment variable override
+    os.environ["APP_API_KEY"] = "secret-123"
+    os.environ["APP_PORT"] = "9000"
+    
+    try:
+        cfg = loader.load("config.json")
+        print("Loaded Config:", cfg)
+    except Exception as e:
+        print("Error:", e)
