@@ -1556,7 +1556,7 @@ func (e *Engine) validateFindings(ctx context.Context, findings []Finding, plan 
 // publication policy keeps a single definition.
 func (e *Engine) gateOverruled(overruled []Overruled) []Overruled {
 	publishes := func(f Finding) bool {
-		kept, _ := Filter([]Finding{f}, e.Config.Persona.Nitpick, e.Config.Review.MinSeverity)
+		kept, _ := FilterWith([]Finding{f}, e.Config.Persona.Nitpick, e.Config.Review.MinSeverity, e.Config.Review.Slop)
 		return len(kept) > 0
 	}
 

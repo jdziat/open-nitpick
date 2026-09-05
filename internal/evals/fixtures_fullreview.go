@@ -39,11 +39,11 @@ func Body(url string) ([]byte, error) {
 // Credentials for the billing gateway.
 const (
 	awsAccessKeyID = "AKIAIOSFODNN7EXAMPLE"
-	stripeSecret   = "sk_live_51H8xk2LqJ3pR9vN0aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6"
+	awsSecretKey   = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 )
 
 // Gateway returns the credentials the billing client signs with.
-func Gateway() (string, string) { return awsAccessKeyID, stripeSecret }
+func Gateway() (string, string) { return awsAccessKeyID, awsSecretKey }
 `,
 	"internal/clean/clean.go": `package clean
 
@@ -100,7 +100,10 @@ var FullReviewPlants = []Defect{
 	},
 	{
 		Path: "internal/cfg/cfg.go", Line: 5, // awsAccessKeyID
-		Keywords: []string{"hard-coded", "hardcoded", "secret", "credential", "committed", "source control", "in the source", "api key", "access key"},
+		// The AWS documentation's own example pair, which every scanner
+		// recognises and no account has ever held. Keywords name what a
+		// finding that read the file says, not the word "secret".
+		Keywords: []string{"hard-coded", "hardcoded", "committed to", "in source control", "in the source", "checked in", "AKIA", "awsSecretKey", "awsAccessKeyID", "Gateway()"},
 		Class:    "security", WantSeverity: "critical",
 		Why: "credentials are committed in source",
 	},
