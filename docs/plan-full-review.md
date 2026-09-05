@@ -14,10 +14,17 @@ with Kimi-K3 on Synthetic. The output now has the grouped sections
 (known advisories from the scanner, listed not judged, with any the
 review set aside; security risks; bugs), the remediation plan and the
 coverage notice, and the tree describes itself to the summarizer as a
-review of a repository, not a change. Still open: the fixture repository
-with planted bugs, a secret, an advisory and slop, as an eval-tagged
-acceptance test (it needs a model and osv-scanner, so it belongs with
-the eval corpora, not the unit tests).
+review of a repository, not a change. The fixture repository
+(`internal/evals/fixtures_fullreview.go`: a planted bug, a planted secret,
+a dependency with a known advisory, a file of slop, a clean control) and
+its acceptance test (`make eval-fullreview`, `TestFullReviewFixture`)
+exist. First run, Kimi-K3 on Synthetic, 2026-09-05: both plants located,
+the control silent, the secret first in the remediation plan, and the
+advisory named by the model from `go.mod` even without osv-scanner
+installed; the advisories section itself is unverified until the scanner
+is installed on the machine that runs the test. One run, same-day
+fixture, Rule 15 applies. Section 1 is done; the report helpers live in
+`internal/fullreview` so the test and the command share them.
 
 Review a whole repository, or the paths given, rather than a change. The
 engine already reviews batches of files with analyzers as evidence and

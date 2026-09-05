@@ -1,4 +1,4 @@
-package main
+package fullreview
 
 import (
 	"strings"
@@ -18,7 +18,7 @@ func TestFullReviewSectionsGroupByWhatAReaderDoes(t *testing.T) {
 		},
 		Discarded: []review.LinterDiscard{{Rule: "CVE-2026-0001", Path: "package-lock.json", Line: 1, Reason: "duplicate"}},
 	}
-	out := sections(report)
+	out := Sections(report)
 	for _, want := range []string{
 		"Known advisories", "GHSA-xxxx-yyyy-zzzz  go.mod:1", "CVE-2026-0001  package-lock.json:1  (reported by the scanner, set aside by the review: duplicate)",
 		"Security risks:\n  [critical/security] web/auth.go:40", "Bugs:\n  [error/correctness] app/db.py:11", "[nit/style] web/auth.go:12",
@@ -31,7 +31,7 @@ func TestFullReviewSectionsGroupByWhatAReaderDoes(t *testing.T) {
 	if strings.Contains(out, "[warning/security] go.mod") {
 		t.Errorf("an advisory was listed twice:\n%s", out)
 	}
-	empty := sections(&review.Report{})
+	empty := Sections(&review.Report{})
 	for _, want := range []string{"Known advisories", "none reported. If osv-scanner is not installed", "Security risks:\n  none reported.", "Bugs:\n  none reported."} {
 		if !strings.Contains(empty, want) {
 			t.Errorf("empty sections lack %q:\n%s", want, empty)
@@ -40,7 +40,7 @@ func TestFullReviewSectionsGroupByWhatAReaderDoes(t *testing.T) {
 }
 
 func TestRemediationPlanOrdersBySeverityAndGroupsSharedFixes(t *testing.T) {
-	plan := remediationPlan([]review.Finding{
+	plan := RemediationPlan([]review.Finding{
 		{Path: "b.go", Line: 3, Severity: "warning", Class: "resource", Title: "Response body not closed"},
 		{Path: "a.go", Line: 9, Severity: "warning", Class: "resource", Title: "response body not closed"},
 		{Path: "c.go", Line: 1, Severity: "critical", Class: "security", Title: "Secret logged"},
@@ -56,14 +56,14 @@ func TestRemediationPlanOrdersBySeverityAndGroupsSharedFixes(t *testing.T) {
 	if !strings.HasSuffix(strings.TrimSpace(plan), "1 finding(s) in 1 file(s): d.go") {
 		t.Errorf("the nit is not last:\n%s", plan)
 	}
-	if remediationPlan(nil) != "\nRemediation plan: nothing to remediate.\n" {
-		t.Errorf("empty plan = %q", remediationPlan(nil))
+	if RemediationPlan(nil) != "\nRemediation plan: nothing to remediate.\n" {
+		t.Errorf("empty plan = %q", RemediationPlan(nil))
 	}
 }
 
 func TestCoverageNoticeNamesWhatWasLeftOut(t *testing.T) {
 	tree := &vcs.Tree{Covered: []string{"a.go"}, Unbudgeted: []string{"z.go"}, Skipped: []vcs.TreeSkip{{Path: "img.png", Reason: "binary"}}}
-	out := coverageNotice(tree)
+	out := CoverageNotice(tree)
 	for _, want := range []string{"Covered 1 file(s).", "budget ran out first (1 file(s)): z.go", "img.png: binary"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("notice lacks %q:\n%s", want, out)

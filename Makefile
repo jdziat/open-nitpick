@@ -303,6 +303,13 @@ quick:
 # review (Incumbent, and Contender once `contender login` has been run).
 # FIXTURES= points it at any other corpus, e.g. the tuning corpus, to see what
 # related context costs where the defect is in the diff.
+# The full-review acceptance: the fixture repository in
+# internal/evals/fixtures_fullreview.go reviewed whole. One model, one run.
+.PHONY: eval-fullreview
+eval-fullreview:
+	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
+	go test -tags=eval -count=1 -timeout=30m -v -run TestFullReviewFixture ./internal/evals/
+
 .PHONY: benchmark-multifile
 benchmark-multifile:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
