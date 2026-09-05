@@ -661,6 +661,22 @@ was tuned against; a candidate replaces it only by beating it on the held-out
 corpus under the rule in [docs/measurement.md](docs/measurement.md).
 `qwen/qwen3.8-27b` and `openai/gpt-5.6-luna` are the two worth that spend.
 
+### When a request never finishes
+
+A router can hand a request to an upstream that accepts it and never
+answers, and a model can generate past any sensible length on one input.
+Both look the same from here: the HTTP client's timeout (`timeout`, default
+10 minutes) fires while the body is still being read. The client then sends
+the request again, up to `max_retries` times (default 3), with an output cap
+of 16k tokens on the retries when the config set none. A hung upstream
+answers under the cap. A runaway generation comes back cut, and the next
+attempt samples at temperature 0.3 instead of zero to break the loop; a
+review that took that path is no longer reproducible by re-running it, and
+its log says so. Every retry and its outcome is one log line, so a review
+that took forty minutes says why. This was built on gemma-4-31b through
+OpenRouter, which lost one review in five without it and none with it; the
+numbers are in [docs/comparison.md](docs/comparison.md).
+
 ### Synthetic
 
 [Synthetic](https://synthetic.new) hosts open-weight models (GLM-5.3-Flash,
