@@ -5,11 +5,17 @@
 # and is noisier. Triage on qwen3.8-27b, the lowest-noise model measured,
 # merges the two lists and reranks. Cost per review is about the sum of the
 # three, still under a cent.
+#
+# This variant keeps that pipeline and adds the expert pass on a stronger
+# model. Triage cannot drop a finding, so it cannot denoise; validation can.
+# Run with NITPICK_EVAL_VALIDATION=1 or the validate model is never called.
 models:
   default:
     model: google/gemma-4-31b-it
     providers: [deepinfra/turbo]
-  triage:  # the denoise pass: a stronger model reranks the cheap reviewers' pool
+  triage:
+    model: qwen/qwen3.8-27b
+  validate:  # the denoise pass: a stronger model refutes findings before they publish
     model: anthropic/claude-sonnet-4.6
   ensemble:
     - model: z-ai/glm-5.3-flash

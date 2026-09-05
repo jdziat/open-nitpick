@@ -6,11 +6,17 @@
 # recall on cross-file contract changes; gemma-4-31b pinned is the cheapest
 # and is level with the others on Go and Python single-file changes. The
 # router is glm-5.3-flash reading the diff once per batch.
+#
+# This variant keeps that pipeline and adds the expert pass on a stronger
+# model. Triage cannot drop a finding, so it cannot denoise; validation can.
+# Run with NITPICK_EVAL_VALIDATION=1 or the validate model is never called.
 models:
   default:
     model: google/gemma-4-31b-it
     providers: [deepinfra/turbo]
-  triage:  # the denoise pass: a stronger model reranks the cheap reviewers' pool
+  triage:
+    model: qwen/qwen3.8-27b
+  validate:  # the denoise pass: a stronger model refutes findings before they publish
     model: anthropic/claude-opus-5
   router:
     model: z-ai/glm-5.3-flash

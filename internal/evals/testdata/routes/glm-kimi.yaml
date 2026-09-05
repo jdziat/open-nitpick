@@ -1,0 +1,14 @@
+# One cheap reviewer, one strong expert.
+#
+# glm-5.3-flash has the best recall of the cheap reviewers and is the
+# noisiest. kimi-k3 was dropped from the reviewer battery for being slow and
+# expensive per review, but the expert pass shows it one finding at a time,
+# so what it costs here is a fraction of a review. The question this file
+# asks is whether a strong expert refuting glm's findings buys glm's recall
+# at a lower noise floor. Run with NITPICK_EVAL_VALIDATION=1 or the validate
+# model is never called.
+models:
+  default:
+    model: z-ai/glm-5.3-flash
+  validate:  # the denoise pass: refutes findings before they publish
+    model: moonshotai/kimi-k3
