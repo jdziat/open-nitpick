@@ -117,7 +117,7 @@ def charge_all(gateway, orders):
 `},
 		Defects: []Defect{{
 			Path: "app/orders.py", Line: 19, // except Exception:
-			Keywords:     []string{"charge_all", "bare except", "failed charge", "receipts", "the batch continues", "order is skipped", "no receipt"},
+			Keywords:     []string{"bare except", "failed charge", "the batch continues", "order is skipped", "no receipt", "dropped without"},
 			Class:        config.ClassSlop,
 			WantSeverity: config.SeverityWarning,
 			Why:          "a failed charge is dropped without a trace and the loop carries on",
@@ -168,7 +168,7 @@ export function formatDuration(ms: number): string {
 `},
 		Defects: []Defect{{
 			Path: "src/duration.ts", Line: 8, // // Sure! Here's a helper function
-			Keywords:     []string{"Here's a helper", "handle all the edge cases", "Note that this function", "formatDuration", "pasted"},
+			Keywords:     []string{"Here's a helper", "handle all the edge cases", "Note that this function", "pasted"},
 			Class:        config.ClassSlop,
 			WantSeverity: config.SeverityNit,
 			Why:          "the comment is a chat reply pasted into the file",
@@ -230,7 +230,7 @@ func (s Size) Offset(n int) int {
 `},
 		Defects: []Defect{{
 			Path: "page/size.go", Line: 22, // if n != 0 || n == 0 {
-			Keywords:     []string{"n != 0 || n == 0", "n == 0", "already clamps", "NewSize", "rows check", "s.rows <= 0"},
+			Keywords:     []string{"n != 0 || n == 0", "n == 0", "already clamps", "rows check", "s.rows <= 0"},
 			Class:        config.ClassSlop,
 			WantSeverity: config.SeverityNit,
 			Why:          "the condition is always true, and the rows check guards a value NewSize already clamps",
@@ -277,7 +277,7 @@ def test_slug_runs_on_empty():
 `},
 		Defects: []Defect{{
 			Path: "tests/test_slug.py", Line: 6, // assert True
-			Keywords:     []string{"test_slug", "test_slug_runs_on_empty", "never checks", "unused result", "whatever slug returns"},
+			Keywords:     []string{"test_slug_runs_on_empty", "never checks", "unused result", "whatever slug returns"},
 			Class:        config.ClassSlop,
 			WantSeverity: config.SeverityWarning,
 			Why:          "neither test checks a result; both pass whatever slug returns",
