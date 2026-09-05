@@ -1,0 +1,26 @@
+# One reviewer per batch, chosen by what the batch is.
+#
+# The rules come from the per-language and per-corpus tables in
+# docs/comparison.md: qwen3.8-27b is the strongest and quietest on TypeScript
+# and on security-sensitive single-file changes; glm-5.3-flash has the best
+# recall on cross-file contract changes; gemma-4-31b pinned is the cheapest
+# and is level with the others on Go and Python single-file changes. The
+# router is glm-5.3-flash reading the diff once per batch.
+models:
+  default:
+    model: google/gemma-4-31b-it
+    providers: [deepinfra/turbo]
+  triage:  # the denoise pass: a stronger model reranks the cheap reviewers' pool
+    model: anthropic/claude-opus-5
+  router:
+    model: z-ai/glm-5.3-flash
+  routes:
+    - name: security
+      match: {kinds: [security, concurrency]}
+      review: {model: qwen/qwen3.8-27b, providers: []}
+    - name: typescript
+      match: {languages: [typescript, javascript]}
+      review: {model: qwen/qwen3.8-27b, providers: []}
+    - name: cross-file
+      match: {min_files: 2}
+      review: {model: z-ai/glm-5.3-flash, providers: []}
