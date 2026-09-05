@@ -941,8 +941,8 @@ was a diff-only inference that happened to match a consequence word
 ("callers", "breaks"). Keywords now credit only a finding that names the
 caller: its file, its function, or a detail that exists only there. Under
 that rule `z-ai/glm-5.3-flash` alone scores 0/8 on both arms, two runs, with
-the controls silent all four times. That is the floor the collector had to
-move.
+the controls silent all four times (`multifile-callers-20260905T160208Z`).
+That is the floor the collector had to move.
 
 **The collector.** Fetcher-based, like the rest of related context, so it
 runs on every provider with no checkout and no type checker: for each
@@ -986,8 +986,8 @@ sentinel run that flipped to a hit and the TypeScript run that flipped to a
 miss are run-to-run variance. That TypeScript miss is an anchor miss, not a
 blind one: the finding names `src/http.ts` and `AbortSignal.timeout` and
 is anchored on the doc comment at line 3 instead of the return at line 13,
-ten lines from the plant against a tolerance of six, which is also the
-run's one noise finding. Our controls were silent in every run behind both
+ten lines from the plant, past both the match tolerance and the wider
+noise tolerance, which is why it is also the run's one noise finding. Our controls were silent in every run behind both
 tables above; two earlier floor runs on the same corpus
 (`multifile-callers-20260905T154530Z`, `155517Z`) each had one glm finding
 on the Python clean control.

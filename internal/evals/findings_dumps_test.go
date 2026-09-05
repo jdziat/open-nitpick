@@ -39,10 +39,42 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 	// Callers corpus: two runs each; recall over 8 plants, noise per review
 	// over 12 reviews, controls silent.
 	callerDefects := map[string][]Defect{}
-	callerPlants := 0
+	callerPlants, callerClean := 0, 0
 	for _, f := range CallerFixtures() {
 		callerDefects[f.Name] = f.Defects
 		callerPlants += len(f.Defects)
+		if f.Clean() {
+			callerClean++
+		}
+	}
+	if want := "Six fixtures (`CallerFixtures`): four planted, two clean controls"; len(CallerFixtures()) != 6 || callerClean != 2 || !strings.Contains(prose, want) {
+		t.Errorf("corpus is %d fixtures, %d clean; prose says %q", len(CallerFixtures()), callerClean, want)
+	}
+
+	// The floor: no plant located on either arm, controls silent, in the
+	// run the prose names; and the two earlier floor runs it names for
+	// having one finding on the Python control each.
+	{
+		g := readGrid(t, dump("multifile-callers-20260905T160208Z"), 2)
+		for _, arm := range []string{"+ctx", ""} {
+			if h, _, _ := g.tally(arm, callerDefects); h != 0 {
+				t.Errorf("floor run: %d hit(s) on arm %q; prose says 0/8 on both arms", h, arm)
+			}
+		}
+		for f, d := range callerDefects {
+			if len(d) == 0 && g.findingsOn(f) != 0 {
+				t.Errorf("floor run: finding on control %s; prose says controls silent all four times", f)
+			}
+		}
+		if !strings.Contains(prose, "(`multifile-callers-20260905T160208Z`)") {
+			t.Errorf("prose does not name the floor dump")
+		}
+		for _, stem := range []string{"multifile-callers-20260905T154530Z", "multifile-callers-20260905T155517Z"} {
+			e := readGrid(t, dump(stem), 2)
+			if n := e.findingsOn("python-clean-precondition-satisfied"); n != 1 {
+				t.Errorf("%s: %d finding(s) on the Python control; prose says one", stem, n)
+			}
+		}
 	}
 	var diffNoiseRates []float64
 	for _, c := range []struct{ stem, label string }{
@@ -146,8 +178,11 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 		if planted[f] {
 			continue
 		}
-		if _, l := g.perFixture(f, "+ctx"); l > 0 && !strings.Contains(prose, "the walk-on loss is the Python clean control") {
-			t.Errorf("walk-on lost a review on control %s; the prose does not say so", f)
+		if _, l := g.perFixture(f, "+ctx"); l > 0 {
+			lang := map[string]string{"python": "Python", "ts": "TypeScript", "go": "Go"}[strings.SplitN(f, "-", 2)[0]]
+			if !strings.Contains(prose, "the walk-on loss is the "+lang+" clean control") {
+				t.Errorf("walk-on lost a review on control %s; the prose names a different control or none", f)
+			}
 		}
 	}
 	if !strings.Contains(prose, fmt.Sprintf("leaves the denominator at %d", len(planted)*g.runs)) {
