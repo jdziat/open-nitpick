@@ -50,6 +50,11 @@ type Related struct {
 
 	// Snippet is the definition's own lines, un-numbered.
 	Snippet string
+
+	// Calls names the redefined symbol this snippet calls, when the snippet
+	// is a caller attached by callers.go rather than a definition the
+	// change uses. Empty for a definition.
+	Calls string
 }
 
 // DirLister names the entries of a directory at the reviewed revision, with a
@@ -206,10 +211,6 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 	default:
 		return 0
 	}
-	if len(wants) == 0 {
-		return 0
-	}
-
 	// Most-used first, so the cap keeps the definitions the change leans on.
 	sort.SliceStable(wants, func(i, j int) bool {
 		if wants[i].uses != wants[j].uses {
@@ -221,12 +222,22 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 		return wants[i].name < wants[j].name
 	})
 
+	// Callers come after every definition the change uses: the callee is
+	// what the changed line means, the caller is what it breaks, and when
+	// the budget holds only one the first is the one to keep.
+	callers := c.callerWants(e)
+	sortCallers(callers)
+	wants = append(wants, callers...)
+	if len(wants) == 0 {
+		return 0
+	}
+
 	spent := 0
 	for _, w := range wants {
 		if len(e.Related) >= maxRelatedPerFile {
 			break
 		}
-		key := w.file + "\x00" + w.name
+		key := w.file + "\x00" + w.name + "\x00" + w.calls
 		if c.attached[key] {
 			continue
 		}
@@ -240,6 +251,7 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 		}
 		def.Path = w.file
 		def.Name = w.name
+		def.Calls = w.calls
 
 		cost := est.EstimateTokens(renderRelated(def))
 		if spent+cost > budget {
@@ -259,6 +271,9 @@ type want struct {
 	name    string
 	uses    int
 	extract func(content, name string) (Related, bool)
+
+	// calls is set on a caller want: the redefined symbol the snippet calls.
+	calls string
 }
 
 // addedText joins the lines the change added, which is where a used name has
@@ -855,7 +870,11 @@ func join(lines []string) string {
 // renderRelated formats one attached definition for the prompt.
 func renderRelated(r Related) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "##### %s (from line %d)\n\n```\n", promptSafe(r.Path), r.Line)
+	if r.Calls != "" {
+		fmt.Fprintf(&b, "##### %s (from line %d), calls %s\n\n```\n", promptSafe(r.Path), r.Line, promptSafe(r.Calls))
+	} else {
+		fmt.Fprintf(&b, "##### %s (from line %d)\n\n```\n", promptSafe(r.Path), r.Line)
+	}
 	for i, line := range strings.Split(r.Snippet, "\n") {
 		fmt.Fprintf(&b, "%6d  %s\n", r.Line+i, line)
 	}

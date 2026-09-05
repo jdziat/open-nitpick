@@ -578,10 +578,30 @@ func Render(e Entry) string {
 		// says so, and the anchoring rule already confines findings to the
 		// paths listed for the batch. A finding placed on one of these files
 		// is dropped by the anchor filter, so the model is told not to try.
-		b.WriteString("\n#### Definitions this change uses, from files it does not touch\n\n")
-		b.WriteString("Context only. These files are not under review: judge the change by them, but do not report findings on them.\n\n")
+		var defs, callers []Related
 		for _, r := range e.Related {
-			b.WriteString(renderRelated(r))
+			if r.Calls != "" {
+				callers = append(callers, r)
+			} else {
+				defs = append(defs, r)
+			}
+		}
+		if len(defs) > 0 {
+			b.WriteString("\n#### Definitions this change uses, from files it does not touch\n\n")
+			b.WriteString("Context only. These files are not under review: judge the change by them, but do not report findings on them.\n\n")
+			for _, r := range defs {
+				b.WriteString(renderRelated(r))
+			}
+		}
+		if len(callers) > 0 {
+			// Callers are the one place a changed contract shows its cost.
+			// The instruction names the check because the model otherwise
+			// reads them as more of the same context.
+			b.WriteString("\n#### Callers of what this change redefines, from files it does not touch\n\n")
+			b.WriteString("Context only. These files are not under review and are unchanged: they still assume the old behaviour. Check each against the new definition it calls, and report any break on the changed line that causes it, not on the caller.\n\n")
+			for _, r := range callers {
+				b.WriteString(renderRelated(r))
+			}
 		}
 	}
 
