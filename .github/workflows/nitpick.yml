@@ -38,9 +38,9 @@ jobs:
           # fallback for what the file does not say — but api-key is passed as
           # LLM_API_KEY regardless, so naming a different vendor's secret here
           # would hand that credential to whatever endpoint the file selected.
-          provider: openrouter
-          model: anthropic/claude-sonnet-4.6
-          api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          provider: synthetic
+          model: hf:moonshotai/Kimi-K3
+          api-key: ${{ secrets.SYNTHETIC_API_KEY }}
           # Advisory until the reviewer has earned the right to block merges.
           fail-on: none
           skip-drafts: true

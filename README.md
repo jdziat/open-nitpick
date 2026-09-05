@@ -727,9 +727,9 @@ models:
 export OPENROUTER_API_KEY=sk-or-...
 ```
 
-This is what this repository's own `.nitpick.yaml` uses, because its default
-reviewer is a closed model. Like `synthetic`, its endpoint is compiled into the
-binary, so a committed config can name it.
+Like `synthetic`, its endpoint is compiled into the binary, so a committed
+config can name it. The eval harness reaches every model in the sweep through
+it.
 
 `LLM_API_KEY` is accepted as a fallback, which is how the GitHub Action's
 `api-key` input arrives. `OPENROUTER_API_KEY` wins when both are set, so a
