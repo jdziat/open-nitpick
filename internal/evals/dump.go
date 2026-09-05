@@ -403,6 +403,8 @@ func runDumpName(battery string, fixtures []Fixture, now time.Time, pid int) str
 			kinds["multifile"]++
 		case Info(f.Name):
 			kinds["info"]++
+		case Caller(f.Name):
+			kinds["callers"]++
 		default:
 			kinds["tuning"]++
 		}

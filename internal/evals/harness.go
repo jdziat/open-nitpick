@@ -431,7 +431,7 @@ func HeldOut(fixture string) bool {
 // header. A mixed selection is called out as mixed rather than rounded to
 // whichever half is larger.
 func CorpusLabel(fixtures []Fixture) string {
-	var held, tuning, multi, info int
+	var held, tuning, multi, info, callers int
 	for _, f := range fixtures {
 		switch {
 		case HeldOut(f.Name):
@@ -440,24 +440,28 @@ func CorpusLabel(fixtures []Fixture) string {
 			multi++
 		case Info(f.Name):
 			info++
+		case Caller(f.Name):
+			callers++
 		default:
 			tuning++
 		}
 	}
 
 	switch {
-	case held == 0 && tuning == 0 && multi == 0 && info == 0:
+	case held == 0 && tuning == 0 && multi == 0 && info == 0 && callers == 0:
 		return "EMPTY (no fixtures selected)"
-	case held == 0 && multi == 0 && info == 0:
+	case held == 0 && multi == 0 && info == 0 && callers == 0:
 		return fmt.Sprintf("TUNING corpus (%d fixture(s))", tuning)
-	case tuning == 0 && multi == 0 && info == 0:
+	case tuning == 0 && multi == 0 && info == 0 && callers == 0:
 		return fmt.Sprintf("HELD-OUT corpus (%d fixture(s)) — spent once; a gain measured here is a generalization claim", held)
-	case tuning == 0 && held == 0 && info == 0:
+	case tuning == 0 && held == 0 && info == 0 && callers == 0:
 		return fmt.Sprintf("MULTI-FILE corpus (%d fixture(s)) — the contract is in a file the change does not touch", multi)
-	case tuning == 0 && held == 0 && multi == 0:
+	case tuning == 0 && held == 0 && multi == 0 && callers == 0:
 		return fmt.Sprintf("INFO corpus (%d fixture(s)) — the band no reviewer had located", info)
+	case tuning == 0 && held == 0 && multi == 0 && info == 0:
+		return fmt.Sprintf("CALLERS corpus (%d fixture(s)) — the change is the contract, and the file it breaks is one it does not touch", callers)
 	default:
-		return fmt.Sprintf("MIXED corpus (%d tuning + %d HELD-OUT + %d multi-file + %d info fixture(s)) — not a generalization measurement", tuning, held, multi, info)
+		return fmt.Sprintf("MIXED corpus (%d tuning + %d HELD-OUT + %d multi-file + %d info + %d callers fixture(s)) — not a generalization measurement", tuning, held, multi, info, callers)
 	}
 }
 
