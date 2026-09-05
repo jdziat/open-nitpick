@@ -39,7 +39,7 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 	call := append(c.CallOptions(), opts...)
 
 	switch c.structuredMode() {
-	case config.StructuredJSON:
+	case config.StructuredJSON, config.StructuredText:
 		return extractJSON[T](ctx, c, msgs, call)
 
 	case config.StructuredSchema:
@@ -337,9 +337,21 @@ func extractJSON[T any](ctx context.Context, c *Client, msgs []llms.Message, opt
 	}
 
 	prompted := withSchemaInstruction(msgs, schema)
-	call := append(append([]llms.CallOption(nil), opts...), llms.WithJSONMode())
+	call := append([]llms.CallOption(nil), opts...)
+	if c.structuredMode() != config.StructuredText {
+		call = append(call, llms.WithJSONMode())
+	}
 
 	resp, err := generateContent(ctx, c, prompted, call)
+	if err != nil && c.structuredMode() != config.StructuredText && isCapabilityError(err) && ctx.Err() == nil {
+		// json_object rejected too. The schema is already in the prompt and
+		// the decoder already tolerates prose around the object, so the
+		// request goes again with no response_format, and the client
+		// remembers so the next batch does not pay for the rejection.
+		c.downgradeToText()
+		call = append([]llms.CallOption(nil), opts...)
+		resp, err = generateContent(ctx, c, prompted, call)
+	}
 	if err != nil {
 		return zero, fmt.Errorf("%s: %w", c, err)
 	}
@@ -672,6 +684,19 @@ func (c *Client) structuredMode() config.StructuredMode {
 	c.modeMu.RLock()
 	defer c.modeMu.RUnlock()
 	return c.mode
+}
+
+// downgradeToText records that JSON mode does not work for this provider
+// either. Auto and json both downgrade: json was auto's own fallback, and an
+// operator who chose json outright asked for a JSON reply, which text mode
+// still delivers, not for the header that requested it.
+func (c *Client) downgradeToText() {
+	c.modeMu.Lock()
+	defer c.modeMu.Unlock()
+
+	if c.mode == config.StructuredAuto || c.mode == config.StructuredJSON {
+		c.mode = config.StructuredText
+	}
 }
 
 // downgrade records that the schema path does not work for this provider, so

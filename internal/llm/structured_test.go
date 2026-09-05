@@ -482,3 +482,36 @@ func TestExtractRetriesStalledRequestsUpToMaxRetries(t *testing.T) {
 		t.Fatalf("cancelled context: calls = %d, err = %v; want 1 call and an error", fake.callCount(), err)
 	}
 }
+
+func TestExtractFallsBackToPlainTextWhenJSONModeIsRejected(t *testing.T) {
+	rejected := &llms.APIError{StatusCode: 405, Message: `{"error":{"message":"json_object response format is not supported for model: google/gemma-4-31B-it-turbo","param":"response_format"}}`}
+	fake := newFakeLLM(turn{err: rejected}, turn{content: "Here you go:\n" + validJSON})
+	client := newTestClient(fake, config.StructuredJSON)
+
+	got, err := Extract[result](context.Background(), client, nil)
+	if err != nil {
+		t.Fatalf("json_object rejected must fall back to no response_format, got %v", err)
+	}
+	assertOneFinding(t, got)
+	if fake.callCount() != 2 {
+		t.Fatalf("calls = %d, want 2", fake.callCount())
+	}
+	if fake.call(0).opts.ResponseFormat == nil {
+		t.Error("the first call asked for JSON mode")
+	}
+	if fake.call(1).opts.ResponseFormat != nil {
+		t.Error("the fallback sends no response_format")
+	}
+	if client.structuredMode() != config.StructuredText {
+		t.Errorf("mode after the rejection = %q, want text so the next batch skips it", client.structuredMode())
+	}
+
+	// Chosen outright, text mode never asks for a format.
+	fake = newFakeLLM(turn{content: validJSON})
+	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredText), nil); err != nil {
+		t.Fatal(err)
+	}
+	if fake.call(0).opts.ResponseFormat != nil {
+		t.Error("text mode sent a response_format")
+	}
+}

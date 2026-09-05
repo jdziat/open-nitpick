@@ -95,7 +95,7 @@ func (s ModelSpec) validate(required bool) []error {
 	}
 
 	switch s.StructuredOutput {
-	case "", StructuredAuto, StructuredSchema, StructuredJSON:
+	case "", StructuredAuto, StructuredSchema, StructuredJSON, StructuredText:
 	default:
 		errs = append(errs, fmt.Errorf("unknown structured_output %q (want auto, schema, or json)", s.StructuredOutput))
 	}

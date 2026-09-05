@@ -124,6 +124,11 @@ const (
 	StructuredAuto   StructuredMode = "auto"
 	StructuredSchema StructuredMode = "schema"
 	StructuredJSON   StructuredMode = "json"
+	// StructuredText sends no response_format at all: the schema rides in
+	// the prompt and the reply is parsed leniently. It is where auto lands
+	// when a provider rejects json_object too, which OpenRouter's DeepInfra
+	// turbo endpoints do, and it can be chosen outright for one.
+	StructuredText StructuredMode = "text"
 )
 
 // Models maps review roles to model specifications. Every role falls back to
