@@ -2,6 +2,8 @@
 
 Self-hosted, model-agnostic pull request review.
 
+Documentation: <https://jdziat.github.io/open-nitpick/>
+
 open-nitpick reads a pull request, reviews it with **a model you choose**, and
 posts inline comments. It runs as a GitHub Action, as a CLI in any CI system, or
 against your uncommitted working tree before you even open a pull request.
@@ -13,21 +15,29 @@ driven by configuration and prompts you can read and change.
 ```bash
 go install github.com/jdziat/open-nitpick/cmd/nitpick@latest
 
-export LLM_PROVIDER=openrouter LLM_MODEL=anthropic/claude-sonnet-4.6
-export OPENROUTER_API_KEY=sk-or-...
+export LLM_PROVIDER=synthetic LLM_MODEL=hf:moonshotai/Kimi-K3
+export SYNTHETIC_API_KEY=syn_...
 
 nitpick review          # reviews your uncommitted changes
 ```
+
+The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR),
+the recommended route: open-weight models on a flat subscription, so a review
+costs nothing per token and a busy day of pull requests does not turn into a
+bill. That link carries the author's referral code; the plain
+<https://synthetic.new> works the same. OpenRouter, any OpenAI-compatible
+endpoint and local models are all one config line away — see
+[Configuration](#configuration).
 
 ## Why this exists
 
 Most review bots are a hosted service wrapping one vendor's model, with a prompt
 you cannot see and pricing per seat. open-nitpick inverts that:
 
-- **Any model.** 17 providers via [llm-go-sdk][sdk], plus a built-in
-  `openrouter` that reaches the rest of the catalogue on one key, plus any
-  OpenAI-compatible endpoint through `base_url`, plus local models via `ollama`
-  and `llamacpp`.
+- **Any model.** 17 providers via [llm-go-sdk][sdk], plus built-in
+  `synthetic` (open-weight models on a subscription) and `openrouter` (the rest
+  of the catalogue on one key), plus any OpenAI-compatible endpoint through
+  `base_url`, plus local models via `ollama` and `llamacpp`.
 - **Different models for different jobs.** A cheap model triages and deduplicates;
   an expensive one does the actual reviewing. That split is most of the cost
   saving available.
@@ -82,9 +92,9 @@ jobs:
           fetch-depth: 0        # the reviewer needs history to diff against base
       - uses: jdziat/open-nitpick@v1
         with:
-          provider: openrouter
-          model: anthropic/claude-sonnet-4.6
-          api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          provider: synthetic
+          model: hf:moonshotai/Kimi-K3
+          api-key: ${{ secrets.SYNTHETIC_API_KEY }}
           # Omit fail-on (or set it to none) until you have seen how the model
           # behaves on your codebase. A reviewer that blocks merges on its first
           # false positive is a reviewer the team switches off.
@@ -186,15 +196,15 @@ Everything is optional — with no config file at all, `LLM_PROVIDER` and
 ```yaml
 models:
   default:
-    provider: openrouter
-    model: anthropic/claude-sonnet-4.6
+    provider: synthetic
+    model: hf:moonshotai/Kimi-K3
     # max_tokens is unset by default: the model's own output maximum applies,
     # and reasoning tokens count against whatever you set here on most providers.
     timeout: 10m                     # default; per model call, not per review
 
   triage:                          # cheap model for merging and filtering
-    provider: openrouter
-    model: z-ai/glm-5.3-flash
+    provider: synthetic
+    model: hf:zai-org/GLM-5.3-Flash
     temperature: 0
 
 review:
@@ -518,6 +528,17 @@ not under review. Nothing under `node_modules`, a module cache or outside the
 checkout is ever read, and a file the change itself touches is never attached,
 because the model already has it.
 
+It also works in the other direction. When a change redefines an exported
+function, method or top-level export — in Go, Python, TypeScript or
+JavaScript — the functions in untouched files that call it are attached too,
+under a heading that tells the model to check each caller against the new
+definition. This is the defect class a diff-only review cannot see by
+construction: an error that stops matching a sentinel a handler compares
+with `errors.Is`, a return value that changes unit, a precondition a caller
+already violates. Callers are found by resolving each candidate file's imports
+back to the changed file, capped at three per symbol and 150 file reads per
+review, and a call that cannot be traced to an import is not attached.
+
 It is bounded by `review.related_context_tokens` per batch, spent only from
 what the request budget has left after the changed files themselves, so it can
 narrow nothing the file under review would have got. The summary lists every
@@ -601,9 +622,59 @@ removes it. The measurements are in
 `nit` < `info` < `warning` < `error` < `critical`. `fail_on: none` never fails
 the build.
 
+### Synthetic (recommended)
+
+[Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR) hosts open-weight
+models (Kimi-K3, GLM-5.3-Flash, Qwen3.8-27B and others) behind an
+OpenAI-compatible endpoint on a flat subscription rather than per-token
+billing. That fits a reviewer better than metered pricing does: the cost of a
+review is zero at the margin, so nothing argues for reviewing fewer pull
+requests, and the models it hosts are the ones this project's measurements
+found to do the work — Kimi-K3 as the reviewer, GLM-5.3-Flash for triage.
+The link above carries the author's referral code; <https://synthetic.new>
+without it is the same service.
+
+`synthetic` is a provider with a compiled-in endpoint, so a committed config
+can name it and nothing else is needed:
+
+```yaml
+models:
+  default:
+    provider: synthetic
+    model: hf:moonshotai/Kimi-K3
+  triage:
+    provider: synthetic
+    model: hf:zai-org/GLM-5.3-Flash
+    temperature: 0
+```
+
+```bash
+export SYNTHETIC_API_KEY=syn_...
+```
+
+Model ids are Synthetic's `hf:<org>/<name>` form; their `syn:large:text`
+aliases work too and follow whatever they currently recommend. `SYNTHETIC_API_KEY`
+wins over `LLM_API_KEY` (which is how the GitHub Action's `api-key` input
+arrives), and `OPENAI_API_KEY` is not accepted: it is a credential for a
+different host. The endpoint is compiled into the binary rather than read from
+`base_url`, and that is what lets it be a committed default: `base_url` and
+`api_key_env` are stripped from a config the reviewer does not trust (see
+[Trust model](#trust-model)), so the same setup written against the `openai`
+provider would work only for whoever had exported
+`NITPICK_TRUST_CONFIG_ENDPOINTS`.
+
+The eval harness reaches Synthetic with a `synthetic:` prefix on the model id
+(`MODELS=synthetic:hf:Qwen/Qwen3.8-27B`), which keeps the same weights on two
+hosts as two rows. Cost per review is priced at Synthetic's usage-based rates,
+transcribed into `internal/evals/testdata/pricing.yaml` from the vendor's
+pricing page; on the subscription tier the column is what the same tokens
+would cost when paying per token.
+
 ### OpenRouter
 
-`openrouter` is a provider in its own right, so it needs a key and nothing else:
+`openrouter` reaches the rest of the catalogue — the frontier closed models
+among them — on one key. It is a provider in its own right, so it needs a key
+and nothing else:
 
 ```yaml
 models:
@@ -616,13 +687,9 @@ models:
 export OPENROUTER_API_KEY=sk-or-...
 ```
 
-This is what this repository's own `.nitpick.yaml` uses. Its endpoint is
-compiled into the binary rather than read from `base_url`, and that is the whole
-reason it can be a committed default: `base_url` and `api_key_env` are stripped
-from a config the reviewer does not trust (see [Trust model](#trust-model)), so
-the same setup written against the `openai` provider would work only for whoever
-had exported `NITPICK_TRUST_CONFIG_ENDPOINTS` — and would silently talk to
-OpenAI for everybody else.
+This is what this repository's own `.nitpick.yaml` uses, because its default
+reviewer is a closed model. Like `synthetic`, its endpoint is compiled into the
+binary, so a committed config can name it.
 
 `LLM_API_KEY` is accepted as a fallback, which is how the GitHub Action's
 `api-key` input arrives. `OPENROUTER_API_KEY` wins when both are set, so a
@@ -752,35 +819,6 @@ its log says so. Every retry and its outcome is one log line, so a review
 that took forty minutes says why. This was built on gemma-4-31b through
 OpenRouter, which lost one review in five without it and none with it; the
 numbers are in [docs/comparison.md](docs/comparison.md).
-
-### Synthetic
-
-[Synthetic](https://synthetic.new) hosts open-weight models (GLM-5.3-Flash,
-Qwen3.8-27B, Kimi-K3 and others) behind an OpenAI-compatible endpoint on a
-subscription rather than per-token billing. Like `openrouter`, it is a provider
-with a compiled-in endpoint, so a committed config can name it:
-
-```yaml
-models:
-  default:
-    provider: synthetic
-    model: hf:zai-org/GLM-5.3-Flash
-```
-
-```bash
-export SYNTHETIC_API_KEY=...
-```
-
-Model ids are Synthetic's `hf:<org>/<name>` form; their `syn:large:text`
-aliases work too and follow whatever they currently recommend. `SYNTHETIC_API_KEY`
-wins over `LLM_API_KEY`, and `OPENAI_API_KEY` is not accepted, for the reasons
-given under OpenRouter. The eval harness reaches it with a `synthetic:` prefix
-on the model id (`MODELS=synthetic:hf:Qwen/Qwen3.8-27B`), which keeps the
-same weights on two hosts as two rows. Cost per review is priced at
-Synthetic's usage-based rates, which the operator transcribed into
-`internal/evals/testdata/pricing.yaml` from the vendor's pricing page; the
-subscription tier bills nothing per token, so on it the column is what the
-same tokens would cost when paying per token.
 
 ### Other OpenAI-compatible gateways (vLLM, LiteLLM)
 
@@ -1187,8 +1225,11 @@ produced is part of the product.
 - [docs/remediation.md](docs/remediation.md) — every miss on the benchmark
   repository, its cause read from the pull request, and the plan.
 - [docs/findings.md](docs/findings.md) — what has actually been measured, what it
-  supports, and the nine instrument bugs found so far. Four of them flattered one
-  side of a comparison; one produced a published claim that had to be retracted.
+  supports, and every instrument bug found so far, in a table whose count is the
+  number of rows. Several flattered one side of a comparison; one produced a
+  published claim that had to be retracted.
+
+The same documents are published at <https://jdziat.github.io/open-nitpick/>.
 
 The short version: prefer the judge-free columns. The LLM judge runs at
 temperature 0 and still scores byte-identical input anywhere from 3.66 to 3.98.
@@ -1281,10 +1322,12 @@ a second, independent implementation.
 
 ## Status
 
-Early. The engine, both providers, structured output, linters, and the Action
-work end to end, and a push to a reviewed pull request is reviewed
-incrementally. Not yet done: resolving superseded comments, `@nitpick` command
-handling, and a GitLab provider.
+Usable, measured, and still early. The engine, the GitHub and local providers,
+structured output, analyzers, related context in both directions, per-batch
+routing, ensembles, and the Action work end to end; a push to a reviewed pull
+request is reviewed incrementally. [docs/findings.md](docs/findings.md) is the
+record of what has been measured and what it supports. Not yet done: resolving
+superseded comments, `@nitpick` command handling, and a GitLab provider.
 
 ## License
 

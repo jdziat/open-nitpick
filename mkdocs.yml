@@ -1,0 +1,83 @@
+site_name: open-nitpick
+site_description: Self-hosted, model-agnostic pull request review.
+site_url: https://jdziat.github.io/open-nitpick/
+repo_url: https://github.com/jdziat/open-nitpick
+repo_name: jdziat/open-nitpick
+edit_uri: ""
+
+# The docs directory is staged by `make docs`: README.md becomes guide.md and
+# docs/*.md are copied under docs/, so every relative link in the repository
+# resolves unchanged on the site. website/ holds only what the site adds.
+docs_dir: .website
+site_dir: public
+strict: true
+
+theme:
+  name: material
+  custom_dir: website/overrides
+  language: en
+  icon:
+    logo: np/mark
+  favicon: assets/favicon.svg
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - toc.integrate
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Dark
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Light
+  # Fonts are loaded from extra.css so the 500 and 600 weights exist; the
+  # theme's own loader fetches only 300, 400 and 700.
+  font: false
+
+extra_css:
+  - assets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.highlight:
+      anchor_linenums: false
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Guide: guide.md
+  - Measurement:
+      - Rules: docs/measurement.md
+      - Findings: docs/findings.md
+      - Against Incumbent: docs/comparison.md
+      - Remediation: docs/remediation.md
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jdziat/open-nitpick
+copyright: 'Apache-2.0 &middot; <a href="https://github.com/jdziat/open-nitpick/blob/main/LICENSE">License</a>'

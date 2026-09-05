@@ -49,6 +49,25 @@ cover:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out | tail -1
 
+# The documentation site: README.md as the guide page, docs/*.md as their own
+# pages, and website/ for what only the site has (landing page, styling).
+# Staged into .website/ so every relative link in the repository resolves on
+# the site unchanged. Needs mkdocs-material (pip install mkdocs-material).
+.PHONY: docs docs-serve
+docs:
+	rm -rf .website && mkdir -p .website/docs
+	cp website/index.md .website/index.md
+	cp -r website/assets .website/assets
+	printf -- '---\ntitle: Guide\n---\n' > .website/guide.md
+	sed -E '1s/^# open-nitpick$$/# Guide/; /^Documentation: <https:\/\/jdziat\.github\.io/d; /^The same documents are published at/d' README.md >> .website/guide.md
+	cp docs/*.md .website/docs/
+	sed -i -E 's#\]\(\.\./(internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' .website/docs/*.md
+	sed -i -E 's#\]\((internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' .website/guide.md
+	mkdocs build
+
+docs-serve: docs
+	mkdocs serve -a 127.0.0.1:8321
+
 .PHONY: lint
 lint:
 	go vet ./...
