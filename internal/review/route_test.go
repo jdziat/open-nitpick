@@ -150,7 +150,7 @@ func TestRoutesAndEnsemblesChooseTheReviewerPerBatch(t *testing.T) {
 	want := map[string][]string{
 		"auth.go": {"fake/second", "fake/strong"}, // security route + global ensemble
 		"web.ts":  {"fake/ts-expert"},             // typescript route, ensemble removed by the route
-		"main.py": {"fake/cheap", "fake/second"},   // default + global ensemble
+		"main.py": {"fake/cheap", "fake/second"},  // default + global ensemble
 	}
 	for path, models := range want {
 		got := seen[path]
