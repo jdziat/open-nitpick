@@ -10,10 +10,14 @@ Status 2026-09-05: the command exists (`cmd/nitpick/fullreview.go`,
 `internal/vcs/tree.go`). It reviews the tree as one all-additions change
 through the unchanged engine, with `-budget`, path arguments, the
 remediation plan and the coverage notice. Smoke-run on `internal/diff`
-with Kimi-K3 on Synthetic. Still open from this section: the grouped
-output sections (bugs, security, CVEs as a deterministic list), and the
-fixture repository with its acceptance test. The walkthrough summary for
-a tree review reads as a diff summary and needs its own wording.
+with Kimi-K3 on Synthetic. The output now has the grouped sections
+(known advisories from the scanner, listed not judged, with any the
+review set aside; security risks; bugs), the remediation plan and the
+coverage notice, and the tree describes itself to the summarizer as a
+review of a repository, not a change. Still open: the fixture repository
+with planted bugs, a secret, an advisory and slop, as an eval-tagged
+acceptance test (it needs a model and osv-scanner, so it belongs with
+the eval corpora, not the unit tests).
 
 Review a whole repository, or the paths given, rather than a change. The
 engine already reviews batches of files with analyzers as evidence and

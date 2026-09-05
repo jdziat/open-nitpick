@@ -67,6 +67,23 @@ func NewTree(local *Local, paths []string) *Tree {
 // Name identifies the provider in logs and the review header.
 func (t *Tree) Name() string { return "tree" }
 
+// PullRequest describes the tree review to the model as what it is, so the
+// summary it writes is about a repository rather than about a change: with
+// no title and body the summarizer reports that no change was supplied.
+func (t *Tree) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error) {
+	pr, err := t.Local.PullRequest(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	scope := "the whole repository"
+	if len(t.Paths) > 0 {
+		scope = "the paths " + strings.Join(t.Paths, ", ")
+	}
+	pr.Title = "Full review of " + scope
+	pr.Body = "This is not a change. Every file under review is shown in full and marked as added because the whole of it is under review; nothing was modified. Judge each file as it stands, and write the summary as a description of the repository's state, not of a diff."
+	return pr, nil
+}
+
 // Diff lists the tree and renders every included file as an addition.
 func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 	if ref.Head != Worktree {

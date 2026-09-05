@@ -72,3 +72,15 @@ func TestTreeBudgetStopsInPathOrderAndNamesTheRest(t *testing.T) {
 		t.Errorf("unbudgeted %s", got)
 	}
 }
+
+func TestTreePullRequestDescribesTheReviewNotAChange(t *testing.T) {
+	dir := newRepo(t)
+	tree := NewTree(NewLocal(dir, io.Discard), []string{"pkg", "cmd/"})
+	pr, err := tree.PullRequest(context.Background(), Ref{Head: Worktree})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pr.Title != "Full review of the paths pkg, cmd" || !strings.Contains(pr.Body, "This is not a change") {
+		t.Errorf("title %q body %q", pr.Title, pr.Body)
+	}
+}
