@@ -9,14 +9,17 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // The callers section of docs/findings.md names the dumps behind each of its
 // tables. Two review rounds each found a sentence in that section that the
 // named dump contradicted: the numbers were right and the explanation was
-// wrong. This test re-derives the numbers and the named fixtures from those
-// dumps and holds the prose to them. It runs only where the dumps are, since
-// .eval-runs is not committed; a checkout without them skips.
+// wrong. This test re-derives every row, the noise figures, the subset, the
+// fixtures named as flipped or lost, and the vocabulary claim from the
+// reviewed model's rows of those dumps, committed under
+// testdata/findings-dumps, and holds the prose to them, row by row.
 func TestCallersSectionMatchesItsDumps(t *testing.T) {
 	findings, err := os.ReadFile("../../docs/findings.md")
 	if err != nil {
@@ -30,26 +33,26 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 	prose := strings.ReplaceAll(section[1], "**", "")
 
 	dump := func(stem string) string {
-		m, _ := filepath.Glob(filepath.Join(".eval-runs", stem+"*.jsonl"))
-		if len(m) != 1 {
-			t.Skipf("dump %s not present", stem)
-		}
-		return m[0]
+		return filepath.Join("testdata", "findings-dumps", stem+".jsonl")
 	}
 
 	// Callers corpus: two runs each; recall over 8 plants, noise per review
 	// over 12 reviews, controls silent.
-	for _, c := range []struct{ stem, want string }{
-		{"multifile-callers-20260905T163816Z", "0.62 (5/8) | 0.17"},
-		{"multifile-callers-20260905T164614Z", "0.88 (7/8) | 0.08"},
+	callerDefects := map[string][]Defect{}
+	for _, f := range CallerFixtures() {
+		callerDefects[f.Name] = f.Defects
+	}
+	for _, c := range []struct{ stem, label string }{
+		{"multifile-callers-20260905T163816Z", "| glm + callers, first cut |"},
+		{"multifile-callers-20260905T164614Z", "| glm + callers, constants attached |"},
 	} {
 		g := readGrid(t, dump(c.stem), 2)
-		hits, reviews, noise := g.tally("+ctx")
-		row := fmt.Sprintf("%.2f (%d/8) | %.2f", float64(hits)/8, hits, float64(noise)/float64(reviews))
-		if row != c.want || !strings.Contains(prose, c.want) {
-			t.Errorf("%s: dump says %q, prose wants %q", c.stem, row, c.want)
+		hits, reviews, noise := g.tally("+ctx", callerDefects)
+		row := fmt.Sprintf("%s %.2f (%d/8) | %.2f |", c.label, float64(hits)/8, hits, float64(noise)/float64(reviews))
+		if !strings.Contains(prose, row) {
+			t.Errorf("%s: prose lacks the row the dump gives: %q", c.stem, row)
 		}
-		if h, _, _ := g.tally(""); h != 0 || !strings.Contains(prose, "0.00 (0/8)") {
+		if h, _, _ := g.tally("", callerDefects); h != 0 || !strings.Contains(prose, "| glm, diff only | 0.00 (0/8) |") {
 			t.Errorf("%s: diff-only hits = %d, prose says 0/8", c.stem, h)
 		}
 		for _, f := range []string{"go-clean-wrapped-sentinel", "python-clean-precondition-satisfied"} {
@@ -63,14 +66,21 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 	g := readGrid(t, dump("multifile-multifile-20260905T170442Z"), 1)
 	g.merge(readGrid(t, dump("multifile-multifile-20260905T170918Z"), 2))
 	planted := map[string]bool{}
+	multiDefects := map[string][]Defect{}
 	for _, f := range MultiFileFixtures() {
+		multiDefects[f.Name] = f.Defects
 		if !f.Clean() {
 			planted[f.Name] = true
 		}
 	}
+	for f := range planted {
+		if !g.fixtures[f] {
+			t.Fatalf("planted fixture %s is not in the dumps; the corpus has moved since they were taken", f)
+		}
+	}
 	walkHits, walkLost, diffHits, diffLost := 0, 0, 0, 0
 	subsetWalk, subsetDiff, subsetN := 0, 0, 0
-	var regressed []string
+	var regressed, mustName []string
 	for f := range planted {
 		w, wl := g.perFixture(f, "+ctx")
 		d, dl := g.perFixture(f, "")
@@ -86,11 +96,22 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 		if w < d {
 			regressed = append(regressed, f)
 		}
+		// Every fixture with a lost review on either arm, and every one the
+		// diff-only arm never located while the walk always did, is a
+		// sentence in the prose.
+		if wl > 0 || dl > 0 || (d == 0 && w == g.runs) {
+			mustName = append(mustName, f)
+		}
 	}
 	sort.Strings(regressed)
-	walkRow := fmt.Sprintf("0.92 (%d/%d, %d lost)", walkHits, 36-walkLost, g.lost("+ctx"))
-	diffRow := fmt.Sprintf("0.61 (%d/%d, %d lost)", diffHits, 36-diffLost, g.lost(""))
-	subset := fmt.Sprintf("the walk is %d/%d against %d/%d", subsetWalk, subsetN*3, subsetDiff, subsetN*3)
+	total := len(planted) * g.runs
+	_, walkReviews, walkNoise := g.tally("+ctx", multiDefects)
+	_, diffReviews, diffNoise := g.tally("", multiDefects)
+	walkRow := fmt.Sprintf("| glm + related context, walk on, 3 runs | %.2f (%d/%d, %d lost) | %.2f |",
+		float64(walkHits)/float64(total-walkLost), walkHits, total-walkLost, g.lost("+ctx"), float64(walkNoise)/float64(walkReviews))
+	diffRow := fmt.Sprintf("| glm, diff only, 3 runs | %.2f (%d/%d, %d lost) | %.2f |",
+		float64(diffHits)/float64(total-diffLost), diffHits, total-diffLost, g.lost(""), float64(diffNoise)/float64(diffReviews))
+	subset := fmt.Sprintf("the walk is %d/%d against %d/%d", subsetWalk, subsetN*g.runs, subsetDiff, subsetN*g.runs)
 	for _, want := range []string{walkRow, diffRow, subset} {
 		if !strings.Contains(prose, want) {
 			t.Errorf("prose lacks %q, which the dumps give", want)
@@ -99,9 +120,9 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 	if want := []string{"go-cache-get-unchecked", "go-query-without-deadline", "python-retry-nonidempotent"}; strings.Join(regressed, ",") != strings.Join(want, ",") {
 		t.Errorf("fixtures the walk lost runs on: %v", regressed)
 	}
-	for _, f := range regressed {
+	for _, f := range append(regressed, mustName...) {
 		if !strings.Contains(prose, "`"+f+"`") {
-			t.Errorf("prose does not name %s among the fixtures that went the other way", f)
+			t.Errorf("prose does not name %s, which the grid singles out", f)
 		}
 	}
 	// The python-retry loss is a finding on the plant line whose wording
@@ -120,21 +141,15 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 			t.Errorf("quoted wording %q: in prose %v, in finding %v", phrase, strings.Contains(prose, phrase), strings.Contains(text, phrase))
 		}
 	}
-	var keywords []string
-	for _, f := range MultiFileFixtures() {
-		if f.Name == "python-retry-nonidempotent" {
-			keywords = f.Defects[0].Keywords
-		}
-	}
+	keywords := multiDefects["python-retry-nonidempotent"][0].Keywords
 	for _, k := range []string{"double-charge", "charged again"} {
 		if !strings.Contains(prose, `"`+k+`"`) || !contains(keywords, k) {
 			t.Errorf("quoted keyword %q: in prose %v, in plant %v", k, strings.Contains(prose, k), contains(keywords, k))
 		}
 	}
-	for _, k := range keywords {
-		if strings.Contains(text, strings.ToLower(k)) {
-			t.Errorf("finding mentions plant keyword %q; the prose calls it a vocabulary miss", k)
-		}
+	// The instrument's own rule, not a restatement of it.
+	if mentionsAny(r.finding(), keywords) {
+		t.Errorf("the scorer credits this finding's wording; the prose calls it a vocabulary miss")
 	}
 }
 
@@ -165,6 +180,11 @@ type gridRow struct {
 	Matched   bool    `json:"matched"`
 	Title     *string `json:"title"`
 	Rationale string  `json:"rationale"`
+	Category  string  `json:"category"`
+}
+
+func (r gridRow) finding() review.Finding {
+	return review.Finding{Path: r.Path, Line: r.Line, Title: deref(r.Title), Rationale: r.Rationale, Category: r.Category}
 }
 
 type grid struct {
@@ -249,15 +269,20 @@ func (g *grid) lost(variant string) int {
 	return n
 }
 
-// tally sums hits, reviews present and noise findings across the arm.
-func (g *grid) tally(variant string) (hits, reviews, noise int) {
+// tally sums hits, reviews present and noise findings across the arm. Noise
+// is the scorer's rule: an unmatched finding that explains no plant of its
+// fixture (explainsAny), not merely an unmatched one.
+func (g *grid) tally(variant string, defects map[string][]Defect) (hits, reviews, noise int) {
 	for f := range g.fixtures {
 		h, l := g.perFixture(f, variant)
 		hits += h
 		reviews += g.runs - l
 	}
 	for _, r := range g.rows {
-		if r.Variant == variant && r.Path != "" && !r.Matched && (r.Silent == nil || !*r.Silent) {
+		if r.Variant != variant || r.Path == "" || r.Matched || (r.Silent != nil && *r.Silent) {
+			continue
+		}
+		if !explainsAny(r.finding(), defects[r.Fixture]) {
 			noise++
 		}
 	}

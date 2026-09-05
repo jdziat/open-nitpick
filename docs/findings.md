@@ -1020,9 +1020,9 @@ two processes (`multifile-multifile-20260905T170442Z`, one run;
 |---|---|---|---|
 | glm + related context, walk on, 3 runs | 0.92 (33/36, 1 lost) | 0.12 | $0.0004 |
 | glm + related context, 2026-09-04 record | 0.93 (13/14, 2 lost) | 0.39 | $0.0015 |
-| glm, diff only, 3 runs | 0.61 (20/33, 3 lost) | 0.46 | $0.0003 |
+| glm, diff only, 3 runs | 0.61 (20/33, 3 lost) | 0.41 | $0.0003 |
 
-Recall held and noise fell by two thirds. The lost reviews are absent
+Recall held and noise fell to less than a third. The lost reviews are absent
 from the dumps, which record absence and not cause; the walk-on loss is
 the Python clean control, so it leaves the denominator at 36, and the
 three diff-only losses are on planted fixtures, so that denominator is
@@ -1031,8 +1031,9 @@ fixtures that the diff-only arm missed in every run
 (`go-empty-filter-deletes-all`, `python-expired-token-accepted`,
 `ts-duration-units-through-barrel`, and `ts-client-per-request` in two of
 three) hit in every walk-on run; so did `python-overwrite-through-package`,
-which the diff-only arm missed in its one completed run and lost twice, so
-it is left out of the count below. Three fixtures went the other way, each
+which the diff-only arm missed in its one completed run and lost twice. It
+and `ruby-mailer-in-transaction`, which lost one diff-only run, are left
+out of the count below. Three fixtures went the other way, each
 losing one run of three: `go-cache-get-unchecked` and
 `go-query-without-deadline` to a silent review, and
 `python-retry-nonidempotent` to a finding anchored on the plant itself
