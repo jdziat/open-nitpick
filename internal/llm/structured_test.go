@@ -432,6 +432,31 @@ func TestExtractRetriesStalledRequestsUpToMaxRetries(t *testing.T) {
 		t.Errorf("the caller's cap of 4096 was replaced: %v", got)
 	}
 
+	// A capped retry that comes back cut is a runaway generation: the next
+	// attempt samples above zero, and a caller's own temperature is kept.
+	cut := func() turn {
+		return turn{err: fmt.Errorf("llms: structured output is not valid JSON: %w", errors.New("unexpected end of JSON input"))}
+	}
+	fake = newFakeLLM(stall(), cut(), turn{content: validJSON})
+	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredSchema), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := fake.call(1).opts.Temperature; got != nil && *got != 0 {
+		t.Errorf("the first retry keeps the caller's temperature, got %v", *got)
+	}
+	if got := fake.call(2).opts.Temperature; got == nil || *got != runawayRetryTemperature {
+		t.Errorf("the retry after a truncation samples at %v, got %v", runawayRetryTemperature, got)
+	}
+	fake = newFakeLLM(stall(), cut(), turn{content: validJSON})
+	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredSchema), nil, llms.WithTemperature(0.7)); err == nil {
+		t.Fatal("a caller who set a temperature above zero gets no re-sampling: the truncation is the answer")
+	}
+	// A first attempt cut at a cap the caller chose is not retried.
+	fake = newFakeLLM(cut(), turn{content: validJSON})
+	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredSchema), nil, llms.WithMaxTokens(512)); err == nil || fake.callCount() != 1 {
+		t.Fatalf("first-attempt truncation: calls = %d, err = %v; want 1 call and an error", fake.callCount(), err)
+	}
+
 	// One more stall than the budget is the provider's answer.
 	fake = newFakeLLM(stall(), stall(), stall(), stall(), turn{content: validJSON})
 	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredSchema), nil); err == nil {

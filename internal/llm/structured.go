@@ -117,65 +117,109 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 //
 // A stall is the HTTP client's own timeout firing while the body was still
 // being read: the request left, the provider accepted it, and the answer never
-// finished arriving. From this side two things look exactly like that — an
-// upstream hung behind a router, and a model generating until its own output
-// cap — and the first attempt cannot tell them apart. So the retries are sent
-// with an output cap when the caller set none: a hung upstream still times
-// out, and a runaway generation comes back within a minute, truncated, with a
-// decode error that names the cause instead of a timeout that hides it. The
-// first attempt is never capped, so a legitimately long answer is not cut
-// short for having been asked once.
+// finished arriving. From this side two things look exactly like that, and
+// the eval battery met both on gemma-4-31b in the same run:
+//
+//   - an upstream hung behind the router. The same request sent again is
+//     routed afresh and answers; 15 of 26 stalls in one battery did.
+//   - the model generating past any sensible length on this input, at this
+//     temperature. Sent again unchanged it loops again; 11 of 26 did.
+//
+// So the first retry is sent with an output cap when the caller set none. A
+// hung upstream answers under the cap; a runaway generation comes back cut,
+// with finish_reason=length or a JSON body that ends mid-value, and that is
+// the signal to change the one thing that decides the loop: the retry after a
+// truncation samples at a small temperature instead of zero. A review that
+// took that path is no longer reproducible by re-running it, and the log line
+// says so; the alternative was a review that did not exist.
 //
 // The budget is max_retries (default 3), the same number the SDK spends on
-// 429s and 5xx: a stall is a transient failure that happens to cost a full
-// timeout to detect. On the eval battery gemma-4-31b lost 9 of 42 reviews to
-// stalls with no retry and 21 of 168 with one; every lost fixture passed
-// alone. Only while the caller's own context is live: a cancelled review is
-// not a stalled request.
+// 429s and 5xx: both are transient failures that happen to cost a full
+// timeout to detect. Only while the caller's own context is live: a cancelled
+// review is not a stalled request.
 func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (T, *llms.Response, error) {
 	for attempt := 0; ; attempt++ {
 		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
-		if !stalled(ctx, err) || attempt >= c.stallRetries {
-			c.logStallOutcome(attempt, err)
-			return value, raw, err
+		if next, ok := c.retryAfter(ctx, attempt, call, raw, err); ok {
+			call = next
+			continue
 		}
-		call = c.logStallRetry(attempt, call)
+		c.logRetryOutcome(attempt, err)
+		return value, raw, err
 	}
 }
 
-// generateContent is GenerateContent with generateTyped's stall retries.
+// generateContent is GenerateContent with generateTyped's retries.
 func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (*llms.Response, error) {
 	for attempt := 0; ; attempt++ {
 		resp, err := c.LLM.GenerateContent(ctx, msgs, call...)
-		if !stalled(ctx, err) || attempt >= c.stallRetries {
-			c.logStallOutcome(attempt, err)
-			return resp, err
+		if next, ok := c.retryAfter(ctx, attempt, call, resp, err); ok {
+			call = next
+			continue
 		}
-		call = c.logStallRetry(attempt, call)
+		c.logRetryOutcome(attempt, err)
+		return resp, err
 	}
 }
 
-// logStallRetry records a stall and returns the options the retry is sent with.
-func (c *Client) logStallRetry(attempt int, call []llms.CallOption) []llms.CallOption {
-	next := stallRetryOptions(call)
-	c.logger().Warn("request stalled; sending again",
-		"model", c.String(),
-		"attempt", attempt+1,
-		"retries_left", c.stallRetries-attempt,
-		"timeout", c.Timeout(),
-		"output_capped", !hasMaxTokens(call) && hasMaxTokens(next))
-	return next
+// retryAfter decides whether an attempt is sent again and with what options.
+func (c *Client) retryAfter(ctx context.Context, attempt int, call []llms.CallOption, resp *llms.Response, err error) ([]llms.CallOption, bool) {
+	if attempt >= c.stallRetries {
+		return nil, false
+	}
+	switch {
+	case stalled(ctx, err):
+		next := stallRetryOptions(call)
+		c.logger().Warn("request stalled; sending again",
+			"model", c.String(),
+			"attempt", attempt+1,
+			"retries_left", c.stallRetries-attempt,
+			"timeout", c.Timeout(),
+			"output_capped", !hasMaxTokens(call) && hasMaxTokens(next))
+		return next, true
+	case attempt > 0 && truncated(resp, err) && !hasTemperatureAbove(call, 0):
+		// Only after a retry: a first attempt cut at a cap the caller chose is
+		// the caller's to handle. Only from temperature zero: a sampling
+		// temperature the caller set is kept, and a loop at 0.3 is the model's
+		// answer.
+		c.logger().Warn("retried request was cut at the output cap: runaway generation; sending again at temperature 0.3",
+			"model", c.String(),
+			"attempt", attempt+1,
+			"retries_left", c.stallRetries-attempt)
+		return append(append([]llms.CallOption(nil), call...), llms.WithTemperature(runawayRetryTemperature)), true
+	}
+	return nil, false
 }
 
-// logStallOutcome records a request that was retried for stalling, whichever
-// way it ended, so the log says which attempt answered and whether any did.
-func (c *Client) logStallOutcome(attempt int, err error) {
+// runawayRetryTemperature is what a request is re-sampled at after a
+// truncated retry. Small, because the goal is a different path through the
+// same answer, not a different answer.
+const runawayRetryTemperature = 0.3
+
+// truncated reports a response cut at a length limit: the provider says so,
+// or the body ends mid-JSON.
+func truncated(resp *llms.Response, err error) bool {
+	if resp != nil && resp.FinishReason == llms.FinishReasonLength {
+		return true
+	}
+	return err != nil && strings.Contains(err.Error(), "unexpected end of JSON input")
+}
+
+// hasTemperatureAbove reports whether the options set a temperature above t.
+func hasTemperatureAbove(opts []llms.CallOption, t float64) bool {
+	applied := llms.ApplyOptions(opts...)
+	return applied.Temperature != nil && *applied.Temperature > t
+}
+
+// logRetryOutcome records how a request that was retried ended, so the log
+// says which attempt answered and whether any did.
+func (c *Client) logRetryOutcome(attempt int, err error) {
 	switch {
 	case attempt == 0:
 	case err == nil:
-		c.logger().Warn("request answered after stalling", "model", c.String(), "attempts", attempt+1)
+		c.logger().Warn("request answered after retries", "model", c.String(), "attempts", attempt+1)
 	default:
-		c.logger().Error("request stalled on every attempt", "model", c.String(), "attempts", attempt+1, "err", err)
+		c.logger().Error("request failed on every attempt", "model", c.String(), "attempts", attempt+1, "err", err)
 	}
 }
 
