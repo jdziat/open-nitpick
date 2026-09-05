@@ -965,6 +965,12 @@ checkout that type-checks, which production has only in the Action.
 | glm, diff only | 0.00 (0/8) | 0.50 – 0.58 | $0.0007 |
 | incumbent/cli | 0.00 (0/4) | 0.33 | |
 
+The collector was then rewritten under review (call sites matched in code
+only, class methods attached as methods, constants rendered as constants,
+caps per symbol and per plan) and the corpus rerun: 0.88 and 0.08 again,
+controls silent, so the four runs with constants attached agree
+(`multifile-callers-20260905T164614Z` and `multifile-callers-20260905T170221Z`).
+
 The first cut missed the Python fixture in both runs: the exporter passes
 `BATCH`, a module constant defined outside the attached function, so the
 model saw a name where the precondition needed a number. Each attached
