@@ -511,6 +511,18 @@ func batch(entries []Entry, maxFiles, budget int) []Batch {
 // Render formats one entry for a prompt: the change itself, then the file it
 // lives in. Line numbers are included throughout, since a finding is only
 // actionable if the model can cite where it belongs.
+// RenderDiffOnly renders an entry's header and diff without the file body or
+// related context: what a classifier reads, since the change is the diff.
+func RenderDiffOnly(e Entry) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "### File: %s\n", promptSafe(e.File.Path))
+	stats := e.File.Stats()
+	fmt.Fprintf(&b, "Change: %s (+%d/-%d)\n\n```diff\n", e.File.Kind, stats.Added, stats.Removed)
+	b.WriteString(e.File.String())
+	b.WriteString("```\n")
+	return b.String()
+}
+
 func Render(e Entry) string {
 	var b strings.Builder
 

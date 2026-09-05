@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"io"
 	"log/slog"
 	"os"
@@ -153,12 +154,26 @@ type Model struct {
 	// full id stays the row's name, so a pinned run and the default routing
 	// of the same weights are two rows.
 	Pin string
+
+	// RouteFile is a YAML file whose `models:` block configures a routed or
+	// ensemble review, from a "route:<path>" entry. The row is named
+	// "route:<file stem>" and its cost is the sum over every model the
+	// review reached for, priced each at its own rate.
+	RouteFile string
 }
+
+// Composite reports whether the run speaks through several models.
+func (m Model) Composite() bool { return m.RouteFile != "" }
 
 // ParseModel reads an EnvModels entry into a Model.
 func ParseModel(id string) Model {
 	id = strings.TrimSpace(id)
 	m := Model{ID: id, Kind: "custom"}
+	if path, ok := strings.CutPrefix(id, "route:"); ok {
+		m.RouteFile = path
+		m.ID = "route:" + strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		return m
+	}
 	name := id
 	if provider, rest, ok := strings.Cut(name, ":"); ok && provider == llm.ProviderSynthetic {
 		m.Provider, name = provider, rest
@@ -585,6 +600,10 @@ type RunResult struct {
 	Fixture string
 	Run     int
 
+	// UsageByModel is the usage of each model a composite run reached for,
+	// keyed by model id; nil for a single-model run.
+	UsageByModel map[string]TokenUsage
+
 	Report *review.Report
 	Review *vcs.Review
 
@@ -689,6 +708,39 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	recorder := &recordingLLM{inner: client.LLM}
 	client.LLM = recorder
 
+	// A composite run builds its own roles from the route file and meters
+	// every client it reaches for, by model, so the row's cost is the sum
+	// of each model's usage at that model's own rate.
+	var (
+		roles  = &llm.Roles{Review: client, Triage: client}
+		meters = map[string]*Meter{}
+		mmu    sync.Mutex
+	)
+	if model.Composite() {
+		built, err := llm.BuildRoles(cfg)
+		if err != nil {
+			out.Err = fmt.Errorf("route file %s: %w", model.RouteFile, err)
+			out.Duration = time.Since(started)
+			return out
+		}
+		meterInto := func(c *llm.Client) {
+			mmu.Lock()
+			defer mmu.Unlock()
+			m := MeterClient(c)
+			meters[c.Spec.Model] = m
+		}
+		built.Each(meterInto)
+		inner := built.Build
+		built.Build = func(spec config.ModelSpec) (*llm.Client, error) {
+			c, err := inner(spec)
+			if err == nil {
+				meterInto(c)
+			}
+			return c, err
+		}
+		roles = built
+	}
+
 	provider := &captureProvider{Local: vcs.NewLocal(dir, io.Discard)}
 
 	engine := &review.Engine{
@@ -701,7 +753,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		// shipped pairing — in particular a model annotated in DefaultModels as
 		// good value was ranked as a REVIEWER and has never been measured
 		// triaging another model's findings.
-		Roles:    &llm.Roles{Review: client, Triage: client},
+		Roles:    roles,
 		Provider: provider,
 		Log:      cmpLogger(opts.Log),
 	}
@@ -723,11 +775,82 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	// triage still paid for the review calls that preceded it, and dropping
 	// that spend would make an unreliable model look cheap.
 	out.Usage = meter.Usage()
+	if model.Composite() {
+		out.UsageByModel = map[string]TokenUsage{}
+		var all TokenUsage
+		mmu.Lock()
+		for name, m := range meters {
+			u := m.Usage()
+			out.UsageByModel[name] = u
+			all.PerCall = append(all.PerCall, u.PerCall...)
+			all.Unreported += u.Unreported
+			all.Failed += u.Failed
+		}
+		mmu.Unlock()
+		out.Usage = all
+	}
 
 	out.Err = err
 	out.Duration = time.Since(started)
 
 	return out
+}
+
+// routeFile is the shape of a route file: the config's models block.
+type routeFile struct {
+	Models config.Models `yaml:"models"`
+}
+
+// applyRouteFile replaces cfg's models with the file's, giving every spec
+// the harness's baseline where the file is silent (temperature 0, the
+// default timeout, auto structured output, openrouter) so a route file names
+// only what it decides.
+func applyRouteFile(cfg *config.Config, path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var rf routeFile
+	if err := yaml.Unmarshal(data, &rf); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	baseline := cfg.Models.Default
+	fill := func(spec *config.ModelSpec) {
+		if spec == nil {
+			return
+		}
+		if spec.Provider == "" {
+			spec.Provider = baseline.Provider
+		}
+		if spec.Temperature == nil {
+			spec.Temperature = baseline.Temperature
+		}
+		if spec.Timeout == 0 {
+			spec.Timeout = baseline.Timeout
+		}
+		if spec.StructuredOutput == "" {
+			spec.StructuredOutput = baseline.StructuredOutput
+		}
+	}
+	fill(&rf.Models.Default)
+	if rf.Models.Default.Model == "" {
+		return fmt.Errorf("%s: models.default.model is required", path)
+	}
+	for _, spec := range []*config.ModelSpec{rf.Models.Review, rf.Models.Triage, rf.Models.Validate, rf.Models.Router} {
+		if spec != nil && spec.Provider == "" && spec.Model == "" {
+			continue
+		}
+	}
+	for i := range rf.Models.Routes {
+		for j := range rf.Models.Routes[i].Ensemble {
+			fill(&rf.Models.Routes[i].Ensemble[j])
+		}
+	}
+	for i := range rf.Models.Ensemble {
+		fill(&rf.Models.Ensemble[i])
+	}
+	cfg.Models = rf.Models
+	return nil
 }
 
 // pinList is the providers list for a pin, nil for none.
@@ -775,6 +898,14 @@ func evalConfig(model Model) *config.Config {
 		// Auto exercises the real negotiation: schema first, JSON fallback for
 		// providers that reject it. That path is the point of the matrix.
 		StructuredOutput: config.StructuredAuto,
+	}
+
+	if model.RouteFile != "" {
+		// Errors surface when the run builds its clients; evalConfig has no
+		// error return and a bad file must not be silently a plain run.
+		if err := applyRouteFile(cfg, model.RouteFile); err != nil {
+			cfg.Models.Default.Model = "route-file-error: " + err.Error()
+		}
 	}
 
 	// Linters are deterministic and separately tested; excluding them keeps the

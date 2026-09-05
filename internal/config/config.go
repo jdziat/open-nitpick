@@ -13,6 +13,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -144,6 +145,159 @@ type Models struct {
 	// result: an independent check is worth more when it is not the same
 	// weights re-reading their own claim.
 	Validate *ModelSpec `yaml:"validate"`
+
+	// Router classifies each batch of files by what the change does — a
+	// security-sensitive edit, a cross-file contract change, a migration —
+	// so a route can match on that rather than only on which languages the
+	// files are in. It is a cheap model reading the diff once per batch and
+	// answering with a list of kinds. Optional: routes that name no kinds
+	// never call it.
+	Router *ModelSpec `yaml:"router"`
+
+	// Routes choose the reviewing model per batch. The first route whose
+	// match holds wins; a batch no route matches is reviewed by the review
+	// model. Every model here overlays Default the way a role does, so a
+	// route can name only what differs.
+	Routes []Route `yaml:"routes"`
+
+	// Ensemble names models that review every batch alongside the chosen
+	// one. Their findings are pooled and the triage pass merges and reranks
+	// them; a defect two reviewers report independently is one finding, and
+	// its agreement is a reason to trust the level. A route's own ensemble
+	// replaces this one for the batches it matches.
+	Ensemble []ModelSpec `yaml:"ensemble"`
+}
+
+// Route sends the batches its match describes to a model.
+type Route struct {
+	// Name labels the route in logs and the report. Optional.
+	Name string `yaml:"name"`
+
+	Match RouteMatch `yaml:"match"`
+
+	// Review is the model that reviews matching batches, overlaid on
+	// Default. Nil keeps the review model and only changes the ensemble.
+	Review *ModelSpec `yaml:"review"`
+
+	// Ensemble replaces Models.Ensemble for matching batches. An empty list
+	// on a route that sets it removes the ensemble for those batches.
+	Ensemble []ModelSpec `yaml:"ensemble"`
+}
+
+// RouteMatch is the condition a batch has to meet. Every field that is set
+// must hold; an unset field holds for every batch.
+type RouteMatch struct {
+	// Languages the batch's files are in, by the extension map in the
+	// bundle package ("go", "python", "typescript", ...). The batch matches
+	// when ANY of its files is in one of them.
+	Languages []string `yaml:"languages"`
+
+	// Kinds the router assigned the batch. The batch matches when it has any
+	// of them. Naming a kind requires Models.Router.
+	Kinds []string `yaml:"kinds"`
+
+	// MinFiles and MaxFiles bound how many files the batch holds. Zero is
+	// unset.
+	MinFiles int `yaml:"min_files"`
+	MaxFiles int `yaml:"max_files"`
+}
+
+// The kinds a router may assign. They name what a change DOES, which is what
+// the eval corpora vary and what the measured strengths differ on: the
+// multi-file corpus is contract changes, the tuning corpus is largely
+// security and logic, the info corpus is judgement calls.
+const (
+	KindSecurity    = "security"    // auth, secrets, injection, crypto, permissions
+	KindConcurrency = "concurrency" // goroutines, locks, shared state, async
+	KindContract    = "contract"    // a signature, type, API or file another file depends on
+	KindData        = "data"        // migrations, schemas, serialization, persistence
+	KindConfig      = "config"      // CI, build, infra, dependency manifests
+	KindLogic       = "logic"       // ordinary control flow in one place
+	KindTest        = "test"        // test code only
+	KindDocs        = "docs"        // documentation only
+)
+
+// Kinds lists every kind a router may assign, in the order the prompt
+// presents them.
+func Kinds() []string {
+	return []string{KindSecurity, KindConcurrency, KindContract, KindData, KindConfig, KindLogic, KindTest, KindDocs}
+}
+
+// Matches reports whether a batch with these languages, kinds and file count
+// meets the match.
+func (m RouteMatch) Matches(languages, kinds []string, files int) bool {
+	if m.MinFiles > 0 && files < m.MinFiles {
+		return false
+	}
+	if m.MaxFiles > 0 && files > m.MaxFiles {
+		return false
+	}
+	if len(m.Languages) > 0 && !intersects(m.Languages, languages) {
+		return false
+	}
+	if len(m.Kinds) > 0 && !intersects(m.Kinds, kinds) {
+		return false
+	}
+	return true
+}
+
+// NeedsRouter reports whether any route matches on kinds.
+func (m Models) NeedsRouter() bool {
+	for _, r := range m.Routes {
+		if len(r.Match.Kinds) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// ResolveRoute returns the review spec a route uses.
+func (m Models) ResolveRoute(r Route) ModelSpec {
+	base := m.ResolveModel(RoleReview)
+	if r.Review == nil {
+		return base
+	}
+	return base.overlay(*r.Review)
+}
+
+// ResolveEnsemble returns the ensemble specs for a route (or the global
+// ensemble when the route sets none), each overlaid on Default.
+func (m Models) ResolveEnsemble(r *Route) []ModelSpec {
+	specs := m.Ensemble
+	if r != nil && r.Ensemble != nil {
+		specs = r.Ensemble
+	}
+	out := make([]ModelSpec, 0, len(specs))
+	for _, s := range specs {
+		out = append(out, m.Default.overlay(s))
+	}
+	return out
+}
+
+// ResolveRouter returns the router spec, overlaid on Default, and whether
+// one is configured.
+func (m Models) ResolveRouter() (ModelSpec, bool) {
+	if m.Router == nil {
+		return ModelSpec{}, false
+	}
+	return m.Default.overlay(*m.Router), true
+}
+
+// Key identifies a spec for client caching: the fields that change which
+// endpoint or weights answer, and nothing that only shapes the request.
+func (s ModelSpec) Key() string {
+	return strings.Join(append([]string{s.Provider, s.Model, s.BaseURL}, s.Providers...), "|")
+}
+
+func intersects(a, b []string) bool {
+	for _, x := range a {
+		for _, y := range b {
+			if strings.EqualFold(strings.TrimSpace(x), strings.TrimSpace(y)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Review holds reviewer behavior and gating policy.

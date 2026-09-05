@@ -163,6 +163,8 @@ func TestBenchmarkMultiFile(t *testing.T) {
 	}
 
 	// Our side: each model twice, with related context off and on.
+	var routing routeTally
+
 	variants := []struct {
 		suffix string
 		tune   func(*config.Config)
@@ -195,8 +197,13 @@ func TestBenchmarkMultiFile(t *testing.T) {
 							findings = res.Report.Findings
 						}
 						var cost Cost
-						if price, ok := opts.Prices.Price(model.ID); ok && res.Usage.Complete() {
+						if model.Composite() {
+							cost = compositeCost(opts.Prices, res.UsageByModel)
+						} else if price, ok := opts.Prices.Price(model.ID); ok && res.Usage.Complete() {
 							cost = Cost{USD: price.Cost(res.Usage), Known: true}
+						}
+						if res.Report != nil && len(res.Report.Routes) > 0 {
+							routing.note(name, res.Report.Routes)
 						}
 						record(name, f, findings, res.Err, cost)
 						if res.Err != nil {
@@ -210,6 +217,10 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		}
 	}
 	wg.Wait()
+
+	if text := routing.String(); text != "" {
+		t.Log(text)
+	}
 
 	// The table, sorted by recall then noise.
 	names := make([]string, 0, len(rows))
@@ -317,4 +328,82 @@ func TestCollectContender(t *testing.T) {
 		t.Fatalf("collect: %v", err)
 	}
 	t.Logf("collected %d this pass, %d still outstanding", collected, remaining)
+}
+
+// compositeCost prices a composite run: every model's usage at its own rate,
+// known only when every model is priced and reported its usage.
+func compositeCost(prices *PriceTable, byModel map[string]TokenUsage) Cost {
+	if prices == nil || len(byModel) == 0 {
+		return Cost{}
+	}
+	total := 0.0
+	for name, u := range byModel {
+		if u.Calls() == 0 {
+			continue
+		}
+		price, ok := prices.Price(name)
+		if !ok || !u.Complete() {
+			return Cost{}
+		}
+		total += price.Cost(u)
+	}
+	return Cost{USD: total, Known: true}
+}
+
+// routeTally counts where a composite run's batches went, per contender.
+type routeTally struct {
+	mu     sync.Mutex
+	counts map[string]map[string]int // contender -> "route → model [+ensemble]" -> batches
+}
+
+func (r *routeTally) note(contender string, routes []review.RouteDecision) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.counts == nil {
+		r.counts = map[string]map[string]int{}
+	}
+	if r.counts[contender] == nil {
+		r.counts[contender] = map[string]int{}
+	}
+	for _, d := range routes {
+		key := d.Route
+		if key == "" {
+			key = "default"
+		}
+		key += " → " + d.Reviewer
+		if len(d.Ensemble) > 0 {
+			key += " + " + strings.Join(d.Ensemble, ", ")
+		}
+		if len(d.Kinds) > 0 {
+			key += " [" + strings.Join(d.Kinds, ",") + "]"
+		}
+		r.counts[contender][key]++
+	}
+}
+
+func (r *routeTally) String() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.counts) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\nWhere the batches went:\n")
+	names := make([]string, 0, len(r.counts))
+	for n := range r.counts {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		fmt.Fprintf(&b, "  %s\n", n)
+		keys := make([]string, 0, len(r.counts[n]))
+		for k := range r.counts[n] {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Fprintf(&b, "    %4d  %s\n", r.counts[n][k], k)
+		}
+	}
+	return b.String()
 }

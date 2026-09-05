@@ -149,6 +149,79 @@ type Roles struct {
 	// assemble Roles by hand, such as the eval harness, only name the roles
 	// they are measuring — so read it through Validator rather than directly.
 	Validate *Client
+
+	// Router is the batch classifier, nil when no route needs one.
+	Router *Client
+
+	// Build constructs a client for a spec a route or ensemble names. Nil
+	// means Build in this package; the eval harness sets its own so every
+	// client a review reaches for is metered. Clients are cached by spec
+	// key, so a run pays construction once per distinct model.
+	Build func(config.ModelSpec) (*Client, error)
+
+	mu      sync.Mutex
+	clients map[string]*Client
+	log     *slog.Logger
+}
+
+// Each calls fn for every client the roles hold, the named ones first and
+// then the cached route and ensemble clients, each once.
+func (r *Roles) Each(fn func(*Client)) {
+	if r == nil {
+		return
+	}
+	seen := map[*Client]bool{}
+	visit := func(c *Client) {
+		if c != nil && !seen[c] {
+			seen[c] = true
+			fn(c)
+		}
+	}
+	for _, c := range []*Client{r.Review, r.Triage, r.Validate, r.Router} {
+		visit(c)
+	}
+	r.mu.Lock()
+	cached := make([]*Client, 0, len(r.clients))
+	for _, c := range r.clients {
+		cached = append(cached, c)
+	}
+	r.mu.Unlock()
+	for _, c := range cached {
+		visit(c)
+	}
+}
+
+// For returns the client for a spec, building and caching it on first use.
+// The review client is returned for its own spec without a build, so a route
+// that names the default model shares its client.
+func (r *Roles) For(spec config.ModelSpec) (*Client, error) {
+	key := spec.Key()
+	if r.Review != nil && r.Review.Spec.Key() == key {
+		return r.Review, nil
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if c, ok := r.clients[key]; ok {
+		return c, nil
+	}
+
+	build := r.Build
+	if build == nil {
+		build = Build
+	}
+	c, err := build(spec)
+	if err != nil {
+		return nil, err
+	}
+	if r.log != nil {
+		c.Log = r.log
+	}
+	if r.clients == nil {
+		r.clients = map[string]*Client{}
+	}
+	r.clients[key] = c
+	return c, nil
 }
 
 // WithLogger points every client at l and returns r, for the engine to call
@@ -157,10 +230,16 @@ func (r *Roles) WithLogger(l *slog.Logger) *Roles {
 	if r == nil {
 		return r
 	}
-	for _, c := range []*Client{r.Review, r.Triage, r.Validate} {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.log = l
+	for _, c := range []*Client{r.Review, r.Triage, r.Validate, r.Router} {
 		if c != nil {
 			c.Log = l
 		}
+	}
+	for _, c := range r.clients {
+		c.Log = l
 	}
 	return r
 }
@@ -209,7 +288,33 @@ func BuildRoles(cfg *config.Config) (*Roles, error) {
 		return nil, fmt.Errorf("validation model: %w", err)
 	}
 
-	return &Roles{Review: review, Triage: triage, Validate: validate}, nil
+	roles := &Roles{Review: review, Triage: triage, Validate: validate, Build: Build}
+
+	if spec, ok := cfg.Models.ResolveRouter(); ok && cfg.Models.NeedsRouter() {
+		if roles.Router, err = Build(spec); err != nil {
+			return nil, fmt.Errorf("router model: %w", err)
+		}
+	}
+	// Route and ensemble models are built here rather than on first use so
+	// a misnamed provider fails before any review runs, the way the roles
+	// do, instead of on the first batch that happens to match.
+	for _, r := range cfg.Models.Routes {
+		if _, err := roles.For(cfg.Models.ResolveRoute(r)); err != nil {
+			return nil, fmt.Errorf("route %q review model: %w", r.Name, err)
+		}
+		for _, spec := range cfg.Models.ResolveEnsemble(&r) {
+			if _, err := roles.For(spec); err != nil {
+				return nil, fmt.Errorf("route %q ensemble model: %w", r.Name, err)
+			}
+		}
+	}
+	for _, spec := range cfg.Models.ResolveEnsemble(nil) {
+		if _, err := roles.For(spec); err != nil {
+			return nil, fmt.Errorf("ensemble model: %w", err)
+		}
+	}
+
+	return roles, nil
 }
 
 // CallOptions renders the spec's generation parameters as SDK call options.

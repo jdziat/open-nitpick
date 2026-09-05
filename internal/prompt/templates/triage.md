@@ -34,6 +34,12 @@ Your job is to produce the list a human should actually read.
    not change a finding's `path` to a file it was not reported against.
 5. **Preserve anchors.** Keep `path` exactly as given. Keep `line` from the
    finding you judged clearest.
+6. **Several reviewers may have read the same files.** When findings carry a
+   reviewer name, the same defect reported by two reviewers is one finding:
+   keep the clearer statement, and treat their agreement as a reason to keep
+   the level a reviewer gave rather than lower it. A finding only one
+   reviewer made is judged on its own rationale by rule 2, no higher and no
+   lower for being alone.
 
 ## Ordering
 

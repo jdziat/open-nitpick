@@ -19,6 +19,7 @@ var templates embed.FS
 const (
 	NameReview = "review"
 	NameTriage = "triage"
+	NameRoute  = "route"
 )
 
 // Layer names, in the order they are applied. Later layers appear later in the

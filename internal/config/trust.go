@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -72,6 +73,16 @@ func (c *Config) sanitize(getenv func(string) string) []string {
 	scrub("models.review", c.Models.Review)
 	scrub("models.triage", c.Models.Triage)
 	scrub("models.validate", c.Models.Validate)
+	scrub("models.router", c.Models.Router)
+	for i := range c.Models.Routes {
+		scrub(fmt.Sprintf("models.routes[%d].review", i), c.Models.Routes[i].Review)
+		for j := range c.Models.Routes[i].Ensemble {
+			scrub(fmt.Sprintf("models.routes[%d].ensemble[%d]", i, j), &c.Models.Routes[i].Ensemble[j])
+		}
+	}
+	for i := range c.Models.Ensemble {
+		scrub(fmt.Sprintf("models.ensemble[%d]", i), &c.Models.Ensemble[i])
+	}
 
 	// persona.custom is free text that lands in the SYSTEM prompt, which is the
 	// highest-trust position available. Every other config-sourced string

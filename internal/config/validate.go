@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -52,6 +53,35 @@ func (m Models) validate() []error {
 	}
 	if m.Validate != nil {
 		errs = append(errs, prefixAll("models.validate", m.Validate.validate(false))...)
+	}
+	if m.Router != nil {
+		errs = append(errs, prefixAll("models.router", m.Router.validate(false))...)
+	}
+	for i, r := range m.Routes {
+		where := fmt.Sprintf("models.routes[%d]", i)
+		if r.Review != nil {
+			errs = append(errs, prefixAll(where+".review", r.Review.validate(false))...)
+		}
+		for j := range r.Ensemble {
+			errs = append(errs, prefixAll(fmt.Sprintf("%s.ensemble[%d]", where, j), r.Ensemble[j].validate(false))...)
+		}
+		for _, k := range r.Match.Kinds {
+			if !slices.Contains(Kinds(), strings.ToLower(strings.TrimSpace(k))) {
+				errs = append(errs, fmt.Errorf("%s.match.kinds: %q is not a kind (one of %s)", where, k, strings.Join(Kinds(), ", ")))
+			}
+		}
+		if len(r.Match.Kinds) > 0 && m.Router == nil {
+			errs = append(errs, fmt.Errorf("%s.match.kinds needs models.router to assign kinds", where))
+		}
+		if r.Match.MinFiles > 0 && r.Match.MaxFiles > 0 && r.Match.MinFiles > r.Match.MaxFiles {
+			errs = append(errs, fmt.Errorf("%s.match: min_files %d exceeds max_files %d", where, r.Match.MinFiles, r.Match.MaxFiles))
+		}
+		if r.Review == nil && r.Ensemble == nil {
+			errs = append(errs, fmt.Errorf("%s: a route needs review, ensemble, or both", where))
+		}
+	}
+	for i := range m.Ensemble {
+		errs = append(errs, prefixAll(fmt.Sprintf("models.ensemble[%d]", i), m.Ensemble[i].validate(false))...)
 	}
 
 	return errs

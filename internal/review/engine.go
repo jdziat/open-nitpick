@@ -46,6 +46,10 @@ type Engine struct {
 	// than reviewed under half of one.
 	Models func(policy *config.Config) (*llm.Roles, error)
 
+	// routeDecisions is where each batch of the last review went; copied
+	// into the Report.
+	routeDecisions []RouteDecision
+
 	// Linters supplies deterministic findings to merge with the model's.
 	//
 	// It is a constructor rather than a runner because the policy a review runs
@@ -337,6 +341,11 @@ type Report struct {
 	// Findings are the published findings, most severe first.
 	Findings []Finding
 
+	// Routes records which model reviewed each batch and why, one entry per
+	// batch, in path order. Empty when nothing was routed and no ensemble
+	// ran.
+	Routes []RouteDecision
+
 	// Summary is the walkthrough, empty when summaries are disabled.
 	Summary string
 
@@ -494,6 +503,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	e = next
 
 	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA}
+	defer func() { report.Routes = e.routeDecisions }()
 
 	// What an earlier run left on the pull request, read AFTER the policy is
 	// settled because review.incremental is policy. A provider that cannot
@@ -803,8 +813,9 @@ func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publis
 // A batch that fails does not fail the run: partial review output is far more
 // useful than none, and the failure is logged and surfaced rather than hidden.
 func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.Plan) ([]Finding, []string, error) {
-	base, err := e.reviewPrompt()
-	if err != nil {
+	// Built once for the default reviewer so a prompt error surfaces before
+	// any batch runs; routed reviewers build theirs on first use.
+	if _, err := e.reviewPromptFor(e.Roles.Review); err != nil {
 		return nil, nil, err
 	}
 
@@ -818,6 +829,7 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 		// unreviewed collects the files whose batch never produced a result,
 		// so the report can say so instead of implying they were clean.
 		unreviewed []string
+		decisions  []RouteDecision
 
 		wg  sync.WaitGroup
 		sem = make(chan struct{}, max(1, e.Config.Review.Concurrency))
@@ -841,11 +853,16 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 				return
 			}
 
-			result, err := e.analyzeBatch(ctx, base, prContext, b)
+			r, err := e.reviewersFor(ctx, b)
+			var result []Finding
+			if err == nil {
+				result, err = e.reviewWith(ctx, r, prContext, b)
+			}
 
 			mu.Lock()
 			defer mu.Unlock()
 
+			decisions = append(decisions, r.decision)
 			if err != nil {
 				e.log().Error("batch review failed", "batch", i, "files", b.Paths(), "error", err)
 				failures++
@@ -857,6 +874,11 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 	}
 
 	wg.Wait()
+
+	sort.Slice(decisions, func(i, j int) bool {
+		return strings.Join(decisions[i].Files, ",") < strings.Join(decisions[j].Files, ",")
+	})
+	e.routeDecisions = decisions
 
 	if err := ctx.Err(); err != nil {
 		return nil, nil, err
@@ -965,7 +987,14 @@ func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bu
 }
 
 // analyzeBatch reviews one batch.
+// analyzeBatch reviews a batch with the default review client.
 func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bundle.Batch) ([]Finding, error) {
+	return e.analyzeBatchWith(ctx, e.Roles.Review, base, prContext, b)
+}
+
+// analyzeBatchWith reviews a batch with one client, under the prompt built
+// for it.
+func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base, prContext string, b bundle.Batch) ([]Finding, error) {
 	var body strings.Builder
 
 	if prContext != "" {
@@ -988,7 +1017,7 @@ func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bun
 		return nil, err
 	}
 
-	result, err := llm.Extract[Result](ctx, e.Roles.Review, msgs, schema)
+	result, err := llm.Extract[Result](ctx, client, msgs, schema)
 	if err != nil {
 		return nil, err
 	}
@@ -1000,9 +1029,9 @@ func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bun
 		}
 		e.recordSeverity(&f)
 		f.Class = e.normalizeClass(f)
-		if f.Source == "" {
-			f.Source = e.Roles.Review.String()
-		}
+		// Always this client's name: a model that writes a source of its
+		// own would let two reviewers' findings pass as one's.
+		f.Source = client.String()
 		out = append(out, f)
 	}
 	return out, nil
@@ -1583,9 +1612,23 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 // untrusted data, not in the system prompt where the repository's own
 // instructions live.
 func (e *Engine) reviewPrompt() (string, error) {
+	if e.Roles == nil {
+		return e.reviewPromptFor(nil)
+	}
+	return e.reviewPromptFor(e.Roles.Review)
+}
+
+// reviewPromptFor builds the review prompt for one client: the base prompt
+// is shared, the model-family layer is the client's own. A nil client is
+// the configured review model, for callers that only want the text.
+func (e *Engine) reviewPromptFor(client *llm.Client) (string, error) {
 	var modelText string
 	if e.Config.Review.ModelNotesOn() {
-		modelText = prompt.ModelGuidance(e.Config.Models.ResolveModel(config.RoleReview).Model)
+		model := e.Config.Models.ResolveModel(config.RoleReview).Model
+		if client != nil {
+			model = client.Model()
+		}
+		modelText = prompt.ModelGuidance(model)
 	}
 	p, err := prompt.Build(prompt.NameReview, prompt.Options{
 		PersonaText: prompt.Persona(e.Config.Persona),
