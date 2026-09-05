@@ -38,9 +38,12 @@ import (
 // caller; the walk fails closed. A call site is matched in code only: a
 // comment or a string that names the symbol is not a call.
 
-// maxCallerFiles caps how many candidate files one plan lists looking for
-// callers, across every changed file and language. Each candidate is at most
-// one fetch, which on a hosted provider is one request.
+// maxCallerFiles caps how many candidate files one plan fetches looking for
+// callers, across every changed file and language. A candidate already read
+// for an earlier changed file is not charged again: the ceiling bounds
+// requests, which on a hosted provider are the cost, and a cached file costs
+// none. When the ceiling stops a walk short the plan says so, so a review
+// that attached no callers for a file can be read for what it is.
 const maxCallerFiles = 150
 
 // maxCallersPerSymbol caps how many call sites of one redefined symbol are
@@ -161,7 +164,7 @@ func (c *relatedCollector) walkFiles(root string, isCandidate func(name string) 
 	var out []string
 	queue := []string{strings.Trim(root, "/")}
 	seen := map[string]bool{}
-	for len(queue) > 0 && c.walked < maxCallerFiles {
+	for len(queue) > 0 {
 		dir := queue[0]
 		queue = queue[1:]
 		if seen[dir] {
@@ -184,11 +187,16 @@ func (c *relatedCollector) walkFiles(root string, isCandidate func(name string) 
 			if c.changed[p] {
 				continue
 			}
-			out = append(out, p)
-			c.walked++
-			if c.walked >= maxCallerFiles {
-				break
+			if _, cached := c.files[p]; !cached {
+				if c.walked >= maxCallerFiles {
+					// Something is left unlisted: this file, and whatever
+					// the rest of this directory and the queue hold.
+					c.truncated = true
+					return out
+				}
+				c.walked++
 			}
+			out = append(out, p)
 		}
 	}
 	return out
@@ -197,31 +205,31 @@ func (c *relatedCollector) walkFiles(root string, isCandidate func(name string) 
 // --- Matching call sites in code, not in prose ---------------------------------
 
 var (
-	quotedSpan  = regexp.MustCompile("\"(?:[^\"\\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\\n]|\\\\.)*'|`[^`\\n]*`")
-	slashTail   = regexp.MustCompile(`//.*$`)
-	hashTail    = regexp.MustCompile(`#.*$`)
-	blockSpan   = regexp.MustCompile(`/\*.*?\*/`)
-	pyDocFence  = regexp.MustCompile(`^\s*(?:"""|''')`)
-	pyDocInline = regexp.MustCompile(`^\s*(?:"""|''').*(?:"""|''')\s*$`)
+	quotedSpan = regexp.MustCompile("\"(?:[^\"\\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\\n]|\\\\.)*'|`[^`\\n]*`")
+	slashTail  = regexp.MustCompile(`//.*$`)
+	hashTail   = regexp.MustCompile(`#.*$`)
+	blockSpan  = regexp.MustCompile(`/\*.*?\*/`)
 )
 
 // codeLines returns a copy of lines with string literals and comments
 // blanked, so a regex for a call site cannot match a doc comment that names
 // the symbol or a string that mentions it. Line-local: a multi-line block
-// comment is not tracked, but a Python docstring is, since one that mentions
-// the function it documents is the common case.
+// comment is not tracked, but a Python triple-quoted string is, whether a
+// docstring or a module-level SQL template: a line with an odd number of
+// fences opens or closes one, and every line inside is blank.
 func codeLines(lines []string, hashComments bool) []string {
 	out := make([]string, len(lines))
 	inDoc := false
 	for i, line := range lines {
 		if hashComments {
+			fences := strings.Count(line, `"""`) + strings.Count(line, `'''`)
 			if inDoc {
-				if strings.Contains(line, `"""`) || strings.Contains(line, `'''`) {
+				if fences%2 == 1 {
 					inDoc = false
 				}
 				continue
 			}
-			if pyDocFence.MatchString(line) && !pyDocInline.MatchString(line) {
+			if fences%2 == 1 {
 				inDoc = true
 				continue
 			}
@@ -527,10 +535,19 @@ func (c *relatedCollector) goCallerWants(e *Entry) []want {
 			var calls string
 			switch {
 			case s.receiver != "":
-				// A method call binds by name alone; the file importing the
-				// package (or sharing it) is the evidence that the receiver
-				// is this type. Receiver-type resolution needs a type
-				// checker, which a fetcher cannot run.
+				// A method call binds by name alone, so the file has to
+				// name the receiver type somewhere (a field, a parameter, a
+				// constructor) before a .Name( in it counts: otherwise every
+				// f.Close() in a file that imports the package would attach
+				// as a caller of the package's Close. Receiver resolution
+				// proper needs a type checker, which a fetcher cannot run.
+				typeRef := `\b` + regexp.QuoteMeta(s.receiver) + `\b`
+				if !samePkg {
+					typeRef = `\b` + regexp.QuoteMeta(local) + `\.` + regexp.QuoteMeta(s.receiver) + `\b`
+				}
+				if !regexp.MustCompile(typeRef).MatchString(strings.Join(code, "\n")) {
+					continue
+				}
 				re = regexp.MustCompile(`\.` + regexp.QuoteMeta(s.name) + `\s*\(`)
 				calls = pkgName + "." + s.receiver + "." + s.name
 			case samePkg:
@@ -545,9 +562,10 @@ func (c *relatedCollector) goCallerWants(e *Entry) []want {
 					break
 				}
 				attached[s.name]++
-				wants = append(wants, want{file: file, name: callerName(lines[start]), calls: calls, uses: 1, extract: callerExtract(start, "//")})
+				caller := callerName(lines[start])
+				wants = append(wants, want{file: file, name: caller, calls: calls, uses: 1, extract: callerExtract(start, "//")})
 				for _, i := range callerConstants(lines, start, braceExtent(lines, start), constAt) {
-					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, extract: constantExtract(i, "//")})
+					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, caller: caller, extract: constantExtract(i, "//")})
 				}
 			}
 		}
@@ -743,9 +761,10 @@ func (c *relatedCollector) pyCallerWants(e *Entry) []want {
 					break
 				}
 				attached[s.name]++
-				wants = append(wants, want{file: file, name: callerName(lines[start]), calls: calls, uses: 1, extract: pyExtract(start)})
+				caller := callerName(lines[start])
+				wants = append(wants, want{file: file, name: caller, calls: calls, uses: 1, extract: pyExtract(start)})
 				for _, i := range callerConstants(lines, start, pyBlockEnd(lines, start, indentOf(lines[start])), constAt) {
-					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, extract: constantExtract(i, "#")})
+					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, caller: caller, extract: constantExtract(i, "#")})
 				}
 			}
 		}
@@ -797,11 +816,24 @@ func tsRedefined(content string, ranges [][2]int) []redefined {
 	return out
 }
 
+// tsKeywords are the statements whose header has the shape of a method:
+// `if (x) {`. A block opened by one is not a definition.
+var tsKeywords = map[string]bool{
+	"if": true, "for": true, "while": true, "switch": true, "catch": true, "do": true,
+	"return": true, "typeof": true, "new": true, "await": true, "else": true, "with": true,
+}
+
+// tsMethodAt reports whether a line opens a class member with a body.
+func tsMethodAt(line string) bool {
+	m := tsMethodDef.FindStringSubmatch(line)
+	return m != nil && !tsKeywords[m[1]]
+}
+
 // tsEnclosingDef finds the definition line i sits in: the nearest class
 // member with a body above it at a shallower indentation, else the
 // top-level definition.
 func tsEnclosingDef(lines []string, i int) int {
-	if tsTopDef.MatchString(lines[i]) || tsMethodDef.MatchString(lines[i]) {
+	if tsTopDef.MatchString(lines[i]) || tsMethodAt(lines[i]) {
 		return i
 	}
 	indent := indentOf(lines[i])
@@ -815,7 +847,7 @@ func tsEnclosingDef(lines []string, i int) int {
 		}
 		if len(indentOf(line)) < len(indent) {
 			indent = indentOf(line)
-			if tsMethodDef.MatchString(line) {
+			if tsMethodAt(line) {
 				return j
 			}
 		}
@@ -897,9 +929,10 @@ func (c *relatedCollector) tsCallerWants(e *Entry) []want {
 					break
 				}
 				attached[s.name]++
-				wants = append(wants, want{file: file, name: callerName(lines[start]), calls: calls, uses: 1, extract: callerExtract(start, "//", "/*", "*")})
+				caller := callerName(lines[start])
+				wants = append(wants, want{file: file, name: caller, calls: calls, uses: 1, extract: callerExtract(start, "//", "/*", "*")})
 				for _, i := range callerConstants(lines, start, braceExtent(lines, start), constAt) {
-					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, extract: constantExtract(i, "//", "/*", "*")})
+					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, caller: caller, extract: constantExtract(i, "//", "/*", "*")})
 				}
 			}
 		}

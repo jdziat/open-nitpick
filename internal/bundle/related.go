@@ -56,10 +56,11 @@ type Related struct {
 	// change uses. Empty for a definition.
 	Calls string
 
-	// Constant marks a one-line constant a caller passes, attached beside
-	// that caller (Calls names the same symbol) and rendered apart from it,
-	// because a constant calls nothing.
+	// Constant marks a one-line constant a caller passes, and Caller names
+	// that caller. It is attached only when the caller was, and rendered
+	// apart from it, because a constant calls nothing.
 	Constant bool
+	Caller   string
 }
 
 // DirLister names the entries of a directory at the reviewed revision, with a
@@ -100,13 +101,17 @@ type relatedCollector struct {
 	// plan attaches each once.
 	attached map[string]bool
 
-	// walked counts the candidate files the caller walk has listed for this
-	// plan, against maxCallerFiles. See callers.go.
-	walked int
+	// walked counts the candidate files the caller walk has charged to this
+	// plan, against maxCallerFiles, and truncated records that the ceiling
+	// stopped a walk with candidates unlisted. See callers.go.
+	walked    int
+	truncated bool
 
-	// maxBytes refuses a file larger than this, so the caller walk cannot
-	// fetch and scan a generated bundle that escaped callerSkipDirs. Zero
-	// means no limit.
+	// maxBytes refuses a file larger than this after fetching it, so the
+	// caller walk cannot scan a generated bundle that escaped
+	// callerSkipDirs. It applies to every read the collector makes,
+	// definitions included, which the review's max_file_bytes already
+	// refuses for the files under review. Zero means no limit.
 	maxBytes int
 }
 
@@ -230,7 +235,13 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 	// what the changed line means, the caller is what it breaks, and when
 	// the budget holds only one the first is the one to keep. The walk is
 	// skipped when nothing it finds could be attached.
-	if len(e.Related)+len(wants) < maxRelatedPerFile && budget >= minCallerBudget {
+	fresh := 0
+	for _, w := range wants {
+		if !c.attached[w.file+"\x00"+w.name+"\x00"+w.calls] {
+			fresh++
+		}
+	}
+	if len(e.Related)+fresh < maxRelatedPerFile && budget >= minCallerBudget {
 		callers := c.callerWants(e)
 		sortCallers(callers)
 		wants = append(wants, callers...)
@@ -275,12 +286,18 @@ func (c *relatedCollector) definitionWants(e *Entry) []want {
 // attach reads and renders wants into e.Related in order, within budget.
 func (c *relatedCollector) attach(e *Entry, wants []want, budget int, est *llms.TokenEstimator) int {
 	spent := 0
+	// callers attached for this entry, by file and name, so a constant is
+	// never attached without the caller it belongs to.
+	callers := map[string]bool{}
 	for _, w := range wants {
 		if len(e.Related) >= maxRelatedPerFile {
 			break
 		}
 		key := w.file + "\x00" + w.name + "\x00" + w.calls
 		if c.attached[key] {
+			continue
+		}
+		if w.constant && !callers[w.file+"\x00"+w.caller] {
 			continue
 		}
 		content, ok := c.read(w.file)
@@ -295,6 +312,7 @@ func (c *relatedCollector) attach(e *Entry, wants []want, budget int, est *llms.
 		def.Name = w.name
 		def.Calls = w.calls
 		def.Constant = w.constant
+		def.Caller = w.caller
 
 		cost := est.EstimateTokens(renderRelated(def))
 		if spent+cost > budget {
@@ -302,6 +320,9 @@ func (c *relatedCollector) attach(e *Entry, wants []want, budget int, est *llms.
 		}
 		spent += cost
 		c.attached[key] = true
+		if w.calls != "" && !w.constant {
+			callers[w.file+"\x00"+w.name] = true
+		}
 		e.Related = append(e.Related, def)
 	}
 	return spent
@@ -318,8 +339,10 @@ type want struct {
 	// calls is set on a caller want: the redefined symbol the snippet calls.
 	calls string
 
-	// constant marks a one-line constant a caller passes.
+	// constant marks a one-line constant a caller passes, and caller names
+	// that caller.
 	constant bool
+	caller   string
 }
 
 // addedText joins the lines the change added, which is where a used name has
@@ -918,7 +941,7 @@ func renderRelated(r Related) string {
 	var b strings.Builder
 	switch {
 	case r.Constant:
-		fmt.Fprintf(&b, "##### %s (line %d), a constant the caller above passes\n\n```\n", promptSafe(r.Path), r.Line)
+		fmt.Fprintf(&b, "##### %s (line %d), a constant %s passes\n\n```\n", promptSafe(r.Path), r.Line, promptSafe(r.Caller))
 	case r.Calls != "":
 		fmt.Fprintf(&b, "##### %s (from line %d), calls %s\n\n```\n", promptSafe(r.Path), r.Line, promptSafe(r.Calls))
 	default:

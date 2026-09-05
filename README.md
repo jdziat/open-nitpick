@@ -545,7 +545,10 @@ already violates. Callers are found by resolving each candidate file's imports
 back to the changed file, in code rather than in comments or strings, capped
 at three call sites per symbol and 150 candidate files per review, and a call
 that cannot be traced to an import is not attached. A one-line constant the
-caller passes comes along with it. Measured on its own corpus in
+caller passes comes along with it. The walk is up to 150 file fetches a
+review on top of the changed files, and when that ceiling stops it short the
+summary says so, so a file with no callers attached is not read as a file
+with no callers. Measured on its own corpus in
 [docs/findings.md](docs/findings.md#callers-2026-09-05): a cheap model went
 from finding none of the planted contract breaks to seven of eight.
 
@@ -753,8 +756,11 @@ a single run, so gaps under about 0.10 are inside the noise.
 
 Incumbent's on-demand price on the same corpora is $0.25 to $0.36 a review.
 
-Every row was measured with `review.related_context: true`. It is off by
-default; set it to reproduce these numbers.
+Every row was measured with `review.related_context: true`, on 2026-09-04,
+before the caller walk was added under the same flag. It is off by default;
+set it to reproduce these numbers. The multi-file corpus rerun with the walk
+on ([docs/findings.md](docs/findings.md#callers-2026-09-05)) cost no more per
+review than before, but the sweep itself has not been repeated.
 
 The default stays sonnet-4.6 because the sweep ran on the corpora the prompt
 was tuned against; a candidate replaces it only by beating it on the held-out

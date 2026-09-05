@@ -241,6 +241,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	b.WriteString(linterNotice(report))
 	b.WriteString(uncoveredNotice(report))
 	b.WriteString(discardNotice(report))
+	b.WriteString(callerWalkNotice(report))
 
 	if cfg == nil || cfg.Review.Summary {
 		b.WriteString(walkthrough(report))
@@ -569,6 +570,16 @@ func discardHeadline(discarded []LinterDiscard) string {
 // maxUncoveredPerReason. The path is inline-escaped for the reason every other
 // path in this file is: it comes from the diff, and a filename can carry
 // markdown.
+// callerWalkNotice says when the search for callers of what the change
+// redefines stopped short, so a file with no callers attached is not read
+// as a file with no callers.
+func callerWalkNotice(report *Report) string {
+	if report.Plan == nil || !report.Plan.CallerWalkTruncated {
+		return ""
+	}
+	return "\nThe search for callers of what this change redefines stopped at its ceiling of candidate files, so some callers in this repository were not read and any break in them is not reported.\n"
+}
+
 func uncoveredNotice(report *Report) string {
 	if len(report.Uncovered) == 0 {
 		return ""

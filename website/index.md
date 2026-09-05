@@ -16,6 +16,13 @@ hide:
 [Source on GitHub](https://github.com/jdziat/open-nitpick){ .md-button }
 </div>
 
+<div class="np-stat" markdown>
+<div markdown><strong>5</strong><span>corpora, four re-runnable</span></div>
+<div markdown><strong>18</strong><span>instrument bugs recorded</span></div>
+<div markdown><strong>1</strong><span>published claim retracted</span></div>
+</div>
+<p class="np-fine">Counts as of 2026-09-05, from <a href="docs/findings/">the findings</a>.</p>
+
 </div>
 
 <div class="np-prose" markdown>
@@ -29,13 +36,6 @@ export SYNTHETIC_API_KEY=syn_...
 
 nitpick review          # reviews your uncommitted changes
 ```
-
-<div class="np-stat" markdown>
-<div markdown><strong>5</strong><span>corpora, four of them re-runnable</span></div>
-<div markdown><strong>18</strong><span>instrument bugs recorded</span></div>
-<div markdown><strong>1</strong><span>published claim retracted</span></div>
-<div markdown><strong>2026-09-05</strong><span>counts as of</span></div>
-</div>
 
 </div>
 
@@ -75,16 +75,16 @@ Five corpora, a judge-free harness, and a findings document that records its own
 
 <div class="np-prose" markdown>
 
-<p class="np-fine" markdown>The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR), the recommended route: open-weight models on a flat subscription, $30 a month for one pack as of 2026-09-05. That link carries the author's referral code, and the author receives referral credit if you sign up through it; [synthetic.new](https://synthetic.new) without it is the same service at the same price. [Why, and the alternatives →](guide.md#synthetic-recommended)</p>
-
 ## How a review runs
 
 1. The change is read from GitHub or a local checkout, and the policy it is reviewed under comes from the base revision, not the branch.
 2. Analyzers that are installed run against the changed lines, isolated from the tree, and their output becomes evidence.
-3. Files are bundled into batches under a token budget, with related context attached: what a changed line calls, and who calls what the change redefined.
+3. Files are bundled into batches under a token budget, with related context attached when it is switched on: what a changed line calls, and who calls what the change redefined.
 4. Each batch is reviewed by the model the route selects. A triage model merges and filters. An optional expert pass refutes.
 5. The review is posted as inline comments, with a summary that lists every file not reviewed, every analyzer that did not run, and every finding that was discarded and why.
 
 [The full walkthrough →](guide.md#how-a-review-runs)
+
+<p class="np-fine" markdown>The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR), the recommended route: open-weight models on a flat subscription, $30 a month for one pack as of 2026-09-05. That link carries the author's referral code, and the author receives referral credit if you sign up through it; [synthetic.new](https://synthetic.new) without it is the same service at the same price. To spend nothing first, `nitpick explain-config` prints what a review would send without sending it, and `LLM_PROVIDER=ollama` runs against a local model. [Why, and the alternatives →](guide.md#synthetic-recommended)</p>
 
 </div>

@@ -128,6 +128,13 @@ type Plan struct {
 	// files — and which files, since a finding may lean on one.
 	RelatedFiles       []string
 	RelatedDefinitions int
+
+	// CallerWalkTruncated records that the search for callers of what the
+	// change redefines stopped at its file ceiling with candidates unread,
+	// so a file with no callers attached may have callers all the same.
+	// Disclosed for the reason the skips are: silence must not read as
+	// "none".
+	CallerWalkTruncated bool
 }
 
 // Skip records one excluded file.
@@ -275,6 +282,7 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 					plan.RelatedFiles = append(plan.RelatedFiles, r.Path)
 				}
 			}
+			plan.CallerWalkTruncated = plan.CallerWalkTruncated || related.truncated
 		}
 		entries = append(entries, entry)
 	}
@@ -599,7 +607,7 @@ func Render(e Entry) string {
 			// The instruction names the check because the model otherwise
 			// reads them as more of the same context.
 			b.WriteString("\n#### Callers of what this change redefines, from files it does not touch\n\n")
-			b.WriteString("Context only. These files are not under review and are unchanged: they still assume the old behaviour. Check each against the new definition it calls, and report any break on the changed line that causes it, not on the caller. A constant listed after a caller is one that caller passes, shown so its value is known.\n\n")
+			b.WriteString("Context only. These files are not under review and are unchanged: they still assume the old behaviour. Check each against the new definition it calls, and report any break on the changed line that causes it, not on the caller. A constant listed with a caller's name is one that caller passes, shown so its value is known.\n\n")
 			for _, r := range callers {
 				b.WriteString(renderRelated(r))
 			}

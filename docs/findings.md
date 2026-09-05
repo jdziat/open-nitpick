@@ -935,8 +935,8 @@ length. Python: a page-size precondition under an exporter that passes 500
 duration that changes from milliseconds to seconds under a caller that hands
 it to `AbortSignal.timeout`.
 
-**The rule the floor forced.** Three floor runs credited one to four of eight
-plants before a single caller was ever attached, and every credited finding
+**The rule the floor forced.** Three floor runs credited none to four of
+eight plants before a single caller was ever attached, and every credited finding
 was a diff-only inference that happened to match a consequence word
 ("callers", "breaks"). Keywords now credit only a finding that names the
 caller: its file, its function, or a detail that exists only there. Under
@@ -962,22 +962,32 @@ checkout that type-checks, which production has only in the Action.
 |---|---|---|---|
 | glm + callers, first cut | 0.62 (5/8) | 0.17 | $0.0007 |
 | glm + callers, constants attached | **0.88** (7/8) | 0.08 | $0.0005 |
-| glm, diff only | 0.00 (0/8) | 0.50 – 0.58 | $0.0007 |
+| glm, diff only | 0.00 (0/8) | 0.50 – 0.58 | $0.0007 – $0.0008 |
 | incumbent/cli | 0.00 (0/4) | 0.33 | |
+
+Incumbent's one finding on `go-error-identity-changed` says the sentinel
+should be wrapped so callers can keep using `errors.Is`, which is the right
+fix and a diff-only inference: it names no caller, so the keyword rule does
+not credit it. Its finding on the clean Python control is noise.
 
 The collector was then rewritten under review (call sites matched in code
 only, class methods attached as methods, constants rendered as constants,
 caps per symbol and per plan) and the corpus rerun: 0.88 and 0.08 again,
-controls silent, so the four runs with constants attached agree
+controls silent on our side, so the four runs with constants attached agree
 (`multifile-callers-20260905T164614Z` and `multifile-callers-20260905T170221Z`).
 
-The first cut missed the Python fixture in both runs: the exporter passes
-`BATCH`, a module constant defined outside the attached function, so the
-model saw a name where the precondition needed a number. Each attached
-caller now brings the one-line top-level constants its body names. The
-remaining miss is one run of the TypeScript fixture, where the review
-reported the unit change on the callee without naming the caller. The
-controls were silent in every run of every variant.
+The first cut missed the Python fixture in both runs, and the Go sentinel
+fixture in one: the exporter passes `BATCH`, a module constant defined
+outside the attached function, so the model saw a name where the
+precondition needed a number. Each attached caller now brings the one-line
+top-level constants its body names. Of the four fixture-runs that changed
+between the two tables, the two Python hits are the constants; the Go
+sentinel run that flipped to a hit and the TypeScript run that flipped to a
+miss are run-to-run variance. That TypeScript miss is an anchor miss, not a
+blind one: the finding names `src/http.ts` and `AbortSignal.timeout` and
+is anchored on the doc comment at line 3 instead of the return at line 13,
+ten lines past the tolerance, which is also the run's one noise finding.
+Our controls were silent in every run of every variant.
 
 **What else the day measured.**
 
@@ -998,8 +1008,25 @@ controls were silent in every run of every variant.
   for GLM. Rates are priced at the captured endpoint, a point estimate, so
   the figure is a floor if the router sends a request elsewhere.
 
+**The regression check.** The multi-file corpus, fourteen fixtures, with
+the walk on under the same flag, `z-ai/glm-5.3-flash`, three runs across
+two processes (`multifile-multifile-20260905T170442Z`, one run;
+`multifile-multifile-20260905T170918Z`, two runs):
+
+| contender | RECALL | NOISE / review | $ / review |
+|---|---|---|---|
+| glm + related context, walk on, 3 runs | 0.92 (33/36, 1 lost) | 0.12 | $0.0004 |
+| glm + related context, 2026-09-04 record | 0.93 (13/14, 2 lost) | 0.39 | $0.0015 |
+| glm, diff only, 3 runs | 0.61 (22/36, 3 lost) | 0.42 | $0.0003 |
+
+Recall held and noise fell by two thirds; the one lost review was a
+provider failure on the Python clean control, not a review. The one
+fixture that was not at ceiling before, `go-cache-get-unchecked`, hit in
+all three runs: its caller is a method on an imported type, which the
+callee direction could not bind and the caller direction attaches by name
+once the file names the receiver type.
+
 Rule 15 applies to the callers corpus in full: six fixtures, written the
 same day as the collector by the same hand, outside the ground-truth
-registries. The multi-file corpus is the regression check, and it has not
-been rerun with the collector on yet.
+registries. The twelve-model sweep has not been repeated with the walk on.
 

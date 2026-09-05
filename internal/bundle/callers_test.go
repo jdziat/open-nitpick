@@ -224,7 +224,7 @@ def helper():
 		t.Errorf("constant = %q at line %d constant=%v, want BATCH = 500 at line 5", c.Snippet, c.Line, c.Constant)
 	}
 	rendered := Render(plan.Batches[0].Entries[0])
-	if !strings.Contains(rendered, "##### app/export.py (line 5), a constant the caller above passes") {
+	if !strings.Contains(rendered, "##### app/export.py (line 5), a constant export_orders passes") {
 		t.Errorf("constant rendered as a caller:\n%s", rendered)
 	}
 }
@@ -266,7 +266,7 @@ export function other() {}
 	}
 }
 
-func TestCallersWalkStopsAtTheFileCeiling(t *testing.T) {
+func TestCallersWalkStopsAtTheFileCeilingAndSaysSo(t *testing.T) {
 	store := "package store\n\n// Lookup finds x.\nfunc Lookup() int { return 1 }\n"
 	tree := fakeTree{"go.mod": callersGoMod, "store/s.go": store}
 	for i := 0; i < maxCallerFiles+50; i++ {
@@ -275,14 +275,24 @@ func TestCallersWalkStopsAtTheFileCeiling(t *testing.T) {
 	tree["zzz/last.go"] = "package zzz\n\nimport \"example.com/app/store\"\n\nfunc Last() { store.Lookup() }\n"
 
 	c := newRelatedCollector(context.Background(), diff.Files{modifiedFile("store/s.go", store, 4)}, tree.fetch, tree.list)
-	files := c.walkFiles("", func(name string) bool { return strings.HasSuffix(name, ".go") })
-	if len(files) != maxCallerFiles {
-		t.Fatalf("walked %d files, want the ceiling %d", len(files), maxCallerFiles)
+	isGo := func(name string) bool { return strings.HasSuffix(name, ".go") }
+	files := c.walkFiles("", isGo)
+	if len(files) != maxCallerFiles || !c.truncated {
+		t.Fatalf("walked %d files (truncated=%v), want the ceiling %d and truncated", len(files), c.truncated, maxCallerFiles)
 	}
-	// The ceiling is per plan: a second walk, for another changed file or
-	// language, gets nothing more.
-	if again := c.walkFiles("", func(name string) bool { return true }); len(again) != 0 {
-		t.Fatalf("second walk listed %d files past the plan ceiling", len(again))
+	// The ceiling bounds fetches. Once those files are read, a second walk
+	// for another changed file lists them again at no charge, and still
+	// nothing past them.
+	for _, f := range files {
+		c.read(f)
+	}
+	if again := c.walkFiles("", isGo); len(again) != maxCallerFiles {
+		t.Fatalf("second walk listed %d files, want the same %d cached ones", len(again), maxCallerFiles)
+	}
+
+	plan := assembleCallers(t, tree, true, modifiedFile("store/s.go", store, 4))
+	if !plan.CallerWalkTruncated {
+		t.Errorf("plan does not record the truncated walk")
 	}
 }
 
@@ -435,5 +445,139 @@ func TestCallersCapPerSymbolAcrossFiles(t *testing.T) {
 	got := callerNames(assembleCallers(t, tree, true, modifiedFile("store/s.go", store, 4)))
 	if len(got) != maxCallersPerSymbol {
 		t.Fatalf("attached %d callers, want the cap %d: %v", len(got), maxCallersPerSymbol, got)
+	}
+}
+
+func TestCallersTypeScriptNestedInControlFlowAttachTheFunction(t *testing.T) {
+	duration := "export function parseDuration(text: string): number {\n  return Number(text);\n}\n"
+	http := `import { parseDuration } from "./duration";
+
+export function handler(req: Request, timeout: string) {
+  if (req.ok) {
+    for (const attempt of [1, 2]) {
+      return AbortSignal.timeout(parseDuration(timeout));
+    }
+  }
+  return null;
+}
+
+export class Client {
+  async get(url: string, timeout: string): Promise<Response> {
+    while (true) {
+      const signal = AbortSignal.timeout(parseDuration(timeout));
+      return fetch(url, { signal });
+    }
+  }
+}
+`
+	tree := fakeTree{"package.json": "{}", "src/duration.ts": duration, "src/http.ts": http}
+	plan := assembleCallers(t, tree, true, modifiedFile("src/duration.ts", duration, 2))
+	got := callerNames(plan)
+	want := []string{"src/http.ts:get calls duration.parseDuration", "src/http.ts:handler calls duration.parseDuration"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("callers = %v, want %v", got, want)
+	}
+	for _, r := range plan.Batches[0].Entries[0].Related {
+		if !strings.Contains(r.Snippet, "(") || strings.HasPrefix(strings.TrimSpace(r.Snippet), "if") || strings.HasPrefix(strings.TrimSpace(r.Snippet), "while") {
+			t.Errorf("snippet starts at a control-flow header, not a definition:\n%s", r.Snippet)
+		}
+	}
+}
+
+func TestCallersPythonMultilineStringsDoNotHideCallers(t *testing.T) {
+	db := "def fetch_orders(conn, offset, limit):\n    return []\n"
+	svc := `from app.db import fetch_orders
+
+SQL = """
+SELECT 1
+"""
+
+
+def handler(conn):
+    return fetch_orders(conn, 0, 10)
+
+
+def other(conn):
+    """Mentions fetch_orders() in a docstring."""
+    return fetch_orders(conn, 10, 10)
+`
+	tree := fakeTree{"app/__init__.py": "", "app/db.py": db, "app/svc.py": svc}
+	got := callerNames(assembleCallers(t, tree, true, modifiedFile("app/db.py", db, 2)))
+	want := []string{"app/svc.py:handler calls db.fetch_orders", "app/svc.py:other calls db.fetch_orders"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("callers = %v, want %v", got, want)
+	}
+}
+
+func TestCallersConstantsNameTheirCaller(t *testing.T) {
+	store := "package store\n\n// Lookup finds x.\nfunc Lookup(n int) int { return n }\n"
+	web := `package web
+
+import "example.com/app/store"
+
+const ZLimit = 5
+const ALimit = 99
+
+// Zeta comes first in the file and last by name.
+func Zeta() int { return store.Lookup(ZLimit) }
+
+// Alpha comes second in the file and first by name.
+func Alpha() int { return store.Lookup(ALimit) }
+`
+	tree := fakeTree{"go.mod": callersGoMod, "store/s.go": store, "web/w.go": web}
+	plan := assembleCallers(t, tree, true, modifiedFile("store/s.go", store, 4))
+	byName := map[string]string{}
+	for _, r := range plan.Batches[0].Entries[0].Related {
+		if r.Constant {
+			byName[r.Snippet] = r.Caller
+		}
+	}
+	if byName["const ZLimit = 5"] != "Zeta" || byName["const ALimit = 99"] != "Alpha" {
+		t.Fatalf("constants attributed as %v", byName)
+	}
+	rendered := Render(plan.Batches[0].Entries[0])
+	if !strings.Contains(rendered, "a constant Zeta passes") || !strings.Contains(rendered, "a constant Alpha passes") {
+		t.Errorf("rendering does not name the caller:\n%s", rendered)
+	}
+}
+
+func TestCallersGoMethodNeedsTheReceiverTypeNamed(t *testing.T) {
+	store := `package store
+
+// Users is a table.
+type Users struct{}
+
+// Lookup finds x.
+func (u *Users) Lookup(id string) string { return id }
+`
+	stranger := `package web
+
+import "example.com/app/store"
+
+type file struct{}
+
+func (file) Lookup(id string) string { return id }
+
+// Unrelated calls Lookup on its own type and only mentions the package.
+func Unrelated() string {
+	var f file
+	_ = store.ErrNotFound
+	return f.Lookup("x")
+}
+`
+	user := `package web2
+
+import "example.com/app/store"
+
+// Handler holds the users table.
+type Handler struct{ users *store.Users }
+
+// Serve looks a user up.
+func (h *Handler) Serve(id string) string { return h.users.Lookup(id) }
+`
+	tree := fakeTree{"go.mod": callersGoMod, "store/s.go": store, "web/w.go": stranger, "web2/w.go": user}
+	got := callerNames(assembleCallers(t, tree, true, modifiedFile("store/s.go", store, 7)))
+	if want := "web2/w.go:Serve calls store.Users.Lookup"; strings.Join(got, ",") != want {
+		t.Fatalf("callers = %v, want %v", got, want)
 	}
 }
