@@ -58,6 +58,14 @@ Judge-free, with the keyword rule the callers corpus uses.
 
 ## 2. The `slop` class
 
+Status 2026-09-05: built. `config.ClassSlop`, the `review.slop` switch
+(`internal/config/config.go`), the prompt layer `prompt.SlopGuidance`
+with the nine rules and their exclusions, a dedicated expert
+(`experts/slop.md`), the gate that publishes the class by the switch
+alone, and the corpus `SlopFixtures` (five planted/control pairs,
+`make eval-slop`). The measurement is in `docs/findings.md` once the
+first run is recorded.
+
 "AI slop" has to be defined before it can be scored, and defined as things
 a reader can check, not as a feeling. Working list, each a finding with a
 line:
@@ -83,6 +91,11 @@ controls are silent.
 
 ## 3. `nitpick repo-score`
 
+Status 2026-09-05: built (`internal/fullreview/score.go`, the command in
+`cmd/nitpick/fullreview.go`). Three numbers per language with their
+denominators; `SlopThreshold` 2.0 weighted findings per thousand lines;
+acceptance `TestRepoScoreFixture` under `make eval-fullreview`.
+
 A number from `full-review` with the `slop` class on: slop findings per
 thousand lines, weighted by severity, reported with the count and the
 denominator beside it so the number is never read alone. Plus the same
@@ -95,6 +108,15 @@ planted slop and below it with the slop files removed; a known-clean
 repository (this one, at a tagged commit) scores below it.
 
 ## 4. `nitpick identify-model`
+
+Status 2026-09-05: the experiment exists (`internal/modelid`, corpus under
+`internal/evals/testdata/modelid` from `cmd/modelid-corpus`): six models
+from the sweep, twelve tasks, three languages, plus a human control from
+the Go and Python standard libraries (TypeScript has no offline human
+source here, and says so). `TestModelIdentificationExperiment` prints the
+confusion matrices for two task splits and the verdict against
+`GoMargin` 0.15 over the majority baseline. The command is built only
+on a go.
 
 Which model wrote a file. This is the one command whose premise needs a
 measurement before code: it is not known that current models leave a
