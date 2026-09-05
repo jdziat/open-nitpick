@@ -56,10 +56,15 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 	// having one finding on the Python control each.
 	{
 		g := readGrid(t, dump("multifile-callers-20260905T160208Z"), 2)
+		plants := callerPlants * g.runs
 		for _, arm := range []string{"+ctx", ""} {
-			if h, _, _ := g.tally(arm, callerDefects); h != 0 {
-				t.Errorf("floor run: %d hit(s) on arm %q; prose says 0/8 on both arms", h, arm)
+			if h, r, _ := g.tally(arm, callerDefects); h != 0 || r != len(CallerFixtures())*g.runs {
+				t.Errorf("floor run: %d hit(s) over %d reviews on arm %q; prose says 0/%d on both arms with no review lost", h, r, arm, plants)
 			}
+		}
+		words := map[int]string{4: "four", 8: "eight", 12: "twelve"}
+		if want := fmt.Sprintf("scores 0/%d on both arms, two runs, with the controls silent in all %s control reviews", plants, words[callerClean*g.runs*2]); !strings.Contains(prose, want) {
+			t.Errorf("prose lacks %q", want)
 		}
 		for f, d := range callerDefects {
 			if len(d) == 0 && g.findingsOn(f) != 0 {

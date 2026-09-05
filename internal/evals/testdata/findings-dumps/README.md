@@ -6,7 +6,8 @@ committed evidence in the sense `.gitignore` gives the phrase: the tables,
 the noise range, the lost and flipped fixtures, the floor, and the
 vocabulary claim in that section are re-derived from these files on every
 test run. Sentences the test does not derive (the Incumbent column, the
-first cut's attribution, the TypeScript anchor miss) are checked by hand
+rule the floor forced, the first cut's attribution, the TypeScript anchor
+miss) are checked by hand
 and say so where they appear. The full dumps, with every model and every
 field, stay under `.eval-runs/`, and each trim records its source's
 SHA-256 so a retrim is checkable by hand.
