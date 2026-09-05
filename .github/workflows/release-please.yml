@@ -1,0 +1,25 @@
+name: Release PR
+
+# Semantic releases from conventional commits: on every push to main,
+# release-please keeps one pull request open whose title carries the next
+# version, computed from the commit types since the last tag (feat: minor,
+# fix: patch, a "!" or BREAKING CHANGE footer: major), and whose body is the
+# changelog. Merging that pull request tags the release and creates it on
+# GitHub; release.yml then builds, signs and attaches the binaries.
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

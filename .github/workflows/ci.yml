@@ -85,3 +85,14 @@ jobs:
           python-version: "3.12"
       - run: pip install mkdocs-material==9.7.6
       - run: make docs
+
+  # Pull request commits follow Conventional Commits, which is what
+  # release-please reads to version and describe the next release.
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - run: scripts/check-commits.sh "origin/${{ github.base_ref }}..HEAD"

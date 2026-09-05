@@ -4,12 +4,17 @@ on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # Keyless signing: the workflow's OIDC identity is the signer, and a
+      # verifier checks the certificate against this repository and
+      # workflow rather than a key anyone could have copied.
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -28,6 +33,26 @@ jobs:
       - name: Build binaries
         run: make dist VERSION="$GITHUB_REF_NAME"
 
+      - name: Checksums
+        run: |
+          cd dist
+          [ -f checksums.txt ] || sha256sum -- * > checksums.txt
+
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.10.1
+
+      # One Sigstore bundle per asset, checksums included, so a verifier
+      # needs the asset, its bundle, and the identity below, nothing else:
+      #   cosign verify-blob --bundle FILE.sigstore.json \
+      #     --certificate-identity-regexp '^https://github.com/jdziat/open-nitpick/' \
+      #     --certificate-oidc-issuer https://token.actions.githubusercontent.com FILE
+      - name: Sign
+        run: |
+          cd dist
+          for f in *; do
+            case "$f" in *.sigstore.json) continue ;; esac
+            cosign sign-blob --yes --bundle "$f.sigstore.json" "$f"
+          done
+
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -40,3 +65,13 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
           fi
+
+      # The Action is used as @v1; the major tag follows every v1.x.y
+      # release so that pin gets the fixes without a rewrite.
+      - name: Move the major tag
+        if: ${{ !contains(github.ref_name, '-') }}
+        run: |
+          major="${GITHUB_REF_NAME%%.*}"
+          [ "$major" = "$GITHUB_REF_NAME" ] && exit 0
+          git tag -f "$major" "$GITHUB_REF_NAME"
+          git push -f origin "$major"

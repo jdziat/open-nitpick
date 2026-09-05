@@ -1288,6 +1288,27 @@ go test -race ./...
 make quick           # measure a prompt or analyzer change for a few cents (see below)
 ```
 
+### Commits and releases
+
+Commit subjects follow [Conventional Commits](https://www.conventionalcommits.org/):
+`feat(scope): what changed`, `fix: …`, `docs: …`, `evals: …`, `prompt: …`.
+CI checks every pull request's commits with `scripts/check-commits.sh`.
+On each push to main, release-please keeps one pull request open with the
+next version and its changelog; merging it tags the release. The release
+workflow then builds the binaries, writes `checksums.txt`, and signs every
+asset with Sigstore keyless signing, so a download is checkable against this
+repository's workflow identity and nothing else:
+
+```bash
+cosign verify-blob --bundle nitpick_v1.2.0_linux_amd64.sigstore.json \
+  --certificate-identity-regexp '^https://github.com/jdziat/open-nitpick/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  nitpick_v1.2.0_linux_amd64
+```
+
+The `v1` tag follows every `v1.x.y` release, which is what the Action's
+`@v1` pin relies on.
+
 ### Iterating cheaply
 
 `make quick` runs the tuning corpus and the multi-file corpus, judge-free,
