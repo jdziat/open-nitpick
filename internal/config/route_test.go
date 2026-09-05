@@ -52,7 +52,7 @@ func TestAPinFollowsItsModel(t *testing.T) {
 	if got := base.overlay(ModelSpec{Temperature: floatPtr(0)}); len(got.Providers) != 1 {
 		t.Errorf("the same model keeps the pin: %v", got.Providers)
 	}
-	if got := base.overlay(ModelSpec{Providers: []string{}}); got.Providers != nil && len(got.Providers) != 0 {
+	if got := base.overlay(ModelSpec{Providers: []string{}}); len(got.Providers) != 0 {
 		t.Errorf("an explicit empty list clears the pin: %v", got.Providers)
 	}
 	if got := base.overlay(ModelSpec{Model: "x", Providers: []string{"together"}}); len(got.Providers) != 1 || got.Providers[0] != "together" {
