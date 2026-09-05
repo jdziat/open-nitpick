@@ -8,8 +8,8 @@
 package llm
 
 import (
-	"log/slog"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
