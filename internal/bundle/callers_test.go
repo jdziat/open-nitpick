@@ -468,6 +468,8 @@ export class Client {
     cb();
   }
 
+  make() { return function () { return parseDuration("1s"); }; }
+
   async get(url: string, timeout: string = "30s"): Promise<Response> {
     while (true) {
       const signal = AbortSignal.timeout(parseDuration(timeout));
@@ -479,7 +481,7 @@ export class Client {
 	tree := fakeTree{"package.json": "{}", "src/duration.ts": duration, "src/http.ts": http}
 	plan := assembleCallers(t, tree, true, modifiedFile("src/duration.ts", duration, 2))
 	got := callerNames(plan)
-	want := []string{"src/http.ts:get calls duration.parseDuration", "src/http.ts:handler calls duration.parseDuration"}
+	want := []string{"src/http.ts:get calls duration.parseDuration", "src/http.ts:handler calls duration.parseDuration", "src/http.ts:make calls duration.parseDuration"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("callers = %v, want %v", got, want)
 	}
@@ -649,6 +651,7 @@ func TestCallersPythonFencesInCommentsAndStringsDoNotOpenADocstring(t *testing.T
 
 # Docstrings in this project use """ style.
 SEP = '"""'
+PAIR = 'a''b'
 
 
 def handler(conn):

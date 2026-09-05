@@ -209,6 +209,9 @@ var (
 	slashTail  = regexp.MustCompile(`//.*$`)
 	hashTail   = regexp.MustCompile(`#.*$`)
 	blockSpan  = regexp.MustCompile(`/\*.*?\*/`)
+	// fenceOrSpan matches a Python triple-quote fence before it can be
+	// read as an empty string plus a quote.
+	fenceOrSpan = regexp.MustCompile(`"""|'''|` + quotedSpan.String())
 )
 
 // codeLines returns a copy of lines with string literals and comments
@@ -229,11 +232,15 @@ func codeLines(lines []string, hashComments bool) []string {
 			// quote and still counts one.
 			probe := line
 			if !inDoc {
-				// Each quoted span keeps its own quote characters, so an
-				// empty `''` is not rewritten to `""` and a `'''` fence
-				// still counts as one.
-				probe = hashTail.ReplaceAllString(quotedSpan.ReplaceAllStringFunc(line, func(q string) string {
-					return q[:1] + q[len(q)-1:]
+				// A fence passes through to be counted; any other quoted
+				// span is replaced by a space, so it leaves no quote behind
+				// to re-pair with a neighbour (`'a''b'` would otherwise
+				// collapse to four quotes and read as a fence).
+				probe = hashTail.ReplaceAllString(fenceOrSpan.ReplaceAllStringFunc(line, func(q string) string {
+					if q == `"""` || q == `'''` {
+						return q
+					}
+					return " "
 				}), "")
 			}
 			fences := strings.Count(probe, `"""`) + strings.Count(probe, `'''`)
@@ -797,12 +804,15 @@ var (
 	// tsMethodDef is a class member with a body: a method, an accessor, or a
 	// property holding a function, at any indentation.
 	// The parameter list admits one level of nested parens, so a callback
-	// type (`run(cb: () => void) {`) is a method; a call whose last
-	// argument is a function (`setTimeout(function () {`,
-	// `it('x', function () {`) is not, because tsMethodAt rejects the
-	// `function` keyword inside the header. Quoted spans are blanked
-	// before matching, so a string default is fine. The arrow branch is
-	// also anchored by its `=>`.
+	// type (`run(cb: () => void) {`) is a method. A call whose last
+	// argument is a callback is not: with an arrow (`it('x', () => {`) the
+	// outer paren never closes on the line, and with `function` the
+	// keyword sits inside the header, which tsMethodAt rejects. Quoted
+	// spans are blanked before matching, so a string default is fine. Two
+	// shapes still fall back to the enclosing class, the safe direction:
+	// two levels of nesting in a parameter type, and a function-typed
+	// return annotation (`make(): (a: number) => string {`). The arrow
+	// branch is anchored by its `=>`.
 	tsMethodDef = regexp.MustCompile(`^\s+(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*(?:\*\s*)?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*(?:\((?:[^()]|\([^()]*\))*\)\s*(?::[^{=]+)?\s*\{|=\s*(?:async\s*)?(?:\((?:[^()]|\([^()]*\))*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)`)
 )
 
@@ -857,7 +867,9 @@ var tsKeywords = map[string]bool{
 func tsMethodAt(line string) bool {
 	blank := quotedSpan.ReplaceAllStringFunc(line, func(q string) string { return q[:1] + q[len(q)-1:] })
 	m := tsMethodDef.FindStringSubmatch(blank)
-	return m != nil && !tsKeywords[m[1]] && !tsFunctionWord.MatchString(blank)
+	// The keyword is looked for in the header alone (m[0]), not the whole
+	// line: a one-line method that returns a function is still a method.
+	return m != nil && !tsKeywords[m[1]] && !tsFunctionWord.MatchString(m[0])
 }
 
 var tsFunctionWord = regexp.MustCompile(`\bfunction\b`)
