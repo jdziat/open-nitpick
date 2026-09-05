@@ -1,0 +1,20 @@
+{
+  "fixture": "python-clean-logged-and-reraised",
+  "findings": [
+    {
+      "path": "app/orders.py",
+      "line": 18,
+      "end_line": 21,
+      "severity": "warning",
+      "category": "Data Integrity \u0026 Integration",
+      "class": "correctness",
+      "title": "Preserve partial charge state before re-raising.",
+      "rationale": "charge_all stores successful receipts locally, then re-raises GatewayError before returning them. A retry can therefore charge earlier orders twice if gateway.charge is not idempotent. Preserve partial receipts in the exception or result, or use a stable per-order idempotency key such as order.id.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-05T20:43:00Z",
+  "mode": "plaintext",
+  "fingerprint": "7b56fa6b55e9b152ee3085ba01efd9b8a65216834c424b62ab717af0b04f7154",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3229187981\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Data Integrity \u0026 Integration]\n  → app/orders.py:18-21\n\n  Preserve partial charge state before re-raising.\n\n  charge_all stores successful receipts locally, then re-raises\n  GatewayError before returning them. A retry can therefore charge earlier\n  orders twice if gateway.charge is not idempotent. Preserve partial\n  receipts in the exception or result, or use a stable per-order idempotency\n  key such as order.id.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - app/orders.py\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 6s elapsed\nFinishing analysis tools... 15s elapsed\nWriting review comments... 15s elapsed\n"
+}

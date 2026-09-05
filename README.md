@@ -77,6 +77,7 @@ turn into a clickable link.
 nitpick full-review                     # every file git knows about, the model on every batch
 nitpick full-review internal/vcs cmd    # only these paths
 nitpick full-review -budget 200000      # stop after ~200k tokens of source, and say what was left
+nitpick repo-score                      # the same, plus slop, bug and security findings per thousand lines
 ```
 
 `full-review` reads the working tree as one change that adds every file, so
@@ -88,7 +89,35 @@ review. The output is the review, then a remediation plan ordered most
 severe first with findings that share a fix grouped and the files each
 touches counted, then what was not covered: files past the budget, and
 files left out for being binary, empty or oversized. The default is the
-whole tree; `-budget` is for a first look, and its report says so.
+whole tree; `-budget` is for a first look, and its report says so. A tree
+review also asks for the slop class, described below.
+
+`repo-score` adds three numbers per language, each with its count and its
+denominator beside it so none is read alone: slop, bug and security
+findings weighted by severity (critical 8, error 4, warning 2, info 1, nit
+0.5) per thousand lines reviewed. Known advisories are listed, not scored.
+A threshold on the slop rate names when a repository reads as generated
+and left unread; the fixture that set it is in `internal/evals`.
+
+### The slop class
+
+`review.slop: true` asks the model for, and publishes, findings in a tenth
+class, `slop`: code that reads as generated and left unread, where the cost
+to the next reader can be named. It is nine rules a reader can check on the
+line, each with the lookalike it excludes: a comment that restates the line
+below it; a comment describing behaviour the code lacks; dead code beside
+its replacement; a check against a condition the types exclude; an error
+swallowed and carried on from; generic naming where the file has a specific
+word; boilerplate repeated three times where the language has the
+abstraction; prose that addresses the reader as a chat reply; a test that
+asserts nothing. The rules are the prompt layer `prompt.SlopGuidance`, and
+`nitpick explain-config` prints them when the switch is on.
+
+It is off by default in a review, whatever the nitpick level, and on in
+`full-review` and `repo-score`. Its corpus (`make eval-slop`) is five
+planted/control pairs, and the number that matters is silence on the
+controls: a human-written file with a plain comment is what the class is
+measured against.
 
 ### GitHub Actions
 
@@ -237,6 +266,7 @@ review:
   incremental: true                # on a re-run, read only what changed since the last review
   related_context: true            # default: attach imported definitions used on changed lines (see below)
   related_context_callers: false   # default: also walk the repository for callers of what the change redefines
+  slop: false                      # default: also report the slop class (see "The slop class" below)
   max_files: 60
   token_budget_per_request: 60000  # per model CALL; raise it for large-context models
   include_full_files: true         # send whole files, not just hunks

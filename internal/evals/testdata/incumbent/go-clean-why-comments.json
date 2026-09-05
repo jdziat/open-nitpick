@@ -1,0 +1,19 @@
+{
+  "fixture": "go-clean-why-comments",
+  "findings": [
+    {
+      "path": "billing/invoice.go",
+      "line": 16,
+      "severity": "warning",
+      "category": "Functional Correctness",
+      "class": "correctness",
+      "title": "Prevent overflow in the invoice total.",
+      "rationale": "Invoice.Cents accepts any int64, so total += inv.Cents can overflow and return an incorrect total. Define an overflow policy: return an error when the sum exceeds the int64 range, or use a wider numeric representation. Add positive and negative overflow tests.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-05T20:40:28Z",
+  "mode": "plaintext",
+  "fingerprint": "55bbe4d90e7b4b8a31ec8f6249ec3d1bc1f19c7351a24cd3c169da999bbd20d1",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-4219906328\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Functional Correctness]\n  → billing/invoice.go:16\n\n  Prevent overflow in the invoice total.\n\n  Invoice.Cents accepts any int64, so total += inv.Cents can overflow\n  and return an incorrect total. Define an overflow policy: return an error\n  when the sum exceeds the int64 range, or use a wider numeric\n  representation. Add positive and negative overflow tests.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - billing/invoice.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 16s elapsed\nWriting review comments... 16s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}
