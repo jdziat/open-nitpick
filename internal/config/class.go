@@ -97,10 +97,24 @@ var defectClasses = []Class{
 // level is a superset of the one before it, so narrowing never needs a finding
 // that was not generated.
 var allowedClasses = map[NitpickLevel]map[Class]bool{
-	NitpickOff:      classSet(defectClasses...),
-	NitpickMinimal:  classSet(append(append([]Class{}, defectClasses...), ClassContract)...),
-	NitpickNormal:   classSet(append(append([]Class{}, defectClasses...), ClassContract, ClassTests, ClassMaintainability)...),
-	NitpickPedantic: classSet(append(Classes(), ClassUnknown)...),
+	NitpickOff:     classSet(defectClasses...),
+	NitpickMinimal: classSet(append(append([]Class{}, defectClasses...), ClassContract)...),
+	NitpickNormal:  classSet(append(append([]Class{}, defectClasses...), ClassContract, ClassTests, ClassMaintainability)...),
+	// Pedantic is every class but slop: that one is published by
+	// review.slop alone, so no level's set holds it.
+	NitpickPedantic: classSet(append(levelClasses(), ClassUnknown)...),
+}
+
+// levelClasses is Classes without ClassSlop, the one class no nitpick level
+// publishes.
+func levelClasses() []Class {
+	var out []Class
+	for _, c := range Classes() {
+		if c != ClassSlop {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func classSet(cs ...Class) map[Class]bool {

@@ -1,0 +1,19 @@
+{
+  "fixture": "go-slop-type-excluded-check",
+  "findings": [
+    {
+      "path": "page/size.go",
+      "line": 22,
+      "severity": "warning",
+      "category": "Functional Correctness",
+      "class": "correctness",
+      "title": "Replace the tautological page check.",
+      "rationale": "n != 0 || n == 0 is true for every integer. The fallback at Line [25] is unreachable, and Offset(0) returns -s.rows. For the existing one-based formula, check that n \u003e 0 before calculating the offset.\n\nProposed fix\n\n-\tif n != 0 || n == 0 { +\tif n \u003e 0 { return (n - 1) * s.rows } return 0",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-05T20:46:47Z",
+  "mode": "plaintext",
+  "fingerprint": "691ce5c9d1474b17ef492ab2ab500c7f9e77a178cbf4d96930d7f51f2fd398e4",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2858715458\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Functional Correctness]\n  → page/size.go:22\n\n  Replace the tautological page check.\n\n  n != 0 || n == 0 is true for every integer. The fallback at Line [25] is\n  unreachable, and Offset(0) returns -s.rows. For the existing one-based\n  formula, check that n \u003e 0 before calculating the offset.\n\n\n  Proposed fix\n\n  -\tif n != 0 || n == 0 {\n  +\tif n \u003e 0 {\n  \t\treturn (n - 1) * s.rows\n  \t}\n  \treturn 0\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - page/size.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\n"
+}

@@ -1,0 +1,26 @@
+{
+  "fixture": "python-slop-test-asserts-nothing",
+  "findings": [
+    {
+      "path": "tests/test_slug.py",
+      "line": 5,
+      "end_line": 6,
+      "also_at": [
+        {
+          "line": 10,
+          "end_line": 11
+        }
+      ],
+      "severity": "info",
+      "category": "Functional Correctness",
+      "class": "correctness",
+      "title": "Assert the returned slug values.",
+      "rationale": "test_slug always passes because assert True does not check slug. test_slug_runs_on_empty discards result, which also triggers Ruff B018. Replace both with assertions against the expected return values.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-05T20:49:19Z",
+  "mode": "plaintext",
+  "fingerprint": "ca38376e8163664c0fd3c01b366bc97598cacc56e8fb19747f8f97f2c8a61ae1",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3749051721\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  minor [Functional Correctness]\n  → tests/test_slug.py:5-6\n\n  Assert the returned slug values.\n\n  test_slug always passes because assert True does not check slug.\n  test_slug_runs_on_empty discards result, which also triggers Ruff\n  B018. Replace both with assertions against the expected return values.\n\n\n\n\n\n  Also applies to: 10-11\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMinor    1\n\n1 file reviewed:\n  - tests/test_slug.py\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 19s elapsed\nWriting review comments... 19s elapsed\n"
+}

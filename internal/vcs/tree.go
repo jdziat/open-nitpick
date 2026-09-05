@@ -103,6 +103,9 @@ func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 	var out bytes.Buffer
 	spent := 0
 	for _, name := range names {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if !t.wanted(name) {
 			continue
 		}

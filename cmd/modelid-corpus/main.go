@@ -7,6 +7,10 @@
 //
 //	modelid-corpus -out internal/evals/testdata/modelid -models a,b,c
 //
+// Files are written with a trailing .txt so that nothing treats the corpus
+// as source: it is data, and a formatter or vet run over the tree must not
+// reformat or fail on it.
+//
 // The OpenRouter key comes from the environment (OPENROUTER_API_KEY or
 // LLM_API_KEY), as for the eval harness. Files already present are not
 // regenerated, so a run can be resumed.
@@ -76,7 +80,7 @@ func main() {
 					if stop {
 						return
 					}
-					path := filepath.Join(out, modelid.Slug(id), lang.Name, fmt.Sprintf("%02d%s", i, lang.Ext))
+					path := filepath.Join(out, modelid.Slug(id), lang.Name, fmt.Sprintf("%02d%s.txt", i, lang.Ext))
 					if _, err := os.Stat(path); err == nil {
 						continue
 					}
@@ -149,7 +153,7 @@ func sampleHuman(out string) (int, error) {
 			continue
 		}
 		var candidates []string
-		_ = filepath.WalkDir(root.dir, func(p string, d os.DirEntry, err error) error {
+		walkErr := filepath.WalkDir(root.dir, func(p string, d os.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				if d != nil && d.IsDir() && (strings.Contains(p, "testdata") || strings.Contains(p, "test") || strings.Contains(p, "vendor") || strings.Contains(p, "site-packages")) {
 					return filepath.SkipDir
@@ -165,6 +169,12 @@ func sampleHuman(out string) (int, error) {
 			candidates = append(candidates, p)
 			return nil
 		})
+		if walkErr != nil {
+			return n, fmt.Errorf("%s control under %s: %w", lang, root.dir, walkErr)
+		}
+		if len(candidates) < len(modelid.Tasks) {
+			return n, fmt.Errorf("%s control under %s: %d candidate files, fewer than the %d tasks", lang, root.dir, len(candidates), len(modelid.Tasks))
+		}
 		r.Shuffle(len(candidates), func(i, j int) { candidates[i], candidates[j] = candidates[j], candidates[i] })
 		for i := 0; i < len(modelid.Tasks) && i < len(candidates); i++ {
 			data, err := os.ReadFile(candidates[i])
@@ -174,7 +184,7 @@ func sampleHuman(out string) (int, error) {
 			if strings.Contains(string(data), "DO NOT EDIT") {
 				continue
 			}
-			path := filepath.Join(out, "human", lang, fmt.Sprintf("%02d%s", i, root.ext))
+			path := filepath.Join(out, "human", lang, fmt.Sprintf("%02d%s.txt", i, root.ext))
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				return n, err
 			}
