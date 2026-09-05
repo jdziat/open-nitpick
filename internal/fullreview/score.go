@@ -33,10 +33,12 @@ func weight(severity string) float64 {
 		return 4
 	case config.SeverityWarning:
 		return 2
-	case config.SeverityInfo:
-		return 1
-	default:
+	case config.SeverityNit:
 		return 0.5
+	default:
+		// Info, and any vocabulary the scale does not know, which the
+		// severity ranking reads as info too.
+		return 1
 	}
 }
 
