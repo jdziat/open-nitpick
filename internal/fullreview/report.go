@@ -125,7 +125,10 @@ func RemediationPlan(findings []review.Finding) string {
 		if ordered[i].class != ordered[j].class {
 			return classOrder(ordered[i].class) < classOrder(ordered[j].class)
 		}
-		return ordered[i].first < ordered[j].first
+		if ordered[i].first != ordered[j].first {
+			return ordered[i].first < ordered[j].first
+		}
+		return ordered[i].title < ordered[j].title
 	})
 
 	var b strings.Builder

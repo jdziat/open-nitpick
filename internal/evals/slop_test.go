@@ -41,7 +41,11 @@ func TestSlopCorpusIsWellFormed(t *testing.T) {
 			// past it: this corpus sits outside the registries that check
 			// anchors for the others.
 			lines := strings.Split(content, "\n")
-			want := slopAnchors[f.Name]
+			want, known := slopAnchors[f.Name]
+			if !known {
+				t.Errorf("%s: no entry in slopAnchors; add the text of its anchored line", f.Name)
+				continue
+			}
 			if d.Line < 1 || d.Line > len(lines) || !strings.Contains(lines[d.Line-1], want) {
 				got := ""
 				if d.Line >= 1 && d.Line <= len(lines) {
