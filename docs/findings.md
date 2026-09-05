@@ -1060,3 +1060,45 @@ named and sends excerpts to a third party, which an operator should choose
 knowing both that and the numbers above. The harness turns both on for
 its `+ctx` arm and both off otherwise, whatever the defaults are.
 
+## The slop class (2026-09-05, evening)
+
+A tenth finding class, `slop`: generated-looking code that costs a reader,
+defined as nine rules a reader can check on the line, each with the
+lookalike it excludes (`prompt.SlopGuidance`). It is published by
+`review.slop` alone, never by the nitpick level, and it ships off in a
+review and on in `full-review` and `repo-score`. The decision that it stays
+off until its controls are silent was taken before the first run.
+
+**The corpus.** Five planted/control pairs (`SlopFixtures`): a Go function
+whose every comment restates its line, against one whose comments say why;
+a Python loop that swallows every exception, against one that records and
+re-raises; a TypeScript chat reply pasted as a doc comment, against a doc
+comment; a Go condition that is always true beside a guard the constructor
+already makes, against a real guard; a Python test that asserts nothing,
+against one that asserts. Keywords name details only the fixture holds,
+since the prompt carries the rules' own words; the sweep in
+`TestNoPlantedKeywordAppearsInTheShippedPrompt` covers the slop layer too.
+
+**One run, judge-free, `NITPICK_EVAL_SLOP=1`
+(`multifile-tuning-20260905T203723Z`):**
+
+| contender | RECALL | NOISE / review | findings on the five controls | $ / review |
+|---|---|---|---|---|
+| Kimi-K3 (Synthetic) + related context | 0.80 (4/5) | 0.20 | 0 | $0.016 |
+| glm-5.3-flash | 0.80 (4/5) | 0.20 | 1 | $0.0013 |
+| Kimi-K3 (Synthetic) | 0.80 (4/5) | 0.40 | 2 | $0.026 |
+| glm-5.3-flash + related context | 0.60 (3/5) | 0.30 | 0 | $0.0008 |
+| incumbent/cli | 0.60 (3/5) | 0.50 | 1 | |
+
+The plants every contender found are the swallowed exception, the chat
+prose and the always-true condition. The restating comments were found
+by Kimi-K3 with related context only; the test that asserts nothing was
+found by everyone but that same configuration. Each miss is a run of one,
+so nothing here separates a rule from run-to-run variance yet. The number
+the class is measured against is the control column: Kimi-K3 with related
+context and glm with related context were silent on all five; the other
+three configurations each flagged a human-written lookalike at least once.
+That is why the class stays off by default, and what a second run has to
+improve on before the default is revisited. Rule 15 applies in full: five
+pairs, written the same day as the rules, by the same hand.
+
