@@ -321,7 +321,8 @@ func EveryFixture() []Fixture {
 	all := AllFixtures()
 	all = append(all, MultiFileFixtures()...)
 	all = append(all, InfoFixtures()...)
-	return append(all, CallerFixtures()...)
+	all = append(all, CallerFixtures()...)
+	return append(all, SlopFixtures()...)
 }
 
 // contractBreakFixture renames the wire name of a field on a public payload.

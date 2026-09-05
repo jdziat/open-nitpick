@@ -54,6 +54,7 @@ func TestFullReviewFixture(t *testing.T) {
 	cfg := evalConfig(model)
 	cfg.Review.RelatedContext = true
 	cfg.Review.RelatedContextCallers = true
+	cfg.Review.Slop = true
 	cfg.Review.MaxFiles = 1 << 30
 	cfg.Review.Incremental = false
 	cfg.Linters.Mode = config.LinterAuto

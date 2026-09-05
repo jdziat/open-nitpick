@@ -60,6 +60,7 @@ func runFullReview(ctx context.Context, args []string) error {
 	// lifted for the same reason; the token budget still bounds each call.
 	cfg.Review.RelatedContext = true
 	cfg.Review.RelatedContextCallers = true
+	cfg.Review.Slop = true
 	cfg.Review.MaxFiles = 1 << 30 // the whole tree is the point; -budget bounds it
 	cfg.Review.Incremental = false
 

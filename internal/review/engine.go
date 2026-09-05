@@ -1457,7 +1457,7 @@ func (e *Engine) capAnalyzerFindings(findings []Finding) []Finding {
 // wants to hear about, and min_severity decides how serious a problem has to be
 // once it is a kind they want.
 func (e *Engine) applyGate(findings []Finding) []Finding {
-	kept, dropped := Filter(findings, e.Config.Persona.Nitpick, e.Config.Review.MinSeverity)
+	kept, dropped := FilterWith(findings, e.Config.Persona.Nitpick, e.Config.Review.MinSeverity, e.Config.Review.Slop)
 
 	for _, f := range dropped {
 		e.log().Debug("dropped finding outside the configured policy",
@@ -1477,8 +1477,22 @@ func (e *Engine) applyGate(findings []Finding) []Finding {
 // A filter that could only be exercised by making a model call would not
 // deliver that.
 func Filter(findings []Finding, level config.NitpickLevel, minimum config.Severity) (kept, dropped []Finding) {
+	return FilterWith(findings, level, minimum, false)
+}
+
+// FilterWith is Filter with the slop switch: the slop class is published by
+// review.slop alone, at whatever nitpick level, and never without it.
+func FilterWith(findings []Finding, level config.NitpickLevel, minimum config.Severity, slop bool) (kept, dropped []Finding) {
 	for _, f := range findings {
 		switch {
+		case f.Cls() == config.ClassSlop && !slop:
+			dropped = append(dropped, f)
+		case f.Cls() == config.ClassSlop:
+			if f.Sev().AtLeast(minimum) {
+				kept = append(kept, f)
+			} else {
+				dropped = append(dropped, f)
+			}
 		case !level.Publishes(f.Cls()):
 			dropped = append(dropped, f)
 		case !f.Sev().AtLeast(minimum):
@@ -1630,9 +1644,14 @@ func (e *Engine) reviewPromptFor(client *llm.Client) (string, error) {
 		}
 		modelText = prompt.ModelGuidance(model)
 	}
+	var slopText string
+	if e.Config.Review.Slop {
+		slopText = prompt.SlopGuidance()
+	}
 	p, err := prompt.Build(prompt.NameReview, prompt.Options{
 		PersonaText: prompt.Persona(e.Config.Persona),
 		ModelText:   modelText,
+		SlopText:    slopText,
 		Run:         e.Instruction,
 	})
 	if err != nil {

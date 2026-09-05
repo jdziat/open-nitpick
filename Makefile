@@ -115,6 +115,11 @@ TUNING := go-nil-deref,go-sql-injection,go-hardcoded-secret,python-command-injec
 
 # Every fixture in evals.CallerFixtures(): the change is the contract and the
 # file it breaks is untouched. TestTheMakefileNamesTheWholeCallersCorpus pins it.
+# Every fixture in evals.SlopFixtures(): planted/control pairs for the slop
+# class. Run with NITPICK_EVAL_SLOP=1 (make eval-slop), or the plants are in a
+# class the review never asks for.
+SLOP := go-slop-restating-comments,go-clean-why-comments,python-slop-swallowed-exception,python-clean-logged-and-reraised,ts-slop-chat-prose,ts-clean-doc-comment,go-slop-type-excluded-check,go-clean-real-guard,python-slop-test-asserts-nothing,python-clean-test-asserts
+
 CALLERS := go-error-identity-changed,go-clean-wrapped-sentinel,go-return-units-changed,python-precondition-added,python-clean-precondition-satisfied,ts-return-units-changed
 
 # Every fixture in evals.InfoFixtures(): the band no reviewer had located.
@@ -309,6 +314,12 @@ quick:
 eval-fullreview:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
 	go test -tags=eval -count=1 -timeout=30m -v -run TestFullReviewFixture ./internal/evals/
+
+# The slop corpus, judge-free, with review.slop on: recall over the plants
+# and, above all, silence on the controls.
+.PHONY: eval-slop
+eval-slop:
+	NITPICK_EVAL_SLOP=1 $(MAKE) benchmark-multifile FIXTURES='$(SLOP)' MODELS='$(or $(MODELS),z-ai/glm-5.3-flash)' RUNS='$(or $(RUNS),1)'
 
 .PHONY: benchmark-multifile
 benchmark-multifile:

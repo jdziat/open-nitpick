@@ -42,6 +42,12 @@ const (
 	ClassMaintainability Class = "maintainability"
 	// ClassStyle is naming, documentation, idiom, and consistency.
 	ClassStyle Class = "style"
+	// ClassSlop is generated-looking code that costs a reader: a comment that
+	// restates its line, a check against a condition the types exclude, an
+	// error swallowed and carried on from, a test that asserts nothing. It is
+	// published by review.slop alone, never by the nitpick level, so a team
+	// that has not asked for it never sees it.
+	ClassSlop Class = "slop"
 
 	// ClassUnknown is where an unrecognized class lands.
 	//
@@ -59,6 +65,7 @@ func Classes() []Class {
 	return []Class{
 		ClassCorrectness, ClassConcurrency, ClassSecurity, ClassResource,
 		ClassDataLoss, ClassContract, ClassTests, ClassMaintainability, ClassStyle,
+		ClassSlop,
 	}
 }
 

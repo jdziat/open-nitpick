@@ -25,13 +25,15 @@ var advisoryID = regexp.MustCompile(`^(GHSA-|CVE-|PYSEC-|GO-\d|RUSTSEC-|OSV-|MAL
 // bugs. Each section says when it is empty, since an absent heading reads
 // as "not looked at".
 func Sections(report *review.Report) string {
-	var advisories, security, bugs []review.Finding
+	var advisories, security, bugs, slop []review.Finding
 	for _, f := range report.Findings {
 		switch {
 		case f.FromAnalyzer && advisoryID.MatchString(f.Source):
 			advisories = append(advisories, f)
 		case f.Class == string(config.ClassSecurity):
 			security = append(security, f)
+		case f.Class == string(config.ClassSlop):
+			slop = append(slop, f)
 		default:
 			bugs = append(bugs, f)
 		}
@@ -42,7 +44,7 @@ func Sections(report *review.Report) string {
 			setAside = append(setAside, d)
 		}
 	}
-	for _, list := range [][]review.Finding{advisories, security, bugs} {
+	for _, list := range [][]review.Finding{advisories, security, bugs, slop} {
 		sort.SliceStable(list, func(i, j int) bool {
 			ri, rj := config.Severity(list[i].Severity).Rank(), config.Severity(list[j].Severity).Rank()
 			if ri != rj {
@@ -68,6 +70,7 @@ func Sections(report *review.Report) string {
 	}
 	writeSection(&b, "Security risks", security)
 	writeSection(&b, "Bugs", bugs)
+	writeSection(&b, "AI slop (rule by rule; see the slop layer of the prompt)", slop)
 	return b.String()
 }
 
