@@ -79,7 +79,7 @@ func runFullReview(ctx context.Context, args []string) error {
 	// is the policy.
 	engine.Policy = nil
 	report, err := engine.Review(ctx, ref)
-	if err != nil && !(errors.Is(err, review.ErrPublish) && report != nil) {
+	if err != nil && (!errors.Is(err, review.ErrPublish) || report == nil) {
 		return err
 	}
 

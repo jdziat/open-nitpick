@@ -64,6 +64,7 @@ func NewTree(local *Local, paths []string) *Tree {
 	return &Tree{Local: local, Paths: clean}
 }
 
+// Name identifies the provider in logs and the review header.
 func (t *Tree) Name() string { return "tree" }
 
 // Diff lists the tree and renders every included file as an addition.
