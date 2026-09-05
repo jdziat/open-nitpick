@@ -29,8 +29,8 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 	if len(section) != 2 {
 		t.Fatal("findings.md has no callers section")
 	}
-	// Bold markers are typography, not content.
-	prose := strings.ReplaceAll(section[1], "**", "")
+	// Bold markers are typography, not content, and a line break is a space.
+	prose := strings.Join(strings.Fields(strings.ReplaceAll(section[1], "**", "")), " ")
 
 	dump := func(stem string) string {
 		return filepath.Join("testdata", "findings-dumps", stem+".jsonl")
@@ -39,27 +39,53 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 	// Callers corpus: two runs each; recall over 8 plants, noise per review
 	// over 12 reviews, controls silent.
 	callerDefects := map[string][]Defect{}
+	callerPlants := 0
 	for _, f := range CallerFixtures() {
 		callerDefects[f.Name] = f.Defects
+		callerPlants += len(f.Defects)
 	}
+	var diffNoiseRates []float64
 	for _, c := range []struct{ stem, label string }{
 		{"multifile-callers-20260905T163816Z", "| glm + callers, first cut |"},
 		{"multifile-callers-20260905T164614Z", "| glm + callers, constants attached |"},
 	} {
 		g := readGrid(t, dump(c.stem), 2)
+		for f := range callerDefects {
+			if !g.fixtures[f] {
+				t.Fatalf("%s: fixture %s is not in the dump; the corpus has moved since it was taken", c.stem, f)
+			}
+		}
+		plants := callerPlants * g.runs
 		hits, reviews, noise := g.tally("+ctx", callerDefects)
-		row := fmt.Sprintf("%s %.2f (%d/8) | %.2f |", c.label, float64(hits)/8, hits, float64(noise)/float64(reviews))
+		row := fmt.Sprintf("%s %.2f (%d/%d) | %.2f |", c.label, float64(hits)/float64(plants), hits, plants, float64(noise)/float64(reviews))
 		if !strings.Contains(prose, row) {
 			t.Errorf("%s: prose lacks the row the dump gives: %q", c.stem, row)
 		}
-		if h, _, _ := g.tally("", callerDefects); h != 0 || !strings.Contains(prose, "| glm, diff only | 0.00 (0/8) |") {
-			t.Errorf("%s: diff-only hits = %d, prose says 0/8", c.stem, h)
+		h, r, n := g.tally("", callerDefects)
+		if h != 0 {
+			t.Errorf("%s: diff-only hits = %d, prose says 0/%d", c.stem, h, plants)
 		}
+		diffNoiseRates = append(diffNoiseRates, float64(n)/float64(r))
 		for _, f := range []string{"go-clean-wrapped-sentinel", "python-clean-precondition-satisfied"} {
 			if n := g.findingsOn(f); n != 0 {
 				t.Errorf("%s: %d finding(s) on control %s; prose says our controls were silent", c.stem, n, f)
 			}
 		}
+	}
+
+	// The rerun after the rewrite is cited as agreeing with the constants
+	// row; it has no row of its own, so the sentence is checked instead.
+	{
+		g := readGrid(t, dump("multifile-callers-20260905T170221Z"), 2)
+		hits, reviews, noise := g.tally("+ctx", callerDefects)
+		plants := callerPlants * g.runs
+		if got := fmt.Sprintf("%.2f and %.2f again", float64(hits)/float64(plants), float64(noise)/float64(reviews)); !strings.Contains(prose, got) {
+			t.Errorf("prose lacks %q, which the rerun dump gives", got)
+		}
+	}
+	sort.Float64s(diffNoiseRates)
+	if row := fmt.Sprintf("| glm, diff only | 0.00 (0/%d) | %.2f – %.2f |", callerPlants*2, diffNoiseRates[0], diffNoiseRates[len(diffNoiseRates)-1]); !strings.Contains(prose, row) {
+		t.Errorf("prose lacks the diff-only callers row the dumps give: %q", row)
 	}
 
 	// Multi-file regression: three runs across two dumps.
@@ -80,7 +106,7 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 	}
 	walkHits, walkLost, diffHits, diffLost := 0, 0, 0, 0
 	subsetWalk, subsetDiff, subsetN := 0, 0, 0
-	var regressed, mustName []string
+	var regressed, mustName, mustSay []string
 	for f := range planted {
 		w, wl := g.perFixture(f, "+ctx")
 		d, dl := g.perFixture(f, "")
@@ -98,12 +124,35 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 		}
 		// Every fixture with a lost review on either arm, and every one the
 		// diff-only arm never located while the walk always did, is a
-		// sentence in the prose.
-		if wl > 0 || dl > 0 || (d == 0 && w == g.runs) {
+		// sentence in the prose, and the count in that sentence is checked.
+		switch {
+		case dl == 2:
+			mustSay = append(mustSay, "`"+f+"`, which the diff-only arm missed in its one completed run and lost twice")
+		case dl == 1:
+			mustSay = append(mustSay, "`"+f+"`, which lost one diff-only run")
+		case d == 0 && w == g.runs:
+			mustName = append(mustName, f)
+		case d == 1 && w == g.runs:
+			mustSay = append(mustSay, "`"+f+"` in two of three")
+		}
+		if wl > 0 {
 			mustName = append(mustName, f)
 		}
 	}
 	sort.Strings(regressed)
+	// The walk-on arm's lost reviews are on clean controls only, which is
+	// why its denominator is the planted count; the prose says so.
+	for f := range g.fixtures {
+		if planted[f] {
+			continue
+		}
+		if _, l := g.perFixture(f, "+ctx"); l > 0 && !strings.Contains(prose, "the walk-on loss is the Python clean control") {
+			t.Errorf("walk-on lost a review on control %s; the prose does not say so", f)
+		}
+	}
+	if !strings.Contains(prose, fmt.Sprintf("leaves the denominator at %d", len(planted)*g.runs)) {
+		t.Errorf("prose does not state the walk-on denominator")
+	}
 	total := len(planted) * g.runs
 	_, walkReviews, walkNoise := g.tally("+ctx", multiDefects)
 	_, diffReviews, diffNoise := g.tally("", multiDefects)
@@ -125,6 +174,23 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 			t.Errorf("prose does not name %s, which the grid singles out", f)
 		}
 	}
+	for _, sentence := range mustSay {
+		if !strings.Contains(prose, sentence) {
+			t.Errorf("prose lacks %q, which the grid gives", sentence)
+		}
+	}
+	// A regression to a silent review is described as one.
+	var silentLosses []string
+	for _, f := range regressed {
+		for run := 0; run < g.runs; run++ {
+			if g.present(f, "+ctx", run) && !g.hit(f, "+ctx", run) && g.finding(f, "+ctx", run) == nil {
+				silentLosses = append(silentLosses, "`"+f+"`")
+			}
+		}
+	}
+	if want := strings.Join(silentLosses, " and ") + " to a silent review"; !strings.Contains(prose, want) {
+		t.Errorf("prose lacks %q", want)
+	}
 	// The python-retry loss is a finding on the plant line whose wording
 	// misses the keywords: the quoted phrases must be in the finding, the
 	// quoted keywords in the plant, and no keyword in the finding.
@@ -138,13 +204,13 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 	text := strings.ToLower(deref(r.Title) + " " + r.Rationale)
 	for _, phrase := range []string{"double-charging", "issued again"} {
 		if !strings.Contains(prose, `"`+phrase+`"`) || !strings.Contains(text, phrase) {
-			t.Errorf("quoted wording %q: in prose %v, in finding %v", phrase, strings.Contains(prose, phrase), strings.Contains(text, phrase))
+			t.Errorf("quoted wording %q: quoted in prose %v, in finding %v", phrase, strings.Contains(prose, `"`+phrase+`"`), strings.Contains(text, phrase))
 		}
 	}
 	keywords := multiDefects["python-retry-nonidempotent"][0].Keywords
 	for _, k := range []string{"double-charge", "charged again"} {
 		if !strings.Contains(prose, `"`+k+`"`) || !contains(keywords, k) {
-			t.Errorf("quoted keyword %q: in prose %v, in plant %v", k, strings.Contains(prose, k), contains(keywords, k))
+			t.Errorf("quoted keyword %q: quoted in prose %v, in plant %v", k, strings.Contains(prose, `"`+k+`"`), contains(keywords, k))
 		}
 	}
 	// The instrument's own rule, not a restatement of it.
@@ -212,6 +278,9 @@ func readGrid(t *testing.T, path string, runs int) *grid {
 			g.fixtures[r.Fixture] = true
 			g.rows = append(g.rows, r)
 		}
+	}
+	if err := sc.Err(); err != nil {
+		t.Fatal(err)
 	}
 	return g
 }

@@ -678,3 +678,54 @@ def later(conn):
 		t.Fatalf("callers = %v, want %v", got, want)
 	}
 }
+
+func TestCallersPythonDocstringsCloseOnlyOnTheirOwnDelimiter(t *testing.T) {
+	db := "def fetch_orders(conn, offset, limit):\n    return []\n"
+	svc := `'''Module docstring in single-quote style.
+
+It mentions the """ style, and fetch_orders(conn, 0, 1), as text.
+'''
+from app.db import fetch_orders
+
+
+def handler(conn):
+    """Docstring in double-quote style mentioning SEP = "'''" as text."""
+    return fetch_orders(conn, 0, 10)
+
+
+def unclosed(conn):
+    x = '''a """ b
+    fetch_orders(conn, 1, 1) is text until the string closes
+    '''
+    return None
+
+
+def later(conn):
+    return fetch_orders(conn, 10, 10)
+`
+	tree := fakeTree{"app/__init__.py": "", "app/db.py": db, "app/svc.py": svc}
+	got := callerNames(assembleCallers(t, tree, true, modifiedFile("app/db.py", db, 2)))
+	want := []string{"app/svc.py:handler calls db.fetch_orders", "app/svc.py:later calls db.fetch_orders"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("callers = %v, want %v", got, want)
+	}
+}
+
+func TestCallersTypeScriptFunctionInAParameterListFallsBackToTheClass(t *testing.T) {
+	lib := "export function retry(n: number): number {\n  return n;\n}\n"
+	work := `import { retry } from "./lib";
+
+export class Runner {
+  wrap(f = function () {}) {
+    return retry(1);
+  }
+}
+`
+	tree := fakeTree{"package.json": "{}", "src/lib.ts": lib, "src/work.ts": work}
+	got := callerNames(assembleCallers(t, tree, true, modifiedFile("src/lib.ts", lib, 2)))
+	// The safe direction: the class is attached, with the call inside it,
+	// rather than nothing or a header that is not a definition.
+	if want := "src/work.ts:Runner calls lib.retry"; strings.Join(got, ",") != want {
+		t.Fatalf("callers = %v, want %v", got, want)
+	}
+}

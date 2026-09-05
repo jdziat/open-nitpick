@@ -220,40 +220,50 @@ var (
 // blanked, so a regex for a call site cannot match a doc comment that names
 // the symbol or a string that mentions it. Line-local: a multi-line block
 // comment is not tracked, but a Python triple-quoted string is, whether a
-// docstring or a module-level SQL template: a line with an odd number of
-// fences opens or closes one, and every line inside is blank.
+// docstring or a module-level SQL template: a line with an odd count of one
+// fence style opens a string in that style, only that style closes it, and
+// every line inside is blank.
 func codeLines(lines []string, hashComments bool) []string {
 	out := make([]string, len(lines))
-	inDoc := false
+	docDelim := ""
 	for i, line := range lines {
 		if hashComments {
-			// Fences are counted on the line with its quoted spans and
-			// comment tail blanked, so a `"""` inside a comment or a
-			// single-quoted string does not open a docstring that swallows
-			// the rest of the file. An opening `x = """` keeps its unpaired
-			// quote and still counts one.
-			probe := line
-			if !inDoc {
-				// A fence passes through to be counted; any other quoted
-				// span is replaced by a space, so it leaves no quote behind
-				// to re-pair with a neighbour (`'a''b'` would otherwise
-				// collapse to four quotes and read as a fence).
-				probe = hashTail.ReplaceAllString(fenceOrSpan.ReplaceAllStringFunc(line, func(q string) string {
-					if q == `"""` || q == `'''` {
-						return q
-					}
-					return " "
-				}), "")
-			}
-			fences := strings.Count(probe, `"""`) + strings.Count(probe, `'''`)
-			if inDoc {
-				if fences%2 == 1 {
-					inDoc = false
+			if docDelim != "" {
+				// Inside, only the delimiter that opened counts: a `"""`
+				// mentioned in a `'''` docstring is text.
+				if strings.Count(line, docDelim)%2 == 1 {
+					docDelim = ""
 				}
 				continue
 			}
-			if fences%2 == 1 {
-				inDoc = true
+			// Fences are counted on the line with its quoted spans and
+			// comment tail blanked, so a fence inside a comment, a
+			// single-quoted string or a closed triple-quoted string does
+			// not open a docstring that swallows the rest of the file. A
+			// fence passes through to be counted; any other span becomes a
+			// space, so it leaves no quote behind to re-pair with a
+			// neighbour (`'a''b'` would otherwise read as a fence). An
+			// opening `x = """` keeps its unpaired quote and counts one.
+			probe := hashTail.ReplaceAllString(fenceOrSpan.ReplaceAllStringFunc(line, func(q string) string {
+				if q == `"""` || q == `'''` {
+					return q
+				}
+				return " "
+			}), "")
+			sq, dq := strings.Count(probe, `'''`), strings.Count(probe, `"""`)
+			switch {
+			case sq%2 == 1 && dq%2 == 1:
+				// Both unpaired: the earlier one opened, the later is text.
+				docDelim = `'''`
+				if strings.Index(probe, `"""`) < strings.Index(probe, `'''`) {
+					docDelim = `"""`
+				}
+			case sq%2 == 1:
+				docDelim = `'''`
+			case dq%2 == 1:
+				docDelim = `"""`
+			}
+			if docDelim != "" {
 				continue
 			}
 		}
