@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	llms "github.com/nocturnium/llm-go-sdk"
+	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"

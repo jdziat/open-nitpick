@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	llms "github.com/nocturnium/llm-go-sdk"
+	llms "github.com/nocturnium/llm-go-sdk/v6"
 )
 
 // capabilitySignals are substrings a provider uses when it rejects the request

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	llms "github.com/nocturnium/llm-go-sdk"
+	llms "github.com/nocturnium/llm-go-sdk/v6"
 	"gopkg.in/yaml.v3"
 
 	"github.com/jdziat/open-nitpick/internal/llm"

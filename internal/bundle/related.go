@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	llms "github.com/nocturnium/llm-go-sdk"
+	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/vcs"

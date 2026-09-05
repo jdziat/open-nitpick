@@ -15,8 +15,9 @@ import (
 	"sync"
 	"time"
 
-	llms "github.com/nocturnium/llm-go-sdk"
-	_ "github.com/nocturnium/llm-go-sdk/pkg/providers/all" // register every provider with llms.New
+	llms "github.com/nocturnium/llm-go-sdk/v6"
+	"github.com/nocturnium/llm-go-sdk/v6/pkg/middleware/resilience"
+	_ "github.com/nocturnium/llm-go-sdk/v6/pkg/providers/all" // register every provider with llms.New
 
 	"github.com/jdziat/open-nitpick/internal/config"
 )
@@ -78,6 +79,9 @@ func Build(spec config.ModelSpec) (*Client, error) {
 		// llamacpp) enable this themselves, so leaving it off here does not
 		// break the ordinary local-model path.
 		AllowPrivateIPs: spec.AllowPrivateEndpoint,
+		// The SDK split plain-HTTP from private-IP access in v5; the config
+		// documents allow_private_endpoint as granting both.
+		AllowHTTP: spec.AllowPrivateEndpoint,
 	}
 	if key, ok := spec.APIKey(nil); ok {
 		cfg.APIKey = key
@@ -94,7 +98,7 @@ func Build(spec config.ModelSpec) (*Client, error) {
 	if spec.MaxRetries != nil {
 		maxRetries = *spec.MaxRetries
 	}
-	resilient := llms.NewResilientClient(client, llms.WithMaxRetries(maxRetries))
+	resilient := resilience.NewResilientClient(client, resilience.WithMaxRetries(maxRetries))
 
 	mode := spec.StructuredOutput
 	if mode == "" {

@@ -18,7 +18,7 @@ import (
 	"sync"
 	"testing"
 
-	llms "github.com/nocturnium/llm-go-sdk"
+	llms "github.com/nocturnium/llm-go-sdk/v6"
 )
 
 // evalConcurrency bounds in-flight reviews. Held well below any provider rate
