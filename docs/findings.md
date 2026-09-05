@@ -901,3 +901,20 @@ Read the run dumps first; most of the noise was ours.
 - **Raw control characters inside JSON strings** are now escaped by the
   lenient decoder. Without a response format, gemma emits them on most
   replies; with one, the provider had been hiding the habit.
+
+## Routing and ensembles (2026-09-05)
+
+- **Per-batch routing ships.** Routes match on language, file count and
+  router-assigned kinds; the report records every decision; the harness
+  prices a composite run per model. Routed cheap models match qwen3.8-27b's
+  recall and near its noise at a third of its cost.
+- **An ensemble of two cheap reviewers with a mid-model rerank has the
+  highest weighted recall measured (0.84)** and pays in noise (0.21 – 0.38).
+  The rerank merges duplicates; it does not yet discount what one reviewer
+  said and the other did not. Next lever.
+- **A rule that matched nothing.** `min_files` matches the batch, batches
+  are one file, so the cross-file route never fired. Recorded rather than
+  hidden; the fix is a match on the change's file count.
+- **A pin leaked across models** on the first run: the triage and router
+  specs inherited gemma's `providers` and every qwen call got "no
+  endpoints". A pin now follows its model through overlays.

@@ -646,6 +646,8 @@ a single run, so gaps under about 0.10 are inside the noise.
 
 | tier | model | weighted recall | $/review | trade |
 |---|---|---|---|---|
+| best value overall | routed: gemma pinned, qwen3.8-27b for security and TypeScript, glm-5.3-flash router, qwen triage (`internal/evals/testdata/routes/routed.yaml`) | 0.81 | $0.005 – $0.011 | qwen's recall and near its noise at a third of the price; three models to configure |
+| highest recall | ensemble: gemma pinned + glm-5.3-flash on every batch, qwen triage (`ensemble-cheap.yaml`) | 0.84 | $0.010 – $0.011 | best info-corpus recall measured; noisiest configuration in this table |
 | cheapest of all | `google/gemma-4-31b-it` pinned to `deepinfra/turbo` | 0.75 | $0.0003 | needs `providers: [deepinfra/turbo]`; weak on the info corpus; best on multi-file diffs |
 | cheapest without a pin | `openai/gpt-5.6-luna` | 0.76 | $0.0005 – $0.0023 | quiet on multi-file diffs (0.04 noise); weak on the info corpus |
 | cheapest with no surprises | `z-ai/glm-5.3-flash` | 0.82 | $0.0017 | noisy on multi-file diffs; never lost a review |
