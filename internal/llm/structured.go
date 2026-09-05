@@ -340,6 +340,8 @@ func extractJSON[T any](ctx context.Context, c *Client, msgs []llms.Message, opt
 	call := append([]llms.CallOption(nil), opts...)
 	if c.structuredMode() != config.StructuredText {
 		call = append(call, llms.WithJSONMode())
+	} else {
+		call = append(call, withoutResponseFormat())
 	}
 
 	resp, err := generateContent(ctx, c, prompted, call)
@@ -349,7 +351,7 @@ func extractJSON[T any](ctx context.Context, c *Client, msgs []llms.Message, opt
 		// request goes again with no response_format, and the client
 		// remembers so the next batch does not pay for the rejection.
 		c.downgradeToText()
-		call = append([]llms.CallOption(nil), opts...)
+		call = append(append([]llms.CallOption(nil), opts...), withoutResponseFormat())
 		resp, err = generateContent(ctx, c, prompted, call)
 	}
 	if err != nil {
@@ -684,6 +686,15 @@ func (c *Client) structuredMode() config.StructuredMode {
 	c.modeMu.RLock()
 	defer c.modeMu.RUnlock()
 	return c.mode
+}
+
+// withoutResponseFormat clears any response_format an earlier option set.
+// The caller's options carry the json_schema request the schema path was
+// built with, and applied after them this is what makes "no format" true
+// rather than "the schema format again", which is how the first text-mode
+// fallback re-sent the very header the provider had just rejected.
+func withoutResponseFormat() llms.CallOption {
+	return func(o *llms.CallOptions) { o.ResponseFormat = nil }
 }
 
 // downgradeToText records that JSON mode does not work for this provider

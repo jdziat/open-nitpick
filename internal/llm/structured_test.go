@@ -488,7 +488,10 @@ func TestExtractFallsBackToPlainTextWhenJSONModeIsRejected(t *testing.T) {
 	fake := newFakeLLM(turn{err: rejected}, turn{content: "Here you go:\n" + validJSON})
 	client := newTestClient(fake, config.StructuredJSON)
 
-	got, err := Extract[result](context.Background(), client, nil)
+	// The engine passes the schema as a call option; the fallback must not
+	// let it through as a response_format.
+	schema := llms.WithJSONSchema("result", []byte(`{"type":"object"}`), true)
+	got, err := Extract[result](context.Background(), client, nil, schema)
 	if err != nil {
 		t.Fatalf("json_object rejected must fall back to no response_format, got %v", err)
 	}
@@ -506,9 +509,10 @@ func TestExtractFallsBackToPlainTextWhenJSONModeIsRejected(t *testing.T) {
 		t.Errorf("mode after the rejection = %q, want text so the next batch skips it", client.structuredMode())
 	}
 
-	// Chosen outright, text mode never asks for a format.
+	// Chosen outright, text mode never asks for a format, whatever the
+	// caller's options carry.
 	fake = newFakeLLM(turn{content: validJSON})
-	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredText), nil); err != nil {
+	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredText), nil, schema); err != nil {
 		t.Fatal(err)
 	}
 	if fake.call(0).opts.ResponseFormat != nil {
