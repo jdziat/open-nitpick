@@ -184,12 +184,15 @@ def unrelated():
 
 from app.db import fetch_orders
 
+BATCH = 500
+UNUSED = 1
+
 
 def export_orders(conn, out):
     """Write every order to out, a page at a time."""
     offset = 0
     while True:
-        rows = fetch_orders(conn, offset, 500)
+        rows = fetch_orders(conn, offset, BATCH)
         if not rows:
             return
         csv.writer(out).writerows(rows)
@@ -207,13 +210,18 @@ def helper():
 	}
 	plan := assembleCallers(t, tree, true, modifiedFile("app/db.py", db, 7))
 	got := callerNames(plan)
-	want := []string{"app/export.py:export_orders calls db.fetch_orders"}
+	want := []string{"app/export.py:export_orders calls db.fetch_orders", "app/export.py:export_orders:BATCH = 500 calls db.fetch_orders"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("callers = %v, want %v", got, want)
 	}
-	snippet := plan.Batches[0].Entries[0].Related[0].Snippet
-	if !strings.Contains(snippet, "fetch_orders(conn, offset, 500)") || strings.Contains(snippet, "def helper") {
+	related := plan.Batches[0].Entries[0].Related
+	if snippet := related[0].Snippet; !strings.Contains(snippet, "fetch_orders(conn, offset, BATCH)") || strings.Contains(snippet, "def helper") {
 		t.Errorf("snippet is not the enclosing def alone:\n%s", snippet)
+	}
+	// The constant the call passes comes along, on its own line; one the
+	// body never names does not.
+	if c := related[1]; c.Snippet != "BATCH = 500" || c.Line != 5 {
+		t.Errorf("constant = %q at line %d, want BATCH = 500 at line 5", c.Snippet, c.Line)
 	}
 }
 

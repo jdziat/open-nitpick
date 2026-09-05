@@ -185,6 +185,60 @@ func callSites(lines []string, re *regexp.Regexp, enclosing func(lines []string,
 	return starts
 }
 
+// callerConstants finds the single-line, top-level constants of a file that
+// the body at lines[start:end] names, and returns their line indexes. A
+// caller that passes BATCH where the new precondition is on the page size
+// tells the model nothing unless BATCH's value comes along; the definition
+// is one line and sits outside the function, so it is attached beside it.
+// Capped at maxCallerConstants per caller.
+func callerConstants(lines []string, start, end int, def *regexp.Regexp) []int {
+	body := strings.Join(lines[start:min(end, len(lines))], "\n")
+	used := map[string]bool{}
+	for _, m := range identWord.FindAllString(body, -1) {
+		used[m] = true
+	}
+	var out []int
+	for i, line := range lines {
+		if i >= start && i < end {
+			continue
+		}
+		m := def.FindStringSubmatch(line)
+		if m == nil || !used[m[1]] {
+			continue
+		}
+		out = append(out, i)
+		if len(out) >= maxCallerConstants {
+			break
+		}
+	}
+	return out
+}
+
+// maxCallerConstants caps how many constant lines one caller brings along.
+const maxCallerConstants = 3
+
+var (
+	identWord = regexp.MustCompile(`\b[A-Za-z_$][\w$]*\b`)
+	// One-line top-level constant or variable, per language: the name is
+	// the first group. Block members in Go (`\tNAME = ...` inside const (...))
+	// are matched by the indented form.
+	goConstLine = regexp.MustCompile(`^(?:(?:const|var)\s+|\t)([A-Z]\w*)\s*(?:\w+\s*)?=\s*\S`)
+	pyConstLine = regexp.MustCompile(`^([A-Z][A-Z0-9_]*)\s*(?::\s*[\w\[\], ]+)?\s*=\s*\S`)
+	tsConstLine = regexp.MustCompile(`^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*\S`)
+)
+
+// constantExtract returns the one line at index i with its leading comments.
+func constantExtract(i int, commentPrefixes ...string) func(content, name string) (Related, bool) {
+	return func(content, _ string) (Related, bool) {
+		lines := splitLines(content)
+		if i < 0 || i >= len(lines) {
+			return Related{}, false
+		}
+		from := withLeadingComments(lines, i, commentPrefixes...)
+		return Related{Line: from + 1, Snippet: join(lines[from : i+1])}, true
+	}
+}
+
 // callerExtract cuts the definition starting at line start out of content:
 // its leading comment block and its brace-delimited body.
 func callerExtract(start int, commentPrefixes ...string) func(content, name string) (Related, bool) {
@@ -327,6 +381,9 @@ func (c *relatedCollector) goCallerWants(e *Entry) []want {
 					uses:    1,
 					extract: callerExtract(start, "//"),
 				})
+				for _, i := range callerConstants(lines, start, braceExtent(lines, start), goConstLine) {
+					wants = append(wants, want{file: file, name: callerName(lines[start]) + ":" + strings.TrimSpace(lines[i]), calls: calls, extract: constantExtract(i, "//")})
+				}
 			}
 		}
 	}
@@ -419,6 +476,24 @@ func pyEnclosingDef(lines []string, i int) int {
 	return -1
 }
 
+// pyDefEnd returns the index one past the last line of the def starting at
+// start, by indentation, with trailing blank lines left out.
+func pyDefEnd(lines []string, start int) int {
+	end := start + 1
+	for end < len(lines) && end-start < maxDefinitionLines {
+		t := lines[end]
+		if strings.TrimSpace(t) != "" && !strings.HasPrefix(t, " ") && !strings.HasPrefix(t, "\t") {
+			break
+		}
+		end++
+	}
+	// Trailing blank lines are the gap to the next def, not the body.
+	for end > start+1 && strings.TrimSpace(lines[end-1]) == "" {
+		end--
+	}
+	return end
+}
+
 // pyExtract cuts a def out by indentation, since Python has no braces.
 func pyExtract(start int) func(content, name string) (Related, bool) {
 	return func(content, _ string) (Related, bool) {
@@ -430,19 +505,7 @@ func pyExtract(start int) func(content, name string) (Related, bool) {
 		for from > 0 && strings.HasPrefix(lines[from-1], "@") {
 			from--
 		}
-		end := start + 1
-		for end < len(lines) && end-from < maxDefinitionLines {
-			t := lines[end]
-			if strings.TrimSpace(t) != "" && !strings.HasPrefix(t, " ") && !strings.HasPrefix(t, "\t") {
-				break
-			}
-			end++
-		}
-		// Trailing blank lines are the gap to the next def, not the body.
-		for end > start+1 && strings.TrimSpace(lines[end-1]) == "" {
-			end--
-		}
-		return Related{Line: from + 1, Snippet: join(lines[from:end])}, true
+		return Related{Line: from + 1, Snippet: join(lines[from:pyDefEnd(lines, start)])}, true
 	}
 }
 
@@ -514,6 +577,9 @@ func (c *relatedCollector) pyCallerWants(e *Entry) []want {
 					uses:    1,
 					extract: pyExtract(start),
 				})
+				for _, i := range callerConstants(lines, start, pyDefEnd(lines, start), pyConstLine) {
+					wants = append(wants, want{file: file, name: callerName(lines[start]) + ":" + strings.TrimSpace(lines[i]), calls: modName + "." + s.name, extract: constantExtract(i, "#")})
+				}
 			}
 		}
 	}
@@ -638,6 +704,9 @@ func (c *relatedCollector) tsCallerWants(e *Entry) []want {
 					uses:    1,
 					extract: callerExtract(start, "//", "/*", "*"),
 				})
+				for _, i := range callerConstants(lines, start, braceExtent(lines, start), tsConstLine) {
+					wants = append(wants, want{file: file, name: callerName(lines[start]) + ":" + strings.TrimSpace(lines[i]), calls: modName + "." + s.name, extract: constantExtract(i, "//", "/*", "*")})
+				}
 			}
 		}
 	}
