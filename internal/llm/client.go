@@ -8,6 +8,7 @@
 package llm
 
 import (
+	"log/slog"
 	"fmt"
 	"slices"
 	"strings"
@@ -37,6 +38,11 @@ type Client struct {
 	// single client from concurrent workers.
 	mode   config.StructuredMode
 	modeMu sync.RWMutex
+
+	// Log receives one line per stall retry, so a review that took forty
+	// minutes says why in its own log rather than in a timing someone has to
+	// notice. Nil discards.
+	Log *slog.Logger
 
 	// stallRetries is how many times a request whose answer never finished
 	// arriving is sent again; see generateTyped. It shares max_retries with
@@ -143,6 +149,28 @@ type Roles struct {
 	// assemble Roles by hand, such as the eval harness, only name the roles
 	// they are measuring — so read it through Validator rather than directly.
 	Validate *Client
+}
+
+// WithLogger points every client at l and returns r, for the engine to call
+// once it knows where its own log goes.
+func (r *Roles) WithLogger(l *slog.Logger) *Roles {
+	if r == nil {
+		return r
+	}
+	for _, c := range []*Client{r.Review, r.Triage, r.Validate} {
+		if c != nil {
+			c.Log = l
+		}
+	}
+	return r
+}
+
+// logger is Log, or a discarding logger.
+func (c *Client) logger() *slog.Logger {
+	if c != nil && c.Log != nil {
+		return c.Log
+	}
+	return slog.New(slog.DiscardHandler)
 }
 
 // Validator returns the client the expert-validation pass speaks through,

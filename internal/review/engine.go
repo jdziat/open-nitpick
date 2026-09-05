@@ -1735,6 +1735,7 @@ func (e *Engine) withPolicy(policy Policy) (*Engine, error) {
 			return nil, errors.New("review: the change modifies the configuration, and this engine " +
 				"cannot rebuild its models from the policy that replaced it (wire Models)")
 		}
+		e.Roles.WithLogger(e.log())
 		return e, nil
 	}
 
@@ -1750,7 +1751,7 @@ func (e *Engine) withPolicy(policy Policy) (*Engine, error) {
 
 	swapped := *e
 	swapped.Config = policy.Config
-	swapped.Roles = roles
+	swapped.Roles = roles.WithLogger(swapped.log())
 
 	swapped.log().Info("models ready",
 		"review", roles.Review.String(),

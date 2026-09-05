@@ -136,9 +136,10 @@ func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, c
 	for attempt := 0; ; attempt++ {
 		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
 		if !stalled(ctx, err) || attempt >= c.stallRetries {
+			c.logStallOutcome(attempt, err)
 			return value, raw, err
 		}
-		call = stallRetryOptions(call)
+		call = c.logStallRetry(attempt, call)
 	}
 }
 
@@ -147,9 +148,34 @@ func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call [
 	for attempt := 0; ; attempt++ {
 		resp, err := c.LLM.GenerateContent(ctx, msgs, call...)
 		if !stalled(ctx, err) || attempt >= c.stallRetries {
+			c.logStallOutcome(attempt, err)
 			return resp, err
 		}
-		call = stallRetryOptions(call)
+		call = c.logStallRetry(attempt, call)
+	}
+}
+
+// logStallRetry records a stall and returns the options the retry is sent with.
+func (c *Client) logStallRetry(attempt int, call []llms.CallOption) []llms.CallOption {
+	next := stallRetryOptions(call)
+	c.logger().Warn("request stalled; sending again",
+		"model", c.String(),
+		"attempt", attempt+1,
+		"retries_left", c.stallRetries-attempt,
+		"timeout", c.Timeout(),
+		"output_capped", !hasMaxTokens(call) && hasMaxTokens(next))
+	return next
+}
+
+// logStallOutcome records a request that was retried for stalling, whichever
+// way it ended, so the log says which attempt answered and whether any did.
+func (c *Client) logStallOutcome(attempt int, err error) {
+	switch {
+	case attempt == 0:
+	case err == nil:
+		c.logger().Warn("request answered after stalling", "model", c.String(), "attempts", attempt+1)
+	default:
+		c.logger().Error("request stalled on every attempt", "model", c.String(), "attempts", attempt+1, "err", err)
 	}
 }
 
