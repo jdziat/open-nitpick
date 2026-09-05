@@ -74,16 +74,19 @@ func main() {
 			defer wg.Done()
 			for _, lang := range modelid.Languages {
 				for i, task := range modelid.Tasks {
-					mu.Lock()
-					stop := limit > 0 && done >= limit
-					mu.Unlock()
-					if stop {
-						return
-					}
 					path := filepath.Join(out, modelid.Slug(id), lang.Name, fmt.Sprintf("%02d%s.txt", i, lang.Ext))
 					if _, err := os.Stat(path); err == nil {
 						continue
 					}
+					// The slot is reserved before the call, so -limit bounds
+					// what is paid for, not what was finished.
+					mu.Lock()
+					if limit > 0 && done >= limit {
+						mu.Unlock()
+						return
+					}
+					done++
+					mu.Unlock()
 					var code string
 					var err error
 					for attempt := 0; attempt < 2 && len(code) < 50; attempt++ {
@@ -101,9 +104,6 @@ func main() {
 						fmt.Fprintln(os.Stderr, err)
 						return
 					}
-					mu.Lock()
-					done++
-					mu.Unlock()
 					fmt.Printf("%s %s %02d: %d bytes\n", id, lang.Name, i, len(code))
 				}
 			}
