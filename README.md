@@ -662,6 +662,58 @@ was tuned against; a candidate replaces it only by beating it on the held-out
 corpus under the rule in [docs/measurement.md](docs/measurement.md).
 `qwen/qwen3.8-27b` and `openai/gpt-5.6-luna` are the two worth that spend.
 
+### Routing batches to different models, and ensembles
+
+A review is a set of batches, and each batch can go to the model that
+measured best for what it is. `models.routes` is tried in order; the first
+match wins, and a batch no route matches goes to the review model. A match
+can name languages (by file extension), a file-count range, and the kinds
+of change a router assigned:
+
+```yaml
+models:
+  default:
+    provider: openrouter
+    model: google/gemma-4-31b-it
+    providers: [deepinfra/turbo]
+  triage:
+    model: qwen/qwen3.8-27b
+  router:
+    model: z-ai/glm-5.3-flash
+  routes:
+    - name: security
+      match: {kinds: [security, concurrency]}
+      review: {model: qwen/qwen3.8-27b}
+    - name: typescript
+      match: {languages: [typescript, javascript]}
+      review: {model: qwen/qwen3.8-27b}
+    - name: cross-file
+      match: {min_files: 2}
+      review: {model: z-ai/glm-5.3-flash}
+  ensemble:
+    - model: z-ai/glm-5.3-flash
+```
+
+The router is a cheap model that reads each batch's diff once and answers
+with kinds from a fixed list: `security`, `concurrency`, `contract`,
+`data`, `config`, `logic`, `test`, `docs`. It runs only when a route names
+a kind. A router that fails does not fail the batch; the batch is reviewed
+unclassified and the report says so.
+
+`models.ensemble` names models that review every batch alongside the
+chosen one. Their findings are pooled and the triage pass merges duplicates
+and reranks: the same defect from two reviewers is one finding, and their
+agreement is a reason to keep its level. A route's own `ensemble` replaces
+the global one for the batches it matches; an empty list removes it.
+
+Every model here overlays `default` the way a role does, so a route names
+only what differs. A provider pin follows its model: a route that changes
+the model starts unpinned unless it sets `providers` itself. The report
+records where each batch went (`Report.Routes`), and `nitpick explain-config`
+shows the prompt each reviewer gets, including its model-family layer. The
+measured configurations are in `internal/evals/testdata/routes/` and their
+numbers in [docs/comparison.md](docs/comparison.md).
+
 ### Pinning a router to one upstream
 
 OpenRouter serves a model from many upstream providers and picks one per
