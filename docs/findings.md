@@ -1102,6 +1102,36 @@ That is why the class stays off by default, and what a second run has to
 improve on before the default is revisited. Rule 15 applies in full: five
 pairs, written the same day as the rules, by the same hand.
 
+**The second run, two runs per fixture
+(`multifile-slop-20260905T221622Z`):**
+
+| contender | RECALL | NOISE / review | control reviews with a finding (of 10) | $ / review |
+|---|---|---|---|---|
+| Kimi-K3 (Synthetic) | 0.80 (8/10) | 0.40 | 4 | $0.020 |
+| glm-5.3-flash + related context | 0.80 (8/10) | 0.65 | 5 | $0.0020 |
+| Kimi-K3 (Synthetic) + related context | 0.70 (7/10) | 0.40 | 4 | $0.023 |
+| glm-5.3-flash | 0.70 (7/10) | 0.70 | 5 | $0.0017 |
+
+The first run's silent controls were luck. Over ten control reviews per
+configuration, every configuration flagged a human-written lookalike four
+or five times, and one control accounts for most of it: the TypeScript doc
+comment (`ts-clean-doc-comment`) was flagged in every run of every
+configuration but one. Its comment addresses the reader in the second
+person ("You get \"1500ms\", not \"1.5s\""), which rule 8 excludes in so
+many words and the models read as the chat prose the rule forbids. The
+Python control that records and re-raises was flagged in five of eight
+runs. The Go controls and the asserting test were mostly left alone.
+Recall held at 0.70 to 0.80, with no fixture found by every configuration
+in every run.
+
+So the class is not close to a default. What the second run says the
+rules need before a third: rule 8's exclusion has to be stated as a
+positive test the model can apply (a doc comment that names a return
+value, a constraint or a caller is not a chat reply, whatever person it
+is written in), and rule 5's exclusion needs the same for a handler that
+re-raises. The controls stay as they are: a human-written file with a
+second-person doc comment is what the class must not flag.
+
 ## Which model wrote it (2026-09-05, evening)
 
 Section 4 of `docs/plan-full-review.md` asked a question before it allowed
