@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -143,15 +144,26 @@ func generate(ctx context.Context, client *llm.Client, lang modelid.Language, ta
 // of human-written code on this machine, which the experiment reports.
 func sampleHuman(out string) (int, error) {
 	roots := map[string]struct{ dir, ext string }{
-		"go":     {dir: goroot() + "/src", ext: ".go"},
+		"go":     {dir: goroot(), ext: ".go"},
 		"python": {dir: pystdlib(), ext: ".py"},
 	}
-	r := rand.New(rand.NewPCG(2026, 9))
+	if roots["go"].dir != "" {
+		roots["go"] = struct{ dir, ext string }{dir: roots["go"].dir + "/src", ext: ".go"}
+	}
 	n := 0
-	for lang, root := range roots {
+	// Languages in a fixed order, each with its own seeded stream, so the
+	// sample is the same set of files on every run on the same machine.
+	langs := make([]string, 0, len(roots))
+	for lang := range roots {
+		langs = append(langs, lang)
+	}
+	sort.Strings(langs)
+	for seed, lang := range langs {
+		root := roots[lang]
 		if root.dir == "" {
-			continue
+			return n, fmt.Errorf("%s control: no standard library found on this machine", lang)
 		}
+		r := rand.New(rand.NewPCG(2026, uint64(seed)))
 		var candidates []string
 		walkErr := filepath.WalkDir(root.dir, func(p string, d os.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
@@ -166,9 +178,15 @@ func sampleHuman(out string) (int, error) {
 			if info, err := d.Info(); err != nil || info.Size() < 1500 || info.Size() > 12000 {
 				return nil
 			}
+			// Generated files are filtered before sampling, so the sample
+			// has no gaps and no generated code.
+			if data, err := os.ReadFile(p); err != nil || strings.Contains(string(data), "DO NOT EDIT") {
+				return nil
+			}
 			candidates = append(candidates, p)
 			return nil
 		})
+		sort.Strings(candidates)
 		if walkErr != nil {
 			return n, fmt.Errorf("%s control under %s: %w", lang, root.dir, walkErr)
 		}
@@ -180,9 +198,6 @@ func sampleHuman(out string) (int, error) {
 			data, err := os.ReadFile(candidates[i])
 			if err != nil {
 				return n, err
-			}
-			if strings.Contains(string(data), "DO NOT EDIT") {
-				continue
 			}
 			path := filepath.Join(out, "human", lang, fmt.Sprintf("%02d%s.txt", i, root.ext))
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

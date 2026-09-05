@@ -121,7 +121,12 @@ func (c *Classifier) Predict(f Features) (author string, confidence float64) {
 		}
 		cands = append(cands, cand{a, math.Sqrt(d)})
 	}
-	sort.Slice(cands, func(i, j int) bool { return cands[i].dist < cands[j].dist })
+	sort.Slice(cands, func(i, j int) bool {
+		if cands[i].dist != cands[j].dist {
+			return cands[i].dist < cands[j].dist
+		}
+		return cands[i].author < cands[j].author
+	})
 	if len(cands) == 0 {
 		return "unknown", 0
 	}
