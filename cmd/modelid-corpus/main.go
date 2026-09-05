@@ -37,15 +37,16 @@ import (
 )
 
 func main() {
-	var out, models, human string
+	var out, models string
+	var human bool
 	var limit int
 	flag.StringVar(&out, "out", "internal/evals/testdata/modelid", "corpus directory")
 	flag.StringVar(&models, "models", "", "comma-separated OpenRouter model ids")
-	flag.StringVar(&human, "human", "", "also sample the human control set from GOROOT and the Python stdlib (yes/no)")
+	flag.BoolVar(&human, "human", false, "also sample the human control set from GOROOT and the Python stdlib")
 	flag.IntVar(&limit, "limit", 0, "generate at most this many files this run (0: all)")
 	flag.Parse()
 
-	if human == "yes" {
+	if human {
 		n, err := sampleHuman(out)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "human control:", err)

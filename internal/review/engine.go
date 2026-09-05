@@ -1481,12 +1481,17 @@ func Filter(findings []Finding, level config.NitpickLevel, minimum config.Severi
 }
 
 // FilterWith is Filter with the slop switch: the slop class is published by
-// review.slop alone, at whatever nitpick level, and never without it.
+// review.slop alone, at whatever nitpick level. The schema offers the class
+// whether or not the switch is on, so a model may label a finding slop
+// unasked; with the switch off that finding is not dropped for its label
+// but read as style, the class it is nearest to, and published or not as
+// style is at the configured level.
 func FilterWith(findings []Finding, level config.NitpickLevel, minimum config.Severity, slop bool) (kept, dropped []Finding) {
 	for _, f := range findings {
+		if f.Cls() == config.ClassSlop && !slop {
+			f.Class = string(config.ClassStyle)
+		}
 		switch {
-		case f.Cls() == config.ClassSlop && !slop:
-			dropped = append(dropped, f)
 		case f.Cls() == config.ClassSlop:
 			if f.Sev().AtLeast(minimum) {
 				kept = append(kept, f)

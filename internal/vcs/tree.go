@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -113,13 +115,15 @@ func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 			t.Unbudgeted = append(t.Unbudgeted, name)
 			continue
 		}
+		// Size is checked before the read, so an oversized file costs a
+		// stat, not its bytes in memory.
+		if info, err := os.Stat(filepath.Join(t.Dir, filepath.FromSlash(name))); err == nil && t.MaxBytes > 0 && info.Size() > int64(t.MaxBytes) {
+			t.Skipped = append(t.Skipped, TreeSkip{Path: name, Reason: fmt.Sprintf("larger than %d bytes", t.MaxBytes)})
+			continue
+		}
 		content, err := t.readContained(name)
 		if err != nil {
 			t.Skipped = append(t.Skipped, TreeSkip{Path: name, Reason: "unreadable: " + err.Error()})
-			continue
-		}
-		if t.MaxBytes > 0 && len(content) > t.MaxBytes {
-			t.Skipped = append(t.Skipped, TreeSkip{Path: name, Reason: fmt.Sprintf("larger than %d bytes", t.MaxBytes)})
 			continue
 		}
 		if len(content) == 0 {
