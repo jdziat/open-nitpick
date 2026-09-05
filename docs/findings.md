@@ -885,3 +885,19 @@ Read the run dumps first; most of the noise was ours.
   nothing for a model that does not stall.
 - **gemma-4-26b-a4b-it** is not a contender: half the 31b's recall at the
   same price.
+
+## Pinning the upstream (2026-09-04)
+
+- **`providers` pins an OpenRouter model to named upstreams** with no
+  fallback. Pinned to deepinfra/turbo, gemma-4-31b had no stalls, no lost
+  reviews, and reviews in seconds, at $0.0003 a review. The stall retries
+  stay, because a deployment that does not pin still needs them, and the
+  log now shows every retry.
+- **A third structured-output strategy was missing.** A provider that
+  rejects both `json_schema` and `json_object` got no review at all. `text`
+  mode fixes that, and two bugs in its first version (the schema format
+  leaking through the caller's options; a race on the shared client's
+  mode) were found by the pinned run within an hour of each other.
+- **Raw control characters inside JSON strings** are now escaped by the
+  lenient decoder. Without a response format, gemma emits them on most
+  replies; with one, the provider had been hiding the habit.

@@ -646,6 +646,7 @@ a single run, so gaps under about 0.10 are inside the noise.
 
 | tier | model | weighted recall | $/review | trade |
 |---|---|---|---|---|
+| cheapest of all | `google/gemma-4-31b-it` pinned to `deepinfra/turbo` | 0.75 | $0.0003 | needs `providers: [deepinfra/turbo]`; weak on the info corpus; best on multi-file diffs |
 | cheapest that holds the line | `openai/gpt-5.6-luna` | 0.79 | $0.0006 | highest noise of the cheap tier on single-file diffs |
 | cheapest with no surprises | `z-ai/glm-5.3-flash` | 0.82 | $0.0017 | noisy on multi-file diffs; never lost a review |
 | best quality per dollar | `qwen/qwen3.8-27b` | 0.82 | $0.017 | above the default on every corpus with lower noise |
@@ -660,6 +661,27 @@ The default stays sonnet-4.6 because the sweep ran on the corpora the prompt
 was tuned against; a candidate replaces it only by beating it on the held-out
 corpus under the rule in [docs/measurement.md](docs/measurement.md).
 `qwen/qwen3.8-27b` and `openai/gpt-5.6-luna` are the two worth that spend.
+
+### Pinning a router to one upstream
+
+OpenRouter serves a model from many upstream providers and picks one per
+request. When some of them stall, `providers` names the ones a review may
+use, in order, with no fallback beyond them:
+
+```yaml
+models:
+  default:
+    provider: openrouter
+    model: google/gemma-4-31b-it
+    providers: [deepinfra/turbo]
+```
+
+Slugs are OpenRouter's, with an endpoint suffix where one exists. The
+setting is only accepted with the `openrouter` provider. It is also a
+trust decision: a pull request that edits `.nitpick.yaml` can change it,
+which chooses which third party reads the code, exactly as `model` already
+can. Rates differ by upstream, so the eval harness prices a pinned run only
+when the pin is the endpoint the price table recorded.
 
 ### When a request never finishes
 

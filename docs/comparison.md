@@ -454,3 +454,45 @@ OpenRouter's routing preferences and measure the loss rate there.
 
 The 26b MoE finishes and is not good enough: half the 31b's recall on every
 corpus at the same price.
+
+### gemma-4-31b pinned to one upstream (2026-09-04)
+
+The stalls were OpenRouter's routing, and they can be routed around.
+`models.default.providers: [deepinfra/turbo]` sends every request to that one
+endpoint with no fallback. Two runs per corpus, engine log kept:
+
+| gemma-4-31b-it | tuning R / N | multi-file R / N | info R / N | $/review | lost | stalls | wall clock per corpus |
+|---|---|---|---|---|---|---|---|
+| default routing, 4 attempts, capped and re-sampled retries | 0.72 / 0.12 | 0.92 / 0.11 | 0.50 / 0.38 | $0.0003 – $0.0019 | 0 of 168 | 41 | 1 – 3 hours |
+| pinned to deepinfra/turbo, related context on | 0.78 / 0.19 | 0.88 / 0.04 | 0.55 / 0.17 | $0.0003 – $0.0004 | 0 of 168 | 0 | about 3 minutes |
+| pinned, related context off | 0.84 / 0.09 | 0.62 / 0.18 | 0.60 / 0.08 | $0.0003 – $0.0004 | 0 | 0 | about 3 minutes |
+
+Getting there took three more fixes, each found by the pinned run failing
+in a new way and each general:
+
+- DeepInfra's turbo endpoint rejects `json_schema` and `json_object`
+  response formats alike, with a 405. The client had two strategies and
+  no third, so every review died. There is now a `text` structured mode
+  (no `response_format`; the schema rides in the prompt and the reply is
+  parsed leniently), and `auto` and `json` both fall to it when a provider
+  rejects `json_object`.
+- The first text-mode fallback re-sent the schema format anyway, because
+  the caller's options carried it and "no format" had to be applied after
+  them, not by leaving one out.
+- Without a response format constraining it, gemma writes a real tab inside
+  a JSON string on most replies. The lenient decoder now escapes control
+  characters inside string literals before giving up.
+
+And one race: two batches share a client, and one downgrading it between
+the other's request and its error check made the other skip the fallback
+for the rejection it had just received.
+
+**What this makes gemma-4-31b.** Pinned, it is the cheapest model in these
+tables by a factor of three over glm-5.3-flash, with multi-file recall and
+noise (0.88 / 0.04) that only qwen3.8-27b matches at forty times the price,
+and it finishes a review in seconds. Its weak corpus is info, where it finds
+about half the plants; the single-file tuning corpus is better without
+related context than with it. It is the cheap pick for a repository whose
+pull requests touch several files, and the pin is not optional: the same
+weights through OpenRouter's default routing lose one request in five to
+stalls and take an hour to say so.
