@@ -1,0 +1,29 @@
+"""Generate URL-friendly slugs from Unicode text."""
+
+
+def slugify(text: str) -> str:
+    """
+    Return a slug derived from *text*.
+
+    The result is lowercased; every maximal run of one or more
+    non-alphanumeric characters is replaced by a single ``-``; and any
+    leading or trailing ``-`` characters are removed.
+
+    ``str.isalnum()`` is used for the alphanumeric test, so Unicode
+    letters and digits are preserved, e.g.::
+
+        >>> slugify('  Äpfel & Birnen -- 100% ')
+        'äpfel-birnen-100'
+        >>> slugify('Crème brûlée')
+        'creme-brulee'
+    """
+    slug = []
+    in_separator = False
+    for char in text.lower():
+        if char.isalnum():
+            slug.append(char)
+            in_separator = False
+        elif not in_separator and slug:
+            slug.append('-')
+            in_separator = True
+    return ''.join(slug).rstrip('-')

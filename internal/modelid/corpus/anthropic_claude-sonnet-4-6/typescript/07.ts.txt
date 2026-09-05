@@ -1,0 +1,253 @@
+import * as fs from "fs";
+import * as path from "path";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface AppConfig {
+  port: number;
+  host: string;
+  databaseUrl: string;
+  logLevel: "debug" | "info" | "warn" | "error";
+  jwtSecret: string;
+  maxConnections: number;
+  enableCors: boolean;
+  corsOrigin: string;
+  apiPrefix: string;
+  nodeEnv: "development" | "production" | "test";
+}
+
+type RawConfig = Partial<Record<keyof AppConfig, unknown>>;
+
+// ─── Defaults ─────────────────────────────────────────────────────────────────
+
+const DEFAULTS: AppConfig = {
+  port: 3000,
+  host: "0.0.0.0",
+  databaseUrl: "",
+  logLevel: "info",
+  jwtSecret: "",
+  maxConnections: 10,
+  enableCors: false,
+  corsOrigin: "*",
+  apiPrefix: "/api",
+  nodeEnv: "development",
+};
+
+// ─── Required keys (must be non-empty after all overrides) ───────────────────
+
+const REQUIRED_KEYS: (keyof AppConfig)[] = ["databaseUrl", "jwtSecret"];
+
+// ─── Environment variable map ─────────────────────────────────────────────────
+
+const ENV_MAP: Record<keyof AppConfig, string> = {
+  port: "APP_PORT",
+  host: "APP_HOST",
+  databaseUrl: "DATABASE_URL",
+  logLevel: "LOG_LEVEL",
+  jwtSecret: "JWT_SECRET",
+  maxConnections: "MAX_CONNECTIONS",
+  enableCors: "ENABLE_CORS",
+  corsOrigin: "CORS_ORIGIN",
+  apiPrefix: "API_PREFIX",
+  nodeEnv: "NODE_ENV",
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function coerce<T>(key: keyof AppConfig, value: string): T {
+  const defaultValue = DEFAULTS[key];
+
+  if (typeof defaultValue === "number") {
+    const parsed = Number(value);
+    if (isNaN(parsed)) {
+      throw new Error(
+        `Environment variable ${ENV_MAP[key]} must be a number, got "${value}"`
+      );
+    }
+    return parsed as unknown as T;
+  }
+
+  if (typeof defaultValue === "boolean") {
+    const lower = value.toLowerCase();
+    if (lower !== "true" && lower !== "false") {
+      throw new Error(
+        `Environment variable ${ENV_MAP[key]} must be "true" or "false", got "${value}"`
+      );
+    }
+    return (lower === "true") as unknown as T;
+  }
+
+  return value as unknown as T;
+}
+
+function readJsonFile(filePath: string): RawConfig {
+  const resolved = path.resolve(filePath);
+
+  if (!fs.existsSync(resolved)) {
+    console.warn(`[config] File not found: ${resolved}. Using defaults.`);
+    return {};
+  }
+
+  const raw = fs.readFileSync(resolved, "utf-8");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`[config] Failed to parse JSON file "${resolved}": ${err}`);
+  }
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      `[config] Expected a JSON object in "${resolved}", got ${typeof parsed}`
+    );
+  }
+
+  return parsed as RawConfig;
+}
+
+function applyEnvOverrides(config: AppConfig): AppConfig {
+  const result = { ...config };
+
+  for (const key of Object.keys(ENV_MAP) as (keyof AppConfig)[]) {
+    const envVar = ENV_MAP[key];
+    const envValue = process.env[envVar];
+
+    if (envValue !== undefined && envValue !== "") {
+      (result as Record<keyof AppConfig, unknown>)[key] = coerce(key, envValue);
+    }
+  }
+
+  return result;
+}
+
+function mergeWithDefaults(raw: RawConfig): AppConfig {
+  const result = { ...DEFAULTS };
+
+  for (const key of Object.keys(DEFAULTS) as (keyof AppConfig)[]) {
+    if (key in raw && raw[key] !== undefined && raw[key] !== null) {
+      const defaultValue = DEFAULTS[key];
+      const rawValue = raw[key];
+
+      if (typeof defaultValue === "number") {
+        const num = Number(rawValue);
+        if (isNaN(num)) {
+          throw new Error(
+            `[config] Key "${key}" must be a number, got "${rawValue}"`
+          );
+        }
+        (result as Record<keyof AppConfig, unknown>)[key] = num;
+      } else if (typeof defaultValue === "boolean") {
+        if (typeof rawValue === "boolean") {
+          (result as Record<keyof AppConfig, unknown>)[key] = rawValue;
+        } else if (rawValue === "true" || rawValue === "false") {
+          (result as Record<keyof AppConfig, unknown>)[key] =
+            rawValue === "true";
+        } else {
+          throw new Error(
+            `[config] Key "${key}" must be a boolean, got "${rawValue}"`
+          );
+        }
+      } else {
+        (result as Record<keyof AppConfig, unknown>)[key] = rawValue;
+      }
+    }
+  }
+
+  return result;
+}
+
+function validate(config: AppConfig): void {
+  const errors: string[] = [];
+
+  for (const key of REQUIRED_KEYS) {
+    const value = config[key];
+    if (value === undefined || value === null || value === "") {
+      errors.push(
+        `Required config key "${key}" (env: ${ENV_MAP[key]}) is missing or empty.`
+      );
+    }
+  }
+
+  const validLogLevels = ["debug", "info", "warn", "error"];
+  if (!validLogLevels.includes(config.logLevel)) {
+    errors.push(
+      `Invalid logLevel "${config.logLevel}". Must be one of: ${validLogLevels.join(", ")}`
+    );
+  }
+
+  const validEnvs = ["development", "production", "test"];
+  if (!validEnvs.includes(config.nodeEnv)) {
+    errors.push(
+      `Invalid nodeEnv "${config.nodeEnv}". Must be one of: ${validEnvs.join(", ")}`
+    );
+  }
+
+  if (config.port < 1 || config.port > 65535) {
+    errors.push(`Invalid port "${config.port}". Must be between 1 and 65535.`);
+  }
+
+  if (config.maxConnections < 1) {
+    errors.push(
+      `Invalid maxConnections "${config.maxConnections}". Must be at least 1.`
+    );
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `[config] Validation failed:\n  - ${errors.join("\n  - ")}`
+    );
+  }
+}
+
+// ─── Main loader ──────────────────────────────────────────────────────────────
+
+export function loadConfig(filePath: string = "config.json"): AppConfig {
+  console.info(`[config] Loading configuration from "${filePath}"...`);
+
+  // 1. Read JSON file (falls back to empty object if missing)
+  const rawJson = readJsonFile(filePath);
+
+  // 2. Merge JSON values with defaults
+  const merged = mergeWithDefaults(rawJson);
+
+  // 3. Apply environment variable overrides
+  const withEnv = applyEnvOverrides(merged);
+
+  // 4. Validate required keys and value constraints
+  validate(withEnv);
+
+  console.info("[config] Configuration loaded successfully.");
+  console.debug("[config] Final config:", {
+    ...withEnv,
+    jwtSecret: withEnv.jwtSecret ? "***" : "(empty)",
+    databaseUrl: withEnv.databaseUrl
+      ? withEnv.databaseUrl.replace(/:\/\/[^@]+@/, "://***@")
+      : "(empty)",
+  });
+
+  return withEnv;
+}
+
+// ─── CLI entry point ──────────────────────────────────────────────────────────
+
+if (require.main === module) {
+  const configPath = process.argv[2] ?? "config.json";
+  try {
+    const config = loadConfig(configPath);
+    console.log("\nLoaded config:");
+    console.log(
+      JSON.stringify(
+        {
+          ...config,
+          jwtSecret: config.jwtSecret ? "***" : "(empty)",
+        },
+        null,
+        2
+      )
+    );
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
+}

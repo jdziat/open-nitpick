@@ -1,0 +1,53 @@
+export interface RetryOptions {
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  jitterRatio?: number;
+}
+
+export async function retry<T>(
+  operation: (attempt: number) => T | PromiseLike<T>,
+  maxAttempts: number,
+  options: RetryOptions = {},
+): Promise<T> {
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+    throw new RangeError("maxAttempts must be a positive integer");
+  }
+
+  const initialDelayMs = Math.max(0, options.initialDelayMs ?? 100);
+  const maxDelayMs = Math.max(initialDelayMs, options.maxDelayMs ?? 30_000);
+  const jitterRatio = Math.max(0, Math.min(1, options.jitterRatio ?? 0.25));
+
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation(attempt);
+    } catch (error) {
+      lastError = error;
+
+      if (attempt === maxAttempts) {
+        throw lastError;
+      }
+
+      const exponentialDelay = Math.min(
+        maxDelayMs,
+        initialDelayMs * 2 ** (attempt - 1),
+      );
+      const jitter =
+        exponentialDelay *
+        ((Math.random() * 2 - 1) * jitterRatio);
+      const delay = Math.max(
+        0,
+        Math.min(maxDelayMs, exponentialDelay + jitter),
+      );
+
+      if (delay > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+export default retry;

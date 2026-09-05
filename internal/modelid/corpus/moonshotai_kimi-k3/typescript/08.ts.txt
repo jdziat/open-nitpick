@@ -1,0 +1,83 @@
+type Comparator<T> = (a: T, b: T) => number;
+
+class PriorityQueue<T> {
+  private heap: T[] = [];
+  private readonly compare: Comparator<T>;
+
+  constructor(compare: Comparator<T>) {
+    this.compare = compare;
+  }
+
+  get size(): number {
+    return this.heap.length;
+  }
+
+  isEmpty(): boolean {
+    return this.heap.length === 0;
+  }
+
+  peek(): T | undefined {
+    return this.heap[0];
+  }
+
+  push(value: T): void {
+    this.heap.push(value);
+    this.siftUp(this.heap.length - 1);
+  }
+
+  pop(): T | undefined {
+    if (this.heap.length === 0) {
+      return undefined;
+    }
+    const top = this.heap[0];
+    const last = this.heap.pop() as T;
+    if (this.heap.length > 0) {
+      this.heap[0] = last;
+      this.siftDown(0);
+    }
+    return top;
+  }
+
+  private siftUp(index: number): void {
+    let child = index;
+    while (child > 0) {
+      const parent = (child - 1) >> 1;
+      if (this.compare(this.heap[child], this.heap[parent]) < 0) {
+        this.swap(child, parent);
+        child = parent;
+      } else {
+        break;
+      }
+    }
+  }
+
+  private siftDown(index: number): void {
+    const n = this.heap.length;
+    let parent = index;
+    for (;;) {
+      const left = 2 * parent + 1;
+      const right = left + 1;
+      let smallest = parent;
+      if (left < n && this.compare(this.heap[left], this.heap[smallest]) < 0) {
+        smallest = left;
+      }
+      if (right < n && this.compare(this.heap[right], this.heap[smallest]) < 0) {
+        smallest = right;
+      }
+      if (smallest === parent) {
+        break;
+      }
+      this.swap(parent, smallest);
+      parent = smallest;
+    }
+  }
+
+  private swap(i: number, j: number): void {
+    const tmp = this.heap[i];
+    this.heap[i] = this.heap[j];
+    this.heap[j] = tmp;
+  }
+}
+
+export { PriorityQueue };
+export type { Comparator };

@@ -1,0 +1,42 @@
+package main
+
+import (
+	"fmt"
+	"iter"
+	"time"
+)
+
+// Days returns an iterator that yields every day between start and end,
+// inclusive. When skipWeekends is true, Saturdays and Sundays are omitted.
+// Dates are normalized to midnight in start's location so iteration proceeds
+// one calendar day at a time.
+func Days(start, end time.Time, skipWeekends bool) iter.Seq[time.Time] {
+	return func(yield func(time.Time) bool) {
+		loc := start.Location()
+		first := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
+		last := time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, loc)
+		for d := first; !d.After(last); d = d.AddDate(0, 0, 1) {
+			if skipWeekends && (d.Weekday() == time.Saturday || d.Weekday() == time.Sunday) {
+				continue
+			}
+			if !yield(d) {
+				return
+			}
+		}
+	}
+}
+
+func main() {
+	start := time.Date(2024, time.March, 7, 0, 0, 0, 0, time.Local)
+	end := time.Date(2024, time.March, 12, 0, 0, 0, 0, time.Local)
+
+	fmt.Println("Every day:")
+	for d := range Days(start, end, false) {
+		fmt.Println(" ", d.Format("Mon 2006-01-02"))
+	}
+
+	fmt.Println("Weekdays only:")
+	for d := range Days(start, end, true) {
+		fmt.Println(" ", d.Format("Mon 2006-01-02"))
+	}
+}

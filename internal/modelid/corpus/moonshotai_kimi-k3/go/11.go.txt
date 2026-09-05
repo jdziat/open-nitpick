@@ -1,0 +1,191 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"math"
+	"strings"
+)
+
+var (
+	ErrShapeMismatch = errors.New("matrix: shape mismatch")
+	ErrNotSquare     = errors.New("matrix: not square")
+)
+
+// Matrix is a dense, row-major matrix of float64 values.
+type Matrix struct {
+	rows int
+	cols int
+	data []float64
+}
+
+// NewMatrix builds a rows x cols matrix from row-major data.
+func NewMatrix(rows, cols int, data []float64) (Matrix, error) {
+	if rows <= 0 || cols <= 0 {
+		return Matrix{}, fmt.Errorf("matrix: dimensions must be positive, got %dx%d", rows, cols)
+	}
+	if len(data) != rows*cols {
+		return Matrix{}, fmt.Errorf("%w: %dx%d needs %d values, got %d",
+			ErrShapeMismatch, rows, cols, rows*cols, len(data))
+	}
+	cp := make([]float64, len(data))
+	copy(cp, data)
+	return Matrix{rows: rows, cols: cols, data: cp}, nil
+}
+
+// Identity returns the n x n identity matrix.
+func Identity(n int) (Matrix, error) {
+	if n <= 0 {
+		return Matrix{}, fmt.Errorf("matrix: dimension must be positive, got %d", n)
+	}
+	m := Matrix{rows: n, cols: n, data: make([]float64, n*n)}
+	for i := 0; i < n; i++ {
+		m.data[i*n+i] = 1
+	}
+	return m, nil
+}
+
+func (m Matrix) Rows() int { return m.rows }
+func (m Matrix) Cols() int { return m.cols }
+
+// At returns the element at row r, column c (zero-based).
+func (m Matrix) At(r, c int) (float64, error) {
+	if r < 0 || r >= m.rows || c < 0 || c >= m.cols {
+		return 0, fmt.Errorf("matrix: index (%d,%d) out of bounds for %dx%d",
+			r, c, m.rows, m.cols)
+	}
+	return m.data[r*m.cols+c], nil
+}
+
+// Mul computes m * o. It fails unless m.Cols() == o.Rows().
+func (m Matrix) Mul(o Matrix) (Matrix, error) {
+	if m.cols != o.rows {
+		return Matrix{}, fmt.Errorf("%w: cannot multiply %dx%d by %dx%d",
+			ErrShapeMismatch, m.rows, m.cols, o.rows, o.cols)
+	}
+	out := make([]float64, m.rows*o.cols)
+	for i := 0; i < m.rows; i++ {
+		for k := 0; k < m.cols; k++ {
+			a := m.data[i*m.cols+k]
+			if a == 0 {
+				continue
+			}
+			for j := 0; j < o.cols; j++ {
+				out[i*o.cols+j] += a * o.data[k*o.cols+j]
+			}
+		}
+	}
+	return Matrix{rows: m.rows, cols: o.cols, data: out}, nil
+}
+
+// Transpose returns the matrix with rows and columns swapped.
+func (m Matrix) Transpose() Matrix {
+	out := make([]float64, len(m.data))
+	for i := 0; i < m.rows; i++ {
+		for j := 0; j < m.cols; j++ {
+			out[j*m.rows+i] = m.data[i*m.cols+j]
+		}
+	}
+	return Matrix{rows: m.cols, cols: m.rows, data: out}
+}
+
+// Determinant computes the determinant via Gaussian elimination with
+// partial pivoting. It fails for non-square matrices.
+func (m Matrix) Determinant() (float64, error) {
+	if m.rows != m.cols {
+		return 0, fmt.Errorf("%w: determinant undefined for %dx%d",
+			ErrNotSquare, m.rows, m.cols)
+	}
+	n := m.rows
+	a := make([]float64, len(m.data))
+	copy(a, m.data)
+
+	det, sign := 1.0, 1.0
+	for col := 0; col < n; col++ {
+		pivot, maxAbs := col, math.Abs(a[col*n+col])
+		for r := col + 1; r < n; r++ {
+			if v := math.Abs(a[r*n+col]); v > maxAbs {
+				maxAbs, pivot = v, r
+			}
+		}
+		if maxAbs == 0 {
+			return 0, nil // singular matrix
+		}
+		if pivot != col {
+			for j := 0; j < n; j++ {
+				a[col*n+j], a[pivot*n+j] = a[pivot*n+j], a[col*n+j]
+			}
+			sign = -sign
+		}
+		p := a[col*n+col]
+		det *= p
+		for r := col + 1; r < n; r++ {
+			f := a[r*n+col] / p
+			for j := col; j < n; j++ {
+				a[r*n+j] -= f * a[col*n+j]
+			}
+		}
+	}
+	return sign * det, nil
+}
+
+func (m Matrix) String() string {
+	var b strings.Builder
+	for i := 0; i < m.rows; i++ {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteByte('[')
+		for j := 0; j < m.cols; j++ {
+			if j > 0 {
+				b.WriteByte(' ')
+			}
+			fmt.Fprintf(&b, "%8.3f", m.data[i*m.cols+j])
+		}
+		b.WriteByte(']')
+	}
+	return b.String()
+}
+
+func main() {
+	a, err := NewMatrix(2, 3, []float64{1, 2, 3, 4, 5, 6})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	b, err := NewMatrix(3, 2, []float64{7, 8, 9, 10, 11, 12})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	prod, err := a.Mul(b)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("A * B =")
+	fmt.Println(prod)
+
+	det, err := prod.Determinant()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Printf("det(A * B) = %v\n", det)
+
+	fmt.Println("A transposed =")
+	fmt.Println(a.Transpose())
+
+	if _, err := a.Mul(a); err != nil {
+		fmt.Println("expected error:", err)
+	}
+	if _, err := a.Determinant(); err != nil {
+		fmt.Println("expected error:", err)
+	}
+
+	c, _ := NewMatrix(3, 3, []float64{6, 1, 1, 4, -2, 5, 2, 8, 7})
+	if d, err := c.Determinant(); err == nil {
+		fmt.Printf("det(C) = %v\n", d)
+	}
+}

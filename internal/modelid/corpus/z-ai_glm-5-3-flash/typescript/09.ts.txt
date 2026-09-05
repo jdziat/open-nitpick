@@ -1,0 +1,72 @@
+/**
+ * dateRange.ts
+ *
+ * A date-range iterator that yields each calendar day between two dates
+ * (inclusive), with an optional flag to skip weekends.
+ */
+
+export interface DateRangeOptions {
+  /** When true, Saturdays and Sundays are excluded from the iteration. Default: false. */
+  skipWeekends?: boolean;
+}
+
+/** Returns a copy of the given date with the time components zeroed out. */
+function startOfDay(date: Date): Date {
+  const copy = new Date(date.getTime());
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+/** Normalizes a Date-like input to local midnight, validating that it is a real date. */
+function toStartOfDay(value: Date | string | number): Date {
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError(`Invalid date value: ${String(value)}`);
+  }
+  return startOfDay(date);
+}
+
+/** Returns true if the date falls on a Saturday or Sunday. */
+export function isWeekend(date: Date): boolean {
+  const day = date.getDay(); // 0 = Sunday, 6 = Saturday
+  return day === 0 || day === 6;
+}
+
+/**
+ * Iterates over every day from `start` through `end`, inclusive.
+ *
+ * @param start   The first day of the range (Date, ISO string, or timestamp).
+ * @param end     The last day of the range (Date, ISO string, or timestamp).
+ * @param options Optional settings, e.g. `{ skipWeekends: true }`.
+ * @yields        A new Date object for each day, normalized to local midnight.
+ * @throws        RangeError if either input is invalid or start is after end.
+ *
+ * @example
+ * const from = new Date("2024-05-01");
+ * const to = new Date("2024-05-10");
+ *
+ * for (const day of dateRange(from, to, { skipWeekends: true })) {
+ *   console.log(day.toISOString().slice(0, 10));
+ * }
+ */
+export function* dateRange(
+  start: Date | string | number,
+  end: Date | string | number,
+  options: DateRangeOptions = {},
+): Generator<Date, void, undefined> {
+  const { skipWeekends = false } = options;
+
+  let current = toStartOfDay(start);
+  const last = toStartOfDay(end);
+
+  if (current.getTime() > last.getTime()) {
+    throw new RangeError("Start date must not be after end date.");
+  }
+
+  while (current.getTime() <= last.getTime()) {
+    if (!skipWeekends || !isWeekend(current)) {
+      yield new Date(current.getTime());
+    }
+    current.setDate(current.getDate() + 1);
+  }
+}

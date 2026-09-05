@@ -1,0 +1,34 @@
+export interface WordCount {
+    word: string;
+    count: number;
+}
+
+export function getTopKWords(text: string, k: number): WordCount[] {
+    if (!text) return [];
+
+    // Normalize: lowercase and replace non-alphanumeric characters (except spaces) with space
+    const normalizedText = text
+        .toLowerCase()
+        .replace(/[^\w\s]|_/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    if (!normalizedText) return [];
+
+    const words = normalizedText.split(" ");
+    const frequencyMap: Record<string, number> = {};
+
+    for (const word of words) {
+        frequencyMap[word] = (frequencyMap[word] || 0) + 1;
+    }
+
+    return Object.entries(frequencyMap)
+        .map(([word, count]) => ({ word, count }))
+        .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
+        .slice(0, k);
+}
+
+// Example usage:
+const sampleText = "Hello world! Hello TypeScript, world. World of TypeScript!";
+const topWords = getTopKWords(sampleText, 3);
+console.log(topWords);

@@ -1,0 +1,83 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"sort"
+	"strings"
+	"unicode"
+)
+
+type WordCount struct {
+	Word  string
+	Count int
+}
+
+func countWords(text string) map[string]int {
+	counts := make(map[string]int)
+	var word strings.Builder
+
+	flush := func() {
+		if word.Len() > 0 {
+			counts[word.String()]++
+			word.Reset()
+		}
+	}
+
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			word.WriteRune(unicode.ToLower(r))
+		} else {
+			flush()
+		}
+	}
+	flush()
+
+	return counts
+}
+
+func TopKWords(text string, k int) []WordCount {
+	if k < 0 {
+		return nil
+	}
+
+	counts := countWords(text)
+	result := make([]WordCount, 0, len(counts))
+
+	for w, c := range counts {
+		result = append(result, WordCount{Word: w, Count: c})
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Count != result[j].Count {
+			return result[i].Count > result[j].Count
+		}
+		return result[i].Word < result[j].Word
+	})
+
+	if k < len(result) {
+		return result[:k]
+	}
+	return result
+}
+
+func main() {
+	k := 10
+	if len(os.Args) > 1 {
+		if _, err := fmt.Sscanf(os.Args[1], "%d", &k); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+
+	text, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	for _, wc := range TopKWords(string(text), k) {
+		fmt.Printf("%s %d\n", wc.Word, wc.Count)
+	}
+}

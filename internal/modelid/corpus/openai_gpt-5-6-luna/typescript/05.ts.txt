@@ -1,0 +1,32 @@
+import { readFileSync } from "node:fs";
+
+export interface WordCount {
+  word: string;
+  count: number;
+}
+
+export function topKWords(text: string, k: number): WordCount[] {
+  if (k <= 0) {
+    return [];
+  }
+
+  const counts = new Map<string, number>();
+  const words = text
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .match(/[\p{L}\p{N}]+/gu) ?? [];
+
+  for (const word of words) {
+    counts.set(word, (counts.get(word) ?? 0) + 1);
+  }
+
+  return Array.from(counts, ([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
+    .slice(0, k);
+}
+
+if (typeof require !== "undefined" && require.main === module) {
+  const input = readFileSync(0, "utf8");
+  const k = Number.parseInt(process.argv[2] ?? "10", 10);
+  process.stdout.write(`${JSON.stringify(topKWords(input, Number.isNaN(k) ? 10 : k))}\n`);
+}

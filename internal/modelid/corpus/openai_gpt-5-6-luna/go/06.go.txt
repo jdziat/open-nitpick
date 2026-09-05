@@ -1,0 +1,100 @@
+package main
+
+type Node struct {
+	Key   int
+	Left  *Node
+	Right *Node
+}
+
+type BinarySearchTree struct {
+	Root *Node
+}
+
+func (t *BinarySearchTree) Insert(key int) {
+	t.Root = insertNode(t.Root, key)
+}
+
+func insertNode(node *Node, key int) *Node {
+	if node == nil {
+		return &Node{Key: key}
+	}
+
+	if key < node.Key {
+		node.Left = insertNode(node.Left, key)
+	} else if key > node.Key {
+		node.Right = insertNode(node.Right, key)
+	}
+
+	return node
+}
+
+func (t *BinarySearchTree) Search(key int) *Node {
+	node := t.Root
+
+	for node != nil {
+		if key == node.Key {
+			return node
+		}
+		if key < node.Key {
+			node = node.Left
+		} else {
+			node = node.Right
+		}
+	}
+
+	return nil
+}
+
+func (t *BinarySearchTree) Delete(key int) {
+	t.Root = deleteNode(t.Root, key)
+}
+
+func deleteNode(node *Node, key int) *Node {
+	if node == nil {
+		return nil
+	}
+
+	if key < node.Key {
+		node.Left = deleteNode(node.Left, key)
+		return node
+	}
+
+	if key > node.Key {
+		node.Right = deleteNode(node.Right, key)
+		return node
+	}
+
+	if node.Left == nil {
+		return node.Right
+	}
+	if node.Right == nil {
+		return node.Left
+	}
+
+	successor := node.Right
+	for successor.Left != nil {
+		successor = successor.Left
+	}
+
+	node.Key = successor.Key
+	node.Right = deleteNode(node.Right, successor.Key)
+	return node
+}
+
+func (t *BinarySearchTree) InOrder() []int {
+	values := make([]int, 0)
+	inOrderTraversal(t.Root, &values)
+	return values
+}
+
+func inOrderTraversal(node *Node, values *[]int) {
+	if node == nil {
+		return
+	}
+
+	inOrderTraversal(node.Left, values)
+	*values = append(*values, node.Key)
+	inOrderTraversal(node.Right, values)
+}
+
+func main() {}

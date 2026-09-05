@@ -1,0 +1,146 @@
+/**
+ * word-frequency.ts
+ *
+ * A word-frequency counter: reads text, normalises case and
+ * punctuation, and returns the top K words with their counts.
+ *
+ * Library usage:
+ *   import { topWords } from "./word-frequency";
+ *   const top = topWords("The cat, the CAT! the cat?", 2);
+ *   // => [ { word: "cat", count: 3 }, { word: "the", count: 3 } ]
+ *
+ * CLI usage (reads from stdin):
+ *   cat book.txt | ts-node word-frequency.ts 20
+ */
+
+export interface WordCount {
+  word: string;
+  count: number;
+}
+
+export interface NormalizeOptions {
+  /**
+   * Fold accented characters to their base letters ("café" -> "cafe").
+   * Default: false.
+   */
+  stripDiacritics?: boolean;
+  /** Ignore words shorter than this many characters. Default: 1. */
+  minLength?: number;
+  /** Lower-cased words to exclude from the count. */
+  stopWords?: ReadonlySet<string>;
+}
+
+/**
+ * Split raw text into normalised word tokens.
+ *
+ * Normalisation:
+ *   - lower-casing (so "The", "THE" and "the" are the same word);
+ *   - punctuation is dropped, except apostrophes *inside* a word
+ *     ("don't" survives, "'quoted'" becomes "quoted");
+ *   - hyphens and dashes act as separators ("well-known" -> "well", "known");
+ *   - optionally, diacritics are stripped via NFKD decomposition.
+ *
+ * Letters, digits and "_" count as word characters; everything else
+ * (spaces, commas, em-dashes, ...) is treated as a separator.
+ */
+export function tokenize(text: string, options: NormalizeOptions = {}): string[] {
+  const { stripDiacritics = false, minLength = 1, stopWords } = options;
+
+  let source = text.toLowerCase();
+  if (stripDiacritics) {
+    source = source.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  const matches = source.match(/[\p{L}\p{N}_]+(?:['’][\p{L}\p{N}_]+)*/gu);
+  if (matches === null) {
+    return [];
+  }
+
+  const tokens: string[] = [];
+  for (const token of matches) {
+    if (token.length < minLength) continue;
+    if (stopWords !== undefined && stopWords.has(token)) continue;
+    tokens.push(token);
+  }
+  return tokens;
+}
+
+/** Build a frequency map from an iterable of tokens. */
+export function countWords(tokens: Iterable<string>): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const token of tokens) {
+    counts.set(token, (counts.get(token) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Pick the `k` most frequent words from a frequency map.
+ * Ties are broken alphabetically so results are deterministic.
+ * `k <= 0` yields an empty list.
+ */
+export function topK(counts: ReadonlyMap<string, number>, k: number): WordCount[] {
+  if (k <= 0) {
+    return [];
+  }
+  return Array.from(counts, ([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
+    .slice(0, k);
+}
+
+/** One-call pipeline: raw text in, top-K words out. */
+export function topWords(text: string, k: number, options: NormalizeOptions = {}): WordCount[] {
+  return topK(countWords(tokenize(text, options)), k);
+}
+
+/** Render results as aligned "count  word" lines. */
+export function format(results: readonly WordCount[]): string {
+  const width = results.reduce((w, r) => Math.max(w, String(r.count).length), 1);
+  return results.map((r) => `${String(r.count).padStart(width)}  ${r.word}`).join("\n");
+}
+
+/* ------------------------------------------------------------------ */
+/* Standalone CLI: reads stdin, prints the top K words.               */
+/* ------------------------------------------------------------------ */
+
+/* Minimal ambient declarations so the file also compiles without     */
+/* @types/node installed.                                             */
+declare const process: {
+  argv: string[];
+  exit(code: number): void;
+  stdin: {
+    setEncoding(encoding: string): void;
+    on(event: "data", listener: (chunk: string) => void): void;
+    on(event: "end", listener: () => void): void;
+  };
+};
+declare const require: { main: unknown } | undefined;
+declare const module: unknown;
+declare const console: {
+  log(message?: unknown, ...rest: unknown[]): void;
+  error(message?: unknown, ...rest: unknown[]): void;
+};
+
+function runCli(): void {
+  const k = Number.parseInt(process.argv[2] ?? "10", 10);
+  if (!Number.isInteger(k) || k < 1) {
+    console.error("Usage: ts-node word-frequency.ts [k] < input.txt");
+    process.exit(1);
+  }
+
+  let input = "";
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (chunk) => {
+    input += chunk;
+  });
+  process.stdin.on("end", () => {
+    const output = format(topWords(input, k));
+    if (output.length > 0) {
+      console.log(output);
+    }
+  });
+}
+
+if (typeof require !== "undefined" && typeof module !== "undefined" && require.main === module) {
+  runCli();
+}

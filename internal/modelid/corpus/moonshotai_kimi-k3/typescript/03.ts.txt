@@ -1,0 +1,172 @@
+/**
+ * retry.ts
+ *
+ * A retry helper that calls a function up to N times with exponential
+ * backoff and jitter. When every attempt fails, the error thrown by the
+ * final attempt is re-thrown to the caller.
+ */
+
+export interface RetryOptions {
+  /** Total number of attempts, including the initial call. Must be >= 1. */
+  attempts: number;
+  /** Delay before the first retry, in milliseconds. Default: 100. */
+  initialDelayMs?: number;
+  /** Upper bound for any computed delay, in milliseconds. Default: 30_000. */
+  maxDelayMs?: number;
+  /** Factor by which the delay grows after each failure. Default: 2. */
+  backoffFactor?: number;
+  /**
+   * Jitter ratio in the range [0, 1]. Each delay is randomized within
+   * +/- (delay * jitterRatio). Use 0 to disable jitter. Default: 0.5.
+   */
+  jitterRatio?: number;
+  /**
+   * Decides whether a failure is retryable. Return false to stop
+   * immediately and re-throw the error. Default: retry every error.
+   */
+  shouldRetry?: (error: unknown, attempt: number) => boolean;
+  /** Invoked before each sleep between attempts. */
+  onRetry?: (error: unknown, attempt: number, delayMs: number) => void;
+  /** Cancels the wait between attempts when aborted. */
+  signal?: AbortSignal;
+}
+
+/**
+ * Calls `fn` until it succeeds or `options.attempts` attempts have been made.
+ *
+ * The delay between attempts grows exponentially
+ * (`initialDelayMs * backoffFactor^(attempt - 1)`, capped at `maxDelayMs`)
+ * and is randomized by `jitterRatio`.
+ *
+ * @param fn      The operation to retry. Receives the 1-based attempt number
+ *                and may be synchronous or asynchronous.
+ * @param options Retry configuration; `attempts` is required.
+ * @returns       The value produced by the first successful call.
+ * @throws        The error produced by the final attempt when all attempts
+ *                fail, or immediately when `shouldRetry` returns false.
+ */
+export async function retry<T>(
+  fn: (attempt: number) => T | Promise<T>,
+  options: RetryOptions,
+): Promise<T> {
+  const {
+    attempts,
+    initialDelayMs = 100,
+    maxDelayMs = 30_000,
+    backoffFactor = 2,
+    jitterRatio = 0.5,
+    shouldRetry = () => true,
+    onRetry,
+    signal,
+  } = options;
+
+  if (!Number.isInteger(attempts) || attempts < 1) {
+    throw new RangeError(`retry: "attempts" must be an integer >= 1, got ${attempts}`);
+  }
+
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    throwIfAborted(signal);
+
+    try {
+      return await fn(attempt);
+    } catch (error) {
+      lastError = error;
+
+      if (attempt >= attempts || !shouldRetry(error, attempt)) {
+        throw error;
+      }
+
+      const delayMs = computeDelay(attempt, initialDelayMs, backoffFactor, maxDelayMs, jitterRatio);
+      onRetry?.(error, attempt, delayMs);
+      await sleep(delayMs, signal);
+    }
+  }
+
+  // Unreachable while attempts >= 1 (guarded above); ensures the last error
+  // is always surfaced instead of the promise resolving to `undefined`.
+  throw lastError;
+}
+
+export default retry;
+
+function computeDelay(
+  attempt: number,
+  initialDelayMs: number,
+  backoffFactor: number,
+  maxDelayMs: number,
+  jitterRatio: number,
+): number {
+  const exponential = initialDelayMs * Math.pow(backoffFactor, attempt - 1);
+  const capped = Math.min(exponential, maxDelayMs);
+  const ratio = clamp(jitterRatio, 0, 1);
+  const spread = capped * ratio;
+  const jittered = capped - spread + Math.random() * spread * 2;
+  return clamp(Math.round(jittered), 0, maxDelayMs);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortReason(signal));
+      return;
+    }
+
+    const cleanup = (): void => {
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      cleanup();
+      reject(abortReason(signal as AbortSignal));
+    };
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw abortReason(signal);
+  }
+}
+
+function abortReason(signal: AbortSignal): unknown {
+  const reason = (signal as { reason?: unknown }).reason;
+  if (reason !== undefined) {
+    return reason;
+  }
+  const error = new Error("The operation was aborted.");
+  error.name = "AbortError";
+  return error;
+}
+
+/*
+ * Example:
+ *
+ *   const data = await retry(
+ *     () => fetch("https://api.example.com/data").then((r) => {
+ *       if (!r.ok) throw new Error(`HTTP ${r.status}`);
+ *       return r.json();
+ *     }),
+ *     {
+ *       attempts: 5,
+ *       initialDelayMs: 200,
+ *       maxDelayMs: 5_000,
+ *       backoffFactor: 2,
+ *       jitterRatio: 0.5,
+ *       shouldRetry: (err) => !(err instanceof Error && err.message === "HTTP 404"),
+ *       onRetry: (err, attempt, delay) =>
+ *         console.warn(`attempt ${attempt} failed (${String(err)}); retrying in ${delay}ms`),
+ *     },
+ *   );
+ */

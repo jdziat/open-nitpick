@@ -1,0 +1,149 @@
+// Package retry provides a helper for invoking functions with exponential
+// backoff and jitter, returning the last error when all attempts fail.
+package retry
+
+import (
+	"context"
+	"errors"
+	"math"
+	"math/rand"
+	"time"
+)
+
+// Config controls the behavior of Do.
+type Config struct {
+	// Attempts is the maximum number of times fn is called.
+	// Values less than 1 are treated as 1.
+	Attempts int
+
+	// BaseDelay is the delay before the first retry. Later delays grow
+	// exponentially from this value. Negative values are treated as 0.
+	BaseDelay time.Duration
+
+	// MaxDelay caps the computed backoff delay. Zero or negative values
+	// disable the cap.
+	MaxDelay time.Duration
+
+	// Multiplier is the factor by which the delay grows after each failed
+	// attempt. Values less than 1 are treated as 2.
+	Multiplier float64
+
+	// Jitter is the maximum fraction (0..1) of randomization applied to
+	// each delay. For example, 0.25 perturbs each delay by up to 25% in
+	// either direction. Values outside [0, 1] are clamped.
+	Jitter float64
+
+	// Retryable reports whether an error should trigger another attempt.
+	// If nil, every non-nil error is considered retryable.
+	Retryable func(err error) bool
+}
+
+// DefaultConfig is used by Do when cfg is nil, and by Retry.
+var DefaultConfig = Config{
+	Attempts:   3,
+	BaseDelay:  100 * time.Millisecond,
+	MaxDelay:   5 * time.Second,
+	Multiplier: 2.0,
+	Jitter:     0.25,
+}
+
+// Do calls fn up to cfg.Attempts times, sleeping between attempts with
+// exponential backoff and jitter. It returns nil as soon as fn succeeds,
+// and returns the last error produced by fn when all attempts fail.
+// If ctx is canceled while waiting, Do returns the context error joined
+// with the last error from fn, if any.
+func Do(ctx context.Context, cfg *Config, fn func(ctx context.Context) error) error {
+	c := DefaultConfig
+	if cfg != nil {
+		c = *cfg
+	}
+	c.normalize()
+
+	var lastErr error
+	for attempt := 0; attempt < c.Attempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return joinLast(err, lastErr)
+		}
+
+		if err := fn(ctx); err == nil {
+			return nil
+		} else {
+			lastErr = err
+			if c.Retryable != nil && !c.Retryable(err) {
+				return err
+			}
+		}
+
+		if attempt == c.Attempts-1 {
+			break
+		}
+
+		timer := time.NewTimer(c.delay(attempt))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return joinLast(ctx.Err(), lastErr)
+		case <-timer.C:
+		}
+	}
+	return lastErr
+}
+
+// Retry calls fn up to attempts times using DefaultConfig's backoff
+// parameters, returning the last error when all attempts fail.
+func Retry(ctx context.Context, attempts int, fn func(ctx context.Context) error) error {
+	cfg := DefaultConfig
+	cfg.Attempts = attempts
+	return Do(ctx, &cfg, fn)
+}
+
+func (c *Config) normalize() {
+	if c.Attempts < 1 {
+		c.Attempts = 1
+	}
+	if c.BaseDelay < 0 {
+		c.BaseDelay = 0
+	}
+	if c.Multiplier < 1 {
+		c.Multiplier = 2
+	}
+	if c.Jitter < 0 {
+		c.Jitter = 0
+	}
+	if c.Jitter > 1 {
+		c.Jitter = 1
+	}
+}
+
+// delay computes the backoff for the given zero-based attempt and applies
+// jitter.
+func (c Config) delay(attempt int) time.Duration {
+	d := float64(c.BaseDelay)
+	for i := 0; i < attempt; i++ {
+		d *= c.Multiplier
+		if (c.MaxDelay > 0 && d >= float64(c.MaxDelay)) || d >= float64(math.MaxInt64) {
+			break
+		}
+	}
+	if c.MaxDelay > 0 && d > float64(c.MaxDelay) {
+		d = float64(c.MaxDelay)
+	}
+	if d > float64(math.MaxInt64) {
+		d = float64(math.MaxInt64)
+	}
+	if c.Jitter > 0 && d > 0 {
+		spread := d * c.Jitter
+		d = d - spread + rand.Float64()*2*spread
+	}
+	if d < 0 {
+		d = 0
+	}
+	return time.Duration(d)
+}
+
+func joinLast(ctxErr, lastErr error) error {
+	if lastErr == nil {
+		return ctxErr
+	}
+	return errors.Join(ctxErr, lastErr)
+}

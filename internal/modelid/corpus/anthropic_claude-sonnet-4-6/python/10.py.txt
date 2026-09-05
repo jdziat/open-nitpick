@@ -1,0 +1,92 @@
+import hashlib
+import time
+from typing import Optional
+
+
+class URLShortener:
+    def __init__(self):
+        self._store: dict[str, dict] = {}
+
+    def shorten(self, original_url: str, ttl_seconds: Optional[int] = None) -> str:
+        timestamp = str(time.time())
+        raw = original_url + timestamp
+        code = hashlib.md5(raw.encode()).hexdigest()[:6]
+
+        expires_at = None
+        if ttl_seconds is not None:
+            expires_at = time.time() + ttl_seconds
+
+        self._store[code] = {
+            "url": original_url,
+            "expires_at": expires_at,
+        }
+        return code
+
+    def resolve(self, code: str) -> Optional[str]:
+        entry = self._store.get(code)
+        if entry is None:
+            return None
+
+        if entry["expires_at"] is not None and time.time() > entry["expires_at"]:
+            del self._store[code]
+            return None
+
+        return entry["url"]
+
+    def delete(self, code: str) -> bool:
+        if code in self._store:
+            del self._store[code]
+            return True
+        return False
+
+    def active_count(self) -> int:
+        now = time.time()
+        return sum(
+            1
+            for entry in self._store.values()
+            if entry["expires_at"] is None or entry["expires_at"] > now
+        )
+
+
+def main():
+    shortener = URLShortener()
+
+    url1 = "https://www.example.com/some/very/long/path?query=1&other=2"
+    url2 = "https://www.another-example.org/page"
+
+    code1 = shortener.shorten(url1)
+    code2 = shortener.shorten(url2, ttl_seconds=2)
+    code3 = shortener.shorten("https://expiring-soon.com", ttl_seconds=1)
+
+    print(f"Shortened '{url1}' -> '{code1}'")
+    print(f"Shortened '{url2}' -> '{code2}' (expires in 2s)")
+    print(f"Shortened 'https://expiring-soon.com' -> '{code3}' (expires in 1s)")
+    print()
+
+    print(f"Resolve '{code1}': {shortener.resolve(code1)}")
+    print(f"Resolve '{code2}': {shortener.resolve(code2)}")
+    print(f"Resolve '{code3}': {shortener.resolve(code3)}")
+    print(f"Resolve 'unknown': {shortener.resolve('unknown')}")
+    print(f"Active URLs: {shortener.active_count()}")
+    print()
+
+    print("Waiting 1.5 seconds...")
+    time.sleep(1.5)
+    print(f"Resolve '{code3}' after expiry: {shortener.resolve(code3)}")
+    print(f"Active URLs: {shortener.active_count()}")
+    print()
+
+    print("Waiting another 1 second (total 2.5s)...")
+    time.sleep(1)
+    print(f"Resolve '{code2}' after expiry: {shortener.resolve(code2)}")
+    print(f"Active URLs: {shortener.active_count()}")
+    print()
+
+    deleted = shortener.delete(code1)
+    print(f"Deleted '{code1}': {deleted}")
+    print(f"Resolve '{code1}' after deletion: {shortener.resolve(code1)}")
+    print(f"Active URLs: {shortener.active_count()}")
+
+
+if __name__ == "__main__":
+    main()

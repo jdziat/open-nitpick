@@ -1,0 +1,71 @@
+/**
+ * Minimal in-memory URL shortener with expiry support.
+ *
+ * Usage:
+ *   const shortener = new UrlShortener();
+ *   const code = shortener.shorten("https://example.com", 60); // expires in 60s
+ *   const url = shortener.resolve(code);                       // "https://example.com"
+ */
+
+const CODE_LENGTH = 7;
+const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const DEFAULT_TTL_SECONDS = 60 * 60; // 1 hour
+
+interface Entry {
+  url: string;
+  expiresAt: number | null; // epoch milliseconds; null = never expires
+}
+
+export class UrlShortener {
+  private entries = new Map<string, Entry>();
+
+  /** Shortens a URL and returns a unique short code. */
+  shorten(url: string, ttlSeconds: number = DEFAULT_TTL_SECONDS): string {
+    const parsed = new URL(url); // throws on invalid URL
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error(`Unsupported protocol: ${parsed.protocol}`);
+    }
+
+    let code: string;
+    do {
+      code = randomCode(CODE_LENGTH);
+    } while (this.entries.has(code));
+
+    const expiresAt = ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : null;
+    this.entries.set(code, { url, expiresAt });
+    return code;
+  }
+
+  /** Returns the original URL for a code, or null if unknown or expired. */
+  resolve(code: string): string | null {
+    const entry = this.entries.get(code);
+    if (!entry) return null;
+
+    if (entry.expiresAt !== null && Date.now() >= entry.expiresAt) {
+      this.entries.delete(code); // lazily evict expired entries
+      return null;
+    }
+    return entry.url;
+  }
+
+  /** Removes all expired entries; returns how many were evicted. */
+  prune(): number {
+    const now = Date.now();
+    let evicted = 0;
+    for (const [code, entry] of this.entries) {
+      if (entry.expiresAt !== null && now >= entry.expiresAt) {
+        this.entries.delete(code);
+        evicted++;
+      }
+    }
+    return evicted;
+  }
+}
+
+function randomCode(length: number): string {
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+  }
+  return code;
+}

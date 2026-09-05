@@ -1,0 +1,212 @@
+export class MatrixError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MatrixError";
+    Object.setPrototypeOf(this, MatrixError.prototype);
+  }
+}
+
+export class Matrix {
+  readonly rows: number;
+  readonly cols: number;
+  readonly data: number[][];
+
+  constructor(rows: number, cols: number, data?: number[][]) {
+    if (!Number.isInteger(rows) || rows < 0) {
+      throw new MatrixError("rows must be a non-negative integer.");
+    }
+    if (!Number.isInteger(cols) || cols < 0) {
+      throw new MatrixError("cols must be a non-negative integer.");
+    }
+
+    const source = data ?? [];
+
+    if (source.length !== rows) {
+      throw new MatrixError(`Expected ${rows} rows, got ${source.length}.`);
+    }
+
+    const normalized: number[][] = [];
+
+    for (let r = 0; r < rows; r++) {
+      const row = source[r];
+
+      if (!Array.isArray(row)) {
+        throw new MatrixError(`Row ${r} is not an array.`);
+      }
+
+      if (row.length !== cols) {
+        throw new MatrixError(`Row ${r} must have ${cols} columns, got ${row.length}.`);
+      }
+
+      const copy: number[] = new Array<number>(cols);
+
+      for (let c = 0; c < cols; c++) {
+        const value = row[c];
+
+        if (typeof value !== "number" || !Number.isFinite(value)) {
+          throw new MatrixError(`Entry (${r}, ${c}) must be a finite number.`);
+        }
+
+        copy[c] = value;
+      }
+
+      normalized.push(copy);
+    }
+
+    this.rows = rows;
+    this.cols = cols;
+    this.data = normalized;
+  }
+
+  static fromRows(rows: number[][]): Matrix {
+    if (rows.length === 0) {
+      return new Matrix(0, 0);
+    }
+
+    return new Matrix(rows.length, rows[0].length, rows);
+  }
+
+  static zeros(rows: number, cols: number): Matrix {
+    return new Matrix(
+      rows,
+      cols,
+      Array.from({ length: rows }, () => new Array<number>(cols).fill(0))
+    );
+  }
+
+  static identity(size: number): Matrix {
+    return new Matrix(
+      size,
+      size,
+      Array.from({ length: size }, (_, r) =>
+        Array.from({ length: size }, (_, c) => (r === c ? 1 : 0))
+      )
+    );
+  }
+
+  get(row: number, col: number): number {
+    if (!Number.isInteger(row) || row < 0 || row >= this.rows) {
+      throw new MatrixError(`Row index ${row} is out of bounds.`);
+    }
+
+    if (!Number.isInteger(col) || col < 0 || col >= this.cols) {
+      throw new MatrixError(`Column index ${col} is out of bounds.`);
+    }
+
+    return this.data[row][col];
+  }
+
+  multiply(other: Matrix): Matrix {
+    return multiply(this, other);
+  }
+
+  transpose(): Matrix {
+    return transpose(this);
+  }
+
+  determinant(): number {
+    return determinant(this);
+  }
+
+  toString(): string {
+    return this.data.map((row) => `[${row.join(", ")}]`).join("\n");
+  }
+}
+
+export function multiply(a: Matrix, b: Matrix): Matrix {
+  if (a.cols !== b.rows) {
+    throw new MatrixError(
+      `Cannot multiply ${a.rows}x${a.cols} by ${b.rows}x${b.cols}: inner dimensions must match.`
+    );
+  }
+
+  const data: number[][] = Array.from(
+    { length: a.rows },
+    () => new Array<number>(b.cols).fill(0)
+  );
+
+  for (let i = 0; i < a.rows; i++) {
+    for (let k = 0; k < a.cols; k++) {
+      const aik = a.data[i][k];
+
+      if (aik === 0) {
+        continue;
+      }
+
+      for (let j = 0; j < b.cols; j++) {
+        data[i][j] += aik * b.data[k][j];
+      }
+    }
+  }
+
+  return new Matrix(a.rows, b.cols, data);
+}
+
+export function transpose(m: Matrix): Matrix {
+  const data: number[][] = Array.from(
+    { length: m.cols },
+    (_, col) =>
+      Array.from({ length: m.rows }, (_, row) => m.data[row][col])
+  );
+
+  return new Matrix(m.cols, m.rows, data);
+}
+
+export function determinant(m: Matrix): number {
+  if (m.rows !== m.cols) {
+    throw new MatrixError(
+      `Determinant requires a square matrix; got ${m.rows}x${m.cols}.`
+    );
+  }
+
+  const n = m.rows;
+
+  if (n === 0) {
+    return 1;
+  }
+
+  if (n === 1) {
+    return m.data[0][0];
+  }
+
+  if (n === 2) {
+    return m.data[0][0] * m.data[1][1] - m.data[0][1] * m.data[1][0];
+  }
+
+  const a = m.data.map((row) => row.slice());
+  let det = 1;
+
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+
+    for (let row = col + 1; row < n; row++) {
+      if (Math.abs(a[row][col]) > Math.abs(a[pivot][col])) {
+        pivot = row;
+      }
+    }
+
+    if (Math.abs(a[pivot][col]) === 0) {
+      return 0;
+    }
+
+    if (pivot !== col) {
+      const temp = a[col];
+      a[col] = a[pivot];
+      a[pivot] = temp;
+      det = -det;
+    }
+
+    const pivotValue = a[col][col];
+    det *= pivotValue;
+
+    for (let row = col + 1; row < n; row++) {
+      const factor = a[row][col] / pivotValue;
+
+      for (let c = col; c < n; c++) {
+        a[row][c] -= factor * a[col][c];
+      }
+    }
+  }
+
+  return det;
+}

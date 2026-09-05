@@ -1,0 +1,197 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"unicode/utf8"
+)
+
+// ParseCSV parses a CSV string with the given delimiter and returns rows of strings.
+// It supports quoted fields and escaped quotes (either "" or \").
+func ParseCSV(input string, delimiter rune) ([][]string, error) {
+	var rows [][]string
+	var currentRow []string
+
+	if delimiter == '"' {
+		return nil, errors.New("delimiter cannot be a double-quote character")
+	}
+
+	pos := 0
+	length := len(input)
+
+	for pos <= length {
+		// If we're past the end, finalize
+		if pos == length {
+			// Append whatever row we have (even empty last row handling)
+			rows = append(rows, currentRow)
+			break
+		}
+
+		r, size := utf8.DecodeRuneInString(input[pos:])
+
+		// Handle newline (end of row)
+		if r == '\n' || r == '\r' {
+			rows = append(rows, currentRow)
+			currentRow = nil
+			pos += size
+			// Handle \r\n
+			if r == '\r' && pos < length {
+				next, nextSize := utf8.DecodeRuneInString(input[pos:])
+				if next == '\n' {
+					pos += nextSize
+				}
+			}
+			continue
+		}
+
+		// Handle quoted field
+		if r == '"' {
+			pos += size // skip opening quote
+			var fieldBuilder strings.Builder
+			closed := false
+			for pos < length {
+				fr, fsize := utf8.DecodeRuneInString(input[pos:])
+				if fr == '"' {
+					// Check for escaped quote: "" 
+					nextPos := pos + fsize
+					if nextPos < length {
+						nr, nsize := utf8.DecodeRuneInString(input[nextPos:])
+						if nr == '"' {
+							// Escaped quote
+							fieldBuilder.WriteRune('"')
+							pos = nextPos + nsize
+							continue
+						}
+					}
+					// Closing quote
+					pos += fsize
+					closed = true
+					break
+				} else if fr == '\\' {
+					// Check for \"
+					nextPos := pos + fsize
+					if nextPos < length {
+						nr, nsize := utf8.DecodeRuneInString(input[nextPos:])
+						if nr == '"' {
+							fieldBuilder.WriteRune('"')
+							pos = nextPos + nsize
+							continue
+						}
+					}
+					fieldBuilder.WriteRune(fr)
+					pos += fsize
+				} else {
+					fieldBuilder.WriteRune(fr)
+					pos += fsize
+				}
+			}
+			if !closed {
+				return nil, errors.New("unclosed quoted field")
+			}
+			currentRow = append(currentRow, fieldBuilder.String())
+
+			// After closing quote, expect delimiter or newline or end
+			if pos < length {
+				ar, asize := utf8.DecodeRuneInString(input[pos:])
+				if ar == delimiter {
+					pos += asize
+				} else if ar == '\n' || ar == '\r' {
+					// Let the main loop handle the newline
+				} else {
+					return nil, fmt.Errorf("unexpected character %q after closing quote at position %d", ar, pos)
+				}
+			}
+			continue
+		}
+
+		// Handle unquoted field
+		var fieldBuilder strings.Builder
+		for pos < length {
+			fr, fsize := utf8.DecodeRuneInString(input[pos:])
+			if fr == delimiter {
+				pos += fsize
+				break
+			}
+			if fr == '\n' || fr == '\r' {
+				break
+			}
+			fieldBuilder.WriteRune(fr)
+			pos += fsize
+		}
+		currentRow = append(currentRow, fieldBuilder.String())
+
+		// If we ended on a delimiter we already consumed it above.
+		// If we ended on newline, let the main loop handle it.
+		// If we ended because pos == length, the outer loop will finalize.
+	}
+
+	// Remove trailing empty row if input ends with newline
+	if len(rows) > 0 {
+		last := rows[len(rows)-1]
+		if len(last) == 0 {
+			rows = rows[:len(rows)-1]
+		} else if len(last) == 1 && last[0] == "" {
+			rows = rows[:len(rows)-1]
+		}
+	}
+
+	return rows, nil
+}
+
+func main() {
+	examples := []struct {
+		name      string
+		input     string
+		delimiter rune
+	}{
+		{
+			name:      "Basic CSV",
+			input:     "name,age,city\nAlice,30,New York\nBob,25,Los Angeles",
+			delimiter: ',',
+		},
+		{
+			name:      "Quoted fields",
+			input:     `"hello","world","foo bar"`,
+			delimiter: ',',
+		},
+		{
+			name:      "Escaped quotes (doubled)",
+			input:     `"she said ""hello""","ok"`,
+			delimiter: ',',
+		},
+		{
+			name:      `Escaped quotes (backslash)`,
+			input:     `"she said \"hello\"","ok"`,
+			delimiter: ',',
+		},
+		{
+			name:      "Custom delimiter",
+			input:     "a|b|c\n1|2|3",
+			delimiter: '|',
+		},
+		{
+			name:      "Mixed quoted and unquoted",
+			input:     `Alice,"Smith, Jr.",30`,
+			delimiter: ',',
+		},
+		{
+			name:      "CRLF line endings",
+			input:     "a,b,c\r\n1,2,3\r\n",
+			delimiter: ',',
+		},
+	}
+
+	for _, ex := range examples {
+		fmt.Printf("=== %s ===\n", ex.name)
+		rows, err := ParseCSV(ex.input, ex.delimiter)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		} else {
+			for i, row := range rows {
+				fmt.Printf("  Row %d: %v\n", i, row)
+			}
+		}
+		fmt.Println()
+	}
+}

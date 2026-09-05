@@ -1,0 +1,109 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+// RetryConfig controls the behavior of Retry.
+type RetryConfig struct {
+	MaxAttempts int           // total number of attempts (minimum 1)
+	BaseDelay   time.Duration // delay before the first retry
+	MaxDelay    time.Duration // upper bound for a single backoff delay
+	Multiplier  float64       // growth factor between attempts (typically 2)
+	Jitter      float64       // randomization fraction, 0..1
+}
+
+// Retry calls fn up to cfg.MaxAttempts times, sleeping between attempts with
+// exponential backoff plus jitter. It returns nil as soon as fn succeeds, or
+// the error from the final attempt if every attempt fails. If ctx is canceled
+// while waiting between attempts, the last error is returned.
+func Retry(ctx context.Context, cfg RetryConfig, fn func(attempt int) error) error {
+	if cfg.MaxAttempts < 1 {
+		cfg.MaxAttempts = 1
+	}
+	if cfg.BaseDelay <= 0 {
+		cfg.BaseDelay = 100 * time.Millisecond
+	}
+	if cfg.MaxDelay <= 0 {
+		cfg.MaxDelay = 10 * time.Second
+	}
+	if cfg.Multiplier < 1 {
+		cfg.Multiplier = 2
+	}
+	if cfg.Jitter < 0 {
+		cfg.Jitter = 0
+	} else if cfg.Jitter > 1 {
+		cfg.Jitter = 1
+	}
+
+	var lastErr error
+	delay := cfg.BaseDelay
+
+	for attempt := 1; attempt <= cfg.MaxAttempts; attempt++ {
+		err := fn(attempt)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+
+		if attempt == cfg.MaxAttempts {
+			break
+		}
+
+		sleepFor := jitterDelay(delay, cfg.Jitter)
+		if sleepErr := sleep(ctx, sleepFor); sleepErr != nil {
+			return lastErr
+		}
+
+		next := time.Duration(float64(delay) * cfg.Multiplier)
+		if next > cfg.MaxDelay {
+			next = cfg.MaxDelay
+		}
+		delay = next
+	}
+
+	return lastErr
+}
+
+// jitterDelay centers a random offset of +/- jitter around d.
+func jitterDelay(d time.Duration, jitter float64) time.Duration {
+	if jitter <= 0 {
+		return d
+	}
+	span := float64(d) * jitter
+	return time.Duration(float64(d) - span/2 + rand.Float64()*span)
+}
+
+func sleep(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return ctx.Err()
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
+}
+
+func main() {
+	attempts := 0
+	err := Retry(context.Background(), RetryConfig{
+		MaxAttempts: 5,
+		BaseDelay:   50 * time.Millisecond,
+		MaxDelay:    1 * time.Second,
+		Multiplier:  2,
+		Jitter:      0.5,
+	}, func(attempt int) error {
+		attempts++
+		fmt.Printf("attempt %d: failing\n", attempt)
+		return errors.New("transient failure")
+	})
+	fmt.Printf("gave up after %d attempts: %v\n", attempts, err)
+}

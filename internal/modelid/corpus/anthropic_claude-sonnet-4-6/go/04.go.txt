@@ -1,0 +1,53 @@
+package main
+
+import (
+	"fmt"
+	"strings"
+	"unicode"
+)
+
+// Slugify converts a string into a URL-friendly slug.
+// It lowercases text, replaces runs of non-alphanumeric characters with a
+// single hyphen, trims leading/trailing hyphens, and handles Unicode letters.
+func Slugify(s string) string {
+	var builder strings.Builder
+	inNonAlnum := false
+
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			if inNonAlnum {
+				builder.WriteRune('-')
+				inNonAlnum = false
+			}
+			builder.WriteRune(unicode.ToLower(r))
+		} else {
+			inNonAlnum = true
+		}
+	}
+
+	result := builder.String()
+	result = strings.Trim(result, "-")
+	return result
+}
+
+func main() {
+	examples := []string{
+		"Hello, World!",
+		"  Leading and trailing spaces  ",
+		"Multiple   spaces   between   words",
+		"Special @#$% Characters!!!",
+		"Unicode: Héllo Wörld",
+		"日本語テスト",
+		"MiXeD CaSe StRiNg",
+		"already-a-slug",
+		"---hyphens---",
+		"numbers 123 and letters",
+		"",
+		"Ünïcödé & Spëcîål Chàrs",
+	}
+
+	for _, ex := range examples {
+		fmt.Printf("Input:  %q\n", ex)
+		fmt.Printf("Output: %q\n\n", Slugify(ex))
+	}
+}

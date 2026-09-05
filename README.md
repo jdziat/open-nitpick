@@ -99,6 +99,22 @@ findings weighted by severity (critical 8, error 4, warning 2, info 1, nit
 A threshold on the slop rate names when a repository reads as generated
 and left unread; the fixture that set it is in `internal/evals`.
 
+### Which model wrote it
+
+```bash
+nitpick identify-model src/client.ts
+```
+
+Names the model whose style a file is most similar to, from a corpus of
+the same twelve programs written by six models. It answers for TypeScript
+only, because that is the one language where the experiment in
+[docs/findings.md](docs/findings.md#which-model-wrote-it-2026-09-05-evening)
+cleared the bar set before it ran; for Go and Python the classifier could
+not hold a margin over guessing the commonest author, and the command
+says so rather than guessing. Below a confidence floor it answers
+"unknown". A match is a style similarity against a small corpus, not an
+attribution.
+
 ### The slop class
 
 `review.slop: true` asks the model for, and publishes, findings in a tenth

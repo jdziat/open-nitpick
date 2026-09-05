@@ -1,0 +1,191 @@
+class MatrixShapeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MatrixShapeError";
+  }
+}
+
+class Matrix {
+  readonly rows: number;
+  readonly cols: number;
+  private readonly data: number[][];
+
+  constructor(data: number[][]) {
+    if (data.length === 0) {
+      throw new MatrixShapeError("Matrix must have at least one row.");
+    }
+    const cols = data[0].length;
+    if (cols === 0) {
+      throw new MatrixShapeError("Matrix must have at least one column.");
+    }
+    for (const row of data) {
+      if (row.length !== cols) {
+        throw new MatrixShapeError(
+          "All rows of a matrix must have the same length."
+        );
+      }
+    }
+    this.data = data.map((row) => [...row]);
+    this.rows = data.length;
+    this.cols = cols;
+  }
+
+  static zeros(rows: number, cols: number): Matrix {
+    Matrix.validateDimensions(rows, cols);
+    return new Matrix(
+      Array.from({ length: rows }, () => new Array<number>(cols).fill(0))
+    );
+  }
+
+  static identity(size: number): Matrix {
+    Matrix.validateDimensions(size, size);
+    return new Matrix(
+      Array.from({ length: size }, (_, i) =>
+        Array.from({ length: size }, (_, j) => (i === j ? 1 : 0))
+      )
+    );
+  }
+
+  private static validateDimensions(rows: number, cols: number): void {
+    if (
+      !Number.isInteger(rows) ||
+      !Number.isInteger(cols) ||
+      rows <= 0 ||
+      cols <= 0
+    ) {
+      throw new MatrixShapeError(
+        `Matrix dimensions must be positive integers, got ${rows}x${cols}.`
+      );
+    }
+  }
+
+  get(row: number, col: number): number {
+    if (row < 0 || row >= this.rows || col < 0 || col >= this.cols) {
+      throw new MatrixShapeError(
+        `Index (${row}, ${col}) out of bounds for ${this.rows}x${this.cols} matrix.`
+      );
+    }
+    return this.data[row][col];
+  }
+
+  toArray(): number[][] {
+    return this.data.map((row) => [...row]);
+  }
+
+  transpose(): Matrix {
+    const result: number[][] = [];
+    for (let j = 0; j < this.cols; j++) {
+      const row: number[] = [];
+      for (let i = 0; i < this.rows; i++) {
+        row.push(this.data[i][j]);
+      }
+      result.push(row);
+    }
+    return new Matrix(result);
+  }
+
+  multiply(other: Matrix): Matrix {
+    if (this.cols !== other.rows) {
+      throw new MatrixShapeError(
+        `Cannot multiply a ${this.rows}x${this.cols} matrix by a ` +
+          `${other.rows}x${other.cols} matrix: inner dimensions must match.`
+      );
+    }
+    const result: number[][] = [];
+    for (let i = 0; i < this.rows; i++) {
+      const row: number[] = [];
+      for (let j = 0; j < other.cols; j++) {
+        let sum = 0;
+        for (let k = 0; k < this.cols; k++) {
+          sum += this.data[i][k] * other.data[k][j];
+        }
+        row.push(sum);
+      }
+      result.push(row);
+    }
+    return new Matrix(result);
+  }
+
+  scale(factor: number): Matrix {
+    return new Matrix(this.data.map((row) => row.map((v) => v * factor)));
+  }
+
+  determinant(): number {
+    if (this.rows !== this.cols) {
+      throw new MatrixShapeError(
+        `Determinant is only defined for square matrices, got ${this.rows}x${this.cols}.`
+      );
+    }
+    // Gaussian elimination with partial pivoting.
+    const n = this.rows;
+    const a = this.data.map((row) => [...row]);
+    let det = 1;
+    for (let i = 0; i < n; i++) {
+      let pivotRow = i;
+      for (let r = i + 1; r < n; r++) {
+        if (Math.abs(a[r][i]) > Math.abs(a[pivotRow][i])) {
+          pivotRow = r;
+        }
+      }
+      if (a[pivotRow][i] === 0) {
+        return 0;
+      }
+      if (pivotRow !== i) {
+        [a[i], a[pivotRow]] = [a[pivotRow], a[i]];
+        det = -det;
+      }
+      const pivot = a[i][i];
+      det *= pivot;
+      for (let r = i + 1; r < n; r++) {
+        const factor = a[r][i] / pivot;
+        for (let c = i; c < n; c++) {
+          a[r][c] -= factor * a[i][c];
+        }
+      }
+    }
+    return det;
+  }
+
+  toString(): string {
+    return this.data.map((row) => `[ ${row.join(", ")} ]`).join("\n");
+  }
+}
+
+// --- Example usage ---
+
+const a = new Matrix([
+  [1, 2],
+  [3, 4],
+]);
+const b = new Matrix([
+  [5, 6],
+  [7, 8],
+]);
+
+console.log("A * B:");
+console.log(a.multiply(b).toString());
+
+console.log("\nTranspose of A:");
+console.log(a.transpose().toString());
+
+console.log("\ndet(A):", a.determinant());
+
+try {
+  const c = new Matrix([
+    [1, 2, 3],
+    [4, 5, 6],
+  ]);
+  a.multiply(c); // 2x2 times 2x3 is fine, but let's force a mismatch:
+  c.multiply(a); // 2x3 times 2x2 -> error
+} catch (e) {
+  console.error("\nCaught:", (e as Error).message);
+}
+
+try {
+  new Matrix([
+    [1, 2, 3],
+    [4, 5, 6],
+  ]).determinant();
+} catch (e) {
+  console.error("Caught:", (e as Error).message);
+}

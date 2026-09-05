@@ -1,0 +1,10 @@
+function slugify(text: string): string {
+  return text
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export { slugify };
+export default slugify;

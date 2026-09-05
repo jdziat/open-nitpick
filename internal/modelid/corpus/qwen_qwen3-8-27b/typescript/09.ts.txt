@@ -1,0 +1,32 @@
+export interface DateRangeOptions {
+  skipWeekends?: boolean;
+}
+
+export function* dateRange(
+  start: Date,
+  end: Date,
+  options: DateRangeOptions = {}
+): Generator<Date, void, unknown> {
+  const { skipWeekends = false } = options;
+
+  const current = new Date(start);
+  current.setHours(0, 0, 0, 0);
+
+  const endDate = new Date(end);
+  endDate.setHours(0, 0, 0, 0);
+
+  if (current.getTime() > endDate.getTime()) {
+    return;
+  }
+
+  while (current.getTime() <= endDate.getTime()) {
+    const day = new Date(current);
+    const dayOfWeek = day.getDay();
+
+    if (!skipWeekends || (dayOfWeek !== 0 && dayOfWeek !== 6)) {
+      yield day;
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+}

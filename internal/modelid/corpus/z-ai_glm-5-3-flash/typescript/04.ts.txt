@@ -1,0 +1,10 @@
+function slugify(text: string): string {
+  return text
+    .normalize("NFC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "");
+}
+
+export default slugify;

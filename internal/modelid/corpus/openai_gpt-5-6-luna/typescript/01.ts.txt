@@ -1,0 +1,108 @@
+export function parseCSV(input: string, delimiter: string = ","): string[][] {
+  if (delimiter.length !== 1) {
+    throw new Error("Delimiter must be a single character");
+  }
+
+  if (delimiter === '"' || delimiter === "\r" || delimiter === "\n") {
+    throw new Error("Invalid delimiter");
+  }
+
+  if (input.length === 0) {
+    return [];
+  }
+
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let fieldStarted = false;
+  let inQuotes = false;
+  let afterClosingQuote = false;
+  let endedWithRecordSeparator = false;
+
+  const finishRecord = (): void => {
+    row.push(field);
+    rows.push(row);
+    row = [];
+    field = "";
+    fieldStarted = false;
+    afterClosingQuote = false;
+    endedWithRecordSeparator = true;
+  };
+
+  for (let i = 0; i < input.length; i++) {
+    const character = input[i];
+
+    if (inQuotes) {
+      if (character === '"') {
+        if (input[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+          afterClosingQuote = true;
+        }
+      } else {
+        field += character;
+      }
+      continue;
+    }
+
+    if (afterClosingQuote) {
+      if (input.startsWith(delimiter, i)) {
+        row.push(field);
+        field = "";
+        fieldStarted = false;
+        afterClosingQuote = false;
+        endedWithRecordSeparator = false;
+        i += delimiter.length - 1;
+      } else if (character === "\r" || character === "\n") {
+        if (character === "\r" && input[i + 1] === "\n") {
+          i++;
+        }
+        finishRecord();
+      } else {
+        throw new SyntaxError(
+          "Unexpected character after closing quote"
+        );
+      }
+      continue;
+    }
+
+    if (character === '"') {
+      if (fieldStarted) {
+        throw new SyntaxError("Unexpected quote in unquoted field");
+      }
+      inQuotes = true;
+      fieldStarted = true;
+      endedWithRecordSeparator = false;
+    } else if (input.startsWith(delimiter, i)) {
+      row.push(field);
+      field = "";
+      fieldStarted = false;
+      endedWithRecordSeparator = false;
+      i += delimiter.length - 1;
+    } else if (character === "\r" || character === "\n") {
+      if (character === "\r" && input[i + 1] === "\n") {
+        i++;
+      }
+      finishRecord();
+    } else {
+      field += character;
+      fieldStarted = true;
+      endedWithRecordSeparator = false;
+    }
+  }
+
+  if (inQuotes) {
+    throw new SyntaxError("Unterminated quoted field");
+  }
+
+  if (!endedWithRecordSeparator) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+export default parseCSV;

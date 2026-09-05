@@ -49,6 +49,8 @@ func run() int {
 		err = runFullReview(ctx, os.Args[2:])
 	case "repo-score":
 		err = runRepoScore(ctx, os.Args[2:])
+	case "identify-model":
+		err = runIdentifyModel(os.Args[2:])
 	case "explain-config":
 		err = runExplainConfig(os.Args[2:])
 	case "linters":
@@ -98,6 +100,7 @@ Usage:
                                    Review the whole tree, or the paths given, with a remediation plan
   nitpick repo-score [flags] [path...]
                                    The same, plus slop, bug and security findings per thousand lines, by language
+  nitpick identify-model <file>... Which model's style a file is most similar to (TypeScript only; see docs/findings.md)
   nitpick explain-config [flags]   Show the resolved configuration and prompts
   nitpick providers                List available model providers
   nitpick linters                  List the deterministic analyzers and how each is configured

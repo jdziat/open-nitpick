@@ -1,0 +1,99 @@
+from typing import Callable, Generic, Iterable, List, TypeVar
+
+
+T = TypeVar("T")
+
+
+class PriorityQueue(Generic[T]):
+    """A binary-heap priority queue.
+
+    The comparison function may either return True when its first argument
+    should precede its second argument, or return a negative, zero, or
+    positive value in the style of cmp().
+    """
+
+    def __init__(
+        self,
+        comparison: Callable[[T, T], object],
+        iterable: Iterable[T] = (),
+    ) -> None:
+        self._comparison = comparison
+        self._heap: List[T] = list(iterable)
+        for index in range(len(self._heap) // 2 - 1, -1, -1):
+            self._sift_down(index)
+
+    def _comes_before(self, first: T, second: T) -> bool:
+        result = self._comparison(first, second)
+        if isinstance(result, bool):
+            return result
+        return result < 0
+
+    def _sift_up(self, index: int) -> None:
+        while index > 0:
+            parent = (index - 1) // 2
+            if not self._comes_before(self._heap[index], self._heap[parent]):
+                break
+            self._heap[index], self._heap[parent] = (
+                self._heap[parent],
+                self._heap[index],
+            )
+            index = parent
+
+    def _sift_down(self, index: int) -> None:
+        size = len(self._heap)
+        while True:
+            left = 2 * index + 1
+            right = left + 1
+            best = index
+
+            if (
+                left < size
+                and self._comes_before(self._heap[left], self._heap[best])
+            ):
+                best = left
+
+            if (
+                right < size
+                and self._comes_before(self._heap[right], self._heap[best])
+            ):
+                best = right
+
+            if best == index:
+                break
+
+            self._heap[index], self._heap[best] = (
+                self._heap[best],
+                self._heap[index],
+            )
+            index = best
+
+    def push(self, item: T) -> None:
+        self._heap.append(item)
+        self._sift_up(len(self._heap) - 1)
+
+    def peek(self) -> T:
+        if not self._heap:
+            raise IndexError("peek from empty priority queue")
+        return self._heap[0]
+
+    def pop(self) -> T:
+        if not self._heap:
+            raise IndexError("pop from empty priority queue")
+
+        item = self._heap[0]
+        last = self._heap.pop()
+
+        if self._heap:
+            self._heap[0] = last
+            self._sift_down(0)
+
+        return item
+
+    def __len__(self) -> int:
+        return len(self._heap)
+
+    def __bool__(self) -> bool:
+        return bool(self._heap)
+
+    def is_empty(self) -> bool:
+        return not self._heap

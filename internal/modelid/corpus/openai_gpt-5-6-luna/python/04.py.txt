@@ -1,0 +1,15 @@
+def slugify(text: str) -> str:
+    text = text.lower()
+    result = []
+    separator_pending = False
+
+    for character in text:
+        if character.isalnum():
+            if separator_pending and result:
+                result.append("-")
+            result.append(character)
+            separator_pending = False
+        elif result:
+            separator_pending = True
+
+    return "".join(result)

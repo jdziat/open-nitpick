@@ -1,0 +1,85 @@
+package main
+
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
+	"sync"
+	"time"
+)
+
+type entry struct {
+	url       string
+	expiresAt time.Time
+}
+
+type shortener struct {
+	mu      sync.Mutex
+	entries map[string]entry
+}
+
+func newShortener() *shortener {
+	return &shortener{entries: make(map[string]entry)}
+}
+
+func (s *shortener) shorten(url string, ttl time.Duration) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var code string
+	var err error
+	for {
+		code, err = randomCode(8)
+		if err != nil {
+			return "", err
+		}
+		if _, taken := s.entries[code]; !taken {
+			break
+		}
+	}
+
+	s.entries[code] = entry{url: url, expiresAt: time.Now().Add(ttl)}
+	return code, nil
+}
+
+func (s *shortener) resolve(code string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	e, ok := s.entries[code]
+	if !ok {
+		return "", false
+	}
+	if time.Now().After(e.expiresAt) {
+		delete(s.entries, code)
+		return "", false
+	}
+	return e.url, true
+}
+
+func randomCode(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func main() {
+	s := newShortener()
+
+	code, err := s.shorten("https://example.com", 2*time.Second)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("short code:", code)
+
+	if url, ok := s.resolve(code); ok {
+		fmt.Println("resolved:", url)
+	}
+
+	time.Sleep(3 * time.Second)
+	if _, ok := s.resolve(code); !ok {
+		fmt.Println("link expired")
+	}
+}

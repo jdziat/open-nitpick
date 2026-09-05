@@ -1,0 +1,68 @@
+package main
+
+import (
+	"fmt"
+	"iter"
+	"time"
+)
+
+// EachDay returns an iterator over every calendar day from start through
+// end, inclusive. If skipWeekends is true, Saturdays and Sundays are
+// omitted. The dates are normalized to midnight; if end is before start
+// the sequence is empty. Iteration stops early if the consumer breaks
+// out of the range loop.
+func EachDay(start, end time.Time, skipWeekends bool) iter.Seq[time.Time] {
+	return func(yield func(time.Time) bool) {
+		cur := midnight(start)
+		stop := midnight(end)
+		if stop.Before(cur) {
+			return
+		}
+		for !cur.After(stop) {
+			if !skipWeekends || isWeekday(cur) {
+				if !yield(cur) {
+					return
+				}
+			}
+			cur = cur.AddDate(0, 0, 1)
+		}
+	}
+}
+
+func midnight(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+func isWeekday(t time.Time) bool {
+	switch t.Weekday() {
+	case time.Saturday, time.Sunday:
+		return false
+	default:
+		return true
+	}
+}
+
+func main() {
+	start := time.Date(2024, time.March, 29, 15, 30, 0, 0, time.UTC) // Friday
+	end := time.Date(2024, time.April, 2, 9, 0, 0, 0, time.UTC)      // Tuesday
+
+	fmt.Println("All days:")
+	for day := range EachDay(start, end, false) {
+		fmt.Println(day.Format("Mon 2006-01-02"))
+	}
+
+	fmt.Println("\nWeekdays only:")
+	for day := range EachDay(start, end, true) {
+		fmt.Println(day.Format("Mon 2006-01-02"))
+	}
+
+	fmt.Println("\nFirst two weekdays (early stop):")
+	n := 0
+	for day := range EachDay(start, end, true) {
+		fmt.Println(day.Format("Mon 2006-01-02"))
+		n++
+		if n == 2 {
+			break
+		}
+	}
+}

@@ -1,0 +1,134 @@
+import math
+import threading
+import time
+from typing import Optional
+
+
+class TokenBucketRateLimiter:
+    """Thread-safe token-bucket rate limiter."""
+
+    def __init__(
+        self,
+        capacity: float,
+        refill_rate: float,
+        initial_tokens: Optional[float] = None,
+    ) -> None:
+        if not math.isfinite(capacity) or capacity <= 0:
+            raise ValueError("capacity must be a positive finite number")
+        if not math.isfinite(refill_rate) or refill_rate < 0:
+            raise ValueError("refill_rate must be a non-negative finite number")
+
+        if initial_tokens is None:
+            initial_tokens = capacity
+        elif not math.isfinite(initial_tokens):
+            raise ValueError("initial_tokens must be finite")
+
+        if initial_tokens < 0 or initial_tokens > capacity:
+            raise ValueError("initial_tokens must be between 0 and capacity")
+
+        self.capacity = float(capacity)
+        self.refill_rate = float(refill_rate)
+        self._tokens = float(initial_tokens)
+        self._last_refill = time.monotonic()
+        self._condition = threading.Condition()
+
+    def _refill_locked(self, now: float) -> None:
+        elapsed = now - self._last_refill
+        if elapsed <= 0:
+            return
+
+        if self.refill_rate > 0:
+            self._tokens = min(
+                self.capacity,
+                self._tokens + elapsed * self.refill_rate,
+            )
+        self._last_refill = now
+
+    def allow(self, tokens: float = 1.0) -> bool:
+        """Consume tokens immediately if available; otherwise return False."""
+        amount = self._validate_amount(tokens)
+
+        with self._condition:
+            self._refill_locked(time.monotonic())
+            if self._tokens < amount:
+                return False
+            self._tokens -= amount
+            return True
+
+    def acquire(self, tokens: float = 1.0, timeout: Optional[float] = None) -> bool:
+        """
+        Wait until the requested tokens are available.
+
+        Returns True when tokens are consumed, or False if the timeout expires.
+        A timeout of None waits indefinitely.
+        """
+        amount = self._validate_amount(tokens)
+
+        if timeout is not None:
+            if not math.isfinite(timeout) or timeout < 0:
+                raise ValueError("timeout must be a non-negative finite number")
+            deadline = time.monotonic() + timeout
+        else:
+            deadline = None
+
+        with self._condition:
+            while True:
+                now = time.monotonic()
+                self._refill_locked(now)
+
+                if self._tokens >= amount:
+                    self._tokens -= amount
+                    return True
+
+                if self.refill_rate == 0:
+                    if deadline is None:
+                        self._condition.wait()
+                        continue
+                    remaining = deadline - now
+                    if remaining <= 0:
+                        return False
+                    self._condition.wait(remaining)
+                    continue
+
+                wait_time = (amount - self._tokens) / self.refill_rate
+
+                if deadline is not None:
+                    remaining = deadline - now
+                    if remaining <= 0:
+                        return False
+                    wait_time = min(wait_time, remaining)
+
+                self._condition.wait(wait_time)
+
+    def try_acquire(self, tokens: float = 1.0) -> bool:
+        """Alias for allow()."""
+        return self.allow(tokens)
+
+    @property
+    def available_tokens(self) -> float:
+        """Return the currently available token count."""
+        with self._condition:
+            self._refill_locked(time.monotonic())
+            return self._tokens
+
+    def reset(self, tokens: Optional[float] = None) -> None:
+        """Reset the bucket to the specified token count, or to full capacity."""
+        if tokens is None:
+            tokens = self.capacity
+        if not math.isfinite(tokens) or tokens < 0 or tokens > self.capacity:
+            raise ValueError("tokens must be between 0 and capacity")
+
+        with self._condition:
+            self._tokens = float(tokens)
+            self._last_refill = time.monotonic()
+            self._condition.notify_all()
+
+    def _validate_amount(self, tokens: float) -> float:
+        if not math.isfinite(tokens) or tokens < 0:
+            raise ValueError("tokens must be a non-negative finite number")
+        if tokens > self.capacity:
+            raise ValueError("requested tokens cannot exceed capacity")
+        return float(tokens)
+
+
+__all__ = ["TokenBucketRateLimiter"]

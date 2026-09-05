@@ -1,0 +1,144 @@
+package ratelimiter
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"time"
+)
+
+var ErrLimitTooLarge = errors.New("requested tokens exceed limiter capacity")
+
+type Limiter struct {
+	mu       sync.Mutex
+	capacity float64
+	rate     float64
+	tokens   float64
+	last     time.Time
+}
+
+func New(capacity int, refillPerSecond float64) *Limiter {
+	return NewLimiter(capacity, refillPerSecond)
+}
+
+func NewLimiter(capacity int, refillPerSecond float64) *Limiter {
+	if capacity <= 0 {
+		panic("ratelimiter: capacity must be greater than zero")
+	}
+	if refillPerSecond < 0 {
+		panic("ratelimiter: refill rate cannot be negative")
+	}
+
+	now := time.Now()
+	return &Limiter{
+		capacity: float64(capacity),
+		rate:     refillPerSecond,
+		tokens:   float64(capacity),
+		last:     now,
+	}
+}
+
+func (l *Limiter) Allow() bool {
+	return l.AllowN(1)
+}
+
+func (l *Limiter) AllowN(n int) bool {
+	if n <= 0 {
+		return true
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.refill(time.Now())
+
+	required := float64(n)
+	if required > l.capacity || l.tokens < required {
+		return false
+	}
+
+	l.tokens -= required
+	return true
+}
+
+func (l *Limiter) Wait(ctx context.Context) error {
+	return l.WaitN(ctx, 1)
+}
+
+func (l *Limiter) WaitN(ctx context.Context, n int) error {
+	if n <= 0 {
+		return nil
+	}
+	if ctx == nil {
+		panic("ratelimiter: nil context")
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	required := float64(n)
+	if required > l.capacity {
+		return ErrLimitTooLarge
+	}
+
+	for {
+		l.mu.Lock()
+		now := time.Now()
+		l.refill(now)
+
+		if l.tokens >= required {
+			l.tokens -= required
+			l.mu.Unlock()
+			return nil
+		}
+
+		if l.rate == 0 {
+			l.mu.Unlock()
+			<-ctx.Done()
+			return ctx.Err()
+		}
+
+		waitSeconds := (required - l.tokens) / l.rate
+		waitDuration := durationFromSeconds(waitSeconds)
+		l.mu.Unlock()
+
+		timer := time.NewTimer(waitDuration)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func (l *Limiter) refill(now time.Time) {
+	elapsed := now.Sub(l.last).Seconds()
+	if elapsed <= 0 {
+		return
+	}
+
+	l.tokens += elapsed * l.rate
+	if l.tokens > l.capacity {
+		l.tokens = l.capacity
+	}
+	l.last = now
+}
+
+func durationFromSeconds(seconds float64) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+
+	maxSeconds := float64(time.Duration(1<<63 - 1)) / float64(time.Second)
+	if seconds >= maxSeconds {
+		return time.Duration(1<<63 - 1)
+	}
+
+	return time.Duration(seconds * float64(time.Second))
+}

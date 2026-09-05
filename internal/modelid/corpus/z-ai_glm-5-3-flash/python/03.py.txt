@@ -1,0 +1,121 @@
+"""retry.py -- call a function up to N times with exponential backoff and jitter.
+
+Public API:
+    retry(func, *args, attempts=5, ...)  -> func's result, or the last
+        exception if every attempt fails.
+    with_retry(...)                      -> decorator form of retry().
+"""
+
+from __future__ import annotations
+
+import functools
+import random
+import time
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T")
+
+
+def retry(
+    func: Callable[..., T],
+    *args: Any,
+    attempts: int = 5,
+    base_delay: float = 0.5,
+    max_delay: float = 30.0,
+    factor: float = 2.0,
+    jitter: bool = True,
+    retry_on: tuple[type[BaseException], ...] = (Exception,),
+    **kwargs: Any,
+) -> T | Exception:
+    """Call ``func(*args, **kwargs)`` up to ``attempts`` times.
+
+    The sleep after the attempt that just failed (0-based index ``n``) is
+    ``min(max_delay, base_delay * factor ** n)`` seconds.  When ``jitter``
+    is true, the actual sleep is a uniform random value in ``[0, delay)``
+    ("full jitter"), which keeps many competing callers from retrying in
+    lockstep.
+
+    Returns the function's return value on the first successful attempt.
+    If all attempts fail, returns the last exception instead of raising it.
+    Exceptions not matching ``retry_on`` propagate immediately.
+
+    Raises:
+        ValueError: if ``attempts < 1`` or the delay settings are invalid.
+    """
+    if attempts < 1:
+        raise ValueError("attempts must be at least 1")
+    if base_delay < 0 or max_delay < 0:
+        raise ValueError("delays must be non-negative")
+    if factor < 1:
+        raise ValueError("factor must be >= 1")
+
+    last_error: BaseException | None = None
+    for attempt in range(attempts):
+        try:
+            return func(*args, **kwargs)
+        except retry_on as exc:
+            last_error = exc
+            if attempt < attempts - 1:
+                delay = min(max_delay, base_delay * factor**attempt)
+                if jitter:
+                    delay = random.uniform(0, delay)
+                time.sleep(max(0.0, delay))
+
+    # Only reachable when every attempt raised.
+    return last_error  # type: ignore[return-value]
+
+
+def with_retry(
+    attempts: int = 5,
+    base_delay: float = 0.5,
+    max_delay: float = 30.0,
+    factor: float = 2.0,
+    jitter: bool = True,
+    retry_on: tuple[type[BaseException], ...] = (Exception,),
+) -> Callable[[Callable[..., T]], Callable[..., T | Exception]]:
+    """Decorator form of :func:`retry`.
+
+        @with_retry(attempts=4, base_delay=0.2)
+        def fetch(url): ...
+
+    Calls to the decorated function return its result, or the last
+    exception once every attempt has failed.
+    """
+
+    def decorator(func: Callable[..., T]) -> Callable[..., T | Exception]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> T | Exception:
+            bound = functools.partial(func, *args, **kwargs)
+            return retry(
+                bound,
+                attempts=attempts,
+                base_delay=base_delay,
+                max_delay=max_delay,
+                factor=factor,
+                jitter=jitter,
+                retry_on=retry_on,
+            )
+
+        return wrapper
+
+    return decorator
+
+
+if __name__ == "__main__":
+    # 1) Flaky dependency that recovers on its third call.
+    state = {"calls": 0}
+
+    def flaky() -> str:
+        state["calls"] += 1
+        if state["calls"] < 3:
+            raise ConnectionError(f"transient failure #{state['calls']}")
+        return f"success on call {state['calls']}"
+
+    print(retry(flaky, attempts=5, base_delay=0.1, max_delay=1.0))
+
+    # 2) A dependency that never recovers: the last error is returned.
+    def always_fails() -> None:
+        raise TimeoutError("backend unreachable")
+
+    outcome = retry(always_fails, attempts=3, base_delay=0.1, max_delay=0.4)
+    print(f"gave up after 3 attempts: {type(outcome).__name__}: {outcome}")

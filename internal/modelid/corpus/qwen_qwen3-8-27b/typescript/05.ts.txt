@@ -1,0 +1,13 @@
+`? No, final no analysis.
+
+Maybe include a `normalize` function:
+`const normalized = text.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ");`
+Then split `/\s+/`. This removes punctuation by replacing with space, so "don't" -> "don t" (apostrophe to space). If we want remove, replace with "". Which to choose? I'd choose replace with space because punctuation often separates words. "normalises punctuation" could mean strip punctuation and whitespace. The regex match approach equivalent. Good.
+
+Need maybe top K stable? Good.
+
+Could include `export type WordFrequency = { word: string; count: number };` instead of interface. Fine.
+
+Let's consider if final should be a script with no exports? "single typescript source file" maybe they want to run it. If no exports, it's a script. But "returns" suggests function. We can export.
+
+If they run `tsc file.ts` and then `node file.js`, nothing happens. If they expected program, fail. Could include a CLI guarded by a simple condition that doesn't require main detection? For example, if

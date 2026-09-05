@@ -1,0 +1,179 @@
+package main
+
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
+	"sync"
+	"time"
+)
+
+// ErrNotFound is returned when a short code does not exist.
+var ErrNotFound = errors.New("short code not found")
+
+// ErrExpired is returned when a short code has passed its expiry time.
+var ErrExpired = errors.New("short code has expired")
+
+// entry holds the original URL and its expiry time.
+type entry struct {
+	originalURL string
+	expiresAt   time.Time
+}
+
+// URLShortener is a minimal in-memory URL shortener with expiry support.
+type URLShortener struct {
+	mu    sync.RWMutex
+	store map[string]entry
+}
+
+// NewURLShortener creates and returns a new URLShortener.
+func NewURLShortener() *URLShortener {
+	return &URLShortener{
+		store: make(map[string]entry),
+	}
+}
+
+// generateCode creates a random URL-safe short code of the given byte length.
+func generateCode(byteLen int) (string, error) {
+	b := make([]byte, byteLen)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// Shorten stores the given URL with an expiry duration and returns a short code.
+// If ttl is zero or negative, the entry never expires.
+func (s *URLShortener) Shorten(originalURL string, ttl time.Duration) (string, error) {
+	if originalURL == "" {
+		return "", errors.New("originalURL must not be empty")
+	}
+
+	code, err := generateCode(6) // 6 bytes → 8 base64 chars
+	if err != nil {
+		return "", err
+	}
+
+	var expiresAt time.Time
+	if ttl > 0 {
+		expiresAt = time.Now().Add(ttl)
+	}
+
+	s.mu.Lock()
+	// Extremely unlikely collision guard.
+	for {
+		if _, exists := s.store[code]; !exists {
+			break
+		}
+		code, err = generateCode(6)
+		if err != nil {
+			s.mu.Unlock()
+			return "", err
+		}
+	}
+	s.store[code] = entry{
+		originalURL: originalURL,
+		expiresAt:   expiresAt,
+	}
+	s.mu.Unlock()
+
+	return code, nil
+}
+
+// Resolve returns the original URL for the given short code.
+// It returns ErrNotFound if the code does not exist and ErrExpired if it has expired.
+func (s *URLShortener) Resolve(code string) (string, error) {
+	s.mu.RLock()
+	e, ok := s.store[code]
+	s.mu.RUnlock()
+
+	if !ok {
+		return "", ErrNotFound
+	}
+
+	if !e.expiresAt.IsZero() && time.Now().After(e.expiresAt) {
+		// Lazily delete the expired entry.
+		s.mu.Lock()
+		delete(s.store, code)
+		s.mu.Unlock()
+		return "", ErrExpired
+	}
+
+	return e.originalURL, nil
+}
+
+// Delete removes a short code from the store.
+func (s *URLShortener) Delete(code string) {
+	s.mu.Lock()
+	delete(s.store, code)
+	s.mu.Unlock()
+}
+
+// PurgeExpired removes all expired entries from the store.
+func (s *URLShortener) PurgeExpired() {
+	now := time.Now()
+	s.mu.Lock()
+	for code, e := range s.store {
+		if !e.expiresAt.IsZero() && now.After(e.expiresAt) {
+			delete(s.store, code)
+		}
+	}
+	s.mu.Unlock()
+}
+
+// ----- demonstration / smoke test in main -----
+
+import (
+	"fmt"
+	"log"
+)
+
+func main() {
+	s := NewURLShortener()
+
+	// Shorten with a 2-second TTL.
+	code, err := s.Shorten("https://www.example.com/some/very/long/path?query=1", 2*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Short code: %s\n", code)
+
+	// Resolve immediately – should succeed.
+	url, err := s.Resolve(code)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Resolved:   %s\n", url)
+
+	// Wait for expiry.
+	fmt.Println("Waiting 3 seconds for expiry…")
+	time.Sleep(3 * time.Second)
+
+	// Resolve after expiry – should return ErrExpired.
+	_, err = s.Resolve(code)
+	if errors.Is(err, ErrExpired) {
+		fmt.Println("Entry correctly reported as expired.")
+	} else {
+		fmt.Printf("Unexpected error: %v\n", err)
+	}
+
+	// Shorten with no expiry (permanent).
+	permCode, err := s.Shorten("https://www.example.com/permanent", 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Permanent short code: %s\n", permCode)
+
+	permURL, err := s.Resolve(permCode)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Permanent resolved:   %s\n", permURL)
+
+	// Delete it.
+	s.Delete(permCode)
+	_, err = s.Resolve(permCode)
+	if errors.Is(err, ErrNotFound) {
+		fmt.Println("Entry correctly removed after deletion.")
+	}
+}

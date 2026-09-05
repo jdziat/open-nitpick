@@ -5,7 +5,7 @@
 // machine. Nothing here is a product; it is the experiment's input, and the
 // experiment decides whether a product is built.
 //
-//	modelid-corpus -out internal/evals/testdata/modelid -models a,b,c
+//	modelid-corpus -out internal/modelid/corpus -models a,b,c
 //
 // Files are written with a trailing .txt so that nothing treats the corpus
 // as source: it is data, and a formatter or vet run over the tree must not
@@ -40,7 +40,7 @@ func main() {
 	var out, models string
 	var human bool
 	var limit int
-	flag.StringVar(&out, "out", "internal/evals/testdata/modelid", "corpus directory")
+	flag.StringVar(&out, "out", "internal/modelid/corpus", "corpus directory (the package embeds internal/modelid/corpus)")
 	flag.StringVar(&models, "models", "", "comma-separated OpenRouter model ids")
 	flag.BoolVar(&human, "human", false, "also sample the human control set from GOROOT and the Python stdlib")
 	flag.IntVar(&limit, "limit", 0, "generate at most this many files this run (0: all)")

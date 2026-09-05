@@ -1,0 +1,96 @@
+package main
+
+import "fmt"
+
+type PriorityQueue[T any] struct {
+	data []T
+	less func(a, b T) bool
+}
+
+func NewPriorityQueue[T any](less func(a, b T) bool) *PriorityQueue[T] {
+	return &PriorityQueue[T]{
+		data: make([]T, 0),
+		less: less,
+	}
+}
+
+func (pq *PriorityQueue[T]) Push(val T) {
+	pq.data = append(pq.data, val)
+	pq.up(len(pq.data) - 1)
+}
+
+func (pq *PriorityQueue[T]) Pop() (T, bool) {
+	if len(pq.data) == 0 {
+		var zero T
+		return zero, false
+	}
+	root := pq.data[0]
+	last := len(pq.data) - 1
+	pq.data[0] = pq.data[last]
+	pq.data = pq.data[:last]
+	if len(pq.data) > 0 {
+		pq.down(0)
+	}
+	return root, true
+}
+
+func (pq *PriorityQueue[T]) Peek() (T, bool) {
+	if len(pq.data) == 0 {
+		var zero T
+		return zero, false
+	}
+	return pq.data[0], true
+}
+
+func (pq *PriorityQueue[T]) up(i int) {
+	for {
+		parent := (i - 1) / 2
+		if i == 0 || !pq.less(pq.data[i], pq.data[parent]) {
+			break
+		}
+		pq.data[i], pq.data[parent] = pq.data[parent], pq.data[i]
+		i = parent
+	}
+}
+
+func (pq *PriorityQueue[T]) down(i int) {
+	for {
+		left := 2*i + 1
+		if left >= len(pq.data) || left < 0 {
+			break
+		}
+		smallest := left
+		if right := left + 1; right < len(pq.data) && pq.less(pq.data[right], pq.data[left]) {
+			smallest = right
+		}
+		if !pq.less(pq.data[smallest], pq.data[i]) {
+			break
+		}
+		pq.data[i], pq.data[smallest] = pq.data[smallest], pq.data[i]
+		i = smallest
+	}
+}
+
+func main() {
+	// Min-heap of integers
+	pq := NewPriorityQueue(func(a, b int) bool {
+		return a < b
+	})
+
+	pq.Push(10)
+	pq.Push(5)
+	pq.Push(20)
+	pq.Push(1)
+
+	if val, ok := pq.Peek(); ok {
+		fmt.Printf("Peek: %d\n", val)
+	}
+
+	for {
+		val, ok := pq.Pop()
+		if !ok {
+			break
+		}
+		fmt.Printf("Pop: %d\n", val)
+	}
+}

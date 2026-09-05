@@ -1,0 +1,67 @@
+import { Lock } from 'async-lock';
+
+export class TokenBucket {
+    private capacity: number;
+    private refillRate: number;
+    private tokens: number;
+    private lastRefillTime: number;
+    private lock: Lock;
+
+    constructor(capacity: number, refillRate: number) {
+        this.capacity = capacity;
+        this.refillRate = refillRate;
+        this.tokens = capacity;
+        this.lastRefillTime = Date.now();
+        this.lock = new Lock();
+    }
+
+    private refill(): void {
+        const now = Date.now();
+        const elapsedMs = now - this.lastRefillTime;
+        const tokensToAdd = (elapsedMs / 1000) * this.refillRate;
+        
+        this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
+        this.lastRefillTime = now;
+    }
+
+    async tryConsume(tokensRequested: number = 1): Promise<boolean> {
+        return await this.lock.acquire('bucket', async () => {
+            this.refill();
+
+            if (this.tokens >= tokensRequested) {
+                this.tokens -= tokensRequested;
+                return true;
+            }
+
+            return false;
+        });
+    }
+
+    async consume(tokensRequested: number = 1): Promise<void> {
+        while (true) {
+            const success = await this.tryConsume(tokensRequested);
+            if (success) return;
+
+            const waitTime = (tokensRequested - this.tokens) / this.refillRate * 1000;
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+    }
+}
+
+// Simple Lock implementation to ensure atomicity in async environments
+class Lock {
+    private mutex: Promise<void> = Promise.resolve();
+
+    async acquire<T>(key: string, callback: () => Promise<T>): Promise<T> {
+        await this.mutex;
+        let release: () => void;
+        const next = new Promise<void>(res => { release = res; });
+        this.mutex = next;
+
+        try {
+            return await callback();
+        } finally {
+            if (release) release();
+        }
+    }
+}

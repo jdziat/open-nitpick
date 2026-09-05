@@ -1,0 +1,120 @@
+package shortener
+
+import (
+	"errors"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+)
+
+var (
+	ErrInvalidURL = errors.New("URL must not be empty")
+	ErrInvalidTTL = errors.New("expiry must be in the future")
+	ErrNotFound  = errors.New("short code not found")
+	ErrExpired   = errors.New("short code expired")
+)
+
+type entry struct {
+	url       string
+	expiresAt time.Time
+}
+
+type URLShortener struct {
+	mu      sync.RWMutex
+	entries map[string]entry
+	counter uint64
+}
+
+func NewURLShortener() *URLShortener {
+	return &URLShortener{
+		entries: make(map[string]entry),
+	}
+}
+
+func (s *URLShortener) Shorten(rawURL string, ttl time.Duration) (string, error) {
+	if strings.TrimSpace(rawURL) == "" {
+		return "", ErrInvalidURL
+	}
+	if ttl <= 0 {
+		return "", ErrInvalidTTL
+	}
+
+	return s.ShortenUntil(rawURL, time.Now().Add(ttl))
+}
+
+func (s *URLShortener) ShortenUntil(rawURL string, expiresAt time.Time) (string, error) {
+	if strings.TrimSpace(rawURL) == "" {
+		return "", ErrInvalidURL
+	}
+	if !expiresAt.After(time.Now()) {
+		return "", ErrInvalidTTL
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var code string
+	for {
+		n := atomic.AddUint64(&s.counter, 1)
+		code = encodeBase62(n)
+		if _, exists := s.entries[code]; !exists {
+			break
+		}
+	}
+
+	s.entries[code] = entry{
+		url:       rawURL,
+		expiresAt: expiresAt,
+	}
+
+	return code, nil
+}
+
+func (s *URLShortener) Resolve(code string) (string, error) {
+	if strings.TrimSpace(code) == "" {
+		return "", ErrNotFound
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	item, ok := s.entries[code]
+	if !ok {
+		return "", ErrNotFound
+	}
+
+	if !time.Now().Before(item.expiresAt) {
+		delete(s.entries, code)
+		return "", ErrExpired
+	}
+
+	return item.url, nil
+}
+
+func (s *URLShortener) shorten(rawURL string, ttl time.Duration) (string, error) {
+	return s.Shorten(rawURL, ttl)
+}
+
+func (s *URLShortener) resolve(code string) (string, error) {
+	return s.Resolve(code)
+}
+
+func encodeBase62(n uint64) string {
+	const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	if n == 0 {
+		return string(alphabet[0])
+	}
+
+	var buf [11]byte
+	i := len(buf)
+
+	for n > 0 {
+		i--
+		buf[i] = alphabet[n%62]
+		n /= 62
+	}
+
+	return string(buf[i:])
+}

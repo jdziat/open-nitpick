@@ -1,0 +1,196 @@
+import time
+import random
+import functools
+from typing import Callable, Optional, Tuple, Type, TypeVar
+
+T = TypeVar("T")
+
+
+class RetryError(Exception):
+    """Raised when all retry attempts have been exhausted."""
+
+    def __init__(self, message: str, last_exception: Exception):
+        super().__init__(message)
+        self.last_exception = last_exception
+
+
+def retry(
+    func: Callable[..., T],
+    *args,
+    max_attempts: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    exponential_base: float = 2.0,
+    jitter: bool = True,
+    exceptions: Tuple[Type[Exception], ...] = (Exception,),
+    on_retry: Optional[Callable[[int, Exception, float], None]] = None,
+    **kwargs,
+) -> T:
+    """
+    Call func(*args, **kwargs) up to max_attempts times with exponential backoff and jitter.
+
+    Parameters
+    ----------
+    func          : The callable to invoke.
+    *args         : Positional arguments forwarded to func.
+    max_attempts  : Maximum number of total attempts (must be >= 1).
+    base_delay    : Initial delay in seconds between attempts.
+    max_delay     : Maximum delay in seconds between attempts.
+    exponential_base : Base for the exponential backoff calculation.
+    jitter        : If True, add random jitter to the delay.
+    exceptions    : Tuple of exception types that should trigger a retry.
+    on_retry      : Optional callback(attempt_number, exception, delay) called before each retry.
+    **kwargs      : Keyword arguments forwarded to func.
+
+    Returns
+    -------
+    The return value of func on success.
+
+    Raises
+    ------
+    RetryError    : When all attempts fail, wrapping the last exception.
+    """
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be >= 1")
+
+    last_exception: Optional[Exception] = None
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return func(*args, **kwargs)
+        except exceptions as exc:
+            last_exception = exc
+
+            if attempt == max_attempts:
+                break
+
+            delay = min(base_delay * (exponential_base ** (attempt - 1)), max_delay)
+            if jitter:
+                delay = random.uniform(0.0, delay)
+
+            if on_retry is not None:
+                on_retry(attempt, exc, delay)
+
+            time.sleep(delay)
+
+    raise RetryError(
+        f"All {max_attempts} attempt(s) failed. Last error: {last_exception!r}",
+        last_exception,
+    )
+
+
+def retry_decorator(
+    max_attempts: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    exponential_base: float = 2.0,
+    jitter: bool = True,
+    exceptions: Tuple[Type[Exception], ...] = (Exception,),
+    on_retry: Optional[Callable[[int, Exception, float], None]] = None,
+):
+    """
+    Decorator factory that applies retry logic to the decorated function.
+
+    Usage
+    -----
+    @retry_decorator(max_attempts=5, base_delay=0.5)
+    def my_function():
+        ...
+    """
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> T:
+            return retry(
+                func,
+                *args,
+                max_attempts=max_attempts,
+                base_delay=base_delay,
+                max_delay=max_delay,
+                exponential_base=exponential_base,
+                jitter=jitter,
+                exceptions=exceptions,
+                on_retry=on_retry,
+                **kwargs,
+            )
+        return wrapper
+    return decorator
+
+
+# ---------------------------------------------------------------------------
+# Self-contained demonstration / smoke test
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import sys
+
+    print("=== Demo 1: retry() helper – succeeds on 3rd attempt ===")
+    call_count = 0
+
+    def flaky_function(succeed_on: int) -> str:
+        global call_count
+        call_count += 1
+        if call_count < succeed_on:
+            raise ValueError(f"Simulated failure on attempt {call_count}")
+        return f"Success on attempt {call_count}"
+
+    def log_retry(attempt: int, exc: Exception, delay: float) -> None:
+        print(f"  Attempt {attempt} failed with {exc!r}. Retrying in {delay:.3f}s …")
+
+    call_count = 0
+    result = retry(
+        flaky_function,
+        3,
+        max_attempts=5,
+        base_delay=0.1,
+        max_delay=2.0,
+        jitter=True,
+        exceptions=(ValueError,),
+        on_retry=log_retry,
+    )
+    print(f"  Result: {result}\n")
+
+    print("=== Demo 2: retry() helper – all attempts fail ===")
+    call_count = 0
+
+    def always_fails() -> None:
+        global call_count
+        call_count += 1
+        raise RuntimeError(f"Permanent failure (attempt {call_count})")
+
+    try:
+        retry(
+            always_fails,
+            max_attempts=3,
+            base_delay=0.05,
+            jitter=False,
+            exceptions=(RuntimeError,),
+            on_retry=log_retry,
+        )
+    except RetryError as e:
+        print(f"  Caught RetryError: {e}")
+        print(f"  Last exception   : {e.last_exception!r}\n")
+
+    print("=== Demo 3: @retry_decorator – succeeds on 2nd attempt ===")
+    call_count = 0
+
+    @retry_decorator(max_attempts=4, base_delay=0.1, jitter=True, on_retry=log_retry)
+    def decorated_flaky() -> str:
+        global call_count
+        call_count += 1
+        if call_count < 2:
+            raise ConnectionError("Network blip")
+        return "Connected!"
+
+    call_count = 0
+    print(f"  Result: {decorated_flaky()}\n")
+
+    print("=== Demo 4: max_attempts=1 – no retries ===")
+    call_count = 0
+
+    try:
+        retry(always_fails, max_attempts=1, base_delay=1.0)
+    except RetryError as e:
+        print(f"  Caught RetryError after 1 attempt: {e.last_exception!r}\n")
+
+    print("All demos completed successfully.")
+    sys.exit(0)

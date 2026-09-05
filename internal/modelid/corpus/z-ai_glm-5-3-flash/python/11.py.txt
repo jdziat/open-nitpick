@@ -1,0 +1,170 @@
+import numbers
+
+
+class ShapeError(ValueError):
+    """Raised when matrix shapes are incompatible with a requested operation."""
+
+
+class Matrix:
+    """A dense matrix backed by a list of rows.
+
+    Supports matrix multiplication (via ``*`` or ``@``), transposing
+    (``transpose()`` or the ``T`` property), and the determinant of square
+    matrices (``determinant()``).  Shape mismatches raise ShapeError, a
+    subclass of ValueError.
+    """
+
+    def __init__(self, rows):
+        rows = [list(row) for row in rows]
+        if rows:
+            width = len(rows[0])
+            for i, row in enumerate(rows):
+                if len(row) != width:
+                    raise ShapeError(
+                        "ragged matrix: row 0 has %d entries but row %d has %d"
+                        % (width, i, len(row))
+                    )
+                for entry in row:
+                    if not isinstance(entry, numbers.Number):
+                        raise TypeError(
+                            "matrix entries must be numbers, got %s"
+                            % type(entry).__name__
+                        )
+        self._rows = rows
+        self._nrows = len(rows)
+        self._ncols = len(rows[0]) if rows else 0
+
+    @classmethod
+    def identity(cls, n):
+        """Return the n-by-n identity matrix."""
+        return cls([[1 if i == j else 0 for j in range(n)] for i in range(n)])
+
+    @property
+    def shape(self):
+        """The (rows, columns) shape of the matrix."""
+        return (self._nrows, self._ncols)
+
+    @property
+    def is_square(self):
+        return self._nrows == self._ncols
+
+    @property
+    def T(self):
+        return self.transpose()
+
+    def to_list(self):
+        """Return a copy of the matrix as a list of row lists."""
+        return [list(row) for row in self._rows]
+
+    def transpose(self):
+        """Return the transpose of the matrix."""
+        return Matrix(
+            [
+                [self._rows[i][j] for i in range(self._nrows)]
+                for j in range(self._ncols)
+            ]
+        )
+
+    def _check_multiplier(self, other):
+        if not isinstance(other, Matrix):
+            return NotImplemented
+        if self._ncols != other._nrows:
+            raise ShapeError(
+                "cannot multiply matrices of shape %r and %r: "
+                "inner dimensions differ (%d != %d)"
+                % (self.shape, other.shape, self._ncols, other._nrows)
+            )
+
+    def __matmul__(self, other):
+        stop = self._check_multiplier(other)
+        if stop is NotImplemented:
+            return stop
+        result = [
+            [
+                sum(
+                    self._rows[i][k] * other._rows[k][j]
+                    for k in range(self._ncols)
+                )
+                for j in range(other._ncols)
+            ]
+            for i in range(self._nrows)
+        ]
+        return Matrix(result)
+
+    __mul__ = __matmul__
+
+    def determinant(self):
+        """Return the determinant of a square matrix.
+
+        Uses cofactor expansion along the first row; fine for small matrices.
+        """
+        if not self.is_square:
+            raise ShapeError(
+                "determinant is only defined for square matrices, got shape %r"
+                % (self.shape,)
+            )
+        return self._determinant(self._rows)
+
+    det = determinant
+
+    @staticmethod
+    def _determinant(rows):
+        n = len(rows)
+        if n == 0:
+            return 1
+        if n == 1:
+            return rows[0][0]
+        if n == 2:
+            return rows[0][0] * rows[1][1] - rows[0][1] * rows[1][0]
+        total = 0
+        for j, pivot in enumerate(rows[0]):
+            if pivot == 0:
+                continue
+            minor = [row[:j] + row[j + 1:] for row in rows[1:]]
+            sign = 1 if j % 2 == 0 else -1
+            total += sign * pivot * Matrix._determinant(minor)
+        return total
+
+    def __getitem__(self, index):
+        if isinstance(index, tuple):
+            i, j = index
+            return self._rows[i][j]
+        return self._rows[index]
+
+    def __len__(self):
+        return self._nrows
+
+    def __eq__(self, other):
+        if not isinstance(other, Matrix):
+            return NotImplemented
+        return self._rows == other._rows
+
+    def __repr__(self):
+        return "Matrix(%r)" % (self._rows,)
+
+
+if __name__ == "__main__":
+    a = Matrix([[1, 2], [3, 4]])
+    b = Matrix([[0, 1], [1, 0]])
+    print("A      =", a)
+    print("B      =", b)
+    print("A @ B  =", a @ b)
+    print("A^T    =", a.transpose())
+    print("det(A) =", a.determinant())
+    print("A == A*T is", a == a.T.T)
+
+    c = Matrix([[1, 2, 3], [4, 5, 6]])
+    print("C      =", c)
+    print("C^T    =", c.T)
+    print("C @ C^T=", c @ c.T)
+
+    for bad_call, description in [
+        (lambda: c @ a, "C @ A (2x3 by 2x2)"),
+        (lambda: c.determinant(), "determinant of a 2x3 matrix"),
+        (lambda: Matrix([[1, 2], [3]]), "ragged construction"),
+        (lambda: a @ "nope", "multiplying by a non-matrix"),
+    ]:
+        try:
+            bad_call()
+        except (ShapeError, TypeError) as exc:
+            print("%s raised %s: %s" % (description, type(exc).__name__, exc))

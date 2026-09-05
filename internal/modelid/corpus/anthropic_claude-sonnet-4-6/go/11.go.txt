@@ -1,0 +1,245 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"math"
+)
+
+// Matrix represents a 2D matrix with rows and cols dimensions.
+type Matrix struct {
+	rows int
+	cols int
+	data [][]float64
+}
+
+// NewMatrix creates a new matrix with the given number of rows and columns.
+func NewMatrix(rows, cols int) (*Matrix, error) {
+	if rows <= 0 || cols <= 0 {
+		return nil, errors.New("matrix dimensions must be positive")
+	}
+	data := make([][]float64, rows)
+	for i := range data {
+		data[i] = make([]float64, cols)
+	}
+	return &Matrix{rows: rows, cols: cols, data: data}, nil
+}
+
+// NewMatrixFromSlice creates a new matrix from a 2D slice.
+func NewMatrixFromSlice(data [][]float64) (*Matrix, error) {
+	if len(data) == 0 {
+		return nil, errors.New("data must have at least one row")
+	}
+	cols := len(data[0])
+	if cols == 0 {
+		return nil, errors.New("data must have at least one column")
+	}
+	for i, row := range data {
+		if len(row) != cols {
+			return nil, fmt.Errorf("row %d has %d columns, expected %d", i, len(row), cols)
+		}
+	}
+	rows := len(data)
+	m := &Matrix{rows: rows, cols: cols, data: make([][]float64, rows)}
+	for i := range data {
+		m.data[i] = make([]float64, cols)
+		copy(m.data[i], data[i])
+	}
+	return m, nil
+}
+
+// Get returns the element at row i, column j.
+func (m *Matrix) Get(i, j int) (float64, error) {
+	if i < 0 || i >= m.rows || j < 0 || j >= m.cols {
+		return 0, fmt.Errorf("index (%d, %d) out of bounds for matrix of size (%d, %d)", i, j, m.rows, m.cols)
+	}
+	return m.data[i][j], nil
+}
+
+// Set sets the element at row i, column j to val.
+func (m *Matrix) Set(i, j int, val float64) error {
+	if i < 0 || i >= m.rows || j < 0 || j >= m.cols {
+		return fmt.Errorf("index (%d, %d) out of bounds for matrix of size (%d, %d)", i, j, m.rows, m.cols)
+	}
+	m.data[i][j] = val
+	return nil
+}
+
+// Rows returns the number of rows.
+func (m *Matrix) Rows() int {
+	return m.rows
+}
+
+// Cols returns the number of columns.
+func (m *Matrix) Cols() int {
+	return m.cols
+}
+
+// Multiply multiplies two matrices and returns the result.
+// The number of columns in m must equal the number of rows in other.
+func (m *Matrix) Multiply(other *Matrix) (*Matrix, error) {
+	if m.cols != other.rows {
+		return nil, fmt.Errorf("shape mismatch: cannot multiply matrix of size (%d, %d) by matrix of size (%d, %d)", m.rows, m.cols, other.rows, other.cols)
+	}
+	result, err := NewMatrix(m.rows, other.cols)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < m.rows; i++ {
+		for j := 0; j < other.cols; j++ {
+			sum := 0.0
+			for k := 0; k < m.cols; k++ {
+				sum += m.data[i][k] * other.data[k][j]
+			}
+			result.data[i][j] = sum
+		}
+	}
+	return result, nil
+}
+
+// Transpose returns the transpose of the matrix.
+func (m *Matrix) Transpose() *Matrix {
+	result := &Matrix{
+		rows: m.cols,
+		cols: m.rows,
+		data: make([][]float64, m.cols),
+	}
+	for i := range result.data {
+		result.data[i] = make([]float64, m.rows)
+	}
+	for i := 0; i < m.rows; i++ {
+		for j := 0; j < m.cols; j++ {
+			result.data[j][i] = m.data[i][j]
+		}
+	}
+	return result
+}
+
+// Determinant computes the determinant of a square matrix.
+// Returns an error if the matrix is not square.
+func (m *Matrix) Determinant() (float64, error) {
+	if m.rows != m.cols {
+		return 0, fmt.Errorf("determinant is only defined for square matrices, got (%d, %d)", m.rows, m.cols)
+	}
+	return determinant(m.data, m.rows), nil
+}
+
+// determinant computes the determinant recursively using cofactor expansion.
+func determinant(data [][]float64, n int) float64 {
+	if n == 1 {
+		return data[0][0]
+	}
+	if n == 2 {
+		return data[0][0]*data[1][1] - data[0][1]*data[1][0]
+	}
+	det := 0.0
+	for col := 0; col < n; col++ {
+		minor := minor(data, 0, col, n)
+		sign := math.Pow(-1, float64(col))
+		det += sign * data[0][col] * determinant(minor, n-1)
+	}
+	return det
+}
+
+// minor returns the minor matrix obtained by deleting row r and column c.
+func minor(data [][]float64, r, c, n int) [][]float64 {
+	result := make([][]float64, n-1)
+	ri := 0
+	for i := 0; i < n; i++ {
+		if i == r {
+			continue
+		}
+		result[ri] = make([]float64, n-1)
+		ci := 0
+		for j := 0; j < n; j++ {
+			if j == c {
+				continue
+			}
+			result[ri][ci] = data[i][j]
+			ci++
+		}
+		ri++
+	}
+	return result
+}
+
+// String returns a string representation of the matrix.
+func (m *Matrix) String() string {
+	s := ""
+	for i, row := range m.data {
+		s += fmt.Sprintf("%v", row)
+		if i < m.rows-1 {
+			s += "\n"
+		}
+	}
+	return s
+}
+
+func main() {
+	// Example usage
+	a, _ := NewMatrixFromSlice([][]float64{
+		{1, 2, 3},
+		{4, 5, 6},
+	})
+
+	b, _ := NewMatrixFromSlice([][]float64{
+		{7, 8},
+		{9, 10},
+		{11, 12},
+	})
+
+	fmt.Println("Matrix A:")
+	fmt.Println(a)
+
+	fmt.Println("\nMatrix B:")
+	fmt.Println(b)
+
+	product, err := a.Multiply(b)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Println("\nA * B:")
+		fmt.Println(product)
+	}
+
+	transA := a.Transpose()
+	fmt.Println("\nTranspose of A:")
+	fmt.Println(transA)
+
+	square, _ := NewMatrixFromSlice([][]float64{
+		{1, 2, 3},
+		{4, 5, 6},
+		{7, 8, 9},
+	})
+
+	det, err := square.Determinant()
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Printf("\nDeterminant of square matrix: %.4f\n", det)
+	}
+
+	square2, _ := NewMatrixFromSlice([][]float64{
+		{3, 8},
+		{4, 6},
+	})
+
+	det2, err := square2.Determinant()
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Printf("\nDeterminant of 2x2 matrix: %.4f\n", det2)
+	}
+
+	// Test shape mismatch error
+	_, err = b.Multiply(a)
+	if err != nil {
+		fmt.Println("\nExpected error:", err)
+	}
+
+	// Test determinant on non-square matrix
+	_, err = a.Determinant()
+	if err != nil {
+		fmt.Println("Expected error:", err)
+	}
+}

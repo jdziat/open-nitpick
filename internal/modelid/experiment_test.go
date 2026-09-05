@@ -45,7 +45,7 @@ func TestClassifierSeparatesDistinctStyles(t *testing.T) {
 // corpus and logs the matrices; it fails only when the corpus is malformed.
 // The go/no-go reads the two splits' margins over the majority baseline.
 func TestModelIdentificationExperiment(t *testing.T) {
-	const dir = "../evals/testdata/modelid"
+	const dir = "corpus"
 	if _, err := os.Stat(dir); err != nil {
 		t.Skip("no corpus")
 	}
