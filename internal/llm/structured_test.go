@@ -410,8 +410,30 @@ func TestExtractRetriesStalledRequestsUpToMaxRetries(t *testing.T) {
 		}
 	}
 
+	// The first attempt is never capped; every retry after a stall is, unless
+	// the caller chose a cap, in which case theirs stands.
+	fake := newFakeLLM(stall(), stall(), turn{content: validJSON})
+	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredSchema), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := fake.call(0).opts.MaxTokens; got != nil {
+		t.Errorf("first attempt was capped at %d", *got)
+	}
+	for i := 1; i <= 2; i++ {
+		if got := fake.call(i).opts.MaxTokens; got == nil || *got != creditCappedMaxTokens {
+			t.Errorf("retry %d not capped at %d, so a runaway generation times out rather than returning truncated: %v", i, creditCappedMaxTokens, got)
+		}
+	}
+	fake = newFakeLLM(stall(), turn{content: validJSON})
+	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredSchema), nil, llms.WithMaxTokens(4096)); err != nil {
+		t.Fatal(err)
+	}
+	if got := fake.call(1).opts.MaxTokens; got == nil || *got != 4096 {
+		t.Errorf("the caller's cap of 4096 was replaced: %v", got)
+	}
+
 	// One more stall than the budget is the provider's answer.
-	fake := newFakeLLM(stall(), stall(), stall(), stall(), turn{content: validJSON})
+	fake = newFakeLLM(stall(), stall(), stall(), stall(), turn{content: validJSON})
 	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredSchema), nil); err == nil {
 		t.Fatal("a stall past max_retries is not retried")
 	}

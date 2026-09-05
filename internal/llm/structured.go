@@ -117,14 +117,20 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 //
 // A stall is the HTTP client's own timeout firing while the body was still
 // being read: the request left, the provider accepted it, and the answer never
-// finished arriving. Behind a router that is one upstream hanging, and the
-// same request sent again is routed afresh. On the eval battery gemma-4-31b
-// lost 9 of 42 reviews this way on one-file fixtures, every one of which
-// passed alone; with one retry it still lost 21 of 168, because the second
-// attempt lands on the same hung upstream often enough. So the budget is
-// max_retries (default 3), the same number the SDK spends on 429s and 5xx —
-// a stall is a transient failure that happens to cost a full timeout to
-// detect. Only while the caller's own context is live: a cancelled review is
+// finished arriving. From this side two things look exactly like that — an
+// upstream hung behind a router, and a model generating until its own output
+// cap — and the first attempt cannot tell them apart. So the retries are sent
+// with an output cap when the caller set none: a hung upstream still times
+// out, and a runaway generation comes back within a minute, truncated, with a
+// decode error that names the cause instead of a timeout that hides it. The
+// first attempt is never capped, so a legitimately long answer is not cut
+// short for having been asked once.
+//
+// The budget is max_retries (default 3), the same number the SDK spends on
+// 429s and 5xx: a stall is a transient failure that happens to cost a full
+// timeout to detect. On the eval battery gemma-4-31b lost 9 of 42 reviews to
+// stalls with no retry and 21 of 168 with one; every lost fixture passed
+// alone. Only while the caller's own context is live: a cancelled review is
 // not a stalled request.
 func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (T, *llms.Response, error) {
 	for attempt := 0; ; attempt++ {
@@ -132,6 +138,7 @@ func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, c
 		if !stalled(ctx, err) || attempt >= c.stallRetries {
 			return value, raw, err
 		}
+		call = stallRetryOptions(call)
 	}
 }
 
@@ -142,7 +149,18 @@ func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call [
 		if !stalled(ctx, err) || attempt >= c.stallRetries {
 			return resp, err
 		}
+		call = stallRetryOptions(call)
 	}
+}
+
+// stallRetryOptions caps the output of a retried request when the caller set
+// no cap, at the same size the 402 path retries with. A cap the caller chose
+// is kept as chosen.
+func stallRetryOptions(call []llms.CallOption) []llms.CallOption {
+	if hasMaxTokens(call) {
+		return call
+	}
+	return append(append([]llms.CallOption(nil), call...), llms.WithMaxTokens(creditCappedMaxTokens))
 }
 
 // stalled reports a client-side timeout on a request whose caller is still
