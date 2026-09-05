@@ -19,7 +19,8 @@ type Sample struct {
 	Features Features
 }
 
-// LoadCorpus reads <dir>/<author>/<language>/<NN>.<ext>.
+// LoadCorpus reads <dir>/<author>/<language>/<NN>.<ext>.txt; the .txt keeps
+// the corpus from being read as source by anything but this package.
 func LoadCorpus(dir string) ([]Sample, error) {
 	var out []Sample
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
@@ -35,7 +36,7 @@ func LoadCorpus(dir string) ([]Sample, error) {
 			return nil
 		}
 		var task int
-		if _, err := fmt.Sscanf(strings.TrimSuffix(parts[2], filepath.Ext(parts[2])), "%d", &task); err != nil {
+		if _, err := fmt.Sscanf(strings.SplitN(parts[2], ".", 2)[0], "%d", &task); err != nil {
 			return nil
 		}
 		data, err := os.ReadFile(p)

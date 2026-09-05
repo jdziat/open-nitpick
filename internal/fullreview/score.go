@@ -111,7 +111,12 @@ func Score(report *review.Report, tree *vcs.Tree) Scorecard {
 		card.Total.SecurityWeighted += r.SecurityWeighted
 	}
 	card.Total.Language = "all"
-	sort.Slice(card.Languages, func(i, j int) bool { return card.Languages[i].Lines > card.Languages[j].Lines })
+	sort.Slice(card.Languages, func(i, j int) bool {
+		if card.Languages[i].Lines != card.Languages[j].Lines {
+			return card.Languages[i].Lines > card.Languages[j].Lines
+		}
+		return card.Languages[i].Language < card.Languages[j].Language
+	})
 	return card
 }
 

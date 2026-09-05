@@ -1,0 +1,19 @@
+{
+  "fixture": "go-clean-real-guard",
+  "findings": [
+    {
+      "path": "page/size.go",
+      "line": 23,
+      "severity": "info",
+      "category": "Functional Correctness",
+      "class": "correctness",
+      "title": "Guard the offset multiplication against overflow.",
+      "rationale": "If a caller supplies a sufficiently large positive n, the guard is bypassed and (n - 1) * s.rows can overflow int, returning an incorrect offset. Add an upper-bound or overflow check before the multiplication.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-05T20:48:21Z",
+  "mode": "plaintext",
+  "fingerprint": "fe65f752689760bd1c7d17141615a9a1ed388b7eb983d322684cb6d239b7fbc6",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2306782556\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  minor [Functional Correctness]\n  → page/size.go:23\n\n  Guard the offset multiplication against overflow.\n\n  If a caller supplies a sufficiently large positive n, the guard is\n  bypassed and (n - 1) * s.rows can overflow int, returning an incorrect\n  offset. Add an upper-bound or overflow check before the multiplication.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMinor    1\n\n1 file reviewed:\n  - page/size.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 6s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

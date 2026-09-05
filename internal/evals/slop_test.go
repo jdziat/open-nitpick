@@ -32,8 +32,22 @@ func TestSlopCorpusIsWellFormed(t *testing.T) {
 			if d.Class != config.ClassSlop {
 				t.Errorf("%s: plant class %s, want slop", f.Name, d.Class)
 			}
-			if _, ok := f.Head[d.Path]; !ok {
+			content, ok := f.Head[d.Path]
+			if !ok {
 				t.Errorf("%s: plant path %s is not in Head", f.Name, d.Path)
+				continue
+			}
+			// The anchor is the line the fixture's comment names, not one
+			// past it: this corpus sits outside the registries that check
+			// anchors for the others.
+			lines := strings.Split(content, "\n")
+			want := slopAnchors[f.Name]
+			if d.Line < 1 || d.Line > len(lines) || !strings.Contains(lines[d.Line-1], want) {
+				got := ""
+				if d.Line >= 1 && d.Line <= len(lines) {
+					got = lines[d.Line-1]
+				}
+				t.Errorf("%s: line %d is %q, want the line holding %q", f.Name, d.Line, got, want)
 			}
 		}
 		if !Slop(f.Name) {
@@ -49,6 +63,15 @@ func TestSlopCorpusIsWellFormed(t *testing.T) {
 			t.Errorf("%s is not in EveryFixture", f.Name)
 		}
 	}
+}
+
+// slopAnchors is the text on each plant's anchored line.
+var slopAnchors = map[string]string{
+	"go-slop-restating-comments":       "Initialize the total",
+	"python-slop-swallowed-exception":  "except Exception",
+	"ts-slop-chat-prose":               "Sure! Here's",
+	"go-slop-type-excluded-check":      "n != 0 || n == 0",
+	"python-slop-test-asserts-nothing": "assert True",
 }
 
 // The Makefile's SLOP line and SlopFixtures() name the same set, so

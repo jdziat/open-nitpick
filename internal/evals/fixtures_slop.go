@@ -59,7 +59,7 @@ func Total(invoices []Invoice) int64 {
 }
 `},
 		Defects: []Defect{{
-			Path: "billing/invoice.go", Line: 13, // // Initialize the total to zero.
+			Path: "billing/invoice.go", Line: 12, // // Initialize the total to zero.
 			Keywords:     []string{"Initialize the total", "Loop over the invoices", "Add the cents", "Return the total", "every comment in Total", "each comment"},
 			Class:        config.ClassSlop,
 			WantSeverity: config.SeverityNit,
@@ -116,7 +116,7 @@ def charge_all(gateway, orders):
     return receipts
 `},
 		Defects: []Defect{{
-			Path: "app/orders.py", Line: 20, // except Exception:
+			Path: "app/orders.py", Line: 19, // except Exception:
 			Keywords:     []string{"charge_all", "bare except", "failed charge", "receipts", "the batch continues", "order is skipped", "no receipt"},
 			Class:        config.ClassSlop,
 			WantSeverity: config.SeverityWarning,
