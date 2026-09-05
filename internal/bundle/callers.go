@@ -796,12 +796,14 @@ var (
 	tsTopDef = regexp.MustCompile(`^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?\s*|class\s+|const\s+|let\s+|var\s+)([A-Za-z_$][\w$]*)`)
 	// tsMethodDef is a class member with a body: a method, an accessor, or a
 	// property holding a function, at any indentation.
-	// Neither parameter list admits a nested paren or quote, so a call
-	// whose last argument is a function (`setTimeout(function () {`,
-	// `it('x', function () {`) is not read as a method header; a default
-	// value holding a call falls back to the enclosing function, which is
-	// the safe direction. The arrow branch is also anchored by its `=>`.
-	tsMethodDef = regexp.MustCompile(`^\s+(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*(?:\*\s*)?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*(?:\([^()'"]*\)\s*(?::[^{=]+)?\s*\{|=\s*(?:async\s*)?(?:\([^()'"]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)`)
+	// Neither parameter list admits a nested paren, so a call whose last
+	// argument is a function (`setTimeout(function () {`,
+	// `it('x', function () {`) is not read as a method header; a
+	// parameter whose default value holds a call falls back to the
+	// enclosing definition, which is the safe direction. Quoted spans are
+	// blanked before matching (tsMethodAt), so a string default is fine.
+	// The arrow branch is also anchored by its `=>`.
+	tsMethodDef = regexp.MustCompile(`^\s+(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*(?:\*\s*)?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*(?:\([^()]*\)\s*(?::[^{=]+)?\s*\{|=\s*(?:async\s*)?(?:\([^()]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)`)
 )
 
 // tsRedefined names the exported top-level definitions whose lines the diff
@@ -847,9 +849,12 @@ var tsKeywords = map[string]bool{
 	"function": true,
 }
 
-// tsMethodAt reports whether a line opens a class member with a body.
+// tsMethodAt reports whether a line opens a class member with a body. String
+// literals are emptied first, so a default like `name = "hi"` neither hides
+// the method nor lets a paren inside a string count as nesting.
 func tsMethodAt(line string) bool {
-	m := tsMethodDef.FindStringSubmatch(line)
+	blank := quotedSpan.ReplaceAllStringFunc(line, func(q string) string { return q[:1] + q[len(q)-1:] })
+	m := tsMethodDef.FindStringSubmatch(blank)
 	return m != nil && !tsKeywords[m[1]]
 }
 

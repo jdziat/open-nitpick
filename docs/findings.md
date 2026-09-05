@@ -1030,12 +1030,15 @@ three diff-only losses are on planted fixtures, so that denominator is
 fixtures that the diff-only arm missed in every run
 (`go-empty-filter-deletes-all`, `python-expired-token-accepted`,
 `ts-duration-units-through-barrel`, and `ts-client-per-request` in two of
-three) hit in every walk-on run, and one fixture went the other way,
-`go-cache-get-unchecked`, three of three without the walk and two of three
-with it. That is evidence the walk is not harmful and probably helps on
-this corpus, which is a weaker claim than a mechanism; the mechanism is
-shown on the callers corpus, where the finding has to name the attached
-caller to count.
+three) hit in every walk-on run. Three fixtures went the other way, each
+losing one run of three: `go-cache-get-unchecked` and
+`go-query-without-deadline` to a silent review, and
+`python-retry-nonidempotent` to a finding that names the plant but anchors
+outside the tolerance. On the ten planted fixtures with three complete
+reviews on both arms the walk is 27/30 against 18/30. That is evidence the
+walk is not harmful and probably helps on this corpus, which is a weaker
+claim than a mechanism; the mechanism is shown on the callers corpus,
+where the finding has to name the attached caller to count.
 
 Rule 15 applies to the callers corpus in full: six fixtures, written the
 same day as the collector by the same hand, outside the ground-truth

@@ -462,7 +462,9 @@ export function handler(req: Request, timeout: string) {
 }
 
 export class Client {
-  async get(url: string, timeout: string): Promise<Response> {
+  constructor(private base = 'http://x') {}
+
+  async get(url: string, timeout: string = "30s"): Promise<Response> {
     while (true) {
       const signal = AbortSignal.timeout(parseDuration(timeout));
       return fetch(url, { signal });

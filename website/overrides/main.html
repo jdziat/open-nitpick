@@ -1,15 +1,17 @@
 {% extends "base.html" %}
 
+{% set home_title = "open-nitpick: self-hosted, model-agnostic pull request review" %}
+
 {% block htmltitle %}
   {% if page.is_homepage %}
-    <title>open-nitpick: self-hosted, model-agnostic pull request review</title>
+    <title>{{ home_title }}</title>
   {% else %}
     {{ super() }}
   {% endif %}
 {% endblock %}
 
 {% block extrahead %}
-  {% set page_title = page.title if page.title and not page.is_homepage else "open-nitpick: self-hosted, model-agnostic pull request review" %}
+  {% set page_title = page.title if page.title and not page.is_homepage else home_title %}
   {% set description = page.meta.description if page.meta and page.meta.description else config.site_description %}
   <link rel="preload" href="{{ 'assets/fonts/Inter-var.woff2' | url }}" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="{{ 'assets/fonts/JetBrainsMono-var.woff2' | url }}" as="font" type="font/woff2" crossorigin>
