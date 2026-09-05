@@ -40,6 +40,13 @@ const (
 	// run can measure the layer against its absence.
 	EnvModelNotes = "NITPICK_EVAL_MODEL_NOTES"
 
+	// EnvEngineLog names a file that receives every review's engine log at
+	// WARN and above, appended. A battery discards the engine log otherwise,
+	// which is how "lost 9 of 42 reviews" arrived with nothing to say why:
+	// the retries, the stalls and the provider's errors all went to a
+	// discarding handler.
+	EnvEngineLog = "NITPICK_EVAL_ENGINE_LOG"
+
 	// EnvCapture names a directory to write every raw model response into.
 	// Those responses become offline regression fixtures.
 	EnvCapture = "NITPICK_EVAL_CAPTURE"
@@ -281,6 +288,14 @@ func OptionsFromEnv() (Options, error) {
 		if len(models) > 0 {
 			opts.Models = models
 		}
+	}
+
+	if path := strings.TrimSpace(os.Getenv(EnvEngineLog)); path != "" {
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+		if err != nil {
+			return opts, fmt.Errorf("%s: %w", EnvEngineLog, err)
+		}
+		opts.Log = slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	}
 
 	if raw := strings.TrimSpace(os.Getenv(EnvRuns)); raw != "" {
