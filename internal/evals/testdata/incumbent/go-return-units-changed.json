@@ -1,0 +1,8 @@
+{
+  "fixture": "go-return-units-changed",
+  "findings": null,
+  "at": "2026-09-05T15:23:38Z",
+  "mode": "plaintext",
+  "fingerprint": "0b758f8453d057f78d654f69730c286e82c0475903d8b7530117bfa0f8dd7370",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2373782950\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - internal/quota/quota.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 19s elapsed\nWriting review comments... 19s elapsed\n"
+}

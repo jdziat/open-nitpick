@@ -1,0 +1,8 @@
+{
+  "fixture": "python-precondition-added",
+  "findings": null,
+  "at": "2026-09-05T15:25:21Z",
+  "mode": "plaintext",
+  "fingerprint": "001b094f916264087f839742913978422625a1d1e150bc8581ab15d3d919ebde",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2616673424\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - app/db.py\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 8s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

@@ -1,0 +1,8 @@
+{
+  "fixture": "go-clean-wrapped-sentinel",
+  "findings": null,
+  "at": "2026-09-05T15:47:49Z",
+  "mode": "plaintext",
+  "fingerprint": "dc65092ed3e8ffb4e5f197cff4234ff94910f0982bb533453dc1ed3682adcc11",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-3394320389\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - internal/store/users.go\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\n"
+}

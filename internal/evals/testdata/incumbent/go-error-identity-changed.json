@@ -1,0 +1,19 @@
+{
+  "fixture": "go-error-identity-changed",
+  "findings": [
+    {
+      "path": "internal/store/users.go",
+      "line": 27,
+      "severity": "warning",
+      "category": "Data Integrity \u0026 Integration",
+      "class": "correctness",
+      "title": "Preserve ErrNotFound when adding the user ID.",
+      "rationale": "Lookup documents and exports ErrNotFound for missing users. Wrap it with %w so callers can use errors.Is(err, ErrNotFound) while retaining the user ID.\n\nProposed fix\n\n-\t\treturn \"\", fmt.Errorf(\"user %q: no such user\", id) +\t\treturn \"\", fmt.Errorf(\"user %q: %w\", id, ErrNotFound)",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-05T15:46:36Z",
+  "mode": "plaintext",
+  "fingerprint": "d3f2d086fc30eb84380c7561bccdb14931c1ac6e3d0ead170a8b2d3f255e422b",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1428263253\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Data Integrity \u0026 Integration]\n  → internal/store/users.go:27\n\n  Preserve ErrNotFound when adding the user ID.\n\n  Lookup documents and exports ErrNotFound for missing users. Wrap it\n  with %w so callers can use errors.Is(err, ErrNotFound) while retaining\n  the user ID.\n\n\n  Proposed fix\n\n  -\t\treturn \"\", fmt.Errorf(\"user %q: no such user\", id)\n  +\t\treturn \"\", fmt.Errorf(\"user %q: %w\", id, ErrNotFound)\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - internal/store/users.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 6s elapsed\nFinishing analysis tools... 16s elapsed\nWriting review comments... 16s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

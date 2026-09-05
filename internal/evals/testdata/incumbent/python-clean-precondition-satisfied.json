@@ -1,0 +1,20 @@
+{
+  "fixture": "python-clean-precondition-satisfied",
+  "findings": [
+    {
+      "path": "app/db.py",
+      "line": 10,
+      "end_line": 11,
+      "severity": "info",
+      "category": "Stability \u0026 Availability",
+      "class": "correctness",
+      "title": "Correct the SQLite rationale for zero limits.",
+      "rationale": "LIMIT 0 returns no rows, while a negative LIMIT means no limit. Keep rejecting zero if that is the API contract, but revise the docstring so it does not apply the “no limit” behavior to every non-positive value.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-05T15:26:54Z",
+  "mode": "plaintext",
+  "fingerprint": "6d65985b8ca9d6d0bfa9b81a1cb262a09acd9627b005d8349ce3c5e778054e76",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-2356167864\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  minor [Stability \u0026 Availability]\n  → app/db.py:10-11\n\n  Correct the SQLite rationale for zero limits.\n\n  LIMIT 0 returns no rows, while a negative LIMIT means no limit. Keep\n  rejecting zero if that is the API contract, but revise the docstring so it\n  does not apply the “no limit” behavior to every non-positive value.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMinor    1\n\n1 file reviewed:\n  - app/db.py\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 17s elapsed\nWriting review comments... 17s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

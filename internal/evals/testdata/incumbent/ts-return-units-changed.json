@@ -1,0 +1,8 @@
+{
+  "fixture": "ts-return-units-changed",
+  "findings": null,
+  "at": "2026-09-05T15:27:41Z",
+  "mode": "plaintext",
+  "fingerprint": "14820e041354c2ca838286beecbe064694c3c21e9f86a70d11491b24e965ea8d",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-262080957\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - src/duration.ts\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 1s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 6s elapsed\nFinishing analysis tools... 15s elapsed\nWriting review comments... 15s elapsed\n"
+}
