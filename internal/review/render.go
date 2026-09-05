@@ -216,19 +216,22 @@ func fenceFor(s string) string {
 
 // renderSummary builds the walkthrough comment.
 //
-// The policy notice, the analyzer roster, the discard notice and the withheld
-// list are the four parts review.summary does not switch off. That setting asks
-// for less narration; it is not permission to change what a review means without
-// saying so. Everything else here describes FILES, and suppressing those costs a
-// reader context — while these four describe a finding the reviewer produced and
-// something else then removed, a configuration the change supplied and this run
-// refused, a deterministic analyzer that did not run, and a deterministic
-// finding this tool discarded before anything judged it. With summaries off and
-// these suppressed too, a run whose only finding an expert overruled, whose
-// policy came from somewhere other than the file in the change, whose Go
-// analyzer never produced a report, or whose analyzer findings were all thrown
-// away for a forged path, publishes nothing at all and is indistinguishable from
-// a clean review.
+// The notices are the parts review.summary does not switch off: the policy
+// notice, the incremental and nothing-reviewed notices, the analyzer roster,
+// the uncovered list, the discard notice, the caller-walk notice and the
+// withheld list. That setting asks for less narration; it is not permission
+// to change what a review means without saying so. The walkthrough describes
+// FILES, and suppressing it costs a reader context — while each notice
+// describes something that makes silence mean less than it appears to: a
+// finding the reviewer produced and something else then removed, a
+// configuration the change supplied and this run refused, a deterministic
+// analyzer that did not run, a deterministic finding this tool discarded
+// before anything judged it, a search for callers that stopped short. With
+// summaries off and these suppressed too, a run whose only finding an expert
+// overruled, whose policy came from somewhere other than the file in the
+// change, whose Go analyzer never produced a report, or whose analyzer
+// findings were all thrown away for a forged path, publishes nothing at all
+// and is indistinguishable from a clean review.
 func renderSummary(report *Report, cfg *config.Config) string {
 	var b strings.Builder
 

@@ -3,6 +3,7 @@ package evals
 import (
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -23,7 +24,9 @@ func TestInstrumentBugCountIsTheTableRowCount(t *testing.T) {
 	}
 	body := strings.SplitN(section[1], "\n## ", 2)[0]
 
-	// The first table in the section: header, separator, then one row per bug.
+	// The first table in the section: header, separator, then one row per
+	// bug. The separator is recognised by its `|---` prefix, which is the
+	// style findings.md uses; a `| --- |` separator would count as a row.
 	rows := 0
 	inTable := false
 	for _, line := range strings.Split(body, "\n") {
@@ -66,19 +69,7 @@ func TestInstrumentBugCountIsTheTableRowCount(t *testing.T) {
 	if m == nil {
 		t.Fatal("website/index.md has no instrument-bug stat")
 	}
-	if m[1] != itoa(rows) {
+	if m[1] != strconv.Itoa(rows) {
 		t.Errorf("website/index.md says %s instrument bugs; the table has %d rows", m[1], rows)
 	}
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b []byte
-	for n > 0 {
-		b = append([]byte{byte('0' + n%10)}, b...)
-		n /= 10
-	}
-	return string(b)
 }

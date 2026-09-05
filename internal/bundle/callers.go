@@ -187,7 +187,7 @@ func (c *relatedCollector) walkFiles(root string, isCandidate func(name string) 
 			if c.changed[p] {
 				continue
 			}
-			if _, cached := c.files[p]; !cached {
+			if _, cached := c.files[p]; !cached && !c.missing[p] {
 				if c.walked >= maxCallerFiles {
 					// Something is left unlisted: this file, and whatever
 					// the rest of this directory and the queue hold.
@@ -222,7 +222,16 @@ func codeLines(lines []string, hashComments bool) []string {
 	inDoc := false
 	for i, line := range lines {
 		if hashComments {
-			fences := strings.Count(line, `"""`) + strings.Count(line, `'''`)
+			// Fences are counted on the line with its quoted spans and
+			// comment tail blanked, so a `"""` inside a comment or a
+			// single-quoted string does not open a docstring that swallows
+			// the rest of the file. An opening `x = """` keeps its unpaired
+			// quote and still counts one.
+			probe := line
+			if !inDoc {
+				probe = hashTail.ReplaceAllString(quotedSpan.ReplaceAllString(line, `""`), "")
+			}
+			fences := strings.Count(probe, `"""`) + strings.Count(probe, `'''`)
 			if inDoc {
 				if fences%2 == 1 {
 					inDoc = false
@@ -537,10 +546,14 @@ func (c *relatedCollector) goCallerWants(e *Entry) []want {
 			case s.receiver != "":
 				// A method call binds by name alone, so the file has to
 				// name the receiver type somewhere (a field, a parameter, a
-				// constructor) before a .Name( in it counts: otherwise every
-				// f.Close() in a file that imports the package would attach
-				// as a caller of the package's Close. Receiver resolution
-				// proper needs a type checker, which a fetcher cannot run.
+				// composite literal, a type assertion) before a .Name( in
+				// it counts: otherwise every f.Close() in a file that
+				// imports the package would attach as a caller of the
+				// package's Close. A caller that only ever holds the value
+				// from a constructor (`u := store.New()`) never names the
+				// type and is missed; that is the fail-closed side.
+				// Receiver resolution proper needs a type checker, which a
+				// fetcher cannot run.
 				typeRef := `\b` + regexp.QuoteMeta(s.receiver) + `\b`
 				if !samePkg {
 					typeRef = `\b` + regexp.QuoteMeta(local) + `\.` + regexp.QuoteMeta(s.receiver) + `\b`
@@ -563,9 +576,9 @@ func (c *relatedCollector) goCallerWants(e *Entry) []want {
 				}
 				attached[s.name]++
 				caller := callerName(lines[start])
-				wants = append(wants, want{file: file, name: caller, calls: calls, uses: 1, extract: callerExtract(start, "//")})
+				wants = append(wants, want{file: file, name: caller, line: start, calls: calls, uses: 1, extract: callerExtract(start, "//")})
 				for _, i := range callerConstants(lines, start, braceExtent(lines, start), constAt) {
-					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, caller: caller, extract: constantExtract(i, "//")})
+					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), line: i, calls: calls, constant: true, caller: caller, callerLine: start, extract: constantExtract(i, "//")})
 				}
 			}
 		}
@@ -762,9 +775,9 @@ func (c *relatedCollector) pyCallerWants(e *Entry) []want {
 				}
 				attached[s.name]++
 				caller := callerName(lines[start])
-				wants = append(wants, want{file: file, name: caller, calls: calls, uses: 1, extract: pyExtract(start)})
+				wants = append(wants, want{file: file, name: caller, line: start, calls: calls, uses: 1, extract: pyExtract(start)})
 				for _, i := range callerConstants(lines, start, pyBlockEnd(lines, start, indentOf(lines[start])), constAt) {
-					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, caller: caller, extract: constantExtract(i, "#")})
+					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), line: i, calls: calls, constant: true, caller: caller, callerLine: start, extract: constantExtract(i, "#")})
 				}
 			}
 		}
@@ -778,7 +791,12 @@ var (
 	tsTopDef = regexp.MustCompile(`^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?\s*|class\s+|const\s+|let\s+|var\s+)([A-Za-z_$][\w$]*)`)
 	// tsMethodDef is a class member with a body: a method, an accessor, or a
 	// property holding a function, at any indentation.
-	tsMethodDef = regexp.MustCompile(`^\s+(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*(?:\*\s*)?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*(?:\([^)]*\)\s*(?::[^{=]+)?\s*\{|=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)`)
+	// The parameter list admits no nested paren or quote, so a call whose
+	// last argument is a function (`setTimeout(function () {`,
+	// `it('x', function () {`) is not read as a method header; a default
+	// value holding a call falls back to the enclosing function, which is
+	// the safe direction.
+	tsMethodDef = regexp.MustCompile(`^\s+(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*(?:\*\s*)?([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*(?:\([^()'"]*\)\s*(?::[^{=]+)?\s*\{|=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)`)
 )
 
 // tsRedefined names the exported top-level definitions whose lines the diff
@@ -821,6 +839,7 @@ func tsRedefined(content string, ranges [][2]int) []redefined {
 var tsKeywords = map[string]bool{
 	"if": true, "for": true, "while": true, "switch": true, "catch": true, "do": true,
 	"return": true, "typeof": true, "new": true, "await": true, "else": true, "with": true,
+	"function": true,
 }
 
 // tsMethodAt reports whether a line opens a class member with a body.
@@ -930,9 +949,9 @@ func (c *relatedCollector) tsCallerWants(e *Entry) []want {
 				}
 				attached[s.name]++
 				caller := callerName(lines[start])
-				wants = append(wants, want{file: file, name: caller, calls: calls, uses: 1, extract: callerExtract(start, "//", "/*", "*")})
+				wants = append(wants, want{file: file, name: caller, line: start, calls: calls, uses: 1, extract: callerExtract(start, "//", "/*", "*")})
 				for _, i := range callerConstants(lines, start, braceExtent(lines, start), constAt) {
-					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), calls: calls, constant: true, caller: caller, extract: constantExtract(i, "//", "/*", "*")})
+					wants = append(wants, want{file: file, name: strings.TrimSpace(lines[i]), line: i, calls: calls, constant: true, caller: caller, callerLine: start, extract: constantExtract(i, "//", "/*", "*")})
 				}
 			}
 		}

@@ -581,3 +581,71 @@ func (h *Handler) Serve(id string) string { return h.users.Lookup(id) }
 		t.Fatalf("callers = %v, want %v", got, want)
 	}
 }
+
+func TestCallersOfOneNameOnTwoReceiversAreTwoCallers(t *testing.T) {
+	store := `package store
+
+// Users is a table.
+type Users struct{}
+
+// Lookup finds x.
+func (u *Users) Lookup(id string) string { return id }
+`
+	web := `package web
+
+import "example.com/app/store"
+
+type Alpha struct{ users *store.Users }
+type Beta struct{ users *store.Users }
+
+// Run on Alpha.
+func (a *Alpha) Run() string { return a.users.Lookup("a") }
+
+// Run on Beta.
+func (b *Beta) Run() string { return b.users.Lookup("b") }
+`
+	tree := fakeTree{"go.mod": callersGoMod, "store/s.go": store, "web/w.go": web}
+	got := callerNames(assembleCallers(t, tree, true, modifiedFile("store/s.go", store, 7)))
+	want := []string{"web/w.go:Run calls store.Users.Lookup", "web/w.go:Run calls store.Users.Lookup"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("callers = %v, want both Run methods", got)
+	}
+}
+
+func TestCallersTypeScriptCallbackArgumentsAreNotMethodHeaders(t *testing.T) {
+	lib := "export function retry(n: number): number {\n  return n;\n}\n"
+	work := `import { retry } from "./lib";
+
+export function scheduleWork(n: number) {
+  setTimeout(function () {
+    retry(n);
+  }, 10);
+  it('does a thing', function () {
+    retry(n + 1);
+  });
+}
+`
+	tree := fakeTree{"package.json": "{}", "src/lib.ts": lib, "src/work.ts": work}
+	got := callerNames(assembleCallers(t, tree, true, modifiedFile("src/lib.ts", lib, 2)))
+	if want := "src/work.ts:scheduleWork calls lib.retry"; strings.Join(got, ",") != want {
+		t.Fatalf("callers = %v, want %v", got, want)
+	}
+}
+
+func TestCallersPythonFencesInCommentsAndStringsDoNotOpenADocstring(t *testing.T) {
+	db := "def fetch_orders(conn, offset, limit):\n    return []\n"
+	svc := `from app.db import fetch_orders
+
+# Docstrings in this project use """ style.
+SEP = '"""'
+
+
+def handler(conn):
+    return fetch_orders(conn, 0, 10)
+`
+	tree := fakeTree{"app/__init__.py": "", "app/db.py": db, "app/svc.py": svc}
+	got := callerNames(assembleCallers(t, tree, true, modifiedFile("app/db.py", db, 2)))
+	if want := "app/svc.py:handler calls db.fetch_orders"; strings.Join(got, ",") != want {
+		t.Fatalf("callers = %v, want %v", got, want)
+	}
+}

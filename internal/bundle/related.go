@@ -9,6 +9,7 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
@@ -237,7 +238,7 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 	// skipped when nothing it finds could be attached.
 	fresh := 0
 	for _, w := range wants {
-		if !c.attached[w.file+"\x00"+w.name+"\x00"+w.calls] {
+		if !c.attached[w.key()] {
 			fresh++
 		}
 	}
@@ -293,11 +294,11 @@ func (c *relatedCollector) attach(e *Entry, wants []want, budget int, est *llms.
 		if len(e.Related) >= maxRelatedPerFile {
 			break
 		}
-		key := w.file + "\x00" + w.name + "\x00" + w.calls
+		key := w.key()
 		if c.attached[key] {
 			continue
 		}
-		if w.constant && !callers[w.file+"\x00"+w.caller] {
+		if w.constant && !callers[w.file+"\x00"+strconv.Itoa(w.callerLine)] {
 			continue
 		}
 		content, ok := c.read(w.file)
@@ -321,11 +322,21 @@ func (c *relatedCollector) attach(e *Entry, wants []want, budget int, est *llms.
 		spent += cost
 		c.attached[key] = true
 		if w.calls != "" && !w.constant {
-			callers[w.file+"\x00"+w.name] = true
+			callers[w.file+"\x00"+strconv.Itoa(w.line)] = true
 		}
 		e.Related = append(e.Related, def)
 	}
 	return spent
+}
+
+// key identifies a want for dedupe across a plan. A definition is its file
+// and name; a caller is also its line, since one file can define two
+// methods of one name on two receivers.
+func (w want) key() string {
+	if w.calls == "" {
+		return w.file + "\x00" + w.name
+	}
+	return w.file + "\x00" + w.name + "\x00" + strconv.Itoa(w.line) + "\x00" + w.calls
 }
 
 // want is one definition a changed file may need: where to look, what to look
@@ -339,10 +350,14 @@ type want struct {
 	// calls is set on a caller want: the redefined symbol the snippet calls.
 	calls string
 
-	// constant marks a one-line constant a caller passes, and caller names
-	// that caller.
-	constant bool
-	caller   string
+	// line is the 0-based line the want starts on, part of its identity
+	// for a caller: two receivers' methods of one name in one file are two
+	// callers. constant marks a one-line constant a caller passes; caller
+	// and callerLine name that caller.
+	line       int
+	constant   bool
+	caller     string
+	callerLine int
 }
 
 // addedText joins the lines the change added, which is where a used name has
@@ -940,8 +955,10 @@ func join(lines []string) string {
 func renderRelated(r Related) string {
 	var b strings.Builder
 	switch {
-	case r.Constant:
+	case r.Constant && r.Caller != "":
 		fmt.Fprintf(&b, "##### %s (line %d), a constant %s passes\n\n```\n", promptSafe(r.Path), r.Line, promptSafe(r.Caller))
+	case r.Constant:
+		fmt.Fprintf(&b, "##### %s (line %d), a constant the caller passes\n\n```\n", promptSafe(r.Path), r.Line)
 	case r.Calls != "":
 		fmt.Fprintf(&b, "##### %s (from line %d), calls %s\n\n```\n", promptSafe(r.Path), r.Line, promptSafe(r.Calls))
 	default:

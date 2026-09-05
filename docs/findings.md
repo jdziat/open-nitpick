@@ -977,7 +977,7 @@ controls silent on our side, so the four runs with constants attached agree
 (`multifile-callers-20260905T164614Z` and `multifile-callers-20260905T170221Z`).
 
 The first cut missed the Python fixture in both runs, and the Go sentinel
-fixture in one: the exporter passes `BATCH`, a module constant defined
+fixture in run 0 of `163816Z`: the exporter passes `BATCH`, a module constant defined
 outside the attached function, so the model saw a name where the
 precondition needed a number. Each attached caller now brings the one-line
 top-level constants its body names. Of the four fixture-runs that changed
@@ -986,8 +986,11 @@ sentinel run that flipped to a hit and the TypeScript run that flipped to a
 miss are run-to-run variance. That TypeScript miss is an anchor miss, not a
 blind one: the finding names `src/http.ts` and `AbortSignal.timeout` and
 is anchored on the doc comment at line 3 instead of the return at line 13,
-ten lines past the tolerance, which is also the run's one noise finding.
-Our controls were silent in every run of every variant.
+ten lines from the plant against a tolerance of six, which is also the
+run's one noise finding. Our controls were silent in every run behind both
+tables above; two earlier floor runs on the same corpus
+(`multifile-callers-20260905T154530Z`, `155517Z`) each had one glm finding
+on the Python clean control.
 
 **What else the day measured.**
 
@@ -1017,14 +1020,22 @@ two processes (`multifile-multifile-20260905T170442Z`, one run;
 |---|---|---|---|
 | glm + related context, walk on, 3 runs | 0.92 (33/36, 1 lost) | 0.12 | $0.0004 |
 | glm + related context, 2026-09-04 record | 0.93 (13/14, 2 lost) | 0.39 | $0.0015 |
-| glm, diff only, 3 runs | 0.61 (22/36, 3 lost) | 0.42 | $0.0003 |
+| glm, diff only, 3 runs | 0.61 (20/33, 3 lost) | 0.46 | $0.0003 |
 
-Recall held and noise fell by two thirds; the one lost review was a
-provider failure on the Python clean control, not a review. The one
-fixture that was not at ceiling before, `go-cache-get-unchecked`, hit in
-all three runs: its caller is a method on an imported type, which the
-callee direction could not bind and the caller direction attaches by name
-once the file names the receiver type.
+Recall held and noise fell by two thirds. The lost reviews are absent
+from the dumps, which record absence and not cause; the walk-on loss is
+the Python clean control, so it leaves the denominator at 36, and the
+three diff-only losses are on planted fixtures, so that denominator is
+33. What the per-fixture grid supports, and no more: four planted
+fixtures that the diff-only arm missed in every run
+(`go-empty-filter-deletes-all`, `python-expired-token-accepted`,
+`ts-duration-units-through-barrel`, and `ts-client-per-request` in two of
+three) hit in every walk-on run, and one fixture went the other way,
+`go-cache-get-unchecked`, three of three without the walk and two of three
+with it. That is evidence the walk is not harmful and probably helps on
+this corpus, which is a weaker claim than a mechanism; the mechanism is
+shown on the callers corpus, where the finding has to name the attached
+caller to count.
 
 Rule 15 applies to the callers corpus in full: six fixtures, written the
 same day as the collector by the same hand, outside the ground-truth

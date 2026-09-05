@@ -135,3 +135,20 @@
   .np-hero p.np-lede { font-size: 0.95rem; }
   .np-stat { gap: 1.5rem; }
 }
+
+/* Round 3: one radius, keyboard focus on the card, mobile stat row. */
+.md-typeset .md-button, .np-card, .md-search__form { border-radius: 0.4rem; }
+.np-card a:focus-visible { outline: none; }
+.np-card:focus-within { outline: 2px solid var(--md-primary-fg-color); outline-offset: 2px; }
+.np-grid { grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr)); }
+.md-typeset .md-button:not(.md-button--primary):hover,
+.md-typeset .md-button:not(.md-button--primary):focus-visible {
+  background-color: var(--md-accent-fg-color--transparent);
+  border-color: var(--md-primary-fg-color);
+  color: var(--md-primary-fg-color);
+}
+[data-md-color-scheme="slate"] { --md-primary-fg-color--dark: #5eead4; }
+@media (max-width: 44rem) {
+  .np-stat { gap: 1rem; }
+  .np-stat div { min-width: 0; flex: 1 1 0; }
+}
