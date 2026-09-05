@@ -169,8 +169,8 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		suffix string
 		tune   func(*config.Config)
 	}{
-		{"", func(c *config.Config) { c.Review.RelatedContext = false }},
-		{" +ctx", func(c *config.Config) { c.Review.RelatedContext = true }},
+		{"", func(c *config.Config) { c.Review.RelatedContext, c.Review.RelatedContextCallers = false, false }},
+		{" +ctx", func(c *config.Config) { c.Review.RelatedContext, c.Review.RelatedContextCallers = true, true }},
 	}
 
 	var wg sync.WaitGroup

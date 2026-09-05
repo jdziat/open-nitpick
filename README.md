@@ -216,7 +216,8 @@ review:
   fail_on: none                    # default: advisory. Set to error/critical to gate CI.
   min_severity: info               # drop anything below this entirely
   incremental: true                # on a re-run, read only what changed since the last review
-  related_context: false           # attach imported definitions used on changed lines (see below)
+  related_context: true            # default: attach imported definitions used on changed lines (see below)
+  related_context_callers: false   # default: also walk the repository for callers of what the change redefines
   max_files: 60
   token_budget_per_request: 60000  # per model CALL; raise it for large-context models
   include_full_files: true         # send whole files, not just hunks
@@ -511,9 +512,9 @@ about code it was not shown, so a defect that turns on a callee's contract — a
 helper documented as "must be called with a deadline", a converter that takes
 dollars and is handed cents — is one it can only guess at.
 
-`review.related_context: true` attaches, beside each changed file, the
-definitions it imports from elsewhere in the repository and uses on a changed
-line: Go package-level functions, types and constants reached through the
+`review.related_context`, on by default, attaches, beside each changed file,
+the definitions it imports from elsewhere in the repository and uses on a
+changed line: Go package-level functions, types and constants reached through the
 module's own import path; TypeScript and JavaScript exports reached through a
 relative import; Python module-level `def`, `class` and assignments reached
 through `from x import y` or `import x`; Rust items reached through
@@ -534,8 +535,9 @@ not under review. Nothing under `node_modules`, a module cache or outside the
 checkout is ever read, and a file the change itself touches is never attached,
 because the model already has it.
 
-It also works in the other direction. When a change redefines an exported
-function, method or top-level export — in Go, Python, TypeScript or
+It also works in the other direction, behind its own switch,
+`review.related_context_callers`, off by default. When a change redefines an
+exported function, method or top-level export — in Go, Python, TypeScript or
 JavaScript — the functions in untouched files that call it are attached too,
 under a heading that tells the model to check each caller against the new
 definition. This is the defect class a diff-only review cannot see by
@@ -558,9 +560,17 @@ narrow nothing the file under review would have got. The summary lists every
 file attached as context; a file read by the caller walk and found to hold no
 caller is not listed.
 
-It ships **off** until the measurement in [docs/findings.md](docs/findings.md)
-says otherwise. Context is not free: the same definitions that let a model
-confirm a defect give it more to be confidently wrong about.
+The two switches differ in what they read. Definitions come from files the
+change already names through its imports, so attaching them discloses
+nothing a reviewer of that diff would not open, and every price in the model
+sweep was measured with them on; that direction ships on. The caller walk
+reads up to 150 files the change never named and sends excerpts to the model,
+which is a different consent boundary from "review my diff", so it ships off
+and the measured gain (0/8 to 7/8 on its corpus, noise down on the multi-file
+corpus, in [docs/findings.md](docs/findings.md#callers-2026-09-05)) is for
+the operator to weigh against that. Context is not free either way: the same
+definitions that let a model confirm a defect give it more to be confidently
+wrong about.
 
 ### Personality and how much it nitpicks
 
@@ -757,9 +767,9 @@ a single run, so gaps under about 0.10 are inside the noise.
 Incumbent's on-demand price on the same corpora is $0.25 to $0.36 a review.
 
 Every row was measured with `review.related_context: true`, on 2026-09-04,
-before the caller walk was added under the same flag. It is off by default;
-set it to reproduce these numbers. The multi-file corpus rerun with the walk
-on ([docs/findings.md](docs/findings.md#callers-2026-09-05)) cost no more per
+which is now the default, and without the caller walk, which is not. The
+multi-file corpus rerun with the walk on
+([docs/findings.md](docs/findings.md#callers-2026-09-05)) cost no more per
 review than before, but the sweep itself has not been repeated.
 
 The default stays sonnet-4.6 because the sweep ran on the corpora the prompt

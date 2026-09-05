@@ -108,11 +108,14 @@ func Defaults() *Config {
 			// this tool has already reviewed, where the alternative is posting
 			// the same findings again on every push.
 			Incremental: true,
-			// Off until measured; see docs/findings.md. Reading a called
-			// function's definition is the kind of context that can just as
-			// easily hand a model something new to be wrong about.
-			RelatedContext:       false,
-			RelatedContextTokens: 16000,
+			// On: it reads only what the change already imports, and every
+			// price in the model sweep was measured with it on (see
+			// docs/findings.md). The caller walk is off: it reads files the
+			// change never named, and an operator should choose that
+			// knowing the fetch count and the measured gain.
+			RelatedContext:        true,
+			RelatedContextCallers: false,
+			RelatedContextTokens:  16000,
 		},
 		Persona: DefaultPersona(),
 		// Stated rather than left to the zero value, because "off" here is a

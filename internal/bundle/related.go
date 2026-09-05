@@ -108,6 +108,10 @@ type relatedCollector struct {
 	walked    int
 	truncated bool
 
+	// callers switches the walk over the repository for callers of what the
+	// change redefines (callers.go); review.related_context_callers.
+	callers bool
+
 	// maxBytes refuses a file larger than this after fetching it, so the
 	// caller walk cannot scan a generated bundle that escaped
 	// callerSkipDirs. It applies to every read the collector makes,
@@ -242,7 +246,7 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 			fresh++
 		}
 	}
-	if len(e.Related)+fresh < maxRelatedPerFile && budget >= minCallerBudget {
+	if c.callers && len(e.Related)+fresh < maxRelatedPerFile && budget >= minCallerBudget {
 		callers := c.callerWants(e)
 		sortCallers(callers)
 		wants = append(wants, callers...)

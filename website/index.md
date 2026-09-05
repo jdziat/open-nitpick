@@ -53,7 +53,7 @@ Path-scoped instructions live next to the code they describe. `nitpick explain-c
 
 <div class="np-card" markdown>
 <p class="np-card-title">Context in both directions</p>
-The definitions a changed line calls, and the untouched callers of what a change redefines, attached from the repository with their real line numbers. Off by default until measured more widely. [Related context →](guide.md#related-context)
+The definitions a changed line calls, on by default, and the untouched callers of what a change redefines, behind its own switch because it reads files the change never named. [Related context →](guide.md#related-context)
 </div>
 
 <div class="np-card" markdown>
@@ -79,7 +79,7 @@ Five corpora, a judge-free harness, and a findings document that records its own
 
 1. The change is read from GitHub or a local checkout, and the policy it is reviewed under comes from the base revision, not the branch.
 2. Analyzers that are installed run against the changed lines, isolated from the tree, and their output becomes evidence.
-3. Files are bundled into batches under a token budget, with related context attached when it is switched on: what a changed line calls, and who calls what the change redefined.
+3. Files are bundled into batches under a token budget, with related context attached: what a changed line calls by default, and who calls what the change redefined when the caller walk is switched on.
 4. Each batch is reviewed by the model the route selects. A triage model merges and filters. An optional expert pass refutes.
 5. The review is posted as inline comments, with a summary that lists every file not reviewed, every analyzer that did not run, and every finding that was discarded and why.
 

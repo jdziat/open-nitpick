@@ -34,10 +34,12 @@ review:
   # budget is about how much one call is asked to judge at once, not what
   # the model can hold. Raised here, where the reviewer is a frontier model.
   token_budget_per_request: 120000
-  # Off in the shipped defaults until measured more widely; on here, where
-  # reviews are advisory, because docs/findings.md's multi-file table is the
-  # evidence that it finds what a diff-only review cannot.
+  # Definitions the change imports are attached by default. The caller
+  # walk, which reads files the change never named, is off by default and
+  # on here, where reviews are advisory and the repository is this one;
+  # docs/findings.md's callers section is the evidence for what it finds.
   related_context: true
+  related_context_callers: true
 
 instructions:
   - path: "**/*.go"

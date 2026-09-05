@@ -52,7 +52,8 @@ const (
 	// Those responses become offline regression fixtures.
 	EnvCapture = "NITPICK_EVAL_CAPTURE"
 
-	// EnvRelatedContext switches review.related_context on for every review in
+	// EnvRelatedContext switches review.related_context and
+	// review.related_context_callers on for every review in
 	// the run, so the feature can be measured against the same corpus with it
 	// off. Any non-empty value other than "0" or "false" enables it.
 	EnvRelatedContext = "NITPICK_EVAL_RELATED_CONTEXT"
@@ -924,12 +925,16 @@ func evalConfig(model Model) *config.Config {
 		cfg.Review.ModelNotes = &off
 	}
 
-	// Off unless the run asks, matching the shipped default; the harness is
-	// how the default gets decided. See docs/findings.md.
+	// Both directions off unless the run asks, whatever the shipped default
+	// is: the harness is how the default gets decided, and the diff-only arm
+	// has to stay diff-only. See docs/findings.md.
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvRelatedContext))) {
 	case "", "0", "false", "off":
+		cfg.Review.RelatedContext = false
+		cfg.Review.RelatedContextCallers = false
 	default:
 		cfg.Review.RelatedContext = true
+		cfg.Review.RelatedContextCallers = true
 	}
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvValidation))) {
 	case "", "0", "false", "off":

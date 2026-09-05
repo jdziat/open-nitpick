@@ -69,6 +69,7 @@ func addedFile(p, content string) *diff.File {
 func relatedConfig() *config.Config {
 	cfg := config.Defaults()
 	cfg.Review.RelatedContext = true
+	cfg.Review.RelatedContextCallers = true
 	return cfg
 }
 
@@ -300,11 +301,28 @@ func TestRelatedSkipsChangedFilesAndUnusedImports(t *testing.T) {
 	}
 }
 
-func TestRelatedIsOffByDefaultAndBudgeted(t *testing.T) {
+func TestRelatedDefaultsAttachDefinitionsButNotCallersAndAreBudgeted(t *testing.T) {
 	tree := fakeTree{"a.ts": "import { f } from \"./b\";\nf();\n", "b.ts": "export function f() {}\n"}
 	plan := assembleRelated(t, config.Defaults(), tree, true, "a.ts")
-	if n := len(relatedNames(plan)); n != 0 {
-		t.Errorf("related context attached %d definitions with the feature off", n)
+	if got := relatedNames(plan); strings.Join(got, ",") != "b.ts:f" {
+		t.Errorf("defaults attached %v, want the one definition the change imports", got)
+	}
+
+	// The caller walk is a separate switch, off by default: a redefined
+	// export with a caller in the tree attaches nothing under the defaults.
+	lib := "export function g(): number {\n  return 1;\n}\n"
+	callerTree := fakeTree{"package.json": "{}", "src/lib.ts": lib, "src/use.ts": "import { g } from \"./lib\";\nexport function h() { return g(); }\n"}
+	walk, err := AssembleWith(context.Background(), config.Defaults(), diff.Files{modifiedFile("src/lib.ts", lib, 2)}, callerTree.fetch, callerTree.list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := callerNames(walk); len(got) != 0 {
+		t.Errorf("defaults attached callers %v; review.related_context_callers is off by default", got)
+	}
+	off := config.Defaults()
+	off.Review.RelatedContext = false
+	if plan := assembleRelated(t, off, tree, true, "a.ts"); len(relatedNames(plan)) != 0 {
+		t.Errorf("related_context: false still attached %v", relatedNames(plan))
 	}
 
 	// A budget too small for the one definition attaches nothing, and the

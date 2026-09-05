@@ -1051,3 +1051,12 @@ Rule 15 applies to the callers corpus in full: six fixtures, written the
 same day as the collector by the same hand, outside the ground-truth
 registries. The twelve-model sweep has not been repeated with the walk on.
 
+**The default, decided.** The flag was split the same evening.
+`review.related_context` (definitions the change imports) is on by default:
+it reads only files the change points at, and the sweep was priced with
+it on. `review.related_context_callers` (the walk) is off by default, not
+for want of evidence but because it reads up to 150 files the change never
+named and sends excerpts to a third party, which an operator should choose
+knowing both that and the numbers above. The harness turns both on for
+its `+ctx` arm and both off otherwise, whatever the defaults are.
+

@@ -347,8 +347,18 @@ type Review struct {
 
 	// RelatedContext attaches, beside each changed file, the definitions it
 	// imports from elsewhere in the repository and uses on a changed line, so
-	// the model can read what a called function does instead of guessing.
+	// the model can read what a called function does instead of guessing. It
+	// reads only files the change itself points at through its imports.
 	RelatedContext bool `yaml:"related_context"`
+
+	// RelatedContextCallers also attaches, for each exported symbol the
+	// change redefines, the untouched functions that call it, found by
+	// walking the repository's own files. That walk reads up to 150 files
+	// nobody named and sends excerpts of them to the model, which is a
+	// different consent boundary from "review my diff"; it is therefore a
+	// separate switch, and off unless asked for. It does nothing unless
+	// RelatedContext is on.
+	RelatedContextCallers bool `yaml:"related_context_callers"`
 
 	// ModelNotes adds the prompt layer addressed to the reviewing model's
 	// family (prompt.ModelGuidance). On unless set to false; the switch

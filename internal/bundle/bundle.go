@@ -204,6 +204,7 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 	if cfg.Review.RelatedContext && fetch != nil {
 		related = newRelatedCollector(ctx, files, fetch, list)
 		related.maxBytes = cfg.Review.MaxFileBytes
+		related.callers = cfg.Review.RelatedContextCallers
 	}
 
 	// Selection and content run in one pass so that review.max_files counts
