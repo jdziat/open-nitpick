@@ -1,4 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="open-nitpick">
-  <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f766e"/>
-  <path d="M18 34l8 8 20-20" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="open-nitpick">
+  <rect width="512" height="512" rx="96" fill="#ffffff"/>
+  <g fill="#127482">
+    <rect x="89" y="37" width="311" height="65" rx="10"/>
+    <path d="M37 130h67v14H51v107h53v14H37z"/>
+    <rect x="89" y="289" width="336" height="55" rx="10"/>
+    <rect x="89" y="411" width="290" height="64" rx="10"/>
+  </g>
+  <g fill="#67eac7">
+    <rect x="88" y="169" width="386" height="54" rx="10"/>
+    <path d="M474 256h-60v14h46v93h-46v14h60z"/>
+  </g>
 </svg>
