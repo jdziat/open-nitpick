@@ -149,6 +149,17 @@ exists for TypeScript, answers "most similar to" with the classifier's
 confidence, and "unknown" with the reason otherwise. The corpus is
 embedded in the binary from `internal/modelid/corpus`.
 
+Result 2026-09-06 (`docs/findings.md`, "Fingerprints"): a second
+instrument, character 3-grams and token bigrams under cosine
+(`internal/modelid/fingerprint.go`), clears the 0.15 margin in all three
+languages on both task splits and across generations, with license
+headers stripped so the human control is not found by its copyright
+line. The command now uses the fingerprint, trains on both embedded
+generations, answers for Go, Python and TypeScript, and abstains below a
+margin of 0.05 (0.91 precision on the second corpus). The mined idioms
+per author are in `RESULTS.md`. Next: the contributor question on real
+repositories with commit trailers as ground truth (see the findings).
+
 Which model wrote a file. This is the one command whose premise needs a
 measurement before code: it is not known that current models leave a
 stylistic signature that survives a human edit, and a confident wrong

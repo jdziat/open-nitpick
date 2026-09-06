@@ -1277,3 +1277,74 @@ review, and the plan is what the README promises. Refuted by the
 verifiers: the shallow-checkout fallback (the shipped action fetches full
 history), strict mode failing on the named scanner (guarded anyway), and
 a two-lockfile dedupe (the scanner runs per file).
+
+## Fingerprints: which model wrote it, second instrument (2026-09-06)
+
+The first instrument was twenty-two hand-picked shape statistics and a
+nearest-centroid classifier, and it cleared the bar for TypeScript only.
+The second is the standard instrument of authorship attribution:
+character 3-grams (spaces collapsed, tabs kept) and token bigrams
+(identifiers keep their case, numbers collapse to one token), sublinear
+and unit-length, scored by cosine to each author's centroid over the grams
+seen in at least two training files. A third method averages the two.
+The same corpora, the same two task splits, the same cross-generation
+test, the same rule set before the first run: a margin of 0.15 over the
+majority baseline. One change to the corpus reading, made before the
+numbers below were taken: a leading license header is stripped from every
+file, because the human control is standard-library code that opens with
+one and no model writes one, and with it in the fingerprint found the
+human by the copyright line (the mined "idioms" for the human were
+"Copyright", "All rights", "BSD-style"). Stripping it took the Go
+even-split fingerprint from 0.33 to 0.19 over baseline.
+
+| language | split | features | fingerprint | combined |
+|---|---|---|---|---|
+| go | even tasks train | 0.11 | 0.19 | 0.19 |
+| go | first half train | 0.15 | 0.38 | 0.26 |
+| go | corpus to corpus2 | 0.15 | 0.59 | 0.39 |
+| python | even tasks train | 0.08 | 0.42 | 0.29 |
+| python | first half train | 0.13 | 0.33 | 0.23 |
+| python | corpus to corpus2 | 0.14 | 0.55 | 0.48 |
+| typescript | even tasks train | 0.28 | 0.28 | 0.34 |
+| typescript | first half train | 0.21 | 0.26 | 0.29 |
+| typescript | corpus to corpus2 | 0.29 | 0.55 | 0.45 |
+
+Margins over the majority baseline; accuracies and the matrices are in
+`internal/modelid/RESULTS.md`. The fingerprint clears the bar in every
+language on every split, and across generations it is right on about
+three files in four (0.77, 0.73, 0.74) against a baseline of 0.18.
+Combining it with the features makes it worse everywhere but one cell,
+which says the features carry little the n-grams do not and some noise
+they do not. The verdict changes: go for all three languages, under the
+fingerprint alone.
+
+**What the idioms say.** The readable half: per author and language, the
+token bigrams present in at least four of their files and at least three
+times rarer in everyone else's. claude-sonnet-4.6 writes "Example usage"
+blocks and `console.log` demonstrations in TypeScript and "creates a",
+"the given", "and returns" doc comments in Go; kimi-k3 writes
+"reports whether" in Go, the standard library's own phrase, and `**` bold
+in comments; gpt-5.6-luna writes `func New`, `= errors`, `not isinstance`
+and `export default`; glm-5.3-flash writes `from __future__ import
+annotations` and JSDoc `* /`; gemma-4 and qwen3.8 leave almost no bigram
+above the threshold, which is consistent with their rows in the matrices.
+The human control's idioms after stripping are `internal /`, `unsafe .`,
+`bytes .`, `encoding .`: it is recognised as standard-library code, not as
+a person, and that is what it is. The corpus has no human control in
+TypeScript and none in the second generation, so no number above says
+anything about telling a model from a person; it says which of six models
+a file is nearest to.
+
+**The floor.** Under cosine the margin between the best and second-best
+author is small in absolute terms, and the old floor of 0.20 would answer
+for no file at all. On the second corpus, answering only above a margin
+of 0.05 is right 81 times in 89 and abstains on 108 of 197; above 0.10,
+right 25 in 26, abstaining on 171. The command's floor is 0.05, and its
+output says "margin", not "confidence".
+
+**What still holds from the first run.** Same-day corpus, six models,
+files of a few hundred lines, and no measurement of a signature surviving
+a human edit; Rule 15 applies. Two generations are two samplings of the
+same prompts, not two months of a model's life. The command trains on
+both generations and answers "most similar to" for Go, Python and
+TypeScript, "unknown" below the floor or outside the corpus, and says so.
