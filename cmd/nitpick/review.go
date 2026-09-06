@@ -71,8 +71,8 @@ func runReview(ctx context.Context, args []string) error {
 	}
 
 	// Go's flag package stops at the first non-flag argument and leaves the
-	// rest unread. Silently ignoring them means a misplaced flag — or an
-	// action.yml that builds its argv wrongly — changes nothing and says
+	// rest unread. Silently ignoring them means a misplaced flag, or an
+	// action.yml that builds its argv wrongly, changes nothing and says
 	// nothing, which is how -fail-on went missing in CI.
 	if fs.NArg() > 0 {
 		return fmt.Errorf("unexpected argument %q (flags must precede positional arguments)", fs.Arg(0))
@@ -159,8 +159,10 @@ func runReview(ctx context.Context, args []string) error {
 		if actions.active() {
 			fmt.Printf("::warning::open-nitpick: %s\n", reason)
 		}
-		_ = (&dryRunProvider{source: provider, out: os.Stdout}).PublishReview(ctx, ref,
-			review.Render(report, report.Files, cfg))
+		if perr := (&dryRunProvider{source: provider, out: os.Stdout}).PublishReview(ctx, ref,
+			review.Render(report, report.Files, cfg)); perr != nil {
+			log.Warn("could not print the review either", "error", perr)
+		}
 	default:
 		actions.setOutputs(resultError, nil)
 		return err
@@ -187,8 +189,8 @@ func runReview(ctx context.Context, args []string) error {
 // It is a function rather than a literal inside runReview because the wiring IS
 // the defense: an engine without Policy reviews a config-editing change under
 // the configuration that change wrote, and one without Models lets that change
-// pick the model that reviews it. Both are optional on the engine — an offline
-// driver has no base revision to resolve against — so neither omission is a
+// pick the model that reviews it. Both are optional on the engine (an offline
+// driver has no base revision to resolve against), so neither omission is a
 // build error, and a test can only pin them by constructing what the command
 // constructs.
 func newEngine(f *reviewFlags, repo string, cfg *config.Config, provider vcs.Provider, log *slog.Logger) *review.Engine {
@@ -199,8 +201,8 @@ func newEngine(f *reviewFlags, repo string, cfg *config.Config, provider vcs.Pro
 
 		// A change may not supply the policy it is reviewed under. Wired here
 		// rather than defaulted inside the engine because only this layer knows
-		// the checkout the diff's paths are relative to and which forge can name
-		// the base revision.
+		// the checkout the diff's paths are relative to and which forge resolves
+		// revisions.
 		Policy: &config.BasePolicy{RepoRoot: repo, Loaded: cfg, Provider: provider},
 
 		// Built from the policy the engine resolved, never from the file on
@@ -228,16 +230,10 @@ func newEngine(f *reviewFlags, repo string, cfg *config.Config, provider vcs.Pro
 	return engine
 }
 
-// gate returns the severity that decides this run's exit status.
-//
-// It cannot be read from the loaded configuration. When the change under review
-// edits .nitpick.yaml the engine reviews under a policy resolved from a revision
-// the change cannot write, and taking fail_on from the change's own file here
-// would hand back the one knob that decides whether CI goes red — after every
-// other knob had already been taken away.
-//
-// The -fail-on flag still outranks both, because it comes from the operator's
-// command line rather than from the change.
+// gate returns the severity that decides this run's exit status: the
+// -fail-on flag, else the resolved policy's fail_on, else the loaded file's.
+// The policy comes first because a change that edits .nitpick.yaml must not
+// choose the knob that decides whether CI goes red.
 func gate(report *review.Report, flag string, cfg *config.Config) config.Severity {
 	if flag != "" {
 		return config.Severity(flag)
@@ -253,7 +249,7 @@ func gate(report *review.Report, flag string, cfg *config.Config) config.Severit
 // It is on stderr as well as in the published summary because the local and
 // dry-run paths are where a contributor checks what their config change does,
 // and a run that silently reviewed under something else looks like the config
-// simply had no effect.
+// had no effect.
 func printPolicy(report *review.Report) {
 	if !report.Policy.Replaced {
 		return
@@ -264,8 +260,8 @@ func printPolicy(report *review.Report) {
 		report.Policy.Modified, report.Policy.Source())
 
 	// The Dropped reported above resolution belongs to the file that was set
-	// aside. These are the keys scrubbed from the policy that actually ran, and
-	// they were being discarded unread — so an operator whose base_url stopped
+	// aside. These are the keys scrubbed from the policy that ran, and
+	// they were being discarded unread, so an operator whose base_url stopped
 	// applying was told about the wrong file's keys, or about none at all.
 	if policy := report.Policy.Config; policy != nil && len(policy.Dropped) > 0 {
 		fmt.Fprintf(os.Stderr,
@@ -274,25 +270,10 @@ func printPolicy(report *review.Report) {
 	}
 }
 
-// printLinters reports how each deterministic analyzer was configured, and
-// which of them did not run.
-//
-// It sits beside printPolicy because it says the same kind of thing: the review
-// did not use configuration that lives in the repository. .nitpick.yaml
-// substitution has been announced here since it was introduced; analyzer
-// isolation announced nothing, so a run where eslint and semgrep never
-// executed, and golangci-lint ignored the repository's own .golangci.yml,
-// looked exactly like a run where all four were clean.
-//
-// It is NOT the disclosure, though it was briefly the only one. An operator
-// running this locally reads stderr; the person who has to know that a review
-// covered less than it looks like is reading the pull request, and
-// review.linterNotice is what reaches them.
-//
-// Everything is printed, not only the degradations. An analyzer reported as
-// having run isolated is the fact that the repository's lint settings did not
-// apply, and a reader who sees a shorter list next run has no way to tell which
-// line went missing.
+// printLinters reports how each deterministic analyzer was configured and
+// which did not run, every one and not only the degradations, so a shorter
+// list next run is visible. This is the local echo; review.linterNotice is
+// the disclosure that reaches the pull request.
 func printLinters(report *review.Report) {
 	if len(report.Linters) == 0 {
 		return
@@ -393,7 +374,7 @@ func githubProvider(repo string) (*vcs.GitHub, error) {
 }
 
 // dryRunProvider reads from a real forge but prints the review instead of
-// publishing it, so --dry-run reviews the code the user actually named.
+// publishing it, so --dry-run reviews the code the user named.
 type dryRunProvider struct {
 	source vcs.Provider
 	out    io.Writer
@@ -414,13 +395,8 @@ func (d *dryRunProvider) FileContent(ctx context.Context, ref vcs.Ref, path stri
 }
 
 // BaseRevision forwards to the wrapped forge so a dry run resolves policy the
-// way the real run will.
-//
-// vcs.BaseRevision asks for the interface rather than a method on Provider
-// precisely so a wrapper that cannot answer is forced to say so — but this one
-// can answer, and staying silent would push every config-editing change onto the
-// defaults fallback under -dry-run alone. A dry run that previews a different
-// review from the one that will be published is worse than no preview.
+// way the real run will; a wrapper that stayed silent would push every
+// config-editing change onto the defaults fallback under -dry-run alone.
 func (d *dryRunProvider) BaseRevision(ctx context.Context, ref vcs.Ref) (string, error) {
 	resolver, ok := d.source.(vcs.BaseResolver)
 	if !ok {
@@ -571,7 +547,7 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 	// Where the file is and which policy applies are different questions, and
 	// they have different answers for exactly one change: the one that edits
 	// this file. An operator asking this command what their configuration
-	// resolves to gets a misleading answer without this line — they read the
+	// resolves to gets a misleading answer without this line: they read the
 	// resolved ignore list here and then watch a review not honor it.
 	//
 	// Which answer is right turns on whether the change under review can reach
@@ -594,9 +570,9 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 	b.WriteString("\n")
 
 	// The keys sanitize discarded, named here as well as in the review log.
-	// This command exists to answer "what does my config actually resolve to",
+	// This command exists to answer "what does my config resolve to",
 	// and a key that was silently thrown away is the single most surprising
-	// answer it can give — an operator debugging "why is it talking to the
+	// answer it can give; an operator debugging "why is it talking to the
 	// wrong endpoint" reads this, not a CI log. Printing nothing when nothing
 	// was dropped is also what makes the empty case evidence rather than the
 	// same output any config would produce.
@@ -650,7 +626,7 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 	}
 
 	// Printing the exact prompt is what makes prompt tuning possible without
-	// spending tokens to discover what was actually sent.
+	// spending tokens to discover what was sent.
 	p, err := prompt.Build(prompt.NameReview, prompt.Options{
 		PersonaText: prompt.Persona(cfg.Persona),
 		Repository:  "(pull request title and body are inserted here at review time, fenced as untrusted)",

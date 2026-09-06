@@ -127,6 +127,9 @@ func slopScore(ctx context.Context, f *reviewFlags, paths []string, budget int, 
 		}
 		data, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(p)))
 		if err != nil {
+			// The tree read it moments ago; a file that cannot be read
+			// now is recorded as left out, not dropped from the score.
+			out.Skipped = append(out.Skipped, p+": unreadable for the tells: "+err.Error())
 			continue
 		}
 		out.Files++

@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 // trailers name the tools whose co-author lines label a commit. The match
@@ -116,7 +117,16 @@ func run(repo, out, clones, lang string, perClass, minLines, maxLines int, since
 		}
 		commits = append(commits, c)
 	}
-	sort.Slice(commits, func(i, j int) bool { return commits[i].date < commits[j].date })
+	// The dates are ISO 8601 with the committer's offset, so a string
+	// order would sort by local time; parse, and compare instants.
+	when := func(c commit) time.Time {
+		t, err := time.Parse(time.RFC3339, c.date)
+		if err != nil {
+			return time.Time{}
+		}
+		return t
+	}
+	sort.Slice(commits, func(i, j int) bool { return when(commits[i]).Before(when(commits[j])) })
 	// Both classes come from the same era: nothing before the first
 	// model-labelled commit is sampled, so a time split cannot separate
 	// the classes by date alone, and neither can the classifier by the

@@ -92,7 +92,7 @@ func TestMCPInstallUserScopeUsesTheHomeAndThisBinary(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(home, ".codex"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(home, ".codex", "config.toml"), []byte("model = \"o3\"\n\n[mcp_servers.nitpick]\ncommand = \"old\"\nargs = [\"mcp\"]\n\n[mcp_servers.other]\ncommand = \"y\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(home, ".codex", "config.toml"), []byte("model = \"o3\"\n\n[mcp_servers.nitpick]\ncommand = \"old\"\nargs = [\"mcp\"]\n\n[mcp_servers.nitpick.env]\nOLD = \"1\"\n\n[mcp_servers.other]\ncommand = \"y\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {
@@ -102,7 +102,7 @@ func TestMCPInstallUserScopeUsesTheHomeAndThisBinary(t *testing.T) {
 	}
 	toml, _ := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
 	got := string(toml)
-	if strings.Count(got, "[mcp_servers.nitpick]") != 1 || !strings.Contains(got, "model = \"o3\"") || !strings.Contains(got, "[mcp_servers.other]") || strings.Contains(got, "\"old\"") {
+	if strings.Count(got, "[mcp_servers.nitpick]") != 1 || !strings.Contains(got, "model = \"o3\"") || !strings.Contains(got, "[mcp_servers.other]") || strings.Contains(got, "\"old\"") || strings.Contains(got, "[mcp_servers.nitpick.env]") {
 		t.Errorf("codex config:\n%s", got)
 	}
 	if !strings.Contains(got, "command = \"nitpick\"\nargs = [\"mcp\"]") {
