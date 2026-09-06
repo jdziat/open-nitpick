@@ -1,0 +1,123 @@
+# GitHub Actions and other CI
+
+## GitHub Actions
+
+```yaml
+name: Review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  # A new push supersedes an in-flight review of the same pull request.
+  group: nitpick-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # the reviewer needs history to diff against base
+      - uses: jdziat/open-nitpick@v1
+        with:
+          provider: synthetic
+          model: hf:moonshotai/Kimi-K3
+          api-key: ${{ secrets.SYNTHETIC_API_KEY }}
+          # Omit fail-on (or set it to none) until you have seen how the model
+          # behaves on your codebase. A reviewer that blocks merges on its first
+          # false positive is a reviewer the team switches off.
+          fail-on: none
+          skip-drafts: true
+```
+
+**What a run does.** The release binary for the runner is downloaded and its
+checksum verified; when no release matches `version`, or the repository is a
+private copy whose releases cannot be fetched, the binary is built from the
+Action's own checkout. The pull request is reviewed and the review is posted as
+one GitHub review with inline comments. The same review (walkthrough,
+findings table, analyzer roster) is written to the job summary, and the
+step sets outputs a later step can read:
+
+| output | value |
+|---|---|
+| `result` | `clean`, `findings` (the gate was tripped), `skipped` (a draft), or `error` (the review could not run) |
+| `findings`, `critical`, `error`, `warning` | counts of what was published |
+| `files` | files reviewed |
+| `withheld` | findings an earlier review had already posted |
+
+Exit codes: `0` clean, `1` findings at or above `fail_on`, `2` the review could
+not run. CI can tell "this change has problems" apart from "the reviewer
+broke", and `result` says which without parsing the log.
+
+**Analyzers on the runner.** A stock runner has none of the deterministic
+analyzers installed, so the roster says "not on PATH" for every one. Set
+`analyzers: auto` and the Action installs and caches, at whatever version each
+tool's own installer serves that day, the analyzers for the languages the
+change touches: golangci-lint for Go, ruff
+and pylint for Python, shellcheck, hadolint, yamllint, actionlint and zizmor,
+tflint and checkov, sqlfluff, rubocop and brakeman, cppcheck, biome, buf, and
+gitleaks always. A comma-separated list installs exactly those. The installs
+are not pinned: they run `go install ...@latest`, package-manager installs,
+"latest" release downloads, and for actionlint, tflint and dotenv-linter the
+vendor's install script fetched from its default branch, inside a job that
+holds the model key and a write-scoped `GITHUB_TOKEN`. That is the same
+exposure as any workflow that installs tools from upstream, and it is the
+reason the roster names the tool and version it ran; pin by preinstalling
+the tools you trust and listing them, or leave `analyzers` unset. This is what
+the hosted reviewers do implicitly; here it is a line in the workflow.
+
+**Try it first.** `dry-run: true` prints the review to the log and the job
+summary and posts nothing. `nitpick explain-config` shows the prompt a path
+would get before a token is spent.
+
+**Events.** On `pull_request` the pull request is found from the environment.
+On `workflow_dispatch` or `issue_comment`, set `pr-number`. On `push` there is
+no pull request: the pushed range is reviewed and printed to the log and the
+summary, nothing is posted, and `fail-on` still gates the job; `fetch-depth: 0`
+is required so the range is in the checkout. Any other event fails with a
+message rather than reviewing an empty tree.
+
+**Forks.** On a `pull_request` from a fork the default `GITHUB_TOKEN` is
+read-only, so the review cannot be posted. It is not lost: the run prints it
+to the log, writes it to the job summary, gates on it, and emits a warning
+annotation saying why it was not posted. Do **not** switch to
+`pull_request_target` to get write access: that runs the workflow with your
+secrets against the fork's code, and this tool's own trust model is not a
+substitute for that mistake.
+
+**Incremental review.** A push to a pull request this tool has already
+reviewed is reviewed incrementally: only the files changed since the last
+review are read, and a finding an earlier run already posted is withheld
+rather than posted again. The review says which files it read and how many
+findings it withheld. A force push that makes the earlier revision
+unreachable reviews the whole change again. `review.incremental: false`
+reviews the whole change on every push.
+
+How a finding is recognised as already posted: every comment carries a
+fingerprint of its path, class and title, and a review carries the revision it
+read. A finding matches an earlier comment when the fingerprints agree
+(which survives the line moving), or when the class and file agree and the line is
+within two of where the forge now shows the earlier comment, which survives a
+rewording. Deleting the bot's comment is how a reviewer says "do not post this
+again"; it will not come back.
+
+**Pinning.** `@v1` follows the latest 1.x release of the Action; the binary it
+installs follows `version`, which defaults to the latest release. Pin both to
+a tag for a build that never changes under you. GitHub Enterprise Server is
+supported: the API URL comes from the runner; releases are fetched from
+github.com.
+
+## Any other CI
+
+```bash
+nitpick review -owner acme -repo-name widgets -pr 42
+```
+
+with `GITHUB_TOKEN` in the environment. Inside GitHub Actions the repository and
+pull request number are detected automatically.
