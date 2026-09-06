@@ -14,8 +14,9 @@ import (
 // real repository, were the lines a commit added written by a person or by
 // a tool", with the commit's co-author trailer as the label. The corpus is
 // built by cmd/contrib-corpus and is not committed, being other people's
-// code; its layout is <repo>/<label>/<language>/<NNNNN>.<ext>.txt with the
-// number the commit's rank by date.
+// code; its layout is <repo>/<label>/<language>/<NNNNN>-<k>.<ext>.txt with
+// the number the commit's rank by date and k the file's index within the
+// commit.
 
 // contribName is the file shape the generator writes.
 var contribName = regexp.MustCompile(`^\d{5}-\d+\.[a-z]+\.txt$`)

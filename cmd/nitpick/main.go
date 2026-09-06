@@ -51,6 +51,8 @@ func run() int {
 		err = runRepoScore(ctx, os.Args[2:])
 	case "identify-model":
 		err = runIdentifyModel(os.Args[2:])
+	case "mcp":
+		err = runMCP(ctx, os.Args[2:])
 	case "explain-config":
 		err = runExplainConfig(os.Args[2:])
 	case "linters":
@@ -92,7 +94,7 @@ func run() int {
 var errFindings = errors.New("findings at or above the configured threshold")
 
 func usage() {
-	fmt.Fprint(os.Stderr, `nitpick — self-hosted, model-agnostic pull request review
+	fmt.Fprint(os.Stderr, `nitpick: self-hosted, model-agnostic pull request review
 
 Usage:
   nitpick review [flags]           Review a change
@@ -100,7 +102,8 @@ Usage:
                                    Review the whole tree, or the paths given, with a remediation plan
   nitpick repo-score [flags] [path...]
                                    The same, plus slop, bug and security findings per thousand lines, by language
-  nitpick identify-model <file>... Which model's style a file is most similar to (TypeScript only; see docs/findings.md)
+  nitpick identify-model <file>... Which model's style a file is most similar to (Go, Python, TypeScript; see docs/findings.md)
+  nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
   nitpick explain-config [flags]   Show the resolved configuration and prompts
   nitpick providers                List available model providers
   nitpick linters                  List the deterministic analyzers and how each is configured
