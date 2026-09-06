@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.4.0](https://github.com/jdziat/open-nitpick/compare/v1.3.0...v1.4.0) (2026-09-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **repo:** remove the contributor corpus, ten projects' source code
+
+### Fixes
+
+* **repo:** remove the contributor corpus, ten projects' source code ([a8a18bd](https://github.com/jdziat/open-nitpick/commit/a8a18bd2f3994c26e6a83ae46f93fd64c49e0190))
+
+
+### Documentation
+
+* **site:** the magnifier mark replaces the four-bar logo ([cb6db6f](https://github.com/jdziat/open-nitpick/commit/cb6db6f0705d296412877a3c8aea180bf6b99749))
+* the corpus tooling is gone, so the docs stop pointing at it ([#8](https://github.com/jdziat/open-nitpick/issues/8)) ([22b2a14](https://github.com/jdziat/open-nitpick/commit/22b2a144d29e164b194bf43566cd19dc876ce84a))
+* the launch blockers two reviews found ([1736843](https://github.com/jdziat/open-nitpick/commit/1736843a086b2c3610175c80d73206cf192214f2))
+
 ## 1.3.0 (2026-09-06)
 
 
