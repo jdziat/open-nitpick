@@ -86,6 +86,11 @@ type PullRequest struct {
 	HeadRef string
 	HeadSHA string
 
+	// HeadMessage is the head commit's full message, when the provider can
+	// read it; a [skip review] marker may sit there rather than in the
+	// title or body.
+	HeadMessage string
+
 	Draft bool
 }
 
@@ -280,4 +285,20 @@ func BaseRevision(ctx context.Context, p Provider, ref Ref) (string, error) {
 		return "", fmt.Errorf("%s: %w", p.Name(), ErrNoBaseRevision)
 	}
 	return rev, nil
+}
+
+// SkipRequested reports whether the pull request's title, body or head
+// commit message carries one of the markers, case-insensitively.
+func SkipRequested(pr *PullRequest, markers []string) (string, bool) {
+	if pr == nil {
+		return "", false
+	}
+	text := strings.ToLower(pr.Title + "\n" + pr.Body + "\n" + pr.HeadMessage)
+	for _, m := range markers {
+		m = strings.TrimSpace(m)
+		if m != "" && strings.Contains(text, strings.ToLower(m)) {
+			return m, true
+		}
+	}
+	return "", false
 }
