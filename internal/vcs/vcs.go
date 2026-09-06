@@ -189,6 +189,24 @@ type PriorComment struct {
 	Class       string
 }
 
+// ThreadComment is one comment on a review thread, for a conversation's
+// context.
+type ThreadComment struct {
+	ID     int64
+	Author string
+	Body   string
+}
+
+// Conversationalist is implemented by providers that can carry the @mention
+// conversation: reply on a thread or the conversation, read a thread, and
+// acknowledge a comment with a reaction.
+type Conversationalist interface {
+	ReplyToReviewComment(ctx context.Context, ref Ref, commentID int64, body string) error
+	CommentOnPullRequest(ctx context.Context, ref Ref, body string) error
+	ThreadComments(ctx context.Context, ref Ref, rootID int64) ([]ThreadComment, error)
+	React(ctx context.Context, ref Ref, commentID int64, inline bool, content string) error
+}
+
 // ThreadResolver is implemented by providers that can resolve the review
 // threads this tool opened earlier, with a reply saying why. It returns the
 // comment IDs whose threads were resolved.
