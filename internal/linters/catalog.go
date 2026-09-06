@@ -466,7 +466,13 @@ func checkmakeSpec() toolSpec {
 			return []string{"--config", inv.config, "--format", "{{.FileName}}\t{{.LineNumber}}\t{{.Rule}}\t{{.Violation}}\n", inv.files[0]}
 		},
 		parse: func(inv invocation, report []byte, exit int) ([]Finding, error) {
-			f, _ := lineReport{re: re, fallback: config.SeverityNit}.parse(report)
+			// Output the parser cannot read is an error, as it is for every
+			// other parser here: dropping it published a failed run as a
+			// clean Makefile.
+			f, err := lineReport{re: re, fallback: config.SeverityNit}.parse(report)
+			if err != nil {
+				return nil, err
+			}
 			for i := range f {
 				if f[i].Path == "" {
 					f[i].Path = inv.files[0]
@@ -941,9 +947,16 @@ func tflintSpec() toolSpec {
 		exts:      []string{".tf", ".tfvars"},
 		isolation: isolatedByShipped, shipped: ".tflint.hcl",
 		args: func(inv invocation) []string {
+			// The filter is matched against the path tflint reports, which
+			// is relative to the directory it runs in (the repository root
+			// here), so the repository-relative path is what matches; a
+			// basename matched nothing below the root and collided across
+			// directories. Modules below the root still need tflint's own
+			// --recursive or --chdir to be inspected at all, which this
+			// spec does not add: unverified against a real run.
 			args := []string{"--format", "sarif", "--no-color", "--config", inv.config}
 			for _, f := range inv.files {
-				args = append(args, "--filter", filepath.Base(f))
+				args = append(args, "--filter", filepath.ToSlash(f))
 			}
 			return args
 		},

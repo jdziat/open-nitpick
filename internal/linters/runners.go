@@ -413,6 +413,13 @@ func (g *golangciLint) Run(ctx context.Context, repoRoot string, files []string)
 
 		out, exit, err := runCommand(ctx, repoRoot, filepath.Join(repoRoot, t.Module), "golangci-lint", env, args...)
 		if err != nil {
+			// The refusal above is deliberate and its message is not: an
+			// operator reading "lower than the targeted Go version" in a
+			// roster line has to know that the fix is a newer go where
+			// nitpick runs, not a setting on the tree.
+			if strings.Contains(err.Error(), "lower than the targeted Go version") {
+				err = fmt.Errorf("%w (the go on PATH is older than go.mod asks for; GOTOOLCHAIN=local is set on purpose so the tree under review cannot choose the toolchain, so install the newer go where nitpick runs)", err)
+			}
 			return nil, err
 		}
 
@@ -1593,7 +1600,7 @@ func (e *eslint) Name() string { return "eslint" }
 // any change, with the status line blaming a missing binary — and it decided
 // nothing: the operator's config is what switches this analyzer on, and a change
 // with no JavaScript in it has no targets to pass either way.
-func (e *eslint) Detect(_ context.Context, _ string, files []string) error {
+func (e *eslint) Detect(_ context.Context, repoRoot string, files []string) error {
 	if e.cfg.Err != nil {
 		return e.cfg.Err
 	}
@@ -1603,8 +1610,10 @@ func (e *eslint) Detect(_ context.Context, _ string, files []string) error {
 	if e.cfg.Ref == "" {
 		return errors.New(eslintUnconfigured)
 	}
-	if !available("eslint") {
-		return notOnPath("eslint")
+	// The same resolution Run uses, so a node_modules/.bin/eslint the tree
+	// put on PATH is refused here, in the roster, and not first at Run.
+	if _, err := resolveBinary("eslint", repoRoot); err != nil {
+		return err
 	}
 	return nil
 }

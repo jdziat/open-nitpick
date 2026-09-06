@@ -149,7 +149,8 @@ type TreeOut struct {
 	ReviewOut
 	Sections   string    `json:"sections" jsonschema:"known advisories, security risks, bugs and slop, as text"`
 	Plan       string    `json:"plan" jsonschema:"the remediation plan, most severe first, findings that share a fix grouped"`
-	Covered    []string  `json:"covered"`
+	Covered    []string  `json:"covered" jsonschema:"files a model answered for"`
+	Unreviewed []string  `json:"unreviewed,omitempty" jsonschema:"files whose review batch failed; silence about them is not a clean file"`
 	Unbudgeted []string  `json:"unbudgeted,omitempty" jsonschema:"files the budget stopped before"`
 	Skipped    []string  `json:"skipped,omitempty" jsonschema:"files left out, with the reason"`
 	Score      string    `json:"score,omitempty" jsonschema:"the scorecard, for repo_score"`
@@ -267,9 +268,9 @@ func (t *mcpTools) tree(ctx context.Context, in TreeIn, score bool) (*mcp.CallTo
 		ReviewOut:  reviewOut(report, failOn),
 		Sections:   strings.TrimSpace(fullreview.Sections(report)),
 		Plan:       strings.TrimSpace(fullreview.RemediationPlan(report.Findings)),
-		Covered:    tree.Covered,
 		Unbudgeted: tree.Unbudgeted,
 	}
+	out.Covered, out.Unreviewed = fullreview.Reviewed(report, tree)
 	for _, s := range tree.Skipped {
 		out.Skipped = append(out.Skipped, s.Path+": "+s.Reason)
 	}
@@ -307,7 +308,7 @@ func (t *mcpTools) tree(ctx context.Context, in TreeIn, score bool) (*mcp.CallTo
 		out.Plan = strings.TrimSpace(fullreview.RemediationPlan(filtered.Findings))
 		out.Summary = strings.TrimSpace(out.Summary) + fmt.Sprintf("\n\nFiltered to %s: %d of %d finding(s) shown.", strings.Join(in.Classes, ", "), len(kept), total)
 	}
-	text := reviewText(out.ReviewOut) + "\n\n" + out.Sections + "\n\n" + out.Plan + "\n" + strings.TrimSpace(fullreview.CoverageNotice(tree))
+	text := reviewText(out.ReviewOut) + "\n\n" + out.Sections + "\n\n" + out.Plan + "\n" + strings.TrimSpace(fullreview.CoverageNotice(report, tree))
 	if len(out.Hidden) > 0 {
 		text += fmt.Sprintf("\n\n%d finding(s) outside the filter, in hidden:", len(out.Hidden))
 		for _, f := range out.Hidden {
