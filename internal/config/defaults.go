@@ -110,6 +110,7 @@ func Defaults() *Config {
 			Incremental:       true,
 			ResolveSuperseded: true,
 			Mention:           "@nitpick",
+			SkipMarkers:       []string{"[skip review]", "[skip nitpick]"},
 			// On: it reads only what the change already imports, and every
 			// price in the model sweep was measured with it on (see
 			// docs/findings.md). The caller walk is off: it reads files the

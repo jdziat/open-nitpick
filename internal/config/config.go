@@ -343,6 +343,11 @@ type Review struct {
 	// thread, anything else is a question answered in the thread.
 	Mention string `yaml:"mention"`
 
+	// SkipMarkers are phrases that, in a pull request's title, body or head
+	// commit message, ask for no review: the run reports "skipped" and
+	// posts nothing. Matched case-insensitively.
+	SkipMarkers []string `yaml:"skip_markers"`
+
 	// Incremental makes a run on a pull request this tool has reviewed before
 	// read only the files changed since that review, and withhold findings it
 	// has already posted. It has no effect on a first review, on a local
