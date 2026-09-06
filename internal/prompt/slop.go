@@ -29,10 +29,15 @@ otherwise, and say which rule in the rationale.
 4. **A check against a condition the types exclude.** ` + "`if x != nil`" + ` on a
    value type, ` + "`if d != 0 || d == 0`" + `, a length check on a value that
    cannot be negative. Not a finding: a check that guards a real input.
-5. **An error swallowed and carried on from.** ` + "`except Exception: pass`" + `, a
-   ` + "`recover()`" + ` that prints and continues, an error assigned to ` + "`_`" + ` on a call
-   whose failure matters. File at ` + "`warning`" + `. Not a finding: an error
-   deliberately ignored with a comment saying why, or recorded and re-raised.
+5. **An error swallowed and carried on from.** A handler is slop only when
+   ALL three hold: the error is caught (` + "`except`, `catch`, `recover`, `_ = err`" + `),
+   nothing is done with it (no log, no re-raise, no return, no wrap), and
+   execution continues as if it had not happened. File at ` + "`warning`" + `. A
+   handler that does ANY of these is not slop, whatever else it does: writes
+   to a log, re-raises or returns the error, wraps it, stops the loop or the
+   batch, or carries a comment saying why the error is ignored. Before
+   filing, name which of the three conditions hold; if one does not, do not
+   file.
 6. **Generic naming where the file's own vocabulary has a specific word.**
    ` + "`data`, `result`, `helper`, `utils2`, `ProcessData`" + ` in a file whose other
    names say ` + "`order`, `invoice`, `tenant`" + `. Not a finding: a generic name in
@@ -41,10 +46,15 @@ otherwise, and say which rule in the rationale.
    abstraction.** The same five lines for three fields where a loop, a helper
    or a generic would do. Not a finding: two occurrences, or three that
    differ in a way the abstraction would hide.
-8. **Prose that addresses the reader as a chat reply.** "Sure! Here's",
-   "Note that", "This function will", "I hope this helps", in a comment or
-   docstring. Not a finding: ordinary documentation in the second person
-   where the codebase writes that way.
+8. **Prose that addresses the reader as a chat reply.** A comment is slop
+   only when it contains a phrase that belongs to a conversation and not to
+   the code: "Sure!", "Here's", "I hope this helps", "Let me know", "Note
+   that this function will", "As you can see", "I've added", or an
+   apology or a greeting. The person a comment is written in is NOT the
+   test: a doc comment in the second person ("You get X, not Y") that
+   names a return value, a constraint, a caller or an example is
+   documentation, and is never slop under this rule. Before filing, quote
+   the conversational phrase; if there is none, do not file.
 9. **A test that asserts nothing, or only that the code ran.** A test whose
    body calls the function and checks no result; ` + "`assert True`" + `; a test that
    asserts on its own fixture. File at ` + "`warning`" + `. Not a finding: a test
