@@ -108,6 +108,7 @@ func Defaults() *Config {
 			// this tool has already reviewed, where the alternative is posting
 			// the same findings again on every push.
 			Incremental: true,
+			SkipMarkers: []string{"[skip review]", "[skip nitpick]"},
 			// On: it reads only what the change already imports, and every
 			// price in the model sweep was measured with it on (see
 			// docs/findings.md). The caller walk is off: it reads files the

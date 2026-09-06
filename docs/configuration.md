@@ -194,3 +194,10 @@ removes it. The measurements are in
 
 `nit` < `info` < `warning` < `error` < `critical`. `fail_on: none` never fails
 the build.
+
+
+## Skipping a pull request
+
+`review.skip_markers` lists the phrases that, in a pull request's title,
+body or head commit message, ask for no review. The default is
+`["[skip review]", "[skip nitpick]"]`; the match is case-insensitive.
