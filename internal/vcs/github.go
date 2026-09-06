@@ -790,6 +790,65 @@ func (g *GitHub) ThreadComments(ctx context.Context, ref Ref, rootID int64) ([]T
 	}
 }
 
+// AnswerMarker distinguishes an answer to a mention from every other comment
+// the reviewer posts.
+//
+// The general bot marker cannot serve here. It is on published findings and on
+// the summary too, so counting it would let a review that posted five findings
+// exhaust a five-answer cap and refuse the first question anybody asked. The
+// cap is about how often the reviewer is TALKED TO, and only these comments
+// are that.
+const AnswerMarker = "<!-- nitpick:answer -->"
+
+// CountAnswers counts the replies the reviewer has posted to mentions on a
+// pull request, conversation comments and inline ones alike.
+//
+// It is how a per-pull-request answer cap is enforced without persisting a
+// counter anywhere: the answers already posted ARE the record of how many
+// times it has answered, and they survive a re-run, a new runner, and a
+// cleared cache.
+func (g *GitHub) CountAnswers(ctx context.Context, ref Ref) (int, error) {
+	if err := validateRef(ref); err != nil {
+		return 0, err
+	}
+
+	var n int
+
+	opts := &github.IssueListCommentsOptions{ListOptions: github.ListOptions{PerPage: 100}}
+	for {
+		comments, resp, err := g.client.Issues.ListComments(ctx, ref.Owner, ref.Repo, ref.Number, opts)
+		if err != nil {
+			return 0, fmt.Errorf("github: list comments on %s: %w", ref, err)
+		}
+		for _, c := range comments {
+			if strings.Contains(c.GetBody(), AnswerMarker) {
+				n++
+			}
+		}
+		if resp == nil || resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	rOpts := &github.PullRequestListCommentsOptions{ListOptions: github.ListOptions{PerPage: 100}}
+	for {
+		comments, resp, err := g.client.PullRequests.ListComments(ctx, ref.Owner, ref.Repo, ref.Number, rOpts)
+		if err != nil {
+			return 0, fmt.Errorf("github: list review comments on %s: %w", ref, err)
+		}
+		for _, c := range comments {
+			if strings.Contains(c.GetBody(), AnswerMarker) {
+				n++
+			}
+		}
+		if resp == nil || resp.NextPage == 0 {
+			return n, nil
+		}
+		rOpts.Page = resp.NextPage
+	}
+}
+
 // React acknowledges a comment with a reaction (eyes while working, +1 when
 // done), on an inline comment or a conversation comment.
 func (g *GitHub) React(ctx context.Context, ref Ref, commentID int64, inline bool, content string) error {

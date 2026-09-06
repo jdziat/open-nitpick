@@ -205,6 +205,52 @@ layer so it can be read without spending tokens. `review.model_notes: false`
 removes it. The measurements are in
 [docs/comparison.md](comparison.md#tuning-for-glm-53-flash-and-qwen38-27b-2026-09-04).
 
+## Who may make it spend
+
+A comment event runs in the **base** repository, holding the base repository's
+secrets, whoever wrote the comment. On a public repository that means every
+account on the forge is one `@nitpick` away from your model credit, and a cap
+on the size of each answer does not bound a total whose multiplier is the
+number of strangers.
+
+So the reviewer answers a closed set by default:
+
+```yaml
+review:
+  respond:
+    from: [owner, member, collaborator]   # the default
+    max_per_pull_request: 0               # 0 is no cap
+```
+
+`contributor` is **not** in the default set. It means "has a merged commit",
+which is permanent: one accepted typo fix would buy unlimited calls forever.
+Add it if you want that, knowing what it grants.
+
+A comment from outside the set is ignored without a reaction and without a
+model call, and the run says who was refused and what the allowed set is. No
+reaction is deliberate: acknowledging a mention tells someone probing that
+something is listening.
+
+**`max_per_pull_request`** bounds the case the list does not, a person or an
+automation inside the set in a loop. The count comes from the answers already
+posted on the pull request, so it survives a re-run and needs nothing
+persisted. Answers carry their own marker, so published findings and the
+summary do not count against it: a review that posted five findings would
+otherwise exhaust a cap of five and refuse the first question anybody asked. Where the count cannot be read, the run says the cap is not being
+enforced rather than answering as though it were.
+
+**The workflow should gate too.** `nitpick respond` refuses these comments
+itself, but only after a runner has started and the repository is checked out.
+The shipped `.github/workflows/nitpick-respond.yml` tests
+`github.event.comment.author_association` in its `if:`, so a stranger's comment
+costs nothing at all. It also groups concurrency per pull request rather than
+per comment: a burst of twenty comments then costs two runs instead of twenty,
+at the price of dropping the questions cancelled while pending.
+
+**Forked pull requests** are a separate matter and are already handled by the
+shipped workflow, which skips them: reviewing one would need the model key
+present in a run whose code the contributor controls.
+
 ## A spending ceiling
 
 Off by default. Set one and the review stays under it by reviewing fewer files,

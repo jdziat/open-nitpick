@@ -13,16 +13,33 @@ permissions:
   issues: write
 
 concurrency:
-  group: nitpick-respond-${{ github.event.comment.id }}
+  # Per pull request, not per comment. Keyed on the comment id, twenty comments
+  # in a minute were twenty concurrent runs. Keyed here, one runs, one waits,
+  # and the rest are cancelled while pending: a burst costs two runs instead of
+  # twenty. The trade is real and worth naming, because it is a dropped answer
+  # rather than a delayed one: two questions asked seconds apart may leave one
+  # unanswered, and the person has to ask again.
+  group: nitpick-respond-${{ github.event.issue.number || github.event.pull_request.number }}
 
 jobs:
   respond:
     runs-on: ubuntu-latest
-    # Only a comment on a pull request that addresses the reviewer; the
-    # command re-checks both, this just saves the runner.
+    # Three conditions, and the third is the one that matters for money.
+    #
+    # A comment event runs HERE, in the base repository, with this
+    # repository's secrets, whoever wrote the comment. Without the
+    # author_association test, every account on GitHub can spend the model
+    # credit one "@nitpick" at a time, and each attempt also burns a runner.
+    # `nitpick respond` refuses the same set by itself (review.respond.from),
+    # so this is the cheap half of the same gate: it stops the runner from
+    # starting rather than stopping it after checkout.
     if: >-
       contains(github.event.comment.body, '@nitpick') &&
-      (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request != null)
+      (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request != null) &&
+      contains(
+        fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),
+        github.event.comment.author_association
+      )
     env:
       NITPICK_APP_ID: ${{ secrets.NITPICK_APP_ID }}
     steps:

@@ -30,6 +30,17 @@ type Event struct {
 	Path      string // for an inline comment, the file
 	Line      int    // and the line the forge shows it on
 	RootID    int64  // for an inline reply, the thread's first comment; else CommentID
+
+	// Association is the forge's own answer to "what is this person to this
+	// repository": OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, FIRST_TIME_
+	// CONTRIBUTOR, FIRST_TIMER, MANNEQUIN or NONE.
+	//
+	// It is carried because a comment event runs in the BASE repository with
+	// the repository's secrets, whoever wrote it. On a public repository that
+	// is every GitHub account in the world holding a key to the model
+	// credential, one comment per call, and no amount of per-answer word
+	// capping bounds a cost whose multiplier is the number of strangers.
+	Association string
 }
 
 // ParseEvent reads the GitHub event payload for the two comment events. A
@@ -44,9 +55,10 @@ func ParseEvent(name string, payload []byte) (*Event, error) {
 				PullRequest json.RawMessage `json:"pull_request"`
 			} `json:"issue"`
 			Comment struct {
-				ID   int64  `json:"id"`
-				Body string `json:"body"`
-				User struct {
+				ID          int64  `json:"id"`
+				Body        string `json:"body"`
+				Association string `json:"author_association"`
+				User        struct {
 					Login string `json:"login"`
 				} `json:"user"`
 			} `json:"comment"`
@@ -57,19 +69,24 @@ func ParseEvent(name string, payload []byte) (*Event, error) {
 		if len(p.Issue.PullRequest) == 0 || string(p.Issue.PullRequest) == "null" {
 			return nil, fmt.Errorf("issue #%d is not a pull request", p.Issue.Number)
 		}
-		return &Event{Number: p.Issue.Number, CommentID: p.Comment.ID, RootID: p.Comment.ID, Author: p.Comment.User.Login, Body: p.Comment.Body}, nil
+		return &Event{
+			Number: p.Issue.Number, CommentID: p.Comment.ID, RootID: p.Comment.ID,
+			Author: p.Comment.User.Login, Body: p.Comment.Body,
+			Association: p.Comment.Association,
+		}, nil
 	case "pull_request_review_comment":
 		var p struct {
 			PullRequest struct {
 				Number int `json:"number"`
 			} `json:"pull_request"`
 			Comment struct {
-				ID        int64  `json:"id"`
-				Body      string `json:"body"`
-				Path      string `json:"path"`
-				Line      int    `json:"line"`
-				InReplyTo int64  `json:"in_reply_to_id"`
-				User      struct {
+				ID          int64  `json:"id"`
+				Body        string `json:"body"`
+				Path        string `json:"path"`
+				Line        int    `json:"line"`
+				InReplyTo   int64  `json:"in_reply_to_id"`
+				Association string `json:"author_association"`
+				User        struct {
 					Login string `json:"login"`
 				} `json:"user"`
 			} `json:"comment"`
@@ -81,7 +98,12 @@ func ParseEvent(name string, payload []byte) (*Event, error) {
 		if root == 0 {
 			root = p.Comment.ID
 		}
-		return &Event{Number: p.PullRequest.Number, CommentID: p.Comment.ID, RootID: root, Author: p.Comment.User.Login, Body: p.Comment.Body, Inline: true, Path: p.Comment.Path, Line: p.Comment.Line}, nil
+		return &Event{
+			Number: p.PullRequest.Number, CommentID: p.Comment.ID, RootID: root,
+			Author: p.Comment.User.Login, Body: p.Comment.Body,
+			Association: p.Comment.Association,
+			Inline:      true, Path: p.Comment.Path, Line: p.Comment.Line,
+		}, nil
 	}
 	return nil, fmt.Errorf("event %q is not a comment event", name)
 }

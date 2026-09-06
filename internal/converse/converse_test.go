@@ -67,3 +67,25 @@ func TestExcerptNumbersAndMarksTheLine(t *testing.T) {
 		t.Error("the first line is marked when it is the line")
 	}
 }
+
+// The association has to survive parsing, or the gate that reads it is
+// checking a field that is always empty and refusing everyone.
+func TestTheAuthorAssociationIsCarriedFromBothEvents(t *testing.T) {
+	issue := `{"issue":{"number":7,"pull_request":{}},"comment":{"id":11,"body":"@nitpick review","author_association":"COLLABORATOR","user":{"login":"kim"}}}`
+	ev, err := ParseEvent("issue_comment", []byte(issue))
+	if err != nil {
+		t.Fatalf("issue_comment: %v", err)
+	}
+	if ev.Association != "COLLABORATOR" {
+		t.Errorf("Association = %q, want COLLABORATOR", ev.Association)
+	}
+
+	inline := `{"pull_request":{"number":7},"comment":{"id":12,"body":"@nitpick why","path":"a.go","line":3,"author_association":"NONE","user":{"login":"stranger"}}}`
+	ev, err = ParseEvent("pull_request_review_comment", []byte(inline))
+	if err != nil {
+		t.Fatalf("pull_request_review_comment: %v", err)
+	}
+	if ev.Association != "NONE" {
+		t.Errorf("Association = %q, want NONE", ev.Association)
+	}
+}

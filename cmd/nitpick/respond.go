@@ -88,6 +88,33 @@ func runRespond(ctx context.Context, args []string) error {
 		log.Info("the comment is the reviewer's own; nothing to do", "comment", ev.CommentID)
 		return nil
 	}
+	// Who is allowed to spend the repository's money by talking to the
+	// reviewer. Checked before the reaction, not only before the model call: a
+	// reaction tells a stranger the mention was seen, which is an invitation to
+	// try again, and the whole point here is to be boring to poke at.
+	if !cfg.Review.Respond.Allows(ev.Association) {
+		log.Info("ignoring a mention from outside the allowed set; "+
+			"answering it would spend this repository's model credit",
+			"author", ev.Author, "association", strings.ToLower(ev.Association),
+			"allowed", cfg.Review.Respond.String(), "comment", ev.CommentID)
+		return nil
+	}
+
+	if cap := cfg.Review.Respond.MaxPerPullRequest; cap > 0 {
+		answered, err := gh.CountAnswers(ctx, ref)
+		switch {
+		case err != nil:
+			// Not fatal, and not a silent pass either: the cap exists to bound
+			// spending, so a run that cannot count what it has already answered
+			// says so rather than answering anyway without mentioning it.
+			log.Warn("could not count prior answers, so the per-pull-request cap "+
+				"is not being enforced on this comment", "error", err, "cap", cap)
+		case answered >= cap:
+			log.Info("this pull request has had its answers", "answered", answered, "cap", cap)
+			return nil
+		}
+	}
+
 	log.Info("answering a mention", "kind", kind, "pr", ref.Number, "comment", ev.CommentID, "author", ev.Author)
 	if err := gh.React(ctx, ref, ev.CommentID, ev.Inline, "eyes"); err != nil {
 		log.Warn("could not acknowledge the comment", "error", err)
@@ -154,6 +181,10 @@ func runRespond(ctx context.Context, args []string) error {
 			_ = gh.React(ctx, ref, ev.CommentID, ev.Inline, "confused")
 			return err
 		}
+		// Marked as an answer, which is what review.respond.max_per_pull_request
+		// counts. Without it the cap would count published findings too, and a
+		// review that posted five of them would refuse the first question.
+		answer += "\n\n" + vcs.AnswerMarker
 		if ev.Inline {
 			err = gh.ReplyToReviewComment(ctx, ref, ev.RootID, answer)
 		} else {
