@@ -119,7 +119,7 @@ func Defaults() *Config {
 			RelatedContext:        true,
 			RelatedContextCallers: false,
 			// Off until its controls are seen to be silent; see
-			// docs/plan-full-review.md, section 2.
+			// notes/plan-full-review.md, section 2.
 			Slop:                 false,
 			RelatedContextTokens: 16000,
 		},

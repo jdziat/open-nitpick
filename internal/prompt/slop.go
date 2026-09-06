@@ -4,7 +4,7 @@ package prompt
 // code that costs a reader, defined as things a reader can check on the
 // line, never as a feeling about the author. Each rule carries the shape
 // that is a finding and the lookalike that is not, because the class is
-// worthless if it fires on ordinary code. See docs/plan-full-review.md.
+// worthless if it fires on ordinary code. See notes/plan-full-review.md.
 func SlopGuidance() string {
 	return `## The slop class
 

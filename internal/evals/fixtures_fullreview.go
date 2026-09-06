@@ -3,7 +3,7 @@ package evals
 // The full-review fixture: a small repository reviewed whole by
 // `nitpick full-review`, with a planted bug, a planted secret, a dependency
 // with a known advisory, a file of slop for the class section 2 of
-// docs/plan-full-review.md defines, and a clean control. It is not a change:
+// notes/plan-full-review.md defines, and a clean control. It is not a change:
 // every file is what it is, and the acceptance is that the whole-tree review
 // finds the bug and the secret, says nothing about the control, lists the
 // advisory when the scanner is installed, and puts the secret first in the
