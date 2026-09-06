@@ -106,6 +106,24 @@ func mapOutsideSpans(s string, f func(string) string) string {
 	return strings.Join(parts, "`")
 }
 
+// scrubOverruled scrubs the findings a reader still sees under "reported,
+// then withheld", and the reason given for withholding them.
+func scrubOverruled(overruled []Overruled) int {
+	n := 0
+	for i := range overruled {
+		if t, changed := Scrub(overruled[i].Finding.Title); changed {
+			overruled[i].Finding.Title, n = t, n+1
+		}
+		if r, changed := Scrub(overruled[i].Finding.Rationale); changed {
+			overruled[i].Finding.Rationale, n = r, n+1
+		}
+		if r, changed := Scrub(overruled[i].Reason); changed {
+			overruled[i].Reason, n = r, n+1
+		}
+	}
+	return n
+}
+
 // scrubFindings scrubs every finding's title and rationale and returns how
 // many pieces of text changed, for the log.
 func scrubFindings(findings []Finding) int {
