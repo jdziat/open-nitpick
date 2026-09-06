@@ -740,6 +740,14 @@ func walkthrough(report *Report) string {
 		}
 	}
 
+	// A ceiling that changed what was reviewed is stated in the open, above the
+	// collapsed skip list. The files it dropped are in that list too, but a
+	// reader who does not open it must still learn that the review was bounded
+	// by money rather than by what the change contains.
+	if note := budgetNote(report); note != "" {
+		b.WriteString(note)
+	}
+
 	// Surfacing skips is a correctness matter, not a nicety: a review that
 	// quietly ignored most of the diff otherwise looks like a clean bill of
 	// health.
@@ -884,5 +892,34 @@ func groupByReason(skips []bundle.Skip, omit string) string {
 	for _, reason := range order {
 		fmt.Fprintf(&b, "- %s: %s\n", reason, strings.Join(byReason[reason], ", "))
 	}
+	return b.String()
+}
+
+// budgetNote states what a spending ceiling changed, and returns "" when no
+// ceiling was configured or the whole diff fit under it.
+//
+// It reports the estimate as an estimate. The number is computed from token
+// counts the run has not yet spent, at rates the operator supplied, so calling
+// it the cost would be a claim this tool cannot make.
+func budgetNote(report *Report) string {
+	fit := report.Budget
+	if fit == nil || !fit.Trimmed() {
+		return ""
+	}
+
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "\n> **This review was bounded by a spending ceiling.** "+
+		"Reviewing every changed file was estimated at $%.2f against a $%.2f ceiling, "+
+		"so the %d highest-ranked file(s) were reviewed at an estimated $%.2f and "+
+		"%d were not. Findings are absent for those files because nobody looked, "+
+		"not because they are clean.\n",
+		fit.Before.Dollars, fit.Ceiling, len(fit.Kept), fit.After.Dollars, len(fit.Dropped))
+
+	if fit.Forced {
+		fmt.Fprintf(&b, ">\n> `review.budget.min_files` kept files the ceiling does not "+
+			"pay for, so this run is expected to exceed it.\n")
+	}
+
 	return b.String()
 }

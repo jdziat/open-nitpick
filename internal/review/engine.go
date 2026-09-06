@@ -368,6 +368,14 @@ type Report struct {
 	// quality.
 	Overruled []Overruled
 
+	// Budget records the spending ceiling this review ran under and what it
+	// changed, nil when no ceiling was configured.
+	//
+	// A ceiling that quietly reviewed nine files of a twelve-file diff would be
+	// the exact silence Incomplete exists to prevent, arriving through
+	// configuration instead of through a failure.
+	Budget *Fit
+
 	// Incomplete lists files whose review batch failed. These files were NOT
 	// reviewed, so the absence of findings for them means nothing. Reporting
 	// them is a correctness requirement: a partially-failed review that prints
@@ -534,6 +542,15 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	}
 	for _, s := range plan.Skipped {
 		e.log().Debug("skipped file", "path", s.Path, "reason", s.Reason)
+	}
+
+	if fit, trimmed, err := e.applyBudget(ctx, ref, pr, plan, files, fetch); err != nil {
+		return nil, err
+	} else if fit != nil {
+		report.Budget = fit
+		if trimmed != nil {
+			plan = trimmed
+		}
 	}
 
 	report.Plan = plan

@@ -391,6 +391,9 @@ type Review struct {
 	// batch. It is spent from the request budget, so a large value narrows
 	// the window each changed file itself gets.
 	RelatedContextTokens int `yaml:"related_context_tokens"`
+
+	// Budget bounds what one review may spend. Off by default; see budget.go.
+	Budget Budget `yaml:"budget"`
 }
 
 // Instruction is a path-scoped prompt addition. Every instruction whose Path
