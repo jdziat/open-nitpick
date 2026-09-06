@@ -741,3 +741,69 @@ func (g *GitHub) graphql(ctx context.Context, query string, variables map[string
 	}
 	return nil
 }
+
+// ReplyToReviewComment posts a reply on an inline thread, marked as this
+// tool's so a later run recognises it.
+func (g *GitHub) ReplyToReviewComment(ctx context.Context, ref Ref, commentID int64, body string) error {
+	if err := validateRef(ref); err != nil {
+		return err
+	}
+	if _, _, err := g.client.PullRequests.CreateCommentInReplyTo(ctx, ref.Owner, ref.Repo, ref.Number, body+"\n\n"+g.Bot, commentID); err != nil {
+		return fmt.Errorf("github: reply on %s: %w", ref, err)
+	}
+	return nil
+}
+
+// CommentOnPullRequest posts a comment on the pull request's conversation.
+func (g *GitHub) CommentOnPullRequest(ctx context.Context, ref Ref, body string) error {
+	if err := validateRef(ref); err != nil {
+		return err
+	}
+	if _, _, err := g.client.Issues.CreateComment(ctx, ref.Owner, ref.Repo, ref.Number, &github.IssueComment{Body: github.Ptr(body + "\n\n" + g.Bot)}); err != nil {
+		return fmt.Errorf("github: comment on %s: %w", ref, err)
+	}
+	return nil
+}
+
+// ThreadComments returns a thread's comments, oldest first: the root and
+// every reply to it.
+func (g *GitHub) ThreadComments(ctx context.Context, ref Ref, rootID int64) ([]ThreadComment, error) {
+	if err := validateRef(ref); err != nil {
+		return nil, err
+	}
+	var out []ThreadComment
+	opts := &github.PullRequestListCommentsOptions{ListOptions: github.ListOptions{PerPage: 100}}
+	for {
+		comments, resp, err := g.client.PullRequests.ListComments(ctx, ref.Owner, ref.Repo, ref.Number, opts)
+		if err != nil {
+			return nil, fmt.Errorf("github: list review comments on %s: %w", ref, err)
+		}
+		for _, c := range comments {
+			if c.GetID() == rootID || c.GetInReplyTo() == rootID {
+				out = append(out, ThreadComment{ID: c.GetID(), Author: c.GetUser().GetLogin(), Body: c.GetBody()})
+			}
+		}
+		if resp == nil || resp.NextPage == 0 {
+			return out, nil
+		}
+		opts.Page = resp.NextPage
+	}
+}
+
+// React acknowledges a comment with a reaction (eyes while working, +1 when
+// done), on an inline comment or a conversation comment.
+func (g *GitHub) React(ctx context.Context, ref Ref, commentID int64, inline bool, content string) error {
+	if err := validateRef(ref); err != nil {
+		return err
+	}
+	var err error
+	if inline {
+		_, _, err = g.client.Reactions.CreatePullRequestCommentReaction(ctx, ref.Owner, ref.Repo, commentID, content)
+	} else {
+		_, _, err = g.client.Reactions.CreateIssueCommentReaction(ctx, ref.Owner, ref.Repo, commentID, content)
+	}
+	if err != nil {
+		return fmt.Errorf("github: react on %s: %w", ref, err)
+	}
+	return nil
+}

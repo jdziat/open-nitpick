@@ -195,6 +195,12 @@ removes it. The measurements are in
 `nit` < `info` < `warning` < `error` < `critical`. `fail_on: none` never fails
 the build.
 
+## The mention
+
+`review.mention` (default `@nitpick`) is the handle a pull request comment
+uses to talk to the reviewer; see the CI page for the workflow that
+answers it.
+
 ## Resolving superseded comments
 
 `review.resolve_superseded` (default on) lets an incremental run close its

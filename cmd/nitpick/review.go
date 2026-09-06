@@ -34,6 +34,7 @@ type reviewFlags struct {
 	verbose     bool
 	logFormat   string
 	noLinters   bool
+	full        bool
 
 	// Pull request selection. When unset, these are read from the GitHub
 	// Actions environment.
@@ -58,6 +59,7 @@ func runReview(ctx context.Context, args []string) error {
 	fs.BoolVar(&f.dryRun, "dry-run", false, "print the review instead of publishing it")
 	fs.BoolVar(&f.skipDraft, "skip-draft", false, "do nothing when the pull request is a draft")
 	fs.BoolVar(&f.noLinters, "no-linters", false, "skip linters even when configured")
+	fs.BoolVar(&f.full, "full", false, "review the whole change even if an earlier run reviewed part of it (no incremental narrowing)")
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
 	fs.StringVar(&f.logFormat, "log-format", "text", "log format: text or json")
 
@@ -94,6 +96,9 @@ func runReview(ctx context.Context, args []string) error {
 			return fmt.Errorf("invalid -fail-on %q", f.failOn)
 		}
 		cfg.Review.FailOn = sev
+	}
+	if f.full {
+		cfg.Review.Incremental = false
 	}
 
 	log := newLogger(f.verbose, f.logFormat)
