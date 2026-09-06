@@ -194,3 +194,13 @@ removes it. The measurements are in
 
 `nit` < `info` < `warning` < `error` < `critical`. `fail_on: none` never fails
 the build.
+
+## Resolving superseded comments
+
+`review.resolve_superseded` (default on) lets an incremental run close its
+own earlier comment threads when the lines they pointed at changed since
+the earlier review and the finding did not recur, with a reply on the
+thread saying so. A comment on a file the run did not re-read is left
+alone, since nothing there was checked; so is every comment when the
+earlier revision could not be compared (a force push). The GitHub App or
+token needs Pull requests write, which posting reviews already needs.

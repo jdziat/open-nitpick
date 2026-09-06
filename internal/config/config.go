@@ -345,6 +345,12 @@ type Review struct {
 	// push reviews the whole change again.
 	Incremental bool `yaml:"incremental"`
 
+	// ResolveSuperseded lets an incremental run resolve its own earlier
+	// comment threads when the lines they pointed at changed and the
+	// finding did not recur, with a reply saying so. Off, and old threads
+	// stay open for a person to close.
+	ResolveSuperseded bool `yaml:"resolve_superseded"`
+
 	// RelatedContext attaches, beside each changed file, the definitions it
 	// imports from elsewhere in the repository and uses on a changed line, so
 	// the model can read what a called function does instead of guessing. It

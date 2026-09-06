@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -298,5 +299,73 @@ func TestMultiLineSuggestionsAreCommittableOnlyWhenValidated(t *testing.T) {
 				t.Errorf("an unvalidated fix was published as committable: start=%d\n%s", c.StartLine, c.Body)
 			}
 		}
+	}
+}
+
+// resolvingProvider records the threads the engine asked it to resolve.
+type resolvingProvider struct {
+	incrementalProvider
+	resolved []int64
+	reply    string
+}
+
+func (p *resolvingProvider) ResolveThreads(_ context.Context, _ vcs.Ref, ids []int64, reply string) ([]int64, error) {
+	p.resolved = append(p.resolved, ids...)
+	p.reply = reply
+	return ids, nil
+}
+
+// An earlier comment whose file was re-read and whose finding did not recur
+// is resolved with a reply; one whose finding recurred is not, nor is one
+// on a file this run did not re-read, since nothing there was checked. A
+// comment the forge no longer places on the diff (line 0) is resolved even
+// on an unchanged file, since its lines are gone.
+func TestIncrementalRunResolvesSupersededComments(t *testing.T) {
+	appFinding := Finding{
+		Path: "app.go", Line: 4, Severity: "error", Category: "correctness", Class: "correctness",
+		Title: "Ignored error from http.Get", Rationale: "resp may be nil, so the deferred Close panics.",
+	}
+	gone := Finding{Path: "app.go", Line: 2, Class: "style", Title: "Old style nit"}
+	elsewhere := Finding{Path: "other.go", Line: 3, Class: "style", Title: "Unread file nit"}
+	outdated := Finding{Path: "other.go", Line: 9, Class: "resource", Title: "Body not closed"}
+	model := &scriptedLLM{byPrompt: map[string]string{
+		"triaging findings":            mustJSON(t, Result{Summary: "s", Findings: []Finding{appFinding}}),
+		"Review the following changes": mustJSON(t, Result{Findings: []Finding{appFinding}}),
+	}}
+	provider := &resolvingProvider{incrementalProvider: incrementalProvider{
+		stubProvider: stubProvider{diff: incrementalDiff},
+		head:         "new",
+		prior: &vcs.PriorReview{Head: "old", Comments: []vcs.PriorComment{
+			{ID: 1, Path: "app.go", Line: 4, Fingerprint: Fingerprint(appFinding), Class: "correctness"},
+			{ID: 2, Path: "app.go", Line: 2, Fingerprint: Fingerprint(gone), Class: "style"},
+			{ID: 3, Path: "other.go", Line: 3, Fingerprint: Fingerprint(elsewhere), Class: "style"},
+			{ID: 4, Path: "other.go", Line: 0, Fingerprint: Fingerprint(outdated), Class: "resource"},
+		}},
+		changed: []string{"app.go"},
+		ok:      true,
+	}}
+
+	report, err := newEngine(t, model, provider, nil).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if got := fmt.Sprint(provider.resolved); got != "[2 4]" {
+		t.Errorf("resolved = %s, want the superseded comment on the re-read file and the outdated one", got)
+	}
+	if len(report.Superseded) != 2 || !strings.Contains(provider.reply, "did not recur") || !strings.Contains(provider.reply, "old") {
+		t.Errorf("superseded = %+v, reply = %q", report.Superseded, provider.reply)
+	}
+	if !strings.Contains(Render(report, report.Files, newEngine(t, model, provider, nil).Config).Summary, "2 earlier comment thread(s) were resolved") {
+		t.Error("the notice does not say the threads were resolved")
+	}
+
+	// Switched off, nothing is resolved.
+	provider.resolved = nil
+	engine := newEngine(t, model, provider, func(c *config.Config) { c.Review.ResolveSuperseded = false })
+	if _, err := engine.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.resolved) != 0 {
+		t.Errorf("resolved with the switch off: %v", provider.resolved)
 	}
 }
