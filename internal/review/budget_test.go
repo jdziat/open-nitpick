@@ -314,3 +314,24 @@ func TestScoringANilFileDoesNotPanic(t *testing.T) {
 		t.Errorf("Score(nil) = %+v, want the zero value", got)
 	}
 }
+
+// min_files can keep every file and still cost more than the ceiling. Nothing
+// is dropped, so coverage is fine, but the operator set a limit this run
+// passes and has to be told.
+func TestAForcedOverspendWithNoDropsStillReports(t *testing.T) {
+	note := budgetNote(&Report{Budget: &Fit{
+		Kept:    []string{"a.go", "b.go"},
+		After:   Estimate{Dollars: 3.10},
+		Ceiling: 1.00,
+		Forced:  true,
+	}})
+
+	for _, want := range []string{"exceed", "$3.10", "$1.00", "min_files"} {
+		if !strings.Contains(note, want) {
+			t.Errorf("note is missing %q:\n%s", want, note)
+		}
+	}
+	if strings.Contains(note, "were not") {
+		t.Errorf("a run that dropped nothing claims dropped files:\n%s", note)
+	}
+}

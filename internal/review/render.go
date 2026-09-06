@@ -899,11 +899,22 @@ func groupByReason(skips []bundle.Skip, omit string) string {
 // it the cost would be a claim this tool cannot make.
 func budgetNote(report *Report) string {
 	fit := report.Budget
-	if fit == nil || !fit.Trimmed() {
+	if fit == nil || (!fit.Trimmed() && !fit.Forced) {
 		return ""
 	}
 
 	var b strings.Builder
+
+	// min_files can keep every file and still exceed the ceiling, which drops
+	// nothing and so has nothing to warn about coverage. It is still worth a
+	// line: the operator set a limit and this run is expected to pass it.
+	if !fit.Trimmed() {
+		fmt.Fprintf(&b, "\n> **This review is expected to exceed its spending ceiling.** "+
+			"Every changed file was reviewed at an estimated $%.2f against a $%.2f "+
+			"ceiling, because `review.budget.min_files` is set to %d. Coverage is "+
+			"unaffected.\n", fit.After.Dollars, fit.Ceiling, len(fit.Kept))
+		return b.String()
+	}
 
 	fmt.Fprintf(&b, "\n> **This review was bounded by a spending ceiling.** "+
 		"Reviewing every changed file was estimated at $%.2f against a $%.2f ceiling, "+
