@@ -149,6 +149,7 @@ func run(repo, out, clones, lang string, perClass, minLines, maxLines int, since
 		byLabel[c.label] = append(byLabel[c.label], c)
 	}
 	written := map[string]int{}
+	unreadable := 0
 	ext := exts[lang]
 	for label, cs := range byLabel {
 		r := rand.New(rand.NewPCG(2026, uint64(len(cs))))
@@ -157,6 +158,10 @@ func run(repo, out, clones, lang string, perClass, minLines, maxLines int, since
 			c := cs[i]
 			show, err := gitOut(dir, "show", "--format=", "--unified=0", "--no-color", "--diff-filter=AM", c.sha, "--", "*"+ext)
 			if err != nil {
+				// Counted and reported, so a short quota can be told from
+				// a clone that cannot show its own commits.
+				unreadable++
+				fmt.Fprintf(os.Stderr, "skipping %s: %v\n", c.sha[:12], err)
 				continue
 			}
 			k := 0
@@ -185,7 +190,7 @@ func run(repo, out, clones, lang string, perClass, minLines, maxLines int, since
 			}
 		}
 	}
-	fmt.Fprintf(os.Stderr, "wrote %v under %s\n", written, filepath.Join(out, slug))
+	fmt.Fprintf(os.Stderr, "wrote %v under %s (%d commit(s) unreadable)\n", written, filepath.Join(out, slug), unreadable)
 	return nil
 }
 

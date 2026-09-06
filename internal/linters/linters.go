@@ -860,8 +860,10 @@ func runCommand(ctx context.Context, repoRoot, workDir, name string, env []strin
 	cmd.Dir = workDir
 	cmd.Env = env
 
-	// Kill the process group if it ignores cancellation, so a wedged analyzer
-	// cannot outlive the review.
+	// CommandContext kills the analyzer on cancellation; WaitDelay bounds
+	// how long Run then waits for its pipes to close before giving up on
+	// them. It kills no process group: a child the analyzer spawned can
+	// outlive the review, and that is not handled here.
 	cmd.WaitDelay = 5 * time.Second
 
 	var stdout, stderr strings.Builder

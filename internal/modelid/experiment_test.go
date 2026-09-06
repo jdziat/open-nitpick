@@ -179,3 +179,19 @@ func TestContributorExperiment(t *testing.T) {
 	results := ContribExperiment(Methods[1], corpus, false, Interleaved)
 	t.Logf("fingerprint, by tool, interleaved:%s", Render(results))
 }
+
+// A sample with nothing in common with any author is unknown at zero
+// confidence, not the alphabetically first author at one.
+func TestFingerprintWithNoSharedGramsIsUnknown(t *testing.T) {
+	train := []Sample{
+		{Author: "a", Language: "go", Profile: Fingerprint("package a\n\nfunc A() {}\n")},
+		{Author: "b", Language: "go", Profile: Fingerprint("package b\n\nfunc B() {}\n")},
+	}
+	f := TrainFingerprints(train)
+	if author, conf := f.Predict(Fingerprint("")); author != "unknown" || conf != 0 {
+		t.Errorf("empty file = %s at %.2f, want unknown at 0", author, conf)
+	}
+	if author, conf := f.Predict(Fingerprint("\u4e2d\u6587\u7684\u6587\u672c")); author != "unknown" || conf != 0 {
+		t.Errorf("file with no shared grams = %s at %.2f, want unknown at 0", author, conf)
+	}
+}

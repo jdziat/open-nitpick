@@ -196,3 +196,20 @@ func TestRustUseTreesAreWalked(t *testing.T) {
 		t.Errorf("splitTopLevel = %q", got)
 	}
 }
+
+// A use tree that does not close (`use crate::util::{helper;`) once walked
+// the same text forever and took the review down with a stack overflow; it
+// now names nothing, and the balanced use beside it still resolves.
+func TestRustUnbalancedUseTreeNamesNothing(t *testing.T) {
+	tree := fakeTree{
+		"Cargo.toml":  "[package]\nname = \"app\"\n",
+		"src/lib.rs":  "pub mod util;\n",
+		"src/util.rs": "pub fn helper() {}\npub fn other() {}\n",
+		"src/main.rs": "use crate::util::{helper;\nuse crate::util::other;\n\nfn main() { other(); helper(); }\n",
+	}
+	plan := assembleRelated(t, relatedConfig(), tree, true, "src/main.rs")
+	got := relatedNames(plan)
+	if len(got) != 1 || got[0] != "src/util.rs:other" {
+		t.Errorf("related = %v, want only the balanced use resolved", got)
+	}
+}

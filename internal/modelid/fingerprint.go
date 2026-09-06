@@ -181,9 +181,11 @@ func best(sims map[string]float64) (string, float64) {
 		return cands[i].author < cands[j].author
 	})
 	switch {
-	case len(cands) == 0:
+	case len(cands) == 0 || cands[0].sim == 0:
+		// Nothing in common with any author (an empty file, or one in
+		// no language the corpus has) is no author, not a confident one.
 		return "unknown", 0
-	case len(cands) == 1 || cands[0].sim == 0:
+	case len(cands) == 1:
 		return cands[0].author, 1
 	}
 	return cands[0].author, math.Min(1, (cands[0].sim-cands[1].sim)/cands[0].sim)

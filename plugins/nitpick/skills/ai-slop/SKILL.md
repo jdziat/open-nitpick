@@ -45,6 +45,8 @@ it is wrong, and saying so is part of the job.
    Do not "clean it up" by deleting the try; make the error visible.
 4. When the answer is clean for the paths given, say which paths were
    covered; `covered` and `skipped` are in the answer.
+5. `hidden` lists the findings the review made outside the slop class
+   (bugs, security). They were paid for; relay them rather than drop them.
 
 ## What this is not
 

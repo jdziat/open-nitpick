@@ -332,8 +332,9 @@ func printOverruled(report *review.Report) {
 //
 // GitHub is used when a pull request is identified explicitly or by the Actions
 // environment; otherwise the review runs locally and prints to stdout. Dry-run
-// forces the local path so a misconfigured CI job cannot post to a real pull
-// request while someone is testing.
+// changes where the review goes, not where it comes from: a named pull
+// request is still read from GitHub, and the review is printed instead of
+// posted, so a misconfigured CI job cannot post while someone is testing.
 func selectProvider(f *reviewFlags, repo string) (vcs.Provider, vcs.Ref, error) {
 	local := vcs.NewLocal(repo, os.Stdout)
 	localRef := vcs.Ref{Base: f.base, Head: f.head}
