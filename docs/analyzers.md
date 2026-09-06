@@ -1,0 +1,256 @@
+# Analyzers
+
+Thirty-three deterministic analyzers, covering the languages the hosted reviewers
+list. Two are enabled by name out of the box; twenty-four more run whenever they
+are installed and the change contains files they read; the remaining seven run
+only when named, and most of those also need a configuration or an explicit
+grant. `nitpick linters` prints this table from
+the binary.
+
+| analyzer | covers | runs | configuration |
+|---|---|---|---|
+| golangci-lint | Go | enabled | open-nitpick's own config; `golangci_config` overrides |
+| ruff | Python | enabled | `--isolated`; `ruff_config` overrides |
+| pylint | Python (errors and warnings only) | auto | shipped rcfile |
+| brakeman | Ruby on Rails (security) | auto | shipped config and an empty ignore file |
+| shellcheck | shell | auto | `--norc` |
+| hadolint | Dockerfile | auto | shipped config |
+| yamllint | YAML | auto | shipped config |
+| actionlint | GitHub Actions | auto | shipped config |
+| zizmor | GitHub Actions (security) | auto | shipped config |
+| gitleaks | secrets in any file | auto | shipped config; secrets are redacted from the finding |
+| cppcheck | C, C++ | auto | none; inline suppressions not honoured |
+| luacheck | Lua | auto | `--no-config` |
+| dotenv-linter | .env files | auto | none |
+| checkmake | Makefile | auto | shipped config |
+| sqlfluff | SQL | auto | shipped config (ANSI); set your dialect via `configs` |
+| biome | JS, TS, JSON, CSS | auto | shipped config |
+| oxlint | JS, TS | auto | shipped config |
+| htmlhint | HTML | auto | shipped config |
+| rubocop | Ruby | auto | shipped config |
+| detekt | Kotlin | auto | shipped config on the tool's defaults |
+| swiftlint | Swift | auto | shipped config |
+| pmd | Java | auto | the bundled quickstart ruleset |
+| checkov | Terraform, Kubernetes, Helm, Compose, Dockerfile, ARM, Bicep | auto | shipped config, no downloads |
+| tflint | Terraform | auto | shipped config, bundled ruleset |
+| buf | Protocol Buffers | auto | shipped config |
+| psscriptanalyzer | PowerShell | auto | none |
+| eslint | JS, TS | opt-in | `eslint_config` required |
+| semgrep | any | opt-in | `semgrep_config` required |
+| stylelint | CSS, SCSS, Less | opt-in | `configs.stylelint` required; a config may be code |
+| markdownlint | Markdown | opt-in | shipped config; noisy, so not auto |
+| osv-scanner | lockfiles | opt-in | shipped config; queries osv.dev, so not auto; `full-review` and `repo-score` name it |
+| phpstan | PHP | opt-in | `configs.phpstan` and `trusted`: loads the project's autoloader |
+| clippy | Rust | opt-in | `trusted`: cargo runs build scripts and proc macros |
+
+The rules are the ones the first four already follow. A binary is resolved
+from `PATH` and refused inside the repository. Configuration is the shipped
+file, written outside the repository, or the operator's `configs.<name>`,
+which must resolve outside it; a tool with neither useful default nor
+operator config does not run and says so. A tool that has to execute the
+tree's code to analyze it is refused until named in `trusted`, because no
+configuration outside the tree makes that safe on a stranger's pull request.
+In-source suppression (`# noqa`, `// NOLINT`, `# rubocop:disable`) is not
+closed for any of them.
+
+**Auto-detected analyzers make no roster entry unless they run or fail.** A
+tool that is not installed, or has nothing to read, is not listed, so the
+block on the pull request stays short enough to be read. Naming a tool in
+`enabled` is how to be told when it is missing, and how to make strict mode
+fail on it.
+
+Not covered: Vale and LanguageTool (prose), Presidio (PII), Verilator, Fortran,
+Rego, Smarty, Shopify themes, Ember templates, Windows batch, CircleCI and
+oasdiff.
+
+**Analyzers do not read configuration from the branch under review.**
+golangci-lint runs isolated under a config open-nitpick ships and ruff runs
+`--isolated`; eslint and semgrep do not run at all until you point them at a
+configuration you control, which is also why they are not in the default
+`enabled` list. Adding them there without setting their config is a mistake
+`mode: strict` will fail on, and that is the point; having them enabled by
+default only meant strict failed on every review. The reason for all of it is the
+one this project already applies to `.nitpick.yaml`: a change may not
+supply the policy it is reviewed under, and analyzer configuration is policy. A
+pull request adding a `.golangci.yml` with `linters: {default: none}` was
+switching off the entire deterministic half of its own review, and the run
+reported success.
+
+**Policy is not a list of filenames, and drawing the line around config files
+left the property open.** Policy is anything in the tree that decides what the
+review reports. `--no-config` removed the attacker's configuration and our own
+ability to set defaults in the same stroke, which left golangci-lint's stock
+defaults in charge, and those read the tree. Measured against golangci-lint
+2.8.0:
+
+- `// Code generated by protoc-gen-go. DO NOT EDIT.` on line 1 of the file under
+  review skipped the whole file, because `linters.exclusions.generated` defaults
+  to `lax`. Zero findings, exit 0, nothing in `Report.Error`, and a roster line
+  saying the analyzer ran, byte-identical to a clean review, under `mode:
+  strict` as well as `auto`. There is no command-line flag for it; `disable` can
+  only be said in a config file.
+- `max-same-issues` defaults to 3 and `max-issues-per-linter` to 50. Eight
+  identical `errcheck` violations arrived as three, and nothing in the JSON said
+  five had been cut.
+- `uniq-by-line` defaults to true, so one issue survives per line. A
+  two-statement function reported four issues with it off and two with it on.
+
+So open-nitpick ships its own golangci-lint config, embedded in the binary and
+written to a temporary directory **outside** the repository under review. It sets
+`exclusions.generated: disable`, and if it cannot be written outside the
+repository the analyzer does not run and says so; it never falls back to the
+defaults it exists to replace. The other three are passed as command-line flags
+(`--max-same-issues 0`, `--max-issues-per-linter 0`, `--uniq-by-line=false`,
+alongside `--path-mode abs`), which means **they apply to your `golangci_config`
+too**. That is deliberately overriding you, and the reason is that none of the
+four decides which rules run: they decide how much of the analyzer's own output
+survives to be gated, and a finding golangci-lint dropped is one this review
+cannot tell you about. Your `min_severity`, your nitpick level and your own
+exclusion rules all still narrow the result, and all of them are visible.
+
+Setting `golangci_config` replaces our file wholly: golangci-lint reads one
+config, not two, so `exclusions.generated` becomes yours again. Set it to
+`disable` unless you want a generated-file header in the diff to skip the file.
+
+The cost is real and it applies to every pull request, not only the ones that
+edit these files: **your `.golangci.yml` and your `[tool.ruff]` settings do not
+apply.** Your enabled linter set, your exclusions, your `per-file-ignores`:
+none of it. Isolated ruff in particular reports things your configuration was
+suppressing, and so does golangci-lint with `exclusions.generated: disable`: a
+repository that commits generated Go gets linted on it. Expect both to be
+noisier rather than quieter. `golangci_config` and `ruff_config` are the way
+back, and the file has to live outside the repository: a path your CI provisions,
+a mounted config, a config repo checked out beside this one.
+
+eslint's cost is not a flag, which is why it is off rather than isolated. An
+eslint config is JavaScript that eslint loads and *executes*, so a config inside
+the tree can be rewritten by the pull request being reviewed: arbitrary code in
+CI with `GITHUB_TOKEN` and your model API key in the environment. But a config
+outside the tree cannot resolve its own plugin imports, because Node resolves
+them relative to the config file's own directory. Enabling eslint therefore means
+provisioning a config *directory* with its own `node_modules` holding every
+plugin, parser and shared config it imports, not just a file. And an external
+config that imports back into the repository (`import "./eslint-rules/index.js"`)
+re-opens the hole completely: the config is a loader, and substituting the loader
+does not substitute what it loads.
+
+semgrep is off for a different reason: it has no default rule set, so with no
+`--config` it analyzes nothing. Point `semgrep_config` at a rule file outside the
+repository, or at a registry reference (`p/...`, `r/...`), a fetch you asked for
+by name. It previously ran with `--config auto`, which semgrep refuses whenever
+metrics are off; that invocation had never produced a single finding, and nothing
+said so.
+
+Every review says what every analyzer did: `ran` under `isolated:
+open-nitpick's own analyzer config` or `operator config <path>`, `did not run:
+<reason>`, or `skipped` because the change contained no files it reads. It is
+published **on the pull request**, in the summary comment beside the notice about
+a substituted `.nitpick.yaml`, and repeated on stderr; the counts are in the
+collapsed heading, so a reviewer who never opens the block still sees that
+something did not run. The reason is that a review which quietly ran less than
+you think looks exactly like a clean one, and `skipped` is separated from `did
+not run` so that the line which means something is not buried among three that
+never do.
+
+`did not run` is not only about missing binaries. golangci-lint reports a failure
+to load your packages *inside the same JSON it reports issues in*, and a pull
+request can trigger one from the tree: a `go.work` that does not list the module,
+a `//go:build ignore` on the file it wants unread. Those runs are reported as
+failures, not as zero findings.
+
+**What `mode: strict` does, exactly.** It makes an analyzer that was enabled and
+applicable but did not run an *error from the analyzer set*, which is logged and
+published on the pull request as `did not run: <reason>`. It does **not** change
+the run's exit status: that is decided by `review.fail_on` against the findings
+that were published, and an analyzer which produced no findings because it never
+ran contributes nothing to it. This file used to say strict "fails the review",
+which is what a reader would take to mean the job goes red. If you need a missing
+analyzer to break the build, gate on the roster yourself for now.
+
+**And every review says how many analyzer findings it discarded**, in a second
+collapsed block beside the roster. An analyzer reports on whole packages while a
+review comments on a diff, so findings are routinely dropped: for a file the
+change does not touch, for a line it does not touch (`only_changed_lines`), or
+for a line the diff does not carry at all. Those three are counted, because a
+per-finding list of them is a wall of text nobody opens twice.
+
+The fourth reason is counted *and* named individually, because it is not policy:
+a finding reported **for a path that is not in this checkout**. Nothing in a
+healthy tree produces one. It used to be dropped by a bare `continue` (no
+counter, no log, no status), and that single line absorbed two real defects. One
+was ours: with `golangci_config` set, golangci-lint's `relative-path-mode`
+defaults to the *config file's* directory, so every finding arrived as
+`../repo/app.go` and the opt-in path published nothing at all while reporting
+that it ran. `--path-mode abs` fixes that one. The other is described in the
+security section below.
+
+The count covers every analyzer finding removed by *anchoring*: the analyzer
+set's normalization and both of the engine's anchor passes. It was the first of
+those alone until the anchor pass was found dropping analyzer findings at debug
+level after the number had already been computed. It is still not "every analyzer
+finding that did not reach the pull request": triage sits between the two anchor
+passes and may merge one finding into another or drop it as noise, which is the
+job it is there to do, and nothing enumerates those.
+
+**And every review says which parts of the change the analyzers did not fully
+cover**, in a third collapsed block: *Analyzed less than it ran over*.
+`golangci-lint — ran` is true and gets read as "the Go analyzer looked at this
+change", which is a different claim. Six things break it, each described in the
+security section: a changed Go file the build excludes, a `//nolint` this change
+added, a changed `.go` file with no `go.mod` above it, a file importing `"C"`
+while cgo is off, a changed `.go` file this review's own ignore list withheld
+from every analyzer, and a module whose `go` directive is below the toolchain
+analyzing it, which switches off every check gated on a later version, most
+visibly the standard library's deprecations. Files are named individually, with
+a line where one decided the gap, because a count would leave nobody able to go
+and look; individually up to twenty per reason, after which the rest are counted,
+because `go mod vendor` is hundreds of files and a body the forge rejects is
+worse than a shorter list. The last of the six is the only one that means
+*reduced* coverage rather than none, which is why the block says "did not fully
+cover" rather than "reported nothing about".
+
+The ignore list is also how a change can be reviewed by *nothing*, and that case
+does not reach the block above at all: with every changed file set aside there
+are no batches to send, so the run ends before a model or an analyzer is asked
+anything. One file under `vendor/` is enough, and vendored code is compiled into
+your binary. Such a review opens with **Nothing in this change was reviewed**,
+counting what was set aside and why, instead of the forge's default "found
+nothing to comment on".
+
+Analyzer severities are translated onto the five levels above, and the analyzer's
+own word is kept beside the result: `HIGH` and `ERROR` both become error (they are
+the same level in semgrep's scale), `MEDIUM` becomes warning, `CRITICAL` becomes
+critical, and a word we cannot read (like an unrecognized string in your
+`.golangci.yml`) becomes warning, the same as no severity at all.
+
+Whether a deterministic tool should be able to fail your build at
+`fail_on: critical` is your decision, not this tool's. `linters.max_severity` is
+where you make it: `warning` means nothing reported by an analyzer is published or
+gated above warning, however the analyzer rated it and however the reviewing model
+re-rates it afterwards. It does not touch the model's own findings.
+
+It has one hole, and you should know it rather than discover it. The ceiling
+recognises an analyzer's finding by its attribution. If triage rewrites a finding
+far enough that it can no longer be matched back, which happens when an analyzer
+message spans several lines, as a semgrep rule with a multi-line `message:` does,
+the result is treated as the model's own and the ceiling does not apply to it. Titles
+are flattened before triage sees them so this is rare, but "rare" is not "cannot",
+and a reworded finding can be published and gated above your ceiling.
+
+Two consequences worth knowing before you set them. Both describe
+`golangci_config` only: with no config golangci-lint publishes no severity at
+all, so under the default every Go analyzer finding arrives as `warning` and the
+ceiling has nothing to reduce.
+
+- golangci-lint's `Severity` is whatever text your `golangci_config` puts there,
+  and `severity.default` applies it to every issue. `severity.default: critical`
+  therefore lets `misspell` fail a `fail_on: critical` build unless
+  `max_severity` says otherwise.
+- `nit` is below the default `review.min_severity` of `info`, so
+  `severity.default: nit` publishes no Go analyzer findings at all.
+
+`max_severity` was never a defence against silencing, it only reduces, so the
+two are complementary and neither substitutes for the other.
+
+Unknown keys are rejected at load time, so a typo fails immediately instead of
+being silently ignored.
