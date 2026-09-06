@@ -132,3 +132,34 @@ func TestMalformedTemplateIsAnError(t *testing.T) {
 		t.Fatal("want an error for a malformed template")
 	}
 }
+
+// Every prompt carries the voice layer, and it says the things a reader
+// can check: no em dashes, no filler, a length.
+func TestVoiceLayerIsOnEveryPrompt(t *testing.T) {
+	for _, name := range []string{NameReview, NameTriage, NameRoute} {
+		p, err := Build(name, Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var found bool
+		for _, l := range p.Layers {
+			if l.Name == LayerVoice {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s has no voice layer", name)
+		}
+		if !strings.Contains(p.String(), "No em dashes") {
+			t.Errorf("%s does not forbid em dashes", name)
+		}
+	}
+	for _, want := range []string{"at most 12 words", "at most 3 sentences", "genuinely", "No chat"} {
+		if !strings.Contains(Voice, want) {
+			t.Errorf("the voice layer lacks %q", want)
+		}
+	}
+	if strings.Contains(Voice, "—") {
+		t.Error("the layer that forbids em dashes contains one")
+	}
+}

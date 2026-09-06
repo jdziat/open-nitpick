@@ -33,6 +33,9 @@ const (
 	LayerRun = "run"
 	// LayerSlop is the slop class's rules, present only when review.slop is on.
 	LayerSlop = "slop"
+	// LayerVoice is how to write a finding: length, punctuation, no filler.
+	// Every role carries it, and review.Scrub enforces what it can.
+	LayerVoice = "voice"
 )
 
 // Layer is one contribution to a prompt.
@@ -131,6 +134,7 @@ func Build(name string, opts Options) (Prompt, error) {
 	}
 
 	p := Prompt{Layers: []Layer{{Name: LayerBase, Text: rendered}}}
+	p.Layers = append(p.Layers, Layer{Name: LayerVoice, Text: Voice})
 
 	if strings.TrimSpace(opts.PersonaText) != "" {
 		p.Layers = append(p.Layers, Layer{Name: LayerPersona, Text: opts.PersonaText})
