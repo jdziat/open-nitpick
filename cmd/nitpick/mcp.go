@@ -96,9 +96,9 @@ func newMCPServer(root string, log *slog.Logger) *mcp.Server {
 	}, t.codeSmell)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "ai_slop",
-		Description: "Findings in the slop class only, for the paths given (or the whole tree): code that reads as generated and left unread, under nine rules a reader can check " +
-			"(a comment that restates its line, a docstring that describes behaviour the code does not have, a swallowed error, a tautological guard, chat prose in a comment, and so on). " +
-			"Each finding names the rule. A full review filtered to that class; pass paths to keep it cheap.",
+		Description: "AI slop for the paths given (or the whole tree), with a score and fixes. Two instruments: the tells, which need no model (em dashes, en dashes as separators, arrows in prose, filler qualifiers, chat prose, comments that restate their line, doc comments longer than what they document), each with its fix; " +
+			"and, unless no_model is set, the model's nine slop rules through the review engine (a docstring that describes behaviour the code does not have, a swallowed error, a tautological guard, generic names, and so on). " +
+			"Returns tells by rule, the model's findings with suggestions, both per thousand lines, findings outside the slop class the review made (hidden), and recommendations ordered by count. Pass paths to keep the model's pass cheap; no_model is free.",
 	}, t.aiSlop)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "identify_model",
@@ -260,9 +260,23 @@ func (t *mcpTools) codeSmell(ctx context.Context, _ *mcp.CallToolRequest, in Tre
 	return t.tree(ctx, in, false)
 }
 
-func (t *mcpTools) aiSlop(ctx context.Context, _ *mcp.CallToolRequest, in TreeIn) (*mcp.CallToolResult, TreeOut, error) {
-	in.Classes = []string{string(config.ClassSlop)}
-	return t.tree(ctx, in, false)
+// SlopIn selects the tree for ai_slop.
+type SlopIn struct {
+	Repo        string   `json:"repo,omitempty" jsonschema:"repository root; the server's default when omitted"`
+	Paths       []string `json:"paths,omitempty" jsonschema:"paths under the repository root; the whole tree when omitted"`
+	Budget      int      `json:"budget,omitempty" jsonschema:"stop the model's pass after this many estimated tokens of source"`
+	Instruction string   `json:"instruction,omitempty"`
+	NoModel     bool     `json:"no_model,omitempty" jsonschema:"the tells only: no model call, free and fast"`
+	NoLinters   bool     `json:"no_linters,omitempty"`
+}
+
+func (t *mcpTools) aiSlop(ctx context.Context, _ *mcp.CallToolRequest, in SlopIn) (*mcp.CallToolResult, SlopResult, error) {
+	f := &reviewFlags{repo: t.repoFor(in.Repo), instruction: in.Instruction, noLinters: in.NoLinters}
+	res, err := slopScore(ctx, f, in.Paths, in.Budget, in.NoModel, t.log)
+	if err != nil {
+		return nil, SlopResult{}, err
+	}
+	return textResult(strings.TrimSpace(res.Text())), *res, nil
 }
 
 func (t *mcpTools) tree(ctx context.Context, in TreeIn, score bool) (*mcp.CallToolResult, TreeOut, error) {
