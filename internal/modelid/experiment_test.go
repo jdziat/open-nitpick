@@ -56,15 +56,48 @@ func TestModelIdentificationExperiment(t *testing.T) {
 	if len(samples) == 0 {
 		t.Skip("empty corpus")
 	}
-	for name, split := range map[string]func(int) bool{
-		"even tasks train": func(task int) bool { return task%2 == 0 },
-		"first half train": func(task int) bool { return task < len(Tasks)/2 },
-	} {
-		results := Experiment(samples, split)
-		t.Logf("split %s:%s", name, Render(results))
-		for _, r := range results {
-			t.Logf("%s: margin over majority %.2f (%s)", r.Language, r.Accuracy()-r.Baseline(), Verdict(r))
+	for _, m := range Methods {
+		for name, split := range map[string]func(int) bool{
+			"even tasks train": func(task int) bool { return task%2 == 0 },
+			"first half train": func(task int) bool { return task < len(Tasks)/2 },
+		} {
+			results := ExperimentWith(m, samples, split)
+			t.Logf("method %s, split %s:%s", m.Name, name, Render(results))
+			for _, r := range results {
+				t.Logf("%s, %s: margin over majority %.2f (%s)", r.Language, r.Method, r.Accuracy()-r.Baseline(), Verdict(r))
+			}
 		}
+	}
+	for _, lang := range Languages {
+		t.Logf("idioms, %s:%s", lang.Name, RenderIdioms(Idioms(samples, lang.Name, 4, 8)))
+	}
+}
+
+func TestFingerprintSeparatesDistinctStyles(t *testing.T) {
+	var samples []Sample
+	for task := range 12 {
+		tabs := "package a\n\nfunc F(x int) int {\n\tif x > 0 {\n\t\treturn x\n\t}\n\treturn -x\n}\n"
+		spaces := "package a\n\n// Edge case: negatives.\nfunc absoluteValue(v int) int {\n    if v > 0 {\n        return v\n    }\n    return -v\n}\n"
+		for i, body := range []string{tabs, spaces} {
+			author := []string{"tabs", "spaces"}[i]
+			content := strings.Repeat(body, 1+task%3)
+			samples = append(samples, Sample{Author: author, Language: "go", Task: task, Features: Extract(content, "go"), Profile: Fingerprint(content)})
+		}
+	}
+	for _, m := range Methods[1:] {
+		results := ExperimentWith(m, samples, func(task int) bool { return task%2 == 0 })
+		if len(results) != 1 || results[0].Accuracy() != 1 {
+			t.Errorf("%s: %s", m.Name, Render(results))
+		}
+	}
+	found := false
+	for _, id := range Idioms(samples, "go", 3, 50)["spaces"] {
+		if id.Gram == "Edge case" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the spaces author's idiom was not mined: %+v", Idioms(samples, "go", 3, 50)["spaces"])
 	}
 }
 
@@ -88,9 +121,61 @@ func TestModelIdentificationAcrossGenerations(t *testing.T) {
 	if len(second) == 0 {
 		t.Skip("empty second corpus")
 	}
-	results := CrossExperiment(first, second)
-	t.Logf("train on corpus, test on corpus2:%s", Render(results))
-	for _, r := range results {
-		t.Logf("%s: margin over majority %.2f (%s)", r.Language, r.Accuracy()-r.Baseline(), Verdict(r))
+	for _, m := range Methods {
+		results := CrossExperimentWith(m, first, second)
+		t.Logf("method %s, train on corpus, test on corpus2:%s", m.Name, Render(results))
+		for _, r := range results {
+			t.Logf("%s, %s: margin over majority %.2f (%s)", r.Language, r.Method, r.Accuracy()-r.Baseline(), Verdict(r))
+		}
 	}
+}
+
+func TestLicenseHeaderIsStrippedBeforeMeasuring(t *testing.T) {
+	src := "// Copyright 2014 The Go Authors. All rights reserved.\n// Use of this source code is governed by a BSD-style\n// license that can be found in the LICENSE file.\n\npackage a\n\n// F does a thing.\nfunc F() {}\n"
+	if got := StripLicenseHeader(src); !strings.HasPrefix(got, "package a") || !strings.Contains(got, "// F does") {
+		t.Errorf("stripped = %q", got)
+	}
+	plain := "package a\n\n// F does a thing.\nfunc F() {}\n"
+	if got := StripLicenseHeader(plain); got != plain {
+		t.Errorf("a doc comment was stripped: %q", got)
+	}
+	if _, ok := NewSample("human", "go", 0, "x", src).Profile.Tok["All rights"]; ok {
+		t.Error("the copyright line reached the fingerprint")
+	}
+}
+
+// TestContributorExperiment reads the corpus cmd/contrib-corpus builds
+// (NITPICK_CONTRIB_CORPUS, default ./contrib), which is not committed, and
+// logs a time split per repository: were the lines a commit added written
+// by a person or by the tool its trailer names.
+func TestContributorExperiment(t *testing.T) {
+	dir := os.Getenv("NITPICK_CONTRIB_CORPUS")
+	if dir == "" {
+		dir = "contrib"
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Skip("no contributor corpus")
+	}
+	corpus, err := LoadContrib(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(corpus) == 0 {
+		t.Skip("empty contributor corpus")
+	}
+	for _, split := range []struct {
+		name string
+		s    ContribSplit
+	}{{"older half trains", OlderHalf}, {"blocks of fifty alternate", Blocks}, {"interleaved by date", Interleaved}} {
+		for _, m := range Methods {
+			results := ContribExperiment(m, corpus, true, split.s)
+			t.Logf("method %s, human against model, %s:%s", m.Name, split.name, Render(results))
+			for _, r := range results {
+				recall, precision := ModelRecall(r)
+				t.Logf("%s, %s, %s: balanced accuracy %.2f against chance 0.50; model recall %.2f, precision %.2f", r.Language, r.Method, split.name, Balanced(r), recall, precision)
+			}
+		}
+	}
+	results := ContribExperiment(Methods[1], corpus, false, Interleaved)
+	t.Logf("fingerprint, by tool, interleaved:%s", Render(results))
 }

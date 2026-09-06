@@ -11,13 +11,13 @@ import (
 )
 
 // runIdentifyModel says which corpus author a file's style is most similar
-// to. It is offered for the one language the experiment cleared, answers
+// to. It is offered for the languages the experiment cleared, answers
 // "unknown" everywhere else and below the confidence floor, and says so:
-// see docs/findings.md, "Which model wrote it".
+// see docs/findings.md, "Which model wrote it" and "Fingerprints".
 func runIdentifyModel(args []string) error {
 	fs := flag.NewFlagSet("identify-model", flag.ContinueOnError)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: nitpick identify-model <file>...\n\nNames the model whose style each file is most similar to, from the experiment's corpus.\nTypeScript only; other languages and low-confidence answers are \"unknown\", with the reason.")
+		fmt.Fprintln(os.Stderr, "Usage: nitpick identify-model <file>...\n\nNames the model whose style each file is most similar to, from the experiment's corpus.\nGo, Python and TypeScript; other languages and low-confidence answers are \"unknown\", with the reason.")
 	}
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -40,7 +40,7 @@ func runIdentifyModel(args []string) error {
 			fmt.Printf("%s: unknown (%s)\n", path, reason)
 			continue
 		}
-		fmt.Printf("%s: most similar to %s (confidence %.2f; a style match against a small corpus, not an attribution)\n", path, strings.ReplaceAll(author, "_", "/"), confidence)
+		fmt.Printf("%s: most similar to %s (margin %.2f over the next; a style match against a small corpus of six models, not an attribution)\n", path, strings.ReplaceAll(author, "_", "/"), confidence)
 	}
 	return nil
 }

@@ -18,6 +18,7 @@ type Sample struct {
 	Task     int
 	Path     string
 	Features Features
+	Profile  Profile
 }
 
 // LoadCorpus reads <dir>/<author>/<language>/<NN>.<ext>.txt; the .txt keeps
@@ -44,10 +45,40 @@ func LoadCorpus(dir string) ([]Sample, error) {
 		if err != nil {
 			return err
 		}
-		out = append(out, Sample{Author: parts[0], Language: parts[1], Task: task, Path: rel, Features: Extract(string(data), parts[1])})
+		out = append(out, NewSample(parts[0], parts[1], task, rel, string(data)))
 		return nil
 	})
 	return out, err
+}
+
+// NewSample measures one file. A leading license header is dropped first:
+// the human control is sampled from standard libraries, every file of
+// which opens with one, and no model writes one, so left in it would let
+// the classifier recognise the human by the copyright line rather than by
+// the code.
+func NewSample(author, lang string, task int, path, content string) Sample {
+	content = StripLicenseHeader(content)
+	return Sample{Author: author, Language: lang, Task: task, Path: path, Features: Extract(content, lang), Profile: Fingerprint(content)}
+}
+
+// StripLicenseHeader removes the comment block a file opens with when it
+// mentions a copyright or a license, and the blank lines after it.
+func StripLicenseHeader(content string) string {
+	lines := strings.Split(content, "\n")
+	end := 0
+	for end < len(lines) {
+		t := strings.TrimSpace(lines[end])
+		if t == "" || strings.HasPrefix(t, "//") || strings.HasPrefix(t, "#") || strings.HasPrefix(t, "/*") || strings.HasPrefix(t, "*") {
+			end++
+			continue
+		}
+		break
+	}
+	head := strings.ToLower(strings.Join(lines[:end], "\n"))
+	if end == 0 || (!strings.Contains(head, "copyright") && !strings.Contains(head, "license")) {
+		return content
+	}
+	return strings.Join(lines[end:], "\n")
 }
 
 // corpusName is the file shape the generator writes: NN.<ext>.txt.
@@ -145,6 +176,7 @@ func (c *Classifier) Predict(f Features) (author string, confidence float64) {
 
 // Result is one language's held-out outcome.
 type Result struct {
+	Method    string
 	Language  string
 	Authors   []string
 	Train     int
@@ -171,6 +203,11 @@ func frac(a, b int) float64 {
 // language. Splitting by task, not by file, is what stops the classifier
 // scoring by recognising the program rather than the author.
 func Experiment(samples []Sample, trainTask func(task int) bool) []Result {
+	return ExperimentWith(Methods[0], samples, trainTask)
+}
+
+// ExperimentWith is Experiment under one method.
+func ExperimentWith(m Method, samples []Sample, trainTask func(task int) bool) []Result {
 	byLang := map[string][]Sample{}
 	for _, s := range samples {
 		byLang[s.Language] = append(byLang[s.Language], s)
@@ -185,23 +222,23 @@ func Experiment(samples []Sample, trainTask func(task int) bool) []Result {
 				test = append(test, s)
 			}
 		}
-		results = append(results, score(lang, train, test))
+		results = append(results, score(m, lang, train, test))
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].Language < results[j].Language })
 	return results
 }
 
 // score trains on train and tests on test for one language.
-func score(lang string, train, test []Sample) Result {
-	c := Train(train)
-	r := Result{Language: lang, Train: len(train), Test: len(test), Confusion: map[string]map[string]int{}}
+func score(m Method, lang string, train, test []Sample) Result {
+	predict := m.Train(train)
+	r := Result{Method: m.Name, Language: lang, Train: len(train), Test: len(test), Confusion: map[string]map[string]int{}}
 	counts := map[string]int{}
 	authors := map[string]bool{}
 	for _, s := range train {
 		authors[s.Author] = true
 	}
 	for _, s := range test {
-		got, _ := c.Predict(s.Features)
+		got, _ := predict(s)
 		if r.Confusion[s.Author] == nil {
 			r.Confusion[s.Author] = map[string]int{}
 		}
@@ -232,8 +269,8 @@ func score(lang string, train, test []Sample) Result {
 func Render(results []Result) string {
 	var b strings.Builder
 	for _, r := range results {
-		fmt.Fprintf(&b, "\n%s: %d train, %d test, %d authors; accuracy %.2f against a majority baseline of %.2f (chance %.2f)\n",
-			r.Language, r.Train, r.Test, len(r.Authors), r.Accuracy(), r.Baseline(), frac(1, len(r.Authors)))
+		fmt.Fprintf(&b, "\n%s, %s: %d train, %d test, %d authors; accuracy %.2f against a majority baseline of %.2f (chance %.2f)\n",
+			r.Language, r.Method, r.Train, r.Test, len(r.Authors), r.Accuracy(), r.Baseline(), frac(1, len(r.Authors)))
 		fmt.Fprintf(&b, "  %-28s", "actual \\ predicted")
 		for _, a := range r.Authors {
 			fmt.Fprintf(&b, " %8s", short(a))
@@ -276,6 +313,11 @@ func Verdict(r Result) string {
 // the second corpus is the same tasks generated again, so a signature that
 // holds here holds across samplings.
 func CrossExperiment(train, test []Sample) []Result {
+	return CrossExperimentWith(Methods[0], train, test)
+}
+
+// CrossExperimentWith is CrossExperiment under one method.
+func CrossExperimentWith(m Method, train, test []Sample) []Result {
 	byLang := map[string][2][]Sample{}
 	for _, s := range train {
 		e := byLang[s.Language]
@@ -292,7 +334,7 @@ func CrossExperiment(train, test []Sample) []Result {
 		if len(e[0]) == 0 || len(e[1]) == 0 {
 			continue
 		}
-		results = append(results, score(lang, e[0], e[1]))
+		results = append(results, score(m, lang, e[0], e[1]))
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].Language < results[j].Language })
 	return results
