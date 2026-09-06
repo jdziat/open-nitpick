@@ -1,3 +1,5 @@
+<p align="center"><img src="website/assets/logo.svg" width="112" alt="open-nitpick"></p>
+
 # open-nitpick
 
 [![CI](https://github.com/jdziat/open-nitpick/actions/workflows/ci.yml/badge.svg)](https://github.com/jdziat/open-nitpick/actions/workflows/ci.yml)
