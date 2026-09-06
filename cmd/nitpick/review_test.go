@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/converse"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
@@ -498,5 +499,28 @@ func TestSkipReasonReadsDraftsAndMarkers(t *testing.T) {
 	}
 	if skipReason(&vcs.PullRequest{Title: "[skip review]"}, false, nil) != "" {
 		t.Error("with no markers configured nothing is skipped")
+	}
+}
+
+// A comment event names its pull request itself; the repository comes from
+// the flags or the Actions environment, since GITHUB_REF names a branch on
+// a comment event and the review resolver would give up.
+func TestRefForEventUsesTheEventNumberAndTheRepositoryEnv(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "o/r")
+	ref, err := refForEvent(&reviewFlags{}, &converse.Event{Number: 16})
+	if err != nil || ref.Owner != "o" || ref.Repo != "r" || ref.Number != 16 {
+		t.Errorf("ref = %+v, %v", ref, err)
+	}
+	ref, err = refForEvent(&reviewFlags{owner: "a", repoName: "b"}, &converse.Event{Number: 2})
+	if err != nil || ref.Owner != "a" || ref.Repo != "b" {
+		t.Errorf("flags should win: %+v, %v", ref, err)
+	}
+	t.Setenv("GITHUB_REPOSITORY", "")
+	if _, err := refForEvent(&reviewFlags{}, &converse.Event{Number: 2}); err == nil {
+		t.Error("no repository anywhere must be an error")
+	}
+	t.Setenv("GITHUB_REPOSITORY", "o/r")
+	if _, err := refForEvent(&reviewFlags{}, &converse.Event{}); err == nil {
+		t.Error("an event with no pull request must be an error")
 	}
 }
