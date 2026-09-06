@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/fullreview"
@@ -81,9 +83,9 @@ func runTreeReview(ctx context.Context, name string, args []string, score bool) 
 	// osv.dev; a whole-tree review wants the known advisories, so it is
 	// named here. Naming it is a request, not a promise: outside strict
 	// mode a binary that is not installed is a skip the roster reports.
-	if !slices.Contains(cfg.Linters.Enabled, "osv-scanner") {
-		cfg.Linters.Enabled = append(cfg.Linters.Enabled, "osv-scanner")
-	}
+	// Under strict mode a named analyzer that is missing fails the run,
+	// and that list is the operator's promise, not this command's to add to.
+	enableAdvisoryScanner(cfg)
 
 	tree := vcs.NewTree(vcs.NewLocal(repo, os.Stdout), fs.Args())
 	tree.MaxBytes = cfg.Review.MaxFileBytes
@@ -115,4 +117,14 @@ func runTreeReview(ctx context.Context, name string, args []string, score bool) 
 		fmt.Print(fullreview.Score(report, tree).String())
 	}
 	return nil
+}
+
+// enableAdvisoryScanner names osv-scanner for a tree review unless the
+// operator runs analyzers strictly, where a name is a promise the binary
+// is present.
+func enableAdvisoryScanner(cfg *config.Config) {
+	if cfg.Linters.Mode == config.LinterStrict || slices.Contains(cfg.Linters.Enabled, "osv-scanner") {
+		return
+	}
+	cfg.Linters.Enabled = append(cfg.Linters.Enabled, "osv-scanner")
 }

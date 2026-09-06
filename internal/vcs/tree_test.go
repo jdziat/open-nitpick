@@ -53,6 +53,15 @@ func TestTreeDiffAddsEveryFileUnderThePathsAndSaysWhatItLeftOut(t *testing.T) {
 	if _, err := tree.Diff(context.Background(), Ref{Head: "HEAD"}); err == nil {
 		t.Error("a tree diff of a revision did not fail")
 	}
+
+	// A path that names nothing is an error, not an empty review: an
+	// absolute path, a glob, and a typo each match no listed file.
+	for _, bad := range []string{dir + "/pkg", "pkg/*.go", "pgk"} {
+		wrong := NewTree(NewLocal(dir, io.Discard), []string{"pkg", bad})
+		if _, err := wrong.Diff(context.Background(), Ref{Head: Worktree}); err == nil || !strings.Contains(err.Error(), "matches no file") {
+			t.Errorf("path %q: err = %v, want a refusal naming the path", bad, err)
+		}
+	}
 }
 
 func TestTreeBudgetStopsInPathOrderAndNamesTheRest(t *testing.T) {
@@ -70,6 +79,24 @@ func TestTreeBudgetStopsInPathOrderAndNamesTheRest(t *testing.T) {
 	}
 	if got := strings.Join(tree.Unbudgeted, ","); got != "c.go" {
 		t.Errorf("unbudgeted %s", got)
+	}
+}
+
+// A repository with no commits yet is still a tree.
+func TestTreeReviewsARepositoryWithNoCommits(t *testing.T) {
+	dir := t.TempDir()
+	gitIn(t, dir, "init", "-q", "-b", "main")
+	write(t, dir, "a.go", "package a\n")
+	tree := NewTree(NewLocal(dir, io.Discard), nil)
+	if _, err := tree.PullRequest(context.Background(), Ref{Head: Worktree}); err != nil {
+		t.Fatalf("PullRequest on an unborn HEAD: %v", err)
+	}
+	raw, err := tree.Diff(context.Background(), Ref{Head: Worktree})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "+package a") {
+		t.Errorf("the untracked file was not reviewed:\n%s", raw)
 	}
 }
 

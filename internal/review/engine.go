@@ -6,6 +6,7 @@ package review
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -603,11 +604,21 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// published as the triage model's own correctness findings. Held out
 	// here and rejoined after validation, they keep their rule, their
 	// class and their line, and still pass the operator's ceiling and gate.
-	findings, advisories := holdAdvisories(findings)
+	findings, advisories := holdAdvisories(dedupe(findings))
 
 	summary, findings, withheldByTriage, err := e.triage(ctx, pr, findings)
 	if err != nil {
 		return nil, err
+	}
+	// The summary was written over what triage saw, which the advisories
+	// were not; a walkthrough that says the change is clean above four
+	// posted CVEs would be wrong, so it says they are there.
+	if summary != "" && len(advisories) > 0 {
+		note := fmt.Sprintf("%d known advisories from the dependency scanner are", len(advisories))
+		if len(advisories) == 1 {
+			note = "1 known advisory from the dependency scanner is"
+		}
+		summary = strings.TrimRight(summary, "\n") + "\n\n" + note + " listed with the findings."
 	}
 
 	// Triage rewrites findings, including their line numbers, so anchors are
@@ -1023,7 +1034,7 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		{Role: llms.RoleUser, Content: body.String()},
 	}
 
-	schema, err := schemaOption(findingsSchemaName, findingsSchema)
+	schema, err := schemaOption(findingsSchemaName, func() (json.RawMessage, error) { return findingsSchema(offeredClasses(e.Config.Review.Slop)) })
 	if err != nil {
 		return nil, err
 	}
@@ -1275,7 +1286,7 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		{Role: llms.RoleUser, Content: renderForTriage(pr, findings)},
 	}
 
-	schema, err := schemaOption(triageSchemaName, triageSchema)
+	schema, err := schemaOption(triageSchemaName, func() (json.RawMessage, error) { return triageSchema(offeredClasses(e.Config.Review.Slop)) })
 	if err != nil {
 		return "", nil, nil, err
 	}

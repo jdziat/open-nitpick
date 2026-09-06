@@ -168,7 +168,10 @@ func sampleHuman(out string) (int, error) {
 		var candidates []string
 		walkErr := filepath.WalkDir(root.dir, func(p string, d os.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
-				if d != nil && d.IsDir() && (strings.Contains(p, "testdata") || strings.Contains(p, "test") || strings.Contains(p, "vendor") || strings.Contains(p, "site-packages")) {
+				// By the directory's own name, and never the root: a
+				// toolchain installed under a path containing "test" or
+				// "vendor" would otherwise be skipped whole at the first call.
+				if d != nil && d.IsDir() && p != root.dir && (strings.Contains(d.Name(), "test") || d.Name() == "vendor" || d.Name() == "site-packages") {
 					return filepath.SkipDir
 				}
 				return nil

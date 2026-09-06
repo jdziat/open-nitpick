@@ -420,6 +420,9 @@ func TestKnownAdvisoriesAreNotTriaged(t *testing.T) {
 	if len(report.Findings) != 3 {
 		t.Errorf("findings = %d, want the bug and both advisories", len(report.Findings))
 	}
+	if !strings.Contains(report.Summary, "2 known advisories from the dependency scanner are listed") {
+		t.Errorf("the summary does not say the advisories exist:\n%s", report.Summary)
+	}
 }
 
 // The linters package qualifies every rule with its tool, so the id a report
