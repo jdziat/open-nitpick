@@ -36,6 +36,42 @@ jobs:
           skip-drafts: true
 ```
 
+**Talking to it.** A comment on the pull request that starts with
+`@nitpick` is answered by a second workflow on `issue_comment` and
+`pull_request_review_comment` events, running the Action with
+`command: respond`:
+
+```yaml
+name: Respond
+on:
+  issue_comment: {types: [created]}
+  pull_request_review_comment: {types: [created]}
+permissions: {contents: read, pull-requests: write, issues: write}
+jobs:
+  respond:
+    if: contains(github.event.comment.body, '@nitpick')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: jdziat/open-nitpick@v1
+        with:
+          command: respond
+          provider: synthetic
+          model: hf:moonshotai/Kimi-K3
+          api-key: ${{ secrets.SYNTHETIC_API_KEY }}
+```
+
+`@nitpick review` reviews the whole change again, not the increment.
+`@nitpick resolve` on an inline thread resolves it with a reply naming who
+asked. Anything else is a question, answered in the same thread by the
+review model with the diff, the lines around the thread, and the thread
+so far as its context; forge-authored text is fenced as untrusted, so a
+comment cannot instruct the model. The comment gets an eyes reaction when
+the run starts and a thumbs-up when it has answered. The handle is
+`review.mention` in `.nitpick.yaml`. This repository's own is
+[.github/workflows/nitpick-respond.yml](https://github.com/jdziat/open-nitpick/blob/main/.github/workflows/nitpick-respond.yml).
+
 **Superseded comments.** On a later push, an earlier inline comment whose
 lines changed and whose finding did not recur is resolved with a reply
 saying so, and the walkthrough counts them. `review.resolve_superseded:

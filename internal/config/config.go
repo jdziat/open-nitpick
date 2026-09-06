@@ -338,6 +338,11 @@ type Review struct {
 	// Summary emits a walkthrough summary alongside inline comments.
 	Summary bool `yaml:"summary"`
 
+	// Mention is the handle a comment uses to talk to the reviewer:
+	// "@nitpick review" reviews again, "@nitpick resolve" closes the
+	// thread, anything else is a question answered in the thread.
+	Mention string `yaml:"mention"`
+
 	// SkipMarkers are phrases that, in a pull request's title, body or head
 	// commit message, ask for no review: the run reports "skipped" and
 	// posts nothing. Matched case-insensitively.

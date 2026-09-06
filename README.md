@@ -105,8 +105,8 @@ Usable, measured, and still early. The engine, the GitHub and local providers,
 structured output, analyzers, related context in both directions, per-batch
 routing, ensembles, and the Action work end to end; a push to a reviewed pull
 request is reviewed incrementally. [docs/findings.md](docs/findings.md) is the
-record of what has been measured and what it supports. Not yet done: resolving
-superseded comments, `@nitpick` command handling, and a GitLab provider.
+record of what has been measured and what it supports. Not yet done: a GitLab
+provider.
 
 ## License
 

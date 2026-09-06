@@ -109,6 +109,7 @@ func Defaults() *Config {
 			// the same findings again on every push.
 			Incremental:       true,
 			ResolveSuperseded: true,
+			Mention:           "@nitpick",
 			SkipMarkers:       []string{"[skip review]", "[skip nitpick]"},
 			// On: it reads only what the change already imports, and every
 			// price in the model sweep was measured with it on (see
