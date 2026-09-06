@@ -23,7 +23,7 @@ import (
 )
 
 // TestFullReviewFixture is the acceptance test for `nitpick full-review`,
-// section 1 of docs/plan-full-review.md: the fixture repository reviewed
+// section 1 of notes/plan-full-review.md: the fixture repository reviewed
 // whole finds the planted bug and the planted secret, says nothing about the
 // clean file, lists the known advisory when osv-scanner is installed, and
 // puts the secret first in the remediation plan. Judge-free: a finding is
