@@ -62,7 +62,7 @@ docs:
 	sed -E '1s/^# open-nitpick$$/# Guide/; /^Documentation: <https:\/\/jdziat\.github\.io/d; /^The same documents are published at/d' README.md >> .website/guide.md
 	cp docs/*.md .website/docs/
 	for f in .website/docs/*.md; do sed -E 's#\]\(\.\./(internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
-	sed -E 's#\]\((internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' .website/guide.md > .website/guide.md.tmp && mv .website/guide.md.tmp .website/guide.md
+	sed -E 's#\]\((internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g; s#src="website/assets/#src="../assets/#g' .website/guide.md > .website/guide.md.tmp && mv .website/guide.md.tmp .website/guide.md
 	mkdocs build
 
 docs-serve: docs
