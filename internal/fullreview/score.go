@@ -64,7 +64,18 @@ func (s LanguageScore) PerKLOC(weighted float64) float64 {
 type Scorecard struct {
 	Languages []LanguageScore
 	Total     LanguageScore
+	// Unreviewed are the covered files whose batch failed. They are in no
+	// denominator, and a card with any is incomplete: a rate over the
+	// files a model answered for is a rate over the files that happened
+	// not to fail, and it says so.
+	Unreviewed []string
+	// AnalyzersFailed names the analyzers that did not run, since a
+	// security rate with the security analyzers missing is a lower bound.
+	AnalyzersFailed []string
 }
+
+// Incomplete reports whether any batch failed or any analyzer did not run.
+func (c Scorecard) Incomplete() bool { return len(c.Unreviewed) > 0 || len(c.AnalyzersFailed) > 0 }
 
 // Score computes the scorecard from a whole-tree review and the tree it read.
 func Score(report *review.Report, tree *vcs.Tree) Scorecard {
@@ -77,7 +88,8 @@ func Score(report *review.Report, tree *vcs.Tree) Scorecard {
 		}
 		return r
 	}
-	for _, p := range tree.Covered {
+	reviewed, failed := Reviewed(report, tree)
+	for _, p := range reviewed {
 		r := row(languageOf(p))
 		r.Files++
 		r.Lines += tree.Lines[p]
@@ -113,6 +125,8 @@ func Score(report *review.Report, tree *vcs.Tree) Scorecard {
 		card.Total.SecurityWeighted += r.SecurityWeighted
 	}
 	card.Total.Language = "all"
+	card.Unreviewed = failed
+	card.AnalyzersFailed = FailedAnalyzers(report)
 	sort.Slice(card.Languages, func(i, j int) bool {
 		if card.Languages[i].Lines != card.Languages[j].Lines {
 			return card.Languages[i].Lines > card.Languages[j].Lines
@@ -143,6 +157,15 @@ func (c Scorecard) String() string {
 		verdict = "above"
 	}
 	fmt.Fprintf(&b, "  slop per thousand lines is %s the threshold of %.1f.\n", verdict, SlopThreshold)
+	if c.Incomplete() {
+		b.WriteString("  INCOMPLETE: the rates above are over the files a model answered for, not the tree.\n")
+		if len(c.Unreviewed) > 0 {
+			fmt.Fprintf(&b, "  %d file(s) whose batch failed are in no denominator: %s\n", len(c.Unreviewed), strings.Join(c.Unreviewed, ", "))
+		}
+		for _, a := range c.AnalyzersFailed {
+			fmt.Fprintf(&b, "  analyzer did not run, so its findings are missing from the numerators: %s\n", a)
+		}
+	}
 	return b.String()
 }
 

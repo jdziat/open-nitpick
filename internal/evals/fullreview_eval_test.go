@@ -34,7 +34,7 @@ var advisoryID = regexp.MustCompile(`(?m)^\s+osv-scanner\((GHSA-|CVE-|GO-20)[^)]
 
 func TestFullReviewFixture(t *testing.T) {
 	report, tree, model := reviewTree(t, FullReviewFixture)
-	out := fullreview.Sections(report) + fullreview.RemediationPlan(report.Findings) + fullreview.CoverageNotice(tree)
+	out := fullreview.Sections(report) + fullreview.RemediationPlan(report.Findings) + fullreview.CoverageNotice(report, tree)
 	t.Logf("model %s reviewed %d file(s), %d finding(s):\n%s", model.ID, len(tree.Covered), len(report.Findings), out)
 
 	for _, plant := range FullReviewPlants {
