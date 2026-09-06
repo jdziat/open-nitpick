@@ -9,7 +9,8 @@ measured tables are what each did on this project's corpora, with every rule
 in [measurement.md](measurement.md) applying: above all that the corpora are
 this project's own, that the incumbent's side is its CLI in plain-text mode
 on a free allowance rather than the hosted product with a learned codebase,
-and that Bugbot is not in the tables because it could not be run here.
+and that Contender, a second hosted reviewer, is not in the tables
+because it could not be run here.
 
 ## Capabilities
 
@@ -22,7 +23,7 @@ and that Bugbot is not in the tables because it could not be run here.
 | Trust model | reads `.incumbent.yaml` and analyzer configs from the branch under review | a change may not supply the policy it is reviewed under: policy from the base revision, analyzer configs never from the tree, endpoint keys stripped from untrusted config |
 | Forges | GitHub, GitLab, Bitbucket, Azure DevOps | GitHub, local |
 | Incremental review on push | yes | yes; fingerprints withhold findings already posted, files unchanged since the last review are not re-read, force push falls back to full |
-| Static analyzers | ~50 tools, auto-selected | 33 tools, auto-detected when installed, every one isolated from the tree; see the README table |
+| Static analyzers | ~50 tools, auto-selected | 33 tools, auto-detected when installed, every one isolated from the tree; see [analyzers.md](analyzers.md) |
 | Repository context | indexes the repository | attaches the definitions a changed line uses: Go (types and methods), TypeScript (aliases, barrels), Python (package re-exports), Ruby (Rails autoload), Rust, Java, Kotlin, C/C++; and the untouched callers of what a change redefines, with the constants they pass: Go, Python, TypeScript |
 | Disclosure | summary and walkthrough | every file not reviewed, every analyzer that did not run, every finding an analyzer produced and the review discarded, every part of the change an analyzer did not cover, every finding a domain expert overruled |
 | Chat, `@mention` commands | yes | no |
@@ -115,7 +116,7 @@ suppress an objection the corpus itself calls defensible. What would move it
 is a larger TypeScript corpus, not a narrower reviewer.
 
 Nothing above is a claim about the hosted product with a learned codebase,
-about Bugbot, or about a corpus anyone else wrote.
+about Contender, or about a corpus anyone else wrote.
 
 ### End to end, on GitHub (2026-09-03)
 
@@ -410,7 +411,7 @@ parallel runs lost most of GLM's reviews there; the same fixtures passed
 alone, so the losses are rate limiting under load, not the model. Both models
 then ran sequentially, one corpus at a time, one run each, twice for GLM;
 related context on. `$/review` is at Synthetic's usage-based rates
-(`testdata/pricing.yaml`), which the operator read off the vendor's pricing
+(`internal/evals/testdata/pricing.yaml`), which the operator read off the vendor's pricing
 page and pasted, since Synthetic publishes no pricing JSON. The subscription
 tier bills nothing per token; the column is what the same tokens cost when
 paying per token.

@@ -477,7 +477,8 @@ one CLI review per fixture against a free allowance, in plain-text mode, on
 the same day; nothing here says what the hosted product with a learned
 codebase does.
 
-**Bugbot was not measured.** It has no CLI and reviews only pull requests on
+**Contender, a second hosted reviewer, was not measured.** It has no CLI
+and reviews only pull requests on
 a repository it is installed on, so there is no adapter and no number.
 
 **What this does and does not license.** Related context found one defect a

@@ -1,5 +1,11 @@
 # Plan: full-review, model identification, repo-score
 
+> Archived. This was the working plan for one week's work in September
+> 2026, kept for the decisions it records. It is not documentation, it is
+> not published to the site, and its status lines are true as of the dates
+> they carry, not of today. `identify-model` was withdrawn; see
+> [docs/findings.md](../docs/findings.md).
+
 Branch `feature/full-review`, opened 2026-09-05 from main at fc8311e. Three
 commands, in the order they should be built, each with the acceptance it
 must meet before the next starts. Nothing here is implemented yet.
@@ -201,7 +207,7 @@ experiment fails, the finding is published and the command is not built.
    cover, in the caller-walk notice's voice.
 3. The model-identification corpus spend is approved. Step 4's experiment
    may start once 1 through 3 are built.
-4. The repository stays private until this plan's steps are done.
+4. The repository stayed private until this plan's steps were done.
 5. Related context was split on main (`related_context` on,
    `related_context_callers` off) before this branch starts; `full-review`
    turns both on by default, since a whole-tree review has already read
