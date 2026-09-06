@@ -1348,3 +1348,87 @@ a human edit; Rule 15 applies. Two generations are two samplings of the
 same prompts, not two months of a model's life. The command trains on
 both generations and answers "most similar to" for Go, Python and
 TypeScript, "unknown" below the floor or outside the corpus, and says so.
+
+## Contributors: does the signature survive a real repository (2026-09-06)
+
+The corpus experiment asks which of six models wrote a whole file that
+one of them wrote alone. The question a reader of a pull request has is
+different: were the lines this commit added written by a person or by a
+tool, in a repository with its own conventions, formatters and reviewers.
+Ground truth exists where a project's history labels model commits with a
+co-author trailer (`Co-authored-by: Claude`, `Copilot`, `Codex`, `Cursor`,
+`aider`, `Devin`). Ten popular repositories were found that carry at
+least forty such commits under a permissive license: gofiber/fiber,
+github/github-mcp-server, cli/cli and temporalio/temporal in Go;
+browser-use/browser-use, huggingface/huggingface_hub and aider-AI/aider
+in Python; vitest-dev/vitest, triggerdotdev/trigger.dev and
+better-auth/better-auth in TypeScript.
+
+**The corpus.** `cmd/contrib-corpus` clones a repository, labels each
+non-merge commit by its trailer, restricts both classes to the era from
+the first model-labelled commit, draws commits per label in a seeded
+random order, and writes the lines each commit added to each source file
+(30 to 600 lines, tests and vendored code excluded) as one sample. Up to
+300 samples per label; aider yielded 37 and 7 and is reported but does
+not count. The corpus is other people's code and is not committed; the
+test skips without it.
+
+**Three splits by commit date**, because the first two attempts at
+sampling made the split a date test (the newest human commits against a
+year of model commits, then a stride that put every human sample before
+every model sample): the older half trains and the newer tests, which
+asks whether a signature holds over time; alternate blocks of fifty
+commits, which spans the era without a test commit's neighbours in
+training; and every other commit, which spans the era but leaks, since
+consecutive commits are often one pull request touching one file. The
+measure is balanced accuracy (the mean of the two classes' recalls,
+chance 0.50), since a centroid classifier does not know the class sizes
+and plain accuracy against the majority baseline punishes it for
+splitting its calls. Fingerprint, human against model:
+
+| repository | older half | blocks | interleaved | model precision (blocks) |
+|---|---|---|---|---|
+| gofiber/fiber (go) | 0.54 | 0.80 | 0.78 | 0.84 |
+| vitest-dev/vitest (ts) | 0.64 | 0.70 | 0.73 | 0.58 |
+| browser-use/browser-use (py) | 0.49 | 0.74 | 0.76 | 0.33 |
+| huggingface_hub (py) | 0.52 | 0.58 | 0.56 | 0.59 |
+| github-mcp-server (go) | 0.51 | 0.57 | 0.61 | 0.58 |
+| trigger.dev (ts) | 0.59 | 0.53 | 0.60 | 0.62 |
+| temporalio/temporal (go) | 0.53 | 0.51 | 0.56 | 0.54 |
+| cli/cli (go) | 0.50 | 0.46 | 0.60 | 0.20 |
+| better-auth (ts) | 0.38 | 0.46 | 0.50 | 0.34 |
+| aider (py, 37 and 7) | 0.86 | 1.00 | 0.78 | n/a |
+
+The naive Bayes method (`TrainBayes`, equal priors, Laplace smoothing,
+added for this experiment as the stronger of the two simple instruments
+for two unequal classes) is within a few points of the fingerprint
+everywhere and is in `RESULTS.md`; the dense features are at chance.
+
+**What it says.** In three repositories the lines a tool added are told
+from the lines people added at 0.70 to 0.80 within an era, and in
+gofiber/fiber a call of "model" is right 0.84 of the time. In six the
+instrument is at chance on every split. Over time the signal decays in
+every repository but vitest: gofiber's 0.80 within an era is 0.54 with
+the older half training. Three readings fit, and this experiment cannot
+pick between them: the tool's signature is the model version's and
+changes when the version does; the human class is not one author but a
+project, and what the fingerprint learns within an era is the era's
+files rather than the author; and the label is noisy in both directions,
+since a person who runs a model without the trailer is "human" and a
+tool whose output a person rewrote before committing is "model". The
+repositories where it works are the ones where model commits are a large
+share of the era (fiber 388 of 2123, vitest 126 of 1267) and pass
+through the same formatter as everyone else, which argues against the
+formatter as the explanation and for the volume of training examples.
+
+**The verdict.** Not a product. "Which contributor wrote this" on a real
+repository is not answered by this instrument at a level a reader could
+act on, and where it does answer, it answers "this looks like the tool's
+commits from around the same time", which is a weaker claim than the
+words suggest. `identify-model` stays what it is: the nearest of six
+models in a same-prompt corpus, with the floor and the caveat. What would
+move this is per-repository training on that repository's own labelled
+history, offered only where the block split clears a bar set in advance,
+and it would need a corpus that is not other people's code to be tested
+in this repository. One run per repository, ten repositories, one
+generation of the corpus; Rule 15 applies.
