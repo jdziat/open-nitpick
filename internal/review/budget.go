@@ -42,7 +42,7 @@ func (e Estimate) String() string {
 func EstimatePlan(cfg *config.Config, plan *bundle.Plan) Estimate {
 	b := cfg.Review.Budget
 
-	reviewers := 1 + len(cfg.Models.Ensemble)
+	reviewers := maxReviewers(cfg)
 	est := Estimate{Reviewers: reviewers}
 	for _, batch := range plan.Batches {
 		est.PromptTokens += batch.Tokens * reviewers
@@ -50,6 +50,24 @@ func EstimatePlan(cfg *config.Config, plan *bundle.Plan) Estimate {
 	est.CompletionTokens = int(float64(est.PromptTokens) * b.EffectiveCompletionRatio())
 	est.Dollars = dollars(b, est.PromptTokens, est.CompletionTokens)
 	return est
+}
+
+// maxReviewers is the largest number of models that could read one batch.
+//
+// A route's ensemble REPLACES the global one for the batches it matches, so
+// which batch goes where decides the real count, and that is not known until
+// the router has run. Taking the maximum over every ensemble a batch could
+// land in over-estimates a configuration whose expensive route matches few
+// batches, and that is the correct direction: under-counting reviewers spends
+// more than the ceiling allows.
+func maxReviewers(cfg *config.Config) int {
+	most := len(cfg.Models.Ensemble)
+	for _, r := range cfg.Models.Routes {
+		if r.Ensemble != nil && len(r.Ensemble) > most {
+			most = len(r.Ensemble)
+		}
+	}
+	return 1 + most
 }
 
 // dollars prices tokens at the configured per-million rates.

@@ -249,7 +249,7 @@ func TestTheSummarySaysWhenACeilingTrimmedTheReview(t *testing.T) {
 	}}
 
 	note := budgetNote(report)
-	for _, want := range []string{"spending ceiling", "$2.40", "$1.00", "$0.80", "nobody looked"} {
+	for _, want := range []string{"spending ceiling", "$2.40", "$1.00", "$0.80", "no model read them"} {
 		if !strings.Contains(note, want) {
 			t.Errorf("note is missing %q:\n%s", want, note)
 		}
@@ -272,5 +272,45 @@ func TestTheSummarySaysWhenMinFilesExceedsTheCeiling(t *testing.T) {
 	}})
 	if !strings.Contains(note, "min_files") {
 		t.Errorf("forced run does not name min_files:\n%s", note)
+	}
+}
+
+// Turning the walkthrough off must not turn a trimmed review into a silent
+// one. The ceiling belongs with the coverage notices, not inside the summary.
+func TestTheCeilingNoticeSurvivesSummaryBeingOff(t *testing.T) {
+	report := &Report{Budget: &Fit{
+		Kept: []string{"a.go"}, Dropped: []string{"b.go"},
+		Before: Estimate{Dollars: 2}, After: Estimate{Dollars: 0.5}, Ceiling: 1,
+	}}
+
+	cfg := config.Defaults()
+	cfg.Review.Summary = false
+
+	if got := renderSummary(report, cfg); !strings.Contains(got, "spending ceiling") {
+		t.Errorf("the ceiling vanished with review.summary off:\n%s", got)
+	}
+}
+
+// A route's ensemble replaces the global one, so the estimate has to price the
+// largest set a batch could land in.
+func TestRouteEnsemblesCountTowardTheEstimate(t *testing.T) {
+	cfg := budgetConfig(1.00)
+	cfg.Models.Ensemble = []config.ModelSpec{{Model: "one"}}
+	cfg.Models.Routes = []config.Route{{
+		Name:     "security",
+		Ensemble: []config.ModelSpec{{Model: "a"}, {Model: "b"}, {Model: "c"}},
+	}}
+
+	a := file("a.go", 10, 5)
+	if got := EstimatePlan(cfg, planOf(entry(a, 1000))).Reviewers; got != 4 {
+		t.Errorf("Reviewers = %d, want 4: one reviewer plus the largest route ensemble", got)
+	}
+}
+
+// A nil file is scored rather than panicking: Rank is fed whatever the diff
+// parser produced.
+func TestScoringANilFileDoesNotPanic(t *testing.T) {
+	if got := Score(nil); got.Path != "" || got.Score != 0 {
+		t.Errorf("Score(nil) = %+v, want the zero value", got)
 	}
 }

@@ -245,6 +245,10 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	b.WriteString(uncoveredNotice(report))
 	b.WriteString(discardNotice(report))
 	b.WriteString(callerWalkNotice(report))
+	// With the others, and NOT inside the walkthrough: a ceiling that changed
+	// what was reviewed is a fact about coverage, and review.summary turning
+	// the walkthrough off must not turn it into a silent trim.
+	b.WriteString(budgetNote(report))
 
 	if cfg == nil || cfg.Review.Summary {
 		b.WriteString(walkthrough(report))
@@ -740,14 +744,6 @@ func walkthrough(report *Report) string {
 		}
 	}
 
-	// A ceiling that changed what was reviewed is stated in the open, above the
-	// collapsed skip list. The files it dropped are in that list too, but a
-	// reader who does not open it must still learn that the review was bounded
-	// by money rather than by what the change contains.
-	if note := budgetNote(report); note != "" {
-		b.WriteString(note)
-	}
-
 	// Surfacing skips is a correctness matter, not a nicety: a review that
 	// quietly ignored most of the diff otherwise looks like a clean bill of
 	// health.
@@ -911,10 +907,12 @@ func budgetNote(report *Report) string {
 
 	fmt.Fprintf(&b, "\n> **This review was bounded by a spending ceiling.** "+
 		"Reviewing every changed file was estimated at $%.2f against a $%.2f ceiling, "+
-		"so the %d highest-ranked file(s) were reviewed at an estimated $%.2f and "+
-		"%d were not. Findings are absent for those files because nobody looked, "+
-		"not because they are clean.\n",
-		fit.Before.Dollars, fit.Ceiling, len(fit.Kept), fit.After.Dollars, len(fit.Dropped))
+		"so the %d highest-ranked file(s) were read by a model at an estimated $%.2f "+
+		"and %d were not. The absence of a model finding on those %d says only that "+
+		"no model read them. Analyzers run over the whole change and are unaffected, "+
+		"so an analyzer finding on a file in this list is still a real one.\n",
+		fit.Before.Dollars, fit.Ceiling, len(fit.Kept), fit.After.Dollars,
+		len(fit.Dropped), len(fit.Dropped))
 
 	if fit.Forced {
 		fmt.Fprintf(&b, ">\n> `review.budget.min_files` kept files the ceiling does not "+

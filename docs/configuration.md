@@ -250,13 +250,18 @@ writes, so `completion_ratio` assumes an answer a quarter the size of the
 prompt, roughly four times what a clean review produces. Over-estimating
 reviews fewer files than it could have and says so; under-estimating spends
 more than you allowed, which is the one direction a ceiling must not fail in.
-An ensemble multiplies the estimate by the number of reviewers.
+An ensemble multiplies the estimate by the number of reviewers, and where a
+route carries its own ensemble the estimate uses the largest set a batch could
+land in, since which batch takes which route is not known until the router has
+run.
 
 **What the pull request says.** A trimmed review states the ceiling, both
-estimates, and how many files it did not read, above the collapsed file list
-rather than inside it. Every dropped file also appears under *Files not
-reviewed* with the ceiling as its reason. A reader who sees no findings for a
-file must be able to tell "nobody looked" from "nothing found".
+estimates, and how many files it did not read, with the coverage notices rather
+than inside the walkthrough, so turning `review.summary` off does not turn a
+trimmed review into a silent one. Every dropped file also appears under *Files
+not reviewed* with the ceiling as its reason. Analyzers are unaffected: they run
+over the whole change, so an analyzer finding on a dropped file is still real,
+and only the model's silence there means nothing.
 
 **`min_files`** reviews that many of the top-ranked files even when the ceiling
 does not pay for them, and the run reports that it expects to exceed the

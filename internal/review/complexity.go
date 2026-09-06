@@ -65,10 +65,10 @@ func Rank(files []*diff.File) []Complexity {
 
 // Score rates one file.
 func Score(f *diff.File) Complexity {
-	c := Complexity{Path: f.Path}
 	if f == nil {
-		return c
+		return Complexity{}
 	}
+	c := Complexity{Path: f.Path}
 
 	var added, removed, branches int
 	for _, h := range f.Hunks {
