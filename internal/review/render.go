@@ -245,6 +245,10 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	b.WriteString(uncoveredNotice(report))
 	b.WriteString(discardNotice(report))
 	b.WriteString(callerWalkNotice(report))
+	// With the others, and NOT inside the walkthrough: a ceiling that changed
+	// what was reviewed is a fact about coverage, and review.summary turning
+	// the walkthrough off must not turn it into a silent trim.
+	b.WriteString(budgetNote(report))
 
 	if cfg == nil || cfg.Review.Summary {
 		b.WriteString(walkthrough(report))
@@ -884,5 +888,47 @@ func groupByReason(skips []bundle.Skip, omit string) string {
 	for _, reason := range order {
 		fmt.Fprintf(&b, "- %s: %s\n", reason, strings.Join(byReason[reason], ", "))
 	}
+	return b.String()
+}
+
+// budgetNote states what a spending ceiling changed, and returns "" when no
+// ceiling was configured or the whole diff fit under it.
+//
+// It reports the estimate as an estimate. The number is computed from token
+// counts the run has not yet spent, at rates the operator supplied, so calling
+// it the cost would be a claim this tool cannot make.
+func budgetNote(report *Report) string {
+	fit := report.Budget
+	if fit == nil || (!fit.Trimmed() && !fit.Forced) {
+		return ""
+	}
+
+	var b strings.Builder
+
+	// min_files can keep every file and still exceed the ceiling, which drops
+	// nothing and so has nothing to warn about coverage. It is still worth a
+	// line: the operator set a limit and this run is expected to pass it.
+	if !fit.Trimmed() {
+		fmt.Fprintf(&b, "\n> **This review is expected to exceed its spending ceiling.** "+
+			"Every changed file was reviewed at an estimated $%.2f against a $%.2f "+
+			"ceiling, because `review.budget.min_files` is set to %d. Coverage is "+
+			"unaffected.\n", fit.After.Dollars, fit.Ceiling, len(fit.Kept))
+		return b.String()
+	}
+
+	fmt.Fprintf(&b, "\n> **This review was bounded by a spending ceiling.** "+
+		"Reviewing every changed file was estimated at $%.2f against a $%.2f ceiling, "+
+		"so the %d highest-ranked file(s) were read by a model at an estimated $%.2f "+
+		"and %d were not. The absence of a model finding on those %d says only that "+
+		"no model read them. Analyzers run over the whole change and are unaffected, "+
+		"so an analyzer finding on a file in this list is still a real one.\n",
+		fit.Before.Dollars, fit.Ceiling, len(fit.Kept), fit.After.Dollars,
+		len(fit.Dropped), len(fit.Dropped))
+
+	if fit.Forced {
+		fmt.Fprintf(&b, ">\n> `review.budget.min_files` kept files the ceiling does not "+
+			"pay for, so this run is expected to exceed it.\n")
+	}
+
 	return b.String()
 }

@@ -158,6 +158,8 @@ func (s ModelSpec) validate(required bool) []error {
 func (r Review) validate() []error {
 	var errs []error
 
+	errs = append(errs, r.Budget.validate()...)
+
 	if r.MaxFiles <= 0 {
 		errs = append(errs, fmt.Errorf("review.max_files must be positive, got %d", r.MaxFiles))
 	}

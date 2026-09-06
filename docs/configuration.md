@@ -205,6 +205,76 @@ layer so it can be read without spending tokens. `review.model_notes: false`
 removes it. The measurements are in
 [docs/comparison.md](comparison.md#tuning-for-glm-53-flash-and-qwen38-27b-2026-09-04).
 
+## A spending ceiling
+
+Off by default. Set one and the review stays under it by reviewing fewer files,
+not by stopping partway.
+
+```yaml
+review:
+  budget:
+    max_spend: 1.00        # US dollars; 0, the default, is no ceiling
+    scope: run             # run | pull_request
+    prices:                # required with max_spend, per MILLION tokens
+      input: 0.30
+      output: 1.20
+    completion_ratio: 0.25 # assumed output size as a fraction of the prompt
+    overhead: 1.0          # scale the estimate to cover triage and validation
+    min_files: 0           # review this many top files even if they do not fit
+```
+
+**Rates are yours to supply.** A price is a claim about what a vendor charges
+you, on your account, at your tier. The dated table in `internal/evals` is
+evidence for a measurement, not a promise about anyone's bill, so a ceiling is
+computed only from rates you wrote down. A `max_spend` without them is a
+configuration error rather than a ceiling that silently never binds.
+
+**What gets reviewed.** When the whole diff costs more than the ceiling, files
+are ranked and the highest-ranked are reviewed until the money runs out. The
+ranking is computed from the diff with no model call, and it is a priority
+rather than a prediction of where the bug is:
+
+| Signal | Effect |
+|---|---|
+| Changed lines | Raises the score, logarithmically. A 4,000-line mechanical change does not outrank a 12-line one. |
+| Control flow per added line | Raises it. Branches, error paths, concurrency and cancellation. |
+| Edits scattered across a file | Raises it. Five separate hunks are harder than one. |
+| A new file | Raises it. Nothing has reviewed this code before. |
+| A path that looks sensitive | Raises it. Auth, crypto, payment, migration, permission, SQL. |
+| A deletion | Halves it. What matters is mostly the callers. |
+| A test | Halves it. Worth reviewing, worth reviewing after the code it covers. |
+| Prose or data | Halves it. Markdown, YAML, JSON, lockfiles. |
+
+**The estimate errs high.** Output size is not knowable before the model
+writes, so `completion_ratio` assumes an answer a quarter the size of the
+prompt, roughly four times what a clean review produces. Over-estimating
+reviews fewer files than it could have and says so; under-estimating spends
+more than you allowed, which is the one direction a ceiling must not fail in.
+An ensemble multiplies the estimate by the number of reviewers, and where a
+route carries its own ensemble the estimate uses the largest set a batch could
+land in, since which batch takes which route is not known until the router has
+run.
+
+**What the pull request says.** A trimmed review states the ceiling, both
+estimates, and how many files it did not read, with the coverage notices rather
+than inside the walkthrough, so turning `review.summary` off does not turn a
+trimmed review into a silent one. Every dropped file also appears under *Files
+not reviewed* with the ceiling as its reason. Analyzers are unaffected: they run
+over the whole change, so an analyzer finding on a dropped file is still real,
+and only the model's silence there means nothing.
+
+**`min_files`** reviews that many of the top-ranked files even when the ceiling
+does not pay for them, and the run reports that it expects to exceed the
+ceiling. Left at zero, a diff whose cheapest file is over the ceiling is
+reviewed not at all, and says so.
+
+!!! warning "`scope: pull_request` is not yet cumulative"
+
+    It is accepted and validated, and it currently behaves as `run`: prior
+    spend on the same pull request is not recorded anywhere a later run can
+    read it. The run logs that it is bounded as if it were the first. Track it
+    in [#12](https://github.com/jdziat/open-nitpick/issues/12).
+
 ## Choosing the model per batch
 
 One model for everything is the default. Two optional mechanisms change that,
