@@ -790,6 +790,56 @@ func (g *GitHub) ThreadComments(ctx context.Context, ref Ref, rootID int64) ([]T
 	}
 }
 
+// CountBotComments counts the reviewer's own comments on a pull request, both
+// conversation comments and inline ones.
+//
+// It is how a per-pull-request answer cap is enforced without persisting a
+// counter anywhere: the comments the reviewer already posted ARE the record of
+// how many times it has answered, and they survive a re-run, a new runner, and
+// a cleared cache. The marker is the same one incremental review recognizes
+// its own work by.
+func (g *GitHub) CountBotComments(ctx context.Context, ref Ref) (int, error) {
+	if err := validateRef(ref); err != nil {
+		return 0, err
+	}
+
+	var n int
+
+	opts := &github.IssueListCommentsOptions{ListOptions: github.ListOptions{PerPage: 100}}
+	for {
+		comments, resp, err := g.client.Issues.ListComments(ctx, ref.Owner, ref.Repo, ref.Number, opts)
+		if err != nil {
+			return 0, fmt.Errorf("github: list comments on %s: %w", ref, err)
+		}
+		for _, c := range comments {
+			if strings.Contains(c.GetBody(), g.Bot) {
+				n++
+			}
+		}
+		if resp == nil || resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	rOpts := &github.PullRequestListCommentsOptions{ListOptions: github.ListOptions{PerPage: 100}}
+	for {
+		comments, resp, err := g.client.PullRequests.ListComments(ctx, ref.Owner, ref.Repo, ref.Number, rOpts)
+		if err != nil {
+			return 0, fmt.Errorf("github: list review comments on %s: %w", ref, err)
+		}
+		for _, c := range comments {
+			if strings.Contains(c.GetBody(), g.Bot) {
+				n++
+			}
+		}
+		if resp == nil || resp.NextPage == 0 {
+			return n, nil
+		}
+		rOpts.Page = resp.NextPage
+	}
+}
+
 // React acknowledges a comment with a reaction (eyes while working, +1 when
 // done), on an inline comment or a conversation comment.
 func (g *GitHub) React(ctx context.Context, ref Ref, commentID int64, inline bool, content string) error {

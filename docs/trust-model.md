@@ -24,6 +24,18 @@ including `.nitpick.yaml`. Three consequences:
   to `openrouter`; naming a router as the default is what makes the reachable
   set a whole catalogue rather than one vendor's. Review `.nitpick.yaml` changes
   on their own merits, exactly as you would a change to a CI workflow.
+- **A stranger's comment must not be able to spend your model credit.** A
+  comment event runs in the BASE repository with the base repository's secrets,
+  whoever wrote the comment, so on a public repository the mention feature is
+  an open door to the model key's balance unless it is gated. The reviewer
+  answers `review.respond.from` only, which defaults to owner, member and
+  collaborator, and refuses everyone else without a reaction and without a
+  model call. The shipped workflow tests the same field in its `if:`, so a
+  refused comment does not even start a runner. `contributor` is excluded from
+  the default set on purpose: it is permanent, and one merged typo fix would
+  otherwise buy unlimited calls. See
+  [Configuration](configuration.md#who-may-make-it-spend).
+
 - **A change that edits `.nitpick.yaml` is not reviewed under its own edit.**
   The keys above bound what a config file may say; this bounds *which* config
   file speaks. When the change under review modifies the configuration's own

@@ -392,6 +392,10 @@ type Review struct {
 	// the window each changed file itself gets.
 	RelatedContextTokens int `yaml:"related_context_tokens"`
 
+	// Respond bounds who may make the reviewer spend money by mentioning it.
+	// See spend.go.
+	Respond Respond `yaml:"respond"`
+
 	// Budget bounds what one review may spend. Off by default; see budget.go.
 	Budget Budget `yaml:"budget"`
 }
