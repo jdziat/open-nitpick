@@ -463,6 +463,14 @@ func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 			continue
 		}
 
+		// A finding with no line at all (a SARIF result without a region
+		// from a tool whose parser does not place it) cannot be anchored,
+		// and saying so is the reason; the changed-line check below would
+		// otherwise report line 0 of the file as unchanged.
+		if f.Line <= 0 {
+			s.discard(f, review.DiscardUnanchorable)
+			continue
+		}
 		// A pull request review should discuss what the pull request did.
 		// Pre-existing lint debt on untouched lines is somebody else's problem
 		// and reporting it is the fastest way to get the bot switched off.
@@ -653,6 +661,11 @@ func classForRule(rule string) config.Class {
 	r := strings.ToLower(rule)
 
 	switch {
+	// A published advisory against a pinned dependency is a security finding
+	// whatever else its id contains: "CVE-2020-14040" names no linter.
+	case review.IsAdvisoryRule(rule):
+		return config.ClassSecurity
+
 	case strings.Contains(r, "gosec"), strings.Contains(r, "semgrep"),
 		strings.Contains(r, "security"), strings.Contains(r, "bandit"),
 		strings.Contains(r, "injection"), strings.Contains(r, "crypto"):

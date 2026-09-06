@@ -1,0 +1,140 @@
+package config
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"strings"
+)
+
+type Config struct {
+	Host        string `json:"host"`
+	Port        int    `json:"port"`
+	Debug       bool   `json:"debug"`
+	LogLevel    string `json:"log_level"`
+	DatabaseURL string `json:"database_url"`
+	APIKey      string `json:"api_key"`
+	Timeout     int    `json:"timeout_seconds"`
+}
+
+func Defaults() Config {
+	return Config{
+		Host:     "127.0.0.1",
+		Port:     8080,
+		Debug:    false,
+		LogLevel: "info",
+		Timeout:  30,
+	}
+}
+
+func Load(path string) (Config, error) {
+	cfg := Defaults()
+
+	if path == "" {
+		return Config{}, fmt.Errorf("configuration file path is empty")
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Config{}, fmt.Errorf("read configuration file: %w", err)
+	}
+
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&cfg); err != nil {
+		return Config{}, fmt.Errorf("decode configuration file: %w", err)
+	}
+
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return Config{}, fmt.Errorf("configuration file contains multiple JSON values")
+		}
+		return Config{}, fmt.Errorf("invalid trailing content in configuration file: %w", err)
+	}
+
+	if err := applyEnvironment(&cfg); err != nil {
+		return Config{}, err
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return Config{}, err
+	}
+
+	return cfg, nil
+}
+
+func MustLoad(path string) Config {
+	cfg, err := Load(path)
+	if err != nil {
+		panic(err)
+	}
+	return cfg
+}
+
+func (c Config) Validate() error {
+	var missing []string
+
+	if strings.TrimSpace(c.DatabaseURL) == "" {
+		missing = append(missing, "database_url")
+	}
+	if strings.TrimSpace(c.APIKey) == "" {
+		missing = append(missing, "api_key")
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required configuration keys: %s", strings.Join(missing, ", "))
+	}
+	if c.Port < 1 || c.Port > 65535 {
+		return fmt.Errorf("port must be between 1 and 65535")
+	}
+	if c.Timeout <= 0 {
+		return fmt.Errorf("timeout_seconds must be greater than zero")
+	}
+
+	return nil
+}
+
+func applyEnvironment(cfg *Config) error {
+	if value, ok := os.LookupEnv("APP_HOST"); ok {
+		cfg.Host = value
+	}
+	if value, ok := os.LookupEnv("APP_LOG_LEVEL"); ok {
+		cfg.LogLevel = value
+	}
+	if value, ok := os.LookupEnv("APP_DATABASE_URL"); ok {
+		cfg.DatabaseURL = value
+	}
+	if value, ok := os.LookupEnv("APP_API_KEY"); ok {
+		cfg.APIKey = value
+	}
+
+	if value, ok := os.LookupEnv("APP_PORT"); ok {
+		port, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("APP_PORT must be an integer: %w", err)
+		}
+		cfg.Port = port
+	}
+
+	if value, ok := os.LookupEnv("APP_DEBUG"); ok {
+		debug, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("APP_DEBUG must be a boolean: %w", err)
+		}
+		cfg.Debug = debug
+	}
+
+	if value, ok := os.LookupEnv("APP_TIMEOUT_SECONDS"); ok {
+		timeout, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("APP_TIMEOUT_SECONDS must be an integer: %w", err)
+		}
+		cfg.Timeout = timeout
+	}
+
+	return nil
+}

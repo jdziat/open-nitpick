@@ -1,0 +1,8 @@
+{
+  "fixture": "python-clean-test-asserts",
+  "findings": null,
+  "at": "2026-09-05T20:50:16Z",
+  "mode": "plaintext",
+  "fingerprint": "6430407217bd53601b57802a6fae38c43bb66c13c5cf11e5af23abfc40bbbfd9",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1590412790\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────\nReview complete\nNo findings ✔\n\n1 file reviewed:\n  - tests/test_slug.py\n────────────────────────────────────────\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 27s elapsed\nWriting review comments... 27s elapsed\n"
+}

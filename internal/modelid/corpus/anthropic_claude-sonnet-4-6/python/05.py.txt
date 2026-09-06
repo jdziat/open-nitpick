@@ -1,0 +1,82 @@
+import re
+import sys
+from collections import Counter
+
+
+def count_words(text: str) -> Counter:
+    """Normalise text and count word frequencies."""
+    text = text.lower()
+    words = re.findall(r"[a-z']+", text)
+    # Strip leading/trailing apostrophes from each word
+    cleaned = [word.strip("'") for word in words if word.strip("'")]
+    return Counter(cleaned)
+
+
+def top_k_words(text: str, k: int = 10) -> list[tuple[str, int]]:
+    """Return the top K words with their counts."""
+    freq = count_words(text)
+    return freq.most_common(k)
+
+
+def read_input(source: str | None = None) -> str:
+    """Read text from a file path or stdin."""
+    if source:
+        with open(source, "r", encoding="utf-8") as f:
+            return f.read()
+    return sys.stdin.read()
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Count word frequencies in text and display the top K words."
+    )
+    parser.add_argument(
+        "file",
+        nargs="?",
+        help="Path to a text file (reads from stdin if omitted).",
+    )
+    parser.add_argument(
+        "-k",
+        "--top",
+        type=int,
+        default=10,
+        help="Number of top words to display (default: 10).",
+    )
+    args = parser.parse_args()
+
+    text = read_input(args.file)
+
+    if not text.strip():
+        print("No text provided.", file=sys.stderr)
+        sys.exit(1)
+
+    results = top_k_words(text, k=args.top)
+
+    if not results:
+        print("No words found in the provided text.")
+        return
+
+    max_word_len = max(len(word) for word, _ in results)
+    max_count_len = max(len(str(count)) for _, count in results)
+
+    header_word = "Word"
+    header_count = "Count"
+    col_word = max(max_word_len, len(header_word))
+    col_count = max(max_count_len, len(header_count))
+
+    separator = f"+{'-' * (col_word + 2)}+{'-' * (col_count + 2)}+"
+    header = f"| {header_word:<{col_word}} | {header_count:>{col_count}} |"
+
+    print(separator)
+    print(header)
+    print(separator)
+    for rank, (word, count) in enumerate(results, start=1):
+        print(f"| {word:<{col_word}} | {count:>{col_count}} |")
+    print(separator)
+    print(f"\nShowing top {len(results)} word(s).")
+
+
+if __name__ == "__main__":
+    main()

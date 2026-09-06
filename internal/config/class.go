@@ -42,6 +42,12 @@ const (
 	ClassMaintainability Class = "maintainability"
 	// ClassStyle is naming, documentation, idiom, and consistency.
 	ClassStyle Class = "style"
+	// ClassSlop is generated-looking code that costs a reader: a comment that
+	// restates its line, a check against a condition the types exclude, an
+	// error swallowed and carried on from, a test that asserts nothing. It is
+	// published by review.slop alone, never by the nitpick level, so a team
+	// that has not asked for it never sees it.
+	ClassSlop Class = "slop"
 
 	// ClassUnknown is where an unrecognized class lands.
 	//
@@ -59,6 +65,7 @@ func Classes() []Class {
 	return []Class{
 		ClassCorrectness, ClassConcurrency, ClassSecurity, ClassResource,
 		ClassDataLoss, ClassContract, ClassTests, ClassMaintainability, ClassStyle,
+		ClassSlop,
 	}
 }
 
@@ -90,10 +97,24 @@ var defectClasses = []Class{
 // level is a superset of the one before it, so narrowing never needs a finding
 // that was not generated.
 var allowedClasses = map[NitpickLevel]map[Class]bool{
-	NitpickOff:      classSet(defectClasses...),
-	NitpickMinimal:  classSet(append(append([]Class{}, defectClasses...), ClassContract)...),
-	NitpickNormal:   classSet(append(append([]Class{}, defectClasses...), ClassContract, ClassTests, ClassMaintainability)...),
-	NitpickPedantic: classSet(append(Classes(), ClassUnknown)...),
+	NitpickOff:     classSet(defectClasses...),
+	NitpickMinimal: classSet(append(append([]Class{}, defectClasses...), ClassContract)...),
+	NitpickNormal:  classSet(append(append([]Class{}, defectClasses...), ClassContract, ClassTests, ClassMaintainability)...),
+	// Pedantic is every class but slop: that one is published by
+	// review.slop alone, so no level's set holds it.
+	NitpickPedantic: classSet(append(levelClasses(), ClassUnknown)...),
+}
+
+// levelClasses is Classes without ClassSlop, the one class no nitpick level
+// publishes.
+func levelClasses() []Class {
+	var out []Class
+	for _, c := range Classes() {
+		if c != ClassSlop {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func classSet(cs ...Class) map[Class]bool {

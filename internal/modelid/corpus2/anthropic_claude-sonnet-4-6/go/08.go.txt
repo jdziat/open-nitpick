@@ -1,0 +1,144 @@
+package main
+
+import "fmt"
+
+// PriorityQueue is a generic priority queue backed by a binary heap.
+// The less function determines ordering: if less(a, b) is true, a has higher priority than b.
+type PriorityQueue[T any] struct {
+	data []T
+	less func(a, b T) bool
+}
+
+// NewPriorityQueue creates a new PriorityQueue with the given comparison function.
+func NewPriorityQueue[T any](less func(a, b T) bool) *PriorityQueue[T] {
+	return &PriorityQueue[T]{less: less}
+}
+
+// Len returns the number of elements in the queue.
+func (pq *PriorityQueue[T]) Len() int {
+	return len(pq.data)
+}
+
+// Push adds an element to the priority queue.
+func (pq *PriorityQueue[T]) Push(val T) {
+	pq.data = append(pq.data, val)
+	pq.siftUp(len(pq.data) - 1)
+}
+
+// Pop removes and returns the highest-priority element.
+// Panics if the queue is empty.
+func (pq *PriorityQueue[T]) Pop() T {
+	if len(pq.data) == 0 {
+		panic("priority queue is empty")
+	}
+	top := pq.data[0]
+	last := len(pq.data) - 1
+	pq.data[0] = pq.data[last]
+	pq.data = pq.data[:last]
+	if len(pq.data) > 0 {
+		pq.siftDown(0)
+	}
+	return top
+}
+
+// Peek returns the highest-priority element without removing it.
+// Panics if the queue is empty.
+func (pq *PriorityQueue[T]) Peek() T {
+	if len(pq.data) == 0 {
+		panic("priority queue is empty")
+	}
+	return pq.data[0]
+}
+
+// siftUp moves the element at index i up to its correct position.
+func (pq *PriorityQueue[T]) siftUp(i int) {
+	for i > 0 {
+		parent := (i - 1) / 2
+		if pq.less(pq.data[i], pq.data[parent]) {
+			pq.data[i], pq.data[parent] = pq.data[parent], pq.data[i]
+			i = parent
+		} else {
+			break
+		}
+	}
+}
+
+// siftDown moves the element at index i down to its correct position.
+func (pq *PriorityQueue[T]) siftDown(i int) {
+	n := len(pq.data)
+	for {
+		smallest := i
+		left := 2*i + 1
+		right := 2*i + 2
+
+		if left < n && pq.less(pq.data[left], pq.data[smallest]) {
+			smallest = left
+		}
+		if right < n && pq.less(pq.data[right], pq.data[smallest]) {
+			smallest = right
+		}
+		if smallest == i {
+			break
+		}
+		pq.data[i], pq.data[smallest] = pq.data[smallest], pq.data[i]
+		i = smallest
+	}
+}
+
+func main() {
+	// Min-heap of ints
+	minHeap := NewPriorityQueue[int](func(a, b int) bool {
+		return a < b
+	})
+
+	values := []int{5, 3, 8, 1, 9, 2, 7, 4, 6}
+	for _, v := range values {
+		minHeap.Push(v)
+	}
+
+	fmt.Println("Min-heap pop order:")
+	for minHeap.Len() > 0 {
+		fmt.Printf("%d ", minHeap.Pop())
+	}
+	fmt.Println()
+
+	// Max-heap of ints
+	maxHeap := NewPriorityQueue[int](func(a, b int) bool {
+		return a > b
+	})
+
+	for _, v := range values {
+		maxHeap.Push(v)
+	}
+
+	fmt.Println("Max-heap pop order:")
+	for maxHeap.Len() > 0 {
+		fmt.Printf("%d ", maxHeap.Pop())
+	}
+	fmt.Println()
+
+	// Priority queue of strings ordered by length
+	strHeap := NewPriorityQueue[string](func(a, b string) bool {
+		return len(a) < len(b)
+	})
+
+	words := []string{"banana", "fig", "apple", "kiwi", "plum", "cherry", "date"}
+	for _, w := range words {
+		strHeap.Push(w)
+	}
+
+	fmt.Println("String heap (shortest first) pop order:")
+	for strHeap.Len() > 0 {
+		fmt.Printf("%q ", strHeap.Pop())
+	}
+	fmt.Println()
+
+	// Peek demonstration
+	pq := NewPriorityQueue[int](func(a, b int) bool { return a < b })
+	pq.Push(10)
+	pq.Push(3)
+	pq.Push(7)
+	fmt.Printf("Peek: %d, Len: %d\n", pq.Peek(), pq.Len())
+	fmt.Printf("Pop: %d, Len: %d\n", pq.Pop(), pq.Len())
+	fmt.Printf("Peek: %d, Len: %d\n", pq.Peek(), pq.Len())
+}

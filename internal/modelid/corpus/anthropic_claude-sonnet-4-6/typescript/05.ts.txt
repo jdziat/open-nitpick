@@ -1,0 +1,153 @@
+import * as fs from "fs";
+import * as readline from "readline";
+
+interface WordFrequency {
+  word: string;
+  count: number;
+}
+
+function normalizeText(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s'-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((word) => word.replace(/^['-]+|['-]+$/g, ""))
+    .filter((word) => word.length > 0);
+}
+
+function countWordFrequencies(words: string[]): Map<string, number> {
+  const frequencies = new Map<string, number>();
+  for (const word of words) {
+    frequencies.set(word, (frequencies.get(word) ?? 0) + 1);
+  }
+  return frequencies;
+}
+
+function getTopKWords(
+  frequencies: Map<string, number>,
+  k: number
+): WordFrequency[] {
+  return Array.from(frequencies.entries())
+    .map(([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
+    .slice(0, k);
+}
+
+function processText(text: string, k: number): WordFrequency[] {
+  const words = normalizeText(text);
+  const frequencies = countWordFrequencies(words);
+  return getTopKWords(frequencies, k);
+}
+
+async function readFromStdin(): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    terminal: false,
+  });
+
+  const lines: string[] = [];
+  for await (const line of rl) {
+    lines.push(line);
+  }
+  return lines.join("\n");
+}
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+
+  let k = 10;
+  let inputFile: string | null = null;
+
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === "-k" || args[i] === "--top") && i + 1 < args.length) {
+      const parsed = parseInt(args[i + 1], 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        k = parsed;
+      } else {
+        console.error(`Invalid value for k: ${args[i + 1]}`);
+        process.exit(1);
+      }
+      i++;
+    } else if (args[i] === "--help" || args[i] === "-h") {
+      console.log(
+        "Usage: ts-node solution.ts [-k <number>] [<input-file>]"
+      );
+      console.log("");
+      console.log("Options:");
+      console.log("  -k, --top <number>  Number of top words to display (default: 10)");
+      console.log("  -h, --help          Show this help message");
+      console.log("");
+      console.log("If no input file is provided, reads from stdin.");
+      process.exit(0);
+    } else if (!args[i].startsWith("-")) {
+      inputFile = args[i];
+    }
+  }
+
+  let text: string;
+
+  if (inputFile) {
+    if (!fs.existsSync(inputFile)) {
+      console.error(`File not found: ${inputFile}`);
+      process.exit(1);
+    }
+    text = fs.readFileSync(inputFile, "utf-8");
+  } else if (!process.stdin.isTTY) {
+    text = await readFromStdin();
+  } else {
+    console.log("Enter text (press Ctrl+D when done):");
+    text = await readFromStdin();
+  }
+
+  if (!text.trim()) {
+    console.log("No text provided.");
+    process.exit(0);
+  }
+
+  const topWords = processText(text, k);
+
+  if (topWords.length === 0) {
+    console.log("No words found in the provided text.");
+    return;
+  }
+
+  console.log(`\nTop ${Math.min(k, topWords.length)} words:\n`);
+
+  const maxWordLength = Math.max(...topWords.map((wf) => wf.word.length));
+  const maxCountLength = Math.max(
+    ...topWords.map((wf) => wf.count.toString().length)
+  );
+
+  const header = `${"Rank".padEnd(6)}${"Word".padEnd(maxWordLength + 4)}${"Count".padStart(maxCountLength)}`;
+  const separator = "-".repeat(header.length);
+
+  console.log(header);
+  console.log(separator);
+
+  topWords.forEach((wf, index) => {
+    const rank = `${index + 1}.`.padEnd(6);
+    const word = wf.word.padEnd(maxWordLength + 4);
+    const count = wf.count.toString().padStart(maxCountLength);
+    console.log(`${rank}${word}${count}`);
+  });
+
+  console.log(separator);
+  console.log(`\nTotal unique words: ${countUniqueWords(text)}`);
+  console.log(`Total words processed: ${countTotalWords(text)}`);
+}
+
+function countUniqueWords(text: string): number {
+  const words = normalizeText(text);
+  return new Set(words).size;
+}
+
+function countTotalWords(text: string): number {
+  return normalizeText(text).length;
+}
+
+main().catch((error) => {
+  console.error("An error occurred:", error);
+  process.exit(1);
+});

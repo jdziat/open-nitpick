@@ -1,0 +1,144 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+	"unicode"
+)
+
+func tokenize(text string) []string {
+	var tokens []string
+	var current strings.Builder
+
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '\'' {
+			current.WriteRune(unicode.ToLower(r))
+		} else {
+			if current.Len() > 0 {
+				word := strings.Trim(current.String(), "'")
+				if len(word) > 0 {
+					tokens = append(tokens, word)
+				}
+				current.Reset()
+			}
+		}
+	}
+
+	if current.Len() > 0 {
+		word := strings.Trim(current.String(), "'")
+		if len(word) > 0 {
+			tokens = append(tokens, word)
+		}
+	}
+
+	return tokens
+}
+
+type wordCount struct {
+	word  string
+	count int
+}
+
+func topK(freq map[string]int, k int) []wordCount {
+	wcs := make([]wordCount, 0, len(freq))
+	for w, c := range freq {
+		wcs = append(wcs, wordCount{w, c})
+	}
+
+	sort.Slice(wcs, func(i, j int) bool {
+		if wcs[i].count != wcs[j].count {
+			return wcs[i].count > wcs[j].count
+		}
+		return wcs[i].word < wcs[j].word
+	})
+
+	if k > len(wcs) {
+		k = len(wcs)
+	}
+	return wcs[:k]
+}
+
+func countFrequencies(scanner *bufio.Scanner) map[string]int {
+	freq := make(map[string]int)
+	for scanner.Scan() {
+		line := scanner.Text()
+		tokens := tokenize(line)
+		for _, t := range tokens {
+			freq[t]++
+		}
+	}
+	return freq
+}
+
+func main() {
+	k := 10
+
+	args := os.Args[1:]
+	if len(args) > 0 {
+		fmt.Sscanf(args[0], "%d", &k)
+	}
+
+	if k <= 0 {
+		fmt.Fprintln(os.Stderr, "k must be a positive integer")
+		os.Exit(1)
+	}
+
+	var freq map[string]int
+
+	if len(args) > 1 {
+		// Read from files provided as arguments (after k)
+		combined := make(map[string]int)
+		for _, filename := range args[1:] {
+			f, err := os.Open(filename)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "cannot open file %s: %v\n", filename, err)
+				os.Exit(1)
+			}
+			scanner := bufio.NewScanner(f)
+			fm := countFrequencies(scanner)
+			f.Close()
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "error reading file %s: %v\n", filename, err)
+				os.Exit(1)
+			}
+			for w, c := range fm {
+				combined[w] += c
+			}
+		}
+		freq = combined
+	} else {
+		// Read from stdin
+		scanner := bufio.NewScanner(os.Stdin)
+		const maxCapacity = 10 * 1024 * 1024
+		buf := make([]byte, maxCapacity)
+		scanner.Buffer(buf, maxCapacity)
+		freq = countFrequencies(scanner)
+		if err := scanner.Err(); err != nil {
+			fmt.Fprintf(os.Stderr, "error reading stdin: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	results := topK(freq, k)
+
+	if len(results) == 0 {
+		fmt.Println("No words found.")
+		return
+	}
+
+	maxWidth := 0
+	for _, wc := range results {
+		if len(wc.word) > maxWidth {
+			maxWidth = len(wc.word)
+		}
+	}
+
+	fmt.Printf("%-*s  %s\n", maxWidth, "WORD", "COUNT")
+	fmt.Printf("%s  %s\n", strings.Repeat("-", maxWidth), "-----")
+	for _, wc := range results {
+		fmt.Printf("%-*s  %d\n", maxWidth, wc.word, wc.count)
+	}
+}

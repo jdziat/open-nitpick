@@ -1,0 +1,150 @@
+export class MatrixShapeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MatrixShapeError";
+  }
+}
+
+export type MatrixInput = readonly (readonly number[])[];
+
+export class Matrix {
+  public readonly rows: number;
+  public readonly cols: number;
+  public readonly data: number[][];
+
+  public constructor(data: MatrixInput) {
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new MatrixShapeError("A matrix must contain at least one row.");
+    }
+
+    if (!Array.isArray(data[0]) || data[0].length === 0) {
+      throw new MatrixShapeError("A matrix must contain at least one column.");
+    }
+
+    const columnCount = data[0].length;
+
+    for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
+      const row = data[rowIndex];
+
+      if (!Array.isArray(row) || row.length !== columnCount) {
+        throw new MatrixShapeError(
+          "All matrix rows must have the same number of columns."
+        );
+      }
+
+      for (const value of row) {
+        if (typeof value !== "number") {
+          throw new TypeError("Matrix entries must be numbers.");
+        }
+      }
+    }
+
+    this.rows = data.length;
+    this.cols = columnCount;
+    this.data = data.map((row) => [...row]);
+  }
+
+  public get columns(): number {
+    return this.cols;
+  }
+
+  public get shape(): readonly [number, number] {
+    return [this.rows, this.cols];
+  }
+
+  public multiply(other: Matrix): Matrix {
+    if (this.cols !== other.rows) {
+      throw new MatrixShapeError(
+        `Cannot multiply a ${this.rows}x${this.cols} matrix by a ` +
+          `${other.rows}x${other.cols} matrix.`
+      );
+    }
+
+    const result: number[][] = Array.from({ length: this.rows }, () =>
+      Array(other.cols).fill(0)
+    );
+
+    for (let i = 0; i < this.rows; i++) {
+      for (let k = 0; k < this.cols; k++) {
+        const value = this.data[i][k];
+
+        for (let j = 0; j < other.cols; j++) {
+          result[i][j] += value * other.data[k][j];
+        }
+      }
+    }
+
+    return new Matrix(result);
+  }
+
+  public transpose(): Matrix {
+    const result: number[][] = Array.from({ length: this.cols }, () =>
+      Array(this.rows).fill(0)
+    );
+
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        result[j][i] = this.data[i][j];
+      }
+    }
+
+    return new Matrix(result);
+  }
+
+  public determinant(): number {
+    if (this.rows !== this.cols) {
+      throw new MatrixShapeError(
+        `Determinant is only defined for square matrices, but this matrix is ` +
+          `${this.rows}x${this.cols}.`
+      );
+    }
+
+    const matrix = this.data.map((row) => [...row]);
+    let determinant = 1;
+
+    for (let column = 0; column < this.rows; column++) {
+      let pivotRow = column;
+
+      for (let row = column + 1; row < this.rows; row++) {
+        if (Math.abs(matrix[row][column]) > Math.abs(matrix[pivotRow][column])) {
+          pivotRow = row;
+        }
+      }
+
+      if (matrix[pivotRow][column] === 0) {
+        return 0;
+      }
+
+      if (pivotRow !== column) {
+        [matrix[column], matrix[pivotRow]] = [
+          matrix[pivotRow],
+          matrix[column],
+        ];
+        determinant *= -1;
+      }
+
+      const pivot = matrix[column][column];
+      determinant *= pivot;
+
+      for (let row = column + 1; row < this.rows; row++) {
+        const factor = matrix[row][column] / pivot;
+
+        for (let j = column + 1; j < this.rows; j++) {
+          matrix[row][j] -= factor * matrix[column][j];
+        }
+      }
+    }
+
+    return determinant;
+  }
+
+  public toArray(): number[][] {
+    return this.data.map((row) => [...row]);
+  }
+
+  public static multiply(left: Matrix, right: Matrix): Matrix {
+    return left.multiply(right);
+  }
+}
+
+export default Matrix;

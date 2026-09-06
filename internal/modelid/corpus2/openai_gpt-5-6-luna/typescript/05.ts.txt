@@ -1,0 +1,30 @@
+export interface WordCount {
+  word: string;
+  count: number;
+}
+
+export function countTopWords(text: string, k: number): WordCount[] {
+  if (!Number.isFinite(k) || k <= 0) {
+    return [];
+  }
+
+  const counts = new Map<string, number>();
+  const words = text
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}\p{M}]+/gu, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  for (const word of words) {
+    counts.set(word, (counts.get(word) ?? 0) + 1);
+  }
+
+  return Array.from(counts, ([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
+    .slice(0, Math.floor(k));
+}
+
+export const topKWords = countTopWords;
+
+export default countTopWords;

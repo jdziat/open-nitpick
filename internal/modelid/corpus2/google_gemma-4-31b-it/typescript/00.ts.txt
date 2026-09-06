@@ -1,0 +1,67 @@
+class LRUCacheNode<K, V> {
+    public prev: LRUCacheNode<K, V> | null = null;
+    public next: LRUCacheNode<K, V> | null = null;
+    constructor(public key: K, public value: V) {}
+}
+
+export class LRUCache<K, V> {
+    private capacity: number;
+    private map: Map<K, LRUCacheNode<K, V>> = new Map();
+    private head: LRUCacheNode<K, V> | null = null;
+    private tail: LRUCacheNode<K, V> | null = null;
+
+    constructor(capacity: number) {
+        this.capacity = capacity;
+    }
+
+    public get(key: K): V | null {
+        const node = this.map.get(key);
+        if (!node) return null;
+
+        this.moveToHead(node);
+        return node.value;
+    }
+
+    public put(key: K, value: V): void {
+        const existingNode = this.map.get(key);
+
+        if (existingNode) {
+            existingNode.value = value;
+            this.moveToHead(existingNode);
+        } else {
+            const newNode = new LRUCacheNode(key, value);
+            if (this.map.size >= this.capacity) {
+                this.evict();
+            }
+            this.addToHead(newNode);
+            this.map.set(key, newNode);
+        }
+    }
+
+    private addToHead(node: LRUCacheNode<K, V>): void {
+        node.next = this.head;
+        node.prev = null;
+        if (this.head) this.head.prev = node;
+        this.head = node;
+        if (!this.tail) this.tail = node;
+    }
+
+    private removeNode(node: LRUCacheNode<K, V>): void {
+        if (node.prev) node.prev.next = node.next;
+        else this.head = node.next;
+
+        if (node.next) node.next.prev = node.prev;
+        else this.tail = node.prev;
+    }
+
+    private moveToHead(node: LRUCacheNode<K, V>): void {
+        this.removeNode(node);
+        this.addToHead(node);
+    }
+
+    private evict(): void {
+        if (!this.tail) return;
+        this.map.delete(this.tail.key);
+        this.removeNode(this.tail);
+    }
+}

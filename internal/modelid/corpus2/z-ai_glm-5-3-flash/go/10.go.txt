@@ -1,0 +1,146 @@
+package main
+
+import (
+	"crypto/rand"
+	"errors"
+	"fmt"
+	"math/big"
+	"sync"
+	"time"
+)
+
+const (
+	alphabet        = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	codeLength      = 8
+	defaultTTL      = 24 * time.Hour
+	cleanupInterval = time.Minute
+)
+
+var (
+	ErrEmptyURL = errors.New("shortener: empty URL")
+	ErrNotFound = errors.New("shortener: unknown or expired code")
+)
+
+type entry struct {
+	url       string
+	expiresAt time.Time
+}
+
+type Shortener struct {
+	mu      sync.Mutex
+	entries map[string]entry
+	stop    chan struct{}
+	once    sync.Once
+}
+
+func NewShortener() *Shortener {
+	s := &Shortener{
+		entries: make(map[string]entry),
+		stop:    make(chan struct{}),
+	}
+	go s.cleanup()
+	return s
+}
+
+func (s *Shortener) Close() {
+	s.once.Do(func() { close(s.stop) })
+}
+
+func (s *Shortener) Shorten(rawURL string, ttl time.Duration) (string, error) {
+	if rawURL == "" {
+		return "", ErrEmptyURL
+	}
+	if ttl <= 0 {
+		ttl = defaultTTL
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var code string
+	for {
+		c, err := randomCode(codeLength)
+		if err != nil {
+			return "", err
+		}
+		if _, exists := s.entries[c]; !exists {
+			code = c
+			break
+		}
+	}
+
+	s.entries[code] = entry{url: rawURL, expiresAt: time.Now().Add(ttl)}
+	return code, nil
+}
+
+func (s *Shortener) Resolve(code string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	e, ok := s.entries[code]
+	if !ok {
+		return "", ErrNotFound
+	}
+	if time.Now().After(e.expiresAt) {
+		delete(s.entries, code)
+		return "", ErrNotFound
+	}
+	return e.url, nil
+}
+
+func (s *Shortener) cleanup() {
+	ticker := time.NewTicker(cleanupInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.mu.Lock()
+			now := time.Now()
+			for code, e := range s.entries {
+				if now.After(e.expiresAt) {
+					delete(s.entries, code)
+				}
+			}
+			s.mu.Unlock()
+		case <-s.stop:
+			return
+		}
+	}
+}
+
+func randomCode(n int) (string, error) {
+	out := make([]byte, n)
+	max := big.NewInt(int64(len(alphabet)))
+	for i := range out {
+		idx, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", fmt.Errorf("shortener: generating code: %w", err)
+		}
+		out[i] = alphabet[idx.Int64()]
+	}
+	return string(out), nil
+}
+
+func main() {
+	s := NewShortener()
+	defer s.Close()
+
+	code, err := s.Shorten("https://example.com/some/very/long/url", time.Second)
+	if err != nil {
+		fmt.Println("shorten failed:", err)
+		return
+	}
+	fmt.Println("short code:", code)
+
+	if url, err := s.Resolve(code); err == nil {
+		fmt.Println("resolved:", url)
+	} else {
+		fmt.Println("resolve failed:", err)
+	}
+
+	time.Sleep(1500 * time.Millisecond)
+
+	if _, err := s.Resolve(code); err != nil {
+		fmt.Println("after expiry:", err)
+	}
+}

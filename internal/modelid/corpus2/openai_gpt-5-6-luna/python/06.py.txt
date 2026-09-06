@@ -1,0 +1,102 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Generic, Iterator, Optional, TypeVar
+
+
+T = TypeVar("T")
+
+
+@dataclass
+class Node(Generic[T]):
+    key: T
+    left: Optional["Node[T]"] = None
+    right: Optional["Node[T]"] = None
+
+
+class BinarySearchTree(Generic[T]):
+    def __init__(self) -> None:
+        self.root: Optional[Node[T]] = None
+
+    def insert(self, key: T) -> None:
+        self.root = self._insert(self.root, key)
+
+    def _insert(self, node: Optional[Node[T]], key: T) -> Node[T]:
+        if node is None:
+            return Node(key)
+
+        if key < node.key:
+            node.left = self._insert(node.left, key)
+        elif key > node.key:
+            node.right = self._insert(node.right, key)
+
+        return node
+
+    def search(self, key: T) -> Optional[Node[T]]:
+        current = self.root
+
+        while current is not None:
+            if key == current.key:
+                return current
+            if key < current.key:
+                current = current.left
+            else:
+                current = current.right
+
+        return None
+
+    def delete(self, key: T) -> None:
+        self.root = self._delete(self.root, key)
+
+    def _delete(self, node: Optional[Node[T]], key: T) -> Optional[Node[T]]:
+        if node is None:
+            return None
+
+        if key < node.key:
+            node.left = self._delete(node.left, key)
+        elif key > node.key:
+            node.right = self._delete(node.right, key)
+        else:
+            if node.left is None:
+                return node.right
+            if node.right is None:
+                return node.left
+
+            successor = self._minimum(node.right)
+            node.key = successor.key
+            node.right = self._delete(node.right, successor.key)
+
+        return node
+
+    def _minimum(self, node: Node[T]) -> Node[T]:
+        while node.left is not None:
+            node = node.left
+        return node
+
+    def inorder(self) -> list[T]:
+        return list(self._inorder(self.root))
+
+    def _inorder(self, node: Optional[Node[T]]) -> Iterator[T]:
+        if node is not None:
+            yield from self._inorder(node.left)
+            yield node.key
+            yield from self._inorder(node.right)
+
+    def __contains__(self, key: T) -> bool:
+        return self.search(key) is not None
+
+    def __iter__(self) -> Iterator[T]:
+        return self._inorder(self.root)
+
+
+if __name__ == "__main__":
+    tree = BinarySearchTree[int]()
+
+    for value in (50, 30, 70, 20, 40, 60, 80):
+        tree.insert(value)
+
+    print(tree.inorder())
+    print(tree.search(40) is not None)
+
+    tree.delete(30)
+    print(tree.inorder())

@@ -1,0 +1,122 @@
+package main
+
+import (
+	"fmt"
+)
+
+type Node struct {
+	Key   int
+	Left  *Node
+	Right *Node
+}
+
+type BST struct {
+	Root *Node
+}
+
+func (t *BST) Insert(key int) {
+	t.Root = insert(t.Root, key)
+}
+
+func insert(node *Node, key int) *Node {
+	if node == nil {
+		return &Node{Key: key}
+	}
+	if key < node.Key {
+		node.Left = insert(node.Left, key)
+	} else if key > node.Key {
+		node.Right = insert(node.Right, key)
+	}
+	return node
+}
+
+func (t *BST) Search(key int) bool {
+	return search(t.Root, key)
+}
+
+func search(node *Node, key int) bool {
+	if node == nil {
+		return false
+	}
+	if key == node.Key {
+		return true
+	}
+	if key < node.Key {
+		return search(node.Left, key)
+	}
+	return search(node.Right, key)
+}
+
+func (t *BST) Delete(key int) {
+	t.Root = deleteNode(t.Root, key)
+}
+
+func deleteNode(node *Node, key int) *Node {
+	if node == nil {
+		return nil
+	}
+
+	if key < node.Key {
+		node.Left = deleteNode(node.Left, key)
+	} else if key > node.Key {
+		node.Right = deleteNode(node.Right, key)
+	} else {
+		if node.Left == nil {
+			return node.Right
+		} else if node.Right == nil {
+			return node.Left
+		}
+
+		minNode := findMin(node.Right)
+		node.Key = minNode.Key
+		node.Right = deleteNode(node.Right, minNode.Key)
+	}
+	return node
+}
+
+func findMin(node *Node) *Node {
+	current := node
+	for current.Left != nil {
+		current = current.Left
+	}
+	return current
+}
+
+func (t *BST) InOrder() {
+	inOrder(t.Root)
+	fmt.Println()
+}
+
+func inOrder(node *Node) {
+	if node != nil {
+		inOrder(node.Left)
+		fmt.Printf("%d ", node.Key)
+		inOrder(node.Right)
+	}
+}
+
+func main() {
+	bst := &BST{}
+	keys := []int{50, 30, 20, 40, 70, 60, 80}
+	for _, k := range keys {
+		bst.Insert(k)
+	}
+
+	fmt.Print("In-order traversal: ")
+	bst.InOrder()
+
+	fmt.Printf("Search 40: %v\n", bst.Search(40))
+	fmt.Printf("Search 90: %v\n", bst.Search(90))
+
+	fmt.Println("Deleting 20 (leaf)...")
+	bst.Delete(20)
+	bst.InOrder()
+
+	fmt.Println("Deleting 30 (one child)...")
+	bst.Delete(30)
+	bst.InOrder()
+
+	fmt.Println("Deleting 50 (two children)...")
+	bst.Delete(50)
+	bst.InOrder()
+}

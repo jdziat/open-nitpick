@@ -58,6 +58,7 @@ const (
 	keyTests       = "tests"
 	keyDesign      = "design"
 	keyStyle       = "style"
+	keySlop        = "slop"
 	keyGeneralist  = "generalist"
 )
 
@@ -79,6 +80,7 @@ var expertRoster = []struct{ key, name, file string }{
 	{keyTests, "Test design expert", "tests.md"},
 	{keyDesign, "Software design and maintainability reviewer", "design.md"},
 	{keyStyle, "Language idiom reviewer", "style.md"},
+	{keySlop, "Generated-code reviewer", "slop.md"},
 	{keyGeneralist, "Senior engineer", "generalist.md"},
 }
 
@@ -312,6 +314,7 @@ var classExpert = map[config.Class]string{
 	config.ClassTests:           keyTests,
 	config.ClassMaintainability: keyDesign,
 	config.ClassStyle:           keyStyle,
+	config.ClassSlop:            keySlop,
 	config.ClassUnknown:         keyGeneralist,
 }
 

@@ -1,0 +1,47 @@
+class PriorityQueue:
+    """Priority queue backed by a binary heap.
+
+    compare(a, b) should return a negative number if a should be popped
+    before b, zero if equal, and a positive number if b should be popped
+    before a. Boolean results are also accepted: True means a should be
+    popped before b.
+    """
+
+    def __init__(self, compare=None):
+        self._heap = []
+        self._compare = compare if compare is not None else lambda a, b: (a > b) - (a < b)
+
+    def _should_come_before(self, a, b):
+        result = self._compare(a, b)
+        if isinstance(result, bool):
+            return result
+        return result < 0
+
+    def push(self, item):
+        self._heap.append(item)
+        i = len(self._heap) - 1
+        while i > 0:
+            parent = (i - 1) // 2
+            if self._should_come_before(self._heap[i], self._heap[parent]):
+                self._heap[i], self._heap[parent] = self._heap[parent], self._heap[i]
+                i = parent
+            else:
+                break
+
+    def pop(self):
+        if not self._heap:
+            raise IndexError("pop from empty priority queue")
+        heap = self._heap
+        item = heap[0]
+        last = heap.pop()
+        if heap:
+            heap[0] = last
+            i = 0
+            n = len(heap)
+            while True:
+                left = 2 * i + 1
+                if left >= n:
+                    break
+                right = left + 1
+                best = left
+                if right < n and self._should_come_before(heap[right], heap[left]):

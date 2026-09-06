@@ -1,0 +1,154 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"strings"
+)
+
+// Parser parses a subset of CSV: fields may be quoted with double
+// quotes, a doubled quote ("") inside a quoted field is an escaped
+// literal quote, and the field delimiter is configurable.
+type Parser struct {
+	Delimiter rune
+}
+
+// NewParser returns a Parser that uses delim as the field delimiter.
+// A zero delim defaults to ','.
+func NewParser(delim rune) *Parser {
+	if delim == 0 {
+		delim = ','
+	}
+	return &Parser{Delimiter: delim}
+}
+
+// Parse reads CSV from r and returns the rows as slices of strings.
+func (p *Parser) Parse(r io.Reader) ([][]string, error) {
+	br := bufio.NewReader(r)
+	var (
+		rows         [][]string
+		row          []string
+		field        strings.Builder
+		inQuotes     bool
+		fieldStarted bool
+	)
+
+	flushField := func() {
+		row = append(row, field.String())
+		field.Reset()
+		fieldStarted = false
+	}
+	flushRow := func() {
+		rows = append(rows, row)
+		row = nil
+	}
+
+	for {
+		c, _, err := br.ReadRune()
+		if err != nil {
+			if err != io.EOF {
+				return nil, err
+			}
+			if inQuotes {
+				return nil, fmt.Errorf("csv: unterminated quoted field")
+			}
+			if fieldStarted || len(row) > 0 {
+				flushField()
+				flushRow()
+			}
+			return rows, nil
+		}
+
+		if inQuotes {
+			if c != '"' {
+				// Everything, including delimiters and newlines,
+				// is literal inside a quoted field.
+				field.WriteRune(c)
+				continue
+			}
+			// A quote either closes the field or, when doubled,
+			// is an escaped literal quote.
+			next, _, err := br.ReadRune()
+			if err == io.EOF {
+				inQuotes = false
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			if next == '"' {
+				field.WriteRune('"')
+			} else {
+				inQuotes = false
+				if err := br.UnreadRune(); err != nil {
+					return nil, err
+				}
+			}
+			continue
+		}
+
+		switch c {
+		case '"':
+			if fieldStarted {
+				// Bare quote inside an unquoted field: keep it literal.
+				field.WriteRune(c)
+			} else {
+				inQuotes = true
+				fieldStarted = true
+			}
+		case p.Delimiter:
+			flushField()
+		case '\n':
+			flushField()
+			flushRow()
+		case '\r':
+			// Treat both \r and \r\n as row terminators.
+			next, _, err := br.ReadRune()
+			if err == nil {
+				if next != '\n' {
+					if err := br.UnreadRune(); err != nil {
+						return nil, err
+					}
+				}
+			} else if err != io.EOF {
+				return nil, err
+			}
+			flushField()
+			flushRow()
+		default:
+			field.WriteRune(c)
+			fieldStarted = true
+		}
+	}
+}
+
+// ParseString parses CSV from s and returns the rows.
+func (p *Parser) ParseString(s string) ([][]string, error) {
+	return p.Parse(strings.NewReader(s))
+}
+
+func main() {
+	sample := "name,quote,note\n" +
+		"\"Ada Lovelace\",\"She said \"\"hello\"\"\",first row\n" +
+		"plain,\"multi\nline\",last row\n"
+
+	rows, err := NewParser(',').ParseString(sample)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	for i, row := range rows {
+		fmt.Printf("row %d: %q\n", i, row)
+	}
+
+	semicolon := "a;b;c\n\"x;y\";z;w\n"
+	rows, err = NewParser(';').ParseString(semicolon)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	for i, row := range rows {
+		fmt.Printf("row %d: %q\n", i, row)
+	}
+}

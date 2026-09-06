@@ -1,0 +1,119 @@
+package main
+
+import "fmt"
+
+type Node struct {
+	Value int
+	Left  *Node
+	Right *Node
+}
+
+type BST struct {
+	Root *Node
+}
+
+func NewBST() *BST {
+	return &BST{}
+}
+
+func (t *BST) Insert(value int) {
+	t.Root = insert(t.Root, value)
+}
+
+func insert(node *Node, value int) *Node {
+	if node == nil {
+		return &Node{Value: value}
+	}
+
+	if value < node.Value {
+		node.Left = insert(node.Left, value)
+	} else if value > node.Value {
+		node.Right = insert(node.Right, value)
+	}
+
+	return node
+}
+
+func (t *BST) Search(value int) bool {
+	return search(t.Root, value)
+}
+
+func search(node *Node, value int) bool {
+	if node == nil {
+		return false
+	}
+
+	if value == node.Value {
+		return true
+	}
+
+	if value < node.Value {
+		return search(node.Left, value)
+	}
+
+	return search(node.Right, value)
+}
+
+func (t *BST) Delete(value int) {
+	t.Root = deleteNode(t.Root, value)
+}
+
+func deleteNode(node *Node, value int) *Node {
+	if node == nil {
+		return nil
+	}
+
+	if value < node.Value {
+		node.Left = deleteNode(node.Left, value)
+	} else if value > node.Value {
+		node.Right = deleteNode(node.Right, value)
+	} else {
+		if node.Left == nil {
+			return node.Right
+		}
+		if node.Right == nil {
+			return node.Left
+		}
+
+		min := node.Right
+		for min.Left != nil {
+			min = min.Left
+		}
+
+		node.Value = min.Value
+		node.Right = deleteNode(node.Right, min.Value)
+	}
+
+	return node
+}
+
+func (t *BST) InOrder() []int {
+	var result []int
+
+	var walk func(node *Node)
+	walk = func(node *Node) {
+		if node == nil {
+			return
+		}
+		walk(node.Left)
+		result = append(result, node.Value)
+		walk(node.Right)
+	}
+
+	walk(t.Root)
+	return result
+}
+
+func main() {
+	tree := NewBST()
+
+	for _, value := range []int{50, 30, 70, 20, 40, 60, 80} {
+		tree.Insert(value)
+	}
+
+	fmt.Println(tree.InOrder())
+	fmt.Println(tree.Search(40))
+
+	tree.Delete(30)
+	fmt.Println(tree.InOrder())
+}

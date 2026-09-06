@@ -1,0 +1,19 @@
+{
+  "fixture": "go-slop-restating-comments",
+  "findings": [
+    {
+      "path": "billing/invoice.go",
+      "line": 17,
+      "severity": "warning",
+      "category": "Data Integrity \u0026 Integration",
+      "class": "correctness",
+      "title": "Handle int64 overflow in billing.Total.",
+      "rationale": "Invoice.Cents is a public int64, and no caller or contract bounds the cumulative value. When the sum exceeds the int64 range, `total += inv.Cents` wraps and returns an invalid total. Use checked arithmetic and return overflow through the API.",
+      "suggestion": ""
+    }
+  ],
+  "at": "2026-09-05T20:38:29Z",
+  "mode": "plaintext",
+  "fingerprint": "2f5beb7a26b061ac7ee441f604b43eb79f5011b242f7308584fd4af553179980",
+  "raw": "────────────────────────────────────────\nIncumbent Review\n\nDiff      : staged changes and tracked edits\nCompare   : main → main\nDirectory : cr-collect-1927271065\n────────────────────────────────────────\n\n(reviewer banner removed)\n\n\n────────────────────────────────────────────────────────────────────────\n  major [Data Integrity \u0026 Integration]\n  → billing/invoice.go:17\n\n  Handle int64 overflow in billing.Total.\n\n  Invoice.Cents is a public int64, and no caller or contract bounds the\n  cumulative value. When the sum exceeds the int64 range, `total +=\n  inv.Cents` wraps and returns an invalid total. Use checked arithmetic and\n  return overflow through the API.\n\n\n────────────────────────────────────────\nReview complete\n1 finding ✔\n\nMajor    1\n\n1 file reviewed:\n  - billing/invoice.go\n────────────────────────────────────────\n\nPrint all AI prompts: incumbent review --show-prompts\n\nNotice: Detected claude environment. Use `incumbent review --agent` for structured agent-friendly output.\nConnecting to Incumbent... 0s elapsed\nPreparing review... 2s elapsed\nPreparing sandbox... 2s elapsed\nSummarizing changes... 7s elapsed\nFinishing analysis tools... 16s elapsed\nWriting review comments... 16s elapsed\nWriting review comments... 1m 00s elapsed - still working\n"
+}

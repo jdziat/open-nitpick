@@ -1,0 +1,53 @@
+package retry
+
+import (
+	"errors"
+	"math/rand"
+	"time"
+)
+
+const (
+	baseDelay = 100 * time.Millisecond
+	maxDelay  = 10 * time.Second
+)
+
+// Retry calls fn up to n times, waiting with exponential backoff and jitter
+// between attempts. It returns nil if fn succeeds. If all attempts fail, it
+// returns the last error returned by fn.
+func Retry(n int, fn func() error) error {
+	if n <= 0 {
+		return errors.New("retry: n must be positive")
+	}
+	if fn == nil {
+		return errors.New("retry: fn must not be nil")
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < n; attempt++ {
+		lastErr = fn()
+		if lastErr == nil {
+			return nil
+		}
+		if attempt == n-1 {
+			break
+		}
+		time.Sleep(backoff(attempt))
+	}
+	return lastErr
+}
+
+func backoff(attempt int) time.Duration {
+	if attempt > 30 {
+		attempt = 30
+	}
+
+	delay := baseDelay << uint(attempt)
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+	if delay <= 0 {
+		return 0
+	}
+
+	return time.Duration(rand.Int63n(int64(delay)))
+}

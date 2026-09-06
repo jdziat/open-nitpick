@@ -1,0 +1,67 @@
+class LRUCache {
+  private capacity: number;
+  private cache: Map<number, number>;
+
+  constructor(capacity: number) {
+    this.capacity = capacity;
+    this.cache = new Map();
+  }
+
+  get(key: number): number {
+    if (!this.cache.has(key)) {
+      return -1;
+    }
+    const value = this.cache.get(key)!;
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+
+  put(key: number, value: number): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.capacity) {
+      const lruKey = this.cache.keys().next().value;
+      this.cache.delete(lruKey);
+    }
+    this.cache.set(key, value);
+  }
+}
+
+// Example usage and tests
+const cache = new LRUCache(3);
+
+console.log("LRU Cache with capacity 3");
+
+cache.put(1, 10);
+console.log("put(1, 10)");
+
+cache.put(2, 20);
+console.log("put(2, 20)");
+
+cache.put(3, 30);
+console.log("put(3, 30)");
+
+console.log(`get(1) = ${cache.get(1)}`); // 10, also marks 1 as recently used
+
+cache.put(4, 40); // evicts key 2 (least recently used)
+console.log("put(4, 40) -> evicts key 2");
+
+console.log(`get(2) = ${cache.get(2)}`); // -1, was evicted
+console.log(`get(3) = ${cache.get(3)}`); // 30
+console.log(`get(4) = ${cache.get(4)}`); // 40
+
+cache.put(5, 50); // evicts key 1
+console.log("put(5, 50) -> evicts key 1");
+
+console.log(`get(1) = ${cache.get(1)}`); // -1, was evicted
+console.log(`get(3) = ${cache.get(3)}`); // 30
+console.log(`get(4) = ${cache.get(4)}`); // 40
+console.log(`get(5) = ${cache.get(5)}`); // 50
+
+cache.put(3, 300); // update existing key
+console.log("put(3, 300) -> update key 3");
+
+console.log(`get(3) = ${cache.get(3)}`); // 300
+
+export { LRUCache };

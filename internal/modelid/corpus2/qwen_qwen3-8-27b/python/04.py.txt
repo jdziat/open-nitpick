@@ -1,0 +1,18 @@
+def slugify(text: str) -> str:
+    text = str(text).lower()
+    result = []
+    in_word = False
+
+    for char in text:
+        if char.isalnum():
+            if in_word:
+                result.append(char)
+            else:
+                if result:
+                    result.append("-")
+                result.append(char)
+                in_word = True
+        else:
+            in_word = False
+
+    return "".join(result)

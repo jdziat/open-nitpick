@@ -1,0 +1,35 @@
+class MatrixError(ValueError):
+    """Base class for matrix-related errors."""
+
+
+class ShapeMismatchError(MatrixError):
+    """Raised when matrix shapes are incompatible."""
+
+
+def _is_scalar(value):
+    return not isinstance(value, (str, bytes, list, tuple, set, frozenset, dict)) and not hasattr(value, "__iter__")
+
+
+class Matrix:
+    """A simple matrix type supporting multiplication, transpose, and determinant."""
+
+    def __init__(self, rows):
+        if isinstance(rows, Matrix):
+            self._data = [list(row) for row in rows._data]
+            self._rows = len(self._data)
+            self._cols = len(self._data[0]) if self._rows else 0
+            return
+
+        if isinstance(rows, (str, bytes)):
+            raise TypeError("Matrix rows must be a sequence of sequences of values")
+
+        if isinstance(rows, (list, tuple)):
+            if len(rows) == 0:
+                rows = []
+            elif all(_is_scalar(value) for value in rows):
+                rows = [list(rows)]
+
+        data = []
+        cols = None
+
+        for index, row in enumerate

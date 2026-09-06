@@ -1,0 +1,53 @@
+import time
+import random
+from typing import Callable, TypeVar, Any
+
+T = TypeVar('T')
+
+def retry(
+    func: Callable[..., T], 
+    attempts: int = 3, 
+    base_delay: float = 1.0, 
+    max_delay: float = 60.0, 
+    exceptions: tuple = (Exception,)
+) -> T:
+    """
+    Retries a function with exponential backoff and jitter.
+    Returns the result of the function if successful.
+    Raises the last encountered exception if all attempts fail.
+    """
+    last_exception = None
+    
+    for attempt in range(attempts):
+        try:
+            return func()
+        except exceptions as e:
+            last_exception = e
+            if attempt == attempts - 1:
+                break
+            
+            # Exponential backoff: base_delay * 2^attempt
+            delay = min(base_delay * (2 ** attempt), max_delay)
+            # Full Jitter: random value between 0 and the calculated delay
+            sleep_time = random.uniform(0, delay)
+            time.sleep(sleep_time)
+            
+    raise last_exception
+
+if __name__ == "__main__":
+    # Example usage:
+    counter = 0
+    def unstable_function():
+        global counter
+        counter += 1
+        if counter < 3:
+            print(f"Attempt {counter} failed...")
+            raise ValueError("Transient error")
+        print(f"Attempt {counter} succeeded!")
+        return "Success!"
+
+    try:
+        result = retry(unstable_function, attempts=5)
+        print(f"Result: {result}")
+    except Exception as e:
+        print(f"Final failure: {e}")

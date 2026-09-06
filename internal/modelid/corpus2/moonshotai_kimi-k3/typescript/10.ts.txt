@@ -1,0 +1,54 @@
+type Entry = {
+  url: string;
+  expiresAt: number;
+};
+
+class UrlShortener {
+  private entries = new Map<string, Entry>();
+  private counter = 0;
+
+  constructor(private readonly defaultTtlMs: number = 60_000) {}
+
+  shorten(url: string, ttlMs?: number): string {
+    const code = this.generateCode();
+    this.entries.set(code, {
+      url,
+      expiresAt: Date.now() + (ttlMs ?? this.defaultTtlMs),
+    });
+    return code;
+  }
+
+  resolve(code: string): string | null {
+    const entry = this.entries.get(code);
+    if (!entry) {
+      return null;
+    }
+    if (Date.now() >= entry.expiresAt) {
+      this.entries.delete(code);
+      return null;
+    }
+    return entry.url;
+  }
+
+  private generateCode(): string {
+    let code: string;
+    do {
+      code = (this.counter++).toString(36);
+    } while (this.entries.has(code));
+    return code;
+  }
+}
+
+export { UrlShortener };
+
+// --- Demo ---
+const shortener = new UrlShortener(5_000);
+
+const code = shortener.shorten("https://example.com/some/very/long/path");
+console.log("code:", code);
+console.log("resolved:", shortener.resolve(code));
+console.log("unknown:", shortener.resolve("nope"));
+
+setTimeout(() => {
+  console.log("after expiry:", shortener.resolve(code));
+}, 6_000);

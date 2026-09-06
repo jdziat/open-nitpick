@@ -1,0 +1,66 @@
+"""A minimal in-memory URL shortener with expiry."""
+
+import secrets
+import string
+import time
+
+_ALPHABET = string.ascii_letters + string.digits
+
+
+class URLShortener:
+    """Maps short codes to URLs. Entries may expire after a TTL (seconds)."""
+
+    def __init__(self, code_length=6, default_ttl=None):
+        self.code_length = code_length
+        self.default_ttl = default_ttl  # seconds; None means entries never expire
+        self._entries = {}  # code -> (url, expires_at)
+
+    def shorten(self, url, ttl=None):
+        """Store url and return a new short code.
+
+        ttl is the lifetime in seconds; when omitted, default_ttl is used.
+        A ttl of None means the entry never expires.
+        """
+        if ttl is None:
+            ttl = self.default_ttl
+        expires_at = None if ttl is None else time.time() + ttl
+        code = self._new_code()
+        self._entries[code] = (url, expires_at)
+        return code
+
+    def resolve(self, code):
+        """Return the original URL for code, or None if unknown or expired."""
+        entry = self._entries.get(code)
+        if entry is None:
+            return None
+        url, expires_at = entry
+        if expires_at is not None and time.time() >= expires_at:
+            del self._entries[code]
+            return None
+        return url
+
+    def _new_code(self):
+        while True:
+            code = "".join(secrets.choice(_ALPHABET) for _ in range(self.code_length))
+            if self.resolve(code) is None:  # unused, or expired (and now purged)
+                return code
+
+
+# Shared default instance backing the module-level helpers.
+_shortener = URLShortener()
+
+
+def shorten(url, ttl=None):
+    """Store url in the shared shortener and return its short code."""
+    return _shortener.shorten(url, ttl)
+
+
+def resolve(code):
+    """Return the original URL for code from the shared shortener, or None."""
+    return _shortener.resolve(code)
+
+
+if __name__ == "__main__":
+    demo = URLShortener(default_ttl=3600)
+    c = demo.shorten("https://example.com/a/very/long/url")
+    print(f"{c} -> {demo.resolve(c)}")

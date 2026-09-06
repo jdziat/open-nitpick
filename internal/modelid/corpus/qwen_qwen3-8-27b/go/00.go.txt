@@ -1,0 +1,63 @@
+package main
+
+import "container/list"
+
+type lruEntry struct {
+	key   interface{}
+	value interface{}
+}
+
+type LRUCache struct {
+	capacity int
+	items    *list.List
+	index    map[interface{}]*list.Element
+}
+
+func NewLRUCache(capacity int) *LRUCache {
+	if capacity < 0 {
+		capacity = 0
+	}
+	return &LRUCache{
+		capacity: capacity,
+		items:    list.New(),
+		index:    make(map[interface{}]*list.Element),
+	}
+}
+
+func (c *LRUCache) Get(key interface{}) (interface{}, bool) {
+	if c == nil || c.capacity == 0 {
+		return nil, false
+	}
+
+	elem, ok := c.index[key]
+	if !ok {
+		return nil, false
+	}
+
+	c.items.MoveToFront(elem)
+	return elem.Value.(*lruEntry).value, true
+}
+
+func (c *LRUCache) Put(key, value interface{}) {
+	if c == nil || c.capacity == 0 {
+		return
+	}
+
+	if elem, ok := c.index[key]; ok {
+		c.items.MoveToFront(elem)
+		elem.Value.(*lruEntry).value = value
+		return
+	}
+
+	if c.items.Len() >= c.capacity {
+		back := c.items.Back()
+		if back != nil {
+			c.items.Remove(back)
+			delete(c.index, back.Value.(*lruEntry).key)
+		}
+	}
+
+	c.index[key] = c.items.PushFront(&lruEntry{key: key, value: value})
+}
+
+func main() {}

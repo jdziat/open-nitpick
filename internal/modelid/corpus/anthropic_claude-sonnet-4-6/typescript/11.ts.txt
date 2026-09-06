@@ -1,0 +1,234 @@
+export class Matrix {
+  private data: number[][];
+  public readonly rows: number;
+  public readonly cols: number;
+
+  constructor(data: number[][]) {
+    if (data.length === 0) {
+      throw new Error("Matrix must have at least one row");
+    }
+    const cols = data[0].length;
+    if (cols === 0) {
+      throw new Error("Matrix must have at least one column");
+    }
+    for (let i = 1; i < data.length; i++) {
+      if (data[i].length !== cols) {
+        throw new Error(
+          `Row ${i} has ${data[i].length} columns, expected ${cols}`
+        );
+      }
+    }
+    this.data = data.map((row) => [...row]);
+    this.rows = data.length;
+    this.cols = cols;
+  }
+
+  static fromDimensions(rows: number, cols: number, fill = 0): Matrix {
+    const data = Array.from({ length: rows }, () => Array(cols).fill(fill));
+    return new Matrix(data);
+  }
+
+  static identity(size: number): Matrix {
+    const data = Array.from({ length: size }, (_, i) =>
+      Array.from({ length: size }, (_, j) => (i === j ? 1 : 0))
+    );
+    return new Matrix(data);
+  }
+
+  get(row: number, col: number): number {
+    if (row < 0 || row >= this.rows) {
+      throw new Error(`Row index ${row} out of bounds [0, ${this.rows})`);
+    }
+    if (col < 0 || col >= this.cols) {
+      throw new Error(`Column index ${col} out of bounds [0, ${this.cols})`);
+    }
+    return this.data[row][col];
+  }
+
+  set(row: number, col: number, value: number): void {
+    if (row < 0 || row >= this.rows) {
+      throw new Error(`Row index ${row} out of bounds [0, ${this.rows})`);
+    }
+    if (col < 0 || col >= this.cols) {
+      throw new Error(`Column index ${col} out of bounds [0, ${this.cols})`);
+    }
+    this.data[row][col] = value;
+  }
+
+  toArray(): number[][] {
+    return this.data.map((row) => [...row]);
+  }
+
+  multiply(other: Matrix): Matrix {
+    if (this.cols !== other.rows) {
+      throw new Error(
+        `Shape mismatch for multiplication: (${this.rows}x${this.cols}) * (${other.rows}x${other.cols}). ` +
+          `Inner dimensions must match: ${this.cols} !== ${other.rows}`
+      );
+    }
+    const result = Matrix.fromDimensions(this.rows, other.cols, 0);
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < other.cols; j++) {
+        let sum = 0;
+        for (let k = 0; k < this.cols; k++) {
+          sum += this.data[i][k] * other.data[k][j];
+        }
+        result.data[i][j] = sum;
+      }
+    }
+    return result;
+  }
+
+  transpose(): Matrix {
+    const result = Matrix.fromDimensions(this.cols, this.rows, 0);
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        result.data[j][i] = this.data[i][j];
+      }
+    }
+    return result;
+  }
+
+  determinant(): number {
+    if (this.rows !== this.cols) {
+      throw new Error(
+        `Determinant is only defined for square matrices, got ${this.rows}x${this.cols}`
+      );
+    }
+    return this._determinantRecursive(this.data);
+  }
+
+  private _determinantRecursive(matrix: number[][]): number {
+    const n = matrix.length;
+    if (n === 1) {
+      return matrix[0][0];
+    }
+    if (n === 2) {
+      return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+    }
+    let det = 0;
+    for (let col = 0; col < n; col++) {
+      const subMatrix = this._subMatrix(matrix, 0, col);
+      const sign = col % 2 === 0 ? 1 : -1;
+      det += sign * matrix[0][col] * this._determinantRecursive(subMatrix);
+    }
+    return det;
+  }
+
+  private _subMatrix(matrix: number[][], excludeRow: number, excludeCol: number): number[][] {
+    return matrix
+      .filter((_, rowIndex) => rowIndex !== excludeRow)
+      .map((row) => row.filter((_, colIndex) => colIndex !== excludeCol));
+  }
+
+  add(other: Matrix): Matrix {
+    if (this.rows !== other.rows || this.cols !== other.cols) {
+      throw new Error(
+        `Shape mismatch for addition: (${this.rows}x${this.cols}) + (${other.rows}x${other.cols}). ` +
+          `Dimensions must match exactly.`
+      );
+    }
+    const result = Matrix.fromDimensions(this.rows, this.cols, 0);
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        result.data[i][j] = this.data[i][j] + other.data[i][j];
+      }
+    }
+    return result;
+  }
+
+  subtract(other: Matrix): Matrix {
+    if (this.rows !== other.rows || this.cols !== other.cols) {
+      throw new Error(
+        `Shape mismatch for subtraction: (${this.rows}x${this.cols}) - (${other.rows}x${other.cols}). ` +
+          `Dimensions must match exactly.`
+      );
+    }
+    const result = Matrix.fromDimensions(this.rows, this.cols, 0);
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        result.data[i][j] = this.data[i][j] - other.data[i][j];
+      }
+    }
+    return result;
+  }
+
+  scale(scalar: number): Matrix {
+    const result = Matrix.fromDimensions(this.rows, this.cols, 0);
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        result.data[i][j] = this.data[i][j] * scalar;
+      }
+    }
+    return result;
+  }
+
+  equals(other: Matrix, epsilon = 1e-10): boolean {
+    if (this.rows !== other.rows || this.cols !== other.cols) {
+      return false;
+    }
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        if (Math.abs(this.data[i][j] - other.data[i][j]) > epsilon) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  toString(): string {
+    const rows = this.data.map((row) => `[${row.join(", ")}]`);
+    return `Matrix(${this.rows}x${this.cols}) [\n  ${rows.join(",\n  ")}\n]`;
+  }
+}
+
+// --- Example usage / smoke test ---
+
+const A = new Matrix([
+  [1, 2, 3],
+  [4, 5, 6],
+]);
+
+const B = new Matrix([
+  [7, 8],
+  [9, 10],
+  [11, 12],
+]);
+
+const C = A.multiply(B);
+console.log("A * B =");
+console.log(C.toString());
+
+const T = A.transpose();
+console.log("A^T =");
+console.log(T.toString());
+
+const square = new Matrix([
+  [1, 2, 3],
+  [4, 5, 6],
+  [7, 8, 9],
+]);
+
+console.log("det(square) =", square.determinant());
+
+const square2 = new Matrix([
+  [3, 8],
+  [4, 6],
+]);
+
+console.log("det(square2) =", square2.determinant()); // expected: 3*6 - 8*4 = 18 - 32 = -14
+
+// Test error on non-square determinant
+try {
+  A.determinant();
+} catch (e) {
+  console.log("Expected error:", (e as Error).message);
+}
+
+// Test error on shape mismatch for multiplication
+try {
+  A.multiply(A);
+} catch (e) {
+  console.log("Expected error:", (e as Error).message);
+}

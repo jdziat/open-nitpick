@@ -1,0 +1,132 @@
+package main
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+// TokenBucket is a thread-safe token bucket rate limiter.
+type TokenBucket struct {
+	mu         sync.Mutex
+	capacity   float64
+	tokens     float64
+	refillRate float64 // tokens per second
+	lastRefill time.Time
+}
+
+// NewTokenBucket creates a new TokenBucket with the given capacity and refill rate (tokens/sec).
+// The bucket starts full.
+func NewTokenBucket(capacity float64, refillRate float64) *TokenBucket {
+	return &TokenBucket{
+		capacity:   capacity,
+		tokens:     capacity,
+		refillRate: refillRate,
+		lastRefill: time.Now(),
+	}
+}
+
+// refill adds tokens based on elapsed time since last refill.
+// Must be called with tb.mu held.
+func (tb *TokenBucket) refill() {
+	now := time.Now()
+	elapsed := now.Sub(tb.lastRefill).Seconds()
+	tb.tokens += elapsed * tb.refillRate
+	if tb.tokens > tb.capacity {
+		tb.tokens = tb.capacity
+	}
+	tb.lastRefill = now
+}
+
+// Allow attempts to consume n tokens from the bucket.
+// Returns true if the tokens were available and consumed, false otherwise.
+func (tb *TokenBucket) Allow(n float64) bool {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+
+	tb.refill()
+
+	if tb.tokens >= n {
+		tb.tokens -= n
+		return true
+	}
+	return false
+}
+
+// AllowOne attempts to consume a single token from the bucket.
+func (tb *TokenBucket) AllowOne() bool {
+	return tb.Allow(1)
+}
+
+// Tokens returns the current number of available tokens (approximate).
+func (tb *TokenBucket) Tokens() float64 {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+	tb.refill()
+	return tb.tokens
+}
+
+// Wait blocks until n tokens are available and then consumes them.
+func (tb *TokenBucket) Wait(n float64) {
+	for {
+		tb.mu.Lock()
+		tb.refill()
+		if tb.tokens >= n {
+			tb.tokens -= n
+			tb.mu.Unlock()
+			return
+		}
+		// Calculate how long to wait for enough tokens.
+		needed := n - tb.tokens
+		waitDuration := time.Duration(needed/tb.refillRate*float64(time.Second))
+		tb.mu.Unlock()
+
+		if waitDuration > 0 {
+			time.Sleep(waitDuration)
+		}
+	}
+}
+
+func main() {
+	// Example: capacity=5 tokens, refill rate=2 tokens/sec
+	tb := NewTokenBucket(5, 2)
+
+	var wg sync.WaitGroup
+	results := make(chan string, 20)
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			if tb.AllowOne() {
+				results <- fmt.Sprintf("goroutine %d: allowed", id)
+			} else {
+				results <- fmt.Sprintf("goroutine %d: denied", id)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(results)
+
+	for r := range results {
+		fmt.Println(r)
+	}
+
+	fmt.Printf("Tokens remaining after burst: %.2f\n", tb.Tokens())
+
+	// Wait for refill and try again
+	fmt.Println("Waiting 2 seconds for refill...")
+	time.Sleep(2 * time.Second)
+	fmt.Printf("Tokens after 2s: %.2f\n", tb.Tokens())
+
+	// Demonstrate Wait
+	fmt.Println("Using Wait to consume 3 tokens...")
+	tb2 := NewTokenBucket(3, 1)
+	// Drain the bucket
+	tb2.Allow(3)
+	fmt.Printf("Tokens after drain: %.2f\n", tb2.Tokens())
+	start := time.Now()
+	tb2.Wait(2)
+	fmt.Printf("Wait completed in %.2fs, tokens remaining: %.2f\n", time.Since(start).Seconds(), tb2.Tokens())
+}

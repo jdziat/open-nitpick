@@ -1,0 +1,116 @@
+package main
+
+import "fmt"
+
+type Node struct {
+	Value int
+	Left  *Node
+	Right *Node
+}
+
+type BST struct {
+	Root *Node
+}
+
+func (bst *BST) Insert(val int) {
+	bst.Root = insert(bst.Root, val)
+}
+
+func insert(node *Node, val int) *Node {
+	if node == nil {
+		return &Node{Value: val}
+	}
+	if val < node.Value {
+		node.Left = insert(node.Left, val)
+	} else if val > node.Value {
+		node.Right = insert(node.Right, val)
+	}
+	return node
+}
+
+func (bst *BST) Search(val int) bool {
+	return search(bst.Root, val)
+}
+
+func search(node *Node, val int) bool {
+	if node == nil {
+		return false
+	}
+	if val == node.Value {
+		return true
+	}
+	if val < node.Value {
+		return search(node.Left, val)
+	}
+	return search(node.Right, val)
+}
+
+func (bst *BST) Delete(val int) {
+	bst.Root = deleteNode(bst.Root, val)
+}
+
+func deleteNode(node *Node, val int) *Node {
+	if node == nil {
+		return nil
+	}
+
+	if val < node.Value {
+		node.Left = deleteNode(node.Left, val)
+	} else if val > node.Value {
+		node.Right = deleteNode(node.Right, val)
+	} else {
+		if node.Left == nil {
+			return node.Right
+		} else if node.Right == nil {
+			return node.Left
+		}
+
+		minNode := findMin(node.Right)
+		node.Value = minNode.Value
+		node.Right = deleteNode(node.Right, minNode.Value)
+	}
+	return node
+}
+
+func findMin(node *Node) *Node {
+	for node.Left != nil {
+		node = node.Left
+	}
+	return node
+}
+
+func (bst *BST) InOrder() {
+	inOrder(bst.Root)
+	fmt.Println()
+}
+
+func inOrder(node *Node) {
+	if node == nil {
+		return
+	}
+	inOrder(node.Left)
+	fmt.Printf("%d ", node.Value)
+	inOrder(node.Right)
+}
+
+func main() {
+	bst := &BST{}
+	nums := []int{50, 30, 20, 40, 70, 60, 80}
+	for _, n := range nums {
+		bst.Insert(n)
+	}
+
+	fmt.Print("In-order: ")
+	bst.InOrder()
+
+	fmt.Printf("Search 40: %v\n", bst.Search(40))
+	fmt.Printf("Search 100: %v\n", bst.Search(100))
+
+	fmt.Println("Deleting 20, 50, 80...")
+	bst.Delete(20)
+	bst.Delete(50)
+	bst.Delete(80)
+
+	fmt.Print("In-order: ")
+	bst.InOrder()
+}

@@ -1,0 +1,32 @@
+import re
+from collections import Counter
+
+def get_top_words(text, k=10):
+    """
+    Normalizes text by removing punctuation and converting to lowercase,
+    then returns the top K most frequent words.
+    """
+    # Remove punctuation using regex and convert to lowercase
+    # This keeps only alphanumeric characters and spaces
+    normalized_text = re.sub(r'[^\w\s]', '', text.lower())
+    
+    # Split into words based on whitespace
+    words = normalized_text.split()
+    
+    # Count frequencies
+    counts = Counter(words)
+    
+    # Return the K most common words
+    return counts.most_common(k)
+
+if __name__ == "__main__":
+    sample_text = """
+    Hello world! This is a test. Hello again, world. 
+    This test is only a test. Python is great, and Python is fast!
+    """
+    top_k = 5
+    result = get_top_words(sample_text, top_k)
+    
+    print(f"Top {top_k} words:")
+    for word, count in result:
+        print(f"{word}: {count}")

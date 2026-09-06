@@ -1,0 +1,52 @@
+package daterange
+
+import "time"
+
+// Iterator yields each date from start through end, inclusive.
+type Iterator struct {
+	start         time.Time
+	end           time.Time
+	current       time.Time
+	skipWeekends  bool
+}
+
+// New creates an iterator over the dates from start through end, inclusive.
+// The time of day is discarded, and dates are interpreted in start's location.
+func New(start, end time.Time, skipWeekends bool) *Iterator {
+	loc := start.Location()
+	start = dateOnly(start, loc)
+	end = dateOnly(end.In(loc), loc)
+
+	return &Iterator{
+		start:        start,
+		end:          end,
+		current:      start,
+		skipWeekends: skipWeekends,
+	}
+}
+
+// Next returns the next date and true, or the zero time and false when exhausted.
+func (it *Iterator) Next() (time.Time, bool) {
+	for !it.current.After(it.end) {
+		current := it.current
+		it.current = it.current.AddDate(0, 0, 1)
+
+		if it.skipWeekends &&
+			(current.Weekday() == time.Saturday || current.Weekday() == time.Sunday) {
+			continue
+		}
+
+		return current, true
+	}
+
+	return time.Time{}, false
+}
+
+// Reset rewinds the iterator to its starting date.
+func (it *Iterator) Reset() {
+	it.current = it.start
+}
+
+func dateOnly(t time.Time, loc *time.Location) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+}

@@ -1,0 +1,116 @@
+package main
+
+import "fmt"
+
+// PriorityQueue is a priority queue backed by a binary heap, ordered by a
+// caller-supplied comparison. less(a, b) reports whether a has higher
+// priority than b, i.e. whether a should leave the queue before b.
+type PriorityQueue[T any] struct {
+	items []T
+	less  func(a, b T) bool
+}
+
+// New returns an empty PriorityQueue ordered by less.
+func New[T any](less func(a, b T) bool) *PriorityQueue[T] {
+	return &PriorityQueue[T]{less: less}
+}
+
+// Len returns the number of elements currently in the queue.
+func (q *PriorityQueue[T]) Len() int {
+	return len(q.items)
+}
+
+// Push inserts v into the queue in O(log n) time.
+func (q *PriorityQueue[T]) Push(v T) {
+	q.items = append(q.items, v)
+	q.siftUp(len(q.items) - 1)
+}
+
+// Peek returns the highest-priority element without removing it. The second
+// return value reports whether the queue was non-empty.
+func (q *PriorityQueue[T]) Peek() (T, bool) {
+	if len(q.items) == 0 {
+		var zero T
+		return zero, false
+	}
+	return q.items[0], true
+}
+
+// Pop removes and returns the highest-priority element in O(log n) time.
+// The second return value reports whether the queue was non-empty.
+func (q *PriorityQueue[T]) Pop() (T, bool) {
+	if len(q.items) == 0 {
+		var zero T
+		return zero, false
+	}
+	top := q.items[0]
+	n := len(q.items) - 1
+	q.items[0] = q.items[n]
+	var zero T
+	q.items[n] = zero // don't retain a reference to the removed element
+	q.items = q.items[:n]
+	if n > 0 {
+		q.siftDown(0)
+	}
+	return top, true
+}
+
+// siftUp restores the heap invariant by moving the element at index i
+// toward the root.
+func (q *PriorityQueue[T]) siftUp(i int) {
+	for i > 0 {
+		parent := (i - 1) / 2
+		if !q.less(q.items[i], q.items[parent]) {
+			return
+		}
+		q.items[i], q.items[parent] = q.items[parent], q.items[i]
+		i = parent
+	}
+}
+
+// siftDown restores the heap invariant by moving the element at index i
+// toward the leaves.
+func (q *PriorityQueue[T]) siftDown(i int) {
+	n := len(q.items)
+	for {
+		left := 2*i + 1
+		if left >= n {
+			return
+		}
+		best := left
+		if right := left + 1; right < n && q.less(q.items[right], q.items[left]) {
+			best = right
+		}
+		if !q.less(q.items[best], q.items[i]) {
+			return
+		}
+		q.items[i], q.items[best] = q.items[best], q.items[i]
+		i = best
+	}
+}
+
+func main() {
+	// Min-heap: smallest int has highest priority.
+	min := New(func(a, b int) bool { return a < b })
+	for _, v := range []int{5, 1, 4, 1, 3, 9, 2} {
+		min.Push(v)
+	}
+	if v, ok := min.Peek(); ok {
+		fmt.Println("peek:", v)
+	}
+	for min.Len() > 0 {
+		v, _ := min.Pop()
+		fmt.Print(v, " ")
+	}
+	fmt.Println()
+
+	// Custom ordering: longest string has highest priority.
+	longest := New(func(a, b string) bool { return len(a) > len(b) })
+	longest.Push("hi")
+	longest.Push("hello")
+	longest.Push("hey")
+	for longest.Len() > 0 {
+		v, _ := longest.Pop()
+		fmt.Println(v)
+	}
+}

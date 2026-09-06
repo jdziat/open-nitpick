@@ -1,0 +1,32 @@
+interface Entry {
+  url: string;
+  expiresAt: number;
+}
+
+const store = new Map<string, Entry>();
+const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+function generateCode(length = 6): string {
+  let code = "";
+  do {
+    code = Array.from({ length }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+  } while (store.has(code));
+  return code;
+}
+
+export function shorten(url: string, ttlMs: number = 60_000): string {
+  const code = generateCode();
+  const expiresAt = Date.now() + Math.max(0, ttlMs);
+  store.set(code, { url, expiresAt });
+  return code;
+}
+
+export function resolve(code: string): string | null {
+  const entry = store.get(code);
+  if (!entry) return null;
+  if (Date.now() >= entry.expiresAt) {
+    store.delete(code);
+    return null;
+  }
+  return entry.url;
+}

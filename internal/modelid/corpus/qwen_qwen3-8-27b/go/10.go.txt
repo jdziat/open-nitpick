@@ -1,0 +1,80 @@
+package urlshortener
+
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"sync"
+	"time"
+)
+
+type entry struct {
+	url       string
+	expiresAt time.Time
+}
+
+var (
+	mu   sync.RWMutex
+	data = make(map[string]entry)
+)
+
+func Shorten(url string, ttl time.Duration) (string, error) {
+	if url == "" {
+		return "", errors.New("url is empty")
+	}
+	if ttl <= 0 {
+		return "", errors.New("ttl must be positive")
+	}
+
+	code, err := randomCode()
+	if err != nil {
+		return "", err
+	}
+
+	now := time.Now()
+	mu.Lock()
+	defer mu.Unlock()
+
+	for {
+		old, exists := data[code]
+		if !exists || !old.expiresAt.After(now) {
+			data[code] = entry{url: url, expiresAt: now.Add(ttl)}
+			return code, nil
+		}
+
+		code, err = randomCode()
+		if err != nil {
+			return "", err
+		}
+	}
+}
+
+func Resolve(code string) (string, error) {
+	if code == "" {
+		return "", errors.New("code is empty")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, ok := data[code]
+	if !ok {
+		return "", fmt.Errorf("short code %q not found", code)
+	}
+
+	if time.Now().After(e.expiresAt) {
+		delete(data, code)
+		return "", fmt.Errorf("short code %q expired", code)
+	}
+
+	return e.url, nil
+}
+
+func randomCode() (string, error) {
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}

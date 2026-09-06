@@ -1,0 +1,22 @@
+package slug
+
+import (
+	"strings"
+	"unicode"
+)
+
+func Slugify(s string) string {
+	s = strings.ToLower(s)
+	var b strings.Builder
+	prevAlnum := false
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			prevAlnum = true
+		} else if prevAlnum {
+			b.WriteRune('-')
+			prevAlnum = false
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}

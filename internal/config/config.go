@@ -365,6 +365,12 @@ type Review struct {
 	// exists so the layer's contribution can be measured on its own.
 	ModelNotes *bool `yaml:"model_notes"`
 
+	// Slop asks the model for, and publishes, findings in the slop class:
+	// generated-looking code that costs a reader, defined rule by rule in
+	// the prompt layer prompt.SlopGuidance. Off by default in a review; a
+	// whole-tree review turns it on. Independent of the nitpick level.
+	Slop bool `yaml:"slop"`
+
 	// RelatedContextTokens bounds how much related context is attached per
 	// batch. It is spent from the request budget, so a large value narrows
 	// the window each changed file itself gets.

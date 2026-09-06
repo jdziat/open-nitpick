@@ -1,0 +1,69 @@
+const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const DEFAULT_TTL_MS = 60 * 60 * 1000;
+
+interface Entry {
+  url: string;
+  expiresAt: number;
+}
+
+export class URLShortener {
+  private readonly entries = new Map<string, Entry>();
+  private readonly defaultTtlMs: number;
+  private nextId = 1;
+
+  constructor(defaultTtlMs = DEFAULT_TTL_MS) {
+    if (!Number.isFinite(defaultTtlMs) || defaultTtlMs <= 0) {
+      throw new RangeError("defaultTtlMs must be a positive finite number");
+    }
+
+    this.defaultTtlMs = defaultTtlMs;
+  }
+
+  shorten(url: string, ttlMs = this.defaultTtlMs): string {
+    if (!url) {
+      throw new TypeError("url must not be empty");
+    }
+
+    if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
+      throw new RangeError("ttlMs must be a positive finite number");
+    }
+
+    let code: string;
+    do {
+      code = this.encode(this.nextId++);
+    } while (this.entries.has(code));
+
+    this.entries.set(code, {
+      url,
+      expiresAt: Date.now() + ttlMs,
+    });
+
+    return code;
+  }
+
+  resolve(code: string): string | null {
+    const entry = this.entries.get(code);
+
+    if (!entry) {
+      return null;
+    }
+
+    if (Date.now() >= entry.expiresAt) {
+      this.entries.delete(code);
+      return null;
+    }
+
+    return entry.url;
+  }
+
+  private encode(value: number): string {
+    let code = "";
+
+    while (value > 0) {
+      code = ALPHABET[value % ALPHABET.length] + code;
+      value = Math.floor(value / ALPHABET.length);
+    }
+
+    return code.padStart(6, "0");
+  }
+}

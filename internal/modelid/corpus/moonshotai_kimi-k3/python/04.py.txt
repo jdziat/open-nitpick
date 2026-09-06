@@ -1,0 +1,29 @@
+"""Slugify utility: convert arbitrary text into URL-friendly slugs."""
+
+import re
+import unicodedata
+
+
+def slugify(text):
+    """Convert text to a URL-friendly slug.
+
+    The text is lowercased, Unicode characters are transliterated to
+    their closest ASCII equivalents (e.g. "é" -> "e"), runs of
+    non-alphanumeric characters are replaced with single hyphens, and
+    leading/trailing hyphens are removed.
+    """
+    text = unicodedata.normalize("NFKD", str(text))
+    text = text.encode("ascii", "ignore").decode("ascii")
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9]+", "-", text)
+    return text.strip("-")
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) > 1:
+        print(slugify(" ".join(sys.argv[1:])))
+    else:
+        for line in sys.stdin:
+            print(slugify(line.rstrip("\n")))

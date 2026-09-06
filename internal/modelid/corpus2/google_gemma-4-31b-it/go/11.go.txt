@@ -1,0 +1,113 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"math"
+)
+
+type Matrix [][]float64
+
+func NewMatrix(rows, cols int) Matrix {
+	m := make(Matrix, rows)
+	for i := range m {
+		m[i] = make([]float64, cols)
+	}
+	return m
+}
+
+func (m Matrix) Rows() int {
+	return len(m)
+}
+
+func (m Matrix) Cols() int {
+	if len(m) == 0 {
+		return 0
+	}
+	return len(m[0])
+}
+
+func (m Matrix) Multiply(other Matrix) (Matrix, error) {
+	if m.Cols() != other.Rows() {
+		return nil, errors.New("shape mismatch: columns of first must equal rows of second")
+	}
+
+	res := NewMatrix(m.Rows(), other.Cols())
+	for i := 0; i < m.Rows(); i++ {
+		for j := 0; j < other.Cols(); j++ {
+			sum := 0.0
+			for k := 0; k < m.Cols(); k++ {
+				sum += m[i][k] * other[k][j]
+			}
+			res[i][j] = sum
+		}
+	}
+	return res, nil
+}
+
+func (m Matrix) Transpose() Matrix {
+	rows, cols := m.Rows(), m.Cols()
+	res := NewMatrix(cols, rows)
+	for i := 0; i < rows; i++ {
+		for j := 0; j < cols; j++ {
+			res[j][i] = m[i][j]
+		}
+	}
+	return res
+}
+
+func (m Matrix) Determinant() (float64, error) {
+	rows, cols := m.Rows(), m.Cols()
+	if rows != cols {
+		return 0, errors.New("matrix must be square to calculate determinant")
+	}
+
+	if rows == 1 {
+		return m[0][0], nil
+	}
+	if rows == 2 {
+		return m[0][0]*m[1][1] - m[0][1]*m[1][0], nil
+	}
+
+	det := 0.0
+	for j := 0; j < cols; j++ {
+		sub := NewMatrix(rows-1, cols-1)
+		for row := 1; row < rows; row++ {
+			colIdx := 0
+			for col := 0; col < cols; col++ {
+				if col == j {
+					continue
+				}
+				sub[row-1][colIdx] = m[row][col]
+				colIdx++
+			}
+		}
+		subDet, _ := sub.Determinant()
+		if j%2 == 0 {
+			det += m[0][j] * subDet
+		} else {
+			det -= m[0][j] * subDet
+		}
+	}
+	return det, nil
+}
+
+func main() {
+	a := Matrix{
+		{1, 2},
+		{3, 4},
+	}
+	b := Matrix{
+		{5, 6},
+		{7, 8},
+	}
+
+	prod, _ := a.Multiply(b)
+	fmt.Printf("Product: %v\n", prod)
+
+	trans := a.Transpose()
+	fmt.Printf("Transpose of A: %v\n", trans)
+
+	det, _ := a.Determinant()
+	fmt.Printf("Determinant of A: %f\n", det)
+}

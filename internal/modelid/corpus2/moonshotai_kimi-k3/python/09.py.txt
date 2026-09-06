@@ -1,0 +1,83 @@
+"""Date-range iterator yielding each day between two dates inclusive."""
+
+from datetime import date, datetime, timedelta
+from typing import Iterator, Union
+
+DateLike = Union[date, datetime, str]
+
+
+def _to_date(value: DateLike) -> date:
+    """Convert a date, datetime, or ISO 8601 string to a date."""
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        return date.fromisoformat(value)
+    raise TypeError(f"Unsupported date type: {type(value)!r}")
+
+
+def date_range(
+    start: DateLike,
+    end: DateLike,
+    *,
+    skip_weekends: bool = False,
+) -> Iterator[date]:
+    """Yield each day from ``start`` to ``end``, inclusive.
+
+    Args:
+        start: First day to yield (date, datetime, or ISO 8601 string).
+        end: Last day to yield (inclusive).
+        skip_weekends: When True, Saturdays and Sundays are omitted.
+
+    Yields:
+        datetime.date objects, one per day, in ascending order.
+
+    Raises:
+        ValueError: If ``start`` is after ``end``.
+    """
+    current = _to_date(start)
+    last = _to_date(end)
+    if current > last:
+        raise ValueError("start must not be after end")
+
+    one_day = timedelta(days=1)
+    while current <= last:
+        if not skip_weekends or current.weekday() < 5:
+            yield current
+        current += one_day
+
+
+class DateRange:
+    """Reusable iterable version of :func:`date_range`."""
+
+    def __init__(self, start: DateLike, end: DateLike, *, skip_weekends: bool = False):
+        self.start = _to_date(start)
+        self.end = _to_date(end)
+        if self.start > self.end:
+            raise ValueError("start must not be after end")
+        self.skip_weekends = skip_weekends
+
+    def __iter__(self) -> Iterator[date]:
+        return date_range(self.start, self.end, skip_weekends=self.skip_weekends)
+
+    def __len__(self) -> int:
+        total = (self.end - self.start).days + 1
+        if not self.skip_weekends:
+            return total
+        full_weeks, extra = divmod(total, 7)
+        weekdays = full_weeks * 5
+        for i in range(extra):
+            if (self.start + timedelta(days=i)).weekday() < 5:
+                weekdays += 1
+        return weekdays
+
+
+if __name__ == "__main__":
+    print("All days from 2024-06-01 to 2024-06-10:")
+    for day in date_range("2024-06-01", "2024-06-10"):
+        print(" ", day, day.strftime("%A"))
+
+    print("\nWeekdays only:")
+    for day in date_range("2024-06-01", "2024-06-10", skip_weekends=True):
+        print(" ", day, day.strftime("%A"))

@@ -1,0 +1,98 @@
+// Command wordfreq reads text from standard input, normalises case and
+// punctuation, and prints the top K most frequent words with their counts.
+//
+// Usage:
+//
+//	wordfreq -k 10 < input.txt
+package main
+
+import (
+	"bufio"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"sort"
+	"strings"
+	"unicode"
+)
+
+// tokenize reads r, lowercases it, and splits it into words. A word is a
+// maximal run of Unicode letters or digits; every other rune is treated as a
+// separator.
+func tokenize(r io.Reader) ([]string, error) {
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+
+	var (
+		words []string
+		b     strings.Builder
+	)
+	flush := func() {
+		if b.Len() > 0 {
+			words = append(words, b.String())
+			b.Reset()
+		}
+	}
+
+	for sc.Scan() {
+		for _, r := range strings.ToLower(sc.Text()) {
+			if unicode.IsLetter(r) || unicode.IsDigit(r) {
+				b.WriteRune(r)
+			} else {
+				flush()
+			}
+		}
+		flush()
+	}
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	return words, nil
+}
+
+type entry struct {
+	word  string
+	count int
+}
+
+// topK returns the k highest-count entries, ties broken alphabetically.
+func topK(counts map[string]int, k int) []entry {
+	if k < 0 {
+		k = 0
+	}
+	entries := make([]entry, 0, len(counts))
+	for w, c := range counts {
+		entries = append(entries, entry{w, c})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].count != entries[j].count {
+			return entries[i].count > entries[j].count
+		}
+		return entries[i].word < entries[j].word
+	})
+	if k > len(entries) {
+		k = len(entries)
+	}
+	return entries[:k]
+}
+
+func main() {
+	k := flag.Int("k", 10, "number of top words to report")
+	flag.Parse()
+
+	words, err := tokenize(os.Stdin)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "wordfreq:", err)
+		os.Exit(1)
+	}
+
+	counts := make(map[string]int, len(words))
+	for _, w := range words {
+		counts[w]++
+	}
+
+	for _, e := range topK(counts, *k) {
+		fmt.Printf("%s\t%d\n", e.word, e.count)
+	}
+}

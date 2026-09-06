@@ -115,7 +115,10 @@ func Defaults() *Config {
 			// knowing the fetch count and the measured gain.
 			RelatedContext:        true,
 			RelatedContextCallers: false,
-			RelatedContextTokens:  16000,
+			// Off until its controls are seen to be silent; see
+			// docs/plan-full-review.md, section 2.
+			Slop:                 false,
+			RelatedContextTokens: 16000,
 		},
 		Persona: DefaultPersona(),
 		// Stated rather than left to the zero value, because "off" here is a

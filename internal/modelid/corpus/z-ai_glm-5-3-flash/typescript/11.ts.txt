@@ -1,0 +1,151 @@
+export class MatrixShapeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MatrixShapeError";
+    Object.setPrototypeOf(this, MatrixShapeError.prototype);
+  }
+}
+
+export type MatrixEntries = ReadonlyArray<ReadonlyArray<number>>;
+
+export class Matrix {
+  private readonly data: ReadonlyArray<ReadonlyArray<number>>;
+
+  constructor(entries: MatrixEntries) {
+    if (!Array.isArray(entries) || entries.length === 0) {
+      throw new MatrixShapeError("A matrix must have at least one row.");
+    }
+    const cols = entries[0].length;
+    if (cols === 0) {
+      throw new MatrixShapeError("A matrix must have at least one column.");
+    }
+    for (let i = 0; i < entries.length; i++) {
+      const row = entries[i];
+      if (!Array.isArray(row) || row.length !== cols) {
+        throw new MatrixShapeError(
+          `Ragged matrix: row ${i} has length ${row?.length ?? 0}, expected ${cols}.`
+        );
+      }
+      for (let j = 0; j < cols; j++) {
+        if (typeof row[j] !== "number" || !Number.isFinite(row[j])) {
+          throw new TypeError(`Entry at (${i}, ${j}) is not a finite number.`);
+        }
+      }
+    }
+    this.data = entries.map((row) => [...row]);
+  }
+
+  static identity(size: number): Matrix {
+    if (!Number.isInteger(size) || size < 1) {
+      throw new RangeError(`Identity size must be a positive integer, got ${size}.`);
+    }
+    const entries: number[][] = [];
+    for (let i = 0; i < size; i++) {
+      const row = new Array<number>(size).fill(0);
+      row[i] = 1;
+      entries.push(row);
+    }
+    return new Matrix(entries);
+  }
+
+  get rows(): number {
+    return this.data.length;
+  }
+
+  get cols(): number {
+    return this.data[0].length;
+  }
+
+  get shape(): readonly [number, number] {
+    return [this.rows, this.cols] as const;
+  }
+
+  at(row: number, col: number): number {
+    this.assertRowIndex(row);
+    this.assertColIndex(col);
+    return this.data[row][col];
+  }
+
+  toArray(): number[][] {
+    return this.data.map((row) => [...row]);
+  }
+
+  multiply(other: Matrix): Matrix {
+    if (this.cols !== other.rows) {
+      throw new MatrixShapeError(
+        `Cannot multiply: left matrix is ${this.rows}x${this.cols}, right matrix is ` +
+          `${other.rows}x${other.cols} (inner dimensions ${this.cols} and ${other.rows} must match).`
+      );
+    }
+    const entries: number[][] = Array.from({ length: this.rows }, () =>
+      new Array<number>(other.cols).fill(0)
+    );
+    for (let i = 0; i < this.rows; i++) {
+      for (let k = 0; k < this.cols; k++) {
+        const left = this.data[i][k];
+        if (left === 0) continue;
+        for (let j = 0; j < other.cols; j++) {
+          entries[i][j] += left * other.data[k][j];
+        }
+      }
+    }
+    return new Matrix(entries);
+  }
+
+  transpose(): Matrix {
+    const entries: number[][] = Array.from({ length: this.cols }, () =>
+      new Array<number>(this.rows).fill(0)
+    );
+    for (let i = 0; i < this.rows; i++) {
+      for (let j = 0; j < this.cols; j++) {
+        entries[j][i] = this.data[i][j];
+      }
+    }
+    return new Matrix(entries);
+  }
+
+  determinant(): number {
+    if (this.rows !== this.cols) {
+      throw new MatrixShapeError(
+        `Determinant requires a square matrix, got ${this.rows}x${this.cols}.`
+      );
+    }
+    const n = this.rows;
+    const a: number[][] = this.toArray();
+    let sign = 1;
+
+    // Gaussian elimination with partial pivoting, O(n^3).
+    for (let col = 0; col < n; col++) {
+      let pivot = col;
+      for (let row = col + 1; row < n; row++) {
+        if (Math.abs(a[row][col]) > Math.abs(a[pivot][col])) {
+          pivot = row;
+        }
+      }
+      if (a[pivot][col] === 0) {
+        return 0; // Singular matrix.
+      }
+      if (pivot !== col) {
+        const tmp = a[col];
+        a[col] = a[pivot];
+        a[pivot] = tmp;
+        sign = -sign;
+      }
+      for (let row = col + 1; row < n; row++) {
+        const factor = a[row][col] / a[col][col];
+        if (factor === 0) continue;
+        for (let c = col; c < n; c++) {
+          a[row][c] -= factor * a[col][c];
+        }
+        a[row][col] = 0;
+      }
+    }
+
+    let det = sign;
+    for (let i = 0; i < n; i++) {
+      det *= a[i][i];
+    }
+    return det;
+  }
+
+  toString(): string {

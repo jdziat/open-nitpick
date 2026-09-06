@@ -1,0 +1,145 @@
+class ShapeError(ValueError):
+    """Raised when matrix dimensions are incompatible."""
+
+
+class Matrix:
+    def __init__(self, rows):
+        if isinstance(rows, Matrix):
+            rows = rows._data
+
+        rows = list(rows)
+
+        if not rows:
+            self._data = ()
+            self._rows = 0
+            self._cols = 0
+            return
+
+        normalized = [tuple(row) for row in rows]
+        column_count = len(normalized[0])
+
+        if any(len(row) != column_count for row in normalized):
+            raise ShapeError("matrix rows must all have the same length")
+
+        self._data = tuple(normalized)
+        self._rows = len(normalized)
+        self._cols = column_count
+
+    @property
+    def shape(self):
+        return self._rows, self._cols
+
+    @property
+    def rows(self):
+        return self._rows
+
+    @property
+    def columns(self):
+        return self._cols
+
+    @property
+    def data(self):
+        return [list(row) for row in self._data]
+
+    def __getitem__(self, index):
+        return self._data[index]
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return self._rows
+
+    def __repr__(self):
+        return "Matrix({!r})".format(self.data)
+
+    def __eq__(self, other):
+        return isinstance(other, Matrix) and self._data == other._data
+
+    def transpose(self):
+        if self._rows == 0:
+            return Matrix([])
+
+        return Matrix(
+            [
+                [self._data[row][column] for row in range(self._rows)]
+                for column in range(self._cols)
+            ]
+        )
+
+    @property
+    def T(self):
+        return self.transpose()
+
+    def __matmul__(self, other):
+        if not isinstance(other, Matrix):
+            return NotImplemented
+
+        if self._cols != other._rows:
+            raise ShapeError(
+                "cannot multiply matrices with shapes {} and {}".format(
+                    self.shape, other.shape
+                )
+            )
+
+        result = [
+            [
+                sum(
+                    self._data[i][k] * other._data[k][j]
+                    for k in range(self._cols)
+                )
+                for j in range(other._cols)
+            ]
+            for i in range(self._rows)
+        ]
+        return Matrix(result)
+
+    def __mul__(self, other):
+        return self.__matmul__(other)
+
+    def multiply(self, other):
+        return self.__matmul__(other)
+
+    def determinant(self):
+        if self._rows != self._cols:
+            raise ShapeError(
+                "determinant is only defined for square matrices, got shape {}".format(
+                    self.shape
+                )
+            )
+
+        n = self._rows
+        if n == 0:
+            return 1
+
+        matrix = [list(row) for row in self._data]
+        determinant = 1
+
+        for column in range(n):
+            pivot = None
+            for row in range(column, n):
+                if matrix[row][column] != 0:
+                    pivot = row
+                    break
+
+            if pivot is None:
+                return 0
+
+            if pivot != column:
+                matrix[column], matrix[pivot] = matrix[pivot], matrix[column]
+                determinant = -determinant
+
+            pivot_value = matrix[column][column]
+            determinant *= pivot_value
+
+            for row in range(column + 1, n):
+                factor = matrix[row][column] / pivot_value
+                for current_column in range(column + 1, n):
+                    matrix[row][current_column] -= (
+                        factor * matrix[column][current_column]
+                    )
+
+        return determinant
+
+    def det(self):
+        return self.determinant()

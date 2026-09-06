@@ -1,0 +1,51 @@
+function* dateRangeIterator(
+  startDate: Date,
+  endDate: Date,
+  skipWeekends: boolean = false
+): Generator<Date> {
+  const current = new Date(startDate);
+  current.setHours(0, 0, 0, 0);
+
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+
+  while (current <= end) {
+    const dayOfWeek = current.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    if (!skipWeekends || !isWeekend) {
+      yield new Date(current);
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+}
+
+// Example usage
+const start = new Date("2024-01-01");
+const end = new Date("2024-01-14");
+
+console.log("All days from Jan 1 to Jan 14, 2024:");
+for (const date of dateRangeIterator(start, end)) {
+  console.log(date.toDateString());
+}
+
+console.log("\nWeekdays only from Jan 1 to Jan 14, 2024:");
+for (const date of dateRangeIterator(start, end, true)) {
+  console.log(date.toDateString());
+}
+
+// Collect into array helper
+function collectDates(
+  startDate: Date,
+  endDate: Date,
+  skipWeekends: boolean = false
+): Date[] {
+  return [...dateRangeIterator(startDate, endDate, skipWeekends)];
+}
+
+const allDays = collectDates(start, end);
+console.log(`\nTotal days: ${allDays.length}`);
+
+const weekdays = collectDates(start, end, true);
+console.log(`Total weekdays: ${weekdays.length}`);

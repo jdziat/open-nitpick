@@ -1,0 +1,167 @@
+/**
+ * token-bucket.ts
+ *
+ * A token-bucket rate limiter with a fixed capacity and a constant refill
+ * rate (tokens per second).
+ *
+ * Concurrency safety:
+ *   - Every mutation of bucket state happens inside a single synchronous
+ *     critical section (there is no `await` between checking the token
+ *     count and decrementing it). Because JavaScript/TypeScript executes
+ *     synchronous code atomically with respect to other tasks, concurrent
+ *     callers can never overdraw the bucket.
+ *   - Asynchronous waiters (consume()) are additionally serialized through
+ *     an internal promise chain, giving them strict FIFO ordering and
+ *     preventing wake-up races between concurrent consumers.
+ *
+ * Example:
+ *   const limiter = new TokenBucket({ capacity: 10, refillRatePerSecond: 2 });
+ *   if (limiter.tryConsume()) { ... }        // non-blocking
+ *   await limiter.consume(3);                // waits until 3 tokens exist
+ */
+
+export interface TokenBucketOptions {
+  /** Maximum number of tokens the bucket can hold. */
+  capacity: number;
+  /** Number of tokens added to the bucket per second. */
+  refillRatePerSecond: number;
+  /** Start with a full bucket (true, default) or an empty one (false). */
+  startFull?: boolean;
+  /** Clock override (milliseconds), useful for tests. Default: Date.now. */
+  now?: () => number;
+}
+
+export class TokenBucket {
+  private readonly capacity: number;
+  private readonly refillRatePerSecond: number;
+  private readonly now: () => number;
+
+  private tokens: number;
+  private lastRefillMs: number;
+
+  /**
+   * Tail of the promise chain that serializes asynchronous waiters.
+   * It never rejects; each waiter's errors are absorbed so the chain
+   * keeps moving for subsequent callers.
+   */
+  private tail: Promise<unknown> = Promise.resolve();
+
+  constructor(options: TokenBucketOptions) {
+    const { capacity, refillRatePerSecond, startFull = true, now = Date.now } = options;
+
+    if (!Number.isFinite(capacity) || capacity <= 0) {
+      throw new RangeError(`capacity must be a positive finite number, got ${capacity}`);
+    }
+    if (!Number.isFinite(refillRatePerSecond) || refillRatePerSecond <= 0) {
+      throw new RangeError(
+        `refillRatePerSecond must be a positive finite number, got ${refillRatePerSecond}`
+      );
+    }
+
+    this.capacity = capacity;
+    this.refillRatePerSecond = refillRatePerSecond;
+    this.now = now;
+    this.tokens = startFull ? capacity : 0;
+    this.lastRefillMs = this.now();
+  }
+
+  /** Maximum number of tokens the bucket can hold. */
+  get capacityTokens(): number {
+    return this.capacity;
+  }
+
+  /** Tokens available right now (after applying lazy refill). */
+  get availableTokens(): number {
+    this.refill();
+    return this.tokens;
+  }
+
+  /**
+   * Try to consume `count` tokens without waiting.
+   * Returns true and deducts the tokens if enough are available,
+   * otherwise returns false and leaves the bucket unchanged.
+   * Fully synchronous, therefore atomic.
+   */
+  tryConsume(count = 1): boolean {
+    this.validateCount(count);
+    this.refill();
+    if (this.tokens < count) return false;
+    this.tokens -= count;
+    return true;
+  }
+
+  /**
+   * Consume `count` tokens, waiting until enough are available.
+   * Concurrent callers are served in FIFO order. Note that tryConsume()
+   * is best-effort and may grab tokens ahead of queued waiters.
+   */
+  consume(count = 1): Promise<void> {
+    this.validateCount(count);
+    if (count > this.capacity) {
+      return Promise.reject(
+        new RangeError(
+          `cannot consume ${count} tokens from a bucket with capacity ${this.capacity}`
+        )
+      );
+    }
+    const result = this.tail.then(() => this.waitForAndConsume(count));
+    this.tail = result.then(noop, noop);
+    return result;
+  }
+
+  /** Seconds until at least `count` tokens will be available (0 if already available). */
+  timeUntilAvailable(count = 1): number {
+    this.validateCount(count);
+    this.refill();
+    const deficit = count - this.tokens;
+    return deficit <= 0 ? 0 : deficit / this.refillRatePerSecond;
+  }
+
+  // ----------------------------------------------------------------------
+
+  private validateCount(count: number): void {
+    if (!Number.isFinite(count) || count <= 0) {
+      throw new RangeError(`count must be a positive finite number, got ${count}`);
+    }
+  }
+
+  /**
+   * Lazily add the tokens accrued since the last refill.
+   * Synchronous and atomic; also tolerates backwards clock jumps.
+   */
+  private refill(): void {
+    const nowMs = this.now();
+    const elapsedMs = nowMs - this.lastRefillMs;
+    if (elapsedMs <= 0) return;
+    this.tokens = Math.min(
+      this.capacity,
+      this.tokens + (elapsedMs / 1000) * this.refillRatePerSecond
+    );
+    this.lastRefillMs = nowMs;
+  }
+
+  /**
+   * Runs with exclusive access (serialized by the waiter chain).
+   * The check-and-decrement contains no `await`, so it is atomic.
+   */
+  private async waitForAndConsume(count: number): Promise<void> {
+    for (;;) {
+      this.refill();
+      if (this.tokens >= count) {
+        this.tokens -= count;
+        return;
+      }
+      const missingTokens = count - this.tokens;
+      const waitMs = (missingTokens / this.refillRatePerSecond) * 1000;
+      await sleep(waitMs);
+    }
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => setTimeout(resolve, Math.max(0, ms)));
+}
+
+function noop(): void {}
+
+export default TokenBucket;

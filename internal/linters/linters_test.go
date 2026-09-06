@@ -10,6 +10,7 @@ import (
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // changedDiff adds lines 1..3 of app.go, so only those lines are commentable.
@@ -63,6 +64,28 @@ func baseConfig() *config.Config {
 	cfg := config.Defaults()
 	cfg.Models.Default = config.ModelSpec{Provider: "openai", Model: "gpt-4o"}
 	return cfg
+}
+
+// A finding the tool gave no line is dropped as unanchorable, with that
+// reason, not as "unchanged line 0".
+func TestAFindingWithNoLineIsUnanchorableNotUnchanged(t *testing.T) {
+	cfg := baseConfig()
+	runner := &fakeRunner{name: "fake", detected: true, findings: []Finding{
+		{Path: "app.go", Line: 0, Message: "no region", Severity: config.SeverityWarning},
+	}}
+	set := New(".", cfg, nil)
+	set.runners = []Runner{runner}
+	got, err := set.Run(context.Background(), parse(t, changedDiff))
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("findings = %+v, want none", got)
+	}
+	d := set.Discarded()
+	if len(d) != 1 || d[0].Reason != review.DiscardUnanchorable {
+		t.Errorf("discards = %+v, want one, unanchorable", d)
+	}
 }
 
 func TestFindingsOnUnchangedLinesAreDropped(t *testing.T) {

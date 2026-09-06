@@ -108,3 +108,14 @@ func TestGenerationLevelIsNormal(t *testing.T) {
 		t.Error("the generation level must not include style")
 	}
 }
+
+func TestNoNitpickLevelPublishesSlop(t *testing.T) {
+	for _, level := range []NitpickLevel{NitpickOff, NitpickMinimal, NitpickNormal, NitpickPedantic} {
+		if level.Publishes(ClassSlop) {
+			t.Errorf("level %s publishes slop; review.slop alone may", level)
+		}
+	}
+	if !NitpickPedantic.Publishes(ClassStyle) {
+		t.Errorf("pedantic no longer publishes style")
+	}
+}

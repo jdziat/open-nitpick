@@ -1,0 +1,70 @@
+/**
+ * LRU (least recently used) cache with a fixed capacity.
+ *
+ * Backed by a Map, whose iteration order is insertion order, to track
+ * recency: entries are re-inserted at the tail when touched, and the
+ * oldest entry (first key) is evicted when the cache is full.
+ *
+ * get and put are both O(1).
+ */
+export class LRUCache<K, V> {
+  private readonly capacity: number;
+  private readonly entries: Map<K, V>;
+
+  constructor(capacity: number) {
+    if (!Number.isInteger(capacity) || capacity < 0) {
+      throw new RangeError(
+        `capacity must be a non-negative integer, got ${capacity}`,
+      );
+    }
+    this.capacity = capacity;
+    this.entries = new Map<K, V>();
+  }
+
+  /** Number of entries currently stored. */
+  get size(): number {
+    return this.entries.size;
+  }
+
+  /**
+   * Returns the value for `key` if present and marks the entry as most
+   * recently used. Returns undefined if the key is absent.
+   */
+  get(key: K): V | undefined {
+    if (!this.entries.has(key)) {
+      return undefined;
+    }
+    const value = this.entries.get(key)!;
+    // Refresh recency: move entry to the most-recent position.
+    this.entries.delete(key);
+    this.entries.set(key, value);
+    return value;
+  }
+
+  /**
+   * Inserts or updates `key` with `value`, marking the entry as most
+   * recently used. If the cache is at capacity and the key is new, the
+   * least recently used entry is evicted.
+   */
+  put(key: K, value: V): void {
+    if (this.capacity === 0) {
+      return;
+    }
+    if (this.entries.has(key)) {
+      // Existing key: refresh its recency.
+      this.entries.delete(key);
+    } else if (this.entries.size >= this.capacity) {
+      // At capacity: evict the least recently used (oldest) entry.
+      const oldest = this.entries.keys().next();
+      if (!oldest.done) {
+        this.entries.delete(oldest.value);
+      }
+    }
+    this.entries.set(key, value);
+  }
+
+  /** Removes all entries. */
+  clear(): void {
+    this.entries.clear();
+  }
+}

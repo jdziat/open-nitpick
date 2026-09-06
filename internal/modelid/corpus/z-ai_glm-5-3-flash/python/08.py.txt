@@ -1,0 +1,142 @@
+"""A priority queue backed by a binary heap, ordered by a caller-supplied
+comparison.
+
+The comparator ``cmp(a, b)`` must return a negative number if ``a`` should be
+popped before ``b``, a positive number if ``b`` should be popped before ``a``,
+and zero if the two items are equivalent in priority.  The default comparator
+yields a min-heap over naturally ordered items.
+"""
+
+from __future__ import annotations
+
+from typing import Callable, Iterable, List, TypeVar
+
+T = TypeVar("T")
+
+Comparator = Callable[[T, T], int]
+
+
+def _default_cmp(a: T, b: T) -> int:
+    if a < b:
+        return -1
+    if a > b:
+        return 1
+    return 0
+
+
+class PriorityQueue:
+    """A binary-heap priority queue ordered by a caller-supplied comparison.
+
+    Parameters
+    ----------
+    cmp:
+        Comparison function ``cmp(a, b)`` returning a negative number, zero,
+        or a positive number when ``a`` should precede, tie with, or follow
+        ``b`` respectively.  Defaults to natural ordering (min-heap).
+    items:
+        Optional iterable used to seed the queue; built in O(n) via heapify.
+    """
+
+    def __init__(
+        self,
+        cmp: Comparator[T] | None = None,
+        items: Iterable[T] = (),
+    ) -> None:
+        self._cmp: Comparator[T] = _default_cmp if cmp is None else cmp
+        if not callable(self._cmp):
+            raise TypeError("cmp must be callable")
+        self._heap: List[T] = list(items)
+        for index in range(len(self._heap) // 2 - 1, -1, -1):
+            self._sift_down(index)
+
+    def __len__(self) -> int:
+        return len(self._heap)
+
+    def __bool__(self) -> bool:
+        return bool(self._heap)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(<{len(self._heap)} items>)"
+
+    def push(self, item: T) -> None:
+        """Add *item* to the queue.  O(log n)."""
+        heap = self._heap
+        heap.append(item)
+        self._sift_up(len(heap) - 1)
+
+    def pop(self) -> T:
+        """Remove and return the highest-priority item.  O(log n).
+
+        Raises:
+            IndexError: if the queue is empty.
+        """
+        heap = self._heap
+        if not heap:
+            raise IndexError("pop from an empty priority queue")
+        top = heap[0]
+        last = heap.pop()
+        if heap:
+            heap[0] = last
+            self._sift_down(0)
+        return top
+
+    def peek(self) -> T:
+        """Return, without removing, the highest-priority item.  O(1).
+
+        Raises:
+            IndexError: if the queue is empty.
+        """
+        if not self._heap:
+            raise IndexError("peek from an empty priority queue")
+        return self._heap[0]
+
+    # -- internal helpers ---------------------------------------------
+
+    def _sift_up(self, index: int) -> None:
+        heap = self._heap
+        cmp = self._cmp
+        item = heap[index]
+        while index > 0:
+            parent = (index - 1) // 2
+            if cmp(item, heap[parent]) < 0:
+                heap[index] = heap[parent]
+                index = parent
+            else:
+                break
+        heap[index] = item
+
+    def _sift_down(self, index: int) -> None:
+        heap = self._heap
+        cmp = self._cmp
+        n = len(heap)
+        item = heap[index]
+        while True:
+            child = 2 * index + 1
+            if child >= n:
+                break
+            right = child + 1
+            if right < n and cmp(heap[right], heap[child]) < 0:
+                child = right
+            if cmp(heap[child], item) < 0:
+                heap[index] = heap[child]
+                index = child
+            else:
+                break
+        heap[index] = item
+
+
+if __name__ == "__main__":
+    # Default comparator: min-heap over natural ordering.
+    q = PriorityQueue()
+    for value in (5, 1, 9, 3, 3, 7):
+        q.push(value)
+    assert [q.pop() for _ in range(len(q))] == [1, 3, 3, 5, 7, 9]
+
+    # Max-heap via a reversed comparator.
+    q = PriorityQueue(cmp=lambda a, b: (b > a) - (b < a))
+    for value in (5, 1, 9, 3):
+        q.push(value)
+    assert [q.pop() for _ in range(4)] == [9, 5, 3, 1]
+
+    # Custom comparator: shortest string pops first.
+    words = PriorityQueue(cmp=lambda a, b: len(a) - len(b))

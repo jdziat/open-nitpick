@@ -1,0 +1,45 @@
+/**
+ * tokenBucket.ts
+ *
+ * A token-bucket rate limiter that is safe to call from concurrent code.
+ *
+ * The bucket holds at most `capacity` tokens, starts full, and refills
+ * continuously at `refillPerSecond` tokens per second.
+ *
+ * Concurrency-safety notes (JavaScript/TypeScript event-loop model):
+ *  - The language has no preemptive threading within a realm: concurrent
+ *    async operations can only interleave at `await` points. Every state
+ *    mutation below (refill, deduction, queue manipulation, timer setup)
+ *    happens inside one synchronous block, so the bucket can never be
+ *    observed in a half-updated state by an interleaved caller.
+ *  - A queued waiter's tokens are deducted synchronously at the moment it is
+ *    dequeued (before its promise continuation runs), so multiple concurrent
+ *    `acquire()` calls can never consume the same token twice.
+ *  - Waiters are served strictly FIFO, and `tryAcquire()` refuses to "steal"
+ *    tokens while callers are queued, so non-blocking callers cannot starve
+ *    blocking ones (and vice versa).
+ *  - A single timer drives wake-ups; it is reset whenever the head of the
+ *    queue changes, so there are no lost or duplicate wake-ups.
+ */
+
+export interface TokenBucketOptions {
+  /** Maximum tokens the bucket can hold (burst size). Must be > 0. */
+  capacity: number;
+  /** Tokens added per second, continuously. Must be > 0. */
+  refillPerSecond: number;
+  /**
+   * Clock in milliseconds, injectable for testing (e.g. () => performance.now()).
+   * Defaults to Date.now().
+   */
+  clock?: () => number;
+}
+
+/** Float tolerance: elapsed-time refill math can leave tokens a hair under. */
+const EPSILON = 1e-9;
+
+class AbortedError extends Error {
+  constructor() {
+    super("acquire() aborted");
+    this.name = "AbortedError";
+  }
+}

@@ -1,0 +1,55 @@
+"""A retry helper with exponential backoff and jitter."""
+
+import random
+import time
+from typing import Callable, Tuple, Type, TypeVar, Union
+
+T = TypeVar("T")
+
+
+def retry(
+    func: Callable[..., T],
+    /,
+    *args,
+    attempts: int = 3,
+    base_delay: float = 0.5,
+    max_delay: float = 60.0,
+    backoff: float = 2.0,
+    jitter: float = 0.5,
+    exceptions: Tuple[Type[BaseException], ...] = (Exception,),
+    **kwargs,
+) -> Union[T, BaseException]:
+    """Call ``func(*args, **kwargs)``, retrying on failure.
+
+    The function is called up to ``attempts`` times. Between attempts the
+    caller sleeps for ``base_delay * backoff ** n`` seconds (capped at
+    ``max_delay``), where ``n`` is the number of failures so far. Each
+    delay is randomized by up to +/- ``jitter`` (a fraction of the delay)
+    to avoid thundering-herd effects.
+
+    Only exceptions that are instances of ``exceptions`` trigger a retry;
+    anything else propagates immediately.
+
+    Returns ``func``'s result on success. If every attempt fails, the
+    last caught exception is returned (not raised).
+
+    Raises:
+        ValueError: If ``attempts`` is less than 1.
+    """
+    if attempts < 1:
+        raise ValueError("attempts must be >= 1")
+
+    last_error: Union[BaseException, None] = None
+    for attempt in range(attempts):
+        try:
+            return func(*args, **kwargs)
+        except exceptions as exc:
+            last_error = exc
+            if attempt == attempts - 1:
+                break
+            delay = min(base_delay * (backoff ** attempt), max_delay)
+            if jitter > 0:
+                delta = delay * jitter
+                delay = random.uniform(delay - delta, delay + delta)
+            time.sleep(max(0.0, delay))
+    return last_error

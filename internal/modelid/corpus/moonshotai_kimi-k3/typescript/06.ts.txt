@@ -1,0 +1,136 @@
+class TreeNode<T> {
+    value: T;
+    left: TreeNode<T> | null;
+    right: TreeNode<T> | null;
+
+    constructor(value: T) {
+        this.value = value;
+        this.left = null;
+        this.right = null;
+    }
+}
+
+class BinarySearchTree<T> {
+    private root: TreeNode<T> | null = null;
+    private readonly compare: (a: T, b: T) => number;
+
+    constructor(compare?: (a: T, b: T) => number) {
+        this.compare = compare ?? ((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    }
+
+    insert(value: T): void {
+        this.root = this.insertNode(this.root, value);
+    }
+
+    private insertNode(node: TreeNode<T> | null, value: T): TreeNode<T> {
+        if (node === null) {
+            return new TreeNode(value);
+        }
+
+        const cmp = this.compare(value, node.value);
+        if (cmp < 0) {
+            node.left = this.insertNode(node.left, value);
+        } else if (cmp > 0) {
+            node.right = this.insertNode(node.right, value);
+        }
+        // Equal values (duplicates) are ignored.
+
+        return node;
+    }
+
+    search(value: T): boolean {
+        let current = this.root;
+
+        while (current !== null) {
+            const cmp = this.compare(value, current.value);
+            if (cmp < 0) {
+                current = current.left;
+            } else if (cmp > 0) {
+                current = current.right;
+            } else {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    delete(value: T): void {
+        this.root = this.deleteNode(this.root, value);
+    }
+
+    private deleteNode(node: TreeNode<T> | null, value: T): TreeNode<T> | null {
+        if (node === null) {
+            return null;
+        }
+
+        const cmp = this.compare(value, node.value);
+        if (cmp < 0) {
+            node.left = this.deleteNode(node.left, value);
+        } else if (cmp > 0) {
+            node.right = this.deleteNode(node.right, value);
+        } else {
+            // Node found. Handle the three cases.
+            if (node.left === null && node.right === null) {
+                return null; // Leaf node.
+            }
+            if (node.left === null) {
+                return node.right; // Only right child.
+            }
+            if (node.right === null) {
+                return node.left; // Only left child.
+            }
+            // Two children: copy the in-order successor's value,
+            // then delete the successor from the right subtree.
+            const successor = this.findMin(node.right);
+            node.value = successor.value;
+            node.right = this.deleteNode(node.right, successor.value);
+        }
+
+        return node;
+    }
+
+    private findMin(node: TreeNode<T>): TreeNode<T> {
+        while (node.left !== null) {
+            node = node.left;
+        }
+        return node;
+    }
+
+    inOrderTraversal(): T[] {
+        const result: T[] = [];
+        this.inOrder(this.root, result);
+        return result;
+    }
+
+    private inOrder(node: TreeNode<T> | null, result: T[]): void {
+        if (node === null) {
+            return;
+        }
+        this.inOrder(node.left, result);
+        result.push(node.value);
+        this.inOrder(node.right, result);
+    }
+}
+
+// --- Demo ---
+
+const tree = new BinarySearchTree<number>();
+
+for (const value of [8, 3, 10, 1, 6, 14, 4, 7, 13]) {
+    tree.insert(value);
+}
+
+console.log("In-order traversal:", tree.inOrderTraversal().join(" "));
+
+console.log("Search 6:", tree.search(6));
+console.log("Search 5:", tree.search(5));
+
+tree.delete(1); // leaf
+console.log("After deleting 1:", tree.inOrderTraversal().join(" "));
+
+tree.delete(14); // node with one child
+console.log("After deleting 14:", tree.inOrderTraversal().join(" "));
+
+tree.delete(3); // node with two children
+console.log("After deleting 3:", tree.inOrderTraversal().join(" "));

@@ -1,0 +1,190 @@
+/**
+ * Binary search tree (BST) supporting insert, search, delete,
+ * and in-order traversal.
+ *
+ * Duplicate values are ignored on insert (the tree behaves like a set).
+ * The default comparator assumes values are directly comparable with
+ * relational operators (numbers, strings, etc.). Pass a custom compare
+ * function to the constructor for other types.
+ */
+
+type CompareFn<T> = (a: T, b: T) => number;
+
+function defaultCompare<T>(a: T, b: T): number {
+  if (a === b) return 0;
+  return (a as unknown as number) < (b as unknown as number) ? -1 : 1;
+}
+
+class BinarySearchTreeNode<T> {
+  value: T;
+  left: BinarySearchTreeNode<T> | null = null;
+  right: BinarySearchTreeNode<T> | null = null;
+
+  constructor(value: T) {
+    this.value = value;
+  }
+}
+
+export class BinarySearchTree<T> {
+  private root: BinarySearchTreeNode<T> | null = null;
+  private compare: CompareFn<T>;
+  private count = 0;
+
+  constructor(compare: CompareFn<T> = defaultCompare) {
+    this.compare = compare;
+  }
+
+  /** Insert a value. Does nothing if the value already exists. O(h). */
+  insert(value: T): void {
+    if (this.root === null) {
+      this.root = new BinarySearchTreeNode(value);
+      this.count++;
+      return;
+    }
+
+    let current = this.root;
+    for (;;) {
+      const cmp = this.compare(value, current.value);
+      if (cmp < 0) {
+        if (current.left === null) {
+          current.left = new BinarySearchTreeNode(value);
+          this.count++;
+          return;
+        }
+        current = current.left;
+      } else if (cmp > 0) {
+        if (current.right === null) {
+          current.right = new BinarySearchTreeNode(value);
+          this.count++;
+          return;
+        }
+        current = current.right;
+      } else {
+        return; // duplicate: ignore
+      }
+    }
+  }
+
+  /** Return true if the value exists in the tree. O(h). */
+  search(value: T): boolean {
+    let current = this.root;
+    while (current !== null) {
+      const cmp = this.compare(value, current.value);
+      if (cmp === 0) return true;
+      current = cmp < 0 ? current.left : current.right;
+    }
+    return false;
+  }
+
+  /** Remove a value. Returns true if it was found and removed. O(h). */
+  delete(value: T): boolean {
+    if (!this.search(value)) return false;
+    this.root = this.removeNode(this.root, value);
+    this.count--;
+    return true;
+  }
+
+  /** Return all values in ascending order. O(n). */
+  inOrderTraversal(): T[] {
+    const result: T[] = [];
+    this.inOrderWalk(this.root, result);
+    return result;
+  }
+
+  get size(): number {
+    return this.count;
+  }
+
+  get isEmpty(): boolean {
+    return this.root === null;
+  }
+
+  /** Smallest value in the tree, or undefined if empty. */
+  min(): T | undefined {
+    return this.root === null ? undefined : this.minNode(this.root).value;
+  }
+
+  /** Largest value in the tree, or undefined if empty. */
+  max(): T | undefined {
+    return this.root === null ? undefined : this.maxNode(this.root).value;
+  }
+
+  /** Remove all values from the tree. */
+  clear(): void {
+    this.root = null;
+    this.count = 0;
+  }
+
+  private removeNode(
+    node: BinarySearchTreeNode<T> | null,
+    value: T
+  ): BinarySearchTreeNode<T> | null {
+    if (node === null) return null;
+
+    const cmp = this.compare(value, node.value);
+    if (cmp < 0) {
+      node.left = this.removeNode(node.left, value);
+    } else if (cmp > 0) {
+      node.right = this.removeNode(node.right, value);
+    } else {
+      // Node found. Handle the three deletion cases:
+      if (node.left === null) {
+        // Zero children or right child only.
+        return node.right;
+      }
+      if (node.right === null) {
+        // Left child only.
+        return node.left;
+      }
+      // Two children: replace value with the in-order successor
+      // (smallest value in the right subtree), then delete the
+      // successor from the right subtree.
+      const successor = this.minNode(node.right);
+      node.value = successor.value;
+      node.right = this.removeNode(node.right, successor.value);
+    }
+    return node;
+  }
+
+  private minNode(node: BinarySearchTreeNode<T>): BinarySearchTreeNode<T> {
+    while (node.left !== null) node = node.left;
+    return node;
+  }
+
+  private maxNode(node: BinarySearchTreeNode<T>): BinarySearchTreeNode<T> {
+    while (node.right !== null) node = node.right;
+    return node;
+  }
+
+  private inOrderWalk(
+    node: BinarySearchTreeNode<T> | null,
+    out: T[]
+  ): void {
+    if (node === null) return;
+    this.inOrderWalk(node.left, out);
+    out.push(node.value);
+    this.inOrderWalk(node.right, out);
+  }
+}
+
+// Example usage:
+//
+// const tree = new BinarySearchTree<number>();
+// tree.insert(50);
+// tree.insert(30);
+// tree.insert(70);
+// tree.insert(20);
+// tree.insert(40);
+// tree.insert(60);
+// tree.insert(80);
+//
+// tree.search(40);              // true
+// tree.search(99);              // false
+// tree.inOrderTraversal();      // [20, 30, 40, 50, 60, 70, 80]
+//
+// tree.delete(20);              // true  (leaf)
+// tree.delete(30);              // true  (one child)
+// tree.delete(50);              // true  (two children)
+// tree.inOrderTraversal();      // [40, 60, 70, 80]
+// tree.min();                   // 40
+// tree.max();                   // 80

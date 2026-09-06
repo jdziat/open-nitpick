@@ -1,0 +1,71 @@
+package main
+
+import (
+	"crypto/sha1"
+	"encoding/base64"
+	"fmt"
+	"sync"
+	"time"
+)
+
+type entry struct {
+	url    string
+	expiry time.Time
+}
+
+type Shortener struct {
+	mu    sync.RWMutex
+	store map[string]entry
+}
+
+func NewShortener() *Shortener {
+	return &Shortener{
+		store: make(map[string]entry),
+	}
+}
+
+func (s *Shortener) Shorten(url string, duration time.Duration) string {
+	h := sha1.New()
+	h.Write([]byte(url))
+	code := base64.URLEncoding.EncodeToString(h.Sum(nil))[:8]
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.store[code] = entry{
+		url:    url,
+		expiry: time.Now().Add(duration),
+	}
+	return code
+}
+
+func (s *Shortener) Resolve(code string) (string, bool) {
+	s.mu.RLock()
+	e, ok := s.store[code]
+	s.mu.RUnlock()
+
+	if !ok || time.Now().After(e.expiry) {
+		if ok {
+			s.mu.Lock()
+			delete(s.store, code)
+			s.mu.Unlock()
+		}
+		return "", false
+	}
+	return e.url, true
+}
+
+func main() {
+	s := NewShortener()
+	code := s.Shorten("https://google.com", 2*time.Second)
+	fmt.Printf("Short code: %s\n", code)
+
+	if url, ok := s.Resolve(code); ok {
+		fmt.Printf("Resolved: %s\n", url)
+	}
+
+	time.Sleep(3 * time.Second)
+
+	if _, ok := s.Resolve(code); !ok {
+		fmt.Println("URL expired successfully")
+	}
+}

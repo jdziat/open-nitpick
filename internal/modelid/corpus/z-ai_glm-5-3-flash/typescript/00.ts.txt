@@ -1,0 +1,61 @@
+export class LRUCache<K, V> {
+  private readonly capacity: number;
+  private readonly map: Map<K, V>;
+
+  constructor(capacity: number) {
+    if (!Number.isInteger(capacity) || capacity <= 0) {
+      throw new RangeError("Capacity must be a positive integer");
+    }
+    this.capacity = capacity;
+    this.map = new Map<K, V>();
+  }
+
+  get(key: K): V | undefined {
+    if (!this.map.has(key)) {
+      return undefined;
+    }
+    const value = this.map.get(key)!;
+    // Re-insert so this key becomes the most recently used.
+    this.map.delete(key);
+    this.map.set(key, value);
+    return value;
+  }
+
+  put(key: K, value: V): void {
+    if (this.map.has(key)) {
+      // Update in place and mark as most recently used.
+      this.map.delete(key);
+    } else if (this.map.size >= this.capacity) {
+      // Map preserves insertion order, so the first key is least recently used.
+      const lruKey = this.map.keys().next().value as K;
+      this.map.delete(lruKey);
+    }
+    this.map.set(key, value);
+  }
+
+  has(key: K): boolean {
+    return this.map.has(key);
+  }
+
+  delete(key: K): boolean {
+    return this.map.delete(key);
+  }
+
+  clear(): void {
+    this.map.clear();
+  }
+
+  get size(): number {
+    return this.map.size;
+  }
+}
+
+// Example usage:
+// const cache = new LRUCache<string, number>(2);
+// cache.put("a", 1);
+// cache.put("b", 2);
+// cache.get("a");          // 1 (marks "a" as most recently used)
+// cache.put("c", 3);       // evicts "b" (least recently used)
+// cache.get("b");          // undefined
+// cache.get("a");          // 1
+// cache.get("c");          // 3

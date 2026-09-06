@@ -1,0 +1,87 @@
+export type Comparator<T> = (a: T, b: T) => number;
+
+export class PriorityQueue<T> {
+  private readonly heap: T[] = [];
+  private readonly compare: Comparator<T>;
+
+  constructor(comparator: Comparator<T>) {
+    this.compare = comparator;
+  }
+
+  get size(): number {
+    return this.heap.length;
+  }
+
+  push(value: T): void {
+    this.heap.push(value);
+    this.siftUp(this.heap.length - 1);
+  }
+
+  pop(): T | undefined {
+    if (this.heap.length === 0) {
+      return undefined;
+    }
+
+    const top = this.heap[0] as T;
+    const last = this.heap.pop() as T;
+
+    if (this.heap.length > 0) {
+      this.heap[0] = last;
+      this.siftDown(0);
+    }
+
+    return top;
+  }
+
+  peek(): T | undefined {
+    return this.heap[0];
+  }
+
+  private siftUp(index: number): void {
+    const heap = this.heap;
+
+    while (index > 0) {
+      const parent = (index - 1) >> 1;
+      const value = heap[index] as T;
+      const parentValue = heap[parent] as T;
+
+      if (this.compare(value, parentValue) < 0) {
+        heap[index] = parentValue;
+        heap[parent] = value;
+        index = parent;
+      } else {
+        break;
+      }
+    }
+  }
+
+  private siftDown(index: number): void {
+    const heap = this.heap;
+    const size = heap.length;
+    let current = index;
+
+    for (;;) {
+      const left = current * 2 + 1;
+      const right = left + 1;
+      let largest = current;
+
+      if (left < size && this.compare(heap[left] as T, heap[largest] as T) < 0) {
+        largest = left;
+      }
+
+      if (right < size && this.compare(heap[right] as T, heap[largest] as T) < 0) {
+        largest = right;
+      }
+
+      if (largest === current) {
+        break;
+      }
+
+      const currentValue = heap[current] as T;
+      const largestValue = heap[largest] as T;
+      heap[current] = largestValue;
+      heap[largest] = currentValue;
+      current = largest;
+    }
+  }
+}

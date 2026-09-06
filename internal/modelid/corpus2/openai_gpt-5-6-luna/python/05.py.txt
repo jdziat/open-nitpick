@@ -1,0 +1,29 @@
+import sys
+import unicodedata
+from collections import Counter
+
+
+def top_k_words(text: str, k: int) -> list[tuple[str, int]]:
+    """Return the k most frequent words in text as (word, count) pairs."""
+    if k <= 0:
+        return []
+
+    normalized = unicodedata.normalize("NFKC", text).casefold()
+    words = [
+        "".join(char for char in part if char.isalnum())
+        for part in normalized.split()
+    ]
+    words = [word for word in words if word]
+
+    counts = Counter(words)
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:k]
+
+
+def count_words(text: str, k: int) -> list[tuple[str, int]]:
+    return top_k_words(text, k)
+
+
+if __name__ == "__main__":
+    k = int(sys.argv[1]) if len(sys.argv) > 1 else 10
+    for word, count in top_k_words(sys.stdin.read(), k):
+        print(f"{word}\t{count}")

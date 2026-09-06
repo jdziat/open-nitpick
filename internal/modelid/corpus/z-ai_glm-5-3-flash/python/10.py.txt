@@ -1,0 +1,75 @@
+import secrets
+import string
+import time
+
+_ALPHABET = string.ascii_letters + string.digits
+
+
+class URLShortener:
+    """Minimal in-memory URL shortener with optional expiry (TTL in seconds)."""
+
+    def __init__(self, code_length: int = 6):
+        if code_length < 1:
+            raise ValueError("code_length must be >= 1")
+        self._code_length = code_length
+        self._codes = {}    # code -> (url, expires_at or None)
+        self._reverse = {}  # url  -> code (reuse codes for the same URL)
+
+    def shorten(self, url: str, ttl: float | None = None) -> str:
+        if not url:
+            raise ValueError("url must be a non-empty string")
+        if ttl is not None and ttl <= 0:
+            raise ValueError("ttl must be positive or None")
+        expires_at = None if ttl is None else time.monotonic() + ttl
+        code = self._reverse.get(url)
+        if code is None:
+            code = self._new_code()
+            self._reverse[url] = code
+        self._codes[code] = (url, expires_at)
+        return code
+
+    def resolve(self, code: str) -> str | None:
+        entry = self._codes.get(code)
+        if entry is None:
+            return None
+        url, expires_at = entry
+        if expires_at is not None and time.monotonic() >= expires_at:
+            self._remove(code, url)
+            return None
+        return url
+
+    def purge(self) -> int:
+        """Remove all expired entries; returns how many were removed."""
+        now = time.monotonic()
+        expired = [c for c, (_, exp) in self._codes.items()
+                   if exp is not None and now >= exp]
+        for code in expired:
+            self._remove(code, self._codes[code][0])
+        return len(expired)
+
+    def _remove(self, code: str, url: str) -> None:
+        self._codes.pop(code, None)
+        if self._reverse.get(url) == code:
+            del self._reverse[url]
+
+    def _new_code(self) -> str:
+        while True:
+            code = "".join(secrets.choice(_ALPHABET)
+                           for _ in range(self._code_length))
+            if code not in self._codes:
+                return code
+
+
+if __name__ == "__main__":
+    shortener = URLShortener()
+
+    code = shortener.shorten("https://example.com")
+    print("shortened:", code)
+    print("resolved: ", shortener.resolve(code))
+
+    temp_code = shortener.shorten("https://example.org", ttl=1)
+    print("temp resolved before expiry:", shortener.resolve(temp_code))
+
+    time.sleep(1.1)
+    print("temp resolved after expiry: ", shortener.resolve(temp_code))
+    print("normal still resolves:      ", shortener.resolve(code))

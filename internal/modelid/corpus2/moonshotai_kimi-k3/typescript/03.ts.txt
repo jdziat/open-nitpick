@@ -1,0 +1,135 @@
+/**
+ * retry.ts
+ *
+ * A retry helper that calls a function up to N times with exponential
+ * backoff and jitter, rethrowing the last error when all attempts fail.
+ */
+
+export interface RetryOptions {
+  /** Maximum number of attempts (including the first). Default: 3. */
+  retries?: number;
+  /** Delay before the first retry, in milliseconds. Default: 100. */
+  initialDelayMs?: number;
+  /** Upper bound for any single delay, in milliseconds. Default: 30000. */
+  maxDelayMs?: number;
+  /** Multiplier applied to the delay after each failed attempt. Default: 2. */
+  factor?: number;
+  /**
+   * Jitter strategy:
+   *  - "full"  -> random delay in [0, backoff]
+   *  - "equal" -> backoff / 2 + random in [0, backoff / 2]
+   *  - "none"  -> no jitter
+   * Default: "full".
+   */
+  jitter?: "full" | "equal" | "none";
+  /** Return false to stop retrying a given error immediately. */
+  shouldRetry?: (error: unknown, attempt: number) => boolean;
+  /** Called before sleeping between attempts. */
+  onRetry?: (error: unknown, attempt: number, delayMs: number) => void;
+  /** Abort the whole operation (including time spent sleeping). */
+  signal?: AbortSignal;
+}
+
+function abortError(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException("Aborted", "AbortError");
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError(signal));
+      return;
+    }
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(abortError(signal!));
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function computeDelay(
+  attempt: number,
+  initialDelayMs: number,
+  factor: number,
+  maxDelayMs: number,
+  jitter: "full" | "equal" | "none",
+): number {
+  const backoff = Math.min(initialDelayMs * Math.pow(factor, attempt - 1), maxDelayMs);
+  switch (jitter) {
+    case "none":
+      return Math.round(backoff);
+    case "equal":
+      return Math.round(backoff / 2 + Math.random() * (backoff / 2));
+    case "full":
+    default:
+      return Math.round(Math.random() * backoff);
+  }
+}
+
+/**
+ * Calls `fn` until it succeeds or `retries` attempts have been made.
+ * Failed attempts are followed by an exponentially growing, jittered delay.
+ * When every attempt fails, the error thrown by the last attempt is rethrown.
+ *
+ * @example
+ * const data = await retry(() => fetchJson("/api/items"), {
+ *   retries: 5,
+ *   initialDelayMs: 200,
+ *   shouldRetry: (err) => err instanceof HttpError && err.status >= 500,
+ *   onRetry: (err, attempt, delay) =>
+ *     console.warn(`attempt ${attempt} failed, retrying in ${delay}ms`, err),
+ * });
+ */
+export async function retry<T>(
+  fn: (attempt: number) => T | Promise<T>,
+  options: RetryOptions = {},
+): Promise<T> {
+  const {
+    retries = 3,
+    initialDelayMs = 100,
+    maxDelayMs = 30_000,
+    factor = 2,
+    jitter = "full",
+    shouldRetry = () => true,
+    onRetry,
+    signal,
+  } = options;
+
+  if (!Number.isInteger(retries) || retries < 1) {
+    throw new RangeError(`retry: "retries" must be an integer >= 1, got ${retries}`);
+  }
+
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    if (signal?.aborted) {
+      throw abortError(signal);
+    }
+    try {
+      return await fn(attempt);
+    } catch (error) {
+      lastError = error;
+      if (attempt >= retries || !shouldRetry(error, attempt)) {
+        throw error;
+      }
+      const delayMs = computeDelay(attempt, initialDelayMs, factor, maxDelayMs, jitter);
+      onRetry?.(error, attempt, delayMs);
+      await sleep(delayMs, signal);
+    }
+  }
+
+  // Unreachable in practice, but satisfies the compiler and documents intent:
+  // when every attempt fails, the last error is rethrown.
+  throw lastError;
+}
+
+export default retry;

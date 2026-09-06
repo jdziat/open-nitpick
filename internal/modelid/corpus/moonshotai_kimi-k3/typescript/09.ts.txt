@@ -1,0 +1,94 @@
+/**
+ * date-range.ts
+ *
+ * A date-range iterator that yields each day between two dates inclusive,
+ * with an option to skip weekends (Saturdays and Sundays).
+ */
+
+export interface DateRangeOptions {
+  /** When true, Saturdays and Sundays are not yielded. Defaults to false. */
+  skipWeekends?: boolean;
+}
+
+/** Returns true if the given date falls on a Saturday or Sunday. */
+export function isWeekend(date: Date): boolean {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+/**
+ * Iterates over each day between `start` and `end`, inclusive of both
+ * endpoints. The order of the two dates does not matter; iteration always
+ * proceeds from the earlier date to the later one.
+ *
+ * Each yielded value is a new `Date` instance set to local midnight, so
+ * mutating a yielded date does not affect the iteration.
+ *
+ * @example
+ * for (const day of dateRange(new Date("2024-03-01"), new Date("2024-03-10"), { skipWeekends: true })) {
+ *   console.log(day.toDateString());
+ * }
+ */
+export function* dateRange(
+  start: Date,
+  end: Date,
+  options: DateRangeOptions = {}
+): Generator<Date, void, undefined> {
+  const { skipWeekends = false } = options;
+
+  let from = new Date(start.getTime());
+  let to = new Date(end.getTime());
+
+  // Normalize both endpoints to local midnight.
+  from.setHours(0, 0, 0, 0);
+  to.setHours(0, 0, 0, 0);
+
+  // Always iterate ascending, regardless of argument order.
+  if (from.getTime() > to.getTime()) {
+    const tmp = from;
+    from = to;
+    to = tmp;
+  }
+
+  const current = from;
+  while (current.getTime() <= to.getTime()) {
+    if (!skipWeekends || !isWeekend(current)) {
+      yield new Date(current.getTime());
+    }
+    // setDate() advances by one calendar day and stays correct across
+    // daylight-saving time transitions, unlike adding 24 * 60 * 60 * 1000 ms.
+    current.setDate(current.getDate() + 1);
+  }
+}
+
+/**
+ * Iterable class wrapper around {@link dateRange}, convenient when the range
+ * needs to be passed around and iterated multiple times.
+ *
+ * @example
+ * const range = new DateRange(new Date("2024-03-01"), new Date("2024-03-31"), { skipWeekends: true });
+ * const businessDays = [...range];
+ */
+export class DateRange implements Iterable<Date> {
+  constructor(
+    public readonly start: Date,
+    public readonly end: Date,
+    public readonly options: DateRangeOptions = {}
+  ) {}
+
+  *[Symbol.iterator](): Generator<Date, void, undefined> {
+    yield* dateRange(this.start, this.end, this.options);
+  }
+
+  /** Returns all dates in the range as an array. */
+  toArray(): Date[] {
+    return [...this];
+  }
+
+  /** Returns the number of days in the range (after weekend filtering). */
+  count(): number {
+    let n = 0;
+    for (const _ of this) n++;
+    return n;
+  }
+}

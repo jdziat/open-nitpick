@@ -1,0 +1,105 @@
+/**
+ * A comparison function that defines the ordering of a priority queue.
+ *
+ * Should return:
+ *   - a negative number if `a` should be dequeued before `b`
+ *   - a positive number if `b` should be dequeued before `a`
+ *   - zero if `a` and `b` are equivalent in priority
+ */
+export type Comparator<T> = (a: T, b: T) => number;
+
+/**
+ * A priority queue backed by a binary heap.
+ *
+ * The element with the highest priority, as determined by the caller-supplied
+ * comparator, is always at the front of the queue. push and pop run in
+ * O(log n); peek runs in O(1).
+ */
+export class PriorityQueue<T> {
+  private heap: T[] = [];
+
+  constructor(private readonly compare: Comparator<T>) {}
+
+  /** Number of elements currently in the queue. */
+  get size(): number {
+    return this.heap.length;
+  }
+
+  /** Returns true when the queue holds no elements. */
+  isEmpty(): boolean {
+    return this.heap.length === 0;
+  }
+
+  /** Adds an element to the queue. */
+  push(value: T): this {
+    this.heap.push(value);
+    this.siftUp(this.heap.length - 1);
+    return this;
+  }
+
+  /** Removes and returns the highest-priority element, or undefined if empty. */
+  pop(): T | undefined {
+    if (this.heap.length === 0) return undefined;
+
+    const top = this.heap[0];
+    const last = this.heap.pop()!;
+
+    if (this.heap.length > 0) {
+      this.heap[0] = last;
+      this.siftDown(0);
+    }
+
+    return top;
+  }
+
+  /** Returns the highest-priority element without removing it, or undefined if empty. */
+  peek(): T | undefined {
+    return this.heap.length > 0 ? this.heap[0] : undefined;
+  }
+
+  /** Removes all elements from the queue. */
+  clear(): void {
+    this.heap.length = 0;
+  }
+
+  private siftUp(index: number): void {
+    const value = this.heap[index];
+
+    while (index > 0) {
+      const parent = (index - 1) >> 1;
+      if (this.compare(value, this.heap[parent]) < 0) {
+        this.heap[index] = this.heap[parent];
+        index = parent;
+      } else {
+        break;
+      }
+    }
+
+    this.heap[index] = value;
+  }
+
+  private siftDown(index: number): void {
+    const length = this.heap.length;
+    const value = this.heap[index];
+
+    while (true) {
+      const left = 2 * index + 1;
+      if (left >= length) break;
+
+      const right = left + 1;
+      let child = left;
+      if (right < length && this.compare(this.heap[right], this.heap[left]) < 0) {
+        child = right;
+      }
+
+      if (this.compare(this.heap[child], value) < 0) {
+        this.heap[index] = this.heap[child];
+        index = child;
+      } else {
+        break;
+      }
+    }
+
+    this.heap[index] = value;
+  }
+}

@@ -1,0 +1,34 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"math"
+)
+
+// Matrix represents a row-major matrix.
+type Matrix struct {
+	Rows int
+	Cols int
+	Data []float64
+}
+
+func NewMatrix(rows, cols int, data []float64) (*Matrix, error) {
+	if rows < 0 || cols < 0 {
+		return nil, fmt.Errorf("invalid matrix dimensions %dx%d", rows, cols)
+	}
+	expected := rows * cols
+	if len(data) != expected {
+		return nil, fmt.Errorf("matrix data length %d does not match dimensions %dx%d", len(data), rows, cols)
+	}
+	m := &Matrix{Rows: rows, Cols: cols, Data: make([]float64, expected)}
+	copy(m.Data, data)
+	return m, nil
+}
+
+func (m *Matrix) Multiply(n *Matrix) (*Matrix, error) {
+	if m == nil || n == nil {
+		return nil, errors.New("cannot multiply nil matrix")
+	}
+	if m.Cols != n.Rows {
+		return nil, fmt.Errorf("cannot multiply %dx%d

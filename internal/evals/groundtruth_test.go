@@ -3670,6 +3670,9 @@ func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 	for _, f := range CallerFixtures() {
 		multi[f.Name] = true // a fourth, the multi-file corpus's other direction
 	}
+	for _, f := range SlopFixtures() {
+		multi[f.Name] = true // a fifth, planted/control pairs for the slop class
+	}
 
 	for name, where := range authored {
 		reason, excused := exempt[name]

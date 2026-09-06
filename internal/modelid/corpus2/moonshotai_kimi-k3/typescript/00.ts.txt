@@ -1,0 +1,122 @@
+class LRUNode<K, V> {
+    key: K;
+    value: V;
+    prev: LRUNode<K, V> | null = null;
+    next: LRUNode<K, V> | null = null;
+
+    constructor(key: K, value: V) {
+        this.key = key;
+        this.value = value;
+    }
+}
+
+class LRUCache<K, V> {
+    private readonly capacity: number;
+    private readonly map: Map<K, LRUNode<K, V>>;
+    private head: LRUNode<K, V> | null = null; // most recently used
+    private tail: LRUNode<K, V> | null = null; // least recently used
+
+    constructor(capacity: number) {
+        if (!Number.isInteger(capacity) || capacity <= 0) {
+            throw new Error("LRUCache capacity must be a positive integer");
+        }
+        this.capacity = capacity;
+        this.map = new Map<K, LRUNode<K, V>>();
+    }
+
+    get size(): number {
+        return this.map.size;
+    }
+
+    get(key: K): V | undefined {
+        const node = this.map.get(key);
+        if (node === undefined) {
+            return undefined;
+        }
+        this.moveToFront(node);
+        return node.value;
+    }
+
+    put(key: K, value: V): void {
+        const existing = this.map.get(key);
+        if (existing !== undefined) {
+            existing.value = value;
+            this.moveToFront(existing);
+            return;
+        }
+
+        const node = new LRUNode<K, V>(key, value);
+        this.map.set(key, node);
+        this.addToFront(node);
+
+        if (this.map.size > this.capacity) {
+            this.evictLeastRecentlyUsed();
+        }
+    }
+
+    has(key: K): boolean {
+        return this.map.has(key);
+    }
+
+    delete(key: K): boolean {
+        const node = this.map.get(key);
+        if (node === undefined) {
+            return false;
+        }
+        this.removeNode(node);
+        this.map.delete(key);
+        return true;
+    }
+
+    clear(): void {
+        this.map.clear();
+        this.head = null;
+        this.tail = null;
+    }
+
+    private addToFront(node: LRUNode<K, V>): void {
+        node.prev = null;
+        node.next = this.head;
+        if (this.head !== null) {
+            this.head.prev = node;
+        }
+        this.head = node;
+        if (this.tail === null) {
+            this.tail = node;
+        }
+    }
+
+    private removeNode(node: LRUNode<K, V>): void {
+        if (node.prev !== null) {
+            node.prev.next = node.next;
+        } else {
+            this.head = node.next;
+        }
+        if (node.next !== null) {
+            node.next.prev = node.prev;
+        } else {
+            this.tail = node.prev;
+        }
+        node.prev = null;
+        node.next = null;
+    }
+
+    private moveToFront(node: LRUNode<K, V>): void {
+        if (node === this.head) {
+            return;
+        }
+        this.removeNode(node);
+        this.addToFront(node);
+    }
+
+    private evictLeastRecentlyUsed(): void {
+        if (this.tail === null) {
+            return;
+        }
+        const lru = this.tail;
+        this.removeNode(lru);
+        this.map.delete(lru.key);
+    }
+}
+
+export { LRUCache };

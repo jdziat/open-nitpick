@@ -1,0 +1,93 @@
+package retry
+
+import (
+	"errors"
+	"math/rand"
+	"time"
+)
+
+// Config holds the configuration for the retry helper.
+type Config struct {
+	// MaxAttempts is the maximum number of times the function will be called.
+	MaxAttempts int
+	// InitialDelay is the delay before the second attempt.
+	InitialDelay time.Duration
+	// MaxDelay caps the exponential backoff delay.
+	MaxDelay time.Duration
+	// Multiplier is the factor by which the delay increases each attempt.
+	Multiplier float64
+	// JitterFraction is the fraction of the current delay to add as random jitter (0.0 to 1.0).
+	JitterFraction float64
+}
+
+// DefaultConfig returns a Config with sensible defaults.
+func DefaultConfig() Config {
+	return Config{
+		MaxAttempts:    3,
+		InitialDelay:   100 * time.Millisecond,
+		MaxDelay:       30 * time.Second,
+		Multiplier:     2.0,
+		JitterFraction: 0.25,
+	}
+}
+
+// Do calls fn up to cfg.MaxAttempts times. It returns nil on the first
+// successful call, or the last error if all attempts fail.
+func Do(cfg Config, fn func() error) error {
+	if cfg.MaxAttempts <= 0 {
+		return errors.New("retry: MaxAttempts must be greater than zero")
+	}
+	if cfg.Multiplier <= 0 {
+		cfg.Multiplier = 2.0
+	}
+	if cfg.JitterFraction < 0 {
+		cfg.JitterFraction = 0
+	}
+	if cfg.JitterFraction > 1 {
+		cfg.JitterFraction = 1
+	}
+
+	var lastErr error
+	delay := cfg.InitialDelay
+
+	for attempt := 0; attempt < cfg.MaxAttempts; attempt++ {
+		lastErr = fn()
+		if lastErr == nil {
+			return nil
+		}
+
+		// No sleep after the last attempt.
+		if attempt == cfg.MaxAttempts-1 {
+			break
+		}
+
+		sleep := delay
+		if cfg.JitterFraction > 0 {
+			// Add a random jitter in the range [0, JitterFraction * delay).
+			jitter := time.Duration(float64(delay) * cfg.JitterFraction * rand.Float64())
+			sleep += jitter
+		}
+
+		if cfg.MaxDelay > 0 && sleep > cfg.MaxDelay {
+			sleep = cfg.MaxDelay
+		}
+
+		time.Sleep(sleep)
+
+		// Increase delay for next iteration.
+		next := time.Duration(float64(delay) * cfg.Multiplier)
+		if cfg.MaxDelay > 0 && next > cfg.MaxDelay {
+			next = cfg.MaxDelay
+		}
+		delay = next
+	}
+
+	return lastErr
+}
+
+// DoSimple calls fn up to maxAttempts times using default backoff settings.
+func DoSimple(maxAttempts int, fn func() error) error {
+	cfg := DefaultConfig()
+	cfg.MaxAttempts = maxAttempts
+	return Do(cfg, fn)
+}

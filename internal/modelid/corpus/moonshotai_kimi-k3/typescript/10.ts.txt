@@ -1,0 +1,45 @@
+interface ShortenedUrl {
+  originalUrl: string;
+  expiresAt: number;
+}
+
+class UrlShortener {
+  private readonly urls = new Map<string, ShortenedUrl>();
+  private counter = 0;
+  private static readonly ALPHABET =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  private static readonly DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  shorten(originalUrl: string, ttlMs: number = UrlShortener.DEFAULT_TTL_MS): string {
+    const code = this.generateCode();
+    this.urls.set(code, {
+      originalUrl,
+      expiresAt: Date.now() + ttlMs,
+    });
+    return code;
+  }
+
+  resolve(code: string): string | null {
+    const entry = this.urls.get(code);
+    if (!entry) {
+      return null;
+    }
+    if (Date.now() >= entry.expiresAt) {
+      this.urls.delete(code);
+      return null;
+    }
+    return entry.originalUrl;
+  }
+
+  private generateCode(): string {
+    let num = this.counter++;
+    let code = "";
+    do {
+      code = UrlShortener.ALPHABET[num % UrlShortener.ALPHABET.length] + code;
+      num = Math.floor(num / UrlShortener.ALPHABET.length);
+    } while (num > 0);
+    return code;
+  }
+}
+
+export { UrlShortener };

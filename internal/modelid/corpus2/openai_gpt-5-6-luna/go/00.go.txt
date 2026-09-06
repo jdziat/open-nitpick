@@ -1,0 +1,67 @@
+package lru
+
+import "container/list"
+
+type entry struct {
+	key   int
+	value any
+}
+
+type Cache struct {
+	capacity int
+	items    map[int]*list.Element
+	order    *list.List
+}
+
+func New(capacity int) *Cache {
+	if capacity < 0 {
+		capacity = 0
+	}
+
+	return &Cache{
+		capacity: capacity,
+		items:    make(map[int]*list.Element),
+		order:    list.New(),
+	}
+}
+
+func (c *Cache) Get(key int) (any, bool) {
+	element, ok := c.items[key]
+	if !ok {
+		return nil, false
+	}
+
+	c.order.MoveToFront(element)
+	return element.Value.(entry).value, true
+}
+
+func (c *Cache) Put(key int, value any) {
+	if c.capacity == 0 {
+		return
+	}
+
+	if element, ok := c.items[key]; ok {
+		element.Value = entry{key: key, value: value}
+		c.order.MoveToFront(element)
+		return
+	}
+
+	element := c.order.PushFront(entry{key: key, value: value})
+	c.items[key] = element
+
+	if c.order.Len() > c.capacity {
+		oldest := c.order.Back()
+		if oldest != nil {
+			c.order.Remove(oldest)
+			delete(c.items, oldest.Value.(entry).key)
+		}
+	}
+}
+
+func (c *Cache) Len() int {
+	return c.order.Len()
+}
+
+func (c *Cache) Capacity() int {
+	return c.capacity
+}

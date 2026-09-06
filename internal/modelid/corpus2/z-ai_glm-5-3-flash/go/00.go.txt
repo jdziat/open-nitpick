@@ -1,0 +1,119 @@
+package main
+
+import "fmt"
+
+// entry is a node in the doubly linked list that tracks usage order.
+type entry[K comparable, V any] struct {
+	key   K
+	value V
+	prev  *entry[K, V]
+	next  *entry[K, V]
+}
+
+// LRUCache is a fixed-capacity cache that evicts the least recently used
+// entry when capacity is exceeded. It is not safe for concurrent use;
+// guard it with a mutex if multiple goroutines share it.
+type LRUCache[K comparable, V any] struct {
+	capacity int
+	items    map[K]*entry[K, V]
+	head     *entry[K, V] // sentinel, most recently used side
+	tail     *entry[K, V] // sentinel, least recently used side
+}
+
+// NewLRUCache creates a cache with the given fixed capacity.
+func NewLRUCache[K comparable, V any](capacity int) *LRUCache[K, V] {
+	if capacity < 1 {
+		panic("lru: capacity must be at least 1")
+	}
+	h := &entry[K, V]{}
+	t := &entry[K, V]{}
+	h.next = t
+	t.prev = h
+	return &LRUCache[K, V]{
+		capacity: capacity,
+		items:    make(map[K]*entry[K, V], capacity),
+		head:     h,
+		tail:     t,
+	}
+}
+
+// Get returns the value for key and reports whether it was found.
+// A successful lookup makes the entry the most recently used.
+func (c *LRUCache[K, V]) Get(key K) (V, bool) {
+	e, ok := c.items[key]
+	if !ok {
+		var zero V
+		return zero, false
+	}
+	c.moveToFront(e)
+	return e.value, true
+}
+
+// Put stores value under key, making it the most recently used entry.
+// If the key is new and the cache is full, the least recently used
+// entry is evicted first.
+func (c *LRUCache[K, V]) Put(key K, value V) {
+	if e, ok := c.items[key]; ok {
+		e.value = value
+		c.moveToFront(e)
+		return
+	}
+	e := &entry[K, V]{key: key, value: value}
+	c.items[key] = e
+	c.addToFront(e)
+	if len(c.items) > c.capacity {
+		lru := c.tail.prev
+		c.unlink(lru)
+		delete(c.items, lru.key)
+	}
+}
+
+// Len returns the number of entries currently stored in the cache.
+func (c *LRUCache[K, V]) Len() int { return len(c.items) }
+
+func (c *LRUCache[K, V]) addToFront(e *entry[K, V]) {
+	e.prev = c.head
+	e.next = c.head.next
+	c.head.next.prev = e
+	c.head.next = e
+}
+
+func (c *LRUCache[K, V]) unlink(e *entry[K, V]) {
+	e.prev.next = e.next
+	e.next.prev = e.prev
+	e.prev = nil
+	e.next = nil
+}
+
+func (c *LRUCache[K, V]) moveToFront(e *entry[K, V]) {
+	c.unlink(e)
+	c.addToFront(e)
+}
+
+func main() {
+	cache := NewLRUCache[string, int](3)
+
+	cache.Put("a", 1)
+	cache.Put("b", 2)
+	cache.Put("c", 3)
+
+	if v, ok := cache.Get("a"); ok {
+		fmt.Println("a =", v) // "a" is now most recently used
+	}
+
+	cache.Put("d", 4) // evicts "b", the least recently used entry
+
+	if _, ok := cache.Get("b"); !ok {
+		fmt.Println("b: evicted")
+	}
+
+	cache.Put("c", 30) // update existing key, refreshes recency
+
+	fmt.Println("size =", cache.Len())
+
+	for _, k := range []string{"a", "c", "d"} {
+		if v, ok := cache.Get(k); ok {
+			fmt.Printf("%s = %d\n", k, v)
+		}
+	}
+}

@@ -1,0 +1,44 @@
+import secrets
+import time
+from __future__ import annotations
+
+
+class URLShortener:
+    """Minimal in-memory URL shortener with entry expiry."""
+
+    def __init__(self, default_ttl: float = 3600.0, code_length: int = 6):
+        self.default_ttl = default_ttl
+        self.code_length = code_length
+        self._urls: dict[str, tuple[str, float]] = {}  # code -> (url, expires_at)
+
+    def shorten(self, url: str, ttl: float | None = None) -> str:
+        """Store a URL and return a unique short code."""
+        code = self._new_code()
+        expires_at = time.monotonic() + (self.default_ttl if ttl is None else ttl)
+        self._urls[code] = (url, expires_at)
+        return code
+
+    def resolve(self, code: str) -> str | None:
+        """Return the original URL for a code, or None if unknown or expired."""
+        entry = self._urls.get(code)
+        if entry is None:
+            return None
+        url, expires_at = entry
+        if time.monotonic() >= expires_at:
+            del self._urls[code]
+            return None
+        return url
+
+    def _new_code(self) -> str:
+        while True:
+            code = secrets.token_urlsafe(self.code_length)[: self.code_length]
+            if code not in self._urls:
+                return code
+
+
+if __name__ == "__main__":
+    shortener = URLShortener(default_ttl=2.0)
+    code = shortener.shorten("https://example.com")
+    print(code, "->", shortener.resolve(code))
+    time.sleep(3)
+    print(code, "->", shortener.resolve(code))

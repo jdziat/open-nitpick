@@ -1,0 +1,91 @@
+import threading
+import time
+from typing import Dict, Optional, Tuple
+
+
+class URLShortener:
+    """A minimal thread-safe, in-memory URL shortener."""
+
+    _ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+    def __init__(self, default_expiry: Optional[float] = None) -> None:
+        self.default_expiry = default_expiry
+        self._entries: Dict[str, Tuple[str, Optional[float]]] = {}
+        self._counter = 0
+        self._lock = threading.RLock()
+
+    def shorten(self, url: str, expires_in: Optional[float] = None) -> str:
+        if not isinstance(url, str) or not url:
+            raise ValueError("url must be a non-empty string")
+
+        ttl = self.default_expiry if expires_in is None else expires_in
+        if ttl is not None and ttl < 0:
+            raise ValueError("expires_in must be non-negative")
+
+        with self._lock:
+            self._counter += 1
+            code = self._encode(self._counter)
+            expires_at = None if ttl is None else time.monotonic() + ttl
+            self._entries[code] = (url, expires_at)
+            return code
+
+    def resolve(self, code: str) -> Optional[str]:
+        with self._lock:
+            entry = self._entries.get(code)
+            if entry is None:
+                return None
+
+            url, expires_at = entry
+            if expires_at is not None and time.monotonic() >= expires_at:
+                del self._entries[code]
+                return None
+
+            return url
+
+    def delete(self, code: str) -> bool:
+        with self._lock:
+            return self._entries.pop(code, None) is not None
+
+    def _encode(self, value: int) -> str:
+        result = []
+        base = len(self._ALPHABET)
+
+        while value:
+            value, remainder = divmod(value, base)
+            result.append(self._ALPHABET[remainder])
+
+        return "".join(reversed(result)) or self._ALPHABET[0]
+
+
+_default_shortener = URLShortener()
+
+
+def shorten(url: str, expires_in: Optional[float] = None) -> str:
+    return _default_shortener.shorten(url, expires_in)
+
+
+def resolve(code: str) -> Optional[str]:
+    return _default_shortener.resolve(code)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="In-memory URL shortener")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    shorten_parser = subparsers.add_parser("shorten")
+    shorten_parser.add_argument("url")
+    shorten_parser.add_argument("--expires-in", type=float)
+
+    resolve_parser = subparsers.add_parser("resolve")
+    resolve_parser.add_argument("code")
+
+    args = parser.parse_args()
+
+    if args.command == "shorten":
+        print(shorten(args.url, args.expires_in))
+    else:
+        result = resolve(args.code)
+        if result is not None:
+            print(result)

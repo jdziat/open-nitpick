@@ -1,0 +1,67 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"regexp"
+	"sort"
+	"strings"
+)
+
+type WordCount struct {
+	Word  string
+	Count int
+}
+
+func getTopWords(text string, k int) []WordCount {
+	reg := regexp.MustCompile(`[^a-zA-Z0-9\s]+`)
+	processedText := reg.ReplaceAllString(strings.ToLower(text), " ")
+	words := strings.Fields(processedText)
+
+	counts := make(map[string]int)
+	for _, word := range words {
+		counts[word]++
+	}
+
+	var sortedWords []WordCount
+	for word, count := range counts {
+		sortedWords = append(sortedWords, WordCount{word, count})
+	}
+
+	sort.Slice(sortedWords, func(i, j int) bool {
+		if sortedWords[i].Count == sortedWords[j].Count {
+			return sortedWords[i].Word < sortedWords[j].Word
+		}
+		return sortedWords[i].Count > sortedWords[j].Count
+	})
+
+	if len(sortedWords) > k {
+		return sortedWords[:k]
+	}
+	return sortedWords
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run main.go <top_k_number>")
+		return
+	}
+
+	var k int
+	fmt.Sscanf(os.Args[1], "%d", &k)
+
+	fmt.Println("Enter text (Ctrl+D or Ctrl+Z to finish):")
+	scanner := bufio.NewScanner(os.Stdin)
+	var builder strings.Builder
+	for scanner.Scan() {
+		builder.WriteString(scanner.Text() + " ")
+	}
+
+	topWords := getTopWords(builder.String(), k)
+
+	fmt.Printf("\nTop %d words:\n", k)
+	for _, wc := range topWords {
+		fmt.Printf("%s: %d\n", wc.Word, wc.Count)
+	}
+}

@@ -1,0 +1,169 @@
+package main
+
+import "fmt"
+
+// PriorityQueue is a generic priority queue backed by a binary (min) heap.
+// The less function determines ordering: if less(a, b) is true, a has higher priority than b.
+type PriorityQueue[T any] struct {
+	data []T
+	less func(a, b T) bool
+}
+
+// NewPriorityQueue creates a new PriorityQueue with the given comparison function.
+func NewPriorityQueue[T any](less func(a, b T) bool) *PriorityQueue[T] {
+	return &PriorityQueue[T]{less: less}
+}
+
+// Len returns the number of elements in the queue.
+func (pq *PriorityQueue[T]) Len() int {
+	return len(pq.data)
+}
+
+// Push adds an element to the priority queue.
+func (pq *PriorityQueue[T]) Push(val T) {
+	pq.data = append(pq.data, val)
+	pq.siftUp(len(pq.data) - 1)
+}
+
+// Pop removes and returns the highest-priority element.
+// Panics if the queue is empty.
+func (pq *PriorityQueue[T]) Pop() T {
+	if len(pq.data) == 0 {
+		panic("priority queue is empty")
+	}
+	top := pq.data[0]
+	last := len(pq.data) - 1
+	pq.data[0] = pq.data[last]
+	pq.data = pq.data[:last]
+	if len(pq.data) > 0 {
+		pq.siftDown(0)
+	}
+	return top
+}
+
+// Peek returns the highest-priority element without removing it.
+// Panics if the queue is empty.
+func (pq *PriorityQueue[T]) Peek() T {
+	if len(pq.data) == 0 {
+		panic("priority queue is empty")
+	}
+	return pq.data[0]
+}
+
+// siftUp moves the element at index i up to its correct position.
+func (pq *PriorityQueue[T]) siftUp(i int) {
+	for i > 0 {
+		parent := (i - 1) / 2
+		if pq.less(pq.data[i], pq.data[parent]) {
+			pq.data[i], pq.data[parent] = pq.data[parent], pq.data[i]
+			i = parent
+		} else {
+			break
+		}
+	}
+}
+
+// siftDown moves the element at index i down to its correct position.
+func (pq *PriorityQueue[T]) siftDown(i int) {
+	n := len(pq.data)
+	for {
+		smallest := i
+		left := 2*i + 1
+		right := 2*i + 2
+
+		if left < n && pq.less(pq.data[left], pq.data[smallest]) {
+			smallest = left
+		}
+		if right < n && pq.less(pq.data[right], pq.data[smallest]) {
+			smallest = right
+		}
+		if smallest == i {
+			break
+		}
+		pq.data[i], pq.data[smallest] = pq.data[smallest], pq.data[i]
+		i = smallest
+	}
+}
+
+func main() {
+	// Example: min-heap of integers
+	fmt.Println("=== Min-Heap of Integers ===")
+	minPQ := NewPriorityQueue[int](func(a, b int) bool {
+		return a < b
+	})
+
+	values := []int{5, 3, 8, 1, 9, 2, 7, 4, 6}
+	for _, v := range values {
+		minPQ.Push(v)
+		fmt.Printf("Pushed %d, peek = %d, len = %d\n", v, minPQ.Peek(), minPQ.Len())
+	}
+
+	fmt.Println("\nPopping all elements (should be in ascending order):")
+	for minPQ.Len() > 0 {
+		fmt.Printf("%d ", minPQ.Pop())
+	}
+	fmt.Println()
+
+	// Example: max-heap of integers
+	fmt.Println("\n=== Max-Heap of Integers ===")
+	maxPQ := NewPriorityQueue[int](func(a, b int) bool {
+		return a > b
+	})
+
+	for _, v := range values {
+		maxPQ.Push(v)
+	}
+
+	fmt.Println("Popping all elements (should be in descending order):")
+	for maxPQ.Len() > 0 {
+		fmt.Printf("%d ", maxPQ.Pop())
+	}
+	fmt.Println()
+
+	// Example: priority queue of strings ordered by length
+	fmt.Println("\n=== Priority Queue of Strings (by length, shortest first) ===")
+	strPQ := NewPriorityQueue[string](func(a, b string) bool {
+		return len(a) < len(b)
+	})
+
+	words := []string{"banana", "fig", "apple", "kiwi", "date", "elderberry", "cherry"}
+	for _, w := range words {
+		strPQ.Push(w)
+	}
+
+	fmt.Println("Popping all elements (shortest to longest):")
+	for strPQ.Len() > 0 {
+		fmt.Printf("%q ", strPQ.Pop())
+	}
+	fmt.Println()
+
+	// Example: priority queue of structs
+	fmt.Println("\n=== Priority Queue of Tasks (by priority, highest first) ===")
+	type Task struct {
+		Name     string
+		Priority int
+	}
+
+	taskPQ := NewPriorityQueue[Task](func(a, b Task) bool {
+		return a.Priority > b.Priority
+	})
+
+	tasks := []Task{
+		{"Low priority task", 1},
+		{"Critical task", 10},
+		{"Medium task", 5},
+		{"High priority task", 8},
+		{"Urgent task", 9},
+	}
+
+	for _, t := range tasks {
+		taskPQ.Push(t)
+		fmt.Printf("Pushed task %q (priority %d), peek = %q\n", t.Name, t.Priority, taskPQ.Peek().Name)
+	}
+
+	fmt.Println("\nProcessing tasks in priority order:")
+	for taskPQ.Len() > 0 {
+		t := taskPQ.Pop()
+		fmt.Printf("Processing: %q (priority %d)\n", t.Name, t.Priority)
+	}
+}

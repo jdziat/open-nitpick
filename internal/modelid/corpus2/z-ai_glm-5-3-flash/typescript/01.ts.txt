@@ -1,0 +1,59 @@
+/**
+ * A parser for a practical subset of CSV (RFC 4180 style):
+ *
+ * - Fields may be enclosed in double quotes (`"..."`).
+ * - Inside a quoted field, `""` denotes a literal double quote.
+ * - The field delimiter is configurable and must be a single character
+ *   other than `"` or a newline (default: `,`).
+ * - Records are terminated by `\r\n`, `\n`, or `\r`.
+ * - Delimiters, escaped quotes, and newlines may appear inside quoted
+ *   fields as data.
+ * - A trailing record terminator at the end of the input does not
+ *   produce an extra empty record; empty input produces no records.
+ *
+ * The parser is intentionally lenient about some malformed inputs
+ * (e.g., an unterminated quoted field, or stray quotes inside unquoted
+ * fields): it does its best rather than throwing.
+ */
+
+export interface CsvParseOptions {
+  /**
+   * Single-character field delimiter. Must not be `"` or a newline.
+   * Defaults to `","`.
+   */
+  delimiter?: string;
+}
+
+/**
+ * Parses CSV text into rows of string fields.
+ *
+ * @param input   The raw CSV text.
+ * @param options Parser options (currently: `delimiter`).
+ * @returns An array of records; each record is an array of field strings.
+ */
+export function parseCsv(
+  input: string,
+  options: CsvParseOptions = {}
+): string[][] {
+  const delimiter = options.delimiter ?? ",";
+
+  if (delimiter.length !== 1) {
+    throw new Error(
+      `delimiter must be exactly one character, got ${JSON.stringify(delimiter)}`
+    );
+  }
+  if (delimiter === '"' || delimiter === "\n" || delimiter === "\r") {
+    throw new Error("delimiter must not be a double quote or a newline character");
+  }
+
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+
+  // True once the current field has been established: either it was opened
+  // as a quoted field, or at least one literal character was appended.
+  // It decides whether a `"` starts a quoted field or is treated as data.
+  let fieldOpen = false;
+
+  // True while scanning inside a quoted field.
+  let inQuotes

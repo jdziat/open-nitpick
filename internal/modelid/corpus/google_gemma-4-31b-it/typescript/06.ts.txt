@@ -1,0 +1,91 @@
+class BSTNode<T> {
+    value: T;
+    left: BSTNode<T> | null = null;
+    right: BSTNode<T> | null = null;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+}
+
+class BinarySearchTree<T> {
+    root: BSTNode<T> | null = null;
+
+    insert(value: T): void {
+        const newNode = new BSTNode(value);
+        if (!this.root) {
+            this.root = newNode;
+            return;
+        }
+
+        let current = this.root;
+        while (true) {
+            if (value < current.value) {
+                if (!current.left) {
+                    current.left = newNode;
+                    break;
+                }
+                current = current.left;
+            } else {
+                if (!current.right) {
+                    current.right = newNode;
+                    break;
+                }
+                current = current.right;
+            }
+        }
+    }
+
+    search(value: T): BSTNode<T> | null {
+        let current = this.root;
+        while (current) {
+            if (value === current.value) return current;
+            current = value < current.value ? current.left : current.right;
+        }
+        return null;
+    }
+
+    delete(value: T): void {
+        this.root = this._deleteRecursive(this.root, value);
+    }
+
+    private _deleteRecursive(node: BSTNode<T> | null, value: T): BSTNode<T> | null {
+        if (!node) return null;
+
+        if (value < node.value) {
+            node.left = this._deleteRecursive(node.left, value);
+        } else if (value > node.value) {
+            node.right = this._deleteRecursive(node.right, value);
+        } else {
+            if (!node.left) return node.right;
+            if (!node.right) return node.left;
+
+            const minNode = this._findMin(node.right);
+            node.value = minNode.value;
+            node.right = this._deleteRecursive(node.right, minNode.value);
+        }
+        return node;
+    }
+
+    private _findMin(node: BSTNode<T>): BSTNode<T> {
+        let current = node;
+        while (current.left) current = current.left;
+        return current;
+    }
+
+    inOrderTraversal(callback: (value: T) => void): void {
+        const traverse = (node: BSTNode<T> | null) => {
+            if (!node) return;
+            traverse(node.left);
+            callback(node.value);
+            traverse(node.right);
+        };
+        traverse(this.root);
+    }
+
+    toArray(): T[] {
+        const result: T[] = [];
+        this.inOrderTraversal(val => result.push(val));
+        return result;
+    }
+}

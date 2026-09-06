@@ -1,0 +1,94 @@
+class Node:
+    def __init__(self, value):
+        self.value = value
+        self.left = None
+        self.right = None
+
+
+class BinarySearchTree:
+    def __init__(self):
+        self.root = None
+
+    def insert(self, value):
+        if self.root is None:
+            self.root = Node(value)
+        else:
+            self._insert(self.root, value)
+
+    def _insert(self, node, value):
+        if value < node.value:
+            if node.left is None:
+                node.left = Node(value)
+            else:
+                self._insert(node.left, value)
+        elif value > node.value:
+            if node.right is None:
+                node.right = Node(value)
+            else:
+                self._insert(node.right, value)
+        # Duplicate values are ignored
+
+    def search(self, value):
+        return self._search(self.root, value)
+
+    def _search(self, node, value):
+        if node is None:
+            return False
+        if value == node.value:
+            return True
+        elif value < node.value:
+            return self._search(node.left, value)
+        else:
+            return self._search(node.right, value)
+
+    def delete(self, value):
+        self.root = self._delete(self.root, value)
+
+    def _delete(self, node, value):
+        if node is None:
+            return None
+        if value < node.value:
+            node.left = self._delete(node.left, value)
+        elif value > node.value:
+            node.right = self._delete(node.right, value)
+        else:
+            if node.left is None:
+                return node.right
+            if node.right is None:
+                return node.left
+            successor = self._min_value_node(node.right)
+            node.value = successor.value
+            node.right = self._delete(node.right, successor.value)
+        return node
+
+    def _min_value_node(self, node):
+        current = node
+        while current.left is not None:
+            current = current.left
+        return current
+
+    def inorder(self):
+        result = []
+        self._inorder(self.root, result)
+        return result
+
+    def _inorder(self, node, result):
+        if node is not None:
+            self._inorder(node.left, result)
+            result.append(node.value)
+            self._inorder(node.right, result)
+
+
+if __name__ == "__main__":
+    bst = BinarySearchTree()
+    for value in [50, 30, 70, 20, 40, 60, 80]:
+        bst.insert(value)
+
+    print("In-order traversal:", bst.inorder())
+    print("Search 40:", bst.search(40))
+    print("Search 25:", bst.search(25))
+
+    bst.delete(20)
+    bst.delete(30)
+    bst.delete(50)
+    print("After deleting 20, 30, 50:", bst.inorder())

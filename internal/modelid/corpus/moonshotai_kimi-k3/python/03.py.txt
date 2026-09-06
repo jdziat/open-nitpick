@@ -1,0 +1,149 @@
+"""Retry helper: call a function up to N times with exponential backoff and jitter.
+
+The last error is *returned* (not raised) when all attempts fail.
+"""
+
+from __future__ import annotations
+
+import functools
+import random
+import time
+from typing import Any, Callable, Optional, Tuple, Type, TypeVar, Union
+
+__all__ = ["retry", "with_retry"]
+
+T = TypeVar("T")
+
+ExceptionTypes = Union[Type[BaseException], Tuple[Type[BaseException], ...]]
+OnRetry = Callable[[BaseException, int, float], None]
+
+
+def _backoff_delay(
+    attempt_index: int,
+    initial_delay: float,
+    backoff_factor: float,
+    max_delay: float,
+    jitter: float,
+) -> float:
+    """Return how long to sleep after attempt ``attempt_index`` (0-based).
+
+    The base delay grows as ``initial_delay * backoff_factor ** attempt_index``
+    (capped at ``max_delay``). ``jitter`` is a fraction in [0, 1] that widens
+    the delay into the uniform range ``[d * (1 - jitter), d * (1 + jitter)]``.
+    """
+    delay = min(initial_delay * (backoff_factor ** attempt_index), max_delay)
+    if jitter > 0.0:
+        spread = delay * jitter
+        delay = random.uniform(delay - spread, delay + spread)
+    return max(delay, 0.0)
+
+
+def retry(
+    func: Callable[..., T],
+    *args: Any,
+    attempts: int = 3,
+    initial_delay: float = 0.1,
+    max_delay: float = 30.0,
+    backoff_factor: float = 2.0,
+    jitter: float = 0.1,
+    exceptions: ExceptionTypes = Exception,
+    on_retry: Optional[OnRetry] = None,
+    **kwargs: Any,
+) -> Union[T, BaseException]:
+    """Call ``func(*args, **kwargs)``, retrying on failure.
+
+    Up to ``attempts`` calls are made. Between attempts the caller sleeps for
+    an exponentially increasing, jittered delay. Only instances of
+    ``exceptions`` trigger a retry; any other exception propagates immediately.
+
+    Returns ``func``'s result on the first success. If every attempt fails,
+    the *last* caught exception object is returned instead of being raised.
+
+    ``on_retry``, if given, is invoked as ``on_retry(error, attempt_number,
+    delay)`` before each sleep, where ``attempt_number`` is the 1-based index
+    of the attempt that just failed.
+    """
+    if attempts < 1:
+        raise ValueError("attempts must be at least 1")
+    if initial_delay < 0:
+        raise ValueError("initial_delay must be non-negative")
+    if backoff_factor < 1:
+        raise ValueError("backoff_factor must be >= 1")
+
+    last_error: Optional[BaseException] = None
+    for attempt_index in range(attempts):
+        try:
+            return func(*args, **kwargs)
+        except exceptions as exc:
+            last_error = exc
+            if attempt_index + 1 >= attempts:
+                break
+            delay = _backoff_delay(
+                attempt_index, initial_delay, backoff_factor, max_delay, jitter
+            )
+            if on_retry is not None:
+                on_retry(exc, attempt_index + 1, delay)
+            time.sleep(delay)
+
+    assert last_error is not None  # guaranteed because attempts >= 1
+    return last_error
+
+
+def with_retry(
+    attempts: int = 3,
+    initial_delay: float = 0.1,
+    max_delay: float = 30.0,
+    backoff_factor: float = 2.0,
+    jitter: float = 0.1,
+    exceptions: ExceptionTypes = Exception,
+    on_retry: Optional[OnRetry] = None,
+) -> Callable[[Callable[..., T]], Callable[..., Union[T, BaseException]]]:
+    """Decorator form of :func:`retry` with the same semantics."""
+
+    def decorator(func: Callable[..., T]) -> Callable[..., Union[T, BaseException]]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Union[T, BaseException]:
+            return retry(
+                func,
+                *args,
+                attempts=attempts,
+                initial_delay=initial_delay,
+                max_delay=max_delay,
+                backoff_factor=backoff_factor,
+                jitter=jitter,
+                exceptions=exceptions,
+                on_retry=on_retry,
+                **kwargs,
+            )
+
+        return wrapper
+
+    return decorator
+
+
+if __name__ == "__main__":
+    # Demo 1: a flaky function that succeeds on the third call.
+    calls = {"n": 0}
+
+    def flaky() -> str:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise ConnectionError(f"boom #{calls['n']}")
+        return "ok"
+
+    result = retry(
+        flaky,
+        attempts=5,
+        initial_delay=0.05,
+        on_retry=lambda err, n, d: print(
+            f"attempt {n} failed: {err}; retrying in {d:.3f}s"
+        ),
+    )
+    print("result:", result)
+
+    # Demo 2: total failure returns the last error object.
+    def always_fails() -> None:
+        raise ValueError("nope")
+
+    error = retry(always_fails, attempts=3, initial_delay=0.05)
+    print("returned error:", repr(error))

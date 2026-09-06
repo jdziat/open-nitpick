@@ -1,0 +1,108 @@
+class CSVParseError(ValueError):
+    """Raised when the input is not valid CSV."""
+
+
+def parse_csv(text: str, delimiter: str = ",") -> list[list[str]]:
+    """
+    Parse CSV text into rows of strings.
+
+    Supports quoted fields, doubled escaped quotes, embedded newlines in
+    quoted fields, and a configurable single-character delimiter.
+    """
+    if not isinstance(text, str):
+        raise TypeError("text must be a string")
+    if not isinstance(delimiter, str) or len(delimiter) != 1:
+        raise ValueError("delimiter must be a single character")
+    if delimiter in {'"', "\r", "\n"}:
+        raise ValueError("delimiter cannot be a quote or newline")
+
+    rows: list[list[str]] = []
+    row: list[str] = []
+    field: list[str] = []
+    in_quotes = False
+    after_quote = False
+    field_started = False
+
+    def finish_field() -> None:
+        nonlocal field, field_started, after_quote
+        row.append("".join(field))
+        field = []
+        field_started = False
+        after_quote = False
+
+    def finish_row() -> None:
+        nonlocal row
+        finish_field()
+        rows.append(row)
+        row = []
+
+    i = 0
+    length = len(text)
+
+    while i < length:
+        char = text[i]
+
+        if in_quotes:
+            if char == '"':
+                if i + 1 < length and text[i + 1] == '"':
+                    field.append('"')
+                    i += 2
+                else:
+                    in_quotes = False
+                    after_quote = True
+                    i += 1
+            else:
+                field.append(char)
+                i += 1
+            continue
+
+        if after_quote:
+            if char == delimiter:
+                finish_field()
+                i += 1
+            elif char == "\r" or char == "\n":
+                finish_row()
+                if char == "\r" and i + 1 < length and text[i + 1] == "\n":
+                    i += 2
+                else:
+                    i += 1
+            else:
+                raise CSVParseError(
+                    f"unexpected character after closing quote at position {i}"
+                )
+            continue
+
+        if not field_started and char == '"':
+            in_quotes = True
+            field_started = True
+            i += 1
+        elif char == delimiter:
+            finish_field()
+            i += 1
+        elif char == "\r" or char == "\n":
+            finish_row()
+            if char == "\r" and i + 1 < length and text[i + 1] == "\n":
+                i += 2
+            else:
+                i += 1
+        elif char == '"':
+            raise CSVParseError(f"unexpected quote at position {i}")
+        else:
+            field.append(char)
+            field_started = True
+            i += 1
+
+    if in_quotes:
+        raise CSVParseError("unterminated quoted field")
+
+    if field_started or after_quote or row:
+        finish_row()
+
+    return rows
+
+
+if __name__ == "__main__":
+    import sys
+
+    delimiter = sys.argv[1] if len(sys.argv) > 1 else ","
+    print(parse_csv(sys.stdin.read(), delimiter))

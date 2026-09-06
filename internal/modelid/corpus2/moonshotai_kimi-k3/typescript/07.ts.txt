@@ -1,0 +1,253 @@
+/**
+ * config-loader.ts
+ *
+ * A typed JSON configuration loader featuring:
+ *   - default values (lowest precedence)
+ *   - overrides from a JSON config file
+ *   - overrides from environment variables (highest precedence)
+ *   - validation of required keys (dot-notation paths)
+ *
+ * Precedence: environment variables > config file > defaults.
+ */
+
+import { readFileSync, existsSync } from "fs";
+import { resolve } from "path";
+
+/* ------------------------------------------------------------------ */
+/* Errors                                                               */
+/* ------------------------------------------------------------------ */
+
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigError";
+  }
+}
+
+export class ConfigValidationError extends ConfigError {
+  public readonly missingKeys: readonly string[];
+
+  constructor(missingKeys: readonly string[]) {
+    super(
+      `Missing required configuration key(s): ${missingKeys.join(", ")}`
+    );
+    this.name = "ConfigValidationError";
+    this.missingKeys = missingKeys;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Options                                                              */
+/* ------------------------------------------------------------------ */
+
+export interface LoadConfigOptions<T> {
+  /** Path to the JSON config file. Relative paths resolve from cwd. */
+  configPath?: string;
+
+  /** Default configuration values (lowest precedence). */
+  defaults: T;
+
+  /**
+   * Required keys in dot notation (e.g. "database.host").
+   * A key counts as missing when its value is undefined, null, or "".
+   */
+  requiredKeys?: readonly string[];
+
+  /**
+   * Only environment variables starting with `${envPrefix}_` are applied.
+   * Defaults to "APP". Pass "" to consider every environment variable.
+   */
+  envPrefix?: string;
+
+  /**
+   * Separator denoting nesting inside environment variable names.
+   * Defaults to "__". Example: APP_DATABASE__HOST -> database.host
+   */
+  envSeparator?: string;
+
+  /** Throw when `configPath` is given but the file does not exist. */
+  configFileRequired?: boolean;
+
+  /** Environment source. Defaults to `process.env` (injectable for tests). */
+  env?: NodeJS.ProcessEnv;
+}
+
+/* ------------------------------------------------------------------ */
+/* Internal helpers                                                     */
+/* ------------------------------------------------------------------ */
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Recursively merges `override` onto `base` without mutating either.
+ * Plain objects merge deeply; arrays and scalars are replaced wholesale.
+ */
+function deepMerge<T>(base: T, override: unknown): T {
+  if (Array.isArray(override)) {
+    return override.slice() as unknown as T;
+  }
+  if (isPlainObject(override)) {
+    const merged: Record<string, unknown> = isPlainObject(base)
+      ? { ...(base as Record<string, unknown>) }
+      : {};
+    for (const [key, value] of Object.entries(override)) {
+      merged[key] = deepMerge(merged[key], value);
+    }
+    return merged as unknown as T;
+  }
+  return override === undefined ? base : (override as T);
+}
+
+/** Parses an environment variable value: JSON when possible, else string. */
+function parseEnvValue(raw: string): unknown {
+  const trimmed = raw.trim();
+  if (trimmed === "") return "";
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return raw;
+  }
+}
+
+/** Sets a nested value, creating intermediate objects as needed. */
+function setByPath(
+  target: Record<string, unknown>,
+  path: readonly string[],
+  value: unknown
+): void {
+  let cursor = target;
+  for (let i = 0; i < path.length - 1; i++) {
+    const segment = path[i];
+    if (!isPlainObject(cursor[segment])) {
+      cursor[segment] = {};
+    }
+    cursor = cursor[segment] as Record<string, unknown>;
+  }
+  cursor[path[path.length - 1]] = value;
+}
+
+/** Reads a nested value via a dot-notation path. */
+function getByPath(source: unknown, path: string): unknown {
+  let cursor: unknown = source;
+  for (const segment of path.split(".")) {
+    if (!isPlainObject(cursor)) return undefined;
+    cursor = cursor[segment];
+  }
+  return cursor;
+}
+
+function isMissing(value: unknown): boolean {
+  return value === undefined || value === null || value === "";
+}
+
+/** Converts an env var suffix (e.g. DATABASE__HOST) into a key path. */
+function envKeyToPath(key: string, separator: string): string[] {
+  return key
+    .split(separator)
+    .filter((segment) => segment.length > 0)
+    .map((segment) => segment.toLowerCase());
+}
+
+/* ------------------------------------------------------------------ */
+/* Loader                                                               */
+/* ------------------------------------------------------------------ */
+
+export function loadConfig<T extends Record<string, unknown>>(
+  options: LoadConfigOptions<T>
+): T {
+  const {
+    configPath,
+    defaults,
+    requiredKeys = [],
+    envPrefix = "APP",
+    envSeparator = "__",
+    configFileRequired = false,
+    env = process.env,
+  } = options;
+
+  if (envSeparator === "") {
+    throw new ConfigError("envSeparator must not be an empty string.");
+  }
+
+  // 1. Start from a deep copy of the defaults.
+  let config: unknown = deepMerge({}, defaults);
+
+  // 2. Merge the JSON config file, when present.
+  if (configPath !== undefined) {
+    const absolutePath = resolve(configPath);
+    if (existsSync(absolutePath)) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(readFileSync(absolutePath, "utf8"));
+      } catch (err) {
+        throw new ConfigError(
+          `Failed to parse config file "${absolutePath}": ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+      if (!isPlainObject(parsed)) {
+        throw new ConfigError(
+          `Config file "${absolutePath}" must contain a JSON object at the top level.`
+        );
+      }
+      config = deepMerge(config, parsed);
+    } else if (configFileRequired) {
+      throw new ConfigError(`Config file not found: "${absolutePath}"`);
+    }
+  }
+
+  // 3. Apply environment-variable overrides (highest precedence).
+  const prefix = envPrefix === "" ? "" : `${envPrefix}_`;
+  for (const [rawKey, rawValue] of Object.entries(env)) {
+    if (rawValue === undefined) continue;
+    if (prefix !== "" && !rawKey.startsWith(prefix)) continue;
+
+    const path = envKeyToPath(rawKey.slice(prefix.length), envSeparator);
+    if (path.length === 0) continue;
+
+    setByPath(
+      config as Record<string, unknown>,
+      path,
+      parseEnvValue(rawValue)
+    );
+  }
+
+  // 4. Validate required keys.
+  const missing = requiredKeys.filter((key) =>
+    isMissing(getByPath(config, key))
+  );
+  if (missing.length > 0) {
+    throw new ConfigValidationError(missing);
+  }
+
+  return config as T;
+}
+
+/* ------------------------------------------------------------------ */
+/* Example usage                                                        */
+/* ------------------------------------------------------------------ */
+
+/*
+interface AppConfig {
+  server: { host: string; port: number };
+  database: { url: string; poolSize: number };
+  debug: boolean;
+}
+
+// Given APP_DATABASE__URL="postgres://localhost/db" in the environment:
+const config = loadConfig<AppConfig>({
+  configPath: "./config/app.json",
+  defaults: {
+    server: { host: "0.0.0.0", port: 3000 },
+    database: { url: "", poolSize: 10 },
+    debug: false,
+  },
+  requiredKeys: ["server.host", "server.port", "database.url"],
+  envPrefix: "APP",
+});
+
+console.log(config.database.url); // "postgres://localhost/db"
+*/

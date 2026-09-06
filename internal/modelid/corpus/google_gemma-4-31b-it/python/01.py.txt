@@ -1,0 +1,60 @@
+import csv
+
+def parse_csv(text, delimiter=','):
+    """
+    Parses a subset of CSV: supports quoted fields, escaped quotes (double-quotes),
+    and a configurable delimiter. Returns a list of rows (lists of strings).
+    """
+    rows = []
+    current_row = []
+    current_field = []
+    in_quotes = False
+    i = 0
+    
+    while i < len(text):
+        char = text[i]
+        
+        if in_quotes:
+            if char == '"':
+                # Check for escaped quote (double quote)
+                if i + 1 < len(text) and text[i + 1] == '"':
+                    current_field.append('"')
+                    i += 1
+                else:
+                    # End of quoted field
+                    in_quotes = False
+            else:
+                current_field.append(char)
+        else:
+            if char == '"':
+                in_quotes = True
+            elif char == delimiter:
+                current_row.append("".join(current_field))
+                current_field = []
+            elif char == '\n':
+                current_row.append("".join(current_field))
+                rows.append(current_row)
+                current_row = []
+                current_field = []
+            elif char == '\r':
+                # Handle CRLF by ignoring \r and letting \n trigger the row end
+                pass
+            else:
+                current_field.append(char)
+        i += 1
+
+    # Handle trailing data
+    if current_field or (len(text) > 0 and text[-1] == delimiter):
+        current_row.append("".join(current_field))
+    
+    if current_row:
+        rows.append(current_row)
+        
+    return rows
+
+if __name__ == "__main__":
+    # Test Case
+    data = 'Name,Note,City\n"John ""The Big"" Doe",Hello,"New York"\nJane,World,London'
+    result = parse_csv(data)
+    for row in result:
+        print(row)

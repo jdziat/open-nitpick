@@ -1,0 +1,141 @@
+export type Comparator<T> = (a: T, b: T) => number;
+
+class TreeNode<T> {
+  constructor(
+    public value: T,
+    public left: TreeNode<T> | null = null,
+    public right: TreeNode<T> | null = null
+  ) {}
+}
+
+export class BinarySearchTree<T> {
+  private root: TreeNode<T> | null = null;
+
+  constructor(
+    private readonly compare: Comparator<T> = ((a: T, b: T) => {
+      if (a === b) return 0;
+      return (a as any) < (b as any) ? -1 : 1;
+    })
+  ) {}
+
+  insert(value: T): void {
+    const newNode = new TreeNode(value);
+
+    if (this.root === null) {
+      this.root = newNode;
+      return;
+    }
+
+    let current = this.root;
+
+    while (true) {
+      const comparison = this.compare(value, current.value);
+
+      if (comparison === 0) {
+        return;
+      }
+
+      if (comparison < 0) {
+        if (current.left === null) {
+          current.left = newNode;
+          return;
+        }
+        current = current.left;
+      } else {
+        if (current.right === null) {
+          current.right = newNode;
+          return;
+        }
+        current = current.right;
+      }
+    }
+  }
+
+  search(value: T): boolean {
+    let current = this.root;
+
+    while (current !== null) {
+      const comparison = this.compare(value, current.value);
+
+      if (comparison === 0) {
+        return true;
+      }
+
+      current = comparison < 0 ? current.left : current.right;
+    }
+
+    return false;
+  }
+
+  delete(value: T): boolean {
+    let deleted = false;
+
+    const removeMinimum = (node: TreeNode<T>): TreeNode<T> | null => {
+      if (node.left === null) {
+        return node.right;
+      }
+
+      node.left = removeMinimum(node.left);
+      return node;
+    };
+
+    const remove = (node: TreeNode<T> | null): TreeNode<T> | null => {
+      if (node === null) {
+        return null;
+      }
+
+      const comparison = this.compare(value, node.value);
+
+      if (comparison < 0) {
+        node.left = remove(node.left);
+        return node;
+      }
+
+      if (comparison > 0) {
+        node.right = remove(node.right);
+        return node;
+      }
+
+      deleted = true;
+
+      if (node.left === null) {
+        return node.right;
+      }
+
+      if (node.right === null) {
+        return node.left;
+      }
+
+      let successor = node.right;
+      while (successor.left !== null) {
+        successor = successor.left;
+      }
+
+      node.value = successor.value;
+      node.right = removeMinimum(node.right);
+      return node;
+    };
+
+    this.root = remove(this.root);
+    return deleted;
+  }
+
+  inOrder(): T[] {
+    const result: T[] = [];
+    const stack: TreeNode<T>[] = [];
+    let current = this.root;
+
+    while (current !== null || stack.length > 0) {
+      while (current !== null) {
+        stack.push(current);
+        current = current.left;
+      }
+
+      current = stack.pop()!;
+      result.push(current.value);
+      current = current.right;
+    }
+
+    return result;
+  }
+}

@@ -1,0 +1,114 @@
+export function parseCsv(input: string, delimiter = ","): string[][] {
+  if (typeof delimiter !== "string" || delimiter.length === 0) {
+    throw new TypeError("Delimiter must be a non-empty string");
+  }
+
+  if (delimiter.includes('"') || delimiter.includes("\r") || delimiter.includes("\n")) {
+    throw new TypeError("Delimiter cannot contain quotes or line breaks");
+  }
+
+  if (input.length === 0) {
+    return [];
+  }
+
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  let fieldStarted = false;
+  let afterClosingQuote = false;
+
+  const resetField = (): void => {
+    field = "";
+    fieldStarted = false;
+    afterClosingQuote = false;
+  };
+
+  const pushField = (): void => {
+    row.push(field);
+    resetField();
+  };
+
+  const pushRow = (): void => {
+    pushField();
+    rows.push(row);
+    row = [];
+  };
+
+  let i = 0;
+
+  while (i < input.length) {
+    const character = input[i];
+
+    if (inQuotes) {
+      if (character === '"') {
+        if (input[i + 1] === '"') {
+          field += '"';
+          i += 2;
+        } else {
+          inQuotes = false;
+          afterClosingQuote = true;
+          i++;
+        }
+      } else {
+        field += character;
+        i++;
+      }
+
+      continue;
+    }
+
+    if (afterClosingQuote) {
+      if (input.startsWith(delimiter, i)) {
+        pushField();
+        i += delimiter.length;
+      } else if (character === "\r" || character === "\n") {
+        pushRow();
+        if (character === "\r" && input[i + 1] === "\n") {
+          i += 2;
+        } else {
+          i++;
+        }
+      } else {
+        throw new SyntaxError(
+          `Unexpected character after closing quote at position ${i}`
+        );
+      }
+
+      continue;
+    }
+
+    if (!fieldStarted && character === '"') {
+      inQuotes = true;
+      fieldStarted = true;
+      i++;
+    } else if (input.startsWith(delimiter, i)) {
+      pushField();
+      i += delimiter.length;
+    } else if (character === "\r" || character === "\n") {
+      pushRow();
+      if (character === "\r" && input[i + 1] === "\n") {
+        i += 2;
+      } else {
+        i++;
+      }
+    } else {
+      if (character === '"') {
+        throw new SyntaxError(`Unexpected quote at position ${i}`);
+      }
+
+      field += character;
+      fieldStarted = true;
+      i++;
+    }
+  }
+
+  if (row.length > 0 || fieldStarted || field.length > 0) {
+    pushField();
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+export default parseCsv;
