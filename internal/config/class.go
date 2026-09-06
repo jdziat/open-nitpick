@@ -133,9 +133,10 @@ func classSet(cs ...Class) map[Class]bool {
 // hunt is never diluted by it.
 const GenerationLevel = NitpickNormal
 
-// Normalize maps a model-supplied class onto a known one. Unrecognized values
-// become maintainability: visible, filtered out at the strictest levels, and
-// never silently promoted into the defect classes that drive gating.
+// Normalize maps a model-supplied class onto a known one, through a few
+// aliases models reach for unprompted. An unrecognized value lands in
+// ClassUnknown, with false: published at every level rather than hidden,
+// and never silently promoted into the defect classes that drive gating.
 func (c Class) Normalize() (Class, bool) {
 	n := Class(strings.ToLower(strings.TrimSpace(string(c))))
 
