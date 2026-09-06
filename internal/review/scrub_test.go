@@ -69,3 +69,19 @@ func indexOf(s, sub string) int {
 	}
 	return -1
 }
+
+// A withheld finding is still published, under "reported, then withheld",
+// so its title, rationale and the reason are scrubbed too.
+func TestScrubOverruledCoversTheReason(t *testing.T) {
+	o := []Overruled{{
+		Finding: Finding{Title: "Nil deref — here", Rationale: "It actually panics."},
+		Expert:  "correctness",
+		Reason:  "Sure! The guard actually covers it.",
+	}}
+	if n := scrubOverruled(o); n != 3 {
+		t.Errorf("changed = %d, want 3", n)
+	}
+	if o[0].Finding.Title != "Nil deref, here" || o[0].Reason != "The guard covers it." {
+		t.Errorf("overruled = %+v", o[0])
+	}
+}

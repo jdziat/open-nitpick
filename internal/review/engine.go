@@ -676,7 +676,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// reaches a pull request carrying the habits this tool reports in
 	// other people's code is the worst kind of finding, and the prompt's
 	// voice layer asks but cannot enforce.
-	if n := scrubFindings(findings); n > 0 {
+	if n := scrubFindings(findings) + scrubOverruled(report.Overruled); n > 0 {
 		e.log().Debug("scrubbed model prose", "pieces", n)
 	}
 	summary, _ = Scrub(summary)
