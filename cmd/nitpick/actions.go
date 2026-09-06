@@ -17,7 +17,7 @@ import (
 // step's outputs, which a later step reads, and the job summary, which a
 // person reads without opening the log. Both are files named by the
 // environment, and both are written by the CLI itself rather than scraped
-// from its output by the Action's shell — which is how the `findings` output
+// from its output by the Action's shell, which is how the `findings` output
 // spent a release reading zero, because the line it grepped for was on
 // stderr and the grep read stdout.
 //

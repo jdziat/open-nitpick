@@ -162,8 +162,8 @@ func TestPullRequestReviewRequiresAToken(t *testing.T) {
 }
 
 // TestExplainConfigNamesThePolicySource covers the question this command exists
-// to answer. "What does my config resolve to" has a second half — whether it
-// resolves at all for the change being reviewed — and an operator who reads the
+// to answer. "What does my config resolve to" has a second half, whether it
+// resolves at all for the change being reviewed, and an operator who reads the
 // ignore list here and then watches a review not honor it has been told
 // something untrue by omission.
 func TestExplainConfigNamesThePolicySource(t *testing.T) {
@@ -192,7 +192,7 @@ func TestExplainConfigNamesThePolicySource(t *testing.T) {
 
 // TestGateIgnoresTheChangesOwnFailOn is the last knob the invariant has to
 // cover. The engine reviews a config-editing change under a policy resolved
-// elsewhere, and then the CLI decides the exit status — so reading fail_on from
+// elsewhere, and then the CLI decides the exit status, so reading fail_on from
 // the loaded file here would hand the change back the only setting that decides
 // whether CI goes red, after every other setting had been taken away.
 func TestGateIgnoresTheChangesOwnFailOn(t *testing.T) {
@@ -200,7 +200,7 @@ func TestGateIgnoresTheChangesOwnFailOn(t *testing.T) {
 	supplied := config.Defaults()
 	supplied.Review.FailOn = config.SeverityNone
 
-	// The policy the engine actually reviewed under.
+	// The policy the engine reviewed under.
 	resolved := config.Defaults()
 	resolved.Review.FailOn = config.SeverityWarning
 
@@ -225,8 +225,8 @@ func TestGateIgnoresTheChangesOwnFailOn(t *testing.T) {
 // TestTheReviewEngineIsWiredAgainstTheChangesOwnPolicy is the regression test
 // for the whole defense being one unpinned line of wiring.
 //
-// Engine.Policy and Engine.Models are both optional — an offline driver has no
-// base revision to resolve against and wires its own clients — so dropping
+// Engine.Policy and Engine.Models are both optional (an offline driver has no
+// base revision to resolve against and wires its own clients), so dropping
 // either from this command is a clean build and a green suite, while every
 // config-editing change is reviewed under the configuration it wrote for itself
 // and gated on the fail_on it chose. internal/review tests the engine's half and
@@ -254,7 +254,7 @@ func TestTheReviewEngineIsWiredAgainstTheChangesOwnPolicy(t *testing.T) {
 	}
 
 	// The checkout has no git history, so no accepted version can be read and
-	// the resolver falls back to built-in defaults — which is still a policy the
+	// the resolver falls back to built-in defaults, which is still a policy the
 	// change did not write, and the property being asserted.
 	t.Setenv(config.EnvProvider, "openai")
 	t.Setenv(config.EnvModel, "gpt-4o")
@@ -299,8 +299,8 @@ func TestDryRunResolvesPolicyLikeTheRealRun(t *testing.T) {
 		t.Errorf("BaseRevision = %q, want the wrapped forge's answer", rev)
 	}
 
-	// And a source that genuinely cannot answer must still be unable to, rather
-	// than have the wrapper invent something plausible — the plausible answer is
+	// And a source that cannot answer must still be unable to, rather
+	// than have the wrapper invent something plausible: the plausible answer is
 	// the head under review.
 	silent := &dryRunProvider{source: &vcs.GitHub{}, out: io.Discard}
 	if _, err := silent.BaseRevision(context.Background(), vcs.Ref{}); err == nil {
@@ -324,7 +324,7 @@ func (b *baseNamingProvider) BaseRevision(context.Context, vcs.Ref) (string, err
 // TestExplainConfigDoesNotPromiseSubstitutionForAnOutsideConfig covers the
 // -config escape hatch, which is the configuration the defaults-fallback failure
 // actively recommends. A change under review cannot edit a file outside the
-// repository, so that file always applies — and the command told an operator who
+// repository, so that file always applies, and the command told an operator who
 // took its own advice the exact opposite.
 func TestExplainConfigDoesNotPromiseSubstitutionForAnOutsideConfig(t *testing.T) {
 	outside := filepath.Join(t.TempDir(), "outside.yaml")
@@ -405,13 +405,13 @@ func captureStdout(t *testing.T, fn func()) string {
 }
 
 // TestExplainConfigNamesDiscardedKeys covers the command's answer to the
-// question an operator actually asks it: what did my config resolve to, and
+// question an operator asks it: what did my config resolve to, and
 // what did you throw away?
 //
 // The discarded keys used to appear only in `nitpick review`'s log, so
 // explain-config printed byte-identical "Models:" sections for a config whose
 // endpoint was honored and one whose endpoint was silently stripped. That makes
-// its silence worthless as evidence — the property this repository's committed
+// its silence worthless as evidence, the property this repository's committed
 // default depends on could not be checked with the command built to check it.
 func TestExplainConfigNamesDiscardedKeys(t *testing.T) {
 	// Untrusted: this is the CI default and the case that strips keys.
