@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/jdziat/open-nitpick/v2/internal/bundle"
 )
 
 // TestWindowedFilesAreDisclosed is the regression test for a disclosure that

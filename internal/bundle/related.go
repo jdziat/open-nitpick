@@ -14,8 +14,8 @@ import (
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/jdziat/open-nitpick/v2/internal/diff"
+	"github.com/jdziat/open-nitpick/v2/internal/vcs"
 )
 
 // Related context: the definitions a changed file imports from elsewhere in

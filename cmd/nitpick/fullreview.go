@@ -11,12 +11,12 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/fullreview"
-	"github.com/jdziat/open-nitpick/internal/review"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/jdziat/open-nitpick/v2/internal/fullreview"
+	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/v2/internal/vcs"
 )
 
 // runFullReview reviews a repository, or the paths named, rather than a

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
 )
 
 // TestRejudgeDump re-judges findings that were already collected, with a

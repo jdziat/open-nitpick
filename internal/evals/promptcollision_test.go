@@ -69,9 +69,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/prompt"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/prompt"
+	"github.com/jdziat/open-nitpick/v2/internal/review"
 )
 
 // shippedPromptTexts renders the prompt text a review is generated from, keyed

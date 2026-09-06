@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/review"
 )
 
 // The two rule widths Incumbent prints: 40 columns between sections, 72 around

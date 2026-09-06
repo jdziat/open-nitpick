@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/review"
 )
 
 // IncumbentModel is the pseudo-model id used for Incumbent in reports, so it

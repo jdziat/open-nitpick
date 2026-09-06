@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
 )
 
 // specByName finds a catalog entry.
