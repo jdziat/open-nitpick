@@ -1,7 +1,7 @@
 // Command benchrepo turns the eval corpora into a real repository, so the
 // GitHub Action can be benchmarked end to end on real pull requests.
 //
-//	benchrepo init <dir>            write every fixture's base state under fixtures/<name>/ and commit it
+//	benchrepo init <dir>            write every fixture's base state under services/<name>/ and commit it
 //	benchrepo branches <dir>        create one branch per fixture with its head state committed
 //	benchrepo prs <owner/repo>      open a pull request for every fixture branch
 //	benchrepo trigger <owner/repo>  ask Incumbent's hosted app to review every fixture pull request
