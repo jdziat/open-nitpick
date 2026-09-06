@@ -595,6 +595,16 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings, dropped := e.filterAnchors(findings, files)
 	discarded = append(discarded, dropped...)
 
+	// A known advisory is deterministic evidence: a scanner matched a pinned
+	// version against a published vulnerability, and no model pass has
+	// anything to judge about it. Triage could merge or reword one, and a
+	// rewording loses the attribution that names it as the scanner's (see
+	// restoreSeverityProvenance), which is how four CVEs on a go.mod were
+	// published as the triage model's own correctness findings. Held out
+	// here and rejoined after validation, they keep their rule, their
+	// class and their line, and still pass the operator's ceiling and gate.
+	findings, advisories := holdAdvisories(findings)
+
 	summary, findings, withheldByTriage, err := e.triage(ctx, pr, findings)
 	if err != nil {
 		return nil, err
@@ -627,6 +637,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// severity verdict has to be able to move a finding across the gate's
 	// threshold in either direction.
 	findings, overruled := e.validateFindings(ctx, findings, plan)
+	findings = append(findings, advisories...)
 
 	// After every pass that can raise a severity, and before the gate reads
 	// one. This is the application of linters.max_severity that binds.
@@ -1118,6 +1129,19 @@ func (e *Engine) recordSeverity(f *Finding) {
 // direction: failing to restore prints "(word not recorded)", which is visible,
 // while restoring onto the wrong finding quotes a reviewer as saying something
 // it did not — the failure this whole field pair exists to prevent.
+// holdAdvisories splits the known advisories from the findings a model pass
+// will see, preserving order on both sides.
+func holdAdvisories(findings []Finding) (rest, advisories []Finding) {
+	for _, f := range findings {
+		if f.IsAdvisory() {
+			advisories = append(advisories, f)
+		} else {
+			rest = append(rest, f)
+		}
+	}
+	return rest, advisories
+}
+
 func (e *Engine) restoreSeverityProvenance(f *Finding, before map[string]Finding) {
 	original, ok := before[f.Key()]
 	if !ok {

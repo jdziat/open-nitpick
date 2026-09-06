@@ -315,6 +315,36 @@ func TestSARIFParserReadsLevelsAndRefusesAnEmptyLog(t *testing.T) {
 	}
 }
 
+// osv-scanner writes each advisory against the lockfile with no region, the
+// shape that once made every advisory vanish before the catalog's line-1
+// fallback could run.
+func TestOSVScannerKeepsAdvisoriesWithoutARegion(t *testing.T) {
+	inv := invocation{repoRoot: "/repo", tmpDir: t.TempDir(), files: []string{"go.mod"}}
+	// The same advisory twice, as the scanner reports a package reachable
+	// by two paths; once is enough.
+	result := `{"ruleId":"CVE-2020-14040","level":"warning","kind":"fail","message":{"text":"Package 'golang.org/x/text@0.3.0' is vulnerable to 'CVE-2020-14040' (also known as 'GO-2020-0015', 'GHSA-5rcv-m4m3-hfh7')."},
+	   "locations":[{"physicalLocation":{"artifactLocation":{"uri":"file:///repo/go.mod"}}}]}`
+	report := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"osv-scanner","rules":[{"id":"CVE-2020-14040"}]}},"results":[` + result + `,` + result + `]}]}`
+	findings, err := osvScannerSpec().parse(inv, []byte(report), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("findings = %+v, want the repeated advisory once", findings)
+	}
+	f := findings[0]
+	if f.Path != "go.mod" || f.Line != 1 || f.Rule != "CVE-2020-14040" || f.Severity != config.SeverityWarning {
+		t.Errorf("advisory not placed on the lockfile's first line: %+v", f)
+	}
+	// The class is decided on the qualified rule the report carries.
+	if got := classForRule(prefixRule("osv-scanner", f.Rule)); got != config.ClassSecurity {
+		t.Errorf("class of a known advisory = %s, want security", got)
+	}
+	if !strings.Contains(f.Message, "GHSA-5rcv-m4m3-hfh7") {
+		t.Errorf("aliases dropped from the message: %q", f.Message)
+	}
+}
+
 func TestGitleaksNeverReportsTheSecret(t *testing.T) {
 	inv := invocation{repoRoot: "/repo", tmpDir: t.TempDir(), files: []string{"config.yaml"}}
 	report := `[{"Description":"AWS Access Key","StartLine":4,"Secret":"AKIAIOSFODNN7EXAMPLE","Match":"AKIAIOSFODNN7EXAMPLE","File":"config.yaml","RuleID":"aws-access-token"}]`

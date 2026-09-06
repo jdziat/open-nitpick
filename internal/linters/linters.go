@@ -653,6 +653,11 @@ func classForRule(rule string) config.Class {
 	r := strings.ToLower(rule)
 
 	switch {
+	// A published advisory against a pinned dependency is a security finding
+	// whatever else its id contains: "CVE-2020-14040" names no linter.
+	case review.IsAdvisoryRule(rule):
+		return config.ClassSecurity
+
 	case strings.Contains(r, "gosec"), strings.Contains(r, "semgrep"),
 		strings.Contains(r, "security"), strings.Contains(r, "bandit"),
 		strings.Contains(r, "injection"), strings.Contains(r, "crypto"):

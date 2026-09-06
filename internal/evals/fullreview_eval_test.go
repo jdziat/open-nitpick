@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,10 @@ import (
 // clean file, lists the known advisory when osv-scanner is installed, and
 // puts the secret first in the remediation plan. Judge-free: a finding is
 // credited by the keyword rule the other corpora use.
+// advisoryID is a line of the known-advisories section: the scanner's rule,
+// qualified with its name, then the lockfile anchor.
+var advisoryID = regexp.MustCompile(`(?m)^\s+osv-scanner\((GHSA-|CVE-|GO-20)[^)]*\)\s+go\.mod:\d+ `)
+
 func TestFullReviewFixture(t *testing.T) {
 	report, tree, model := reviewTree(t, FullReviewFixture)
 	out := fullreview.Sections(report) + fullreview.RemediationPlan(report.Findings) + fullreview.CoverageNotice(tree)
@@ -44,8 +49,10 @@ func TestFullReviewFixture(t *testing.T) {
 	}
 
 	if _, err := exec.LookPath("osv-scanner"); err == nil {
-		if !strings.Contains(out, "golang.org/x/text") && !strings.Contains(out, "GO-20") && !strings.Contains(out, "GHSA-") {
-			t.Errorf("osv-scanner is installed but no advisory for golang.org/x/text v0.3.0 is listed:\n%s", out)
+		// The scanner's section, not the model's wording: the model names
+		// the pin on its own, and that must not stand in for the advisory.
+		if !strings.Contains(out, "\nKnown advisories") || strings.Contains(out, "none reported. If osv-scanner") || !advisoryID.MatchString(out) {
+			t.Errorf("osv-scanner is installed but the known-advisories section lists no advisory id for golang.org/x/text v0.3.0:\n%s", out)
 		}
 	} else {
 		t.Logf("osv-scanner not installed; the advisories section is unverified")
@@ -120,6 +127,7 @@ func reviewTree(t *testing.T, files map[string]string) (*review.Report, *vcs.Tre
 	cfg.Linters.Mode = config.LinterAuto
 	auto := true
 	cfg.Linters.AutoDetect = &auto
+	cfg.Linters.Enabled = append(cfg.Linters.Enabled, "osv-scanner") // as the command does; a skip when absent
 
 	client, err := llm.Build(cfg.Models.Default)
 	if err != nil {

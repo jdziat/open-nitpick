@@ -5,7 +5,6 @@ package fullreview
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -13,11 +12,6 @@ import (
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
-
-// advisoryID is the shape of a vulnerability identifier an analyzer such as
-// osv-scanner reports as its rule: a known advisory is deterministic
-// evidence, listed as such rather than judged.
-var advisoryID = regexp.MustCompile(`^(GHSA-|CVE-|PYSEC-|GO-\d|RUSTSEC-|OSV-|MAL-)`)
 
 // Sections groups what the review found by what a reader does about it:
 // known advisories (deterministic, from the dependency scanner, including
@@ -28,7 +22,7 @@ func Sections(report *review.Report) string {
 	var advisories, security, bugs, slop []review.Finding
 	for _, f := range report.Findings {
 		switch {
-		case f.FromAnalyzer && advisoryID.MatchString(f.Source):
+		case f.IsAdvisory():
 			advisories = append(advisories, f)
 		case f.Class == string(config.ClassSecurity):
 			security = append(security, f)
@@ -40,7 +34,7 @@ func Sections(report *review.Report) string {
 	}
 	var setAside []review.LinterDiscard
 	for _, d := range report.Discarded {
-		if advisoryID.MatchString(d.Rule) {
+		if review.IsAdvisoryRule(d.Rule) {
 			setAside = append(setAside, d)
 		}
 	}
@@ -88,6 +82,12 @@ func writeSection(b *strings.Builder, name string, findings []review.Finding) {
 // RemediationPlan orders findings most severe first and groups those that
 // share a title within a class, since one fix usually clears them together.
 // The estimate is in files touched, which is countable; hours are not.
+//
+// One rule sits above the severity grades: a security finding at warning or
+// above sorts with the errors. Models grade a committed credential anywhere
+// from warning to critical, and an exposed credential is an incident to
+// contain before a crash is a bug to fix, so the plan does not let the
+// grade decide which of the two a reader sees first.
 func RemediationPlan(findings []review.Finding) string {
 	if len(findings) == 0 {
 		return "\nRemediation plan: nothing to remediate.\n"
@@ -126,8 +126,8 @@ func RemediationPlan(findings []review.Finding) string {
 		ordered = append(ordered, g)
 	}
 	sort.SliceStable(ordered, func(i, j int) bool {
-		if ordered[i].severity.Rank() != ordered[j].severity.Rank() {
-			return ordered[i].severity.Rank() > ordered[j].severity.Rank()
+		if planRank(ordered[i].severity, ordered[i].class) != planRank(ordered[j].severity, ordered[j].class) {
+			return planRank(ordered[i].severity, ordered[i].class) > planRank(ordered[j].severity, ordered[j].class)
 		}
 		if ordered[i].class != ordered[j].class {
 			return classOrder(ordered[i].class) < classOrder(ordered[j].class)
@@ -156,6 +156,16 @@ func RemediationPlan(findings []review.Finding) string {
 
 // classOrder breaks severity ties: what leaks or breaks before what reads
 // badly.
+// planRank is the severity rank the plan sorts by: the grade, lifted to
+// error for a security finding graded warning (see RemediationPlan).
+func planRank(sev config.Severity, class string) int {
+	r := sev.Rank()
+	if class == string(config.ClassSecurity) && sev.AtLeast(config.SeverityWarning) && r < config.SeverityError.Rank() {
+		r = config.SeverityError.Rank()
+	}
+	return r
+}
+
 func classOrder(class string) int {
 	for i, c := range []string{"security", "correctness", "concurrency", "resource", "contract", "tests", "maintainability", "style"} {
 		if c == class {

@@ -353,7 +353,7 @@ the binary.
 | semgrep | any | opt-in | `semgrep_config` required |
 | stylelint | CSS, SCSS, Less | opt-in | `configs.stylelint` required; a config may be code |
 | markdownlint | Markdown | opt-in | shipped config; noisy, so not auto |
-| osv-scanner | lockfiles | opt-in | shipped config; queries osv.dev, so not auto |
+| osv-scanner | lockfiles | opt-in | shipped config; queries osv.dev, so not auto; `full-review` and `repo-score` name it |
 | phpstan | PHP | opt-in | `configs.phpstan` and `trusted`: loads the project's autoloader |
 | clippy | Rust | opt-in | `trusted`: cargo runs build scripts and proc macros |
 

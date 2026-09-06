@@ -386,3 +386,62 @@ func runWithLinter(t *testing.T, level config.NitpickLevel, review, lint, triage
 	}
 	return report
 }
+
+// A known advisory is not the triage model's to merge, reword or drop: it is
+// published as the scanner reported it, under its rule and class. The scripted
+// triage here answers with the bug alone, which is what a triage model that
+// merged or dropped both advisories would answer; both are published anyway.
+func TestKnownAdvisoriesAreNotTriaged(t *testing.T) {
+	cve := Finding{
+		Path: "app.go", Line: 4, Severity: "warning", Class: "security", FromAnalyzer: true,
+		Title:     "Package 'golang.org/x/text@0.3.0' is vulnerable to 'CVE-2020-14040' (also known as 'GO-2020-0015').",
+		Rationale: "Reported by CVE-2020-14040.", Source: "CVE-2020-14040",
+	}
+	second := cve
+	second.Title, second.Source = "Package 'golang.org/x/text@0.3.0' is vulnerable to 'CVE-2022-32149'.", "CVE-2022-32149"
+	bug := Finding{Path: "app.go", Line: 4, Severity: "error", Class: "correctness", Title: "Deferred close panics"}
+
+	report := runWithLinter(t, config.NitpickNormal, []Finding{bug}, []Finding{cve, second}, []Finding{bug})
+
+	var got []Finding
+	for _, f := range report.Findings {
+		if f.IsAdvisory() {
+			got = append(got, f)
+		}
+	}
+	if len(got) != 2 {
+		t.Fatalf("advisories published = %+v, want both as the scanner reported them:\n%+v", got, report.Findings)
+	}
+	for i, f := range got {
+		if f.Title != []Finding{cve, second}[i].Title || f.Class != "security" || f.Triager != "" || !f.FromAnalyzer {
+			t.Errorf("advisory was judged by a model: %+v", f)
+		}
+	}
+	if len(report.Findings) != 3 {
+		t.Errorf("findings = %d, want the bug and both advisories", len(report.Findings))
+	}
+}
+
+// The linters package qualifies every rule with its tool, so the id a report
+// carries is "osv-scanner(CVE-...)"; an advisory is recognized in that form
+// and in the bare one, and an unrelated rule that merely mentions one is not.
+func TestAdvisoryRulesAreRecognizedQualifiedOrBare(t *testing.T) {
+	for _, rule := range []string{"CVE-2020-14040", "osv-scanner(CVE-2020-14040)", "osv-scanner(GHSA-5rcv-m4m3-hfh7)", "GO-2020-0015", "osv-scanner(PYSEC-2021-1)", "RUSTSEC-2020-0001"} {
+		if !IsAdvisoryRule(rule) {
+			t.Errorf("%q is not recognized as an advisory", rule)
+		}
+	}
+	for _, rule := range []string{"golangci-lint(gosec)", "semgrep(go.lang.security.audit.cve-check)", "errcheck", ""} {
+		if IsAdvisoryRule(rule) {
+			t.Errorf("%q is recognized as an advisory", rule)
+		}
+	}
+	f := Finding{Source: "osv-scanner(CVE-2020-14040)"}
+	if f.IsAdvisory() {
+		t.Error("a finding not from an analyzer is not an advisory whatever its source says")
+	}
+	f.FromAnalyzer = true
+	if !f.IsAdvisory() {
+		t.Error("an analyzer finding with an advisory rule is an advisory")
+	}
+}
