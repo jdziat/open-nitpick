@@ -1,0 +1,42 @@
+// commit bb41f94bdd9e 2026-07-14T04:05:56+00:00 log/context.go
+	"github.com/gofiber/utils/v2/swar"
+	idx := indexControlByte(p)
+	if idx == -1 {
+	copy(scrubbed, p)
+	for i := idx; i < len(scrubbed); i++ {
+		if isControlByte(scrubbed[i]) {
+	idx := indexControlByte(s)
+	if idx == -1 {
+	copy(scrubbed, s)
+	for i := idx; i < len(scrubbed); i++ {
+		if isControlByte(scrubbed[i]) {
+// indexControlByte returns the index of the first byte isControlByte matches,
+// or -1 if none is present. It scans eight bytes at a time; inputs of 8+
+// bytes finish with one overlapping word, shorter ones byte-wise.
+func indexControlByte[S ~string | ~[]byte](s S) int {
+	n := len(s)
+	i := 0
+	for ; i+swar.WordLen <= n; i += swar.WordLen {
+		if m := controlScrubMask(swar.Load8(s, i)); m != 0 {
+			return i + swar.FirstLane(m)
+		}
+	}
+	if i == n {
+		return -1
+	}
+	if n >= swar.WordLen {
+		if m := controlScrubMask(swar.Load8(s, n-swar.WordLen)); m != 0 {
+			return n - swar.WordLen + swar.FirstLane(m)
+		}
+		return -1
+	}
+	for ; i < n; i++ {
+		if isControlByte(s[i]) {
+			return i
+		}
+	}
+	return -1
+// controlScrubMask marks the lanes of w holding bytes isControlByte matches:
+// C0 controls except HTAB, plus DEL. Bytes >= 0x80 are never marked.
+func controlScrubMask(w uint64) uint64 {
+	return (swar.MatchRangeMask(w, 0x00, 0x1f) &^ swar.MatchByteMask(w, '\t')) | swar.MatchByteMask(w, 0x7f)

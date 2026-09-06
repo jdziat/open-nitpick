@@ -1,0 +1,37 @@
+// commit ba919854a1b1 2026-08-19T18:05:00-07:00 common/namespace/nsreplication/transmission_task_handler.go
+	otellog "go.opentelemetry.io/otel/log"
+	"go.temporal.io/server/common/dynamicconfig"
+	"go.temporal.io/server/common/wideevents"
+		namespaceReplicationQueue    persistence.NamespaceReplicationQueue
+		logger                       log.Logger
+		eventLogger                  otellog.Logger
+		emitNamespaceLifecycleEvents dynamicconfig.BoolPropertyFn
+		currentCluster               string
+	eventLogger otellog.Logger,
+	emitNamespaceLifecycleEvents dynamicconfig.BoolPropertyFn,
+	currentCluster string,
+		namespaceReplicationQueue:    namespaceReplicationQueue,
+		logger:                       logger,
+		eventLogger:                  eventLogger,
+		emitNamespaceLifecycleEvents: emitNamespaceLifecycleEvents,
+		currentCluster:               currentCluster,
+	replicationTask := &replicationspb.ReplicationTask{
+		TaskType:   taskType,
+		Attributes: task,
+	}
+	err := r.namespaceReplicationQueue.Publish(ctx, replicationTask)
+	if err != nil {
+		return err
+	}
+
+	if r.emitNamespaceLifecycleEvents() {
+		eventData, ok := wideevents.NewDefaultNamespaceReplicationTaskEventDataProvider().Extract(replicationTask)
+		if !ok {
+			return nil
+		}
+		wideevents.EmitNamespaceReplicationLifecycle(r.eventLogger, wideevents.NamespaceReplicationLifecycleInput{
+			Phase:         wideevents.NamespaceReplicationCreated,
+			EventData:     eventData,
+			SourceCluster: r.currentCluster,
+	}
+	return nil

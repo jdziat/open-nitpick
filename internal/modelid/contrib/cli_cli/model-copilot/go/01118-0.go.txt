@@ -1,0 +1,63 @@
+// commit b63f5bfd9ac1 2026-04-16T15:38:36+02:00 pkg/cmd/skills/publish/publish.go
+	"path"
+			Skills are discovered using the same conventions as install:
+
+			  - %[1]sskills/*/SKILL.md%[1]s
+			  - %[1]sskills/{scope}/*/SKILL.md%[1]s
+			  - %[1]s*/SKILL.md%[1]s (root-level)
+			  - %[1]splugins/{scope}/skills/*/SKILL.md%[1]s
+
+	skills, err := discovery.DiscoverLocalSkills(dir)
+		return err
+	for _, skill := range skills {
+		dirName := path.Base(skill.Path)
+		skillPath := filepath.Join(dir, filepath.FromSlash(skill.Path), "SKILL.md")
+				skill:    skill.DisplayName(),
+				skill:    skill.DisplayName(),
+				skill:    skill.DisplayName(),
+					skill:    skill.DisplayName(),
+					skill:    skill.DisplayName(),
+				skill:    skill.DisplayName(),
+				skill:    skill.DisplayName(),
+					skill:    skill.DisplayName(),
+							skill:    skill.DisplayName(),
+							skill:    skill.DisplayName(),
+							skill:    skill.DisplayName(),
+						skill:    skill.DisplayName(),
+					skill:    skill.DisplayName(),
+				skill:    skill.DisplayName(),
+			var skillAbsDirs []string
+			for _, skill := range skills {
+				skillAbsDirs = append(skillAbsDirs, filepath.Join(dir, filepath.FromSlash(skill.Path)))
+			}
+			securityDiags := checkSecuritySettings(client, host, owner, repo, skillAbsDirs)
+		renderDiagnosticsTTY(opts, len(skills), diagnostics, errors, warnings, fixes, owner, repo)
+func checkSecuritySettings(client *api.Client, host, owner, repo string, skillDirs []string) []publishDiagnostic {
+	hasCode, hasManifests := detectCodeAndManifests(skillDirs)
+// detectCodeAndManifests walks the skill directories looking for code files
+func detectCodeAndManifests(skillDirs []string) (hasCode, hasManifests bool) {
+	for _, dir := range skillDirs {
+		_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+			ext := filepath.Ext(info.Name())
+			if codeExtensions[ext] {
+				hasCode = true
+			}
+			if manifestFiles[info.Name()] {
+				hasManifests = true
+			}
+			if hasCode && hasManifests {
+				// Stop walking this skill directory early; the outer loop
+				// continues to process remaining skill directories.
+				return filepath.SkipAll
+			}
+		})
+			return
+	}
+func renderDiagnosticsTTY(opts *PublishOptions, skillCount int, diagnostics []publishDiagnostic, errors, warnings, fixes int, owner, repo string) {
+		fmt.Fprintf(opts.IO.Out, "%s %d skill(s) validated successfully\n", cs.SuccessIcon(), skillCount)

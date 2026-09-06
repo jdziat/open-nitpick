@@ -1,0 +1,35 @@
+// commit 7af8755aed8b 2026-08-07T15:15:37+02:00 packages/browser/src/node/index.ts
+import type { ServerResponse } from 'node:http'
+// pin a Cache-Control value and stop Vite's later middleware from overriding it
+function pinCacheControl(res: ServerResponse, value: string): void {
+  res.setHeader('Cache-Control', value)
+  const setHeader = res.setHeader.bind(res)
+  res.setHeader = function (name, ...args) {
+    if (name === 'Cache-Control') {
+      return res
+    }
+    return (setHeader as (...a: unknown[]) => ServerResponse)(name, ...args)
+  }
+}
+
+      // vitest's own dist files only change with the vitest version and
+      // browser contexts don't outlive the process, so there is no reason
+      // to revalidate them in every tester iframe. Skipped for persistent
+      // contexts and preview providers — their disk cache would survive a vitest upgrade
+      const persistentContext = (parentServer.config.browser.provider?.options as { persistentContext?: unknown } | undefined)?.persistentContext
+      const immutablePrefixes = persistentContext || parentServer.config.browser.provider?.name === 'preview'
+        ? []
+        : ['/__vitest_browser__/', `/@fs${vitestDist}`, `/@fs${distRoot}`]
+
+        const url = req.url
+        if (url) {
+          if (immutablePrefixes.some(prefix => url.startsWith(prefix))) {
+            pinCacheControl(res, 'public,max-age=31536000,immutable')
+          }
+          // 9000 mega head move
+          // Vite always caches optimized dependencies, but users might mock
+          // them in _some_ tests, while keeping original modules in others;
+          // there is no way to configure that in Vite, so we pin no-cache
+          // and ignore the cache-control Vite sets in the next middleware
+          else if (versionRegexp.test(url) && !url.includes('chunk-')) {
+            pinCacheControl(res, 'no-cache')

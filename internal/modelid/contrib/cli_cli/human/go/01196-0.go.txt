@@ -1,0 +1,481 @@
+// commit d9fab039abdb 2026-05-11T10:54:57+01:00 pkg/cmd/skills/list/list.go
+package list
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/skills/discovery"
+	"github.com/cli/cli/v2/internal/skills/frontmatter"
+	"github.com/cli/cli/v2/internal/skills/installer"
+	"github.com/cli/cli/v2/internal/skills/registry"
+	"github.com/cli/cli/v2/internal/skills/source"
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/spf13/cobra"
+)
+
+var skillListFields = []string{
+	"skillName",
+	"hosts",
+	"scope",
+	"sourceURL",
+	"version",
+	"pinned",
+	"path",
+}
+
+// ListOptions holds dependencies and user-provided flags for the list command.
+type ListOptions struct {
+	IO        *iostreams.IOStreams
+	Telemetry ghtelemetry.EventRecorder
+	GitClient *git.Client
+	Exporter  cmdutil.Exporter
+
+	Agent        string
+	Scope        string
+	ScopeChanged bool
+	Dir          string
+}
+
+type agentInfo struct {
+	id string
+}
+
+type scanTarget struct {
+	dir   string
+	hosts []agentInfo
+	scope string
+}
+
+type listedSkill struct {
+	skillName string
+	hostIDs   []string
+	scope     string
+	source    string
+	sourceURL string
+	version   string
+	pinned    bool
+	path      string
+}
+
+// ExportData implements cmdutil.exportable for --json output.
+func (s listedSkill) ExportData(fields []string) map[string]interface{} {
+	data := map[string]interface{}{}
+	for _, f := range fields {
+		switch f {
+		case "skillName":
+			data[f] = s.skillName
+		case "hosts":
+			data[f] = s.hostIDs
+		case "scope":
+			data[f] = s.scope
+		case "sourceURL":
+			data[f] = s.sourceURL
+		case "version":
+			data[f] = s.version
+		case "pinned":
+			data[f] = s.pinned
+		case "path":
+			data[f] = s.path
+		}
+	}
+	return data
+}
+
+// NewCmdList creates the "skills list" command.
+func NewCmdList(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*ListOptions) error) *cobra.Command {
+	opts := &ListOptions{
+		IO:        f.IOStreams,
+		Telemetry: telemetry,
+		GitClient: f.GitClient,
+	}
+
+	cmd := &cobra.Command{
+		Use:     "list [flags]",
+		Short:   "List installed skills (preview)",
+		Aliases: []string{"ls"},
+		Long: heredoc.Docf(`
+			List installed agent skills across known agent host directories.
+
+			By default, scans all supported agent hosts in both project and user scope.
+			Use %[1]s--agent%[1]s to scan one host, %[1]s--scope%[1]s to scan only project or user
+			scope, or %[1]s--dir%[1]s to scan a custom skills directory.
+
+			Project-scope skills are discovered relative to the current git repository
+			root. User-scope skills are discovered relative to your home directory.
+		`, "`"),
+		Example: heredoc.Doc(`
+			# List all installed skills
+			$ gh skill list
+
+			# List skills installed for Claude Code
+			$ gh skill list --agent claude-code
+
+			# List user-scope skills
+			$ gh skill list --scope user
+
+			# List skills as JSON
+			$ gh skill list --json skillName,sourceURL,scope,version,pinned,path
+		`),
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.ScopeChanged = cmd.Flags().Changed("scope")
+
+			if opts.Dir != "" && opts.Agent != "" {
+				return cmdutil.FlagErrorf("--dir and --agent cannot be used together")
+			}
+			if opts.Dir != "" && opts.ScopeChanged {
+				return cmdutil.FlagErrorf("--dir and --scope cannot be used together")
+			}
+
+			if runF != nil {
+				return runF(opts)
+			}
+			return listRun(opts)
+		},
+	}
+
+	cmdutil.StringEnumFlag(cmd, &opts.Agent, "agent", "", "", registry.AgentIDs(), "Filter by target agent")
+	cmdutil.StringEnumFlag(cmd, &opts.Scope, "scope", "", "", []string{string(registry.ScopeProject), string(registry.ScopeUser)}, "Filter by installation scope")
+	cmd.Flags().StringVar(&opts.Dir, "dir", "", "Scan a custom directory for installed skills")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, skillListFields)
+
+	return cmd
+}
+
+func listRun(opts *ListOptions) error {
+	skills, err := listInstalledSkills(opts)
+	if err != nil {
+		return err
+	}
+	sortListedSkills(skills)
+	recordListTelemetry(opts, len(skills))
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, skills)
+	}
+
+	if len(skills) == 0 {
+		return cmdutil.NewNoResultsError("no installed skills found")
+	}
+
+	return renderTable(opts.IO, skills)
+}
+
+func listInstalledSkills(opts *ListOptions) ([]listedSkill, error) {
+	targets, err := buildScanTargets(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	var all []listedSkill
+	for _, target := range targets {
+		skills, scanErr := scanInstalledSkills(target.dir, target.hosts, target.scope)
+		if scanErr != nil {
+			if opts.Dir != "" {
+				return nil, fmt.Errorf("could not scan directory: %w", scanErr)
+			}
+			continue
+		}
+		all = append(all, skills...)
+	}
+
+	return all, nil
+}
+
+func buildScanTargets(opts *ListOptions) ([]scanTarget, error) {
+	if opts.Dir != "" {
+		dir, err := filepath.Abs(opts.Dir)
+		if err != nil {
+			return nil, fmt.Errorf("could not resolve path: %w", err)
+		}
+		return []scanTarget{{dir: dir, scope: "custom"}}, nil
+	}
+
+	gitRoot := installer.ResolveGitRoot(opts.GitClient)
+	homeDir := installer.ResolveHomeDir()
+
+	hosts, err := selectedHosts(opts.Agent)
+	if err != nil {
+		return nil, err
+	}
+	scopes := selectedScopes(opts.Scope)
+
+	byDir := map[string]int{}
+	var targets []scanTarget
+	for _, host := range hosts {
+		for _, scope := range scopes {
+			dir, installErr := host.InstallDir(scope, gitRoot, homeDir)
+			if installErr != nil {
+				continue
+			}
+
+			if idx, ok := byDir[dir]; ok {
+				targets[idx].hosts = appendHost(targets[idx].hosts, host)
+				continue
+			}
+
+			byDir[dir] = len(targets)
+			targets = append(targets, scanTarget{
+				dir:   dir,
+				hosts: []agentInfo{{id: host.ID}},
+				scope: string(scope),
+			})
+		}
+	}
+
+	return targets, nil
+}
+
+func selectedHosts(agentID string) ([]*registry.AgentHost, error) {
+	if agentID != "" {
+		host, err := registry.FindByID(agentID)
+		if err != nil {
+			return nil, err
+		}
+		return []*registry.AgentHost{host}, nil
+	}
+
+	hosts := make([]*registry.AgentHost, len(registry.Agents))
+	for i := range registry.Agents {
+		hosts[i] = &registry.Agents[i]
+	}
+	return hosts, nil
+}
+
+func selectedScopes(scope string) []registry.Scope {
+	if scope != "" {
+		return []registry.Scope{registry.Scope(scope)}
+	}
+	return []registry.Scope{registry.ScopeProject, registry.ScopeUser}
+}
+
+func appendHost(hosts []agentInfo, host *registry.AgentHost) []agentInfo {
+	for _, existing := range hosts {
+		if existing.id == host.ID {
+			return hosts
+		}
+	}
+	return append(hosts, agentInfo{id: host.ID})
+}
+
+func scanInstalledSkills(skillsDir string, hosts []agentInfo, scope string) ([]listedSkill, error) {
+	entries, err := os.ReadDir(skillsDir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not read skills directory: %w", err)
+	}
+
+	var skills []listedSkill
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+
+		// Flat layout: {dir}/{name}/SKILL.md.
+		skillDir := filepath.Join(skillsDir, e.Name())
+		skillFile := filepath.Join(skillDir, "SKILL.md")
+		if data, readErr := os.ReadFile(skillFile); readErr == nil {
+			skills = append(skills, parseInstalledSkill(data, e.Name(), skillDir, hosts, scope))
+			continue
+		}
+
+		// Namespaced layout: {dir}/{namespace}/{name}/SKILL.md.
+		subEntries, subErr := os.ReadDir(skillDir)
+		if subErr != nil {
+			continue
+		}
+		for _, sub := range subEntries {
+			if !sub.IsDir() {
+				continue
+			}
+			subSkillDir := filepath.Join(skillDir, sub.Name())
+			subSkillFile := filepath.Join(subSkillDir, "SKILL.md")
+			if data, readErr := os.ReadFile(subSkillFile); readErr == nil {
+				installName := e.Name() + "/" + sub.Name()
+				skills = append(skills, parseInstalledSkill(data, installName, subSkillDir, hosts, scope))
+			}
+		}
+	}
+
+	return skills, nil
+}
+
+func parseInstalledSkill(data []byte, name, dir string, hosts []agentInfo, scope string) listedSkill {
+	s := listedSkill{
+		skillName: name,
+		hostIDs:   hostIDs(hosts),
+		scope:     scope,
+		path:      dir,
+	}
+
+	result, err := frontmatter.Parse(string(data))
+	if err != nil {
+		return s
+	}
+
+	meta := result.Metadata.Meta
+	if meta == nil {
+		return s
+	}
+
+	if sourcePath, _ := meta["github-path"].(string); sourcePath != "" {
+		if skillName := skillNameFromSourcePath(sourcePath); skillName != "" {
+			s.skillName = skillName
+		}
+	}
+
+	if repoURL, _ := meta["github-repo"].(string); repoURL != "" {
+		s.sourceURL = repoURL
+		s.source = repoURL
+		if repo, parseErr := source.ParseRepoURL(repoURL); parseErr == nil {
+			s.source = ghrepo.FullName(repo)
+			s.sourceURL = source.BuildRepoURL(repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+		}
+	} else if localPath, _ := meta["local-path"].(string); localPath != "" {
+		s.sourceURL = localPath
+		s.source = localPath
+	}
+
+	if ref, _ := meta["github-ref"].(string); ref != "" {
+		s.version = discovery.ShortRef(ref)
+	}
+	if pinnedRef, _ := meta["github-pinned"].(string); pinnedRef != "" {
+		s.pinned = true
+		if s.version == "" {
+			s.version = pinnedRef
+		}
+	}
+
+	return s
+}
+
+func skillNameFromSourcePath(sourcePath string) string {
+	sourcePath = strings.TrimSuffix(sourcePath, "/SKILL.md")
+	sourcePath = strings.Trim(sourcePath, "/")
+	if sourcePath == "" {
+		return ""
+	}
+
+	parts := strings.Split(sourcePath, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] != "skills" {
+			continue
+		}
+
+		if i >= 2 && parts[i-2] == "plugins" && i+1 < len(parts) {
+			return parts[i-1] + "/" + parts[len(parts)-1]
+		}
+
+		afterSkills := len(parts) - i - 1
+		switch afterSkills {
+		case 0:
+			return ""
+		case 1:
+			return parts[i+1]
+		default:
+			return parts[i+1] + "/" + parts[len(parts)-1]
+		}
+	}
+
+	return parts[len(parts)-1]
+}
+
+func hostIDs(hosts []agentInfo) []string {
+	ids := make([]string, len(hosts))
+	for i, host := range hosts {
+		ids[i] = host.id
+	}
+	return ids
+}
+
+func sortListedSkills(skills []listedSkill) {
+	sort.Slice(skills, func(i, j int) bool {
+		if skills[i].skillName != skills[j].skillName {
+			return skills[i].skillName < skills[j].skillName
+		}
+		if skills[i].scope != skills[j].scope {
+			return skills[i].scope < skills[j].scope
+		}
+		if formatHosts(skills[i].hostIDs) != formatHosts(skills[j].hostIDs) {
+			return formatHosts(skills[i].hostIDs) < formatHosts(skills[j].hostIDs)
+		}
+		return skills[i].path < skills[j].path
+	})
+}
+
+func renderTable(io *iostreams.IOStreams, skills []listedSkill) error {
+	table := tableprinter.New(io, tableprinter.WithHeader("Name", "Agent", "Scope", "Source"))
+
+	for _, skill := range skills {
+		table.AddField(skill.skillName)
+		table.AddField(formatHosts(skill.hostIDs))
+		table.AddField(displayOrDash(skill.scope))
+		table.AddField(displayOrDash(skill.source))
+		table.EndRow()
+	}
+
+	return table.Render()
+}
+
+func displayOrDash(value string) string {
+	if value == "" {
+		return "-"
+	}
+	return value
+}
+
+func formatHosts(hosts []string) string {
+	if len(hosts) == 0 {
+		return "-"
+	}
+	return strings.Join(hosts, ",")
+}
+
+func recordListTelemetry(opts *ListOptions, skillCount int) {
+	if opts.Telemetry == nil {
+		return
+	}
+
+	agentHosts := opts.Agent
+	if agentHosts == "" {
+		agentHosts = "all"
+	}
+	scope := opts.Scope
+	if scope == "" {
+		scope = "all"
+	}
+	customDir := "false"
+	if opts.Dir != "" {
+		customDir = "true"
+		scope = "custom"
+	}
+	format := "table"
+	if opts.Exporter != nil {
+		format = "json"
+	}
+
+	opts.Telemetry.Record(ghtelemetry.Event{
+		Type: "skill_list",
+		Dimensions: ghtelemetry.Dimensions{
+			"agent_hosts": agentHosts,
+			"custom_dir":  customDir,
+			"format":      format,
+			"scope":       scope,
+		},
+		Measures: ghtelemetry.Measures{
+			"skill_count": int64(skillCount),
+		},
+	})
+}

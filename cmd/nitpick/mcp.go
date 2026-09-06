@@ -48,7 +48,7 @@ func runMCP(ctx context.Context, args []string) error {
 	fs.StringVar(&repo, "repo", ".", "default repository root for tools that do not name one")
 	fs.BoolVar(&verbose, "v", false, "verbose logging on stderr")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: nitpick mcp [flags]\n       nitpick mcp install <client> [-user] [-print]\n       nitpick mcp clients\n\nServes the review tools over the Model Context Protocol on stdio, for an agent session.\nTools: review, full_review, repo_score, code_smell, ai_slop, identify_model, explain_config.\ninstall writes the server into a client's configuration (claude-code, claude-desktop, cursor, windsurf, vscode, opencode, gemini-cli, codex).\n\nFlags:")
+		fmt.Fprintln(os.Stderr, "Usage: nitpick mcp [flags]\n       nitpick mcp install <client> [-user] [-print]\n       nitpick mcp clients\n\nServes the review tools over the Model Context Protocol on stdio, for an agent session.\nTools: review, full_review, repo_score, code_smell, ai_slop, explain_config.\ninstall writes the server into a client's configuration (claude-code, claude-desktop, cursor, windsurf, vscode, opencode, gemini-cli, codex).\n\nFlags:")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -100,11 +100,6 @@ func newMCPServer(root string, log *slog.Logger) *mcp.Server {
 			"and, unless no_model is set, the model's nine slop rules through the review engine (a docstring that describes behaviour the code does not have, a swallowed error, a tautological guard, generic names, and so on). " +
 			"Returns tells by rule, the model's findings with suggestions, both per thousand lines, findings outside the slop class the review made (hidden), and recommendations ordered by count. Pass paths to keep the model's pass cheap; no_model is free.",
 	}, t.aiSlop)
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "identify_model",
-		Description: "Which of six models' styles a Go, Python or TypeScript file is most similar to, from a fingerprint over a small same-prompt corpus. " +
-			"Answers unknown below a margin of 0.05 or outside the corpus, and says why. A style match, not an attribution: it cannot tell a person from a model, and a model outside the corpus is reported as whichever of the six it is nearest to.",
-	}, t.identifyModel)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "explain_config",
 		Description: "The resolved open-nitpick configuration for a repository: config source, models per role, validation, gating, budget, analyzers, persona, and the instructions that apply to a given path.",
@@ -186,17 +181,6 @@ type TreeIn struct {
 	Instruction string   `json:"instruction,omitempty" jsonschema:"an extra instruction for this review only"`
 	Classes     []string `json:"classes,omitempty" jsonschema:"return only findings in these classes"`
 	NoLinters   bool     `json:"no_linters,omitempty" jsonschema:"skip the deterministic analyzers"`
-}
-
-// IdentifyIn names the files.
-type IdentifyIn struct {
-	Files []string `json:"files" jsonschema:"paths of Go, Python or TypeScript files"`
-}
-
-// IdentifyOut is one answer per file.
-type IdentifyOut struct {
-	Results []identification `json:"results"`
-	Caveat  string           `json:"caveat"`
 }
 
 // ExplainIn selects the repository.
@@ -345,33 +329,6 @@ func (t *mcpTools) tree(ctx context.Context, in TreeIn, score bool) (*mcp.CallTo
 		text += "\n\n" + out.Score
 	}
 	return textResult(text), out, nil
-}
-
-func (t *mcpTools) identifyModel(_ context.Context, _ *mcp.CallToolRequest, in IdentifyIn) (*mcp.CallToolResult, IdentifyOut, error) {
-	if len(in.Files) == 0 {
-		return nil, IdentifyOut{}, errors.New("no files given")
-	}
-	paths := make([]string, 0, len(in.Files))
-	for _, p := range in.Files {
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(t.root, p)
-		}
-		paths = append(paths, p)
-	}
-	ids, err := identifyFiles(paths)
-	if err != nil {
-		return nil, IdentifyOut{}, err
-	}
-	var b strings.Builder
-	for _, id := range ids {
-		if id.Author == "unknown" {
-			fmt.Fprintf(&b, "%s: unknown (%s)\n", id.Path, id.Reason)
-		} else {
-			fmt.Fprintf(&b, "%s: most similar to %s (margin %.2f)\n", id.Path, id.Author, id.Margin)
-		}
-	}
-	b.WriteString(identifyCaveat + ".")
-	return textResult(b.String()), IdentifyOut{Results: ids, Caveat: identifyCaveat}, nil
 }
 
 func (t *mcpTools) explainConfig(_ context.Context, _ *mcp.CallToolRequest, in ExplainIn) (*mcp.CallToolResult, ExplainOut, error) {

@@ -1,0 +1,95 @@
+// commit fe3ab8bdd26d 2026-08-27T02:33:47+00:00 ctx_interface_gen.go
+	// ContentType returns the Content-Type request header, parameters included.
+	//
+	// Req and Res both carry a ContentType, so on Ctx the request wins, as it does
+	// for Get. Use Res().ContentType() for the type the response will send.
+	ContentType() string
+	// It answers from the route that is running, unlike App.MountPath, which
+	// describes the app it is called on however that app is being served: a sub-app
+	// that is mounted and also listened on directly reports its mount prefix there
+	// even for its own traffic, where this reports "".
+	//
+	// The prefix is the owning app's, so mounting one *App at two prefixes reports
+	// the one it was mounted at last — the same limitation App.MountPath has, since
+	// that is where the prefix is recorded. Mount separate instances when each needs
+	// to know its own prefix.
+	// IsFinal returns true if no further handler of the current route runs after
+	// this one. It is the exact complement of IsMiddleware, and false when no route
+	// matched at all.
+	//
+	// It describes this route, not the whole request: a route registered with Use is
+	// never final even when it is the last thing that runs, and another route can
+	// still match after a final handler calls Next — a specific path followed by a
+	// catch-all is the ordinary case. So this does not promise that the response is
+	// finished; use it to tell an endpoint handler from a middleware one.
+	// Returned value is only valid within the handler. Do not store any references.
+	// Make copies or use the Immutable setting to use the value outside the Handler.
+	// headerField returns a request header's field value, matching the field name
+	// the way a recipient must (RFC 9110 Section 5.1).
+	//
+	// fasthttp's Peek is byte-exact, which resolves every spelling only while it
+	// canonicalizes the key; under DisableHeaderNormalizing the store keeps what the
+	// peer sent, which for HTTP/2 and 3 is lower case. That is the bug the CSRF
+	// middleware was fixed for: a lower-case "origin:" read as absent and the
+	// same-origin check found nothing to verify. The byte-exact read stays the fast
+	// path, and the walk runs only for the config that needs it.
+	headerField(name string) []byte
+	// order they appear in the Cookie header, or nil when the client sent none. A
+	// name the client repeated is returned once per occurrence, which is how a
+	// caller detects the shadowing AllCookies collapses.
+	//
+	// Unlike Cookies, the returned strings are copies rather than views into the
+	// request buffer, so they stay valid past the handler.
+	// AllCookies returns the cookies sent with the request as a name/value map, or
+	// nil when the client sent none. A repeated name resolves to its first
+	// occurrence, which is the one Cookies answers with too — the two must agree,
+	// because a client can shadow a cookie by sending the name twice and code that
+	// validated one value while consuming the other would validate the wrong one.
+	// Use CookieNames to see that a name was repeated at all.
+	//
+	// The keys and values are copies rather than views into the request buffer:
+	// fasthttp rewrites those bytes in place when a handler edits a request cookie,
+	// which would not merely stale the map but rehash it into one whose own keys no
+	// longer find their entries.
+	// Tags are returned verbatim, weak "W/" prefix included, and are not validated;
+	// empty list elements are dropped, as RFC 9110 Section 5.6.1 requires, so a
+	// trailing comma is not an extra tag. Fresh already applies these tags to the
+	// response ETag; reach for this only to implement a comparison of your own.
+	// Returned values are only valid within the handler. Do not store any references.
+	// Make copies or use the Immutable setting instead.
+	// map of the whole header block. It returns nil when the header is absent.
+	//
+	// Empty field lines are skipped, so len(GetAll(k)) > 0 answers the same question
+	// as HasHeader(k). Without that, the headers fasthttp keeps in a slot of their
+	// own report one empty line when they are not present at all, and a
+	// request-smuggling guard testing for Content-Length would fire on every request
+	// that has none.
+	//
+	// Returned values are only valid within the handler. Do not store any
+	// references: they view the request buffer, which the next request on the
+	// connection overwrites, so a credential cached past the handler silently
+	// becomes another request's. Make copies or use the Immutable setting instead.
+	//
+	// Returned value is only valid within the handler. Do not store any references:
+	// it views the request buffer, which the next request on the connection
+	// overwrites, so a token cached past the handler — or used as a key in a shared
+	// map — silently becomes another request's. Make copies or use the Immutable
+	// setting instead.
+	//
+	// The headers fasthttp stores in a slot of their own cannot repeat, and Add
+	// does not append for them: Content-Type, Content-Encoding, Content-Length,
+	// Connection, Server and Trailer are replaced, and Transfer-Encoding and Date
+	// are ignored because fasthttp writes them itself. Use Set for those.
+	// The second result is false when no cookie of that name has been set, or when
+	// its Set-Cookie field value does not parse.
+	//
+	// Cookie names are case-sensitive (RFC 6265 Section 4.1.1). A name written more
+	// than once resolves to the first occurrence; use Cookies to see them all.
+	// it untouched. A streamed body counts as written without draining the stream,
+	// which is the case Body deliberately answers nil for.
+	// NoContent replies 204 No Content. SendStatus already discards the body for
+	// every status statusDisallowsBody names; this drops the Content-Type as well,
+	// since RFC 9110 Section 6.4.1 gives a 204 no content to describe.
+	//
+	// SendStatus(StatusNoContent) leaves a Content-Type a handler had set, so the
+	// two are not interchangeable: this is the one that sends nothing about content.

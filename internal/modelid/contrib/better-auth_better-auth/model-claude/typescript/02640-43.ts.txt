@@ -1,0 +1,38 @@
+// commit 5c45abcd2094 2026-07-30T21:42:14-04:00 packages/oauth-provider/src/types/zod.ts
+/** Canonical RFC 7517 JWK Set metadata for an OAuth client. */
+export const clientJwksSchema = z.object({
+	keys: z.array(z.record(z.string(), z.unknown())).min(1),
+});
+
+	client_name: z
+		.string()
+		.refine((value) => value.trim().length > 0, "client_name cannot be empty")
+		.optional(),
+	jwks: clientJwksSchema.optional(),
+	// OIDC Registration §2: classifies redirect URI policy independently of
+	// client authentication.
+	application_type: z.enum(["web", "native"]).optional(),
+/**
+ * Complete OAuth client metadata document schema shared by registration and
+ * verified client-discovery integrations.
+ *
+ * Unlike {@link clientRegistrationRequestSchema}, a metadata document carries
+ * its own identifier and may contain the server-assigned secret fields that a
+ * discovery profile must explicitly prohibit. Keeping those fields in the
+ * parsed shape lets profile validation distinguish a forbidden value from an
+ * unknown extension without unsafe casts or ad-hoc allowlists.
+ */
+export const oauthClientMetadataSchema = clientRegistrationRequestSchema
+	.omit({ skip_consent: true })
+	.extend({
+		client_id: z
+			.string()
+			.refine((value) => value.trim().length > 0, "client_id cannot be empty"),
+		client_secret: z.string().optional(),
+		client_secret_expires_at: z.number().int().nonnegative().optional(),
+		client_id_issued_at: z.number().int().nonnegative().optional(),
+	})
+	.loose();
+
+export type OAuthClientMetadata = z.infer<typeof oauthClientMetadataSchema>;
+

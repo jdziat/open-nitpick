@@ -1,0 +1,85 @@
+// commit cfc453a2a6eb 2025-11-21T18:09:23-08:00 packages/better-auth/src/plugins/email-otp/index.ts
+	constantTimeEqual,
+	 * Function to send email verification.
+	 *
+	 * It is recommended to not await the email sending to avoid timing attacks.
+	 * On serverless platforms, use `waitUntil` or similar to ensure the email is sent.
+			const decryptedOtp = await symmetricDecrypt({
+				key: ctx.context.secret,
+				data: storedOtp,
+			});
+			return constantTimeEqual(decryptedOtp, otp);
+			return constantTimeEqual(hashedOtp, storedOtp);
+			return constantTimeEqual(hashedOtp, storedOtp);
+			return constantTimeEqual(decryptedOtp, otp);
+		return constantTimeEqual(otp, storedOtp);
+				const user = await ctx.context.internalAdapter.findUserByEmail(email);
+				if (!user) {
+					if (ctx.body.type === "sign-in" && !opts.disableSignUp) {
+						// allow
+					} else {
+						await ctx.context.internalAdapter.deleteVerificationByIdentifier(
+							`${ctx.body.type}-otp-${email}`,
+						);
+						return ctx.json({
+							success: true,
+						});
+					}
+				}
+
+						/**
+						 * safe to leak the existence of a user, given the user has already the OTP from the
+						 * email
+						 */
+					const user = await ctx.context.internalAdapter.findUserByEmail(email);
+					if (!user) {
+						await ctx.context.internalAdapter.deleteVerificationByIdentifier(
+							`forget-password-otp-${email}`,
+						);
+						return ctx.json({
+							success: true,
+						});
+					}
+					await options
+						.sendVerificationOTP(
+							{
+								email,
+								otp,
+								type: "forget-password",
+							},
+							ctx,
+						)
+						.catch((e) => {
+							ctx.context.logger.error("Failed to send OTP", e);
+						});
+					const user = await ctx.context.internalAdapter.findUserByEmail(
+						email,
+						{
+							includeAccounts: true,
+						},
+					);
+					if (!user) {
+						throw new APIError("BAD_REQUEST", {
+							message: BASE_ERROR_CODES.USER_NOT_FOUND,
+						});
+					}
+					const minPasswordLength =
+						ctx.context.password.config.minPasswordLength;
+					if (ctx.body.password.length < minPasswordLength) {
+						throw new APIError("BAD_REQUEST", {
+							message: BASE_ERROR_CODES.PASSWORD_TOO_SHORT,
+						});
+					}
+					const maxPasswordLength =
+						ctx.context.password.config.maxPasswordLength;
+					if (ctx.body.password.length > maxPasswordLength) {
+						throw new APIError("BAD_REQUEST", {
+							message: BASE_ERROR_CODES.PASSWORD_TOO_LONG,
+						});
+					}
+					let account = user.accounts?.find(
+					if (
+						ctx.context.options.emailAndPassword?.revokeSessionsOnPasswordReset
+					) {
+						await ctx.context.internalAdapter.deleteSessions(user.user.id);
+					}

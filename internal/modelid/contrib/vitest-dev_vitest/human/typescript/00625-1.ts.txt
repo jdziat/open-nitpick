@@ -1,0 +1,47 @@
+// commit 16d13d98115a 2026-02-18T09:43:08+09:00 packages/runner/src/utils/limit-concurrency.ts
+export interface ConcurrencyLimiter extends ConcurrencyLimiterFn {
+  acquire: () => (() => void) | Promise<() => void>
+}
+
+type ConcurrencyLimiterFn = <Args extends unknown[], T>(func: (...args: Args) => PromiseLike<T> | T, ...args: Args) => Promise<T>
+
+export function limitConcurrency(concurrency: number = Infinity): ConcurrencyLimiter {
+  const acquire = () => {
+    let released = false
+    const release = () => {
+      if (!released) {
+        released = true
+        finish()
+    }
+
+    if (count++ < concurrency) {
+      return release
+    }
+
+    return new Promise<() => void>((resolve) => {
+      if (tail) {
+        tail = tail[1] = [() => resolve(release)]
+        head = tail = [() => resolve(release)]
+    })
+
+  const limiterFn: ConcurrencyLimiterFn = (func, ...args) => {
+    function run(release: () => void) {
+      try {
+        const result = func(...args)
+        if (result instanceof Promise) {
+          return result.finally(release)
+        }
+        release()
+        return Promise.resolve(result)
+      }
+      catch (error) {
+        release()
+        return Promise.reject(error)
+      }
+    }
+
+    const release = acquire()
+    return release instanceof Promise ? release.then(run) : run(release)
+  }
+
+  return Object.assign(limiterFn, { acquire })

@@ -1,0 +1,66 @@
+// commit 0afe6debe957 2026-07-25T16:22:13+00:00 path.go
+	constParam    bool            // route is exactly one const segment + one plain trailing param; see matchConstParam
+	parser.constParam = false
+	parser.constParam = isConstParamShape(parser.segs)
+}
+
+// isConstParamShape reports whether segs is the "/const/:param" shape that
+// matchConstParam specializes: exactly one constant segment followed by one
+// plain trailing parameter. Every condition here is one the specialized body
+// assumes rather than re-checks, so keep the two in step.
+func isConstParamShape(segs []*routeSegment) bool {
+	if len(segs) != 2 {
+		return false
+	}
+	c, p := segs[0], segs[1]
+	return !c.IsParam && !c.HasOptionalSlash &&
+		p.IsParam && p.IsLast && !p.IsGreedy && !p.IsOptional && len(p.Constraints) == 0
+	if parser.constParam {
+		return parser.matchConstParam(detectionPath, path, params, partialCheck)
+	}
+
+// matchConstParam is getMatch specialized to the "/const/:param" shape, which
+// is what most REST endpoints look like ("/user/keys/:key_id"). It is a
+// straight-line rewrite of the generic segment walk for that shape, not a
+// different matcher: isConstParamShape gates on exactly the properties that
+// let each step below collapse.
+//
+// Walking the generic loop for two segments costs a pointer chase per segment,
+// the IsParam/IsOptional/IsLast branches, the constraint loop and the reslice
+// bookkeeping, all to reach the same three operations this does directly.
+func (parser *routeParser) matchConstParam(detectionPath, path string, params *[maxParams]string, partialCheck bool) bool { //nolint:revive // mirrors getMatch's signature
+	constSeg := parser.segs[0]
+
+	// Same guard as the generic const branch; HasOptionalSlash is excluded by
+	// the gate, so the trailing-slash-drop case cannot arise here.
+	n := constSeg.Length
+	if uint(n) > uint(len(detectionPath)) || detectionPath[:n] != constSeg.Const {
+		return false
+	}
+
+	// The parameter is last and non-greedy, so findParamLenForLastSegment would
+	// stop it at the next '/', or take the remainder when there is none.
+	rest := detectionPath[n:]
+	i := len(rest)
+	if idx := strings.IndexByte(rest, slashDelimiter); idx != -1 {
+		i = idx
+	}
+	// The gate excludes optional parameters, so an empty one is no match.
+	if i == 0 {
+		return false
+	}
+
+	// offset into path, never resliced, exactly as the generic loop tracks it
+	params[0] = path[n : n+i]
+
+	if i == len(rest) {
+		return true
+	}
+	// Leftover detection path: only prefix (use) routes may stop short, and
+	// only on a segment boundary.
+	if !partialCheck {
+		return false
+	}
+	return hasPartialMatchBoundary(detectionPath, n+i)
+}
+

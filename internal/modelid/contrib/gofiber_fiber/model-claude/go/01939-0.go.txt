@@ -1,0 +1,86 @@
+// commit 59f0fb6805fa 2026-08-15T21:07:53+00:00 mount.go
+	// parser matches path when it carries parameters, and is nil otherwise: a
+	// mount can be registered at "/:tenant" the same way a route can
+	parser *routeParser
+	// path is the full mount path, normalized by the app it is mounted on
+// newDomainMount records a mount of mounted at path, normalized and parsed
+// with the routing rules of the app it is being mounted on, so the lookups
+// recognize it the same way the router recognizes its routes.
+func (app *App) newDomainMount(mounted *App, path string, matchers []domainMatcher) domainMountedApp {
+	normalized := app.normalizePath(path)
+
+	mount := domainMountedApp{
+		app:      mounted,
+		path:     normalized,
+		matchers: matchers,
+	}
+
+	if parser := parseRoute(normalized, app.config.RegexHandler, app.customConstraints...); len(parser.params) > 0 {
+		mount.parser = &parser
+	}
+
+	return mount
+}
+
+// covers reports whether this mount covers path, which is matched as a pattern
+// when the mount path carries parameters.
+func (m *domainMountedApp) covers(path string) bool {
+	if m.parser != nil {
+		var params [maxParams]string
+
+		return m.parser.getMatch(path, path, &params, true)
+	}
+
+	return strings.HasPrefix(utils.AddTrailingSlashString(path), utils.AddTrailingSlashString(m.path))
+}
+
+func (m *domainMountedApp) equals(other *domainMountedApp) bool {
+// depth counts the path segments a mount path covers, so the deepest mount
+// covering a request can be picked. The root mount covers none of its own,
+// which leaves any named mount more specific than it.
+func mountDepth(path string) int {
+	if path == "" || path == "/" {
+		return 0
+	}
+
+	return strings.Count(path, "/")
+}
+
+// depth counts the path segments this mount covers.
+func (m *domainMountedApp) depth() int {
+	return mountDepth(m.path)
+func (app *App) domainMountedViews(c Ctx) (*App, int) { //nolint:gocritic // unnamedResult: named returns conflict with nonamedreturns linter
+	owner, depth := app.domainMountOwner(c)
+	if owner == nil || owner.config.Views == nil {
+		return nil, 0
+	}
+
+	return owner, depth
+}
+
+// domainMountOwner returns the domain mount that owns this request and the
+// depth it matched at: the deepest one covering the path whose patterns match
+// the host, and among equally deep ones the first registered, matching the
+// order their routes are matched in.
+func (app *App) domainMountOwner(c Ctx) (*App, int) { //nolint:gocritic // unnamedResult: named returns conflict with nonamedreturns linter
+		owner *App
+		best  int
+	path := app.normalizePath(c.Path())
+
+		if !mount.covers(path) || !mount.matchesHost(c.Hostname()) {
+		if depth := mount.depth(); owner == nil || depth > best {
+			owner, best = mount.app, depth
+	return owner, best
+// Both sides are put through this app's routing rules first: an app list is
+// keyed by the path the caller spelled, so on a case-insensitive app a mount
+// routes do. A parametric mount path is matched literally here — the app list
+// keeps no parsed form of its keys.
+func (app *App) appendDomainMounts(dst, mounts []domainMountedApp, prefix string) []domainMountedApp {
+	for i := range mounts {
+		mount := &mounts[i]
+		dst = addDomainMount(dst, app.newDomainMount(mount.app, getGroupPath(prefix, mount.path), mount.matchers))
+	for i := range dst {
+		if dst[i].equals(&mount) {
+			return dst
+		}
+		app.mountFields.domainAppList = app.appendDomainMounts(app.mountFields.domainAppList, subApp.mountFields.domainAppList, prefix)

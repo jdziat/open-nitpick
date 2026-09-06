@@ -1,0 +1,33 @@
+# commit 4c7b420ff74f 2026-03-31T10:49:04+02:00 src/huggingface_hub/_buckets.py
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any, Literal
+    source: str | Path | bytes
+    xet_hash: str | None = field(default=None)
+    size: int | None = field(default=None)
+    content_type: str | None = field(init=False)
+    mtime: datetime | None
+    uploaded_at: datetime | None
+    uploaded_at: datetime | None
+    size: int | None = None
+    local_mtime: str | None = None
+    remote_mtime: str | None = None
+    bucket_file: BucketFile | None = None  # BucketFile when available (not serialized to plan file)
+    def summary(self) -> dict[str, int | str]:
+        include_patterns: list[str] | None = None,
+        exclude_patterns: list[str] | None = None,
+        filter_rules: list[tuple[str, str]] | None = None,
+    bucket_file: Any | None = None,
+    filter_matcher: FilterMatcher | None = None,
+    status: Any | None = None,
+    remote_total: int | None = None
+def _execute_plan(plan: SyncPlan, api: "HfApi", verbose: bool = False, status: Any | None = None) -> None:
+        add_files: list[tuple[str | Path | bytes, str]] = []
+        download_files: list[tuple[str | BucketFile, str | Path]] = []
+    source: str | None = None,
+    dest: str | None = None,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
+    filter_from: str | None = None,
+    plan: str | None = None,
+    apply: str | None = None,
+    token: bool | str | None = None,

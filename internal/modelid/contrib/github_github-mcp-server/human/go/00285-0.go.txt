@@ -1,0 +1,33 @@
+// commit 05681870383a 2025-07-17T13:29:46+01:00 pkg/github/repositories.go
+				// First, get file info from Contents API to retrieve SHA
+				var fileSHA string
+				opts := &github.RepositoryContentGetOptions{Ref: ref}
+				fileContent, _, respContents, err := client.Repositories.GetContents(ctx, owner, repo, path, opts)
+				if respContents != nil {
+					defer func() { _ = respContents.Body.Close() }()
+				}
+				if err != nil {
+					return ghErrors.NewGitHubAPIErrorResponse(ctx,
+						"failed to get file SHA",
+						respContents,
+						err,
+					), nil
+				}
+				if fileContent == nil || fileContent.SHA == nil {
+					return mcp.NewToolResultError("file content SHA is nil"), nil
+				}
+				fileSHA = *fileContent.SHA
+						result := mcp.TextResourceContents{
+						}
+						// Include SHA in the result metadata
+						if fileSHA != "" {
+							return mcp.NewToolResultResource(fmt.Sprintf("successfully downloaded text file (SHA: %s)", fileSHA), result), nil
+						}
+						return mcp.NewToolResultResource("successfully downloaded text file", result), nil
+					result := mcp.BlobResourceContents{
+					}
+					// Include SHA in the result metadata
+					if fileSHA != "" {
+						return mcp.NewToolResultResource(fmt.Sprintf("successfully downloaded binary file (SHA: %s)", fileSHA), result), nil
+					}
+					return mcp.NewToolResultResource("successfully downloaded binary file", result), nil

@@ -1,0 +1,67 @@
+// commit 4c7c2ea09e79 2026-03-21T12:40:21+00:00 domain.go
+	var subApp *App
+			subApp = arg
+		if subApp != nil {
+			return d.mount(prefix, subApp)
+		}
+
+		wrapped := d.wrapHandlers(handlers)
+// mount attaches a sub-app instance to the domain router at the specified prefix.
+// All routes from the sub-app will only be accessible when the request hostname
+// matches the domain pattern.
+func (d *domainRouter) mount(prefix string, subApp *App) Router {
+	// Determine the full mount path by combining the domain router's path with the prefix
+	var mountPath string
+	if d.group != nil {
+		mountPath = getGroupPath(d.group.Prefix, prefix)
+	} else {
+		mountPath = prefix
+	}
+
+	// Normalize the mount path
+	mountPath = utils.TrimRight(mountPath, '/')
+	if mountPath == "" {
+		mountPath = "/"
+	}
+
+	// Wrap all handlers in the sub-app with domain checking BEFORE mounting
+	// This ensures that when the routes are expanded during startup, they already
+	// have domain filtering applied.
+	for m := range subApp.stack {
+		for _, route := range subApp.stack[m] {
+			if len(route.Handlers) > 0 {
+				route.Handlers = d.wrapHandlers(route.Handlers)
+			}
+		}
+	}
+
+	d.app.mutex.Lock()
+	// Support for configs of mounted-apps and sub-mounted-apps
+	for mountedPrefixes, subAppInstance := range subApp.mountFields.appList {
+		path := getGroupPath(mountPath, mountedPrefixes)
+
+		subAppInstance.mountFields.mountPath = path
+		d.app.mountFields.appList[path] = subAppInstance
+	}
+	d.app.mutex.Unlock()
+
+	// Create a mount group that references the sub-app
+	mountGroup := &Group{Prefix: mountPath, app: subApp}
+
+	// Register the mount point - the routes will be expanded during startup
+	d.app.register([]string{methodUse}, mountPath, mountGroup)
+
+	// Execute onMount hooks
+	if err := subApp.hooks.executeOnMountHooks(d.app); err != nil {
+		panic(err)
+	}
+
+	// Mark the underlying group so Name() can distinguish between
+	// group-name-prefix calls and route-name calls
+	if d.group != nil && !d.group.anyRouteDefined {
+		d.group.anyRouteDefined = true
+	}
+
+	return d
+}
+

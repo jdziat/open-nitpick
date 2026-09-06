@@ -1,0 +1,37 @@
+// commit cb9360b2ab41 2026-07-03T16:00:57+00:00 res.go
+	existing, multiLine := peekJoinedResponseHeader(&r.c.fasthttp.Response.Header, field)
+	updated := appendUniqueValues(utils.UnsafeString(existing), values)
+	if updated == "" {
+		return
+	}
+	if multiLine {
+		// Set only rewrites the first field line; drop the extras that are
+		// now folded into the combined value.
+		r.c.fasthttp.Response.Header.Del(field)
+	}
+	r.Set(field, updated)
+}
+
+// appendUniqueValues returns h extended with the non-empty values that are
+// not already listed in it, or "" when nothing was added (h only ever grows,
+// so a changed result is never empty).
+func appendUniqueValues(h string, values []string) string {
+	if originalH == h {
+		return ""
+	return h
+	existing, multiLine := peekJoinedResponseHeader(&r.c.fasthttp.Response.Header, HeaderVary)
+	existingStr := utils.UnsafeString(existing)
+	if slices.Contains(fields, "*") || headerContainsValue(existingStr, "*") {
+		if multiLine {
+			// setCanonical only rewrites the first field line.
+			r.c.fasthttp.Response.Header.Del(HeaderVary)
+		}
+	updated := appendUniqueValues(existingStr, fields)
+	if updated == "" {
+		return
+	}
+	if multiLine {
+		// Set only rewrites the first field line; fold the extras into one.
+		r.c.fasthttp.Response.Header.Del(HeaderVary)
+	}
+	r.Set(HeaderVary, updated)

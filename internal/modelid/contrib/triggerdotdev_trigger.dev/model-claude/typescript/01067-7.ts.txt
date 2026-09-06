@@ -1,0 +1,52 @@
+// commit 71d98b4e6b4d 2026-05-22T14:43:03+01:00 apps/webapp/app/v3/eventRepository/clickhouseEventRepository.server.ts
+  MetricsV1Input,
+  /** OTLP / task metrics_v1 flush scheduler config */
+  otlpMetricsBatchSize?: number;
+  otlpMetricsFlushInterval?: number;
+  otlpMetricsMaxConcurrency?: number;
+  private readonly _otlpMetricsFlushScheduler: DynamicFlushScheduler<MetricsV1Input>;
+
+    this._otlpMetricsFlushScheduler = new DynamicFlushScheduler({
+      batchSize: config.otlpMetricsBatchSize ?? 10000,
+      flushInterval: config.otlpMetricsFlushInterval ?? 1000,
+      callback: this.#flushOtelMetricsBatch.bind(this),
+      minConcurrency: 1,
+      maxConcurrency: config.otlpMetricsMaxConcurrency ?? 3,
+      loadSheddingEnabled: false,
+    });
+        logger.error("Dropped batch after sanitize-retry still hit ClickHouse JSON parse error", {
+          flushId,
+          contextLabel,
+          batchSize: rows.length,
+          permanentlyDroppedBatches: this._permanentlyDroppedBatches,
+          sampleRow: JSON.stringify(rows[0] ?? null).slice(0, 1024),
+          firstError: firstMessage.split("\n")[0],
+          retryError: retryMessage.split("\n")[0],
+        });
+  async #flushOtelMetricsBatch(flushId: string, rows: MetricsV1Input[]) {
+    await startSpan(this._tracer, "flushOtelMetricsBatch", async (span) => {
+      span.setAttribute("flush_id", flushId);
+      span.setAttribute("row_count", rows.length);
+
+      const [insertError] = await this._clickhouse.metrics.insert(rows, {
+        params: {
+          clickhouse_settings: this.#getClickhouseInsertSettings(),
+        },
+      });
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      logger.info("ClickhouseEventRepository.flushOtelMetricsBatch Inserted OTLP metrics batch", {
+        rows: rows.length,
+      });
+    });
+  }
+
+  insertMany(events: CreateEventInput[]): void {
+  insertManyMetrics(rows: MetricsV1Input[]): void {
+    if (rows.length === 0) return;
+    this._otlpMetricsFlushScheduler.addToBatch(rows);
+  }
+

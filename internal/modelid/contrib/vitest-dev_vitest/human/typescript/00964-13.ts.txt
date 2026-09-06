@@ -1,0 +1,41 @@
+// commit 19f6e8947072 2026-05-29T13:05:07+02:00 packages/vitest/src/types/global.ts
+import type { Bench, BenchResult } from '../runtime/benchmark'
+
+    /**
+     * Asserts that a benchmark result is faster than another benchmark result.
+     * Compares mean latency — lower is faster.
+     *
+     * @example
+     * const result = await bench.compare(
+     *   bench('lib1', () => { lib1() }),
+     *   bench('lib2', () => { lib2() }),
+     * )
+     * expect(result.get('lib1')).toBeFasterThan(result.get('lib2'))
+     * expect(result.get('lib1')).toBeFasterThan(result.get('lib2'), { delta: 0.1 })
+     */
+    toBeFasterThan: (
+      expected: BenchResult,
+      options?: { delta?: number },
+    ) => void
+
+    /**
+     * Asserts that a benchmark result is slower than another benchmark result.
+     * Compares mean latency — higher is slower.
+     *
+     * @example
+     * const result = await bench.compare(
+     *   bench('lib1', () => { lib1() }),
+     *   bench('lib2', () => { lib2() }),
+     * )
+     * expect(result.get('lib2')).toBeSlowerThan(result.get('lib1'))
+     * expect(result.get('lib2')).toBeSlowerThan(result.get('lib1'), { delta: 0.2 })
+     */
+    toBeSlowerThan: (
+      expected: BenchResult,
+      options?: { delta?: number },
+    ) => void
+    /**
+     * Create a benchmark to run. It will be reported after the test is finished.
+     * @see {@link https://vitest.dev/guide/benchmarking}
+     */
+    readonly bench: Bench

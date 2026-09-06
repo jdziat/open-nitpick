@@ -1,0 +1,94 @@
+// commit b7683b82be40 2026-08-03T07:15:59-04:00 packages/scim/src/collection-query.test.ts
+const SCIM_ENTERPRISE_USER_SCHEMA =
+	"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User";
+
+	it.each([
+		[
+			'displayName eq "MyPlatform BA SCIM - Admins"',
+			"MyPlatform BA SCIM - Admins",
+		],
+		['displayName eq "Research and Development"', "Research and Development"],
+		['displayName eq "Platform - \\"Admins\\""', 'Platform - "Admins"'],
+	] as const)("finds the top-level equality operator in %s", (filter, value) => {
+		expect(parseSCIMCollectionQuery("Group", { filter })).toMatchObject({
+			ok: true,
+			value: {
+				filters: [{ attribute: "displayName", operator: "eq", value }],
+			},
+		});
+	});
+
+	it("preserves top-level conjunctions when a quoted value contains and", () => {
+		expect(
+			parseSCIMCollectionQuery("Group", {
+				filter:
+					'displayName eq "Research and Development" and externalId eq "research-and-development"',
+			}),
+		).toMatchObject({
+			ok: true,
+			value: {
+				filters: [
+					{
+						attribute: "displayName",
+						operator: "eq",
+						value: "Research and Development",
+					},
+					{
+						attribute: "externalId",
+						operator: "eq",
+						value: "research-and-development",
+					},
+				],
+			},
+		});
+	});
+
+		["User", 'user Name eq "ada"', "unsupported-filter-operator"],
+		[
+			"Group",
+			'displayName ne "MyPlatform BA SCIM - Admins"',
+			"unsupported-filter-operator",
+		],
+		["Group", 'displayName eq "one" ne "two"', "invalid-filter-value"],
+	it.each([
+		["Group", 'displayName eq "unterminated'],
+		["Group", 'displayName] eq "Admins"'],
+		["User", 'emails[type eq "work".value eq "ada@example.com"'],
+	] as const)("returns invalid filter syntax for malformed %s quote or bracket state", (resourceType, filter) => {
+		const result =
+			resourceType === "User"
+				? parseSCIMCollectionQuery("User", { filter })
+				: parseSCIMCollectionQuery("Group", { filter });
+
+		expect(result).toMatchObject({
+			ok: false,
+			error: {
+				code: "invalid-filter-syntax",
+				parameter: "filter",
+				scimType: "invalidFilter",
+			},
+		});
+	});
+
+	it("resolves qualified Enterprise User paths by their longest schema URI", () => {
+		expect(
+			parseSCIMAttributeProjection("User", {
+				attributes: [
+					SCIM_ENTERPRISE_USER_SCHEMA,
+					`${SCIM_ENTERPRISE_USER_SCHEMA.toUpperCase()}:department`,
+					`${SCIM_ENTERPRISE_USER_SCHEMA}:manager.value`,
+				],
+			}),
+		).toEqual({
+			ok: true,
+			value: {
+				mode: "include",
+				attributes: new Set([
+					SCIM_ENTERPRISE_USER_SCHEMA.toLowerCase(),
+					`${SCIM_ENTERPRISE_USER_SCHEMA.toLowerCase()}.department`,
+					`${SCIM_ENTERPRISE_USER_SCHEMA.toLowerCase()}.manager.value`,
+				]),
+			},
+		});
+	});
+

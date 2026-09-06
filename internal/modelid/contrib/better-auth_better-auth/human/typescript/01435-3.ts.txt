@@ -1,0 +1,33 @@
+// commit 197792318fda 2026-02-20T19:58:29+00:00 packages/better-auth/src/context/helpers.ts
+import { getBaseURL, isDynamicBaseURLConfig } from "../utils/url";
+	const trustedOrigins: (string | undefined | null)[] = [];
+
+	if (isDynamicBaseURLConfig(options.baseURL)) {
+		const allowedHosts = options.baseURL.allowedHosts;
+		for (const host of allowedHosts) {
+			if (!host.includes("://")) {
+				trustedOrigins.push(`https://${host}`);
+				if (host.includes("localhost") || host.includes("127.0.0.1")) {
+					trustedOrigins.push(`http://${host}`);
+				}
+			} else {
+				trustedOrigins.push(host);
+			}
+		}
+
+		if (options.baseURL.fallback) {
+			try {
+				trustedOrigins.push(new URL(options.baseURL.fallback).origin);
+			} catch {}
+		}
+	} else {
+		const baseURL = getBaseURL(
+			typeof options.baseURL === "string" ? options.baseURL : undefined,
+			options.basePath,
+			request,
+		);
+		if (baseURL) {
+			trustedOrigins.push(new URL(baseURL).origin);
+		}
+	}
+

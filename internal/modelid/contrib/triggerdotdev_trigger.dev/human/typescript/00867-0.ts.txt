@@ -1,0 +1,56 @@
+// commit 0e63f8317e7c 2026-03-30T23:25:07+01:00 apps/webapp/app/runEngine/concerns/queues.server.ts
+    let taskTtl: string | null | undefined;
+
+        // A specific queue name is provided, validate it exists for the locked worker
+            workers: { some: { id: lockedBackgroundWorker.id } },
+
+
+        // Only fetch task for TTL if caller didn't provide a per-trigger TTL
+        if (request.body.options?.ttl === undefined) {
+          const lockedTask = await this.prisma.backgroundWorkerTask.findFirst({
+            where: {
+              workerId: lockedBackgroundWorker.id,
+              runtimeEnvironmentId: request.environment.id,
+              slug: request.taskId,
+            },
+            select: { ttl: true },
+          });
+
+          taskTtl = lockedTask?.ttl;
+        }
+        // No queue override - fetch task with queue to get both default queue and TTL
+        taskTtl = lockedTask.ttl;
+
+
+      const taskInfo = await this.getTaskQueueInfo(request);
+      queueName = taskInfo.queueName;
+      taskTtl = taskInfo.taskTtl;
+      taskTtl,
+  private async getTaskQueueInfo(
+    request: TriggerTaskRequest
+  ): Promise<{ queueName: string; taskTtl?: string | null }> {
+    const overriddenQueueName = extractQueueName(queue);
+    // When caller provides both a queue override and a per-trigger TTL,
+    // we don't need any DB queries - the per-trigger TTL takes precedence
+    if (overriddenQueueName && body.options?.ttl !== undefined) {
+      return { queueName: overriddenQueueName, taskTtl: undefined };
+    }
+
+      return { queueName: overriddenQueueName ?? defaultQueueName, taskTtl: undefined };
+    }
+
+    // When queue is overridden, we only need TTL from the task (no queue join needed)
+    if (overriddenQueueName) {
+      const task = await this.prisma.backgroundWorkerTask.findFirst({
+        where: {
+          workerId: worker.id,
+          runtimeEnvironmentId: environment.id,
+          slug: taskId,
+        },
+        select: { ttl: true },
+      });
+
+      return { queueName: overriddenQueueName, taskTtl: task?.ttl };
+      return { queueName: defaultQueueName, taskTtl: undefined };
+      return { queueName: defaultQueueName, taskTtl: task.ttl };
+    return { queueName: task.queue.name ?? defaultQueueName, taskTtl: task.ttl };

@@ -1,0 +1,32 @@
+// commit 3e1fca0cc55c 2025-11-26T14:20:01+00:00 internal/ghmcp/server.go
+	// EnabledTools is a list of specific tools to enable (additive to toolsets)
+	// When specified, these tools are registered in addition to any specified toolset tools
+	EnabledTools []string
+
+	// Enable and register toolsets if configured
+	// This always happens if toolsets are specified, regardless of whether tools are also specified
+	if len(enabledToolsets) > 0 {
+		err = tsg.EnableToolsets(enabledToolsets, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to enable toolsets: %w", err)
+		}
+
+		// Register all mcp functionality with the server
+		tsg.RegisterAll(ghServer)
+	// Register specific tools if configured
+	if len(cfg.EnabledTools) > 0 {
+		// Clean and validate tool names
+		enabledTools := github.CleanTools(cfg.EnabledTools)
+		// Register the specified tools (additive to any toolsets already enabled)
+		err = tsg.RegisterSpecificTools(ghServer, enabledTools, cfg.ReadOnly)
+		if err != nil {
+			return nil, fmt.Errorf("failed to register tools: %w", err)
+		}
+	}
+
+	// Register dynamic toolsets if configured (additive to toolsets and tools)
+	// EnabledTools is a list of specific tools to enable (additive to toolsets)
+	// When specified, these tools are registered in addition to any specified toolset tools
+	EnabledTools []string
+
+		EnabledTools:      cfg.EnabledTools,

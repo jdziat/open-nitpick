@@ -1,0 +1,71 @@
+// commit 3f67b7e2c068 2026-08-25T15:52:53+02:00 pkg/github/repositories.go
+		scopes.PublicRead(scopes.Repo),
+		scopes.PublicRead(scopes.Repo),
+		scopes.PublicRead(scopes.Repo),
+	tool := NewTool(
+		scopes.RequireAll(scopes.Repo),
+			path, err = validateRelativePath(path)
+			if err != nil {
+				return utils.NewToolResultError(fmt.Sprintf("invalid path: %s", err)), nil, nil
+			}
+	tool.ScopeAccess.Challenge = workflowScopeChallengeForPath
+	tool.ScopeAccess.Scopes = []string{string(scopes.Repo), string(scopes.Workflow)}
+	return tool
+		scopes.RequireAll(scopes.Repo),
+		scopes.RequireAll(scopes.DeleteRepo, scopes.Repo),
+		scopes.PublicRead(scopes.Repo),
+		scopes.RequireAll(scopes.Repo),
+	tool := NewTool(
+		scopes.RequireAll(scopes.Repo),
+			path, err = validateRelativePath(path)
+			if err != nil {
+				return utils.NewToolResultError(fmt.Sprintf("invalid path: %s", err)), nil, nil
+			}
+	tool.ScopeAccess.Challenge = workflowScopeChallengeForPath
+	tool.ScopeAccess.Scopes = []string{string(scopes.Repo), string(scopes.Workflow)}
+	return tool
+		scopes.RequireAll(scopes.Repo),
+	tool := NewTool(
+		scopes.RequireAll(scopes.Repo),
+			entries := make([]*github.TreeEntry, 0, len(filesObj))
+			for _, file := range filesObj {
+				fileMap, ok := file.(map[string]any)
+				if !ok {
+					return utils.NewToolResultError("each file must be an object with path and content"), nil, nil
+				}
+
+				filePath, ok := fileMap["path"].(string)
+				if !ok || filePath == "" {
+					return utils.NewToolResultError("each file must have a path"), nil, nil
+				}
+				filePath, err = validateRelativePath(filePath)
+				if err != nil {
+					return utils.NewToolResultError(fmt.Sprintf("invalid file path: %s", err)), nil, nil
+				}
+
+				content, ok := fileMap["content"].(string)
+				if !ok {
+					return utils.NewToolResultError("each file must have content"), nil, nil
+				}
+
+				entries = append(entries, &github.TreeEntry{
+					Path:    github.Ptr(filePath),
+					Mode:    github.Ptr("100644"),
+					Type:    github.Ptr("blob"),
+					Content: github.Ptr(content),
+				})
+			}
+
+	tool.ScopeAccess.Challenge = workflowScopeChallengeForFiles
+	tool.ScopeAccess.Scopes = []string{string(scopes.Repo), string(scopes.Workflow)}
+	return tool
+		scopes.PublicRead(scopes.Repo),
+		scopes.PublicRead(scopes.Repo),
+		scopes.PublicRead(scopes.Repo),
+		scopes.PublicRead(scopes.Repo),
+		scopes.PublicRead(scopes.Repo),
+		scopes.PublicRead(scopes.Repo),
+		scopes.RequireAll(scopes.Repo),
+		scopes.RequireAll(scopes.Repo),
+		scopes.PublicRead(scopes.Repo),
+		scopes.PublicRead(scopes.Repo),

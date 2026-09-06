@@ -1,0 +1,40 @@
+// commit 9dd2235b7aca 2026-07-29T08:14:55-04:00 pkg/cmd/pr/checkout/checkout.go
+	"os"
+	if opts.Worktree != "" {
+		if err := ensureWorktreePathSafe(opts.Worktree); err != nil {
+			return err
+		}
+	}
+
+	if worktree == "" {
+			{"checkout", "--detach", "FETCH_HEAD"},
+		}
+	}
+
+	if isWorktreeAtPath(gitClient, worktree) {
+		return [][]string{
+			append([]string{"-C", worktree}, fetchCmd...),
+			{"-C", worktree, "checkout", "--detach", "FETCH_HEAD"},
+		{"worktree", "add", "--detach", worktree, "FETCH_HEAD"},
+	// TODO: check if non-fast-forward and suggest to use `--force`
+// ensureWorktreePathSafe validates a --worktree target before we write to it.
+// The path must be either non-existent (git will create the worktree) or an
+// existing directory, and never a symlink at its final component. A symlinked
+// ancestor (e.g. macOS /tmp -> /private/tmp) is allowed; only the leaf is
+// checked, using os.Lstat so a leaf symlink is not followed. Rejecting a leaf
+// symlink is defense-in-depth against writing PR content through a planted link.
+func ensureWorktreePathSafe(path string) error {
+	fi, err := os.Lstat(path)
+	switch {
+	case os.IsNotExist(err):
+		return nil
+	case err != nil:
+		return err
+	case fi.Mode()&os.ModeSymlink != 0:
+		return fmt.Errorf("--worktree path must not be a symlink: %s", path)
+	case !fi.IsDir():
+		return fmt.Errorf("--worktree path must be a directory: %s", path)
+	}
+	return nil
+}
+

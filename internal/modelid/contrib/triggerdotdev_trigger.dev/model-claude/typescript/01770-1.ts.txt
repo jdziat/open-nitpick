@@ -1,0 +1,77 @@
+// commit 15dd973f92d5 2026-08-27T15:57:32+01:00 apps/webapp/app/v3/runOpsMigration/mintBatchFriendlyId.server.test.ts
+    const r = batchIdForMintKind({ kind: "runOpsId" });
+  it("a shard char mints a gen-2 batch id carrying that char", () => {
+    const r = batchIdForMintKind({ kind: "runOpsId", shardChar: "a" });
+    expect(r.id.length).toBe(26);
+    expect(r.id[24]).toBe("a");
+    expect(r.id[25]).toBe("2");
+    expect(classifyKind(r.id)).toBe("runOpsId");
+  });
+
+    const r = batchIdForMintKind({ kind: "cuid" });
+      expect([25, 26]).toContain(batchIdForMintKind({ kind }).id.length);
+  const NEW_PARENT = `run_${"a".repeat(24)}01`;
+  const LEGACY_PARENT = `run_${"a".repeat(25)}`;
+  const GEN2_PARENT = `run_${"a".repeat(24)}a2`;
+    const resolveMintShard = vi.fn().mockResolvedValue("new");
+    const target = await resolveBatchMintKind({
+      deps: { resolveRunIdMintKind, resolveMintShard },
+    expect(target.kind).toBe("runOpsId");
+    expect(target.shardChar).toBeUndefined();
+  it("ROOT batch mints by the mint policy when a shard is active", async () => {
+    const target = await resolveBatchMintKind({
+      environment,
+      deps: {
+        resolveRunIdMintKind: vi.fn().mockResolvedValue("runOpsId"),
+        resolveMintShard: vi.fn().mockResolvedValue("a"),
+      },
+    });
+    expect(target).toEqual({ kind: "runOpsId", shardChar: "a", region: undefined });
+  });
+
+    const target = await resolveBatchMintKind({
+      deps: {
+        resolveRunIdMintKind: vi.fn().mockResolvedValue("cuid"),
+        resolveMintShard: vi.fn(),
+      },
+    expect(target.kind).toBe("cuid");
+    const target = await resolveBatchMintKind({
+      parentRunFriendlyId: NEW_PARENT,
+      deps: { resolveRunIdMintKind, resolveMintShard: vi.fn() },
+    expect(target).toEqual({ kind: "runOpsId" });
+    expect(resolveRunIdMintKind).not.toHaveBeenCalled();
+  });
+  it("CHILD batch takes a gen-2 parent's shard char", async () => {
+    const resolveRunIdMintKind = vi.fn();
+    const resolveMintShard = vi.fn();
+    const target = await resolveBatchMintKind({
+      environment,
+      parentRunFriendlyId: GEN2_PARENT,
+      deps: { resolveRunIdMintKind, resolveMintShard },
+    });
+    expect(target).toEqual({ kind: "runOpsId", shardChar: "a" });
+    expect(resolveMintShard).not.toHaveBeenCalled();
+    const target = await resolveBatchMintKind({
+      parentRunFriendlyId: LEGACY_PARENT,
+      deps: { resolveRunIdMintKind, resolveMintShard: vi.fn() },
+    expect(target).toEqual({ kind: "cuid" });
+    const target = await resolveBatchMintKind({
+      parentRunFriendlyId: LEGACY_PARENT,
+      deps: { resolveRunIdMintKind, resolveMintShard: vi.fn() },
+    expect(target).toEqual({ kind: "cuid" });
+    const target = await resolveBatchMintKind({
+      parentRunFriendlyId: NEW_PARENT,
+      deps: { resolveRunIdMintKind, resolveMintShard: vi.fn() },
+    expect(target).toEqual({ kind: "runOpsId" });
+
+  it("FLIP does not move a gen-2 child off its parent's shard", async () => {
+    const target = await resolveBatchMintKind({
+      environment,
+      parentRunFriendlyId: GEN2_PARENT,
+      deps: {
+        resolveRunIdMintKind: vi.fn().mockResolvedValue("cuid"),
+        resolveMintShard: vi.fn().mockResolvedValue("b"),
+      },
+    });
+    expect(target).toEqual({ kind: "runOpsId", shardChar: "a" });
+  });

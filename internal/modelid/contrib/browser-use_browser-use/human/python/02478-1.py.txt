@@ -1,0 +1,78 @@
+# commit b177f3166ea7 2025-08-30T20:50:42+02:00 browser_use/tools/service.py
+def handle_browser_error(e: BrowserError) -> ActionResult:
+	if e.long_term_memory is not None:
+		if e.short_term_memory is not None:
+			return ActionResult(
+				extracted_content=e.short_term_memory, error=e.long_term_memory, include_extracted_content_only_once=True
+			)
+		else:
+			return ActionResult(error=e.long_term_memory)
+	# Fallback to original error handling if long_term_memory is None
+	logger.warning(
+		'⚠️ A BrowserError was raised without long_term_memory - always set long_term_memory when raising BrowserError to propagate right messages to LLM.'
+	)
+	raise e
+				return ActionResult(error=f'Failed to search Google for "{params.query}": {str(e)}')
+					site_unavailable_msg = f'Navigation failed - site unavailable: {params.url}'
+					browser_session.logger.warning(f'⚠️ {site_unavailable_msg} - {error_msg}')
+					return ActionResult(error=f'Navigation failed: {str(e)}')
+				error_msg = f'Failed to go back: {str(e)}'
+			except BrowserError as e:
+				return handle_browser_error(e)
+				error_msg = f'Failed to click element {params.index}: {str(e)}'
+				# comment this out for now as it should be handled properly
+				# if 'dropdown' in str(e) and node:
+				# 	try:
+				# 		return await get_dropdown_options(
+				# 			params=GetDropdownOptionsAction(index=params.index), browser_session=browser_session
+				# 		)
+				# 	except Exception as dropdown_error:
+				# 		logger.error(
+				# 			f'Failed to get dropdown options as shortcut during click_element_by_index on dropdown: {type(dropdown_error).__name__}: {dropdown_error}'
+				# 		)
+			except BrowserError as e:
+				return handle_browser_error(e)
+								msg = f'File path {params.path} is not available. Upload files must be in available_file_paths, downloaded_files, or a file managed by file_system.'
+								logger.error(f'❌ {msg}')
+								return ActionResult(error=msg)
+							msg = f'File path {params.path} is not available. Upload files must be in available_file_paths, downloaded_files, or a file managed by file_system.'
+							raise BrowserError(message=msg, long_term_memory=msg)
+					msg = f'File {params.path} does not exist'
+					return ActionResult(error=msg)
+				msg = f'Element with index {params.index} does not exist.'
+				return ActionResult(error=msg)
+				return ActionResult(error=f'Failed to switch to tab {params.tab_id or params.url}.')
+				return ActionResult(error=f'Failed to close tab {params.tab_id}.')
+				error_msg = 'Failed to execute scroll action.'
+				error_msg = f'Failed to send keys: {str(e)}'
+			# Use structured memory from the handler
+				extracted_content=dropdown_data['short_term_memory'],
+				long_term_memory=dropdown_data['long_term_memory'],
+			# Check if the selection was successful
+			if selection_data.get('success') == 'true':
+				# Extract the message from the returned data
+				msg = selection_data.get('message', f'Selected option: {params.text}')
+				return ActionResult(
+					extracted_content=msg,
+					include_in_memory=True,
+					long_term_memory=f"Selected dropdown option '{params.text}' at index {params.index}",
+				)
+			else:
+				# Handle structured error response
+				# TODO: raise BrowserError instead of returning ActionResult
+				if 'short_term_memory' in selection_data and 'long_term_memory' in selection_data:
+					return ActionResult(
+						extracted_content=selection_data['short_term_memory'],
+						long_term_memory=selection_data['long_term_memory'],
+						include_extracted_content_only_once=True,
+					)
+				else:
+					# Fallback to regular error
+					error_msg = selection_data.get('error', f'Failed to select option: {params.text}')
+					return ActionResult(error=error_msg)
+					except BrowserError as e:
+						logger.error(f'❌ Action {action_name} failed with BrowserError: {str(e)}')
+						result = handle_browser_error(e)
+						return result
+						logger.error(f"Action '{action_name}' failed with error: {str(e)}")
+						result = ActionResult(error=str(e))

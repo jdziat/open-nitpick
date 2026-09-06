@@ -1,0 +1,62 @@
+# commit c8ddbb7d6d2b 2025-07-04T15:35:06+02:00 browser_use/browser/session.py
+		wait=1,  # wait 1s between attempts
+		retries=3,  # 3 attempts
+		timeout=15,  # 15 second reasonable timeout
+		semaphore_timeout=5,  # 5 second semaphore timeout
+			# Reasonable timeout for screenshot
+					timeout=10000,  # 10 second playwright timeout
+				timeout=12.0,  # 12 second asyncio timeout
+		# Skip expensive performance API logging - can cause significant delays on complex pages
+		bytes_used = None
+		self.logger.debug('🔄 Starting get_state_summary...')
+			await asyncio.wait_for(page.evaluate('1'), timeout=5.0)
+			self.logger.debug('🧹 Removing highlights...')
+			self.logger.debug('🌳 Starting DOM processing...')
+					timeout=45.0,  # 45 second timeout for DOM processing - generous for complex pages
+				self.logger.debug('✅ DOM processing completed')
+				self.logger.warning(f'DOM processing timed out after 45 seconds for {page.url}')
+				self.logger.warning('🔄 Falling back to minimal DOM state to allow basic navigation...')
+
+				# Create minimal DOM state for basic navigation
+				from browser_use.dom.views import DOMElementNode
+
+				minimal_element_tree = DOMElementNode(
+					tag_name='body',
+					xpath='/body',
+					attributes={},
+					children=[],
+					is_visible=True,
+					parent=None,
+				)
+
+				from browser_use.dom.views import DOMState
+
+				content = DOMState(element_tree=minimal_element_tree, selector_map={})
+			self.logger.debug('📋 Getting tabs info...')
+			self.logger.debug('✅ Tabs info completed')
+				self.logger.debug('📸 Starting screenshot...')
+				# Reasonable timeout for screenshot
+					timeout=15.0,  # 15 second reasonable timeout
+				self.logger.debug('✅ Screenshot completed')
+			try:
+				self.logger.debug('📏 Getting scroll info...')
+				pixels_above, pixels_below = await asyncio.wait_for(self.get_scroll_info(page), timeout=5.0)
+				self.logger.debug('✅ Scroll info completed')
+			except Exception as e:
+				self.logger.warning(f'Failed to get scroll info: {type(e).__name__}')
+				pixels_above, pixels_below = 0, 0
+
+			try:
+				title = await asyncio.wait_for(page.title(), timeout=5.0)
+			except Exception:
+				title = 'Title unavailable'
+
+			# Check if this is a minimal fallback state
+			browser_errors = []
+			if not content.selector_map:  # Empty selector map indicates fallback state
+				browser_errors.append(
+					f'DOM processing timed out for {page.url} - using minimal state. Basic navigation still available via go_to_url, scroll, and search actions.'
+				)
+				title=title,
+				browser_errors=browser_errors,
+			self.logger.debug('✅ get_state_summary completed successfully')

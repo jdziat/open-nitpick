@@ -1,0 +1,39 @@
+// commit 0c2eea6338a2 2026-07-30T19:22:49-06:00 pkg/cmd/attestation/api/client.go
+	"strconv"
+	"github.com/cli/cli/v2/internal/safeurl"
+func (c *LiveClient) buildRequestURL(params FetchParams) (safeurl.SafeURL, error) {
+		return nil, err
+	var u *safeurl.MutableSafeURL
+		owner, name, err := safeurl.RepoPartsFromNWO(params.Repo)
+		if err != nil {
+			return nil, err
+		}
+		u, err = safeurl.JoinPath("repos", owner, name, "attestations", params.Digest)
+		if err != nil {
+			return nil, err
+		}
+		var err error
+		u, err = safeurl.JoinPath("orgs", params.Owner, "attestations", params.Digest)
+		if err != nil {
+			return nil, err
+		}
+	u.SetQuery("per_page", strconv.Itoa(perPage))
+		u.SetQuery("predicate_type", params.PredicateType)
+	return u, nil
+	u, err := c.buildRequestURL(params)
+	var pageURL safeurl.SafeURL = u
+
+	for pageURL.String() != "" && len(attestations) < params.Limit {
+			newURL, restErr := c.githubAPI.RESTWithNext(c.host, http.MethodGet, pageURL.String(), nil, &resp)
+			pageURL = safeurl.NewImmutableSafeURL(newURL)
+			b, err := c.getBundle(safeurl.NewImmutableSafeURL(a.BundleURL))
+func (c *LiveClient) getBundle(url safeurl.SafeURL) (*bundle.Bundle, error) {
+		resp, err := c.externalHttpClient.Get(url.String())
+			return fmt.Errorf("attestation bundle with URL %s returned status code %d", url.String(), resp.StatusCode)
+	u, err := safeurl.JoinPath(MetaPath)
+	if err != nil {
+		return "", err
+	}
+	return c.getTrustDomain(u)
+func (c *LiveClient) getTrustDomain(u safeurl.SafeURL) (string, error) {
+		restErr := c.githubAPI.REST(c.host, http.MethodGet, u.String(), nil, &resp)

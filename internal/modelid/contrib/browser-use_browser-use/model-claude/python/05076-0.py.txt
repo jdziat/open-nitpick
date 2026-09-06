@@ -1,0 +1,32 @@
+# commit d4abb27612ea 2026-07-22T20:22:03-07:00 browser_use/browser/watchdogs/default_action_watchdog.py
+								// For real <input>/<textarea>, use the prototype's native value setter:
+								// React patches the instance setter to track values, so a direct
+								// `this.value = ""` makes React's tracker think nothing changed and the
+								// input event gets ignored, leaving controlled components with the old
+								// value. For anything else with a .value accessor (web components,
+								// selects), the prototype setter throws Illegal invocation - keep using
+								// the element's own setter there.
+								if (this instanceof HTMLInputElement || this instanceof HTMLTextAreaElement) {
+									const proto = this instanceof HTMLTextAreaElement
+										? window.HTMLTextAreaElement.prototype
+										: window.HTMLInputElement.prototype;
+									const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+									try {
+										desc.set.call(this, "");
+									} catch (e) {
+										this.value = "";
+									}
+											// Pick the descriptor for THIS element type; calling the
+											// HTMLInputElement setter on a textarea or web component
+											// throws Illegal invocation.
+											var desc = null;
+											if (this instanceof HTMLInputElement) {
+												desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+											} else if (this instanceof HTMLTextAreaElement) {
+												desc = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+											}
+												try {
+													desc.set.call(this, newValue);
+												} catch (e) {
+													this.value = newValue;
+												}

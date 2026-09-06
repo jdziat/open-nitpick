@@ -1,0 +1,38 @@
+// commit 78c1169cf61e 2026-05-12T18:09:24+02:00 packages/browser/src/client/tester/trace.ts
+import type { BrowserRPC } from '../client'
+import { getBrowserState, getWorkerState, now } from '../utils'
+  // UI has access to original config but let artifact own this
+  // Each artifact currently carries one entry; the UI merges entries by attempt.
+  // TODO: revisit whether this should be modeled as a single entry.
+export type BrowserTraceEntryRangePhase = 'start' | 'end'
+export interface BrowserTraceEntryRange {
+  id: string
+  phase: BrowserTraceEntryRangePhase
+}
+
+  range?: BrowserTraceEntryRange
+  // Derived on UI side from range start/end entries.
+export function createBrowserTraceRangeId(): string {
+  return Math.random().toString(36).slice(2)
+export async function recordBrowserTraceEntry(
+  options: Omit<BrowserTraceEntry, 'snapshot' | 'startTime'>,
+): Promise<void> {
+  const relativeStartTime = now() - attemptInfo.startTime
+
+  // An async lane could defer artifact recording and flush it at test-attempt end,
+  // but the synchronous snapshot work is already a comparable cost, and this path
+  // is mostly data passing after that.
+  // Keep it simple unless measurements show artifact recording is a bottleneck.
+  const data: BrowserTraceData = {
+    retry,
+    repeats,
+    recordCanvas,
+    entries: [entry],
+  }
+  const rpc = getWorkerState().rpc as any as BrowserRPC
+  await rpc.triggerCommand<void>(
+    getBrowserState().sessionId,
+    '__vitest_recordBrowserTrace',
+    undefined,
+    [{ testId: task.id, data }],
+  )

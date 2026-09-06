@@ -1,0 +1,32 @@
+// commit d8813fd133d9 2026-04-03T00:00:06+00:00 service/worker/workerdeployment/util.go
+	UpdateVersionComputeConfig        = "update-version-compute-config" // for Worker Deployment Version wfs
+	CreateWorkerDeployment            = "create-deployment"             // for Worker Deployment wfs
+	CreateWorkerDeploymentVersion     = "create-deployment-version"     // for Worker Deployment wfs
+	QueryCreateRequestID    = "create-request-id"   // for Worker Deployment wf
+	errDeploymentDeleted          = "worker deployment deleted"        // returned in the race condition that the deployment is deleted but the workflow is not yet closed.
+	errDeploymentAlreadyExists    = "worker deployment already exists" // returned in the race condition that the deployment exists with a different request ID.
+	errVersionAlreadyExists       = "worker deployment version already exists"
+	errFailedPrecondition   = "FailedPrecondition"
+	errInvalidComputeConfig = "errInvalidComputeConfig"
+	ErrWorkerDeploymentAlreadyExists          = "Worker Deployment with name %q already exists"
+	ErrWorkerDeploymentVersionAlreadyExists   = "Worker Deployment Version %q already exists"
+
+	AutoCreateRequestIDPrefix = "_auto_create_"
+func makeNewVersionState(
+	deploymentName,
+	buildID string,
+	createTime time.Time,
+	identity string,
+	initialStatus enumspb.WorkerDeploymentVersionStatus,
+	syncBatchSize int32,
+) *deploymentspb.VersionLocalState {
+		CreateTime:           timestamppb.New(createTime),
+		Status:               initialStatus,
+		RoutingUpdateTime:    nil,
+		CurrentSinceTime:     nil,                                 // not current
+		RampingSinceTime:     nil,                                 // not ramping
+		RampPercentage:       0,                                   // not ramping
+		DrainageInfo:         &deploymentpb.VersionDrainageInfo{}, // not draining or drained
+		Metadata:             nil,
+		SyncBatchSize:        syncBatchSize,
+		LastModifierIdentity: identity,

@@ -1,0 +1,40 @@
+// commit 2f64ac0c2155 2025-11-17T10:20:39+00:00 pkg/github/discussions.go
+	Number         githubv4.Int
+	Title          githubv4.String
+	CreatedAt      githubv4.DateTime
+	UpdatedAt      githubv4.DateTime
+	Closed         githubv4.Boolean
+	IsAnswered     githubv4.Boolean
+	AnswerChosenAt *githubv4.DateTime
+	Author         struct {
+						Number         githubv4.Int
+						Title          githubv4.String
+						Body           githubv4.String
+						CreatedAt      githubv4.DateTime
+						Closed         githubv4.Boolean
+						IsAnswered     githubv4.Boolean
+						AnswerChosenAt *githubv4.DateTime
+						URL            githubv4.String `graphql:"url"`
+						Category       struct {
+
+			// Build response as map to include fields not present in go-github's Discussion struct.
+			// The go-github library's Discussion type lacks isAnswered and answerChosenAt fields,
+			// so we use map[string]interface{} for the response (consistent with other functions
+			// like ListDiscussions and GetDiscussionComments).
+			response := map[string]interface{}{
+				"number":     int(d.Number),
+				"title":      string(d.Title),
+				"body":       string(d.Body),
+				"url":        string(d.URL),
+				"closed":     bool(d.Closed),
+				"isAnswered": bool(d.IsAnswered),
+				"createdAt":  d.CreatedAt.Time,
+				"category": map[string]interface{}{
+					"name": string(d.Category.Name),
+
+			// Add optional timestamp fields if present
+			if d.AnswerChosenAt != nil {
+				response["answerChosenAt"] = d.AnswerChosenAt.Time
+			}
+
+			out, err := json.Marshal(response)

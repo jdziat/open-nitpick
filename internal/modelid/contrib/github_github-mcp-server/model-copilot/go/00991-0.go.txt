@@ -1,0 +1,89 @@
+// commit d080b23f593d 2026-07-29T15:57:26-04:00 pkg/github/projects.go
+	maxProjectItemsPerBatch              = 50
+	projectsMethodUpdateProjectItems        = "update_project_items"
+func updateProjectItemsItemSchema() *jsonschema.Schema {
+	variant := func(required []string, properties map[string]*jsonschema.Schema) *jsonschema.Schema {
+		return &jsonschema.Schema{
+			Type:                 "object",
+			AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+			Properties:           properties,
+			Required:             required,
+		}
+	}
+
+	return &jsonschema.Schema{
+		Type: "object",
+		OneOf: []*jsonschema.Schema{
+			variant([]string{"node_id"}, map[string]*jsonschema.Schema{
+				"node_id": {
+					Type:        "string",
+					Description: "The project item's GraphQL node ID, as returned by 'list_project_items' or 'add_project_item'.",
+				},
+			}),
+			variant([]string{"item_id"}, map[string]*jsonschema.Schema{
+				"item_id": {
+					Type:        "integer",
+					Description: "The numeric project item ID.",
+				},
+			}),
+			variant([]string{"item_owner", "item_repo", "issue_number"}, map[string]*jsonschema.Schema{
+				"item_owner": {
+					Type:        "string",
+					Description: "Owner of the repository containing the issue.",
+				},
+				"item_repo": {
+					Type:        "string",
+					Description: "Repository containing the issue.",
+				},
+				"issue_number": {
+					Type:        "integer",
+					Description: "Issue number used to resolve the project item.",
+				},
+			}),
+		},
+	}
+}
+
+func projectUpdatedFieldSchema() *jsonschema.Schema {
+	value := &jsonschema.Schema{
+		Description: "The value to apply. Any JSON value is accepted; use null to clear the field.",
+	}
+	variant := func(required []string, properties map[string]*jsonschema.Schema) *jsonschema.Schema {
+		properties["value"] = value
+		return &jsonschema.Schema{
+			Type:                 "object",
+			AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+			Properties:           properties,
+			Required:             required,
+		}
+	}
+
+	return &jsonschema.Schema{
+		Type:        "object",
+		Description: "The field/value to apply, using {\"id\": 123, \"value\": ...} or {\"name\": \"Status\", \"value\": ...}; null clears the field. Required for 'update_project_item' and 'update_project_items', where one top-level field/value applies to every item in a batch. For 'update_project_item' SINGLE_SELECT fields, the name form accepts option names; the ID form expects an option ID.",
+		OneOf: []*jsonschema.Schema{
+			variant([]string{"id", "value"}, map[string]*jsonschema.Schema{
+				"id": {
+					Type:        "integer",
+					Description: "The numeric project field ID.",
+				},
+			}),
+			variant([]string{"name", "value"}, map[string]*jsonschema.Schema{
+				"name": {
+					Type:        "string",
+					Description: "The project field name. Matching is case-insensitive.",
+				},
+			}),
+		},
+	}
+}
+
+			Description: t("TOOL_PROJECTS_WRITE_DESCRIPTION", "Create and manage GitHub Projects: create projects, add/update/delete items, bulk-update many items at once, create status updates, and add iteration fields."),
+							projectsMethodUpdateProjectItems,
+					"updated_field": projectUpdatedFieldSchema(),
+					"items": {
+						Type:        "array",
+						Description: "The items to update with the top-level 'updated_field'. Required for 'update_project_items'; prefer it over calling 'update_project_item' in a loop. Each entry must match exactly one reference variant: 'node_id', numeric 'item_id', or 'item_owner' + 'item_repo' + 'issue_number'. Limit: " + strconv.Itoa(maxProjectItemsPerBatch) + " items per call.",
+						Items:       updateProjectItemsItemSchema(),
+			case projectsMethodUpdateProjectItems:
+				return updateProjectItemsBatch(ctx, client, gqlClient, owner, ownerType, projectNumber, args)

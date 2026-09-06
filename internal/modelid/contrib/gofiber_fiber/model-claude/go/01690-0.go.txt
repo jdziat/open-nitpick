@@ -1,0 +1,42 @@
+// commit 05b5a3aafa61 2026-07-14T11:59:58+00:00 helpers.go
+// quoteEscapeMask marks the lanes of w holding bytes quoteRawString must
+// escape: '\\', '"', any C0 control (including HTAB), or DEL. Lanes >= 0x80
+// are never marked; non-ASCII bytes pass through verbatim. This is
+// utils.IndexNonQuotable's RFC 9110 set widened by HTAB, which the RFC
+// permits as qdtext but this function has always percent-encoded.
+func quoteEscapeMask(w uint64) uint64 {
+	return swar.MatchByteMask(w, '\\') | swar.MatchByteMask(w, '"') |
+		swar.MatchRangeMask(w, 0x00, 0x1f) | swar.MatchByteMask(w, 0x7f)
+}
+
+// indexQuoteEscape returns the index of the first byte quoteEscapeMask
+// matches, or -1 if raw needs no escaping. It scans eight bytes at a time,
+// finishing inputs of 8+ bytes with one overlapping word; shorter inputs
+// are checked byte-wise.
+func indexQuoteEscape(raw string) int {
+	n := len(raw)
+	i := 0
+	for ; i+swar.WordLen <= n; i += swar.WordLen {
+		if m := quoteEscapeMask(swar.Load8(raw, i)); m != 0 {
+			return i + swar.FirstLane(m)
+		}
+	}
+	if i == n {
+		return -1
+	}
+	if n >= swar.WordLen {
+		if m := quoteEscapeMask(swar.Load8(raw, n-swar.WordLen)); m != 0 {
+			return n - swar.WordLen + swar.FirstLane(m)
+		}
+		return -1
+	}
+	for ; i < n; i++ {
+		if c := raw[i]; c == '\\' || c == '"' || c < 0x20 || c == 0x7f {
+			return i
+		}
+	}
+	return -1
+}
+
+	// buffer and the string allocation entirely.
+	end := indexQuoteEscape(raw)

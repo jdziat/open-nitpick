@@ -1,0 +1,73 @@
+// commit dc8f90e66e9a 2026-08-14T17:32:43+01:00 internal-packages/run-engine/src/engine/controlPlaneResolver.ts
+/**
+ * Optional dispatch filter threaded from the dequeue consumer. When present, the resolve fetches
+ * ONLY the task matching `taskIdentifier` and the queue matching `queue` (index point-lookups via
+ * `@@unique([workerId, slug])` / `@@unique([runtimeEnvironmentId, name])`) instead of the worker's
+ * whole task/queue set. Absent (any non-dequeue caller) keeps the full-set behaviour.
+ */
+export type WorkerVersionDispatchFilter = {
+  taskIdentifier?: string;
+  queue?: { lockedQueueId?: string | null; name: string };
+};
+
+  resolveWorkerVersion(
+    args: {
+      environmentId: string;
+      type: RuntimeEnvironmentType;
+      workerId?: string;
+    } & WorkerVersionDispatchFilter
+  ): Promise<ResolvedWorkerVersion | null>;
+type WorkerVersionWheres = {
+  taskWhere: { slug: string } | undefined;
+  queueWhere: { id: string } | { name: string } | undefined;
+};
+
+/** Build the nested-include `where`s for a dispatch filter (undefined = fetch the whole set). */
+export function workerVersionWheres(filter: WorkerVersionDispatchFilter): WorkerVersionWheres {
+  return {
+    taskWhere: filter.taskIdentifier ? { slug: filter.taskIdentifier } : undefined,
+    queueWhere: filter.queue
+      ? filter.queue.lockedQueueId
+        ? { id: filter.queue.lockedQueueId }
+        : { name: filter.queue.name }
+      : undefined,
+  };
+}
+
+  async resolveWorkerVersion(
+    args: {
+      environmentId: string;
+      type: RuntimeEnvironmentType;
+      workerId?: string;
+    } & WorkerVersionDispatchFilter
+  ): Promise<ResolvedWorkerVersion | null> {
+    const wheres = workerVersionWheres(args);
+      return workerId
+        ? this.#getWorkerById(workerId, wheres)
+        : this.#getMostRecentWorker(environmentId, wheres);
+      ? this.#getWorkerDeploymentFromWorker(workerId, wheres)
+      : this.#getManagedWorkerFromCurrentlyPromotedDeployment(environmentId, wheres);
+  async #getWorkerDeploymentFromWorker(
+    workerId: string,
+    wheres: WorkerVersionWheres
+  ): Promise<ResolvedWorkerVersion | null> {
+        tasks: { where: wheres.taskWhere, select: resolvedWorkerTaskSelect },
+        queues: { where: wheres.queueWhere, select: resolvedTaskQueueSelect },
+  async #getMostRecentWorker(
+    environmentId: string,
+    wheres: WorkerVersionWheres
+  ): Promise<ResolvedWorkerVersion | null> {
+        tasks: { where: wheres.taskWhere, select: resolvedWorkerTaskSelect },
+        queues: { where: wheres.queueWhere, select: resolvedTaskQueueSelect },
+  async #getWorkerById(
+    workerId: string,
+    wheres: WorkerVersionWheres
+  ): Promise<ResolvedWorkerVersion | null> {
+        tasks: { where: wheres.taskWhere, select: resolvedWorkerTaskSelect },
+        queues: { where: wheres.queueWhere, select: resolvedTaskQueueSelect },
+    environmentId: string,
+    wheres: WorkerVersionWheres
+                tasks: { where: wheres.taskWhere, select: resolvedWorkerTaskSelect },
+                queues: { where: wheres.queueWhere, select: resolvedTaskQueueSelect },
+            tasks: { where: wheres.taskWhere, select: resolvedWorkerTaskSelect },
+            queues: { where: wheres.queueWhere, select: resolvedTaskQueueSelect },

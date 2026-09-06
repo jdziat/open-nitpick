@@ -1,0 +1,36 @@
+// commit e95424515725 2026-08-26T12:05:07-06:00 api/export_pr.go
+func (issue *Issue) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
+			items := make([]map[string]any, 0, len(issue.ProjectItems.Nodes))
+				items = append(items, map[string]any{
+			items := make([]map[string]any, 0, len(issue.ClosedByPullRequestsReferences.Nodes))
+				items = append(items, map[string]any{
+					"repository": map[string]any{
+						"owner": map[string]any{
+				data[f] = map[string]any{
+			items := make([]map[string]any, 0, len(issue.SubIssues.Nodes))
+				items = append(items, map[string]any{
+			data[f] = map[string]any{
+			data[f] = map[string]any{
+			items := make([]map[string]any, 0, len(issue.BlockedBy.Nodes))
+				items = append(items, map[string]any{
+			data[f] = map[string]any{
+			items := make([]map[string]any, 0, len(issue.Blocking.Nodes))
+				items = append(items, map[string]any{
+			data[f] = map[string]any{
+func (pr *PullRequest) ExportData(fields []string) map[string]any {
+	data := map[string]any{}
+				checks := make([]any, 0, len(n[0].Commit.StatusCheckRollup.Contexts.Nodes))
+						checks = append(checks, map[string]any{
+						checks = append(checks, map[string]any{
+			commits := make([]any, 0, len(pr.Commits.Nodes))
+				authors := make([]any, 0, len(commit.Authors.Nodes))
+					authors = append(authors, map[string]any{
+				commits = append(commits, map[string]any{
+			items := make([]map[string]any, 0, len(pr.ProjectItems.Nodes))
+				items = append(items, map[string]any{
+			requests := make([]any, 0, len(pr.ReviewRequests.Nodes))
+			items := make([]map[string]any, 0, len(pr.ClosingIssuesReferences.Nodes))
+				items = append(items, map[string]any{
+					"repository": map[string]any{
+						"owner": map[string]any{

@@ -1,0 +1,109 @@
+// commit 7d8786cd8790 2025-12-23T23:55:50+08:00 packages/better-auth/src/plugins/admin/routes.ts
+import { APIError, BASE_ERROR_CODES } from "@better-auth/core/error";
+import { getSessionFromCtx } from "../../api";
+		throw APIError.fromStatus("UNAUTHORIZED");
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_CHANGE_USERS_ROLE,
+				);
+						throw APIError.from(
+							"BAD_REQUEST",
+							ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_SET_NON_EXISTENT_VALUE,
+						);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_GET_USER,
+				);
+				throw APIError.from("NOT_FOUND", BASE_ERROR_CODES.USER_NOT_FOUND);
+					throw APIError.from(
+						"FORBIDDEN",
+						ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_CREATE_USERS,
+					);
+				throw APIError.from("BAD_REQUEST", BASE_ERROR_CODES.INVALID_EMAIL);
+				throw APIError.from(
+					"BAD_REQUEST",
+					ADMIN_ERROR_CODES.USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL,
+				);
+				throw APIError.from(
+					"INTERNAL_SERVER_ERROR",
+					ADMIN_ERROR_CODES.FAILED_TO_CREATE_USER,
+				);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_UPDATE_USERS,
+				);
+				throw APIError.from("BAD_REQUEST", ADMIN_ERROR_CODES.NO_DATA_TO_UPDATE);
+					throw APIError.from(
+						"FORBIDDEN",
+						ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_CHANGE_USERS_ROLE,
+					);
+						throw APIError.from(
+							"BAD_REQUEST",
+							ADMIN_ERROR_CODES.INVALID_ROLE_TYPE,
+						);
+						throw APIError.from(
+							"BAD_REQUEST",
+							ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_SET_NON_EXISTENT_VALUE,
+						);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_LIST_USERS,
+				);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_LIST_USERS_SESSIONS,
+				);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_BAN_USERS,
+				);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_BAN_USERS,
+				);
+				throw APIError.from("NOT_FOUND", BASE_ERROR_CODES.USER_NOT_FOUND);
+				throw APIError.from(
+					"BAD_REQUEST",
+					ADMIN_ERROR_CODES.YOU_CANNOT_BAN_YOURSELF,
+				);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_IMPERSONATE_USERS,
+				);
+				throw APIError.from("NOT_FOUND", BASE_ERROR_CODES.USER_NOT_FOUND);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_CANNOT_IMPERSONATE_ADMINS,
+				);
+				throw APIError.from(
+					"INTERNAL_SERVER_ERROR",
+					ADMIN_ERROR_CODES.FAILED_TO_CREATE_USER,
+				);
+				throw APIError.fromStatus("UNAUTHORIZED");
+				throw APIError.fromStatus("BAD_REQUEST", {
+				throw APIError.fromStatus("INTERNAL_SERVER_ERROR", {
+				throw APIError.fromStatus("INTERNAL_SERVER_ERROR", {
+				throw APIError.fromStatus("INTERNAL_SERVER_ERROR", {
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_REVOKE_USERS_SESSIONS,
+				);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_REVOKE_USERS_SESSIONS,
+				);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_DELETE_USERS,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					ADMIN_ERROR_CODES.YOU_CANNOT_REMOVE_YOURSELF,
+				);
+				throw APIError.from("NOT_FOUND", BASE_ERROR_CODES.USER_NOT_FOUND);
+				throw APIError.from(
+					"FORBIDDEN",
+					ADMIN_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_SET_USERS_PASSWORD,
+				);
+				throw APIError.from("BAD_REQUEST", BASE_ERROR_CODES.PASSWORD_TOO_SHORT);
+				throw APIError.from("BAD_REQUEST", BASE_ERROR_CODES.PASSWORD_TOO_LONG);

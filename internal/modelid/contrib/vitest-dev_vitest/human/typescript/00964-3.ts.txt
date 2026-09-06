@@ -1,0 +1,77 @@
+// commit 19f6e8947072 2026-05-29T13:05:07+02:00 packages/vitest/src/node/cli/cli-api.ts
+
+  /**
+   * Only run benchmark projects, filtering out all other projects.
+   * Set automatically by `vitest bench`.
+   * @internal
+   */
+  benchmarkOnly?: boolean
+export async function startVitest(
+  cliFilters?: string[],
+  options?: CliOptions,
+  viteOverrides?: ViteUserConfig,
+  vitestOptions?: VitestOptions,
+): Promise<Vitest>
+/**
+ * @deprecated The `mode` argument is no longer used. Use `startVitest(cliFilters?, options?, viteOverrides?, vitestOptions?)` instead.
+ */
+  cliFilters?: string[],
+  options?: CliOptions,
+): Promise<Vitest>
+export async function startVitest(
+  modeOrCliFilters?: VitestRunMode | string[],
+  cliFiltersOrOptions?: string[] | CliOptions,
+  optionsOrViteOverrides?: CliOptions | ViteUserConfig,
+  viteOverridesOrVitestOptions?: ViteUserConfig | VitestOptions,
+  maybeVitestOptions?: VitestOptions,
+  let cliFilters: string[]
+  let options: CliOptions
+  let viteOverrides: ViteUserConfig | undefined
+  let vitestOptions: VitestOptions | undefined
+  if (typeof modeOrCliFilters === 'string') {
+    cliFilters = (cliFiltersOrOptions as string[] | undefined) ?? []
+    options = (optionsOrViteOverrides as CliOptions | undefined) ?? {}
+    viteOverrides = viteOverridesOrVitestOptions as ViteUserConfig | undefined
+    vitestOptions = maybeVitestOptions
+  }
+  else {
+    cliFilters = modeOrCliFilters ?? []
+    options = (cliFiltersOrOptions as CliOptions | undefined) ?? {}
+    viteOverrides = optionsOrViteOverrides as ViteUserConfig | undefined
+    vitestOptions = viteOverridesOrVitestOptions as VitestOptions | undefined
+  }
+  if (ctx._coverageOptions.enabled) {
+export async function prepareVitest(
+  options?: CliOptions,
+  viteOverrides?: ViteUserConfig,
+  vitestOptions?: VitestOptions,
+  cliFilters?: string[],
+): Promise<Vitest>
+/**
+ * @deprecated The `mode` argument is no longer used. Use `prepareVitest(options?, viteOverrides?, vitestOptions?, cliFilters?)` instead.
+ */
+  options?: CliOptions,
+): Promise<Vitest>
+export async function prepareVitest(
+  modeOrOptions?: VitestRunMode | CliOptions,
+  optionsOrViteOverrides?: CliOptions | ViteUserConfig,
+  viteOverridesOrVitestOptions?: ViteUserConfig | VitestOptions,
+  vitestOptionsOrCliFilters?: VitestOptions | string[],
+  maybeCliFilters?: string[],
+  let options: CliOptions
+  let viteOverrides: ViteUserConfig | undefined
+  let vitestOptions: VitestOptions | undefined
+  let cliFilters: string[] | undefined
+  if (typeof modeOrOptions === 'string') {
+    options = (optionsOrViteOverrides as CliOptions | undefined) ?? {}
+    viteOverrides = viteOverridesOrVitestOptions as ViteUserConfig | undefined
+    vitestOptions = vitestOptionsOrCliFilters as VitestOptions | undefined
+    cliFilters = maybeCliFilters
+  }
+  else {
+    options = modeOrOptions ?? {}
+    viteOverrides = optionsOrViteOverrides as ViteUserConfig | undefined
+    vitestOptions = viteOverridesOrVitestOptions as VitestOptions | undefined
+    cliFilters = vitestOptionsOrCliFilters as string[] | undefined
+  }
+  const ctx = await createVitest(options, viteOverrides, vitestOptions)

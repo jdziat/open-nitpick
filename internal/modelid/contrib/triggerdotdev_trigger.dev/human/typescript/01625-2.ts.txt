@@ -1,0 +1,95 @@
+// commit 8dc8e1b58b36 2026-08-14T15:11:30+01:00 internal-packages/run-engine/src/engine/controlPlaneResolver.ts
+/**
+ * The BackgroundWorkerTask columns the dequeue resolve path actually reads. The worker's
+ * whole task set (~73 rows) is fetched for one matched task, so pulling the unread heavy
+ * JSON columns (`payloadSchema`, `config`, `queueConfig`, `description`) shipped ~62KB/query
+ * on the hottest control-plane read. `machineConfig`/`retryConfig` are read at dequeue and stay.
+ */
+export type ResolvedWorkerTask = {
+  id: string;
+  slug: string;
+  machineConfig: Prisma.JsonValue | null;
+  retryConfig: Prisma.JsonValue | null;
+  maxDurationInSeconds: number | null;
+};
+
+/** The `select` that yields a `ResolvedWorkerTask`. */
+export const resolvedWorkerTaskSelect = {
+  id: true,
+  slug: true,
+  machineConfig: true,
+  retryConfig: true,
+  maxDurationInSeconds: true,
+} satisfies Prisma.BackgroundWorkerTaskSelect;
+
+/**
+ * The TaskQueue columns the dequeue resolve path uses: `id` and `name` (the matcher keys on
+ * `lockedQueueId`/`name`). Drops the unread `rateLimit` JSON and the concurrency/type scalars.
+ */
+export type ResolvedTaskQueue = {
+  id: string;
+  name: string;
+};
+
+/** The `select` that yields a `ResolvedTaskQueue`. */
+export const resolvedTaskQueueSelect = {
+  id: true,
+  name: true,
+} satisfies Prisma.TaskQueueSelect;
+
+/**
+ * The WorkerDeployment columns the dequeue resolve path reads: `id`, `friendlyId`,
+ * `imageReference`, `imagePlatform`. Drops the unread heavy JSON columns (`externalBuildData`,
+ * `buildServerMetadata`, `errorData`, `git`) that this single-row read otherwise ships.
+ */
+export type ResolvedWorkerDeployment = {
+  id: string;
+  friendlyId: string;
+  imageReference: string | null;
+  imagePlatform: string;
+};
+
+/** The `select` that yields a `ResolvedWorkerDeployment`. */
+export const resolvedWorkerDeploymentSelect = {
+  id: true,
+  friendlyId: true,
+  imageReference: true,
+  imagePlatform: true,
+} satisfies Prisma.WorkerDeploymentSelect;
+
+  tasks: ResolvedWorkerTask[];
+  queues: ResolvedTaskQueue[];
+  deployment: ResolvedWorkerDeployment | null;
+        deployment: { select: resolvedWorkerDeploymentSelect },
+        tasks: { select: resolvedWorkerTaskSelect },
+        queues: { select: resolvedTaskQueueSelect },
+        tasks: { select: resolvedWorkerTaskSelect },
+        queues: { select: resolvedTaskQueueSelect },
+        deployment: { select: resolvedWorkerDeploymentSelect },
+        tasks: { select: resolvedWorkerTaskSelect },
+        queues: { select: resolvedTaskQueueSelect },
+          select: {
+            ...resolvedWorkerDeploymentSelect,
+            type: true,
+                tasks: { select: resolvedWorkerTaskSelect },
+                queues: { select: resolvedTaskQueueSelect },
+      const { worker } = promotion.deployment;
+        worker,
+        tasks: worker.tasks,
+        queues: worker.queues,
+        deployment: {
+          id: promotion.deployment.id,
+          friendlyId: promotion.deployment.friendlyId,
+          imageReference: promotion.deployment.imageReference,
+          imagePlatform: promotion.deployment.imagePlatform,
+        },
+      select: {
+        ...resolvedWorkerDeploymentSelect,
+            tasks: { select: resolvedWorkerTaskSelect },
+            queues: { select: resolvedTaskQueueSelect },
+      deployment: {
+        id: latestV2Deployment.id,
+        friendlyId: latestV2Deployment.friendlyId,
+        imageReference: latestV2Deployment.imageReference,
+        imagePlatform: latestV2Deployment.imagePlatform,
+      },

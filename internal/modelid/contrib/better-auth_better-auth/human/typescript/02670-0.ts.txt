@@ -1,0 +1,142 @@
+// commit 44e04d4bbe0d 2026-08-04T21:00:23+00:00 packages/expo/src/client.ts
+} from "better-auth/cookies/utils";
+import type * as SecureStore from "expo-secure-store";
+/**
+ * Storage used by the Expo client for cookies and cached session data.
+ */
+export type ExpoClientStorage = Pick<
+	typeof SecureStore,
+	"setItem" | "setItemAsync" | "getItem" | "getItemAsync"
+>;
+
+	storage: ExpoClientStorage;
+export function getCookie(cookie: string | null) {
+	const parsed = safeJSONParse<Record<string, StoredCookie>>(cookie) ?? {};
+function getStorageWrites(key: string, value: string): [string, string][] {
+	if (value.length <= STORAGE_VALUE_LIMIT) {
+		return [[key, value]];
+	}
+
+	const count = Math.ceil(value.length / STORAGE_VALUE_LIMIT);
+	const writes: [string, string][] = [[key, ""]];
+	for (let i = 0; i < count; i++) {
+		const start = i * STORAGE_VALUE_LIMIT;
+		writes.push([
+			`${key}.${i}`,
+			value.slice(start, start + STORAGE_VALUE_LIMIT),
+		]);
+	}
+	writes.push([key, `${CHUNK_MARKER}${count}`]);
+	return writes;
+}
+
+export function storageAdapter(storage: ExpoClientStorage) {
+		getItemAsync: async (name: string): Promise<string | null> => {
+			const key = normalizeCookieName(name);
+			const stored = await storage.getItemAsync(key);
+			if (stored == null || !stored.startsWith(CHUNK_MARKER)) {
+				return stored;
+			}
+			const count = Number(stored.slice(CHUNK_MARKER.length));
+			if (!Number.isInteger(count) || count < 1) {
+				return null;
+			}
+			let value = "";
+			for (let i = 0; i < count; i++) {
+				const chunk = await storage.getItemAsync(`${key}.${i}`);
+				if (chunk == null) {
+					return null;
+				}
+				value += chunk;
+			}
+			return value;
+		},
+		setItem: (name: string, value: string): void => {
+				for (const [writeKey, writeValue] of getStorageWrites(key, value)) {
+					storage.setItem(writeKey, writeValue);
+			} catch (error) {
+				console.error(
+					`[better-auth/expo] failed to persist "${key}" to storage`,
+					error,
+				);
+			}
+		},
+		setItemAsync: async (name: string, value: string): Promise<void> => {
+			const key = normalizeCookieName(name);
+			try {
+				for (const [writeKey, writeValue] of getStorageWrites(key, value)) {
+					await storage.setItemAsync(writeKey, writeValue);
+	const storage = storageAdapter(opts.storage);
+	let sessionCacheHydration: Promise<void> | undefined;
+	const restoreSessionCache = async () => {
+		if (isWeb || opts?.disableCache) {
+			return;
+		}
+
+		const sessionAtom = store?.atoms.session;
+		if (!sessionAtom) {
+			return;
+		}
+		const initialSessionState = sessionAtom.get();
+		if (initialSessionState.data !== null) {
+			return;
+		}
+
+		const raw = await storage.getItemAsync(localCacheName);
+		const cached = raw
+			? safeJSONParse<{ user: User; session: Session }>(raw)
+			: null;
+		const expiresAt = cached?.session?.expiresAt;
+		const expiresAtMs = expiresAt ? new Date(expiresAt).getTime() : Number.NaN;
+		const fresh =
+			!!cached?.user?.id && !!cached.session?.id && expiresAtMs > Date.now();
+		if (fresh && sessionAtom.get() === initialSessionState) {
+			sessionAtom.set({
+				...initialSessionState,
+				data: cached,
+				error: null,
+			});
+		}
+	};
+	const hydrateSessionCache = () => {
+		if (!sessionCacheHydration) {
+			sessionCacheHydration = restoreSessionCache().catch((error) => {
+				sessionCacheHydration = undefined;
+				throw error;
+			});
+		}
+		return sessionCacheHydration;
+	};
+		await storage.setItemAsync(cookieName, "{}");
+		await storage.setItemAsync(localCacheName, "{}");
+				 * const cookie = await client.getCookie();
+				 * ```
+				getCookie: async () => {
+					const storedCookie = await storage.getItemAsync(cookieName);
+					return getCookie(storedCookie);
+						const { pathname } = new URL(context.request.url);
+								const prevCookie = await storage.getItemAsync(cookieName);
+									await storage.setItemAsync(cookieName, toSetCookie);
+									await storage.setItemAsync(cookieName, toSetCookie);
+						if (pathname.endsWith("/get-session") && !opts?.disableCache) {
+							await storage.setItemAsync(localCacheName, JSON.stringify(data));
+						if (pathname.endsWith("/sign-out")) {
+						const isSignInRequest =
+							pathname.endsWith("/sign-in") || pathname.includes("/sign-in/");
+						const isLinkSocialRequest = pathname.endsWith("/link-social");
+							(isSignInRequest || isLinkSocialRequest) &&
+							const storedCookieJson = await storage.getItemAsync(cookieName);
+							const prevCookie = await storage.getItemAsync(cookieName);
+							await storage.setItemAsync(cookieName, toSetCookie);
+					const { pathname } = new URL(url, options?.baseURL);
+					if (pathname.endsWith("/get-session")) {
+						await hydrateSessionCache();
+					}
+						const storedCookie = pathname.endsWith("/link-social")
+							? await storage.getItemAsync(cookieName)
+							: null;
+						const cookie = getCookie(storedCookie);
+						const storedCookie = await storage.getItemAsync(cookieName);
+						const cookie = getCookie(storedCookie);
+						if (pathname.endsWith("/sign-out")) {
+export { parseSetCookieHeader } from "better-auth/cookies/utils";

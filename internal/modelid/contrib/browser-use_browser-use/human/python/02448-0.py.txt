@@ -1,0 +1,61 @@
+# commit 3b6c5d11ba36 2025-08-29T20:24:13-07:00 browser_use/browser/python_highlights.py
+	"""Draw an enhanced bounding box with much bigger index containers and dashed borders."""
+	# Draw dashed bounding box with pattern: 1 line, 2 spaces, 1 line, 2 spaces...
+	dash_length = 4
+	gap_length = 8
+	line_width = 2
+
+	# Helper function to draw dashed line
+	def draw_dashed_line(start_x, start_y, end_x, end_y):
+		if start_x == end_x:  # Vertical line
+			y = start_y
+			while y < end_y:
+				dash_end = min(y + dash_length, end_y)
+				draw.line([(start_x, y), (start_x, dash_end)], fill=color, width=line_width)
+				y += dash_length + gap_length
+		else:  # Horizontal line
+			x = start_x
+			while x < end_x:
+				dash_end = min(x + dash_length, end_x)
+				draw.line([(x, start_y), (dash_end, start_y)], fill=color, width=line_width)
+				x += dash_length + gap_length
+
+	# Draw dashed rectangle
+	draw_dashed_line(x1, y1, x2, y1)  # Top
+	draw_dashed_line(x2, y1, x2, y2)  # Right
+	draw_dashed_line(x2, y2, x1, y2)  # Bottom
+	draw_dashed_line(x1, y2, x1, y1)  # Left
+
+	# Draw much bigger index overlay if we have index text
+			# Use much bigger font size for index (5x bigger base)
+			huge_font = None
+			font_size = 32  # Much bigger than the original 16
+				huge_font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', font_size)
+					huge_font = ImageFont.truetype('arial.ttf', font_size)
+					# Try system fonts on different platforms
+					try:
+						huge_font = ImageFont.truetype('Arial Bold.ttf', font_size)
+					except (OSError, IOError):
+						huge_font = font  # Fallback to original font
+
+			# Get text size with much bigger font
+			if huge_font:
+				bbox_text = draw.textbbox((0, 0), text, font=huge_font)
+			# Much bigger padding (5x bigger)
+			padding = 20
+			# Simple positioning logic: always top-left
+			# Inside if element is big enough, outside if too small
+			min_container_width = text_width + padding * 2
+			min_container_height = text_height + padding * 2
+
+			if element_width >= min_container_width and element_height >= min_container_height:
+				# Place inside top-left corner
+				# Place outside top-left corner
+				text_y = max(0, y1 - min_container_height)
+			# Ensure text stays within image bounds (use actual image size if available)
+			img_width, img_height = draw.im.size if hasattr(draw, 'im') else (2000, 1500)  # Larger default
+			text_x = max(0, min(text_x, img_width - min_container_width))
+			text_y = max(0, min(text_y, img_height - min_container_height))
+			# Draw much bigger background rectangle (5x bigger)
+			draw.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=color, outline='white', width=3)
+			draw.text((text_x, text_y), text, fill='white', font=huge_font or font)

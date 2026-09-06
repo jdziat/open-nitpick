@@ -1,0 +1,97 @@
+// commit b50a343da5d0 2026-03-04T09:01:15+01:00 pkg/github/params.go
+	"math"
+// toInt converts a value to int, handling both float64 and string representations.
+// Some MCP clients send numeric values as strings. It rejects NaN, ±Inf,
+// fractional values, and values outside the int range.
+func toInt(val any) (int, error) {
+	var f float64
+	switch v := val.(type) {
+	case float64:
+		f = v
+	case string:
+		var err error
+		f, err = strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid numeric value: %s", v)
+		}
+	default:
+		return 0, fmt.Errorf("expected number, got %T", val)
+	}
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, fmt.Errorf("non-finite numeric value")
+	}
+	if f != math.Trunc(f) {
+		return 0, fmt.Errorf("non-integer numeric value: %v", f)
+	}
+	if f > math.MaxInt || f < math.MinInt {
+		return 0, fmt.Errorf("numeric value out of int range: %v", f)
+	}
+	return int(f), nil
+}
+
+// toInt64 converts a value to int64, handling both float64 and string representations.
+// Some MCP clients send numeric values as strings. It rejects NaN, ±Inf,
+// fractional values, and values that lose precision in the float64→int64 conversion.
+func toInt64(val any) (int64, error) {
+	var f float64
+	switch v := val.(type) {
+	case float64:
+		f = v
+	case string:
+		var err error
+		f, err = strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid numeric value: %s", v)
+		}
+	default:
+		return 0, fmt.Errorf("expected number, got %T", val)
+	}
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, fmt.Errorf("non-finite numeric value")
+	}
+	if f != math.Trunc(f) {
+		return 0, fmt.Errorf("non-integer numeric value: %v", f)
+	}
+	result := int64(f)
+	// Check round-trip to detect precision loss for large int64 values
+	if float64(result) != f {
+		return 0, fmt.Errorf("numeric value %v is too large to fit in int64", f)
+	}
+	return result, nil
+}
+
+// 2. Checks if the parameter is of the expected type (float64 or numeric string).
+	v, ok := args[p]
+	if !ok {
+		return 0, fmt.Errorf("missing required parameter: %s", p)
+	}
+
+	result, err := toInt(v)
+		return 0, fmt.Errorf("parameter %s is not a valid number: %w", p, err)
+	}
+
+	if result == 0 {
+		return 0, fmt.Errorf("missing required parameter: %s", p)
+
+	return result, nil
+// 2. Checks if the parameter is of the expected type (float64 or numeric string).
+	val, ok := args[p]
+	if !ok {
+		return 0, fmt.Errorf("missing required parameter: %s", p)
+	}
+
+	result, err := toInt64(val)
+		return 0, fmt.Errorf("parameter %s is not a valid number: %w", p, err)
+	if result == 0 {
+		return 0, fmt.Errorf("missing required parameter: %s", p)
+
+// 2. If it is present, it checks if the parameter is of the expected type (float64 or numeric string) and returns it
+	val, ok := args[p]
+	if !ok {
+		return 0, nil
+	}
+
+	result, err := toInt(val)
+		return 0, fmt.Errorf("parameter %s is not a valid number: %w", p, err)
+
+	return result, nil

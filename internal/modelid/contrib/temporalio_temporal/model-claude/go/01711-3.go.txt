@@ -1,0 +1,53 @@
+// commit d83b12e87e4f 2026-08-18T18:17:32-07:00 service/history/shard/handover_tracker.go
+	"go.temporal.io/server/common/dynamicconfig"
+	ShardID                      int32
+	ClusterMetadata              cluster.Metadata
+	GetMaxReplicationTaskID      func() int64
+	ErrorByStateFn               func() error
+	NotifyReplicationFn          func(taskID int64)
+	NamespaceRegistry            namespace.Registry
+	Logger                       log.Logger
+	EventLogger                  otellog.Logger
+	EmitNamespaceLifecycleEvents dynamicconfig.BoolPropertyFn
+	handoverNamespaces           map[namespace.Name]*namespaceHandOverInfo
+	shardID                      int32
+	clusterMetadata              cluster.Metadata
+	getMaxReplicationTaskID      func() int64
+	errorByStateFn               func() error
+	notifyReplicationFn          func(taskID int64)
+	logger                       log.Logger
+	eventLogger                  otellog.Logger
+	emitNamespaceLifecycleEvents dynamicconfig.BoolPropertyFn
+			handoverNamespaces:           make(map[namespace.Name]*namespaceHandOverInfo),
+			shardID:                      params.ShardID,
+			clusterMetadata:              params.ClusterMetadata,
+			getMaxReplicationTaskID:      params.GetMaxReplicationTaskID,
+			errorByStateFn:               params.ErrorByStateFn,
+			notifyReplicationFn:          params.NotifyReplicationFn,
+			logger:                       params.Logger,
+			eventLogger:                  params.EventLogger,
+			emitNamespaceLifecycleEvents: params.EmitNamespaceLifecycleEvents,
+			if t.shouldEmitNamespaceLifecycleEvents() {
+				wideevents.EmitHandoverWatermarkRemoved(
+					t.eventLogger, t.shardID, nsName.String(), newNs.ID().String(),
+					removed.MaxReplicationTaskID, removed.NotificationVersion, deletedFromDB,
+				)
+			}
+			if t.shouldEmitNamespaceLifecycleEvents() {
+				wideevents.EmitHandoverWatermarkSet(
+					t.eventLogger, t.shardID, nsName.String(), newNs.ID().String(),
+					maxReplicationTaskID, handover.NotificationVersion,
+					maxReplicationTaskID == PendingMaxReplicationTaskID, wideevents.WatermarkUpdated,
+				)
+			}
+		if t.shouldEmitNamespaceLifecycleEvents() {
+			wideevents.EmitHandoverWatermarkSet(
+				t.eventLogger, t.shardID, nsName.String(), newNs.ID().String(),
+				maxReplicationTaskID, newNs.NotificationVersion(),
+				maxReplicationTaskID == PendingMaxReplicationTaskID, wideevents.WatermarkAdded,
+			)
+		}
+func (t *defaultHandoverTracker) shouldEmitNamespaceLifecycleEvents() bool {
+	return t.emitNamespaceLifecycleEvents != nil && t.emitNamespaceLifecycleEvents()
+}
+

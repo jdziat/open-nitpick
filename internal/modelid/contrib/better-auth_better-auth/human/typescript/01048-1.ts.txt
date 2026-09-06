@@ -1,0 +1,32 @@
+// commit 884d4f943af6 2026-01-12T04:22:06-08:00 packages/better-auth/src/db/internal-adapter.ts
+				const seenTokens = new Set<string>();
+				const sessions: Session[] = [];
+				for (const { token, expiresAt } of list) {
+					if (expiresAt <= now || seenTokens.has(token)) continue;
+					seenTokens.add(token);
+
+					const data = await secondaryStorage.get(token);
+					if (!data) continue;
+
+					const parsed = safeJSONParse<{
+						session: Session;
+						user: User;
+					}>(data);
+					if (!parsed) continue;
+
+					sessions.push(
+						parseSessionOutput(ctx.options, {
+							...parsed.session,
+							expiresAt: new Date(parsed.session.expiresAt),
+						}),
+					);
+									list = list.filter(
+										(session) =>
+											session.expiresAt > now && session.token !== data.token,
+									);
+								const sorted = [
+									...list,
+									{ token: data.token, expiresAt: data.expiresAt.getTime() },
+								].sort((a, b) => a.expiresAt - b.expiresAt);
+								const furthestSessionExp =
+									sorted.at(-1)?.expiresAt ?? data.expiresAt.getTime();

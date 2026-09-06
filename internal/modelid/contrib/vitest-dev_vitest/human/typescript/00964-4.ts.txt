@@ -1,0 +1,35 @@
+// commit 19f6e8947072 2026-05-29T13:05:07+02:00 packages/vitest/src/node/config/resolveConfig.ts
+  resolved.mode ??= viteConfig.mode ?? 'test'
+
+  resolved.benchmark = {
+    ...benchmarkConfigDefaults,
+    ...resolved.benchmark,
+  }
+
+  const fileParallelism = options.fileParallelism ?? true
+  // @ts-expect-error "reporter" is from CLI, should be absolute to the running directory
+  // it is passed down as "vitest --reporter ../reporter.js"
+  const reportersFromCLI = resolved.reporter
+  const cliReporters = toArray(reportersFromCLI || []).map(
+    (reporter: string) => {
+      // ./reporter.js || ../reporter.js, but not .reporters/reporter.js
+      if (/^\.\.?\//.test(reporter)) {
+        return resolve(process.cwd(), reporter)
+      }
+      return reporter
+    },
+  )
+  if (cliReporters.length) {
+    // When CLI reporters are specified, preserve options from config file
+    const configReportersMap = new Map<string, Record<string, unknown>>()
+    // Build a map of reporter names to their options from the config
+    for (const reporter of resolved.reporters) {
+      if (Array.isArray(reporter)) {
+        const [reporterName, reporterOptions] = reporter
+        if (typeof reporterName === 'string') {
+          configReportersMap.set(reporterName, reporterOptions as Record<string, unknown>)
+
+    resolved.reporters = Array.from(new Set(toArray(cliReporters)))
+      .filter(Boolean)
+      .map(reporter => [reporter, configReportersMap.get(reporter) || {}])
+    ??= options.fileParallelism ?? true

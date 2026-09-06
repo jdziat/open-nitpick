@@ -1,0 +1,33 @@
+// commit 2a1409fe88d4 2026-07-30T18:47:41-06:00 pkg/cmd/pr/diff/diff.go
+	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
+
+	AllowEscapeSequences bool
+
+			By default, terminal escape sequences in the diff are neutralized, since
+			they could manipulate your terminal. Pass %[1]s--allow-escape-sequences%[1]s to
+			print the diff verbatim, for example when piping a patch to another program.
+	cmd.Flags().BoolVar(&opts.AllowEscapeSequences, "allow-escape-sequences", false, "Allow printing terminal escape sequences")
+	// A terminal shows escape sequences inert through ContentOut; piped output is
+	// faithful, so a diff carrying escape sequences is refused rather than silently
+	// altered. --allow-escape-sequences streams raw on both. The colored path
+	// always neutralizes, since it is terminal-bound.
+	if opts.AllowEscapeSequences {
+		opts.IO.SetContentSanitization(false)
+		return changedFilesNames(opts.IO.ContentOut, diff)
+	}
+
+	if opts.UseColor {
+		return colorDiffLines(opts.IO.Out, sanitizedReader(diff))
+	if !opts.AllowEscapeSequences && !opts.IO.IsStdoutTTY() {
+		data, err := io.ReadAll(diff)
+		if err != nil {
+			return err
+		}
+		if iostreams.ContainsEscapeSequence(data) {
+			return errors.New("the diff contains terminal escape sequences; pass --allow-escape-sequences to output it anyway")
+		}
+		opts.IO.SetContentSanitization(false)
+		_, err = opts.IO.ContentOut.Write(data)
+	_, err = io.Copy(opts.IO.ContentOut, diff)
+	return err
+	return transform.NewReader(r, &asciisanitizer.Sanitizer{})

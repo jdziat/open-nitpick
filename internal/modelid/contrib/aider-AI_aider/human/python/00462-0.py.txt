@@ -1,0 +1,61 @@
+# commit 18f702b95ae0 2025-05-08T15:48:40-07:00 aider/utils.py
+    """
+    Minimal spinner that scans a single marker back and forth across a line.
+
+    The animation is pre-rendered into a list of frames.  If the terminal
+    cannot display unicode the frames are converted to plain ASCII.
+    """
+
+    def __init__(self, text: str, width: int = 7):
+        self.width = max(1, width)
+        self.last_update = 0.0
+        # Decide which characters to use
+        scan_char, trail_char = "≡", "─"
+        if not self._supports_unicode():
+            scan_char, trail_char = "#", "-"
+
+        # Build the animation frames
+        forward = [
+            f"[{trail_char * pos}{scan_char}{trail_char * (self.width - 1 - pos)}]"
+            for pos in range(self.width)
+        ]
+        self.frames = forward + forward[-2:0:-1]  # bounce back
+        self.frame_idx = 0
+        self.scan_char = scan_char
+        self.animation_len = len(self.frames[0])
+
+    def _supports_unicode(self) -> bool:
+        if not self.is_tty:
+            return False
+        try:
+            sys.stdout.write("∎\b \b")
+            sys.stdout.flush()
+            return True
+        except UnicodeEncodeError:
+            return False
+        except Exception:
+            return False
+
+    def _next_frame(self) -> str:
+        frame = self.frames[self.frame_idx]
+        self.frame_idx = (self.frame_idx + 1) % len(self.frames)
+        return frame
+
+    def step(self) -> None:
+        now = time.time()
+        if not self.visible and now - self.start_time >= 0.5:
+            self.last_update = 0.0
+        if not self.visible or now - self.last_update < 0.1:
+        self.last_update = now
+        frame = self._next_frame()
+        sys.stdout.write(f"\r{self.text} {frame}")
+        # Backspace cursor to the scanner character
+        pos_in_content = frame.find(self.scan_char) - 1  # exclude '['
+        chars_after_scanner = (self.width - 1) - pos_in_content
+        num_backspaces = max(0, chars_after_scanner + 2)  # +']' and extra
+        sys.stdout.write("\b" * num_backspaces)
+        sys.stdout.flush()
+    def end(self) -> None:
+            clear_len = len(self.text) + 1 + self.animation_len
+            sys.stdout.write("\r" + " " * clear_len + "\r")
+            sys.stdout.flush()

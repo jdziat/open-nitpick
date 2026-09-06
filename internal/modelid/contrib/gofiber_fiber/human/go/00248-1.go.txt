@@ -1,0 +1,38 @@
+// commit 6d1f7b26af66 2025-09-16T21:49:41+02:00 middleware/etag/etag.go
+var (
+	weakPrefix = []byte("W/")
+	crc32q     = crc32.MakeTable(0xD5828281)
+)
+
+// Generate returns a strong ETag for body.
+func Generate(body []byte) []byte {
+	if len(body) > math.MaxUint32 {
+		return nil
+	}
+	bb := bytebufferpool.Get()
+	defer bytebufferpool.Put(bb)
+	b := bb.B[:0]
+	b = append(b, '"')
+	b = appendUint(b, uint32(len(body))) // #nosec G115 -- length checked above
+	b = append(b, '-')
+	b = appendUint(b, crc32.Checksum(body, crc32q))
+	b = append(b, '"')
+	return append([]byte(nil), b...)
+}
+
+// GenerateWeak returns a weak ETag for body.
+func GenerateWeak(body []byte) []byte {
+	tag := Generate(body)
+	if tag == nil {
+		return nil
+	}
+	return append(weakPrefix, tag...)
+}
+
+	normalizedHeaderETag := []byte("Etag")
+		var etag []byte
+		if cfg.Weak {
+			etag = GenerateWeak(body)
+		} else {
+			etag = Generate(body)
+		}

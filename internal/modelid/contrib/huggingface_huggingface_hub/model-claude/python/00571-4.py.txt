@@ -1,0 +1,38 @@
+# commit 70e6fd9ecea0 2026-05-19T14:49:51+02:00 tests/test_utils_hf_uris.py
+    # --- '@' in filenames (literal, not a revision separator) -----------------
+    # Bucket with '@' in filename
+    (
+        "hf://buckets/my-org/my-bucket/file@1.txt",
+        HfUri(type="bucket", id="my-org/my-bucket", path_in_repo="file@1.txt"),
+        "hf://buckets/my-org/my-bucket/file@1.txt",
+    ),
+    # Bucket with '@' in nested path
+    (
+        "hf://buckets/my-org/my-bucket/sub/data@v2.bin",
+        HfUri(type="bucket", id="my-org/my-bucket", path_in_repo="sub/data@v2.bin"),
+        "hf://buckets/my-org/my-bucket/sub/data@v2.bin",
+    ),
+    # Repo with '@' in filename (no revision)
+    (
+        "hf://models/my-org/my-model/file@1.txt",
+        HfUri(type="model", id="my-org/my-model", path_in_repo="file@1.txt"),
+        "hf://models/my-org/my-model/file@1.txt",
+    ),
+    # Repo with '@' in nested path (no revision, implicit model type)
+    (
+        "hf://my-org/my-model/sub/data@v2.bin",
+        HfUri(type="model", id="my-org/my-model", path_in_repo="sub/data@v2.bin"),
+        "hf://models/my-org/my-model/sub/data@v2.bin",
+    ),
+    # Repo with explicit revision AND '@' in filename
+    (
+        "hf://models/my-org/my-model@main/file@1.txt",
+        HfUri(type="model", id="my-org/my-model", revision="main", path_in_repo="file@1.txt"),
+        "hf://models/my-org/my-model@main/file@1.txt",
+    ),
+    # '@' right after namespace/name is still a revision separator
+    (
+        "hf://a/b/c@v1",
+        HfUri(type="model", id="a/b", path_in_repo="c@v1"),
+        "hf://models/a/b/c@v1",
+    ),

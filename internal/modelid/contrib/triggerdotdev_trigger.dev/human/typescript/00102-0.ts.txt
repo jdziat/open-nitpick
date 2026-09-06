@@ -1,0 +1,37 @@
+// commit 0f3179f4933f 2025-06-26T15:13:26+01:00 apps/webapp/app/services/realtimeClient.server.ts
+export type RealtimeRequestOptions = {
+  skipColumns?: string[];
+};
+
+    requestOptions?: RealtimeRequestOptions,
+    return this.#streamRunsWhere(url, environment, `id='${runId}'`, requestOptions, clientVersion);
+    requestOptions?: RealtimeRequestOptions,
+    return this.#streamRunsWhere(url, environment, whereClause, requestOptions, clientVersion);
+    requestOptions?: RealtimeRequestOptions,
+    const response = await this.#streamRunsWhere(
+      url,
+      environment,
+      whereClause,
+      requestOptions,
+      clientVersion
+    );
+    requestOptions?: RealtimeRequestOptions,
+      requestOptions,
+    requestOptions?: RealtimeRequestOptions,
+    let skipColumns = getSkipColumns($url.searchParams, requestOptions);
+    if (skipColumns.length > 0) {
+      skipColumns = skipColumns.filter((c) => c !== "" && !RESERVED_COLUMNS.includes(c));
+
+function getSkipColumns(searchParams: URLSearchParams, requestOptions?: RealtimeRequestOptions) {
+  if (requestOptions?.skipColumns) {
+    return requestOptions.skipColumns;
+  }
+
+  const skipColumnsRaw = searchParams.get("skipColumns");
+
+  if (skipColumnsRaw) {
+    return skipColumnsRaw.split(",").map((c) => c.trim());
+  }
+
+  return [];
+}

@@ -1,0 +1,46 @@
+# commit db4c4e9b49a9 2025-08-08T04:13:44-07:00 tests/ci/test_registry.py
+	from browser_use.browser.events import NavigateToUrlEvent
+	browser_session.event_bus.dispatch(NavigateToUrlEvent(url=f'{base_url}/test'))
+	await asyncio.sleep(0.5)  # Wait for navigation
+			url = await browser_session.get_current_page_url()
+			return ActionResult(extracted_content=f'Text: {text}, URL: {url}')
+		from browser_use.browser.events import NavigateToUrlEvent
+		event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url=f'{base_url}/test', new_tab=True))
+		await event
+		from browser_use.browser.events import NavigateToUrlEvent
+		event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url=f'{base_url}/test', new_tab=True))
+		await event
+		from browser_use.browser.events import NavigateToUrlEvent
+		event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url=f'{base_url}/test', new_tab=True))
+		await event
+			url = await browser_session.get_current_page_url()
+				extracted_content=f'Text: {params.text}, Number: {params.number}, Flag: {params.optional_flag}, URL: {url}'
+		from browser_use.browser.events import NavigateToUrlEvent
+		event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url=f'{base_url}/test', new_tab=True))
+		await event
+			url = page.url
+				extracted_content=f'Text: {text}, URL: {url}, LLM: {llm_response.completion}, Files: {len(files)}'
+		from browser_use.browser.events import NavigateToUrlEvent
+		event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url=f'{base_url}/test', new_tab=True))
+		await event
+			return ActionResult(extracted_content=f'No params action executed on {url}')
+			url = await browser.get_current_page_url()
+			return ActionResult(extracted_content=f'Legacy browser: {text}, URL: {url}')
+			url = await browser_context.get_current_page_url()
+			return ActionResult(extracted_content=f'Legacy context: {text}, URL: {url}')
+		url = await browser_session.get_current_page_url()
+			return ActionResult(extracted_content=f'Direct page: {text}, URL: {url}')
+			url = await browser_session.get_current_page_url()
+			return ActionResult(extracted_content=f'Browser session: {text}, URL: {url}')
+			return ActionResult(extracted_content=f'Pydantic page: {params.message}, URL: {url}')
+			url = await browser_session.get_current_page_url()
+			return f'Helper processed: {data} on {url}'
+			url = await browser_session.get_current_page_url()
+			return ActionResult(extracted_content=f'Selected cell {cell_or_range} on {url}')
+			url = await browser_session.get_current_page_url()
+			return ActionResult(extracted_content=f'Base: {value} on {url}')
+			url = await browser_session.get_current_page_url()
+			return ActionResult(extracted_content=f'Selected cell {cell_or_range} on {url}')
+			url = await browser_session.get_current_page_url()
+			return ActionResult(extracted_content=f'Text: {text}, URL: {url}')
+			url = await browser_session.get_current_page_url()

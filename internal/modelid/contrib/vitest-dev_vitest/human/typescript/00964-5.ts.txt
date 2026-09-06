@@ -1,0 +1,41 @@
+// commit 19f6e8947072 2026-05-29T13:05:07+02:00 packages/vitest/src/node/core.ts
+import { getDefaultTestProject, resolveDefaultProjects, resolveProjects } from './projects/resolveProjects'
+import { createReporters } from './reporters/utils'
+   * new Vitest({
+  /**
+   * @deprecated Do not rely on this property, it's always `test`. Scheduled to be removed in the next major.
+   */
+  public readonly mode = 'test'
+
+  constructor(
+    cliOptions: UserConfig,
+    options?: VitestOptions,
+  )
+  /**
+   * @deprecated The `mode` argument is no longer used. Use `new Vitest(cliOptions, options)` instead.
+   */
+    mode: VitestRunMode,
+    options?: VitestOptions,
+  )
+  constructor(
+    modeOrCliOptions: VitestRunMode | UserConfig,
+    cliOptionsOrOptions?: UserConfig | VitestOptions,
+    maybeOptions?: VitestOptions,
+    let cliOptions: UserConfig
+    let options: VitestOptions
+    if (typeof modeOrCliOptions === 'string') {
+      cliOptions = cliOptionsOrOptions as UserConfig
+      options = maybeOptions ?? {}
+    }
+    else {
+      cliOptions = modeOrCliOptions
+      options = (cliOptionsOrOptions as VitestOptions) ?? {}
+    }
+    this.projects = await this.resolveProjects(this._cliOptions)
+    if (this._cliOptions.benchmarkOnly) {
+      this.projects = this.projects.filter(c => c.config.benchmark.enabled)
+    }
+    await Promise.all(this.projects.flatMap((project) => {
+    this.reporters = await createReporters(resolved.reporters, this)
+    return resolveDefaultProjects(this, new Set([project.name]), [project])
+          throw new FilesNotFoundError()

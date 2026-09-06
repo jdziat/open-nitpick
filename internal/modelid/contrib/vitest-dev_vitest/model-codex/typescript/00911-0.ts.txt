@@ -1,0 +1,53 @@
+// commit 4f7c2670cf59 2026-05-18T13:04:02+02:00 packages/ui/client/composables/client/static.ts
+import type { VitestClient, VitestClientRpc } from './ws'
+export interface HTMLReportMetadata {
+  testModules: {
+    projectName: string
+    moduleId: string
+    relativeModuleId: string
+  }[]
+  sourceCode: {
+    codeTable: string[]
+    testModules: { [projectName: string]: { [relativeModuleId: string]: number } }
+  }
+function deserializeReportMetadata(metadata: HTMLReportMetadata) {
+  const sourceCodes: { [moduleId: string]: string } = {}
+  for (const testModule of metadata.testModules) {
+    const codeIndex = metadata.sourceCode.testModules[testModule.projectName]?.[testModule.relativeModuleId]
+    if (codeIndex != null) {
+      sourceCodes[testModule.moduleId] = metadata.sourceCode.codeTable[codeIndex]
+    }
+  }
+  const rpc: VitestClientRpc = {
+    getFiles: async () => {
+    getConfig: async () => {
+    getUnhandledErrors: async () => {
+    readTestFile: async (id) => {
+      return sourceCodes[id]
+    getPaths: async () => [],
+    getResolvedProjectLabels: async () => [],
+    getExternalResult: async () => undefined,
+    getTransformResult: async () => undefined,
+    rerun: async () => {},
+    rerunTask: async () => {},
+    updateSnapshot: async () => {},
+    saveTestFile: async () => {},
+    getTestFiles: async () => [],
+  }
+  return rpc
+}
+export function createStaticClient(): VitestClient {
+  const ctx = reactive<VitestClient>({
+    ws: new EventTarget() as WebSocket,
+    state: new StateManager(),
+    rpc: undefined!,
+    reconnect: () => registerMetadata(),
+    waitForConnection: async () => {},
+  })
+  ctx.state.filesMap = reactive(ctx.state.filesMap)
+  ctx.state.idMap = reactive(ctx.state.idMap)
+    let metadata: HTMLReportMetadata
+      metadata = parse(decompressed)
+      metadata = parse(strFromU8(content))
+    ctx.rpc = deserializeReportMetadata(metadata)
+    ctx.ws.dispatchEvent(new Event('open'))

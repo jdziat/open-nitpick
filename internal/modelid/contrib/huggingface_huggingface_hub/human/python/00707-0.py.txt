@@ -1,0 +1,50 @@
+# commit 6f7dfbaa3f89 2026-06-29T18:22:03+02:00 tests/test_cache_layout.py
+import pytest
+
+from .testing_utils import repo_name
+@pytest.mark.production
+class TestCacheFileLayoutHfHubDownload:
+    @pytest.mark.skipif(os.name == "nt", reason="Symlinks are deactivated in Windows tests.")
+            with SoftTemporaryDirectory() as cache:
+                assert refs == [expected_reference]
+                assert snapshots == [snapshot_name]
+                assert len(snapshot_content) == 1
+                assert os.path.islink(snapshot_content_path)
+                assert blob_contents == "File 0"
+            with SoftTemporaryDirectory() as cache:
+                with pytest.raises(EntryNotFoundError):
+                assert refs == [expected_reference]
+                assert no_exist_snapshots == [snapshot_name]
+                assert len(no_exist_content) == 1
+                assert no_exist_content[0] == filename
+                assert content == ""
+            assert creation_time_0 == creation_time_1
+    @pytest.mark.skipif(os.name == "nt", reason="Symlinks are deactivated in Windows tests.")
+            assert creation_time_0 == creation_time_1
+    @pytest.mark.skipif(os.name == "nt", reason="Symlinks are deactivated in Windows tests.")
+            assert refs == ["file-2", "main"]
+            assert refs_contents == snapshots
+            assert snapshot_links[0] == snapshot_links[1]
+@pytest.mark.production
+class TestCacheFileLayoutSnapshotDownload:
+    @pytest.mark.skipif(os.name == "nt", reason="Symlinks are deactivated in Windows tests.")
+            assert refs == ["main"]
+            assert [ref_content] == snapshots
+            assert all([os.path.isfile(link) for link in resolved_snapshot_links])
+    @pytest.mark.skipif(os.name == "nt", reason="Symlinks are deactivated in Windows tests.")
+            assert refs == ["file-2", "file-3"]
+            assert refs_content == snapshots
+            assert len(all_links) == 8
+            assert len(all_unique_links) == 5
+class TestReferenceUpdates:
+    def test_update_reference(self, api: HfApi):
+        repo_id = api.create_repo(repo_name(), exist_ok=True).repo_id
+            api.upload_file(path_or_fileobj=BytesIO(b"Some string"), path_in_repo="file.txt", repo_id=repo_id)
+                assert refs == ["main"]
+                api.upload_file(
+                assert initial_ref_content != final_ref_content
+                assert os.path.isdir(os.path.join(expected_path, "snapshots", initial_ref_content))
+                assert os.path.isfile(os.path.join(expected_path, "snapshots", initial_ref_content, "file.txt"))
+                assert os.path.isdir(os.path.join(expected_path, "snapshots", final_ref_content))
+                assert os.path.isfile(os.path.join(expected_path, "snapshots", final_ref_content, "file.txt"))
+            api.delete_repo(repo_id)

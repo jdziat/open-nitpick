@@ -1,0 +1,64 @@
+# commit 6f7dfbaa3f89 2026-06-29T18:22:03+02:00 tests/test_cache_no_symlinks.py
+from pytest_mock import MockerFixture
+from .testing_utils import DUMMY_MODEL_ID
+@pytest.mark.production
+class TestCacheLayoutIfSymlinksNotSupported:
+    def test_are_symlinks_supported_default(self, mocker: MockerFixture) -> None:
+        mocker.patch(
+            "huggingface_hub.file_download._are_symlinks_supported_in_dir",
+            {HF_HUB_CACHE: True},
+        )
+        assert are_symlinks_supported()
+    def test_are_symlinks_supported_disabled_by_env(self, mocker: MockerFixture) -> None:
+        mocker.patch("huggingface_hub.file_download.constants.HF_HUB_DISABLE_SYMLINKS", True)
+        mocker.patch("huggingface_hub.file_download._are_symlinks_supported_in_dir", {HF_HUB_CACHE: True})
+        assert not are_symlinks_supported()
+    def test_are_symlinks_supported_windows_specific_dir(self, mocker: MockerFixture) -> None:
+        mock_symlink = mocker.patch("huggingface_hub.file_download.os.symlink")
+        mocker.patch("huggingface_hub.file_download._are_symlinks_supported_in_dir", {})
+        with pytest.warns(UserWarning):
+            assert not are_symlinks_supported(this_dir)
+            assert not are_symlinks_supported(this_dir.absolute())
+            assert are_symlinks_supported()  # True
+    def test_download_no_symlink_new_file(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        mock_are_symlinks_supported = mocker.patch("huggingface_hub.file_download.are_symlinks_supported")
+                cache_dir=tmp_path,
+        assert not filepath.is_symlink()
+        assert filepath.is_file()
+        assert len(list((Path(filepath).parents[2] / "blobs").glob("*"))) == 0
+    def test_download_no_symlink_existing_file(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        mock_are_symlinks_supported = mocker.patch("huggingface_hub.file_download.are_symlinks_supported")
+                cache_dir=tmp_path,
+        assert filepath.is_symlink()
+        assert blob_path.is_file()
+                cache_dir=tmp_path,
+        assert not new_filepath.is_symlink()
+        assert new_filepath.is_file()
+        assert blob_path.is_file()
+    def test_scan_and_delete_cache_no_symlinks(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        mock_are_symlinks_supported = mocker.patch("huggingface_hub.file_download.are_symlinks_supported")
+            cache_dir=tmp_path,
+            cache_dir=tmp_path,
+            cache_dir=tmp_path,
+            cache_dir=tmp_path,
+        report = scan_cache_dir(tmp_path)
+        assert len(report.repos) == 1
+        assert len(report.warnings) == 0
+        assert len(repo.revisions) == 2
+        assert repo.nb_files == 4
+        assert len(repo.refs) == 1  # only `main`
+        assert main_revision.nb_files == 2
+            assert main_revision.snapshot_path in file.blob_path.parents
+                assert older_revision.snapshot_path in file.blob_path.parents
+                assert older_revision.snapshot_path not in file.blob_path.parents
+                assert "blobs" in str(file.blob_path)
+        assert repo.size_on_disk == main_revision.size_on_disk + older_revision.size_on_disk
+        assert strategy_delete_repo.expected_freed_size == repo.size_on_disk
+        assert len(strategy_delete_repo.blobs) == 0
+        assert len(strategy_delete_repo.snapshots) == 0
+        assert len(strategy_delete_repo.refs) == 0
+        assert len(strategy_delete_repo.repos) == 1
+        assert strategy_delete_revision.blobs == {file.blob_path for file in older_revision.files}
+        assert strategy_delete_revision.snapshots == {older_revision.snapshot_path}
+        assert len(strategy_delete_revision.refs) == 0
+        assert len(strategy_delete_revision.repos) == 0

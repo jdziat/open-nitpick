@@ -1,0 +1,56 @@
+// commit 21c70ad67333 2025-07-02T11:30:13+01:00 internal-packages/run-engine/src/engine/systems/runAttemptSystem.ts
+  FlushedRunMetadata,
+import { tryCatch } from "@trigger.dev/core/utils";
+    await this.#notifyMetadataUpdated(runId, completion);
+
+  async #notifyMetadataUpdated(runId: string, completion: TaskRunExecutionResult) {
+    if (completion.metadata) {
+      this.$.eventBus.emit("runMetadataUpdated", {
+        time: new Date(),
+        run: {
+          id: runId,
+          metadata: completion.metadata,
+        },
+      });
+
+      return;
+    }
+
+    if (completion.flushedMetadata) {
+      const [packetError, packet] = await tryCatch(parsePacket(completion.flushedMetadata));
+
+      if (!packet) {
+        return;
+      }
+
+      if (packetError) {
+        this.$.logger.error("RunEngine.completeRunAttempt(): failed to parse flushed metadata", {
+          runId,
+          flushedMetadata: completion.flushedMetadata,
+          error: packetError,
+        });
+
+        return;
+      }
+
+      const metadata = FlushedRunMetadata.safeParse(packet);
+
+      if (!metadata.success) {
+        this.$.logger.error("RunEngine.completeRunAttempt(): failed to parse flushed metadata", {
+          runId,
+          flushedMetadata: completion.flushedMetadata,
+          error: metadata.error,
+        });
+
+        return;
+      }
+
+      this.$.eventBus.emit("runMetadataUpdated", {
+        time: new Date(),
+        run: {
+          id: runId,
+          metadata: metadata.data,
+        },
+      });
+    }
+  }

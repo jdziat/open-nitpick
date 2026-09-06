@@ -1,0 +1,87 @@
+# commit eaac6fee4ab0 2026-02-24T16:34:54+01:00 src/huggingface_hub/cli/_cli_utils.py
+import shutil
+import sys
+_ALIAS_SPLIT = re.compile(r"\s*\|\s*")
+
+
+    - supports aliases via pipe-separated names (e.g. ``name="list | ls"``).
+    def get_command(self, ctx: click.Context, cmd_name: str) -> Optional[click.Command]:
+        # Try exact match first
+        cmd = super().get_command(ctx, cmd_name)
+        if cmd is not None:
+            return cmd
+        # Fall back to alias lookup: check if cmd_name matches any alias
+        # taken from https://github.com/fastapi/typer/issues/132#issuecomment-2417492805
+        for registered_name, registered_cmd in self.commands.items():
+            aliases = _ALIAS_SPLIT.split(registered_name)
+            if cmd_name in aliases:
+                return registered_cmd
+        return None
+
+    def _alias_map(self) -> dict[str, list[str]]:
+        """Build a mapping from primary command name to its aliases (if any)."""
+        result: dict[str, list[str]] = {}
+        for registered_name in self.commands:
+            parts = _ALIAS_SPLIT.split(registered_name)
+            primary = parts[0]
+            result[primary] = parts[1:]
+        return result
+
+        alias_map = self._alias_map()
+            aliases = alias_map.get(name, [])
+            if aliases:
+                help_text = f"(alias: {', '.join(aliases)}) {help_text}"
+        # For aliased commands ("list | ls"), use the primary name (first entry).
+        primary_names: list[str] = []
+        for name in self.commands:
+            primary = _ALIAS_SPLIT.split(name)[0]
+            primary_names.append(primary)
+        return sorted(primary_names)
+    alignments: Optional[dict[str, str]] = None,
+        alignments: Optional mapping of header name to "left" or "right". Defaults to "left".
+    screaming_headers = [_to_header(h) for h in headers]
+    # Remap alignments keys to screaming case to match tabulate headers
+    screaming_alignments = {_to_header(k): v for k, v in (alignments or {}).items()}
+    print(tabulate(rows, headers=screaming_headers, alignments=screaming_alignments))
+    alignments: Optional[dict[str, str]] = None,
+        alignments: Optional mapping of header name to "left" or "right". Defaults to "left".
+    print_as_table(items, headers=headers, row_fn=row_fn, alignments=alignments)
+### STATUS LINE
+
+
+class StatusLine:
+    """Write transient grey status messages on a single line (TTY only).
+
+    Messages are written to stderr using carriage return to overwrite the previous status.
+    Does nothing when stderr is not a TTY (e.g. piped output) to avoid polluting output.
+    """
+
+    def __init__(self, enabled: bool = True):
+        self._active = enabled and sys.stderr.isatty()
+
+    def update(self, msg: str) -> None:
+        if not self._active:
+            return
+        width = shutil.get_terminal_size().columns
+        if len(msg) > width - 1:
+            msg = msg[: width - 4] + "..."
+        sys.stderr.write(f"\r\033[K{ANSI.gray(msg)}")
+        sys.stderr.flush()
+
+    def done(self, msg: str) -> None:
+        """Write a final status message for the current step and move to the next line."""
+        if not self._active:
+            return
+        width = shutil.get_terminal_size().columns
+        if len(msg) > width - 1:
+            msg = msg[: width - 4] + "..."
+        sys.stderr.write(f"\r\033[K{ANSI.gray(msg)}\n")
+        sys.stderr.flush()
+
+    def clear(self) -> None:
+        if not self._active:
+            return
+        sys.stderr.write("\r\033[K")
+        sys.stderr.flush()
+
+

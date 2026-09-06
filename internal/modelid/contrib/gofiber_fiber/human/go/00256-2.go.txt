@@ -1,0 +1,38 @@
+// commit 8136af2df941 2025-09-21T00:20:02+02:00 middleware/csrf/csrf.go
+	"fmt"
+				raw, err := getRawFromStorage(c, cookieToken, cfg, sessionManager, storageManager)
+				if err != nil {
+					return cfg.ErrorHandler(c, err)
+				}
+			raw, err := getRawFromStorage(c, extractedToken, cfg, sessionManager, storageManager)
+			if err != nil {
+				return cfg.ErrorHandler(c, err)
+			}
+				if err := deleteTokenFromStorage(c, extractedToken, cfg, sessionManager, storageManager); err != nil {
+					return cfg.ErrorHandler(c, err)
+				}
+		if err := createOrExtendTokenInStorage(c, token, cfg, sessionManager, storageManager); err != nil {
+			return cfg.ErrorHandler(c, err)
+		}
+func getRawFromStorage(c fiber.Ctx, token string, cfg Config, sessionManager *sessionManager, storageManager *storageManager) ([]byte, error) {
+		return sessionManager.getRaw(c, token, dummyValue), nil
+	}
+	raw, err := storageManager.getRaw(c, token)
+	if err != nil {
+		return nil, fmt.Errorf("csrf: failed to fetch token from storage: %w", err)
+	return raw, nil
+func createOrExtendTokenInStorage(c fiber.Ctx, token string, cfg Config, sessionManager *sessionManager, storageManager *storageManager) error {
+		return nil
+	}
+	if err := storageManager.setRaw(c, token, dummyValue, cfg.IdleTimeout); err != nil {
+		return fmt.Errorf("csrf: failed to store token in storage: %w", err)
+	return nil
+func deleteTokenFromStorage(c fiber.Ctx, token string, cfg Config, sessionManager *sessionManager, storageManager *storageManager) error {
+		return nil
+	}
+	if err := storageManager.delRaw(c, token); err != nil {
+		return fmt.Errorf("csrf: failed to delete token from storage: %w", err)
+	return nil
+	if err := deleteTokenFromStorage(c, cookieToken, handler.config, handler.sessionManager, handler.storageManager); err != nil {
+		return handler.config.ErrorHandler(c, err)
+	}

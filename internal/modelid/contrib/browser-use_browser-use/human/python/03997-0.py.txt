@@ -1,0 +1,152 @@
+# commit db832bcb837e 2026-02-01T20:26:50-08:00 tests/ci/test_structured_extraction.py
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: extraction_schema injection via special parameter
+# ---------------------------------------------------------------------------
+
+PRODUCT_SCHEMA = {
+	'type': 'object',
+	'properties': {
+		'products': {
+			'type': 'array',
+			'items': {
+				'type': 'object',
+				'properties': {
+					'name': {'type': 'string'},
+					'price': {'type': 'number'},
+				},
+				'required': ['name', 'price'],
+			},
+		},
+	},
+	'required': ['products'],
+}
+
+MOCK_PRODUCTS = {'products': [{'name': 'Widget A', 'price': 9.99}, {'name': 'Widget B', 'price': 19.99}]}
+
+
+class TestExtractionSchemaInjection:
+	"""Tests that extraction_schema injected as a special parameter triggers structured extraction."""
+
+	async def test_injected_extraction_schema_triggers_structured_path(self, browser_session, base_url):
+		"""extraction_schema passed via act() triggers structured extraction even without output_schema in params."""
+		tools = Tools()
+		await tools.navigate(url=f'{base_url}/products', new_tab=False, browser_session=browser_session)
+		await asyncio.sleep(0.5)
+
+		extraction_llm = _make_extraction_llm(structured_response=MOCK_PRODUCTS)
+
+		with tempfile.TemporaryDirectory() as tmp:
+			fs = FileSystem(tmp)
+			result = await tools.extract(
+				query='List all products with prices',
+				browser_session=browser_session,
+				page_extraction_llm=extraction_llm,
+				file_system=fs,
+				extraction_schema=PRODUCT_SCHEMA,
+			)
+
+		assert isinstance(result, ActionResult)
+		assert result.extracted_content is not None
+		assert '<structured_result>' in result.extracted_content
+
+		# Parse and verify JSON
+		start = result.extracted_content.index('<structured_result>') + len('<structured_result>')
+		end = result.extracted_content.index('</structured_result>')
+		parsed = json.loads(result.extracted_content[start:end].strip())
+		assert parsed == MOCK_PRODUCTS
+
+		assert result.metadata is not None
+		assert result.metadata['structured_extraction'] is True
+
+	async def test_output_schema_takes_precedence_over_extraction_schema(self, browser_session, base_url):
+		"""When the LLM provides output_schema in params, it should take precedence over injected extraction_schema."""
+		tools = Tools()
+		await tools.navigate(url=f'{base_url}/products', new_tab=False, browser_session=browser_session)
+		await asyncio.sleep(0.5)
+
+		# Different schema than the injected one — just a name list
+		param_schema = {
+			'type': 'object',
+			'properties': {
+				'names': {'type': 'array', 'items': {'type': 'string'}},
+			},
+			'required': ['names'],
+		}
+		param_response = {'names': ['Widget A', 'Widget B']}
+		extraction_llm = _make_extraction_llm(structured_response=param_response)
+
+		with tempfile.TemporaryDirectory() as tmp:
+			fs = FileSystem(tmp)
+			result = await tools.extract(
+				query='List product names',
+				output_schema=param_schema,
+				browser_session=browser_session,
+				page_extraction_llm=extraction_llm,
+				file_system=fs,
+				extraction_schema=PRODUCT_SCHEMA,  # should be ignored
+			)
+
+		assert isinstance(result, ActionResult)
+		assert result.extracted_content is not None
+		assert '<structured_result>' in result.extracted_content
+
+		start = result.extracted_content.index('<structured_result>') + len('<structured_result>')
+		end = result.extracted_content.index('</structured_result>')
+		parsed = json.loads(result.extracted_content[start:end].strip())
+		# Should match param_schema response, NOT PRODUCT_SCHEMA
+		assert parsed == param_response
+		assert result.metadata is not None
+		assert result.metadata['extraction_result']['schema_used'] == param_schema
+
+	async def test_no_schema_uses_freetext_path(self, browser_session, base_url):
+		"""When neither output_schema nor extraction_schema is provided, free-text path is used (backward compat)."""
+		tools = Tools()
+		await tools.navigate(url=f'{base_url}/products', new_tab=False, browser_session=browser_session)
+		await asyncio.sleep(0.5)
+
+		extraction_llm = _make_extraction_llm(freetext_response='Widget A costs $9.99')
+
+		with tempfile.TemporaryDirectory() as tmp:
+			fs = FileSystem(tmp)
+			result = await tools.extract(
+				query='What products are listed?',
+				browser_session=browser_session,
+				page_extraction_llm=extraction_llm,
+				file_system=fs,
+				# No extraction_schema, no output_schema
+			)
+
+		assert isinstance(result, ActionResult)
+		assert result.extracted_content is not None
+		assert '<result>' in result.extracted_content
+		assert '<structured_result>' not in result.extracted_content
+		assert result.metadata is None
+
+	async def test_extraction_schema_threads_through_act(self, browser_session, base_url):
+		"""extraction_schema passed to act() reaches extract() via the registry's special parameter injection."""
+		tools = Tools()
+		await tools.navigate(url=f'{base_url}/products', new_tab=False, browser_session=browser_session)
+		await asyncio.sleep(0.5)
+
+		extraction_llm = _make_extraction_llm(structured_response=MOCK_PRODUCTS)
+
+		with tempfile.TemporaryDirectory() as tmp:
+			fs = FileSystem(tmp)
+
+			# Build an ActionModel for the extract action
+			action_model = tools.registry.create_action_model()
+			action = action_model.model_validate({'extract': {'query': 'List products'}})
+
+			result = await tools.act(
+				action=action,
+				browser_session=browser_session,
+				page_extraction_llm=extraction_llm,
+				file_system=fs,
+				extraction_schema=PRODUCT_SCHEMA,
+			)
+
+		assert isinstance(result, ActionResult)
+		assert result.extracted_content is not None
+		assert '<structured_result>' in result.extracted_content

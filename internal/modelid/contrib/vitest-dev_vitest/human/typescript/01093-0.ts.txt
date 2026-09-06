@@ -1,0 +1,36 @@
+// commit d8b040c63aaf 2026-07-23T15:10:10+02:00 packages/vitest/src/node/environments/fetchModule.ts
+/**
+ * Tracks the wall time during which at least one transform is running.
+ * Durations of individual fetches cannot be summed instead: concurrent
+ * fetches (parallel workers, the vm pool graph prewarm) all wait on the same
+ * deduplicated in-flight transforms, so per-caller wall times overcount the
+ * actual work by orders of magnitude.
+ */
+export interface TransformClock {
+  transformStarted: () => void
+  transformFinished: () => void
+}
+
+    private clock: TransformClock,
+    this.clock.transformStarted()
+    try {
+      const moduleRunnerModule = await fetchModule(
+        environment,
+        url,
+        importer,
+        {
+          ...options,
+          inlineSourceMap: false,
+        },
+      ).catch(handleRollupError)
+
+      const result: VitestFetchResult = processResultSource(environment, moduleRunnerModule)
+      if ('code' in result) {
+        result.moduleType = await this.cachedModuleType(result.file, result.code, moduleGraphModule.transformResult)
+      }
+      return result
+    }
+    finally {
+      this.clock.transformFinished()
+  clock: TransformClock,
+  const fetcher = new ModuleFetcher(resolver, config, fsCache, clock, tmpProjectDir)

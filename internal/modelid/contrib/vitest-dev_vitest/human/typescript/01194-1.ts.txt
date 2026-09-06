@@ -1,0 +1,39 @@
+// commit afec5d7374cb 2026-08-18T08:48:33+02:00 packages/ui/client/composables/explorer/tree.ts
+    // TODO: Replace this bootstrap/run fallback with explicit lifecycle handling.
+      this.collect(true, false)
+      this.collect(true, false)
+  private collect(start: boolean, end: boolean) {
+    runCollect(
+      start,
+      end,
+      this.summary,
+      searchMatcher.value.matcher,
+      {
+        failed: filter.failed,
+        success: filter.success,
+        skipped: filter.skipped,
+        slow: filter.slow,
+        onlyTests: filter.onlyTests,
+      },
+      end ? this.executionTime : performance.now() - this.startTime,
+    )
+    runCollapseNode(id)
+    runExpandNode(id, searchMatcher.value.matcher, {
+      failed: filter.failed,
+      success: filter.success,
+      skipped: filter.skipped,
+      slow: filter.slow,
+      onlyTests: filter.onlyTests,
+    runCollapseAllTask()
+    runExpandAll(searchMatcher.value.matcher, {
+      failed: filter.failed,
+      success: filter.success,
+      skipped: filter.skipped,
+      slow: filter.slow,
+      onlyTests: filter.onlyTests,
+    runFilter(searchMatcher.value.matcher, {
+      failed: filter.failed,
+      success: filter.success,
+      skipped: filter.skipped,
+      slow: filter.slow,
+      onlyTests: filter.onlyTests,

@@ -1,0 +1,36 @@
+// commit 23415e28f0e2 2026-09-02T06:07:45+00:00 client/hooks.go
+	"bytes"
+var protocolCheck = regexp.MustCompile(`(?i)^https?://.*$`)
+	// Merge headers from the client. Each key is cleared first, so a request
+	// sent again does not carry every previous send's values as well.
+	for key := range c.header.All() {
+		req.RawRequest.Header.DelBytes(key)
+	}
+	// Merge headers from the request. A key set at both levels takes the
+	// request's values only: request-level headers override the client's.
+	for key := range req.header.All() {
+		req.RawRequest.Header.DelBytes(key)
+	}
+		if err := cookie.ParseBytes(value); err != nil {
+			// An attribute fasthttp cannot parse (a negative Max-Age, an
+			// Expires in another format) is ignored, not fatal (RFC 6265
+			// Section 5.2): keep the cookie's name and value on their own.
+			cookie.Reset()
+			pair, _, _ := bytes.Cut(value, []byte{';'})
+			if err := cookie.ParseBytes(pair); err != nil {
+				fasthttp.ReleaseCookie(cookie)
+				continue
+			}
+	if !c.isDebug || c.logger == nil {
+	// A streamed body is consumed by whoever reads it first, so only the
+	// headers are logged for one; String() would drain it before the caller.
+	if req.RawRequest.IsBodyStream() {
+		c.logger.Debugf("%s\n", req.RawRequest.Header.String())
+	} else {
+		c.logger.Debugf("%s\n", req.RawRequest.String())
+	}
+	if resp.RawResponse.IsBodyStream() {
+		c.logger.Debugf("%s\n", resp.RawResponse.Header.String())
+	} else {
+		c.logger.Debugf("%s\n", resp.RawResponse.String())
+	}

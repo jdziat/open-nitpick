@@ -1,0 +1,37 @@
+# commit 9e311dbc75ff 2026-04-14T14:28:21+02:00 src/huggingface_hub/cli/repos.py
+    FormatWithAutoOpt,
+from ._output import OutputFormatWithAuto, out
+        out.warning("`hf repo` is deprecated in favor of `hf repos`.")
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Repo created", repo_id=repo_url.repo_id, url=str(repo_url))
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Repo duplicated", from_id=from_id, to_id=repo_url.repo_id, url=str(repo_url))
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "-y",
+            "--yes",
+            help="Answer Yes to prompt automatically.",
+        ),
+    ] = False,
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.confirm(f"You are about to permanently delete {repo_type.value} '{repo_id}'. Proceed?", yes=yes)
+    out.result("Repo deleted", repo_id=repo_id)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Repo moved", from_id=from_id, to_id=to_id)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Repo settings updated", repo_id=repo_id)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Files deleted", repo_id=repo_id, commit_url=url)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Branch created", branch=branch, repo_type=repo_type.value, repo_id=repo_id)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Branch deleted", branch=branch, repo_type=repo_type.value, repo_id=repo_id)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Tag created", tag=tag, repo_type=repo_type_str, repo_id=repo_id)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    items = [{"name": t.name, "target_commit": t.target_commit, "ref": t.ref} for t in refs.tags]
+    out.table(items)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.text(f"You are about to delete tag {tag} on {repo_type_str} {repo_id}")
+    out.result("Tag deleted", tag=tag, repo_type=repo_type_str, repo_id=repo_id)

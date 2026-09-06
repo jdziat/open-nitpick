@@ -1,0 +1,60 @@
+# commit 5171916bb42e 2025-07-08T01:12:10-07:00 browser_use/browser/session.py
+	_subprocess: Any = PrivateAttr(default=None)  # Chrome subprocess reference for error handling
+		self.logger.debug(f'Found Chrome process args: {args[:5]}..., debug_port={debug_port}')
+				# First check if the Chrome process has exited
+				try:
+					chrome_process = psutil.Process(pid=self.browser_pid)
+					if not chrome_process.is_running():
+						# If we have a subprocess reference, try to get stderr
+						if hasattr(self, '_subprocess') and self._subprocess:
+							stderr_output = ''
+							if self._subprocess.stderr:
+								try:
+									stderr_bytes = await self._subprocess.stderr.read()
+									stderr_output = stderr_bytes.decode('utf-8', errors='replace')
+								except Exception:
+									pass
+							if 'Failed parsing extensions' in stderr_output:
+								self.logger.error(f'❌ Chrome process {self.browser_pid} exited: Failed parsing extensions')
+								raise RuntimeError('Failed parsing extensions: Chrome profile incompatibility detected')
+						self.logger.error(f'❌ Chrome process {self.browser_pid} exited unexpectedly')
+						self.browser_pid = None
+						return
+				except psutil.NoSuchProcess:
+					self.logger.error(f'❌ Chrome process {self.browser_pid} no longer exists')
+					self.browser_pid = None
+					return
+
+			# If HAR recording is requested, we need to create a new context with recording enabled
+			# Cannot reuse existing context as HAR recording must be configured at context creation
+			if self.browser_profile.record_har_path and self.browser.contexts:
+				self.logger.info('🎥 Creating new browser_context with HAR recording enabled (cannot reuse existing context)')
+				self.browser_context = await self.browser.new_context(
+					**self.browser_profile.kwargs_for_new_context().model_dump(mode='json')
+				)
+			elif self.browser.contexts:
+							stdout=asyncio.subprocess.PIPE,
+							stderr=asyncio.subprocess.PIPE,
+						# Store the subprocess reference for error handling
+						self._subprocess = process
+
+								# Chrome exited, try to read stderr for error message
+								stderr_output = ''
+								if process.stderr:
+									try:
+										stderr_bytes = await process.stderr.read()
+										stderr_output = stderr_bytes.decode('utf-8', errors='replace')
+									except Exception:
+										pass
+
+								# Check for common Chrome errors
+								if 'Failed parsing extensions' in stderr_output:
+									raise RuntimeError(
+										f'Failed parsing extensions: Chrome profile incompatibility detected. Chrome exited with code {process.returncode}'
+									)
+								elif stderr_output:
+									raise RuntimeError(
+										f'Chrome subprocess exited with code {process.returncode}. Error output: {stderr_output[:500]}'
+									)
+								else:
+									raise RuntimeError(f'Chrome subprocess exited with code {process.returncode}')

@@ -1,0 +1,265 @@
+// commit c115f440bc1c 2026-08-27T09:06:06+01:00 packages/core/src/v3/sessionStreams/manager.ts
+import type {
+  SessionChannelIO,
+  SessionStreamManager,
+  SessionStreamRecord,
+  SessionStreamRecordPredicate,
+} from "./types.js";
+/**
+ * A handler that sees the whole record rather than just its payload. Consumers
+ * that route by sequence number need the metadata, the same reason
+ * `onceRecord` exists alongside `once`.
+ */
+type SessionStreamRecordHandler = (record: SessionStreamRecord) => void | boolean | Promise<void>;
+
+type RegisteredHandler =
+  | { kind: "data"; fn: SessionStreamHandler }
+  | { kind: "record"; fn: SessionStreamRecordHandler };
+
+  resolve: (result: InputStreamOnceResult<SessionStreamRecord>) => void;
+  predicate?: SessionStreamRecordPredicate;
+  private handlers = new Map<string, Set<RegisteredHandler>>();
+  private buffer = new Map<string, SessionStreamRecord[]>();
+  // Sequence numbers for records that were delivered but not consumed.
+  // Kept separately from `buffer` so the committed cursor can be calculated
+  // without depending on buffer traversal.
+  private unconsumedSeqNums = new Map<string, Set<number>>();
+
+  // High-water mark of seq_nums that have been *consumed* (delivered to a
+  // once() waiter or shifted off the buffer into a once() caller) on a channel.
+  // `lastDispatchedSeqNum()` clamps this behind any unconsumed barrier before
+  // it is persisted on a turn-complete control record.
+    return this.#register(sessionId, io, { kind: "data", fn: handler });
+  }
+
+  /**
+   * Register a handler that receives the full record, including its sequence
+   * number. Same consume semantics as {@link on}: returning `true` consumes.
+   */
+  onRecord(
+    sessionId: string,
+    io: SessionChannelIO,
+    handler: SessionStreamRecordHandler
+  ): { off: () => void } {
+    return this.#register(sessionId, io, { kind: "record", fn: handler });
+  }
+
+  #register(
+    sessionId: string,
+    io: SessionChannelIO,
+    handler: RegisteredHandler
+  ): { off: () => void } {
+      const keptRecords: SessionStreamRecord[] = [];
+      for (const record of buffered) {
+        const consumed = this.#invokeHandler(handler, record);
+          this.#advanceLastDispatched(key, record.seqNum);
+          keptRecords.push(record);
+      this.#drainOnceWaitersFromBuffer(key);
+    const recordPromise = this.onceRecord(sessionId, io, options);
+    return new InputStreamOncePromise<unknown>((resolve, reject) => {
+      recordPromise.then((result) => {
+        resolve(result.ok ? { ok: true, output: result.output.data } : result);
+      }, reject);
+    });
+  }
+
+  onceRecord(
+    sessionId: string,
+    io: SessionChannelIO,
+    options?: InputStreamOnceOptions
+  ): InputStreamOncePromise<SessionStreamRecord> {
+    return this.#onceRecord(sessionId, io, undefined, options);
+  }
+
+  onceRecordWhere(
+    sessionId: string,
+    io: SessionChannelIO,
+    predicate: SessionStreamRecordPredicate,
+    options?: InputStreamOnceOptions
+  ): InputStreamOncePromise<SessionStreamRecord> {
+    return this.#onceRecord(sessionId, io, predicate, options);
+  }
+
+  #onceRecord(
+    sessionId: string,
+    io: SessionChannelIO,
+    predicate: SessionStreamRecordPredicate | undefined,
+    options?: InputStreamOnceOptions
+  ): InputStreamOncePromise<SessionStreamRecord> {
+    if (options?.timeoutMs === 0) {
+      const record = this.#takeBufferedRecord(key, predicate);
+      return new InputStreamOncePromise((resolve) => {
+        resolve(
+          record
+            ? { ok: true, output: record }
+            : { ok: false, error: new InputStreamTimeoutError(key, 0) }
+        );
+      });
+    }
+
+    const record = this.#takeBufferedRecord(key, predicate);
+    if (record) {
+        resolve({ ok: true, output: record });
+    return new InputStreamOncePromise<SessionStreamRecord>((resolve, reject) => {
+      const waiter: OnceWaiter = { resolve, reject, predicate };
+  #takeBufferedRecord(
+    key: string,
+    predicate: SessionStreamRecordPredicate | undefined
+  ): SessionStreamRecord | undefined {
+    const buffered = this.buffer.get(key);
+    if (!buffered || buffered.length === 0) return undefined;
+
+    const record = buffered[0]!;
+    if (predicate && !predicate(record)) return undefined;
+
+    buffered.shift();
+    if (buffered.length === 0) {
+      this.buffer.delete(key);
+    }
+    this.#advanceLastDispatched(key, record.seqNum);
+    this.#drainOnceWaitersFromBuffer(key);
+    return record;
+  }
+
+    return this.peekRecord(sessionId, io)?.data;
+  }
+
+  peekRecord(sessionId: string, io: SessionChannelIO): SessionStreamRecord | undefined {
+    return this.buffer.get(keyFor(sessionId, io))?.[0];
+  consumeRecord(sessionId: string, io: SessionChannelIO, seqNum: number): void {
+    const key = keyFor(sessionId, io);
+    const buffered = this.buffer.get(key);
+    const index = buffered?.findIndex((record) => record.seqNum === seqNum) ?? -1;
+
+    if (buffered && index !== -1) {
+      buffered.splice(index, 1);
+      if (buffered.length === 0) {
+        this.buffer.delete(key);
+      }
+    }
+
+    this.#advanceLastDispatched(key, seqNum);
+    this.#drainOnceWaitersFromBuffer(key);
+  }
+
+    const key = keyFor(sessionId, io);
+    const highWatermark = this.lastDispatchedSeqNums.get(key);
+    if (highWatermark === undefined) return undefined;
+
+    const unconsumedSeqNums = this.unconsumedSeqNums.get(key);
+    if (!unconsumedSeqNums || unconsumedSeqNums.size === 0) return highWatermark;
+
+    let earliestUnconsumedSeqNum = Infinity;
+    for (const seqNum of unconsumedSeqNums) {
+      earliestUnconsumedSeqNum = Math.min(earliestUnconsumedSeqNum, seqNum);
+    }
+
+    const safeCursor = Math.min(highWatermark, earliestUnconsumedSeqNum - 1);
+    return safeCursor >= 0 ? safeCursor : undefined;
+    if (!Number.isFinite(seqNum)) return;
+
+    this.#removeUnconsumedRecord(key, seqNum);
+    if (!Number.isFinite(seqNum)) return;
+  #markUnconsumedRecord(key: string, seqNum: number): void {
+    if (!Number.isFinite(seqNum)) return;
+
+    let unconsumedSeqNums = this.unconsumedSeqNums.get(key);
+    if (!unconsumedSeqNums) {
+      unconsumedSeqNums = new Set();
+      this.unconsumedSeqNums.set(key, unconsumedSeqNums);
+    }
+    unconsumedSeqNums.add(seqNum);
+  }
+
+  #removeUnconsumedRecord(key: string, seqNum: number): void {
+    const unconsumedSeqNums = this.unconsumedSeqNums.get(key);
+    unconsumedSeqNums?.delete(seqNum);
+    if (unconsumedSeqNums?.size === 0) {
+      this.unconsumedSeqNums.delete(key);
+    }
+  }
+
+      const record = buffered.shift()!;
+      this.#advanceLastDispatched(key, record.seqNum);
+      this.#drainOnceWaitersFromBuffer(key);
+  /**
+   * Re-open a channel that `disconnectStream` closed, without registering a
+   * new consumer. A single long-lived reader (the session channel router) has
+   * to be able to bring its own tail back after a suspend, and re-attaching
+   * its handler just to clear the suppression flag would replay the buffer at
+   * it.
+   */
+  reconnectStream(sessionId: string, io: SessionChannelIO): void {
+    const key = keyFor(sessionId, io);
+    this.explicitlyDisconnected.delete(key);
+    this.#ensureTailConnected(sessionId, io);
+  }
+
+    this.unconsumedSeqNums.clear();
+        // honor that until a fresh `on()` / `once()` re-attaches. Existing
+        // buffered records stay available across the suspension, but a
+        // run-level handler must not reconnect and receive another copy of
+        // the record being delivered through the waitpoint.
+          if (!Number.isFinite(seqNum)) return;
+          this.seqNums.set(key, seqNum);
+          this.#dispatch(key, {
+            id: part.recordId ?? part.id,
+            seqNum,
+            data,
+          });
+  #dispatch(key: string, record: SessionStreamRecord): void {
+    const existingBuffer = this.buffer.get(key);
+    const waiter =
+      existingBuffer && existingBuffer.length > 0 ? undefined : this.#takeOnceWaiter(key, record);
+    if (waiter) {
+      this.#advanceLastDispatched(key, record.seqNum);
+      waiter.resolve({ ok: true, output: record });
+      this.#invokeHandlers(key, record);
+    const consumed = this.#invokeHandlers(key, record);
+      this.#advanceLastDispatched(key, record.seqNum);
+    buffered.push(record);
+    this.#markUnconsumedRecord(key, record.seqNum);
+    this.#drainOnceWaitersFromBuffer(key);
+  }
+
+  #takeOnceWaiter(key: string, record: SessionStreamRecord): OnceWaiter | undefined {
+    const waiters = this.onceWaiters.get(key);
+    if (!waiters) return undefined;
+
+    const index = waiters.findIndex((waiter) => {
+      if (!waiter.predicate) return true;
+      try {
+        return waiter.predicate(record);
+      } catch (error) {
+        if (this.debug) {
+          console.error("[SessionStreamManager] Record predicate error:", error);
+        }
+        return false;
+      }
+    });
+    if (index === -1) return undefined;
+
+    const [waiter] = waiters.splice(index, 1);
+    if (waiters.length === 0) this.onceWaiters.delete(key);
+    if (waiter!.timeoutHandle) clearTimeout(waiter!.timeoutHandle);
+    if (waiter!.signal && waiter!.abortHandler) {
+      waiter!.signal.removeEventListener("abort", waiter!.abortHandler);
+    }
+    return waiter;
+  }
+
+  #drainOnceWaitersFromBuffer(key: string): void {
+    const buffered = this.buffer.get(key);
+    while (buffered && buffered.length > 0) {
+      const record = buffered[0]!;
+      const waiter = this.#takeOnceWaiter(key, record);
+      if (!waiter) return;
+
+      buffered.shift();
+      if (buffered.length === 0) this.buffer.delete(key);
+      this.#advanceLastDispatched(key, record.seqNum);
+      waiter.resolve({ ok: true, output: record });
+  #invokeHandlers(key: string, record: SessionStreamRecord): boolean {
+      if (this.#invokeHandler(handler, record)) {
+  #invokeHandler(handler: RegisteredHandler, record: SessionStreamRecord): boolean {
+      const result = handler.kind === "record" ? handler.fn(record) : handler.fn(record.data);

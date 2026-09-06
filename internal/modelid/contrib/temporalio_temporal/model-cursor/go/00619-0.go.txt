@@ -1,0 +1,31 @@
+// commit 11ca486581fc 2026-03-10T15:02:04-07:00 service/matching/workers/registry_impl.go
+		buckets            []*bucket                        // buckets for partitioning the keyspace
+		maxItemsFn         dynamicconfig.IntPropertyFn      // dynamic config for maximum entries
+		ttlFn              dynamicconfig.DurationPropertyFn // dynamic config for entry TTL
+		minEvictAgeFn      dynamicconfig.DurationPropertyFn // dynamic config for minimum evict age
+		evictionIntervalFn dynamicconfig.DurationPropertyFn // dynamic config for eviction interval
+		total              atomic.Int64                     // atomic counter of total entries
+		quit               chan struct{}                    // channel to signal shutdown of the eviction loop
+		seed               maphash.Seed                     // seed for the hasher, used to ensure consistent hashing
+		metricsHandler     metrics.Handler                  // metrics handler for recording registry metrics
+		metricsEmitter     *workerMetricsEmitter            // emitter for heartbeat-derived metrics
+		NumBuckets       dynamicconfig.IntPropertyFn
+		TTL              dynamicconfig.DurationPropertyFn
+		MinEvictAge      dynamicconfig.DurationPropertyFn
+		MaxItems         dynamicconfig.IntPropertyFn
+		EvictionInterval dynamicconfig.DurationPropertyFn
+		MetricsHandler   metrics.Handler
+		MetricsConfig    WorkerMetricsConfig
+		buckets:            make([]*bucket, params.NumBuckets()),
+		maxItemsFn:         params.MaxItems,
+		ttlFn:              params.TTL,
+		minEvictAgeFn:      params.MinEvictAge,
+		evictionIntervalFn: params.EvictionInterval,
+		seed:               maphash.MakeSeed(),
+		quit:               make(chan struct{}),
+		metricsHandler:     params.MetricsHandler,
+		metricsEmitter: &workerMetricsEmitter{
+			handler: params.MetricsHandler,
+			config:  params.MetricsConfig,
+		},
+	m.metricsEmitter.emit(nsName, workerHeartbeat)

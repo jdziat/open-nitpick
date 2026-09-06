@@ -1,0 +1,118 @@
+// commit 53cae592f616 2025-06-05T10:35:21-07:00 pkg/cmd/release/verify/verify.go
+	"net/http"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
+type VerifyOptions struct {
+	TagName  string
+	BaseRepo ghrepo.Interface
+	Exporter cmdutil.Exporter
+}
+
+type VerifyConfig struct {
+	HttpClient  *http.Client
+	IO          *iostreams.IOStreams
+	Opts        *VerifyOptions
+	AttClient   api.Client
+	AttVerifier shared.Verifier
+}
+
+func NewCmdVerify(f *cmdutil.Factory, runF func(config *VerifyConfig) error) *cobra.Command {
+	opts := &VerifyOptions{}
+
+		RunE: func(cmd *cobra.Command, args []string) error {
+				return fmt.Errorf("failed to determine base repository: %w", err)
+			opts.BaseRepo = baseRepo
+
+			httpClient, err := f.HttpClient()
+			io := f.IOStreams
+			attClient := api.NewLiveClient(httpClient, baseRepo.RepoHost(), att_io.NewHandler(io))
+			attVerifier := &shared.AttestationVerifier{
+				AttClient:  attClient,
+				HttpClient: httpClient,
+				IO:         io,
+			config := &VerifyConfig{
+				Opts:        opts,
+				HttpClient:  httpClient,
+				AttClient:   attClient,
+				AttVerifier: attVerifier,
+				IO:          io,
+				return runF(config)
+			return verifyRun(config)
+func verifyRun(config *VerifyConfig) error {
+	opts := config.Opts
+	baseRepo := opts.BaseRepo
+	tagName := opts.TagName
+	if tagName == "" {
+		release, err := shared.FetchLatestRelease(ctx, config.HttpClient, baseRepo)
+		tagName = release.TagName
+	// Retrieve the ref for the release tag
+	ref, err := shared.FetchRefSHA(ctx, config.HttpClient, baseRepo, tagName)
+	// Find attestaitons for the release tag SHA
+	attestations, err := config.AttClient.GetByDigest(api.FetchParams{
+		Digest:        releaseRefDigest.DigestWithAlg(),
+		PredicateType: shared.ReleasePredicateType,
+		Owner:         baseRepo.RepoOwner(),
+		Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
+		Limit:         10,
+	})
+		return fmt.Errorf("no attestations for tag %s (%s)", tagName, releaseRefDigest.DigestWithAlg())
+	// Filter attestations by tag name
+	filteredAttestations, err := shared.FilterAttestationsByTag(attestations, tagName)
+		return fmt.Errorf("error parsing attestations for tag %s: %w", tagName, err)
+		return fmt.Errorf("no attestations found for release %s in %s", tagName, baseRepo.RepoName())
+	if len(filteredAttestations) > 1 {
+		return fmt.Errorf("duplicate attestations found for release %s in %s", tagName, baseRepo.RepoName())
+	}
+	// Verify attestation
+	verified, err := config.AttVerifier.VerifyAttestation(releaseRefDigest, filteredAttestations[0])
+		return fmt.Errorf("failed to verify attestations for tag %s: %w", tagName, err)
+		return opts.Exporter.Write(config.IO, verified)
+	io := config.IO
+	cs := io.ColorScheme()
+	fmt.Fprintf(io.Out, "Resolved tag %s to %s\n", tagName, releaseRefDigest.DigestWithAlg())
+	fmt.Fprint(io.Out, "Loaded attestation from GitHub API\n")
+	fmt.Fprintf(io.Out, cs.Green("%s Release %s verified!\n"), cs.SuccessIcon(), tagName)
+	fmt.Fprintln(io.Out)
+	if err := printVerifiedSubjects(io, verified); err != nil {
+		return err
+	}
+func printVerifiedSubjects(io *iostreams.IOStreams, att *verification.AttestationProcessingResult) error {
+	cs := io.ColorScheme()
+	w := io.Out
+
+	statement := att.Attestation.Bundle.GetDsseEnvelope().Payload
+	var statementData v1.Statement
+
+	err := protojson.Unmarshal([]byte(statement), &statementData)
+	if err != nil {
+		return err
+	}
+
+	// If there aren't at least two subjects, there are no assets to display
+	if len(statementData.Subject) < 2 {
+		return nil
+	}
+
+	fmt.Fprintln(w, cs.Bold("Assets"))
+	table := tableprinter.New(io, tableprinter.WithHeader("Name", "Digest"))
+
+	for _, s := range statementData.Subject {
+		name := s.Name
+		digest := s.Digest
+
+		if name != "" {
+			digestStr := ""
+			for key, value := range digest {
+				digestStr = key + ":" + value
+
+			table.AddField(name)
+			table.AddField(digestStr)
+			table.EndRow()
+	err = table.Render()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(w)
+
+	return nil

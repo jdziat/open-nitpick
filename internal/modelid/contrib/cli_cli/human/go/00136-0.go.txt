@@ -1,0 +1,32 @@
+// commit 545b420ff880 2025-07-03T07:43:35+02:00 pkg/cmd/search/code/code.go
+	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	Config   func() (gh.Config, error)
+		Config:  f.Config,
+		// Convert legacy `filename` and `extension` elasticsearch qualifiers to Blackbird's `path`
+		// qualifier when opening web search.
+		if opts.Query.Qualifiers.Filename != "" || opts.Query.Qualifiers.Extension != "" {
+			cfg, err := opts.Config()
+			if err != nil {
+				return err
+			}
+			host, _ := cfg.Authentication().DefaultHost()
+			// FIXME: Remove this check once GHES supports Blackbird.
+			if host == ghinstance.Default() {
+				filename, extension, _ := strings.Cut(opts.Query.Qualifiers.Filename, ".")
+				if filename == "" {
+					filename = "*"
+				}
+				// Prioritize file extension that may have been provided with the `--filename` flag.
+				if extension == "" {
+					if opts.Query.Qualifiers.Extension != "" {
+						extension, _ = strings.CutPrefix(opts.Query.Qualifiers.Extension, ".")
+					} else {
+						extension = "*"
+					}
+				}
+				opts.Query.Qualifiers.Filename = ""
+				opts.Query.Qualifiers.Extension = ""
+				opts.Query.Qualifiers.Path = fmt.Sprintf("%s.%s", filename, extension)
+			}
+		}

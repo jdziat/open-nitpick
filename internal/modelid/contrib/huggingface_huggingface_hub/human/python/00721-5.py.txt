@@ -1,0 +1,51 @@
+# commit 7b53d234c37a 2026-07-03T10:28:39+02:00 src/huggingface_hub/cli/inference_endpoints.py
+import click
+from ._framework import Argument, Option
+    Argument(help="Endpoint name."),
+    Option(help="Endpoint name."),
+    Option(
+        raise click.exceptions.Exit(code=error.response.status_code) from error
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        raise click.exceptions.Exit(code=error.response.status_code) from error
+        raise click.exceptions.Exit(code=error.response.status_code) from error
+ie_cli.add_group(catalog_app, name="catalog")
+        raise click.exceptions.Exit(code=error.response.status_code) from error
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        raise click.exceptions.Exit(code=error.response.status_code) from error
+        Option("--yes", help="Skip confirmation prompts."),
+        raise click.exceptions.Exit(code=error.response.status_code) from error
+        raise click.exceptions.Exit(code=error.response.status_code) from error
+        Option(
+        raise click.exceptions.Exit(code=error.response.status_code) from error
+        raise click.exceptions.Exit(code=error.response.status_code) from error

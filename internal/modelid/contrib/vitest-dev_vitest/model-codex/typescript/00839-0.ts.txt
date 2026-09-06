@@ -1,0 +1,33 @@
+// commit 9229f2edc37f 2026-04-27T09:58:47+02:00 test/cli/test/static-collect.test.ts
+test('concurrent false cancels inherited concurrent', async () => {
+      test('not concurrent via options', { concurrent: false }, () => {})
+      describe('non-concurrent nested', { concurrent: false }, () => {
+        "non-concurrent nested": {
+          "not concurrent": {
+            "fullName": "concurrent suite > non-concurrent nested > not concurrent",
+            "location": "9:8",
+        "not concurrent via options": {
+          "errors": [],
+          "fullName": "concurrent suite > not concurrent via options",
+          "id": "-1732721377_0_1",
+          "location": "6:6",
+          "mode": "run",
+          "state": "pending",
+        },
+        "regular nested": {
+          "still concurrent": {
+            "concurrent": true,
+            "fullName": "concurrent suite > regular nested > still concurrent",
+            "id": "-1732721377_0_3_0",
+            "location": "13:8",
+      test('not concurrent via options', { concurrent: false }, () => {})
+        "not concurrent via options": {
+          "errors": [],
+          "fullName": "options tests > not concurrent via options",
+          "id": "-1732721377_0_4",
+          "location": "9:6",
+          "mode": "skip",
+          "state": "skipped",
+        },
+          "id": "-1732721377_0_5",
+          "location": "10:6",

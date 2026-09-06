@@ -1,0 +1,43 @@
+// commit 951902dff206 2026-08-23T16:35:33+02:00 middleware/redirect/redirect.go
+			n = scaledWidth(n, atom)
+			n = scaledWidth(n, atom)
+			n = scaledWidth(n, atom)
+			if !bounds.quantifies {
+				// Braces standing as text: the "{" is a byte like any other,
+				// and what it holds is measured rather than passed over.
+				atom, prev, quantified = 1, n, false
+				continue
+			}
+		term = scaledWidth(term, w)
+	return scaledWidth(prev, max(total, 1))
+// scaledWidth multiplies one width by another, saturating rather than wrapping.
+// Both stay at or below maxPatternWidth, but their product does not fit an int
+// where an int is thirty-two bits wide, and a product that wraps comes back
+// negative: on a 386 build "/p/[a-z][a-z][a-z][a-z][a-z][a-zA-Z]{1,2}" measured
+// -1405091840 and sorted ahead of the "/p/[a][a-z][a-z][a-z][a-z][a]" it contains.
+func scaledWidth(a, b int) int {
+	if a <= 0 || b <= 0 {
+		return 0
+	}
+	if a > maxPatternWidth/b {
+		return maxPatternWidth
+	}
+	return clampWidth(a * b)
+}
+
+// literal length needs of it. quantifies separates the braces that bound a
+// repetition from the ones standing as text, whose bounds say nothing either.
+	quantifies bool
+//
+// So is a "{" whose body spells no bound. Its braces and everything between them
+// are rule like any other and are walked rather than skipped: skipping them hid
+// the run in "/p/{x*}", which then sorted ahead of the "/p/[{][x]([a]+)[}]" it
+// contains.
+	bounds := quantifierRange(rule[i+1 : i+brace])
+	if !bounds.quantifies {
+		return i + 1, bounds
+	}
+	return i + brace + 1, bounds
+		return quantifierBounds{lo: m, hi: m, allowsNone: m == 0, quantifies: true}
+		return quantifierBounds{lo: m, allowsNone: m == 0, runsOn: true, quantifies: true}
+	return quantifierBounds{lo: m, hi: n, allowsNone: m == 0, quantifies: true}

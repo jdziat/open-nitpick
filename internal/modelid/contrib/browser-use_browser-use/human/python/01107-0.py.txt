@@ -1,0 +1,56 @@
+# commit b1aa20ae6425 2025-07-01T10:43:28+02:00 browser_use/dom/views.py
+from browser_use.dom.utils import cap_text_length
+DEFAULT_INCLUDE_ATTRIBUTES = [
+	'title',
+	'type',
+	# 'name',
+	'role',
+	'value',
+	'aria-label',
+	'placeholder',
+	'alt',
+	'aria-expanded',
+	'data-date-format',
+	'checked',
+	'data-state',
+	'aria-checked',
+]
+
+
+		if not include_attributes:
+			include_attributes = DEFAULT_INCLUDE_ATTRIBUTES
+
+					text = node.get_all_text_till_next_clickable_element()
+					attributes_html_str = None
+							key: str(value)
+							for key, value in node.attributes.items()
+							if key in include_attributes and str(value).strip() != ''
+						# If value of any of the attributes is the same as ANY other value attribute only include the one that appears first in include_attributes
+						# WARNING: heavy vibes, but it seems good enough for saving tokens (it kicks in hard when it's long text)
+
+						# Pre-compute ordered keys that exist in both lists (faster than repeated lookups)
+						ordered_keys = [key for key in include_attributes if key in attributes_to_include]
+
+						if len(ordered_keys) > 1:  # Only process if we have multiple attributes
+							keys_to_remove = set()  # Use set for O(1) lookups
+							seen_values = {}  # value -> first_key_with_this_value
+
+							for key in ordered_keys:
+								value = attributes_to_include[key]
+								if len(value) > 5:  # to not remove false, true, etc
+									if value in seen_values:
+										# This value was already seen with an earlier key, so remove this key
+										keys_to_remove.add(key)
+									else:
+										# First time seeing this value, record it
+										seen_values[value] = key
+
+							# Remove duplicate keys (no need to check existence since we know they exist)
+							for key in keys_to_remove:
+								del attributes_to_include[key]
+
+						if attributes_to_include.items():
+							attributes_html_str = ' '.join(
+								f'{key}={cap_text_length(value, 15)}' for key, value in attributes_to_include.items()
+							)
+						text = text.strip()

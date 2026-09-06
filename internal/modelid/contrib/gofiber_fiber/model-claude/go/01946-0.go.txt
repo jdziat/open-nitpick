@@ -1,0 +1,59 @@
+// commit 5212e9355ba3 2026-08-15T23:24:01+00:00 domain.go
+	// Each app's mount path is written under its own lock, and before the
+	// parent's is taken: an app registering a route reads it there, and it may
+	// be the parent itself when an app is mounted on itself.
+		mount.app.mutex.Lock()
+		mount.app.mutex.Unlock()
+	}
+
+	d.app.mutex.Lock()
+	// Support for configs of mounted-apps and sub-mounted-apps
+	for i := range pending {
+		mount := &pending[i]
+		recorded := d.app.newDomainMount(mount.app, mount.path, append(slices.Clone(mount.matchers), d.matcher), mount.ancestors)
+
+		d.app.mountFields.domainAppList = addDomainMount(d.app.mountFields.domainAppList, &recorded)
+	// Take a snapshot rather than holding the lock for the whole walk: it keeps
+	// this from ever holding two apps' locks at once. The routes are copied by
+	// value, not by pointer, because registering a route on a path src already
+	// serves appends to that route's handlers in place, and renaming one writes
+	// its name — a clone taken after the lock was released would race both.
+	// A mount placeholder is kept as it is: its target app is read from the
+	// group it carries, and the walk into it has to happen unlocked.
+	//
+	// The snapshot is indexed by dst's methods, not src's: an app is free to
+	// configure its own RequestMethods, and the two tables then neither line up
+	// nor have to be the same length.
+	type sourceRoute struct {
+		route *Route
+		owner *App
+	}
+
+	stack := make([][]sourceRoute, len(routes))
+		srcRoutes := src.routesForMethod(dst.method(m))
+		stack[m] = make([]sourceRoute, len(srcRoutes))
+
+		for i, route := range srcRoutes {
+			if route.mount {
+				stack[m][i] = sourceRoute{route: route}
+				continue
+			}
+
+			// src is itself a wrapper when the sub-app had domain mounts of its
+			// own, and already knows the real app behind each of its routes.
+			owner := src.routeOwner(route)
+			if owner == nil {
+				owner = src
+			}
+
+			stack[m][i] = sourceRoute{route: src.copyRoute(route), owner: owner}
+		}
+		for _, source := range stack[m] {
+			if source.route.mount {
+				group := source.route.group
+				if mounted[group] == nil {
+					mounted[group] = d.domainRoutes(dst, group.app, getGroupPath(pathPrefix, source.route.path), append(chain, src), autoHead)
+				routes[m] = append(routes[m], mounted[group][m]...)
+			clonedRoute := source.route
+			// and the path.
+			dst.markRouteOwner(clonedRoute, source.owner)

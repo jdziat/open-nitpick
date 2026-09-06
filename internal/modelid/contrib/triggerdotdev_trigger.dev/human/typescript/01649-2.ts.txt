@@ -1,0 +1,108 @@
+// commit e768d0a72433 2026-08-18T13:14:01+02:00 internal-packages/dashboard-agent/src/step-cache.test.ts
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { withCacheBreakpoint } from "./model-provider";
+    providerOptions: {
+      __cacheBreakpoint: { kind: "prefix" },
+      anthropic: { cacheControl: PROMPT_CACHE_CONTROL },
+    },
+      __cacheBreakpoint: { kind: "step" },
+      __cacheBreakpoint: { kind: "step" },
+
+  // A conversation resumed after this branch shipped can still carry a step
+  // breakpoint in the pre-discriminator shape. It must be stripped like any other.
+  it("strips a legacy step breakpoint on resume", () => {
+    const legacyStep: Message = {
+      role: "tool",
+      content: "ok",
+      providerOptions: { anthropic: { cacheControl: STEP_CACHE_CONTROL, keep: true } },
+    };
+    const marked = markStepCacheBreakpoint([turnHistory(), legacyStep, toolResult(20)]);
+
+    expect(ttlOf(marked[1])).toBeUndefined();
+    expect(marked[1]!.providerOptions).toEqual({ anthropic: { keep: true } });
+    expect(ttlOf(marked[0])).toBe("1h");
+  });
+});
+
+describe("the step cache breakpoint on Bedrock", () => {
+  let priorProvider: string | undefined;
+  beforeEach(() => {
+    priorProvider = process.env.DASHBOARD_AGENT_MODEL_PROVIDER;
+    process.env.DASHBOARD_AGENT_MODEL_PROVIDER = "bedrock";
+  });
+  afterEach(() => {
+    if (priorProvider === undefined) delete process.env.DASHBOARD_AGENT_MODEL_PROVIDER;
+    else process.env.DASHBOARD_AGENT_MODEL_PROVIDER = priorProvider;
+  });
+
+  function bedrockCachePoint(message: Message | undefined): { ttl?: unknown } | undefined {
+    return (message?.providerOptions?.bedrock as { cachePoint?: { ttl?: unknown } } | undefined)
+      ?.cachePoint;
+  }
+
+  function breakpointTag(message: Message | undefined): unknown {
+    return (message?.providerOptions?.__cacheBreakpoint as { kind?: unknown } | undefined)?.kind;
+  }
+
+  function prefixMarker(): Message {
+    return {
+      role: "user",
+      content: "why did run_1 fail?",
+      providerOptions: withCacheBreakpoint(undefined, "prefix"),
+    };
+  }
+
+  // Nothing undocumented reaches AWS: the wire cachePoint is a plain `{type:"default"}`
+  // for both markers. The prefix/step distinction lives only in the `__cacheBreakpoint` tag.
+  it("emits a plain cachePoint with no ttl for either marker", () => {
+    expect(bedrockCachePoint(prefixMarker())).toEqual({ type: "default" });
+    const step: Message = {
+      role: "tool",
+      content: "ok",
+      providerOptions: withCacheBreakpoint(undefined, "step"),
+    };
+    expect(bedrockCachePoint(step)).toEqual({ type: "default" });
+    expect(bedrockCachePoint(step)).not.toHaveProperty("ttl");
+    expect(breakpointTag(prefixMarker())).toBe("prefix");
+    expect(breakpointTag(step)).toBe("step");
+  });
+
+  // The turn-wide prefix marker sits on the last message; a short conversation never
+  // earns a step marker, so stripping the prefix would leave the history uncached.
+  it("keeps the turn-wide prefix cachePoint on a short conversation", () => {
+    const marked = markStepCacheBreakpoint([prefixMarker()]);
+
+    expect(bedrockCachePoint(marked.at(-1))).toEqual({ type: "default" });
+    expect(breakpointTag(marked.at(-1))).toBe("prefix");
+  });
+
+  it("rolls the per-step cachePoint onto the tail once it is worth caching", () => {
+    const marked = markStepCacheBreakpoint([prefixMarker(), toolResult(MIN_STEP_CACHE_CHARS)]);
+
+    expect(bedrockCachePoint(marked[0])).toEqual({ type: "default" });
+    expect(breakpointTag(marked[0])).toBe("prefix");
+    expect(bedrockCachePoint(marked.at(-1))).toEqual({ type: "default" });
+    expect(breakpointTag(marked.at(-1))).toBe("step");
+  });
+      __cacheBreakpoint: { kind: "step" },
+  it("reports Bedrock's write from its metadata and its read from the call's usage", () => {
+    const prior = process.env.DASHBOARD_AGENT_MODEL_PROVIDER;
+    process.env.DASHBOARD_AGENT_MODEL_PROVIDER = "bedrock";
+    try {
+      expect(
+        stepCacheAttributes(
+          2,
+          { bedrock: { usage: { cacheWriteInputTokens: 8_000 } } },
+          { inputTokenDetails: { cacheReadTokens: 12_000 } }
+        )
+      ).toEqual({
+        "dashboard_agent.step": 2,
+        "gen_ai.usage.cache_creation_input_tokens": 8_000,
+        "gen_ai.usage.cache_read_input_tokens": 12_000,
+      });
+    } finally {
+      if (prior === undefined) delete process.env.DASHBOARD_AGENT_MODEL_PROVIDER;
+      else process.env.DASHBOARD_AGENT_MODEL_PROVIDER = prior;
+    }
+  });
+

@@ -1,0 +1,50 @@
+// commit 7cfb3547285c 2025-11-26T11:24:23+01:00 pkg/lockdown/lockdown.go
+	client           *githubv4.Client
+	mu               sync.Mutex
+	cache            *cache2go.CacheTable
+	ttl              time.Duration
+	logger           *slog.Logger
+	trustedBotLogins map[string]struct{}
+			trustedBotLogins: map[string]struct{}{
+				"copilot": {},
+			},
+// IsSafeContent determines if the specified user can safely access the requested repository content.
+// Safe access applies when any of the following is true:
+// - the content was created by a trusted bot;
+// - the author currently has push access to the repository;
+// - the repository is private;
+// - the content was created by the viewer.
+
+	c.logDebug(ctx, fmt.Sprintf("evaluated repo access for user %s to %s/%s for content filtering, result: hasPushAccess=%t, isPrivate=%t",
+		username, owner, repo, repoInfo.HasPushAccess, repoInfo.IsPrivate))
+
+	if c.isTrustedBot(username) || repoInfo.IsPrivate || repoInfo.ViewerLogin == strings.ToLower(username) {
+			c.logDebug(ctx, fmt.Sprintf("repo access cache hit for user %s to %s/%s", username, owner, repo))
+
+		c.logDebug(ctx, "known users cache miss, fetching from graphql API")
+
+
+
+	c.logDebug(ctx, fmt.Sprintf("repo access cache miss for user %s to %s/%s", username, owner, repo))
+	c.logDebug(ctx, fmt.Sprintf("queried repo access info for user %s to %s/%s: isPrivate=%t, hasPushAccess=%t, viewerLogin=%s",
+		username, owner, repo, bool(query.Repository.IsPrivate), hasPush, query.Viewer.Login))
+
+func (c *RepoAccessCache) log(ctx context.Context, level slog.Level, msg string, attrs ...slog.Attr) {
+	if c == nil || c.logger == nil {
+		return
+	}
+	if !c.logger.Enabled(ctx, level) {
+		return
+	}
+	c.logger.LogAttrs(ctx, level, msg, attrs...)
+func (c *RepoAccessCache) logDebug(ctx context.Context, msg string, attrs ...slog.Attr) {
+	c.log(ctx, slog.LevelDebug, msg, attrs...)
+}
+
+func (c *RepoAccessCache) isTrustedBot(username string) bool {
+	_, ok := c.trustedBotLogins[strings.ToLower(username)]
+	return ok
+}
+
+func cacheKey(owner, repo string) string {
+	return fmt.Sprintf("%s/%s", strings.ToLower(owner), strings.ToLower(repo))

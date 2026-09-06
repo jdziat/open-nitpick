@@ -1,0 +1,48 @@
+// commit 69dc7bcde893 2026-02-23T13:48:09+00:00 apps/webapp/app/presenters/v3/DeploymentPresenter.server.ts
+import { VercelProjectIntegrationDataSchema } from "~/v3/vercel/vercelProjectIntegrationSchema";
+
+    // Look up Vercel integration data to construct a deployment URL
+    let vercelDeploymentUrl: string | undefined;
+    const vercelProjectIntegration =
+      await this.#prismaClient.organizationProjectIntegration.findFirst({
+        where: {
+          projectId: project.id,
+          deletedAt: null,
+          organizationIntegration: {
+            service: "VERCEL",
+            deletedAt: null,
+          },
+        },
+        select: {
+          integrationData: true,
+        },
+      });
+
+    if (vercelProjectIntegration) {
+      const parsed = VercelProjectIntegrationDataSchema.safeParse(
+        vercelProjectIntegration.integrationData
+      );
+
+      if (parsed.success && parsed.data.vercelTeamSlug) {
+        const integrationDeployment =
+          await this.#prismaClient.integrationDeployment.findFirst({
+            where: {
+              deploymentId: deployment.id,
+              integrationName: "vercel",
+            },
+            select: {
+              integrationDeploymentId: true,
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+          });
+
+        if (integrationDeployment) {
+          const vercelId = integrationDeployment.integrationDeploymentId;
+          vercelDeploymentUrl = `https://vercel.com/${parsed.data.vercelTeamSlug}/${parsed.data.vercelProjectName}/${vercelId}`;
+        }
+      }
+    }
+
+        vercelDeploymentUrl,

@@ -1,0 +1,43 @@
+// commit dcadeb75d49a 2025-09-05T12:44:21+01:00 pkg/cmd/agent-task/capi/sessions.go
+	"errors"
+var ErrSessionNotFound = errors.New("not found")
+
+// GetSession retrieves a specific agent session by ID.
+func (c *CAPIClient) GetSession(ctx context.Context, id string) (*Session, error) {
+	if id == "" {
+		return nil, fmt.Errorf("missing session ID")
+	}
+
+	url := fmt.Sprintf("%s/agents/sessions/%s", baseCAPIURL, url.PathEscape(id))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		if res.StatusCode == http.StatusNotFound {
+			return nil, ErrSessionNotFound
+		}
+		return nil, fmt.Errorf("failed to get session: %s", res.Status)
+	}
+
+	var rawSession session
+	if err := json.NewDecoder(res.Body).Decode(&rawSession); err != nil {
+		return nil, fmt.Errorf("failed to decode session response: %w", err)
+	}
+
+	sessions, err := c.hydrateSessionPullRequestsAndUsers([]session{rawSession})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch session resources: %w", err)
+	}
+
+	return sessions[0], nil
+}
+

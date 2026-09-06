@@ -1,0 +1,50 @@
+// commit 84f3e1b39c9f 2026-07-03T18:52:08+01:00 apps/webapp/app/runEngine/concerns/idempotencyKeys.server.ts
+import { runOpsLegacyPrisma, runOpsNewPrisma } from "~/db.server";
+import { isSplitEnabled } from "~/v3/runOpsMigration/splitMode.server";
+import { resolveRunIdMintKind } from "~/v3/engineVersion.server";
+import { resolveIdempotencyDedupClient } from "./idempotencyResidency.server";
+    // Probe and clears must hit the DB where the would-be run will physically live.
+    const dedupClient = await resolveIdempotencyDedupClient(
+      {
+        environmentForMint: {
+          organizationId: request.environment.organizationId,
+          id: request.environment.id,
+          orgFeatureFlags: request.environment.organization?.featureFlags,
+        },
+        parentRunFriendlyId: request.body.options?.parentRunId,
+      },
+      {
+        isSplitEnabled,
+        fallbackClient: this.prisma,
+        newClient: runOpsNewPrisma,
+        legacyClient: runOpsLegacyPrisma,
+        resolveMintKind: resolveRunIdMintKind,
+        // `isMigrated` is intentionally omitted: until a child of a swept
+        // legacy-id parent can be born on the new DB, the swept-marker override
+        // would never change the answer, so a child routes by parent id-shape.
+      }
+    );
+
+          dedupClient
+          dedupClient
+          dedupClient
+              tx: dedupClient,
+    // Gated on the same per-org mollifier flag the gate uses, and the same
+    // bypass list (debounce + oneTimeUseToken): if the gate would never mollify
+    // the request, there's no buffer to serialise against and PG's unique
+    // constraint already deduplicates concurrent same-key races. Skipping the
+    // claim's Redis SETNX keeps its RTT off the hot path for those requests
+    // during staged rollout. The org-flag check is a pure in-memory read of
+    // `Organization.featureFlags`, no DB query.
+          dedupClient
+        // Claim resolved to a runId nothing can find — the run was genuinely
+        // lost (claimant errored after publish, or both the PG row and buffer
+        // entry TTL'd out). Terminal, not transient, so falling through to a
+        // fresh trigger is the correct recovery.
+        // Falling through claimless doesn't duplicate runs: concurrent
+        // fall-throughs converge on one run via the same dedup backstops the
+        // claim layer relies on — PG's unique constraint on the idempotency key
+        // (pass-through path) and `accept`'s SETNX (mollify path). Once the
+        // first commits, later callers find it via the writer-PG / buffer
+        // lookups above despite the stale `resolved:` slot (cleared by its ~30s
+        // TTL). Residual cost is a few deduped trigger attempts, not dup runs.

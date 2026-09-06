@@ -1,0 +1,33 @@
+// commit 874e035b7c21 2026-06-12T12:39:33-07:00 service/history/worker_commands_task_dispatcher.go
+	workerpb "go.temporal.io/api/worker/v1"
+		d.recordCommandMetrics(task.Commands, namespaceName, "max_attempts_exceeded")
+	return d.dispatchToWorker(ctx, task, namespaceName)
+	namespaceName string,
+		d.recordCommandMetrics(task.Commands, namespaceName, "rpc_error")
+		d.recordCommandMetrics(task.Commands, namespaceName, "success")
+	return d.handleError(nexusErr, task, namespaceName)
+func (d *workerCommandsTaskDispatcher) handleError(nexusErr error, task *tasks.WorkerCommandsTask, namespaceName string) error {
+			d.recordCommandMetrics(task.Commands, namespaceName, "no_poller")
+			d.recordCommandMetrics(task.Commands, namespaceName, "non_retryable_error")
+		d.recordCommandMetrics(task.Commands, namespaceName, "transport_error")
+	d.recordCommandMetrics(task.Commands, namespaceName, "worker_error")
+
+func (d *workerCommandsTaskDispatcher) recordCommandMetrics(commands []*workerpb.WorkerCommand, namespaceName string, outcome string) {
+	for _, cmd := range commands {
+		metrics.WorkerCommandsSent.With(d.metricsHandler).Record(
+			1,
+			metrics.NamespaceTag(namespaceName),
+			metrics.OutcomeTag(outcome),
+			metrics.StringTag("command_type", workerCommandTypeName(cmd)),
+		)
+	}
+}
+
+func workerCommandTypeName(cmd *workerpb.WorkerCommand) string {
+	switch cmd.GetType().(type) {
+	case *workerpb.WorkerCommand_CancelActivity:
+		return "cancel_activity"
+	default:
+		return "unknown"
+	}
+}

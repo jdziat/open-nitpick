@@ -1,0 +1,62 @@
+// commit 00bfae330cbc 2025-12-19T11:01:46-05:00 client/frontend/metric_client_gen.go
+func (c *metricClient) GetActivityExecutionResult(
+	request *workflowservice.GetActivityExecutionResultRequest,
+) (_ *workflowservice.GetActivityExecutionResultResponse, retError error) {
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "FrontendClientGetActivityExecutionResult")
+	return c.client.GetActivityExecutionResult(ctx, request, opts...)
+func (c *metricClient) PauseActivityExecution(
+	ctx context.Context,
+	request *workflowservice.PauseActivityExecutionRequest,
+	opts ...grpc.CallOption,
+) (_ *workflowservice.PauseActivityExecutionResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "FrontendClientPauseActivityExecution")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.PauseActivityExecution(ctx, request, opts...)
+}
+
+func (c *metricClient) ResetActivityExecution(
+	ctx context.Context,
+	request *workflowservice.ResetActivityExecutionRequest,
+	opts ...grpc.CallOption,
+) (_ *workflowservice.ResetActivityExecutionResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "FrontendClientResetActivityExecution")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.ResetActivityExecution(ctx, request, opts...)
+}
+
+func (c *metricClient) UnpauseActivityExecution(
+	ctx context.Context,
+	request *workflowservice.UnpauseActivityExecutionRequest,
+	opts ...grpc.CallOption,
+) (_ *workflowservice.UnpauseActivityExecutionResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "FrontendClientUnpauseActivityExecution")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.UnpauseActivityExecution(ctx, request, opts...)
+}
+
+func (c *metricClient) UpdateActivityExecutionOptions(
+	ctx context.Context,
+	request *workflowservice.UpdateActivityExecutionOptionsRequest,
+	opts ...grpc.CallOption,
+) (_ *workflowservice.UpdateActivityExecutionOptionsResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "FrontendClientUpdateActivityExecutionOptions")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.UpdateActivityExecutionOptions(ctx, request, opts...)
+}
+

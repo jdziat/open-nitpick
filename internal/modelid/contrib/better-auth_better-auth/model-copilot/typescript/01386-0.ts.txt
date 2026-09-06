@@ -1,0 +1,54 @@
+// commit 1e30369b2c93 2026-02-16T12:35:18-08:00 packages/oauth-provider/src/authorize.ts
+
+import {
+	getClient,
+	getJwtPlugin,
+	isPKCERequired,
+	parsePrompt,
+	storeToken,
+} from "./utils";
+			return !validScopes?.has(scope);
+	// Check if PKCE is required for this client and scope
+	const pkceRequired = isPKCERequired(client, requestedScopes);
+
+	// Validate PKCE parameters if required
+	if (pkceRequired) {
+		if (!query.code_challenge || !query.code_challenge_method) {
+			throw ctx.redirect(
+				formatErrorURL(
+					query.redirect_uri,
+					"invalid_request",
+					pkceRequired.valueOf(),
+					query.state,
+					getIssuer(ctx, opts),
+				),
+			);
+		}
+	// If PKCE parameters are provided, validate them (even if not required)
+	if (query.code_challenge || query.code_challenge_method) {
+		// Both parameters must be provided together
+		if (!query.code_challenge || !query.code_challenge_method) {
+			throw ctx.redirect(
+				formatErrorURL(
+					query.redirect_uri,
+					"invalid_request",
+					"code_challenge and code_challenge_method must both be provided",
+					query.state,
+					getIssuer(ctx, opts),
+				),
+			);
+		}
+
+		// Check code challenge method is supported (only S256)
+		const codeChallengesSupported = ["S256"];
+		if (!codeChallengesSupported.includes(query.code_challenge_method)) {
+			throw ctx.redirect(
+				formatErrorURL(
+					query.redirect_uri,
+					"invalid_request",
+					"invalid code_challenge method, only S256 is supported",
+					query.state,
+					getIssuer(ctx, opts),
+				),
+			);
+		}

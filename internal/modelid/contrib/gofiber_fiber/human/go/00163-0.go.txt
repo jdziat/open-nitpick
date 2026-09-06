@@ -1,0 +1,33 @@
+// commit 059b1616caf4 2025-08-05T09:27:36+02:00 bind.go
+	"errors"
+	"sync"
+var bindPool = sync.Pool{
+	New: func() any {
+		return &Bind{
+			dontHandleErrs: true,
+		}
+	},
+}
+
+// AcquireBind returns Bind reference from bind pool.
+func AcquireBind() *Bind {
+	b, ok := bindPool.Get().(*Bind)
+	if !ok {
+		panic(errors.New("failed to type-assert to *Bind"))
+	}
+
+	return b
+}
+
+// ReleaseBind returns b acquired via Bind to bind pool.
+func ReleaseBind(b *Bind) {
+	b.release()
+	bindPool.Put(b)
+}
+
+func (b *Bind) release() {
+	b.ctx = nil
+	b.dontHandleErrs = true
+	b.skipValidation = false
+}
+

@@ -1,0 +1,95 @@
+# commit 52c718a54382 2025-10-23T14:48:03+02:00 utils/generate_async_inference_client.py
+
+    # Handle __enter__, __exit__, close
+    code = _remove_enter_exit_stack(code)
+
+    # Use _async_stream_text_generation_response
+            + "from .._common import _async_yield_from\n"
+            + "from huggingface_hub.utils import get_async_session\n"
+            + "from contextlib import AsyncExitStack\n"
+            + "import httpx\n"
+            client = await self._get_async_client()
+                response = await self.exit_stack.enter_async_context(
+                    client.stream(
+                        "POST",
+                        request_parameters.url,
+                        json=request_parameters.json,
+                        data=request_parameters.data,
+                        headers=request_parameters.headers,
+                        cookies=self.cookies,
+                        timeout=self.timeout,
+                    )
+                )
+                hf_raise_for_status(response)
+                return _async_yield_from(client, response)
+                response = await client.post(
+                    request_parameters.url,
+                    json=request_parameters.json,
+                    data=request_parameters.data,
+                    headers=request_parameters.headers,
+                    cookies=self.cookies,
+                    timeout=self.timeout,
+                )
+                hf_raise_for_status(response)
+                return response.content
+        except HfHubHTTPError as error:
+            if error.response.status_code == 422 and request_parameters.task != "unknown":
+                msg = str(error.args[0])
+                if len(error.response.text) > 0:
+                    msg += f"{os.linesep}{error.response.text}{os.linesep}"
+                error.args = (msg,) + error.args[1:]
+            """
+    # Update AsyncInferenceClient._inner_post() implementation
+    return code
+
+
+ENTER_EXIT_STACK_SYNC_CODE = """
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.exit_stack.close()
+
+    def close(self):
+        self.exit_stack.close()"""
+
+ENTER_EXIT_STACK_ASYNC_CODE = """
+    async def __aenter__(self):
+        return self
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.close()
+    async def close(self):
+        \"""Close the client.
+
+        This method is automatically called when using the client as a context manager.
+        \"""
+        await self.exit_stack.aclose()
+
+    async def _get_async_client(self):
+        \"""Get a unique async client for this AsyncInferenceClient instance.
+
+        Returns the same client instance on subsequent calls, ensuring proper
+        connection reuse and resource management through the exit stack.
+        \"""
+        if self._async_client is None:
+            self._async_client = await self.exit_stack.enter_async_context(get_async_session())
+        return self._async_client
+"""
+
+
+def _remove_enter_exit_stack(code: str) -> str:
+    code = code.replace(
+        "exit_stack = ExitStack()",
+        "exit_stack = AsyncExitStack()\n        self._async_client: Optional[httpx.AsyncClient] = None",
+    )
+    code = code.replace(ENTER_EXIT_STACK_SYNC_CODE, ENTER_EXIT_STACK_ASYNC_CODE)
+    return code
+    # Text-generation task has to be handled specifically since it has a recursive call mechanism (to retry on non-tgi servers)
+        "Iterable[",
+        "AsyncIterable[",
+    get_url_sync_snippet = """
+        response = get_session().get(url, headers=build_hf_headers(token=self.token))"""
+    get_url_async_snippet = """
+        client = await self._get_async_client()
+        response = await client.get(url, headers=build_hf_headers(token=self.token))"""
+    return code.replace(get_url_sync_snippet, get_url_async_snippet)

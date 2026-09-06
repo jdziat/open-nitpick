@@ -1,0 +1,37 @@
+// commit fb748cb2bf3a 2026-05-19T15:31:43+01:00 pkg/cmd/skills/preview/preview.go
+			The skill argument can be a name, a namespaced name (%[1]sauthor/skill%[1]s),
+			or an exact path within the repository (%[1]sskills/author/skill%[1]s,
+			%[1]spackages/agent-skills/code-review%[1]s, or any %[1]s.../SKILL.md%[1]s path).
+			Namespaced names with one slash are matched by name. Use a %[1]sSKILL.md%[1]s
+			suffix to force a one-directory path outside the standard conventions.
+
+			# Preview from a non-standard nested path (efficient, skips full discovery)
+			$ gh skill preview oracle/netsuite-suitecloud-sdk packages/agent-skills/netsuite-ai-connector-instructions
+
+	var skill discovery.Skill
+	if discovery.IsSkillPath(opts.SkillName) {
+		opts.IO.StartProgressIndicatorWithLabel("Looking up skill")
+		found, err := discovery.DiscoverSkillByPath(apiClient, hostname, owner, repoName, resolved.SHA, opts.SkillName)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		skill = *found
+	} else {
+		opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
+		allSkills, err := discovery.DiscoverSkillsWithOptions(apiClient, hostname, owner, repoName, resolved.SHA, discovery.DiscoverOptions{})
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		skills, err := filterHiddenDirSkills(opts, allSkills)
+		if err != nil {
+			return err
+		}
+		sort.Slice(skills, func(i, j int) bool {
+			return skills[i].DisplayName() < skills[j].DisplayName()
+		})
+		skill, err = selectSkill(opts, skills)
+		if err != nil {
+			return err
+		}

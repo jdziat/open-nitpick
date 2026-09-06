@@ -1,0 +1,34 @@
+// commit 84f3e1b39c9f 2026-07-03T18:52:08+01:00 apps/webapp/app/v3/services/alerts/performTaskRunAlerts.server.ts
+import { type RunStore } from "@internal/run-store";
+import { type PrismaClientOrTransaction, type prisma } from "~/db.server";
+import type { ControlPlaneResolver } from "~/v3/runOpsMigration/controlPlaneResolver.server";
+import { controlPlaneResolver as defaultControlPlaneResolver } from "~/v3/runOpsMigration/controlPlaneResolver.server";
+// The alert hydration reads only run-ops scalars (id/projectId/runtimeEnvironmentId); the env's
+// type (and its parent's) is resolved via the control-plane resolver so the run-ops DB can split
+// without a cross-provider join. The prior `lockedBy` + `runtimeEnvironment` includes were unused.
+  { select: { id: true; projectId: true; runtimeEnvironmentId: true } },
+  #controlPlaneResolver: ControlPlaneResolver;
+
+  constructor(
+    opts: {
+      prisma?: PrismaClientOrTransaction;
+      replica?: PrismaClientOrTransaction;
+      runStore?: RunStore;
+      controlPlaneResolver?: ControlPlaneResolver;
+    } = {}
+  ) {
+    super(opts.prisma, opts.replica, opts.runStore);
+    this.#controlPlaneResolver = opts.controlPlaneResolver ?? defaultControlPlaneResolver;
+  }
+
+        select: {
+          id: true,
+          projectId: true,
+          runtimeEnvironmentId: true,
+    const env = await this.#controlPlaneResolver.resolveEnv(run.runtimeEnvironmentId);
+
+    if (!env) {
+      return;
+    }
+
+          has: env.parentEnvironmentType ?? env.type,

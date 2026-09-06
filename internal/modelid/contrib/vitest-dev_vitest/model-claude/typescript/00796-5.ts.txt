@@ -1,0 +1,64 @@
+// commit d4fbb5cc9317 2026-04-09T09:23:59+02:00 packages/ui/client/components/artifacts/visual-regression/VisualRegression.spec.ts
+    const result = render(VisualRegression, {
+
+    expect(result.container).toMatchAriaInlineSnapshot(`
+      - article:
+        - heading "Visual Regression" [level=1]
+        - paragraph: /.*/
+        - tablist
+    `)
+    const result = render(VisualRegression, {
+          message: 'Happy testing!',
+    await expect.element(result.locator).toMatchAriaInlineSnapshot(`
+      - article:
+        - heading "Visual Regression" [level=1]
+        - paragraph: Happy testing!
+        - tablist:
+          - tab "Diff" [selected]
+        - tabpanel "Diff":
+          - link:
+            - /url: /.*/
+            - img
+    `)
+    const result = render(VisualRegression, {
+    expect(result.container).toMatchAriaInlineSnapshot(`
+      - article:
+        - heading "Visual Regression" [level=1]
+        - paragraph: /.*/
+        - tablist:
+          - tab "Reference" [selected]
+          - tab "Actual"
+          - tab "Slider"
+        - tabpanel "Reference":
+          - link:
+            - /url: /.*/
+            - img
+    `)
+    await expect.element(tablist.getByRole('tab', { selected: true })).toHaveTextContent('Slider')
+    expect(result.container).toMatchAriaInlineSnapshot(`
+      - article:
+        - heading "Visual Regression" [level=1]
+        - paragraph: /.*/
+        - tablist:
+          - tab "Reference"
+          - tab "Actual"
+          - tab "Slider" [selected]
+        - tabpanel "Slider":
+          - slider "Adjust slider to compare reference and actual images": "50"
+          - status: Showing 50% reference, 50% actual
+    `)
+    const result = render(VisualRegression, {
+    expect(result.container).toMatchAriaInlineSnapshot(`
+      - article:
+        - heading "Visual Regression" [level=1]
+        - paragraph: /.*/
+        - tablist:
+          - tab "Diff" [selected]
+          - tab "Reference"
+          - tab "Actual"
+          - tab "Slider"
+        - tabpanel "Diff":
+          - link:
+            - /url: /.*/
+            - img
+    `)

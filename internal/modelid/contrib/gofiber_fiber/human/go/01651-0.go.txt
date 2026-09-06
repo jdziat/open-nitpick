@@ -1,0 +1,134 @@
+// commit e8d21b8b0250 2026-07-08T13:25:35+05:30 helpers.go
+// Match specificity levels returned by the acceptsX helpers. A higher value
+// means the range matched the offer more specifically. They only need to be
+// ordered consistently within a single helper (each getOffer call uses one
+// helper), so an explicit q=0 rejection can override a positive match of the
+// same or lower specificity per RFC 9110 §12.5.1.
+const (
+	matchWildcard = 1 // "*" / trailing-"*" prefix / language "*"
+	matchPrefix   = 2 // language subtag prefix, e.g. "en" matching "en-US"
+	matchExact    = 3 // exact, case-insensitive match
+
+	// Media ranges rank by their coarse class first and by the number of
+	// matched media-type parameters second, so "text/html;level=1" outranks
+	// "text/html", which outranks "text/*", which outranks "*/*".
+	matchMediaAny         = 1 // "*/*"
+	matchMediaTypeAny     = 2 // "type/*"
+	matchMediaTypeSubtype = 3 // "type/subtype"
+	mediaSpecificityScale = 100
+)
+
+// It returns the match specificity (0 = no match, higher = more specific): a
+// wildcard/prefix match is less specific than an exact match. The specificity is
+// used to let an explicit q=0 rejection override a less specific positive match
+// of the same coarse class (RFC 9110 §12.5.1).
+func acceptsOffer(spec, offer string, _ headerParams) int {
+			return 0
+		}
+		if utils.EqualFold(prefix, offer[:len(prefix)]) {
+			return matchWildcard
+		return 0
+	if utils.EqualFold(spec, offer) {
+		return matchExact
+	}
+	return 0
+// It returns the match specificity (0 = no match): "*" is least specific, a
+// prefix match ("en" for "en-US") is more specific, and an exact match is most
+// specific — so an explicit "en-US;q=0" can override a positive "en".
+func acceptsLanguageOfferBasic(spec, offer string, _ headerParams) int {
+		return matchWildcard
+		return 0
+		return matchExact
+	if len(offer) > len(spec) &&
+		offer[len(spec)] == '-' {
+		return matchPrefix
+	}
+	return 0
+// It returns the match specificity (0 = no match): a bare "*" is least specific,
+// and otherwise the specificity grows with the number of concrete range subtags
+// that had to match, so a deeper range (e.g. "en-US") outranks a shorter one
+// ("en") and an explicit "en-US;q=0" can override a positive "en".
+func acceptsLanguageOfferExtended(spec, offer string, _ headerParams) int {
+		return matchWildcard
+		return 0
+		return 0
+			return 0
+			return 0
+
+	// 4: matched all range subtags. Rank by the number of concrete (non-"*")
+	// range subtags so a more specific range wins the specificity comparison.
+	specificity := matchWildcard
+	for _, sub := range rs {
+		if sub != "*" {
+			specificity++
+		}
+	}
+	return specificity
+// It returns the match specificity (0 = no match): "*/*" is least specific,
+// then "type/*", then "type/subtype", and matched media-type parameters break
+// ties so "text/html;level=1" outranks "text/html" (letting "text/html;level=1;q=0"
+// override a positive "text/html").
+func acceptsOfferType(spec, offerType string, specParams headerParams) int {
+		return mediaMatchSpecificity(matchMediaAny, specParams, offerParams)
+		return mediaMatchSpecificity(matchMediaTypeSubtype, specParams, offerParams)
+			return mediaMatchSpecificity(matchMediaTypeAny, specParams, offerParams)
+	return 0
+}
+
+// mediaMatchSpecificity returns the specificity of a media range that matched an
+// offer's type/subtype, or 0 when the media-type parameters don't match. The
+// coarse class dominates; the count of matched parameters breaks ties.
+func mediaMatchSpecificity(base int, specParams headerParams, offerParams string) int {
+	if !paramsMatch(specParams, offerParams) {
+		return 0
+	}
+	return base*mediaSpecificityScale + len(specParams)
+func getOffer(header []byte, isAccepted func(spec, offer string, specParams headerParams) int, offers ...string) string {
+	// Whether any range carries an explicit q=0 rejection. When none do, the
+	// more-specific-rejection scan can be skipped entirely on the hot path.
+	hasRejections := false
+		if quality == 0 {
+			hasRejections = true
+		}
+
+	if !hasRejections {
+		// Fast path: without any q=0 rejection this is the plain "first matching
+		// range in preference order wins" selection, identical to the algorithm
+		// before q=0 handling, so there is no need to compute or compare match
+		// specificity.
+	selectFast:
+		for _, acceptedType := range acceptedTypes {
+			for _, offer := range offers {
+				if offer != "" && isAccepted(acceptedType.spec, offer, acceptedType.params) > 0 {
+					result = offer
+					break selectFast
+				}
+			}
+	} else {
+		// Rejection-aware path: an offer is only acceptable if its matching range
+		// is not overridden by a q=0 range that matches it at least as
+		// specifically (RFC 9110 §12.5.1).
+	selectWithRejections:
+		for _, acceptedType := range acceptedTypes {
+			if acceptedType.quality == 0 {
+				// A q=0 range never selects an offer; it can only reject one.
+			for _, offer := range offers {
+				if offer == "" {
+					continue
+				}
+				matchSpecificity := isAccepted(acceptedType.spec, offer, acceptedType.params)
+				if matchSpecificity > 0 &&
+					!rejectedByMoreSpecificRange(acceptedTypes, isAccepted, offer, matchSpecificity) {
+					result = offer
+					break selectWithRejections
+				}
+// rejectedByMoreSpecificRange reports whether a q=0 range matches the offer at
+// least as specifically as the positive match at baseSpecificity, i.e. the
+// client explicitly rejected the offer per RFC 9110 §12.5.1. Comparing the
+// effective match specificity (rather than the coarse parsed bucket) lets a
+// same-class rejection win — e.g. "en-US;q=0" over "en", "utf-8;q=0" over an
+// earlier "utf-8", or "text/html;level=1;q=0" over "text/html" — while a less
+// specific rejection such as "text/*;q=0" still does not override "text/html".
+func rejectedByMoreSpecificRange(types []acceptedType, isAccepted func(spec, offer string, specParams headerParams) int, offer string, baseSpecificity int) bool {
+		if types[i].quality == 0 &&
+			isAccepted(types[i].spec, offer, types[i].params) >= baseSpecificity {

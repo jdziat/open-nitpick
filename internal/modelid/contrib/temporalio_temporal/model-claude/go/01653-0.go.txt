@@ -1,0 +1,130 @@
+// commit 574ec6697de4 2026-08-06T18:54:08-07:00 service/matching/fair_task_reader.go
+	"slices"
+		outstandingTasks *btree.BTreeG[outstandingTask] // level-ordered outstanding tasks and acks
+		loadedTasks      int                            // == number of loaded (unacked) entries in outstandingTasks
+		readLevel        fairLevel                      // == highest level in outstandingTasks, or if empty, the level we should read next
+		ackLevel         fairLevel                      // inclusive: task exactly at ackLevel _has_ been acked
+		atEnd            bool                           // whether we believe outstandingTasks represents the entire queue right now
+
+	// outstandingTask is one level-keyed entry in fairTaskReader.outstandingTasks. Each entry is
+	// either loaded (task != nil, the task is in the matcher awaiting dispatch) or acked
+	// (task == nil, the level is completed/expired but not yet advanced past).
+	outstandingTask struct {
+		level fairLevel
+		task  *internalTask
+	}
+// outstandingTaskLess orders entries by level. Levels are unique per task, so no tiebreaker is
+// needed and Set at an existing level replaces (rather than duplicates) the entry there.
+func outstandingTaskLess(a, b outstandingTask) bool {
+	return a.level.less(b.level)
+}
+
+// acked reports whether this entry is an ack (completed or pre-acked) rather than a task that
+// occupies a memory slot. Acked entries don't count toward the loaded-task limit.
+func (o outstandingTask) acked() bool {
+	return o.task == nil
+}
+
+		outstandingTasks: btree.NewBTreeGOptions(outstandingTaskLess, btree.Options{NoLocks: true}),
+	if entry, found := tr.outstandingTasks.Get(outstandingTask{level: task.fairLevel()}); !found {
+	} else if !softassert.That(tr.logger, entry.task != nil, "completed task was already acked") {
+	tr.outstandingTasks.Set(outstandingTask{level: task.fairLevel()}) // replace loaded task with an ack
+// nolint:revive,cognitive-complexity // merge is an inherently multi-phase operation
+	batchSize := tr.backlogMgr.config.GetTasksBatchSize()
+	// Work on a copy-on-write snapshot of the outstanding tasks: merge the newly read/written
+	// tasks into it, trim it back to batchSize loaded tasks, and install the result as the new set
+	// of outstanding tasks. The btree does the trimming for us.
+	merged := tr.outstandingTasks.Copy()
+
+	// The merged operations below all touch nearby levels, so share one path hint across the Get,
+	// Set, and Delete point operations on merged.
+	var hint btree.PathHint
+
+	// (1) Merge the newly read/written tasks into the snapshot. Already-acked tasks (expired, or
+	// re-read after their ack was evicted) go in as acks; the rest become loaded tasks. We create
+	// the internalTask now so the tree can order it by level, and remember the ones we created so
+	// we can drop any that don't survive the trim below.
+	var created []*internalTask
+			// acked. Ignore these.
+			// If we're writing and we're not at the end, ignore tasks above readLevel since we
+			// don't know what's in between readLevel and there.
+		} else if _, have := merged.GetHint(outstandingTask{level: level}, &hint); have {
+			// On a write/read race or a re-read of a range we may see a task we already have
+			// (loaded or acked). Ignore tasks we already track.
+		} else if _, wasAcked := tr.evictedAcks.Delete(level); wasAcked {
+			// This task was already acked, but its ack was evicted from memory before it could
+			// advance the ack level, and now we've re-read it. Insert it as a pre-acked (nil) entry
+			// so it advances the ack level instead of being re-delivered to the matcher.
+			merged.SetHint(outstandingTask{level: level}, &hint)
+		} else if IsTaskExpired(t) {
+			// Expired tasks are inserted pre-acked so they advance ackLevel and get GC'd.
+			merged.SetHint(outstandingTask{level: level}, &hint)
+			recordDroppedTask(tr.backlogMgr.metricsHandler, dropReasonExpiredRead)
+		} else {
+			task := newInternalTaskFromBacklog(t, tr.completeTask)
+			tr.backlogMgr.setPriority(task)
+			merged.SetHint(outstandingTask{level: level, task: task}, &hint)
+			created = append(created, task)
+	// (2) Find the trim point: the level of the first loaded task past the lowest batchSize. Acked
+	// levels don't occupy a memory slot, so they don't count toward the limit. If we never exceed
+	// batchSize, cut stays at maxFairLevel, meaning nothing is trimmed.
+	cut := outstandingTask{level: maxFairLevel}
+	loaded := 0
+	merged.Scan(func(o outstandingTask) bool {
+		if o.acked() {
+			return true
+		} else if loaded++; loaded > batchSize {
+			cut = o
+			return false
+		return true
+	})
+	// (3) Split the tasks we just created into survivors and overflow (at or above the cut). We
+	// never added the overflow to the matcher, so we just drop them from the tree; only survivors
+	// are counted and returned to be matched. After we get to this point, each survivor must
+	// eventually call task.finish/finishForwarded, which calls tr.completeTask.
+	created = slices.DeleteFunc(created, func(task *internalTask) bool {
+		if level := task.fairLevel(); !level.less(cut.level) {
+			merged.DeleteHint(outstandingTask{level: level}, &hint)
+			return true
+		tr.loadedTasks++
+		tr.backlogAge.record(task.event.Data.CreateTime, 1)
+		return false
+	})
+	// (4) Chop the pre-existing entries at or above the cut and evict them. The overflow we created
+	// is already gone, so everything chopped here was in the matcher (a loaded task) or is an ack.
+	// When there's no cut, cut is maxFairLevel and this range is empty.
+	chopped := merged.DeleteRange(cut, outstandingTask{level: maxFairLevel}, nil)
+	chopped.Scan(func(o outstandingTask) bool {
+		if o.task != nil {
+			// A loaded task we're dropping from memory. It may already have been matched and
+			// removed (then setEvicted is a no-op); otherwise it's removed from the matcher.
+			// Lock order: task reader lock < matcher lock, so this is okay.
+			tr.backlogAge.record(o.task.event.Data.CreateTime, -1)
+			tr.loadedTasks--
+			o.task.setEvicted()
+		} else {
+			// An ack above the cut. Cache it so if we re-read the task we can skip it, rather
+			// than using the ack to advance the ack level across the tasks dropped below it.
+			tr.evictedAcks.Set(o.level)
+		}
+		return true
+	softassert.That(tr.logger, tr.loadedTasks >= 0, "loadedTasks went negative")
+	// Trim the evicted-ack cache to max size by dropping the highest levels.
+	// Install the trimmed snapshot as the new outstanding tasks.
+	tr.outstandingTasks = merged
+
+	// readLevel is the highest level we track, loaded or acked. If we track nothing, leave it where
+	// it is so we resume reading from there.
+	if maxItem, ok := merged.Max(); ok {
+		tr.readLevel = maxItem.level
+	// Advance the ack level past any pre-acked (nil) entries we just added: expired tasks and acks
+	// we re-inserted from the evicted-ack cache. Harmless if we added none.
+	// Also if we trimmed anything from memory (cut moved below maxFairLevel), we can't either.
+	// If we read to the end and didn't trim anything, then we know we're at the end.
+	if mode == mergeReadMiddle || cut.level != maxFairLevel {
+	return created
+	// Adjust the ack level as far as we can, past any leading acks.
+		minItem, ok := tr.outstandingTasks.Min()
+		if !ok || !minItem.acked() {
+		tr.ackLevel = minItem.level
+		tr.outstandingTasks.PopMin()

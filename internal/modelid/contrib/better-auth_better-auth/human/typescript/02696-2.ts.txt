@@ -1,0 +1,63 @@
+// commit 3ca2c08dc325 2026-08-11T18:05:25-04:00 packages/better-auth/src/plugins/device-authorization/schema.test.ts
+	it("uniquely indexes device authorization lookup fields", () => {
+			{ fields: ["deviceCode"], unique: true },
+			{ fields: ["userCode"], unique: true },
+	it("declares server_error for failed device-code issuance", () => {
+		const plugin = deviceAuthorization();
+		const endpoint = plugin.endpoints.deviceCode;
+
+		expect(
+			endpoint.options.error.safeParse({
+				error: "server_error",
+				error_description: "Failed to generate a unique device code",
+			}).success,
+		).toBe(true);
+		expect(endpoint.options.metadata).toMatchObject({
+			openapi: {
+				responses: {
+					400: {
+						content: {
+							"application/json": {
+								schema: {
+									properties: {
+										error: {
+											enum: expect.not.arrayContaining(["server_error"]),
+										},
+									},
+								},
+							},
+						},
+					},
+					500: {
+						content: {
+							"application/json": {
+								schema: {
+									properties: {
+										error: { enum: ["server_error"] },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		});
+	});
+
+	it("adds grant-specific responses to the device-code OpenAPI contract", () => {
+		const plugin = deviceAuthorization({
+			grant: {
+				...schemaGrant({}),
+				requestOpenAPIResponses: {
+					401: { description: "Grant authentication failed" },
+				},
+			},
+		});
+
+		expect(
+			plugin.endpoints.deviceCode.options.metadata?.openapi?.responses,
+		).toMatchObject({
+			401: { description: "Grant authentication failed" },
+		});
+	});
+

@@ -1,0 +1,39 @@
+// commit 00e3c151d490 2026-08-26T09:19:12+01:00 apps/webapp/app/v3/runStore.server.ts
+  runOpsShardHandles,
+  /** Gen-2 shard handles. When non-empty, buildRunStore builds one dedicated store per descriptor and
+   * hands them to the N-way router; an aliased shard shares its target's database. Empty/absent keeps
+   * the two-store compat router. */
+  shards?: Array<{
+    key: ShardKey;
+    writer: RunOpsPrismaClient;
+    replica: RunOpsPrismaClient;
+    aliasOf?: ShardKey;
+    resilience?: TransactionResilienceConfig;
+  }>;
+  // Gen-2 shards: one dedicated store per descriptor, handed to the N-way router. An aliased shard
+  // builds a store over its target's (shared) client and carries aliasOf, so the router dedups it out
+  // of fan-out sums by declaration. No shards -> the two-store compat router (byte-identical).
+  const shardStores = (deps.shards ?? []).map((shard) => ({
+    key: shard.key,
+    store: new PostgresRunStore({
+      prisma: shard.writer,
+      readOnlyPrisma: shard.replica,
+      schemaVariant: "dedicated" as const,
+      maxWait: shard.resilience?.maxWait,
+      transactionStartRetry: shard.resilience?.startRetry,
+    }),
+    aliasOf: shard.aliasOf,
+  }));
+
+    shards: shardStores.length > 0 ? shardStores : undefined,
+      // Absent under a minimal db.server mock; default to no shards so the compat router is built.
+      shardHandles: runOpsShardHandles ?? [],
+  const { shardHandles, ...storeHandles } = handles;
+    ...storeHandles,
+    shards: shardHandles.map((shard) => ({
+      key: shard.key,
+      writer: shard.writer,
+      replica: shard.replica,
+      aliasOf: shard.aliasOf,
+      resilience: resilienceForClient(shard.writer),
+    })),

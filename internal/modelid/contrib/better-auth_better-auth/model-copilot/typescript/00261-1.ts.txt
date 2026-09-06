@@ -1,0 +1,58 @@
+// commit 0aa6dff678af 2025-10-29T00:11:52+00:00 packages/better-auth/src/cookies/index.ts
+import { createSessionStore } from "./session-store";
+		// Check if we need to chunk the cookie (only if it exceeds 4093 bytes)
+			const sessionStore = createSessionStore(
+				ctx.context.authCookies.sessionData.name,
+				options,
+				ctx,
+
+			const cookies = sessionStore.chunk(data, options);
+			sessionStore.setCookies(cookies);
+		} else {
+			const sessionStore = createSessionStore(
+				ctx.context.authCookies.sessionData.name,
+				options,
+				ctx,
+			);
+
+			if (sessionStore.hasChunks()) {
+				const cleanCookies = sessionStore.clean();
+				sessionStore.setCookies(cleanCookies);
+			}
+
+			ctx.setCookie(ctx.context.authCookies.sessionData.name, data, options);
+
+	// Use createSessionStore to clean up all session data chunks
+	const sessionStore = createSessionStore(
+		ctx.context.authCookies.sessionData.name,
+		ctx.context.authCookies.sessionData.options,
+		ctx,
+	);
+	const cleanCookies = sessionStore.clean();
+	sessionStore.setCookies(cleanCookies);
+
+
+	// Check for chunked cookies
+	let sessionData = parsedCookie.get(name);
+	if (!sessionData) {
+		// Try to reconstruct from chunks
+		const chunks: Array<{ index: number; value: string }> = [];
+		for (const [cookieName, value] of parsedCookie.entries()) {
+			if (cookieName.startsWith(name + ".")) {
+				const parts = cookieName.split(".");
+				const indexStr = parts[parts.length - 1];
+				const index = parseInt(indexStr || "0", 10);
+				if (!isNaN(index)) {
+					chunks.push({ index, value });
+				}
+			}
+		}
+
+		if (chunks.length > 0) {
+			// Sort by index and join
+			chunks.sort((a, b) => a.index - b.index);
+			sessionData = chunks.map((c) => c.value).join("");
+		}
+	}
+
+export { createSessionStore, getChunkedCookie } from "./session-store";

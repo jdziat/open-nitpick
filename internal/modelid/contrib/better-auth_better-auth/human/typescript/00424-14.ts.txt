@@ -1,0 +1,38 @@
+// commit f5bbb96d4e56 2025-11-15T16:55:50+00:00 packages/better-auth/src/db/get-migration.ts
+import { initGetFieldName } from "../adapters/adapter-factory/get-field-name";
+import { initGetModelName } from "../adapters/adapter-factory/get-model-name";
+import { getAuthTables } from "./get-tables";
+	const getModelName = initGetModelName({
+		schema: getAuthTables(config),
+		usePlural: false,
+	});
+	const getFieldName = initGetFieldName({
+		schema: getAuthTables(config),
+		usePlural: false,
+	});
+
+	// Helper function to safely resolve model and field names, falling back to
+	// user-supplied strings for external tables not in the BetterAuth schema
+	function getReferencePath(model: string, field: string): string {
+		try {
+			const modelName = getModelName(model);
+			const fieldName = getFieldName({ model, field });
+			return `${modelName}.${fieldName}`;
+		} catch {
+			// If resolution fails (external table), fall back to user-supplied references
+			return `${model}.${field}`;
+		}
+	}
+
+							.references(
+								getReferencePath(
+									field.references.model,
+									field.references.field,
+								),
+							)
+							.references(
+								getReferencePath(
+									field.references.model,
+									field.references.field,
+								),
+							)

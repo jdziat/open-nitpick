@@ -1,0 +1,38 @@
+// commit 6fcf2ea52718 2026-09-02T15:28:58+02:00 pkg/search/searcher.go
+	"errors"
+	"github.com/cli/cli/v2/api"
+func (s searcher) search(query Query, result interface{}) (string, error) {
+	u, err := safeurl.JoinPath("search", string(query.Kind))
+	accept := "application/vnd.github.v3+json"
+		accept = "application/vnd.github.text-match+json"
+	// The Content-Type this site used to set explicitly is the one the client already sends,
+	// so it is no longer stated here.
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(s.client).Request(s.host, http.MethodGet, u.String(), nil,
+		api.WithHeader("Accept", accept))
+		// Search reports query errors in a shape of its own, so the generic API error is
+		// translated back rather than surfaced directly.
+		var apiErr api.HTTPError
+		if errors.As(err, &apiErr) {
+			return apiErr.Headers.Get("Link"), asSearchError(apiErr)
+		}
+// asSearchError converts an api.HTTPError into search's own error type, which formats
+// invalid queries differently from the rest of the CLI.
+func asSearchError(apiErr api.HTTPError) error {
+	searchErr := httpError{
+		Message:    apiErr.Message,
+		RequestURL: apiErr.RequestURL,
+		StatusCode: apiErr.StatusCode,
+	// A non-JSON response leaves Message empty, where this package used to report the status line.
+	if searchErr.Message == "" {
+		searchErr.Message = fmt.Sprintf("%d %s", apiErr.StatusCode, http.StatusText(apiErr.StatusCode))
+	for _, item := range apiErr.Errors {
+		searchErr.Errors = append(searchErr.Errors, httpErrorItem{
+			Code:     item.Code,
+			Field:    item.Field,
+			Message:  item.Message,
+			Resource: item.Resource,
+		})
+	return searchErr

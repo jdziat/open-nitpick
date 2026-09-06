@@ -1,0 +1,42 @@
+# commit 4fe27c5cb5b3 2026-01-31T10:24:44-05:00 browser_use/tools/service.py
+			from pathlib import Path
+			def find_matching_download() -> dict | None:
+				"""Find a download that matches the pattern (most recent first)."""
+				# Check downloads in reverse order (most recent first)
+				for file_path in reversed(browser_session.downloaded_files):
+					path = Path(file_path)
+					if path.exists():
+						file_name = path.name
+						# Check pattern if specified
+						if params.file_name_pattern:
+							if not re.search(params.file_name_pattern, file_name):
+								continue
+						return {
+							'path': file_path,
+							'file_name': file_name,
+							'file_size': path.stat().st_size,
+							'mime_type': None,
+						}
+				return None
+
+			# Check if a matching download already exists
+			already_downloaded = find_matching_download()
+			if already_downloaded:
+				result_msg = f"Download completed: {already_downloaded['file_name']} ({already_downloaded['file_size']} bytes) saved to {already_downloaded['path']}"
+				logger.info(f'📥 {result_msg}')
+				return ActionResult(
+					extracted_content=result_msg,
+					include_in_memory=True,
+				)
+
+			# No matching download yet - wait for FileDownloadedEvent
+				# Check one more time in case download completed but event was missed
+				final_check = find_matching_download()
+				if final_check:
+					result_msg = f"Download completed: {final_check['file_name']} ({final_check['file_size']} bytes) saved to {final_check['path']}"
+					logger.info(f'📥 {result_msg}')
+					return ActionResult(
+						extracted_content=result_msg,
+						include_in_memory=True,
+					)
+

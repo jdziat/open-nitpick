@@ -1,0 +1,138 @@
+# commit 54e4dacbf95e 2025-10-26T06:05:49-07:00 browser_use/browser/session.py
+		"""Create a CDP session for a target using the shared WebSocket.
+			cdp_client: The shared CDP client (root WebSocket connection)
+		# Always use shared CDP client (event-driven approach)
+		cdp_session = cls(
+			cdp_client=cdp_client,
+			target_id=target_id,
+			session_id='connecting',
+		)
+		"""Disconnect session (no-op since we use shared WebSocket)."""
+		# With event-driven approach, all sessions share the root WebSocket
+		# Nothing to disconnect - only the root client is disconnected on browser.stop()
+		pass
+	_session_manager: Any = PrivateAttr(default=None)  # SessionManager instance
+		# Clear session manager first (stops event monitoring)
+		if self._session_manager:
+			await self._session_manager.clear()
+			self._session_manager = None
+
+		# Clear session pool (all sessions share the root WebSocket, so no disconnect needed)
+	async def get_or_create_cdp_session(self, target_id: TargetID | None = None, focus: bool = True) -> CDPSession:
+		"""Get CDP session for a target from the event-driven pool.
+
+		With autoAttach=True, sessions are created automatically by Chrome and added
+		to the pool via Target.attachedToTarget events. This method retrieves them.
+			target_id: Target ID to get session for. If None, uses current agent focus.
+			focus: If True, switches agent focus to this target.
+			CDPSession for the specified target.
+
+		Raises:
+			ValueError: If target doesn't exist or session is not available.
+		assert self._cdp_client_root is not None, 'Root CDP client not initialized'
+		assert self.agent_focus is not None, 'CDP session not initialized'
+		assert self._session_manager is not None, 'SessionManager not initialized'
+		# If no target_id specified, use current agent focus
+		# Get session from event-driven pool
+		session = await self._session_manager.get_session_for_target(target_id)
+
+		if session:
+			# Validate session is still active
+			is_valid = await self._session_manager.validate_session(target_id)
+			if not is_valid:
+				raise ValueError(f'Target {target_id} has detached - no active sessions')
+
+			# Update focus if requested
+				self.logger.debug(f'[SessionManager] Switching focus: {self.agent_focus.target_id[:8]}... → {target_id[:8]}...')
+
+			# Resume if waiting for debugger
+				try:
+					await session.cdp_client.send.Runtime.runIfWaitingForDebugger(session_id=session.session_id)
+				except Exception:
+					pass  # May fail if not waiting
+			return session
+		# Session not in pool yet - wait for attach event
+		self.logger.debug(f'[SessionManager] Waiting for target {target_id[:8]}... to attach...')
+		# Wait up to 2 seconds for the attach event
+		for attempt in range(20):
+			await asyncio.sleep(0.1)
+			session = await self._session_manager.get_session_for_target(target_id)
+			if session:
+				self.logger.debug(f'[SessionManager] Target appeared after {attempt * 100}ms')
+				if focus:
+					self.agent_focus = session
+				return session
+		# Timeout - target doesn't exist
+		raise ValueError(f'Target {target_id} not found - may have detached or never existed')
+
+			# Initialize event-driven session manager FIRST (before enabling autoAttach)
+			from browser_use.browser.session_manager import SessionManager
+
+			self._session_manager = SessionManager(self)
+			await self._session_manager.start_monitoring()
+			self.logger.info('Event-driven session manager started')
+
+			# Enable auto-attach so Chrome automatically notifies us when NEW targets attach/detach
+			# This is the foundation of event-driven session management
+				params={'autoAttach': True, 'waitForDebuggerOnStart': False, 'flatten': True}
+			self.logger.info('CDP client connected with auto-attach enabled')
+			# Manually attach to ALL EXISTING targets (autoAttach only fires for new ones)
+			# We attach to everything (pages, iframes, workers) for complete coverage
+			for target in targets['targetInfos']:
+				target_id = target['targetId']
+				target_type = target.get('type', 'unknown')
+
+				try:
+					# Attach to target - this triggers attachedToTarget event
+					result = await self._cdp_client_root.send.Target.attachToTarget(
+						params={'targetId': target_id, 'flatten': True}
+					)
+					session_id = result['sessionId']
+
+					# Enable auto-attach for this target's children
+					await self._cdp_client_root.send.Target.setAutoAttach(
+						params={'autoAttach': True, 'waitForDebuggerOnStart': False, 'flatten': True}, session_id=session_id
+					)
+
+					self.logger.debug(
+						f'Attached to existing target: {target_id[:8]}... (type={target_type}, session={session_id[:8]}...)'
+					)
+				except Exception as e:
+					self.logger.debug(f'Failed to attach to existing target {target_id[:8]}... (type={target_type}): {e}')
+
+			# Check for chrome://newtab pages and redirect them to about:blank
+						# Sessions now exist from manual attachment above
+						session = await self._session_manager.get_session_for_target(target_id)
+						if session:
+							await session.cdp_client.send.Page.navigate(
+								params={'url': 'about:blank'}, session_id=session.session_id
+							)
+							target['url'] = 'about:blank'
+							await asyncio.sleep(0.05)  # Let navigation start
+						self.logger.warning(f'Failed to redirect {target_url}: {e}')
+			# Ensure we have at least one page
+				self.logger.debug(f'📄 Created new blank page: {target_id}')
+				self.logger.debug(f'📄 Using existing page: {target_id}')
+
+			# Wait for SessionManager to receive the attach event for this target
+			# (Chrome will fire Target.attachedToTarget event which SessionManager handles)
+			for _ in range(20):  # Wait up to 2 seconds
+				await asyncio.sleep(0.1)
+				session = await self._session_manager.get_session_for_target(target_id)
+				if session:
+					self.agent_focus = session
+					# SessionManager already added it to pool - no need to do it manually
+					self.logger.debug(f'📄 Agent focus set to {target_id[:8]}...')
+					break
+
+			if not self.agent_focus:
+				raise RuntimeError(f'Failed to get session for initial target {target_id}')
+			if self.agent_focus.title == 'Unknown title':
+				self.logger.warning('Session created but title is unknown (may be normal for about:blank)')
+				# Stale session - Chrome should have sent detach event
+				# If we're here, event listener will clean it up
+				self.logger.debug(f'Found stale session for target {full_target_id}, skipping')
+		cdp_session = await self.get_or_create_cdp_session(target_id=None)
+		cdp_session = await self.get_or_create_cdp_session(target_id=None)
+			cdp_session = await self.get_or_create_cdp_session(target_id, focus=False)
+		cdp_session = await self.get_or_create_cdp_session(target_id=None)

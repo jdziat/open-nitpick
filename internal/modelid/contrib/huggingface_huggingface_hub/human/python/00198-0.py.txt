@@ -1,0 +1,60 @@
+# commit b7e5eac971e8 2025-12-01T18:01:33+01:00 src/huggingface_hub/file_download.py
+from .utils._http import (
+    _DEFAULT_RETRY_ON_EXCEPTIONS,
+    _DEFAULT_RETRY_ON_STATUS_CODES,
+    _adjust_range_header,
+    http_backoff,
+    http_stream_backoff,
+)
+def _httpx_follow_relative_redirects(
+    method: HTTP_METHOD_T, url: str, *, retry_on_errors: bool = False, **httpx_kwargs
+) -> httpx.Response:
+    A backoff mechanism retries the HTTP call on errors (429, 5xx, timeout, network errors).
+        retry_on_errors (`bool`, *optional*, defaults to `False`):
+            Whether to retry on errors. If False, no retry is performed (fast fallback to local cache).
+            If True, uses default retry behavior (429, 5xx, timeout, network errors).
+    # if `retry_on_errors=False`, disable all retries for fast fallback to cache
+    no_retry_kwargs: dict[str, Any] = (
+        {} if retry_on_errors else {"retry_on_exceptions": (), "retry_on_status_codes": ()}
+    )
+
+            **no_retry_kwargs,
+            if isinstance(head_call_error, _DEFAULT_RETRY_ON_EXCEPTIONS) or (
+                isinstance(head_call_error, HfHubHTTPError)
+                and head_call_error.response.status_code in _DEFAULT_RETRY_ON_STATUS_CODES
+            ):
+                logger.info("No local file found. Retrying..")
+                        retry_on_errors=True,
+        elif not force_download:
+            if isinstance(head_call_error, _DEFAULT_RETRY_ON_EXCEPTIONS) or (
+                isinstance(head_call_error, HfHubHTTPError)
+                and head_call_error.response.status_code in _DEFAULT_RETRY_ON_STATUS_CODES
+            ):
+                logger.info("No local file found. Retrying..")
+                (url_to_download, etag, commit_hash, expected_size, xet_file_data, head_call_error) = (
+                    _get_metadata_or_catch_error(
+                        repo_id=repo_id,
+                        filename=filename,
+                        repo_type=repo_type,
+                        revision=revision,
+                        endpoint=endpoint,
+                        etag_timeout=_ETAG_RETRY_TIMEOUT,
+                        headers=headers,
+                        token=token,
+                        local_files_only=local_files_only,
+                        retry_on_errors=True,
+                    )
+    retry_on_errors: bool = False,
+        retry_on_errors (`bool`, *optional*, defaults to `False`):
+            Whether to retry on errors (429, 5xx, timeout, network errors).
+            If False, no retry for fast fallback to local cache.
+    response = _httpx_follow_relative_redirects(
+        method="HEAD", url=url, headers=hf_headers, timeout=timeout, retry_on_errors=retry_on_errors
+    )
+    retry_on_errors: bool = False,
+                    url=url,
+                    timeout=etag_timeout,
+                    headers=headers,
+                    token=token,
+                    endpoint=endpoint,
+                    retry_on_errors=retry_on_errors,

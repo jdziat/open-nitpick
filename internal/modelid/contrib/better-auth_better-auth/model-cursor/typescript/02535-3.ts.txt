@@ -1,0 +1,58 @@
+// commit 5d38b138c3c7 2026-07-07T17:57:24+00:00 packages/drizzle-adapter/src/relations-v2/generate-drizzle-schema.ts
+/**
+ * Convert a schema namespace into a valid JavaScript identifier so it can be
+ * used as the `const <name>Schema = pgSchema(...)` variable name.
+ * e.g. "my-auth" -> "myAuth", "123schema" -> "_123schema".
+ */
+function toValidIdentifier(str: string): string {
+	// camelCase across any separator (hyphen, underscore, space, etc.), drop any
+	// remaining invalid characters, then prefix a leading digit last so the
+	// identifier stays valid.
+	let result = str
+		.replace(/[^a-zA-Z0-9]+([a-zA-Z0-9])/g, (_, char: string) =>
+			char.toUpperCase(),
+		)
+		.replace(/[^a-zA-Z0-9]/g, "")
+		.replace(/^[0-9]/, "_$&");
+
+	if (result.length > 0 && /[A-Z]/.test(result[0]!)) {
+		result = result[0]!.toLowerCase() + result.slice(1);
+	}
+
+	return result || "schema";
+}
+
+	const schemaName = adapterConfig?.schemaName;
+
+		schemaName,
+	// Add schema declaration for PostgreSQL when schemaName is provided.
+	// Relations only reference the exported table consts, so the namespace has
+	// no effect on the generated defineRelationsPart block.
+	let schemaVarName: string | undefined;
+	if (databaseType === "pg" && schemaName) {
+		schemaVarName = `${toValidIdentifier(schemaName)}Schema`;
+		if (schemaVarName === "pgSchema") {
+			schemaVarName = "pgCustomSchema";
+		}
+		code += `\nconst ${schemaVarName} = pgSchema(${JSON.stringify(schemaName)});\n`;
+	}
+
+	// Table function to use: namespaced schema table for pg + schemaName,
+	// otherwise the plain dialect table helper.
+	const tableFunction =
+		databaseType === "pg" && schemaName && schemaVarName
+			? `${schemaVarName}.table`
+			: `${databaseType}Table`;
+
+		const schema = `export const ${modelName} = ${tableFunction}("${convertToSnakeCase(
+	schemaName,
+	schemaName?: string;
+	// Import pgSchema for PostgreSQL when a custom schema namespace is provided.
+	if (databaseType === "pg" && schemaName) {
+		coreImports.push("pgSchema");
+	}
+
+	if (!(databaseType === "pg" && schemaName)) {
+		coreImports.push(`${databaseType}Table`);
+	}
+

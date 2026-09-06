@@ -1,0 +1,53 @@
+// commit c99d18f8d1cc 2026-05-03T13:03:50+09:00 test/unit/test/hooks-stack.test.ts
+const hookOrder: string[] = []
+    hookOrder.push(`${hook} #${order}`)
+  vitest.beforeAll(() => {
+    hookOrder.push(`beforeAll #1`)
+    return function beforeAllCleanup() {
+      hookOrder.push(`beforeAllCleanup #1`)
+    }
+  })
+  callHook('afterAll', 1)
+
+  callHook('beforeAll', 3)
+    hookOrder.push(`afterAll #2`)
+  })
+
+  vitest.beforeEach(() => {
+    hookOrder.push(`beforeEach #1`)
+
+    return function beforeEachCleanup() {
+      hookOrder.push(`beforeEachCleanup #1`)
+    }
+  callHook('beforeEach', 2)
+  callHook('afterEach', 1)
+  callHook('beforeEach', 3)
+  callHook('afterEach', 2)
+    expect(hookOrder).toEqual([
+      'beforeAll #1',
+      'beforeAll #2',
+      'beforeAll #3',
+
+      'beforeEach #1',
+      'beforeEach #2',
+      'beforeEach #3',
+    ])
+    expect(hookOrder).toEqual([
+      'beforeAll #1',
+      'beforeAll #2',
+      'beforeAll #3',
+
+      'beforeEach #1',
+      'beforeEach #2',
+      'beforeEach #3',
+
+      'afterEach #2',
+      'afterEach #1',
+
+      'beforeEachCleanup #1',
+
+      'afterAll #2',
+      'afterAll #1',
+
+      'beforeAllCleanup #1',
+    ])

@@ -1,0 +1,32 @@
+// commit bd7ca66505f0 2025-11-16T23:42:14+01:00 pkg/github/projects.go
+			var resp *github.Response
+			var projectFields []*github.ProjectV2Field
+
+				projectFields, resp, err = client.Projects.ListOrganizationProjectFields(ctx, owner, projectNumber, opts)
+				projectFields, resp, err = client.Projects.ListUserProjectFields(ctx, owner, projectNumber, opts)
+			var projectItems []*github.ProjectV2Item
+				projectItems, resp, err = client.Projects.ListOrganizationProjectItems(ctx, owner, projectNumber, opts)
+				projectItems, resp, err = client.Projects.ListUserProjectItems(ctx, owner, projectNumber, opts)
+			resp := &github.Response{}
+			projectItem := &github.ProjectV2Item{}
+			var opts *github.GetProjectItemOptions
+				opts = &github.GetProjectItemOptions{
+					Fields: fields,
+				}
+			if ownerType == "org" {
+				projectItem, resp, err = client.Projects.GetOrganizationProjectItem(ctx, owner, projectNumber, itemID, opts)
+			} else {
+				projectItem, resp, err = client.Projects.GetUserProjectItem(ctx, owner, projectNumber, itemID, opts)
+			itemID, err := RequiredBigInt(req, "item_id")
+			var resp *github.Response
+			var updatedItem *github.ProjectV2Item
+
+				updatedItem, resp, err = client.Projects.UpdateOrganizationProjectItem(ctx, owner, projectNumber, itemID, updatePayload)
+				updatedItem, resp, err = client.Projects.UpdateUserProjectItem(ctx, owner, projectNumber, itemID, updatePayload)
+func buildUpdateProjectItem(input map[string]any) (*github.UpdateProjectItemOptions, error) {
+	payload := &github.UpdateProjectItemOptions{
+		Fields: []*github.UpdateProjectV2Field{{
+			ID:    int64(idFieldAsFloat64),
+			Value: valueField,
+		}},
+	}

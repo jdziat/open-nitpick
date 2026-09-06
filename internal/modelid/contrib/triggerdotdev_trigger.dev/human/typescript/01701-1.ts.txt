@@ -1,0 +1,72 @@
+// commit 19908436b841 2026-08-20T07:08:22+01:00 apps/webapp/test/apiRunListPresenter.test.ts
+// The presenter graph imports `~/db.server` singletons even though these tests pass explicit real
+// clients. The proxies keep those singleton reads on the current warm Postgres fixture.
+
+
+        get(_target, property) {
+          return holder.client[property];
+
+import { ClickHouse } from "@internal/clickhouse";
+import { containerTest } from "@internal/testcontainers";
+import {
+  addEnvironment,
+  createRun,
+  insertTaskRunV2Rows,
+  seedParents,
+} from "./helpers/apiRunListPresenterTestHelpers";
+function setupClients(prisma: unknown, clickhouseUrl: string): ClickHouse {
+  const clickhouse = new ClickHouse({
+    url: clickhouseUrl,
+    name: "api-run-list-presenter-test",
+    compression: { request: true },
+  legacyReplicaHolder.client = prisma;
+  newClientHolder.client = prisma;
+  clickhouseHolder.client = clickhouse;
+  return clickhouse;
+describe("ApiRunListPresenter public /runs list", () => {
+  containerTest(
+    async ({ clickhouseContainer, prisma }) => {
+      setupClients(prisma, clickhouseContainer.getConnectionUrl());
+      const ctx = await seedParents(prisma, "empty");
+
+      // Keep the split/read-through branch active while both real clients point at the empty DB.
+      const presenter = new ApiRunListPresenter(prisma, prisma, {
+        newClient: prisma,
+        legacyReplica: prisma,
+        splitEnabled: true,
+      const result = await presenter.call(
+        { id: ctx.projectId },
+        { "page[size]": 10 } as any,
+        CURRENT_API_VERSION,
+        { id: ctx.environmentId, organizationId: ctx.organizationId }
+      );
+      expect(result.data).toEqual([]);
+      expect(result.pagination).toHaveProperty("next");
+      expect(result.pagination).toHaveProperty("previous");
+  containerTest(
+    async ({ clickhouseContainer, prisma }) => {
+      const clickhouse = setupClients(prisma, clickhouseContainer.getConnectionUrl());
+      const stagingEnvironmentId = await addEnvironment(prisma, ctx, "scoping", "staging");
+
+      // The Postgres rows exercise real hydration; matching ClickHouse rows provide the list IDs.
+      const runs = await Promise.all([
+        createRun(prisma, ctx, { friendlyId: "run_prod1" }),
+        createRun(prisma, ctx, { friendlyId: "run_prod2" }),
+        createRun(prisma, ctx, {
+          friendlyId: "run_staging",
+          runtimeEnvironmentId: stagingEnvironmentId,
+        }),
+      ]);
+      await insertTaskRunV2Rows(clickhouse, runs);
+      // Omitting the fourth argument forces the control-plane runtimeEnvironment.findMany branch.
+      expect(result.data.map((run) => run.id).sort()).toEqual(["run_prod1", "run_prod2"]);
+  containerTest(
+    async ({ clickhouseContainer, prisma }) => {
+      const clickhouse = setupClients(prisma, clickhouseContainer.getConnectionUrl());
+      const runs = await Promise.all([
+        createRun(prisma, ctx, { friendlyId: "run_pt1" }),
+        createRun(prisma, ctx, { friendlyId: "run_pt2" }),
+      ]);
+      await insertTaskRunV2Rows(clickhouse, runs);
+      // No readThroughDeps preserves the single-database path used by existing callers.
+      expect(result.data.map((run) => run.id).sort()).toEqual(["run_pt1", "run_pt2"]);

@@ -1,0 +1,62 @@
+// commit 17f29b7b176a 2026-09-02T12:54:22+00:00 apps/webapp/app/routes/resources.runs.$runParam.ts
+import { undefinedOnUnroutableId } from "~/v3/runOpsMigration/unroutableRead.server";
+  const run = await undefinedOnUnroutableId(
+    () =>
+      runStore.findRun(
+        {
+          friendlyId: parsedParams.runParam,
+        {
+            id: true,
+            traceId: true,
+            //metadata
+            number: true,
+            taskIdentifier: true,
+            isTest: true,
+            runTags: true,
+            machinePreset: true,
+            runtimeEnvironmentId: true,
+            projectId: true,
+            lockedById: true,
+            lockedToVersionId: true,
+            //status + duration
+            status: true,
+            startedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            queuedAt: true,
+            completedAt: true,
+            logsDeletedAt: true,
+            //idempotency
+            idempotencyKey: true,
+            //delayed
+            delayUntil: true,
+            //ttl
+            ttl: true,
+            expiredAt: true,
+            //queue
+            queue: true,
+            concurrencyKey: true,
+            //schedule
+            scheduleId: true,
+            //usage
+            baseCostInCents: true,
+            costInCents: true,
+            usageDurationMs: true,
+            payload: true,
+            payloadType: true,
+            metadata: true,
+            metadataType: true,
+            maxAttempts: true,
+            parentTaskRun: {
+              select: {
+                friendlyId: true,
+              },
+            },
+            rootTaskRun: {
+              select: {
+                friendlyId: true,
+              },
+            },
+        }
+      ),
+    { runParam: params.runParam ?? params.runId }

@@ -1,0 +1,60 @@
+// commit b7c3630811c8 2026-06-02T13:26:12+03:00 req.go
+	"slices"
+// IP returns the client's IP address. When the request comes from a trusted proxy (see
+// [TrustProxyConfig]), the value is extracted from the configured ProxyHeader by walking the
+// X-Forwarded-For chain right-to-left and skipping all trusted proxy IPs; the first
+// non-trusted IP in the chain is returned. Please use Config.TrustProxy to prevent header
+// spoofing if your app is behind a proxy.
+// extractIPFromHeader returns the client IP from the given proxy header by walking the
+// X-Forwarded-For chain from right to left and stripping trusted proxy IPs. When trusted
+// proxies are configured, the rightmost non-trusted IP is returned; otherwise the first
+// valid IP (left-to-right) is returned. When IP validation is disabled, the raw header
+// value is returned as-is.
+	if !app.config.EnableIPValidation {
+		return r.Get(app.config.ProxyHeader)
+	}
+	ips := r.extractIPsFromHeader(header)
+	if len(ips) == 0 {
+		if ip := r.c.fasthttp.RemoteIP(); ip != nil {
+			return ip.String()
+		}
+		return ""
+	}
+	if !r.hasTrustedProxyConfig() {
+		return ips[0]
+	}
+	for _, ip := range slices.Backward(ips) {
+		if !r.isTrustedProxyIP(ip) {
+			return ip
+		}
+	}
+	return ips[0]
+}
+// hasTrustedProxyConfig returns true if any trusted proxy configuration is set.
+func (r *DefaultReq) hasTrustedProxyConfig() bool {
+	cfg := r.c.app.config.TrustProxyConfig
+	return len(cfg.ips) > 0 || len(cfg.ranges) > 0 || cfg.Loopback || cfg.Private || cfg.LinkLocal
+}
+// isTrustedProxyIP checks whether the given IP string matches any configured trusted proxy.
+func (r *DefaultReq) isTrustedProxyIP(ipStr string) bool {
+	cfg := r.c.app.config.TrustProxyConfig
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	if cfg.Loopback && ip.IsLoopback() {
+		return true
+	}
+	if cfg.Private && ip.IsPrivate() {
+		return true
+	}
+	if cfg.LinkLocal && ip.IsLinkLocalUnicast() {
+		return true
+	}
+	if _, trusted := cfg.ips[ipStr]; trusted {
+		return true
+	}
+	for _, ipNet := range cfg.ranges {
+		if ipNet.Contains(ip) {
+			return true
+	return false

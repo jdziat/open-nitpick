@@ -1,0 +1,57 @@
+// commit d8b040c63aaf 2026-07-23T15:10:10+02:00 packages/vitest/src/runtime/external-executor.ts
+import type { CodeCache } from './vm/code-cache'
+// a relative ESM specifier resolves by plain URL join — Node's resolver adds
+// no information for these (it does not check existence and relative
+// specifiers never consult package.json), but it re-derives the package
+// scope on every uncached call, re-parsing large `exports` maps. Restricted
+// to a conservative charset so anything URL-special falls back to Node.
+const SIMPLE_RELATIVE_SPECIFIER_RE = /^\.{1,2}\/[\w\-./]+$/
+
+  codeCache?: CodeCache
+  resolveCache?: Map<string, string>
+  moduleInfoCache?: Map<string, ModuleInformation>
+export interface ModuleInformation {
+  exists?: boolean
+  public readonly codeCache: CodeCache | undefined
+    this.codeCache = options.codeCache
+      codeCache: options.codeCache,
+    if (
+      SIMPLE_RELATIVE_SPECIFIER_RE.test(specifier)
+      && parent.startsWith('file://')
+    ) {
+      return new URL(specifier, parent).href
+    }
+
+    // resolution of externalized modules is stable for the lifetime of the
+    // worker (like fileMap/packageCache), while fresh vm contexts re-resolve
+    // every import edge
+    const cache = this.options.resolveCache
+    const key = cache ? `${parent}\n${specifier}` : undefined
+    if (cache) {
+      const cached = cache.get(key!)
+      if (cached !== undefined) {
+        return cached
+      }
+    }
+
+    const resolved = nativeResolve(specifier, parent)
+    if (cache && typeof resolved === 'string') {
+      cache.set(key!, resolved)
+    }
+    return resolved
+    const cached = this.options.moduleInfoCache?.get(identifier)
+    if (cached) {
+      return cached
+    }
+    const info = this.resolveModuleInformation(identifier)
+    this.options.moduleInfoCache?.set(identifier, info)
+    return info
+  }
+
+  private resolveModuleInformation(identifier: string): ModuleInformation {
+    const information = this.getModuleInformation(identifier)
+    const { type, url, path } = information
+    if (type === 'module' || type === 'commonjs' || type === 'wasm') {
+      information.exists ??= existsSync(path)
+    }
+    if (information.exists === false) {

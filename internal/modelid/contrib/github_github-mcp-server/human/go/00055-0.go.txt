@@ -1,0 +1,49 @@
+// commit d01e70533257 2025-04-03T23:10:00+02:00 pkg/github/issues.go
+			mcp.WithArray("assignees",
+				mcp.Description("Usernames to assign to this issue"),
+				mcp.Items(
+					map[string]interface{}{
+						"type": "string",
+					},
+				),
+			),
+			mcp.WithArray("labels",
+				mcp.Description("Labels to apply to this issue"),
+				mcp.Items(
+					map[string]interface{}{
+						"type": "string",
+					},
+				),
+			assignees, err := optionalParam[[]string](request, "assignees")
+
+			labels, err := optionalParam[[]string](request, "labels")
+			mcp.WithArray("labels",
+				mcp.Description("Filter by labels"),
+				mcp.Items(
+					map[string]interface{}{
+						"type": "string",
+					},
+				),
+			// Get labels
+			opts.Labels, err = optionalParam[[]string](request, "labels")
+				mcp.Enum("open", "closed"),
+			),
+			mcp.WithArray("labels",
+				mcp.Description("New labels"),
+				mcp.Items(
+					map[string]interface{}{
+						"type": "string",
+					},
+				),
+			),
+			mcp.WithArray("assignees",
+				mcp.Description("New assignees"),
+				mcp.Items(
+					map[string]interface{}{
+						"type": "string",
+					},
+				),
+			// Get labels
+			labels, err := optionalParam[[]string](request, "labels")
+			// Get assignees
+			assignees, err := optionalParam[[]string](request, "assignees")

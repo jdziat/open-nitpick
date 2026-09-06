@@ -1,0 +1,43 @@
+// commit cbcf29f6d17c 2025-06-09T15:11:38+02:00 pkg/github/pullrequests.go
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(false),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+			title, err := RequiredParam[string](request, "title")
+			head, err := RequiredParam[string](request, "head")
+			base, err := RequiredParam[string](request, "base")
+				ReadOnlyHint: ToBoolPtr(false),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(false),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(false),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(false),
+				ReadOnlyHint: ToBoolPtr(false),
+				ReadOnlyHint: ToBoolPtr(false),
+				ReadOnlyHint: ToBoolPtr(false),
+				ReadOnlyHint: ToBoolPtr(false),
+				ReadOnlyHint: ToBoolPtr(true),
+				ReadOnlyHint: ToBoolPtr(false),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")

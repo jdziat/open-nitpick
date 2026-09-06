@@ -1,0 +1,32 @@
+// commit 323c7e78f04b 2025-11-24T18:40:58-08:00 packages/better-auth/src/adapters/create-test-suite.ts
+								count: async (args: any) => {
+									adapter = await helpers.adapter();
+									const res = await adapter.count(args);
+									return res as any;
+								},
+								deleteMany: async (args: any) => {
+									adapter = await helpers.adapter();
+									const res = await adapter.deleteMany(args);
+									return res as any;
+								},
+								delete: async (args: any) => {
+									adapter = await helpers.adapter();
+									const res = await adapter.delete(args);
+									return res as any;
+								},
+									adapter = await helpers.adapter();
+									const res = await adapter.findOne(args);
+									return res as any;
+									adapter = await helpers.adapter();
+									const res = await adapter.findMany(args);
+									return res as any;
+								},
+								update: async (args: any) => {
+									adapter = await helpers.adapter();
+									const res = await adapter.update(args);
+									return res as any;
+								},
+								updateMany: async (args) => {
+									adapter = await helpers.adapter();
+									const res = await adapter.updateMany(args);
+									return res as any;

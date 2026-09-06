@@ -1,0 +1,180 @@
+// commit ce2e4f94725a 2025-12-17T09:56:24+01:00 cmd/github-mcp-server/generate_docs.go
+	"github.com/github/github-mcp-server/pkg/inventory"
+	for _, doc := range []struct {
+		path string
+		fn   func(string) error
+	}{
+		// File to edit, function to generate its docs
+		{"README.md", generateReadmeDocs},
+		{"docs/remote-server.md", generateRemoteServerDocs},
+		{"docs/deprecated-tool-aliases.md", generateDeprecatedAliasesDocs},
+	} {
+		if err := doc.fn(doc.path); err != nil {
+			return fmt.Errorf("failed to generate docs for %s: %w", doc.path, err)
+		}
+		fmt.Printf("Successfully updated %s with automated documentation\n", doc.path)
+	// Build inventory - stateless, no dependencies needed for doc generation
+	r := github.NewInventory(t).Build()
+	toolsetsDoc := generateToolsetsDoc(r)
+	toolsDoc := generateToolsDoc(r)
+	updatedContent, err := replaceSection(string(content), "START AUTOMATED TOOLSETS", "END AUTOMATED TOOLSETS", toolsetsDoc)
+	if err != nil {
+		return err
+	}
+	updatedContent, err = replaceSection(updatedContent, "START AUTOMATED TOOLS", "END AUTOMATED TOOLS", toolsDoc)
+	if err != nil {
+		return err
+	}
+	updatedContent, err := replaceSection(string(content), "START AUTOMATED TOOLSETS", "END AUTOMATED TOOLSETS", toolsetsDoc)
+	if err != nil {
+		return err
+	return os.WriteFile(docsPath, []byte(updatedContent), 0600) //#nosec G306
+func generateToolsetsDoc(i *inventory.Inventory) string {
+	var buf strings.Builder
+	buf.WriteString("| Toolset                 | Description                                                   |\n")
+	buf.WriteString("| ----------------------- | ------------------------------------------------------------- |\n")
+	// Add the context toolset row with custom description (strongly recommended)
+	buf.WriteString("| `context`               | **Strongly recommended**: Tools that provide context about the current user and GitHub context you are operating in |\n")
+	// AvailableToolsets() returns toolsets that have tools, sorted by ID
+	// Exclude context (custom description above) and dynamic (internal only)
+	for _, ts := range i.AvailableToolsets("context", "dynamic") {
+		fmt.Fprintf(&buf, "| `%s` | %s |\n", ts.ID, ts.Description)
+	return strings.TrimSuffix(buf.String(), "\n")
+func generateToolsDoc(r *inventory.Inventory) string {
+	// AllTools() returns tools sorted by toolset ID then tool name.
+	// We iterate once, grouping by toolset as we encounter them.
+	tools := r.AllTools()
+	if len(tools) == 0 {
+		return ""
+	var buf strings.Builder
+	var toolBuf strings.Builder
+	var currentToolsetID inventory.ToolsetID
+	firstSection := true
+	writeSection := func() {
+		if toolBuf.Len() == 0 {
+			return
+		if !firstSection {
+			buf.WriteString("\n\n")
+		firstSection = false
+		sectionName := formatToolsetName(string(currentToolsetID))
+		fmt.Fprintf(&buf, "<details>\n\n<summary>%s</summary>\n\n%s\n\n</details>", sectionName, strings.TrimSuffix(toolBuf.String(), "\n\n"))
+		toolBuf.Reset()
+	}
+	for _, tool := range tools {
+		// When toolset changes, emit the previous section
+		if tool.Toolset.ID != currentToolsetID {
+			writeSection()
+			currentToolsetID = tool.Toolset.ID
+		writeToolDoc(&toolBuf, tool.Tool)
+		toolBuf.WriteString("\n\n")
+	// Emit the last section
+	writeSection()
+
+	return buf.String()
+func writeToolDoc(buf *strings.Builder, tool mcp.Tool) {
+	fmt.Fprintf(buf, "- **%s** - %s\n", tool.Name, tool.Annotations.Title)
+		buf.WriteString("  - No parameters required")
+		return
+		buf.WriteString("  - No parameters required")
+		return
+		for i, propName := range paramNames {
+			var typeStr string
+			description := indentMultilineDescription(prop.Description, "    ")
+			fmt.Fprintf(buf, "  - `%s`: %s (%s, %s)", propName, description, typeStr, requiredStr)
+			if i < len(paramNames)-1 {
+				buf.WriteString("\n")
+			}
+		buf.WriteString("  - No parameters required")
+	if !strings.Contains(description, "\n") {
+	var buf strings.Builder
+	lines := strings.Split(description, "\n")
+	buf.WriteString(lines[0])
+		buf.WriteString("\n")
+		buf.WriteString(indent)
+		buf.WriteString(lines[i])
+	return buf.String()
+func replaceSection(content, startMarker, endMarker, newContent string) (string, error) {
+	start := fmt.Sprintf("<!-- %s -->", startMarker)
+	end := fmt.Sprintf("<!-- %s -->", endMarker)
+	startIdx := strings.Index(content, start)
+	endIdx := strings.Index(content, end)
+	if startIdx == -1 || endIdx == -1 {
+		return "", fmt.Errorf("markers not found: %s / %s", start, end)
+	}
+	var buf strings.Builder
+	buf.WriteString(content[:startIdx])
+	buf.WriteString(start)
+	buf.WriteString("\n")
+	buf.WriteString(newContent)
+	buf.WriteString("\n")
+	buf.WriteString(content[endIdx:])
+	return buf.String(), nil
+	// Build inventory - stateless
+	r := github.NewInventory(t).Build()
+	// AvailableToolsets() returns toolsets that have tools, sorted by ID
+	// Exclude context (handled separately) and dynamic (internal only)
+	for _, ts := range r.AvailableToolsets("context", "dynamic") {
+		idStr := string(ts.ID)
+		formattedName := formatToolsetName(idStr)
+		apiURL := fmt.Sprintf("https://api.githubcopilot.com/mcp/x/%s", idStr)
+		readonlyURL := fmt.Sprintf("https://api.githubcopilot.com/mcp/x/%s/readonly", idStr)
+		installLink := fmt.Sprintf("[Install](https://insiders.vscode.dev/redirect/mcp/install?name=gh-%s&config=%s)", idStr, installConfig)
+		readonlyInstallLink := fmt.Sprintf("[Install read-only](https://insiders.vscode.dev/redirect/mcp/install?name=gh-%s&config=%s)", idStr, readonlyConfig)
+		fmt.Fprintf(&buf, "| %-14s | %-48s | %-53s | %-218s | %-110s | %-288s |\n",
+			ts.Description,
+		)
+	}
+
+	return strings.TrimSuffix(buf.String(), "\n")
+}
+
+func generateDeprecatedAliasesDocs(docsPath string) error {
+	// Read the current file
+	content, err := os.ReadFile(docsPath) //#nosec G304
+	if err != nil {
+		return fmt.Errorf("failed to read docs file: %w", err)
+	}
+
+	// Generate the table
+	aliasesDoc := generateDeprecatedAliasesTable()
+
+	// Replace content between markers
+	updatedContent, err := replaceSection(string(content), "START AUTOMATED ALIASES", "END AUTOMATED ALIASES", aliasesDoc)
+	if err != nil {
+		return err
+	}
+
+	// Write back to file
+	err = os.WriteFile(docsPath, []byte(updatedContent), 0600)
+	if err != nil {
+		return fmt.Errorf("failed to write deprecated aliases docs: %w", err)
+	}
+
+	return nil
+}
+
+func generateDeprecatedAliasesTable() string {
+	var buf strings.Builder
+
+	// Add table header
+	buf.WriteString("| Old Name | New Name |\n")
+	buf.WriteString("|----------|----------|\n")
+
+	aliases := github.DeprecatedToolAliases
+	if len(aliases) == 0 {
+		buf.WriteString("| *(none currently)* | |")
+	} else {
+		// Sort keys for deterministic output
+		var oldNames []string
+		for oldName := range aliases {
+			oldNames = append(oldNames, oldName)
+		}
+		sort.Strings(oldNames)
+
+		for i, oldName := range oldNames {
+			newName := aliases[oldName]
+			fmt.Fprintf(&buf, "| `%s` | `%s` |", oldName, newName)
+			if i < len(oldNames)-1 {
+				buf.WriteString("\n")
+			}
+		}

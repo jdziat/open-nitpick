@@ -1,0 +1,35 @@
+// commit e48602f5a4bc 2025-12-19T11:18:19-05:00 service/history/api/resetworkflow/api.go
+	workflowpb "go.temporal.io/api/workflow/v1"
+	"go.temporal.io/server/api/matchingservice/v1"
+	"go.temporal.io/server/common/cache"
+	"go.temporal.io/server/common/worker_versioning"
+	matchingClient matchingservice.MatchingServiceClient,
+	versionMembershipCache cache.Cache,
+	// Validate versioning override, if any.
+	err = validatePostResetOperationInputs(ctx, request.GetPostResetOperations(), matchingClient, versionMembershipCache,
+		baseMutableState.GetExecutionInfo().GetTaskQueue(), namespaceID.String())
+	if err != nil {
+		return nil, err
+	}
+
+
+// validatePostResetOperationInputs validates the optional post reset operation inputs.
+func validatePostResetOperationInputs(ctx context.Context,
+	postResetOperations []*workflowpb.PostResetOperation,
+	matchingClient matchingservice.MatchingServiceClient,
+	versionMembershipCache cache.Cache,
+	taskQueue string,
+	namespaceID string) error {
+	for _, operation := range postResetOperations {
+		switch op := operation.GetVariant().(type) {
+		case *workflowpb.PostResetOperation_UpdateWorkflowOptions_:
+			opts := op.UpdateWorkflowOptions.GetWorkflowExecutionOptions()
+			if err := worker_versioning.ValidateVersioningOverride(ctx, opts.GetVersioningOverride(), matchingClient, versionMembershipCache, taskQueue, enumspb.TASK_QUEUE_TYPE_WORKFLOW, namespaceID); err != nil {
+				return err
+			}
+		default:
+			return serviceerror.NewInvalidArgumentf("unsupported post reset operation: %T", op)
+		}
+	}
+	return nil
+}

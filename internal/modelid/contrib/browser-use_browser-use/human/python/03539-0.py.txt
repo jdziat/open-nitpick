@@ -1,0 +1,60 @@
+# commit fd67e3b4ddbc 2025-10-30T19:36:54-07:00 browser_use/init_cmd.py
+		# Generate additional files if template has a manifest
+		if 'files' in INIT_TEMPLATES[template]:
+			import stat
+
+			for file_spec in INIT_TEMPLATES[template]['files']:
+				source_path = file_spec['source']
+				dest_name = file_spec['dest']
+				dest_path = output_path.parent / dest_name
+				is_binary = file_spec.get('binary', False)
+				is_executable = file_spec.get('executable', False)
+
+				# Skip if we already wrote this file (main.py)
+				if dest_path == output_path:
+					continue
+
+				# Fetch and write file
+				try:
+					if is_binary:
+						file_content = _fetch_binary_from_github(source_path)
+						if file_content:
+							if not dest_path.exists() or force:
+								dest_path.write_bytes(file_content)
+								console.print(f'[green]✓[/green] Created [cyan]{dest_name}[/cyan]')
+						else:
+							console.print(f'[yellow]⚠[/yellow]  Could not fetch [cyan]{dest_name}[/cyan] from GitHub')
+					else:
+						file_content = _get_template_content(source_path)
+						if _write_init_file(dest_path, file_content, force):
+							console.print(f'[green]✓[/green] Created [cyan]{dest_name}[/cyan]')
+							# Make executable if needed
+							if is_executable and sys.platform != 'win32':
+								dest_path.chmod(dest_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+				except Exception as e:
+					console.print(f'[yellow]⚠[/yellow]  Error generating [cyan]{dest_name}[/cyan]: {e}')
+		# Display next steps from manifest if available
+		if 'next_steps' in INIT_TEMPLATES[template]:
+			steps = INIT_TEMPLATES[template]['next_steps']
+			for i, step in enumerate(steps, 1):
+				# Handle footer separately (no numbering)
+				if 'footer' in step:
+					next_steps.append(f'{step["footer"]}\n', style='dim italic')
+					continue
+
+				# Step title
+				next_steps.append(f'\n{i}. {step["title"]}:\n', style='bold')
+
+				# Step commands
+				for cmd in step.get('commands', []):
+					# Replace placeholders
+					cmd = cmd.replace('{template}', template)
+					cmd = cmd.replace('{output}', output_path.name)
+					next_steps.append(f'   {cmd}\n', style='dim')
+
+				# Optional note
+				if 'note' in step:
+					next_steps.append(f'   {step["note"]}\n', style='dim italic')
+
+				next_steps.append('\n')
+			# Default workflow for templates without custom next_steps

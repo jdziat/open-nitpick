@@ -1,0 +1,59 @@
+// commit 30bd567d486a 2026-05-01T15:39:19+01:00 apps/webapp/app/v3/services/changeCurrentDeployment.server.ts
+import { BackgroundWorkerMetadata, tryCatch } from "@trigger.dev/core/v3";
+import { syncDeclarativeSchedules } from "./createBackgroundWorker.server";
+              compareDeploymentVersions(currentPromotion.deployment.version, deployment.version) >=
+              0
+              compareDeploymentVersions(currentPromotion.deployment.version, deployment.version) <=
+              0
+    const [scheduleSyncError] = await tryCatch(this.#syncSchedulesForDeployment(deployment));
+
+    if (scheduleSyncError) {
+      logger.error("Error syncing declarative schedules on deployment change", {
+        error: scheduleSyncError,
+      });
+    }
+
+
+  async #syncSchedulesForDeployment(deployment: WorkerDeployment) {
+    const worker = await this._prisma.backgroundWorker.findFirst({
+      where: { id: deployment.workerId! },
+    });
+
+    if (!worker) {
+      logger.error("Worker not found for deployment schedule sync", {
+        deploymentId: deployment.id,
+        workerId: deployment.workerId,
+      });
+      return;
+    }
+
+    const parsed = BackgroundWorkerMetadata.safeParse(worker.metadata);
+
+    if (!parsed.success) {
+      logger.error("Failed to parse worker metadata for schedule sync", {
+        deploymentId: deployment.id,
+        workerId: deployment.workerId,
+        error: parsed.error,
+      });
+      return;
+    }
+
+    const environment = await this._prisma.runtimeEnvironment.findFirst({
+      where: { id: deployment.environmentId },
+      include: {
+        project: true,
+        organization: true,
+        orgMember: true,
+      },
+    });
+
+    if (!environment) {
+      logger.error("Environment not found for deployment schedule sync", {
+        deploymentId: deployment.id,
+        environmentId: deployment.environmentId,
+      });
+      return;
+    }
+
+    await syncDeclarativeSchedules(parsed.data.tasks, worker, environment, this._prisma);
+  }

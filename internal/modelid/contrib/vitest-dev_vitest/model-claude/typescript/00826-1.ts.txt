@@ -1,0 +1,55 @@
+// commit 3f802da4bce9 2026-04-22T06:49:32+02:00 packages/pretty-format/src/types.ts
+   *
+   * When `true`, pretty-format defaults `spacingInner` to `' '`, `spacingOuter` to `''`,
+   * and ignores indentation. It also changes the default for `printBasicPrototype`
+   * from `true` to `false`, although an explicit `printBasicPrototype` still wins.
+   * Explicit `spacingInner` / `spacingOuter` overrides still apply.
+   *
+   * Defaults to `true`, unless `min` is `true`, in which case it defaults to `false`.
+   * An explicit `printBasicPrototype` value always overrides the `min` default.
+  /**
+   * Whitespace inserted after commas between items or entries.
+   *
+   * For example, in `{a: 1, b: 2}` or `[1, 2]`, this controls the gap after each comma:
+   * `{a: 1,${spacingInner}b: 2}`
+   * `[1,${spacingInner}2]`
+   *
+   * Defaults to `'\n'` in regular mode and `' '` when `min` is `true`.
+   * Can be overridden independently of `min`.
+   */
+  spacingInner?: string
+  /**
+   * Whitespace inserted immediately inside collection/object delimiters.
+   *
+   * For example, this controls the space or newline right after the opening delimiter
+   * and right before the closing delimiter:
+   * `{${spacingOuter}a: 1${spacingOuter}}`
+   * `[${spacingOuter}1${spacingOuter}]`
+   *
+   * Defaults to `'\n'` in regular mode and `''` when `min` is `true`.
+   * Can be overridden independently of `min`.
+   */
+  spacingOuter?: string
+  /**
+   * Whether to print strings using single quotes instead of double quotes.
+   *
+   * For example:
+   * `"hello"` when `false`
+   * `'hello'` when `true`
+   *
+   * @default false
+   */
+  singleQuote?: boolean
+  /**
+   * Whether to always quote object property keys.
+   *
+   * For example:
+   * `{"a": 1}` when `true`
+   * `{a: 1}` when `false` and the key is a valid identifier
+   * `{"my-key": 1}` still stays quoted because it is not a valid identifier
+   *
+   * @default true
+   */
+  quoteKeys?: boolean
+  singleQuote: boolean
+  quoteKeys: boolean

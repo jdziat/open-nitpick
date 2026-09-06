@@ -1,0 +1,185 @@
+// commit 2618999bcb6c 2026-06-10T09:32:52+01:00 pkg/cmd/discussion/client/client_impl.go
+
+// AddComment adds a comment to a discussion. If replyToID is non-empty, the
+// comment is created as a reply to that comment.
+func (c *discussionClient) AddComment(repo ghrepo.Interface, discussionID, body, replyToID string) (*DiscussionComment, error) {
+	var mutation struct {
+		AddDiscussionComment struct {
+			Comment struct {
+				ID             string
+				URL            string `graphql:"url"`
+				Author         actorNode
+				Body           string
+				CreatedAt      time.Time
+				IsAnswer       bool
+				UpvoteCount    int
+				ReactionGroups []struct {
+					Content string
+					Users   struct {
+						TotalCount int
+					}
+				} `graphql:"reactionGroups"`
+			}
+		} `graphql:"addDiscussionComment(input: $input)"`
+	}
+
+	input := githubv4.AddDiscussionCommentInput{
+		DiscussionID: githubv4.ID(discussionID),
+		Body:         githubv4.String(body),
+	}
+	if replyToID != "" {
+		id := githubv4.ID(replyToID)
+		input.ReplyToID = &id
+	}
+
+	variables := map[string]interface{}{
+		"input": input,
+	}
+
+	if err := c.gql.Mutate(repo.RepoHost(), "AddDiscussionComment", &mutation, variables); err != nil {
+		return nil, err
+	}
+
+	src := mutation.AddDiscussionComment.Comment
+	comment := &DiscussionComment{
+		ID:          src.ID,
+		URL:         src.URL,
+		Author:      mapActorFromListNode(src.Author),
+		Body:        src.Body,
+		CreatedAt:   src.CreatedAt,
+		IsAnswer:    src.IsAnswer,
+		UpvoteCount: src.UpvoteCount,
+	}
+	for _, rg := range src.ReactionGroups {
+		comment.ReactionGroups = append(comment.ReactionGroups, ReactionGroup{
+			Content:    rg.Content,
+			TotalCount: rg.Users.TotalCount,
+		})
+	}
+	return comment, nil
+}
+
+// UpdateComment updates the body of an existing discussion comment or reply.
+func (c *discussionClient) UpdateComment(repo ghrepo.Interface, commentID, body string) (*DiscussionComment, error) {
+	var mutation struct {
+		UpdateDiscussionComment struct {
+			Comment struct {
+				ID             string
+				URL            string `graphql:"url"`
+				Author         actorNode
+				Body           string
+				CreatedAt      time.Time
+				IsAnswer       bool
+				UpvoteCount    int
+				ReactionGroups []struct {
+					Content string
+					Users   struct {
+						TotalCount int
+					}
+				} `graphql:"reactionGroups"`
+			}
+		} `graphql:"updateDiscussionComment(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.UpdateDiscussionCommentInput{
+			CommentID: githubv4.ID(commentID),
+			Body:      githubv4.String(body),
+		},
+	}
+
+	if err := c.gql.Mutate(repo.RepoHost(), "UpdateDiscussionComment", &mutation, variables); err != nil {
+		return nil, err
+	}
+
+	src := mutation.UpdateDiscussionComment.Comment
+	comment := &DiscussionComment{
+		ID:          src.ID,
+		URL:         src.URL,
+		Author:      mapActorFromListNode(src.Author),
+		Body:        src.Body,
+		CreatedAt:   src.CreatedAt,
+		IsAnswer:    src.IsAnswer,
+		UpvoteCount: src.UpvoteCount,
+	}
+	for _, rg := range src.ReactionGroups {
+		comment.ReactionGroups = append(comment.ReactionGroups, ReactionGroup{
+			Content:    rg.Content,
+			TotalCount: rg.Users.TotalCount,
+		})
+	}
+	return comment, nil
+}
+
+// DeleteComment deletes a discussion comment or reply.
+func (c *discussionClient) DeleteComment(repo ghrepo.Interface, commentID string) error {
+	var mutation struct {
+		DeleteDiscussionComment struct {
+			Comment struct {
+				ID string
+			}
+		} `graphql:"deleteDiscussionComment(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.DeleteDiscussionCommentInput{
+			ID: githubv4.ID(commentID),
+		},
+	}
+
+	return c.gql.Mutate(repo.RepoHost(), "DeleteDiscussionComment", &mutation, variables)
+}
+
+// GetComment fetches a single discussion comment by node ID.
+func (c *discussionClient) GetComment(repo ghrepo.Interface, commentID string) (*DiscussionComment, error) {
+	var query struct {
+		Node struct {
+			Typename          string `graphql:"__typename"`
+			DiscussionComment struct {
+				ID             string
+				URL            string `graphql:"url"`
+				Author         actorNode
+				Body           string
+				CreatedAt      time.Time
+				IsAnswer       bool
+				UpvoteCount    int
+				ReactionGroups []struct {
+					Content string
+					Users   struct {
+						TotalCount int
+					}
+				} `graphql:"reactionGroups"`
+			} `graphql:"... on DiscussionComment"`
+		} `graphql:"node(id: $id)"`
+	}
+
+	variables := map[string]interface{}{
+		"id": githubv4.ID(commentID),
+	}
+
+	if err := c.gql.Query(repo.RepoHost(), "GetDiscussionComment", &query, variables); err != nil {
+		return nil, err
+	}
+
+	if query.Node.Typename != "DiscussionComment" {
+		return nil, fmt.Errorf("node %s is not a discussion comment (got %s)", commentID, query.Node.Typename)
+	}
+
+	src := query.Node.DiscussionComment
+	comment := &DiscussionComment{
+		ID:          src.ID,
+		URL:         src.URL,
+		Author:      mapActorFromListNode(src.Author),
+		Body:        src.Body,
+		CreatedAt:   src.CreatedAt,
+		IsAnswer:    src.IsAnswer,
+		UpvoteCount: src.UpvoteCount,
+	}
+	for _, rg := range src.ReactionGroups {
+		comment.ReactionGroups = append(comment.ReactionGroups, ReactionGroup{
+			Content:    rg.Content,
+			TotalCount: rg.Users.TotalCount,
+		})
+	}
+	return comment, nil
+}

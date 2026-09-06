@@ -1,0 +1,34 @@
+# commit 7a10ae0c968b 2025-06-24T12:26:55+02:00 tests/ci/evaluate_tasks.py
+from browser_use.llm import ChatOpenAI
+from browser_use.llm.messages import UserMessage
+			print(
+				f'[DEBUG] Browser error type: {type(browser_error).__name__}',
+				file=sys.stderr,
+			)
+			print(
+				f'[DEBUG] Agent.run() failed with error: {str(agent_error)}',
+				file=sys.stderr,
+			)
+			response = await agent_llm.ainvoke([UserMessage(content="Say 'test'")])
+			print(
+				f'[DEBUG] LLM test call successful: {response.completion[:50]}',
+				file=sys.stderr,
+			)
+			print(
+				f'[DEBUG] Agent output preview: {agent_output[:200]}...',
+				file=sys.stderr,
+			)
+		response = await judge_llm.ainvoke([UserMessage(content=judge_prompt)], output_format=JudgeResponse)
+		judge_response = response.completion
+		return {
+			'file': os.path.basename(task_file),
+			'success': False,
+			'explanation': f'Task failed with error: {str(e)}',
+		}
+		detailed_results.append(
+			{
+				'task': r['file'].replace('.yaml', ''),
+				'success': r['success'],
+				'reason': r['explanation'],
+			}
+		)

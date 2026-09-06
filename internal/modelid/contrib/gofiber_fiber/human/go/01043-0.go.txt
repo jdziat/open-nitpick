@@ -1,0 +1,43 @@
+// commit a4946e981be7 2026-04-30T04:14:54+00:00 shared_state.go
+func newSharedState(cfg *Config) *SharedState {
+	if cfg == nil {
+		cfg = &Config{}
+	}
+
+//nolint:gocritic // Keep unnamed returns for clarity.
+func encodeSharedStateValue(v any, encoder func(any) ([]byte, error), format string) ([]byte, error) {
+	var (
+		encoded   []byte
+		err       error
+		recovered any
+	)
+	func() {
+		// App-configured codecs may be nil or may still use Fiber's
+		// binder.Unimplemented* placeholders, which panic instead of returning an
+		// error, so recover here and surface a regular error.
+		defer func() {
+			recovered = recover()
+		}()
+
+		encoded, err = encoder(v)
+	if recovered != nil {
+		return nil, sharedStateCodecPanicError("encode", format, recovered)
+	}
+func decodeSharedStateValue(data []byte, out any, decoder func([]byte, any) error, format string) error {
+	var (
+		err       error
+		recovered any
+	)
+	func() {
+		// App-configured codecs may be nil or may still use Fiber's
+		// binder.Unimplemented* placeholders, which panic instead of returning an
+		// error, so recover here and surface a regular error.
+		defer func() {
+			recovered = recover()
+		}()
+
+		err = decoder(data, out)
+	if recovered != nil {
+		return sharedStateCodecPanicError("decode", format, recovered)
+	}
+	if err != nil {

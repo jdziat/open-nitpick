@@ -1,0 +1,48 @@
+// commit 192d1dff0d56 2025-07-18T03:19:50+02:00 internal/storage/memory/memory.go
+	"context"
+func (s *Storage) GetWithContext(ctx context.Context, key string) ([]byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		// Continue execution if context is not done
+	}
+
+	return s.Get(key)
+}
+
+// SetWithContext sets key with value
+func (s *Storage) SetWithContext(ctx context.Context, key string, val []byte, exp time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		// Continue execution if context is not done
+	}
+
+	return s.Set(key, val, exp)
+}
+
+func (s *Storage) DeleteWithContext(ctx context.Context, key string) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		// Continue execution if context is not done
+	}
+
+	return s.Delete(key)
+}
+
+// ResetWithContext resets all keys with a context
+func (s *Storage) ResetWithContext(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		// Continue execution if context is not done
+	}
+
+	return s.Reset()
+}
+

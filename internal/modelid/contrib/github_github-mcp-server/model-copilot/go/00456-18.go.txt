@@ -1,0 +1,54 @@
+// commit 60aef5d2e3da 2025-12-01T14:30:59+01:00 pkg/toolsets/toolsets.go
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+type ServerTool struct {
+	Tool         mcp.Tool
+	RegisterFunc func(s *mcp.Server)
+func NewServerTool[In, Out any](tool mcp.Tool, handler mcp.ToolHandlerFor[In, Out]) ServerTool {
+	return ServerTool{Tool: tool, RegisterFunc: func(s *mcp.Server) {
+		mcp.AddTool(s, &tool, handler)
+	}}
+}
+
+type ServerResourceTemplate struct {
+	Template mcp.ResourceTemplate
+	Handler  mcp.ResourceHandler
+}
+
+func NewServerResourceTemplate(resourceTemplate mcp.ResourceTemplate, handler mcp.ResourceHandler) ServerResourceTemplate {
+	return ServerResourceTemplate{
+type ServerPrompt struct {
+	Prompt  mcp.Prompt
+	Handler mcp.PromptHandler
+}
+
+func NewServerPrompt(prompt mcp.Prompt, handler mcp.PromptHandler) ServerPrompt {
+	return ServerPrompt{
+	writeTools  []ServerTool
+	readTools   []ServerTool
+	resourceTemplates []ServerResourceTemplate
+	prompts []ServerPrompt
+func (t *Toolset) GetActiveTools() []ServerTool {
+func (t *Toolset) GetAvailableTools() []ServerTool {
+func (t *Toolset) RegisterTools(s *mcp.Server) {
+		tool.RegisterFunc(s)
+			tool.RegisterFunc(s)
+func (t *Toolset) AddResourceTemplates(templates ...ServerResourceTemplate) *Toolset {
+func (t *Toolset) AddPrompts(prompts ...ServerPrompt) *Toolset {
+func (t *Toolset) GetActiveResourceTemplates() []ServerResourceTemplate {
+func (t *Toolset) GetAvailableResourceTemplates() []ServerResourceTemplate {
+func (t *Toolset) RegisterResourcesTemplates(s *mcp.Server) {
+		s.AddResourceTemplate(&resource.Template, resource.Handler)
+func (t *Toolset) RegisterPrompts(s *mcp.Server) {
+		s.AddPrompt(&prompt.Prompt, prompt.Handler)
+func (t *Toolset) AddWriteTools(tools ...ServerTool) *Toolset {
+		if tool.Tool.Annotations.ReadOnlyHint {
+func (t *Toolset) AddReadTools(tools ...ServerTool) *Toolset {
+		if !tool.Tool.Annotations.ReadOnlyHint {
+func (tg *ToolsetGroup) RegisterAll(s *mcp.Server) {
+func (tg *ToolsetGroup) FindToolByName(toolName string) (*ServerTool, string, error) {
+func (tg *ToolsetGroup) RegisterSpecificTools(s *mcp.Server, toolNames []string, readOnly bool) error {
+		if tool.Tool.Annotations.ReadOnlyHint && readOnly {
+			// Skip write tools in read-only mode
+			skippedTools = append(skippedTools, toolName)
+			continue
+		tool.RegisterFunc(s)

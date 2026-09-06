@@ -1,0 +1,31 @@
+# commit c8242e7edd76 2026-02-12T10:10:05-08:00 browser_use/skill_cli/server.py
+from typing import IO
+
+import portalocker
+		self._lock_file: IO | None = None
+		from browser_use.skill_cli.utils import get_lock_path, get_pid_path, get_socket_path
+
+		# Acquire exclusive lock BEFORE writing PID - this prevents race conditions
+		lock_path = get_lock_path(self.session_name)
+		lock_path.parent.mkdir(parents=True, exist_ok=True)
+		lock_path.touch(exist_ok=True)
+
+		self._lock_file = open(lock_path, 'r+')  # noqa: ASYNC230 - blocking ok at startup
+		try:
+			portalocker.lock(self._lock_file, portalocker.LOCK_EX | portalocker.LOCK_NB)
+		except portalocker.LockException:
+			logger.error(f'Another server is already running for session: {self.session_name}')
+			self._lock_file.close()
+			self._lock_file = None
+			sys.exit(1)
+
+		logger.info(f'Acquired exclusive lock for session: {self.session_name}')
+		# NOW safe to write PID file
+			# Release lock on shutdown
+			if self._lock_file:
+				try:
+					portalocker.unlock(self._lock_file)
+					self._lock_file.close()
+				except Exception:
+					pass
+				self._lock_file = None

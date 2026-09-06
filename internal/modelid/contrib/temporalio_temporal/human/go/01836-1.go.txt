@@ -1,0 +1,146 @@
+// commit adb4a6ce8060 2026-09-02T23:12:54+00:00 tests/xdc/parent_child_harness.go
+	"go.temporal.io/server/common/namespace"
+	historytasks "go.temporal.io/server/service/history/tasks"
+		resumeParentConversion    func()
+	if r.resumeParentConversion != nil {
+		r.resumeParentConversion()
+	}
+func delayParentReplicationTaskConversion(cluster parentChildCluster) parentChildScenarioStep {
+	return parentChildScenarioStep{
+		name: fmt.Sprintf("delay parent replication task conversion on %s", cluster),
+		run: func(_ context.Context, runtime *parentChildScenarioRuntime) error {
+			clusterIndex := int(cluster)
+			if clusterIndex < 0 || clusterIndex >= len(runtime.suite.clusters) {
+				return fmt.Errorf("unknown parent-child cluster %d", cluster)
+			}
+			if runtime.resumeParentConversion != nil {
+				return errors.New("parent replication task conversion is already delayed")
+			}
+
+			release := make(chan struct{})
+			var releaseOnce sync.Once
+			runtime.resumeParentConversion = func() {
+				releaseOnce.Do(func() { close(release) })
+			}
+			runtime.removeHooks = append(runtime.removeHooks, runtime.suite.clusters[clusterIndex].InjectHook(
+				runtime.suite.T(),
+				testhooks.NewHook(
+					testhooks.HistoryReplicationTaskConversionInterceptor,
+					func(task historytasks.Task, convert func() (*replicationspb.ReplicationTask, error)) (*replicationspb.ReplicationTask, error) {
+						if task.GetWorkflowID() != runtime.parentID {
+							return convert()
+						}
+						<-release
+						return convert()
+					},
+				),
+				namespace.ID(runtime.namespaceID),
+			))
+			return nil
+		},
+	}
+}
+
+			return runtime.resolveDelayedReplication(targetCluster, workflow, true)
+			return runtime.resolveDelayedReplication(targetCluster, workflow, false)
+			_, err := runtime.closeChildWorkflowTask(ctx, enumspb.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION)
+			return err
+func (r *parentChildScenarioRuntime) resolveDelayedReplication(
+	shouldApply bool,
+	if shouldApply {
+		r.tracef(
+			"  apply delayed task %d to cluster %d for %s [%s]",
+			task.task.GetSourceTaskId(),
+			targetClusterIndex,
+			workflow,
+			formatParentChildReplicationTask(task.task, events),
+		)
+		if err := task.apply(); err != nil {
+			return err
+		}
+		r.recordChildRunIDFromAppliedTask(workflow, task, events)
+		return nil
+func (r *parentChildScenarioRuntime) closeChildWorkflowTask(
+	ctx context.Context,
+	commandType enumspb.CommandType,
+) (string, error) {
+	var command *commandpb.Command
+	switch commandType {
+	case enumspb.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION:
+		command = &commandpb.Command{
+			CommandType: commandType,
+			Attributes: &commandpb.Command_CompleteWorkflowExecutionCommandAttributes{
+				CompleteWorkflowExecutionCommandAttributes: &commandpb.CompleteWorkflowExecutionCommandAttributes{},
+			},
+		}
+	case enumspb.COMMAND_TYPE_CONTINUE_AS_NEW_WORKFLOW_EXECUTION:
+		command = &commandpb.Command{
+			CommandType: commandType,
+			Attributes: &commandpb.Command_ContinueAsNewWorkflowExecutionCommandAttributes{
+				ContinueAsNewWorkflowExecutionCommandAttributes: &commandpb.ContinueAsNewWorkflowExecutionCommandAttributes{
+					WorkflowType:        &commonpb.WorkflowType{Name: "child-workflow"},
+					TaskQueue:           r.childTestVars.TaskQueue(),
+					WorkflowRunTimeout:  durationpb.New(time.Minute),
+					WorkflowTaskTimeout: durationpb.New(10 * time.Second),
+				},
+			},
+		}
+	default:
+		return "", fmt.Errorf("unsupported child close command %s", commandType)
+	}
+
+	closedRunID := r.childRunID
+			closedRunID = r.childRunID
+			Commands: []*commandpb.Command{command},
+	if err != nil || commandType != enumspb.COMMAND_TYPE_CONTINUE_AS_NEW_WORKFLOW_EXECUTION {
+		return closedRunID, err
+	}
+
+	events, err := r.activeWorkflowHistory(ctx, childWorkflow)
+	if err != nil {
+		return "", err
+	}
+	continuedAsNewEvent := findHistoryEvent(events, enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW, nil)
+	if continuedAsNewEvent == nil {
+		return "", fmt.Errorf("child run %s has no WorkflowExecutionContinuedAsNew event", closedRunID)
+	}
+	newRunID := continuedAsNewEvent.GetWorkflowExecutionContinuedAsNewEventAttributes().GetNewExecutionRunId()
+	if newRunID == "" {
+		return "", fmt.Errorf("child run %s continued as new without a new run ID", closedRunID)
+	}
+	r.childRunID = newRunID
+	r.tracef("  child continued as new from run %s to %s", closedRunID, newRunID)
+	return closedRunID, nil
+}
+
+func (r *parentChildScenarioRuntime) resetChildWorkflow(ctx context.Context) error {
+	events, err := r.activeWorkflowHistory(ctx, childWorkflow)
+	if err != nil {
+		return err
+	}
+	workflowTaskCompletedEvent := findHistoryEvent(events, enumspb.EVENT_TYPE_WORKFLOW_TASK_COMPLETED, nil)
+	if workflowTaskCompletedEvent == nil {
+		return fmt.Errorf("child run %s has no WorkflowTaskCompleted event", r.childRunID)
+	}
+
+	baseRunID := r.childRunID
+	response, err := r.activeCluster().FrontendClient().ResetWorkflowExecution(ctx, &workflowservice.ResetWorkflowExecutionRequest{
+		Namespace: r.namespace,
+		WorkflowExecution: &commonpb.WorkflowExecution{
+			WorkflowId: r.childID,
+			RunId:      baseRunID,
+		},
+		Reason:                    "parent-child XDC test",
+		WorkflowTaskFinishEventId: workflowTaskCompletedEvent.GetEventId(),
+		RequestId:                 uuid.NewString(),
+		Identity:                  r.childTestVars.WorkerIdentity(),
+	})
+	if err != nil {
+		return err
+	}
+	if response.GetRunId() == "" {
+		return fmt.Errorf("reset child run %s without a new run ID", baseRunID)
+	}
+	r.childRunID = response.GetRunId()
+	r.tracef("  reset child from run %s to %s", baseRunID, r.childRunID)
+	return nil

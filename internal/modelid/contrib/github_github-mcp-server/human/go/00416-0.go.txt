@@ -1,0 +1,68 @@
+// commit b68bec003d8d 2025-11-07T17:31:17+00:00 pkg/github/projects.go
+
+			minimalProjects := []MinimalProject{}
+			var resp *github.Response
+			var projectFields []*github.ProjectV2Field
+			opts := &github.ListProjectsOptions{
+				ListProjectsPaginationOptions: github.ListProjectsPaginationOptions{PerPage: &perPage},
+			if ownerType == "org" {
+				projectFields, resp, err = client.Projects.ListOrganizationProjectFields(ctx, owner, projectNumber, opts)
+			} else {
+				projectFields, resp, err = client.Projects.ListUserProjectFields(ctx, owner, projectNumber, opts)
+			fieldID, err := RequiredBigInt(req, "field_id")
+			var resp *github.Response
+			var projectField *github.ProjectV2Field
+
+				projectField, resp, err = client.Projects.GetOrganizationProjectField(ctx, owner, projectNumber, fieldID)
+				projectField, resp, err = client.Projects.GetUserProjectField(ctx, owner, projectNumber, fieldID)
+			fields, err := OptionalBigIntArrayParam(req, "fields")
+			var resp *github.Response
+			var projectItems []*github.ProjectV2Item
+			var queryPtr *string
+			if queryStr != "" {
+				queryPtr = &queryStr
+			opts := &github.ListProjectItemsOptions{
+				Fields: fields,
+				ListProjectsOptions: github.ListProjectsOptions{
+					ListProjectsPaginationOptions: github.ListProjectsPaginationOptions{PerPage: &perPage},
+					Query:                         queryPtr,
+				},
+			if ownerType == "org" {
+				projectItems, resp, err = client.Projects.ListOrganizationProjectItems(ctx, owner, projectNumber, opts)
+			} else {
+				projectItems, resp, err = client.Projects.ListUserProjectItems(ctx, owner, projectNumber, opts)
+			itemID, err := RequiredBigInt(req, "item_id")
+			fields, err := OptionalBigIntArrayParam(req, "fields")
+			itemID, err := RequiredBigInt(req, "item_id")
+			newItem := &github.AddProjectItemOptions{
+				ID:   itemID,
+
+			var resp *github.Response
+			var addedItem *github.ProjectV2Item
+
+			if ownerType == "org" {
+				addedItem, resp, err = client.Projects.AddOrganizationProjectItem(ctx, owner, projectNumber, newItem)
+			} else {
+				addedItem, resp, err = client.Projects.AddUserProjectItem(ctx, owner, projectNumber, newItem)
+			itemID, err := RequiredBigInt(req, "item_id")
+			var resp *github.Response
+				resp, err = client.Projects.DeleteOrganizationProjectItem(ctx, owner, projectNumber, itemID)
+				resp, err = client.Projects.DeleteUserProjectItem(ctx, owner, projectNumber, itemID)
+type fieldSelectionOptions struct {
+	// Specific list of field IDs to include in the response. If not provided, only the title field is included.
+	// The comma tag encodes the slice as comma-separated values: fields=102589,985201,169875
+	Fields []int64 `url:"fields,omitempty,comma"`
+	origURL, err := url.Parse(s)
+	origValues := origURL.Query()
+
+	// Use the github.com/google/go-querystring library to parse the struct
+	newValues, err := query.Values(opts)
+	// Merge the values
+	for key, values := range newValues {
+		for _, value := range values {
+			origValues.Add(key, value)
+		}
+	}
+
+	origURL.RawQuery = origValues.Encode()
+	return origURL.String(), nil

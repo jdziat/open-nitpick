@@ -1,0 +1,52 @@
+// commit 0bd0bf0818df 2026-05-20T15:27:04+02:00 pkg/github/code_scanning.go
+	schema := &jsonschema.Schema{
+		Type: "object",
+		Properties: map[string]*jsonschema.Schema{
+			"owner": {
+				Type:        "string",
+				Description: "The owner of the repository.",
+			},
+			"repo": {
+				Type:        "string",
+				Description: "The name of the repository.",
+			},
+			"state": {
+				Type:        "string",
+				Description: "Filter code scanning alerts by state. Defaults to open",
+				Enum:        []any{"open", "closed", "dismissed", "fixed"},
+				Default:     json.RawMessage(`"open"`),
+			},
+			"ref": {
+				Type:        "string",
+				Description: "The Git reference for the results you want to list.",
+			},
+			"severity": {
+				Type:        "string",
+				Description: "Filter code scanning alerts by severity",
+				Enum:        []any{"critical", "high", "medium", "low", "warning", "note", "error"},
+			},
+			"tool_name": {
+				Type:        "string",
+				Description: "The name of the tool used for code scanning.",
+			},
+		},
+		Required: []string{"owner", "repo"},
+	}
+	WithPagination(schema)
+
+			InputSchema: schema,
+			pagination, err := OptionalPaginationParams(args)
+			if err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			}
+
+			alerts, resp, err := client.CodeScanning.ListAlertsForRepo(ctx, owner, repo, &github.AlertListOptions{
+				Ref:      ref,
+				State:    state,
+				Severity: severity,
+				ToolName: toolName,
+				ListOptions: github.ListOptions{
+					Page:    pagination.Page,
+					PerPage: pagination.PerPage,
+				},
+			})

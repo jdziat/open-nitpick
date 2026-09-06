@@ -1,0 +1,147 @@
+# commit 2a39dfa1c516 2025-06-05T21:21:10-07:00 browser_use/browser/session.py
+				self.logger.debug(f'Detected closed browser connection in {func.__name__}, resetting connection state')
+	_logger: logging.Logger | None = PrivateAttr(default=None)
+	@property
+	def logger(self) -> logging.Logger:
+		"""Get instance-specific logger with session ID in the name"""
+		if self._logger is None:
+			# Create a child logger with the session ID
+			self._logger = logging.getLogger(f'browser_use.BrowserSession[{self.id[-3:]}]')
+		return self._logger
+
+					self.logger.info(f'♻️ Re-starting stale session {connection_str}')
+		# self.logger.debug(f'🎭 started successfully')
+					self.logger.debug(f'Failed to save storage state before stopping: {type(e).__name__}: {e}')
+				self.logger.info(
+					self.logger.info(
+						f'🛑 Closing {self._connection_str} {self.browser_profile.channel.name.lower()} context with '
+						f'storage_state= {_log_pretty_path(self.browser_profile.storage_state_path or self.browser_profile.cookies_file) or "<none>"}'
+					self.logger.debug(
+						f'❌ Error closing playwright browser_context={self.browser_context}: {type(e).__name__}: {e}'
+					self.logger.info(f' ↳ Killed browser_pid={self.browser_pid} {_log_pretty_path(executable_path)}')
+						self.logger.debug(
+							f'❌ Error terminating subprocess with browser_pid={self.browser_pid}: {type(e).__name__}: {e}'
+				# 		self.logger.debug(f'Error stopping playwright: {type(e).__name__}: {e}')
+		# self.logger.debug(
+		# 	f'⏹️ Stopping gracefully browser_pid={self.browser_pid} user_data_dir= {_log_pretty_path(self.browser_profile.user_data_dir) or "<incognito>"} keep_alive={self.browser_profile.keep_alive} (close() called)'
+		# self.logger.debug(
+		# 	f'⏹️ Stopping gracefully browser_pid={self.browser_pid} user_data_dir= {_log_pretty_path(self.browser_profile.user_data_dir) or "<incognito>"} keep_alive={self.browser_profile.keep_alive} (context manager exit)'
+				self.logger.info(
+					f'🛑 Stopping (went out of scope) {self._connection_str} keep_alive={keep_alive} user_data_dir= {_log_pretty_path(user_data_dir) or "<incognito>"}'
+			self.logger.info(f'🕶️ Activated stealth mode using patchright {self.browser_profile.channel.name.lower()} browser...')
+				self.logger.info(' 🪄 For maximum stealth, (...) should be passed channel=None or BrowserChannel.CHROME')
+				self.logger.info(' 🪄 For maximum stealth, (...) should be passed a persistent user_data_dir=...')
+				self.logger.info(' 🪄 For maximum stealth, (...) should be passed headless=False & viewport=None')
+			self.logger.info(f'🎭 Connected to existing user-provided browser: {self.browser_context}')
+		self.logger.info(f'🌎 Connecting to existing local browser process: browser_pid={self.browser_pid} on {self.cdp_url}')
+		self.logger.info(f'🌎 Connecting to existing remote chromium playwright node.js server over WSS: {self.wss_url}')
+		self.logger.info(f'🌎 Connecting to existing remote chromium-based browser over CDP: {self.cdp_url}')
+				self.logger.info(f'🌎 Using first browser_context available in existing browser: {self.browser_context}')
+				self.logger.info(
+					f'🌎 Created new empty browser_context in existing browser{storage_info}: {self.browser_context}'
+			self.logger.info(
+				f'🌎 Launching new local browser '
+				# self.logger.debug('🌎 Launching local browser in incognito mode')
+				# self.logger.debug('🌎 Launching new incognito context in browser')
+				# self.logger.debug('🌎 Created new incognito context in browser')
+						self.logger.error(
+							f'🚨 Found potentially conflicting browser process browser_pid={proc.info["pid"]} '
+					self.logger.error(
+						f'❌ Launching new local browser {driver}:{browser_channel} (v{test_browser_version}) failed!'
+			self.logger.debug(
+				f'❌ Error trying to find child chrome processes after launching new browser: {type(e).__name__}: {e}'
+			self.logger.info(f' ↳ Spawned browser_pid={self.browser_pid} {_log_pretty_path(new_chrome_procs[0].cmdline()[0])}')
+			self.logger.debug(' '.join(new_chrome_procs[0].cmdline()))  # print the entire launch command for debugging
+			self.logger.debug(f'🌎 browser connected: v{self.browser.version} {self._connection_str}')
+		# self.logger.debug('Setting up init scripts in browser')
+			self.logger.warning('⚠️ Failed to set up stealth mode. (...) got normal playwright objects as input.')
+			self.logger.debug(
+				f'📜 Found {len(pages)} existing tabs in browser, agent will start focused on Tab [{pages.index(foreground_page)}]: {foreground_page.url}'
+			self.logger.debug('➕ Opened new tab in empty browser context...')
+		# self.logger.debug('About to define _BrowserUseonTabVisibilityChange callback')
+				self.logger.info(
+					f'👁️ Foregound tab changed by human from [{old_tab_idx}]{_log_pretty_url(old_url)} '
+		# self.logger.info('About to call expose_binding')
+			self.logger.debug('expose_binding completed successfully')
+				self.logger.debug(
+					'⚠️ Function "_BrowserUseonTabVisibilityChange" has been already registered, '
+			self.logger.debug(f'⚠️ Failed to register init script for tab focus detection: {e}')
+		# self.logger.info(f'Setting up visibility listeners for {len(self.browser_context.pages)} pages')
+			# self.logger.info(f'Processing page with URL: {repr(page.url)}')
+				# self.logger.debug(f'👁️ Added visibility listener to existing tab: {page.url}')
+				self.logger.debug(
+					f'⚠️ Failed to add visibility listener to existing tab, is it crashed or ignoring CDP commands?: [{page_idx}]{page.url}: {type(e).__name__}: {e}'
+		self.logger.debug(
+			'📐 Setting up viewport: '
+				self.logger.warning(
+					f'⚠️ Failed to grant browser permissions {self.browser_profile.permissions}: {type(e).__name__}: {e}'
+			self.logger.warning(
+				f'⚠️ Failed to set playwright timeout settings '
+			self.logger.warning(
+				f'⚠️ Failed to setup playwright extra_http_headers: {type(e).__name__}: {e}'
+			self.logger.warning(
+				f'⚠️ Failed to update browser geolocation {self.browser_profile.geolocation}: {type(e).__name__}: {e}'
+				self.logger.warning(
+					f'⚠️ Failed to resize browser window to {_log_size(self.browser_profile.window_size)} using CDP setWindowBounds: {type(e).__name__}: {e}'
+				self.logger.info(
+					f'👋 Browser process browser_pid={self.browser_pid} has gone away or crashed, will be re-launched'
+			self.logger.debug(f'⚠️ Failed to remove highlights (this is usually ok): {type(e).__name__}: {e}')
+						self.logger.debug(f'⬇️ Download triggered. Saved file to: {download_path}')
+						self.logger.debug('No download triggered within timeout. Checking navigation...')
+				self.logger.debug(f'⚠️ Failed to get tab info for tab #{page_id}: {_log_pretty_url(page.url)} (ignoring)')
+			self.logger.info(f'🍪 Saved {len(cookies)} cookies to cookies_file= {_log_pretty_path(cookies_file_path)}')
+			self.logger.warning(
+				f'❌ Failed to save cookies to cookies_file= {_log_pretty_path(cookies_file_path)}: {type(e).__name__}: {e}'
+					self.logger.error(
+						f'❌ Failed to merge cookie changes with existing storage_state= {_log_pretty_path(json_path)}: {type(e).__name__}: {e}'
+			self.logger.info(f'🍪 Saved {len(storage_state["cookies"])} cookies to storage_state= {_log_pretty_path(json_path)}')
+			self.logger.warning(f'❌ Failed to save cookies to storage_state= {_log_pretty_path(path)}: {type(e).__name__}: {e}')
+				self.logger.warning(
+			self.logger.warning(
+			self.logger.warning(
+				f'⚠️ storage_state was set as a {type(self.browser_profile.storage_state)} and will not be updated with any cookie changes, use a json file path instead to persist changes'
+			self.logger.warning(
+					self.logger.info(f'🍪 Loaded {len(cookies_data)} cookies from cookies_file= {_log_pretty_path(cookies_path)}')
+				self.logger.warning(
+					f'❌ Failed to load cookies from cookies_file= {_log_pretty_path(cookies_path)}: {type(e).__name__}: {e}'
+					self.logger.warning(
+						f'❌ Failed to load cookies from storage_state= {_log_pretty_path(self.browser_profile.storage_state)}: {type(e).__name__}: {e}'
+				self.logger.info(
+					f'🍪 Loaded {len(storage_state["cookies"])} cookies from storage_state= {_log_pretty_path(self.browser_profile.storage_state)}'
+				self.logger.warning(
+					f'❌ Failed to load cookies from storage_state= {_log_pretty_path(self.browser_profile.storage_state)}: {type(e).__name__}: {e}'
+			# self.logger.debug(f'Request started: {request.url} ({request.resource_type})')
+			# self.logger.debug(f'Request resolved: {request.url} ({content_type})')
+					self.logger.debug(
+			self.logger.debug(f'💤 Page network traffic calmed down after {now - start_time:.2f} seconds')
+			self.logger.warning(
+				f'⚠️ Page load for {_log_pretty_url(page.url)} failed due to {type(e).__name__}, continuing anyway...'
+			self.logger.debug(
+				f'➡️ Page navigation [{tab_idx}]{_log_pretty_url(page.url, 40)} used {bytes_used / 1024:.1f} KB in {elapsed:.2f}s, waiting +{remaining:.2f}s for all frames to finish'
+			self.logger.debug(
+				f'➡️ Page navigation [{tab_idx}]{_log_pretty_url(page.url, 40)} took {elapsed:.2f}s, waiting +{remaining:.2f}s for all frames to finish'
+			self.logger.warning(f'⛔️ Navigation to non-allowed URL detected: {page.url}')
+				self.logger.error(f'⛔️ Failed to go back after detecting non-allowed URL: {type(e).__name__}: {e}')
+			self.logger.debug(f'⏮️ Error during go_back: {type(e).__name__}: {e}')
+			self.logger.debug(f'⏭️ Error during go_forward: {type(e).__name__}: {e}')
+			self.logger.debug(f'⛔️ Error during close_current_tab: {type(e).__name__}: {e}')
+			self.logger.debug(f'👋 Current page is no longer accessible: {type(e).__name__}: {e}')
+			# 	self.logger.debug(f'Opening cross-origin iframe in new tab #{new_page_id}: {url}')
+			self.logger.error(f'❌ Failed to update browser_state_summary: {type(e).__name__}: {e}')
+			self.logger.error(
+				f'❌ Failed to take full-page screenshot: {type(e).__name__}: {e} falling back to viewport-only screenshot'
+			self.logger.error(
+				f'❌ Failed to locate element {css_selector} on page {_log_pretty_url(page.url)}: {type(e).__name__}: {e}'
+			self.logger.error(f'❌ Failed to locate xpath {xpath} on page {_log_pretty_url(page.url)}: {type(e).__name__}: {e}')
+			self.logger.error(
+				f'❌ Failed to locate element {css_selector} on page {_log_pretty_url(page.url)}: {type(e).__name__}: {e}'
+				self.logger.error(f"❌ No visible element with text '{text}' found on page {_log_pretty_url(page.url)}.")
+					self.logger.error(
+						f"❌ Visible element with text '{text}' not found at index #{nth} on page {_log_pretty_url(page.url)}."
+			self.logger.error(
+				f"❌ Failed to locate element by text '{text}' on page {_log_pretty_url(page.url)}: {type(e).__name__}: {e}"
+			self.logger.debug(
+				f'❌ Failed to input text into element: {repr(element_node)} on page {_log_pretty_url(page.url)}: {type(e).__name__}: {e}'
+				self.logger.error(f'❌ Error navigating to {url}: {type(e).__name__}: {e}')
+			self.logger.debug(
+				f'❌ Error in find_file_upload_element_by_index(index={index}) on page {_log_pretty_url(page.url)}: {type(e).__name__}: {e}'

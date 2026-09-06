@@ -1,0 +1,35 @@
+# commit 7b53d234c37a 2026-07-03T10:28:39+02:00 src/huggingface_hub/cli/repos.py
+import click
+from ._framework import Argument, Option
+@repos_cli.group_callback(invoke_without_command=True)
+def _repos_callback(ctx: click.Context) -> None:
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+repos_cli.add_group(tag_cli, name="tag")
+repos_cli.add_group(branch_cli, name="branch")
+        Option(
+        Option(
+        Option("--explore", help="Explore your repos as an interactive 3D city."),
+        Option(
+        Option(
+        Option(
+        Option(
+        Argument(
+        Option(
+        Option(
+        Option(
+        Option(
+        Argument(
+        Option(
+        Option(
+        Option(
+        Argument(
+        Option(
+        Argument(
+        Argument(
+        Option(
+        Argument(
+        Option(

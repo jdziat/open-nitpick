@@ -1,0 +1,42 @@
+// commit 0c2eea6338a2 2026-07-30T19:22:49-06:00 pkg/cmd/secret/set/http.go
+	"github.com/cli/cli/v2/internal/safeurl"
+func getPubKey(client *api.Client, host string, path safeurl.SafeURL) (*PubKey, error) {
+	err := client.REST(host, "GET", path.String(), nil, &pk)
+	u, err := safeurl.JoinPath("orgs", orgName, string(app), "secrets", "public-key")
+	if err != nil {
+		return nil, err
+	}
+	return getPubKey(client, host, u)
+	u, err := safeurl.JoinPath("user", "codespaces", "secrets", "public-key")
+	if err != nil {
+		return nil, err
+	}
+	return getPubKey(client, host, u)
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), string(app), "secrets", "public-key")
+	if err != nil {
+		return nil, err
+	}
+	return getPubKey(client, repo.RepoHost(), u)
+	u, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "environments", envName, "secrets", "public-key")
+	if err != nil {
+		return nil, err
+	}
+	return getPubKey(client, repo.RepoHost(), u)
+func putSecret(client *api.Client, host string, path safeurl.SafeURL, payload interface{}) error {
+	return client.REST(host, "PUT", path.String(), requestBody, nil)
+	path, err := safeurl.JoinPath("orgs", orgName, string(app), "secrets", secretName)
+	if err != nil {
+		return err
+	}
+	path, err := safeurl.JoinPath("user", "codespaces", "secrets", key)
+	if err != nil {
+		return err
+	}
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "environments", envName, "secrets", secretName)
+	if err != nil {
+		return err
+	}
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), string(app), "secrets", secretName)
+	if err != nil {
+		return err
+	}

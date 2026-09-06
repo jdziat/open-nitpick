@@ -1,0 +1,35 @@
+// commit fb7cbc8b853f 2026-06-11T13:48:36+02:00 pkg/github/projects.go
+	"github.com/github/github-mcp-server/pkg/ifc"
+			// attachIFC adds the IFC label to a successful result when IFC
+			// labels are enabled. Project titles, item content, field
+			// definitions, and status updates are user-authored free text
+			// (untrusted); confidentiality is conservatively private since the
+			// project's public flag is not available across every sub-result.
+			attachIFC := func(r *mcp.CallToolResult) *mcp.CallToolResult {
+				return attachStaticIFCLabel(ctx, deps, r, ifc.LabelProject(false))
+			}
+
+				result, payload, err := listProjects(ctx, client, args, owner, ownerType)
+				return attachIFC(result), payload, err
+					result, payload, err := listProjectFields(ctx, client, args, owner, ownerType)
+					return attachIFC(result), payload, err
+					result, payload, err := listProjectItems(ctx, client, args, owner, ownerType)
+					return attachIFC(result), payload, err
+					result, payload, err := listProjectStatusUpdates(ctx, gqlClient, args, owner, ownerType)
+					return attachIFC(result), payload, err
+			// attachIFC adds the IFC label to a successful result when IFC
+			// labels are enabled. Project data is user-authored free text
+			// (untrusted); confidentiality is conservatively private since the
+			// project's public flag is not available across every sub-result.
+			attachIFC := func(r *mcp.CallToolResult) *mcp.CallToolResult {
+				return attachStaticIFCLabel(ctx, deps, r, ifc.LabelProject(false))
+			}
+
+				result, payload, err := getProjectStatusUpdate(ctx, gqlClient, statusUpdateID)
+				return attachIFC(result), payload, err
+				result, payload, err := getProject(ctx, client, owner, ownerType, projectNumber)
+				return attachIFC(result), payload, err
+				result, payload, err := getProjectField(ctx, client, owner, ownerType, projectNumber, fieldID)
+				return attachIFC(result), payload, err
+				result, payload, err := getProjectItem(ctx, client, owner, ownerType, projectNumber, itemID, fields)
+				return attachIFC(result), payload, err

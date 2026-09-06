@@ -1,0 +1,39 @@
+// commit cc1aed88d3f5 2026-06-26T07:42:55+01:00 packages/sso/src/routes/sso.ts
+import { runWithTransaction } from "@better-auth/core/context";
+	lockSSOProviderForAccountLink,
+		linked = await runWithTransaction(ctx.context.adapter, async () => {
+			await lockSSOProviderForAccountLink(ctx, provider);
+			return handleOAuthUserInfo(ctx, {
+				userInfo: {
+					email: userInfo.email,
+					name: userInfo.name || "",
+					id: userInfo.id,
+					image: userInfo.image,
+					emailVerified: options?.trustEmailVerified
+						? userInfo.emailVerified || false
+						: false,
+				},
+				account: {
+					idToken: tokenResponse.idToken,
+					accessToken: tokenResponse.accessToken,
+					refreshToken: tokenResponse.refreshToken,
+					accountId: userInfo.id,
+					providerId: provider.providerId,
+					accessTokenExpiresAt: tokenResponse.accessTokenExpiresAt,
+					refreshTokenExpiresAt: tokenResponse.refreshTokenExpiresAt,
+					scope: tokenResponse.scopes?.join(","),
+				},
+				callbackURL,
+				disableSignUp: options?.disableImplicitSignUp && !requestSignUp,
+				overrideUserInfo: config.overrideUserInfo,
+				source: {
+					method: "sso-oidc",
+					sso: { providerId: provider.providerId, profile: rawProfile },
+				},
+				isTrustedProvider,
+				// SSO provider ids are user-controlled and live in the same namespace
+				// as social providers. Never inherit trust from the global
+				// `trustedProviders` list by name — rely solely on the SSO-specific
+				// `isTrustedProvider` (verified domain ownership) computed above.
+				trustProviderByName: false,
+			});

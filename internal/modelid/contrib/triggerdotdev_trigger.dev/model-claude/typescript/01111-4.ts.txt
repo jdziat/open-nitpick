@@ -1,0 +1,91 @@
+// commit 139eede41c9f 2026-06-02T14:21:37+01:00 packages/redis-worker/src/mollifier/buffer.ts
+// Observability-only sorted set of entries currently in DRAINING state
+// (popped by the drainer, not yet acked/failed/requeued). Score is the
+// pop wall-clock in milliseconds — `ZRANGEBYSCORE 0 <now-Xms>` gives
+// the entries stuck mid-drain for longer than X. NOT load-bearing for
+// correctness: the per-entry hash already carries `status` and the
+// stale-sweep would catch stranded entries via the queue LISTs. This
+// set is a fast top-level index for ops (gauge cardinality, post-crash
+// forensics after an ECS OOM) — see `mollifierDrainerWorker` for the
+// gauge wiring.
+export const DRAINING_SET_KEY = "mollifier:draining";
+
+      DRAINING_SET_KEY,
+      DRAINING_SET_KEY,
+      runId,
+      DRAINING_SET_KEY,
+      DRAINING_SET_KEY,
+      runId,
+  // Observability-only: number of entries currently in DRAINING state
+  // (popped, not yet acked/failed/requeued). The gauge in the webapp
+  // drainer worker polls this on a short interval and emits it as
+  // `mollifier.draining.current` for ops dashboards and post-crash
+  // forensics. Cheap (single ZCARD).
+  async getDrainingCount(): Promise<number> {
+    return this.redis.zcard(DRAINING_SET_KEY);
+  }
+
+  // Observability-only: list runIds that have been DRAINING longer than
+  // `olderThanMs` (i.e. popped before `now - olderThanMs`). Bounded by
+  // `limit` to keep the result set tractable when something has gone
+  // very wrong. ZRANGEBYSCORE is O(log N + K). Score is the pop wall-clock
+  // in milliseconds as written by the popAndMarkDraining Lua.
+  async listStaleDraining(olderThanMs: number, limit: number): Promise<string[]> {
+    const maxScore = Date.now() - Math.max(0, olderThanMs);
+    return this.redis.zrangebyscore(
+      DRAINING_SET_KEY,
+      "-inf",
+      String(maxScore),
+      "LIMIT",
+      0,
+      Math.max(0, limit),
+    );
+  }
+
+      numberOfKeys: 3,
+        local drainingSetKey = KEYS[3]
+        -- Observability-only: leaving DRAINING state, so drop the
+        -- entry from the draining-tracker set. ZREM on absent member
+        -- is a no-op.
+        redis.call('ZREM', drainingSetKey, runId)
+      numberOfKeys: 3,
+        local drainingSetKey = KEYS[3]
+        -- Wall-clock millis used as the ZADD score on the draining-tracker
+        -- set. Computed once per script invocation so all observers see
+        -- the same pop instant. redis.call('TIME') is deterministic per
+        -- script execution (Lua sees it as a single read), satisfying the
+        -- write-determinism contract on replicas/AOF replay.
+        local timeArr = redis.call('TIME')
+        local nowMs = tonumber(timeArr[1]) * 1000 + math.floor(tonumber(timeArr[2]) / 1000)
+
+            -- Observability-only: track the runId in the draining set
+            -- with the pop wall-clock as score. Acked/failed/requeued
+            -- in the corresponding Lua scripts. The set is NOT
+            -- load-bearing for correctness — the per-entry hash carries
+            -- status — so a missed ZREM on a partial Lua execution is
+            -- recoverable via the stale-sweep + entry hash, not a
+            -- correctness bug.
+            redis.call('ZADD', drainingSetKey, nowMs, runId)
+      numberOfKeys: 2,
+        local drainingSetKey = KEYS[2]
+        local runId = ARGV[2]
+
+        -- Always ZREM from the draining-tracker — even if the entry hash
+        -- has been concurrently torn down, the runId might still be in
+        -- the set (e.g. fail() ran first and cleared the hash but a
+        -- delayed ack races in). Idempotent: ZREM on absent is a no-op.
+        redis.call('ZREM', drainingSetKey, runId)
+      numberOfKeys: 2,
+        local drainingSetKey = KEYS[2]
+        local runId = ARGV[2]
+
+        -- Always ZREM from the draining-tracker (idempotent on absent).
+        -- Mirrors ack: the runId may be in the set even if the entry hash
+        -- has been raced away.
+        redis.call('ZREM', drainingSetKey, runId)
+      drainingSetKey: string,
+      drainingSetKey: string,
+      drainingSetKey: string,
+      runId: string,
+      drainingSetKey: string,
+      runId: string,

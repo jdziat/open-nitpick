@@ -1,0 +1,207 @@
+// commit 0fb10fca7d13 2025-09-15T10:13:55-06:00 pkg/cmd/agent-task/shared/log.go
+	"github.com/cli/cli/v2/pkg/markdown"
+	Follow(fetcher func() ([]byte, error), w io.Writer, io *iostreams.IOStreams) error
+	Render(logs []byte, w io.Writer, io *iostreams.IOStreams) (stop bool, err error)
+func (r *logRenderer) Follow(fetcher func() ([]byte, error), w io.Writer, io *iostreams.IOStreams) error {
+		if stop, err := r.Render([]byte(diff), w, io); err != nil {
+func (r *logRenderer) Render(logs []byte, w io.Writer, io *iostreams.IOStreams) (bool, error) {
+		if stop, err := renderLogEntry(entry, w, io); err != nil {
+func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.IOStreams) (bool, error) {
+	cs := io.ColorScheme()
+				renderRawMarkdown(choice.Delta.Content, w, io)
+			renderRawMarkdown(choice.Delta.ReasoningText, w, io)
+					renderToolCall(w, cs, "Start "+v.Name+" MCP server", "")
+				fmt.Fprintf(w, "View %s\n", cs.Bold(relativePath(args.Path)))
+
+				// TODO: Strip the diff formatting from this, but for now render as it is.
+				if err := renderFileContentAsMarkdown("output.diff", choice.Delta.Content, w, io); err != nil {
+					return false, fmt.Errorf("failed to render viewed file content: %w", err)
+				}
+						renderToolCall(w, cs, "Bash", v.Description)
+						renderToolCall(w, cs, "Run Bash command", "")
+					}
+
+					contentWithCommand := choice.Delta.Content
+					if v.Command != "" {
+						contentWithCommand = fmt.Sprintf("%s\n%s", v.Command, choice.Delta.Content)
+					}
+					if err := renderFileContentAsMarkdown("commands.sh", contentWithCommand, w, io); err != nil {
+						return false, fmt.Errorf("failed to render bash command output: %w", err)
+			// GUI does not support these.
+			// case "write_bash":
+			// 	if v := unmarshal[writeBashToolArgs](args); v != nil {
+			// 		renderToolCallTitle("Send input to Bash session " + v.SessionID)
+			// 		continue
+			// 	}
+			// case "read_bash":
+			// 	if v := unmarshal[readBashToolArgs](args); v != nil {
+			// 		renderToolCallTitle("Read logs from Bash session " + v.SessionID)
+			// 		continue
+			// 	}
+			// case "stop_bash":
+			// 	if v := unmarshal[stopBashToolArgs](args); v != nil {
+			// 		renderToolCallTitle("Stop Bash session " + v.SessionID)
+			// 		continue
+			// 	}
+			// case "async_bash":
+			// 	if v := unmarshal[asyncBashToolArgs](args); v != nil {
+			// 		renderToolCallTitle("Start or send input to long-running Bash session " + v.SessionID)
+			// 		continue
+			// 	}
+			// case "read_async_bash":
+			// 	if v := unmarshal[readAsyncBashToolArgs](args); v != nil {
+			// 		renderToolCallTitle("View logs from long-running Bash session " + v.SessionID)
+			// 		continue
+			// 	}
+			// case "stop_async_bash":
+			// 	if v := unmarshal[stopAsyncBashToolArgs](args); v != nil {
+			// 		renderToolCallTitle("Stop long-running Bash session " + v.SessionID)
+			// 		continue
+			// 	}
+			case "think":
+
+				renderToolCall(w, cs, "Thought", "")
+				if err := renderRawMarkdown(args.Thought, w, io); err != nil {
+					return false, fmt.Errorf("failed to render thought: %w", err)
+				}
+				renderToolCall(w, cs, "Progress update", cs.Bold(args.CommitMessage))
+				renderToolCall(w, cs, "Create", cs.Bold(relativePath(args.Path)))
+
+				if err := renderFileContentAsMarkdown(args.Path, args.FileText, w, io); err != nil {
+					return false, fmt.Errorf("failed to render created file content: %w", err)
+				}
+				renderToolCall(w, cs, "Edit", cs.Bold(relativePath(args.Path)))
+				if err := renderFileContentAsMarkdown("output.diff", choice.Delta.Content, w, io); err != nil {
+					return false, fmt.Errorf("failed to render str_replace diff: %w", err)
+				}
+			default:
+				// Unknown tool call. For example for "codeql_checker":
+				// NOTE: omit the delta.content since we don't know how large could that be
+				renderGenericToolCall(w, cs, name)
+
+				// If it's JSON, treat it as such, otherwise we skip whatever the content is.
+				var contentAsJSON any
+				if err := json.Unmarshal([]byte(choice.Delta.Content), &contentAsJSON); err == nil {
+					marshaled, err := json.MarshalIndent(contentAsJSON, "", "  ")
+					if err == nil {
+						choice.Delta.Content = string(marshaled)
+					}
+
+					if err := renderFileContentAsMarkdown("output.json", string(marshaled), w, io); err != nil {
+						return false, fmt.Errorf("failed to render output.json: %w", err)
+					}
+				}
+			}
+func renderRawMarkdown(md string, w io.Writer, io *iostreams.IOStreams) error {
+	// Glamour doesn't add leading newlines when content is a complete
+	// markdown document. So, we have to add the leading newline.
+	paddingFunc := func(s string) string {
+		return fmt.Sprintf("\n%s\n\n", s)
+	}
+
+	return renderMarkdownWithPadding(md, w, io, paddingFunc)
+}
+
+// renderMarkdownWithPadding renders the given markdown string to the given writer.
+// If a paddingFunc is provided, the md string is ran through it before
+// rendering. This can be used to add newlines before and after the content.
+func renderMarkdownWithPadding(md string, w io.Writer, io *iostreams.IOStreams, paddingFunc func(string) string) error {
+	rendered, err := markdown.Render(md,
+		markdown.WithTheme(io.TerminalTheme()),
+		markdown.WithWrap(io.TerminalWidth()),
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to render markdown: %w", err)
+	}
+
+	rendered = strings.TrimSpace(rendered)
+	if paddingFunc != nil {
+		rendered = paddingFunc(rendered)
+	}
+
+	fmt.Fprint(w, rendered)
+
+	return nil
+}
+
+// renderFileContentAsMarkdown renders the given content as markdown
+// based on the file extension of the path.
+func renderFileContentAsMarkdown(path, content string, w io.Writer, io *iostreams.IOStreams) error {
+	parts := strings.Split(path, ".")
+	lang := parts[len(parts)-1]
+	content = strings.TrimSpace(content)
+
+	if lang == "md" {
+		return renderMarkdownWithPadding(content, w, io, nil)
+	}
+
+	md := fmt.Sprintf("```%s\n%s\n```", lang, content)
+	// Glamour adds leading newlines when content is only a code block,
+	// so we only want to add a trailing newline.
+	paddingFunc := func(s string) string {
+		return fmt.Sprintf("%s\n\n", s)
+	}
+
+	return renderMarkdownWithPadding(md, w, io, paddingFunc)
+}
+
+func relativePath(absPath string) string {
+	relPath := strings.TrimPrefix(absPath, "/home/runner/work/")
+
+	parts := strings.Split(relPath, "/")
+
+	// The last two parts of the path are the
+	// repo name and the repo owner.
+	// If that's all we have (or less),
+	// we return a friendly name "repository".
+	if len(parts) > 2 {
+		// Drop the repo owner and name, returning the remaining path.
+		return strings.Join(parts[2:], "/")
+	}
+	return "repository"
+}
+
+func renderToolCall(w io.Writer, cs *iostreams.ColorScheme, descriptor, title string) {
+	if title != "" {
+		title = cs.Bold(title)
+	}
+	if descriptor != "" && title != "" {
+		fmt.Fprintf(w, "%s: %s\n", descriptor, title)
+		fmt.Fprintf(w, "%s\n", descriptor)
+		fmt.Fprintf(w, "%s\n", title)
+func renderGenericToolCall(w io.Writer, cs *iostreams.ColorScheme, name string) {
+	genericToolCallTitles := map[string]string{
+		"codeql_checker":                       "Run CodeQL analysis",
+		"github-mcp-server-list_issues":        "List issues on GitHub",
+		"github-mcp-server-list_pull_requests": "List pull requests on GitHub",
+	}
+
+	descriptor, ok := genericToolCallTitles[name]
+	if !ok {
+		descriptor = fmt.Sprintf("Call to %s", name)
+	}
+
+	renderToolCall(w, cs, descriptor, "")
+// type readBashToolArgs struct {
+// 	SessionID string `json:"sessionId"`
+// }
+// type writeBashToolArgs struct {
+// 	SessionID string `json:"sessionId"`
+// 	Input     string `json:"input"`
+// }
+// type stopBashToolArgs struct {
+// 	SessionID string `json:"sessionId"`
+// }
+// type asyncBashToolArgs struct {
+// 	Command   string `json:"command"`
+// 	SessionID string `json:"sessionId"`
+// }
+// type readAsyncBashToolArgs struct {
+// 	SessionID string `json:"sessionId"`
+// }
+// type stopAsyncBashToolArgs struct {
+// 	SessionID string `json:"sessionId"`
+// }
+	SessionID string `json:"sessionId"`
+	Thought   string `json:"thought"`

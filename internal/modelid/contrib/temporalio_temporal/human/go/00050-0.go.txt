@@ -1,0 +1,33 @@
+// commit de46aa8d2540 2025-10-31T15:32:16+00:00 common/softassert/softassert.go
+type sometimesLogger struct {
+	logger log.Logger
+}
+
+// Sometimes is used to log a message of a noteworthy but non-problematic event.
+//
+// Example:
+// softassert.Sometimes(logger).Warn("termination event", tag.NewStringTag("state", object.state))
+func Sometimes(logger log.Logger) *sometimesLogger {
+	return &sometimesLogger{logger: logger}
+}
+
+// Debug logs a message at debug level.
+func (s *sometimesLogger) Debug(staticMessage string, tags ...tag.Tag) {
+	s.logger.Debug(staticMessage, tags...)
+}
+
+// Info logs a message at info level.
+// `staticMessage` is expected to be a static string to help with grouping and searching logs.
+// Dynamic information should be passed via `tags`.
+func (s *sometimesLogger) Info(staticMessage string, tags ...tag.Tag) {
+	s.logger.Info(staticMessage, tags...)
+// Warn logs a message at warn level.
+func (s *sometimesLogger) Warn(staticMessage string, tags ...tag.Tag) {
+	s.logger.Warn(staticMessage, tags...)
+}
+
+// Error logs a message at error level.
+// `staticMessage` is expected to be a static string to help with grouping and searching logs.
+// Dynamic information should be passed via `tags`.
+func (s *sometimesLogger) Error(staticMessage string, tags ...tag.Tag) {
+	s.logger.Error(staticMessage, tags...)

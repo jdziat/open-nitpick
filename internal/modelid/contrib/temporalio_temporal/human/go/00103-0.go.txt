@@ -1,0 +1,75 @@
+// commit d5ba6df06835 2025-11-18T18:38:06-06:00 common/persistence/visibility/store/sql/visibility_store.go
+	saTypeMap, err := s.searchAttributesProvider.GetSearchAttributes(s.GetIndexName(), false)
+	if err != nil {
+		return nil, err
+	}
+
+	saMapper, err := s.searchAttributesMapperProvider.GetMapper(request.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	queryParams, err := buildQueryParams(
+		request.Namespace,
+		request.NamespaceID,
+		request.Query,
+		sqlQC,
+		saTypeMap,
+		saMapper,
+	)
+	queryString, queryArgs := sqlQC.BuildSelectStmt(queryParams, request.PageSize, pageToken)
+	saTypeMap, err := s.searchAttributesProvider.GetSearchAttributes(s.GetIndexName(), false)
+	if err != nil {
+		return nil, err
+	}
+
+	saMapper, err := s.searchAttributesMapperProvider.GetMapper(request.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	queryParams, err := buildQueryParams(
+		request.Namespace,
+		request.NamespaceID,
+		request.Query,
+		sqlQC,
+		saTypeMap,
+		saMapper,
+	)
+	queryString, queryArgs := sqlQC.BuildCountStmt(queryParams)
+
+func buildQueryParams(
+	namespaceName namespace.Name,
+	namespaceID namespace.ID,
+	queryString string,
+	sqlQC *SQLQueryConverter,
+	saTypeMap searchattribute.NameTypeMap,
+	saMapper searchattribute.Mapper,
+) (*query.QueryParams[sqlparser.Expr], error) {
+	c := query.NewQueryConverter(sqlQC, namespaceName, saTypeMap, saMapper)
+	queryParams, err := c.Convert(queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	nsFilterExpr, err := sqlQC.ConvertComparisonExpr(
+		sqlparser.EqualStr,
+		query.NamespaceIDSAColumn,
+		namespaceID.String(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	queryParams.QueryExpr, err = sqlQC.BuildAndExpr(nsFilterExpr, queryParams.QueryExpr)
+	if err != nil {
+		return nil, err
+	}
+
+	// ORDER BY is not support in SQL visibility store
+	if len(queryParams.OrderBy) > 0 {
+		return nil, query.NewConverterError("%s: 'ORDER BY' clause", query.NotSupportedErrMessage)
+	}
+
+	return queryParams, nil
+}

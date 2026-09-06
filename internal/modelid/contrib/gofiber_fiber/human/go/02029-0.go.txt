@@ -1,0 +1,47 @@
+// commit 4aab02f6f710 2026-08-24T22:25:19+05:30 client/hooks.go
+	"unicode/utf8"
+	uri, err := substitutePathParams(uri, req.path, *c.path)
+	if err != nil {
+		return err
+	}
+// placeholders; and each value is percent-encoded with path-segment rules, so
+// a "/", "?" or "#" inside a value cannot restructure the request target.
+//
+// A placeholder in the authority is filled verbatim and its value is checked
+// against isHostSafe instead, returning ErrPathParamInHost when it fails.
+func substitutePathParams(uri string, sources ...PathParam) (string, error) {
+		return uri, nil
+		// The colons inside an IPv6 literal belong to the address, so
+		// "http://[2001:db8::1]/x" must not be rewritten by a "db8" parameter.
+		if i < authEnd && inIPv6Literal(uri[:i]) {
+			continue
+		}
+
+			if !isHostSafe(val) {
+				return "", fmt.Errorf("%w: %q", ErrPathParamInHost, name)
+			}
+			buf = append(buf, val...)
+		return uri, nil
+	return string(append(buf, uri[last:]...)), nil
+// isHostSafe reports whether val may be substituted into a URI authority
+// verbatim. Percent-encoding is not an option there: fasthttp rejects a "%XX"
+// below 0x80 inside a host, and it then abandons the rest of the URI, so a
+// value that would need escaping has to fail the request instead. The set is
+// RFC 3986's unreserved characters plus the sub-delims a host parse keeps, and
+// any non-ASCII byte, which fasthttp passes through. ":" and "@" are excluded
+// deliberately: they would add a port or a userinfo section, and a value of
+// "x@evil.com" in "http://:host/api" would send the request to evil.com.
+func isHostSafe(val string) bool {
+		switch c := val[i]; {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		case c == '-', c == '.', c == '_', c == '~':
+		case c == '$', c == '&', c == '+', c == '=':
+		case c >= utf8.RuneSelf:
+			return false
+	return true
+}
+
+// inIPv6Literal reports whether the authority prefix ends inside a "[...]"
+// IPv6 literal.
+func inIPv6Literal(prefix string) bool {
+	return strings.LastIndexByte(prefix, '[') > strings.LastIndexByte(prefix, ']')

@@ -1,0 +1,62 @@
+// commit 1d9b55cfdb78 2026-09-03T20:25:17+00:00 packages/cimd/src/node.test.ts
+import { describe, expect, it, vi } from "vitest";
+vi.mock(import("node:dns/promises"), () => ({ lookup: mocks.lookup }));
+vi.mock(import("node:https"), () => ({ request: mocks.request }));
+interface MockLookupAddress {
+	address: string;
+	family: number;
+}
+
+	lookupOptions?: { all?: boolean };
+					lookupOptions: { all?: boolean },
+						result: string | MockLookupAddress[],
+						family?: number,
+				requestOptions.lookup(
+					"client.example.com",
+					options.lookupOptions ?? {},
+					(error, result) => {
+						if (error) {
+							request.emit("error", error);
+							return;
+						}
+
+						if (options.lookupOptions?.all && !Array.isArray(result)) {
+							request.emit("error", new TypeError("Invalid IP address"));
+							return;
+						}
+
+						const response = Readable.from([
+							Buffer.from(options.body ?? "metadata"),
+						]) as Readable & {
+							headers: Record<string, string>;
+							statusCode: number;
+							statusMessage: string;
+						};
+						response.headers = options.headers ?? {
+							"content-type": "application/json",
+						};
+						response.statusCode = options.status ?? 200;
+						response.statusMessage = "OK";
+						onResponse(response);
+					},
+				);
+	/**
+	 * @see https://github.com/better-auth/better-auth/issues/10810
+	 */
+	it("fetches metadata when Node requests all addresses", async () => {
+		mocks.lookup.mockResolvedValue([
+			{ address: "93.184.216.34", family: 4 },
+			{ address: "2606:2800:220:1:248:1893:25c8:1946", family: 6 },
+		]);
+		mockHttpsResponse({
+			body: "ok",
+			lookupOptions: { all: true },
+		});
+
+		const response = await fetchClientMetadataResource(
+			"https://client.example.com/client.json",
+		);
+
+		expect(await response.text()).toBe("ok");
+	});
+

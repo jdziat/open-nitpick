@@ -1,0 +1,67 @@
+// commit 562d26fc8335 2026-04-23T07:39:36-07:00 service/worker/workerdeployment/client.go
+	"strconv"
+	"go.temporal.io/server/common/cache"
+	// revisionNumber is used to compose a stable RequestId on the signal so concurrent signals
+	// for the same (deployment, buildID, revisionNumber) tuple are deduplicated by the receiver
+	// via Temporal's built-in pendingSignalRequestedIDs mechanism.
+		revisionNumber int64,
+// reactivationVersionKey identifies one target version workflow for reactivation-signal dedup.
+type reactivationVersionKey struct {
+	namespaceID    string
+	deploymentName string
+	buildID        string
+}
+
+
+	// highestRevSignaledToVersionWf is a per-pod LRU that holds, for each target version
+	// workflow, the highest revision number this pod has successfully signaled for
+	// reactivation. A reactivation signal for the same or older revision is skipped.
+	// Size-bounded by ReactivationSignalDedupCacheMaxSize; LRU eviction is pure memory
+	// hygiene, not part of the dedup contract. Cross-pod deduplication is handled
+	// separately by the deterministic UUID RequestId on each signal.
+	highestRevSignaledToVersionWf cache.Cache
+	revisionNumber int64,
+	key := reactivationVersionKey{
+		namespaceID:    namespaceEntry.ID().String(),
+		deploymentName: deploymentName,
+		buildID:        buildID,
+	}
+	metricsHandler := d.metricsHandler.WithTags(
+		metrics.CacheTypeTag(metrics.ReactivationSignalDedupCacheTypeTagValue),
+		metrics.OperationTag(metrics.ReactivationSignalDedupScope),
+		metrics.NamespaceIDTag(namespaceEntry.ID().String()),
+	)
+	metrics.CacheRequests.With(metricsHandler).Record(1)
+
+	if stored := d.highestRevSignaledToVersionWf.Get(key); stored != nil {
+		if storedRev, ok := stored.(int64); ok && revisionNumber <= storedRev {
+			// This pod has already signaled the target version workflow at this revision
+			// or a newer one; skip to avoid a redundant RPC. Another pod may still send;
+			// the receiver dedups via the deterministic UUID RequestId.
+			return nil
+		}
+	}
+	metrics.CacheMissCounter.With(metricsHandler).Record(1)
+
+	// Deterministic UUID v5 RequestId derived from the revision number. Multiple history
+	// pods that independently decide to reactivate the same version at the same revision
+	// compute the same RequestId and fold into a single signal delivery, since the receiver
+	// dedups on RequestId.
+	//
+	// Revision alone is enough input because the dedup is scoped to this one version
+	// workflow (addressed by workflowID); different (deployment, build) pairs at the same
+	// revision don't collide because they're different workflows.
+	requestID := uuid.NewSHA1(
+		uuid.Nil,
+		[]byte("reactivation-signal:"+strconv.FormatInt(revisionNumber, 10)),
+	).String()
+
+			RequestId:  requestID,
+	if err != nil {
+		return err
+	}
+
+	// Record success so subsequent calls to the same version workflow for this or older
+	// revisions skip the RPC.
+	d.highestRevSignaledToVersionWf.Put(key, revisionNumber)
+	return nil

@@ -1,0 +1,55 @@
+// commit 0a6ce2bb74b5 2025-05-20T18:35:40-04:00 pkg/cmd/release/verify-asset/verify-asset.go
+func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions) error) *cobra.Command {
+	opts := &attestation.AttestOptions{}
+			opts.TagName = args[0]
+			opts.FilePath = args[1]
+			httpClient, err := f.HttpClient()
+			baseRepo, err := f.BaseRepo()
+			logger := att_io.NewHandler(f.IOStreams)
+
+			*opts = attestation.AttestOptions{
+				TagName:       opts.TagName,
+				FilePath:      opts.FilePath,
+				HttpClient:    httpClient,
+				BaseRepo:      baseRepo,
+				IO:            f.IOStreams,
+				Exporter:      opts.Exporter,
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if runF != nil {
+				return runF(opts)
+			td, err := opts.APIClient.GetTrustDomain()
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to get trust domain"))
+			ec, err := attestation.NewEnforcementCriteria(opts, opts.Logger)
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build policy information"))
+				Logger:       opts.Logger,
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
+			opts.SigstoreVerifier = sigstoreVerifier
+			opts.EC = ec
+			return verifyAssetRun(opts)
+	ref, err := shared.FetchRefSHA(ctx, opts.HttpClient, opts.BaseRepo, opts.TagName)
+	releaseRefDigest := artifact.NewDigestedArtifactForRelease(ref, "sha1")
+	opts.Logger.Printf("Resolved %s to %s\n", opts.TagName, releaseRefDigest.DigestWithAlg())
+	attestations, logMsg, err := attestation.GetAttestations(opts, releaseRefDigest.DigestWithAlg())
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), releaseRefDigest.DigestWithAlg())
+	// Filter attestations by tag
+	filteredAttestations, err := attestation.FilterAttestationsByTag(attestations, opts.TagName)
+	if err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
+		return err
+	}
+
+	filteredAttestations, err = attestation.FilterAttestationsByFileDigest(filteredAttestations, opts.Repo, opts.TagName, fileDigest.Digest())
+	if err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
+		return err
+	}
+
+	if len(filteredAttestations) == 0 {
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for %s\n"), fileName)
+		return nil
+	}
+	verified, errMsg, err := attestation.VerifyAttestations(*releaseRefDigest, filteredAttestations, opts.SigstoreVerifier, opts.EC)
+	opts.Logger.Printf("Attestation found matching release %s (%s)\n", opts.TagName, releaseRefDigest.DigestWithAlg())

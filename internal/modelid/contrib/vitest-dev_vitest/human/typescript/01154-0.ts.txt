@@ -1,0 +1,37 @@
+// commit 658affeb3388 2026-08-11T13:54:22+02:00 packages/vitest/src/node/reporters/base.ts
+  private _printedSuites = new Set<string>()
+    this._printedSuites.clear()
+
+      this.printAncestorSuites(test)
+      this.printAncestorSuites(test)
+      this.printAncestorSuites(test)
+    this.printSuiteEntry(testSuite)
+  }
+
+  private printSuiteEntry(testSuite: TestSuite): void {
+    if (this._printedSuites.has(testSuite.id)) {
+      return
+    }
+    this._printedSuites.add(testSuite.id)
+
+  // When a test line is emitted while renderSucceed is off (e.g. slow tests
+  // or inline benchmarks in CI), its parent describe suites were never printed
+  // by the outer visitor. Walk up and print any that are still missing so the
+  // nesting matches what the TTY output would show.
+  private printAncestorSuites(test: TestCase): void {
+    if (this.renderSucceed) {
+      return
+    }
+
+    const suites: TestSuite[] = []
+    let parent = test.parent
+    while (parent.type === 'suite' && !this._printedSuites.has(parent.id)) {
+      suites.push(parent)
+      parent = parent.parent
+    }
+
+    for (let i = suites.length - 1; i >= 0; i--) {
+      this.printSuiteEntry(suites[i])
+    }
+  }
+

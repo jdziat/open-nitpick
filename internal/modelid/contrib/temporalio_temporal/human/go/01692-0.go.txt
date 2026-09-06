@@ -1,0 +1,55 @@
+// commit 32e366289f35 2026-08-14T17:13:43-07:00 tools/flakereport/writer.go
+	// Flaky tests section
+type bisectTableRow struct {
+	testName string
+	suspect  BisectResult
+}
+
+func buildBisectTableRows(reports []TestBisectReport) []bisectTableRow {
+	rankedReports := make([]TestBisectReport, 0, len(reports))
+	for _, report := range reports {
+		if !report.Skipped && len(report.TopSuspects) > 0 {
+			rankedReports = append(rankedReports, report)
+		}
+	}
+	sort.Slice(rankedReports, func(i, j int) bool {
+		pi := rankedReports[i].TopSuspects[0].Probability
+		pj := rankedReports[j].TopSuspects[0].Probability
+		if pi != pj {
+			return pi > pj
+		}
+		return rankedReports[i].TestName < rankedReports[j].TestName
+	})
+
+	var rows []bisectTableRow
+	for _, report := range rankedReports {
+		for _, suspect := range report.TopSuspects {
+			rows = append(rows, bisectTableRow{testName: report.TestName, suspect: suspect})
+		}
+	}
+	return rows
+}
+
+// writeBisectTable writes suspect (test, commit) pairs into a single flat table.
+func writeBisectTable(sb *strings.Builder, rows []bisectTableRow, repo string) {
+	for _, row := range rows {
+		s := row.suspect
+		shortSHA := s.CommitSHA
+		if len(shortSHA) > 7 {
+			shortSHA = shortSHA[:7]
+		commitURL := github.CommitURL(repo, s.CommitSHA)
+		title := s.CommitTitle
+		if title == s.CommitSHA || title == "" {
+			title = shortSHA
+		beforeStr := fmt.Sprintf("%d/%d (%.0f%%)", s.FailsBefore, s.PassesBefore+s.FailsBefore,
+			pct(s.FailsBefore, s.PassesBefore+s.FailsBefore))
+		afterStr := fmt.Sprintf("%d/%d (%.0f%%)", s.FailsAfter, s.PassesAfter+s.FailsAfter,
+			pct(s.FailsAfter, s.PassesAfter+s.FailsAfter))
+		fmt.Fprintf(sb, "| `%s` | %.1f%% | [%s](%s) %s | %s | %s | %s | %s | %s |\n",
+			escapeTableCell(row.testName), s.Probability*100, shortSHA, commitURL, escapeTableCell(title),
+			s.CommitDate, escapeTableCell(s.CommitAuthor), beforeStr, afterStr, escapeTableCell(s.HeuristicNote))
+	rows := limitReportRows(buildBisectTableRows(reports))
+	writeBisectTable(&sb, rows, repo)
+// writeGitHubSummary writes content to GITHUB_STEP_SUMMARY (if set)
+// and always writes it to outputDir/github-report.md.
+func writeGitHubSummary(content, outputDir string) error {

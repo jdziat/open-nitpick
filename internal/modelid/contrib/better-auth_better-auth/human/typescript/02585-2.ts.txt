@@ -1,0 +1,202 @@
+// commit ed61b4798e0c 2026-07-22T06:53:55-04:00 packages/better-auth/src/oauth2/link-account.ts
+import {
+	queueAfterTransactionHook,
+	runWithTransaction,
+} from "@better-auth/core/context";
+import { APIError } from "@better-auth/core/error";
+		selectedUser?:
+			| {
+					userId: string;
+					profile: "preserve" | "update";
+			  }
+			| undefined;
+		deferNonDatabaseWrites?: boolean | undefined;
+		requireExactAccountBinding?: boolean | undefined;
+	const requireExactAccountBinding =
+		!!opts.selectedUser || opts.requireExactAccountBinding === true;
+	let pendingAccountCookie: Account | null = null;
+			if (
+				opts.selectedUser &&
+				accountOwner.user.id !== opts.selectedUser.userId
+			) {
+				throw new APIError("CONFLICT", {
+					code: "account_ownership_conflict",
+					message: "Account is already linked to another user",
+				});
+			}
+			if (
+				requireExactAccountBinding &&
+				accountOwner.account.providerId !== account.providerId
+			) {
+				throw new APIError("CONFLICT", {
+					code: "account_provider_conflict",
+					message: "Account is already linked through another provider",
+				});
+			}
+		if (opts.selectedUser) {
+			const selectedUser = await c.context.internalAdapter.findUserById(
+				opts.selectedUser.userId,
+			);
+			if (!selectedUser) {
+				throw new APIError("NOT_FOUND", {
+					code: "user_not_found",
+					message: "User not found",
+				});
+			}
+			return {
+				user: selectedUser,
+				linkedAccount: null,
+				accounts: [],
+			};
+		}
+		if (isAPIError(e)) throw e;
+				!opts.selectedUser &&
+				((!isTrustedProvider && !userInfo.emailVerified) ||
+					(requireLocalEmailVerified && !dbUser.user.emailVerified) ||
+					accountLinking?.enabled === false ||
+					accountLinking?.disableImplicitLinking === true)
+				const createdAccount = await c.context.internalAdapter.linkAccount({
+				if (!createdAccount) {
+					return {
+						error: "unable to link account",
+						data: null,
+					};
+				}
+				if (
+					requireExactAccountBinding &&
+					(createdAccount.issuer !== account.issuer ||
+						createdAccount.providerAccountId !== account.providerAccountId ||
+						createdAccount.providerId !== account.providerId ||
+						createdAccount.userId !== dbUser.user.id)
+				) {
+					throw new APIError("CONFLICT", {
+						code: "account_hook_binding_conflict",
+						message: "Account hook changed the selected authentication binding",
+					});
+				}
+				if (c.context.options.account?.storeAccountCookie) {
+					if (opts.deferNonDatabaseWrites)
+						pendingAccountCookie = createdAccount;
+					else await setAccountCookie(c, createdAccount);
+				}
+				!opts.selectedUser &&
+			if (!opts.selectedUser) {
+				user =
+					(await applyUpdateUserInfoOnLink(c, dbUser.user.id, userInfo)) ??
+					user;
+			}
+				const accountCookie = {
+				};
+				if (opts.deferNonDatabaseWrites) pendingAccountCookie = accountCookie;
+				else await setAccountCookie(c, accountCookie);
+				const updatedAccount = await c.context.internalAdapter.updateAccount(
+				if (!updatedAccount) {
+					return {
+						error: "unable to update account",
+						data: null,
+					};
+				}
+				if (
+					requireExactAccountBinding &&
+					(updatedAccount.issuer !== account.issuer ||
+						updatedAccount.providerAccountId !== account.providerAccountId ||
+						updatedAccount.providerId !== account.providerId ||
+						updatedAccount.userId !== dbUser.user.id)
+				) {
+					throw new APIError("CONFLICT", {
+						code: "account_hook_binding_conflict",
+						message: "Account hook changed the selected authentication binding",
+					});
+				}
+				if (opts.deferNonDatabaseWrites && pendingAccountCookie) {
+					pendingAccountCookie = updatedAccount;
+				}
+				!opts.selectedUser &&
+		if (
+			opts.selectedUser
+				? opts.selectedUser.profile === "update"
+				: overrideUserInfo
+		) {
+			if (
+				opts.selectedUser &&
+				updatedUser &&
+				updatedUser.id !== opts.selectedUser.userId
+			) {
+				throw new APIError("CONFLICT", {
+					code: "user_hook_selection_conflict",
+					message: "User hook changed the selected user",
+				});
+			}
+			if (
+				requireExactAccountBinding &&
+				(createdAccount.issuer !== account.issuer ||
+					createdAccount.providerAccountId !== account.providerAccountId ||
+					createdAccount.providerId !== account.providerId ||
+					createdAccount.userId !== createdUser.id)
+			) {
+				throw new APIError("CONFLICT", {
+					code: "account_hook_binding_conflict",
+					message: "Account hook changed the selected authentication binding",
+				});
+			}
+				if (opts.deferNonDatabaseWrites) pendingAccountCookie = createdAccount;
+				else await setAccountCookie(c, createdAccount);
+		await dispatchVerificationEmail(
+			c,
+			user,
+			callbackURL,
+			opts.deferNonDatabaseWrites,
+		);
+			await dispatchVerificationEmail(
+				c,
+				user,
+				callbackURL,
+				opts.deferNonDatabaseWrites,
+			);
+	const session = await c.context.internalAdapter.createSession(
+		user.id,
+		undefined,
+		undefined,
+		undefined,
+		{ deferSecondaryStorageWrites: opts.deferNonDatabaseWrites === true },
+	);
+	if (
+		requireExactAccountBinding &&
+		session.userId !== (opts.selectedUser?.userId ?? user.id)
+	) {
+		throw new APIError("CONFLICT", {
+			code: "session_hook_user_conflict",
+			message: "Session hook changed the selected user",
+		});
+	}
+		accountCookie: pendingAccountCookie,
+	deferUntilAfterTransaction?: boolean | undefined,
+	const send = async () => {
+		try {
+			const token = await createEmailVerificationToken(
+				c.context.secret,
+				user.email,
+				undefined,
+				c.context.options.emailVerification?.expiresIn,
+			);
+			const url = `${c.context.baseURL}/verify-email?token=${token}&callbackURL=${encodeURIComponent(
+				callbackURL || "/",
+			)}`;
+			await c.context.runInBackgroundOrAwait(
+				sendVerificationEmail(
+					{
+						user,
+						url,
+						token,
+					},
+					c.request,
+				),
+			);
+		} catch (e) {
+			c.context.logger.error("Failed to send OAuth verification email", e);
+		}
+	};
+	if (deferUntilAfterTransaction) {
+		await queueAfterTransactionHook(send);
+	} else {
+		await send();

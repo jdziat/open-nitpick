@@ -1,0 +1,81 @@
+// commit e6e3a4e84146 2026-08-06T09:04:10+01:00 pkg/github/issues.go
+					"1. get - Get issue details. Also returns best-effort hierarchy flags (`has_parent`, `has_children`); `parent` and `sub_issues_summary` are optional relationship summaries, and `closed_by_pull_requests` summarizes the pull requests configured to close the issue as `total_count` plus up to 5 `references`.\n" +
+// parent, sub_issues_summary), the closing pull request references, and field_values onto the
+// minimal issue. In lockdown mode references whose content cannot be verified as safe are omitted;
+// has_parent and the numeric counts are structural routing signals and are always safe to surface.
+		if !lockdownMode || isSafeRefContent(ctx, cache, parent.Ref.Repository, parent.AuthorLogin) {
+	// A zero total is meaningful here: it tells an agent that nothing is currently set up to close
+	// the issue, so it does not need to fall back to scanning pull requests. Only a few references
+	// are embedded, so total_count is what distinguishes a complete list from a truncated one.
+	closing := MinimalClosingPullRequests{
+		TotalCount: enrichment.ClosedByPullRequestsTotal,
+		References: make([]MinimalPullRequestRef, 0, len(enrichment.ClosedByPullRequests)),
+	}
+	for _, pr := range enrichment.ClosedByPullRequests {
+		if lockdownMode && !isSafeRefContent(ctx, cache, pr.Ref.Repository, pr.AuthorLogin) {
+			continue
+		}
+		closing.References = append(closing.References, pr.Ref)
+	}
+	minimalIssue.ClosedByPullRequests = &closing
+
+// isSafeRefContent reports whether a related issue or pull request reference can be exposed under
+// lockdown mode. It fails closed: any inability to positively verify safe content (missing cache,
+// missing author, unparseable repository, or a lookup error) results in the reference being omitted.
+func isSafeRefContent(ctx context.Context, cache *lockdown.RepoAccessCache, repository, authorLogin string) bool {
+	if cache == nil || authorLogin == "" {
+	owner, repo, ok := strings.Cut(repository, "/")
+	safe, err := cache.IsSafeContent(ctx, authorLogin, owner, repo)
+// parent reference, closing pull request references, and sub-issue summary counts for the issues
+// identified by their node IDs. It powers the issue_read `get` relationship signals without adding
+// extra round-trips.
+//
+// closedByPullRequestsReferences needs includeClosedPrs so that a merged or closed pull request
+// still explains why an issue was closed, and orderByState so that open pull requests come first.
+// Only a handful of references are embedded because this enrichment runs on every issue_read `get`;
+// totalCount is selected so that a truncated list is never mistaken for the complete set.
+			ClosedByPullRequestsReferences struct {
+				TotalCount githubv4.Int
+				Nodes      []struct {
+					Number githubv4.Int
+					Title  githubv4.String
+					State  githubv4.String
+					URL    githubv4.String
+					Author struct {
+						Login githubv4.String
+					}
+					Repository struct {
+						NameWithOwner githubv4.String
+					}
+				}
+			} `graphql:"closedByPullRequestsReferences(first: 5, includeClosedPrs: true, orderByState: true)"`
+// issueReadClosingPullRequest is a closing pull request reference plus the metadata needed to make
+// a lockdown safe-content decision about it.
+type issueReadClosingPullRequest struct {
+	Ref         MinimalPullRequestRef
+	AuthorLogin string
+}
+
+	FieldValues               []MinimalFieldValue
+	Parent                    *issueReadParent
+	ClosedByPullRequests      []issueReadClosingPullRequest
+	ClosedByPullRequestsTotal int
+	SubIssuesSummary          MinimalSubIssuesSummary
+// its field values, parent reference, closing pull requests, and sub-issue summary counts. Titles
+// are sanitized here because they may originate from a different repository.
+		closing := make([]issueReadClosingPullRequest, 0, len(n.Issue.ClosedByPullRequestsReferences.Nodes))
+		for _, pr := range n.Issue.ClosedByPullRequestsReferences.Nodes {
+			closing = append(closing, issueReadClosingPullRequest{
+				Ref: MinimalPullRequestRef{
+					Number:     int(pr.Number),
+					Title:      sanitize.Sanitize(string(pr.Title)),
+					State:      string(pr.State),
+					URL:        string(pr.URL),
+					Repository: string(pr.Repository.NameWithOwner),
+				},
+				AuthorLogin: string(pr.Author.Login),
+			})
+		}
+		enrichment.ClosedByPullRequests = closing
+		enrichment.ClosedByPullRequestsTotal = int(n.Issue.ClosedByPullRequestsReferences.TotalCount)
+

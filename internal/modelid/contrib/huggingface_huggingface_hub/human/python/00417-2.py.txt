@@ -1,0 +1,51 @@
+# commit 701fb0b1f7a9 2026-03-25T16:35:26+01:00 src/huggingface_hub/hf_api.py
+from ._jobs_api import JobHardware, JobInfo, JobSpec, ScheduledJobInfo, Volume, _create_job_spec
+        volumes: Optional[list[Volume]] = None,
+            volumes (`list[Volume]`, *optional*):
+                Hugging Face Buckets or Repos to mount as volumes in the job container.
+                Each volume is a [`Volume`] with `type` (`"bucket"`, `"model"`, `"dataset"`, or `"space"`),
+                `source` (e.g. `"username/my-bucket"`), and `mount_path` (e.g. `"/data"`).
+
+            Run a Job with volumes:
+
+            ```python
+            >>> from huggingface_hub import Volume, run_job
+            >>> dataset_volume = Volume(type="dataset", source="HuggingFaceFW/fineweb", mount_path="/data")
+            >>> output_bucket_volume = Volume(type="bucket", source="username/my-bucket", mount_path="/output")
+            >>> image = "duckdb/duckdb"
+            >>> command = ["duckdb", "-c", "COPY (SELECT * FROM '/data/**/*.parquet' LIMIT 5) TO '/output/first-rows.parquet'"]
+            >>> run_job(image=image, command=command, volumes=[dataset_volume, output_bucket_volume])
+            ```
+
+            volumes=volumes,
+        volumes: Optional[list[Volume]] = None,
+            volumes (`list[Volume]`, *optional*):
+                Hugging Face Buckets or Repos to mount as volumes in the job container.
+                Each volume is a [`Volume`] with `type` (`"bucket"`, `"model"`, `"dataset"`, or `"space"`),
+                `source` (e.g. `"username/my-bucket"`), and `mount_path` (e.g. `"/data"`).
+
+
+            Mount volumes, e.g. to save model checkpoints during training:
+
+            ```python
+            >>> from huggingface_hub import Volume, run_uv_job
+            >>> script = "my_sft.py"
+            >>> script_args = ["--output_dir", "/training-outputs/training-v3-final", ...]
+            >>> checkpoints_bucket = Volume(type="bucket", source="username/my-bucket", mount_path="/training-outputs")
+            >>> run_uv_job(script, script_args=script_args, volumes=[checkpoints_bucket])
+            ```
+            volumes=volumes,
+        volumes: Optional[list[Volume]] = None,
+            volumes (`list[Volume]`, *optional*):
+                Hugging Face Buckets or Repos to mount as volumes in the job container.
+                Each volume is a [`Volume`] with `type` (`"bucket"`, `"model"`, `"dataset"`, or `"space"`),
+                `source` (e.g. `"username/my-bucket"`), and `mount_path` (e.g. `"/data"`).
+
+            volumes=volumes,
+        volumes: Optional[list[Volume]] = None,
+            volumes (`list[Volume]`, *optional*):
+                Hugging Face Buckets or Repos to mount as volumes in the job container.
+                Each volume is a [`Volume`] with `type` (`"bucket"`, `"model"`, `"dataset"`, or `"space"`),
+                `source` (e.g. `"username/my-bucket"`), and `mount_path` (e.g. `"/data"`).
+
+            volumes=volumes,

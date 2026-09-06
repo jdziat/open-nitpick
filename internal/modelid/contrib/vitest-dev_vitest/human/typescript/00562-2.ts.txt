@@ -1,0 +1,53 @@
+// commit c83395f2c9ec 2026-02-03T13:55:57+01:00 packages/runner/src/types/tasks.ts
+export interface InternalChainableContext<API = TestAPI> {
+  /** @internal */
+  mergeContext: (ctx: Partial<InternalTestContext>) => void
+  /** @internal */
+  setContext: (key: keyof InternalTestContext, value: any) => void
+  /** @internal */
+  withContext: () => API
+  /** @internal */
+  getFixtures: () => TestFixtures
+  /**
+   * Suite-level hooks only receive file/worker scoped fixtures.
+   * Test-scoped fixtures are NOT available in beforeAll/afterAll/aroundAll.
+   */
+  beforeAll: typeof beforeAll<ExtractSuiteContext<ExtraContext>>
+  afterAll: typeof afterAll<ExtractSuiteContext<ExtraContext>>
+  aroundAll: typeof aroundAll<ExtractSuiteContext<ExtraContext>>
+  /**
+   * Test-level hooks receive all fixtures including test-scoped ones.
+   */
+  & ExtendedAPI<ExtraContext> & Hooks<ExtraContext> & {
+    /** @internal */
+    [kChainableContext]: InternalChainableContext<TestAPI>
+export type ExtractSuiteContext<C>
+  = C extends { $__worker?: any } | { $__file?: any } | { $__test?: any }
+    ? ExtractBuilderWorker<C> & ExtractBuilderFile<C>
+    : C
+
+export type SuiteAPI<ExtraContext = object> = ChainableSuiteAPI<ExtraContext> & {
+  /** @internal */
+  [kChainableContext]: InternalChainableContext<TestAPI>
+export interface BeforeAllListener<ExtraContext = object> {
+  (context: ExtraContext, suite: Readonly<Suite | File>): Awaitable<unknown>
+export interface AfterAllListener<ExtraContext = object> {
+  (context: ExtraContext, suite: Readonly<Suite | File>): Awaitable<unknown>
+export interface AroundAllListener<ExtraContext = object> {
+  (
+    runSuite: () => Promise<void>,
+    context: ExtraContext,
+    suite: Readonly<Suite | File>
+  ): Awaitable<unknown>
+}
+
+// Contexts are provided when registered, not when invoked
+export interface RegisteredAllListener {
+  (suite: Readonly<Suite | File>): Awaitable<unknown>
+}
+
+export interface RegisteredAroundAllListener {
+  beforeAll: RegisteredAllListener[]
+  afterAll: RegisteredAllListener[]
+  aroundAll: RegisteredAroundAllListener[]
+

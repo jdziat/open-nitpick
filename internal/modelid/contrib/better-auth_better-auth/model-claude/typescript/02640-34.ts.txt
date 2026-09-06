@@ -1,0 +1,121 @@
+// commit 5c45abcd2094 2026-07-30T21:42:14-04:00 packages/oauth-provider/src/oauthClient/endpoints.ts
+import type { OAuthClientRegistrationMetadata } from "../register";
+import type {
+	OAuthClientAdministrativeResponse,
+	OAuthClientRegistrationResponse,
+	OAuthOptions,
+	SchemaClient,
+	Scope,
+} from "../types";
+import type { GrantType } from "../types/oauth";
+import {
+	normalizeClientCredentialsScopes,
+	validateClientCredentialsScopes,
+} from "./client-credentials";
+type OAuthClientUpdate = Omit<
+	OAuthClientRegistrationMetadata,
+	"application_type" | "client_id" | "resources"
+> & {
+	application_type?: "web" | "native";
+	client_credentials_scopes?: string[];
+};
+
+export function updateClientEndpoint(
+	ctx: GenericEndpointContext & {
+		body: {
+			client_id: string;
+			update: OAuthClientUpdate;
+		};
+	},
+	opts: OAuthOptions<Scope[]>,
+	settings: { admin: true },
+): Promise<OAuthClientAdministrativeResponse>;
+export function updateClientEndpoint(
+	ctx: GenericEndpointContext & {
+		body: {
+			client_id: string;
+			update: OAuthClientUpdate;
+		};
+	},
+	opts: OAuthOptions<Scope[]>,
+	settings?: { admin?: false },
+): Promise<OAuthClientRegistrationResponse>;
+			update: OAuthClientUpdate;
+	settings?: { admin?: boolean },
+): Promise<
+	OAuthClientAdministrativeResponse | OAuthClientRegistrationResponse
+> {
+	const { client_credentials_scopes: rawClientCredentialsScopes, ...updates } =
+		ctx.body.update;
+	const ownsClient = client.userId
+		? client.userId === session.user.id
+		: client.referenceId && opts.clientReference
+			? client.referenceId === (await opts.clientReference(session))
+			: false;
+	const isCrossOwnerScopeConfiguration =
+		!ownsClient &&
+		settings?.admin &&
+		rawClientCredentialsScopes !== undefined &&
+		Object.keys(updates).length === 0;
+	if (!ownsClient && !isCrossOwnerScopeConfiguration) {
+	if (isCrossOwnerScopeConfiguration) {
+		await assertClientPrivileges(
+			ctx,
+			session,
+			opts,
+			"configure-client-credentials-scopes",
+		);
+	}
+	if (
+		Object.keys(updates).length === 0 &&
+		rawClientCredentialsScopes === undefined
+	) {
+		if (settings?.admin) {
+			return {
+				...res,
+				client_credentials_scopes: [...(client.clientCredentialsScopes ?? [])],
+			};
+		}
+	const finalGrantTypes = (updates.grant_types ??
+		client.grantTypes ??
+		[]) as GrantType[];
+	const finalTokenEndpointAuthMethod =
+		updates.token_endpoint_auth_method ?? client.tokenEndpointAuthMethod;
+	const clientCredentialsScopes =
+		rawClientCredentialsScopes === undefined
+			? undefined
+			: normalizeClientCredentialsScopes(rawClientCredentialsScopes);
+	if (clientCredentialsScopes !== undefined) {
+		validateClientCredentialsScopes(
+			clientCredentialsScopes,
+			finalGrantTypes,
+			finalTokenEndpointAuthMethod,
+			opts,
+		);
+		if (clientCredentialsScopes.length > 0 && !isCrossOwnerScopeConfiguration) {
+			await assertClientPrivileges(
+				ctx,
+				session,
+				opts,
+				"configure-client-credentials-scopes",
+			);
+		}
+	}
+
+	if (
+		!finalGrantTypes.includes("client_credentials") ||
+		finalTokenEndpointAuthMethod === "none"
+	) {
+		schemaUpdates.clientCredentialsScopes = [];
+	} else if (clientCredentialsScopes !== undefined) {
+		schemaUpdates.clientCredentialsScopes = clientCredentialsScopes;
+	}
+	if (settings?.admin) {
+		return {
+			...res,
+			client_credentials_scopes: [
+				...(updatedClient.clientCredentialsScopes ?? []),
+			],
+		};
+	}
+	if (client.tokenEndpointAuthMethod === "none" || !client.clientSecret) {

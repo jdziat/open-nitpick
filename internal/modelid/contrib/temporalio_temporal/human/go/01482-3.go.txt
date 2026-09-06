@@ -1,0 +1,50 @@
+// commit 7709660eed4e 2026-07-15T15:06:08-07:00 service/matching/scale_manager.go
+	"go.temporal.io/server/common/number"
+			sm.updateBacklogAndDrainState(ctx)
+		BacklogCounts: sm.scaleState.GetBacklogCounts(),
+	backlogCapC8 := number.EncodeCompact8(int64(decision.BacklogCap))
+		decision.NewTarget == int(sm.scaleState.GetTarget()) &&
+			backlogCapC8 == number.Compact8(sm.scaleState.GetBacklogCap()) {
+	newState.BacklogCap = int32(backlogCapC8)
+func (sm *scaleManager) updateBacklogAndDrainState(ctx context.Context) {
+	prevBacklog := scaleState.GetBacklogCounts()
+	newBacklog := make([]byte, read)
+	backlogChanged := false
+
+		// update backlog count
+		total := totalBacklogFromDescribeResponse(res)
+		var prev number.Compact8
+		if id < int32(len(prevBacklog)) {
+			prev = prevBacklog[id]
+		}
+		newBacklog[id] = number.UpdateCompact8(total, prev)
+		backlogChanged = backlogChanged || newBacklog[id] != prev
+
+	if !backlogChanged && len(toClear) == 0 {
+	newState.BacklogCounts = newBacklog
+	// sync to DB only when drain bits changed (must be persisted before taking effect).
+	// for backlog-count-only updates, update in-memory state only (will be persisted
+	// periodically).
+	needSync := len(toClear) > 0
+	if err := sm.scaleDB.UpdateScaleState(newState, needSync); err != nil {
+	if len(toClear) > 0 {
+		sm.logger.Info("drain",
+			tag.Any("drained-partitions", toClear),
+			tag.Int32("target", info.Write),
+			tag.Int32("prev-read", info.Read),
+			tag.Int32("read", bitSet(newState.BacklogState).len()))
+	}
+func totalBacklogFromDescribeResponse(res *matchingservice.DescribeTaskQueuePartitionResponse) (total int64) {
+	for _, v := range res.GetVersionsInfoInternal() {
+		for _, q := range v.GetPhysicalTaskQueueInfo().GetInternalTaskQueueStatus() {
+			total += q.GetApproximateBacklogCount()
+		}
+	}
+	return
+}
+
+		Read:          read,
+		Write:         write,
+		BacklogCounts: scaleState.GetBacklogCounts(),
+		BacklogCap:    scaleState.GetBacklogCap(),
+		Version:       scaleState.GetTargetVersion(),

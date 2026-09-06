@@ -1,0 +1,54 @@
+// commit 4c26d7675423 2026-06-19T09:21:51+01:00 test/ui/test/ui.spec.ts
+import { existsSync } from 'node:fs'
+import { join } from 'pathe'
+import { resolveApiToken } from '../../../packages/vitest/src/node/config/apiToken'
+const TEST_COUNTS = {
+  pass: 18,
+  fail: 3,
+  files: {
+    pass: 7,
+  },
+}
+
+    pageUrl = server.url
+  test('blocks unauthenticated ui html requests', async ({ request }) => {
+    const cleanUrl = new URL(pageUrl)
+    cleanUrl.search = ''
+    const cleanPageUrl = cleanUrl.toString()
+
+    const tokenless = await request.get(cleanPageUrl)
+    expect(tokenless.status()).toBe(403)
+    await expect(tokenless.text()).resolves.toContain('Vitest UI requires authentication.')
+
+    const badTokenUrl = new URL(cleanPageUrl)
+    badTokenUrl.searchParams.set('token', 'invalid')
+    const badToken = await request.get(badTokenUrl.toString())
+    expect(badToken.status()).toBe(403)
+    await expect(badToken.text()).resolves.toContain('Vitest UI requires authentication.')
+  })
+
+  test('does not serve the api token file', async ({ request }) => {
+    const { tokenPath } = resolveApiToken(vitest!.config.root)
+    expect(existsSync(tokenPath)).toBe(true)
+
+    const fsUrl = new URL(join('/@fs/', tokenPath), pageUrl)
+    const res = await request.get(fsUrl.toString())
+    expect(res.status()).toBe(403)
+  })
+
+  test('allows direct ui access after opening authenticated url', async ({ page }) => {
+    const cleanUrl = new URL(pageUrl)
+    cleanUrl.search = ''
+    const cleanPageUrl = cleanUrl.toString()
+
+    await page.goto(pageUrl)
+    await assertTestCounts(page, { pass: TEST_COUNTS.pass, fail: TEST_COUNTS.fail })
+    expect(page.url()).toBe(`${cleanPageUrl}#/`)
+
+    await page.goto(cleanPageUrl)
+    await assertTestCounts(page, { pass: TEST_COUNTS.pass, fail: TEST_COUNTS.fail })
+    expect(page.url()).toBe(`${cleanPageUrl}#/`)
+  })
+
+    pageUrl = server.url
+    pageUrl = server.url

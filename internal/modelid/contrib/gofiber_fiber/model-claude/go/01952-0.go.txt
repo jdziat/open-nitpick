@@ -1,0 +1,43 @@
+// commit 9c73df4f76c6 2026-08-16T00:59:15+00:00 mount.go
+	walk := mountWalk{seen: make(map[mountWalkKey]int)}
+	walk.add(app, "", nil, nil, nil)
+
+	return walk.refs
+}
+
+// mountWalk carries the state of one walk over an app's mounts.
+type mountWalk struct {
+	// seen holds the longest chain each app has already been reached at, per
+	// path. An app list holds the descendants of the apps it lists, so a
+	// descendant is reachable through every combination of the lists leading to
+	// it — walking one again pays for itself only when the chain is longer than
+	// one it was reached with before, since only the longest is kept.
+	seen map[mountWalkKey]int
+	refs []mountedAppRef
+// mountWalkKey identifies an app at the path it was reached at.
+type mountWalkKey struct {
+	app  *App
+	path string
+}
+
+// add records this app and its descendants, reached at prefix
+func (w *mountWalk) add(app *App, prefix string, matchers []domainMatcher, declared []CustomConstraint, chain []*App) {
+		return
+	key := mountWalkKey{app: app, path: prefix}
+	if reached, ok := w.seen[key]; ok && reached >= len(chain) {
+		return
+	}
+	w.seen[key] = len(chain)
+
+	w.refs = append(w.refs, mountedAppRef{
+		w.add(
+			mount.app,
+		w.add(mounted, getGroupPath(prefix, mountPrefix), matchers, declared, chain)
+func (app *App) appendDomainMounts(dst, mounts []domainMountedApp, prefix string, owner *App) []domainMountedApp {
+
+		// The app they were registered on encloses them from here: their own
+		// ancestors are the apps between it and them, and it is the outermost.
+		ancestors := append([]*App{owner}, mount.ancestors...)
+
+		moved := app.newDomainMount(mount.app, getGroupPath(prefix, mount.path), mount.matchers, ancestors, mount.declared)
+		app.mountFields.domainAppList = app.appendDomainMounts(app.mountFields.domainAppList, subApp.mountFields.domainAppList, prefix, subApp)

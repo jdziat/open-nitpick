@@ -1,0 +1,38 @@
+// commit d6d3359ddb86 2025-11-17T16:23:52+01:00 packages/vitest/src/runtime/moduleRunner/moduleEvaluator.ts
+import type { Span } from '@opentelemetry/api'
+import { Traces } from '../../utils/traces'
+  traces?: Traces
+  private _otel: Traces
+    this._otel = options.traces || new Traces({ enabled: false })
+    // REMOVE WHEN VITE 6 SUPPORT IS OVER
+    const namespace = await this._otel.$(
+      'vitest.module.external',
+      {
+        attributes: { 'code.file.path': file },
+      },
+      () => this.vm
+        ? this.vm.externalModulesExecutor.import(file)
+        : import(file),
+    )
+  ): Promise<any> {
+    return this._otel.$(
+      'vitest.module.inline',
+      span => this._runInlinedModule(context, code, module, span),
+    )
+  }
+
+  private async _runInlinedModule(
+    context: ModuleRunnerContext,
+    code: string,
+    module: Readonly<EvaluatedModuleNode>,
+    span: Span,
+        span.addEvent(`cjs export proxy is triggered for ${String(p)}`)
+          span.addEvent('`exports.default` is assigned, copying values')
+          span.addEvent(`\`exports.${String(p)}\` is assigned, but module.exports is a primitive. assigning "undefined" values instead to comply with ESM`)
+        span.addEvent('`module.exports` is assigned directly, copying all properties to `exports`')
+    span.setAttributes({
+      'code.file.path': filename,
+    })
+
+    span.setAttribute('vitest.module.arguments', argumentsList)
+

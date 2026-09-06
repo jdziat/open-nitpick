@@ -1,0 +1,88 @@
+// commit c266e96c87cc 2026-07-03T17:42:44+01:00 internal-packages/run-engine/src/engine/systems/executionSnapshotSystem.ts
+import type { RunStore } from "@internal/run-store";
+  snapshotId: string,
+  runStore?: RunStore
+  if (runStore) {
+    return runStore.findSnapshotCompletedWaitpointIds(snapshotId, prisma);
+  }
+
+  waitpointIds: string[],
+  runStore?: RunStore
+    const waitpoints = runStore
+      ? await runStore.findManyWaitpoints({ where: { id: { in: chunk } } }, prisma)
+      : await prisma.waitpoint.findMany({
+          where: { id: { in: chunk } },
+        });
+  runId: string,
+  runStore?: RunStore
+  const snapshot = runStore
+    ? await runStore.findLatestExecutionSnapshot(runId, prisma)
+    : await prisma.taskRunExecutionSnapshot.findFirst({
+        where: { runId, isValid: true },
+        include: {
+          completedWaitpoints: true,
+          checkpoint: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+  sinceSnapshotId: string,
+  runStore?: RunStore
+  const sinceSnapshot = runStore
+    ? await runStore.findExecutionSnapshot(
+        {
+          where: { id: sinceSnapshotId, runId },
+          select: { createdAt: true },
+        },
+        prisma
+      )
+    : await prisma.taskRunExecutionSnapshot.findFirst({
+        where: { id: sinceSnapshotId, runId },
+        select: { createdAt: true },
+      });
+  const snapshots = runStore
+    ? await runStore.findManyExecutionSnapshots(
+        {
+          where: {
+            runId,
+            isValid: true,
+            createdAt: { gt: sinceSnapshot.createdAt },
+          },
+          include: {
+            checkpoint: true,
+            // DO NOT include completedWaitpoints here - this causes the N×M explosion
+          },
+          orderBy: { createdAt: "desc" },
+          take: 50,
+        },
+        prisma
+      )
+    : await prisma.taskRunExecutionSnapshot.findMany({
+        where: {
+          runId,
+          isValid: true,
+          createdAt: { gt: sinceSnapshot.createdAt },
+        },
+        include: {
+          checkpoint: true,
+          // DO NOT include completedWaitpoints here - this causes the N×M explosion
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+  const waitpointIds = await getSnapshotWaitpointIds(prisma, latestSnapshot.id, runStore);
+  const waitpoints = await fetchWaitpointsInChunks(prisma, waitpointIds, runStore);
+    },
+    // When set (inside runStore.runInTransaction), the snapshot write goes through the owning store
+    // with `prisma` = that store's own tx, so it shares ONE transaction with the sibling write (e.g.
+    // startAttempt) and a mid-pair failure rolls both back. Otherwise the router routes it.
+    // The heartbeat/eventBus side effects below are unchanged.
+    store?: RunStore
+    const newSnapshot = await (store ?? this.$.runStore).createExecutionSnapshot(
+      {
+        run,
+        snapshot,
+        completedWaitpoints,
+      prisma
+    );
+    const latestSnapshot = await getLatestExecutionSnapshot(prisma, runId, this.$.runStore);
+    const latestSnapshot = await getLatestExecutionSnapshot(prisma, runId, this.$.runStore);

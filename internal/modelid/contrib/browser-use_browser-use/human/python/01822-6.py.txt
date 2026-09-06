@@ -1,0 +1,44 @@
+# commit 659c5145f6ff 2025-08-01T02:42:01-07:00 tests/ci/test_browser_session_storage_state.py
+Test script for BrowserSession storage state functionality and event-driven storage state.
+- NEW: Event-driven storage state operations
+from browser_use.browser.events import SaveStorageStateEvent
+
+
+class TestStorageStateEventSystem:
+	"""Tests for NEW event-driven storage state operations."""
+
+	async def test_save_storage_state_event_dispatching(self, httpserver: HTTPServer, tmp_path: Path):
+		"""Test that SaveStorageStateEvent can be dispatched directly."""
+		# Create temporary storage file
+		storage_file = tmp_path / 'event_test_storage.json'
+
+		# Set up test page with cookies
+		httpserver.expect_request('/cookie-test').respond_with_data(
+			'<html><body><h1>Storage Event Test</h1></body></html>',
+			content_type='text/html',
+			headers={'Set-Cookie': 'test_event_cookie=event_value; Path=/'},
+		)
+
+		browser_session = BrowserSession(
+			browser_profile=BrowserProfile(headless=True, user_data_dir=None, storage_state=storage_file, keep_alive=False)
+		)
+
+		try:
+			await browser_session.start()
+
+			# Navigate to set cookies
+			await browser_session.navigate(httpserver.url_for('/cookie-test'))
+
+			# Dispatch SaveStorageStateEvent directly
+			save_event = browser_session.event_bus.dispatch(SaveStorageStateEvent())
+			await save_event
+
+			# Verify storage file was created
+			assert storage_file.exists(), 'Storage state file should be created by event handler'
+
+			# Verify file contains cookies
+			storage_data = json.loads(storage_file.read_text())
+			assert 'cookies' in storage_data
+
+		finally:
+			await browser_session.kill()

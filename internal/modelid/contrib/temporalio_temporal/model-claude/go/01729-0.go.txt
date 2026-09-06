@@ -1,0 +1,32 @@
+// commit b1d6efc0a7d2 2026-08-19T17:27:43-07:00 service/frontend/nexus_operation_http_handler.go
+	"fmt"
+	logger := log.With(
+		h.logger,
+		tag.WorkflowNamespace(params.Namespace),
+		tag.NexusTaskQueueName(params.TaskQueue),
+	)
+		logger.Error("invalid URL", tag.Error(err))
+		logger.Error("invalid URL", tag.Error(err))
+		logger.Error("invalid namespace name", tag.Error(err))
+		logger.Error("failed to get claims", tag.Error(err))
+		logger.Error("invalid URL", tag.Error(err))
+	logger := log.With(h.logger, tag.NexusEndpointID(endpointIDEscaped))
+		logger.Error("invalid URL", tag.Error(err))
+		logger.Error("invalid Nexus endpoint ID", tag.Error(err))
+	logger = log.With(logger, tag.Endpoint(endpointEntry.Endpoint.GetSpec().GetName()))
+
+	nc, ok := h.nexusContextFromEndpoint(endpointEntry, w, r, logger)
+		logger.Error("failed to get claims", tag.Error(err))
+		logger.Error("invalid URL", tag.Error(err))
+func (h *NexusOperationHTTPHandler) nexusContextFromEndpoint(
+	entry *persistencespb.NexusEndpointEntry,
+	w http.ResponseWriter,
+	r *http.Request,
+	logger log.Logger,
+) (*nexusContext, bool) {
+			logger.Error(
+				"failed to get namespace name by ID",
+				tag.Error(err),
+				tag.NexusEndpointTargetNamespaceID(v.Worker.GetNamespaceId()),
+			)
+		logger.Error("unsupported Nexus endpoint target type", tag.NewStringTag("target-type", fmt.Sprintf("%T", v)))

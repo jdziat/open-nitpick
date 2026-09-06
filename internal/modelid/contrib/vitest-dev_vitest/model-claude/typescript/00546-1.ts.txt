@@ -1,0 +1,33 @@
+// commit 3f7a5f8f8d10 2026-01-29T12:24:20+01:00 packages/vitest/src/node/types/config.ts
+       * When to print import breakdown to CLI terminal after tests finish.
+       * - `true`: Always print
+       * - `false`: Never print (default)
+       * - `'on-warn'`: Print only when any import exceeds the warn threshold
+      print?: boolean | 'on-warn'
+      /**
+       * Fail the test run if any import exceeds the danger threshold.
+       * When failing, the breakdown is always printed regardless of `print` setting.
+       * @default false
+       */
+      failOnDanger?: boolean
+      /**
+       * Duration thresholds in milliseconds for coloring and warnings.
+       */
+      thresholds?: {
+        /**
+         * Warning threshold - imports exceeding this are shown in yellow/orange.
+         * @default 100
+         */
+        warn?: number
+        /**
+         * Danger threshold - imports exceeding this are shown in red.
+         * @default 500
+         */
+        danger?: number
+      }
+      print: boolean | 'on-warn'
+      failOnDanger: boolean
+      thresholds: {
+        warn: number
+        danger: number
+      }

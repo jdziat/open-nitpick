@@ -1,0 +1,129 @@
+// commit 10caf69fdfc6 2026-01-29T14:09:32-08:00 service/matching/matching_engine.go
+	"go.temporal.io/server/api/adminservice/v1"
+	emptyPollWorkflowTaskQueueResponse = &matchingservice.PollWorkflowTaskQueueResponseWithRawHistory{}
+) (*matchingservice.PollWorkflowTaskQueueResponseWithRawHistory, error) {
+			return e.convertPollWorkflowTaskQueueResponse(task.pollWorkflowTaskQueueResponse(), task.namespace)
+			hist, rawHistoryBytes, nextPageToken, err := e.getHistoryForQueryTask(ctx, namespaceID, task, isStickyEnabled)
+				RawHistoryBytes:            rawHistoryBytes,
+// by PollWorkflowTaskQueue. Returns empty history for sticky query and full history for non-sticky.
+// Returns either deserialized history OR raw history bytes (not both).
+// When SendRawHistoryBytesToMatchingService is enabled, it uses GetWorkflowExecutionRawHistory API
+// to get raw bytes and passes them through to frontend without deserializing.
+) (*historypb.History, [][]byte, []byte, error) {
+		return &historypb.History{Events: []*historypb.HistoryEvent{}}, nil, nil, nil
+
+	// When SendRawHistoryBytesToMatchingService is enabled, use GetWorkflowExecutionRawHistory API
+	// to get raw bytes and pass them through to frontend without deserializing in matching service.
+	if e.config.SendRawHistoryBytesToMatchingService() {
+		resp, err := e.historyClient.GetWorkflowExecutionRawHistory(ctx,
+			&historyservice.GetWorkflowExecutionRawHistoryRequest{
+				NamespaceId: nsID.String(),
+				Request: &adminservice.GetWorkflowExecutionRawHistoryRequest{
+					NamespaceId:       nsID.String(),
+					Execution:         task.workflowExecution(),
+					StartEventId:      common.FirstEventID,
+					StartEventVersion: common.EmptyVersion,
+					EndEventId:        common.EmptyEventID,
+					EndEventVersion:   common.EmptyVersion,
+					MaximumPageSize:   maxPageSize,
+				},
+			})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		// Extract raw bytes from HistoryBatches
+		historyBatches := resp.GetResponse().GetHistoryBatches()
+		rawHistoryBytes := make([][]byte, len(historyBatches))
+		for i, blob := range historyBatches {
+			rawHistoryBytes[i] = blob.Data
+		}
+		return nil, rawHistoryBytes, resp.GetResponse().GetNextPageToken(), nil
+	}
+
+	// Use regular GetWorkflowExecutionHistory API
+		return nil, nil, nil, err
+		return nil, nil, nil, err
+	if err != nil {
+		return nil, nil, nil, err
+	}
+				return nil, nil, nil, err
+	return hist, nil, resp.GetResponse().GetNextPageToken(), nil
+) *matchingservice.PollWorkflowTaskQueueResponseWithRawHistory {
+// convertPollWorkflowTaskQueueResponse converts a PollWorkflowTaskQueueResponse to
+// PollWorkflowTaskQueueResponseWithRawHistory. This is used when forwarding tasks
+// from remote matching nodes where the client has already deserialized the response.
+// This function processes search attributes if the history came from raw bytes
+// (RawHistory field), since raw history hasn't been processed yet.
+// If history came from the History field, it's already been processed by history service.
+func (e *matchingEngineImpl) convertPollWorkflowTaskQueueResponse(
+	resp *matchingservice.PollWorkflowTaskQueueResponse,
+	ns namespace.Name,
+) (*matchingservice.PollWorkflowTaskQueueResponseWithRawHistory, error) {
+	if resp == nil {
+		return nil, nil
+	}
+	// RawHistory from forwarded response contains deserialized History (auto-deserialized by gRPC).
+	// We don't re-serialize it back to bytes. The History field is used instead.
+	// Use RawHistory only if History is not available (backward compat with old matching services).
+	history := resp.History
+	if history == nil && resp.RawHistory != nil { //nolint:staticcheck
+		history = resp.RawHistory //nolint:staticcheck
+		// Process search attributes only when using RawHistory.
+		// RawHistory contains auto-deserialized raw bytes that bypass history service's SA processing.
+		// History field means it was already processed by history service.
+		if err := api.ProcessOutgoingSearchAttributes(e.saProvider, e.saMapperProvider, history.Events, ns, e.visibilityManager); err != nil {
+			return nil, err
+		}
+	}
+	newResp := &matchingservice.PollWorkflowTaskQueueResponseWithRawHistory{
+		TaskToken:                  resp.TaskToken,
+		WorkflowExecution:          resp.WorkflowExecution,
+		WorkflowType:               resp.WorkflowType,
+		PreviousStartedEventId:     resp.PreviousStartedEventId,
+		StartedEventId:             resp.StartedEventId,
+		Attempt:                    resp.Attempt,
+		NextEventId:                resp.NextEventId,
+		BacklogCountHint:           resp.BacklogCountHint,
+		StickyExecutionEnabled:     resp.StickyExecutionEnabled,
+		Query:                      resp.Query,
+		TransientWorkflowTask:      resp.TransientWorkflowTask,
+		WorkflowExecutionTaskQueue: resp.WorkflowExecutionTaskQueue,
+		BranchToken:                resp.BranchToken,
+		ScheduledTime:              resp.ScheduledTime,
+		StartedTime:                resp.StartedTime,
+		Queries:                    resp.Queries,
+		Messages:                   resp.Messages,
+		History:                    history,
+		NextPageToken:              resp.NextPageToken,
+		PollerScalingDecision:      resp.PollerScalingDecision,
+	}
+	return newResp, nil
+}
+
+
+	// History service returns RecordWorkflowTaskStartedResponseWithRawHistory on the wire,
+	// but the gRPC client deserializes it as RecordWorkflowTaskStartedResponse.
+	// Due to wire compatibility:
+	// - Server's RawHistory (repeated bytes, field 20) -> Client's RawHistory (*History, auto-deserialized)
+	// - Server's RawHistoryBytes (repeated bytes, field 21) -> Client's RawHistoryBytes ([][]byte, stays as raw)
+	//
+	// Handle history fields - check which one has data:
+	// 1. RawHistoryBytes (new path) - raw bytes, pass through to frontend
+	// 2. RawHistory (old path) - auto-deserialized to *History by gRPC wire compatibility
+	// 3. History - use directly (raw history disabled)
+	if len(resp.RawHistoryBytes) > 0 {
+		// New path: raw bytes in field 21, pass through to frontend without processing.
+		// Search attributes will be processed by frontend.
+	} else if resp.RawHistory != nil { //nolint:staticcheck
+		// Old path: history service using deprecated RawHistory field (field 20).
+		// The gRPC client auto-deserializes repeated bytes into *History via wire compatibility.
+		// Since this came from raw bytes, search attributes haven't been processed yet.
+		// Process them here before moving to History field.
+		ns := namespace.Name(pollReq.Namespace)
+		if err := api.ProcessOutgoingSearchAttributes(e.saProvider, e.saMapperProvider, resp.RawHistory.Events, ns, e.visibilityManager); err != nil { //nolint:staticcheck
+		// Move to History field for consistent handling downstream.
+		resp.History = resp.RawHistory //nolint:staticcheck
+		resp.RawHistory = nil          //nolint:staticcheck
+	// If neither RawHistoryBytes nor RawHistory is set, resp.History should already have the data.
+

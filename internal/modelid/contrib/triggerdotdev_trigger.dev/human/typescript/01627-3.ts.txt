@@ -1,0 +1,34 @@
+// commit dc8f90e66e9a 2026-08-14T17:32:43+01:00 apps/webapp/test/v3/runOpsMigration/controlPlaneResolver.server.test.ts
+  "resolveWorkerVersion (pinned) returns worker/tasks/queues and reads fresh each call",
+    const second = await resolver.resolveWorkerVersion({
+      environmentId: environment.id,
+      backgroundWorkerId: worker.id,
+    });
+    expect(second?.worker.id).toBe(worker.id);
+    expect(reads()).toBeGreaterThan(readsAfterFirst);
+  }
+);
+
+heteroPostgresTest(
+  "resolveWorkerVersion (pinned) serves from cache when the kill-switch is off",
+  async ({ prisma14 }) => {
+    const { environment, project } = await seedControlPlane(prisma14);
+    const { worker } = await seedWorker(prisma14, {
+      projectId: project.id,
+      environmentId: environment.id,
+    });
+    const { client: counting, reads } = countQueries(prisma14);
+    const resolver = new ControlPlaneResolver({
+      controlPlaneReplica: counting,
+      controlPlanePrimary: counting,
+      cache: new ControlPlaneCache(),
+      splitEnabled: () => true,
+      workerVersionFreshReadEnabled: () => false,
+    });
+
+    await resolver.resolveWorkerVersion({
+      environmentId: environment.id,
+      backgroundWorkerId: worker.id,
+    });
+    const readsAfterFirst = reads();
+    expect(reads()).toBeGreaterThan(readsAfterFirst);

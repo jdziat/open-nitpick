@@ -1,0 +1,31 @@
+// commit 816d7f925225 2026-06-26T03:56:20+00:00 packages/better-auth/src/plugins/one-tap/index.ts
+import type { GoogleProfile } from "@better-auth/core/social-providers";
+import {
+	isGoogleHostedDomainAllowed,
+	verifyGoogleIdToken,
+} from "@better-auth/core/social-providers";
+					const payload = (await verifyGoogleIdToken({
+						token: idToken,
+						audience,
+					})) as Partial<GoogleProfile> | null;
+					if (!payload) {
+						throw new APIError("BAD_REQUEST", {
+							message: "invalid id token",
+						});
+					}
+					if (!payload.sub) {
+						throw new APIError("BAD_REQUEST", {
+							message: "invalid id token",
+						});
+					}
+					// Apply the configured Google hosted domain (`hd`) so One Tap
+					// matches the redirect sign-in flow, which rejects tokens whose
+					// `hd` claim is missing or outside the configured restriction.
+					const configuredHostedDomain = googleProvider?.hd;
+					if (
+						!isGoogleHostedDomainAllowed(configuredHostedDomain, payload.hd)
+					) {
+						ctx.context.logger.error(
+							`Google One Tap sign-in rejected: id token hosted domain (hd) "${
+								payload.hd ?? "<missing>"
+							}" does not satisfy the configured "hd" option "${configuredHostedDomain}".`,

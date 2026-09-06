@@ -1,0 +1,35 @@
+// commit 9d1dca9723de 2026-09-04T14:05:29+00:00 client/cookiejar.go
+	"math"
+		applyMaxAge(tmp, now, value)
+// lastMaxAge returns the Max-Age a Set-Cookie value asks for: the last
+// occurrence that is an integer, since a repeated attribute is resolved by the
+// last one and a value that is not an integer is ignored (RFC 6265 §5.2.2).
+// The raw value has to be read because fasthttp cannot answer this — it parses
+// MaxAge as 0 whether the attribute is absent, zero or negative.
+func lastMaxAge(value []byte) (int, bool) {
+		return 0, false
+
+	seconds, ok := 0, false
+		var part []byte
+		part, rest, _ = bytes.Cut(rest, []byte{';'})
+		if !hasValue || !utils.EqualFold(utils.UnsafeString(utils.TrimSpace(name)), "max-age") {
+		if n, err := strconv.Atoi(utils.UnsafeString(utils.TrimSpace(raw))); err == nil {
+			seconds, ok = n, true
+
+	return seconds, ok
+func applyMaxAge(c *fasthttp.Cookie, now time.Time, value []byte) {
+	seconds, ok := lastMaxAge(value)
+	case !ok:
+	case seconds <= 0:
+	default:
+		c.SetExpire(now.Add(maxAgeDuration(seconds)))
+	}
+}
+
+// maxAgeDuration converts Max-Age seconds to a duration, saturating at the
+// longest one a time.Duration holds: a lifetime too far out to express is still
+// a lifetime, not the expiry in the past that overflowing would produce.
+func maxAgeDuration(seconds int) time.Duration {
+	if int64(seconds) > int64(math.MaxInt64/time.Second) {
+		return math.MaxInt64
+	return time.Duration(seconds) * time.Second

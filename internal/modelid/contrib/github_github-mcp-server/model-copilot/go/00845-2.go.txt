@@ -1,0 +1,56 @@
+// commit b91c3b5b3a4e 2026-05-27T16:26:36+02:00 pkg/github/minimal_types.go
+// MinimalIssueFieldValueSingleSelectOption is the trimmed output type for a single-select option of an issue field value.
+type MinimalIssueFieldValueSingleSelectOption struct {
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
+// MinimalIssueFieldValue is the trimmed output type for a custom field value attached to an issue,
+// populated from REST API responses (e.g. get_issue). For GraphQL-sourced field values see MinimalFieldValue.
+type MinimalIssueFieldValue struct {
+	IssueFieldID       int64                                     `json:"issue_field_id,omitempty"`
+	NodeID             string                                    `json:"node_id,omitempty"`
+	DataType           string                                    `json:"data_type,omitempty"`
+	Value              any                                       `json:"value,omitempty"`
+	SingleSelectOption *MinimalIssueFieldValueSingleSelectOption `json:"single_select_option,omitempty"`
+}
+
+// MinimalFieldValue is the trimmed output type for a custom field value resolved via GraphQL
+// (e.g. list_issues, search_issues). Single-value variants populate Value; Values is reserved for multi-select.
+type MinimalFieldValue struct {
+	Field  string   `json:"field"`
+	Value  string   `json:"value,omitempty"`
+	Values []string `json:"values,omitempty"`
+}
+
+	IssueFieldValues  []MinimalIssueFieldValue `json:"issue_field_values,omitempty"`
+	FieldValues       []MinimalFieldValue      `json:"field_values,omitempty"`
+	for _, fv := range issue.IssueFieldValues {
+		if fv == nil {
+			continue
+		}
+		mfv := MinimalIssueFieldValue{
+			IssueFieldID: fv.IssueFieldID,
+			NodeID:       fv.NodeID,
+			DataType:     fv.DataType,
+			Value:        fv.Value,
+		}
+		if opt := fv.SingleSelectOption; opt != nil {
+			mfv.SingleSelectOption = &MinimalIssueFieldValueSingleSelectOption{
+				ID:    opt.ID,
+				Name:  opt.Name,
+				Color: opt.Color,
+			}
+		}
+		m.IssueFieldValues = append(m.IssueFieldValues, mfv)
+	}
+
+		if mfv, ok := fragmentToMinimalFieldValue(fv); ok {
+// fragmentToMinimalFieldValue flattens the union value fragment into a single
+func fragmentToMinimalFieldValue(fv IssueFieldValueFragment) (MinimalFieldValue, bool) {
+		return MinimalFieldValue{
+		return MinimalFieldValue{
+		return MinimalFieldValue{
+		return MinimalFieldValue{
+	return MinimalFieldValue{}, false

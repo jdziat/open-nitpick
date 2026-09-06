@@ -1,0 +1,32 @@
+// commit 938c2a7c31fe 2025-10-24T19:05:09+00:00 packages/better-auth/src/api/index.ts
+import type {
+	AuthContext,
+	BetterAuthOptions,
+	BetterAuthPlugin,
+} from "@better-auth/core";
+import { type InternalLogger, logger } from "@better-auth/core/env";
+	type Middleware,
+import { onRequestRateLimit } from "./rate-limiter";
+	accountInfo,
+	changeEmail,
+	changePassword,
+	deleteUser,
+	deleteUserCallback,
+	error,
+	getAccessToken,
+	linkSocialAccount,
+	listUserAccounts,
+	ok,
+	refreshToken,
+	requestPasswordReset,
+	requestPasswordResetCallback,
+	revokeOtherSessions,
+	setPassword,
+	signUpEmail,
+	updateUser,
+	verifyEmail,
+	type AuthEndpoint,
+	type AuthMiddleware,
+export { APIError } from "better-call";
+export * from "./middlewares";
+export * from "./routes";

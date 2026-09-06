@@ -1,0 +1,102 @@
+// commit 0639dbffe1f7 2026-05-01T12:14:16-07:00 tests/testcore/test_env.go
+	"errors"
+	"go.temporal.io/server/common"
+	"go.temporal.io/server/common/authorization"
+	cluster        *TestCluster
+	nsName         namespace.Name
+	nsID           namespace.ID
+	taskPoller     *taskpoller.TaskPoller
+	t              *testing.T
+	tv             *testvars.TestVars
+	ctx            context.Context
+	dedicatedGuard *dedicatedClusterGuard
+	dedicatedGuard := newDedicatedClusterGuard(options.dedicatedCluster)
+			if !canBeNamespaceScoped(override.setting.Precedence()) {
+				dedicatedGuard.record("global dynamic config used")
+			}
+		dedicatedGuard:     dedicatedGuard,
+	t.Cleanup(func() {
+		if err := env.dedicatedGuard.validate(); err != nil && !t.Failed() {
+			t.Fatal(err)
+		}
+	})
+		e.dedicatedGuard.record("global hook injected")
+func (e *TestEnv) SetOnAuthorize(
+	fn func(context.Context, *authorization.Claims, *authorization.CallTarget) (authorization.Result, error),
+) {
+	e.t.Helper()
+	if e.isShared {
+		e.t.Fatal("SetOnAuthorize cannot be called on a shared cluster; use testcore.WithDedicatedCluster()")
+	}
+	e.dedicatedGuard.record("authorization callback")
+	e.cluster.host.SetOnAuthorize(fn)
+	e.t.Cleanup(func() {
+		e.cluster.host.SetOnAuthorize(nil)
+	})
+}
+
+func (e *TestEnv) SetOnGetClaims(fn func(*authorization.AuthInfo) (*authorization.Claims, error)) {
+	e.t.Helper()
+	if e.isShared {
+		e.t.Fatal("SetOnGetClaims cannot be called on a shared cluster; use testcore.WithDedicatedCluster()")
+	}
+	e.dedicatedGuard.record("authorization callback")
+	e.cluster.host.SetOnGetClaims(fn)
+	e.t.Cleanup(func() {
+		e.cluster.host.SetOnGetClaims(nil)
+	})
+}
+
+	} else if !canBeNamespaceScoped(setting.Precedence()) {
+		e.dedicatedGuard.record("global dynamic config used")
+	e.dedicatedGuard.record("global metric capture") // note that globalCapture has its own misuse detection
+// CloseShard closes the shard that contains the given workflow.
+// This is a cluster-global operation and cannot be called on shared clusters.
+func (e *TestEnv) CloseShard(namespaceID string, workflowID string) {
+	if e.isShared {
+		e.t.Fatalf("CloseShard cannot be called on a shared cluster; use testcore.WithDedicatedCluster()")
+	}
+	e.dedicatedGuard.record("shard closed")
+	shardID := common.WorkflowIDToHistoryShard(namespaceID, workflowID, e.testClusterConfig.HistoryConfig.NumHistoryShards)
+	_, err := e.AdminClient().CloseShard(NewContext(), &adminservice.CloseShardRequest{
+		ShardId: shardID,
+	})
+	e.NoError(err)
+}
+
+
+type dedicatedClusterGuard struct {
+	required    bool
+	mu          sync.Mutex
+	usageReason string
+}
+
+func newDedicatedClusterGuard(required bool) *dedicatedClusterGuard {
+	return &dedicatedClusterGuard{required: required}
+}
+
+// record marks that a dedicated-cluster-only feature was used, satisfying the guard.
+func (u *dedicatedClusterGuard) record(reason string) {
+	if !u.required {
+		return
+	}
+	u.mu.Lock()
+	if u.usageReason == "" {
+		u.usageReason = reason
+	}
+	u.mu.Unlock()
+}
+
+// validate checks that the guard was satisfied i.e. a dedicated-cluster-only feature was used.
+func (u *dedicatedClusterGuard) validate() error {
+	if !u.required {
+		return nil
+	}
+	u.mu.Lock()
+	usageReason := u.usageReason
+	u.mu.Unlock()
+	if usageReason == "" {
+		return errors.New("testcore.WithDedicatedCluster() was requested but no dedicated-cluster-only feature was used")
+	}
+	return nil
+}

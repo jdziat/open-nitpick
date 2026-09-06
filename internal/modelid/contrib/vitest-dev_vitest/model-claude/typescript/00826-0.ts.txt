@@ -1,0 +1,39 @@
+// commit 3f802da4bce9 2026-04-22T06:49:32+02:00 packages/pretty-format/src/index.ts
+  singleQuote: boolean,
+    const q = singleQuote ? '\'' : '"'
+      // escape quote in each case, e.g.
+      //   it's me -> 'it\'s me'
+      //   say "hi" -> "say \"hi\""
+      const escapePattern = singleQuote ? /['\\]/g : /["\\]/g
+      return `${q}${val.replaceAll(escapePattern, '\\$&')}${q}`
+    return `${q}${val}${q}`
+        !config.printBasicPrototype && val.constructor.name === 'Array'
+          : `${val.constructor.name} `
+        val.size,
+        val.size,
+      !config.printBasicPrototype && getConstructorName(val) === 'Object'
+        : `${getConstructorName(val)} `
+      : `${name} {${printObjectProperties(
+        entries,
+        null,
+      config.singleQuote,
+  singleQuote: false,
+  quoteKeys: true,
+  spacingInner: '\n',
+  spacingOuter: '\n',
+    printBasicPrototype: options?.printBasicPrototype ?? !options?.min,
+    spacingInner: options?.spacingInner ?? (options?.min ? ' ' : '\n'),
+    spacingOuter: options?.spacingOuter ?? (options?.min ? '' : '\n'),
+    singleQuote: options?.singleQuote ?? DEFAULT_OPTIONS.singleQuote,
+    quoteKeys: options?.quoteKeys ?? DEFAULT_OPTIONS.quoteKeys,
+  }
+
+  const config = getConfig(options)
+  const plugin = findPlugin(config.plugins, val)
+  if (plugin !== null) {
+    return printPlugin(plugin, val, config, '', 0, [])
+    config.printFunctionName,
+    config.escapeRegex,
+    config.escapeString,
+    config.singleQuote,
+  return printComplexValue(val, config, '', 0, [])

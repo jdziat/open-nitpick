@@ -1,0 +1,103 @@
+# commit 5b4b3dd5aa8d 2025-06-18T23:27:30+02:00 eval/service.py
+from lmnr import AsyncLaminarClient, Laminar, observe
+Laminar.initialize()
+laminar_client = AsyncLaminarClient()
+
+	def __init__(
+		self,
+		task_id: str,
+		run_id: str,
+		task_description: str,
+		task: Task,
+		max_steps: int,
+		laminar_task_link: str | None = None,
+	):
+			'laminarTaskLink': laminar_task_link,  # Add field for task-specific Laminar link
+@observe(name='executor', span_type='EXECUTOR')
+@observe(name='evaluate_task_result', span_type='EVALUATOR')
+@observe(name='evaluation', span_type='EVALUATION')
+	lmnr_run_id: str,
+	laminar_eval_link: str,
+		laminar_task_link = None
+		datapoint_id = None
+			if lmnr_run_id:
+				try:
+					datapoint_id = await laminar_client.evals.create_datapoint(
+						eval_id=lmnr_run_id,
+						data={
+							'task_id': task.task_id,
+							'confirmed_task': task.confirmed_task,
+							'website': task.website,
+							'reference_length': task.reference_length,
+							'level': task.level,
+							'cluster_id': task.cluster_id,
+							'category': task.category,
+						},
+						metadata={
+							'use_vision': str(use_vision),
+							'use_serp': str(use_serp),
+							'enable_memory': str(enable_memory),
+							'memory_interval': str(memory_interval),
+							'max_actions_per_step': str(max_actions_per_step),
+							'validate_output': str(validate_output),
+							'planner_model': str(planner_llm),
+							'planner_interval': str(planner_interval),
+							'include_result': str(include_result),
+						},
+						trace_id=Laminar.get_trace_id(),
+					)
+					# Only create task-specific link if we have the evaluation link
+					if laminar_eval_link:
+						laminar_task_link = f'{laminar_eval_link}?traceId={Laminar.get_trace_id()}&datapointId={datapoint_id}'
+						logger.info(f'Task {task.task_id}: Laminar link: {laminar_task_link}')
+					else:
+						logger.debug(f'Task {task.task_id}: No Laminar evaluation link available, task link not created')
+				except Exception as e:
+					logger.warning(f'Task {task.task_id}: Failed to create Laminar datapoint: {type(e).__name__}: {e}')
+			else:
+				logger.debug(f'Task {task.task_id}: No Laminar run ID available, skipping datapoint creation')
+
+				# Initialize task result and basic setup
+			task_result = TaskResult(task.task_id, run_id, task.confirmed_task, task, max_steps_per_task, laminar_task_link)
+
+
+
+
+						if lmnr_run_id and datapoint_id:
+							await laminar_client.evals.update_datapoint(
+								eval_id=lmnr_run_id,
+								datapoint_id=datapoint_id,
+								scores={
+									'accuracy': evaluation['score'],
+								},
+							)
+					task_result = TaskResult(
+						task.task_id, run_id, task.confirmed_task, task, max_steps_per_task, laminar_task_link
+					)
+	lmnr_run_id: str,
+	laminar_eval_link: str,
+				lmnr_run_id=lmnr_run_id,
+				laminar_eval_link=laminar_eval_link,
+		# --- Create Laminar Evaluation ---
+		logger.info('Creating Laminar evaluation...')
+		lmnr_run_id = None
+		laminar_eval_link = None
+		try:
+			lmnr_run_id = asyncio.run(
+				laminar_client.evals.create_evaluation(
+					group_name=args.test_case,  # Dataset name
+					name=args.user_message if args.user_message else f'{args.test_case} Evaluation',  # Eval name (dev message)
+				)
+			)
+			project_id = 'f07da4a9-b7de-488a-91e3-e17c5f6d676a'
+			laminar_eval_link = f'https://www.lmnr.ai/project/{project_id}/evaluations/{lmnr_run_id}'
+			logger.info(f'📊 Laminar evaluation created: {laminar_eval_link}')
+
+		except Exception as e:
+			logger.error(f'Failed to create Laminar evaluation: {type(e).__name__}: {e}')
+			logger.warning('⚠️ Continuing without Laminar evaluation tracking...')
+		# -------------------------
+
+			'laminarEvalLink': laminar_eval_link,  # Add Laminar link to run data
+				lmnr_run_id=lmnr_run_id,
+				laminar_eval_link=laminar_eval_link,

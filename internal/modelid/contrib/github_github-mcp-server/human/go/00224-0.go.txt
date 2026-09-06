@@ -1,0 +1,51 @@
+// commit 50cfb6d66b5c 2025-06-23T14:46:46+02:00 pkg/github/repositories.go
+	"strconv"
+			mcp.WithString("ref",
+				mcp.Description("Accepts optional git refs such as `refs/tags/<tag>`, `refs/heads/<branch>` or `refs/pull/<pr_number>/head`"),
+			),
+			mcp.WithString("sha",
+				mcp.Description("Accepts optional git sha, if sha is specified it will be used instead of ref"),
+			ref, err := OptionalParam[string](request, "ref")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			sha, err := OptionalParam[string](request, "sha")
+			rawOpts := &raw.RawContentOpts{}
+
+			if strings.HasPrefix(path, "refs/pull/") {
+				prNumber, ok := strings.CutPrefix(path, "refs/pull/")
+				if ok && len(prNumber) > 0 {
+					// fetch the PR from the API to get the latest commit and use SHA
+					githubClient, err := getClient(ctx)
+					if err != nil {
+						return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+					}
+					prNum, err := strconv.Atoi(prNumber)
+					if err != nil {
+						return nil, fmt.Errorf("invalid pull request number: %w", err)
+					}
+					pr, _, err := githubClient.PullRequests.Get(ctx, owner, repo, prNum)
+					if err != nil {
+						return nil, fmt.Errorf("failed to get pull request: %w", err)
+					}
+					sha = pr.GetHead().GetSHA()
+					ref = ""
+				}
+			}
+
+			rawOpts.SHA = sha
+			rawOpts.Ref = ref
+
+
+					if sha != "" {
+						resourceURI, err = url.JoinPath("repo://", owner, repo, "sha", sha, "contents", path)
+						if err != nil {
+							return nil, fmt.Errorf("failed to create resource URI: %w", err)
+						}
+					} else if ref != "" {
+						resourceURI, err = url.JoinPath("repo://", owner, repo, ref, "contents", path)
+						resourceURI, err = url.JoinPath("repo://", owner, repo, "contents", path)
+			if sha != "" {
+				ref = sha
+			}
+				opts := &github.RepositoryContentGetOptions{Ref: ref}

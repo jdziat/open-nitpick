@@ -132,7 +132,14 @@ findings the keyword rule can credit, and it is reported per language.
 planted slop and below it with the slop files removed; a known-clean
 repository (this one, at a tagged commit) scores below it.
 
-## 4. `nitpick identify-model`
+## 4. `nitpick identify-model` (withdrawn)
+
+Removed 2026-09-06: the experiment cleared its pre-registered bar on the
+same-prompt corpus, and the contributor experiment then showed the answer
+does not carry to real repositories. The findings stay; the command, the
+corpora and `internal/modelid` are deleted. What follows is the record of
+what was built and why.
+
 
 Status 2026-09-05: the experiment exists (`internal/modelid`, corpus under
 `internal/evals/testdata/modelid` from `cmd/modelid-corpus`): six models

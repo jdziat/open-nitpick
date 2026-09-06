@@ -1,0 +1,104 @@
+# commit c2c9aa85560a 2026-03-31T21:14:20-07:00 browser_use/skill_cli/commands/cloud.py
+_DEFAULT_BASE_URL = 'https://api.browser-use.com'
+	"""Get the API host URL. All paths are appended by callers."""
+	"""Get versioned API URL: {base}/api/{version}"""
+	return f'{_get_base()}/api/{version}'
+	return f'{_get_base()}/api/{version}/openapi.json'
+	print('Already have an account? Get a key at: https://cloud.browser-use.com/settings?tab=api-keys&new=1', file=sys.stderr)
+	print('  Then run: browser-use cloud login <key>', file=sys.stderr)
+	print('No account? Run: browser-use cloud signup', file=sys.stderr)
+	print('  This creates an agent account you can claim later with: browser-use cloud signup --claim', file=sys.stderr)
+	# Validate existing profile against current API key
+		# Profile doesn't exist or belongs to a different account — create a new one
+# ---------------------------------------------------------------------------
+# Signup (agent self-registration)
+# ---------------------------------------------------------------------------
+
+
+def _signup_challenge() -> int:
+	"""Request a signup challenge."""
+	if _get_api_key_or_none():
+		print('You already have an API key configured.', file=sys.stderr)
+		print('Run `browser-use cloud signup --claim` to claim your account.', file=sys.stderr)
+		return 1
+
+	body = json.dumps({}).encode()
+	status, resp = _http_request('POST', f'{_get_base()}/cloud/signup', body, api_key='')
+	if status >= 400:
+		print(f'Error: HTTP {status}', file=sys.stderr)
+		_print_json(resp, file=sys.stderr)
+		return 1
+
+	try:
+		data = json.loads(resp)
+	except (json.JSONDecodeError, ValueError):
+		print('Error: invalid response', file=sys.stderr)
+		return 1
+
+	print(f'Challenge ID: {data["challenge_id"]}')
+	print(f'Challenge: {data["challenge_text"]}')
+	print()
+	print('Verify to create your agent account:')
+	print(f'  browser-use cloud signup --verify <challenge-id> <answer>')
+	return 0
+
+
+def _signup_verify(challenge_id: str, answer: str) -> int:
+	"""Verify a signup challenge and save the API key."""
+	if _get_api_key_or_none():
+		print('You already have an API key configured.', file=sys.stderr)
+		print('Run `browser-use cloud signup --claim` to claim your account.', file=sys.stderr)
+		return 1
+
+	body = json.dumps({'challenge_id': challenge_id, 'answer': answer}).encode()
+	status, resp = _http_request('POST', f'{_get_base()}/cloud/signup/verify', body, api_key='')
+	if status >= 400:
+		print(f'Error: HTTP {status}', file=sys.stderr)
+		_print_json(resp, file=sys.stderr)
+		return 1
+
+	try:
+		data = json.loads(resp)
+	except (json.JSONDecodeError, ValueError):
+		print('Error: invalid response', file=sys.stderr)
+		return 1
+
+	_save_api_key(data['api_key'])
+	print('API key saved')
+	return 0
+
+
+def _signup_claim() -> int:
+	"""Generate a claim URL for the current API key."""
+	api_key = _get_api_key()
+	status, resp = _http_request('POST', f'{_get_base()}/cloud/signup/claim', None, api_key)
+	if status >= 400:
+		print(f'Error: HTTP {status}', file=sys.stderr)
+		_print_json(resp, file=sys.stderr)
+		return 1
+
+	try:
+		data = json.loads(resp)
+	except (json.JSONDecodeError, ValueError):
+		print('Error: invalid response', file=sys.stderr)
+		return 1
+
+	print(f'Claim URL: {data["claim_url"]}')
+	print('Share this URL with a human to claim ownership of this account.')
+	return 0
+
+
+	if subcmd == 'signup':
+		if '--verify' in argv:
+			idx = argv.index('--verify')
+			if idx + 2 >= len(argv):
+				print('Usage: browser-use cloud signup --verify <challenge-id> <answer>', file=sys.stderr)
+				return 1
+			return _signup_verify(argv[idx + 1], argv[idx + 2])
+		if '--claim' in argv:
+			return _signup_claim()
+		return _signup_challenge()
+
+	print('  signup                            Create an agent account (challenge-response)')
+	print('  signup --verify <id> <answer>     Verify challenge and save API key')
+	print('  signup --claim                    Generate URL to claim your agent account')

@@ -1,0 +1,95 @@
+// commit 15f3532ea131 2026-08-27T16:38:22+00:00 service/history/workflow/metrics.go
+	deploymentspb "go.temporal.io/server/api/deployment/v1"
+type VersioningMetricContext struct {
+	Behavior          enumspb.VersioningBehavior
+	DeploymentVersion *deploymentspb.WorkerDeploymentVersion
+}
+
+type WorkflowTaskCompletionMetrics struct {
+	VersioningInfo VersioningMetricContext
+	Attempt        int32
+}
+
+func RecordWorkflowTaskCompletedMetrics(
+	config *configs.Config,
+	handler metrics.Handler,
+	namespaceName namespace.Name,
+	taskQueue string,
+	completion WorkflowTaskCompletionMetrics,
+) {
+	metrics.WorkflowTasksCompleted.With(handler).Record(
+		1,
+		workflowTaskCompletionMetricTags(config, namespaceName, taskQueue, completion)...,
+	)
+}
+
+func RecordWorkflowTaskFailedMetrics(
+	config *configs.Config,
+	handler metrics.Handler,
+	namespaceName namespace.Name,
+	taskQueue string,
+	operation string,
+	failure string,
+	completion WorkflowTaskCompletionMetrics,
+) {
+	tags := workflowTaskCompletionMetricTags(config, namespaceName, taskQueue, completion)
+	tags = append(tags, metrics.OperationTag(operation), metrics.FailureTag(failure))
+	metrics.FailedWorkflowTasksCounter.With(handler).Record(1, tags...)
+}
+
+func workflowTaskCompletionMetricTags(
+	config *configs.Config,
+	namespaceName namespace.Name,
+	taskQueue string,
+	completion WorkflowTaskCompletionMetrics,
+) []metrics.Tag {
+	tags := []metrics.Tag{
+		metrics.NamespaceTag(namespaceName.String()),
+		metrics.FirstAttemptTag(completion.Attempt),
+	}
+	return append(tags, versioningMetricTags(
+		config,
+		namespaceName,
+		taskQueue,
+		enumspb.TASK_QUEUE_TYPE_WORKFLOW,
+		completion.VersioningInfo,
+	)...)
+}
+
+func versioningMetricTags(
+	config *configs.Config,
+	namespaceName namespace.Name,
+	taskQueue string,
+	taskQueueType enumspb.TaskQueueType,
+	versioning VersioningMetricContext,
+) []metrics.Tag {
+	breakdownMetricsByBuildID := config.BreakdownMetricsByBuildID(
+		namespaceName.String(),
+		taskQueue,
+		taskQueueType,
+	)
+
+	return []metrics.Tag{
+		metrics.VersioningBehaviorTag(versioning.Behavior),
+		metrics.WorkerDeploymentNameTag(versioning.DeploymentVersion.GetDeploymentName(), breakdownMetricsByBuildID),
+		metrics.WorkerDeploymentBuildIDTag(versioning.DeploymentVersion.GetBuildId(), breakdownMetricsByBuildID),
+	}
+}
+
+	TimerType      enumspb.TimeoutType
+	VersioningInfo VersioningMetricContext
+	config := shard.GetConfig()
+	tags = append(tags, versioningMetricTags(
+		config,
+		namespaceName,
+		taskQueue,
+		enumspb.TASK_QUEUE_TYPE_ACTIVITY,
+		completion.VersioningInfo,
+	)...)
+		config,
+		timeoutTag := metrics.StringTag(
+			"timeout_type",
+			completion.TimerType.String(),
+		)
+		metrics.ActivityTaskTimeout.With(metricsHandler).Record(1, timeoutTag)
+			metrics.ActivityTimeout.With(metricsHandler).Record(1, timeoutTag)

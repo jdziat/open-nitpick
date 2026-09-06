@@ -1,0 +1,31 @@
+// commit ef7ea20890e2 2026-07-29T17:09:32-07:00 service/history/replication/executable_verify_versioned_transition_task.go
+		return e.verifyNewRunExist(ctx, true)
+		return e.verifyNewRunExist(ctx, false)
+		return e.verifyNewRunExist(ctx, false)
+// verifyNewRunExist confirms the continue-as-new successor (NewRunId) is present on this cluster.
+//
+// onCurrentBranch distinguishes the caller. On the current branch (case 1) the successor was created
+// atomically with the parent's CAN transition, which is already applied — so a miss is a genuine gap
+// (created-then-removed / corruption) and remains non-retryable DataLoss so it stays visible. On a
+// non-current branch (cases 3 & 4) the successor may legitimately not be materialized yet (replication
+// lag, or a losing multi-cluster CAN-conflict branch), so we recover by resending it via SyncState
+// rather than dead-lettering.
+func (e *ExecutableVerifyVersionedTransitionTask) verifyNewRunExist(ctx context.Context, onCurrentBranch bool) error {
+		if onCurrentBranch {
+			return softassert.UnexpectedDataLoss(e.Logger, "workflow new run not found",
+				fmt.Errorf("NamespaceId: %v, workflowId: %v, runId: %v, newRunId: %v",
+					e.NamespaceID, e.WorkflowID, e.RunID, e.taskAttr.NewRunId))
+		}
+		// Non-current branch: re-pull the new run from the source, mirroring the parent-resend in
+		// Execute (cases 2 & 5) and #7757. SyncState handles every outcome (present->create,
+		// source-missing->cleanup, transient->retry) without dead-lettering; genuinely unrecoverable
+		// cases still DLQ via the bounded retry policy.
+		return serviceerrors.NewSyncState(
+			"new run not replicated yet",
+			e.NamespaceID,
+			e.WorkflowID,
+			e.taskAttr.NewRunId,
+			e.taskAttr.GetArchetypeId(),
+			nil,
+			nil,
+		)

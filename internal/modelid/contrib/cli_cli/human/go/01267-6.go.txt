@@ -1,0 +1,105 @@
+// commit 20147bf81fed 2026-06-04T00:27:11+00:00 pkg/cmd/issue/view/view.go
+			issueNumber, baseRepo, err := issueShared.ParseIssueFromArg(args[0])
+	"issueType", "parent", "subIssues", "subIssuesSummary",
+
+		// TODO IssueRelationshipsCleanup
+		issueFeatures, issueErr := opts.Detector.IssueFeatures()
+		if issueErr == nil && issueFeatures.IssueRelationshipsSupported {
+			lookupFields.AddValues([]string{"blockedBy", "blocking"})
+		}
+	var issueTypeName string
+	if issue.IssueType != nil {
+		issueTypeName = issue.IssueType.Name
+	}
+	fmt.Fprintf(out, "issue-type:\t%s\n", issueTypeName)
+	var parentRef string
+	if issue.Parent != nil {
+		parentRef = formatLinkedIssueRef(issue.Parent)
+	}
+	fmt.Fprintf(out, "parent:\t%s\n", parentRef)
+	fmt.Fprintf(out, "sub-issues:\t%s\n", formatLinkedIssueRefs(issue.SubIssues.Nodes))
+	var subIssuesCompleted string
+	if issue.SubIssuesSummary.Total > 0 {
+		subIssuesCompleted = fmt.Sprintf("%d/%d", issue.SubIssuesSummary.Completed, issue.SubIssuesSummary.Total)
+	}
+	fmt.Fprintf(out, "sub-issues-completed:\t%s\n", subIssuesCompleted)
+	fmt.Fprintf(out, "blocked-by:\t%s\n", formatLinkedIssueRefs(issue.BlockedBy.Nodes))
+	fmt.Fprintf(out, "blocking:\t%s\n", formatLinkedIssueRefs(issue.Blocking.Nodes))
+
+	// State line - include issue type prefix when present
+	stateLine := issueStateTitleWithColor(cs, issue)
+	if issue.IssueType != nil {
+		stateLine = cs.Muted(issue.IssueType.Name) + " · " + stateLine
+	}
+		stateLine,
+	if issue.IssueType != nil {
+		fmt.Fprint(out, cs.Bold("Type: "))
+		fmt.Fprintln(out, issue.IssueType.Name)
+	}
+	if issue.Parent != nil {
+		fmt.Fprint(out, cs.Bold("Parent: "))
+		fmt.Fprintln(out, formatLinkedIssueRef(issue.Parent)+" "+issue.Parent.Title)
+	}
+	if blockedBy := formatLinkedIssueListWithTitle(issue.BlockedBy.Nodes); blockedBy != "" {
+		fmt.Fprint(out, cs.Bold("Blocked by: "))
+		fmt.Fprintln(out, blockedBy)
+	}
+	if blocking := formatLinkedIssueListWithTitle(issue.Blocking.Nodes); blocking != "" {
+		fmt.Fprint(out, cs.Bold("Blocking: "))
+		fmt.Fprintln(out, blocking)
+	}
+	// Sub-issues section
+	if issue.SubIssuesSummary.Total > 0 {
+		fmt.Fprintf(out, "%s · %d/%d (%d%%)\n",
+			cs.Bold("Sub-issues"),
+			issue.SubIssuesSummary.Completed,
+			issue.SubIssuesSummary.Total,
+			int(issue.SubIssuesSummary.PercentCompleted),
+		)
+		for _, sub := range issue.SubIssues.Nodes {
+			stateColor := cs.Green
+			stateLabel := "Open"
+			if sub.State == "CLOSED" {
+				stateColor = cs.Magenta
+				stateLabel = "Closed"
+			}
+			fmt.Fprintf(out, "%s %s %s\n",
+				stateColor(stateLabel),
+				formatLinkedIssueRef(&sub),
+				sub.Title,
+			)
+		}
+		fmt.Fprintln(out)
+	}
+
+// formatLinkedIssueRef formats an issue reference as owner/repo#N.
+func formatLinkedIssueRef(issue *api.LinkedIssue) string {
+	return fmt.Sprintf("%s#%d", issue.Repository.NameWithOwner, issue.Number)
+}
+
+// formatLinkedIssueRefs formats a comma-separated list of linked issue
+// references without titles.
+func formatLinkedIssueRefs(issues []api.LinkedIssue) string {
+	return joinLinkedIssues(issues, false)
+}
+
+// formatLinkedIssueListWithTitle formats a comma-separated list of linked
+// issue references with each title appended after the reference.
+func formatLinkedIssueListWithTitle(issues []api.LinkedIssue) string {
+	return joinLinkedIssues(issues, true)
+}
+
+func joinLinkedIssues(issues []api.LinkedIssue, withTitle bool) string {
+	if len(issues) == 0 {
+		return ""
+	}
+	parts := make([]string, len(issues))
+	for i, issue := range issues {
+		parts[i] = formatLinkedIssueRef(&issue)
+		if withTitle {
+			parts[i] += " " + issue.Title
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+

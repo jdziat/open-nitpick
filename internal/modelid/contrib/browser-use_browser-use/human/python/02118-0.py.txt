@@ -1,0 +1,80 @@
+# commit c88931b6304c 2025-08-16T17:01:28-07:00 browser_use/browser/default_action_watchdog.py
+		cdp_session = await self.browser_session.get_or_create_cdp_session(focus=True)
+				# Keys that need 3-step sequence (produce characters)
+				keys_needing_char_event = ['enter', 'return', 'space']
+
+				# Virtual key codes for proper key identification
+				virtual_key_codes = {
+					'enter': 13,
+					'return': 13,
+					'tab': 9,
+					'escape': 27,
+					'esc': 27,
+					'space': 32,
+					'backspace': 8,
+					'delete': 46,
+					'up': 38,
+					'down': 40,
+					'left': 37,
+					'right': 39,
+					'home': 36,
+					'end': 35,
+					'pageup': 33,
+					'pagedown': 34,
+				}
+
+				if keys in keys_needing_char_event:
+					# 3-step sequence for keys that produce characters
+					vk_code = virtual_key_codes.get(keys, 0)
+					char_text = '\r' if keys in ['enter', 'return'] else ' ' if keys == 'space' else ''
+						params={
+							'type': 'rawKeyDown',
+							'windowsVirtualKeyCode': vk_code,
+							'code': key_map.get(keys, keys),
+							'key': key_map.get(keys, keys),
+						},
+						params={'type': 'char', 'text': char_text, 'unmodifiedText': char_text},
+						params={
+							'type': 'keyUp',
+							'windowsVirtualKeyCode': vk_code,
+							'code': key_map.get(keys, keys),
+							'key': key_map.get(keys, keys),
+						},
+				else:
+					# 2-step sequence for other keys
+					key_type = 'rawKeyDown' if keys in key_map else 'keyDown'
+					vk_code = virtual_key_codes.get(keys)
+
+					if vk_code:
+						# Special keys with virtual key codes
+						await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
+							params={
+								'type': key_type,
+								'key': key,
+								'windowsVirtualKeyCode': vk_code,
+								'code': key_map.get(keys, keys),
+							},
+							session_id=cdp_session.session_id,
+						)
+						await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
+							params={
+								'type': 'keyUp',
+								'key': key,
+								'windowsVirtualKeyCode': vk_code,
+								'code': key_map.get(keys, keys),
+							},
+							session_id=cdp_session.session_id,
+						)
+					else:
+						# Regular characters without virtual key codes
+						await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
+							params={'type': key_type, 'key': key},
+							session_id=cdp_session.session_id,
+						)
+						await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
+							params={'type': 'keyUp', 'key': key},
+							session_id=cdp_session.session_id,
+						)
+
+				# Wait a moment for potential navigation
+				await asyncio.sleep(0.5)

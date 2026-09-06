@@ -1,0 +1,31 @@
+// commit 0c2b360e401b 2025-11-26T16:04:44-08:00 service/history/api/addtasks/api.go
+	"go.temporal.io/server/chasm"
+
+	taskGroupKey struct {
+		namespaceID string
+		businessID  string
+		archetypeID chasm.ArchetypeID
+	}
+	taskGroups := make(map[taskGroupKey]map[tasks.Category][]tasks.Task)
+		// group by namespaceID + execution businessID + archetypeID
+		archetypeID := chasm.WorkflowArchetypeID
+		if hasArchetypeID, ok := deserializedTask.(tasks.HasArchetypeID); ok {
+			archetypeID = hasArchetypeID.GetArchetypeID()
+		}
+		if archetypeID == chasm.UnspecifiedArchetypeID {
+			archetypeID = chasm.WorkflowArchetypeID
+		}
+		groupKey := taskGroupKey{
+			namespaceID: deserializedTask.GetNamespaceID(),
+			businessID:  deserializedTask.GetWorkflowID(),
+			archetypeID: archetypeID,
+		}
+
+		if _, ok := taskGroups[groupKey]; !ok {
+			taskGroups[groupKey] = make(map[tasks.Category][]tasks.Task, 1)
+		taskGroups[groupKey][category] = append(taskGroups[groupKey][category], deserializedTask)
+	for groupKey, taskGroup := range taskGroups {
+			NamespaceID: groupKey.namespaceID,
+			WorkflowID:  groupKey.businessID,
+			ArchetypeID: groupKey.archetypeID,
+			Tasks:       taskGroup,

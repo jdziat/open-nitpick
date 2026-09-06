@@ -1,0 +1,64 @@
+// commit d026f8ffb997 2026-06-10T09:32:59+01:00 pkg/cmd/discussion/client/client_mock.go
+//			ResolveCommentNodeIDFunc: func(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+//				panic("mock out the ResolveCommentNodeID method")
+//			},
+	// ResolveCommentNodeIDFunc mocks the ResolveCommentNodeID method.
+	ResolveCommentNodeIDFunc func(repo ghrepo.Interface, commentDatabaseID int64) (string, error)
+
+		// ResolveCommentNodeID holds details about calls to the ResolveCommentNodeID method.
+		ResolveCommentNodeID []struct {
+			// Repo is the repo argument value.
+			Repo ghrepo.Interface
+			// CommentDatabaseID is the commentDatabaseID argument value.
+			CommentDatabaseID int64
+		}
+	lockAddComment           sync.RWMutex
+	lockCreate               sync.RWMutex
+	lockDeleteComment        sync.RWMutex
+	lockGetByNumber          sync.RWMutex
+	lockGetComment           sync.RWMutex
+	lockGetCommentReplies    sync.RWMutex
+	lockGetWithComments      sync.RWMutex
+	lockList                 sync.RWMutex
+	lockListCategories       sync.RWMutex
+	lockListLabels           sync.RWMutex
+	lockResolveCommentNodeID sync.RWMutex
+	lockSearch               sync.RWMutex
+	lockUpdate               sync.RWMutex
+	lockUpdateComment        sync.RWMutex
+// ResolveCommentNodeID calls ResolveCommentNodeIDFunc.
+func (mock *DiscussionClientMock) ResolveCommentNodeID(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+	if mock.ResolveCommentNodeIDFunc == nil {
+		panic("DiscussionClientMock.ResolveCommentNodeIDFunc: method is nil but DiscussionClient.ResolveCommentNodeID was just called")
+	}
+	callInfo := struct {
+		Repo              ghrepo.Interface
+		CommentDatabaseID int64
+	}{
+		Repo:              repo,
+		CommentDatabaseID: commentDatabaseID,
+	}
+	mock.lockResolveCommentNodeID.Lock()
+	mock.calls.ResolveCommentNodeID = append(mock.calls.ResolveCommentNodeID, callInfo)
+	mock.lockResolveCommentNodeID.Unlock()
+	return mock.ResolveCommentNodeIDFunc(repo, commentDatabaseID)
+}
+
+// ResolveCommentNodeIDCalls gets all the calls that were made to ResolveCommentNodeID.
+// Check the length with:
+//
+//	len(mockedDiscussionClient.ResolveCommentNodeIDCalls())
+func (mock *DiscussionClientMock) ResolveCommentNodeIDCalls() []struct {
+	Repo              ghrepo.Interface
+	CommentDatabaseID int64
+} {
+	var calls []struct {
+		Repo              ghrepo.Interface
+		CommentDatabaseID int64
+	}
+	mock.lockResolveCommentNodeID.RLock()
+	calls = mock.calls.ResolveCommentNodeID
+	mock.lockResolveCommentNodeID.RUnlock()
+	return calls
+}
+

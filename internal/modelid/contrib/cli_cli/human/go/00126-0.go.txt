@@ -1,0 +1,37 @@
+// commit b85dc94f843f 2025-07-01T11:14:50+01:00 pkg/cmd/pr/edit/edit.go
+	"time"
+
+			// support `-R, --repo` override
+			if opts.SelectorArg != "" {
+				// If a URL is provided, parse it to get the base repository.
+				if baseRepo, _, err := shared.ParseURL(opts.SelectorArg); err == nil {
+					opts.BaseRepo = func() (ghrepo.Interface, error) {
+						return baseRepo, nil
+					}
+				}
+			}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	if opts.Detector == nil {
+		baseRepo, err := opts.BaseRepo()
+		if err != nil {
+			return err
+		}
+
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+
+		Fields:   []string{"id", "url", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone"},
+	issueFeatures, err := opts.Detector.IssueFeatures()
+	if issueFeatures.ActorIsAssignable {
+		findOptions.Fields = append(findOptions.Fields, "assignedActors")
+	} else {
+		findOptions.Fields = append(findOptions.Fields, "assignees")
+	}
+
+	if issueFeatures.ActorIsAssignable {

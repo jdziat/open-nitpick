@@ -1,0 +1,57 @@
+# commit 52c718a54382 2025-10-23T14:48:03+02:00 src/huggingface_hub/repocard_data.py
+from typing import Any, Optional, Union
+        dataset_args (`dict[str, Any]`, *optional*):
+        metric_args (`dict[str, Any]`, *optional*):
+    dataset_args: Optional[dict[str, Any]] = None
+    metric_args: Optional[dict[str, Any]] = None
+    def to_yaml(self, line_break=None, original_order: Optional[list[str]] = None) -> str:
+    eval_results: Optional[Union[EvalResult, list[EvalResult]]],
+) -> list[EvalResult]:
+        base_model (`str` or `list[str]`, *optional*):
+        datasets (`Union[str, list[str]]`, *optional*):
+        eval_results (`Union[list[EvalResult], EvalResult]`, *optional*):
+        language (`Union[str, list[str]]`, *optional*):
+        metrics (`list[str]`, *optional*):
+        tags (`list[str]`, *optional*):
+        base_model: Optional[Union[str, list[str]]] = None,
+        datasets: Optional[Union[str, list[str]]] = None,
+        eval_results: Optional[list[EvalResult]] = None,
+        language: Optional[Union[str, list[str]]] = None,
+        metrics: Optional[list[str]] = None,
+        tags: Optional[list[str]] = None,
+        language (`list[str]`, *optional*):
+        license (`Union[str, list[str]]`, *optional*):
+        annotations_creators (`Union[str, list[str]]`, *optional*):
+        language_creators (`Union[str, list[str]]`, *optional*):
+        multilinguality (`Union[str, list[str]]`, *optional*):
+        size_categories (`Union[str, list[str]]`, *optional*):
+        source_datasets (`list[str]]`, *optional*):
+        task_categories (`Union[str, list[str]]`, *optional*):
+        task_ids (`Union[str, list[str]]`, *optional*):
+        train_eval_index (`dict`, *optional*):
+        config_names (`Union[str, list[str]]`, *optional*):
+        language: Optional[Union[str, list[str]]] = None,
+        license: Optional[Union[str, list[str]]] = None,
+        annotations_creators: Optional[Union[str, list[str]]] = None,
+        language_creators: Optional[Union[str, list[str]]] = None,
+        multilinguality: Optional[Union[str, list[str]]] = None,
+        size_categories: Optional[Union[str, list[str]]] = None,
+        source_datasets: Optional[list[str]] = None,
+        task_categories: Optional[Union[str, list[str]]] = None,
+        task_ids: Optional[Union[str, list[str]]] = None,
+        train_eval_index: Optional[dict] = None,
+        config_names: Optional[Union[str, list[str]]] = None,
+        models (list[`str`], *optional*)
+        datasets (`list[str]`, *optional*)
+        tags (`list[str]`, *optional*)
+        models: Optional[list[str]] = None,
+        datasets: Optional[list[str]] = None,
+        tags: Optional[list[str]] = None,
+def model_index_to_eval_results(model_index: list[dict[str, Any]]) -> tuple[str, list[EvalResult]]:
+        model_index (`list[dict[str, Any]]`):
+        eval_results (`list[EvalResult]`):
+def eval_results_to_model_index(model_name: str, eval_results: list[EvalResult]) -> list[dict[str, Any]]:
+        eval_results (`list[EvalResult]`):
+        model_index (`list[dict[str, Any]]`): The eval_results converted to a model-index.
+    task_and_ds_types_map: dict[Any, list[EvalResult]] = defaultdict(list)
+def _to_unique_list(tags: Optional[list[str]]) -> Optional[list[str]]:

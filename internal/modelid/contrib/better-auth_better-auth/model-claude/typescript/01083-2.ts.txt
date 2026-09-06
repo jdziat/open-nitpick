@@ -1,0 +1,140 @@
+// commit 34c8a4bd2a7a 2026-01-13T17:54:37-08:00 packages/sso/src/routes/sso.ts
+	getSessionFromCtx,
+import { generateRelayState, parseRelayState } from "../saml-state";
+type RelayState = Awaited<ReturnType<typeof parseRelayState>>;
+
+				const { state: relayState } = await generateRelayState(
+					ctx,
+					undefined,
+					false,
+				);
+
+					url: `${loginRequest.context}&RelayState=${encodeURIComponent(relayState)}`,
+/**
+ * Validates and returns a safe redirect URL.
+ * - Prevents open redirect attacks by validating against trusted origins
+ * - Prevents redirect loops by checking if URL points to callback route
+ * - Falls back to appOrigin if URL is invalid or unsafe
+ */
+const getSafeRedirectUrl = (
+	url: string | undefined,
+	callbackPath: string,
+	appOrigin: string,
+	isTrustedOrigin: (
+		url: string,
+		settings?: { allowRelativePaths: boolean },
+	) => boolean,
+): string => {
+	if (!url) {
+		return appOrigin;
+	}
+
+	if (url.startsWith("/") && !url.startsWith("//")) {
+		try {
+			const absoluteUrl = new URL(url, appOrigin);
+			if (absoluteUrl.origin !== appOrigin) {
+				return appOrigin;
+			}
+			const callbackPathname = new URL(callbackPath).pathname;
+			if (absoluteUrl.pathname === callbackPathname) {
+				return appOrigin;
+			}
+		} catch {
+			return appOrigin;
+		}
+		return url;
+	}
+
+	if (!isTrustedOrigin(url, { allowRelativePaths: false })) {
+		return appOrigin;
+	}
+
+	try {
+		const callbackPathname = new URL(callbackPath).pathname;
+		const urlPathname = new URL(url).pathname;
+		if (urlPathname === callbackPathname) {
+			return appOrigin;
+		}
+	} catch {
+		if (url === callbackPath || url.startsWith(`${callbackPath}?`)) {
+			return appOrigin;
+		}
+	}
+
+	return url;
+};
+
+			method: ["GET", "POST"],
+			body: callbackSSOSAMLBodySchema.optional(),
+			query: z
+				.object({
+					RelayState: z.string().optional(),
+				})
+				.optional(),
+						"This endpoint is used as the callback URL for SAML providers. Supports both GET and POST methods for IdP-initiated and SP-initiated flows.",
+			const appOrigin = new URL(ctx.context.baseURL).origin;
+			const errorURL =
+				ctx.context.options.onAPIError?.errorURL || `${appOrigin}/error`;
+			const currentCallbackPath = `${ctx.context.baseURL}/sso/saml2/callback/${providerId}`;
+
+			// Determine if this is a GET request by checking both method AND body presence
+			// When called via auth.api.*, ctx.method may not be reliable, so we also check for body
+			const isGetRequest = ctx.method === "GET" && !ctx.body?.SAMLResponse;
+
+			if (isGetRequest) {
+				const session = await getSessionFromCtx(ctx);
+
+				if (!session?.session) {
+					throw ctx.redirect(`${errorURL}?error=invalid_request`);
+				}
+
+				const relayState = ctx.query?.RelayState as string | undefined;
+				const safeRedirectUrl = getSafeRedirectUrl(
+					relayState,
+					currentCallbackPath,
+					appOrigin,
+					(url, settings) => ctx.context.isTrustedOrigin(url, settings),
+				);
+
+				throw ctx.redirect(safeRedirectUrl);
+			}
+
+			if (!ctx.body?.SAMLResponse) {
+				throw new APIError("BAD_REQUEST", {
+					message: "SAMLResponse is required for POST requests",
+				});
+			}
+
+			const { SAMLResponse } = ctx.body;
+			let relayState: RelayState | null = null;
+			if (ctx.body.RelayState) {
+				try {
+					relayState = await parseRelayState(ctx);
+				} catch {
+					relayState = null;
+				}
+			}
+						RelayState: ctx.body.RelayState || undefined,
+							relayState?.callbackURL ||
+							parsedSamlConfig.callbackUrl ||
+							ctx.context.baseURL;
+							relayState?.callbackURL ||
+							parsedSamlConfig.callbackUrl ||
+							ctx.context.baseURL;
+						relayState?.callbackURL ||
+						parsedSamlConfig.callbackUrl ||
+						ctx.context.baseURL;
+						relayState?.callbackURL ||
+						parsedSamlConfig.callbackUrl ||
+						ctx.context.baseURL;
+				relayState?.callbackURL ||
+				parsedSamlConfig.callbackUrl ||
+				ctx.context.baseURL;
+
+			const safeRedirectUrl = getSafeRedirectUrl(
+				relayState?.callbackURL || parsedSamlConfig.callbackUrl,
+				currentCallbackPath,
+				appOrigin,
+				(url, settings) => ctx.context.isTrustedOrigin(url, settings),
+			);
+			throw ctx.redirect(safeRedirectUrl);

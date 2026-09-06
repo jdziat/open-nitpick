@@ -1,0 +1,50 @@
+// commit cbcf29f6d17c 2025-06-09T15:11:38+02:00 pkg/github/repositories.go
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+			sha, err := RequiredParam[string](request, "sha")
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(false),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+			path, err := RequiredParam[string](request, "path")
+			content, err := RequiredParam[string](request, "content")
+			message, err := RequiredParam[string](request, "message")
+			branch, err := RequiredParam[string](request, "branch")
+				ReadOnlyHint: ToBoolPtr(false),
+			name, err := RequiredParam[string](request, "name")
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+			path, err := RequiredParam[string](request, "path")
+				ReadOnlyHint: ToBoolPtr(false),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint:    ToBoolPtr(false),
+				DestructiveHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+			path, err := RequiredParam[string](request, "path")
+			message, err := RequiredParam[string](request, "message")
+			branch, err := RequiredParam[string](request, "branch")
+				ReadOnlyHint: ToBoolPtr(false),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+			branch, err := RequiredParam[string](request, "branch")
+				ReadOnlyHint: ToBoolPtr(false),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+			branch, err := RequiredParam[string](request, "branch")
+			message, err := RequiredParam[string](request, "message")
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+				ReadOnlyHint: ToBoolPtr(true),
+			owner, err := RequiredParam[string](request, "owner")
+			repo, err := RequiredParam[string](request, "repo")
+			tag, err := RequiredParam[string](request, "tag")

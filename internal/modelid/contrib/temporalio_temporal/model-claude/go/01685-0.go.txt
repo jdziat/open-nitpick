@@ -1,0 +1,40 @@
+// commit c33b0aca8e5b 2026-08-14T08:52:01-07:00 common/wideevents/replication_events.go
+	// ReplicationSkipped is a terminal source-side phase: the sender could not build ("convert")
+	// the task after exhausting retries and skipped it (advanced the watermark past it) instead of
+	// wedging the stream. Such a task never reaches executing/applied, so this is where its trace
+	// ends. See StreamSenderImpl.recordStuckTaskSkipped.
+	ReplicationSkipped ReplicationPhase = "skipped"
+	// The three below have no sent/executing/applied event today (emitReplicationSent does not build
+	// them), but a raw queue task of these types can still be skipped, so the skipped event maps them
+	// to keep task_type a single vocabulary across every phase.
+	ReplTaskHistory      = "history"
+	ReplTaskSyncActivity = "sync_activity"
+	ReplTaskSyncHSM      = "sync_hsm"
+	// Phase is sent, executing, applied or skipped.
+	// TargetCluster is the target streamed to; progress is cached per target. Also emitted on skipped,
+	// where it is the passive now missing the dropped task's state.
+	// Priority is the stream it went out on. Also emitted on skipped.
+	// Attempt is which delivery attempt this is; > 0 means the apply is being retried. On a skipped
+	// event it is instead the source-side send/convert attempts exhausted before the task was dropped.
+	case ReplicationSkipped:
+		attrs = p.appendSkipped(attrs)
+// appendSkipped emits the fields for a terminal "skipped" event: target_cluster identifies the
+// passive now missing the dropped state, priority tells whether it was live traffic (high) or force
+// replication (low), attempt records how many convert attempts were exhausted before giving up, and
+// error carries the last convert failure so an operator can investigate. The source_cluster /
+// source_shard / source_task_id join key back to the source queue is emitted by Attributes for every
+// phase, so it is not repeated here.
+func (p ReplicationLifecyclePayload) appendSkipped(attrs []log.KeyValue) []log.KeyValue {
+	if p.TargetCluster != "" {
+		attrs = append(attrs, log.String("target_cluster", p.TargetCluster))
+	}
+	if p.Priority != "" {
+		attrs = append(attrs, log.String("priority", p.Priority))
+	}
+	attrs = append(attrs, log.Int64("attempt", int64(p.Attempt)))
+	if p.Error != "" {
+		attrs = append(attrs, log.String("error", p.Error))
+	}
+	return attrs
+}
+

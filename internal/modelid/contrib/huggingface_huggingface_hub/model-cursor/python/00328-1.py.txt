@@ -1,0 +1,39 @@
+# commit 1ec5adaf915a 2026-02-20T14:50:44+01:00 tests/test_cli.py
+class TestRepoDeleteFilesCommand:
+    """Tests for `hf repo delete-files` (the new primary command)."""
+
+                ["repo", "delete-files", DUMMY_MODEL_ID, "*"],
+                ["repo", "delete-files", DUMMY_MODEL_ID, "file.txt"],
+                ["repo", "delete-files", DUMMY_MODEL_ID, "folder/"],
+                ["repo", "delete-files", DUMMY_MODEL_ID, "file1.txt", "folder/", "file2.txt"],
+                    "repo",
+                    "delete-files",
+                    "repo",
+                    "delete-files",
+    def test_delete_files(self, runner: CliRunner, cli_args: list[str], expected_kwargs: dict[str, object]) -> None:
+        with patch("huggingface_hub.cli.repo.get_hf_api") as api_cls:
+class TestRepoFilesCommand:
+    """Tests for legacy `hf repo-files delete` (deprecated, kept for backward compatibility)."""
+
+    def test_legacy_delete_still_works(self, runner: CliRunner) -> None:
+        with patch("huggingface_hub.cli.repo_files.get_hf_api") as api_cls:
+            api = api_cls.return_value
+            result = runner.invoke(app, ["repo-files", "delete", DUMMY_MODEL_ID, "file.txt"])
+        assert result.exit_code == 0
+        api.delete_files.assert_called_once_with(
+            delete_patterns=["file.txt"],
+            repo_id=DUMMY_MODEL_ID,
+            repo_type="model",
+            revision=None,
+            commit_message=None,
+            commit_description=None,
+            create_pr=False,
+        )
+
+    def test_legacy_delete_emits_deprecation_warning(self, runner: CliRunner) -> None:
+        with patch("huggingface_hub.cli.repo_files.get_hf_api"):
+            result = runner.invoke(app, ["repo-files", "delete", DUMMY_MODEL_ID, "file.txt"])
+        assert result.exit_code == 0
+        assert "hf repo delete-files" in result.output
+
+

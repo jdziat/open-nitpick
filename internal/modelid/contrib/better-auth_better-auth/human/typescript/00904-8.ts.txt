@@ -1,0 +1,64 @@
+// commit 7d8786cd8790 2025-12-23T23:55:50+08:00 packages/better-auth/src/plugins/api-key/api-key.test.ts
+import type { APIError } from "@better-auth/core/error";
+import { isAPIError } from "../../utils/is-api-error";
+import { apiKey, API_KEY_ERROR_CODES as ERROR_CODES } from ".";
+		expect(apiKeyFail.error?.message).toEqual(
+			ERROR_CODES.UNAUTHORIZED_SESSION.message,
+		);
+		expect(res.error?.body.message).toEqual(
+			ERROR_CODES.UNAUTHORIZED_SESSION.message,
+		);
+		expect(err.body.message).toBe(ERROR_CODES.NAME_REQUIRED.message);
+		expect(result.error?.body.message).toEqual(
+			ERROR_CODES.INVALID_NAME_LENGTH.message,
+		);
+		expect(result.error?.body.message).toEqual(
+			ERROR_CODES.INVALID_NAME_LENGTH.message,
+		);
+			ERROR_CODES.INVALID_PREFIX_LENGTH.message,
+			ERROR_CODES.INVALID_PREFIX_LENGTH.message,
+			ERROR_CODES.KEY_DISABLED_EXPIRATION.message,
+			ERROR_CODES.EXPIRES_IN_IS_TOO_SMALL.message,
+			ERROR_CODES.EXPIRES_IN_IS_TOO_LARGE.message,
+		expect(apiKey.error?.message).toEqual(
+			ERROR_CODES.SERVER_ONLY_PROPERTY.message,
+		);
+		expect(apiKey2.error?.message).toEqual(
+			ERROR_CODES.SERVER_ONLY_PROPERTY.message,
+		);
+			ERROR_CODES.REFILL_INTERVAL_AND_AMOUNT_REQUIRED.message,
+			ERROR_CODES.REFILL_AMOUNT_AND_INTERVAL_REQUIRED.message,
+			ERROR_CODES.INVALID_METADATA_TYPE.message,
+		expect(result.error?.body.message).toEqual(
+			ERROR_CODES.METADATA_DISABLED.message,
+		);
+		expect(apiKey.error?.message).toEqual(
+			ERROR_CODES.SERVER_ONLY_PROPERTY.message,
+		);
+		expect(apiKey2.error?.message).toEqual(
+			ERROR_CODES.SERVER_ONLY_PROPERTY.message,
+		);
+		expect(res.error?.body.message).toEqual(
+			ERROR_CODES.UNAUTHORIZED_SESSION.message,
+		);
+				if (isAPIError(e)) {
+					expect(error?.body?.message).toEqual(
+						ERROR_CODES.INVALID_NAME_LENGTH.message,
+					);
+				if (isAPIError(e)) {
+					expect(error?.body?.message).toEqual(
+						ERROR_CODES.INVALID_NAME_LENGTH.message,
+					);
+				if (isAPIError(e)) {
+					expect(error?.body?.message).toEqual(
+						ERROR_CODES.NO_VALUES_TO_UPDATE.message,
+					);
+			ERROR_CODES.KEY_DISABLED_EXPIRATION.message,
+			ERROR_CODES.EXPIRES_IN_IS_TOO_SMALL.message,
+			ERROR_CODES.EXPIRES_IN_IS_TOO_LARGE.message,
+			ERROR_CODES.REFILL_INTERVAL_AND_AMOUNT_REQUIRED.message,
+			ERROR_CODES.REFILL_AMOUNT_AND_INTERVAL_REQUIRED.message,
+			ERROR_CODES.INVALID_METADATA_TYPE.message,
+		expect(result.error?.body.message).toEqual(
+			ERROR_CODES.KEY_NOT_FOUND.message,
+		);

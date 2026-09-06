@@ -1,0 +1,46 @@
+// commit 7689727b3eda 2026-09-03T15:02:03+02:00 pkg/inventory/filters.go
+func (r *Inventory) checkFeatureFlag(ctx context.Context, flagName FeatureFlag) bool {
+	return ResolveFeature(ctx, r.featureChecker, flagName)
+//  2. Read-only and builder filters
+//  3. Toolset/additional and MCP availability filters
+//  4. Functional feature rule
+func (r *Inventory) isToolEnabled(ctx context.Context, tool *ServerTool, featureAsBool FeatureResolver) bool {
+	// 1. Check tool's own Enabled function.
+	// 2. Apply static inventory filters.
+	// 3. Apply selection and request-static MCP availability.
+	if (r.additionalTools == nil || !r.additionalTools[tool.Tool.Name]) && !r.isToolsetEnabled(tool.Toolset.ID) {
+		return false
+	}
+	switch featureDecisionForToolAvailability(ctx, tool.availability()) {
+	case excludeToolBeforeFeatureRule:
+		return false
+	case includeToolWithoutFeatureRule:
+	// 4. Check feature availability.
+	if r.featureChecker != nil && !tool.FeatureRule.Enabled(featureAsBool) {
+	ctx = WithFeatureState(ctx, r.featureChecker)
+	return r.availableTools(ctx)
+}
+
+func (r *Inventory) availableTools(ctx context.Context) []ServerTool {
+	featureAsBool := featureResolver(ctx, r.featureChecker)
+		if r.isToolEnabled(ctx, tool, featureAsBool) {
+	ctx = WithFeatureState(ctx, r.featureChecker)
+	return r.availableResourceTemplates(ctx)
+}
+
+func (r *Inventory) availableResourceTemplates(ctx context.Context) []ServerResourceTemplate {
+	featureAsBool := featureResolver(ctx, r.featureChecker)
+		if !r.isToolsetEnabled(res.Toolset.ID) {
+		if r.featureChecker != nil && !res.FeatureRule.Enabled(featureAsBool) {
+			continue
+		result = append(result, *res)
+	ctx = WithFeatureState(ctx, r.featureChecker)
+	return r.availablePrompts(ctx)
+}
+
+func (r *Inventory) availablePrompts(ctx context.Context) []ServerPrompt {
+	featureAsBool := featureResolver(ctx, r.featureChecker)
+		if !r.isToolsetEnabled(prompt.Toolset.ID) {
+		if r.featureChecker != nil && !prompt.FeatureRule.Enabled(featureAsBool) {
+			continue
+		result = append(result, *prompt)

@@ -1,0 +1,41 @@
+// commit 2d88eb51077d 2026-05-17T16:59:47+00:00 app.go
+	// view engine lock store shared with mounted apps that use the same root app
+	viewsLockStore *viewsLockStore
+type viewsLockStore struct {
+	locks map[viewsLockKey]*sync.RWMutex
+	mutex sync.Mutex
+}
+
+func newViewsLockStore() *viewsLockStore {
+	return &viewsLockStore{
+		locks: make(map[viewsLockKey]*sync.RWMutex),
+	}
+}
+func (s *viewsLockStore) get(views Views) *sync.RWMutex {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if lock, ok := s.locks[key]; ok {
+	s.locks[key] = lock
+	return lock
+}
+
+func (app *App) getViewsLock(views Views) *sync.RWMutex {
+	return app.viewsLockStore.get(views)
+}
+
+func (app *App) setViewsLockStore(store *viewsLockStore) {
+	for _, targetApp := range app.mountFields.appList {
+		if targetApp == nil {
+			continue
+		}
+
+		targetApp.viewsLockStore = store
+		config:         Config{},
+		toBytes:        utils.UnsafeBytes,
+		toString:       utils.UnsafeString,
+		latestRoute:    &Route{},
+		customBinders:  []CustomBinder{},
+		sendfiles:      []*sendFileStore{},
+		viewsLockStore: newViewsLockStore(),
+			viewsLock := targetApp.getViewsLock(targetApp.config.Views)

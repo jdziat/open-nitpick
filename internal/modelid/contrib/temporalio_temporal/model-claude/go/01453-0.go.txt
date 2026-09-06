@@ -1,0 +1,108 @@
+// commit 26c075ddc272 2026-07-13T09:15:50-07:00 tests/testcore/test_cluster_pool.go
+	"encoding/json"
+	"log"
+	var eventsFile *os.File
+	if path := os.Getenv("TEMPORAL_TEST_CLUSTER_EVENTS_FILE"); path != "" {
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			log.Printf("cluster events disabled: cannot open %q: %v", path, err)
+		}
+		eventsFile = f
+	}
+
+		shared:     newClusterPool(sharedSize, false, 0),
+		dedicated:  newClusterPool(dedicatedSize, true, 0),
+		eventsFile: eventsFile,
+
+	eventsFile *os.File
+// Cluster kinds recorded in creation events.
+const (
+	clusterKindShared      = "shared"
+	clusterKindDedicated   = "dedicated"
+	clusterKindSuiteScoped = "suite-scoped"
+)
+
+// clusterRequest describes what a test needs from the cluster router.
+type clusterRequest struct {
+	kind              string // set by the router: shared, dedicated, or suite-scoped
+	dedicated         bool
+	dedicatedReason   string
+	needWorkerService bool
+	dynamicConfig     map[dynamicconfig.Key]any
+	clusterOpts       []TestClusterOption
+}
+
+// mustBeFresh reports whether the request requires a brand-new cluster that
+// cannot be reused.
+func (r clusterRequest) mustBeFresh() bool {
+	return r.needWorkerService || len(r.dynamicConfig) > 0 || len(r.clusterOpts) > 0
+}
+
+// needsDedicated reports whether the request must be served by a dedicated
+// cluster rather than the shared pool.
+func (r clusterRequest) needsDedicated() bool {
+	return r.dedicated || r.mustBeFresh()
+}
+
+// reason explains why the cluster was created, for analytics. It falls back to a
+// generic reason when the caller did not provide one.
+func (r clusterRequest) reason() string {
+	switch r.kind {
+	case clusterKindShared:
+		return "shared pool"
+	case clusterKindSuiteScoped:
+		return "suite-scoped"
+	}
+	switch {
+	case r.dedicatedReason != "":
+		return r.dedicatedReason
+	case r.mustBeFresh():
+		return "custom config"
+	default:
+		return "dedicated (pooled)"
+	}
+}
+
+// recordCreation appends one JSON Lines event per test-cluster creation so a CI
+// run can be queried for which suite created how many clusters of each kind, and
+// why. Events fall back to the test log when no events file is configured.
+func (r clusterRequest) recordCreation(t *testing.T) {
+	suite, _, _ := strings.Cut(t.Name(), "/")
+	line, err := json.Marshal(map[string]any{
+		"suite":  suite,
+		"test":   t.Name(),
+		"kind":   r.kind,
+		"reason": r.reason(),
+		"worker": r.needWorkerService,
+	})
+	if err != nil {
+		return
+	}
+
+	if testClusterRouter.eventsFile == nil {
+		log.Printf("CLUSTEREVENT %s", line)
+		return
+	}
+	// O_APPEND makes each write land atomically at EOF and os.File serializes
+	// concurrent writes, so lines from parallel tests don't interleave.
+	_, _ = testClusterRouter.eventsFile.Write(append(line, '\n'))
+}
+
+func (p *clusterRouter) get(t *testing.T, req clusterRequest) (tb *FunctionalTestBase) {
+	if req.needsDedicated() {
+		return p.getDedicated(t, req)
+		return p.createCluster(t, clusterRequest{kind: clusterKindShared})
+		suiteCluster.cluster = p.createCluster(t, clusterRequest{kind: clusterKindSuiteScoped, needWorkerService: true})
+func (p *clusterRouter) getDedicated(t *testing.T, req clusterRequest) *FunctionalTestBase {
+	req.kind = clusterKindDedicated
+	if req.mustBeFresh() {
+		cluster := p.createCluster(t, req)
+		return p.createCluster(t, req)
+func (p *clusterRouter) createCluster(t *testing.T, req clusterRequest) *FunctionalTestBase {
+	// The worker service is off unless the request explicitly needs it.
+	opts := []TestClusterOption{withWorkerService(req.needWorkerService)}
+	if req.kind != clusterKindDedicated {
+	if len(req.dynamicConfig) > 0 {
+		opts = append(opts, WithDynamicConfigOverrides(req.dynamicConfig))
+	opts = append(opts, req.clusterOpts...)
+	req.recordCreation(t)

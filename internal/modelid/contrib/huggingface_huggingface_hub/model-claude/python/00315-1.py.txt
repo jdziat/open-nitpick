@@ -1,0 +1,42 @@
+# commit 5c9ea9408439 2026-02-17T14:34:47+01:00 tests/test_cli.py
+from huggingface_hub.cli.jobs import _parse_namespace_from_job_id
+from huggingface_hub.errors import CLIError, RevisionNotFoundError
+
+
+class TestParseNamespaceFromJobId:
+    """Unit tests for _parse_namespace_from_job_id."""
+
+    @pytest.mark.parametrize(
+        "input_job_id, input_namespace, expected_job_id, expected_namespace",
+        [
+            ("my-job-id", None, "my-job-id", None),
+            ("my-job-id", "my-username", "my-job-id", "my-username"),
+            ("my-username/my-job-id", None, "my-job-id", "my-username"),
+            ("my-username/my-job-id", "my-username", "my-job-id", "my-username"),
+        ],
+    )
+    def test_parse_namespace_from_job_id(
+        self,
+        input_job_id: str,
+        input_namespace: Optional[str],
+        expected_job_id: str,
+        expected_namespace: Optional[str],
+    ) -> None:
+        job_id, ns = _parse_namespace_from_job_id(input_job_id, input_namespace)
+        assert job_id == expected_job_id
+        assert ns == expected_namespace
+
+    @pytest.mark.parametrize(
+        "input_job_id, input_namespace",
+        [
+            ("my-username/my-job-id", "other-user"),  # conflicting namespace
+            ("", None),
+            ("/", None),
+            ("alice/", None),
+            ("/job1", None),
+            ("alice/job1/extra", None),
+        ],
+    )
+    def test_parse_namespace_from_job_id_errors(self, input_job_id: str, input_namespace: Optional[str]) -> None:
+        with pytest.raises(CLIError):
+            _parse_namespace_from_job_id(input_job_id, input_namespace)

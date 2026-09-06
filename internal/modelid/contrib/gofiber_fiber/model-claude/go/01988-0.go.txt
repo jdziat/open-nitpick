@@ -1,0 +1,54 @@
+// commit 517e413755d3 2026-08-23T16:35:33+02:00 middleware/redirect/redirect.go
+	// atom is what the construct just read multiplied n by, and prev is what the
+	// run measured before it did — both kept so a quantifier can put the atom
+	// back and count what it permits instead.
+	atom, prev := 1, 1
+			atom, prev = 1, n
+			atom, prev = s.classWidth(), n
+			atom, prev = 256, n
+			prev = n
+			total, n, atom, prev = clampWidth(total+n), 1, 1, 1
+			n, atom, prev = repeated(prev, atom, 0, 1), 1, n
+				n, prev = repeated(prev, atom, bounds.lo, bounds.hi), n
+			atom, prev = 1, n
+// repeated returns the width a run reaches once the atom ending it, itself atom
+// alternatives wide, may repeat lo to hi times. Each count the quantifier permits
+// is a set of paths of its own and they add: "[ab]{1,2}" matches the two "[ab]"
+// does and the four its pairs spell, where "[a][ab]?" matches three. Counting
+// only whether none was permitted left the wider of the two the narrower by this
+// measure.
+//
+// prev is what the run measured before the atom multiplied it in, carried here
+// rather than divided back out of it: a product that reached the clamp cannot be
+// undone, and dividing invented a width below it — one that sorted a five-class
+// rule ahead of the subset it contains.
+func repeated(prev, atom, lo, hi int) int {
+	return clampWidth(prev * max(total, 1))
+// quantifierRange reads the body of a "{m,n}". A body spelling no bound is no
+	m, ok := repeatCount(lo)
+	if !ok {
+	n, ok := repeatCount(hi)
+	if !ok || n < m {
+// repeatCount reads one bound of a "{m,n}". Go's repetition grammar spells a
+// bound in decimal digits and nothing else, so a sign makes the braces literal
+// text: "a{-0}" is a path of six bytes, not an "a" repeated none. Reading the
+// sign as a count took four bytes off what that rule pins.
+func repeatCount(bound string) (int, bool) {
+	if bound == "" {
+		return 0, false
+	}
+	for i := 0; i < len(bound); i++ {
+		if bound[i] < '0' || bound[i] > '9' {
+			return 0, false
+		}
+	}
+
+	// A count Go itself would refuse for its size leaves the braces to be read
+	// as they stand, which is what the caller does with a bound it cannot take.
+	n, err := strconv.Atoi(bound)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+

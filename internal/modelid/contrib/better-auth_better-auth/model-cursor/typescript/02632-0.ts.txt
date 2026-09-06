@@ -1,0 +1,47 @@
+// commit e2c73fbec87f 2026-07-27T16:25:27+00:00 packages/better-auth/src/plugins/jwt/jwt.test.ts
+import type { BetterAuthClientPlugin } from "@better-auth/core";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { inferAdditionalFields } from "../additional-fields/client";
+
+/**
+ * Declaration emit previously narrowed `$fetch` from `$fetch<JSONWebKeySet>(...)`,
+ * making `jwtClient()` unassignable to `BetterAuthClientPlugin` and collapsing
+ * `createAuthClient` option inference when combined with other plugins.
+ *
+ * @see https://github.com/masumi-network/sokosumi/pull/3403
+ */
+describe("jwtClient types", () => {
+	it("should be assignable to BetterAuthClientPlugin", () => {
+		const plugin: BetterAuthClientPlugin = jwtClient();
+		const plugins: BetterAuthClientPlugin[] = [jwtClient()];
+		expect(plugin.id).toBe("better-auth-client");
+		expect(plugins).toHaveLength(1);
+	});
+
+	it("should preserve additional user fields when combined with inferAdditionalFields", () => {
+		const client = createAuthClient({
+			plugins: [
+				inferAdditionalFields({
+					user: {
+						logo: {
+							type: "string",
+							required: false,
+						},
+					},
+				}),
+				jwtClient(),
+			],
+		});
+
+		type UpdateUserBody = NonNullable<Parameters<typeof client.updateUser>[0]>;
+
+		const body = {
+			logo: "https://example.com/logo.png",
+		} satisfies UpdateUserBody;
+		expect(body.logo).toBe("https://example.com/logo.png");
+		expectTypeOf<UpdateUserBody>().toMatchTypeOf<{
+			logo?: string | null | undefined;
+		}>();
+		expectTypeOf(client.jwks).toBeFunction();
+	});
+});

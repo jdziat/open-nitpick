@@ -1,0 +1,32 @@
+# commit b698915d6b58 2025-08-11T11:43:57+02:00 src/huggingface_hub/utils/_xet_progress_reporting.py
+from . import is_google_colab, is_notebook
+    """
+    Reports on progress for Xet uploads.
+
+    Shows summary progress bars when running in notebooks or GUIs, and detailed per-file progress in console environments.
+    """
+
+    def __init__(self, n_lines: int = 10, description_width: int = 30):
+        self.per_file_progress = is_google_colab() or not is_notebook()
+
+            "nrows": n_lines + 3 if self.per_file_progress else 3,
+        the whole name right justified into description_width characters.  Also adds some padding.
+
+        if not self.per_file_progress:
+            # Here we just use the defaults.
+            return name
+
+            # If we're only showing summary information, then don't update the individual bars
+            if not self.per_file_progress:
+                continue
+
+        if self.per_file_progress:
+            # Now manually refresh each of the bars
+            for bar in self.current_bars:
+                if bar:
+                    bar.refresh()
+
+        if self.per_file_progress:
+            for bar in self.current_bars:
+                if bar:
+                    bar.close()

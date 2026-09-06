@@ -1,0 +1,38 @@
+# commit f34cd32cac1f 2026-08-14T12:09:00+02:00 tests/test_cli.py
+from huggingface_hub.cli.jobs import _get_jobs_stats_rows, _parse_and_sync_job_volumes, _parse_namespace_from_job_id
+    @pytest.mark.parametrize("num_gpus", [1, 2, 4, 8])
+    def test_stats_rows_one_row_per_gpu(self, num_gpus: int) -> None:
+        """`hf jobs stats` must render one row per GPU, each with its own metrics."""
+        headers = [
+            "JOB ID",
+            "CPU %",
+            "NUM CPU",
+            "MEM %",
+            "MEM USAGE",
+            "NET I/O",
+            "GPU UTIL %",
+            "GPU MEM %",
+            "GPU MEM USAGE",
+        ]
+        metrics = {
+            "cpu_usage_pct": 42,
+            "cpu_millicores": 8000,
+            "memory_used_bytes": 4_000_000_000,
+            "memory_total_bytes": 16_000_000_000,
+            "rx_bps": 1_000_000,
+            "tx_bps": 2_000_000,
+            "gpus": {
+                f"gpu-{index}": {
+                    "utilization": 10 * (index + 1),
+                    "memory_used_bytes": 1_000_000_000 * (index + 1),
+                    "memory_total_bytes": 80_000_000_000,
+                }
+                for index in range(num_gpus)
+            },
+        }
+        (rows,) = [rows for done, _, rows in _get_jobs_stats_rows("my-job-id", [metrics], headers) if not done]
+
+        assert len(rows) == num_gpus
+        assert all(len(row) == len(headers) for row in rows)
+        assert [row[headers.index("GPU UTIL %")] for row in rows] == [f"{10 * (i + 1)}%" for i in range(num_gpus)]
+

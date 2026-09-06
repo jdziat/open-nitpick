@@ -1,0 +1,78 @@
+// commit 19f6e8947072 2026-05-29T13:05:07+02:00 packages/vitest/src/node/projects/resolveProjects.ts
+  return resolveDefaultProjects(vitest, names, resolvedProjects)
+export async function resolveDefaultProjects(
+  vitest: Vitest,
+  names: Set<string>,
+  resolvedProjects: TestProject[],
+): Promise<TestProject[]> {
+  const newProjects = await resolveBrowserProjects(vitest, names, resolvedProjects)
+
+  let lastGroupOrder = Math.max(0, ...newProjects.map(p => p.config.sequence.groupOrder))
+
+  newProjects.forEach((project) => {
+    const benchmark = project.config.benchmark
+    if (!benchmark.enabled) {
+      return
+    }
+
+    if (vitest.isExcludedByProjectFilter(project.config.name)) {
+      benchmark.enabled = false
+      return
+    }
+
+    const name = project.config.name ? `${project.config.name} (bench)` : 'bench'
+    if (!vitest.matchesProjectFilter(name)) {
+      benchmark.enabled = false
+      return
+    }
+
+    if (names.has(name)) {
+      throw new Error(`Cannot create a benchmark project because the name "${name}" is already in use.`)
+    }
+    names.add(name)
+
+    const benchmarkProject = TestProject._cloneTestProject(project, {
+      ...project.config,
+      name,
+      include: benchmark.include,
+      exclude: benchmark.exclude,
+      includeSource: benchmark.includeSource,
+      coverage: {
+        ...project.config.coverage,
+        enabled: false,
+      },
+      maxWorkers: 1,
+      maxConcurrency: 1,
+      testTimeout: project.config.testTimeout < 60_000 ? 60_000 : project.config.testTimeout,
+      hookTimeout: project.config.hookTimeout < 120_000 ? 120_000 : project.config.hookTimeout,
+      // Spread because we disable it in the original project. `projectName`
+      // carries the parent's name so the runtime can substitute it into
+      // `${projectName}` placeholders inside `writeResult` / `bench.from()`
+      // paths — `project.config.name` already excludes the ` (bench)` suffix
+      // we add to the cloned project's own name above.
+      benchmark: { ...benchmark, projectName: project.config.name ?? '' },
+      sequence: {
+        ...project.config.sequence,
+        concurrent: false,
+        // benchmarks should always run in a separate isolated group
+        groupOrder: ++lastGroupOrder,
+      },
+      typecheck: {
+        ...project.config.typecheck,
+        enabled: false,
+      },
+      // TODO: mark if benchmark project?
+    })
+    // disable benchmark in the original project
+    benchmark.enabled = false
+    newProjects.push(benchmarkProject)
+  })
+  return newProjects
+}
+
+async function resolveBrowserProjects(
+      const clone = TestProject._cloneTestProject(project, clonedConfig)
+  // TODO: include benchmarks in browsers
+  if (project.config.benchmark.enabled) {
+    names.push(project.name ? `${project.name} (bench)` : 'bench')
+  }

@@ -1,0 +1,41 @@
+// commit 19e17c54fd4c 2025-09-04T20:12:56+01:00 pkg/cmd/agent-task/capi/sessions.go
+	ID            string
+	Name          string
+	UserID        uint64
+	AgentID       int64
+	Logs          string
+	State         string
+	OwnerID       uint64
+	RepoID        uint64
+	ResourceType  string
+	ResourceID    int64
+	LastUpdatedAt time.Time
+	CreatedAt     time.Time
+	CompletedAt   time.Time
+	EventURL      string
+	EventType     string
+
+	PullRequest *api.PullRequest
+		newSession := fromAPISession(s)
+		newSession.PullRequest = prMap[strconv.FormatInt(s.ResourceID, 10)]
+		newSessions = append(newSessions, newSession)
+
+func fromAPISession(s session) *Session {
+	return &Session{
+		ID:            s.ID,
+		Name:          s.Name,
+		UserID:        s.UserID,
+		AgentID:       s.AgentID,
+		Logs:          s.Logs,
+		State:         s.State,
+		OwnerID:       s.OwnerID,
+		RepoID:        s.RepoID,
+		ResourceType:  s.ResourceType,
+		ResourceID:    s.ResourceID,
+		LastUpdatedAt: s.LastUpdatedAt,
+		CreatedAt:     s.CreatedAt,
+		CompletedAt:   s.CompletedAt,
+		EventURL:      s.EventURL,
+		EventType:     s.EventType,
+	}
+}

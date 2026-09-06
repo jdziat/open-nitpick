@@ -1,0 +1,104 @@
+// commit f5bbb96d4e56 2025-11-15T16:55:50+00:00 packages/better-auth/src/adapters/kysely-adapter/test/adapter.kysely.mssql.test.ts
+	joinsTestSuite,
+
+// Helper function to create a connection factory for a specific database
+const createConnectionFactory = (database: string) => () =>
+	new Tedious.Connection({
+		authentication: {
+			options: {
+				password: "Password123!",
+				userName: "sa",
+			},
+			type: "default",
+		options: {
+			database: database,
+			port: 1433,
+			trustServerCertificate: true,
+			encrypt: false,
+			connectTimeout: 30000,
+			requestTimeout: 30000,
+		server: "localhost",
+	});
+// We need to connect to 'master' database first since 'better_auth' may not exist yet
+		// console.log("Ensuring better_auth database exists...");
+		// Create a temporary connection to 'master' database to create 'better_auth'
+		const masterDialect = new MssqlDialect({
+			tarn: {
+				...Tarn,
+				options: {
+					min: 0,
+					max: 5,
+				},
+			},
+			tedious: {
+				...Tedious,
+				connectionFactory: createConnectionFactory("master"),
+				TYPES: {
+					...Tedious.TYPES,
+					DateTime: Tedious.TYPES.DateTime2,
+				},
+			},
+		});
+
+		const masterDB = new Kysely({
+			dialect: masterDialect,
+		});
+
+		await masterDB.getExecutor().executeQuery({
+
+		await masterDB.destroy();
+		// console.log("Database check/creation completed");
+// Create dialect for better_auth database (after ensuring it exists)
+const dialect = new MssqlDialect({
+	tarn: {
+		...Tarn,
+		options: {
+			min: 0,
+			max: 50,
+		},
+	},
+	tedious: {
+		...Tedious,
+		connectionFactory: createConnectionFactory("better_auth"),
+		TYPES: {
+			...Tedious.TYPES,
+			DateTime: Tedious.TYPES.DateTime2,
+		},
+	},
+});
+
+const kyselyDB = new Kysely({
+	dialect: dialect,
+});
+
+			// console.log("Connection validated successfully");
+	const tables = await query(`SELECT TABLE_NAME, TABLE_SCHEMA 
+FROM INFORMATION_SCHEMA.TABLES 
+WHERE TABLE_TYPE = 'BASE TABLE'
+ORDER BY TABLE_SCHEMA, TABLE_NAME;`);
+
+	console.log("Available tables:", tables);
+
+		user: await query("SELECT * FROM [user]"),
+		session: await query("SELECT * FROM [session]"),
+		account: await query("SELECT * FROM [account]"),
+		verification: await query("SELECT * FROM [verification]"),
+		console.log(`Starting MSSQL migrations`);
+		console.log(`Finished resetting MSSQL database`);
+		console.log(`Running MSSQL migrations`);
+		const { runMigrations, compileMigrations } = await getMigrations(opts);
+		const CI =
+			process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+		// Helpful for debugging mssql enviroment issues on Github actions
+		if (CI) {
+			console.log(`Compiling MSSQL migrations`);
+			const migrations = await compileMigrations();
+			console.log(`Migrations:`, migrations);
+		}
+		console.log(`Finished running MSSQL migrations`);
+		normalTestSuite({
+			async showDB() {
+				await showDB();
+			},
+		}),
+		joinsTestSuite(),

@@ -1,0 +1,34 @@
+// commit a3c54bbff8d7 2025-10-01T21:02:36+02:00 client/client.go
+	timeout                time.Duration
+	mu                     sync.RWMutex
+	debug                  bool
+	disablePathNormalizing bool
+// DisablePathNormalizing reports whether path normalizing is disabled for the client.
+func (c *Client) DisablePathNormalizing() bool {
+	return c.disablePathNormalizing
+}
+
+// SetDisablePathNormalizing configures the client to disable or enable path normalizing.
+func (c *Client) SetDisablePathNormalizing(disable bool) *Client {
+	c.disablePathNormalizing = disable
+	return c
+}
+
+	c.disablePathNormalizing = false
+	Ctx                    context.Context //nolint:containedctx // It's needed to be stored in the config.
+	Body                   any
+	Header                 map[string]string
+	Param                  map[string]string
+	Cookie                 map[string]string
+	PathParam              map[string]string
+	FormData               map[string]string
+	UserAgent              string
+	Referer                string
+	File                   []*File
+	Timeout                time.Duration
+	MaxRedirects           int
+	DisablePathNormalizing bool
+	if cfg.DisablePathNormalizing {
+		req.SetDisablePathNormalizing(true)
+	}
+

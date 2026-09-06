@@ -1,0 +1,31 @@
+# commit 52c718a54382 2025-10-23T14:48:03+02:00 src/huggingface_hub/__init__.py
+__version__ = "1.0.0.rc7"
+    "cli._cli_utils": [
+        "typer_factory",
+    ],
+        "DryRunFileInfo",
+        "ASYNC_CLIENT_FACTORY_T",
+        "CLIENT_FACTORY_T",
+        "close_session",
+        "get_async_session",
+        "hf_raise_for_status",
+        "set_async_client_factory",
+        "set_client_factory",
+    "ASYNC_CLIENT_FACTORY_T",
+    "CLIENT_FACTORY_T",
+    "DryRunFileInfo",
+    "close_session",
+    "get_async_session",
+    "hf_raise_for_status",
+    "set_async_client_factory",
+    "set_client_factory",
+    "typer_factory",
+    from .cli._cli_utils import typer_factory  # noqa: F401
+        DryRunFileInfo,  # noqa: F401
+        ASYNC_CLIENT_FACTORY_T,  # noqa: F401
+        CLIENT_FACTORY_T,  # noqa: F401
+        close_session,  # noqa: F401
+        get_async_session,  # noqa: F401
+        hf_raise_for_status,  # noqa: F401
+        set_async_client_factory,  # noqa: F401
+        set_client_factory,  # noqa: F401

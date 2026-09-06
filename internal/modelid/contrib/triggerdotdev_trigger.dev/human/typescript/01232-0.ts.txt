@@ -1,0 +1,44 @@
+// commit d34b699950a7 2026-06-17T18:37:50+01:00 apps/webapp/app/db.server.ts
+import {
+  captureInfrastructureErrors,
+  infraErrorAlreadyLogged,
+  logTransactionInfrastructureError,
+} from "./utils/prismaErrors";
+// Boundary logger for transac(): skips an error the client extension already
+// logged (and tagged) at the statement level, so a single failure is logged
+// once. Shared by both $transaction overloads so the guard can't drift.
+function logTransactionPrismaError(error: Prisma.PrismaClientKnownRequestError) {
+  if (infraErrorAlreadyLogged(error)) {
+    return;
+  }
+  logger.error("prisma.$transaction error", {
+    code: error.code,
+    meta: error.meta,
+    stack: error.stack,
+    message: error.message,
+    name: error.name,
+  });
+}
+
+): Promise<R | undefined> {
+  try {
+    return await $transactionInner(prisma, fnOrName, fnOrOptions, options);
+  } catch (error) {
+    // transac()'s callback only logs coded Prisma errors; infra errors such as
+    // PrismaClientInitializationError reach the boundary without a `.code`.
+    logTransactionInfrastructureError(error);
+    throw error;
+  }
+}
+
+async function $transactionInner<R>(
+  prisma: PrismaClientOrTransaction,
+  fnOrName: ((prisma: PrismaTransactionClient) => Promise<R>) | string,
+  fnOrOptions?: ((prisma: PrismaTransactionClient) => Promise<R>) | PrismaTransactionOptions,
+  options?: PrismaTransactionOptions
+      return transac(prisma, (client) => fn(client, span), logTransactionPrismaError, options);
+      logTransactionPrismaError,
+export const prisma = singleton("prisma", () =>
+  captureInfrastructureErrors(tagDatasource("writer", getClient()))
+);
+  return replica ? captureInfrastructureErrors(tagDatasource("replica", replica)) : prisma;

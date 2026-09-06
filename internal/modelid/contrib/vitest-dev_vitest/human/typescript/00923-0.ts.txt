@@ -1,0 +1,45 @@
+// commit 3003c4327db9 2026-05-19T11:40:59+02:00 test/ui/test/ui.spec.ts
+  test('filter reveals initially invisible explorer item', async ({ page }) => {
+    await page.setViewportSize({ width: 1000, height: 500 })
+    await page.goto(pageUrl)
+    await testFilterInitiallyInvisibleItem(page)
+  })
+
+
+  test('module graph', async ({ page }) => {
+    await page.goto(pageUrl)
+    await testModuleGraph(page)
+  })
+
+  test('module graph', async ({ page }) => {
+    await page.goto(pageUrl)
+    await testModuleGraph(page)
+  })
+const TEST_COUNTS = {
+  pass: 18,
+  fail: 3,
+  files: {
+    pass: 7,
+  },
+}
+
+  await assertTestCounts(page, { pass: TEST_COUNTS.pass, fail: TEST_COUNTS.fail })
+async function testModuleGraph(page: Page) {
+  await openExplorerFileItem(page, 'sample.test.ts')
+  await page.getByTestId('btn-graph').click()
+  await expect(page.locator('[data-testid=graph] text')).toBeVisible()
+  await expect(page.locator('[data-testid=graph] text')).toHaveText('sample.test.ts')
+
+  await openExplorerFileItem(page, 'sample-browser.test.ts')
+  await page.getByTestId('btn-graph').click()
+  await expect(page.locator('[data-testid=graph] text')).toBeVisible()
+  await expect(page.locator('[data-testid=graph] text')).toHaveText('sample-browser.test.ts')
+}
+
+  await page.getByText(`PASS (${TEST_COUNTS.files.pass})`).click()
+async function testFilterInitiallyInvisibleItem(page: Page) {
+  await expect(getExplorerItem(page, 'sample.test.ts')).not.toBeVisible()
+  await page.getByPlaceholder('Search...').fill('sample.test.ts')
+  await expect(getExplorerItem(page, 'sample.test.ts')).toBeVisible()
+}
+

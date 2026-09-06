@@ -1,0 +1,54 @@
+// commit 38e10d5ebfd5 2026-03-26T14:26:17+01:00 internal/prompter/huh_prompter.go
+	"sync"
+// syncAccessor is a thread-safe huh.Accessor implementation.
+// huh calls OptionsFunc from a goroutine while the main event loop
+// writes field values via Set(). This accessor synchronizes both
+// paths through the same mutex.
+type syncAccessor[T any] struct {
+	mu    *sync.Mutex
+	value T
+}
+
+func (a *syncAccessor[T]) Get() T {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.value
+}
+
+func (a *syncAccessor[T]) Set(value T) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.value = value
+}
+
+func (p *huhPrompter) buildMultiSelectWithSearchForm(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) (*huh.Form, *syncAccessor[[]string]) {
+	var mu sync.Mutex
+
+	queryAccessor := &syncAccessor[string]{mu: &mu}
+	selectAccessor := &syncAccessor[[]string]{mu: &mu, value: slices.Clone(defaultValues)}
+	for _, k := range defaultValues {
+	buildOptions := func() []huh.Option[string] {
+		mu.Lock()
+		query := queryAccessor.value
+		needsFetch := !searchCacheValid || query != cachedSearchQuery
+		mu.Unlock()
+
+		if needsFetch {
+			result := searchFunc(query)
+			mu.Lock()
+			cachedSearchResult = result
+			mu.Unlock()
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		selectedValues := selectAccessor.value
+		Query:    &queryAccessor.value,
+		Selected: &selectAccessor.value,
+				Accessor(queryAccessor),
+				Options(buildOptions()...).
+					return buildOptions()
+				Accessor(selectAccessor).
+	return form, selectAccessor
+	form, accessor := p.buildMultiSelectWithSearchForm(prompt, searchPrompt, defaultValues, persistentValues, searchFunc)
+	return accessor.Get(), nil

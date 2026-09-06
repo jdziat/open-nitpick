@@ -1,0 +1,32 @@
+// commit 5de9704ec0fa 2026-01-20T17:28:32-08:00 packages/core/src/utils/ip.test.ts
+			expect(normalizeIP("2001:db8::1", { ipv6Subnet: 128 })).toBe(
+			expect(normalizeIP("::1", { ipv6Subnet: 128 })).toBe(
+			expect(normalizeIP("::", { ipv6Subnet: 128 })).toBe(
+				"0000:0000:0000:0000:0000:0000:0000:0000",
+			);
+			expect(normalizeIP("2001:DB8::1", { ipv6Subnet: 128 })).toBe(
+			expect(normalizeIP("2001:0DB8:ABCD:EF00::1", { ipv6Subnet: 128 })).toBe(
+			expect(normalizeIP("2001:db8::1", { ipv6Subnet: 128 })).toBe(normalized);
+			expect(normalizeIP("2001:0db8:0:0:0:0:0:1", { ipv6Subnet: 128 })).toBe(
+				normalized,
+			);
+			expect(normalizeIP("2001:db8:0::1", { ipv6Subnet: 128 })).toBe(
+				normalized,
+			);
+			expect(normalizeIP("2001:0db8::0:0:0:1", { ipv6Subnet: 128 })).toBe(
+				normalized,
+			);
+			expect(
+				normalizeIP("2001:db8:85a3::8a2e:370:7334", { ipv6Subnet: 128 }),
+			).toBe("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
+		it("should handle /64 subnet by default", () => {
+			const ip2 = normalizeIP("2001:db8::1", { ipv6Subnet: 64 });
+			expect(ip1).toBe("2001:0db8:0000:0000:0000:0000:0000:0000");
+			const normalized = representations.map((ip) =>
+				normalizeIP(ip, { ipv6Subnet: 128 }),
+			);
+			expect(normalizeIP("::1", { ipv6Subnet: 128 })).toBe(
+			expect(normalizeIP("::", { ipv6Subnet: 128 })).toBe(
+				"0000:0000:0000:0000:0000:0000:0000:0000",
+			);
+			expect(normalizeIP("fe80::1", { ipv6Subnet: 128 })).toBe(

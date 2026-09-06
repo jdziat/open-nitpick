@@ -1,0 +1,63 @@
+// commit e78adcf9761b 2026-03-20T15:40:16+01:00 packages/vitest/src/node/project.ts
+import crypto from 'node:crypto'
+  /** @internal */ _browserReadySessions = new Set<string>()
+  /** @internal */
+  public async _openBrowserPage(sessionId: string, pool: {
+    reject: (error: Error) => void
+    parallel?: boolean
+  }): Promise<void> {
+    if (!this.browser) {
+      throw new Error(`browser is not initialized`)
+    }
+
+    const resolvedUrls = this.browser.vite.resolvedUrls
+    const origin = resolvedUrls?.local[0] ?? resolvedUrls?.network[0]
+    if (!origin) {
+      throw new Error(
+        `Can't find browser origin URL for project "${this.name}"`,
+      )
+    }
+
+    const url = new URL('/__vitest_test__/', origin)
+    url.searchParams.set('sessionId', sessionId)
+    const otelCarrier = this.vitest._traces.getContextCarrier()
+    if (otelCarrier) {
+      url.searchParams.set('otelCarrier', JSON.stringify(otelCarrier))
+    }
+    this.vitest._browserSessions.sessionIds.add(sessionId)
+    const sessionPromise = this.vitest._browserSessions.createSession(
+      sessionId,
+      this,
+      pool,
+    )
+    const pagePromise = this.browser.provider.openPage(
+      sessionId,
+      url.toString(),
+      { parallel: pool.parallel ?? false },
+    )
+    await Promise.all([
+      sessionPromise,
+      pagePromise,
+    ])
+  }
+
+  /** @internal */
+  public async _standalone(): Promise<void> {
+    if (!this.isBrowserEnabled()) {
+      return
+    }
+
+    await this._initBrowserProvider()
+    if (!this.browser) {
+      return
+    }
+
+    const sessionId = crypto.randomUUID()
+    await this._openBrowserPage(sessionId, {
+      reject: (error) => {
+        this.vitest.state.catchError(error, 'Browser Error')
+      },
+    })
+    this._browserReadySessions.add(sessionId)
+  }
+

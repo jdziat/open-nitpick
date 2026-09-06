@@ -1,0 +1,42 @@
+// commit fe3ab8bdd26d 2026-08-27T02:33:47+00:00 ctx.go
+// ContentType returns the Content-Type request header, parameters included.
+//
+// Req and Res both carry a ContentType, so on Ctx the request wins, as it does
+// for Get. Use Res().ContentType() for the type the response will send.
+func (c *DefaultCtx) ContentType() string {
+	return c.DefaultReq.ContentType()
+}
+
+	// Route() builds a synthetic Route when none matched, and that one never
+	// carries a Name — so the allocation could only ever produce "".
+	if c.route == nil {
+		return ""
+	}
+	return c.route.Name
+// It answers from the route that is running, unlike App.MountPath, which
+// describes the app it is called on however that app is being served: a sub-app
+// that is mounted and also listened on directly reports its mount prefix there
+// even for its own traffic, where this reports "".
+//
+// The prefix is the owning app's, so mounting one *App at two prefixes reports
+// the one it was mounted at last — the same limitation App.MountPath has, since
+// that is where the prefix is recorded. Mount separate instances when each needs
+// to know its own prefix.
+	if c.app == nil {
+	// A route with no recorded owner is this app's own, so it is not under a
+	// mount at all — reading the app's own prefix here would answer with a
+	// mount the request never went through.
+	owner := c.app.routeOwner(c.route)
+	if owner == nil {
+		return ""
+
+	return owner.MountPath()
+// IsFinal returns true if no further handler of the current route runs after
+// this one. It is the exact complement of IsMiddleware, and false when no route
+// matched at all.
+//
+// It describes this route, not the whole request: a route registered with Use is
+// never final even when it is the last thing that runs, and another route can
+// still match after a final handler calls Next — a specific path followed by a
+// catch-all is the ordinary case. So this does not promise that the response is
+// finished; use it to tell an endpoint handler from a middleware one.

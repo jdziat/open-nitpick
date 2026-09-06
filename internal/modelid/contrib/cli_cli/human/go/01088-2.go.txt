@@ -1,0 +1,150 @@
+// commit e57fb436fa23 2026-04-15T15:43:43+02:00 internal/skills/gitclient/gitclient.go
+// Package gitclient provides a shared adapter from the cli/cli git.Client
+// (via cmdutil.Factory) to the narrow interfaces used by skills commands.
+package gitclient
+
+import (
+	"context"
+	"os"
+	"strings"
+
+	"github.com/cli/cli/v2/pkg/cmdutil"
+)
+
+// RootResolver can resolve the git repository root directory.
+type RootResolver interface {
+	ToplevelDir() (string, error)
+}
+
+// RemoteResolver can resolve git remote URLs.
+type RemoteResolver interface {
+	RemoteURL(name string) (string, error)
+}
+
+// Client is the full git operations interface used by skills commands.
+type Client interface {
+	RootResolver
+	RemoteResolver
+	GitDir(dir string) error
+	Remotes() ([]string, error)
+	CurrentBranch(dir string) (string, error)
+	IsIgnored(dir, path string) bool
+}
+
+// FactoryClient adapts the cli/cli git.Client to the Client interface.
+type FactoryClient struct {
+	F *cmdutil.Factory
+}
+
+// ToplevelDir returns the root directory of the current git repository.
+func (g *FactoryClient) ToplevelDir() (string, error) {
+	cmd, err := g.F.GitClient.Command(context.Background(), "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// RemoteURL returns the URL configured for the named git remote.
+func (g *FactoryClient) RemoteURL(name string) (string, error) {
+	cmd, err := g.F.GitClient.Command(context.Background(), "remote", "get-url", name)
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// GitDir validates that the given directory is inside a git repository.
+func (g *FactoryClient) GitDir(dir string) error {
+	cmd, err := g.F.GitClient.Command(context.Background(), "-C", dir, "rev-parse", "--git-dir")
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	return err
+}
+
+// Remotes returns the list of configured git remote names.
+func (g *FactoryClient) Remotes() ([]string, error) {
+	cmd, err := g.F.GitClient.Command(context.Background(), "remote")
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(string(out)), nil
+}
+
+// CurrentBranch returns the current branch name, or "" if HEAD is detached.
+func (g *FactoryClient) CurrentBranch(dir string) (string, error) {
+	cmd, err := g.F.GitClient.Command(context.Background(), "-C", dir, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	branch := strings.TrimSpace(string(out))
+	if branch == "HEAD" {
+		return "", nil // detached HEAD
+	}
+	return branch, nil
+}
+
+// IsIgnored reports whether the given path is git-ignored in the given directory.
+func (g *FactoryClient) IsIgnored(dir, path string) bool {
+	cmd, err := g.F.GitClient.Command(context.Background(), "-C", dir, "check-ignore", "-q", path)
+	if err != nil {
+		return false
+	}
+	_, err = cmd.Output()
+	return err == nil
+}
+
+// ResolveGitRoot returns the git repository root using the provided resolver,
+// falling back to the current working directory on error.
+func ResolveGitRoot(resolver RootResolver) string {
+	if resolver == nil {
+		if cwd, err := os.Getwd(); err == nil {
+			return cwd
+		}
+		return ""
+	}
+	root, err := resolver.ToplevelDir()
+	if err != nil {
+		if cwd, cwdErr := os.Getwd(); cwdErr == nil {
+			return cwd
+		}
+		return ""
+	}
+	return root
+}
+
+// ResolveHomeDir returns the user's home directory, or "" on error.
+func ResolveHomeDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return home
+}
+
+// TruncateSHA returns the first 8 characters of a SHA, or the full string
+// if it is shorter.
+func TruncateSHA(sha string) string {
+	if len(sha) > 8 {
+		return sha[:8]
+	}
+	return sha
+}

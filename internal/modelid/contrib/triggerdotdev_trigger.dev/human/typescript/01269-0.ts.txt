@@ -1,0 +1,34 @@
+// commit df78ef96d9ac 2026-06-26T09:01:37+01:00 apps/webapp/app/models/runtimeEnvironment.server.ts
+import { isDefaultDevBranch, sanitizeBranchName } from "@trigger.dev/core/v3/utils/gitBranch";
+  branchName: string | undefined,
+  tx: PrismaClientOrTransaction = $replica
+  const branch = sanitizeBranchName(branchName) ?? undefined;
+
+    childEnvironments: branch
+        where: {
+          branchName: branch,
+          archivedAt: null,
+        },
+      }
+  let environment = await tx.runtimeEnvironment.findFirst({
+    const revokedApiKey = await tx.revokedApiKey.findFirst({
+    if (!branch) {
+  // If there is a named DEV branch (other than default), return it
+  if (environment.type === "DEVELOPMENT" && branch !== undefined && !isDefaultDevBranch(branch)) {
+    const childEnvironment = environment.childEnvironments.at(0);
+
+    if (childEnvironment) {
+      return toAuthenticated({
+        ...childEnvironment,
+        apiKey: environment.apiKey,
+        orgMember: environment.orgMember,
+        organization: environment.organization,
+        project: environment.project,
+      });
+    }
+
+    //A branch was specified but no child environment was found
+    return null;
+
+  }
+

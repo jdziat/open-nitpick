@@ -1,0 +1,159 @@
+// commit 882268cc71e6 2026-01-04T21:36:44-05:00 service/history/workflow/mutable_state_impl.go
+	// Populate the versioningInfo if the inheritedAutoUpgradeInfo is present.
+	if event.GetInheritedAutoUpgradeInfo() != nil {
+		ms.SetVersioningRevisionNumber(event.GetInheritedAutoUpgradeInfo().GetSourceDeploymentRevisionNumber())
+		// TODO (Shivam): Remove this once you make SetDeploymentVersion and SetVersioningBehavior methods with nil checks
+		if ms.executionInfo.VersioningInfo == nil {
+			ms.executionInfo.VersioningInfo = &workflowpb.WorkflowExecutionVersioningInfo{}
+		}
+		ms.executionInfo.VersioningInfo.DeploymentVersion = event.GetInheritedAutoUpgradeInfo().GetSourceDeploymentVersion()
+		// Assume AutoUpgrade behavior for the first workflow task.
+		ms.executionInfo.VersioningInfo.Behavior = enumspb.VERSIONING_BEHAVIOR_AUTO_UPGRADE
+	}
+
+		ms.GetEffectiveVersioningBehavior() != enumspb.VERSIONING_BEHAVIOR_UNSPECIFIED {
+		// Passing nil for usedVersion because starting with pinned override does not add the version to used versions SA until the version is actaully used.
+		//nolint:staticcheck // SA1019
+		if _, err := ms.addBuildIDAndDeploymentInfoToSearchAttributesWithNoVisibilityTask(event.SourceVersionStamp, nil, limit); err != nil {
+	return ms.updateBuildIdsAndDeploymentSearchAttributes(&commonpb.WorkerVersionStamp{UseVersioning: true, BuildId: buildId}, nil, limit)
+func (ms *MutableStateImpl) updateBuildIdsAndDeploymentSearchAttributes(
+	stamp *commonpb.WorkerVersionStamp,
+	usedVersion *deploymentpb.WorkerDeploymentVersion,
+	maxSearchAttributeValueSize int,
+) error {
+	changed, err := ms.addBuildIDAndDeploymentInfoToSearchAttributesWithNoVisibilityTask(stamp, usedVersion, maxSearchAttributeValueSize)
+func (ms *MutableStateImpl) loadUsedDeploymentVersions() ([]string, error) {
+	searchAttributes := ms.executionInfo.SearchAttributes
+	if searchAttributes == nil {
+		return []string{}, nil
+	}
+	saPayload, found := searchAttributes[sadefs.TemporalUsedWorkerDeploymentVersions]
+	if !found {
+		return []string{}, nil
+	}
+	decoded, err := searchattribute.DecodeValue(saPayload, enumspb.INDEXED_VALUE_TYPE_KEYWORD_LIST, true)
+	if err != nil {
+		return nil, err
+	}
+	if decoded == nil {
+		return []string{}, nil
+	}
+	usedDeploymentVersions, ok := decoded.([]string)
+	if !ok {
+		return nil, serviceerror.NewInternal("invalid search attribute value stored for TemporalUsedWorkerDeploymentVersions")
+	}
+	return usedDeploymentVersions, nil
+}
+
+func (ms *MutableStateImpl) addUsedDeploymentVersionToLoadedSearchAttribute(existingValues []string, usedVersion *deploymentpb.WorkerDeploymentVersion) []string {
+	if usedVersion == nil {
+		return existingValues
+	}
+
+	// Get the current deployment version string (already formatted via ExternalWorkerDeploymentVersionToString)
+	deploymentVersionStr := worker_versioning.ExternalWorkerDeploymentVersionToString(usedVersion)
+
+	// Skip empty deployment versions (unversioned workflows don't get tracked)
+	if deploymentVersionStr == "" {
+		return existingValues
+	}
+
+	// Check if already exists (deduplicate)
+	for _, existingValue := range existingValues {
+		if existingValue == deploymentVersionStr {
+			return existingValues // Already present, no change
+		}
+	}
+
+	// Add new deployment version to the list
+	newValues := make([]string, 0, len(existingValues)+1)
+	newValues = append(newValues, existingValues...)
+	newValues = append(newValues, deploymentVersionStr)
+	return newValues
+}
+
+func (ms *MutableStateImpl) saveUsedDeploymentVersions(usedDeploymentVersions []string, maxSearchAttributeValueSize int) error {
+	searchAttributes := ms.executionInfo.SearchAttributes
+	if searchAttributes == nil {
+		searchAttributes = make(map[string]*commonpb.Payload, 1)
+		ms.executionInfo.SearchAttributes = searchAttributes
+	}
+
+	for {
+		saPayload, err := searchattribute.EncodeValue(usedDeploymentVersions, enumspb.INDEXED_VALUE_TYPE_KEYWORD_LIST)
+		if err != nil {
+			return err
+		}
+		if len(usedDeploymentVersions) == 0 || len(saPayload.GetData()) <= maxSearchAttributeValueSize {
+			ms.updateSearchAttributes(map[string]*commonpb.Payload{
+				sadefs.TemporalUsedWorkerDeploymentVersions: saPayload,
+			})
+			break
+		}
+		// If too large, remove oldest entries
+		if len(usedDeploymentVersions) == 1 {
+			usedDeploymentVersions = make([]string, 0)
+		} else {
+			usedDeploymentVersions = usedDeploymentVersions[1:] // Remove oldest
+		}
+	}
+	return nil
+}
+
+	if deployment == "" {
+		saPayloads[sadefs.TemporalWorkerDeployment] = nil
+	} else {
+		deploymentPayload, err := searchattribute.EncodeValue(deployment, enumspb.INDEXED_VALUE_TYPE_KEYWORD)
+		if err != nil {
+			return err
+		}
+		if len(deploymentPayload.GetData()) <= maxSearchAttributeValueSize { // we know the string won't really be over, but still check
+			saPayloads[sadefs.TemporalWorkerDeployment] = deploymentPayload
+		}
+	if version == "" {
+		saPayloads[sadefs.TemporalWorkerDeploymentVersion] = nil
+	} else {
+		saPayloads[sadefs.TemporalWorkerDeploymentVersion] = nil
+		versionPayload, err := searchattribute.EncodeValue(version, enumspb.INDEXED_VALUE_TYPE_KEYWORD)
+		if err != nil {
+			return err
+		}
+		if len(versionPayload.GetData()) <= maxSearchAttributeValueSize { // we know the string won't really be over, but still check
+			saPayloads[sadefs.TemporalWorkerDeploymentVersion] = versionPayload
+		}
+	if behavior == "" {
+		saPayloads[sadefs.TemporalWorkflowVersioningBehavior] = nil
+	} else {
+		behaviorPayload, err := searchattribute.EncodeValue(behavior, enumspb.INDEXED_VALUE_TYPE_KEYWORD)
+		if err != nil {
+			return err
+		}
+		if len(behaviorPayload.GetData()) <= maxSearchAttributeValueSize { // we know the string won't really be over, but still check
+			saPayloads[sadefs.TemporalWorkflowVersioningBehavior] = behaviorPayload
+		}
+func (ms *MutableStateImpl) addBuildIDAndDeploymentInfoToSearchAttributesWithNoVisibilityTask(
+	stamp *commonpb.WorkerVersionStamp,
+	usedVersion *deploymentpb.WorkerDeploymentVersion,
+	maxSearchAttributeValueSize int,
+) (bool, error) {
+	existingUsedDeploymentVersions, err := ms.loadUsedDeploymentVersions()
+	if err != nil {
+		return false, err
+	}
+	modifiedUsedDeploymentVersions := ms.addUsedDeploymentVersionToLoadedSearchAttribute(existingUsedDeploymentVersions, usedVersion)
+		slices.Equal(existingUsedDeploymentVersions, modifiedUsedDeploymentVersions) &&
+	// save used deployment versions if changed
+	if !slices.Equal(existingUsedDeploymentVersions, modifiedUsedDeploymentVersions) {
+		err = ms.saveUsedDeploymentVersions(modifiedUsedDeploymentVersions, maxSearchAttributeValueSize)
+		if err != nil {
+			return false, err // if err != nil, nothing will be written
+		}
+	}
+
+		// Passing nil useVersion because an override by itself should not add to used versions SA
+		if err := ms.updateBuildIdsAndDeploymentSearchAttributes(nil, nil, limit); err != nil {
+	versioningInfo := ms.GetExecutionInfo().GetVersioningInfo()
+	if override := versioningInfo.GetVersioningOverride(); override != nil &&
+	if v := versioningInfo.GetDeploymentVersion(); v != nil {
+		return v.GetDeploymentName()
+	}

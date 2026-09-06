@@ -1,0 +1,66 @@
+// commit 9ba9e3ff8c47 2026-08-18T14:12:04-06:00 pkg/cmd/pr/create/create.go
+	"github.com/cli/cli/v2/internal/attachments"
+
+	Assets []attachments.UserAsset
+			Use %[1]s--attach%[1]s to upload an image or video. The attachment is appended to the
+			body. If the body references an attached file, such as %[1]s![alt](./login.png)%[1]s, that
+			reference is rewritten to point at the uploaded asset instead.
+
+			Alt text for an image follows the path after %[1]s#%[1]s, as in
+			%[1]s--attach './login.png#The login error state'%[1]s. Without it the filename is used.
+			A reference already in the body keeps the alt text written there. Video renders
+			as a player and has no alt text, so it cannot be given any.
+
+			$ gh pr create --attach './login.png#The login error state'
+			opts.Assets, err = attachments.FromFlagValues(cmd)
+			if err != nil {
+				return err
+			}
+
+	attachments.AddFlag(cmd)
+	// Built before the prompts, so a run that cannot upload stops early.
+	var uploader *attachments.Uploader
+	if len(opts.Assets) > 0 {
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+		baseRepo := ctx.PRRefs.BaseRepo()
+		host := baseRepo.RepoHost()
+		tokenType := cfg.Authentication().ActiveTokenType(host)
+
+		uploader, err = attachments.NewUploader(httpClient, tokenType, host, baseRepo.DatabaseID, baseRepo.ViewerPermission)
+		if err != nil {
+			return err
+		}
+	}
+
+		return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
+		// Preview opens the browser, which cannot carry an upload.
+		allowPreview := !state.HasMetadata() && shared.ValidURL(openURL) && !opts.DryRun && len(opts.Assets) == 0
+			action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata() && !opts.DryRun && len(opts.Assets) == 0, false, state.Draft)
+		return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
+		return submitPR(*opts, *ctx, *state, projectsV1Support, uploader)
+func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState, projectV1Support gh.ProjectsV1Support, uploader *attachments.Uploader) error {
+	var uploadErr error
+	if uploader != nil {
+		body, uploaded, err := uploader.UploadAndAttach(context.Background(), state.Body, opts.Assets)
+		// With nothing uploaded, a body that lost the files it was written
+		// around is not what the caller asked to create. The branch is already
+		// pushed by now, so the message says what was not created rather than
+		// claiming the run had no effect.
+		if err != nil && uploaded == 0 {
+			return fmt.Errorf("%w\nno pull request was created", err)
+		}
+		uploadErr = err
+		params["body"] = body
+	}
+
+			err = fmt.Errorf("pull request update failed: %w", err)
+		} else {
+			err = fmt.Errorf("pull request create failed: %w", err)
+		// A failed upload and a failed create have different remedies, and a
+		// failed create leaves the uploaded assets referenced by nothing, so
+		// that error reads first.
+		return errors.Join(uploadErr, err)
+	return uploadErr

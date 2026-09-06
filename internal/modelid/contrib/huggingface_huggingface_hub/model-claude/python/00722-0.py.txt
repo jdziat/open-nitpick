@@ -1,0 +1,34 @@
+# commit cc4e7cc67ae9 2026-07-03T11:13:19+02:00 src/huggingface_hub/utils/_http.py
+def _parse_retry_after(headers: Mapping[str, str]) -> int | None:
+    """Parse the standard `Retry-After` HTTP header into a number of seconds to wait.
+
+    The `Retry-After` header can be either a non-negative number of seconds (delay-seconds)
+    or an HTTP-date after which to retry. We handle only the delay-seconds case.
+
+    See https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Retry-After.
+    """
+    value: str | None = None
+    for key in headers:
+        if key.lower() == "retry-after":
+            value = headers[key]
+            break
+
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+
+    if value.isdigit():
+        return int(value)  # e.g. "Retry-After: 120"
+    return None  #  e.g. "Retry-After: Wed, 21 Oct 2015 07:28:00 GMT" - not supported
+
+
+                # Check 'ratelimit' and `Retry-After` headers.
+                if (
+                    response.status_code == 429
+                    and (ratelimit_info := parse_ratelimit_headers(response.headers)) is not None
+                ):
+                    ratelimit_reset = ratelimit_info.reset_in_seconds
+                elif (retry_after := _parse_retry_after(response.headers)) is not None:
+                    ratelimit_reset = retry_after

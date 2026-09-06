@@ -1,0 +1,46 @@
+// commit a5bc02b0fef8 2026-02-24T05:15:34+00:00 tools/flakereport/slack.go
+	"strings"
+func buildSuccessMessage(summary *ReportSummary, runID, repo string, days int) *SlackMessage {
+	// Add CI breakers details
+	if lines := formatReportLines(summary.CIBreakers); len(lines) > 0 {
+		if len(lines) > slackMaxListItems {
+			lines = lines[:slackMaxListItems]
+		}
+		text := fmt.Sprintf("*CI Breakers (top %d):*\n%s", slackMaxListItems, strings.Join(lines, "\n"))
+				Text: truncateToSlackLimit(text, 2900),
+	// Add flaky tests details (already sorted by failure rate)
+	var flakyFiltered []TestReport
+	for _, r := range summary.FlakyTests {
+		if r.FailureCount >= minFlakyFailures {
+			flakyFiltered = append(flakyFiltered, r)
+		}
+	}
+	if lines := formatReportLines(flakyFiltered); len(lines) > 0 {
+		if len(lines) > slackMaxListItems {
+			lines = lines[:slackMaxListItems]
+		}
+		text := fmt.Sprintf("*Flaky Tests (top %d):*\n%s", slackMaxListItems, strings.Join(lines, "\n"))
+				Text: truncateToSlackLimit(text, 2900),
+						Text: fmt.Sprintf("*Commit:*\n%.7s", sha),
+// renderMarkdown renders a SlackMessage as markdown, treating each block's text as markdown.
+func (msg *SlackMessage) renderMarkdown() string {
+	var sb strings.Builder
+	for _, block := range msg.Blocks {
+		if block.Text != nil {
+			sb.WriteString(block.Text.Text)
+			sb.WriteString("\n\n")
+		}
+		for _, field := range block.Fields {
+			sb.WriteString(field.Text)
+			sb.WriteString("\n")
+		}
+		if len(block.Fields) > 0 {
+			sb.WriteString("\n")
+		}
+	}
+	return sb.String()
+}
+
+// send sends message to webhook URL
+func (msg *SlackMessage) send(webhookURL string) error {
+	jsonData, err := json.Marshal(msg)

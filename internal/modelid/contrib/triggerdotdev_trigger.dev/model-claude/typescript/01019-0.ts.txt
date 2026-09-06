@@ -1,0 +1,74 @@
+// commit 5022769f7001 2026-05-14T16:23:32+01:00 apps/webapp/app/v3/services/initializeDeployment.server.ts
+import { createDeploymentWithNextVersion } from "./initializeDeployment/createDeploymentWithNextVersion.server";
+      // Concurrent deploys to the same environment race on the
+      // `(environmentId, version)` unique constraint. The helper retries on
+      // P2002, recomputing the version (and re-running the image ref call so
+      // the persisted imageReference always matches the persisted version)
+      // each attempt.
+      const deployment = await createDeploymentWithNextVersion(
+        this._prisma,
+        environment.id,
+        async (nextVersion) => {
+          const [imageRefError, imageRefResult] = await tryCatch(
+            getDeploymentImageRef({
+              registry: registryConfig,
+              projectRef: environment.project.externalRef,
+              nextVersion,
+              environmentType: environment.type,
+              deploymentShortCode,
+            })
+          );
+
+          if (imageRefError) {
+            logger.error("Failed to get deployment image ref", {
+              environmentId: environment.id,
+              projectId: environment.projectId,
+              version: nextVersion,
+              triggeredById: triggeredBy?.id,
+              type: payload.type,
+              cause: imageRefError.message,
+            });
+            throw new ServiceValidationError("Failed to get deployment image ref");
+          }
+
+          const { imageRef, isEcr, repoCreated } = imageRefResult;
+
+          logger.debug("Creating deployment", {
+            environmentId: environment.id,
+            projectId: environment.projectId,
+            version: nextVersion,
+            triggeredById: triggeredBy?.id,
+            type: payload.type,
+            imageRef,
+            isEcr,
+            repoCreated,
+            initialStatus,
+            artifactKey: payload.isNativeBuild ? payload.artifactKey : undefined,
+            isNativeBuild: payload.isNativeBuild,
+          });
+
+          return {
+            // Regenerated per attempt: each attempt is a fresh `create` that
+            // must satisfy `WorkerDeployment.friendlyId @unique`, so reusing a
+            // friendlyId across retries would risk a spurious P2002 on
+            // friendlyId instead of the version collision we're retrying.
+            friendlyId: generateFriendlyId("deployment"),
+            contentHash: payload.contentHash,
+            shortCode: deploymentShortCode,
+            status: initialStatus,
+            projectId: environment.projectId,
+            externalBuildData,
+            buildServerMetadata,
+            triggeredById: triggeredBy?.id,
+            type: payload.type,
+            imageReference: imageRef,
+            imagePlatform: env.DEPLOY_IMAGE_PLATFORM,
+            git: payload.gitMeta ?? undefined,
+            commitSHA: payload.gitMeta?.commitSha ?? undefined,
+            runtime: payload.runtime ?? undefined,
+            triggeredVia: payload.triggeredVia ?? undefined,
+            startedAt: initialStatus === "BUILDING" ? new Date() : undefined,
+          };
+        }
+      );
+        imageRef: deployment.imageReference ?? "",

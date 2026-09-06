@@ -1,0 +1,50 @@
+// commit 931c0ee63441 2025-10-14T13:54:57+02:00 packages/vitest/src/node/pools/rpc.ts
+import { existsSync, mkdirSync } from 'node:fs'
+  const vitest = project.vitest
+  project.vitest.state.metadata[project.name] ??= {
+    externalized: {},
+    duration: {},
+    tmps: {},
+  }
+  if (project.config.dumpDir && !existsSync(project.config.dumpDir)) {
+    mkdirSync(project.config.dumpDir, { recursive: true })
+  }
+  project.vitest.state.metadata[project.name].dumpDir = project.config.dumpDir
+  const fetch = createFetchModuleFunction(
+    project._resolver,
+    cacheFs,
+    project.tmpDir,
+    {
+      dumpFolder: project.config.dumpDir,
+      readFromDump: project.config.server.debug?.load ?? process.env.VITEST_DEBUG_LOAD_DUMP != null,
+    },
+  )
+      return await fetch(url, importer, environment, options).then((result) => {
+        const duration = performance.now() - start
+        project.vitest.state.transformTime += duration
+        const metadata = project.vitest.state.metadata[project.name]
+        if ('externalize' in result) {
+          metadata.externalized[url] = result.externalize
+        }
+        if ('tmp' in result) {
+          metadata.tmps[url] = result.tmp
+        }
+        metadata.duration[url] ??= []
+        metadata.duration[url].push(duration)
+        return result
+      })
+      vitest.snapshot.add(snapshot)
+      return vitest.snapshot.resolvePath<ResolveSnapshotPathHandlerContext>(testPath, {
+        vitest.state.collectFiles(project, [file])
+        await vitest._testRun.enqueued(project, file)
+        vitest.state.collectFiles(project, files)
+        await vitest._testRun.collected(project, files)
+      vitest.coverageProvider?.onAfterSuiteRun(meta)
+      return vitest._testRun.annotate(testId, annotation)
+        vitest.state.updateTasks(packs)
+        await vitest._testRun.updated(packs, events)
+        vitest.state.updateUserLog(log)
+        await vitest._testRun.log(log)
+      vitest.state.catchError(err, type)
+      vitest.cancelCurrentRun(reason)
+      return vitest.state.getCountOfFailedTests()

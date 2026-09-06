@@ -1,0 +1,250 @@
+# commit 3b306043d728 2026-03-02T11:53:11+01:00 src/huggingface_hub/hf_file_system.py
+from pathlib import Path, PurePosixPath
+from typing import Any, Iterable, Iterator, NoReturn, Optional, Union
+from .errors import (
+    BucketNotFoundError,
+    EntryNotFoundError,
+    HfHubHTTPError,
+    RepositoryNotFoundError,
+    RevisionNotFoundError,
+)
+from .hf_api import BucketFile, BucketFolder, HfApi, LastCommitInfo, RepoFile, RepoFolder
+    """Top level Data structure containing information about a resolved Hugging Face file system path."""
+
+    root: str
+    path: str
+
+    def unresolve(self) -> str:
+        return f"{self.root}/{self.path}".rstrip("/")
+
+
+@dataclass
+class HfFileSystemResolvedRepositoryPath(HfFileSystemResolvedPath):
+    """Data structure containing information about a resolved path in a repository."""
+    root: str = field(init=False)
+    path: str = field(init=False)
+    def __post_init__(self):
+            self.root = f"{repo_path}@{self._raw_revision}"
+            self.root = f"{repo_path}@{safe_revision(self.revision)}"
+            self.root = repo_path
+        self.path = self.path_in_repo
+
+
+@dataclass
+class HfFileSystemResolvedBucketPath(HfFileSystemResolvedPath):
+    """Data structure containing information about a resolved path in a bucket."""
+
+    bucket_id: str
+    root: str = field(init=False)
+
+    def __post_init__(self):
+        self.root = "buckets/" + self.bucket_id
+        #  * the 1st element indicating whether the repository and the revision exist
+        # Same for buckets
+        self._bucket_exists_cache: dict[str, tuple[bool, Optional[Exception]]] = {}
+        # Note: special case for buckets: revision is always None
+    def _bucket_exists(self, bucket_id: str) -> tuple[bool, Optional[Exception]]:
+        if bucket_id not in self._bucket_exists_cache:
+            try:
+                self._api.bucket_info(bucket_id)
+            except BucketNotFoundError as e:
+                self._bucket_exists_cache[bucket_id] = False, e
+            else:
+                self._bucket_exists_cache[bucket_id] = True, None
+        return self._bucket_exists_cache[bucket_id]
+
+    def resolve_path(
+        self, path: str, revision: Optional[str] = None
+    ) -> Union[HfFileSystemResolvedRepositoryPath, HfFileSystemResolvedBucketPath]:
+            raise NotImplementedError("Access to buckets and repositories lists is not implemented.")
+        elif path.split("/")[0] == "buckets":
+            bucket_id = "/".join(path.split("/")[1:3])
+            path = "/".join(path.split("/")[3:])
+            bucket_exists, err = self._bucket_exists(bucket_id)
+            if not bucket_exists:
+                _raise_file_not_found(path, err)
+            return HfFileSystemResolvedBucketPath(bucket_id=bucket_id, path=path)
+        return HfFileSystemResolvedRepositoryPath(
+            repo_type, repo_id, revision, path_in_repo, _raw_revision=revision_in_path
+        )
+            if not resolved_path.path:
+                if isinstance(resolved_path, HfFileSystemResolvedRepositoryPath):
+                    self._repo_and_revision_exists_cache.pop(
+                        (resolved_path.repo_type, resolved_path.repo_id, None), None
+                    )
+                    self._repo_and_revision_exists_cache.pop(
+                        (resolved_path.repo_type, resolved_path.repo_id, resolved_path.revision), None
+                    )
+                else:
+                    self._bucket_exists_cache.pop(resolved_path.bucket_id, None)
+        if isinstance(resolved_path, HfFileSystemResolvedBucketPath):
+            self._api.batch_bucket_files(resolved_path.bucket_id, delete=[resolved_path.path])
+        else:
+            self._api.delete_file(
+                path_in_repo=resolved_path.path_in_repo,
+                repo_id=resolved_path.repo_id,
+                token=self.token,
+                repo_type=resolved_path.repo_type,
+                revision=resolved_path.revision,
+                commit_message=kwargs.get("commit_message"),
+                commit_description=kwargs.get("commit_description"),
+            )
+        if isinstance(resolved_path, HfFileSystemResolvedBucketPath):
+            delete = [self.resolve_path(path).path for path in paths if not self.isdir(path)]
+            self._api.batch_bucket_files(resolved_path.bucket_id, delete=delete)
+        else:
+            paths_in_repo = [self.resolve_path(path).path for path in paths if not self.isdir(path)]
+            operations = [CommitOperationDelete(path_in_repo=path_in_repo) for path_in_repo in paths_in_repo]
+            commit_message = f"Delete {path} "
+            commit_message += "recursively " if recursive else ""
+            commit_message += f"up to depth {maxdepth} " if maxdepth is not None else ""
+            # TODO: use `commit_description` to list all the deleted paths?
+            self._api.create_commit(
+                repo_id=resolved_path.repo_id,
+                repo_type=resolved_path.repo_type,
+                token=self.token,
+                operations=operations,
+                revision=resolved_path.revision,
+                commit_message=kwargs.get("commit_message", commit_message),
+                commit_description=kwargs.get("commit_description"),
+            )
+            if not resolved_path.path:
+        root_path = resolved_path.root
+        maxdepth = maxdepth if recursive else 1
+            if expand_info and isinstance(resolved_path, HfFileSystemResolvedRepositoryPath):
+                # Check if there are directories in repos with non-expanded entries
+            tree: Iterable[Union[RepoFile, RepoFolder, BucketFile, BucketFolder]]
+            if isinstance(resolved_path, HfFileSystemResolvedBucketPath):
+                tree = self._list_bucket_tree_with_folders(
+                    resolved_path.bucket_id,
+                    prefix=resolved_path.path,
+                    recursive=recursive,
+                )
+            else:
+                tree = self._api.list_repo_tree(
+                    resolved_path.repo_id,
+                    resolved_path.path,
+                    recursive=recursive,
+                    expand=expand_info,
+                    revision=resolved_path.revision,
+                    repo_type=resolved_path.repo_type,
+                )
+                elif isinstance(path_info, BucketFile):
+                    cache_path_info = {
+                        "name": cache_path,
+                        "size": path_info.size,
+                        "type": "file",
+                        "xet_hash": path_info.xet_hash,
+                        "mtime": path_info.mtime,
+                        "uploaded_at": path_info.uploaded_at,
+                    }
+                elif isinstance(path_info, RepoFolder):
+                else:
+                    cache_path_info = {
+                        "name": cache_path,
+                        "size": 0,
+                        "type": "directory",
+                        "uploaded_at": path_info.uploaded_at,
+                    }
+    def _list_bucket_tree_with_folders(
+        self, bucket_id: str, prefix: str, recursive: bool
+    ) -> Iterable[Union[BucketFile, BucketFolder]]:
+        """Same as `HfApi.list_bucket_tree` but always includes folders"""
+        bucket_files = self._api.list_bucket_tree(bucket_id, prefix, recursive=recursive)
+        bucket_folders: dict[str, BucketFolder] = {}
+        min_depth = 1 + prefix.count("/") if prefix else 0
+        out: list[Union[BucketFile, BucketFolder]] = []
+
+        for bucket_entry in bucket_files:
+            out.append(bucket_entry)
+
+            # If recursive=False, both files and folders are returned by the server => nothing to do
+            if not recursive:
+                continue
+
+            # Otherwise, let's rebuild BucketFolders manually
+            for parent_bucket_folder_str in list(PurePosixPath(bucket_entry.path).parents)[: -min_depth - 1]:
+                parent_bucket_folder = BucketFolder(
+                    type="directory", path=str(parent_bucket_folder_str), uploaded_at=bucket_entry.uploaded_at
+                )
+
+                # If folder not visited yet, add it
+                if parent_bucket_folder.path not in bucket_folders:
+                    out.append(parent_bucket_folder)
+                    bucket_folders[parent_bucket_folder.path] = parent_bucket_folder
+                    continue
+
+                # Otherwise, get back BucketFolder object and update its 'uploaded_at'
+                if parent_bucket_folder.uploaded_at is not None:
+                    bucket_folder = bucket_folders[parent_bucket_folder.path]
+                    if bucket_folder.uploaded_at is None or (
+                        bucket_folder.uploaded_at < parent_bucket_folder.uploaded_at
+                    ):
+                        bucket_folder.uploaded_at = parent_bucket_folder.uploaded_at
+
+        if not out:
+            raise EntryNotFoundError(f"File not found in bucket '{bucket_id}': '{prefix}'")
+        return out
+
+            out = self._ls_tree(path, recursive=True, refresh=refresh, maxdepth=maxdepth, **kwargs)
+                path_info = self.info(path, **kwargs)
+        if isinstance(resolved_path1, HfFileSystemResolvedBucketPath) or isinstance(
+            resolved_path2, HfFileSystemResolvedBucketPath
+        ):
+            raise NotImplementedError("Copy from/to buckets is not available yet")
+            `datetime`: Last modified time of the file.
+        if "last_commit" in info:
+            if info["last_commit"] is None:
+                raise NotImplementedError(f"'modified' is not implemented for repository paths like '{path}'")
+            return info["last_commit"].date
+        elif "mtime" in info and info["mtime"]:
+            return info["mtime"]
+        elif "uploaded_at" in info and info["uploaded_at"]:
+            return info["uploaded_at"]
+        else:
+            raise NotImplementedError(f"Cannot determined 'modified' for path '{path}' (info: {info})")
+        > Note: When possible, use `HfApi.get_paths_info()` or `HfApi.repo_info()`  for better performance
+        > (or `HfApi.get_bucket_paths_info()` or `HfApi.bucket_info()` for buckets)
+        if not resolved_path.path:
+            if isinstance(resolved_path, HfFileSystemResolvedRepositoryPath):
+                out["last_commit"] = None
+            if isinstance(resolved_path, HfFileSystemResolvedRepositoryPath) and expand_info:
+        elif isinstance(resolved_path, HfFileSystemResolvedBucketPath):
+            parent_path = self._parent(path)
+            # Fill the cache with cheap call
+            self.ls(parent_path, refresh=refresh)
+            out1 = [o for o in self.dircache[parent_path] if o["name"] == path]
+            if not out1:
+                _raise_file_not_found(path, None)
+            out = out1[0]
+                root_path = HfFileSystemResolvedRepositoryPath(
+        if isinstance(resolved_path, HfFileSystemResolvedBucketPath):
+            url = f"{self.endpoint}/buckets/{resolved_path.bucket_id}/resolve/{quote(resolved_path.path)}"
+        else:
+            url = hf_hub_url(
+                resolved_path.repo_id,
+                resolved_path.path_in_repo,
+                repo_type=resolved_path.repo_type,
+                revision=resolved_path.revision,
+                endpoint=self.endpoint,
+            )
+        > Note: When possible, use `HfApi.hf_hub_download()` or `HfApi.download_bucket_files` for better performance.
+                url=self.url(resolve_remote_path.unresolve()),
+            "_bucket_exists_cache": deepcopy(self._bucket_exists_cache),
+        url = self.url()
+            if isinstance(self.resolved_path, HfFileSystemResolvedBucketPath):
+                self.fs._api.batch_bucket_files(
+                    self.resolved_path.bucket_id, add=[(self.temp_file.name, self.resolved_path.path)]
+                )
+            else:
+                self.fs._api.upload_file(
+                    path_or_fileobj=self.temp_file.name,
+                    path_in_repo=self.resolved_path.path_in_repo,
+                    repo_id=self.resolved_path.repo_id,
+                    token=self.fs.token,
+                    repo_type=self.resolved_path.repo_type,
+                    revision=self.resolved_path.revision,
+                    commit_message=self.kwargs.get("commit_message"),
+                    commit_description=self.kwargs.get("commit_description"),
+                )
+        url = self.url()

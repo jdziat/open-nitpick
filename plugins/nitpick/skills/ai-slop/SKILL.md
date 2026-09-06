@@ -59,7 +59,6 @@ it is wrong, and saying so is part of the job.
 
 ## What this is not
 
-`identify_model` answers a different question (which of six models' styles
-a file is nearest to) and is not evidence of slop; a file can be
-model-written and clean, or human-written and slop. Use this skill for the
-second question and `identify-model` for the first.
+Slop is not a claim about who wrote the code. A file can be model-written
+and clean, or human-written and slop; every finding here names a rule the
+code broke, not an author.

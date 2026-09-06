@@ -1,0 +1,101 @@
+// commit 60aef5d2e3da 2025-12-01T14:30:59+01:00 pkg/github/server.go
+	"github.com/github/github-mcp-server/pkg/utils"
+	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+func NewServer(version string, opts *mcp.ServerOptions) *mcp.Server {
+	if opts == nil {
+		// Add default options
+		opts = &mcp.ServerOptions{
+			HasTools:     true,
+			HasResources: true,
+			HasPrompts:   true,
+		}
+	s := mcp.NewServer(&mcp.Implementation{
+		Name:    "github-mcp-server",
+		Title:   "GitHub MCP Server",
+		Version: version,
+	}, opts)
+
+func OptionalParamOK[T any, A map[string]any](args A, p string) (value T, ok bool, err error) {
+	val, exists := args[p]
+func RequiredParam[T comparable](args map[string]any, p string) (T, error) {
+	if _, ok := args[p]; !ok {
+	val, ok := args[p].(T)
+func RequiredInt(args map[string]any, p string) (int, error) {
+	v, err := RequiredParam[float64](args, p)
+func RequiredBigInt(args map[string]any, p string) (int64, error) {
+	v, err := RequiredParam[float64](args, p)
+func OptionalParam[T any](args map[string]any, p string) (T, error) {
+	if _, ok := args[p]; !ok {
+	if _, ok := args[p].(T); !ok {
+		return zero, fmt.Errorf("parameter %s is not of type %T, is %T", p, zero, args[p])
+	return args[p].(T), nil
+func OptionalIntParam(args map[string]any, p string) (int, error) {
+	v, err := OptionalParam[float64](args, p)
+func OptionalIntParamWithDefault(args map[string]any, p string, d int) (int, error) {
+	v, err := OptionalIntParam(args, p)
+func OptionalBoolParamWithDefault(args map[string]any, p string, d bool) (bool, error) {
+	v, err := OptionalParam[bool](args, p)
+func OptionalStringArrayParam(args map[string]any, p string) ([]string, error) {
+	if _, ok := args[p]; !ok {
+	switch v := args[p].(type) {
+		return []string{}, fmt.Errorf("parameter %s could not be coerced to []string, is %T", p, args[p])
+func OptionalBigIntArrayParam(args map[string]any, p string) ([]int64, error) {
+	if _, ok := args[p]; !ok {
+	switch v := args[p].(type) {
+		return []int64{}, fmt.Errorf("parameter %s could not be coerced to []int64, is %T", p, args[p])
+func WithPagination(schema *jsonschema.Schema) *jsonschema.Schema {
+	schema.Properties["page"] = &jsonschema.Schema{
+		Type:        "number",
+		Description: "Page number for pagination (min 1)",
+		Minimum:     jsonschema.Ptr(1.0),
+	}
+
+	schema.Properties["perPage"] = &jsonschema.Schema{
+		Type:        "number",
+		Description: "Results per page for pagination (min 1, max 100)",
+		Minimum:     jsonschema.Ptr(1.0),
+		Maximum:     jsonschema.Ptr(100.0),
+
+	return schema
+func WithUnifiedPagination(schema *jsonschema.Schema) *jsonschema.Schema {
+	schema.Properties["page"] = &jsonschema.Schema{
+		Type:        "number",
+		Description: "Page number for pagination (min 1)",
+		Minimum:     jsonschema.Ptr(1.0),
+	}
+
+	schema.Properties["perPage"] = &jsonschema.Schema{
+		Type:        "number",
+		Description: "Results per page for pagination (min 1, max 100)",
+		Minimum:     jsonschema.Ptr(1.0),
+		Maximum:     jsonschema.Ptr(100.0),
+
+	schema.Properties["after"] = &jsonschema.Schema{
+		Type:        "string",
+		Description: "Cursor for pagination. Use the endCursor from the previous page's PageInfo for GraphQL APIs.",
+	}
+
+	return schema
+func WithCursorPagination(schema *jsonschema.Schema) *jsonschema.Schema {
+	schema.Properties["perPage"] = &jsonschema.Schema{
+		Type:        "number",
+		Description: "Results per page for pagination (min 1, max 100)",
+		Minimum:     jsonschema.Ptr(1.0),
+		Maximum:     jsonschema.Ptr(100.0),
+
+	schema.Properties["after"] = &jsonschema.Schema{
+		Type:        "string",
+		Description: "Cursor for pagination. Use the endCursor from the previous page's PageInfo for GraphQL APIs.",
+	}
+
+	return schema
+func OptionalPaginationParams(args map[string]any) (PaginationParams, error) {
+	page, err := OptionalIntParamWithDefault(args, "page", 1)
+	perPage, err := OptionalIntParamWithDefault(args, "perPage", 30)
+	after, err := OptionalParam[string](args, "after")
+func OptionalCursorPaginationParams(args map[string]any) (CursorPaginationParams, error) {
+	perPage, err := OptionalIntParamWithDefault(args, "perPage", 30)
+	after, err := OptionalParam[string](args, "after")
+		return utils.NewToolResultErrorFromErr("failed to marshal text result to json", err)
+	return utils.NewToolResultText(string(data))

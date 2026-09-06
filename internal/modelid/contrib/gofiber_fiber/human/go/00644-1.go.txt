@@ -1,0 +1,66 @@
+// commit 58f06e4aec09 2026-02-08T02:40:19-05:00 middleware/idempotency/response_msgp.go
+// Size limits for msgp deserialization
+const (
+	zd44e2ac8limitArrays = 16384
+	zd44e2ac8limitMaps   = 2048
+)
+
+	if zb0001 > zd44e2ac8limitMaps {
+		err = msgp.ErrLimitExceeded
+		return
+	}
+			if zb0002 > 1024 {
+				err = msgp.ErrLimitExceeded
+				return
+			}
+				if zb0003 > 1024 {
+					err = msgp.ErrLimitExceeded
+					return
+				}
+			z.Body, err = dc.ReadBytesLimit(z.Body, zd44e2ac8limitArrays)
+			if err == nil && z.Body == nil {
+				z.Body = []byte{}
+			}
+	if uint32(len(z.Headers)) > zd44e2ac8limitMaps {
+		err = msgp.ErrLimitExceeded
+		return
+	}
+		if uint32(len(za0002)) > zd44e2ac8limitArrays {
+			err = msgp.ErrLimitExceeded
+			return
+		}
+	if uint32(len(z.Headers)) > zd44e2ac8limitMaps {
+		return nil, msgp.ErrLimitExceeded
+	}
+		if uint32(len(za0002)) > zd44e2ac8limitArrays {
+			return nil, msgp.ErrLimitExceeded
+		}
+	if zb0001 > zd44e2ac8limitMaps {
+		err = msgp.ErrLimitExceeded
+		return
+	}
+			if zb0002 > 1024 {
+				err = msgp.ErrLimitExceeded
+				return
+			}
+				if zb0003 > 1024 {
+					err = msgp.ErrLimitExceeded
+					return
+				}
+			var zb0004 uint32
+			zb0004, bts, err = msgp.ReadBytesHeader(bts)
+			if zb0004 > zd44e2ac8limitArrays {
+				err = msgp.ErrLimitExceeded
+				return
+			}
+			if z.Body == nil || uint32(cap(z.Body)) < zb0004 {
+				z.Body = make([]byte, zb0004)
+			} else {
+				z.Body = z.Body[:zb0004]
+			}
+			if uint32(len(bts)) < zb0004 {
+				err = msgp.ErrShortBytes
+				return
+			}
+			copy(z.Body, bts[:zb0004])
+			bts = bts[zb0004:]

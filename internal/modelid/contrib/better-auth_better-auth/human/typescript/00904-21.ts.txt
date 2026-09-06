@@ -1,0 +1,55 @@
+// commit 7d8786cd8790 2025-12-23T23:55:50+08:00 packages/stripe/src/routes.ts
+import { APIError } from "@better-auth/core/error";
+import { STRIPE_ERROR_CODES } from "./error-codes";
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.EMAIL_VERIFICATION_REQUIRED,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.SUBSCRIPTION_PLAN_NOT_FOUND,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.SUBSCRIPTION_NOT_FOUND,
+				);
+					throw APIError.from(
+						"BAD_REQUEST",
+						STRIPE_ERROR_CODES.UNABLE_TO_CREATE_CUSTOMER,
+					);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.ALREADY_SUBSCRIBED_PLAN,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.SUBSCRIPTION_NOT_FOUND,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.SUBSCRIPTION_NOT_FOUND,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.SUBSCRIPTION_NOT_FOUND,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.SUBSCRIPTION_NOT_FOUND,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.SUBSCRIPTION_NOT_ACTIVE,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.SUBSCRIPTION_NOT_SCHEDULED_FOR_CANCELLATION,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.SUBSCRIPTION_NOT_FOUND,
+				);
+				throw APIError.from(
+					"BAD_REQUEST",
+					STRIPE_ERROR_CODES.UNABLE_TO_CREATE_CUSTOMER,
+				);

@@ -1,0 +1,46 @@
+// commit eef39a918178 2026-07-13T15:13:53+00:00 helpers.go
+	// buffer and the string allocation entirely. IndexNonQuotable treats
+	// HTAB as quotable qdtext (per RFC 9110), but this function escapes it,
+	// so a separate tab scan keeps the escape set unchanged.
+	idx := utils.IndexNonQuotable(raw)
+	if tab := strings.IndexByte(raw, '\t'); tab != -1 && (idx == -1 || tab < idx) {
+		idx = tab
+	}
+	if idx == -1 {
+	// Every byte before idx is quotable and tab-free, so it hits the
+	// verbatim case of the switch below; copy it in one append.
+	bb.B = append(bb.B, raw[:idx]...)
+	for i := idx; i < len(raw); i++ {
+			// Only ',', '"' and '\\' can change state, so jump between them
+			// instead of visiting every byte.
+				i := utils.IndexAny3(header[n:], ',', '"', '\\')
+				if i == -1 {
+					n = len(header)
+					break
+				}
+				n += i
+				default: // '\\'
+	// is a single entity tag, not two list elements. Only '"' and ','
+	// affect the split, so jump between them instead of visiting every byte.
+	pos := 0
+	for {
+		i := utils.IndexAny2(header[pos:], '"', ',')
+		if i == -1 {
+			break
+		}
+		i += pos
+		pos = i + 1
+		if header[i] == '"' {
+		} else if !inQuotes {
+			if matchEtag(utils.TrimSpace(header[start:i]), etag) {
+				return false
+			start = i + 1
+	pos := 0
+	for {
+		i := utils.IndexFold(cacheControl[pos:], noCacheValue)
+		if i == -1 {
+			return false
+		i += pos
+		pos = i + 1
+		end := i + len(noCacheValue)
+		if end == len(cacheControl) || isNoCacheDelimiter(cacheControl[end]) || cacheControl[end] == '=' {

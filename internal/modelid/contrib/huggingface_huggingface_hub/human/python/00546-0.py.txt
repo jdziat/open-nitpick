@@ -1,0 +1,35 @@
+# commit 57707cfc5a90 2026-05-04T10:55:37+02:00 src/huggingface_hub/utils/tqdm.py
+class disable_progress_bars:
+    Works as both a regular call and a context manager:
+        disable_progress_bars()           # disables until enable_progress_bars()
+        with disable_progress_bars():     # disables for the block, re-enables on exit
+            ...
+
+
+    def __init__(self, name: str | None = None) -> None:
+
+        self.name = name
+
+        if HF_HUB_DISABLE_PROGRESS_BARS is False:
+            warnings.warn(
+                "Cannot disable progress bars: environment variable `HF_HUB_DISABLE_PROGRESS_BARS=0` is set and has priority."
+            )
+            self._should_reenable = False
+            return
+
+        self._should_reenable = not are_progress_bars_disabled(name)
+        if name is None:
+            progress_bar_states.clear()
+            progress_bar_states["_global"] = False
+        else:
+            keys_to_remove = [key for key in progress_bar_states if key.startswith(f"{name}.")]
+            for key in keys_to_remove:
+                del progress_bar_states[key]
+            progress_bar_states[name] = False
+
+    def __enter__(self) -> "disable_progress_bars":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        if self._should_reenable:
+            enable_progress_bars(self.name)

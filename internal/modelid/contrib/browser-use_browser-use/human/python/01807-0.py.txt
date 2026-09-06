@@ -1,0 +1,271 @@
+# commit ef64212d28be 2025-07-30T21:46:02-07:00 browser_use/browser/session.py
+import asyncio
+	BrowserStateResponseEvent,
+	BrowserStateRequestEvent,
+	TabsInfoRequestEvent,
+	NavigationCompleteEvent,
+	ScreenshotResponseEvent,
+	TabsInfoResponseEvent,
+	ScreenshotRequestEvent,
+from browser_use.utils import logger
+		self.event_bus.on(BrowserStateRequestEvent, self._handle_browser_state_request)
+		self.event_bus.on(ScreenshotRequestEvent, self._handle_screenshot_request)
+		self.event_bus.on(TabsInfoRequestEvent, self._handle_tabs_info_request)
+				self._browser_context = await self._browser.new_context(**self.browser_profile.kwargs_for_new_context().model_dump(exclude_none=True))
+			# Check if we should keep the browser alive
+			if self.browser_profile.keep_alive and not event.force:
+				# Keep browser alive, just notify stop
+				self.event_bus.dispatch(
+					BrowserStoppedEvent(
+						reason='Kept alive due to keep_alive=True',
+					)
+				)
+				return
+
+			
+			# Clear CDP URL for local browsers since the process is gone
+			if self.is_local and self._owns_browser_resources:
+				self.cdp_url = None
+	async def _handle_browser_state_request(self, event: BrowserStateRequestEvent) -> None:
+		try:
+			# Get the full browser state with recovery
+			state = await self._get_browser_state_with_recovery(
+				cache_clickable_elements_hashes=event.cache_clickable_elements_hashes,
+				include_screenshot=event.include_screenshot
+			self.event_bus.dispatch(BrowserStateResponseEvent(state=state))
+		except Exception as e:
+			# Fall back to minimal state on error
+			minimal_state = await self._get_minimal_state_summary()
+			self.event_bus.dispatch(BrowserStateResponseEvent(state=minimal_state))
+	async def _handle_screenshot_request(self, event: ScreenshotRequestEvent) -> None:
+		self.event_bus.dispatch(ScreenshotResponseEvent(screenshot=screenshot_b64))
+	async def _handle_tabs_info_request(self, event: TabsInfoRequestEvent) -> None:
+		# Auto-start if not initialized
+		if not self.initialized:
+			start_event = self.event_bus.dispatch(StartBrowserEvent())
+			await start_event
+		
+		# Dispatch the response event
+		self.event_bus.dispatch(TabsInfoResponseEvent(tabs=tabs))
+		# Dispatch the request event
+		self.event_bus.dispatch(ScreenshotRequestEvent(full_page=full_page, clip=clip))
+		# Wait for the response event
+		try:
+			response = await self.event_bus.expect(ScreenshotResponseEvent, timeout=10.0)
+		except asyncio.TimeoutError:
+			# No screenshot received
+			return b''
+		# Dispatch the request event
+		self.event_bus.dispatch(TabsInfoRequestEvent())
+		# Wait for the response event
+		try:
+			response = await self.event_bus.expect(TabsInfoResponseEvent, timeout=5.0)
+		except asyncio.TimeoutError:
+			# No response received
+			return []
+
+	# DOM element methods
+	async def get_browser_state_with_recovery(
+		self, cache_clickable_elements_hashes: bool = True, include_screenshot: bool = True
+	) -> Any:
+		"""Get browser state with multiple fallback strategies for error recovery
+
+		Parameters:
+		-----------
+		cache_clickable_elements_hashes: bool
+			If True, cache the clickable elements hashes for the current state.
+		include_screenshot: bool
+			If True, include screenshot in the state summary. Set to False to improve performance
+			when screenshots are not needed (e.g., in multi_act element validation).
+		"""
+		# Dispatch request event
+		self.event_bus.dispatch(BrowserStateRequestEvent(
+			include_dom=True,
+			include_screenshot=include_screenshot,
+			cache_clickable_elements_hashes=cache_clickable_elements_hashes
+		))
+		
+		# Wait for response
+		try:
+			response = await self.event_bus.expect(BrowserStateResponseEvent, timeout=60.0)
+			return response.state
+		except asyncio.TimeoutError:
+			# Fall back to minimal state
+			return await self._get_minimal_state_summary()
+	
+	async def _get_browser_state_with_recovery(
+		self, cache_clickable_elements_hashes: bool = True, include_screenshot: bool = True
+	) -> Any:
+		"""Internal method to get browser state with recovery logic."""
+		# Try 1: Full state summary
+		try:
+			await self._wait_for_page_and_frames_load()
+			return await self._get_state_summary(cache_clickable_elements_hashes, include_screenshot=include_screenshot)
+		except Exception as e:
+			logger.warning(f'Full state retrieval failed: {type(e).__name__}: {e}')
+		logger.warning('🔄 Falling back to minimal state summary')
+		return await self._get_minimal_state_summary()
+		
+	async def _wait_for_page_and_frames_load(self, timeout_overwrite: float | None = None):
+		"""
+		Ensures page is fully loaded and stable before continuing.
+		Waits for network idle, DOM stability, and minimum WAIT_TIME.
+		"""
+		# For now, just ensure we have a page
+		page = await self.get_current_page()
+		if not page:
+			raise ValueError("No current page available")
+		
+		# Skip wait for new tab pages
+		if page.url in ['about:blank', 'chrome://new-tab-page/', 'chrome://newtab/']:
+			return
+			
+		# Basic wait for load state
+		try:
+			await page.wait_for_load_state('networkidle', timeout=timeout_overwrite or 30000)
+		except Exception:
+			# Continue even if timeout
+			pass
+	
+	async def _get_state_summary(
+		self, cache_clickable_elements_hashes: bool, include_screenshot: bool = True
+	) -> Any:
+		"""Get a summary of the current browser state"""
+		from browser_use.browser.views import BrowserStateSummary, TabInfo, PageInfo
+		from browser_use.dom.service import DomService
+		
+		# Auto-start if needed
+		if not self.initialized:
+			await self.start()
+			
+		page = await self.get_current_page()
+		
+		# Use DomService to get DOM content like the original implementation
+		dom_service = DomService(page, logger=logger)
+		try:
+			content = await asyncio.wait_for(
+				dom_service.get_clickable_elements(
+					focus_element=-1,
+					viewport_expansion=self.browser_profile.viewport_expansion,
+					highlight_elements=self.browser_profile.highlight_elements,
+				),
+				timeout=45.0,
+			)
+		except asyncio.TimeoutError:
+			logger.warning(f'DOM processing timed out after 45 seconds for {page.url}')
+			# Fall back to minimal DOM
+			from browser_use.dom.views import DOMElementNode, DOMState
+			minimal_element_tree = DOMElementNode(
+				tag_name='body',
+				xpath='/body',
+				attributes={},
+				children=[],
+				is_visible=True,
+				parent=None,
+			)
+			content = DOMState(element_tree=minimal_element_tree, selector_map={})
+		
+		# Get tabs info
+		tabs_info = await self.get_tabs_info()
+		
+		# Get screenshot if requested
+		screenshot_b64 = None
+		if include_screenshot:
+			try:
+				screenshot_bytes = await page.screenshot()
+				screenshot_b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+			except Exception:
+				pass
+		
+		# Get page dimensions
+		try:
+			page_dimensions = await page.evaluate("""
+				() => ({
+					viewport_width: window.innerWidth,
+					viewport_height: window.innerHeight,
+					page_width: document.documentElement.scrollWidth,
+					page_height: document.documentElement.scrollHeight,
+					scroll_x: window.scrollX,
+					scroll_y: window.scrollY
+				})
+			""")
+			
+			page_info = PageInfo(
+				viewport_width=page_dimensions['viewport_width'],
+				viewport_height=page_dimensions['viewport_height'],
+				page_width=page_dimensions['page_width'],
+				page_height=page_dimensions['page_height'],
+				scroll_x=page_dimensions['scroll_x'],
+				scroll_y=page_dimensions['scroll_y'],
+				pixels_above=page_dimensions['scroll_y'],
+				pixels_below=max(0, page_dimensions['page_height'] - page_dimensions['scroll_y'] - page_dimensions['viewport_height']),
+				pixels_left=page_dimensions['scroll_x'],
+				pixels_right=max(0, page_dimensions['page_width'] - page_dimensions['scroll_x'] - page_dimensions['viewport_width']),
+			)
+		except Exception:
+			# Fallback page info
+			viewport = page.viewport_size or {'width': 1280, 'height': 720}
+			page_info = PageInfo(
+				viewport_width=viewport['width'],
+				viewport_height=viewport['height'],
+				page_width=viewport['width'],
+				page_height=viewport['height'],
+				scroll_x=0,
+				scroll_y=0,
+				pixels_above=0,
+				pixels_below=0,
+				pixels_left=0,
+				pixels_right=0,
+			)
+		
+		return BrowserStateSummary(
+			element_tree=content.element_tree,
+			selector_map=content.selector_map,
+			url=page.url,
+			title=await page.title(),
+			tabs=tabs_info,
+			screenshot=screenshot_b64,
+			page_info=page_info,
+			pixels_above=page_info.pixels_above,
+			pixels_below=page_info.pixels_below,
+		)
+		
+	async def _get_minimal_state_summary(self) -> Any:
+		"""Get basic page info without DOM processing"""
+		from browser_use.browser.views import BrowserStateSummary
+		from browser_use.dom.views import DOMElementNode
+		
+		page = await self.get_current_page()
+		
+		# Get basic info
+		url = getattr(page, 'url', 'unknown')
+		
+		try:
+			title = await asyncio.wait_for(page.title(), timeout=2.0)
+		except Exception:
+			title = 'Page Load Error'
+			
+		try:
+			tabs_info = await self.get_tabs_info()
+		except Exception:
+			tabs_info = []
+			
+		# Create minimal DOM element
+		minimal_element_tree = DOMElementNode(
+			tag_name='body',
+			xpath='/body',
+			attributes={},
+			children=[],
+			is_visible=True,
+			parent=None,
+		)
+		
+		return BrowserStateSummary(
+			element_tree=minimal_element_tree,
+			selector_map={},
+			url=url,
+			title=title,
+			tabs=tabs_info,
+			pixels_above=0,
+			pixels_below=0,
+		)

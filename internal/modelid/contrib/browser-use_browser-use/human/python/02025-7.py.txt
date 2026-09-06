@@ -1,0 +1,49 @@
+# commit 7a0889cf20df 2025-08-12T04:14:53-07:00 tests/ci/test_search_google_tab_focus.py
+
+	initial_state_event = browser_session.event_bus.dispatch(BrowserStateRequestEvent(include_screenshot=False))
+
+
+
+	state_event = browser_session.event_bus.dispatch(BrowserStateRequestEvent(include_screenshot=False))
+
+	assert len(state_after.tabs) == initial_tabs_count + 1, f'Expected {initial_tabs_count + 1} tabs, got {len(state_after.tabs)}'
+
+	assert 'google.com/search' in state_after.url, f'Expected Google search URL, got {state_after.url}'
+	assert 'about:blank' not in state_after.url, 'Agent is still on about:blank after search_google'
+
+	assert 'test+search' in state_after.url or 'test%20search' in state_after.url, f'Query not found in URL: {state_after.url}'
+
+	print(f'✅ Test passed! Agent correctly focused on Google tab: {state_after.url}')
+	initial_state_event = browser_session.event_bus.dispatch(BrowserStateRequestEvent(include_screenshot=False))
+
+	nav_event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url='https://example.com', new_tab=True))
+
+
+	state_event = browser_session.event_bus.dispatch(BrowserStateRequestEvent(include_screenshot=False))
+
+	assert len(state_after.tabs) == initial_tabs_count + 1, f'Expected {initial_tabs_count + 1} tabs, got {len(state_after.tabs)}'
+
+	assert 'example.com' in state_after.url, f'Expected example.com URL, got {state_after.url}'
+	assert 'about:blank' not in state_after.url, 'Agent is still on about:blank after new tab navigation'
+
+	print(f'✅ Test passed! Agent correctly focused on new tab: {state_after.url}')
+	nav1_event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url='https://example.com', new_tab=True))
+
+	nav2_event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url='https://github.com', new_tab=True))
+
+	state_event = browser_session.event_bus.dispatch(BrowserStateRequestEvent(include_screenshot=False))
+
+	assert 'github.com' in state.url, f'Expected github.com URL, got {state.url}'
+	assert len(state.tabs) >= 3, f'Expected at least 3 tabs, got {len(state.tabs)}'
+	print(f'✅ Test passed! Agent correctly focused on latest tab: {state.url}')
+
+if __name__ == '__main__':
+			print('Running test_search_google_creates_and_focuses_new_tab...')
+
+			print('\nRunning test_navigate_with_new_tab_focuses_properly...')
+
+			print('\nRunning test_multiple_new_tabs_focus_on_latest...')
+
+			print('\n✅ All tests passed!')
+
+	asyncio.run(run_all_tests())

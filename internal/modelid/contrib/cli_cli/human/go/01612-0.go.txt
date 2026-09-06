@@ -1,0 +1,49 @@
+// commit d5be33d21ff9 2026-08-20T11:35:03-04:00 pkg/cmd/issue/develop/develop.go
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+			$ gh issue develop 123 --checkout --worktree /path/to/wt-feature
+	var worktreeTarget prShared.WorktreeTarget
+	if opts.Worktree != "" {
+		var err error
+		worktreeTarget, err = prShared.ResolveWorktreeTarget(opts.GitClient, opts.Worktree)
+		if err != nil {
+			return err
+		}
+	}
+
+	return checkoutBranch(opts, branchRepo, branchName, worktreeTarget)
+func checkoutBranch(opts *DevelopOptions, branchRepo ghrepo.Interface, checkoutBranch string, worktreeTarget prShared.WorktreeTarget) (err error) {
+	if opts.Worktree != "" {
+		commands, branchExists := prShared.WorktreeCheckoutCommands(
+			gc,
+			worktreeTarget,
+			checkoutBranch,
+			fmt.Sprintf("%s/%s", baseRemote.Name, checkoutBranch),
+		)
+		if err := runGitCommands(gc, commands); err != nil {
+			return err
+		}
+		if branchExists {
+			if err := gc.Pull(ctx.Background(), baseRemote.Name, checkoutBranch, git.WithRepoDir(opts.Worktree)); err != nil {
+				_, _ = fmt.Fprintf(opts.IO.ErrOut, "%s warning: not possible to fast-forward to: %q\n", opts.IO.ColorScheme().WarningIcon(), checkoutBranch)
+		return nil
+	}
+	if gc.HasLocalBranch(ctx.Background(), checkoutBranch) {
+		if err := gc.CheckoutBranch(ctx.Background(), checkoutBranch); err != nil {
+			return err
+
+		if err := gc.Pull(ctx.Background(), baseRemote.Name, checkoutBranch); err != nil {
+		if err := gc.CheckoutNewBranch(ctx.Background(), baseRemote.Name, checkoutBranch); err != nil {
+			return err
+
+func runGitCommands(client *git.Client, commands [][]string) error {
+	for _, args := range commands {
+		cmd, err := client.Command(ctx.Background(), args...)
+		if err != nil {
+			return err
+		}
+		if _, err := cmd.Output(); err != nil {
+			return err
+		}
+	}
+	return nil
+}

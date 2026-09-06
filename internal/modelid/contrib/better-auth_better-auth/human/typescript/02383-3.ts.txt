@@ -1,0 +1,34 @@
+// commit 34558bc52b0e 2026-06-12T15:03:33+00:00 packages/better-auth/src/context/create-context.ts
+import { getCookieCacheJwtSigningKey } from "../plugins/jwt/cookie-cache";
+import type { JwtOptions } from "../plugins/jwt/types";
+	const cookieCacheJwtSigningKey = getCookieCacheJwtSigningKey(options);
+	if (cookieCacheJwtSigningKey === "jwt-plugin") {
+		if (options.session?.cookieCache?.strategy !== "jwt") {
+			throw new BetterAuthError(
+				'`session.cookieCache.jwt.signingKey = "jwt-plugin"` requires `session.cookieCache.strategy = "jwt"`.',
+			);
+		}
+
+		const jwtPlugin = options.plugins?.find((plugin) => plugin.id === "jwt");
+		if (!jwtPlugin) {
+			throw new BetterAuthError(
+				'`session.cookieCache.jwt.signingKey = "jwt-plugin"` requires the `jwt()` plugin to be installed.',
+			);
+		}
+
+		const jwtPluginOptions = (jwtPlugin.options ?? {}) as JwtOptions;
+		if (jwtPluginOptions.jwt?.sign) {
+			throw new BetterAuthError(
+				'`session.cookieCache.jwt.signingKey = "jwt-plugin"` requires locally managed JWT plugin keys and does not support `jwt({ jwt: { sign } })`.',
+			);
+		}
+
+		const gracePeriod = jwtPluginOptions.jwks?.gracePeriod;
+		const cookieMaxAge = options.session?.cookieCache?.maxAge || 60 * 5;
+		if (gracePeriod !== undefined && cookieMaxAge > gracePeriod) {
+			logger.warn(
+				`[better-auth] \`session.cookieCache.maxAge\` (${cookieMaxAge}s) exceeds the JWT plugin JWKS grace period (${gracePeriod}s). Rotated keys may stop verifying cookie-cache JWTs before the cookie expires.`,
+			);
+		}
+	}
+

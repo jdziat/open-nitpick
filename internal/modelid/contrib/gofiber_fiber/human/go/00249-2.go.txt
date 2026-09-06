@@ -1,0 +1,49 @@
+// commit 7265515df697 2025-09-16T21:53:38+02:00 middleware/keyauth/keyauth.go
+	"strings"
+	utils "github.com/gofiber/utils/v2"
+	// Determine the auth schemes from the extractor chain.
+	authSchemes := getAuthSchemes(cfg.Extractor)
+		// Execute the error handler first
+		handlerErr := cfg.ErrorHandler(c, err)
+
+		status := c.Response().StatusCode()
+		if status == fiber.StatusUnauthorized || status == fiber.StatusProxyAuthRequired {
+			header := fiber.HeaderWWWAuthenticate
+			if status == fiber.StatusProxyAuthRequired {
+				header = fiber.HeaderProxyAuthenticate
+			}
+			if len(authSchemes) > 0 {
+				challenges := make([]string, 0, len(authSchemes))
+				for _, scheme := range authSchemes {
+					var b strings.Builder
+					fmt.Fprintf(&b, "%s realm=%q", scheme, cfg.Realm)
+					if utils.EqualFold(scheme, "Bearer") {
+						if cfg.Error != "" {
+							fmt.Fprintf(&b, ", error=%q", cfg.Error)
+							if cfg.ErrorDescription != "" {
+								fmt.Fprintf(&b, ", error_description=%q", cfg.ErrorDescription)
+							}
+							if cfg.ErrorURI != "" {
+								fmt.Fprintf(&b, ", error_uri=%q", cfg.ErrorURI)
+							}
+							if cfg.Error == ErrorInsufficientScope {
+								fmt.Fprintf(&b, ", scope=%q", cfg.Scope)
+							}
+						}
+					}
+					challenges = append(challenges, b.String())
+				}
+				c.Set(header, strings.Join(challenges, ", "))
+			} else if cfg.Challenge != "" {
+				c.Set(header, cfg.Challenge)
+			}
+		return handlerErr
+// getAuthSchemes inspects an extractor and its chain to find all auth schemes
+// used by FromAuthHeader. It returns a slice of schemes, or an empty slice if
+// none are found.
+func getAuthSchemes(e Extractor) []string {
+	var schemes []string
+	if e.Source == SourceAuthHeader && e.AuthScheme != "" {
+		schemes = append(schemes, e.AuthScheme)
+		schemes = append(schemes, getAuthSchemes(ex)...)
+	return schemes

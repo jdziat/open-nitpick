@@ -1,0 +1,177 @@
+// commit 5c45abcd2094 2026-07-30T21:42:14-04:00 packages/oauth-provider/src/utils/client-assertion.ts
+import { validatePublicClientJwks } from "../client-jwks";
+import { getClientDiscoveries } from "../extensions";
+import type {
+	ClientMetadataResourceFetch,
+	OAuthOptions,
+	SchemaClient,
+	Scope,
+} from "../types";
+type JwksCache = Map<string, { jwks: JSONWebKeySet; fetchedAt: number }>;
+type FetchedJwksResult =
+	| { valid: true; jwks: JSONWebKeySet }
+	| { valid: false };
+
+// Provider-scoped JWKS URI caches with 5-minute TTL and bounded size.
+const jwksCaches = new WeakMap<OAuthOptions<Scope[]>, JwksCache>();
+const MAX_JWKS_RESPONSE_BYTES = 64 * 1024;
+const JSON_CONTENT_TYPE = /^application\/(?:[-\w.]+\+)?json\s*(?:;|$)/i;
+function setJwksCache(
+	jwksCache: JwksCache,
+	cacheKey: string,
+	jwks: JSONWebKeySet,
+	fetchedAt: number,
+) {
+	jwksCache.set(cacheKey, { jwks, fetchedAt });
+
+function getJwksCache(opts: OAuthOptions<Scope[]>): JwksCache {
+	const existingCache = jwksCaches.get(opts);
+	if (existingCache) return existingCache;
+	const cache: JwksCache = new Map();
+	jwksCaches.set(opts, cache);
+	return cache;
+}
+
+function getJwksCacheKey(client: SchemaClient<Scope[]>): string {
+	return `${client.clientDiscoveryId ?? "managed"}:${client.jwksUri ?? ""}`;
+}
+	if (parsed.username || parsed.password) {
+		throw new APIError("BAD_REQUEST", {
+			error_description: "jwks_uri must not contain credentials",
+			error: "invalid_client",
+		});
+	}
+	// URL.hash is empty for a bare trailing `#`, so inspect the source value.
+	if (jwksUri.includes("#")) {
+		throw new APIError("BAD_REQUEST", {
+			error_description: "jwks_uri must not include a fragment component",
+			error: "invalid_client",
+		});
+	}
+		const parsed = new URL(clientId);
+		if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+			return undefined;
+		}
+		return parsed.origin;
+async function readBoundedResponseBody(response: Response): Promise<string> {
+	const contentLength = response.headers.get("content-length");
+	if (
+		contentLength !== null &&
+		Number.isFinite(Number(contentLength)) &&
+		Number(contentLength) > MAX_JWKS_RESPONSE_BYTES
+	) {
+		await response.body?.cancel();
+		throw new Error("JWKS response exceeds 64 KiB");
+	}
+
+	if (!response.body) {
+		return "";
+	}
+
+	const reader = response.body.getReader();
+	const chunks: Uint8Array[] = [];
+	let totalBytes = 0;
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		totalBytes += value.byteLength;
+		if (totalBytes > MAX_JWKS_RESPONSE_BYTES) {
+			await reader.cancel();
+			throw new Error("JWKS response exceeds 64 KiB");
+		}
+		chunks.push(value);
+	}
+
+	const bytes = new Uint8Array(totalBytes);
+	let offset = 0;
+	for (const chunk of chunks) {
+		bytes.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return new TextDecoder().decode(bytes);
+}
+
+async function fetchJwksFromUri(
+	jwksUri: string,
+	fetchClientMetadataResource: ClientMetadataResourceFetch = globalThis.fetch,
+): Promise<FetchedJwksResult> {
+		const response = await fetchClientMetadataResource(jwksUri, {
+		if (response.redirected) {
+			throw new Error("JWKS fetch redirected");
+		}
+		if (response.status !== 200) {
+		const contentType = response.headers.get("content-type");
+		if (!contentType || !JSON_CONTENT_TYPE.test(contentType)) {
+			throw new Error("JWKS response must use a JSON media type");
+		}
+		const responseBody = await readBoundedResponseBody(response);
+		let parsedBody: unknown;
+		try {
+			parsedBody = JSON.parse(responseBody);
+		} catch {
+			return { valid: false };
+		}
+		const result = validatePublicClientJwks(parsedBody);
+		if (!result.valid) {
+			return { valid: false };
+		return { valid: true, jwks: result.jwks };
+function createClientJwksFetchError(): APIError {
+	return new APIError("BAD_REQUEST", {
+		error_description: "failed to fetch client JWKS",
+		error: "invalid_client",
+	});
+}
+
+	opts: OAuthOptions<Scope[]>,
+	const discovery = client.clientDiscoveryId
+		? getClientDiscoveries(opts).find(
+				(candidate) => candidate.id === client.clientDiscoveryId,
+			)
+		: undefined;
+	if (client.clientDiscoveryId && !discovery?.fetchClientMetadataResource) {
+		throw new APIError("BAD_REQUEST", {
+			error_description:
+				"client discovery does not provide a metadata resource transport",
+			error: "invalid_client",
+		});
+	}
+	validateJwksUri(
+		ctx,
+		client.jwksUri,
+		client.clientDiscoveryId ? urlClientIdOrigin(client.clientId) : undefined,
+	);
+	const cacheKey = getJwksCacheKey(client);
+	const jwksCache = getJwksCache(opts);
+	const cached = jwksCache.get(cacheKey);
+	let result: FetchedJwksResult;
+		result = await fetchJwksFromUri(
+			client.jwksUri,
+			discovery?.fetchClientMetadataResource,
+		);
+		throw createClientJwksFetchError();
+	if (!result.valid) throw createClientJwksFetchError();
+	setJwksCache(jwksCache, cacheKey, result.jwks, now);
+	return result.jwks;
+	opts: OAuthOptions<Scope[]>,
+	const discovery = client.clientDiscoveryId
+		? getClientDiscoveries(opts).find(
+				(candidate) => candidate.id === client.clientDiscoveryId,
+			)
+		: undefined;
+	if (client.clientDiscoveryId && !discovery?.fetchClientMetadataResource) {
+		return null;
+	}
+		const result = await fetchJwksFromUri(
+			client.jwksUri,
+			discovery?.fetchClientMetadataResource,
+		);
+		if (!result.valid) return null;
+		setJwksCache(
+			getJwksCache(opts),
+			getJwksCacheKey(client),
+			result.jwks,
+			Date.now(),
+		);
+		return result.jwks;
+	const jwks = await fetchClientJwks(ctx, opts, client);
+			const refreshed = await refetchClientJwks(opts, client);

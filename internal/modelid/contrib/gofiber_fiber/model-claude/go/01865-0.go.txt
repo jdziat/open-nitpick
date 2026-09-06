@@ -1,0 +1,65 @@
+// commit 1b825b7c6087 2026-08-10T15:43:48+00:00 middleware/redirect/redirect.go
+	// authorityEnders are the bytes a value may open the next component with,
+	// which is scheme-dependent: see authorityEnders.
+	authorityEnders string
+	// opaquePath is set when the target names a scheme but no authority of its
+	// own. A capture may write the "//" that opens one, and it need only supply
+	// half of it, so the composed location is what gets checked.
+	opaquePath bool
+		spanStart, spanEnd := authoritySpan(v)
+			authorityEnders: authorityEnders(v),
+			opaquePath:      spanStart == spanEnd && schemeEnd(v) > 0,
+			if !authorityHolds(rule.authorityChunks, replacer, rule.authorityEnders) {
+			// The target had a scheme and an opaque path, so it named no host at
+			// all. A value writing the "//" that opens one — "myapp:$1@example.com"
+			// against "//evil.com/x" — hands the destination to the request, and
+			// the "@example.com" that looked like it pinned the host is only path.
+			if rule.opaquePath {
+				if start, end := authoritySpan(location); start != end {
+					continue
+				}
+			}
+	if offset := strings.IndexAny(target[start:], authorityEnders(target)); offset >= 0 {
+// authorityEnders returns the bytes that end target's authority. WHATWG folds
+// "\" into "/" only under a special scheme; under any other one it is an
+// ordinary authority byte, so "myapp://example.com\@evil.com" is userinfo
+// "example.com\" and a host of evil.com. A target with no scheme is
+// protocol-relative, and the scheme it inherits is special.
+func authorityEnders(target string) string {
+	if i := schemeEnd(target); i > 0 && !isSpecialScheme(target[:i]) {
+		return `/?#`
+	}
+	return `/\?#`
+}
+
+func authorityHolds(chunks []authorityChunk, replacer *strings.Replacer, enders string) bool {
+		case strings.IndexByte(enders, value[0]) >= 0 && hostPins(chunks[:i]):
+// reaches the compiled pattern because a key is used as one. "." is among them:
+// it matches any byte, so "/api/user." pins no more of a path than "/api/user"
+// and must not outrank the exact "/api/users". "$" is not, anchoring rather
+// than matching, and the compiled pattern anchors the end regardless.
+const patternBytes = `*.[](){}+?^|\`
+	if i := indexUnescapedAny(rule, patternBytes); i >= 0 {
+	for i := 0; i < len(rule); i++ {
+		if rule[i] == '\\' && i+1 < len(rule) {
+			// An escaped metacharacter matches itself, so it pins the one byte it
+			// stands for — "/a\.b" pins "/a.b", the backslash being syntax.
+			i++
+			n++
+			continue
+		}
+// indexUnescapedAny returns the first index in s of a byte from chars that a
+// backslash does not escape, or -1.
+func indexUnescapedAny(s, chars string) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' {
+			i++ // whatever follows matches itself
+			continue
+		}
+		if strings.IndexByte(chars, s[i]) >= 0 {
+			return i
+		}
+	}
+	return -1
+}
+

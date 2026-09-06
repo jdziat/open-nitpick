@@ -1,0 +1,72 @@
+// commit d026f8ffb997 2026-06-10T09:32:59+01:00 pkg/cmd/discussion/view/view.go
+	DiscussionNumber   int32
+	WebMode            bool
+	Comments           bool
+	RepliesArg         string
+	RepliesCommentID   string
+	RepliesCommentDBID int64
+	Limit              int
+	After              string
+	Order              string
+	Exporter           cmdutil.Exporter
+	Now                func() time.Time
+		Use:   "view {<number> | <url>} [flags]",
+			For a full thread of a comment, pass %[1]s--replies%[1]s with a comment node ID or
+			comment URL (e.g., %[1]shttps://github.com/OWNER/REPO/discussions/123#discussioncomment-456%[1]s).
+			# View replies on a specific comment by node ID
+			$ gh discussion view 123 --replies DC_abc123
+
+			# View replies on a comment using the its URL
+			$ gh discussion view --replies 'https://github.com/OWNER/REPO/discussions/123#discussioncomment-456'
+			$ gh discussion view 123 --replies DC_abc123 --limit 10 --after CURSOR
+			opts.BaseRepo = f.BaseRepo
+
+				opts.Comments, opts.RepliesArg != "", opts.WebMode); err != nil {
+			number, repo, err := shared.ParseDiscussionArg(args[0])
+			if err != nil {
+				return cmdutil.FlagErrorWrap(err)
+			}
+
+			if repo != nil {
+				opts.BaseRepo = func() (ghrepo.Interface, error) {
+					return repo, nil
+				}
+			}
+
+			opts.DiscussionNumber = number
+
+			repliesMode := cmd.Flags().Changed("replies")
+			if repliesMode {
+				parsed, err := shared.ParseDiscussionOrCommentArg(opts.RepliesArg)
+				if err != nil {
+					return cmdutil.FlagErrorf("invalid value for --replies: %w", err)
+				}
+				if parsed.CommentNodeID == "" && parsed.CommentDatabaseID == 0 {
+					return cmdutil.FlagErrorf("--replies requires a comment node ID or comment URL")
+				}
+				if parsed.CommentNodeID != "" {
+					opts.RepliesCommentID = parsed.CommentNodeID
+				} else {
+					// In this case a full comment URL is parsed, so repo and discussion number are also extracted and
+					// should be used instead of the positional argument.
+					opts.RepliesCommentDBID = parsed.CommentDatabaseID
+					opts.DiscussionNumber = parsed.Number
+					opts.BaseRepo = func() (ghrepo.Interface, error) {
+						return parsed.Repo, nil
+					}
+				}
+			}
+
+	cmd.Flags().StringVar(&opts.RepliesArg, "replies", "", "View replies on a specific comment (node ID or comment URL)")
+	if opts.RepliesCommentID != "" || opts.RepliesCommentDBID != 0 {
+		commentID := opts.RepliesCommentID
+		if commentID == "" {
+			resolved, err := c.ResolveCommentNodeID(repo, opts.RepliesCommentDBID)
+			if err != nil {
+				opts.IO.StopProgressIndicator()
+				return err
+			}
+			commentID = resolved
+		}
+
+		discussion, err := c.GetCommentReplies(repo, opts.DiscussionNumber, commentID, opts.Limit, opts.After, opts.Order == orderNewest)

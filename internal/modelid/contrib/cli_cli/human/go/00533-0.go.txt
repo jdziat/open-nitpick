@@ -1,0 +1,49 @@
+// commit fe95cd86f158 2025-09-17T13:28:49+01:00 pkg/cmd/agent-task/capi/sessions.go
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	UserID          int64     `json:"user_id"`
+	AgentID         int64     `json:"agent_id"`
+	Logs            string    `json:"logs"`
+	State           string    `json:"state"`
+	OwnerID         uint64    `json:"owner_id"`
+	RepoID          uint64    `json:"repo_id"`
+	ResourceType    string    `json:"resource_type"`
+	ResourceID      int64     `json:"resource_id"`
+	LastUpdatedAt   time.Time `json:"last_updated_at,omitempty"`
+	CreatedAt       time.Time `json:"created_at,omitempty"`
+	CompletedAt     time.Time `json:"completed_at,omitempty"`
+	EventURL        string    `json:"event_url"`
+	EventType       string    `json:"event_type"`
+	PremiumRequests float64   `json:"premium_requests"`
+	ID              string
+	Name            string
+	UserID          int64
+	AgentID         int64
+	Logs            string
+	State           string
+	OwnerID         uint64
+	RepoID          uint64
+	ResourceType    string
+	ResourceID      int64
+	LastUpdatedAt   time.Time
+	CreatedAt       time.Time
+	CompletedAt     time.Time
+	EventURL        string
+	EventType       string
+	PremiumRequests float64
+		ID:              s.ID,
+		Name:            s.Name,
+		UserID:          s.UserID,
+		AgentID:         s.AgentID,
+		Logs:            s.Logs,
+		State:           s.State,
+		OwnerID:         s.OwnerID,
+		RepoID:          s.RepoID,
+		ResourceType:    s.ResourceType,
+		ResourceID:      s.ResourceID,
+		LastUpdatedAt:   s.LastUpdatedAt,
+		CreatedAt:       s.CreatedAt,
+		CompletedAt:     s.CompletedAt,
+		EventURL:        s.EventURL,
+		EventType:       s.EventType,
+		PremiumRequests: s.PremiumRequests,

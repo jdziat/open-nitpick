@@ -1,0 +1,47 @@
+// commit 49c746c36939 2026-08-16T00:36:08+00:00 domain.go
+	// marks the routes of the apps that register no automatic HEAD routes.
+	d.cloneRoutesForDomain(wrapperApp, subApp)
+	// The routes marked while cloning are passed over, and the marks travel on
+	// to the app this one is mounted on, so it withholds them there as well.
+	wrapperApp.ensureAutoHeadRoutes()
+// Routes cloned from an app that registers no automatic HEAD routes are marked
+// as such on the wrapper, so synthesizing them stays off for those and stays on
+// for the rest.
+func (d *domainRouter) cloneRoutesForDomain(dst, src *App) {
+	for m, routes := range d.domainRoutes(dst, src, domainClone{}) {
+}
+// domainClone is what a walk down a mounted app's tree carries with it.
+type domainClone struct {
+	// prefix is the path the app being walked is mounted at, relative to the
+	// app the domain mount was registered with
+	prefix string
+	// chain holds the apps between the mounted sub-app and this one, so a mount
+	// cycle terminates. It is a slice rather than a set because it is only ever
+	// a few entries deep and each branch needs its own: an app mounted twice on
+	// sibling branches is cloned for both.
+	chain []*App
+	// skipAutoHead marks that an app above this one registers no automatic HEAD
+	// routes, and stands in front of these
+	skipAutoHead bool
+// with the walk's prefix applied, as one slice per method index of dst. Routes
+// of an app src has mounted take the placeholder's position, so the order the
+func (d *domainRouter) domainRoutes(dst, src *App, walk domainClone) [][]*Route {
+	if slices.Contains(walk.chain, src) {
+	// contributes neither HEAD routes nor HEAD middleware to the clone — so a
+	// HEAD route synthesized from one of its GET routes would run the handler
+	// with nothing in front of it. That holds for the apps it has mounted too,
+	// whose routes it stands in front of, and for no one else: the mount is a
+	// tree, and an app opting out says nothing about its siblings or the apps
+	// it is mounted inside.
+	skipAutoHead := walk.skipAutoHead || src.config.DisableHeadAutoRegister || src.methodInt(MethodHead) < 0
+					mounted[group] = d.domainRoutes(dst, group.app, domainClone{
+						prefix:       getGroupPath(walk.prefix, source.route.path),
+						chain:        append(walk.chain, src),
+						skipAutoHead: skipAutoHead,
+					})
+			if walk.prefix != "" {
+				dst.addPrefixToRoute(walk.prefix, clonedRoute, src.config.RegexHandler, src.customConstraints...)
+			if skipAutoHead {
+				dst.markSkipAutoHead(clonedRoute)
+			}
+

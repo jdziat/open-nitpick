@@ -1,0 +1,43 @@
+// commit 7306c5af052b 2026-02-16T23:10:02-08:00 packages/electron/src/client.ts
+import type {
+	ElectronAuthenticateOptions,
+	ElectronRequestAuthOptions,
+} from "./authenticate";
+import { authenticate, requestAuth } from "./authenticate";
+import { setupMain, withGetWindowFallback } from "./browser";
+export const electronClient = <O extends ElectronClientOptions>(options: O) => {
+			let getWindow: () => electron.BrowserWindow | null | undefined = () =>
+				null;
+				/**
+				 * Exchanges the authorization code for a session.
+				 *
+				 * Use this when you need to manually complete the exchange
+				 * (e.g., when another app registered the scheme or deep linking fails).
+				 *
+				 * The authorization code is returned when the user is authorized in the browser. (`electron_authorization_code`)
+				 *
+				 * Note: Must be called after `requestAuth`, since the code verifier and state are stored when the auth flow is initiated.
+				 */
+				authenticate: async (data: ElectronAuthenticateOptions) => {
+					return await authenticate({
+						...data,
+						$fetch,
+						options,
+						getWindow: withGetWindowFallback(getWindow),
+					});
+				},
+				}) => {
+					if (cfg?.getWindow) {
+						getWindow = cfg.getWindow;
+					}
+					return setupMain(
+						$fetch,
+						store,
+						getCookieFn,
+						opts,
+						clientOptions,
+						cfg,
+					);
+				},
+					Bridges: ExposedBridges<O>;
+export type * from "./types/client";

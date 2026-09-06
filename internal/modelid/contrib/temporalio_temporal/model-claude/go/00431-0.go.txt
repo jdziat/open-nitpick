@@ -1,0 +1,36 @@
+// commit f8ee14e9553b 2026-01-23T22:03:31-08:00 service/worker/service.go
+	"net"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/reflection"
+// ServiceName is the name used for the worker service health check.
+const ServiceName = "temporal.api.workflowservice.v1.WorkerService"
+
+
+		server       *grpc.Server
+		grpcListener net.Listener
+		healthServer *health.Server
+	server *grpc.Server,
+	grpcListener net.Listener,
+	healthServer *health.Server,
+
+		server:       server,
+		grpcListener: grpcListener,
+		healthServer: healthServer,
+	healthpb.RegisterHealthServer(s.server, s.healthServer)
+	s.healthServer.SetServingStatus(ServiceName, healthpb.HealthCheckResponse_SERVING)
+
+	reflection.Register(s.server)
+
+	go func() {
+		s.logger.Info("Starting to serve on worker listener")
+		if err := s.server.Serve(s.grpcListener); err != nil {
+			s.logger.Fatal("Failed to serve on worker listener", tag.Error(err))
+		}
+	}()
+
+	s.healthServer.SetServingStatus(ServiceName, healthpb.HealthCheckResponse_NOT_SERVING)
+
+	s.server.GracefulStop()
+

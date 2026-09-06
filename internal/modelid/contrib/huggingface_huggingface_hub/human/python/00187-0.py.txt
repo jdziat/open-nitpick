@@ -1,0 +1,46 @@
+# commit ee6a7d99e37a 2025-11-25T16:11:58+01:00 src/huggingface_hub/hf_api.py
+    LocalTokenNotFoundError,
+        # /whoami-v2 is the only endpoint for which we may want to cache results
+        self._whoami_cache: dict[str, dict] = {}
+
+    def whoami(self, token: Union[bool, str, None] = None, *, cache: bool = False) -> dict:
+        If passing `cache=True`, the result will be cached for subsequent calls for the duration of the Python process. This is useful if you plan to call
+        `whoami` multiple times as this endpoint is heavily rate-limited for security reasons.
+
+            cache (`bool`, *optional*):
+                Whether to cache the result of the `whoami` call for subsequent calls.
+                If an error occurs during the first call, it won't be cached.
+                Defaults to `False`.
+        token = self.token if token is None else token
+        if token is False:
+            raise ValueError("Cannot use `token=False` with `whoami` method as it requires authentication.")
+        if token is True or token is None:
+            token = get_token()
+        if token is None:
+            raise LocalTokenNotFoundError(
+                "Token is required to call the /whoami-v2 endpoint, but no token found. You must provide a token or be logged in to "
+                "Hugging Face with `hf auth login` or `huggingface_hub.login`. See https://huggingface.co/settings/tokens."
+            )
+
+        if cache and (cached_token := self._whoami_cache.get(token)):
+            return cached_token
+
+        # Call Hub
+        output = self._inner_whoami(token=token)
+
+        # Cache result and return
+        if cache:
+            self._whoami_cache[token] = output
+        return output
+
+    def _inner_whoami(self, token: str) -> dict:
+            headers=self._build_hf_headers(token=token),
+                if token == _get_token_from_google_colab():
+                elif token == _get_token_from_environment():
+                elif token == _get_token_from_file():
+            if e.response.status_code == 429:
+                error_message = (
+                    "You've hit the rate limit for the /whoami-v2 endpoint, which is intentionally strict for security reasons."
+                    " If you're calling it often, consider caching the response with `whoami(..., cache=True)`."
+                )
+                raise HfHubHTTPError(error_message, response=e.response) from e

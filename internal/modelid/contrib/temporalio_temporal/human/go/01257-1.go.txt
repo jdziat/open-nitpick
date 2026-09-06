@@ -1,0 +1,102 @@
+// commit 9389c7ff1210 2026-06-09T10:46:43-07:00 service/worker/scanner/scheduleinvariants/invariants.go
+	"iter"
+	scheduleListPageSize = 100
+	// opts is the live schedule-invariants scanner config, re-read on each scan pass.
+	opts        dynamicconfig.TypedPropertyFn[dynamicconfig.ScheduleInvariantsScannerParams]
+	rateLimiter quotas.RateLimiter
+	opts dynamicconfig.TypedPropertyFn[dynamicconfig.ScheduleInvariantsScannerParams],
+		logger:             log.With(logger, tag.Operation(metrics.ScheduleInvariantsScannerScope)),
+		metricsHandler:     metricsHandler.WithTags(metrics.OperationTag(metrics.ScheduleInvariantsScannerScope)),
+		visibilityManager:  visibilityManager,
+		namespaceRegistry:  namespaceRegistry,
+		sdkClientFactory:   sdkClientFactory,
+		currentClusterName: currentClusterName,
+		timeSource:         timeSource,
+		opts:               opts,
+		rateLimiter:        quotas.NewDefaultOutgoingRateLimiter(quotas.RateFn(func() float64 { return opts().VisibilityRPS })),
+		threshold := a.timeSource.Now().UTC().Add(-a.opts().OverdueNextActionTimeTolerance).Format(time.RFC3339Nano)
+		buffer := scheduler.DefaultTweakables.IdleTime * time.Duration(a.opts().StuckOpenIdleTimeBufferMultiplier)
+	ch, timer := a.timeSource.NewTimer(a.opts().ScanInterval)
+			timer.Reset(a.opts().ScanInterval)
+	for _, nsName := range a.ListAllNamespaces() {
+	// maxChecks bounds the number of per-schedule DescribeSchedule calls per namespace
+	// per scan pass, so a namespace with a large backlog of overdue schedules can't
+	// hammer the frontend. Schedules beyond the cap are left unchecked for this pass.
+	maxChecks := a.opts().OverdueNextActionTimeMaxChecksPerNamespace
+	for _, nsName := range a.ListAllNamespaces() {
+		var nsAnomalies, checked int64
+		var scanErr error
+		for scheduleID, err := range a.schedulesInNamespace(ctx, nsName, query) {
+			if err != nil {
+				scanErr = err
+				break
+			}
+			if checked >= int64(maxChecks) {
+				a.logger.Warn("overdue scan hit per-namespace check cap; remaining schedules left unchecked this pass",
+					tag.WorkflowNamespace(nsName),
+					tag.NewInt("cap", maxChecks))
+				metrics.ScheduleInvariantsScannerOverdueNextActionTimeCapHitCount.With(
+					a.metricsHandler.WithTags(metrics.NamespaceTag(nsName))).Record(1)
+				break
+			}
+			checked++
+				continue
+			a.logger.Warn("schedule was expected to fire but doesn't appear to have done so",
+		}
+		if scanErr != nil {
+			a.recordScanError(nsName, subScanner, scanErr)
+// ListAllNamespaces returns the names of every namespace active in the current cluster,
+// from the namespace registry's in-memory snapshot. The snapshot may lag persistence by
+// up to the registry's refresh interval, which is acceptable for a best-effort scanner.
+func (a *Activities) ListAllNamespaces() []string {
+	for _, ns := range a.namespaceRegistry.GetAllNamespaces() {
+		if ns.State() == enumspb.NAMESPACE_STATE_DELETED {
+			continue
+		names = append(names, ns.Name().String())
+	return names
+// schedulesInNamespace returns an iterator over the business IDs of every schedule
+// matching query in the given namespace (scoped to the Scheduler archetype), paginating
+// ListChasmExecutions transparently and consuming the rate limiter per page. Each step
+// yields either a schedule ID (with a nil error) or a terminal error, after which the
+// iterator stops; the consumer stops early by breaking out of the range.
+func (a *Activities) schedulesInNamespace(ctx context.Context, nsName, query string) iter.Seq2[string, error] {
+	return func(yield func(string, error) bool) {
+		nsID, err := a.namespaceRegistry.GetNamespaceID(namespace.Name(nsName))
+			yield("", err)
+			return
+
+		var pageToken []byte
+		for {
+			if err := a.rateLimiter.Wait(ctx); err != nil {
+				if common.IsContextDeadlineExceededErr(err) {
+					err = context.DeadlineExceeded
+				}
+				yield("", err)
+				return
+			}
+			resp, err := a.visibilityManager.ListChasmExecutions(ctx, &visibilityservice.ListChasmExecutionsRequest{
+				ArchetypeId:   chasm.SchedulerArchetypeID,
+				NamespaceId:   nsID.String(),
+				Namespace:     nsName,
+				Query:         query,
+				PageSize:      scheduleListPageSize,
+				NextPageToken: pageToken,
+			})
+			if err != nil {
+				yield("", err)
+				return
+			}
+			for _, exec := range resp.GetExecutions() {
+				if !yield(exec.GetBusinessId(), nil) {
+					return
+				}
+			}
+			pageToken = resp.GetNextPageToken()
+			if len(pageToken) == 0 {
+				return
+			}
+//
+// This deliberately relies on DescribeSchedule rather than the visibility memo: a stuck
+// schedule is exactly the case where the memo's paused flag and running-workflow list go
+// stale, so visibility can't be trusted to rule out an anomaly. DescribeSchedule reads
+// authoritative state. Callers bound the number of these checks per namespace.

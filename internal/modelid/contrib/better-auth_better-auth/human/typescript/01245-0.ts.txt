@@ -1,0 +1,32 @@
+// commit b500aedb9be6 2026-01-28T01:03:13+00:00 packages/i18n/src/types.ts
+import type {
+	AuthContext,
+	BetterAuthPluginRegistry,
+	BetterAuthPluginRegistryIdentifier,
+	UnionToIntersection,
+} from "@better-auth/core";
+
+type ALL_PLUGIN_ERROR_CODE_KEYS = keyof UnionToIntersection<
+	{
+		[Key in Exclude<
+			BetterAuthPluginRegistryIdentifier,
+			"i18n"
+		>]: BetterAuthPluginRegistry<unknown, unknown>[Key] extends {
+			creator: infer C;
+		}
+			? C extends (...args: any[]) => infer P
+				? P extends {
+						$ERROR_CODES: infer E;
+					}
+					? E
+					: {}
+				: {}
+			: {};
+	}[Exclude<BetterAuthPluginRegistryIdentifier, "i18n">]
+>;
+
+type InternalTranslationDictionary = Partial<{
+	[Key in ALL_PLUGIN_ERROR_CODE_KEYS]: string;
+}>;
+export type TranslationDictionary = InternalTranslationDictionary &
+	Record<string, string>;

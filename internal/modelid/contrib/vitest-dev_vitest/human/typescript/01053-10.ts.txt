@@ -1,0 +1,81 @@
+// commit 1c0ec34449b9 2026-07-07T11:24:52+02:00 packages/vitest/src/node/project.ts
+import type { DevEnvironment, ResolvedConfig as ResolvedViteConfig, ViteDevServer } from 'vite'
+import { readFileSync } from 'node:fs'
+import { globProjectFiles, globProjectTestFiles, isInSourceTestCode } from './projects/globProjectFiles'
+  public config: ResolvedConfig
+  public viteConfig: ResolvedViteConfig
+  public vite: ViteDevServer
+  public hash: string
+
+    server: ViteDevServer,
+    viteConfig: ResolvedViteConfig,
+    projectConfig: ResolvedConfig,
+    this.tmpDir = join(tmpdir(), nanoid())
+    this.vite = server
+    this.viteConfig = viteConfig
+    this.config = projectConfig
+    this.hash = generateHash(
+      this.config.root + this.config.name,
+    )
+    this._provideObject(projectConfig.provide)
+  /** @internal */
+  _initializeRunners(server: ViteDevServer) {
+    this._serializedDefines = createDefinesScript(server.config.define)
+    this._resolver = new VitestResolver(server.config.cacheDir, this.config)
+    this._fetcher = createFetchModuleFunction(
+      this._resolver,
+      this.config,
+      this.vitest._fsCache,
+      this.vitest._traces,
+      this.tmpDir,
+    )
+
+    const environment = server.environments.__vitest__
+    this.runner = this.config.experimental.viteModuleRunner === false
+      ? new NativeModuleRunner(this.config.root)
+      : new ServerModuleRunner(
+          environment,
+          this._fetcher,
+          this.config,
+        )
+    const testFiles = await globProjectTestFiles(include, exclude, includeSource, cwd)
+    return !!this.config.browser?.enabled
+  globFiles(include: string[], exclude: string[], cwd: string): Promise<string[]> {
+    return globProjectFiles(include, exclude, cwd)
+      if (isInSourceTestCode(code)) {
+  /**
+   * The parent browser project that owns this cluster's single Vite server.
+   * Set on the primary (the hidden parent of a browser cluster) at server
+   * creation; instance siblings get their own `ProjectBrowser` view via
+   * `_parentBrowser.spawn`.
+   * @internal
+   */
+  _parentBrowser?: ParentProjectBrowser
+          this.vite.close(),
+    return Object.values(this.vite.environments || {})
+    // The browser server is created eagerly with the project, so `this.browser`
+    // is already set here; we only need to initialize the provider.
+    if (this.browser) {
+      await this.vitest.report('onBrowserInit', this)
+  private _provideObject(context: Partial<ProvidedContext>): void {
+      vitest.vite,
+      vitest.viteConfig,
+      vitest.config,
+  /**
+   * Create a sibling project that shares server-derived resources (Vite server,
+   * runner, resolver, fetcher) with a primary project. The sibling has its own
+   * distinct `projectConfig`, but the same `viteConfig` reference as the primary.
+   *
+   * Used for browser-instance and benchmark variants whose entries share a
+   * `viteConfig` reference with a primary project entry.
+   *
+   * @internal
+   */
+  static _spawnSibling(parent: TestProject, config: ResolvedConfig): TestProject {
+    const sibling = new TestProject(parent.vitest, parent.vite, parent.viteConfig, config)
+    sibling.runner = parent.runner
+    sibling._resolver = parent._resolver
+    sibling._fetcher = parent._fetcher
+    sibling._parent = parent
+    sibling._serializedDefines = parent._serializedDefines
+    return sibling

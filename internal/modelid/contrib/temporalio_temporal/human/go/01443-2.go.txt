@@ -1,0 +1,40 @@
+// commit 752e480a9882 2026-07-10T00:49:39+00:00 tests/testcore/test_cluster.go
+		host     *temporalImpl
+		tbFactory persistenceTestBaseFactory
+	return newTestClusterFactoryWithCustomTestBaseFactory(tbFactory)
+func newTestClusterFactoryWithCustomTestBaseFactory(tbFactory persistenceTestBaseFactory) TestClusterFactory {
+type persistenceTestBaseFactory interface {
+	tbFactory persistenceTestBaseFactory,
+	temporalParams := &temporalParams{
+		clusterMetadataConfig:            clusterMetadataConfig,
+		persistenceConfig:                pConfig,
+		metadataMgr:                      testBase.MetadataManager,
+		clusterMetadataManager:           testBase.ClusterMetadataManager,
+		shardMgr:                         testBase.ShardMgr,
+		executionManager:                 testBase.ExecutionManager,
+		namespaceReplicationQueue:        testBase.NamespaceReplicationQueue,
+		abstractDataStoreFactory:         testBase.AbstractDataStoreFactory,
+		visibilityStoreFactory:           testBase.VisibilityStoreFactory,
+		taskMgr:                          testBase.TaskMgr,
+		logger:                           logger,
+		esConfig:                         clusterConfig.ESConfig,
+		esClient:                         esClient,
+		archiverMetadata:                 archiverMetadata,
+		archiverProvider:                 archiverProvider,
+		frontendConfig:                   clusterConfig.FrontendConfig,
+		historyConfig:                    clusterConfig.HistoryConfig,
+		matchingConfig:                   clusterConfig.MatchingConfig,
+		workerConfig:                     clusterConfig.WorkerConfig,
+		mockAdminClient:                  clusterConfig.MockAdminClient,
+		namespaceReplicationTaskExecutor: nsreplication.NewTaskExecutor(clusterConfig.ClusterMetadata.CurrentClusterName, testBase.MetadataManager, nsreplication.NewNoopDataMerger(), nsreplication.NewDefaultAdmitter(), logger, testhooks.TestHooks{}),
+		dcRedirectionPolicy:              clusterConfig.DCRedirectionPolicy,
+		dynamicConfigOverrides:           clusterConfig.DynamicConfigOverrides,
+		tlsConfigProvider:                tlsConfigProvider,
+		serviceFxOptions:                 clusterConfig.ServiceFxOptions,
+		taskCategoryRegistry:             temporal.TaskCategoryRegistryProvider(archiverMetadata),
+		hostsByProtocolByService:         hostsByProtocolByService,
+		spanExporters:                    clusterConfig.SpanExporters,
+		tokenProvider:                    clusterConfig.TokenProvider,
+		enableHistoryTaskRecorder:        clusterConfig.EnableHistoryTaskRecorder,
+		temporalParams.captureMetricsHandler = metricstest.NewCaptureHandler()
+func (tc *TestCluster) Host() *temporalImpl {

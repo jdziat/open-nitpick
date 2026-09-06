@@ -1,0 +1,94 @@
+# commit 6f7dfbaa3f89 2026-06-29T18:22:03+02:00 tests/test_lfs.py
+from unittest.mock import MagicMock
+
+import pytest
+class TestUploadInfo:
+    @pytest.fixture(autouse=True)
+    def setup(self) -> None:
+            assert upload_info.sample == self.sample
+            assert upload_info.size == self.size
+            assert not upload_info.is_hashed
+            assert upload_info.sha256 == self.sha
+            assert upload_info.is_hashed
+        assert upload_info.sample == self.sample
+        assert upload_info.size == self.size
+        assert upload_info.sha256 == self.sha
+        assert upload_info.sample == self.sample
+        assert upload_info.size == self.size
+        assert upload_info.sha256 == self.sha
+class TestSliceFileObj:
+    @pytest.fixture(autouse=True)
+    def setup(self) -> None:
+            assert fileobj_slice.tell() == 0
+            assert fileobj_slice.read() == self.content[24:42]
+            assert fileobj_slice.tell() == 18
+            assert fileobj_slice.read() == b""
+            assert fileobj_slice.tell() == 18
+        assert fileobj.tell() == prev_pos
+            assert fileobj_slice.tell() == 0
+            assert fileobj_slice.read(200) == self.content[0:200]
+            assert fileobj_slice.read(500) == self.content[200:700]
+            assert fileobj_slice.read(200) == self.content[700:900]
+            assert fileobj_slice.read(200) == self.content[900:990]
+            assert fileobj_slice.read(200) == b""
+            assert fileobj_slice.tell() == 0
+            assert fileobj_slice.tell() == 2
+            assert fileobj_slice.fileobj.tell() == 102
+            assert fileobj_slice.tell() == 0
+            assert fileobj_slice.fileobj.tell() == 100
+            assert fileobj_slice.tell() == 100
+            assert fileobj_slice.fileobj.tell() == 200
+            assert fileobj_slice.tell() == 0
+            assert fileobj_slice.tell() == 0
+            assert fileobj_slice.fileobj.tell() == 100
+            assert fileobj_slice.tell() == 50
+            assert fileobj_slice.fileobj.tell() == 150
+            assert fileobj_slice.tell() == 100
+            assert fileobj_slice.fileobj.tell() == 200
+            assert fileobj_slice.tell() == 0
+            assert fileobj_slice.fileobj.tell() == 100
+            assert fileobj_slice.tell() == 0
+            assert fileobj_slice.tell() == 95
+            assert fileobj_slice.fileobj.tell() == 195
+            assert fileobj_slice.tell() == 100
+            assert fileobj_slice.fileobj.tell() == 200
+            assert fileobj_slice.tell() == 0
+            assert fileobj_slice.fileobj.tell() == 100
+                    assert fileobj_slice.tell() == 0
+                    assert fileobj_slice.read() == self.content[24:42]
+                    assert fileobj_slice.tell() == 18
+                    assert fileobj_slice.read() == b""
+                    assert fileobj_slice.tell() == 18
+                assert fileobj.tell() == prev_pos
+                    assert fileobj_slice.tell() == 0
+                    assert fileobj_slice.read(200) == self.content[0:200]
+                    assert fileobj_slice.read(500) == self.content[200:700]
+                    assert fileobj_slice.read(200) == self.content[700:900]
+                    assert fileobj_slice.read(200) == self.content[900:990]
+                    assert fileobj_slice.read(200) == b""
+                    assert fileobj_slice.tell() == 0
+                    assert fileobj_slice.tell() == 2
+                    assert fileobj_slice.fileobj.tell() == 102
+                    assert fileobj_slice.tell() == 0
+                    assert fileobj_slice.fileobj.tell() == 100
+                    assert fileobj_slice.tell() == 100
+                    assert fileobj_slice.fileobj.tell() == 200
+                    assert fileobj_slice.tell() == 0
+                    assert fileobj_slice.tell() == 0
+                    assert fileobj_slice.fileobj.tell() == 100
+                    assert fileobj_slice.tell() == 50
+                    assert fileobj_slice.fileobj.tell() == 150
+                    assert fileobj_slice.tell() == 100
+                    assert fileobj_slice.fileobj.tell() == 200
+                    assert fileobj_slice.tell() == 0
+                    assert fileobj_slice.fileobj.tell() == 100
+                    assert fileobj_slice.tell() == 0
+                    assert fileobj_slice.tell() == 95
+                    assert fileobj_slice.fileobj.tell() == 195
+                    assert fileobj_slice.tell() == 100
+                    assert fileobj_slice.fileobj.tell() == 200
+                    assert fileobj_slice.tell() == 0
+                    assert fileobj_slice.fileobj.tell() == 100
+def test_post_lfs_batch_info_uses_http_backoff(mocker):
+    mock_http_backoff = mocker.patch("huggingface_hub.lfs.http_backoff")
+    mocker.patch("huggingface_hub.lfs.hf_raise_for_status")

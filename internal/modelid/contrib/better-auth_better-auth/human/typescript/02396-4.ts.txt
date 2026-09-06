@@ -1,0 +1,79 @@
+// commit 2fd3d5850006 2026-06-13T12:58:25-07:00 packages/oauth-provider/src/resources.ts
+	 * Merged custom claims across requested resources, returned RAW: reserved
+	 * RFC 9068 names are NOT stripped here. Feed this into
+	 * `resolveAccessTokenClaims`, which owns the single strip; do not place it on
+	 * a token directly or a resource could override an AS-owned claim.
+	rawCustomClaims: Record<string, unknown>;
+ * 7. Merge per-resource `customClaims` (returned raw; reserved-claim
+ *    stripping is owned by `resolveAccessTokenClaims`).
+			rawCustomClaims: {},
+	// Per-resource custom claims: merge in declared order (later resources win
+	// on key collisions). Returned raw; `resolveAccessTokenClaims` strips
+	// reserved RFC 9068 names from the merged access-token claim set, so the
+	// JWT mint and the opaque introspection re-derive can never diverge on
+	// which claims are sanitized.
+		rawCustomClaims: mergedClaims,
+/**
+ * Returns `true` when `clientId` is linked, via the `oauthClientResource` join
+ * table, to at least one of `resourceIdentifiers`. Authorizes cross-client token
+ * introspection (RFC 7662 §2.1/§4): a resource server may introspect a token
+ * whose audience it serves, even when a different client issued the token.
+ *
+ * @internal
+ */
+export async function isClientLinkedToAnyResource(
+	ctx: GenericEndpointContext,
+	opts: OAuthOptions<Scope[]>,
+	clientId: string,
+	resourceIdentifiers: string[],
+): Promise<boolean> {
+	if (resourceIdentifiers.length === 0) return false;
+	const modelName =
+		opts.schema?.oauthClientResource?.modelName ?? "oauthClientResource";
+	const links = await ctx.context.adapter.findMany<OAuthClientResource>({
+		model: modelName,
+		where: [
+			{ field: "clientId", value: clientId },
+			{ field: "resourceId", operator: "in", value: resourceIdentifiers },
+		],
+		limit: 1,
+	});
+	return (links?.length ?? 0) > 0;
+}
+
+/**
+ * Merges `customClaims` from the existing rows of `resourceIdentifiers` in
+ * order (later resources win on collision). Missing rows are skipped; disabled
+ * rows are included, since an already-issued token keeps its claims until it
+ * expires. Returned raw; `resolveAccessTokenClaims` strips reserved names.
+ *
+ * Unlike {@link resolveResourcePolicy}, this applies none of the new-issuance
+ * gates (disabled, scope allowlist, client linkage), so it is the right way to
+ * re-derive claims for an already-issued token at introspection.
+ *
+ * @internal
+ */
+export async function getResourceCustomClaims(
+	ctx: GenericEndpointContext,
+	opts: OAuthOptions<Scope[]>,
+	resourceIdentifiers: string[],
+): Promise<Record<string, unknown>> {
+	if (resourceIdentifiers.length === 0) return {};
+	const rows = await ctx.context.adapter.findMany<OAuthResource>({
+		model: opts.schema?.oauthResource?.modelName ?? "oauthResource",
+		where: [
+			{ field: "identifier", operator: "in", value: resourceIdentifiers },
+		],
+	});
+	const rowByIdentifier = new Map(rows.map((row) => [row.identifier, row]));
+	const merged: Record<string, unknown> = {};
+	// Merge in the token's resource order so "later resource wins" still holds.
+	for (const identifier of resourceIdentifiers) {
+		const row = rowByIdentifier.get(identifier);
+		if (row?.customClaims && typeof row.customClaims === "object") {
+			Object.assign(merged, row.customClaims);
+		}
+	}
+	return merged;
+}
+

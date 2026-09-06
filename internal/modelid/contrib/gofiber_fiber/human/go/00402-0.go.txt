@@ -1,0 +1,97 @@
+// commit 3a13562aae64 2025-11-24T13:07:25+01:00 middleware/limiter/limiter_sliding.go
+	"math"
+		// Rotate window
+		resetInSec := rotateWindow(e, ts, expiration)
+		windowExpiresAt := e.exp
+		rate := int(math.Ceil(float64(e.prevHits)*weight)) + e.currHits
+		remaining := maxRequests - rate
+		if setErr := manager.set(reqCtx, key, e, ttlDuration(resetInSec, expiration)); setErr != nil {
+		// Check if hits exceed the allowed maximum for this request
+		skipHit := (cfg.SkipSuccessfulRequests && statusCode < fiber.StatusBadRequest) ||
+			(cfg.SkipFailedRequests && statusCode >= fiber.StatusBadRequest)
+
+		if skipHit || !cfg.DisableHeaders {
+
+			ts = uint64(utils.Timestamp())
+			resetInSec = rotateWindow(e, ts, expiration)
+			weight = float64(resetInSec) / float64(expiration)
+
+			if skipHit {
+				if counter := bucketForOriginalHit(e, windowExpiresAt, ts, expiration); counter != nil && *counter > 0 {
+					*counter--
+				}
+			}
+
+			rate = int(math.Ceil(float64(e.prevHits)*weight)) + e.currHits
+			remaining = maxRequests - rate
+			if setErr := manager.set(reqCtx, key, e, ttlDuration(resetInSec, expiration)); setErr != nil {
+			// We can continue, update RateLimit headers
+			if !cfg.DisableHeaders {
+				c.Set(xRateLimitLimit, strconv.Itoa(maxRequests))
+				c.Set(xRateLimitRemaining, strconv.Itoa(remaining))
+				c.Set(xRateLimitReset, strconv.FormatUint(resetInSec, 10))
+			}
+
+func rotateWindow(e *item, ts, expiration uint64) uint64 {
+	// Set expiration if entry does not exist
+	if e.exp == 0 {
+		e.exp = ts + expiration
+	} else if ts >= e.exp {
+		// The entry has expired, handle the expiration.
+		// Reset the current hits to 0.
+		elapsed := ts - e.exp
+		if elapsed >= expiration {
+			e.prevHits = 0
+			e.currHits = 0
+			e.exp = ts + expiration
+		} else {
+			e.prevHits = e.currHits
+			e.currHits = 0
+
+			e.exp = ts + expiration - elapsed
+		}
+	}
+
+	// Calculate when it resets in seconds
+	return e.exp - ts
+}
+
+func bucketForOriginalHit(e *item, requestExpiration, ts, expiration uint64) *int {
+	if ts < requestExpiration {
+		return &e.currHits
+	}
+
+	if ts-requestExpiration < expiration {
+		return &e.prevHits
+	}
+
+	return nil
+}
+
+func ttlDuration(resetInSec, expiration uint64) time.Duration {
+	resetDuration, ok := secondsToDuration(resetInSec)
+	if !ok {
+		return time.Duration(math.MaxInt64)
+	}
+
+	expirationDuration, ok := secondsToDuration(expiration)
+	if !ok {
+		return time.Duration(math.MaxInt64)
+	}
+
+	if resetDuration > time.Duration(math.MaxInt64)-expirationDuration {
+		return time.Duration(math.MaxInt64)
+	}
+
+	return resetDuration + expirationDuration
+}
+
+func secondsToDuration(seconds uint64) (time.Duration, bool) {
+	const maxSeconds = math.MaxInt64 / int64(time.Second)
+
+	if seconds > uint64(maxSeconds) {
+		return time.Duration(math.MaxInt64), false
+	}
+
+	return time.Duration(seconds) * time.Second, true
+}

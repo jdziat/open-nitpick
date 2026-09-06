@@ -1,0 +1,96 @@
+// commit 41f551bce47a 2026-07-29T15:13:27+02:00 packages/expect/src/types.ts
+// Allow unused type parameters to preserve their names for extensions.
+export interface Matchers<R extends void | Promise<void> = void | Promise<void>, T = unknown> {}
+  [K in keyof Matchers]?: RawMatcherFn<T, Parameters<Matchers[K]>>
+  Matchers<any>,
+  <T>(actual: T, message?: string): Assertion<void, T>
+interface CustomMatcher<R = any> {
+  toSatisfy: (matcher: (value: any) => boolean, message?: string) => R
+  toBeOneOf: <T>(sample: ReadonlyArray<T> | ReadonlySet<T>) => R
+export interface AsymmetricMatchersContaining extends Matchers<any>, CustomMatcher {
+// eslint-disable-next-line unused-imports/no-unused-vars
+export interface JestAssertion<R extends void | Promise<void>, T = unknown> extends CustomMatcher<R> {
+  toEqual: <E>(expected: E) => R
+  toStrictEqual: <E>(expected: E) => R
+  toBe: <E>(expected: E) => R
+  toMatch: (expected: string | RegExp) => R
+  toMatchObject: <E extends object | any[]>(expected: E) => R
+  toContain: <E>(item: E) => R
+  toContainEqual: <E>(item: E) => R
+  toBeTruthy: () => R
+  toBeFalsy: () => R
+  toBeGreaterThan: (num: number | bigint) => R
+  toBeGreaterThanOrEqual: (num: number | bigint) => R
+  toBeLessThan: (num: number | bigint) => R
+  toBeLessThanOrEqual: (num: number | bigint) => R
+  toBeNaN: () => R
+  toBeUndefined: () => R
+  toBeNull: () => R
+  toBeNullable: () => R
+  toBeDefined: () => R
+  toBeInstanceOf: <E>(expected: E) => R
+  toHaveLength: (length: number) => R
+  ) => R
+  toBeCloseTo: (number: number, numDigits?: number) => R
+  toHaveBeenCalledTimes: (times: number) => R
+  toBeCalledTimes: (times: number) => R
+  toHaveBeenCalled: () => R
+  toBeCalled: () => R
+  toHaveBeenCalledWith: <E extends any[]>(...args: E) => R
+  toBeCalledWith: <E extends any[]>(...args: E) => R
+  toHaveBeenNthCalledWith: <E extends any[]>(n: number, ...args: E) => R
+  toHaveBeenLastCalledWith: <E extends any[]>(...args: E) => R
+  toThrow: (expected?: any) => R
+  toThrowError: (expected?: any) => R
+  toReturn: () => R
+  toHaveReturned: () => R
+  toReturnTimes: (times: number) => R
+  toHaveReturnedTimes: (times: number) => R
+  toReturnWith: <E>(value: E) => R
+  toHaveReturnedWith: <E>(value: E) => R
+  toHaveLastReturnedWith: <E>(value: E) => R
+  toHaveNthReturnedWith: <E>(nthCall: number, value: E) => R
+type VitestAssertion<A, R extends void | Promise<void>, T = unknown> = {
+    ? Assertion<R, T>
+      ? R extends Promise<void> ? PromisifyFunction<A[K]> : A[K]
+      : VitestAssertion<A[K], R, T>;
+} & ((type: string, message?: string) => Assertion<R, T>)
+  [K in keyof O]: PromisifyFunction<O[K]>
+type PromisifyFunction<T> = T extends (...args: infer A) => infer R
+  ? Promisify<T> & ((...args: A) => R extends Promise<any> ? R : Promise<R>)
+  : T
+export type PromisifyAssertion<T> = Assertion<Promise<void>, Awaited<T>>
+
+export interface Assertion<R extends void | Promise<void> = void, T = unknown>
+  extends VitestAssertion<Chai.Assertion, R, T>,
+  JestAssertion<R, T>,
+  ChaiMockAssertion<R, T>,
+  Matchers<R, T> {
+  ) => R
+  toHaveBeenCalledOnce: () => R
+  toHaveBeenCalledExactlyOnceWith: <E extends any[]>(...args: E) => R
+  toHaveBeenCalledBefore: (mock: MockInstance, failIfNoFirstInvocation?: boolean) => R
+  toHaveBeenCalledAfter: (mock: MockInstance, failIfNoFirstInvocation?: boolean) => R
+  toHaveResolved: () => R
+  toHaveResolvedWith: <E>(value: E) => R
+  toHaveResolvedTimes: (times: number) => R
+  toHaveLastResolvedWith: <E>(value: E) => R
+  toHaveNthResolvedWith: <E>(nthCall: number, value: E) => R
+  rejects: PromisifyAssertion<unknown>
+export interface ChaiMockAssertion<R extends void | Promise<void>, T = unknown> {
+  readonly called: Assertion<R, T>
+  callCount: (count: number) => R
+  calledWith: <E extends any[]>(...args: E) => R
+  readonly calledOnce: Assertion<R, T>
+  calledOnceWith: <E extends any[]>(...args: E) => R
+  lastCalledWith: <E extends any[]>(...args: E) => R
+  nthCalledWith: <E extends any[]>(n: number, ...args: E) => R
+  returned: <E>(value: E) => R
+  returnedWith: <E>(value: E) => R
+  returnedTimes: (count: number) => R
+  lastReturnedWith: <E>(value: E) => R
+  nthReturnedWith: <E>(n: number, value: E) => R
+  calledBefore: (mock: MockInstance, failIfNoFirstInvocation?: boolean) => R
+  calledAfter: (mock: MockInstance, failIfNoFirstInvocation?: boolean) => R
+  readonly calledTwice: Assertion<R, T>
+  readonly calledThrice: Assertion<R, T>

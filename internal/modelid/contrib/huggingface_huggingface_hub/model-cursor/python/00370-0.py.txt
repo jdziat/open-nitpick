@@ -1,0 +1,50 @@
+# commit 35a97422e77e 2026-03-06T12:57:10+01:00 utils/release_notes/fetch_prs.py
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+OUTPUT_DIR = Path(os.environ.get("RELEASE_NOTES_OUTPUT_DIR", ".release-notes"))
+    token = os.environ.get("GITHUB_TOKEN_RELEASE_NOTES") or os.environ.get("GITHUB_TOKEN")
+        raise ValueError("GITHUB_TOKEN_RELEASE_NOTES or GITHUB_TOKEN environment variable is required")
+def fetch_doc_diffs(pr) -> list[dict]:
+    """Extract diffs for .md files under docs/ from a PR.
+
+    Returns a list of dicts with filename, status, and patch for each changed doc file.
+    """
+    doc_diffs = []
+    for f in pr.get_files():
+        if f.filename.startswith("docs/") and f.filename.endswith(".md") and f.patch:
+            doc_diffs.append(
+                {
+                    "filename": f.filename,
+                    "status": f.status,
+                    "patch": f.patch,
+                }
+            )
+    return doc_diffs
+
+
+    """Fetch full details for a PR, including doc diffs."""
+        "doc_diffs": fetch_doc_diffs(pr),
+    # Fetch and save PR details concurrently (one GitHub client per thread for thread safety)
+    _thread_local = threading.local()
+
+    def _get_thread_repo():
+        """Get a thread-local GitHub repo instance."""
+        if not hasattr(_thread_local, "repo"):
+            _thread_local.repo = get_github_client().get_repo(repo_name)
+        return _thread_local.repo
+
+    def _fetch_and_save(pr_num: int) -> int:
+        thread_repo = _get_thread_repo()
+        pr_data = fetch_pr_details(thread_repo, pr_num)
+        save_pr_json(pr_data, TMP_DIR)
+        return pr_num
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(_fetch_and_save, pr_num): pr_num for pr_num in pr_numbers}
+        for i, future in enumerate(as_completed(futures), 1):
+            pr_num = futures[future]
+            try:
+                future.result()
+                print(f"  [{i}/{len(pr_numbers)}] Fetched PR #{pr_num}")
+            except Exception as e:
+                print(f"  [{i}/{len(pr_numbers)}] Warning: Failed to fetch PR #{pr_num}: {e}")

@@ -1,0 +1,67 @@
+// commit 8ce77e3c1615 2026-06-26T11:59:35+02:00 internal/ghmcp/server.go
+	"github.com/github/github-mcp-server/internal/oauth"
+	// Construct REST client. When a TokenProvider is configured (OAuth), we
+	// authenticate via BearerAuthTransport and skip go-github's WithAuthToken:
+	// the latter installs its own round tripper that would pin the static token
+	// and shadow the dynamic one.
+	var restClient *gogithub.Client
+	if cfg.TokenProvider != nil {
+		restClient, err = gogithub.NewClient(
+			gogithub.WithHTTPClient(&http.Client{Transport: &transport.BearerAuthTransport{
+				Transport:     restUATransport,
+				TokenProvider: cfg.TokenProvider,
+			}}),
+			gogithub.WithEnterpriseURLs(restURL.String(), uploadURL.String()),
+		)
+	} else {
+		restClient, err = gogithub.NewClient(
+			gogithub.WithHTTPClient(&http.Client{Transport: restUATransport}),
+			gogithub.WithAuthToken(cfg.Token),
+			gogithub.WithEnterpriseURLs(restURL.String(), uploadURL.String()),
+		)
+	}
+			Token:         cfg.Token,
+			TokenProvider: cfg.TokenProvider,
+
+	// OAuthManager, when non-nil, enables OAuth 2.1 login for stdio mode. The
+	// server starts without a token and runs the authorization flow on the
+	// first tool call (see createOAuthMiddleware). It is mutually exclusive with
+	// a static Token.
+	OAuthManager *oauth.Manager
+
+	// OAuthScopes are the scopes requested during OAuth login. They double as
+	// the scope set for tool filtering: tools requiring a scope outside this set
+	// are hidden. The default set is the full supported list, which hides
+	// nothing; an explicit, narrower list filters accordingly.
+	OAuthScopes []string
+	// OAuth login and a static token are mutually exclusive: they would
+	// disagree on how the token is sourced (lazy provider vs. static) and on
+	// scope filtering, so reject the ambiguous combination up front.
+	if cfg.OAuthManager != nil && cfg.Token != "" {
+		return fmt.Errorf("OAuthManager and a static Token are mutually exclusive: provide one or the other")
+	}
+
+	// Determine the scope set used to filter tools. Classic PATs expose their
+	// granted scopes via the API; OAuth uses the requested scopes (the default
+	// set hides nothing, a narrower explicit set filters accordingly). Other
+	// token types don't advertise scopes, so filtering is skipped.
+	switch {
+	case strings.HasPrefix(cfg.Token, "ghp_"):
+	case cfg.OAuthManager != nil:
+		tokenScopes = cfg.OAuthScopes
+		logger.Info("using requested OAuth scopes for tool filtering", "scopes", tokenScopes)
+	default:
+	// For OAuth, the token is resolved lazily: empty until the user authorizes
+	// on the first tool call, then refreshed for the rest of the session.
+	var tokenProvider func() string
+	if cfg.OAuthManager != nil {
+		tokenProvider = cfg.OAuthManager.AccessToken
+	}
+
+		TokenProvider:     tokenProvider,
+	// With OAuth, intercept tool calls to run the authorization flow on first
+	// use, before the handler tries to call GitHub with an empty token.
+	if cfg.OAuthManager != nil {
+		ghServer.AddReceivingMiddleware(createOAuthMiddleware(cfg.OAuthManager, logger))
+	}
+

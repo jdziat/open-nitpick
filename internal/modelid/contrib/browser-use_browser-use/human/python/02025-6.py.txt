@@ -1,0 +1,58 @@
+# commit 7a0889cf20df 2025-08-12T04:14:53-07:00 tests/ci/test_multi_websocket.py
+
+
+	httpserver.expect_request('/').respond_with_data(main_html, content_type='text/html')
+	httpserver.expect_request('/page2.html').respond_with_data(page2_html, content_type='text/html')
+
+	return httpserver.url_for('/')
+
+
+
+		target_id = await browser_session._cdp_create_new_page(test_html + 'page2.html')
+
+
+
+		logger.info('✅ Default behavior: Both sessions share the same WebSocket connection')
+
+
+
+
+		target_id = await browser_session._cdp_create_new_page(test_html + 'page2.html')
+
+
+		session2 = await browser_session.get_or_create_cdp_session(target_id, focus=False, new_socket=True)
+
+
+			params={'expression': 'document.title'}, session_id=session1.session_id
+
+			params={'expression': 'document.title'}, session_id=session2.session_id
+
+		logger.info('✅ Multi-WebSocket: Each target has its own WebSocket connection')
+
+
+
+			target_id = await browser_session._cdp_create_new_page(f'{test_html}#tab{i}')
+
+			session = await browser_session.get_or_create_cdp_session(target_id, focus=False, new_socket=True)
+
+
+
+
+		logger.info('✅ Cleanup: All WebSocket connections properly disconnected')
+
+
+
+			target_id = await browser_session._cdp_create_new_page(f'{test_html}#tab{i}')
+
+		session_shared1 = await browser_session.get_or_create_cdp_session(target_ids[0], focus=False, new_socket=False)
+		session_dedicated1 = await browser_session.get_or_create_cdp_session(target_ids[1], focus=False, new_socket=True)
+		session_shared2 = await browser_session.get_or_create_cdp_session(target_ids[2], focus=False, new_socket=False)
+		session_dedicated2 = await browser_session.get_or_create_cdp_session(target_ids[3], focus=False, new_socket=True)
+
+
+
+
+		logger.info('✅ Mixed mode: Shared and dedicated WebSockets work together')
+
+if __name__ == '__main__':
+	pytest.main([__file__, '-v', '-s'])

@@ -1,0 +1,38 @@
+// commit c266e96c87cc 2026-07-03T17:42:44+01:00 internal-packages/run-engine/src/engine/systems/checkpointSystem.ts
+      const snapshot = await getLatestExecutionSnapshot(prisma, runId, this.$.runStore);
+      // Get the run (run-ops scalars only) and update the status; the control-plane env is
+      // resolved separately so the run-ops DB can split without a cross-provider join.
+          include: {},
+      const env = await this.$.controlPlaneResolver.resolveEnv(run.runtimeEnvironmentId);
+
+      if (!env) {
+        this.$.logger.error("Environment not found for createCheckpoint", {
+          snapshot,
+          runtimeEnvironmentId: run.runtimeEnvironmentId,
+        });
+
+        throw new ServiceValidationError("Run not found", 404);
+      }
+
+          id: env.organizationId,
+          id: env.projectId,
+          id: env.id,
+      // Create the checkpoint through the run-ops store (routed by owning run id). When a caller
+      // supplied a tx distinct from the base client, pass it through so the write stays atomic with
+      // that transaction; otherwise the store resolves it on its own client (passthrough in single-DB).
+      const taskRunCheckpoint = await this.$.runStore.createTaskRunCheckpoint(
+        {
+          data: {
+            ...CheckpointId.generate(),
+            type: checkpoint.type,
+            location: checkpoint.location,
+            imageRef: checkpoint.imageRef,
+            reason: checkpoint.reason,
+            runtimeEnvironmentId: env.id,
+            projectId: env.projectId,
+          },
+        run.id,
+        tx ? prisma : undefined
+      );
+          env,
+      const snapshot = await getLatestExecutionSnapshot(prisma, runId, this.$.runStore);

@@ -1,0 +1,45 @@
+// commit aedcb974f055 2026-06-14T18:28:21-07:00 packages/oauth-provider/src/extensions.test.ts
+					// Sender-constrains an opaque access token (no resource). The
+					// confirmation is persisted on the opaque-token row (RFC 7800 `cnf`)
+					// and surfaced at introspection, not silently dropped.
+							confirmation: { jkt: "opaque-bound-jkt" },
+								// attestation); the grant forwards it to issueTokens. An
+								// mTLS-style `x5t#S256` keeps the token bearer-presentable,
+								// unlike a DPoP `jkt` which would require a proof per request.
+								confirmation: { "x5t#S256": "wallet-attested-cert" },
+		expect(accessTokenPayload.cnf).toEqual({
+			"x5t#S256": "wallet-attested-cert",
+		});
+		expect(tokenResponse.data?.token_type).toBe("Bearer");
+	it("binds an opaque access token to its confirmation and surfaces it at introspection", async () => {
+		const clientAuth = {
+			client_id: oauthClient!.client_id,
+			client_assertion_type: extensionAssertionType,
+			client_assertion: `assertion:${oauthClient!.client_id}`,
+		};
+		const response = await client.$fetch<{
+			access_token: string;
+			token_type: string;
+		}>("/oauth2/token", {
+				...clientAuth,
+		// The opaque token carries the RFC 7800 `cnf` confirmation (persisted on
+		// its row), so it is sender-constrained, not silently minted unbound.
+		expect(response.error).toBeNull();
+		expect(response.data?.token_type).toBe("DPoP");
+
+		const introspection = await client.$fetch<{
+			active: boolean;
+			token_type?: string;
+			cnf?: unknown;
+		}>("/oauth2/introspect", {
+			method: "POST",
+			body: new URLSearchParams({
+				token: response.data!.access_token,
+				token_type_hint: "access_token",
+				...clientAuth,
+			}),
+			headers: { "content-type": "application/x-www-form-urlencoded" },
+		});
+		expect(introspection.data?.active).toBe(true);
+		expect(introspection.data?.token_type).toBe("DPoP");
+		expect(introspection.data?.cnf).toEqual({ jkt: "opaque-bound-jkt" });

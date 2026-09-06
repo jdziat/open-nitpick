@@ -1,0 +1,105 @@
+// commit 9b21f8d322c5 2026-02-10T10:37:09+01:00 apps/webapp/app/v3/environmentVariables/environmentVariablesRepository.server.ts
+  type CreateEnvironmentVariables,
+  type EditEnvironmentVariable,
+  type EditEnvironmentVariableValue,
+  async create(projectId: string, options: CreateEnvironmentVariables): Promise<CreateResult> {
+          // If parentEnvironmentId is provided and isSecret is not explicitly set,
+          // look up if the parent has this variable marked as secret
+          let inheritedIsSecret: boolean | undefined = undefined;
+          if (options.isSecret === undefined && options.parentEnvironmentId) {
+            const parentVariableValue = await tx.environmentVariableValue.findFirst({
+              where: {
+                variableId: environmentVariable.id,
+                environmentId: options.parentEnvironmentId,
+              },
+              select: {
+                isSecret: true,
+              },
+            });
+            if (parentVariableValue?.isSecret) {
+              inheritedIsSecret = true;
+            }
+          }
+
+          const effectiveIsSecret = options.isSecret ?? inheritedIsSecret;
+
+            const existingValueRecord = await tx.environmentVariableValue.findFirst({
+              where: {
+                variableId: environmentVariable.id,
+                environmentId,
+              },
+            });
+
+            // Check if value already exists and is the same, and no metadata change (e.g. isSecret toggle)
+            const existingSecret = await secretStore.getSecret(SecretValue, key);
+            const canSkip =
+              existingSecret &&
+              existingSecret.secret === variable.value &&
+              existingValueRecord &&
+              (options.isSecret === undefined ||
+                existingValueRecord.isSecret === options.isSecret);
+            if (canSkip) {
+              continue;
+            }
+
+            if (existingValueRecord) {
+              await tx.environmentVariableValue.update({
+                where: {
+                  id: existingValueRecord.id,
+                },
+                data: {
+                  version: {
+                    increment: 1,
+                  },
+                  ...(options.lastUpdatedBy ? { lastUpdatedBy: options.lastUpdatedBy } : {}),
+                  valueReferenceId: secretReference.id,
+                  ...(options.isSecret !== undefined
+                    ? {
+                        isSecret: options.isSecret,
+                      }
+                    : {}),
+                },
+              });
+            } else {
+              await tx.environmentVariableValue.create({
+                data: {
+                  environmentId: environmentId,
+                  valueReferenceId: secretReference.id,
+                  isSecret: effectiveIsSecret,
+                  version: 1,
+                  lastUpdatedBy: options.lastUpdatedBy ? options.lastUpdatedBy : Prisma.JsonNull,
+              });
+            }
+  async edit(projectId: string, options: EditEnvironmentVariable): Promise<Result> {
+              await tx.environmentVariableValue.update({
+                where: {
+                  variableId_environmentId: {
+                    variableId: environmentVariable.id,
+                    environmentId: value.environmentId,
+                  },
+                },
+                data: {
+                  version: {
+                    increment: 1,
+                  },
+                  lastUpdatedBy: options.lastUpdatedBy ? options.lastUpdatedBy : undefined,
+                },
+              });
+              version: 1,
+              lastUpdatedBy: options.lastUpdatedBy ? options.lastUpdatedBy : Prisma.JsonNull,
+  async editValue(projectId: string, options: EditEnvironmentVariableValue): Promise<Result> {
+
+        await tx.environmentVariableValue.update({
+          where: {
+            variableId_environmentId: {
+              variableId: environmentVariable.id,
+              environmentId: options.environmentId,
+            },
+          },
+          data: {
+            version: {
+              increment: 1,
+            },
+            lastUpdatedBy: options.lastUpdatedBy ? options.lastUpdatedBy : undefined,
+          },
+        });

@@ -1,0 +1,32 @@
+// commit 3af1129c6b4f 2026-01-16T11:22:39+01:00 pkg/github/dependencies.go
+	"fmt"
+	"os"
+
+	// IsFeatureEnabled checks if a feature flag is enabled.
+	IsFeatureEnabled(ctx context.Context, flagName string) bool
+
+	// Feature flag checker for runtime checks
+	featureChecker inventory.FeatureFlagChecker
+// Compile-time assertion to verify that BaseDeps implements the ToolDependencies interface.
+var _ ToolDependencies = (*BaseDeps)(nil)
+
+	featureChecker inventory.FeatureFlagChecker,
+		featureChecker:    featureChecker,
+// IsFeatureEnabled checks if a feature flag is enabled.
+// Returns false if the feature checker is nil, flag name is empty, or an error occurs.
+// This allows tools to conditionally change behavior based on feature flags.
+func (d BaseDeps) IsFeatureEnabled(ctx context.Context, flagName string) bool {
+	if d.featureChecker == nil || flagName == "" {
+		return false
+	}
+
+	enabled, err := d.featureChecker(ctx, flagName)
+	if err != nil {
+		// Log error but don't fail the tool - treat as disabled
+		fmt.Fprintf(os.Stderr, "Feature flag check error for %q: %v\n", flagName, err)
+		return false
+	}
+
+	return enabled
+}
+

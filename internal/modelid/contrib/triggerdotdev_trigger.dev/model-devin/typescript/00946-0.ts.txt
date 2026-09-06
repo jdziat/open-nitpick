@@ -1,0 +1,47 @@
+// commit 4b28080ed4aa 2026-04-28T11:57:44+02:00 internal-packages/run-engine/src/engine/systems/runAttemptSystem.ts
+        replayedFromTaskRunFriendlyId: true,
+            id: run.taskIdentifier,
+            filePath: "unknown",
+          }),
+            getMachinePreset({
+              defaultMachine: this.options.machines.defaultMachine,
+              machines: this.options.machines.machines,
+              config: undefined,
+              run,
+            })
+          ),
+        isReplay: !!run.replayedFromTaskRunFriendlyId,
+                  replayedFromTaskRunFriendlyId: true,
+                  description: `Attempt created, starting execution${
+                    isWarmStart ? " (warm start)" : ""
+                  }`,
+              isReplay: !!updatedRun.replayedFromTaskRunFriendlyId,
+                  id: BatchId.toFriendlyId(updatedRun.batchId),
+                }
+                  push: bulkActionId,
+                }
+            where: {
+              id: params.lockedQueueId,
+            },
+            select: {
+              id: true,
+              friendlyId: true,
+              name: true,
+            },
+          })
+            where: {
+              runtimeEnvironmentId: params.runtimeEnvironmentId,
+              name: params.queueName,
+            },
+            select: {
+              id: true,
+              friendlyId: true,
+              name: true,
+            },
+          });
+            this.options.machines.machines,
+            machinePresetName as MachinePresetName
+          )
+            this.options.machines.machines,
+            this.options.machines.defaultMachine
+          );

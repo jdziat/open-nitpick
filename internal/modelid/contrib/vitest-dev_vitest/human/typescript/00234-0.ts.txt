@@ -1,0 +1,33 @@
+// commit 197caf2f94e2 2025-10-31T08:35:02+01:00 packages/vitest/src/integrations/env/jsdom.ts
+let _FormData!: typeof FormData
+
+    // delay initialization because it takes ~1s
+    _FormData = globalThis.FormData
+
+    dom.window.FormData = createFormData(dom.window)
+    // delay initialization because it takes ~1s
+    _FormData = globalThis.FormData
+
+    global.FormData = createFormData(dom.window)
+// Node.js 24 has a global FormData that Request accepts
+// FormData is not used anywhere else in JSDOM, so we can safely
+// override it with Node.js implementation, but keep the DOM behaviour
+// this is required because Request (and other fetch API)
+// are not implemented by JSDOM
+function createFormData(window: DOMWindow) {
+  const JSDOMFormData = window.FormData
+  if (!_FormData) {
+    return JSDOMFormData
+  }
+
+  return class FormData extends _FormData {
+    constructor(...args: any[]) {
+      super()
+      const formData = new JSDOMFormData(...args)
+      formData.forEach((value, key) => {
+        this.append(key, value)
+      })
+    }
+  }
+}
+

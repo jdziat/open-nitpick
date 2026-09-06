@@ -1,0 +1,137 @@
+// commit de1a25c2eebe 2026-03-02T12:51:21+01:00 bind.go
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/gofiber/schema"
+// By default (manual mode), parsing failures are returned as *BindError; use errors.As to extract source and field details.
+// With WithAutoHandling(), parsing failures set HTTP 400 and return *Error instead.
+// BindError source constants for BindError.Source.
+const (
+	BindSourceURI        = "uri"
+	BindSourceQuery      = "query"
+	BindSourceHeader     = "header"
+	BindSourceCookie     = "cookie"
+	BindSourceBody       = "body"
+	BindSourceRespHeader = "respHeader"
+)
+
+// BindError wraps a binding failure with the source and field that failed.
+// Use errors.As(err, &be) to extract it when you need to branch on source
+// (e.g. 404 for URI vs 400 for body).
+type BindError struct {
+	Err    error  // underlying error; use errors.As to inspect
+	Source string // binding source: uri, query, body, header, cookie, or respHeader (see BindSource* constants)
+	Field  string // struct field or tag key that failed (best-effort, may be empty)
+}
+
+func (e *BindError) Error() string {
+	if e.Field != "" {
+		return fmt.Sprintf("bind %q from %s: %v", e.Field, e.Source, e.Err)
+	}
+	return fmt.Sprintf("bind from %s: %v", e.Source, e.Err)
+}
+
+func (e *BindError) Unwrap() error {
+	return e.Err
+}
+
+func extractFieldFromError(err error) string {
+	var convErr schema.ConversionError
+	if errors.As(err, &convErr) {
+		return convErr.Key
+	}
+	var unknownKey schema.UnknownKeyError
+	if errors.As(err, &unknownKey) {
+		return unknownKey.Key
+	}
+	var emptyField schema.EmptyFieldError
+	if errors.As(err, &emptyField) {
+		return emptyField.Key
+	}
+	var multiErr schema.MultiError
+	if errors.As(err, &multiErr) {
+		for k := range multiErr {
+			return k
+		}
+	}
+	var unmarshalErr *json.UnmarshalTypeError
+	if errors.As(err, &unmarshalErr) {
+		return unmarshalErr.Field
+	}
+	return ""
+}
+
+func newBindError(source string, raw error) *BindError {
+	return &BindError{Source: source, Field: extractFieldFromError(raw), Err: raw}
+}
+
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+		var fiberErr *Error
+		if errors.As(err, &fiberErr) {
+			return err
+		}
+		return newBindError(BindSourceHeader, err)
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+		var fiberErr *Error
+		if errors.As(err, &fiberErr) {
+			return err
+		}
+		return newBindError(BindSourceRespHeader, err)
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+		var fiberErr *Error
+		if errors.As(err, &fiberErr) {
+			return err
+		}
+		return newBindError(BindSourceCookie, err)
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+		var fiberErr *Error
+		if errors.As(err, &fiberErr) {
+			return err
+		}
+		return newBindError(BindSourceQuery, err)
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+		var fiberErr *Error
+		if errors.As(err, &fiberErr) {
+			return err
+		}
+		return newBindError(BindSourceBody, err)
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+		var fiberErr *Error
+		if errors.As(err, &fiberErr) {
+			return err
+		}
+		return newBindError(BindSourceBody, err)
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+		var fiberErr *Error
+		if errors.As(err, &fiberErr) {
+			return err
+		}
+		return newBindError(BindSourceBody, err)
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+		var fiberErr *Error
+		if errors.As(err, &fiberErr) {
+			return err
+		}
+		return newBindError(BindSourceBody, err)
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+		var fiberErr *Error
+		if errors.As(err, &fiberErr) {
+			return err
+		}
+		return newBindError(BindSourceURI, err)
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+		var fiberErr *Error
+		if errors.As(err, &fiberErr) {
+			return err
+		}
+		return newBindError(BindSourceBody, err)
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).
+			if err := b.returnErr(customBinder.Parse(b.ctx, out)); err != nil {
+				var fiberErr *Error
+				if errors.As(err, &fiberErr) {
+					return err
+				}
+				return newBindError(BindSourceBody, err)
+			}
+			return nil
+// Returns *BindError on parse failure (manual mode) or *Error with status 400 (auto-handling mode).

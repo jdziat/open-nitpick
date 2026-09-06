@@ -1,0 +1,40 @@
+// commit 63e25ac66488 2026-05-14T12:47:47+00:00 client/cookiejar.go
+	"golang.org/x/net/publicsuffix"
+			acceptedDomain, acceptedHostOnly, ok := acceptCookieDomain(hostStr, domain)
+			if !ok {
+			hostOnly = acceptedHostOnly
+			if hostOnly {
+				tmp.SetDomain(hostStr)
+			} else {
+				key = utils.CopyString(acceptedDomain)
+				tmp.SetDomain(acceptedDomain)
+			}
+
+func acceptCookieDomain(host, domain string) (string, bool, bool) {
+	if host == domain {
+		if isIPLiteral(host) || isPublicSuffixDomain(domain) {
+			return host, true, true
+		}
+		return domain, false, true
+	}
+
+	if isIPLiteral(host) || isPublicSuffixDomain(domain) || !domainMatch(host, domain) {
+		return "", false, false
+	}
+
+	return domain, false, true
+}
+
+func isIPLiteral(host string) bool {
+	if len(host) >= 2 && host[0] == '[' && host[len(host)-1] == ']' {
+		host = host[1 : len(host)-1]
+	}
+
+	return net.ParseIP(host) != nil
+}
+
+func isPublicSuffixDomain(domain string) bool {
+	suffix, _ := publicsuffix.PublicSuffix(domain)
+
+	return suffix == domain
+}

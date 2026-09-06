@@ -1,0 +1,152 @@
+// commit d24038cbd23b 2025-03-24T17:28:21+01:00 pkg/github/pullrequests.go
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			pullNumber, err := requiredNumberParam(request, "pull_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			state, err := optionalStringParam(request, "state")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			head, err := optionalStringParam(request, "head")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			base, err := optionalStringParam(request, "base")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			sort, err := optionalStringParam(request, "sort")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			direction, err := optionalStringParam(request, "direction")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			perPage, err := optionalNumberParamWithDefault(request, "per_page", 30)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			page, err := optionalNumberParamWithDefault(request, "page", 1)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			pullNumber, err := requiredNumberParam(request, "pull_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			commitTitle, err := optionalStringParam(request, "commit_title")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			commitMessage, err := optionalStringParam(request, "commit_message")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			mergeMethod, err := optionalStringParam(request, "merge_method")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			pullNumber, err := requiredNumberParam(request, "pull_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			pullNumber, err := requiredNumberParam(request, "pull_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			pullNumber, err := requiredNumberParam(request, "pull_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			expectedHeadSHA, err := optionalStringParam(request, "expected_head_sha")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			pullNumber, err := requiredNumberParam(request, "pull_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			pullNumber, err := requiredNumberParam(request, "pull_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			pullNumber, err := requiredNumberParam(request, "pull_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			event, err := requiredStringParam(request, "event")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			body, err := optionalStringParam(request, "body")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if body != "" {
+			commitID, err := optionalStringParam(request, "commit_id")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			if commitID != "" {

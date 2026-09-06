@@ -1,0 +1,51 @@
+// commit 7930311d2011 2026-08-20T12:53:53+05:30 extractors/extractors.go
+//     decoration (validation, normalization) are honored. For built-in
+//     Chain, the winning child's Source is captured during that Extract
+//     (no second child walk). Hand-rolled Extract+Chain without a capture
+//     falls back to a guarded peek of e.Chain. On Extract failure the
+//     static Source is returned with the error.
+		// Prefer the source recorded while Extract ran (correct under private
+		// kids + public Chain mutation; no double extraction of children).
+		if src, ok := consumeChainWinningSource(c, e.Chain); ok {
+			return v, src, nil
+		}
+// successful child extraction. Fallback when Extract did not record a winner
+// (hand-rolled Extract+Chain). Guarded with the same Locals key as Chain.Extract
+// and extractChainWithSource (public Chain backing array).
+// chainGuardFor returns a Locals key shared by Chain.Extract, peek, and
+// extractChainWithSource for the public Chain backing array.
+// chainWinKeyFor returns the Locals key used to stash the winning Source from
+// Chain.Extract so ExtractWithSource can read it without re-running children.
+func chainWinKeyFor(guard chainGuardKey) chainWinKey {
+	return chainWinKey{id: guard.id}
+}
+
+func rememberChainWinningSource(c fiber.Ctx, guard chainGuardKey, src Source) {
+	c.Locals(chainWinKeyFor(guard), src)
+}
+
+func consumeChainWinningSource(c fiber.Ctx, chain []Extractor) (Source, bool) {
+	guard, ok := chainGuardFor(chain)
+	if !ok {
+		return 0, false
+	}
+	key := chainWinKeyFor(guard)
+	src, ok := c.Locals(key).(Source)
+	if !ok {
+		return 0, false
+	}
+	c.Locals(key, nil)
+	return src, true
+}
+
+// chainWinKey stashes the Source of the child that won Chain.Extract.
+// Shares the pointer identity with chainGuardKey for the same Chain instance.
+type chainWinKey struct {
+	id *byte
+}
+
+			// Guard on the public Chain array so ExtractWithSource / peek share
+			// the same cycle identity (private kids stay execution-only).
+			guard, ok := chainGuardFor(pub)
+					// Record which private child won for ExtractWithSource.
+					rememberChainWinningSource(c, guard, extractor.Source)

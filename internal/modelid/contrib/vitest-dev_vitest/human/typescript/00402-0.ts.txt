@@ -1,0 +1,35 @@
+// commit c78882985975 2025-12-17T12:33:55+01:00 test/cli/test/fails.test.ts
+
+it('reports test file if it failed to load', async () => {
+  const hooks: string[] = []
+  await runInlineTests({
+    'basic.test.js': `throw new Error('fail')`,
+  }, {
+    reporters: [
+      'default',
+      {
+        onTestModuleQueued(testModule) {
+          hooks.push(`onTestModuleQueued:${testModule.relativeModuleId}`)
+        },
+        onTestModuleStart(testModule) {
+          hooks.push(`onTestModuleStart:${testModule.relativeModuleId}`)
+        },
+        onTestModuleCollected(testModule) {
+          hooks.push(`onTestModuleCollected:${testModule.relativeModuleId}`)
+        },
+        onTestModuleEnd(testModule) {
+          hooks.push(`onTestModuleEnd:${testModule.relativeModuleId}`)
+        },
+      },
+    ],
+  })
+
+  expect(hooks).toMatchInlineSnapshot(`
+    [
+      "onTestModuleQueued:basic.test.js",
+      "onTestModuleCollected:basic.test.js",
+      "onTestModuleStart:basic.test.js",
+      "onTestModuleEnd:basic.test.js",
+    ]
+  `)
+})

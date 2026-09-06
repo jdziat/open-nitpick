@@ -1,0 +1,31 @@
+// commit 16d13d98115a 2026-02-18T09:43:08+09:00 packages/runner/src/run.ts
+import type { ConcurrencyLimiter } from './utils/limit-concurrency'
+let limitMaxConcurrency: ConcurrencyLimiter
+      await Promise.all(hooks.map(fn => limitMaxConcurrency(() => fn(test.context))))
+        await limitMaxConcurrency(() => fn(test.context))
+    return limitMaxConcurrency(async () => {
+      return getBeforeHookCleanupCallback(
+        hook,
+        await hook(...args),
+        name === 'beforeEach' ? args[0] as TestContext : undefined,
+      )
+    })
+    let setupLimitConcurrencyRelease: (() => void) | undefined
+    let teardownLimitConcurrencyRelease: (() => void) | undefined
+      setupLimitConcurrencyRelease?.()
+      teardownLimitConcurrencyRelease = await limitMaxConcurrency.acquire()
+
+    setupLimitConcurrencyRelease = await limitMaxConcurrency.acquire()
+
+      finally {
+        setupLimitConcurrencyRelease?.()
+        teardownLimitConcurrencyRelease?.()
+      }
+      setupLimitConcurrencyRelease?.()
+      teardownLimitConcurrencyRelease?.()
+        await limitMaxConcurrency(() => fn())
+      await limitMaxConcurrency(() => fn())
+            await $('test.callback', () => limitMaxConcurrency(() => runner.runTask!(test)))
+            await $('test.callback', () => limitMaxConcurrency(() => fn()))
+    return $(
+    )

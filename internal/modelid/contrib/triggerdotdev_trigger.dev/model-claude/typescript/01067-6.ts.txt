@@ -1,0 +1,76 @@
+// commit 71d98b4e6b4d 2026-05-22T14:43:03+01:00 apps/webapp/app/services/sessionsReplicationService.server.ts
+import type { ClickhouseFactory } from "~/services/clickhouse/clickhouseFactory.server";
+  clickhouseFactory: ClickhouseFactory;
+      const routeCache = new Map<string, ClickHouse>();
+      const groups = new Map<ClickHouse, { sessionInserts: SessionInsertArray[] }>();
+
+      for (const item of batch) {
+        if (!item.session.organizationId) {
+          continue;
+        }
+
+        let client = routeCache.get(item.session.organizationId);
+        if (!client) {
+          client = this.options.clickhouseFactory.getClickhouseForOrganizationSync(
+            item.session.organizationId,
+            "sessions_replication"
+          );
+          routeCache.set(item.session.organizationId, client);
+        }
+
+        let group = groups.get(client);
+        if (!group) {
+          group = { sessionInserts: [] };
+          groups.set(client, group);
+        }
+
+        group.sessionInserts.push(
+          toSessionInsertArray(item.session, item._version, item.event === "delete")
+        );
+      }
+
+      // batch inserts in clickhouse are more performant if the items
+      // are pre-sorted by the primary key
+      const sortSessionInserts = (rows: SessionInsertArray[]) =>
+        rows.sort((a, b) => {
+      const combinedSessionInserts: SessionInsertArray[] = [];
+      let sessionError: Error | null = null;
+
+      // Sequential per-group flush — matches runsReplicationService for the same reason
+      // (parallel writes have hit Linux net.ipv4.tcp_wmem buffer pressure at high throughput).
+      for (const [clickhouse, group] of groups) {
+        sortSessionInserts(group.sessionInserts);
+        combinedSessionInserts.push(...group.sessionInserts);
+
+        const [insErr] = await this.#insertWithRetry(
+          (attempt) => this.#insertSessionInserts(clickhouse, group.sessionInserts, attempt),
+          "session inserts",
+          flushId
+        );
+        if (insErr && !sessionError) {
+          sessionError = insErr;
+        }
+
+        if (!insErr) {
+          this._sessionsInsertedCounter.add(group.sessionInserts.length);
+        }
+      }
+
+      span.setAttribute("session_inserts", combinedSessionInserts.length);
+        sessionInserts: combinedSessionInserts.length,
+        clickhouseGroups: groups.size,
+        sessionInserts: combinedSessionInserts.length,
+      this.events.emit("batchFlushed", { flushId, sessionInserts: combinedSessionInserts });
+  async #insertSessionInserts(
+    clickhouse: ClickHouse,
+    sessionInserts: SessionInsertArray[],
+    attempt: number
+  ) {
+    if (sessionInserts.length === 0) {
+      return;
+    }
+      const [insertError, insertResult] = await clickhouse.sessions.insertCompactArrays(
+        sessionInserts,
+        {
+        }
+      );

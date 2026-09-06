@@ -1,0 +1,55 @@
+// commit 20147bf81fed 2026-06-04T00:27:11+00:00 pkg/cmd/pr/shared/editable.go
+	IssueType          EditableString
+	IssueTypeNameToID  map[string]string
+	// Selectable controls whether the interactive survey offers this
+	// field as one of the things the user can choose to edit. Flag-only
+	// fields leave it false.
+	Selectable bool
+	// Selectable controls whether the interactive survey offers this
+	// field as one of the things the user can choose to edit. Flag-only
+	// fields leave it false.
+	Selectable bool
+		e.Milestone.Edited ||
+		e.IssueType.Edited
+		IssueType:          e.IssueType.clone(),
+		IssueTypeNameToID:  e.IssueTypeNameToID,
+		Value:      es.Value,
+		Default:    es.Default,
+		Edited:     es.Edited,
+		Selectable: es.Selectable,
+		Edited:     es.Edited,
+		Selectable: es.Selectable,
+	if editable.IssueType.Edited {
+		if len(editable.IssueType.Options) > 0 {
+			var selected int
+			selected, err = p.Select("Type", editable.IssueType.Default, editable.IssueType.Options)
+			if err != nil {
+				return err
+			}
+			editable.IssueType.Value = editable.IssueType.Options[selected]
+		}
+	}
+	if editable.Reviewers.Selectable {
+	opts = append(opts, "Assignees", "Labels")
+	if editable.IssueType.Selectable {
+		opts = append(opts, "Type")
+	}
+	opts = append(opts, "Projects", "Milestone")
+	if contains(results, "Type") {
+		editable.IssueType.Edited = true
+	}
+	// Fetch issue types if editing type
+	if editable.IssueType.Edited {
+		issueTypes, err := api.RepoIssueTypes(client, repo)
+		if err == nil {
+			typeNames := make([]string, len(issueTypes))
+			ids := make(map[string]string, len(issueTypes))
+			for i, t := range issueTypes {
+				typeNames[i] = t.Name
+				ids[t.Name] = t.ID
+			}
+			editable.IssueType.Options = typeNames
+			editable.IssueTypeNameToID = ids
+		}
+	}
+

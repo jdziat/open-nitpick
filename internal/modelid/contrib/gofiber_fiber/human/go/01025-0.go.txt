@@ -1,0 +1,72 @@
+// commit 07e867ec4bce 2026-04-29T05:54:36+00:00 middleware/basicauth/config.go
+	"sort"
+const defaultDummyPassword = "fiber-basicauth-dummy"
+
+var defaultDummyPasswordSHA512 = sha512.Sum512([]byte(defaultDummyPassword))
+
+		verifiers, dummyVerify, err := buildVerifiers(cfg.Users)
+		if err != nil {
+			panic(err)
+type verifierStrength struct {
+	algorithm int
+	cost      int
+}
+
+func buildVerifiers(users map[string]string) (map[string]func(string) bool, func(string) bool, error) {
+	verifiers := make(map[string]func(string) bool, len(users))
+	dummyVerify := fallbackDummyVerify
+	keys := make([]string, 0, len(users))
+	for user := range users {
+		keys = append(keys, user)
+	}
+	sort.Strings(keys)
+
+	var dummyStrength verifierStrength
+	hasDummy := false
+	for _, user := range keys {
+		hashedPassword := users[user]
+		verify, err := parseHashedPassword(hashedPassword)
+		if err != nil {
+			return nil, nil, err
+		}
+		verifiers[user] = verify
+
+		strength := verifierStrengthForHash(hashedPassword)
+		if !hasDummy || strength.betterThan(dummyStrength) {
+			dummyVerify = verify
+			dummyStrength = strength
+			hasDummy = true
+		}
+	}
+
+	return verifiers, dummyVerify, nil
+}
+
+func fallbackDummyVerify(pass string) bool {
+	sum := sha512.Sum512([]byte(pass))
+	return subtle.ConstantTimeCompare(sum[:], defaultDummyPasswordSHA512[:]) == 1
+}
+
+func verifierStrengthForHash(h string) verifierStrength {
+	switch {
+	case strings.HasPrefix(h, "$2"):
+		cost, err := bcrypt.Cost([]byte(h))
+		if err != nil {
+			return verifierStrength{algorithm: 3}
+		}
+		return verifierStrength{algorithm: 3, cost: cost}
+	case strings.HasPrefix(h, "{SHA512}"):
+		return verifierStrength{algorithm: 2}
+	default:
+		return verifierStrength{algorithm: 1}
+	}
+}
+
+func (s verifierStrength) betterThan(other verifierStrength) bool {
+	if s.algorithm != other.algorithm {
+		return s.algorithm > other.algorithm
+	}
+
+	return s.cost > other.cost
+}
+

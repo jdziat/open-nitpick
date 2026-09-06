@@ -1,0 +1,59 @@
+// commit 19908436b841 2026-08-20T07:08:22+01:00 internal-packages/run-engine/src/engine/index.ts
+  private batchQueueConsumersEnabled: boolean;
+  private quitPromise?: Promise<void>;
+    // Initialize BatchQueue for DRR-based batch processing. Consumers start lazily when the
+    // process-item callback is registered; before that they cannot perform useful work.
+    this.batchQueueConsumersEnabled = options.batchQueue?.consumerEnabled ?? true;
+    const batchQueueRedis = options.batchQueue?.redis ?? options.queue.redis;
+      // Preserve the configured namespace so existing batch state remains addressable.
+      redis: batchQueueRedis,
+      startConsumers: false,
+      consumersEnabled: this.batchQueueConsumersEnabled,
+    if (this.batchQueueConsumersEnabled) {
+      this.batchQueue.start();
+    }
+  quit(): Promise<void> {
+    this.quitPromise ??= this.#quit();
+    return this.quitPromise;
+  }
+  async #quit(): Promise<void> {
+    this.workerQueueObserverAbortController?.abort();
+
+    // Stop resources that actively process work before closing support resources they may use.
+    const processingResults = await Promise.allSettled([
+      this.runQueue.quit(),
+      this.worker.stop(),
+      this.ttlWorker.stop(),
+      this.batchQueue.close(),
+    ]);
+    this.#logShutdownFailures(
+      ["runQueue.quit", "worker.stop", "ttlWorker.stop", "batchQueue.close"],
+      processingResults
+    );
+    const supportResults = await Promise.allSettled([
+      this.runLock.quit(),
+      this.debounceSystem.quit(),
+    ]);
+    this.#logShutdownFailures(["runLock.quit", "debounceSystem.quit"], supportResults);
+    // RunLocker/Redlock owns this client and normally closes it. Do not send a second QUIT,
+    // but force-disconnect if Redlock failed to leave the connection in its terminal state.
+    if (this.runLockRedis.status !== "end") {
+      try {
+        this.runLockRedis.disconnect();
+      } catch (error) {
+        this.logger.error("RunEngine shutdown operation failed", {
+          operation: "runLockRedis.disconnect",
+          error,
+        });
+      }
+  #logShutdownFailures(operations: string[], results: PromiseSettledResult<unknown>[]): void {
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        this.logger.error("RunEngine shutdown operation failed", {
+          operation: operations[index],
+          error: result.reason,
+        });
+      }
+    });
+  }
+

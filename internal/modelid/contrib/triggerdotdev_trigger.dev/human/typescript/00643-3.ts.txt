@@ -1,0 +1,47 @@
+// commit c8686b5f1c27 2026-01-13T11:21:13+00:00 apps/webapp/app/services/runsRepository/runsRepository.server.ts
+import { type PrismaClient, type PrismaClientOrTransaction } from "~/db.server";
+  prisma: PrismaClientOrTransaction;
+  /** Returns friendly IDs (e.g., run_xxx) instead of internal UUIDs. Used for ClickHouse task_events queries. */
+  listFriendlyRunIds(options: ListRunsOptions): Promise<string[]>;
+                  "repository.name": "postgres",
+                  "fallback.reason": "clickhouse_error",
+                  "fallback.error": error instanceof Error ? error.message : String(error),
+                  organizationId: options.organizationId,
+                  projectId: options.projectId,
+                  environmentId: options.environmentId,
+                },
+              }
+            );
+          }
+          throw error;
+        }
+      },
+      {
+        attributes: {
+          "repository.name": repository.name,
+          organizationId: options.organizationId,
+          projectId: options.projectId,
+          environmentId: options.environmentId,
+        },
+      }
+    );
+  }
+
+  async listFriendlyRunIds(options: ListRunsOptions): Promise<string[]> {
+    const repository = await this.#getRepository();
+    return startActiveSpan(
+      "runsRepository.listFriendlyRunIds",
+      async () => {
+        try {
+          return await repository.listFriendlyRunIds(options);
+        } catch (error) {
+          // If ClickHouse fails, retry with Postgres
+          if (repository.name === "clickhouse") {
+            this.logger?.warn("ClickHouse failed, retrying with Postgres", { error });
+            return startActiveSpan(
+              "runsRepository.listFriendlyRunIds.fallback",
+              async () => {
+                return await this.postgresRunsRepository.listFriendlyRunIds(options);
+              },
+              {
+                attributes: {

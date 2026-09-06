@@ -1,0 +1,43 @@
+// commit c69f82801985 2025-07-02T16:22:12-04:00 pkg/cmd/pr/shared/survey.go
+	"slices"
+	// Retrieve and process data for survey prompts based on the extra fields selected
+		Reviewers:      isChosen("Reviewers"),
+		Assignees:      isChosen("Assignees"),
+		ActorAssignees: isChosen("Assignees") && state.ActorAssignees,
+		Labels:         isChosen("Labels"),
+		ProjectsV1:     isChosen("Projects") && projectsV1Support == gh.ProjectsV1Supported,
+		ProjectsV2:     isChosen("Projects"),
+		Milestones:     isChosen("Milestone"),
+
+	// In order to select any provided assignee, the following code needs to take the provided default assignees in `state`
+	// and translate them to the appropriate actor / user.
+	var assigneesDefault []string
+	if state.ActorAssignees {
+		for _, u := range metadataResult.AssignableActors {
+			assignees = append(assignees, u.DisplayName())
+
+			if slices.Contains(state.Assignees, u.Login()) {
+				assigneesDefault = append(assigneesDefault, u.DisplayName())
+			}
+		}
+	} else {
+		for _, u := range metadataResult.AssignableUsers {
+			assignees = append(assignees, u.DisplayName())
+
+			if slices.Contains(state.Assignees, u.Login()) {
+				assigneesDefault = append(assigneesDefault, u.DisplayName())
+			}
+		}
+	// Prompt user for additional metadata based on selected fields
+			selected, err := p.MultiSelect("Assignees", assigneesDefault, assignees)
+				// Previously, this logic relied upon `assignees` being in `<login>` or `<login> (<name>)` form,
+				// however the inclusion of actors breaks this convention.
+				// Instead, we map the selected indexes to the source that populated `assignees` rather than
+				// relying on parsing the information out.
+				if state.ActorAssignees {
+					values.Assignees = append(values.Assignees, metadataResult.AssignableActors[i].Login())
+				} else {
+					values.Assignees = append(values.Assignees, metadataResult.AssignableUsers[i].Login())
+				}
+	// Update issue / pull request metadata state
+		state.Assignees = values.Assignees

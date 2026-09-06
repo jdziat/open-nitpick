@@ -1,0 +1,84 @@
+// commit 1ccbb0af83dc 2025-09-15T10:13:55-06:00 pkg/cmd/agent-task/view/view.go
+const (
+	defaultLimit           = 40
+	defaultLogPollInterval = 5 * time.Second
+)
+	LogRenderer func() shared.LogRenderer
+	Sleep       func(d time.Duration)
+
+	Log         bool
+	Follow      bool
+}
+
+func defaultLogRenderer() shared.LogRenderer {
+	return shared.NewLogRenderer()
+		IO:          f.IOStreams,
+		HttpClient:  f.HttpClient,
+		CapiClient:  shared.CapiClientFunc(f),
+		Prompter:    f.Prompter,
+		Browser:     f.Browser,
+		LogRenderer: defaultLogRenderer,
+		Sleep:       time.Sleep,
+			if opts.Follow && !opts.Log {
+				return cmdutil.FlagErrorf("--log is required when providing --follow")
+			}
+
+	cmd.Flags().BoolVar(&opts.Log, "log", false, "Show agent session logs")
+	cmd.Flags().BoolVar(&opts.Follow, "follow", false, "Follow agent session logs")
+	printSession(opts, session)
+
+	if opts.Log {
+		return printLogs(opts, capiClient, session.ID)
+	}
+	return nil
+}
+
+func printSession(opts *ViewOptions, session *capi.Session) {
+	cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.Out, "%s • %s • %s%s\n",
+		fmt.Fprintf(opts.IO.Out, "%s\n", shared.ColorFuncForSessionState(*session, cs)(shared.SessionStateString(session.State)))
+		fmt.Fprintf(opts.IO.Out, "Started on behalf of %s %s\n", session.User.Login, text.FuzzyAgo(time.Now(), session.CreatedAt))
+		fmt.Fprintf(opts.IO.Out, "Started %s\n", text.FuzzyAgo(time.Now(), session.CreatedAt))
+	if !opts.Log {
+		fmt.Fprintln(opts.IO.Out, "")
+		fmt.Fprintf(opts.IO.Out, "For detailed session logs, try:\ngh agent-task view '%s' --log\n", session.ID)
+	} else if !opts.Follow {
+		fmt.Fprintln(opts.IO.Out, "")
+		fmt.Fprintf(opts.IO.Out, "To follow session logs, try:\ngh agent-task view '%s' --log --follow\n", session.ID)
+	}
+		fmt.Fprintln(opts.IO.Out, "")
+		fmt.Fprintln(opts.IO.Out, cs.Muted("View this session on GitHub:"))
+		fmt.Fprintln(opts.IO.Out, cs.Muted(fmt.Sprintf("%s/agent-sessions/%s", session.PullRequest.URL, url.PathEscape(session.ID))))
+}
+func printLogs(opts *ViewOptions, capiClient capi.CapiClient, sessionID string) error {
+	ctx := context.Background()
+
+	cs := opts.IO.ColorScheme()
+	renderer := opts.LogRenderer()
+
+	if opts.Follow {
+		var called bool
+		fetcher := func() ([]byte, error) {
+			if called {
+				opts.Sleep(defaultLogPollInterval)
+			}
+			called = true
+			raw, err := capiClient.GetSessionLogs(ctx, sessionID)
+			if err != nil {
+				return nil, err
+			}
+			return raw, nil
+		}
+
+		fmt.Fprintln(opts.IO.Out, "")
+		return renderer.Follow(fetcher, opts.IO.Out, cs)
+	}
+
+	raw, err := capiClient.GetSessionLogs(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch session logs: %w", err)
+	}
+
+	fmt.Fprintln(opts.IO.Out, "")
+	_, err = renderer.Render(raw, opts.IO.Out, cs)
+	return err

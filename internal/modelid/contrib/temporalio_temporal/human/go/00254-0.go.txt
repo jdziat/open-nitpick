@@ -1,0 +1,32 @@
+// commit 83dc5c289cc9 2025-12-19T11:01:47-05:00 chasm/lib/activity/handler.go
+	errordetailspb "go.temporal.io/api/errordetails/v1"
+	"go.temporal.io/server/common/log"
+	"go.temporal.io/server/common/log/tag"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+		enumspb.ACTIVITY_ID_CONFLICT_POLICY_FAIL:         chasm.BusinessIDConflictPolicyFail,
+		enumspb.ACTIVITY_ID_CONFLICT_POLICY_USE_EXISTING: chasm.BusinessIDConflictPolicyUseExisting,
+	logger            log.Logger
+func newHandler(config *Config, metricsHandler metrics.Handler, logger log.Logger, namespaceRegistry namespace.Registry) *handler {
+		logger:            logger,
+				Started: true, // TODO for ACTIVITY_ID_CONFLICT_POLICY_USE_EXISTING, we need a know from chasm the execution is existing and to set false
+
+		var alreadyStartedErr *chasm.ExecutionAlreadyStartedError
+		if errors.As(err, &alreadyStartedErr) {
+			details := &errordetailspb.ActivityExecutionAlreadyStartedFailure{
+				StartRequestId: alreadyStartedErr.CurrentRequestID,
+				RunId:          alreadyStartedErr.CurrentRunID,
+			}
+
+			errStatus := status.New(codes.AlreadyExists, "activity execution already started")
+
+			errStatusWithDetails, errDetail := status.New(codes.AlreadyExists, "activity execution already started").WithDetails(details)
+			if errDetail != nil {
+				h.logger.Error("Failed to add error details to ActivityExecutionAlreadyStartedFailure",
+					tag.Error(errDetail), tag.ActivityID(frontendReq.GetActivityId()))
+				return nil, errStatus.Err()
+			}
+
+			return nil, errStatusWithDetails.Err()
+		}
+

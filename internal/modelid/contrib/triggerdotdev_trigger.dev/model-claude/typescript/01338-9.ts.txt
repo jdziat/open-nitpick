@@ -1,0 +1,94 @@
+// commit 84f3e1b39c9f 2026-07-03T18:52:08+01:00 apps/webapp/app/v3/services/alerts/deliverAlert.server.ts
+import {
+  type ProjectAlertChannelType,
+  type ProjectAlertType,
+  type RuntimeEnvironmentType,
+} from "@trigger.dev/database";
+import type { RunStore } from "@internal/run-store";
+import type { ControlPlaneResolver } from "~/v3/runOpsMigration/controlPlaneResolver.server";
+import { controlPlaneResolver as defaultControlPlaneResolver } from "~/v3/runOpsMigration/controlPlaneResolver.server";
+
+// Run-ops scalars read off `alert.taskRun` downstream. The control-plane fields (env type/branch,
+// lockedBy file/export, lockedToVersion version) are resolved via the resolver and stitched on
+// below, so the run-ops findRun selects scalars only.
+const taskRunAlertSelect = {
+  id: true,
+  friendlyId: true,
+  taskIdentifier: true,
+  taskVersion: true,
+  sdkVersion: true,
+  cliVersion: true,
+  status: true,
+  number: true,
+  isTest: true,
+  createdAt: true,
+  startedAt: true,
+  completedAt: true,
+  idempotencyKey: true,
+  runTags: true,
+  machinePreset: true,
+  error: true,
+  runtimeEnvironmentId: true,
+  lockedById: true,
+  lockedToVersionId: true,
+} satisfies Prisma.TaskRunSelect;
+
+type ResolvedAlertTaskRun = Prisma.Result<
+  typeof prisma.taskRun,
+  { select: typeof taskRunAlertSelect },
+  "findUniqueOrThrow"
+> & {
+  runtimeEnvironment: { type: RuntimeEnvironmentType; branchName: string | null };
+  lockedBy: { filePath: string; exportName: string | null } | null;
+  lockedToVersion: { version: string } | null;
+};
+> & {
+  taskRun: ResolvedAlertTaskRun | null;
+};
+  #controlPlaneResolver: ControlPlaneResolver;
+
+  constructor(
+    opts: {
+      prisma?: PrismaClientOrTransaction;
+      replica?: PrismaClientOrTransaction;
+      runStore?: RunStore;
+      controlPlaneResolver?: ControlPlaneResolver;
+    } = {}
+  ) {
+    super(opts.prisma, opts.replica, opts.runStore);
+    this.#controlPlaneResolver = opts.controlPlaneResolver ?? defaultControlPlaneResolver;
+  }
+
+      const resolvedTaskRun = await this.runStore.findRun(
+        { select: taskRunAlertSelect },
+
+      if (resolvedTaskRun) {
+        const env = await this.#controlPlaneResolver.resolveAuthenticatedEnv(
+          resolvedTaskRun.runtimeEnvironmentId
+        );
+
+        if (!env) {
+          throw new Error(
+            `Could not resolve environment ${resolvedTaskRun.runtimeEnvironmentId} for alert ${alertId}`
+          );
+        }
+
+        const lockedWorker = await this.#controlPlaneResolver.resolveRunLockedWorker({
+          lockedById: resolvedTaskRun.lockedById,
+          lockedToVersionId: resolvedTaskRun.lockedToVersionId,
+        });
+
+        taskRun = {
+          ...resolvedTaskRun,
+          runtimeEnvironment: { type: env.type, branchName: env.branchName },
+          lockedBy: lockedWorker?.lockedBy
+            ? {
+                filePath: lockedWorker.lockedBy.filePath,
+                exportName: lockedWorker.lockedBy.exportName,
+              }
+            : null,
+          lockedToVersion: lockedWorker?.lockedToVersion
+            ? { version: lockedWorker.lockedToVersion.version }
+            : null,
+        };
+      }

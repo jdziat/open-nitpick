@@ -1,0 +1,39 @@
+// commit 86ca6d0b1951 2026-02-12T10:40:51+00:00 packages/better-auth/src/api/rate-limiter/index.ts
+async function resolveRateLimitConfig(req: Request, ctx: AuthContext) {
+		return null;
+				return null;
+	return { key, currentWindow, currentMax };
+}
+
+export async function onRequestRateLimit(req: Request, ctx: AuthContext) {
+	if (!ctx.rateLimit.enabled) {
+		return;
+	}
+	const config = await resolveRateLimitConfig(req, ctx);
+	if (!config) {
+		return;
+	}
+	const { key, currentWindow, currentMax } = config;
+
+	const storage = getRateLimitStorage(ctx, {
+		window: currentWindow,
+	});
+	const data = await storage.get(key);
+
+	if (data && shouldRateLimit(currentMax, currentWindow, data)) {
+		const retryAfter = getRetryAfter(data.lastRequest, currentWindow);
+		return rateLimitResponse(retryAfter);
+	}
+}
+
+export async function onResponseRateLimit(req: Request, ctx: AuthContext) {
+	if (!ctx.rateLimit.enabled) {
+		return;
+	}
+	const config = await resolveRateLimitConfig(req, ctx);
+	if (!config) {
+		return;
+	}
+	const { key, currentWindow } = config;
+
+		if (timeSinceLastRequest > currentWindow * 1000) {

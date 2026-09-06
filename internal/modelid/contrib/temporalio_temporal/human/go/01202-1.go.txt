@@ -1,0 +1,31 @@
+// commit a131913091bc 2026-06-03T22:30:47+00:00 tools/flakereport/report.go
+var sparklineRunes = []rune("▁▂▃▄▅▆▇█")
+
+func formatSparkline(points []int) string {
+	if len(points) == 0 {
+		return "-"
+	}
+
+	maxPoint := 0
+	for _, point := range points {
+		if point > maxPoint {
+			maxPoint = point
+		}
+	}
+	var sb strings.Builder
+	sb.Grow(len(points))
+	for _, point := range points {
+		if point == 0 {
+			sb.WriteRune(sparklineRunes[0])
+			continue
+		}
+		idx := int(math.Ceil(float64(point) / float64(maxPoint) * float64(len(sparklineRunes)-1)))
+		sb.WriteRune(sparklineRunes[idx])
+	}
+	return sb.String()
+}
+
+	sb.WriteString(fmt.Sprintf("| Test | %s | Last Failure | Trend | Links |\n", rateHeader))
+	sb.WriteString("|------|------------|-------------|-------|-------|\n")
+		sb.WriteString(fmt.Sprintf("| `%s` | %s | %s | `%s` | %s |\n",
+			report.TestName, rate, lastFailure, formatSparkline(report.TrendPoints), links))

@@ -1,0 +1,133 @@
+// commit ba919854a1b1 2026-08-19T18:05:00-07:00 common/namespace/nsreplication/replication_task_executor.go
+	otellog "go.opentelemetry.io/otel/log"
+	"go.temporal.io/server/common/dynamicconfig"
+	"go.temporal.io/server/common/wideevents"
+	"google.golang.org/protobuf/proto"
+	// TaskExecutorOption configures a namespace replication task executor.
+	TaskExecutorOption func(*taskExecutorImpl)
+
+		currentCluster               string
+		metadataManager              persistence.MetadataManager
+		dataMerger                   NamespaceDataMerger
+		admitter                     NamespaceReplicationAdmitter
+		logger                       log.Logger
+		eventLogger                  otellog.Logger
+		emitNamespaceLifecycleEvents dynamicconfig.BoolPropertyFn
+		testHooks                    testhooks.TestHooks
+	options ...TaskExecutorOption,
+	executor := &taskExecutorImpl{
+	for _, option := range options {
+		option(executor)
+	}
+	return executor
+}
+
+// WithNamespaceReplicationLifecycleEvents configures processed lifecycle event emission.
+func WithNamespaceReplicationLifecycleEvents(
+	eventLogger otellog.Logger,
+	emitNamespaceLifecycleEvents dynamicconfig.BoolPropertyFn,
+) TaskExecutorOption {
+	return func(executor *taskExecutorImpl) {
+		executor.eventLogger = eventLogger
+		executor.emitNamespaceLifecycleEvents = emitNamespaceLifecycleEvents
+	}
+		if !shouldProcess && err == nil {
+			h.emitNamespaceReplicationProcessed(
+				ctx,
+				wideevents.NamespaceReplicationOutcomeNotAdmitted,
+				nil,
+				nil,
+				nil,
+			)
+		}
+			h.emitNamespaceReplicationProcessed(
+				ctx,
+				wideevents.NamespaceReplicationOutcomeDuplicate,
+				nil,
+				nil,
+				nil,
+			)
+	h.emitNamespaceReplicationProcessed(
+		ctx,
+		wideevents.NamespaceReplicationOutcomeCreated,
+		nil,
+		request,
+		nil,
+	)
+	return nil
+	localNamespacePreMutation := h.cloneLocalNamespaceForReplicationEvent(ctx, resp.Namespace)
+		if localNamespacePreMutation != nil {
+			h.emitNamespaceReplicationProcessed(
+				ctx,
+				wideevents.NamespaceReplicationOutcomeNoChange,
+				localNamespacePreMutation,
+				nil,
+				nil,
+			)
+		}
+	if err := h.metadataManager.UpdateNamespace(ctx, request); err != nil {
+		return err
+	}
+	if localNamespacePreMutation != nil {
+		h.emitNamespaceReplicationProcessed(
+			ctx,
+			wideevents.NamespaceReplicationOutcomeUpdated,
+			localNamespacePreMutation,
+			nil,
+			request,
+		)
+	}
+	return nil
+}
+
+func (h *taskExecutorImpl) cloneLocalNamespaceForReplicationEvent(
+	ctx context.Context,
+	namespaceDetail *persistencespb.NamespaceDetail,
+) *persistencespb.NamespaceDetail {
+	if h.eventLogger == nil ||
+		h.emitNamespaceLifecycleEvents == nil ||
+		!h.emitNamespaceLifecycleEvents() {
+		return nil
+	}
+	if _, ok := wideevents.NamespaceReplicationTaskContextFromContext(ctx); !ok {
+		return nil
+	}
+	clonedNamespace, ok := proto.Clone(namespaceDetail).(*persistencespb.NamespaceDetail)
+	if !ok {
+		h.logger.Error("Failed to clone local namespace for namespace replication lifecycle event")
+		return nil
+	}
+	return clonedNamespace
+}
+
+func (h *taskExecutorImpl) emitNamespaceReplicationProcessed(
+	ctx context.Context,
+	outcome wideevents.NamespaceReplicationOutcome,
+	localNamespacePreMutation *persistencespb.NamespaceDetail,
+	createRequest *persistence.CreateNamespaceRequest,
+	updateRequest *persistence.UpdateNamespaceRequest,
+) {
+	if h.eventLogger == nil ||
+		h.emitNamespaceLifecycleEvents == nil ||
+		!h.emitNamespaceLifecycleEvents() {
+		return
+	}
+
+	metadata, ok := wideevents.NamespaceReplicationTaskContextFromContext(ctx)
+	if !ok {
+		return
+	}
+
+	sourceTaskID := metadata.SourceTaskID
+	wideevents.EmitNamespaceReplicationLifecycle(h.eventLogger, wideevents.NamespaceReplicationLifecycleInput{
+		Phase:                     wideevents.NamespaceReplicationProcessed,
+		Outcome:                   outcome,
+		EventData:                 metadata.EventData,
+		SourceCluster:             metadata.SourceCluster,
+		TargetCluster:             metadata.TargetCluster,
+		SourceTaskID:              &sourceTaskID,
+		AttemptCount:              metadata.AttemptCount,
+		LocalNamespacePreMutation: localNamespacePreMutation,
+		CreateNamespaceRequest:    createRequest,
+		UpdateNamespaceRequest:    updateRequest,
+	})

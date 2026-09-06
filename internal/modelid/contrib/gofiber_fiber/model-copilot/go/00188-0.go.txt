@@ -1,0 +1,44 @@
+// commit 8f2c4e2c724f 2025-08-14T21:05:59+02:00 middleware/keyauth/config.go
+	// Next defines a function to skip this middleware when returned true.
+	//
+	Next func(c fiber.Ctx) bool
+	//
+	// Optional. Default: c.Next()
+	//
+	// Optional. Default: 401 Invalid or expired API Key
+	// Validator is a function to validate the key.
+	//
+	// Required.
+	Validator func(c fiber.Ctx, key string) (bool, error)
+	// This is used to set the `WWW-Authenticate` header when authentication fails.
+	//
+
+	// Extractor is a function to extract the key from the request.
+	//
+	// Optional. Default: FromAuthHeader("Authorization", "Bearer")
+	Extractor Extractor
+	ErrorHandler: func(c fiber.Ctx, err error) error {
+		switch {
+		case errors.Is(err, ErrMissingOrMalformedAPIKey),
+			errors.Is(err, ErrMissingAPIKey),
+			errors.Is(err, ErrMissingAPIKeyInHeader),
+			errors.Is(err, ErrMissingAPIKeyInQuery),
+			errors.Is(err, ErrMissingAPIKeyInParam),
+			errors.Is(err, ErrMissingAPIKeyInForm),
+			errors.Is(err, ErrMissingAPIKeyInCookie):
+			return c.Status(fiber.StatusUnauthorized).SendString(err.Error())
+		}
+		return c.Status(fiber.StatusUnauthorized).SendString("Invalid or expired API Key")
+	},
+	Realm:     "Restricted",
+	Extractor: FromAuthHeader(fiber.HeaderAuthorization, "Bearer"),
+// configDefault is a helper function to set default values
+		panic("fiber: keyauth middleware requires a validator function")
+	// Require a validator function
+	if cfg.Validator == nil {
+		panic("fiber: keyauth middleware requires a validator function")
+	}
+
+	if cfg.Extractor.Extract == nil {
+		cfg.Extractor = ConfigDefault.Extractor
+		cfg.ErrorHandler = ConfigDefault.ErrorHandler

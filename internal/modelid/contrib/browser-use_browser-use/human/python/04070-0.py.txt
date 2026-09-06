@@ -1,0 +1,37 @@
+# commit b2641ea3b775 2026-02-09T21:51:24-08:00 browser_use/skill_cli/tunnel_manager.py
+	# Create log file for cloudflared stderr (avoids SIGPIPE when parent exits)
+	_TUNNELS_DIR.mkdir(parents=True, exist_ok=True)
+	log_file_path = _TUNNELS_DIR / f'{port}.log'
+	log_file = open(log_file_path, 'w')
+
+	# Spawn cloudflared as a daemon
+	# - start_new_session=True: survives parent exit
+	# - stderr to file: avoids SIGPIPE when parent's pipe closes
+		stderr=log_file,
+		start_new_session=True,
+	# Poll the log file until we find the tunnel URL
+		import time
+
+		deadline = time.time() + 15
+		while time.time() < deadline:
+			# Check if process died
+			if process.returncode is not None:
+				log_file.close()
+				content = log_file_path.read_text() if log_file_path.exists() else ''
+				return {'error': f'cloudflared exited unexpectedly: {content[:500]}'}
+
+			# Read log file content
+				content = log_file_path.read_text()
+				match = _URL_PATTERN.search(content)
+				if match:
+					url = match.group(1)
+					break
+			except OSError:
+				pass
+
+			await asyncio.sleep(0.2)
+		log_file.close()
+		log_file.close()
+	# Clean up log file
+	log_file = _TUNNELS_DIR / f'{port}.log'
+	log_file.unlink(missing_ok=True)

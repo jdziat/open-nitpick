@@ -1,0 +1,42 @@
+// commit be1a6cf8dece 2026-05-14T13:12:36+01:00 apps/webapp/app/runEngine/concerns/queues.server.ts
+    let taskKind: string | undefined;
+        // Always fetch the task so we can resolve `triggerSource` (which
+        // becomes `taskKind` on annotations and replicates to ClickHouse).
+        // Without this, AGENT/SCHEDULED runs triggered with
+        // `lockToVersion` + a queue override would be annotated as
+        // STANDARD and disappear from the run-list "Source" filter.
+        // `ttl` is read from the same row but only used when the caller
+        // didn't specify a per-trigger TTL.
+        const lockedTask = await this.replicaPrisma.backgroundWorkerTask.findFirst({
+          where: {
+            workerId: lockedBackgroundWorker.id,
+            runtimeEnvironmentId: request.environment.id,
+            slug: request.taskId,
+          },
+          select: { ttl: true, triggerSource: true },
+        });
+        if (request.body.options?.ttl === undefined) {
+        taskKind = lockedTask?.triggerSource;
+        taskKind = lockedTask.triggerSource;
+      taskKind = taskInfo.taskKind;
+      taskKind,
+  ): Promise<{ queueName: string; taskTtl?: string | null; taskKind?: string | undefined }> {
+    // Even when the caller provides both a queue override and a
+    // per-trigger TTL, we still need to fetch the task so `triggerSource`
+    // (which becomes `taskKind` on annotations and replicates to
+    // ClickHouse) is populated. Without it, AGENT/SCHEDULED runs hitting
+    // this path get stamped as STANDARD and disappear from the
+    // dashboard's `Source` filter. Mirrors the locked-worker fix above
+    // — `taskTtl` is harmless in the returned value because the call
+    // site coalesces `body.options.ttl ?? taskTtl`.
+
+    // Find the current worker for the environment. Replica is fine here —
+    // the adjacent `backgroundWorkerTask` lookups below already use
+    // `replicaPrisma` (replica lag for "just deployed" is bounded the same
+    // way for both queries; reading the worker from the writer and the
+    // task from the replica would only widen the inconsistency window).
+    const worker = await findCurrentWorkerFromEnvironment(environment, this.replicaPrisma);
+        select: { ttl: true, triggerSource: true },
+      return { queueName: overriddenQueueName, taskTtl: task?.ttl, taskKind: task?.triggerSource };
+      return { queueName: defaultQueueName, taskTtl: task.ttl, taskKind: task.triggerSource };
+    return { queueName: task.queue.name ?? defaultQueueName, taskTtl: task.ttl, taskKind: task.triggerSource };

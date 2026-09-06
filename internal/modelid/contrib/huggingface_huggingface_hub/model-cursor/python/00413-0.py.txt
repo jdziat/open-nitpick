@@ -1,0 +1,56 @@
+# commit e41dce254c48 2026-03-25T11:04:08+01:00 src/huggingface_hub/hf_api.py
+RepoVisibility_T = Literal["public", "private", "protected"]
+def _resolve_repo_visibility(
+    *,
+    private: Optional[bool],
+    visibility: Optional[RepoVisibility_T],
+    repo_type: Optional[str],
+) -> Optional[RepoVisibility_T]:
+    if private is not None and visibility is not None:
+        raise ValueError("Received both `private` and `visibility` arguments. Please provide only one of them.")
+
+    if visibility is None:
+        if private is None:
+            return None
+        return "private" if private else "public"
+
+    if visibility == "protected" and repo_type != constants.REPO_TYPE_SPACE:
+        raise ValueError("Only Spaces can be 'protected'. Please set visibility to 'public' or 'private'.")
+    return visibility
+
+
+        visibility: Optional[RepoVisibility_T] = None,
+                Whether to make the repo private. If `None` (default), the repo will be public unless the organization's default is private. This value is ignored if the repo already exists. Cannot be passed together with `visibility`.
+            visibility (`Literal["public", "private", "protected"]`, *optional*):
+                Visibility of the repo. Can be `"public"` or `"private"`, or `"protected"` for Spaces. If `None`
+                (default), the repo will be public unless the organization's default is private. This value is ignored
+                if the repo already exists.
+        resolved_visibility = _resolve_repo_visibility(private=private, visibility=visibility, repo_type=repo_type)
+
+        if resolved_visibility is not None:
+            json["visibility"] = resolved_visibility
+        visibility: Optional[RepoVisibility_T] = None,
+        access requests for their repos, and also to change the visibility of the repo.
+                Whether the repository should be private. Cannot be passed together with `visibility`.
+            visibility (`Literal["public", "private", "protected"]`, *optional*):
+                Visibility of the repository. Can be `"public"` or `"private"`, or `"protected"` for Spaces.
+        resolved_visibility = _resolve_repo_visibility(private=private, visibility=visibility, repo_type=repo_type)
+
+        if resolved_visibility is not None:
+            payload["visibility"] = resolved_visibility
+        visibility: Optional[RepoVisibility_T] = None,
+                privacy as the original repo. Cannot be passed together with `visibility`.
+            visibility (`Literal["public", "private", "protected"]`, *optional*):
+                Visibility of the new repo. Can be `"public"` or `"private"`, or `"protected"` for Spaces. Defaults
+                to the same visibility as the original repo.
+        resolved_visibility = _resolve_repo_visibility(private=private, visibility=visibility, repo_type=repo_type)
+
+        if resolved_visibility is not None:
+            payload["visibility"] = resolved_visibility
+        visibility: Optional[RepoVisibility_T] = None,
+                Whether the new Space should be private or not. Defaults to the same privacy as the original Space. Cannot be passed together with `visibility`.
+            visibility (`Literal["public", "private", "protected"]`, *optional*):
+                Visibility of the new Space. Can be `"public"`, `"private"`, or `"protected"`. Defaults to the same
+                visibility as the original Space.
+        >>> duplicate_space("multimodalart/dreambooth-training", to_id="my-dreambooth", visibility="private")
+            visibility=visibility,

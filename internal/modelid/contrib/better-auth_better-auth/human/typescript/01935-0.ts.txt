@@ -1,0 +1,46 @@
+// commit 749583065958 2026-04-08T17:34:12+00:00 packages/better-auth/src/types/types.test.ts
+import type { BetterAuthOptions, BetterAuthPlugin } from "@better-auth/core";
+import type { Auth } from "./auth";
+	/**
+	 * `Auth<O>["api"].getSession` must remain callable from a generic context.
+	 * Changing this contract is a breaking change for downstream consumers.
+	 *
+	 * @see https://github.com/better-auth/better-auth/pull/8466
+	 * @see https://github.com/next-safe-action/next-safe-action/pull/439
+	 */
+	it("should keep getSession on auth.api when O is a generic parameter", () => {
+		async function probe<O extends BetterAuthOptions>(auth: Auth<O>) {
+			await auth.api.getSession({ headers: new Headers() });
+		}
+		void probe;
+	});
+
+	/**
+	 * A plugin overriding a base endpoint must expose the plugin's type,
+	 * not an intersection that leaks base metadata like `options.body`.
+	 */
+	it("plugin override of base endpoint key should drive auth.api type", async () => {
+		const overridePlugin = {
+			id: "override-base" as const,
+			endpoints: {
+				signInEmail: createAuthEndpoint(
+					"/sign-in/email",
+					{
+						method: "POST",
+					},
+					async (ctx) => {
+						return ctx.json({ overriddenMarker: true as const });
+					},
+				),
+			},
+		} satisfies BetterAuthPlugin;
+		const { auth } = await getTestInstance({ plugins: [overridePlugin] });
+		type ApiSignInEmail = (typeof auth.api)["signInEmail"];
+		type Ret = Awaited<ReturnType<ApiSignInEmail>>;
+		expectTypeOf<Ret>().toEqualTypeOf<{ overriddenMarker: true }>();
+		type Body = ApiSignInEmail extends { options: { body: infer B } }
+			? B
+			: "no-body";
+		expectTypeOf<Body>().toEqualTypeOf<"no-body">();
+	});
+

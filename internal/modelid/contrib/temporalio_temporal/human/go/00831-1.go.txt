@@ -1,0 +1,51 @@
+// commit 68f8c22520dd 2026-04-09T12:44:34-04:00 tests/testcore/functional_test_base.go
+	"go.temporal.io/server/common/searchattribute"
+	expectedSearchAttributes := searchattribute.TestSearchAttributesToRegister()
+	namespaceCacheDeadline := time.Now().Add(5 * NamespaceCacheRefreshInterval)
+	ticker := time.NewTicker(NamespaceCacheRefreshInterval / 2)
+	defer ticker.Stop()
+	for {
+		_, describeErr := s.FrontendClient().DescribeNamespace(NewContext(), &workflowservice.DescribeNamespaceRequest{
+			Namespace: nsName.String(),
+		})
+		if describeErr == nil {
+			break
+		}
+		if time.Now().After(namespaceCacheDeadline) {
+			return namespace.EmptyID, fmt.Errorf("namespace cache did not refresh for %q before deadline", nsName.String())
+		}
+		<-ticker.C
+	}
+
+	_, err = s.OperatorClient().AddSearchAttributes(NewContext(), &operatorservice.AddSearchAttributesRequest{
+		Namespace:        nsName.String(),
+		SearchAttributes: expectedSearchAttributes,
+	})
+	if err != nil {
+		return namespace.EmptyID, err
+	}
+
+	namespaceCacheDeadline = time.Now().Add(5 * NamespaceCacheRefreshInterval)
+	for {
+		listResp, listErr := s.OperatorClient().ListSearchAttributes(NewContext(), &operatorservice.ListSearchAttributesRequest{
+			Namespace: nsName.String(),
+		})
+		if listErr == nil {
+			customAttrs := listResp.GetCustomAttributes()
+			allFound := true
+			for saName := range expectedSearchAttributes {
+				if _, ok := customAttrs[saName]; !ok {
+					allFound = false
+					break
+				}
+			}
+			if allFound {
+				break
+			}
+		}
+		if time.Now().After(namespaceCacheDeadline) {
+			return namespace.EmptyID, fmt.Errorf("search attributes were not ready for %q before deadline", nsName.String())
+		}
+		<-ticker.C
+	}
+

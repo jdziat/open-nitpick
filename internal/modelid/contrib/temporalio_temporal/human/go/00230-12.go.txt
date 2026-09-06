@@ -1,0 +1,161 @@
+// commit ec832866005e 2025-12-19T11:01:32-05:00 common/testing/mockapi/workflowservicemock/v1/service_grpc.pb.mock.go
+// CountActivityExecutions mocks base method.
+func (m *MockWorkflowServiceClient) CountActivityExecutions(ctx context.Context, in *workflowservice.CountActivityExecutionsRequest, opts ...grpc.CallOption) (*workflowservice.CountActivityExecutionsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CountActivityExecutions", varargs...)
+	ret0, _ := ret[0].(*workflowservice.CountActivityExecutionsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountActivityExecutions indicates an expected call of CountActivityExecutions.
+func (mr *MockWorkflowServiceClientMockRecorder) CountActivityExecutions(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountActivityExecutions", reflect.TypeOf((*MockWorkflowServiceClient)(nil).CountActivityExecutions), varargs...)
+}
+
+// DeleteActivityExecution mocks base method.
+func (m *MockWorkflowServiceClient) DeleteActivityExecution(ctx context.Context, in *workflowservice.DeleteActivityExecutionRequest, opts ...grpc.CallOption) (*workflowservice.DeleteActivityExecutionResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteActivityExecution", varargs...)
+	ret0, _ := ret[0].(*workflowservice.DeleteActivityExecutionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteActivityExecution indicates an expected call of DeleteActivityExecution.
+func (mr *MockWorkflowServiceClientMockRecorder) DeleteActivityExecution(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteActivityExecution", reflect.TypeOf((*MockWorkflowServiceClient)(nil).DeleteActivityExecution), varargs...)
+}
+
+// DescribeActivityExecution mocks base method.
+func (m *MockWorkflowServiceClient) DescribeActivityExecution(ctx context.Context, in *workflowservice.DescribeActivityExecutionRequest, opts ...grpc.CallOption) (*workflowservice.DescribeActivityExecutionResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DescribeActivityExecution", varargs...)
+	ret0, _ := ret[0].(*workflowservice.DescribeActivityExecutionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeActivityExecution indicates an expected call of DescribeActivityExecution.
+func (mr *MockWorkflowServiceClientMockRecorder) DescribeActivityExecution(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeActivityExecution", reflect.TypeOf((*MockWorkflowServiceClient)(nil).DescribeActivityExecution), varargs...)
+}
+
+// GetActivityResult mocks base method.
+func (m *MockWorkflowServiceClient) GetActivityResult(ctx context.Context, in *workflowservice.GetActivityResultRequest, opts ...grpc.CallOption) (*workflowservice.GetActivityResultResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetActivityResult", varargs...)
+	ret0, _ := ret[0].(*workflowservice.GetActivityResultResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetActivityResult indicates an expected call of GetActivityResult.
+func (mr *MockWorkflowServiceClientMockRecorder) GetActivityResult(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActivityResult", reflect.TypeOf((*MockWorkflowServiceClient)(nil).GetActivityResult), varargs...)
+}
+
+// ListActivityExecutions mocks base method.
+func (m *MockWorkflowServiceClient) ListActivityExecutions(ctx context.Context, in *workflowservice.ListActivityExecutionsRequest, opts ...grpc.CallOption) (*workflowservice.ListActivityExecutionsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListActivityExecutions", varargs...)
+	ret0, _ := ret[0].(*workflowservice.ListActivityExecutionsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListActivityExecutions indicates an expected call of ListActivityExecutions.
+func (mr *MockWorkflowServiceClientMockRecorder) ListActivityExecutions(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListActivityExecutions", reflect.TypeOf((*MockWorkflowServiceClient)(nil).ListActivityExecutions), varargs...)
+}
+
+// RequestCancelActivityExecution mocks base method.
+func (m *MockWorkflowServiceClient) RequestCancelActivityExecution(ctx context.Context, in *workflowservice.RequestCancelActivityExecutionRequest, opts ...grpc.CallOption) (*workflowservice.RequestCancelActivityExecutionResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "RequestCancelActivityExecution", varargs...)
+	ret0, _ := ret[0].(*workflowservice.RequestCancelActivityExecutionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RequestCancelActivityExecution indicates an expected call of RequestCancelActivityExecution.
+func (mr *MockWorkflowServiceClientMockRecorder) RequestCancelActivityExecution(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestCancelActivityExecution", reflect.TypeOf((*MockWorkflowServiceClient)(nil).RequestCancelActivityExecution), varargs...)
+}
+
+// StartActivityExecution mocks base method.
+func (m *MockWorkflowServiceClient) StartActivityExecution(ctx context.Context, in *workflowservice.StartActivityExecutionRequest, opts ...grpc.CallOption) (*workflowservice.StartActivityExecutionResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "StartActivityExecution", varargs...)
+	ret0, _ := ret[0].(*workflowservice.StartActivityExecutionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StartActivityExecution indicates an expected call of StartActivityExecution.
+func (mr *MockWorkflowServiceClientMockRecorder) StartActivityExecution(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartActivityExecution", reflect.TypeOf((*MockWorkflowServiceClient)(nil).StartActivityExecution), varargs...)
+}
+
+// TerminateActivityExecution mocks base method.
+func (m *MockWorkflowServiceClient) TerminateActivityExecution(ctx context.Context, in *workflowservice.TerminateActivityExecutionRequest, opts ...grpc.CallOption) (*workflowservice.TerminateActivityExecutionResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "TerminateActivityExecution", varargs...)
+	ret0, _ := ret[0].(*workflowservice.TerminateActivityExecutionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TerminateActivityExecution indicates an expected call of TerminateActivityExecution.
+func (mr *MockWorkflowServiceClientMockRecorder) TerminateActivityExecution(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TerminateActivityExecution", reflect.TypeOf((*MockWorkflowServiceClient)(nil).TerminateActivityExecution), varargs...)
+}
+

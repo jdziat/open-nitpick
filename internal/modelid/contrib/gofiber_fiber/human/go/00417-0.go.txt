@@ -1,0 +1,44 @@
+// commit c235f85741e2 2025-11-28T10:37:52+01:00 middleware/cache/cache.go
+		hasAuthorization := len(c.Request().Header.Peek(fiber.HeaderAuthorization)) > 0
+
+				if hasAuthorization && !e.shareable {
+					if cfg.Storage != nil {
+						manager.release(e)
+					}
+					mux.Unlock()
+					c.Set(cfg.CacheHeader, cacheUnreachable)
+					return c.Next()
+				}
+
+		cacheControl := string(c.Response().Header.Peek(fiber.HeaderCacheControl))
+
+		if strings.Contains(utils.ToLower(cacheControl), noStore) {
+			c.Set(cfg.CacheHeader, cacheUnreachable)
+			return nil
+		}
+
+		isSharedCacheAllowed := allowsSharedCache(cacheControl)
+		if hasAuthorization && !isSharedCacheAllowed {
+		e.shareable = isSharedCacheAllowed
+
+func allowsSharedCache(cc string) bool {
+	shareable := false
+
+	for part := range strings.SplitSeq(cc, ",") {
+		part = strings.TrimSpace(utils.ToLower(part))
+		switch {
+		case part == "":
+			continue
+		case part == "private":
+			return false
+		case part == "public":
+			shareable = true
+		case strings.HasPrefix(part, "s-maxage="):
+			shareable = true
+		default:
+			continue
+		}
+	}
+
+	return shareable
+}

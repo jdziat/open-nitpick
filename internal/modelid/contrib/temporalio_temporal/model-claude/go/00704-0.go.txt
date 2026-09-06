@@ -1,0 +1,49 @@
+// commit fd113ce1cc72 2026-03-20T14:23:33-07:00 chasm/lib/activity/activity.go
+	"go.temporal.io/server/common/namespace"
+	Request *historyservice.RespondActivityTaskCompletedRequest
+	Token   *tokenspb.Task
+	Request *historyservice.RespondActivityTaskFailedRequest
+	Token   *tokenspb.Task
+	Request *historyservice.RespondActivityTaskCanceledRequest
+	Token   *tokenspb.Task
+	metricsHandler, err := a.enrichMetricsHandler(ctx, metrics.HistoryRespondActivityTaskCompletedScope)
+	if err != nil {
+		return nil, err
+	}
+	metricsHandler, err := a.enrichMetricsHandler(ctx, metrics.HistoryRespondActivityTaskFailedScope)
+	if err != nil {
+		return nil, err
+	}
+	metricsHandler, err := a.enrichMetricsHandler(ctx, metrics.HistoryRespondActivityTaskCanceledScope)
+	if err != nil {
+		return nil, err
+	}
+			return chasm.TerminateComponentResponse{}, serviceerror.NewFailedPreconditionf(
+				"already terminated with request ID %s", existingReqID)
+	metricsHandler, err := a.enrichMetricsHandler(ctx, metrics.ActivityTerminatedScope)
+	if err != nil {
+		return chasm.TerminateComponentResponse{}, err
+	return chasm.TerminateComponentResponse{}, TransitionTerminated.Apply(a, ctx, terminateEvent{
+		request:        req,
+	})
+func (a *Activity) handleCancellationRequested(ctx chasm.MutableContext, request *activitypb.RequestCancelActivityExecutionRequest) (
+	req := request.GetFrontendRequest()
+		metricsHandler, err := a.enrichMetricsHandler(ctx, metrics.HistoryRespondActivityTaskCanceledScope)
+		if err != nil {
+			return nil, err
+		}
+		err = TransitionCanceled.Apply(a, ctx, cancelEvent{
+func (a *Activity) enrichMetricsHandler(ctx chasm.Context, operationTag string) (metrics.Handler, error) {
+	// activityContextFromChasm panics if the context value is missing; this is intentional and
+	// indicates a library registration bug rather than a runtime error.
+	actCtx := activityContextFromChasm(ctx)
+	namespaceName, err := actCtx.namespaceRegistry.GetNamespaceName(namespace.ID(ctx.ExecutionKey().NamespaceID))
+	if err != nil {
+		return nil, err
+	}
+	breakdownMetricsByTaskQueue := actCtx.config.BreakdownMetricsByTaskQueue
+		ctx.MetricsHandler(),
+		namespaceName.String(),
+		tqid.UnsafeTaskQueueFamily(namespaceName.String(), taskQueueFamily),
+		breakdownMetricsByTaskQueue(namespaceName.String(), taskQueueFamily, enumspb.TASK_QUEUE_TYPE_ACTIVITY),
+	), nil

@@ -1,0 +1,35 @@
+// commit 7d77475989e7 2026-07-13T23:26:48+00:00 middleware/proxy/proxy.go
+	"github.com/gofiber/utils/v2/swar"
+// indexControlByte returns the index of the first control byte (< 0x20 or
+// DEL) in b, or -1 if none is present. Bytes >= 0x80 are allowed; they are
+// handled by URI parsing, not header-injection checks. Scans eight bytes at
+// a time, finishing inputs of 8+ bytes with one overlapping word.
+func indexControlByte(b []byte) int {
+	n := len(b)
+	i := 0
+	for ; i+swar.WordLen <= n; i += swar.WordLen {
+		w := swar.Load8(b, i)
+		if m := swar.MatchRangeMask(w, 0x00, 0x1f) | swar.MatchByteMask(w, 0x7f); m != 0 {
+			return i + swar.FirstLane(m)
+		}
+	}
+	if i == n {
+		return -1
+	}
+	if n >= swar.WordLen {
+		w := swar.Load8(b, n-swar.WordLen)
+		if m := swar.MatchRangeMask(w, 0x00, 0x1f) | swar.MatchByteMask(w, 0x7f); m != 0 {
+			return n - swar.WordLen + swar.FirstLane(m)
+		}
+		return -1
+	}
+	for ; i < n; i++ {
+		if b[i] < 0x20 || b[i] == 0x7f {
+			return i
+		}
+	}
+	return -1
+}
+
+	if indexControlByte(location) != -1 {
+		return nil, fasthttp.ErrorInvalidURI

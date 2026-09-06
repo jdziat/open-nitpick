@@ -1,0 +1,56 @@
+// commit bf6467855c13 2026-02-26T10:02:51+00:00 pkg/github/minimal_types.go
+
+	"github.com/github/github-mcp-server/pkg/sanitize"
+	HTMLURL           string            `json:"html_url,omitempty"`
+// MinimalIssuesResponse is the trimmed output for a paginated list of issues.
+type MinimalIssuesResponse struct {
+	Issues     []MinimalIssue  `json:"issues"`
+	TotalCount int             `json:"totalCount"`
+	PageInfo   MinimalPageInfo `json:"pageInfo"`
+}
+
+func fragmentToMinimalIssue(fragment IssueFragment) MinimalIssue {
+	m := MinimalIssue{
+		Number:    int(fragment.Number),
+		Title:     sanitize.Sanitize(string(fragment.Title)),
+		Body:      sanitize.Sanitize(string(fragment.Body)),
+		State:     string(fragment.State),
+		Comments:  int(fragment.Comments.TotalCount),
+		CreatedAt: fragment.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: fragment.UpdatedAt.Format(time.RFC3339),
+		User: &MinimalUser{
+			Login: string(fragment.Author.Login),
+		},
+	}
+
+	for _, label := range fragment.Labels.Nodes {
+		m.Labels = append(m.Labels, string(label.Name))
+	}
+
+	return m
+}
+
+func convertToMinimalIssuesResponse(fragment IssueQueryFragment) MinimalIssuesResponse {
+	minimalIssues := make([]MinimalIssue, 0, len(fragment.Nodes))
+	for _, issue := range fragment.Nodes {
+		minimalIssues = append(minimalIssues, fragmentToMinimalIssue(issue))
+	}
+
+	return MinimalIssuesResponse{
+		Issues:     minimalIssues,
+		TotalCount: fragment.TotalCount,
+		PageInfo: MinimalPageInfo{
+			HasNextPage:     bool(fragment.PageInfo.HasNextPage),
+			HasPreviousPage: bool(fragment.PageInfo.HasPreviousPage),
+			StartCursor:     string(fragment.PageInfo.StartCursor),
+			EndCursor:       string(fragment.PageInfo.EndCursor),
+		},
+	}
+}
+
+	HasNextPage     bool   `json:"hasNextPage"`
+	HasPreviousPage bool   `json:"hasPreviousPage"`
+	StartCursor     string `json:"startCursor,omitempty"`
+	EndCursor       string `json:"endCursor,omitempty"`
+	TotalCount    int                   `json:"totalCount"`
+	PageInfo      MinimalPageInfo       `json:"pageInfo"`

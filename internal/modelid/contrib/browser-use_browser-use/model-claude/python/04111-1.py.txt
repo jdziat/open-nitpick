@@ -1,0 +1,123 @@
+# commit 1a9f51c541b2 2026-02-11T19:12:32-08:00 browser_use/skill_cli/commands/cloud_task.py
+"""Cloud Task/Session API via browser-use-sdk.
+This module provides functions to interact with the Browser-Use Cloud API
+for creating and managing cloud-based agent tasks and sessions.
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from browser_use_sdk.types.session_item_view import SessionItemView
+from browser_use_sdk.types.session_view import SessionView
+from browser_use_sdk.types.share_view import ShareView
+from browser_use_sdk.types.task_created_response import TaskCreatedResponse
+from browser_use_sdk.types.task_item_view import TaskItemView
+from browser_use_sdk.types.task_log_file_response import TaskLogFileResponse
+from browser_use_sdk.types.task_view import TaskView
+
+from browser_use.skill_cli.sdk import get_sdk_client
+def _filter_none(kwargs: dict[str, Any]) -> dict[str, Any]:
+	"""Filter out None values from kwargs (SDK passes them as null, API rejects)."""
+	return {k: v for k, v in kwargs.items() if v is not None}
+# ============ Sessions ============
+def create_session(**kwargs: Any) -> SessionItemView:
+	"""Create a cloud browser session.
+		persist_memory: Share memory between tasks in session
+		start_url: URL to navigate to when session starts
+		screen_width: Browser screen width in pixels
+		screen_height: Browser screen height in pixels
+		SessionItemView with session details
+	# Map our param names to SDK param names
+	param_map = {
+		'proxy_country': 'proxy_country_code',
+		'screen_width': 'browser_screen_width',
+		'screen_height': 'browser_screen_height',
+	}
+	params = {}
+	for k, v in kwargs.items():
+		if v is not None:
+			params[param_map.get(k, k)] = v
+	return get_sdk_client().sessions.create_session(**params)
+def list_sessions(limit: int = 10, status: str | None = None) -> list[SessionItemView]:
+	"""List cloud browser sessions."""
+	client = get_sdk_client()
+	response = client.sessions.list_sessions(
+		page_size=min(limit, 100),
+		filter_by=status,
+	)
+	return list(response.items) if response.items else []
+def get_session(session_id: str) -> SessionView:
+	"""Get details of a specific session."""
+	return get_sdk_client().sessions.get_session(session_id)
+def stop_session(session_id: str) -> SessionView:
+	"""Stop a cloud session."""
+	return get_sdk_client().sessions.update_session(session_id, action='stop')
+def delete_session(session_id: str) -> None:
+	"""Delete a cloud session and all its tasks."""
+	get_sdk_client().sessions.delete_session(session_id)
+def create_public_share(session_id: str) -> ShareView:
+	"""Create a public share URL for a session."""
+	return get_sdk_client().sessions.create_session_public_share(session_id)
+def delete_public_share(session_id: str) -> None:
+	"""Delete the public share for a session."""
+	get_sdk_client().sessions.delete_session_public_share(session_id)
+def stop_sessions_parallel(session_ids: list[str]) -> tuple[list[str], list[dict[str, Any]]]:
+	"""Stop multiple cloud sessions in parallel."""
+	client = get_sdk_client()
+	stopped: list[str] = []
+	errors: list[dict[str, Any]] = []
+	def stop_one(sid: str) -> tuple[str, str | None]:
+			client.sessions.update_session(sid, action='stop')
+			return (sid, None)
+			return (sid, str(e))
+	with ThreadPoolExecutor(max_workers=10) as executor:
+		futures = {executor.submit(stop_one, sid): sid for sid in session_ids}
+		for future in as_completed(futures):
+			sid, error = future.result()
+			if error:
+				errors.append({'id': sid, 'error': error})
+			else:
+				stopped.append(sid)
+# ============ Tasks ============
+def create_task(task: str, **kwargs: Any) -> TaskCreatedResponse:
+		llm: LLM model identifier
+		vision: Enable/disable vision
+		start_url: URL to start the task from
+		metadata: Task metadata key-value pairs
+		secrets: Task secrets key-value pairs
+		allowed_domains: Restrict navigation to these domains
+		skill_ids: Enable specific skill IDs
+		structured_output: JSON schema for structured output
+		judge: Enable judge mode
+		judge_ground_truth: Expected answer for judge evaluation
+		TaskCreatedResponse with task ID and session ID
+	params = _filter_none(kwargs)
+	params['task'] = task
+	return get_sdk_client().tasks.create_task(**params)
+def get_task(task_id: str) -> TaskView:
+	"""Get full task details including steps."""
+	return get_sdk_client().tasks.get_task(task_id)
+def list_tasks(
+	limit: int = 10,
+	status: str | None = None,
+	session_id: str | None = None,
+) -> list[TaskItemView]:
+	"""List recent tasks."""
+	client = get_sdk_client()
+	response = client.tasks.list_tasks(
+		page_size=limit,
+		**_filter_none({'filter_by': status, 'session_id': session_id}),
+	)
+	return list(response.items) if response.items else []
+def stop_task(task_id: str) -> TaskView:
+	"""Stop a running task."""
+	return get_sdk_client().tasks.update_task(task_id, action='stop')
+def get_task_logs(task_id: str) -> TaskLogFileResponse:
+	"""Get task execution logs."""
+	return get_sdk_client().tasks.get_task_logs(task_id)
+# ============ Polling ============
+def poll_until_complete(
+) -> TaskView:
+	"""Poll task status until finished."""
+	client = get_sdk_client()
+		task = client.tasks.get_task(task_id)
+		current_status = task.status
+			return task
+		time.sleep(poll_interval)

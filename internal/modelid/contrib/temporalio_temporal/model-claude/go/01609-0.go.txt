@@ -1,0 +1,71 @@
+// commit 243d3160483e 2026-07-31T11:01:51-05:00 service/matching/matcher_data.go
+// pollerList is an intrusive doubly-linked list of waiting pollers. Pollers are matched
+// by walking from the head, so the list is kept in the order we want to match them:
+// FIFO (insertion order), except that task forwarders/validators are kept after all
+// local pollers so a task is matched to a local poller in preference to a forwarder.
+//
+// It's intrusive (next/prev live in waitingPoller) so there's no per-poller allocation
+// and removal is O(1) given the poller. There are only ever a handful of forwarders, so
+// keeping them grouped at the tail on insert is cheap.
+type pollerList struct {
+	logger     log.Logger
+	head, tail *waitingPoller
+	count      int
+func (p *pollerList) Len() int {
+	return p.count
+func (p *pollerList) Add(poller *waitingPoller) {
+	softassert.That(p.logger, !poller.queued, "adding poller that is already queued")
+	poller.queued = true
+	// Insert after the last local poller: at the tail for a forwarder, or just before
+	// the forwarders (which stay grouped at the tail) for a local poller.
+	at := p.tail
+	if poller.taskForwarderType == notTaskForwarder {
+		for at != nil && at.taskForwarderType != notTaskForwarder {
+			at = at.prev
+		}
+	}
+	next := p.head
+	if at != nil {
+		next = at.next
+		at.next = poller
+	} else {
+		p.head = poller
+	}
+	poller.prev, poller.next = at, next
+	if next != nil {
+		next.prev = poller
+	} else {
+		p.tail = poller
+	}
+	p.count++
+func (p *pollerList) Remove(poller *waitingPoller) {
+	softassert.That(p.logger, poller.queued, "removing poller that is not queued")
+	if poller.prev != nil {
+		poller.prev.next = poller.next
+	} else {
+		p.head = poller.next
+	}
+	if poller.next != nil {
+		poller.next.prev = poller.prev
+	} else {
+		p.tail = poller.prev
+	}
+	poller.prev, poller.next = nil, nil
+	poller.queued = false
+	p.count--
+	task.queued = true
+	task.queued = false
+		task.queued = false
+	// invariant: all pollers and tasks in these data structures have matchResult == nil and queued == true
+	pollers pollerList
+		pollers:          pollerList{logger: logger},
+	if task.queued {
+				// if poll was being forwarded, it would be absent from the queue even
+				// though matchResult == nil
+				if poller.queued {
+		for poller := d.pollers.head; poller != nil; poller = poller.next {
+	for p := d.pollers.head; p != nil; p = p.next {
+	matchCond   sync.Cond
+	matchResult *matchResult
+// w must not be queued anymore. We don't assert that here: queued lives on the outer
+// struct now, not w, and callers always Remove (which asserts it) before waking.

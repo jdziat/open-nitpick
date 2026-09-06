@@ -1,0 +1,65 @@
+# commit c91c637c699b 2026-07-01T14:51:24+02:00 tests/test_sandbox.py
+    processes: list = []  # background processes started via /processes
+    proc_seq = 0  # monotonic process id source
+        cls = type(self)
+        elif self.path.endswith("/processes"):  # spawn a background process
+            type(self).last_exec = body
+            proc = {
+                "pid": 9000 + cls.proc_seq,
+                "tag": body.get("tag"),
+                "cmd": body["cmd"],
+                "started_at_ms": 1_700_000_000_000 + cls.proc_seq,
+                "running": True,
+                "exit_code": None,
+            }
+            cls.proc_seq += 1
+            cls.processes.append(proc)
+            self._json({"pid": proc["pid"], "tag": proc["tag"]})
+        last = self.path.rsplit("/", 1)[-1]
+        if "/processes/" in self.path:  # kill a background process
+            type(self).processes = [p for p in type(self).processes if str(p["pid"]) != last]
+            self._json({"pid": last, "killed": True})
+            return
+        type(self).sandboxes.discard(last)
+        self._json({"id": last, "deleted": True})
+        elif self.path.endswith("/processes"):  # list background processes
+            self._json(cls.processes)
+    _FakeServer.processes = []
+    _FakeServer.proc_seq = 0
+        processes: list = []
+        proc_seq = 0
+    def test_run_background_returns_process(self, fake_server: str) -> None:
+        sandbox = _make_sandbox(fake_server)
+        process = sandbox.run("python -m http.server 8000", background=True)
+        assert isinstance(process, sandbox_mod.SandboxProcess)
+        assert process.pid == 9000
+        assert process.cmd == "python -m http.server 8000"
+        assert process.running is True
+        # background spawn doesn't stream/wait: the cmd/shell payload is POSTed as-is.
+        assert _FakeServer.last_exec == {"cmd": "python -m http.server 8000"}
+
+    def test_processes_list_and_kill(self, fake_server: str) -> None:
+        sandbox = _make_sandbox(fake_server)
+        sandbox.run(["sleep", "100"], background=True)
+        sandbox.run("sleep 200", background=True)
+        processes = sandbox.processes()
+        assert [p.pid for p in processes] == [9000, 9001]
+        assert processes[0].cmd == ["sleep", "100"]
+        # status fields from the listing are carried through.
+        assert processes[0].running is True
+        assert processes[0].exit_code is None
+        assert processes[0].started_at_ms == 1_700_000_000_000
+        processes[0].kill()
+        assert [p.pid for p in sandbox.processes()] == [9001]
+
+    def test_proxy_url_for(self, fake_server: str) -> None:
+        sandbox = _make_sandbox(fake_server)
+        host = fake_server.split("://", 1)[-1]
+        # default scheme is https; the in-sandbox port and path are appended under /v1/proxy.
+        assert sandbox.proxy_url_for(8000, "/hello") == f"https://{host}/v1/proxy/8000/hello"
+        # a path without a leading slash is normalized.
+        assert sandbox.proxy_url_for(8000, "ws").endswith("/v1/proxy/8000/ws")
+        # the scheme is swapped in for WebSocket clients (host/path unchanged).
+        assert sandbox.proxy_url_for(8000, "/ws", scheme="wss://") == f"wss://{host}/v1/proxy/8000/ws"
+        assert sandbox.proxy_headers["X-Sandbox-Token"] == "secret"
+

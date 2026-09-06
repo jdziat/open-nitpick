@@ -1,0 +1,77 @@
+# commit 7a0889cf20df 2025-08-12T04:14:53-07:00 tests/ci/test_browser_watchdog_permissions.py
+
+
+from browser_use.browser.session import BrowserSession
+	httpserver.expect_request('/geo').respond_with_data(
+
+	profile = BrowserProfile(permissions=['geolocation'], headless=True)
+
+	mock_llm = create_mock_llm(
+		[
+			"""
+			% httpserver.url_for('/geo'),
+			"""
+		""",
+		]
+	)
+
+	agent = Agent(task='Test geolocation permissions', browser=browser, llm=mock_llm)
+
+
+	grant_logs = [
+		record
+		for record in caplog.records
+		if 'Granting browser permissions' in record.message or 'Browser.grantPermissions' in record.message
+	]
+	assert len(grant_logs) > 0, 'Expected Browser.grantPermissions to be called'
+
+	geo_permission_logs = [
+		record
+		for record in caplog.records
+		if 'geolocation' in record.message and ('granting' in record.message.lower() or 'granted' in record.message.lower())
+	]
+	assert len(geo_permission_logs) > 0, 'Expected geolocation permission to be granted'
+
+	profile = BrowserProfile(permissions=['geolocation', 'clipboardReadWrite', 'notifications'], headless=True)
+
+
+
+
+	grant_logs = [
+		record
+		for record in caplog.records
+		if 'Granting browser permissions' in record.message or 'Successfully granted permissions' in record.message
+	]
+	assert len(grant_logs) > 0, 'Expected permissions to be granted'
+
+		assert len(perm_logs) > 0, f'Expected {perm} permission to be granted'
+
+	profile = BrowserProfile(permissions=[], headless=True)
+
+
+
+
+	grant_logs = [
+		record
+		for record in caplog.records
+		if 'Granting browser permissions' in record.message or 'Successfully granted permissions' in record.message
+	]
+	assert len(grant_logs) == 0, 'Expected no permissions to be granted when list is empty'
+
+	profile = BrowserProfile(permissions=['geolocation', 'invalid-permission', 'clipboardReadWrite'], headless=True)
+
+
+
+
+	grant_logs = [
+		record
+		for record in caplog.records
+		if 'Granting browser permissions' in record.message or 'Successfully granted permissions' in record.message
+	]
+	assert len(grant_logs) > 0, 'Expected permissions to be granted'
+
+	warning_logs = [
+		record for record in caplog.records if 'invalid-permission' in record.message or 'Unknown permission' in record.message
+	]
+
+	await browser.stop()

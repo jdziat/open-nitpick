@@ -1,0 +1,42 @@
+// commit 2f3e62bcc197 2026-08-16T01:38:14+00:00 mount.go
+	// Constraints each cloned route was parsed with, which are the ones of the
+	// apps its path was composed by. Two sibling mounts can name one constraint
+	// differently, and a route is only ever bound by the one its own app has.
+	routeConstraints map[*Route][]CustomConstraint
+// markRouteConstraints records the constraints route was parsed with, so the
+// next app to re-parse it uses those rather than a registry merged from every
+// app it happens to have mounted.
+func (app *App) markRouteConstraints(route *Route, constraints []CustomConstraint) {
+	if len(constraints) == 0 {
+		return
+	}
+
+	if app.mountFields.routeConstraints == nil {
+		app.mountFields.routeConstraints = make(map[*Route][]CustomConstraint)
+	}
+
+	app.mountFields.routeConstraints[route] = constraints
+}
+
+// routeConstraintsFor returns the constraints route was parsed with, falling
+// back to those of the app holding it — which is where its own routes get
+// theirs from.
+func (app *App) routeConstraintsFor(route *Route) []CustomConstraint {
+	if recorded, ok := app.mountFields.routeConstraints[route]; ok {
+		return recorded
+	}
+
+	return app.customConstraints
+}
+
+				// The prefix is this app's, and may name a constraint only this
+				// app knows; the route brings the constraints of the apps that
+				// composed its path, and those win where a name is defined
+				// twice. Kept per route: two apps mounted side by side can name
+				// one constraint differently, and neither binds the other.
+				constraints := mergeCustomConstraints(
+					slices.Clone(route.group.app.routeConstraintsFor(subAppRoute)),
+					app.customConstraints,
+				)
+
+				app.markRouteConstraints(subAppRouteClone, constraints)

@@ -1,0 +1,51 @@
+// commit a131913091bc 2026-06-03T22:30:47+00:00 tools/flakereport/parser.go
+func utcDay(t time.Time) time.Time {
+	y, m, d := t.UTC().Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
+type reportWindow struct {
+	days []time.Time
+}
+
+func newReportWindow(since, until time.Time) reportWindow {
+	if since.IsZero() || until.IsZero() || until.Before(since) {
+		return reportWindow{}
+	}
+
+	start := utcDay(since)
+	end := utcDay(until)
+	days := make([]time.Time, 0, int(end.Sub(start).Hours()/24)+1)
+	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
+		days = append(days, day)
+	}
+	return reportWindow{days: days}
+}
+
+func (w reportWindow) dailyFailureCounts(failures []TestFailure) []int {
+	if len(w.days) == 0 {
+		return nil
+	}
+
+	counts := make([]int, len(w.days))
+	firstDay := w.days[0]
+	for _, failure := range failures {
+		day := utcDay(failure.Timestamp)
+		if day.Before(firstDay) || day.After(w.days[len(w.days)-1]) {
+			continue
+		}
+		counts[int(day.Sub(firstDay).Hours()/24)]++
+	}
+	return counts
+}
+
+func buildReports(grouped map[string][]TestFailure, numerator func(string, []TestFailure) int, denominator func(string, []TestFailure) int, repo string, maxLinks int, window reportWindow) []TestReport {
+			TrendPoints:  window.dailyFailureCounts(failures),
+func convertToReports(grouped map[string][]TestFailure, testRunCounts map[string]int, repo string, maxLinks int, window reportWindow) []TestReport {
+		repo, maxLinks, window)
+func convertCrashesToReports(grouped map[string][]TestFailure, jobs []ArtifactJob, repo string, maxLinks int, window reportWindow) []TestReport {
+		repo, maxLinks, window)
+func convertCIBreakersToReports(grouped map[string][]TestFailure, ciBreakCounts map[string]int, totalWorkflowRuns int, repo string, maxLinks int, window reportWindow) []TestReport {
+		repo, maxLinks, window)
+		runKey := suiteRunKey(failure.RunID, failure.MatrixName)
+		suiteFailedRuns[failure.SuiteName][runKey] = true

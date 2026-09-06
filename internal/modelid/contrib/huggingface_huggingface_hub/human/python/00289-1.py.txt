@@ -1,0 +1,34 @@
+# commit 36f65542efdd 2026-02-02T16:24:10+01:00 src/huggingface_hub/cli/cache.py
+from ._cli_utils import (
+    OutputFormat,
+    RepoIdArg,
+    RepoTypeOpt,
+    RevisionOpt,
+    TokenOpt,
+    get_hf_api,
+    typer_factory,
+)
+@cache_cli.command(
+    examples=[
+        "hf cache ls",
+        "hf cache ls --revisions",
+        'hf cache ls --filter "size>1GB" --limit 20',
+        "hf cache ls --format json",
+    ],
+)
+@cache_cli.command(
+    examples=[
+        "hf cache rm model/gpt2",
+        "hf cache rm <revision_hash>",
+        "hf cache rm model/gpt2 --dry-run",
+        "hf cache rm model/gpt2 --yes",
+    ],
+)
+@cache_cli.command(examples=["hf cache prune", "hf cache prune --dry-run"])
+@cache_cli.command(
+    examples=[
+        "hf cache verify gpt2",
+        "hf cache verify gpt2 --revision refs/pr/1",
+        "hf cache verify my-dataset --repo-type dataset",
+    ],
+)

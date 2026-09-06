@@ -1,0 +1,57 @@
+// commit d8813fd133d9 2026-04-03T00:00:06+00:00 client/frontend/metric_client_gen.go
+func (c *metricClient) CreateWorkerDeployment(
+	ctx context.Context,
+	request *workflowservice.CreateWorkerDeploymentRequest,
+	opts ...grpc.CallOption,
+) (_ *workflowservice.CreateWorkerDeploymentResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "FrontendClientCreateWorkerDeployment")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.CreateWorkerDeployment(ctx, request, opts...)
+}
+
+func (c *metricClient) CreateWorkerDeploymentVersion(
+	ctx context.Context,
+	request *workflowservice.CreateWorkerDeploymentVersionRequest,
+	opts ...grpc.CallOption,
+) (_ *workflowservice.CreateWorkerDeploymentVersionResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "FrontendClientCreateWorkerDeploymentVersion")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.CreateWorkerDeploymentVersion(ctx, request, opts...)
+}
+
+func (c *metricClient) UpdateWorkerDeploymentVersionComputeConfig(
+	ctx context.Context,
+	request *workflowservice.UpdateWorkerDeploymentVersionComputeConfigRequest,
+	opts ...grpc.CallOption,
+) (_ *workflowservice.UpdateWorkerDeploymentVersionComputeConfigResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "FrontendClientUpdateWorkerDeploymentVersionComputeConfig")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.UpdateWorkerDeploymentVersionComputeConfig(ctx, request, opts...)
+}
+
+
+func (c *metricClient) ValidateWorkerDeploymentVersionComputeConfig(
+	ctx context.Context,
+	request *workflowservice.ValidateWorkerDeploymentVersionComputeConfigRequest,
+	opts ...grpc.CallOption,
+) (_ *workflowservice.ValidateWorkerDeploymentVersionComputeConfigResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "FrontendClientValidateWorkerDeploymentVersionComputeConfig")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.ValidateWorkerDeploymentVersionComputeConfig(ctx, request, opts...)
+}

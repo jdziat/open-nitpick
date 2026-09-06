@@ -1,0 +1,35 @@
+// commit 7d8786cd8790 2025-12-23T23:55:50+08:00 packages/better-auth/src/api/routes/sign-up.ts
+import { APIError, BASE_ERROR_CODES } from "@better-auth/core/error";
+import { isAPIError } from "../../utils/is-api-error";
+					throw APIError.from("BAD_REQUEST", {
+						code: "EMAIL_PASSWORD_SIGN_UP_DISABLED",
+					throw APIError.from("BAD_REQUEST", BASE_ERROR_CODES.INVALID_EMAIL);
+					throw APIError.from(
+						"BAD_REQUEST",
+						BASE_ERROR_CODES.PASSWORD_TOO_SHORT,
+					);
+					throw APIError.from(
+						"BAD_REQUEST",
+						BASE_ERROR_CODES.PASSWORD_TOO_LONG,
+					);
+					throw APIError.from(
+						"UNPROCESSABLE_ENTITY",
+						BASE_ERROR_CODES.USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL,
+					);
+						throw APIError.from(
+							"BAD_REQUEST",
+							BASE_ERROR_CODES.FAILED_TO_CREATE_USER,
+						);
+					if (isAPIError(e)) {
+					throw APIError.from(
+						"UNPROCESSABLE_ENTITY",
+						BASE_ERROR_CODES.FAILED_TO_CREATE_USER,
+					);
+					throw APIError.from(
+						"UNPROCESSABLE_ENTITY",
+						BASE_ERROR_CODES.FAILED_TO_CREATE_USER,
+					);
+					throw APIError.from(
+						"BAD_REQUEST",
+						BASE_ERROR_CODES.FAILED_TO_CREATE_SESSION,
+					);

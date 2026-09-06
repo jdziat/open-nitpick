@@ -1,0 +1,38 @@
+// commit f5e68663064a 2026-01-12T15:15:33+01:00 test/cli/test/scoped-fixtures.test.ts
+import type { ExpectStatic, SuiteAPI, TestAPI } from 'vitest'
+import { describe, expect, test } from 'vitest'
+// "it" is used inside subtests, we can't "import" it because vitest will inject __vite_ssr_import__
+declare const it: TestAPI
+    'basic.test.ts': ({ extendedTest, expect }) => {
+  const { stderr, stdout } = await runFixtureTests(() => it.extend<{
+    worker: string
+    local: string
+  }>({
+    local: 'local',
+    worker: [
+      ({ local }, use) => use(local),
+      { scope: 'worker' },
+    ],
+  }), {
+    'basic.test.ts': ({ extendedTest, expect }) => {
+  const { stderr, stdout } = await runFixtureTests(() => it.extend<{
+    file: string
+    local: string
+  }>({
+    local: 'local',
+    file: [
+      ({ local }, use) => use(local),
+      { scope: 'file' },
+    ],
+  }), {
+    'basic.test.ts': ({ extendedTest, expect }) => {
+      extendedTest.beforeEach(({ worker }) => {
+      extendedTest.afterEach(({ worker }) => {
+      extendedTest.beforeEach(({ file }) => {
+      extendedTest.afterEach(({ file }) => {
+    'basic.test.js': ({ extendedTest, expect, describe }) => {
+    'second.test.js': ({ extendedTest, describe }) => {
+  fs: Record<string, ((context: { extendedTest: TestAPI<T>; expect: ExpectStatic; describe: SuiteAPI }) => unknown) | ViteUserConfig>,
+    export const describe = globalThis.describe
+    export const expect = globalThis.expect
+        acc[key] = [value, { imports: { './test.js': ['extendedTest', 'expect', 'describe'] } }]

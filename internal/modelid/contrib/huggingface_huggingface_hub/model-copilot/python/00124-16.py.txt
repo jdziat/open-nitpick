@@ -1,0 +1,368 @@
+# commit 52c718a54382 2025-10-23T14:48:03+02:00 src/huggingface_hub/hf_api.py
+import httpx
+    RemoteEntryNotFoundError,
+from .file_download import DryRunFileInfo, HfFileMetadata, get_hf_file_metadata, hf_hub_url
+from .utils._deprecation import _deprecate_arguments
+def repo_type_and_id_from_hf_id(hf_id: str, hub_url: Optional[str] = None) -> tuple[Optional[str], Optional[str], str]:
+    av_scan: Optional[dict]
+    pickle_import_scan: Optional[dict]
+    parameters: dict[str, int]
+    def __new__(cls, *args, commit_url: str, **kwargs):
+        return str.__new__(cls, commit_url)
+        fields (`dict[str, Any]`, *optional*):
+    fields: Optional[dict[str, Any]] = None
+        watched (`list[WebhookWatchedItem]`):
+        domains (`list[WEBHOOK_DOMAIN_T]`):
+    watched: list[WebhookWatchedItem]
+    domains: list[constants.WEBHOOK_DOMAIN_T]
+        gguf (`dict`, *optional*):
+        inference_provider_mapping (`list[InferenceProviderMapping]`, *optional*):
+        tags (`list[str]`):
+        model_index (`dict`, *optional*):
+        config (`dict`, *optional*):
+        siblings (`list[RepoSibling]`):
+        spaces (`list[str]`, *optional*):
+        security_repo_status (`dict`, *optional*):
+    gguf: Optional[dict]
+    inference_provider_mapping: Optional[list[InferenceProviderMapping]]
+    tags: Optional[list[str]]
+    model_index: Optional[dict]
+    config: Optional[dict]
+    siblings: Optional[list[RepoSibling]]
+    spaces: Optional[list[str]]
+    security_repo_status: Optional[dict]
+        tags (`list[str]`):
+        siblings (`list[RepoSibling]`):
+    tags: Optional[list[str]]
+    siblings: Optional[list[RepoSibling]]
+        tags (`list[str]`):
+        siblings (`list[RepoSibling]`):
+        models (`list[str]`, *optional*):
+        datasets (`list[str]`, *optional*):
+    tags: Optional[list[str]]
+    siblings: Optional[list[RepoSibling]]
+    models: Optional[list[str]]
+    datasets: Optional[list[str]]
+        note: Optional[dict] = None,
+        items (`list[CollectionItem]`):
+    items: list[CollectionItem]
+        branches (`list[GitRefInfo]`):
+        converts (`list[GitRefInfo]`):
+        tags (`list[GitRefInfo]`):
+        pull_requests (`list[GitRefInfo]`, *optional*):
+    branches: list[GitRefInfo]
+    converts: list[GitRefInfo]
+    tags: list[GitRefInfo]
+    pull_requests: Optional[list[GitRefInfo]] = None
+        authors (`list[str]`):
+    authors: list[str]
+        datasets (`list[str]`):
+        models (`list[str]`):
+        spaces (`list[str]`):
+    datasets: list[str]
+    models: list[str]
+    spaces: list[str]
+    orgs: list[Organization] = field(default_factory=list)
+        authors (`list[str]`, **optional**):
+    authors: Optional[list[str]]
+        user_agent: Union[dict, str, None] = None,
+        headers: Optional[dict[str, str]] = None,
+    def whoami(self, token: Union[bool, str, None] = None) -> dict:
+        except HfHubHTTPError as e:
+                raise HfHubHTTPError(error_message, response=e.response) from e
+    def get_model_tags(self) -> dict:
+    def get_dataset_tags(self) -> dict:
+        apps: Optional[Union[str, list[str]]] = None,
+        inference_provider: Optional[Union[Literal["all"], "PROVIDER_T", list["PROVIDER_T"]]] = None,
+        trained_dataset: Optional[Union[str, list[str]]] = None,
+        emissions_thresholds: Optional[tuple[float, float]] = None,
+        expand: Optional[list[ExpandModelProperty_T]] = None,
+            expand (`list[ExpandModelProperty_T]`, *optional*):
+                Possible values are `"author"`, `"cardData"`, `"config"`, `"createdAt"`, `"disabled"`, `"downloads"`, `"downloadsAllTime"`, `"gated"`, `"gguf"`, `"inference"`, `"inferenceProviderMapping"`, `"lastModified"`, `"library_name"`, `"likes"`, `"mask_token"`, `"model-index"`, `"pipeline_tag"`, `"private"`, `"safetensors"`, `"sha"`, `"siblings"`, `"spaces"`, `"tags"`, `"transformersInfo"`, `"trendingScore"`, `"widgetData"`, and `"resourceGroup"`.
+        params: dict[str, Any] = {}
+        filter_list: list[str] = []
+            datasets = [trained_dataset] if isinstance(trained_dataset, str) else trained_dataset
+            filter_list.extend(f"dataset:{d}" if not d.startswith("dataset:") else d for d in datasets)
+        benchmark: Optional[Union[str, list[str]]] = None,
+        language_creators: Optional[Union[str, list[str]]] = None,
+        language: Optional[Union[str, list[str]]] = None,
+        multilinguality: Optional[Union[str, list[str]]] = None,
+        size_categories: Optional[Union[str, list[str]]] = None,
+        task_categories: Optional[Union[str, list[str]]] = None,
+        task_ids: Optional[Union[str, list[str]]] = None,
+        expand: Optional[list[ExpandDatasetProperty_T]] = None,
+        tags: Optional[Union[str, list[str]]] = None,
+            expand (`list[ExpandDatasetProperty_T]`, *optional*):
+                Possible values are `"author"`, `"cardData"`, `"citation"`, `"createdAt"`, `"disabled"`, `"description"`, `"downloads"`, `"downloadsAllTime"`, `"gated"`, `"lastModified"`, `"likes"`, `"paperswithcode_id"`, `"private"`, `"siblings"`, `"sha"`, `"tags"`, `"trendingScore"`, `"usedStorage"`, and `"resourceGroup"`.
+        params: dict[str, Any] = {}
+        expand: Optional[list[ExpandSpaceProperty_T]] = None,
+            expand (`list[ExpandSpaceProperty_T]`, *optional*):
+                Possible values are `"author"`, `"cardData"`, `"datasets"`, `"disabled"`, `"lastModified"`, `"createdAt"`, `"likes"`, `"models"`, `"private"`, `"runtime"`, `"sdk"`, `"siblings"`, `"sha"`, `"subdomain"`, `"tags"`, `"trendingScore"`, `"usedStorage"`, and `"resourceGroup"`.
+        params: dict[str, Any] = {}
+        expand: Optional[list[ExpandModelProperty_T]] = None,
+            expand (`list[ExpandModelProperty_T]`, *optional*):
+                Possible values are `"author"`, `"baseModels"`, `"cardData"`, `"childrenModelCount"`, `"config"`, `"createdAt"`, `"disabled"`, `"downloads"`, `"downloadsAllTime"`, `"gated"`, `"gguf"`, `"inference"`, `"inferenceProviderMapping"`, `"lastModified"`, `"library_name"`, `"likes"`, `"mask_token"`, `"model-index"`, `"pipeline_tag"`, `"private"`, `"safetensors"`, `"sha"`, `"siblings"`, `"spaces"`, `"tags"`, `"transformersInfo"`, `"trendingScore"`, `"widgetData"`, `"usedStorage"`, and `"resourceGroup"`.
+        params: dict = {}
+        expand: Optional[list[ExpandDatasetProperty_T]] = None,
+            expand (`list[ExpandDatasetProperty_T]`, *optional*):
+                Possible values are `"author"`, `"cardData"`, `"citation"`, `"createdAt"`, `"disabled"`, `"description"`, `"downloads"`, `"downloadsAllTime"`, `"gated"`, `"lastModified"`, `"likes"`, `"paperswithcode_id"`, `"private"`, `"siblings"`, `"sha"`, `"tags"`, `"trendingScore"`,`"usedStorage"`, and `"resourceGroup"`.
+        params: dict = {}
+        expand: Optional[list[ExpandSpaceProperty_T]] = None,
+            expand (`list[ExpandSpaceProperty_T]`, *optional*):
+                Possible values are `"author"`, `"cardData"`, `"createdAt"`, `"datasets"`, `"disabled"`, `"lastModified"`, `"likes"`, `"models"`, `"private"`, `"runtime"`, `"sdk"`, `"siblings"`, `"sha"`, `"subdomain"`, `"tags"`, `"trendingScore"`, `"usedStorage"`, and `"resourceGroup"`.
+        params: dict = {}
+        except (RepositoryNotFoundError, RemoteEntryNotFoundError, RevisionNotFoundError):
+    ) -> list[str]:
+            `list[str]`: the list of files in a given repository.
+            [`~utils.RemoteEntryNotFoundError`]:
+        def _format_as_git_ref_info(item: dict) -> GitRefInfo:
+    ) -> list[GitCommitInfo]:
+            list[[`GitCommitInfo`]]: list of objects containing information about the commits for a repo on the Hub.
+        paths: Union[list[str], str],
+    ) -> list[Union[RepoFile, RepoFolder]]:
+            paths (`Union[list[str], str]`, *optional*):
+            `list[Union[RepoFile, RepoFolder]]`:
+        space_secrets: Optional[list[dict[str, str]]] = None,
+        space_variables: Optional[list[dict[str, str]]] = None,
+            space_secrets (`list[dict[str, str]]`, *optional*):
+            space_variables (`list[dict[str, str]]`, *optional*):
+        json: dict[str, Any] = {"name": name, "organization": organization}
+        except HfHubHTTPError as err:
+        r = get_session().request("DELETE", path, headers=headers, json=json)
+        payload: dict = {}
+            commit_resp = get_session().post(url=commit_url, headers=headers, content=data, params=params)
+        except RemoteEntryNotFoundError as e:
+        return self.create_commit(
+        allow_patterns: Optional[Union[list[str], str]] = None,
+        ignore_patterns: Optional[Union[list[str], str]] = None,
+        delete_patterns: Optional[Union[list[str], str]] = None,
+        allow_patterns: Optional[Union[list[str], str]] = None,
+        ignore_patterns: Optional[Union[list[str], str]] = None,
+        delete_patterns: Optional[Union[list[str], str]] = None,
+        allow_patterns: Optional[Union[list[str], str]] = None,
+        ignore_patterns: Optional[Union[list[str], str]] = None,
+        delete_patterns: Optional[Union[list[str], str]] = None,
+            allow_patterns (`list[str]` or `str`, *optional*):
+            ignore_patterns (`list[str]` or `str`, *optional*):
+            delete_patterns (`list[str]` or `str`, *optional*):
+        return self.create_commit(
+        delete_patterns: list[str],
+            delete_patterns (`list[str]`):
+        allow_patterns: Optional[Union[list[str], str]] = None,
+        ignore_patterns: Optional[Union[list[str], str]] = None,
+            allow_patterns (`list[str]` or `str`, *optional*):
+            ignore_patterns (`list[str]` or `str`, *optional*):
+            7. Pre-upload LFS file if at least 1 file.
+    @overload
+    def hf_hub_download(
+        self,
+        repo_id: str,
+        filename: str,
+        *,
+        subfolder: Optional[str] = None,
+        repo_type: Optional[str] = None,
+        revision: Optional[str] = None,
+        cache_dir: Union[str, Path, None] = None,
+        local_dir: Union[str, Path, None] = None,
+        force_download: bool = False,
+        etag_timeout: float = constants.DEFAULT_ETAG_TIMEOUT,
+        token: Union[bool, str, None] = None,
+        local_files_only: bool = False,
+        dry_run: Literal[False] = False,
+    ) -> str: ...
+
+    @overload
+    def hf_hub_download(
+        self,
+        repo_id: str,
+        filename: str,
+        *,
+        subfolder: Optional[str] = None,
+        repo_type: Optional[str] = None,
+        revision: Optional[str] = None,
+        cache_dir: Union[str, Path, None] = None,
+        local_dir: Union[str, Path, None] = None,
+        force_download: bool = False,
+        etag_timeout: float = constants.DEFAULT_ETAG_TIMEOUT,
+        token: Union[bool, str, None] = None,
+        local_files_only: bool = False,
+        dry_run: Literal[True],
+    ) -> DryRunFileInfo: ...
+
+        dry_run: bool = False,
+    ) -> Union[str, DryRunFileInfo]:
+                data before giving up which is passed to `httpx.request`.
+            dry_run (`bool`, *optional*, defaults to `False`):
+                If `True`, perform a dry run without actually downloading the file. Returns a
+                [`DryRunFileInfo`] object containing information about what would be downloaded.
+            `str` or [`DryRunFileInfo`]:
+                - If `dry_run=False`: Local path of file or if networking is off, last version of file cached on disk.
+                - If `dry_run=True`: A [`DryRunFileInfo`] object containing download information.
+            [`~utils.RemoteEntryNotFoundError`]
+        allow_patterns: Optional[Union[list[str], str]] = None,
+        ignore_patterns: Optional[Union[list[str], str]] = None,
+        tqdm_class: Optional[type[base_tqdm]] = None,
+                data before giving up which is passed to `httpx.request`.
+            allow_patterns (`list[str]` or `str`, *optional*):
+            ignore_patterns (`list[str]` or `str`, *optional*):
+        params: dict[str, Union[str, int]] = {}
+    ) -> httpx.Response:
+        resp = get_session().post(path, headers=headers, json=body)
+        body: dict[str, str] = {"status": new_status}
+        r = get_session().request(
+            "DELETE",
+    def get_space_variables(self, repo_id: str, *, token: Union[bool, str, None] = None) -> dict[str, SpaceVariable]:
+    ) -> dict[str, SpaceVariable]:
+    ) -> dict[str, SpaceVariable]:
+        r = get_session().request(
+            "DELETE",
+        payload: dict[str, Any] = {"flavor": hardware}
+        secrets: Optional[list[dict[str, str]]] = None,
+        variables: Optional[list[dict[str, str]]] = None,
+            secrets (`list[dict[str, str]]`, *optional*):
+            variables (`list[dict[str, str]]`, *optional*):
+            [`HfHubHTTPError`]:
+        payload: dict[str, Any] = {"repository": f"{to_namespace}/{to_repo_name}"}
+        except HfHubHTTPError as err:
+        payload: dict[str, SpaceStorage] = {"tier": storage}
+    ) -> list[InferenceEndpoint]:
+            list[`InferenceEndpoint`]: A list of all inference endpoints for the given namespace.
+            endpoints: list[InferenceEndpoint] = list_inference_endpoints(namespace=self._get_namespace(token=token))
+        custom_image: Optional[dict] = None,
+        env: Optional[dict[str, str]] = None,
+        secrets: Optional[dict[str, str]] = None,
+        tags: Optional[list[str]] = None,
+            custom_image (`dict`, *optional*):
+            env (`dict[str, str]`, *optional*):
+            secrets (`dict[str, str]`, *optional*):
+            tags (`list[str]`, *optional*):
+        payload: dict = {
+        payload: dict = {
+    def list_inference_catalog(self, *, token: Union[bool, str, None] = None) -> list[str]:
+        custom_image: Optional[dict] = None,
+        env: Optional[dict[str, str]] = None,
+        secrets: Optional[dict[str, str]] = None,
+        tags: Optional[list[str]] = None,
+            custom_image (`dict`, *optional*):
+            env (`dict[str, str]`, *optional*):
+            secrets (`dict[str, str]`, *optional*):
+            tags (`list[str]`, *optional*):
+        payload: dict = defaultdict(lambda: defaultdict(dict))
+        owner: Union[list[str], str, None] = None,
+        item: Union[list[str], str, None] = None,
+            owner (`list[str]` or `str`, *optional*):
+            item (`list[str]` or `str`, *optional*):
+        params: dict = {}
+        except HfHubHTTPError as err:
+        except HfHubHTTPError as err:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+        payload: dict[str, Any] = {"item": {"id": item_id, "type": item_type}}
+        except HfHubHTTPError as err:
+        except HfHubHTTPError as err:
+    ) -> list[AccessRequest]:
+            `list[AccessRequest]`: A list of [`AccessRequest`] objects. Each time contains a `username`, `email`,
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+    ) -> list[AccessRequest]:
+            `list[AccessRequest]`: A list of [`AccessRequest`] objects. Each time contains a `username`, `email`,
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+    ) -> list[AccessRequest]:
+            `list[AccessRequest]`: A list of [`AccessRequest`] objects. Each time contains a `username`, `email`,
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+    ) -> list[AccessRequest]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+    def list_webhooks(self, *, token: Union[bool, str, None] = None) -> list[WebhookInfo]:
+            `list[WebhookInfo]`:
+        watched: list[Union[dict, WebhookWatchedItem]],
+        domains: Optional[list[constants.WEBHOOK_DOMAIN_T]] = None,
+            watched (`list[WebhookWatchedItem]`):
+            domains (`list[Literal["repo", "discussion"]]`, optional):
+        watched: Optional[list[Union[dict, WebhookWatchedItem]]] = None,
+        domains: Optional[list[constants.WEBHOOK_DOMAIN_T]] = None,
+            watched (`list[WebhookWatchedItem]`, optional):
+            domains (`list[Literal["repo", "discussion"]]`, optional):
+        user_agent: Union[dict, str, None] = None,
+    ) -> dict[str, str]:
+        delete_patterns: Optional[Union[list[str], str]],
+    ) -> list[CommitOperationDelete]:
+        allow_patterns: Optional[Union[list[str], str]] = None,
+        ignore_patterns: Optional[Union[list[str], str]] = None,
+    ) -> list[CommitOperationAdd]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+            [`HfHubHTTPError`]:
+        command: list[str],
+        env: Optional[dict[str, Any]] = None,
+        secrets: Optional[dict[str, Any]] = None,
+            command (`list[str]`):
+            env (`dict[str, Any]`, *optional*):
+            secrets (`dict[str, Any]`, *optional*):
+                with get_session().stream(
+                    "GET",
+                ) as response:
+                    log = None
+                    for line in response.iter_lines():
+                        if line and line.startswith("data: {"):
+                            data = json.loads(line[len("data: ") :])
+                            # timestamp = data["timestamp"]
+                            if not data["data"].startswith("===== Job started"):
+                                logging_started = True
+                                log = data["data"]
+                                yield log
+                    logging_finished = logging_started
+            except httpx.DecodingError:
+            except httpx.NetworkError as err:
+    ) -> list[JobInfo]:
+        script_args: Optional[list[str]] = None,
+        dependencies: Optional[list[str]] = None,
+        env: Optional[dict[str, Any]] = None,
+        secrets: Optional[dict[str, Any]] = None,
+            script_args (`list[str]`, *optional*)
+            dependencies (`list[str]`, *optional*)
+            env (`dict[str, Any]`, *optional*):
+            secrets (`dict[str, Any]`, *optional*):
+        command: list[str],
+        env: Optional[dict[str, Any]] = None,
+        secrets: Optional[dict[str, Any]] = None,
+            command (`list[str]`):
+            env (`dict[str, Any]`, *optional*):
+            secrets (`dict[str, Any]`, *optional*):
+        input_json: dict[str, Any] = {
+    ) -> list[ScheduledJobInfo]:
+        script_args: Optional[list[str]] = None,
+        dependencies: Optional[list[str]] = None,
+        env: Optional[dict[str, Any]] = None,
+        secrets: Optional[dict[str, Any]] = None,
+            script_args (`list[str]`, *optional*)
+            dependencies (`list[str]`, *optional*)
+            env (`dict[str, Any]`, *optional*):
+            secrets (`dict[str, Any]`, *optional*):
+        script_args: Optional[list[str]],
+        dependencies: Optional[list[str]],
+        env: Optional[dict[str, Any]],
+        secrets: Optional[dict[str, Any]],
+    ) -> tuple[list[str], dict[str, Any], dict[str, Any]]:

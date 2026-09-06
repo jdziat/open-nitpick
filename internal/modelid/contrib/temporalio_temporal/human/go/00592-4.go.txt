@@ -1,0 +1,81 @@
+// commit 6875191ef7d7 2026-02-22T23:30:24-08:00 chasm/lib/tests/payload.go
+	"go.temporal.io/server/common/softassert"
+
+	componentContextKey string
+)
+
+const (
+	componentCtxKey componentContextKey = "key"
+	componentCtxVal string              = "value"
+	if err := assertContextValue(mutableContext); err != nil {
+		return nil, err
+	}
+
+func assertContextValue(chasmContext chasm.Context) error {
+	if val := chasmContext.Value(componentCtxKey); val != componentCtxVal {
+		return softassert.UnexpectedInternalErr(
+			chasmContext.Logger(),
+			"registered component key value pair not available in context",
+			nil,
+		)
+	}
+
+	return nil
+}
+
+	chasmContext chasm.Context,
+	if err := assertContextValue(chasmContext); err != nil {
+		return nil, err
+	}
+
+	chasmContext chasm.MutableContext,
+	_ chasm.NoValue,
+	if err := assertContextValue(chasmContext); err != nil {
+		return ClosePayloadStoreResponse{}, err
+	}
+
+	if err := assertContextValue(mutableContext); err != nil {
+		return nil, err
+	}
+
+	if err := assertContextValue(chasmContext); err != nil {
+		return nil, err
+	}
+
+	if err := assertContextValue(mutableContext); err != nil {
+		return nil, err
+	}
+
+	chasmContext chasm.Context,
+	if err := assertContextValue(chasmContext); err != nil {
+		// nolint:forbidigo // Panic here for testing.
+		panic("registered component key value pair not available in context")
+	}
+
+func (s *PayloadStore) Terminate(
+	mutableContext chasm.MutableContext,
+	_ chasm.TerminateComponentRequest,
+) (chasm.TerminateComponentResponse, error) {
+	if err := assertContextValue(mutableContext); err != nil {
+		return chasm.TerminateComponentResponse{}, err
+	}
+
+	if _, err := s.Close(mutableContext, nil); err != nil {
+		return chasm.TerminateComponentResponse{}, err
+	}
+	return chasm.TerminateComponentResponse{}, nil
+}
+
+	chasmContext chasm.Context,
+	if err := assertContextValue(chasmContext); err != nil {
+		// nolint:forbidigo // Panic here for testing.
+		panic("registered component key value pair not available in context")
+	}
+
+		ExecutionStatusSearchAttribute.Value(s.LifecycleState(chasmContext).String()),
+func (s *PayloadStore) Memo(chasmContext chasm.Context) proto.Message {
+	if err := assertContextValue(chasmContext); err != nil {
+		// nolint:forbidigo // Panic here for testing.
+		panic("registered component key value pair not available in context")
+	}
+

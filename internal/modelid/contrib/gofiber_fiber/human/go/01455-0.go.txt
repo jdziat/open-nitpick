@@ -1,0 +1,72 @@
+// commit f5d029c07818 2026-06-16T04:24:26+03:00 middleware/session/middleware.go
+	if err := m.Session.saveSessionWithContext(m.resolveContext()); err != nil {
+// resolveContext returns the middleware's stored fiber context if available,
+// otherwise returns context.Background().
+// fiber.Ctx implements context.Context directly, so no allocation is needed.
+func (m *Middleware) resolveContext() context.Context {
+	if m.ctx != nil {
+		return m.ctx
+	}
+	return context.Background()
+}
+
+// DestroyWithContext destroys the session using the provided context for cancellation and timeout control.
+//
+// Parameters:
+//   - ctx: The context to use for the storage operation.
+//
+// Returns:
+//   - error: An error if the destruction fails.
+//
+// Usage:
+//
+//	err := m.DestroyWithContext(ctx)
+func (m *Middleware) DestroyWithContext(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	err := m.Session.DestroyWithContext(ctx)
+	m.isDestroyed = true
+	return err
+}
+
+// ResetWithContext resets the session using the provided context for cancellation and timeout control.
+//
+// Parameters:
+//   - ctx: The context to use for the storage operation.
+//
+// Returns:
+//   - error: An error if the reset fails.
+//
+// Usage:
+//
+//	err := m.ResetWithContext(ctx)
+func (m *Middleware) ResetWithContext(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.Session.ResetWithContext(ctx)
+}
+
+// RegenerateWithContext generates a new session ID while preserving session data,
+// using the provided context for cancellation and timeout control.
+//
+// This method is commonly used after authentication to prevent session fixation attacks.
+// Unlike ResetWithContext(), this method preserves all existing session data.
+//
+// Parameters:
+//   - ctx: The context to use for the storage operation.
+//
+// Returns:
+//   - error: An error if the regeneration fails.
+//
+// Usage:
+//
+//	err := m.RegenerateWithContext(ctx)
+func (m *Middleware) RegenerateWithContext(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.Session.RegenerateWithContext(ctx)
+}
+

@@ -1,0 +1,58 @@
+// commit 2a9e477e4133 2026-02-13T08:09:16+00:00 service/matching/db.go
+// emitPhysicalBacklogGaugesLocked emits backlog gauges tagged by priority key, along with
+// the legacy task_lag_per_tl gauge.
+//
+// When version-attributed backlog metrics are enabled (BacklogMetricsEmitInterval > 0), this
+// emits physical_approximate_backlog_count and physical_approximate_backlog_age_seconds for
+// the unversioned queue only. Version-attributed metrics (including appropriate attribution of
+// the default queue's tasks to current and ramping versions) are emitted separately by the
+// partition manager via fetchAndEmitLogicalBacklogMetrics.
+//
+// When version-attributed metrics are disabled (BacklogMetricsEmitInterval == 0), this falls back
+// to emitting the original approximate_backlog_count and approximate_backlog_age_seconds for
+// all queues (including versioned queues when BreakdownMetricsByBuildID is enabled).
+	if !db.config.BreakdownMetricsByTaskQueue() || !db.config.BreakdownMetricsByPartition() {
+	attributionEnabled := db.config.BacklogMetricsEmitInterval() > 0
+
+	if attributionEnabled {
+		if db.queue.IsVersioned() {
+			return
+		}
+	} else {
+		if db.queue.IsVersioned() && !db.config.BreakdownMetricsByBuildID() {
+			return
+		}
+	}
+
+	backlogCountGauge := metrics.ApproximateBacklogCount
+	backlogAgeGauge := metrics.ApproximateBacklogAgeSeconds
+	if attributionEnabled {
+		backlogCountGauge = metrics.PhysicalApproximateBacklogCount
+		backlogAgeGauge = metrics.PhysicalApproximateBacklogAgeSeconds
+	}
+
+		backlogCountGauge.With(db.metricsHandler).Record(float64(count), metrics.MatchingTaskPriorityTag(priority))
+		backlogAgeGauge.With(db.metricsHandler).Record(0)
+		backlogAgeGauge.With(db.metricsHandler).Record(time.Since(oldestTime).Seconds())
+	if !db.config.BreakdownMetricsByTaskQueue() || !db.config.BreakdownMetricsByPartition() {
+	attributionEnabled := db.config.BacklogMetricsEmitInterval() > 0
+
+	if attributionEnabled {
+		if db.queue.IsVersioned() {
+			return
+		}
+	} else {
+		if db.queue.IsVersioned() && !db.config.BreakdownMetricsByBuildID() {
+			return
+		}
+	}
+
+	backlogCountGauge := metrics.ApproximateBacklogCount
+	backlogAgeGauge := metrics.ApproximateBacklogAgeSeconds
+	if attributionEnabled {
+		backlogCountGauge = metrics.PhysicalApproximateBacklogCount
+		backlogAgeGauge = metrics.PhysicalApproximateBacklogAgeSeconds
+	}
+
+		backlogCountGauge.With(db.metricsHandler).Record(0, metrics.MatchingTaskPriorityTag(k))
+	backlogAgeGauge.With(db.metricsHandler).Record(0)

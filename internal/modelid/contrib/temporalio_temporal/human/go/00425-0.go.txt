@@ -1,0 +1,35 @@
+// commit d4323ebe3698 2026-01-23T10:12:03-08:00 chasm/engine.go
+	StartExecution(
+	) (EngineStartExecutionResult, error)
+	UpdateWithStartExecution(
+// StartExecutionResult contains the outcome of creating a new execution via [StartExecution]
+// or [UpdateWithStartExecution].
+//   - ExecutionRef: A serialized reference to the newly created root component.
+type StartExecutionResult[O any] struct {
+	ExecutionKey ExecutionKey
+	ExecutionRef []byte
+	Created      bool
+	Output       O
+// EngineStartExecutionResult is a type alias for the result type returned by the Engine implementation.
+type EngineStartExecutionResult = StartExecutionResult[struct{}]
+// This option only applies to StartExecution() and UpdateWithStartExecution().
+// This option only applies to StartExecution() and UpdateWithStartExecution().
+// StartExecution creates a new execution with a component initialized by the provided factory function.
+//   - startFn: Factory function that creates the component and produces output.
+//   - input: Application-specific data passed to startFn
+//   - O: The output value produced by startFn
+func StartExecution[C Component, I any, O any](
+	startFn func(MutableContext, I) (C, O, error),
+) (StartExecutionResult[O], error) {
+	result, err := engineFromContext(ctx).StartExecution(
+			c, output, err = startFn(ctx, input)
+		return StartExecutionResult[O]{
+	return StartExecutionResult[O]{
+		ExecutionKey: result.ExecutionKey,
+		ExecutionRef: result.ExecutionRef,
+		Created:      result.Created,
+		Output:       output,
+func UpdateWithStartExecution[C Component, I any, O1 any, O2 any](
+	startFn func(MutableContext, I) (C, O1, error),
+	executionKey, serializedRef, err := engineFromContext(ctx).UpdateWithStartExecution(
+			c, output1, err = startFn(ctx, input)

@@ -1,0 +1,79 @@
+// commit d6d3359ddb86 2025-11-17T16:23:52+01:00 packages/vitest/src/runtime/workers/init.ts
+import type { FileSpecification } from '@vitest/runner'
+import { Traces } from '../../utils/traces'
+let traces!: Traces
+
+        const tracesStart = performance.now()
+
+        traces ??= await new Traces({
+          enabled: message.traces.enabled,
+          sdkPath: message.traces.sdkPath,
+        }).waitInit()
+        const tracesEnd = performance.now()
+
+        const context = traces.getContextFromCarrier(message.traces.otelCarrier)
+
+        // record telemetry as part of "start"
+        traces
+          .startSpan('vitest.runtime.traces', { startTime: tracesStart }, context)
+          .end(tracesEnd)
+
+            traces,
+          workerTeardown = await traces.$(
+            'vitest.runtime.setup',
+            { context },
+            () => worker.setup?.(setupContext),
+          )
+          const tracesContext = traces.getContextFromCarrier(message.otelCarrier)
+          runPromise = traces.$(
+            'vitest.runtime.run',
+            {
+              context: tracesContext,
+              attributes: {
+                'vitest.worker.specifications': traces.isEnabled()
+                  ? getFilesWithLocations(message.context.files)
+                  : [],
+                'vitest.worker.id': message.context.workerId,
+              },
+            },
+            () => entrypoint.run({ ...setupContext, ...message.context }, worker, traces)
+              .catch(error => serializeError(error)),
+          )
+          const tracesContext = traces.getContextFromCarrier(message.otelCarrier)
+          runPromise = traces.$(
+            'vitest.runtime.collect',
+            {
+              context: tracesContext,
+              attributes: {
+                'vitest.worker.specifications': traces.isEnabled()
+                  ? getFilesWithLocations(message.context.files)
+                  : [],
+                'vitest.worker.id': message.context.workerId,
+              },
+            },
+            () => entrypoint.collect({ ...setupContext, ...message.context }, worker, traces)
+              .catch(error => serializeError(error)),
+          )
+          const context = traces.getContextFromCarrier(message.otelCarrier)
+          const error = await traces.$(
+            'vitest.runtime.teardown',
+            { context },
+            async () => {
+              const error = await entrypoint.teardown().catch(error => serializeError(error))
+              await workerTeardown?.()
+              return error
+            },
+          )
+
+          await traces.finish()
+
+function getFilesWithLocations(files: FileSpecification[]): string[] {
+  return files.flatMap((file) => {
+    if (!file.testLocations) {
+      return file.filepath
+    }
+    return file.testLocations.map((location) => {
+      return `${file}:${location}`
+    })
+  })
+}

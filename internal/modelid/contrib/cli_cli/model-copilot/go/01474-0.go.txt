@@ -1,0 +1,66 @@
+// commit d17503e15b47 2026-07-29T09:22:16-04:00 pkg/cmd/pr/checkout/checkout.go
+	var reuseWorktree bool
+		target, err := resolveWorktreeTarget(opts.GitClient, opts.Worktree)
+		if err != nil {
+			return err
+		}
+		if target.isCurrent {
+		reuseWorktree = target.isRepoRoot
+		cmdQueue = append(cmdQueue, cmdsForExistingRemote(headRemote, pr, opts, reuseWorktree)...)
+		cmdQueue = append(cmdQueue, cmdsForMissingRemote(pr, baseURLOrName, baseRepo.RepoHost(), defaultBranch, protocol, opts, reuseWorktree)...)
+func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts *CheckoutOptions, reuseWorktree bool) [][]string {
+		return append(cmds, detachCmds(fetchCmd, opts.Worktree, reuseWorktree)...)
+		if reuseWorktree {
+func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultBranch, protocol string, opts *CheckoutOptions, reuseWorktree bool) [][]string {
+		return detachCmds(fetchCmd, opts.Worktree, reuseWorktree)
+		if reuseWorktree {
+// worktreeTarget holds what checkoutRun needs to know about a --worktree path,
+// resolved once up front so the command builders stay pure and we avoid asking
+// git the same questions repeatedly.
+type worktreeTarget struct {
+	// isCurrent is true when the path resolves to the worktree the command is
+	// already running in. Checking a PR out there would silently switch the
+	// current tree's branch, defeating the purpose of --worktree, so callers
+	// reject it.
+	isCurrent bool
+	// isRepoRoot is true when the path is the root of an existing linked
+	// worktree belonging to this repository, meaning we reuse it rather than
+	// creating a new one.
+	isRepoRoot bool
+// resolveWorktreeTarget asks git about path and the current worktree, letting
+// git resolve symlinks (in any path component), "..", case, and trailing
+// slashes for us instead of comparing paths ourselves. Detection is
+// best-effort: if the current or target worktree cannot be determined (e.g. the
+// path does not exist yet or is not a git directory), the corresponding flags
+// stay false so normal flow proceeds and git worktree add handles the path.
+func resolveWorktreeTarget(client *git.Client, path string) (worktreeTarget, error) {
+	var wt worktreeTarget
+	abs, err := filepath.Abs(path)
+		return wt, err
+	// Current worktree: toplevel then git-common-dir.
+	current, err := revParseFacts(client, "", "--show-toplevel", "--git-common-dir")
+	if err != nil || len(current) < 2 {
+		return wt, nil
+	currentToplevel, currentCommonDir := current[0], current[len(current)-1]
+	// Target worktree: toplevel, prefix (empty exactly at a worktree root),
+	// then git-common-dir. Non-existent and non-git directories error out here.
+	target, err := revParseFacts(client, abs, "--show-toplevel", "--show-prefix", "--git-common-dir")
+	if err != nil || len(target) < 3 {
+		return wt, nil
+	targetToplevel, targetPrefix, targetCommonDir := target[0], target[1], target[2]
+
+	wt.isCurrent = targetToplevel == currentToplevel
+	// A worktree root of this repo has an empty prefix and shares our common dir.
+	wt.isRepoRoot = targetPrefix == "" && targetCommonDir == currentCommonDir
+	return wt, nil
+// revParseFacts runs `git rev-parse --path-format=absolute <flags...>` and
+// returns one output line per flag, in flag order. When dir is non-empty the
+// query is scoped to that directory with -C. Results are absolute, canonical
+// paths (an empty --show-prefix yields an empty line).
+func revParseFacts(client *git.Client, dir string, flags ...string) ([]string, error) {
+	args := append([]string{"rev-parse", "--path-format=absolute"}, flags...)
+		return nil, err
+		return nil, err
+	return strings.Split(strings.TrimRight(string(out), "\n"), "\n"), nil
+func detachCmds(fetchCmd []string, worktree string, reuseWorktree bool) [][]string {
+	if reuseWorktree {

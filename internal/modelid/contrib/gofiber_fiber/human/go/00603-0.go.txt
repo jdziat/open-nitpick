@@ -1,0 +1,34 @@
+// commit 0092199ee990 2026-02-04T17:29:52+01:00 res.go
+// Pre-allocated byte slices for common strings to avoid allocations
+var (
+	charsetUTF8Bytes  = []byte("; charset=utf-8")
+	charsetPrefixBytes = []byte("; charset=")
+	htmlPOpen         = []byte("<p>")
+	htmlPClose        = []byte("</p>")
+)
+
+	// Use stack-allocated array for typical cases (most handlers have <8 types).
+	// This avoids heap allocation in the common case.
+	var typesArray [8]string
+	types := typesArray[:0]
+		// Use bytebufferpool and pre-allocated slices to avoid string concatenation
+		buf := bytebufferpool.Get()
+		buf.Write(htmlPOpen)
+		buf.WriteString(b)
+		buf.Write(htmlPClose)
+		err := r.Send(buf.Bytes())
+		bytebufferpool.Put(buf)
+		return err
+		// Use bytebufferpool to avoid string concatenation allocation
+		buf := bytebufferpool.Get()
+		buf.WriteString(mimeType)
+		buf.Write(charsetPrefixBytes)
+		buf.WriteString(charset[0])
+		r.c.fasthttp.Response.Header.SetContentTypeBytes(buf.Bytes())
+		bytebufferpool.Put(buf)
+			// Use bytebufferpool to avoid string concatenation allocation
+			buf := bytebufferpool.Get()
+			buf.WriteString(mimeType)
+			buf.Write(charsetUTF8Bytes)
+			r.c.fasthttp.Response.Header.SetContentTypeBytes(buf.Bytes())
+			bytebufferpool.Put(buf)

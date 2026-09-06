@@ -1,0 +1,38 @@
+// commit aa302209b065 2026-02-06T15:33:41+01:00 cmd/github-mcp-server/main.go
+	ghhttp "github.com/github/github-mcp-server/pkg/http"
+
+	httpCmd = &cobra.Command{
+		Use:   "http",
+		Short: "Start HTTP server",
+		Long:  `Start an HTTP server that listens for MCP requests over HTTP.`,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			ttl := viper.GetDuration("repo-access-cache-ttl")
+			httpConfig := ghhttp.ServerConfig{
+				Version:              version,
+				Host:                 viper.GetString("host"),
+				Port:                 viper.GetInt("port"),
+				BaseURL:              viper.GetString("base-url"),
+				ResourcePath:         viper.GetString("base-path"),
+				ExportTranslations:   viper.GetBool("export-translations"),
+				EnableCommandLogging: viper.GetBool("enable-command-logging"),
+				LogFilePath:          viper.GetString("log-file"),
+				ContentWindowSize:    viper.GetInt("content-window-size"),
+				LockdownMode:         viper.GetBool("lockdown-mode"),
+				RepoAccessCacheTTL:   &ttl,
+				ScopeChallenge:       viper.GetBool("scope-challenge"),
+			}
+
+			return ghhttp.RunHTTPServer(httpConfig)
+		},
+	}
+	// HTTP-specific flags
+	httpCmd.Flags().Int("port", 8082, "HTTP server port")
+	httpCmd.Flags().String("base-url", "", "Base URL where this server is publicly accessible (for OAuth resource metadata)")
+	httpCmd.Flags().String("base-path", "", "Externally visible base path for the HTTP server (for OAuth resource metadata)")
+	httpCmd.Flags().Bool("scope-challenge", false, "Enable OAuth scope challenge responses")
+
+	_ = viper.BindPFlag("port", httpCmd.Flags().Lookup("port"))
+	_ = viper.BindPFlag("base-url", httpCmd.Flags().Lookup("base-url"))
+	_ = viper.BindPFlag("base-path", httpCmd.Flags().Lookup("base-path"))
+	_ = viper.BindPFlag("scope-challenge", httpCmd.Flags().Lookup("scope-challenge"))
+	rootCmd.AddCommand(httpCmd)

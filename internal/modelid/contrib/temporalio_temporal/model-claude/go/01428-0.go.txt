@@ -1,0 +1,46 @@
+// commit 0fccd46dead3 2026-07-08T10:21:46-05:00 client/matching/client.go
+	"go.temporal.io/server/common/goro"
+	timeout              time.Duration
+	longPollTimeout      time.Duration
+	clients              common.ClientCache
+	resolver             membership.ServiceResolver
+	connectionCloseDelay dynamicconfig.DurationPropertyFn
+	metricsHandler       metrics.Handler
+	logger               log.Logger
+	loadBalancer         LoadBalancer
+	spreadRouting        dynamicconfig.TypedPropertyFn[dynamicconfig.GradualChange[int]]
+	partitionCache       *partitionCache
+	evictionWatcher      *goro.Handle
+		timeout:              timeout,
+		longPollTimeout:      longPollTimeout,
+		clients:              clients,
+		resolver:             resolver,
+		connectionCloseDelay: connectionCloseDelay,
+		metricsHandler:       metricsHandler,
+		logger:               logger,
+		loadBalancer:         lb,
+		spreadRouting:        spreadRouting,
+		partitionCache:       newPartitionCache(metricsHandler),
+	// Start goroutine to prune partition count cache. Stopped by Stop().
+	// Evict cached clients whose host leaves the membership ring. Stopped by Stop().
+	c.evictionWatcher = goro.NewHandle(context.Background()).Go(c.watchMembership)
+// Stop deterministically releases the resources started by NewClient: it stops
+// the eviction watcher and partition-cache rotation goroutines and closes every
+// cached gRPC connection. It is safe to call more than once.
+func (c *clientImpl) Stop() {
+	c.evictionWatcher.Cancel()
+	<-c.evictionWatcher.Done()
+	c.partitionCache.Stop()
+	c.clients.EvictAll()
+}
+
+// watchMembership evicts cached clients whose host leaves the membership ring.
+// It runs until ctx is cancelled (by Stop).
+func (c *clientImpl) watchMembership(ctx context.Context) error {
+	if err := c.resolver.AddListener(listenerName, ch); err != nil {
+		c.logger.Error("Failed to subscribe matching cache to membership", tag.Error(err))
+		return err
+	defer func() { _ = c.resolver.RemoveListener(listenerName) }()
+			return nil
+				evictAt[h.GetAddress()] = time.Now().Add(c.connectionCloseDelay())
+			reapEvictableClients(c.resolver, c.clients, evictAt)

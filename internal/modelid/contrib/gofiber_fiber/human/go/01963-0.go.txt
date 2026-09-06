@@ -1,0 +1,32 @@
+// commit dffc2ccfdc98 2026-08-18T20:56:51+05:30 extractors/extractors.go
+// Source is declared/static metadata (for a chain, the first child). It is not
+// by itself an authoritative origin signal: SourceHeader is the zero value, so
+// a hand-rolled Extract without an explicit Source reports SourceHeader.
+// Runtime origin is available only from a successful ExtractWithSource call
+// (err == nil); on failure the returned Source may be static or last-child
+// fallback metadata and must not be treated as the origin of a value.
+//
+// When decorating a built-in extractor, replace Extract and either clear
+// ExtractSource or set ExtractSource to delegate to the new Extract so
+// ExtractWithSource stays in sync. Dual-callback custom extractors should set
+// both; ExtractWithSource prefers ExtractSource so a runtime-dependent source
+// is not replaced by the static Source field.
+//
+// Prefer keyed composite literals when constructing Extractor values so adding
+// fields (such as ExtractSource) does not break unkeyed literals.
+//
+//   - Otherwise ExtractSource is preferred when set. That keeps dual-callback
+//     custom extractors (Extract for legacy callers, ExtractSource for a
+//     runtime-dependent source) reachable through this helper. Built-in
+//     constructors set both to the same underlying logic; callers that replace
+//     only Extract should clear ExtractSource or re-point it at the new Extract
+//     so the override is visible here.
+//   - When only Extract is set, falls back to Extract with the static Source.
+//
+// The returned Source is meaningful for security decisions only when err is nil.
+	// Prefer ExtractSource when present so intentionally supplied source-aware
+	// callbacks (including dual-callback custom extractors) are not bypassed.
+	if e.ExtractSource != nil {
+		return e.ExtractSource(c)
+	}
+				// ExtractWithSource prefers ExtractSource, then Extract (source-only / legacy).

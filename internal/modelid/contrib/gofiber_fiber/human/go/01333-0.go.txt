@@ -1,0 +1,33 @@
+// commit b7a14fa9c032 2026-05-29T08:17:44+00:00 internal/memory/memory.go
+	data map[string]item // data
+	mu   sync.RWMutex
+	go store.gc(1 * time.Second)
+	if !ok || v.e != 0 && v.e <= utils.Timestamp() {
+		exp = uint32(ttl.Seconds()) + utils.Timestamp()
+func (s *Storage) gc(sleep time.Duration) {
+	ticker := time.NewTicker(sleep)
+	defer ticker.Stop()
+	var expired []string
+
+	for range ticker.C {
+		ts := utils.Timestamp()
+		expired = expired[:0]
+		s.mu.RLock()
+		for key, v := range s.data {
+			if v.e != 0 && v.e <= ts {
+				expired = append(expired, key)
+			}
+		s.mu.RUnlock()
+
+		if len(expired) == 0 {
+			// avoid locking if nothing to delete
+			continue
+		s.mu.Lock()
+		// Double-checked locking.
+		// We might have replaced the item in the meantime.
+		for i := range expired {
+			v := s.data[expired[i]]
+			if v.e != 0 && v.e <= ts {
+				delete(s.data, expired[i])
+			}
+		s.mu.Unlock()

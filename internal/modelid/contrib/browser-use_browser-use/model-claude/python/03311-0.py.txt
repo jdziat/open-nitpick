@@ -1,0 +1,32 @@
+# commit c9137fe0296e 2025-10-24T19:25:00-07:00 browser_use/tools/service.py
+	def __getattr__(self, name: str):
+		"""
+		Enable direct action calls like tools.navigate(url=..., browser_session=...).
+		This provides a simpler API for tests and direct usage while maintaining backward compatibility.
+		"""
+		# Check if this is a registered action
+		if name in self.registry.registry.actions:
+			# Create a wrapper that delegates to registry.execute_action
+			async def action_wrapper(**kwargs):
+				# Separate action params from special params (injected dependencies)
+				special_param_names = {'browser_session', 'page_extraction_llm', 'file_system', 'available_file_paths', 'sensitive_data'}
+
+				# Extract action params (params for the action itself)
+				action_params = {k: v for k, v in kwargs.items() if k not in special_param_names}
+
+				# Extract special params (injected dependencies)
+				special_kwargs = {k: v for k, v in kwargs.items() if k in special_param_names}
+
+				# Delegate to the existing registry.execute_action method
+				# This ensures all the logic (sensitive_data, page_url extraction, error handling, etc.) is centralized
+				return await self.registry.execute_action(
+					action_name=name,
+					params=action_params,
+					**special_kwargs
+				)
+
+			return action_wrapper
+
+		# If not an action, raise AttributeError for normal Python behavior
+		raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+

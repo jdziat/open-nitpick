@@ -1,0 +1,55 @@
+// commit 09d38df96f19 2026-02-12T13:43:41+01:00 pkg/github/repositories.go
+	"encoding/base64"
+				fileSize := fileContent.GetSize()
+				// Build resource URI for the file using URI templates
+				pathParts := strings.Split(path, "/")
+				resourceURI, err := expandRepoResourceURI(owner, repo, sha, ref, pathParts)
+					return utils.NewToolResultError("failed to build resource URI"), nil, nil
+
+				// main branch ref passed in ref parameter but it doesn't exist - default branch was used
+				var successNote string
+				if fallbackUsed {
+					successNote = fmt.Sprintf(" Note: the provided ref '%s' does not exist, default branch '%s' was used instead.", originalRef, rawOpts.Ref)
+				// For files >= 1MB, return a ResourceLink instead of content
+				const maxContentSize = 1024 * 1024 // 1MB
+				if fileSize >= maxContentSize {
+					size := int64(fileSize)
+					resourceLink := &mcp.ResourceLink{
+						URI:   resourceURI,
+						Name:  fileContent.GetName(),
+						Title: fmt.Sprintf("File: %s", path),
+						Size:  &size,
+					return utils.NewToolResultResourceLink(
+						fmt.Sprintf("File %s is too large to display (%d bytes). Use the download URL to fetch the content: %s (SHA: %s)%s",
+							path, fileSize, fileContent.GetDownloadURL(), fileSHA, successNote),
+						resourceLink), nil, nil
+				}
+				// For files < 1MB, get content directly from Contents API
+				content, err := fileContent.GetContent()
+				if err != nil {
+					return utils.NewToolResultError(fmt.Sprintf("failed to decode file content: %s", err)), nil, nil
+				}
+				// Detect content type from the actual content bytes,
+				// mirroring the original approach of using the Content-Type header
+				// from the raw API response.
+				contentBytes := []byte(content)
+				contentType := http.DetectContentType(contentBytes)
+
+				// Determine if content is text or binary based on detected content type
+				isTextContent := strings.HasPrefix(contentType, "text/") ||
+					contentType == "application/json" ||
+					contentType == "application/xml" ||
+					strings.HasSuffix(contentType, "+json") ||
+					strings.HasSuffix(contentType, "+xml")
+
+				if isTextContent {
+						Text:     content,
+					return utils.NewToolResultResource(fmt.Sprintf("successfully downloaded text file (SHA: %s)%s", fileSHA, successNote), result), nil, nil
+				// Binary content - encode as base64 blob
+				blobContent := base64.StdEncoding.EncodeToString(contentBytes)
+				result := &mcp.ResourceContents{
+					URI:      resourceURI,
+					Blob:     []byte(blobContent),
+					MIMEType: contentType,
+				}
+				return utils.NewToolResultResource(fmt.Sprintf("successfully downloaded binary file (SHA: %s)%s", fileSHA, successNote), result), nil, nil

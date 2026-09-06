@@ -1,0 +1,47 @@
+// commit 7eddd273de3b 2026-04-23T11:12:41+02:00 packages/vitest/src/node/types/browser.ts
+export interface BrowserTraceViewOptions {
+  /**
+   * Enable Vitest trace view artifacts collection.
+   *
+   * This option controls Vitest's own trace-view pipeline, independently from provider-specific trace retention.
+   *
+   * @default false
+   * @experimental
+   */
+  enabled?: boolean
+
+  /**
+   * Capture canvas pixels in trace view snapshots.
+   *
+   * This uses rrweb's canvas snapshot support and can increase trace artifact size.
+   * In the trace viewer, this enables a weaker replay iframe sandbox because rrweb needs scripts to redraw canvas data.
+   *
+   * @default false
+   * @experimental
+   */
+  recordCanvas?: boolean
+
+  /**
+   * Inline loaded `<img>` element pixels in trace view snapshots.
+   *
+   * This uses rrweb's image inlining support. It improves offline replay for still images,
+   * but can increase trace artifact size and does not preserve original image resource bytes.
+   *
+   * @default false
+   * @experimental
+   */
+  inlineImages?: boolean
+}
+
+  /**
+   *
+   * Enable Vitest trace view artifacts collection.
+   *
+   * This option controls Vitest's own trace-view pipeline, independently from provider-specific trace retention.
+   *
+   * @default false
+   * @experimental
+   */
+  traceView?: boolean | BrowserTraceViewOptions
+
+  traceView: Required<BrowserTraceViewOptions>

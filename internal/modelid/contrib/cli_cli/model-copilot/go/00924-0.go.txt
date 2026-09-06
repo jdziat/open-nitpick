@@ -1,0 +1,51 @@
+// commit 8dcfd330e7a0 2026-02-18T16:34:13+01:00 internal/featuredetection/feature_detection.go
+	ProjectFeatures() (ProjectFeatures, error)
+type ProjectFeatures struct {
+	// ProjectItemQuery indicates support for the `query` argument on
+	// ProjectV2.items (supported on github.com and GHES 3.20+).
+	ProjectItemQuery bool
+}
+
+var allProjectFeatures = ProjectFeatures{
+	ProjectItemQuery: true,
+}
+
+func (d *detector) ProjectFeatures() (ProjectFeatures, error) {
+	if !ghauth.IsEnterprise(d.host) {
+		return allProjectFeatures, nil
+	}
+
+	var features ProjectFeatures
+
+	var featureDetection struct {
+		ProjectV2 struct {
+			Fields []struct {
+				Name string
+				Args []struct {
+					Name string
+				}
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"ProjectV2: __type(name: \"ProjectV2\")"`
+	}
+
+	gql := api.NewClientFromHTTP(d.httpClient)
+	err := gql.Query(d.host, "ProjectV2_fields", &featureDetection, nil)
+	if err != nil {
+		return features, err
+	}
+
+	for _, field := range featureDetection.ProjectV2.Fields {
+		if field.Name == "items" {
+			for _, arg := range field.Args {
+				if arg.Name == "query" {
+					features.ProjectItemQuery = true
+					break
+				}
+			}
+			break
+		}
+	}
+
+	return features, nil
+}
+

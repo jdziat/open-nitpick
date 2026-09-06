@@ -1,0 +1,38 @@
+# commit 7a0889cf20df 2025-08-12T04:14:53-07:00 tests/ci/test_cdp_new_tab_session.py
+
+from browser_use.browser.session import BrowserSession
+	httpserver.expect_request('/').respond_with_data(
+		content_type='text/html',
+	return httpserver.url_for('/')
+	browser = BrowserSession(browser_profile=BrowserProfile(headless=True, viewport={'width': 800, 'height': 600}))
+
+
+
+
+
+
+		new_tab_event = browser.event_bus.dispatch(NavigateToUrlEvent(url=httpserver_url, new_tab=True))
+
+
+		assert len(tab_created_events) == 1, f'Expected 1 TabCreatedEvent, got {len(tab_created_events)}'
+
+		assert len(tabs) == 2, f'Expected 2 tabs, got {len(tabs)}'
+
+
+			params={'expression': 'document.title'}, session_id=cdp_session.session_id
+
+
+
+
+	browser = BrowserSession(browser_profile=BrowserProfile(headless=True, viewport={'width': 800, 'height': 600}))
+
+
+
+			new_tab_event = browser.event_bus.dispatch(NavigateToUrlEvent(url=f'{httpserver_url}?tab={i}', new_tab=True))
+
+
+		assert len(tabs) == 4, f'Expected 4 tabs, got {len(tabs)}'
+
+			params={'expression': 'window.location.href'}, session_id=cdp_session.session_id
+		assert 'tab=2' in result['result']['value'], 'Should be on the last created tab'
+

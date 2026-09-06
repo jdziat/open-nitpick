@@ -1,0 +1,111 @@
+// commit be1a6cf8dece 2026-05-14T13:12:36+01:00 packages/trigger-sdk/src/v3/streams.ts
+  type InputStreamWaitWithIdleTimeoutOptions,
+  type StreamWriteResult,
+  return pipeInternal(key, value, opts, opts?.spanName ?? "streams.pipe()");
+      ...(opts?.collapsed ? { [SemanticInternalAttributes.COLLAPSED]: true } : {}),
+      waitUntilComplete: async () => {
+        return instance.wait();
+      },
+  return pipeInternal(key, stream, options, options.spanName ?? "streams.writer()");
+    async append(value, options) {
+      // Use a single-write writer so objects are serialized the same way
+      // as stream.writer() — the raw append API sends BodyInit which
+      // doesn't serialize objects correctly for SSE consumers.
+      const { waitUntilComplete } = writer(opts.id, {
+        ...options,
+        spanName: "streams.append()",
+        execute: ({ write }) => {
+          write(value);
+        },
+      });
+      await waitUntilComplete();
+            options?.spanName ?? `inputStream.once()`,
+          // Create the waitpoint before the span so we have the entity ID upfront
+          const response = await apiClient.createInputStreamWaitpoint(ctx.run.id, {
+            streamId: opts.id,
+            timeout: options?.timeout,
+            idempotencyKey: options?.idempotencyKey,
+            idempotencyKeyTTL: options?.idempotencyKeyTTL,
+            tags: options?.tags,
+            lastSeqNum: inputStreams.lastSeqNum(opts.id),
+          });
+
+            options?.spanName ?? `inputStream.wait()`,
+              // 1. Block the run on the waitpoint
+              // 2. Disconnect the SSE tail and clear the buffer before suspending.
+              // Without this, the tail stays alive during the suspension window and
+              // may buffer a copy of the same message that will be delivered via the
+              // waitpoint, causing a duplicate on resume.
+              inputStreams.disconnectStream(opts.id);
+
+                // Advance the seq counter so the SSE tail doesn't replay
+                // the record that was consumed via the waitpoint path when
+                // it lazily reconnects on the next on()/once() call.
+                const prevSeq = inputStreams.lastSeqNum(opts.id);
+                inputStreams.setLastSeqNum(opts.id, (prevSeq ?? -1) + 1);
+
+                [SemanticInternalAttributes.ENTITY_ID]: response.waitpointId,
+    async waitWithIdleTimeout(options) {
+      const self = this;
+      const spanName = options.spanName ?? `inputStream.waitWithIdleTimeout()`;
+
+      return tracer.startActiveSpan(
+        spanName,
+        async (span) => {
+          // Idle phase: keep compute alive
+          if (options.idleTimeoutInSeconds > 0) {
+            const warm = await inputStreams.once(opts.id, {
+              timeoutMs: options.idleTimeoutInSeconds * 1000,
+            });
+            if (warm.ok) {
+              span.setAttribute("wait.resolved", "idle");
+              return { ok: true as const, output: warm.output as TData };
+            }
+          }
+
+          // Skip suspend if requested — return a real WaitpointTimeoutError
+          // so the result shape matches the cold-phase `self.wait()` path
+          // below. Callers that check `if (!result.ok)` work the same as
+          // before; callers that do `throw result.error` get a useful error
+          // instead of `undefined`.
+          if (options.skipSuspend) {
+            span.setAttribute("wait.resolved", "skipped");
+            return {
+              ok: false as const,
+              error: new WaitpointTimeoutError(
+                "Idle timeout elapsed and skipSuspend is set"
+              ),
+            };
+          }
+
+          // Fire onSuspend callback before entering cold phase
+          if (options.onSuspend) {
+            await options.onSuspend();
+          }
+
+          // Cold phase: suspend via .wait() — creates a child span
+          span.setAttribute("wait.resolved", "suspended");
+          const waitResult = await self.wait({
+            timeout: options.timeout,
+            spanName: "suspended",
+          });
+
+          // Fire onResume callback after successful resume
+          if (waitResult.ok && options.onResume) {
+            await options.onResume();
+          }
+
+          return waitResult;
+        },
+        {
+          attributes: {
+            [SemanticInternalAttributes.STYLE_ICON]: "streams",
+            streamId: opts.id,
+            ...accessoryAttributes({
+              items: [{ text: opts.id, variant: "normal" }],
+              style: "codepath",
+            }),
+          },
+        }
+      );
+    },

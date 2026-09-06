@@ -1,0 +1,52 @@
+// commit 9e00eff7ea92 2026-05-28T20:37:26+00:00 client/cookiejar.go
+const maxCookieJarHosts = 1024
+
+	if len(kept) == 0 {
+		delete(cj.hostCookies, host)
+	} else {
+		cj.hostCookies[host] = kept
+	}
+		if len(kept) == 0 {
+			delete(cj.hostCookies, domain)
+		} else {
+			cj.hostCookies[domain] = kept
+		}
+		cj.ensureHostCapacityLocked(key, time.Now())
+		cj.ensureHostCapacityLocked(key, now)
+func (cj *CookieJar) ensureHostCapacityLocked(key string, now time.Time) {
+	if _, ok := cj.hostCookies[key]; ok || len(cj.hostCookies) < maxCookieJarHosts {
+		return
+	}
+
+	for host, cookies := range cj.hostCookies {
+		kept := cookies[:0]
+		for _, sc := range cookies {
+			if !sc.cookie.Expire().Equal(fasthttp.CookieExpireUnlimited) && sc.cookie.Expire().Before(now) {
+				fasthttp.ReleaseCookie(sc.cookie)
+				continue
+			}
+			kept = append(kept, sc)
+		}
+		if len(kept) == 0 {
+			delete(cj.hostCookies, host)
+			if len(cj.hostCookies) < maxCookieJarHosts {
+				return
+			}
+			continue
+		}
+		cj.hostCookies[host] = kept
+	}
+
+	for host, cookies := range cj.hostCookies {
+		releaseStoredCookies(cookies)
+		delete(cj.hostCookies, host)
+		return
+	}
+}
+
+func releaseStoredCookies(cookies []storedCookie) {
+	for _, sc := range cookies {
+		fasthttp.ReleaseCookie(sc.cookie)
+	}
+}
+

@@ -1,0 +1,73 @@
+// commit 44cfd2c8f86b 2026-08-23T16:35:33+02:00 middleware/redirect/redirect.go
+	"unicode"
+			if flags := groupFlagScope(s.rule, s.i); flags.folds {
+				// Folding says what the text it covers matches, so that text
+				// spells no path: counting the "a" of "/p/(?i)a" put it ahead
+				// of the "/p/[a]" it contains, on a path they share. Only
+				// folding does — an "m" moves what an anchor asserts and an "s"
+				// what a "." matches, neither of which is a literal.
+			folded := groupFlagScope(s.rule, s.i).folds
+			case folded:
+				// Folding says what the text inside matches, which is no longer
+		if c == '^' || c == '$' {
+			// An anchor asserts a position and consumes nothing, so it pins no
+			// byte and ends nothing: New anchors every rule already, and
+			// stopping at the "^" of "^/p/a" left it pinning none of the path
+			// it spells.
+			s.i++
+			continue
+		}
+
+			if escapeAsserts(s.rule, s.i) {
+				// An assertion consumes nothing, so it pins nothing and ends
+				// nothing either: "\A/p/a" pins what "/p/a" does.
+				span, _ := escapeSpan(s.rule, s.i)
+				s.i += span
+				continue
+			}
+		c := s.rule[s.i]
+		switch c {
+				// Quoted text spells one path and no alternatives — unless
+				// folding is in force, where each byte of it matches its own
+				// case and the others: "(?i:\Qk\E)" matches three characters.
+				atom = 1
+				for i := range len(q.text) {
+					atom = scaledWidth(atom, s.foldedChar(q.text[i]))
+				}
+				prev, quantified, empty = n, false, q.text == ""
+				s.widest = max(s.widest, atom)
+				n = scaledWidth(n, atom)
+			size, pins := escapeSpan(s.rule, s.i)
+			switch {
+			case escapeSet(s.rule, s.i):
+				atom = s.foldedWidth(setMemberWidth)
+			case pins:
+				// The character it spells, which folding may match in another
+				// case as well.
+				if b, spells := escapeByte(s.rule, s.i, size); spells {
+					atom = s.foldedChar(b)
+				}
+			// unless case folding matches it in another case as well.
+			atom, prev, quantified, empty = s.foldedChar(c), n, false, false
+// foldedChar counts what one character matches where folding is in force, which
+// is knowable exactly: Go folds a "k" to "K" and to the Kelvin sign as well, so
+// three, where an "a" matches two and a "1" one. Reading every folded position
+// as two left "(?i:k)" level with the "[Kk]" it contains.
+func (s *literalScanner) foldedChar(b byte) int {
+	if !s.folded || b >= utf8.RuneSelf {
+		return 1
+	}
+
+	r, n := rune(b), 0
+	for f := r; ; {
+		n++
+		if f = unicode.SimpleFold(f); f == r {
+			return n
+		}
+	}
+}
+
+	if i+1 >= len(rule) {
+		return 0, false // a trailing backslash spells nothing
+	}
+

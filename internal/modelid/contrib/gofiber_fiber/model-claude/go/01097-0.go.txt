@@ -1,0 +1,37 @@
+// commit 49cd38b571fd 2026-05-05T02:39:55+00:00 path.go
+// RegexCompiler defines the interface for regex pattern matching.
+// Both *regexp.Regexp and alternative engines like *coregex.Regex implement these methods.
+// RegexHandler is a function that compiles a regex pattern and returns a compiled regex.
+// This allows using alternative regex engines (e.g., coregex) as drop-in replacements.
+//
+// Example with standard library:
+//
+//	app := fiber.New(fiber.Config{
+//	    RegexHandler: func(pattern string) fiber.RegexCompiler {
+//	        return regexp.MustCompile(pattern)
+//	    },
+//	})
+//
+// Example with coregex:
+//
+//	import "github.com/coregx/coregex"
+//	app := fiber.New(fiber.Config{
+//	    RegexHandler: func(pattern string) fiber.RegexCompiler {
+//	        return coregex.MustCompile(pattern)
+//	    },
+//	})
+type RegexHandler func(pattern string) RegexCompiler
+
+// defaultRegexHandler is the default handler using Go's standard library regexp.
+func defaultRegexHandler(pattern string) RegexCompiler {
+	return regexp.MustCompile(pattern)
+	// Use default regex handler if not configured
+	if config.RegexHandler == nil {
+		config.RegexHandler = defaultRegexHandler
+	parser.parseRoute(patternStr, config.RegexHandler)
+func (parser *routeParser) parseRoute(pattern string, regexHandler RegexHandler, customConstraints ...CustomConstraint) {
+			n, seg = parser.analyseParameterPart(pattern, regexHandler, customConstraints...)
+func parseRoute(pattern string, regexHandler RegexHandler, customConstraints ...CustomConstraint) routeParser {
+	parser.parseRoute(pattern, regexHandler, customConstraints...)
+func (parser *routeParser) analyseParameterPart(pattern string, regexHandler RegexHandler, customConstraints ...CustomConstraint) (int, *routeSegment) {
+					constraint.RegexCompiler = regexHandler(constraint.Data[0])

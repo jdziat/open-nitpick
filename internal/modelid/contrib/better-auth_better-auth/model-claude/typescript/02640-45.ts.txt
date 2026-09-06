@@ -1,0 +1,62 @@
+// commit 5c45abcd2094 2026-07-30T21:42:14-04:00 packages/oauth-provider/src/utils/index.ts
+interface TTLCache<K, V> {
+	get(key: K): V | undefined;
+	set(key: K, value: V): void;
+}
+function createTTLCache<K, V extends { expiresAt?: Date }>(): TTLCache<K, V> {
+	const cache = new Map<K, V>();
+	return {
+		get(key) {
+			const entry = cache.get(key);
+			if (!entry) return undefined;
+			if (entry.expiresAt && entry.expiresAt < new Date()) {
+				cache.delete(key);
+				return undefined;
+			}
+			return entry;
+		},
+		set(key, value) {
+			cache.set(key, value);
+		},
+	};
+const trustedClientCaches = new WeakMap<
+	OAuthOptions<Scope[]>,
+	TTLCache<string, SchemaClient<Scope[]>>
+>();
+
+function getTrustedClientCache(
+	options: OAuthOptions<Scope[]>,
+): TTLCache<string, SchemaClient<Scope[]>> {
+	const existingCache = trustedClientCaches.get(options);
+	if (existingCache) return existingCache;
+	const cache = createTTLCache<string, SchemaClient<Scope[]>>();
+	trustedClientCaches.set(options, cache);
+	return cache;
+}
+	const trustedClientCache = getTrustedClientCache(options);
+	const trustedClient = trustedClientCache.get(clientId);
+	if (trustedClient && !trustedClient.clientDiscoveryId) {
+	if (dbClient?.clientDiscoveryId) {
+		const clientDiscoveryId = dbClient.clientDiscoveryId;
+		const discovery = discoveries.find(
+			(candidate) => candidate.id === clientDiscoveryId,
+		);
+		if (!discovery?.matches(clientId)) return null;
+		dbClient = await discovery.resolve(ctx, clientId, dbClient);
+		if (!dbClient) return null;
+	} else if (dbClient) {
+		if (options.cachedTrustedClients?.has(clientId)) {
+			trustedClientCache.set(clientId, Object.assign({}, dbClient));
+		}
+		return dbClient;
+	} else {
+		for (const discovery of discoveries) {
+			if (!discovery.matches(clientId)) continue;
+			const resolved = await discovery.resolve(ctx, clientId, null);
+			if (resolved) {
+				dbClient = resolved;
+				break;
+			}
+		// Only token_endpoint_auth_method=none identifies a public client.
+		if (client.tokenEndpointAuthMethod !== "none" && !clientSecret) {
+	const isPublicClient = client.tokenEndpointAuthMethod === "none";

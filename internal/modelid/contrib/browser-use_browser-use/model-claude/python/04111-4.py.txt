@@ -1,0 +1,34 @@
+# commit 1a9f51c541b2 2026-02-11T19:12:32-08:00 browser_use/skill_cli/main.py
+  browser-use -b remote run "task" --wait       # Wait for completion
+  browser-use run "task" --wait                 # Wait for completion
+	p.add_argument('--max-steps', type=int, help='Maximum steps')
+		p.add_argument('--proxy-country', help=f'{remote_hint}Proxy country code')
+		p.add_argument('--wait', action='store_true', help=f'{remote_hint}Wait for task to complete (default: async)')
+		# New SDK features
+		p.add_argument('--start-url', help=f'{remote_hint}URL to start the task from')
+		p.add_argument('--metadata', action='append', metavar='KEY=VALUE', help=f'{remote_hint}Task metadata (can repeat)')
+		p.add_argument('--secret', action='append', metavar='KEY=VALUE', help=f'{remote_hint}Task secrets (can repeat)')
+		p.add_argument('--allowed-domain', action='append', metavar='DOMAIN', help=f'{remote_hint}Restrict navigation to domains (can repeat)')
+		p.add_argument('--skill-id', action='append', metavar='ID', help=f'{remote_hint}Enable skill IDs (can repeat)')
+		p.add_argument('--structured-output', metavar='SCHEMA', help=f'{remote_hint}JSON schema for structured output')
+		p.add_argument('--judge', action='store_true', help=f'{remote_hint}Enable judge mode')
+		p.add_argument('--judge-ground-truth', metavar='TEXT', help=f'{remote_hint}Expected answer for judge evaluation')
+		p.add_argument('--session', help='Filter by session ID')
+		# session create - Create session without task
+		p = session_sub.add_parser('create', help='Create a new cloud session')
+		p.add_argument('--profile', help='Cloud profile ID')
+		p.add_argument('--proxy-country', help='Proxy country code')
+		p.add_argument('--start-url', help='Initial URL to navigate to')
+		p.add_argument('--screen-size', metavar='WxH', help='Screen size (e.g., 1920x1080)')
+		p.add_argument('--keep-alive', action='store_true', default=None, help='Keep session alive')
+		p.add_argument('--no-keep-alive', dest='keep_alive', action='store_false', help='Do not keep session alive')
+		p.add_argument('--persist-memory', action='store_true', default=None, help='Persist memory between tasks')
+		p.add_argument('--no-persist-memory', dest='persist_memory', action='store_false', help='Do not persist memory')
+		p.add_argument('--json', action='store_true', help='Output as JSON')
+
+		# session share <session_id> - Create or delete public share
+		p = session_sub.add_parser('share', help='Manage public share URL')
+		p.add_argument('session_id', help='Session ID')
+		p.add_argument('--delete', action='store_true', help='Delete the public share')
+		p.add_argument('--json', action='store_true', help='Output as JSON')
+

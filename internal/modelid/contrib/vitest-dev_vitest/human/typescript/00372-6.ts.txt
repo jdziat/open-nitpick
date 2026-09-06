@@ -1,0 +1,39 @@
+// commit 122ff321cc98 2025-12-02T16:48:29+01:00 packages/vitest/src/utils/base.ts
+import type { ModuleDefinitionLocation } from '../types/module-locations'
+
+
+export function createIndexLocationsMap(source: string): Map<number, ModuleDefinitionLocation> {
+  const map = new Map<number, ModuleDefinitionLocation>()
+  let index = 0
+  let line = 1
+  let column = 1
+  for (const char of source) {
+    map.set(index++, { line, column })
+    if (char === '\n' || char === '\r\n') {
+      line++
+      column = 0
+    }
+    else {
+      column++
+    }
+  }
+  return map
+}
+
+export function createLocationsIndexMap(source: string): Map<string, number> {
+  const map = new Map<string, number>()
+  let index = 0
+  let line = 1
+  let column = 1
+  for (const char of source) {
+    map.set(`${line}:${column}`, index++)
+    if (char === '\n' || char === '\r\n') {
+      line++
+      column = 0
+    }
+    else {
+      column++
+    }
+  }
+  return map
+}

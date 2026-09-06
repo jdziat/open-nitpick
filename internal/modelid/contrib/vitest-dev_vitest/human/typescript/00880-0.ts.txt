@@ -1,0 +1,112 @@
+// commit 511c09269675 2026-05-08T08:07:17+01:00 packages/browser/src/node/commands/screenshotMatcher/index.ts
+import { asyncTimeout, resolveOptions, takeDecodedScreenshot, takeScreenshotBuffer } from './utils'
+  buffer?: Buffer<ArrayBufferLike>
+}
+
+interface CapturedScreenshot {
+  image: DecodedImage
+  buffer: Buffer<ArrayBufferLike>
+  const { element, target } = options
+    resolvedOptions: { comparatorName, comparatorOptions, screenshotOptions, timeout },
+  const screenshotName = `${Date.now()}-${basename(paths.reference)}`
+  const screenshotCaptureOptions = {
+    context,
+    element,
+    name: screenshotName,
+    screenshotOptions,
+    target,
+  } satisfies Parameters<typeof takeScreenshotBuffer>[0]
+
+  let reference: DecodedImage | null = null
+  let initialScreenshot: CapturedScreenshot | null = null
+
+  if (referenceFile) {
+    // Reuse this capture in the stability loop so the byte fast path doesn't add another screenshot.
+    const initialScreenshotBuffer = await takeScreenshotBuffer(screenshotCaptureOptions)
+
+    // Keep custom comparator semantics intact: only the built-in pixelmatch
+    // comparator is known to pass byte-identical PNGs without side effects.
+    if (comparatorName === 'pixelmatch' && Buffer.compare(referenceFile, initialScreenshotBuffer) === 0) {
+      return buildOutput({ type: 'matched-immediately' }, timeout)
+    }
+
+    [reference, initialScreenshot] = await Promise.all([
+      codec.decode(referenceFile, {}),
+      takeScreenshotData({
+        ...screenshotCaptureOptions,
+        buffer: initialScreenshotBuffer,
+        codec,
+      }),
+    ])
+  }
+    initialScreenshot,
+    name: screenshotName,
+    target,
+    screenshotBuffer: screenshotResult?.buffer,
+    screenshotBuffer,
+    screenshotBuffer?: Buffer<ArrayBufferLike>
+          buffer: screenshotBuffer,
+        buffer: screenshotBuffer,
+        buffer: screenshotBuffer,
+      buffer: screenshotBuffer,
+        await encodeScreenshot(outcome.reference, codec),
+        await encodeScreenshot(outcome.actual, codec),
+function encodeScreenshot(screenshot: ScreenshotData, codec: AnyCodec) {
+  return screenshot.buffer ?? codec.encode(screenshot.image, {})
+}
+
+  element?: SerializedLocator
+  initialScreenshot: CapturedScreenshot | null
+  target?: ScreenshotMatcherArguments[2]['target']
+): Promise<{ actual: DecodedImage; buffer: Buffer<ArrayBufferLike>; retries: number } | null> {
+  initialScreenshot,
+  target,
+  buffer: Buffer<ArrayBufferLike>
+    target,
+  let nextScreenshot = initialScreenshot
+  let lastCapturedScreenshot: CapturedScreenshot | null = null
+    const [image1, capturedScreenshot] = await Promise.all([
+      nextScreenshot ?? takeScreenshotData(screenshotArgument),
+    const { image: image2 } = capturedScreenshot
+    lastCapturedScreenshot = capturedScreenshot
+    nextScreenshot = null
+      return {
+        retries,
+        actual: image2,
+        buffer: capturedScreenshot.buffer,
+      }
+  lastCapturedScreenshot ??= await takeScreenshotData(screenshotArgument)
+
+    actual: lastCapturedScreenshot.image,
+    buffer: lastCapturedScreenshot.buffer,
+  }
+}
+
+async function takeScreenshotData({
+  buffer,
+  codec,
+  context,
+  element,
+  name,
+  screenshotOptions,
+  target,
+}: {
+  buffer?: Buffer<ArrayBufferLike>
+  codec: AnyCodec
+  context: BrowserCommandContext
+  element?: SerializedLocator
+  name: string
+  screenshotOptions: ScreenshotMatcherArguments[2]['screenshotOptions']
+  target?: ScreenshotMatcherArguments[2]['target']
+}): Promise<CapturedScreenshot> {
+  const screenshot = buffer ?? await takeScreenshotBuffer({
+    context,
+    element,
+    name,
+    screenshotOptions,
+    target,
+  })
+
+  return {
+    buffer: screenshot,
+    image: await codec.decode(screenshot, {}),

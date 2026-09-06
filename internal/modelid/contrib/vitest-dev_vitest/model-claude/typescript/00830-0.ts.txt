@@ -1,0 +1,43 @@
+// commit 7eddd273de3b 2026-04-23T11:12:41+02:00 packages/browser/src/client/tester/context.ts
+import type { BrowserTraceEntryStatus } from './trace'
+import { ensureAwaited, getBrowserState, getWorkerState, now } from '../utils'
+import { recordBrowserTraceEntry } from './trace'
+    const hasActiveTraceView = !!currentTest && getBrowserState().browserTraceAttempts.has(currentTest.id)
+        let status: BrowserTraceEntryStatus = 'pass'
+        const startTime = now()
+        catch (err) {
+          status = 'fail'
+          throw err
+        }
+          if (hasActiveTraceView) {
+            // TODO: support nested trace
+            recordBrowserTraceEntry(currentTest, {
+              name,
+              kind: 'mark',
+              status,
+              startTime,
+              duration: now() - startTime,
+              stack: options?.stack ?? error?.stack,
+            })
+          }
+    if (!hasActiveTrace && !hasActiveTraceView) {
+    return ensureAwaited((error) => {
+      if (hasActiveTraceView) {
+        recordBrowserTraceEntry(currentTest, {
+          name,
+          kind: 'mark',
+          stack: bodyOrOptions?.stack ?? error?.stack,
+        })
+      }
+      if (!hasActiveTrace) {
+        return Promise.resolve()
+      }
+      return triggerCommand(
+        '__vitest_markTrace',
+        [{
+          name,
+          stack: bodyOrOptions?.stack ?? error?.stack,
+        }],
+        error,
+      )
+    })

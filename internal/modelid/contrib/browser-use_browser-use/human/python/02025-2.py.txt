@@ -1,0 +1,58 @@
+# commit 7a0889cf20df 2025-08-12T04:14:53-07:00 tests/ci/test_browser_event_ClickElementEvent.py
+
+
+		from browser_use.browser.events import BrowserStateRequestEvent, ClickElementEvent, DialogOpenedEvent, NavigateToUrlEvent
+
+		nav_event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url=f'{base_url}/alert_test'))
+		click_event = browser_session.event_bus.dispatch(ClickElementEvent(node=alert_button))
+
+		from browser_use.browser.events import BrowserStateRequestEvent, ClickElementEvent, DialogOpenedEvent, NavigateToUrlEvent
+
+		nav_event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url=f'{base_url}/confirm_test'))
+
+		click_event = browser_session.event_bus.dispatch(ClickElementEvent(node=confirm_button))
+		from browser_use.browser.events import BrowserStateRequestEvent, ClickElementEvent, DialogOpenedEvent, NavigateToUrlEvent
+
+		nav_event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url=f'{base_url}/popup_nav_test'))
+
+		click_event = browser_session.event_bus.dispatch(ClickElementEvent(node=confirm_button))
+		click_event = browser_session.event_bus.dispatch(ClickElementEvent(node=nav_link))
+		from browser_use.browser.events import BrowserStateRequestEvent, ClickElementEvent, DialogOpenedEvent, NavigateToUrlEvent
+
+		nav_event = browser_session.event_bus.dispatch(NavigateToUrlEvent(url=f'{base_url}/beforeunload_test'))
+		click_event = browser_session.event_bus.dispatch(ClickElementEvent(node=nav_link))
+		assert f'{base_url}/page1' in current_url, (
+			f'Navigation should have succeeded after beforeunload was accepted, current URL: {current_url}'
+		)
+
+
+
+
+
+
+
+
+				assert file_info.get('fileName', '').endswith('.txt'), f'Expected .txt file, got: {file_info.get("fileName")}'
+
+
+				assert '.txt' in ui_info.get('fileNameText', ''), f'File name not shown in UI: {ui_info.get("fileNameText")}'
+				assert 'bytes' in ui_info.get('fileSizeText', ''), f'File size not shown in UI: {ui_info.get("fileSizeText")}'
+
+		from browser_use.filesystem.file_system import FileSystem
+
+
+						upload_action,
+						file_system=file_system,
+					assert result.error is not None, 'Upload should have failed for file not in available_file_paths'
+					assert 'not available' in result.error, f'Error message should mention file not available: {result.error}'
+					assert 'not available' in str(e), f'Error should mention file not available: {e}'
+					file_system=file_system,
+				assert result.error is None, f'Upload should have succeeded with file in available_file_paths: {result.error}'
+
+				upload_action_fs = UploadActionModel(upload_file_to_element=UploadFileAction(index=1, path='test.txt'))
+
+					file_system=file_system,  # But FileSystem is provided
+				assert result.error is None, f'Upload should have succeeded with file in FileSystem: {result.error}'
+
+					file_system=file_system,
+				assert result.error is None, f'Upload should have succeeded with file in downloaded_files: {result.error}'

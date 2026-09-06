@@ -1,0 +1,59 @@
+// commit 9be6121eee4b 2026-01-21T18:30:51+01:00 packages/vitest/src/runtime/workers/base.ts
+import type { TestModuleMocker } from '@vitest/mocker'
+import type { ContextModuleRunnerOptions } from '../moduleRunner/startVitestModuleRunner'
+import type { TestModuleRunner } from '../moduleRunner/testModuleRunner'
+import { NativeModuleRunner } from '../../utils/nativeModuleRunner'
+import { Traces } from '../../utils/traces'
+import { listenForErrors } from '../moduleRunner/errorCatcher'
+import { startVitestModuleRunner } from '../moduleRunner/startVitestModuleRunner'
+import { getSafeWorkerState, provideWorkerState } from '../utils'
+let _moduleRunner: TestModuleRunner
+async function startModuleRunner(options: ContextModuleRunnerOptions): Promise<TestModuleRunner> {
+  process.exit = (code = process.exitCode || 0): never => {
+    throw new Error(`process.exit unexpectedly called with "${code}"`)
+  }
+  const state = () => getSafeWorkerState() || options.state
+
+  listenForErrors(state)
+
+  if (options.state.config.experimental.viteModuleRunner === false) {
+    const root = options.state.config.root
+    let mocker: TestModuleMocker | undefined
+    if (options.state.config.experimental.nodeLoader !== false) {
+      // this additionally imports acorn/magic-string
+      const { NativeModuleMocker } = await import('../moduleRunner/nativeModuleMocker')
+      mocker = new NativeModuleMocker({
+        async resolveId(id, importer) {
+          // TODO: use import.meta.resolve instead
+          return state().rpc.resolve(id, importer, '__vitest__')
+        },
+        root,
+        moduleDirectories: state().config.deps.moduleDirectories || ['/node_modules/'],
+        traces: options.traces || new Traces({ enabled: false }),
+        getCurrentTestFilepath() {
+          return state().filepath
+        },
+        spyModule,
+      })
+    }
+    _moduleRunner = new NativeModuleRunner(
+      root,
+      mocker,
+    )
+    return _moduleRunner
+  }
+
+export async function setupBaseEnvironment(context: WorkerSetupContext): Promise<() => Promise<void>> {
+  if (context.config.experimental.viteModuleRunner === false) {
+    const { setupNodeLoaderHooks } = await import('./native')
+    await setupNodeLoaderHooks(context)
+  }
+
+  const { environment, loader } = await loadEnvironment(
+    environmentName,
+    config.root,
+    rpc,
+    otel,
+    context.config.experimental.viteModuleRunner,
+  )
+  const moduleRunner = await startModuleRunner({

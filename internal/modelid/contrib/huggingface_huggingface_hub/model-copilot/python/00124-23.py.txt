@@ -1,0 +1,63 @@
+# commit 52c718a54382 2025-10-23T14:48:03+02:00 src/huggingface_hub/inference/_providers/_common.py
+from typing import Any, Optional, Union, overload
+HARDCODED_MODEL_INFERENCE_MAPPING: dict[str, dict[str, InferenceProviderMapping]] = {
+def filter_none(obj: dict[str, Any]) -> dict[str, Any]: ...
+def filter_none(obj: list[Any]) -> list[Any]: ...
+def filter_none(obj: Union[dict[str, Any], list[Any]]) -> Union[dict[str, Any], list[Any]]:
+        cleaned: dict[str, Any] = {}
+        parameters: dict[str, Any],
+        headers: dict,
+        extra_payload: Optional[dict[str, Any]] = None,
+        response: Union[bytes, dict],
+        self, headers: dict[str, Any], payload: Optional[dict[str, Any]], data: Optional[MimeBytes]
+    ) -> dict[str, Any]:
+    def _prepare_headers(self, headers: dict, api_key: str) -> dict[str, Any]:
+        self, inputs: Any, parameters: dict, provider_mapping_info: InferenceProviderMapping
+    ) -> Optional[dict]:
+        parameters: dict,
+        extra_payload: Optional[dict],
+        inputs: list[Union[dict, ChatCompletionInputMessage]],
+        parameters: dict,
+    ) -> Optional[dict]:
+class AutoRouterConversationalTask(BaseConversationalTask):
+    """
+    Auto-router for conversational tasks.
+
+    We let the Hugging Face router select the best provider for the model, based on availability and user preferences.
+    This is a special case since the selection is done server-side (avoid 1 API call to fetch provider mapping).
+    """
+
+    def __init__(self):
+        super().__init__(provider="auto", base_url="https://router.huggingface.co")
+
+    def _prepare_base_url(self, api_key: str) -> str:
+        """Return the base URL to use for the request.
+
+        Usually not overwritten in subclasses."""
+        # Route to the proxy if the api_key is a HF TOKEN
+        if not api_key.startswith("hf_"):
+            raise ValueError("Cannot select auto-router when using non-Hugging Face API key.")
+        else:
+            return self.base_url  # No `/auto` suffix in the URL
+
+    def _prepare_mapping_info(self, model: Optional[str]) -> InferenceProviderMapping:
+        """
+        In auto-router, we don't need to fetch provider mapping info.
+        We just return a dummy mapping info with provider_id set to the HF model ID.
+        """
+        if model is None:
+            raise ValueError("Please provide an HF model ID.")
+
+        return InferenceProviderMapping(
+            provider="auto",
+            hf_model_id=model,
+            providerId=model,
+            status="live",
+            task="conversational",
+        )
+
+
+        self, inputs: Any, parameters: dict, provider_mapping_info: InferenceProviderMapping
+    ) -> Optional[dict]:
+def _fetch_inference_provider_mapping(model: str) -> list["InferenceProviderMapping"]:
+def recursive_merge(dict1: dict, dict2: dict) -> dict:

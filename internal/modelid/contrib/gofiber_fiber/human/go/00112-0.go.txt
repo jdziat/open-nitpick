@@ -1,0 +1,140 @@
+// commit 09eaaf3be885 2025-07-17T14:48:08+02:00 client/cookiejar.go
+	"strings"
+	secure := bytes.Equal(uri.Scheme(), []byte("https"))
+	return cj.getByHostAndPath(uri.Host(), uri.Path(), secure)
+func (cj *CookieJar) getByHostAndPath(host, path []byte, secure bool) []*fasthttp.Cookie {
+	return cj.cookiesForRequest(hostStr, path, secure)
+	kept := cookies[:0]
+	for _, c := range cookies {
+			continue
+		}
+		kept = append(kept, c)
+	}
+	cj.hostCookies[host] = kept
+
+	return kept
+}
+
+// cookiesForRequest returns cookies that match the given host, path and security settings.
+//
+//nolint:revive // secure is required to filter Secure cookies based on scheme
+func (cj *CookieJar) cookiesForRequest(host string, path []byte, secure bool) []*fasthttp.Cookie {
+	cj.mu.Lock()
+	defer cj.mu.Unlock()
+
+	now := time.Now()
+	var matched []*fasthttp.Cookie
+
+	for domain, cookies := range cj.hostCookies {
+		if !domainMatch(host, domain) {
+			continue
+
+		kept := cookies[:0]
+		for _, c := range cookies {
+			if !c.Expire().Equal(fasthttp.CookieExpireUnlimited) && c.Expire().Before(now) {
+				fasthttp.ReleaseCookie(c)
+				continue
+			}
+			kept = append(kept, c)
+
+			if !pathMatch(path, c.Path()) {
+				continue
+			}
+			if c.Secure() && !secure {
+				continue
+			}
+			nc := fasthttp.AcquireCookie()
+			nc.CopyTo(c)
+			matched = append(matched, nc)
+		}
+		cj.hostCookies[domain] = kept
+	return matched
+	if h, _, err := net.SplitHostPort(hostStr); err == nil {
+		hostStr = h
+	}
+	hostStr = utils.ToLower(hostStr)
+	hostKey := utils.CopyString(hostStr)
+		domain := utils.TrimLeft(cookie.Domain(), '.')
+		utils.ToLowerBytes(domain)
+		key := hostKey
+		if len(domain) == 0 {
+			cookie.SetDomain(hostStr)
+		} else {
+			key = utils.CopyString(utils.UnsafeString(domain))
+			cookie.SetDomainBytes(domain)
+		}
+
+		hostCookies := cj.hostCookies[key]
+
+		existing.CopyTo(cookie)
+		cj.hostCookies[key] = hostCookies
+	secure := bytes.Equal(uri.Scheme(), []byte("https"))
+	cookies := cj.getByHostAndPath(uri.Host(), uri.Path(), secure)
+		fasthttp.ReleaseCookie(cookie)
+func (cj *CookieJar) parseCookiesFromResp(host, _ []byte, resp *fasthttp.Response) {
+	if h, _, err := net.SplitHostPort(hostStr); err == nil {
+		hostStr = h
+	}
+	hostStr = utils.ToLower(hostStr)
+	hostKey := utils.CopyString(hostStr)
+	for _, value := range resp.Header.Cookies() {
+		tmp := fasthttp.AcquireCookie()
+		_ = tmp.ParseBytes(value) //nolint:errcheck // ignore error
+
+		domainBytes := utils.TrimLeft(tmp.Domain(), '.')
+		utils.ToLowerBytes(domainBytes)
+		key := hostKey
+		if len(domainBytes) == 0 {
+			tmp.SetDomain(hostStr)
+		} else {
+			key = utils.CopyString(utils.UnsafeString(domainBytes))
+			tmp.SetDomainBytes(domainBytes)
+		}
+
+		cookies := cj.hostCookies[key]
+		c := searchCookieByKeyAndPath(tmp.Key(), tmp.Path(), cookies)
+			c = fasthttp.AcquireCookie()
+			cookies = append(cookies, c)
+		c.CopyTo(tmp)
+			cj.hostCookies[key] = cookies
+		} else {
+			kept := cookies[:0]
+			for _, v := range cookies {
+				if v != c {
+					kept = append(kept, v)
+				}
+			}
+			cj.hostCookies[key] = kept
+		fasthttp.ReleaseCookie(tmp)
+			if pathMatch(path, c.Path()) {
+
+// pathMatch determines whether the request path matches the cookie path
+// according to RFC 6265 section 5.1.4.
+func pathMatch(reqPath, cookiePath []byte) bool {
+	if len(reqPath) == 0 {
+		reqPath = []byte("/")
+	}
+	if len(cookiePath) == 0 {
+		cookiePath = []byte("/")
+	}
+	if bytes.Equal(reqPath, cookiePath) {
+		return true
+	}
+	if !bytes.HasPrefix(reqPath, cookiePath) {
+		return false
+	}
+	if cookiePath[len(cookiePath)-1] == '/' {
+		return true
+	}
+	return len(reqPath) > len(cookiePath) && reqPath[len(cookiePath)] == '/'
+}
+
+// domainMatch reports whether host domain-matches the given cookie domain.
+func domainMatch(host, domain string) bool {
+	host = utils.ToLower(host)
+
+	if host == domain {
+		return true
+	}
+	return strings.HasSuffix(host, "."+domain)
+}

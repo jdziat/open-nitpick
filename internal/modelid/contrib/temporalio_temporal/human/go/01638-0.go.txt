@@ -1,0 +1,56 @@
+// commit 36e5bb7055b5 2026-08-04T18:03:14-07:00 common/rpc/rpc.go
+	"google.golang.org/grpc/connectivity"
+// Minimum interval between (traffic-triggered) sweeps of shut-down connections.
+const internodeConnCleanupInterval = 30 * time.Minute
+
+	localFrontendClient      func() (*common.FrontendHTTPClient, error)
+	internodeGRPCConnections struct {
+		sync.RWMutex
+		conns map[string]*grpc.ClientConn
+	}
+	internodeConnCleanupTicker *time.Ticker
+	f.internodeGRPCConnections.conns = make(map[string]*grpc.ClientConn)
+	f.internodeConnCleanupTicker = time.NewTicker(internodeConnCleanupInterval)
+	d.maybeCleanupInternodeConns()
+
+	// Reuse the cached connection unless it has been shut down, in which case re-dial.
+	d.internodeGRPCConnections.RLock()
+	conn, ok := d.internodeGRPCConnections.conns[hostName]
+	d.internodeGRPCConnections.RUnlock()
+	if ok && conn.GetState() != connectivity.Shutdown {
+		return conn
+	}
+
+	newConn := d.dial(hostName, tlsClientConfig, append(additionalDialOptions, d.getClientKeepAliveConfig(serviceName))...)
+	if newConn == nil {
+		return nil
+	}
+
+	d.internodeGRPCConnections.Lock()
+	defer d.internodeGRPCConnections.Unlock()
+	if existing, ok := d.internodeGRPCConnections.conns[hostName]; ok && existing.GetState() != connectivity.Shutdown {
+		_ = newConn.Close()
+		return existing
+	}
+	d.internodeGRPCConnections.conns[hostName] = newConn
+	return newConn
+}
+
+// Triggers a sweep at most once per interval, off the connection path.
+func (d *RPCFactory) maybeCleanupInternodeConns() {
+	select {
+	case <-d.internodeConnCleanupTicker.C:
+		go d.cleanupInternodeConns()
+	default:
+	}
+}
+
+// Removes shut-down cached connections; never closes live ones.
+func (d *RPCFactory) cleanupInternodeConns() {
+	d.internodeGRPCConnections.Lock()
+	defer d.internodeGRPCConnections.Unlock()
+	for hostName, conn := range d.internodeGRPCConnections.conns {
+		if conn.GetState() == connectivity.Shutdown {
+			delete(d.internodeGRPCConnections.conns, hostName)
+		}
+	}

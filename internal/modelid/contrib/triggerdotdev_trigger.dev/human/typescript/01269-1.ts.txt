@@ -1,0 +1,113 @@
+// commit df78ef96d9ac 2026-06-26T09:01:37+01:00 apps/webapp/app/presenters/v3/BranchesPresenter.server.ts
+import { DEFAULT_DEV_BRANCH } from "@trigger.dev/core/v3/utils/gitBranch";
+import { type RuntimeEnvironmentType } from "@trigger.dev/database";
+import { type BranchesOptions } from "~/utils/branches";
+import { devPresence } from "./DevPresence.server";
+import { sortEnvironments } from "~/utils/environmentSort";
+import {
+  type BranchableEnvironmentToken,
+  type BranchableEnvironmentType,
+  toBranchableEnvironmentType,
+} from "~/utils/branchableEnvironment";
+/**
+ * Prisma `where` fragment that scopes the branches list by branch name, keyed by
+ * environment type. Spread it into the query's `where` (it contributes either a
+ * `branchName` constraint or a top-level `OR`).
+ *
+ * The default DEV branch is the root dev env, stored with `branchName: null`, so
+ * for DEVELOPMENT we always include the null-branchName root (and still match it
+ * when searching — hence the top-level `OR`, since a scalar field filter can't
+ * express "matches search OR is null"). PREVIEW only ever lists real branches, so
+ * its root (null) is excluded. Passing no `search` yields the "all branches of
+ * this type" fragment.
+ */
+function branchNameFilter(
+  envType: BranchableEnvironmentType,
+  search?: string
+): Prisma.RuntimeEnvironmentWhereInput {
+  switch (envType) {
+    case "DEVELOPMENT":
+      return search
+        ? { OR: [{ branchName: { contains: search, mode: "insensitive" } }, { branchName: null }] }
+        : {};
+    case "PREVIEW":
+      return search
+        ? { branchName: { contains: search, mode: "insensitive" } }
+        : { branchName: { not: null } };
+    default:
+      throw new Error(`branchNameFilter: unsupported environment type "${envType}"`);
+  }
+}
+
+    env,
+    env: BranchableEnvironmentToken;
+    const envType = toBranchableEnvironmentType(env);
+
+        type: envType,
+        // The branchable parent is the root env (no parent). For dev that's
+        // derivable; for preview we trust the isBranchableEnvironment column.
+        ...(envType === "DEVELOPMENT"
+          ? { parentEnvironmentId: null, orgMember: { userId } }
+          : { isBranchableEnvironment: true }),
+      if (envType === "DEVELOPMENT") {
+        throw new Error("No branchable environment in development environment");
+      }
+    const branchNameWhere = branchNameFilter(envType, search);
+    const orgMemberWhere = envType === "DEVELOPMENT" ? { orgMember: { userId } } : {};
+
+        type: envType,
+        ...branchNameWhere,
+        ...orgMemberWhere,
+    const limits = await checkBranchLimit({
+      prisma: this.#prismaClient,
+      organizationId: project.organizationId,
+      projectId: project.id,
+      userId,
+      type: envType,
+    });
+        parentEnvironmentId: true,
+        updatedAt: true,
+        type: envType,
+        ...branchNameWhere,
+        ...orgMemberWhere,
+        type: envType,
+        ...branchNameFilter(envType),
+        ...orgMemberWhere,
+    const branchesFiltered = branches
+      .filter((branch) => envType === "DEVELOPMENT" || branch.branchName !== null)
+      .map((branch) => ({
+        ...branch,
+        git: processGitMetadata(branch.git),
+        branchName: branch.branchName ?? DEFAULT_DEV_BRANCH,
+      }));
+
+    const branchesWithActivity = await hydrateEnvsWithActivity(userId, project.id, branchesFiltered);
+    const branchesSorted = sortEnvironments(branchesWithActivity);
+
+      branches: branchesSorted,
+export async function hydrateEnvsWithActivity<
+  T extends { type: RuntimeEnvironmentType; id: string }
+>(
+  userId: string,
+  projectId: string,
+  environments: T[]
+): Promise<Array<T & { lastActivity: Date | undefined; isConnected: boolean | undefined }>> {
+  const recentDevBranchIds = await devPresence.getRecentBranchIds(userId, projectId);
+
+  const devEnvIds = environments
+    .filter((env) => env.type === "DEVELOPMENT" && recentDevBranchIds.has(env.id))
+    .map((env) => env.id);
+  const connectedMap = await devPresence.isConnectedMany(devEnvIds);
+
+  return environments.map((env) => {
+    if (env.type !== "DEVELOPMENT") {
+      return { ...env, lastActivity: undefined, isConnected: undefined };
+    }
+
+    const devHit = recentDevBranchIds.get(env.id);
+    const lastActivity = devHit === undefined ? undefined : devHit;
+    const isConnected = devHit === undefined ? undefined : (connectedMap.get(env.id) ?? false);
+    return { ...env, lastActivity, isConnected };
+  });
+}
+

@@ -1,0 +1,39 @@
+// commit f45eb20a489c 2026-03-22T02:25:16+00:00 domain.go
+	// Enforce RFC 1035 total length limit on patterns
+	if len(pattern) > 253 {
+		panic(fmt.Sprintf("Domain pattern '%s' exceeds RFC 1035 maximum of 253 characters (%d chars)",
+			pattern, len(pattern)))
+	}
+
+			// Enforce RFC 1035 per-label length limit (63 characters)
+			if len(part) > 63 {
+				panic(fmt.Sprintf("Domain pattern '%s' has label '%s' exceeding RFC 1035 limit of 63 characters (%d chars)",
+					pattern, part, len(part)))
+			}
+//
+// The sub-app is not modified: routes are cloned into a dedicated wrapper app
+// with domain-filtered handlers, so the same sub-app can safely be mounted on
+// multiple domains without double-wrapping. Routes added to the sub-app after
+// mounting will not inherit domain filtering.
+	// Create a wrapper app so that the original sub-app is not mutated.
+	// This allows the same sub-app to be reused (e.g., mounted on multiple
+	// domains) without double-wrapping handlers.
+	wrapperApp := New(Config{
+		CaseSensitive: subApp.config.CaseSensitive,
+		StrictRouting: subApp.config.StrictRouting,
+	})
+
+	// Clone routes from the sub-app with domain-wrapped handlers.
+	// Lock the sub-app while reading to prevent data races with concurrent
+	// route registration.
+	subApp.mutex.Lock()
+			clonedRoute := subApp.copyRoute(route)
+			if len(clonedRoute.Handlers) > 0 {
+				clonedRoute.Handlers = d.wrapHandlers(clonedRoute.Handlers)
+			wrapperApp.stack[m] = append(wrapperApp.stack[m], clonedRoute)
+	subApp.mutex.Unlock()
+	// Create a mount group referencing the wrapper app (not the original).
+	// During route expansion (processSubAppsRoutes), Fiber reads routes from
+	// route.group.app.stack — so using the wrapper ensures expanded routes
+	// carry domain-filtered handlers.
+	mountGroup := &Group{Prefix: mountPath, app: wrapperApp}

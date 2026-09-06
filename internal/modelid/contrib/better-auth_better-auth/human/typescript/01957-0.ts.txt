@@ -1,0 +1,51 @@
+// commit b790144a2e96 2026-04-09T17:30:01+00:00 packages/sso/src/routes/sso.ts
+	validateAudience,
+	validateInResponseTo,
+			const samlRedirectUrl =
+				relayState?.callbackURL ||
+				parsedSamlConfig.callbackUrl ||
+				ctx.context.baseURL;
+			await validateInResponseTo(ctx, {
+				extract: extract as SAMLAssertionExtract,
+				providerId: provider.providerId,
+				options: {
+					enableInResponseToValidation:
+						options?.saml?.enableInResponseToValidation,
+					allowIdpInitiated: options?.saml?.allowIdpInitiated,
+				},
+				redirectUrl: samlRedirectUrl,
+			});
+			validateAudience(ctx, {
+				extract: extract as SAMLAssertionExtract,
+				expectedAudience: parsedSamlConfig.audience,
+				providerId: provider.providerId,
+				redirectUrl: samlRedirectUrl,
+			});
+					sessionIndex: (extract as SAMLAssertionExtract).sessionIndex
+						?.sessionIndex,
+			const acsRedirectUrl =
+				relayState?.callbackURL ||
+				parsedSamlConfig.callbackUrl ||
+				ctx.context.baseURL;
+			await validateInResponseTo(ctx, {
+				extract: extract as SAMLAssertionExtract,
+				providerId,
+				options: {
+					enableInResponseToValidation:
+						options?.saml?.enableInResponseToValidation,
+					allowIdpInitiated: options?.saml?.allowIdpInitiated,
+				},
+				redirectUrl: acsRedirectUrl,
+			});
+			validateAudience(ctx, {
+				extract: extract as SAMLAssertionExtract,
+				expectedAudience: parsedSamlConfig.audience,
+				providerId,
+				redirectUrl: acsRedirectUrl,
+			});
+					sessionIndex: (extract as SAMLAssertionExtract).sessionIndex
+						?.sessionIndex,
+	// LogoutRequest's sessionIndex is a plain string (text node), unlike the
+	// login response's multi-attribute object. Don't cast to SAMLAssertionExtract.
+	const sessionIndex = (parsed.extract as { sessionIndex?: string })
+		.sessionIndex;

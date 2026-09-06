@@ -1,0 +1,41 @@
+// commit 3850323e2123 2026-08-07T13:52:56+02:00 packages/vitest/src/runtime/runBaseTests.ts
+  const offCancel = workerState.onCancel((reason) => {
+  try {
+    await traces.$(
+      `vitest.test.runner.${method}`,
+      async () => {
+        for (const file of files) {
+          if (config.isolate) {
+            moduleRunner.mocker?.reset()
+            resetModules(workerState.evaluatedModules, true)
+          }
+          workerState.filepath = file.filepath
+          if (method === 'run') {
+            const collectAsyncLeaks = config.detectAsyncLeaks ? detectAsyncLeaks(file.filepath, workerState.ctx.projectName) : undefined
+            await traces.$(
+              `vitest.test.runner.${method}.module`,
+              { attributes: { 'code.file.path': file.filepath } },
+              () => startTests([file], testRunner),
+            )
+            const leaks = await collectAsyncLeaks?.()
+            if (leaks?.length) {
+              workerState.rpc.onAsyncLeaks(leaks)
+            }
+          }
+          else {
+            await traces.$(
+              `vitest.test.runner.${method}.module`,
+              { attributes: { 'code.file.path': file.filepath } },
+              () => collectTests([file], testRunner),
+            )
+          // reset after tests, because user might call `vi.setConfig` in setupFile
+          vi.resetConfig()
+          // mocks should not affect different files
+          vi.restoreAllMocks()
+        }
+      },
+    )
+  }
+  finally {
+    offCancel()
+  }

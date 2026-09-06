@@ -1,0 +1,44 @@
+// commit e05a38403ff9 2026-07-22T18:51:35+02:00 internal/ghmcp/server.go
+	"github.com/github/github-mcp-server/internal/githubapp"
+
+	// AppAuth, when non-nil, enables non-interactive GitHub App server-to-server
+	// authentication: the server mints and transparently refreshes installation
+	// access tokens from the app's private key, with no browser, device code, or
+	// elicitation. It suits headless deployments (CI, Kubernetes, background
+	// agents). It is mutually exclusive with a static Token and with
+	// OAuthManager. See internal/githubapp and docs/github-app-auth.md — this
+	// injects a high-privilege credential alongside the agent and should not be
+	// used without an independent security review.
+	AppAuth *githubapp.Config
+	// A static token, OAuth login, and GitHub App auth are mutually exclusive:
+	// they disagree on how the token is sourced (static vs. lazy provider) and
+	// on scope filtering, so reject any ambiguous combination up front.
+	authModes := 0
+	for _, on := range []bool{cfg.Token != "", cfg.OAuthManager != nil, cfg.AppAuth != nil} {
+		if on {
+			authModes++
+		}
+	}
+	if authModes > 1 {
+		return fmt.Errorf("choose exactly one authentication mode: a static Token, OAuthManager (OAuth login), or AppAuth (GitHub App)")
+	// GitHub App server-to-server auth mints installation tokens with no human
+	// in the loop. Build the provider here so it can use the configured logger.
+	var appProvider *githubapp.Provider
+	if cfg.AppAuth != nil {
+		// Surfaced loudly because this injects a high-privilege credential next
+		// to the agent; the detailed guidance lives in docs/github-app-auth.md.
+		logger.Warn("GitHub App server-to-server authentication is enabled; installation tokens minted here can act across every repository the app is installed on — review docs/github-app-auth.md and prefer least-privilege, repository-scoped installations")
+		provider, err := githubapp.NewProvider(*cfg.AppAuth, logger)
+		if err != nil {
+			return fmt.Errorf("failed to configure GitHub App authentication: %w", err)
+		}
+		appProvider = provider
+	}
+
+	// For OAuth or GitHub App auth, the token is resolved lazily by a provider:
+	// empty until the user authorizes (OAuth) or minted on demand and refreshed
+	// (App). A static PAT, by contrast, is passed through unchanged.
+	switch {
+	case cfg.OAuthManager != nil:
+	case appProvider != nil:
+		tokenProvider = appProvider.AccessToken

@@ -1,0 +1,31 @@
+// commit 21389a4756fc 2025-06-24T14:52:11+02:00 pkg/toolsets/toolsets.go
+func NewServerPrompt(prompt mcp.Prompt, handler server.PromptHandlerFunc) ServerPrompt {
+	return ServerPrompt{
+		Prompt:  prompt,
+		Handler: handler,
+	}
+}
+
+// ServerPrompt represents a prompt that can be registered with the MCP server.
+type ServerPrompt struct {
+	Prompt  mcp.Prompt
+	Handler server.PromptHandlerFunc
+}
+
+	// prompts are also not tools but are namespaced similarly
+	prompts []ServerPrompt
+func (t *Toolset) AddPrompts(prompts ...ServerPrompt) *Toolset {
+	t.prompts = append(t.prompts, prompts...)
+	return t
+}
+
+func (t *Toolset) RegisterPrompts(s *server.MCPServer) {
+	if !t.Enabled {
+		return
+	}
+	for _, prompt := range t.prompts {
+		s.AddPrompt(prompt.Prompt, prompt.Handler)
+	}
+}
+
+		toolset.RegisterPrompts(s)

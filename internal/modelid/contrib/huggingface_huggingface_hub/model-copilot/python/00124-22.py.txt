@@ -1,0 +1,34 @@
+# commit 52c718a54382 2025-10-23T14:48:03+02:00 src/huggingface_hub/inference/_mcp/mcp_client.py
+from typing import TYPE_CHECKING, Any, AsyncIterable, Literal, Optional, TypedDict, Union, overload
+from typing_extensions import NotRequired, TypeAlias, Unpack
+    args: NotRequired[list[str]]
+    env: NotRequired[dict[str, str]]
+    headers: NotRequired[dict[str, Any]]
+        self.sessions: dict[ToolName, "ClientSession"] = {}
+        self.available_tools: list[ChatCompletionInputTool] = []
+            **params (`dict[str, Any]`):
+                        - args (list[str], optional): Arguments for the command
+                        - env (dict[str, str], optional): Environment variables for the command
+                        - allowed_tools (list[str], optional): List of tool names to allow from this server
+                        - headers (dict[str, Any], optional): Headers for the SSE connection
+                        - allowed_tools (list[str], optional): List of tool names to allow from this server
+                        - headers (dict[str, Any], optional): Headers for the StreamableHTTP connection
+                        - allowed_tools (list[str], optional): List of tool names to allow from this server
+        messages: list[Union[dict, ChatCompletionInputMessage]],
+        exit_loop_tools: Optional[list[ChatCompletionInputTool]] = None,
+            messages (`list[dict]`):
+            exit_loop_tools (`list[ChatCompletionInputTool]`, *optional*):
+        message: dict[str, Any] = {"role": "unknown", "content": ""}
+        final_tool_calls: dict[int, ChatCompletionStreamOutputDeltaToolCall] = {}
+                tool_calls_list: list[dict[str, Any]] = []
+            if function_name is None:
+                message = ChatCompletionInputMessage.parse_obj_as_instance(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": "Invalid tool call with no function name.",
+                    }
+                )
+                messages.append(message)
+                yield message
+                continue  # move to next tool call
