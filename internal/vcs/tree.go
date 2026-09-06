@@ -82,7 +82,7 @@ func (t *Tree) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error) {
 		// A tree review reads files, not history: a repository with no
 		// commits yet still lists its files, and the review never needs
 		// a SHA.
-		if _, rpErr := t.Local.revParse(ctx, "HEAD"); rpErr == nil {
+		if _, rpErr := t.revParse(ctx, "HEAD"); rpErr == nil {
 			return nil, err
 		}
 		pr = &PullRequest{HeadRef: Worktree}
