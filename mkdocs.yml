@@ -68,7 +68,16 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Guide: guide.md
+  - Guide:
+      - Overview: guide.md
+      - Usage: docs/usage.md
+      - GitHub Actions and other CI: docs/ci.md
+      - Configuration: docs/configuration.md
+      - Analyzers: docs/analyzers.md
+      - Providers and models: docs/providers.md
+      - Trust model: docs/trust-model.md
+      - How a review runs: docs/how-a-review-runs.md
+      - Development: docs/development.md
   - Measurement:
       - Rules: docs/measurement.md
       - Findings: docs/findings.md
