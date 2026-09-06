@@ -41,23 +41,6 @@ findings weighted by severity (critical 8, error 4, warning 2, info 1, nit
 A threshold on the slop rate names when a repository reads as generated
 and left unread; the fixture that set it is in `internal/evals`.
 
-## Which model wrote it
-
-```bash
-nitpick identify-model src/client.ts
-```
-
-Names the model whose style a file is most similar to, from a corpus of
-the same twelve programs written twice by six models, plus a human
-control from the Go and Python standard libraries. The instrument is a
-fingerprint (character 3-grams and token bigrams, the standard tools of
-authorship attribution); it cleared the bar set before the experiment in
-[docs/findings.md](findings.md#which-model-wrote-it-2026-09-05-evening)
-for Go, Python and TypeScript, on two task splits and across a second
-generation of the corpus. Below a confidence floor it answers "unknown".
-A match is a style similarity against a small corpus of six models, not
-an attribution: a model outside the corpus, or a file a person has
-edited, is reported as whichever of the six it is nearest to.
 
 ## From an agent session
 
@@ -70,8 +53,7 @@ Protocol on stdio, and logs its progress to stderr as the command line
 does (each batch as it starts and returns, with elapsed time, then triage,
 validation and publishing): `review` (a change), `full_review` and `repo_score` (a
 tree, with the remediation plan and the coverage notice), `code_smell` and
-`ai_slop` (the tree review filtered to those classes), `identify_model`,
-and `explain_config`. Every tool returns text and structured findings with
+`ai_slop` (the tree review filtered to those classes), and `explain_config`. Every tool returns text and structured findings with
 path, line, severity, class, rationale and suggestion; nothing is
 published, and the session decides what to do with what comes back. The
 plugin under [plugins/nitpick](https://github.com/jdziat/open-nitpick/tree/main/plugins/nitpick) registers the server and

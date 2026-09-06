@@ -1274,6 +1274,19 @@ verifiers: the shallow-checkout fallback (the shipped action fetches full
 history), strict mode failing on the named scanner (guarded anyway), and
 a two-lockfile dedupe (the scanner runs per file).
 
+## Withdrawn: the model-identification command (2026-09-06)
+
+`nitpick identify-model` shipped on the fingerprint result below and was
+removed the same week. The two sections that follow are kept as the record
+of what was measured, and both still hold as measurements: on a same-prompt
+corpus the fingerprint tells six models apart well above chance. What the
+corpus could not tell us is whether the answer means anything on a file
+somebody actually wrote, and the contributor experiment (below) is the
+evidence that it does not: on ten real repositories the same instrument is
+near chance in six of them. A command whose answer a reader cannot act on
+is worse than no command, so the command, its corpora and its package are
+gone. The measurements stay; the product claim is retracted.
+
 ## Fingerprints: which model wrote it, second instrument (2026-09-06)
 
 The first instrument was twenty-two hand-picked shape statistics and a

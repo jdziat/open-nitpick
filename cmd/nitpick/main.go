@@ -53,8 +53,6 @@ func run() int {
 		err = runSlop(ctx, os.Args[2:])
 	case "respond":
 		err = runRespond(ctx, os.Args[2:])
-	case "identify-model":
-		err = runIdentifyModel(os.Args[2:])
 	case "mcp":
 		err = runMCP(ctx, os.Args[2:])
 	case "explain-config":
@@ -108,7 +106,6 @@ Usage:
                                    The same, plus slop, bug and security findings per thousand lines, by language
   nitpick slop [flags] [path...]   AI slop only: the tells without a model, the model's slop rules, a score, and fixes
   nitpick respond [flags]          Answer an @nitpick comment on a pull request (review again, resolve, or a question)
-  nitpick identify-model <file>... Which model's style a file is most similar to (Go, Python, TypeScript; see docs/findings.md)
   nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
   nitpick mcp install <client>     Register that server with an agent client (claude-code, cursor, opencode, codex, ...)
   nitpick explain-config [flags]   Show the resolved configuration and prompts
