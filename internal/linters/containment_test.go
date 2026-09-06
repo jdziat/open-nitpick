@@ -249,6 +249,9 @@ func TestGolangciLintDoesNotRunAToolchainNamedByTheTreeUnderReview(t *testing.T)
 	if !strings.Contains(err.Error(), "1.99.98") {
 		t.Errorf("the failure should name the version it refused, got: %v", err)
 	}
+	if !strings.Contains(err.Error(), "install the newer go where nitpick runs") {
+		t.Errorf("the failure should say what to do about it, got: %v", err)
+	}
 }
 
 // TestGolangciLintUsesAnOperatorConfigFromOutsideTheRepository proves the opt-in

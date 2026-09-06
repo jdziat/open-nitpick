@@ -91,11 +91,40 @@ func TestRemediationPlanPutsASecurityWarningWithTheErrors(t *testing.T) {
 
 func TestCoverageNoticeNamesWhatWasLeftOut(t *testing.T) {
 	tree := &vcs.Tree{Covered: []string{"a.go"}, Unbudgeted: []string{"z.go"}, Skipped: []vcs.TreeSkip{{Path: "img.png", Reason: "binary"}}}
-	out := CoverageNotice(tree)
-	for _, want := range []string{"Covered 1 file(s).", "budget ran out first (1 file(s)): z.go", "img.png: binary"} {
+	out := CoverageNotice(&review.Report{}, tree)
+	for _, want := range []string{"Reviewed 1 of 1 file(s).", "budget ran out first (1 file(s)): z.go", "img.png: binary"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("notice lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+// A file whose batch failed entered the diff but no model answered for it.
+// The tail, which is all a script reading the last lines sees, counts it
+// out and names it, and names the analyzer that did not run; the head of
+// the report already said both, and the tail must not contradict it.
+func TestCoverageNoticeCountsOutFailedBatchesAndAnalyzers(t *testing.T) {
+	tree := &vcs.Tree{Covered: []string{"a.go", "b.go", "c.go"}}
+	report := &review.Report{
+		Incomplete: []string{"b.go", "c.go"},
+		Linters: []review.LinterStatus{
+			{Linter: "golangci-lint", Outcome: review.LinterFailed, State: "the Go language version go1.24 is lower than the targeted go1.25"},
+			{Linter: "osv-scanner", Outcome: review.LinterSkipped, State: "no lockfile"},
+		},
+	}
+	out := CoverageNotice(report, tree)
+	for _, want := range []string{
+		"Reviewed 1 of 3 file(s).",
+		"Not reviewed, the model call for their batch failed (2 file(s)): b.go, c.go",
+		"Analyzers that did not run (1):",
+		"golangci-lint: the Go language version",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("notice lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "Covered 3") || strings.Contains(out, "osv-scanner") {
+		t.Errorf("the tail claims coverage it does not have, or names a skipped analyzer as failed:\n%s", out)
 	}
 }
 

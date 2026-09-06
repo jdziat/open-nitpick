@@ -43,15 +43,27 @@ func TestEslintRefusesRepoLocalBinary(t *testing.T) {
 
 	t.Setenv("LLM_API_KEY", "sk-SECRET-FROM-CI")
 
-	e := &eslint{}
+	// The trap is the only eslint on PATH, and the runner is configured, so
+	// Run reaches the binary resolution: without both, the test passed by
+	// never getting there, and the containment it guards could have been
+	// deleted unnoticed.
+	t.Setenv("PATH", binDir)
+	outside := filepath.Join(t.TempDir(), "eslint.config.js")
+	if err := os.WriteFile(outside, []byte("export default [];\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e := &eslint{cfg: fileConfig(repo, outside)}
 
 	// Detect must not be satisfied by the repository-local binary alone.
-	if err := e.Detect(context.Background(), repo, []string{"app.js"}); err == nil && !available("eslint") {
+	if err := e.Detect(context.Background(), repo, []string{"app.js"}); err == nil {
 		t.Error("Detect should not be satisfied by a repo-supplied binary")
 	}
 
-	// Even if Run is reached, it must not execute the repo's binary.
+	// Run must refuse the repo's binary, and say so, rather than execute it.
 	_, err := e.Run(context.Background(), repo, []string{"app.js"})
+	if err == nil {
+		t.Fatal("Run with only a repo-supplied eslint on PATH did not fail")
+	}
 	t.Logf("Run err = %v", err)
 
 	if data, readErr := os.ReadFile(marker); readErr == nil {
