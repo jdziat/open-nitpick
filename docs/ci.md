@@ -43,7 +43,7 @@ the pull request sidebar. Create one under your account or organisation
 (Settings, Developer settings, GitHub Apps): no webhook, repository
 permissions Contents read, Metadata read, Pull requests read and write;
 install it on the repositories to review; generate a private key. Save the
-App ID as a repository variable `NITPICK_APP_ID` and the key file's
+App ID as a repository secret `NITPICK_APP_ID` and the key file's
 contents as a secret `NITPICK_APP_PRIVATE_KEY` (GitHub refuses secret names
 that start with `GITHUB_`). Then mint the token in the job and hand it to
 the Action:
@@ -51,10 +51,10 @@ the Action:
 ```yaml
       - name: Token for the review app
         id: app
-        if: vars.NITPICK_APP_ID != ''
+        if: ${{ secrets.NITPICK_APP_ID != '' }}
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.NITPICK_APP_ID }}
+          app-id: ${{ secrets.NITPICK_APP_ID }}
           private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
       - uses: jdziat/open-nitpick@v1
         with:
@@ -62,7 +62,7 @@ the Action:
 ```
 
 The `if` and the `||` make the App optional: a repository without the
-variable posts with the job token as before. The token the step mints
+secret posts with the job token as before. The token the step mints
 lasts an hour and is scoped to the installation, so the workflow's
 `permissions` block still governs only the default token.
 

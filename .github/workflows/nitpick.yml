@@ -32,16 +32,16 @@ jobs:
           fetch-depth: 0
 
       # Reviews post under the GitHub App's own name and avatar, with its
-      # own permissions, when the App is configured: NITPICK_APP_ID as a
-      # repository variable and NITPICK_APP_PRIVATE_KEY as a secret (GitHub
+      # own permissions, when the App is configured: NITPICK_APP_ID and
+      # NITPICK_APP_PRIVATE_KEY as repository secrets (GitHub
       # refuses secret names that start with GITHUB_). Without them the
       # default job token posts as github-actions[bot].
       - name: Token for the review app
         id: app
-        if: vars.NITPICK_APP_ID != ''
+        if: ${{ secrets.NITPICK_APP_ID != '' }}
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ vars.NITPICK_APP_ID }}
+          app-id: ${{ secrets.NITPICK_APP_ID }}
           private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
 
       - uses: ./
