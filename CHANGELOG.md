@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.4.0](https://github.com/jdziat/open-nitpick/compare/v1.3.0...v1.4.0) (2026-09-06)
+
+
+### Features
+
+* **cli:** progress logs during a review, and mcp install for agent clients ([c733861](https://github.com/jdziat/open-nitpick/commit/c733861a666a8693ecfcebe21c5aa31f96fcd203))
+* **cli:** progress logs during a review, and mcp install for eight agent clients ([c8d3acb](https://github.com/jdziat/open-nitpick/commit/c8d3acba3945c104d87ab75558ad9c80813932ae))
+
+
+### Fixes
+
+* **config:** pin kimi-k3 on OpenRouter to Moonshot's endpoint, with fallbacks ([a24436c](https://github.com/jdziat/open-nitpick/commit/a24436c5d00e735f3ab3cd7d44e473a6f93e24bb))
+* **config:** pin kimi-k3 on OpenRouter to Moonshot's endpoint, with fallbacks ([ef73d66](https://github.com/jdziat/open-nitpick/commit/ef73d662b627ef5a77caae0b0d26a27a620905dd))
+
+
+### Documentation
+
+* **config:** the OpenRouter config link survives the site build ([cee49ba](https://github.com/jdziat/open-nitpick/commit/cee49ba78a5ec4db0e415797c71971f5da0d6b7e))
+* **config:** the repository's policy on OpenRouter ([f8c1ec0](https://github.com/jdziat/open-nitpick/commit/f8c1ec06b0e11bc7cad913ba4ae57f1916bc9579))
+* **config:** the repository's policy on OpenRouter, as .nitpick.openrouter.yaml ([988bcb8](https://github.com/jdziat/open-nitpick/commit/988bcb863f7cd52dff2ac6ca5e4bb3a6542ab9bc))
+* the README as a home page, the guide as docs pages ([2c02a7a](https://github.com/jdziat/open-nitpick/commit/2c02a7aa16d141725d5bbde249f68af8d3ff8528))
+* the README as a home page, the guide as docs pages ([806cbb6](https://github.com/jdziat/open-nitpick/commit/806cbb659e8c368504387b9479067968eb91c9d9))
+
 ## [1.3.0](https://github.com/jdziat/open-nitpick/compare/v1.2.0...v1.3.0) (2026-09-06)
 
 
