@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
-	"github.com/jdziat/open-nitpick/v2/internal/diff"
-	"github.com/jdziat/open-nitpick/v2/internal/llm"
-	"github.com/jdziat/open-nitpick/v2/internal/vcs"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // classDiff has one added line so any finding on line 4 is placeable.

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // The slop corpus is pairs: every planted fixture has a control beside it,

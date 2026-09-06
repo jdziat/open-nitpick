@@ -45,9 +45,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
-	"github.com/jdziat/open-nitpick/v2/internal/diff"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // goProbe writes a single-module repository containing app.go with the given

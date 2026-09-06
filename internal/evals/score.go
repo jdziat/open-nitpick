@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // anchorTolerance is how far from the planted line a finding may sit and still

@@ -11,11 +11,11 @@ import (
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
-	"github.com/jdziat/open-nitpick/v2/internal/bundle"
-	"github.com/jdziat/open-nitpick/v2/internal/config"
-	"github.com/jdziat/open-nitpick/v2/internal/diff"
-	"github.com/jdziat/open-nitpick/v2/internal/llm"
-	"github.com/jdziat/open-nitpick/v2/internal/vcs"
+	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // scriptedLLM answers each call with the next scripted response, matched by a

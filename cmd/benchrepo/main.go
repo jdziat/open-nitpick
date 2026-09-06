@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/v2/internal/evals"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/internal/evals"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 const (

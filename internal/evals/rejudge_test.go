@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // dumpFixtureNames returns two real corpus fixture names.

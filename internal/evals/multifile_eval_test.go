@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // TestBenchmarkMultiFile is the judge-free head-to-head on the multi-file

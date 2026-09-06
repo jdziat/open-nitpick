@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/v2/internal/vcs"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // hostileConfig is the configuration a change writes for its own review: every

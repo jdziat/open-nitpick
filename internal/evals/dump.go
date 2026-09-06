@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // EnvDump names a file to write per-finding diagnostics into, as JSON Lines.

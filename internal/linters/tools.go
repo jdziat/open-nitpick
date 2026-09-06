@@ -18,7 +18,7 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // The analyzer catalog: every deterministic tool after the first four,

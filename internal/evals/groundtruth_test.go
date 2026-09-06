@@ -15,11 +15,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/v2/internal/bundle"
-	"github.com/jdziat/open-nitpick/v2/internal/config"
-	"github.com/jdziat/open-nitpick/v2/internal/diff"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
-	"github.com/jdziat/open-nitpick/v2/internal/vcs"
+	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // TestPlantedDefectsPointAtRealLines validates the corpus itself.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/jdziat/open-nitpick/v2/internal/vcs"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // Fingerprint identifies a finding across runs of this tool on the same pull

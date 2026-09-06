@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // The callers section of docs/findings.md names the dumps behind each of its

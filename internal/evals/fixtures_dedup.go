@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/v2/internal/config"
+import "github.com/jdziat/open-nitpick/internal/config"
 
 // dedupFixtures is the corpus's cross-batch DEDUP fixture, and it is here for a
 // property no other fixture has: the same defect is reportable from more than
