@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/jdziat/open-nitpick/compare/v1.2.0...v2.0.0) (2026-09-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** remove identify-model, whose answer does not carry to real code
+
+### Features
+
+* **cli:** remove identify-model, whose answer does not carry to real code ([3bc288e](https://github.com/jdziat/open-nitpick/commit/3bc288e5c47333ab1a4d47000d86023d391349be))
+
 ## [1.2.0](https://github.com/jdziat/open-nitpick/compare/v1.1.1...v1.2.0) (2026-09-06)
 
 
