@@ -18,6 +18,16 @@ models:
   default:
     provider: openrouter
     model: moonshotai/kimi-k3
+    # OpenRouter serves kimi-k3 from eighteen upstreams and, unpinned,
+    # picks the cheapest, which on 2026-09-06 were fp4 quantisations of a
+    # reasoning model: one review stalled for ten minutes, was cut at the
+    # output cap on the retry, and answered invalid JSON on the third try.
+    # Pinned to Moonshot's own endpoint first, with two full-precision
+    # fallbacks that support structured output; no fallback beyond them.
+    # The slugs are OpenRouter's endpoint tags (see the README, "Pinning
+    # a router to one upstream"), and a pull request that edits this file
+    # can change them, which chooses who reads the code.
+    providers: [moonshotai/mxfp4, fireworks, together]
     # No max_tokens and no timeout here: unset, the model's own output
     # maximum applies and the call has ten minutes, so a reasoning model's
     # thinking neither truncates its answer nor times it out.
