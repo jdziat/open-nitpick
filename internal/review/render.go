@@ -275,7 +275,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 // reads as seventeen clean files this run looked at.
 func incrementalNotice(report *Report) string {
 	inc := report.Incremental
-	if inc == nil && len(report.AlreadyReported) == 0 {
+	if inc == nil && len(report.AlreadyReported) == 0 && len(report.Superseded) == 0 {
 		return ""
 	}
 
@@ -300,6 +300,10 @@ func incrementalNotice(report *Report) string {
 	if n := len(report.AlreadyReported); n > 0 {
 		fmt.Fprintf(&b, "%d finding(s) from this run were already posted by an earlier review and\n"+
 			"were not posted again.\n", n)
+	}
+	if n := len(report.Superseded); n > 0 {
+		fmt.Fprintf(&b, "%d earlier comment thread(s) were resolved: the lines they pointed at changed\n"+
+			"and the finding did not recur.\n", n)
 	}
 	return blockquote(b.String())
 }
