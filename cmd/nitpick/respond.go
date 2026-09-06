@@ -13,6 +13,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/converse"
 	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // runRespond answers a comment that mentioned the reviewer. It reads the
@@ -73,8 +74,7 @@ func runRespond(ctx context.Context, args []string) error {
 		log.Info("comment does not address the reviewer; nothing to do", "comment", ev.CommentID)
 		return nil
 	}
-	f.pr = ev.Number
-	ref, _, err := resolvePullRequest(&f)
+	ref, err := refForEvent(&f, ev)
 	if err != nil {
 		return err
 	}
@@ -164,4 +164,24 @@ func runRespond(ctx context.Context, args []string) error {
 		}
 		return gh.React(ctx, ref, ev.CommentID, ev.Inline, "+1")
 	}
+}
+
+// refForEvent names the pull request a comment event is about: the number
+// from the event, the repository from the flags or GITHUB_REPOSITORY. The
+// review command's resolver cannot serve here, since on a comment event
+// GITHUB_REF names a branch, not a pull request.
+func refForEvent(f *reviewFlags, ev *converse.Event) (vcs.Ref, error) {
+	owner, name := f.owner, f.repoName
+	if owner == "" || name == "" {
+		if o, n, ok := strings.Cut(os.Getenv("GITHUB_REPOSITORY"), "/"); ok {
+			owner, name = o, n
+		}
+	}
+	if owner == "" || name == "" {
+		return vcs.Ref{}, errors.New("answering a comment needs -owner and -repo-name, or GITHUB_REPOSITORY")
+	}
+	if ev.Number <= 0 {
+		return vcs.Ref{}, errors.New("the event names no pull request")
+	}
+	return vcs.Ref{Owner: owner, Repo: name, Number: ev.Number}, nil
 }
