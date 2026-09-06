@@ -31,6 +31,8 @@ const (
 	LayerRepo = "repository"
 	// LayerRun is a per-invocation instruction from the command line.
 	LayerRun = "run"
+	// LayerSlop is the slop class's rules, present only when review.slop is on.
+	LayerSlop = "slop"
 )
 
 // Layer is one contribution to a prompt.
@@ -102,6 +104,11 @@ type Options struct {
 	// instructions for the same reason the persona does.
 	ModelText string
 
+	// SlopText is the slop class's rules, from SlopGuidance, present only
+	// when the review asks for that class. It follows the model layer and
+	// precedes the repository's instructions for the reason the persona does.
+	SlopText string
+
 	// Data is exposed to the template as `.`.
 	Data any
 }
@@ -131,6 +138,10 @@ func Build(name string, opts Options) (Prompt, error) {
 
 	if strings.TrimSpace(opts.ModelText) != "" {
 		p.Layers = append(p.Layers, Layer{Name: LayerModel, Text: opts.ModelText})
+	}
+
+	if strings.TrimSpace(opts.SlopText) != "" {
+		p.Layers = append(p.Layers, Layer{Name: LayerSlop, Text: opts.SlopText})
 	}
 
 	if strings.TrimSpace(opts.Repository) != "" {

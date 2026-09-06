@@ -161,6 +161,9 @@ func shippedPromptTexts(t *testing.T) map[string]string {
 	// measured, the whole contract collides with exactly one keyword, and it is
 	// the "utc"-inside-"outcome" accident already disclosed three times below.
 	out["validation-contract"] = review.ValidationContract()
+	// The slop layer is in the prompt whenever review.slop is on, which the
+	// slop corpus needs, so its keywords are swept against it too.
+	out["slop"] = prompt.SlopGuidance()
 
 	// Every level, not only config.GenerationLevel. A branch nothing renders
 	// today ships the day that constant moves, and a guard that could only see

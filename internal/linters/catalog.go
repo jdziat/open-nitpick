@@ -968,16 +968,28 @@ func osvScannerSpec() toolSpec {
 			if err != nil {
 				return nil, err
 			}
-			for i := range findings {
+			// The scanner repeats an advisory once per path by which the
+			// package is reachable (measured: 7 results for 4 advisories on
+			// a go.mod with one require), and a report that lists the same
+			// CVE twice reads as two. One per advisory and message.
+			seen := map[string]bool{}
+			out := findings[:0]
+			for _, f := range findings {
 				// A vulnerable dependency is reported against the lockfile,
 				// on line 1 when the scanner gives none, so the finding is
 				// placeable on a lockfile bump.
-				if findings[i].Line <= 0 {
-					findings[i].Line = 1
+				if f.Line <= 0 {
+					f.Line = 1
 				}
-				findings[i].Path = inv.files[0]
+				f.Path = inv.files[0]
+				key := f.Rule + "\x00" + f.Message
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				out = append(out, f)
 			}
-			return findings, nil
+			return out, nil
 		},
 	}
 }

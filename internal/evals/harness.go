@@ -58,6 +58,11 @@ const (
 	// off. Any non-empty value other than "0" or "false" enables it.
 	EnvRelatedContext = "NITPICK_EVAL_RELATED_CONTEXT"
 
+	// EnvSlop switches review.slop on for every review in the run, which the
+	// slop corpus needs: its plants are in a class the default never asks
+	// for. Any non-empty value other than "0" or "false" enables it.
+	EnvSlop = "NITPICK_EVAL_SLOP"
+
 	// EnvValidation switches validation (the expert pass) on for every review
 	// in the run, so its effect on recall and noise can be measured.
 	EnvValidation = "NITPICK_EVAL_VALIDATION"
@@ -432,7 +437,7 @@ func HeldOut(fixture string) bool {
 // header. A mixed selection is called out as mixed rather than rounded to
 // whichever half is larger.
 func CorpusLabel(fixtures []Fixture) string {
-	var held, tuning, multi, info, callers int
+	var held, tuning, multi, info, callers, slop int
 	for _, f := range fixtures {
 		switch {
 		case HeldOut(f.Name):
@@ -443,26 +448,39 @@ func CorpusLabel(fixtures []Fixture) string {
 			info++
 		case Caller(f.Name):
 			callers++
+		case Slop(f.Name):
+			slop++
 		default:
 			tuning++
 		}
 	}
 
+	others := func(except string) int {
+		n := 0
+		for name, count := range map[string]int{"tuning": tuning, "held": held, "multi": multi, "info": info, "callers": callers, "slop": slop} {
+			if name != except {
+				n += count
+			}
+		}
+		return n
+	}
 	switch {
-	case held == 0 && tuning == 0 && multi == 0 && info == 0 && callers == 0:
+	case tuning+held+multi+info+callers+slop == 0:
 		return "EMPTY (no fixtures selected)"
-	case held == 0 && multi == 0 && info == 0 && callers == 0:
+	case others("tuning") == 0:
 		return fmt.Sprintf("TUNING corpus (%d fixture(s))", tuning)
-	case tuning == 0 && multi == 0 && info == 0 && callers == 0:
+	case others("held") == 0:
 		return fmt.Sprintf("HELD-OUT corpus (%d fixture(s)) — spent once; a gain measured here is a generalization claim", held)
-	case tuning == 0 && held == 0 && info == 0 && callers == 0:
+	case others("multi") == 0:
 		return fmt.Sprintf("MULTI-FILE corpus (%d fixture(s)) — the contract is in a file the change does not touch", multi)
-	case tuning == 0 && held == 0 && multi == 0 && callers == 0:
+	case others("info") == 0:
 		return fmt.Sprintf("INFO corpus (%d fixture(s)) — the band no reviewer had located", info)
-	case tuning == 0 && held == 0 && multi == 0 && info == 0:
+	case others("callers") == 0:
 		return fmt.Sprintf("CALLERS corpus (%d fixture(s)) — the change is the contract, and the file it breaks is one it does not touch", callers)
+	case others("slop") == 0:
+		return fmt.Sprintf("SLOP corpus (%d fixture(s)) — planted/control pairs for the slop class; needs review.slop on", slop)
 	default:
-		return fmt.Sprintf("MIXED corpus (%d tuning + %d HELD-OUT + %d multi-file + %d info + %d callers fixture(s)) — not a generalization measurement", tuning, held, multi, info, callers)
+		return fmt.Sprintf("MIXED corpus (%d tuning + %d HELD-OUT + %d multi-file + %d info + %d callers + %d slop fixture(s)) — not a generalization measurement", tuning, held, multi, info, callers, slop)
 	}
 }
 
@@ -940,6 +958,11 @@ func evalConfig(model Model) *config.Config {
 	case "", "0", "false", "off":
 	default:
 		cfg.Validation.Enabled = true
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvSlop))) {
+	case "", "0", "false", "off":
+	default:
+		cfg.Review.Slop = true
 	}
 
 	// Report everything the model says so precision can actually be measured.

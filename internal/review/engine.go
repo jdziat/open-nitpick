@@ -6,6 +6,7 @@ package review
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -595,9 +596,29 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings, dropped := e.filterAnchors(findings, files)
 	discarded = append(discarded, dropped...)
 
+	// A known advisory is deterministic evidence: a scanner matched a pinned
+	// version against a published vulnerability, and no model pass has
+	// anything to judge about it. Triage could merge or reword one, and a
+	// rewording loses the attribution that names it as the scanner's (see
+	// restoreSeverityProvenance), which is how four CVEs on a go.mod were
+	// published as the triage model's own correctness findings. Held out
+	// here and rejoined after validation, they keep their rule, their
+	// class and their line, and still pass the operator's ceiling and gate.
+	findings, advisories := holdAdvisories(dedupe(findings))
+
 	summary, findings, withheldByTriage, err := e.triage(ctx, pr, findings)
 	if err != nil {
 		return nil, err
+	}
+	// The summary was written over what triage saw, which the advisories
+	// were not; a walkthrough that says the change is clean above four
+	// posted CVEs would be wrong, so it says they are there.
+	if summary != "" && len(advisories) > 0 {
+		note := fmt.Sprintf("%d known advisories from the dependency scanner are", len(advisories))
+		if len(advisories) == 1 {
+			note = "1 known advisory from the dependency scanner is"
+		}
+		summary = strings.TrimRight(summary, "\n") + "\n\n" + note + " listed with the findings."
 	}
 
 	// Triage rewrites findings, including their line numbers, so anchors are
@@ -627,6 +648,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// severity verdict has to be able to move a finding across the gate's
 	// threshold in either direction.
 	findings, overruled := e.validateFindings(ctx, findings, plan)
+	findings = append(findings, advisories...)
 
 	// After every pass that can raise a severity, and before the gate reads
 	// one. This is the application of linters.max_severity that binds.
@@ -1012,7 +1034,7 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		{Role: llms.RoleUser, Content: body.String()},
 	}
 
-	schema, err := schemaOption(findingsSchemaName, findingsSchema)
+	schema, err := schemaOption(findingsSchemaName, func() (json.RawMessage, error) { return findingsSchema(offeredClasses(e.Config.Review.Slop)) })
 	if err != nil {
 		return nil, err
 	}
@@ -1118,6 +1140,19 @@ func (e *Engine) recordSeverity(f *Finding) {
 // direction: failing to restore prints "(word not recorded)", which is visible,
 // while restoring onto the wrong finding quotes a reviewer as saying something
 // it did not — the failure this whole field pair exists to prevent.
+// holdAdvisories splits the known advisories from the findings a model pass
+// will see, preserving order on both sides.
+func holdAdvisories(findings []Finding) (rest, advisories []Finding) {
+	for _, f := range findings {
+		if f.IsAdvisory() {
+			advisories = append(advisories, f)
+		} else {
+			rest = append(rest, f)
+		}
+	}
+	return rest, advisories
+}
+
 func (e *Engine) restoreSeverityProvenance(f *Finding, before map[string]Finding) {
 	original, ok := before[f.Key()]
 	if !ok {
@@ -1251,7 +1286,7 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		{Role: llms.RoleUser, Content: renderForTriage(pr, findings)},
 	}
 
-	schema, err := schemaOption(triageSchemaName, triageSchema)
+	schema, err := schemaOption(triageSchemaName, func() (json.RawMessage, error) { return triageSchema(offeredClasses(e.Config.Review.Slop)) })
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -1457,7 +1492,7 @@ func (e *Engine) capAnalyzerFindings(findings []Finding) []Finding {
 // wants to hear about, and min_severity decides how serious a problem has to be
 // once it is a kind they want.
 func (e *Engine) applyGate(findings []Finding) []Finding {
-	kept, dropped := Filter(findings, e.Config.Persona.Nitpick, e.Config.Review.MinSeverity)
+	kept, dropped := FilterWith(findings, e.Config.Persona.Nitpick, e.Config.Review.MinSeverity, e.Config.Review.Slop)
 
 	for _, f := range dropped {
 		e.log().Debug("dropped finding outside the configured policy",
@@ -1477,8 +1512,27 @@ func (e *Engine) applyGate(findings []Finding) []Finding {
 // A filter that could only be exercised by making a model call would not
 // deliver that.
 func Filter(findings []Finding, level config.NitpickLevel, minimum config.Severity) (kept, dropped []Finding) {
+	return FilterWith(findings, level, minimum, false)
+}
+
+// FilterWith is Filter with the slop switch: the slop class is published by
+// review.slop alone, at whatever nitpick level. The schema offers the class
+// whether or not the switch is on, so a model may label a finding slop
+// unasked; with the switch off that finding is not dropped for its label
+// but read as style, the class it is nearest to, and published or not as
+// style is at the configured level.
+func FilterWith(findings []Finding, level config.NitpickLevel, minimum config.Severity, slop bool) (kept, dropped []Finding) {
 	for _, f := range findings {
+		if f.Cls() == config.ClassSlop && !slop {
+			f.Class = string(config.ClassStyle)
+		}
 		switch {
+		case f.Cls() == config.ClassSlop:
+			if f.Sev().AtLeast(minimum) {
+				kept = append(kept, f)
+			} else {
+				dropped = append(dropped, f)
+			}
 		case !level.Publishes(f.Cls()):
 			dropped = append(dropped, f)
 		case !f.Sev().AtLeast(minimum):
@@ -1537,7 +1591,7 @@ func (e *Engine) validateFindings(ctx context.Context, findings []Finding, plan 
 // publication policy keeps a single definition.
 func (e *Engine) gateOverruled(overruled []Overruled) []Overruled {
 	publishes := func(f Finding) bool {
-		kept, _ := Filter([]Finding{f}, e.Config.Persona.Nitpick, e.Config.Review.MinSeverity)
+		kept, _ := FilterWith([]Finding{f}, e.Config.Persona.Nitpick, e.Config.Review.MinSeverity, e.Config.Review.Slop)
 		return len(kept) > 0
 	}
 
@@ -1630,9 +1684,14 @@ func (e *Engine) reviewPromptFor(client *llm.Client) (string, error) {
 		}
 		modelText = prompt.ModelGuidance(model)
 	}
+	var slopText string
+	if e.Config.Review.Slop {
+		slopText = prompt.SlopGuidance()
+	}
 	p, err := prompt.Build(prompt.NameReview, prompt.Options{
 		PersonaText: prompt.Persona(e.Config.Persona),
 		ModelText:   modelText,
+		SlopText:    slopText,
 		Run:         e.Instruction,
 	})
 	if err != nil {
