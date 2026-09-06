@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/jdziat/open-nitpick/compare/v1.0.0...v1.1.0) (2026-09-06)
+
+
+### Features
+
+* **cli:** nitpick slop scores AI slop and says how to fix it ([65d56b3](https://github.com/jdziat/open-nitpick/commit/65d56b3687a102ee2a565ece5d490810ef7ce84b))
+
 ## 1.0.0 (2026-09-06)
 
 
