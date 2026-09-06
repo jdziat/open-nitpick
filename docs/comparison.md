@@ -3,7 +3,7 @@
 A capability comparison and a measured one, kept apart because they are
 different kinds of claim. The capability table is what each product does; the
 measured tables are what each did on this project's corpora, with every rule
-in [measurement.md](measurement.md) applying — above all that the corpora are
+in [measurement.md](measurement.md) applying: above all that the corpora are
 this project's own, that the incumbent's side is its CLI in plain-text mode
 on a free allowance rather than the hosted product with a learned codebase,
 and that Contender and Bugbot are not in the tables because neither could be
@@ -56,7 +56,7 @@ A is the widest anchor in lines. The incumbent has one review per fixture.
 
 The held-out corpus is not re-spent for this table. Its one retained run
 (kimi-k3, 2026-08-07) had C# 3/3 vs 1/1, shell 3/3 vs 0/1, SQL 3/3 vs 1/1,
-Java 0/3 vs 0/1, Rust 0/3 vs 0/1 and Ruby 0/3 vs 0/1 — the Java, Rust and
+Java 0/3 vs 0/1, Rust 0/3 vs 0/1 and Ruby 0/3 vs 0/1: the Java, Rust and
 Ruby plants there are `nit` and `info` plants that no contender has located.
 
 **What iteration 1 changed.** Reading the noise findings behind the baseline
@@ -84,8 +84,8 @@ review is not priced.
 
 ### Iteration 2: the expert pass, measured and left off
 
-`validation.enabled` — a second model pass in which a domain expert can
-refute or re-rate each finding — has shipped disabled and unmeasured since it
+`validation.enabled` (a second model pass in which a domain expert can
+refute or re-rate each finding) has shipped disabled and unmeasured since it
 was written. Measured here for the first time, sonnet-4.6 with related
 context, same corpora, same day:
 
@@ -110,7 +110,7 @@ is one the fixture's own author lists as a reasonable objection. Measurement
 .md's rules say a gap inside the corpus's resolution is not a result in
 either direction, so the iteration stops here rather than tuning a prompt to
 suppress an objection the corpus itself calls defensible. What would move it
-honestly is a larger TypeScript corpus, not a narrower reviewer.
+is a larger TypeScript corpus, not a narrower reviewer.
 
 Nothing above is a claim about the hosted product with a learned codebase,
 about Contender or Bugbot, or about a corpus anyone else wrote.
@@ -119,8 +119,8 @@ about Contender or Bugbot, or about a corpus anyone else wrote.
 
 The corpora were materialised into a private repository
 (`jdziat/nitpick-bench`, one branch and one pull request per fixture, 44 in
-all) and reviewed by the shipped GitHub Action — release install, incremental
-review, the job summary, the lot — with `anthropic/claude-sonnet-4.6`, related
+all) and reviewed by the shipped GitHub Action (release install, incremental
+review, the job summary, the lot) with `anthropic/claude-sonnet-4.6`, related
 context on, and `min_severity: nit`. `cmd/benchrepo score` reads the posted
 review comments back and scores them with the harness's own scorer.
 
@@ -141,7 +141,7 @@ three corpora was located on the real pull request.
 This is the number a user of the Action gets, not a harness number: it went
 through GitHub's diff, the review API, the comment cap, and the fingerprint
 markers. It is also a single run, on fixtures this project wrote, against no
-incumbent — the private repository is where Incumbent's hosted app can be
+incumbent: the private repository is where Incumbent's hosted app can be
 installed for the comparison the CLI cannot give.
 
 ### Head to head with Incumbent's hosted app, on GitHub (2026-09-03)
@@ -182,12 +182,12 @@ between the two columns was checked against the actual comments:
   where the close belongs (line 34) rather than at the `os.Create` (line 19),
   fifteen lines from the plant. Its three "noise" findings there are a
   partial-file-on-error remark, an unbounded-request-body remark, and that
-  same leak at the other anchor — two of the three are defensible.
+  same leak at the other anchor (two of the three are defensible).
 - `go-empty-filter-deletes-all`: its extra finding is golangci-lint's
   `errcheck` on an ignored `fmt.Fprintf`, which it ran and this run did
   not: the benchmark runner has no golangci-lint installed, so
   open-nitpick's analyzer auto-detection had nothing to run. That is a real
-  difference in the hosted product's favour — it brings its analyzers.
+  difference in the hosted product's favour: it brings its analyzers.
 - `go-hardcoded-secret`, `php-forbidden-vs-404`, `defensive-copy-nit`:
   Incumbent posted a walkthrough and no inline comment on all three. The
   committed `sk-live-` key is the one miss that matters.
@@ -210,7 +210,7 @@ fifth of its noise, and answered five seconds faster at the median. It missed
 the same `info` and `nit` plants everyone misses, plus one `nit`. Rule 15
 applies: this corpus is this project's, and 41 plants resolve nothing finer
 than one plant. What it retires is the sentence that the CLI cache was the
-wrong instrument — the hosted product on the same pull requests locates 30
+wrong instrument: the hosted product on the same pull requests locates 30
 where the cache located 14 of 29 on an earlier corpus, and still fewer than
 this reviewer.
 
@@ -227,8 +227,8 @@ publishes and the default `info` would not.
 
 **The incumbent's number is its first full run.** Incumbent's app reviewed
 all 44 pull requests once, on the original layout, before its plan throttled
-it; on the re-laid-out repository it reached about half. That first run —
-30 of 41 located, 5 noise findings, hand-checked above — is taken as its
+it; on the re-laid-out repository it reached about half. That first run
+(30 of 41 located, 5 noise findings, hand-checked above) is taken as its
 result, and the comparison stands on it rather than on a partial second
 pass. Two things it does not control for, both of which cut the same way for
 both reviewers: the first layout told the model it was reading fixtures, and
@@ -290,7 +290,7 @@ pass. The three models marked `×2` ran twice.
 | z-ai/glm-5.3 ×2 | 0.88 / 0.56 | 1.00 / 0.61 | 0.70 / 0.25 | 0.87 | $0.033 |
 | qwen/qwen3.8-max | 0.71 / 0.36 | 1.00 / 0.33 | 0.78 / 0.00 | ~0.78 | $0.044 |
 | openrouter/auto ×2 | 0.81 / 0.19 | 1.00 / 0.79 | 0.75 / 0.21 | 0.87 | unknown |
-| moonshotai/kimi-k3 (earlier sweep) | ties sonnet | ties sonnet | — | — | 1.5 – 2× sonnet |
+| moonshotai/kimi-k3 (earlier sweep) | ties sonnet | ties sonnet | n/a | n/a | 1.5 to 2× sonnet |
 | Incumbent CLI | 0.62 / 0.19 | 0.17 / 0.21 | 0.40 / 0.00 | 0.42 | $0.25 – $0.36 on demand |
 
 Not measured:
@@ -309,12 +309,13 @@ Not measured:
 
 Related context is not free for every model. It lifts every model on the
 multi-file corpus, which is what it was built for, but three models fell on
-the single-file tuning corpus when it was on: deepseek-v4-pro 0.94 → 0.69,
-qwen3.8-27b 0.81 → 0.69, grok-4.6 0.75 → 0.69. deepseek without related
-context is the best single-file result in the sweep, 0.94 recall at 0.12
-noise for $0.013, and the worst info-corpus result with it. Sonnet moved the
-other way on the info corpus, 0.60 → 0.50. One run cannot separate a real
-interaction from a coin flip, so this is recorded and not acted on.
+the single-file tuning corpus when it was on: deepseek-v4-pro fell from
+0.94 to 0.69, qwen3.8-27b from 0.81 to 0.69, grok-4.6 from 0.75 to 0.69.
+deepseek without related context is the best single-file result in the
+sweep, 0.94 recall at 0.12 noise for $0.013, and the worst info-corpus
+result with it. Sonnet moved the other way on the info corpus, falling
+from 0.60 to 0.50. One run cannot separate a real interaction from a coin
+flip, so this is recorded and not acted on.
 
 **Where the money goes.** Against the shipped default:
 
@@ -371,9 +372,9 @@ after column is two runs each with related context on. Recall is over the
 
 | model | before recall / noise | after, notes off | after, notes on |
 |---|---|---|---|
-| glm-5.3-flash | 0.83 / 0.35 | — / — | 0.80 / 0.18 |
-| qwen3.8-27b | 0.83 / 0.10 | — / — | 0.83 / 0.04 |
-| sonnet-4.6 (guard) | 0.83 / 0.25 | — / — | 0.83 / 0.18 |
+| glm-5.3-flash | 0.83 / 0.35 | n/a | 0.80 / 0.18 |
+| qwen3.8-27b | 0.83 / 0.10 | n/a | 0.83 / 0.04 |
+| sonnet-4.6 (guard) | 0.83 / 0.25 | n/a | 0.83 / 0.18 |
 
 Per corpus, related context on, two runs each:
 
@@ -390,14 +391,14 @@ What that says:
   with recall flat. The default model got quieter too, which is the guard
   the pass was run with.
 - **The Qwen note earns its place.** Recall rose on all three corpora
-  (0.72 → 0.81, 0.92 → 0.96, 0.60 → 0.65) and noise did not rise on any.
+  (0.72 to 0.81, 0.92 to 0.96, 0.60 to 0.65) and noise did not rise on any.
   It ships.
 - **The GLM note does not.** Recall did not move and noise went both ways
-  (0.12 → 0.00 on info, 0.19 → 0.30 on multi-file). It was removed, and
+  (0.12 to 0.00 on info, 0.19 to 0.30 on multi-file). It was removed, and
   GLM runs on the base prompt alone. A DeepSeek note was drafted with the
   Qwen wording and never measured; it was removed for that reason.
 - **Qwen's info recall is the one number that fell** against the sweep
-  (0.80 → 0.65). The sweep's figure was one run; the ablation's two runs
+  (0.80 to 0.65). The sweep's figure was one run; the ablation's two runs
   without the note read 0.60. The likelier reading is that 0.80 was the
   high draw, not that the change cost it.
 
@@ -414,7 +415,7 @@ paying per token.
 
 | model on Synthetic | tuning R / N | multi-file R / N | info R / N | $/review | lost |
 |---|---|---|---|---|---|
-| hf:zai-org/GLM-5.3-Flash, run 1 | 0.88 / 0.12 | 0.92 / 0.14 | 0.70 / 0.00 | — | 0 |
+| hf:zai-org/GLM-5.3-Flash, run 1 | 0.88 / 0.12 | 0.92 / 0.14 | 0.70 / 0.00 | n/a | 0 |
 | hf:zai-org/GLM-5.3-Flash, run 2 | 0.69 / 0.19 | 0.92 / 0.21 | 0.78 / 0.09 | $0.0025 – $0.0031 | 1 of 42 |
 | hf:Qwen/Qwen3.8-27B | 0.75 / 0.00 | 0.83 / 0.14 | 0.60 / 0.08 | $0.010 – $0.023 | 0 |
 
@@ -509,7 +510,7 @@ corpus, related context on, no stalls, no lost reviews:
 
 Tuning noise roughly halved and multi-file noise fell to 0.04 with recall
 up, which is the same shape the base-prompt rules produced for every other
-model. Info recall fell 0.70 → 0.50; the old figure was one run and the
+model. Info recall fell from 0.70 to 0.50; the old figure was one run and the
 new one is two, so the likelier reading is that 0.70 was the high draw.
 Weighted recall over the 38 plants is 0.76, beside gemma-4-31b pinned
 (0.75) and under glm-5.3-flash (0.80), at a price between the two.
@@ -549,10 +550,10 @@ What that says:
   qwen triage pass; the reviewers themselves are under a cent together.
 - **The ensemble buys recall with noise.** Weighted recall 0.84 is the
   best measured, and its info recall (0.70) is the best of any
-  configuration, but noise runs 0.21 – 0.38. The triage rerank merges
-  duplicates well — the pool from two reviewers publishes fewer findings
-  than their sum — and does not remove enough of what only one reviewer
-  said. That is the lever to pull next: a rerank that asks the triager to
+  configuration, but noise runs 0.21–0.38. The triage rerank merges
+  duplicates well (the pool from two reviewers publishes fewer findings)
+  and does not remove enough of what only one reviewer said. That is the
+  lever to pull next: a rerank that asks the triager to
   rate a single-reviewer finding against the other reviewer's silence.
 - **The router works.** Its tally sends every security, concurrency and
   TypeScript batch to qwen and the rest to gemma, and the ordering of
