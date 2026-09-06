@@ -1,7 +1,9 @@
 package vcs
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -421,6 +423,7 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 				continue
 			}
 			out.Comments = append(out.Comments, PriorComment{
+				ID:          c.GetID(),
 				Path:        c.GetPath(),
 				Line:        c.GetLine(),
 				Fingerprint: fp,
@@ -604,4 +607,137 @@ func prNumberFromEnv(getenv func(string) string) (int, error) {
 	}
 
 	return 0, fmt.Errorf("no pull request number in the environment")
+}
+
+// ResolveThreads replies to each comment and resolves its review thread.
+// Threads are a GraphQL notion: the REST comment id is matched to its thread
+// through the thread's first comment, and a thread already resolved, or one
+// this tool cannot find, is left alone and not reported as resolved.
+func (g *GitHub) ResolveThreads(ctx context.Context, ref Ref, commentIDs []int64, reply string) ([]int64, error) {
+	if err := validateRef(ref); err != nil {
+		return nil, err
+	}
+	if len(commentIDs) == 0 {
+		return nil, nil
+	}
+	threads, err := g.reviewThreads(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	var resolved []int64
+	for _, id := range commentIDs {
+		th, ok := threads[id]
+		if !ok || th.resolved {
+			continue
+		}
+		if reply != "" {
+			if _, _, err := g.client.PullRequests.CreateCommentInReplyTo(ctx, ref.Owner, ref.Repo, ref.Number, reply, id); err != nil {
+				return resolved, fmt.Errorf("github: reply to comment %d on %s: %w", id, ref, err)
+			}
+		}
+		if err := g.graphql(ctx, `mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { isResolved } } }`, map[string]any{"id": th.id}, nil); err != nil {
+			return resolved, fmt.Errorf("github: resolve thread of comment %d on %s: %w", id, ref, err)
+		}
+		resolved = append(resolved, id)
+	}
+	return resolved, nil
+}
+
+type reviewThread struct {
+	id       string
+	resolved bool
+}
+
+// reviewThreads maps each thread's first comment (by REST id) to the thread.
+func (g *GitHub) reviewThreads(ctx context.Context, ref Ref) (map[int64]reviewThread, error) {
+	out := map[int64]reviewThread{}
+	var cursor *string
+	for {
+		var resp struct {
+			Repository struct {
+				PullRequest struct {
+					ReviewThreads struct {
+						PageInfo struct {
+							HasNextPage bool   `json:"hasNextPage"`
+							EndCursor   string `json:"endCursor"`
+						} `json:"pageInfo"`
+						Nodes []struct {
+							ID         string `json:"id"`
+							IsResolved bool   `json:"isResolved"`
+							Comments   struct {
+								Nodes []struct {
+									DatabaseID int64 `json:"databaseId"`
+								} `json:"nodes"`
+							} `json:"comments"`
+						} `json:"nodes"`
+					} `json:"reviewThreads"`
+				} `json:"pullRequest"`
+			} `json:"repository"`
+		}
+		q := `query($owner: String!, $repo: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id isResolved comments(first: 1) { nodes { databaseId } } }
+      }
+    }
+  }
+}`
+		if err := g.graphql(ctx, q, map[string]any{"owner": ref.Owner, "repo": ref.Repo, "number": ref.Number, "after": cursor}, &resp); err != nil {
+			return nil, fmt.Errorf("github: list review threads on %s: %w", ref, err)
+		}
+		for _, n := range resp.Repository.PullRequest.ReviewThreads.Nodes {
+			if len(n.Comments.Nodes) > 0 {
+				out[n.Comments.Nodes[0].DatabaseID] = reviewThread{id: n.ID, resolved: n.IsResolved}
+			}
+		}
+		page := resp.Repository.PullRequest.ReviewThreads.PageInfo
+		if !page.HasNextPage {
+			return out, nil
+		}
+		cursor = &page.EndCursor
+	}
+}
+
+// graphql posts one query to the GraphQL endpoint beside the REST base URL,
+// with the client's own authentication, and decodes data into out.
+func (g *GitHub) graphql(ctx context.Context, query string, variables map[string]any, out any) error {
+	endpoint := "https://api.github.com/graphql"
+	if base := g.client.BaseURL; base != nil && base.Host != "api.github.com" {
+		endpoint = base.Scheme + "://" + base.Host + "/api/graphql"
+	}
+	body, err := json.Marshal(map[string]any{"query": query, "variables": variables})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := g.client.Client().Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var envelope struct {
+		Data   json.RawMessage `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return fmt.Errorf("graphql: %s: %w", resp.Status, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("graphql: %s", resp.Status)
+	}
+	if len(envelope.Errors) > 0 {
+		return fmt.Errorf("graphql: %s", envelope.Errors[0].Message)
+	}
+	if out != nil {
+		return json.Unmarshal(envelope.Data, out)
+	}
+	return nil
 }

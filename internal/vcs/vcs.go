@@ -177,6 +177,10 @@ type PriorReview struct {
 
 // PriorComment is one inline comment an earlier run published.
 type PriorComment struct {
+	// ID is the forge's identifier for the comment, for a later run that
+	// resolves its thread.
+	ID int64
+
 	Path string
 
 	// Line is where the forge currently shows the comment, which moves as
@@ -188,6 +192,13 @@ type PriorComment struct {
 	// published with. See Comment.Fingerprint.
 	Fingerprint string
 	Class       string
+}
+
+// ThreadResolver is implemented by providers that can resolve the review
+// threads this tool opened earlier, with a reply saying why. It returns the
+// comment IDs whose threads were resolved.
+type ThreadResolver interface {
+	ResolveThreads(ctx context.Context, ref Ref, commentIDs []int64, reply string) ([]int64, error)
 }
 
 // PriorReviewer is implemented by providers that can read back what this tool
