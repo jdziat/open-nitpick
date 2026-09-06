@@ -36,6 +36,11 @@ jobs:
           skip-drafts: true
 ```
 
+**Superseded comments.** On a later push, an earlier inline comment whose
+lines changed and whose finding did not recur is resolved with a reply
+saying so, and the walkthrough counts them. `review.resolve_superseded:
+false` leaves threads for a person to close.
+
 **Skipping a pull request.** `skip-drafts: true` leaves drafts alone until
 they are marked ready. A pull request that should never be reviewed says
 so with `[skip review]` (or `[skip nitpick]`) in its title, its body, or

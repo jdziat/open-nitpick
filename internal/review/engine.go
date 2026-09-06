@@ -403,6 +403,10 @@ type Report struct {
 	// already been read.
 	Head string
 
+	// Superseded are the earlier comments this run resolved: their lines
+	// changed since the earlier review and the finding did not recur.
+	Superseded []vcs.PriorComment
+
 	// Incremental records that this run reviewed only the files changed since
 	// an earlier run, and which. Nil when the whole change was reviewed.
 	Incremental *Incremental
@@ -663,6 +667,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// After the gate, so what is counted as "already posted" is what would
 	// otherwise have been posted, and nothing below min_severity is.
 	findings, report.AlreadyReported = withholdAlreadyReported(findings, prior)
+	report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported)
 
 	// Triage's drops are disclosed exactly as an expert's refutations are:
 	// on the pull request, under "reported, then withheld", with the reason.
@@ -818,6 +823,72 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 
 // withholdAlreadyReported splits findings into those to publish and those an
 // earlier run already posted.
+// superseded resolves the earlier comments this run has outgrown: on an
+// incremental run, a comment whose lines changed since the earlier review
+// (its file was re-read, or the forge no longer places it on the diff) and
+// whose finding this run did not make again. A comment on a file this run
+// did not re-read is left alone, since nothing was checked; so is every
+// comment when the earlier revision could not be compared. Each resolved
+// thread gets a reply saying why, so a reader is not left with a silent
+// close.
+func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorReview, inc *Incremental, findings, withheld []Finding) []vcs.PriorComment {
+	if !e.Config.Review.ResolveSuperseded || prior == nil || inc == nil || inc.Since == "" {
+		return nil
+	}
+	resolver, ok := e.Provider.(vcs.ThreadResolver)
+	if !ok {
+		return nil
+	}
+	reread := map[string]bool{}
+	for _, p := range inc.Reviewed {
+		reread[p] = true
+	}
+	recurred := map[string]bool{}
+	for _, f := range append(append([]Finding(nil), findings...), withheld...) {
+		recurred[Fingerprint(f)] = true
+	}
+	var candidates []vcs.PriorComment
+	var ids []int64
+	for _, c := range prior.Comments {
+		if c.ID == 0 || recurred[c.Fingerprint] {
+			continue
+		}
+		if c.Line == 0 || reread[c.Path] {
+			candidates = append(candidates, c)
+			ids = append(ids, c.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	reply := fmt.Sprintf("Resolved by open-nitpick: the lines this pointed at changed after %s was reviewed, and the finding did not recur on the current head.", short(inc.Since))
+	resolved, err := resolver.ResolveThreads(ctx, ref, ids, reply)
+	if err != nil {
+		e.log().Warn("could not resolve superseded comments", "error", err, "resolved", len(resolved), "of", len(ids))
+	}
+	done := map[int64]bool{}
+	for _, id := range resolved {
+		done[id] = true
+	}
+	var out []vcs.PriorComment
+	for _, c := range candidates {
+		if done[c.ID] {
+			out = append(out, c)
+		}
+	}
+	if len(out) > 0 {
+		e.log().Info("resolved superseded comments", "count", len(out))
+	}
+	return out
+}
+
+func short(sha string) string {
+	if len(sha) > 12 {
+		return sha[:12]
+	}
+	return sha
+}
+
 func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publish, withheld []Finding) {
 	if prior == nil || len(prior.Comments) == 0 {
 		return findings, nil
