@@ -1,0 +1,18 @@
+{
+  "name": "open-nitpick",
+  "owner": {
+    "name": "Jordan Dziat"
+  },
+  "metadata": {
+    "description": "Self-hosted, model-agnostic code review as MCP tools and skills for agent sessions",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "nitpick",
+      "source": "./plugins/nitpick",
+      "description": "Review a change, review a whole repository, find code smell and AI slop, and ask which model's style a file is nearest to, from an agent session through the nitpick MCP server",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -57,15 +59,39 @@ func runTreeReview(ctx context.Context, name string, args []string, score bool) 
 		return err
 	}
 
-	repo, err := filepath.Abs(f.repo)
-	if err != nil {
-		return fmt.Errorf("resolve repo path: %w", err)
-	}
-	cfg, err := loadConfig(repo, f.configPath)
+	log := newLogger(f.verbose, f.logFormat)
+	report, tree, err := treeReview(ctx, &f, fs.Args(), budget, log, os.Stdout)
 	if err != nil {
 		return err
 	}
-	log := newLogger(f.verbose, f.logFormat)
+
+	fmt.Fprintf(os.Stderr, "\nReviewed %d file(s): %s\n", report.Plan.Files(), report.Counts)
+	printPolicy(report)
+	printLinters(report)
+	printOverruled(report)
+	fmt.Print(fullreview.Sections(report))
+	fmt.Print(fullreview.RemediationPlan(report.Findings))
+	fmt.Print(fullreview.CoverageNotice(tree))
+	if score {
+		fmt.Print(fullreview.Score(report, tree).String())
+	}
+	return nil
+}
+
+// treeReview reviews the working tree, or the paths given, and returns the
+// report and the tree that says what was covered. The review text the
+// provider publishes goes to out; the MCP server passes io.Discard, since
+// its stdout is the protocol. Shared by the commands and the server so the
+// overrides below are made once.
+func treeReview(ctx context.Context, f *reviewFlags, paths []string, budget int, log *slog.Logger, out io.Writer) (*review.Report, *vcs.Tree, error) {
+	repo, err := filepath.Abs(f.repo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolve repo path: %w", err)
+	}
+	cfg, err := loadConfig(repo, f.configPath)
+	if err != nil {
+		return nil, nil, err
+	}
 	if len(cfg.Dropped) > 0 {
 		log.Warn("ignored endpoint settings from an untrusted config file", "keys", strings.Join(cfg.Dropped, ", "))
 	}
@@ -87,13 +113,13 @@ func runTreeReview(ctx context.Context, name string, args []string, score bool) 
 	// and that list is the operator's promise, not this command's to add to.
 	enableAdvisoryScanner(cfg)
 
-	tree := vcs.NewTree(vcs.NewLocal(repo, os.Stdout), fs.Args())
+	tree := vcs.NewTree(vcs.NewLocal(repo, out), paths)
 	tree.MaxBytes = cfg.Review.MaxFileBytes
 	tree.Budget = budget
 	ref := vcs.Ref{Head: vcs.Worktree}
 
-	log.Info("reviewing the tree", "repo", repo, "paths", strings.Join(fs.Args(), ","), "budget", budget)
-	engine := newEngine(&f, repo, cfg, tree, log)
+	log.Info("reviewing the tree", "repo", repo, "paths", strings.Join(paths, ","), "budget", budget)
+	engine := newEngine(f, repo, cfg, tree, log)
 	// A pull request may not supply the policy it is reviewed under, so the
 	// engine normally re-reads .nitpick.yaml from the base revision when the
 	// change touches it. A tree review "changes" every file, that one
@@ -103,20 +129,9 @@ func runTreeReview(ctx context.Context, name string, args []string, score bool) 
 	engine.Policy = nil
 	report, err := engine.Review(ctx, ref)
 	if err != nil && (!errors.Is(err, review.ErrPublish) || report == nil) {
-		return err
+		return nil, nil, err
 	}
-
-	fmt.Fprintf(os.Stderr, "\nReviewed %d file(s): %s\n", report.Plan.Files(), report.Counts)
-	printPolicy(report)
-	printLinters(report)
-	printOverruled(report)
-	fmt.Print(fullreview.Sections(report))
-	fmt.Print(fullreview.RemediationPlan(report.Findings))
-	fmt.Print(fullreview.CoverageNotice(tree))
-	if score {
-		fmt.Print(fullreview.Score(report, tree).String())
-	}
-	return nil
+	return report, tree, nil
 }
 
 // enableAdvisoryScanner names osv-scanner for a tree review unless the

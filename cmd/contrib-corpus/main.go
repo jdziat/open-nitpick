@@ -6,12 +6,11 @@
 // The corpus is third-party code and is not committed; the test that reads
 // it skips when it is absent. Output layout, which internal/modelid reads:
 //
-//	<out>/<repo>/<label>/<language>/<NNNNN>.<ext>.txt
+//	<out>/<repo>/<label>/<language>/<NNNNN>-<k>.<ext>.txt
 //
-// where label is "human" or "model-<tool>", and NNNNN is the commit's rank
-// by date, so an experiment can train on the older half and test on the
-// newer, which is the only split that asks whether a signature holds over
-// time rather than across files of one day.
+// where label is "human" or "model-<tool>", NNNNN is the commit's rank by
+// date, so an experiment can split by time, and k is the file's index
+// within the commit.
 package main
 
 import (
