@@ -17,12 +17,19 @@ Install from the marketplace in this repository:
 /plugin install nitpick@open-nitpick
 ```
 
-Or point a project at the server directly, without the skills, in
-`.mcp.json`:
+Or register the server directly, without the skills, with whichever
+client you use:
 
-```json
-{"mcpServers": {"nitpick": {"command": "nitpick", "args": ["mcp"]}}}
 ```
+nitpick mcp install claude-code     # .mcp.json at the repository root
+nitpick mcp install cursor          # or opencode, vscode, gemini-cli; -user for the user-wide file
+nitpick mcp install codex -user     # ~/.codex/config.toml
+nitpick mcp clients                 # the full list
+```
+
+Each writes `{"mcpServers": {"nitpick": {"command": "nitpick", "args":
+["mcp"]}}}` in the client's own shape, keeping what else is in the file;
+`-print` shows it without writing.
 
 ## Tools
 

@@ -124,7 +124,9 @@ nitpick mcp
 ```
 
 Serves the review engine to an agent session over the Model Context
-Protocol on stdio: `review` (a change), `full_review` and `repo_score` (a
+Protocol on stdio, and logs its progress to stderr as the command line
+does (each batch as it starts and returns, with elapsed time, then triage,
+validation and publishing): `review` (a change), `full_review` and `repo_score` (a
 tree, with the remediation plan and the coverage notice), `code_smell` and
 `ai_slop` (the tree review filtered to those classes), `identify_model`,
 and `explain_config`. Every tool returns text and structured findings with
@@ -139,7 +141,21 @@ answer:
 /plugin install nitpick@open-nitpick
 ```
 
-Or, without the skills, in a project's `.mcp.json`:
+Or, without the skills, register the server with the client you use:
+
+```bash
+nitpick mcp install claude-code        # .mcp.json at the repository root
+nitpick mcp install cursor             # .cursor/mcp.json; -user for ~/.cursor/mcp.json
+nitpick mcp install opencode           # opencode.json; -user for ~/.config/opencode/
+nitpick mcp install codex -user        # ~/.codex/config.toml, appended to
+nitpick mcp install claude-desktop -user
+nitpick mcp clients                    # the list: claude-code, claude-desktop, cursor, windsurf, vscode, opencode, gemini-cli, codex
+```
+
+Each writes the server into the client's own file, keeping what else is
+there; `-print` shows the result without writing it. A project file names
+the command as `nitpick`, for a teammate's PATH; a user file names this
+binary's absolute path. What every one of them writes is the same server:
 
 ```json
 {"mcpServers": {"nitpick": {"command": "nitpick", "args": ["mcp"]}}}
