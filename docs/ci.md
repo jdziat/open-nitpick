@@ -49,12 +49,15 @@ that start with `GITHUB_`). Then mint the token in the job and hand it to
 the Action:
 
 ```yaml
+    env:
+      NITPICK_APP_ID: ${{ secrets.NITPICK_APP_ID }}   # a step's if cannot read secrets, only env
+    steps:
       - name: Token for the review app
         id: app
-        if: ${{ secrets.NITPICK_APP_ID != '' }}
+        if: env.NITPICK_APP_ID != ''
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.NITPICK_APP_ID }}
+          app-id: ${{ env.NITPICK_APP_ID }}
           private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
       - uses: jdziat/open-nitpick@v1
         with:
