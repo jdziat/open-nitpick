@@ -4,8 +4,8 @@
 //	benchrepo init <dir>            write every fixture's base state under services/<name>/ and commit it
 //	benchrepo branches <dir>        create one branch per fixture with its head state committed
 //	benchrepo prs <owner/repo>      open a pull request for every fixture branch
-//	benchrepo trigger <owner/repo>  ask Incumbent's hosted app to review every fixture pull request
-//	benchrepo score <owner/repo>    read every reviewer's comments back off the pull requests and score them
+//	benchrepo trigger <owner/repo>  ask the hosted reviewer's app to review every fixture pull request (BENCHREPO_TRIGGER_COMMENT)
+//	benchrepo score <owner/repo>    read every reviewer's comments back off the pull requests and score them (BENCHREPO_BOT_LOGIN)
 //
 // The pull request bodies say nothing about what is planted: the description
 // reaches the reviewer, and a description that names the defect measures
@@ -14,6 +14,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -343,6 +344,9 @@ func fixtureBranches(repo string) (map[string]string, error) {
 // reviews on events it sees after installation, so pull requests opened
 // before it was installed need to be asked; a comment is the documented way.
 func trigger(repo string) error {
+	if triggerComment == "" {
+		return errors.New("BENCHREPO_TRIGGER_COMMENT is not set: the comment that asks the hosted reviewer for a review")
+	}
 	numbers, err := prNumbers(repo)
 	if err != nil {
 		return err
@@ -356,7 +360,7 @@ func trigger(repo string) error {
 		if !ok {
 			continue
 		}
-		if _, err := gh("pr", "comment", "--repo", repo, strconv.Itoa(number), "--body", "@incumbentai full review"); err != nil {
+		if _, err := gh("pr", "comment", "--repo", repo, strconv.Itoa(number), "--body", triggerComment); err != nil {
 			return err
 		}
 		fmt.Println("asked", f.Name)
@@ -384,15 +388,25 @@ func prNumbers(repo string) (map[string]int, error) {
 }
 
 // reviewers are the contenders a comment can belong to, told apart by what
-// posted it: open-nitpick by the marker it leaves in every comment,
-// Incumbent by its app account. Anything else is a human and is not scored.
+// posted it: open-nitpick by the marker it leaves in every comment, the
+// hosted reviewer by its app account, whose login is not written here and
+// arrives through BENCHREPO_BOT_LOGIN. Anything else is a human and is not
+// scored.
 var reviewers = []string{"open-nitpick", "incumbent"}
+
+// botLogin is the prefix of the hosted reviewer's GitHub login, and
+// triggerComment the comment that asks it for a review; both come from the
+// environment so the login is configuration.
+var (
+	botLogin       = os.Getenv("BENCHREPO_BOT_LOGIN")
+	triggerComment = os.Getenv("BENCHREPO_TRIGGER_COMMENT")
+)
 
 func reviewerOf(login, body string) string {
 	switch {
 	case strings.Contains(body, "<!-- open-nitpick"):
 		return "open-nitpick"
-	case strings.HasPrefix(login, "incumbentai"):
+	case botLogin != "" && strings.HasPrefix(login, botLogin):
 		return "incumbent"
 	}
 	return ""
@@ -404,6 +418,9 @@ func reviewerOf(login, body string) string {
 // calls nitpicks into the review body, and those are neither anchored nor
 // counted here — for it or against it.
 func score(repo string) error {
+	if botLogin == "" {
+		return errors.New("BENCHREPO_BOT_LOGIN is not set: the login prefix of the hosted reviewer's app, without which its comments score as a human's")
+	}
 	type comment struct {
 		Path      string `json:"path"`
 		Line      int    `json:"line"`
