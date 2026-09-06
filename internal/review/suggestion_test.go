@@ -19,8 +19,8 @@ import (
 // applicable block. The schema is hand-authored precisely to prevent this.
 func TestSuggestionIsNotSchemaRequired(t *testing.T) {
 	for name, build := range map[string]func() ([]byte, error){
-		"findings": func() ([]byte, error) { return findingsSchema() },
-		"triage":   func() ([]byte, error) { return triageSchema() },
+		"findings": func() ([]byte, error) { return findingsSchema(offeredClasses(true)) },
+		"triage":   func() ([]byte, error) { return triageSchema(offeredClasses(true)) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			raw, err := build()
@@ -74,7 +74,7 @@ func TestSuggestionIsNotSchemaRequired(t *testing.T) {
 func TestSeverityIsAClosedEnumInTheSchema(t *testing.T) {
 	// An unconstrained severity string lets a model return "none", which the
 	// gate treats as outranking critical, or "P1", which silently degrades.
-	raw, err := findingsSchema()
+	raw, err := findingsSchema(offeredClasses(true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,3 +267,25 @@ func TestEmptyPRContextIsOmitted(t *testing.T) {
 
 // renderComment2 renders with emoji enabled, matching the default persona.
 func renderComment2(f Finding) string { return renderComment(f, true) }
+
+// The class enum offers slop only when the switch is on: a model is not
+// invited to label a finding with a class the operator did not ask for.
+func TestSlopIsOfferedInTheSchemaOnlyWhenSwitchedOn(t *testing.T) {
+	off, err := findingsSchema(offeredClasses(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(off), `"slop"`) {
+		t.Error("slop is offered with review.slop off")
+	}
+	on, err := findingsSchema(offeredClasses(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(on), `"slop"`) {
+		t.Error("slop is not offered with review.slop on")
+	}
+	if !strings.Contains(string(off), `"security"`) {
+		t.Error("the other classes must stay offered")
+	}
+}

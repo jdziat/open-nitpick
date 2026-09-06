@@ -1247,11 +1247,33 @@ anywhere from warning to info across four runs, and a committed
 credential is an incident to contain before a crash is a bug to fix
 (`TestRemediationPlanPutsASecurityWarningWithTheErrors`).
 
-**One run each, Kimi-K3 on Synthetic, same-day fixture; Rule 15 applies.**
+**Two runs of the final code, Kimi-K3 on Synthetic, same-day fixture; Rule 15 still applies to the fixture, not the count.**
 The final run lists four advisories under their rules, the plan leads
 with them, both plants are located, and the control is silent. The model
 graded the secret `warning` in that run, so it sits sixth, behind the four
 advisories and its own finding on the same pin; the eval asserts
 the plan's first item is security class, which the advisories satisfy.
-What the run did not verify: the "set aside" line (an advisory the review
-dropped) never fired, since advisories no longer pass through the review.
+The second run matched on every deterministic line: the same four
+advisories, both plants, the control silent, the plan led by the
+advisories; the model graded the secret warning both times. What neither
+run exercised: the "set aside" line, which now fires only for an advisory
+the anchor filter or the analyzer set itself dropped, not one the review
+dropped, since advisories no longer pass through the review.
+
+**Review of the branch against main, same evening (`/code-review main high`,
+eleven confirmed, three refuted).** Fixed with a test each: a full-review path
+argument that names nothing is an error rather than an empty review that
+exits 0; a repository with no commits yet can be tree-reviewed; a SARIF
+finding with no line is discarded as unanchorable, not as "unchanged line
+0"; the remediation plan's tie-break knows data-loss and slop; the
+model-id corpus skips directories by name, not by a substring of the
+root's own path; the schema offers the slop class only when the switch is
+on, so FilterWith's relabelling is a defence rather than the ordinary
+path; and a walkthrough written above held-out advisories says they are
+there. Left as designed: full-review prints the review (each finding with
+its rationale) and then the grouped sections and plan, which the reviewer
+read as each finding appearing twice; the sections are an index over the
+review, and the plan is what the README promises. Refuted by the
+verifiers: the shallow-checkout fallback (the shipped action fetches full
+history), strict mode failing on the named scanner (guarded anyway), and
+a two-lockfile dedupe (the scanner runs per file).

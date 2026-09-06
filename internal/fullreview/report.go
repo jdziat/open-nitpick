@@ -167,7 +167,7 @@ func planRank(sev config.Severity, class string) int {
 }
 
 func classOrder(class string) int {
-	for i, c := range []string{"security", "correctness", "concurrency", "resource", "contract", "tests", "maintainability", "style"} {
+	for i, c := range []string{"security", "data-loss", "correctness", "concurrency", "resource", "contract", "tests", "maintainability", "style", "slop"} {
 		if c == class {
 			return i
 		}

@@ -79,7 +79,13 @@ func (t *Tree) Name() string { return "tree" }
 func (t *Tree) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error) {
 	pr, err := t.Local.PullRequest(ctx, ref)
 	if err != nil {
-		return nil, err
+		// A tree review reads files, not history: a repository with no
+		// commits yet still lists its files, and the review never needs
+		// a SHA.
+		if _, rpErr := t.Local.revParse(ctx, "HEAD"); rpErr == nil {
+			return nil, err
+		}
+		pr = &PullRequest{HeadRef: Worktree}
 	}
 	scope := "the whole repository"
 	if len(t.Paths) > 0 {
@@ -98,6 +104,24 @@ func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 	names, err := t.list(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	// A path argument that names nothing git lists is a mistake (an
+	// absolute path, a glob, a typo, a path relative to somewhere else),
+	// and the review it would produce is a successful-looking review of
+	// nothing. Said before any file is read.
+	matched := make([]bool, len(t.Paths))
+	for _, name := range names {
+		for i, p := range t.Paths {
+			if p == "" || name == p || strings.HasPrefix(name, p+"/") {
+				matched[i] = true
+			}
+		}
+	}
+	for i, p := range t.Paths {
+		if !matched[i] {
+			return nil, fmt.Errorf("path %q matches no file git lists under the repository; paths are relative to the repository root, without globs", p)
+		}
 	}
 
 	t.Covered, t.Unbudgeted, t.Skipped = nil, nil, nil

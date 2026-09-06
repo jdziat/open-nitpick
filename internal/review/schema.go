@@ -31,8 +31,12 @@ const (
 // severityEnum is the closed set a model may return.
 var severityEnum = []string{"nit", "info", "warning", "error", "critical"}
 
-// findingProperties describes one finding.
-func findingProperties() map[string]any {
+// findingProperties describes one finding. classes is the closed set the
+// model may label a finding with: every class the configuration knows,
+// less slop when the slop switch is off, so a model is never offered a
+// class the operator did not ask for and FilterWith's relabelling of an
+// unasked slop finding is a defence, not the ordinary path.
+func findingProperties(classes []string) map[string]any {
 	return map[string]any{
 		"path": map[string]any{
 			"type":        "string",
@@ -53,7 +57,7 @@ func findingProperties() map[string]any {
 		},
 		"class": map[string]any{
 			"type":        "string",
-			"enum":        config.ClassNames(),
+			"enum":        classes,
 			"description": "Which kind of problem this is. Pick the closest match; this drives which findings a repository publishes.",
 		},
 		"title": map[string]any{
@@ -80,7 +84,7 @@ func findingProperties() map[string]any {
 //
 // Note what is absent from `required`: suggestion. That omission is the whole
 // point of hand-authoring this.
-func findingsSchema() (json.RawMessage, error) {
+func findingsSchema(classes []string) (json.RawMessage, error) {
 	schema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -89,7 +93,7 @@ func findingsSchema() (json.RawMessage, error) {
 				"description": "Defects found. An empty array is a valid and common answer.",
 				"items": map[string]any{
 					"type":                 "object",
-					"properties":           findingProperties(),
+					"properties":           findingProperties(classes),
 					"required":             []string{"path", "line", "severity", "category", "class", "title", "rationale"},
 					"additionalProperties": false,
 				},
@@ -104,7 +108,7 @@ func findingsSchema() (json.RawMessage, error) {
 
 // triageSchema is the response schema for the triage pass, which additionally
 // returns the walkthrough summary.
-func triageSchema() (json.RawMessage, error) {
+func triageSchema(classes []string) (json.RawMessage, error) {
 	schema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -113,7 +117,7 @@ func triageSchema() (json.RawMessage, error) {
 				"description": "The findings that should be published, most severe first.",
 				"items": map[string]any{
 					"type":                 "object",
-					"properties":           findingProperties(),
+					"properties":           findingProperties(classes),
 					"required":             []string{"path", "line", "severity", "category", "class", "title", "rationale"},
 					"additionalProperties": false,
 				},
@@ -194,4 +198,20 @@ func schemaOption(name string, build func() (json.RawMessage, error)) (llms.Call
 		return nil, err
 	}
 	return llms.WithJSONSchema(name, schema, true), nil
+}
+
+// offeredClasses is the class enum for a configuration: every class, less
+// slop unless review.slop is on.
+func offeredClasses(slop bool) []string {
+	all := config.ClassNames()
+	if slop {
+		return all
+	}
+	out := make([]string, 0, len(all))
+	for _, c := range all {
+		if c != string(config.ClassSlop) {
+			out = append(out, c)
+		}
+	}
+	return out
 }

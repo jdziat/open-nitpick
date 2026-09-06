@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
@@ -95,5 +96,18 @@ func TestCoverageNoticeNamesWhatWasLeftOut(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("notice lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+// Every class the config knows has a place in the tie-break, so data loss
+// sorts with what breaks and slop with what reads badly.
+func TestRemediationPlanTieBreakKnowsEveryClass(t *testing.T) {
+	for _, c := range config.Classes() {
+		if classOrder(string(c)) == 99 {
+			t.Errorf("class %s has no place in the remediation plan's order", c)
+		}
+	}
+	if classOrder("data-loss") > classOrder("maintainability") || classOrder("slop") < classOrder("style") {
+		t.Error("data loss must sort before maintainability, and slop after style")
 	}
 }

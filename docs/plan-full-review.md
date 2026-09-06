@@ -44,7 +44,7 @@ order: a security finding graded warning or above sorts with the errors,
 since a committed credential is an incident before a crash is a bug. The
 eval asserts the plan's first item is security class; with advisories
 present they lead, and the planted secret follows at whatever the model
-graded it (info in one run, warning in the next), so "the secret first" holds only against
+graded it (info in one run, warning in the next two), so "the secret first" holds only against
 the model's grade, not the scanner's.
 
 Review a whole repository, or the paths given, rather than a change. The
