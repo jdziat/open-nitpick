@@ -175,11 +175,39 @@ func classOrder(class string) int {
 	return 99
 }
 
+// Reviewed is the set of files a model answered for: the tree's covered
+// files less the ones whose batch failed, which the engine lists in
+// Report.Incomplete. Covered is what entered the diff, not what was read,
+// and a tail or a denominator built on it says full coverage over a review
+// whose head admits files were lost.
+func Reviewed(report *review.Report, t *vcs.Tree) (reviewed, failed []string) {
+	lost := map[string]bool{}
+	for _, p := range report.Incomplete {
+		lost[p] = true
+	}
+	for _, p := range t.Covered {
+		if lost[p] {
+			failed = append(failed, p)
+		} else {
+			reviewed = append(reviewed, p)
+		}
+	}
+	return reviewed, failed
+}
+
 // CoverageNotice says what the tree review did not read, in the voice of the
-// review's own notices: silence must not read as clean.
-func CoverageNotice(t *vcs.Tree) string {
+// review's own notices: silence must not read as clean. It is the last
+// thing printed, so it carries everything a reader of the tail alone, or a
+// script reading the last lines, would need: the files a model answered
+// for out of the files that entered, the files whose batch failed, the
+// budget and the skips, and the analyzers that did not run.
+func CoverageNotice(report *review.Report, t *vcs.Tree) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "\nCovered %d file(s).\n", len(t.Covered))
+	reviewed, failed := Reviewed(report, t)
+	fmt.Fprintf(&b, "\nReviewed %d of %d file(s).\n", len(reviewed), len(t.Covered))
+	if len(failed) > 0 {
+		fmt.Fprintf(&b, "Not reviewed, the model call for their batch failed (%d file(s)): %s\n", len(failed), strings.Join(failed, ", "))
+	}
 	if len(t.Unbudgeted) > 0 {
 		fmt.Fprintf(&b, "Not reviewed, the budget ran out first (%d file(s)): %s\n", len(t.Unbudgeted), strings.Join(t.Unbudgeted, ", "))
 	}
@@ -189,5 +217,24 @@ func CoverageNotice(t *vcs.Tree) string {
 			fmt.Fprintf(&b, "  %s: %s\n", s.Path, s.Reason)
 		}
 	}
+	if failed := FailedAnalyzers(report); len(failed) > 0 {
+		fmt.Fprintf(&b, "Analyzers that did not run (%d):\n", len(failed))
+		for _, a := range failed {
+			fmt.Fprintf(&b, "  %s\n", a)
+		}
+	}
 	return b.String()
+}
+
+// FailedAnalyzers names the analyzers that were expected to run and did
+// not, with the reason, so a roster line buried above a long report is
+// repeated where the report ends.
+func FailedAnalyzers(report *review.Report) []string {
+	var out []string
+	for _, s := range report.Linters {
+		if s.Outcome == review.LinterFailed {
+			out = append(out, s.Linter+": "+s.State)
+		}
+	}
+	return out
 }

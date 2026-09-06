@@ -71,7 +71,7 @@ func runTreeReview(ctx context.Context, name string, args []string, score bool) 
 	printOverruled(report)
 	fmt.Print(fullreview.Sections(report))
 	fmt.Print(fullreview.RemediationPlan(report.Findings))
-	fmt.Print(fullreview.CoverageNotice(tree))
+	fmt.Print(fullreview.CoverageNotice(report, tree))
 	if score {
 		fmt.Print(fullreview.Score(report, tree).String())
 	}
