@@ -5867,7 +5867,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 		t.Fatalf("reading docs/findings.md: %v", err)
 	}
 	for _, want := range []string{
-		fmt.Sprintf("%d accurate / %d inflated / %d\nunderstated on the tuning fixtures and %s over all of them — O-ACC %.2f and\n%.2f",
+		fmt.Sprintf("%d accurate / %d inflated / %d\nunderstated on the tuning fixtures and %s over all of them: O-ACC %.2f and\n%.2f",
 			tuning.a, tuning.i, tuning.u, render(crFull), acc(tuning), acc(crFull)),
 		fmt.Sprintf("credited\non %d plants here, landing %d `critical`, %d `error` and %d `warning`",
 			majorPlants, majorSpread[config.SeverityCritical],
@@ -5896,7 +5896,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	for _, want := range []string{
 		fmt.Sprintf("plants %d defects over %d fixtures and bands them %d blocking, %d medium, %d low",
 			plants, len(corpus), bands[2], bands[1], bands[0]),
-		fmt.Sprintf("banded %s — a perfect record, an exact tie with a calibrated reviewer's %s, over %d of the %d plants",
+		fmt.Sprintf("banded %s, a perfect record, an exact tie with a calibrated reviewer's %s, over %d of the %d plants",
 			render(selectiveBanded), render(calibratedBanded), selectiveGraded, plants),
 		fmt.Sprintf("the stampers band %s of %d (B-ACC %.3f)", render(stampCritical), plants, acc(stampCritical)),
 		fmt.Sprintf("it locates %d critical, %d error and %d warning, so %d of its %d are blocking, and it bands %s over them",
