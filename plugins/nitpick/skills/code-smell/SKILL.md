@@ -22,6 +22,8 @@ of those paths costs; name the paths that matter rather than the tree.
 - `plan` orders them and groups the ones that share a fix, with the files
   each touches, which is the estimate.
 - `covered` and `skipped` say what was and was not read.
+- `hidden` lists findings outside the three classes (bugs, security)
+  that the same review made. Relay them; they cost the same.
 
 ## Acting on it
 

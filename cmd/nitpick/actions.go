@@ -58,7 +58,11 @@ func appendFile(path, content string) {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	_, _ = f.WriteString(content)
+	if _, err := f.WriteString(content); err != nil {
+		// A short write leaves a truncated outputs or summary file that a
+		// later step reads as missing keys; said on stderr, not swallowed.
+		fmt.Fprintf(os.Stderr, "could not write %s: %v\n", path, err)
+	}
 }
 
 // setOutputs records the run's outputs. Every count is written, including

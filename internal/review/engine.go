@@ -770,9 +770,9 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 		return files, nil
 	}
 	if prior.Head == pr.HeadSHA {
-		// The same commit reviewed again — a reopen, or a re-run. Nothing
-		// moved, so nothing is re-read; the findings already posted are
-		// withheld below and the run says so.
+		// The same commit reviewed again (a reopen, or a re-run). Nothing
+		// moved, so nothing is re-read: the run stops at the empty batch
+		// with this note as its only output, and the earlier review stands.
 		return nil, &Incremental{Since: prior.Head, Unchanged: files.Paths()}
 	}
 	differ, ok := e.Provider.(vcs.IncrementalDiffer)
@@ -1112,6 +1112,19 @@ func (e *Engine) recordSeverity(f *Finding) {
 	f.Severity = string(normalized)
 }
 
+// holdAdvisories splits the known advisories from the findings a model pass
+// will see, preserving order on both sides.
+func holdAdvisories(findings []Finding) (rest, advisories []Finding) {
+	for _, f := range findings {
+		if f.IsAdvisory() {
+			advisories = append(advisories, f)
+		} else {
+			rest = append(rest, f)
+		}
+	}
+	return rest, advisories
+}
+
 // restoreSeverityProvenance puts back who reported a finding and, where it
 // still describes something, the word that reporter used — both lost by a pass
 // that decodes findings from JSON, where they carry `json:"-"`.
@@ -1140,19 +1153,6 @@ func (e *Engine) recordSeverity(f *Finding) {
 // direction: failing to restore prints "(word not recorded)", which is visible,
 // while restoring onto the wrong finding quotes a reviewer as saying something
 // it did not — the failure this whole field pair exists to prevent.
-// holdAdvisories splits the known advisories from the findings a model pass
-// will see, preserving order on both sides.
-func holdAdvisories(findings []Finding) (rest, advisories []Finding) {
-	for _, f := range findings {
-		if f.IsAdvisory() {
-			advisories = append(advisories, f)
-		} else {
-			rest = append(rest, f)
-		}
-	}
-	return rest, advisories
-}
-
 func (e *Engine) restoreSeverityProvenance(f *Finding, before map[string]Finding) {
 	original, ok := before[f.Key()]
 	if !ok {
