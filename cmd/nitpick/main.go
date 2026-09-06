@@ -104,6 +104,7 @@ Usage:
                                    The same, plus slop, bug and security findings per thousand lines, by language
   nitpick identify-model <file>... Which model's style a file is most similar to (Go, Python, TypeScript; see docs/findings.md)
   nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
+  nitpick mcp install <client>     Register that server with an agent client (claude-code, cursor, opencode, codex, ...)
   nitpick explain-config [flags]   Show the resolved configuration and prompts
   nitpick providers                List available model providers
   nitpick linters                  List the deterministic analyzers and how each is configured
