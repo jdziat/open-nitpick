@@ -9,8 +9,7 @@ measured tables are what each did on this project's corpora, with every rule
 in [measurement.md](measurement.md) applying: above all that the corpora are
 this project's own, that the incumbent's side is its CLI in plain-text mode
 on a free allowance rather than the hosted product with a learned codebase,
-and that Contender and Bugbot are not in the tables because neither could be
-run here.
+and that Bugbot is not in the tables because it could not be run here.
 
 ## Capabilities
 
@@ -116,7 +115,7 @@ suppress an objection the corpus itself calls defensible. What would move it
 is a larger TypeScript corpus, not a narrower reviewer.
 
 Nothing above is a claim about the hosted product with a learned codebase,
-about Contender or Bugbot, or about a corpus anyone else wrote.
+about Bugbot, or about a corpus anyone else wrote.
 
 ### End to end, on GitHub (2026-09-03)
 

@@ -129,10 +129,6 @@ func TestBenchmarkMultiFile(t *testing.T) {
 			_, _, err := CollectIncumbent(ctx, fx, dir, opts.Timeout, log)
 			return err
 		}},
-		{ContenderModel, ContenderCacheDir, CachedContender, ContenderAvailable, func(ctx context.Context, fx []Fixture, dir string, log func(string)) error {
-			_, _, err := CollectContender(ctx, fx, dir, opts.Timeout, log)
-			return err
-		}},
 	}
 	for _, inc := range incumbents {
 		var missing []Fixture
@@ -306,29 +302,6 @@ func trimName(n string) string {
 	return n
 }
 
-// TestCollectContender collects Contender reviews for the selected fixtures,
-// one at a time, caching each. Requires `contender login`.
-func TestCollectContender(t *testing.T) {
-	ctx := context.Background()
-	if !ContenderAvailable(ctx) {
-		t.Skip("contender CLI not installed or not signed in; run 'contender login'")
-	}
-
-	opts, err := OptionsFromEnv()
-	if err != nil {
-		t.Fatalf("options: %v", err)
-	}
-	if strings.TrimSpace(os.Getenv(EnvFixtures)) == "" {
-		opts.Fixtures = MultiFileFixtures()
-	}
-
-	collected, remaining, err := CollectContender(ctx, opts.Fixtures, ContenderCacheDir, opts.Timeout,
-		func(line string) { t.Log(line) })
-	if err != nil {
-		t.Fatalf("collect: %v", err)
-	}
-	t.Logf("collected %d this pass, %d still outstanding", collected, remaining)
-}
 
 // compositeCost prices a composite run: every model's usage at its own rate,
 // known only when every model is priced and reported its usage.

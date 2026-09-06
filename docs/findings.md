@@ -420,7 +420,6 @@ judge:
 | sonnet-4.6 + related context | **1.00** (16/16) | 0.40 (8/20) | 1 | 4/4 | 8/8 | 4/4 |
 | sonnet-4.6, diff only | 0.88 (14/16) | 0.40 (8/20) | 1 | 4/4 | 6/8 | 4/4 |
 | incumbent/cli | 0.12 (1/8) | 0.40 (4/10) | 2 | 1/2 | 0/4 | 0/2 |
-| contender/cli | not collected | | | | | |
 
 Resolution: 8 plants at two runs is 16 observations, so one defect is 0.0625.
 The gap is two observations, and they are the same fixture twice.
@@ -478,11 +477,8 @@ one CLI review per fixture against a free allowance, in plain-text mode, on
 the same day; nothing here says what the hosted product with a learned
 codebase does.
 
-**Contender was not measured.** The adapter is written and tested against the
-CLI's documented `--json` shape, and `make collect-contender` will collect
-once `contender login` has been run on the machine that runs it. Bugbot has no
-CLI and reviews only pull requests on a repository it is installed on, so
-there is no adapter and no number.
+**Bugbot was not measured.** It has no CLI and reviews only pull requests on
+a repository it is installed on, so there is no adapter and no number.
 
 **What this does and does not license.** Related context found one defect a
 diff-only review could not, on the one fixture whose contract was not
