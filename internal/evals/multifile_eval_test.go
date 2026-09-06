@@ -302,7 +302,6 @@ func trimName(n string) string {
 	return n
 }
 
-
 // compositeCost prices a composite run: every model's usage at its own rate,
 // known only when every model is priced and reported its usage.
 func compositeCost(prices *PriceTable, byModel map[string]TokenUsage) Cost {
