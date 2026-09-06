@@ -66,6 +66,11 @@ func TestGitHubValidatesRef(t *testing.T) {
 
 func TestGitHubPullRequest(t *testing.T) {
 	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/repos/o/r/commits/abc123") {
+			// The head commit's message, read for a skip marker.
+			_ = json.NewEncoder(w).Encode(map[string]any{"sha": "abc123", "commit": map[string]any{"message": "Add retry\n\n[skip review]"}})
+			return
+		}
 		if !strings.HasSuffix(r.URL.Path, "/repos/o/r/pulls/7") {
 			t.Errorf("unexpected path %q", r.URL.Path)
 		}
@@ -94,6 +99,12 @@ func TestGitHubPullRequest(t *testing.T) {
 	}
 	if !pr.Draft {
 		t.Error("Draft should be carried through")
+	}
+	if !strings.Contains(pr.HeadMessage, "[skip review]") {
+		t.Errorf("HeadMessage = %q, want the head commit's message", pr.HeadMessage)
+	}
+	if m, ok := SkipRequested(pr, []string{"[skip review]"}); !ok || m != "[skip review]" {
+		t.Errorf("SkipRequested = %q, %v", m, ok)
 	}
 }
 

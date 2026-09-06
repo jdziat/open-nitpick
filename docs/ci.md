@@ -77,6 +77,14 @@ lines changed and whose finding did not recur is resolved with a reply
 saying so, and the walkthrough counts them. `review.resolve_superseded:
 false` leaves threads for a person to close.
 
+**Skipping a pull request.** `skip-drafts: true` leaves drafts alone until
+they are marked ready. A pull request that should never be reviewed says
+so with `[skip review]` (or `[skip nitpick]`) in its title, its body, or
+its head commit's message; the run reports `result: skipped`, posts
+nothing, and the job summary says which marker it found. The phrases are
+`review.skip_markers` in `.nitpick.yaml`, so a repository can choose its
+own.
+
 **Posting as your own GitHub App.** With the job token the review is posted
 by `github-actions[bot]`. A GitHub App gives it a name and an avatar of your
 choosing, its own permissions, and reviews that count as a reviewer's in
