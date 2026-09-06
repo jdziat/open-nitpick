@@ -301,8 +301,11 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 	paths, rejected := safePaths(reviewablePaths(s.cfg, files))
 	for _, p := range rejected {
 		// A path an analyzer would read as a flag. Reported rather than
-		// silently dropped, since it is more likely an attack than an accident.
+		// silently dropped, since it is more likely an attack than an
+		// accident: in the log, and in the report as a file no analyzer
+		// saw, so the review carries the gap and not just the process.
 		s.log.Warn("skipping path that would be parsed as an analyzer flag", "path", p)
+		s.uncover([]review.LinterUncovered{{Linter: "analyzers", Path: p, Reason: review.UncoveredNotSelected}})
 	}
 	if len(paths) == 0 {
 		return nil, nil
