@@ -1,0 +1,32 @@
+# commit f4a5c68589bd 2026-07-08T16:13:31+02:00 src/huggingface_hub/cli/models.py
+from huggingface_hub.inference._providers import PROVIDER_T
+    SoftChoice,
+InferenceProviderEnum = enum.Enum(  # type: ignore[misc]
+    "InferenceProviderEnum", {p: p for p in sorted(get_args(PROVIDER_T))}, type=str
+)
+        "hf models ls --inference-provider fireworks-ai --sort downloads",
+        "hf models ls --warm --search llama",
+    inference_provider: Annotated[
+        list[str] | None,
+        Option(
+            "--inference-provider",
+            click_type=SoftChoice(InferenceProviderEnum),
+            help="Filter by inference provider(s) serving the model, e.g. 'fireworks-ai'.",
+        ),
+    ] = None,
+    warm: Annotated[
+        bool,
+        Option("--warm", help="Only list models currently served by at least one inference provider."),
+    ] = False,
+        if inference_provider is not None:
+            raise click.BadParameter("Cannot use --inference-provider when listing files.")
+        if warm:
+            raise click.BadParameter("Cannot use --warm when listing files.")
+    if warm and inference_provider is not None:
+        raise click.BadParameter("Cannot use --warm together with --inference-provider.")
+            inference="warm" if warm else None,
+            inference_provider=inference_provider,
+    if (inference_provider is not None or warm) and not expand:
+        out.hint(
+            "Use `--expand inferenceProviderMapping` to see which provider serves each model and the provider-specific model id."
+        )

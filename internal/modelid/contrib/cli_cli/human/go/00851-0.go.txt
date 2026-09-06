@@ -1,0 +1,49 @@
+// commit 2d191e5ba030 2026-01-29T11:30:08-07:00 api/queries_pr.go
+// It combines results from three sources using a cascading quota system:
+// - suggestedReviewerActors - suggested based on PR activity (base quota: 5)
+// - repository collaborators - all collaborators (base quota: 5 + unfilled from suggestions)
+// - organization teams - all teams for org repos (base quota: 5 + unfilled from collaborators)
+//
+// This ensures we show up to 15 total candidates, with each source filling any
+// unfilled quota from the previous source. Results are deduplicated.
+	// Fetch 10 from each source to allow cascading quota to fill from available results.
+				} `graphql:"suggestedReviewerActors(first: 10, query: $query)"`
+			} `graphql:"collaborators(first: 10, query: $query)"`
+			} `graphql:"teams(first: 10, query: $query)"`
+	// Build candidates using cascading quota logic:
+	// Each source has a base quota of 5, plus any unfilled quota from previous sources.
+	// This ensures we show up to 15 total candidates, filling gaps when earlier sources have fewer.
+	const baseQuota = 5
+	// Suggested reviewers (excluding author)
+	suggestionsAdded := 0
+		if suggestionsAdded >= baseQuota {
+			break
+		}
+		var login string
+			login = n.Reviewer.User.Login
+			candidate = NewReviewerUser(login, n.Reviewer.User.Name)
+			login = n.Reviewer.Bot.Login
+			candidate = NewReviewerBot(login)
+			suggestionsAdded++
+	// Collaborators: quota = base + unfilled from suggestions
+	collaboratorsQuota := baseQuota + (baseQuota - suggestionsAdded)
+	collaboratorsAdded := 0
+		if collaboratorsAdded >= collaboratorsQuota {
+			break
+		}
+		if !seen[c.Login] {
+			seen[c.Login] = true
+			candidates = append(candidates, NewReviewerUser(c.Login, c.Name))
+			collaboratorsAdded++
+	// Teams: quota = base + unfilled from collaborators
+	teamsQuota := baseQuota + (collaboratorsQuota - collaboratorsAdded)
+	teamsAdded := 0
+	ownerName := repo.RepoOwner()
+		if teamsAdded >= teamsQuota {
+			break
+		}
+		teamLogin := fmt.Sprintf("%s/%s", ownerName, t.Slug)
+		if !seen[teamLogin] {
+			seen[teamLogin] = true
+			candidates = append(candidates, NewReviewerTeam(ownerName, t.Slug))
+			teamsAdded++

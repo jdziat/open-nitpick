@@ -1,0 +1,35 @@
+// commit c83395f2c9ec 2026-02-03T13:55:57+01:00 test/test-utils/index.ts
+export function stripIndent(str: string): string {
+  const normalized = str.replace(/\t/g, '  ')
+  const match = normalized.match(/^[ \t]*(?=\S)/gm)
+  if (!match) {
+    return normalized
+  }
+  const indent = match.filter(m => !!m).reduce((min, line) => Math.min(min, line.length), Infinity)
+  if (indent === 0) {
+    return normalized
+  }
+  return normalized.replace(new RegExp(`^[ ]{${indent}}`, 'gm'), '')
+}
+
+    const code = `await (${stripIndent(String(content))})()`
+    return code
+    const code = `
+const results = await (${stripIndent(String(content[0]))})({ ${imports.flatMap(([_, is]) => is).join(', ')} })
+    return code
+    root,
+const isWindows = process.platform === 'win32'
+
+  if (!root.endsWith('/') && !isWindows) {
+    root += '?/'
+  if (!isWindows) {
+  let unixRoot = root.replace(/\\/g, '/')
+  let win32Root = root.replaceAll('/', '\\\\')
+  if (!root.endsWith('/') && !root.endsWith('\\')) {
+    unixRoot += '?/'
+    win32Root += '?\\\\'
+  }
+
+    .replace(new RegExp(schemaRoot, 'gi'), '<urlRoot>')
+    .replace(new RegExp(unixRoot, 'gi'), '<root>/')
+    .replace(new RegExp(win32Root, 'gi'), '<root>/')

@@ -1,0 +1,36 @@
+// commit 90d696d44052 2026-08-11T08:20:37+02:00 packages/vitest/src/node/plugins/browserLoader.ts
+import c from 'tinyrainbow'
+import { createViteLogger } from '../viteLogger'
+        const logLevel = viteConfig.logLevel ?? 'warn'
+        const logger = createViteLogger(harness.logger, logLevel, {
+          allowClearScreen: false,
+        })
+        return {
+          ...browserConfig,
+          customLogger: {
+            ...logger,
+            info(message, options) {
+              // https://github.com/vitejs/vite/blob/ba3119397d0110952f29965774c627a3017d7292/packages/vite/src/node/optimizer/optimizer.ts#L76-L86
+              // https://github.com/vitejs/vite/blob/ba3119397d0110952f29965774c627a3017d7292/packages/vite/src/node/optimizer/optimizer.ts#L483-L490
+              const isOptimizerMessage
+                = message.includes('dependency optimized: ')
+                  || message.includes('dependencies optimized: ')
+                  || message.includes('optimized dependencies changed. reloading')
+              if (isOptimizerMessage) {
+                // escalate from `info` to `warn` so it shows up on Vitest's default logLevel `warn`
+                logger.warn(message, options)
+              }
+              else {
+                logger.info(message, options)
+              }
+              if (message.includes('optimized dependencies changed. reloading')) {
+                logger.warn(
+                  [
+                    c.yellow(`\n${c.bold('[vitest]')} Vite unexpectedly reloaded a test. This may cause tests to fail, lead to flaky behaviour or duplicated test runs.\n`),
+                    c.yellow(`For a stable experience, add the newly optimized dependencies to your config's ${c.bold('`optimizeDeps.include`')} field manually.\n`),
+                  ].join(''),
+                )
+              }
+            },
+          },
+        }

@@ -1,0 +1,53 @@
+// commit 2d7b8714f7e7 2026-06-30T12:31:24+00:00 router.go
+	// The bucket is resolved exactly as next() does (specific bucket, else bucket 0)
+	// so the candidate indices line up with the bucket next() iterates.
+	bucketHash := treeHash
+	if _, ok := app.treeStack[methodInt][treeHash]; !ok {
+		bucketHash = 0
+	}
+	for _, cand := range app.paramRoutes[methodInt][bucketHash] {
+		if cand.route.match(detectionPath, path, values) {
+			return skipRunChain, 0, cand.idx
+		bh := treeHash
+		if _, ok := app.treeStack[m][treeHash]; !ok {
+			bh = 0
+		for _, cand := range app.paramRoutes[m][bh] {
+			if cand.route.match(detectionPath, path, values) {
+	// Skip unmatched routes before running the middleware chain. When no middleware
+	// is registered the lookahead is pure overhead (next() already answers 404/405
+	// without running anything), so it is gated on skipHasUseRoutes.
+	if app.config.SkipUnmatchedRoutes && app.skipHasUseRoutes {
+	// Skip unmatched routes before running the middleware chain. When no middleware
+	// is registered the lookahead is pure overhead (next() already answers 404/405
+	// without running anything), so it is gated on skipHasUseRoutes.
+	if app.config.SkipUnmatchedRoutes && app.skipHasUseRoutes {
+// indexedRoute pairs a candidate route with its index in the tree bucket it was
+// taken from, so the SkipUnmatchedRoutes lookahead can hand that index to
+// next()/nextCustom() (via firstMatchIndex) to skip endpoints already ruled out.
+type indexedRoute struct {
+	route *Route
+	idx   int
+}
+
+// fast path: a method-global index of static endpoints, a per-tree-bucket bitmask
+// of methods that own parametric/root/star endpoints, and a per-bucket candidate
+// list of those endpoints. It is rebuilt together with the tree so the indexes
+	paramRoutes := make([]map[int][]indexedRoute, len(app.config.RequestMethods))
+	hasUse := false
+		paramRoutes[method] = make(map[int][]indexedRoute)
+			if route.use {
+				hasUse = true
+				continue
+			}
+			if route.mount || route.star || route.root || len(route.Params) > 0 {
+		// Per-bucket candidate list and parametric/root/star mask from the final
+		// buckets (post bucket-0 replication) so they mirror exactly what next()
+		// scans per bucket. The stored idx is the route's position in that same
+		// bucket, which next() iterates. Mounted sub-apps are expanded into normal
+		// routes before buildTree runs, so no mount route reaches this point.
+			for i, route := range bucket {
+				if route.use || route.mount {
+				if route.root || route.star || len(route.Params) > 0 {
+					paramRoutes[method][treeHash] = append(paramRoutes[method][treeHash], indexedRoute{route: route, idx: i})
+	app.paramRoutes = paramRoutes
+	app.skipHasUseRoutes = hasUse

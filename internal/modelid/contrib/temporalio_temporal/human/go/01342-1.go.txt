@@ -1,0 +1,80 @@
+// commit 07389de7d572 2026-06-18T16:19:57-07:00 api/persistence/v1/tasks.pb.go
+type SimplePartitionScalerState struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// How many partitions to target based on add rate alone.
+	AddTarget     int32 `protobuf:"varint,1,opt,name=add_target,json=addTarget,proto3" json:"add_target,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SimplePartitionScalerState) Reset() {
+	*x = SimplePartitionScalerState{}
+	mi := &file_temporal_server_api_persistence_v1_tasks_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SimplePartitionScalerState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SimplePartitionScalerState) ProtoMessage() {}
+
+func (x *SimplePartitionScalerState) ProtoReflect() protoreflect.Message {
+	mi := &file_temporal_server_api_persistence_v1_tasks_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SimplePartitionScalerState.ProtoReflect.Descriptor instead.
+func (*SimplePartitionScalerState) Descriptor() ([]byte, []int) {
+	return file_temporal_server_api_persistence_v1_tasks_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SimplePartitionScalerState) GetAddTarget() int32 {
+	if x != nil {
+		return x.AddTarget
+	}
+	return 0
+}
+
+	"\x14private_scaler_state\x18d \x01(\v2\x14.google.protobuf.AnyR\x12privateScalerState\";\n" +
+	"\x1aSimplePartitionScalerState\x12\x1d\n" +
+	"\n" +
+	"add_target\x18\x01 \x01(\x05R\taddTargetB6Z4go.temporal.io/server/api/persistence/v1;persistenceb\x06proto3"
+var file_temporal_server_api_persistence_v1_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+	(*AllocatedTaskInfo)(nil),          // 0: temporal.server.api.persistence.v1.AllocatedTaskInfo
+	(*TaskInfo)(nil),                   // 1: temporal.server.api.persistence.v1.TaskInfo
+	(*TaskQueueInfo)(nil),              // 2: temporal.server.api.persistence.v1.TaskQueueInfo
+	(*SubqueueInfo)(nil),               // 3: temporal.server.api.persistence.v1.SubqueueInfo
+	(*FairnessKeyCount)(nil),           // 4: temporal.server.api.persistence.v1.FairnessKeyCount
+	(*SubqueueKey)(nil),                // 5: temporal.server.api.persistence.v1.SubqueueKey
+	(*PartitionScaleState)(nil),        // 6: temporal.server.api.persistence.v1.PartitionScaleState
+	(*SimplePartitionScalerState)(nil), // 7: temporal.server.api.persistence.v1.SimplePartitionScalerState
+	(*timestamppb.Timestamp)(nil),      // 8: google.protobuf.Timestamp
+	(*v1.VectorClock)(nil),             // 9: temporal.server.api.clock.v1.VectorClock
+	(*v11.TaskVersionDirective)(nil),   // 10: temporal.server.api.taskqueue.v1.TaskVersionDirective
+	(*v12.Priority)(nil),               // 11: temporal.api.common.v1.Priority
+	(v13.TaskQueueType)(0),             // 12: temporal.api.enums.v1.TaskQueueType
+	(v13.TaskQueueKind)(0),             // 13: temporal.api.enums.v1.TaskQueueKind
+	(*v11.FairLevel)(nil),              // 14: temporal.server.api.taskqueue.v1.FairLevel
+	(*anypb.Any)(nil),                  // 15: google.protobuf.Any
+	8,  // 1: temporal.server.api.persistence.v1.TaskInfo.create_time:type_name -> google.protobuf.Timestamp
+	8,  // 2: temporal.server.api.persistence.v1.TaskInfo.expiry_time:type_name -> google.protobuf.Timestamp
+	9,  // 3: temporal.server.api.persistence.v1.TaskInfo.clock:type_name -> temporal.server.api.clock.v1.VectorClock
+	10, // 4: temporal.server.api.persistence.v1.TaskInfo.version_directive:type_name -> temporal.server.api.taskqueue.v1.TaskVersionDirective
+	11, // 5: temporal.server.api.persistence.v1.TaskInfo.priority:type_name -> temporal.api.common.v1.Priority
+	12, // 6: temporal.server.api.persistence.v1.TaskQueueInfo.task_type:type_name -> temporal.api.enums.v1.TaskQueueType
+	13, // 7: temporal.server.api.persistence.v1.TaskQueueInfo.kind:type_name -> temporal.api.enums.v1.TaskQueueKind
+	8,  // 8: temporal.server.api.persistence.v1.TaskQueueInfo.expiry_time:type_name -> google.protobuf.Timestamp
+	8,  // 9: temporal.server.api.persistence.v1.TaskQueueInfo.last_update_time:type_name -> google.protobuf.Timestamp
+	14, // 13: temporal.server.api.persistence.v1.SubqueueInfo.fair_ack_level:type_name -> temporal.server.api.taskqueue.v1.FairLevel
+	14, // 14: temporal.server.api.persistence.v1.SubqueueInfo.fair_max_read_level:type_name -> temporal.server.api.taskqueue.v1.FairLevel
+	15, // 16: temporal.server.api.persistence.v1.PartitionScaleState.private_scaler_state:type_name -> google.protobuf.Any
+			NumMessages:   8,

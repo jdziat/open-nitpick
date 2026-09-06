@@ -1,0 +1,66 @@
+// commit 7a17195c52df 2025-11-01T17:21:10+01:00 client/core.go
+	// do not close, these will be returned to the pool
+	errChan := acquireErrChan()
+	respChan := acquireResponseChan()
+		// retain both channels until they are drained
+		defer releaseErrChan(errChan)
+		defer releaseResponseChan(respChan)
+
+		reqv := fasthttp.AcquireRequest()
+		defer fasthttp.ReleaseRequest(reqv)
+
+		defer fasthttp.ReleaseResponse(respv)
+
+		c.req.RawRequest.CopyTo(reqv)
+		var err error
+		if err != nil {
+			errChan <- err
+			return
+
+		resp := AcquireResponse()
+		resp.setClient(c.client)
+		resp.setRequest(c.req)
+		respv.CopyTo(resp.RawResponse)
+		respChan <- resp
+	case err := <-errChan:
+		return nil, err
+	case resp := <-respChan:
+		go func() { // drain the channels and release the response
+			select {
+			case resp := <-respChan:
+				ReleaseResponse(resp)
+			case <-errChan:
+			}
+		}()
+var responseChanPool = &sync.Pool{
+	New: func() any {
+		return make(chan *Response)
+	},
+}
+
+// acquireResponseChan returns an empty, non-closed *Response channel from the pool.
+// The returned channel may be returned to the pool with releaseResponseChan
+func acquireResponseChan() chan *Response {
+	ch, ok := responseChanPool.Get().(chan *Response)
+	if !ok {
+		panic(errors.New("failed to type-assert to *Response"))
+	}
+	return ch
+}
+
+// releaseResponseChan returns the *Response channel to the pool.
+// It's the caller's responsibility to ensure that:
+// - the channel is not closed
+// - the channel is drained before returning it
+// - the channel is not reused after returning it
+func releaseResponseChan(ch chan *Response) {
+	responseChanPool.Put(ch)
+}
+
+		return make(chan error)
+// acquireErrChan returns an empty, non-closed error channel from the pool.
+// The returned channel may be returned to the pool with releaseErrChan
+// It's caller's responsibility to ensure that:
+// - the channel is not closed
+// - the channel is drained before returning it
+// - the channel is not reused after returning it

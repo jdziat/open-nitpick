@@ -1,0 +1,41 @@
+// commit f5e68663064a 2026-01-12T15:15:33+01:00 test/cli/test/optimize-deps.test.ts
+import { expect, test } from 'vitest'
+import { runVitest } from '../../test-utils'
+
+test('optimize deps optimizes them into node_modules/.vite', async () => {
+  const { errorTree, stderr } = await runVitest({
+    root: './fixtures/optimize-deps',
+    deps: {
+      optimizer: {
+        client: {
+          enabled: true,
+        },
+        ssr: {
+          enabled: true,
+        },
+      },
+    },
+    $viteConfig: {
+      optimizeDeps: {
+        include: ['@test/test-dep-url'],
+      },
+      ssr: {
+        optimizeDeps: {
+          include: ['@test/test-dep-url'],
+        },
+      },
+    },
+  })
+
+  expect(stderr).toBe('')
+  expect(errorTree()).toMatchInlineSnapshot(`
+    {
+      "ssr.test.ts": {
+        "import.meta.url": "passed",
+      },
+      "web.test.ts": {
+        "import.meta.url": "passed",
+      },
+    }
+  `)
+})

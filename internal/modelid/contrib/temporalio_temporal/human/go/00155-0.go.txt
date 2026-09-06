@@ -1,0 +1,59 @@
+// commit 20a622863ace 2025-12-01T20:21:36-05:00 common/persistence/visibility/store/elasticsearch/visibility_store.go
+) (*store.InternalListWorkflowExecutionsResponse, error) {
+	return s.GetListWorkflowExecutionsResponse(searchResult, request.Namespace, request.PageSize)
+		queryParams, err = s.convertQuery(request.Namespace, request.NamespaceID, request.Query)
+		queryParamsLegacy, err := s.convertQueryLegacy(request.Namespace, request.NamespaceID, request.Query)
+	workflowExecutionInfo, err := s.ParseESDoc(result.Id, result.Source, typeMap, request.Namespace)
+		queryParams, err = s.convertQuery(request.Namespace, request.NamespaceID, request.Query)
+			request.Namespace,
+			request.NamespaceID,
+			request.Query,
+		PageSize: request.PageSize,
+	if s.disableOrderByClause(request.Namespace.String()) && len(queryParams.Sorter) > 0 {
+		s.metricsHandler.WithTags(metrics.NamespaceTag(request.Namespace.String())).
+	searchParams.Sorter, err = getFieldSorter(queryParams.Sorter)
+	pageToken, err := s.deserializePageToken(request.NextPageToken)
+	err = s.processPageToken(searchParams, pageToken, request.Namespace)
+	c := query.NewQueryConverter(&queryConverter{}, namespaceName, saTypeMap, saMapper)
+	nameInterceptor := NewNameInterceptor(namespace, saTypeMap, s.searchAttributesMapperProvider)
+		NewValuesInterceptor(namespace, saTypeMap),
+		namespaceFilterQuery.MustNot(elastic.NewExistsQuery(sadefs.TemporalNamespaceDivision))
+) (*store.InternalListWorkflowExecutionsResponse, error) {
+
+		return &store.InternalListWorkflowExecutionsResponse{}, nil
+	response := &store.InternalListWorkflowExecutionsResponse{
+		Executions: make([]*store.InternalWorkflowExecutionInfo, 0, len(searchResult.Hits.Hits)),
+		workflowExecutionInfo, err := s.ParseESDoc(hit.Id, hit.Source, typeMap, namespace)
+) (*store.InternalWorkflowExecutionInfo, error) {
+		isValidType            bool
+		memo                   []byte
+		memoEncoding           string
+		customSearchAttributes map[string]interface{}
+	record := &store.InternalWorkflowExecutionInfo{}
+		fieldType, err := saTypeMap.GetType(fieldName)
+			// All custom and predefined search attributes are handled here.
+			if customSearchAttributes == nil {
+				customSearchAttributes = map[string]interface{}{}
+			customSearchAttributes[fieldName] = fieldValueParsed
+	if customSearchAttributes != nil {
+		var err error
+		record.SearchAttributes, err = searchattribute.Encode(customSearchAttributes, &saTypeMap)
+		if err != nil {
+			metrics.ElasticsearchDocumentParseFailuresCount.With(s.metricsHandler).Record(1)
+			return nil, serviceerror.NewInternalf(
+				"Unable to encode custom search attributes of Elasticsearch document(%s): %v",
+				docID,
+				err,
+			)
+		}
+		aliasedSas, err := searchattribute.AliasFields(
+			s.searchAttributesMapperProvider,
+			record.SearchAttributes,
+			namespaceName.String(),
+		if err != nil {
+			return nil, err
+		}
+
+		if aliasedSas != record.SearchAttributes {
+			record.SearchAttributes = aliasedSas
+		}

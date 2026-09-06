@@ -1,0 +1,68 @@
+// commit 28b868dad4ac 2025-11-21T10:34:51+01:00 pkg/github/pullrequests.go
+	"github.com/github/github-mcp-server/pkg/lockdown"
+func PullRequestRead(getClient GetClientFn, cache *lockdown.RepoAccessCache, t translations.TranslationHelperFunc, flags FeatureFlags) (mcp.Tool, server.ToolHandlerFunc) {
+				return GetPullRequest(ctx, client, cache, owner, repo, pullNumber, flags)
+				return GetPullRequestReviewComments(ctx, client, cache, owner, repo, pullNumber, pagination, flags)
+				return GetPullRequestReviews(ctx, client, cache, owner, repo, pullNumber, flags)
+				return GetIssueComments(ctx, client, cache, owner, repo, pullNumber, pagination, flags)
+func GetPullRequest(ctx context.Context, client *github.Client, cache *lockdown.RepoAccessCache, owner, repo string, pullNumber int, ff FeatureFlags) (*mcp.CallToolResult, error) {
+	if ff.LockdownMode {
+		if cache == nil {
+			return nil, fmt.Errorf("lockdown cache is not configured")
+		}
+		login := pr.GetUser().GetLogin()
+		if login != "" {
+			isSafeContent, err := cache.IsSafeContent(ctx, login, owner, repo)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check content removal: %w", err)
+			}
+
+			if !isSafeContent {
+				return mcp.NewToolResultError("access to pull request is restricted by lockdown mode"), nil
+			}
+		}
+	}
+
+func GetPullRequestReviewComments(ctx context.Context, client *github.Client, cache *lockdown.RepoAccessCache, owner, repo string, pullNumber int, pagination PaginationParams, ff FeatureFlags) (*mcp.CallToolResult, error) {
+	if ff.LockdownMode {
+		if cache == nil {
+			return nil, fmt.Errorf("lockdown cache is not configured")
+		}
+		filteredComments := make([]*github.PullRequestComment, 0, len(comments))
+		for _, comment := range comments {
+			user := comment.GetUser()
+			if user == nil {
+				continue
+			}
+			isSafeContent, err := cache.IsSafeContent(ctx, user.GetLogin(), owner, repo)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("failed to check lockdown mode: %v", err)), nil
+			}
+			if isSafeContent {
+				filteredComments = append(filteredComments, comment)
+			}
+		}
+		comments = filteredComments
+	}
+
+func GetPullRequestReviews(ctx context.Context, client *github.Client, cache *lockdown.RepoAccessCache, owner, repo string, pullNumber int, ff FeatureFlags) (*mcp.CallToolResult, error) {
+	if ff.LockdownMode {
+		if cache == nil {
+			return nil, fmt.Errorf("lockdown cache is not configured")
+		}
+		filteredReviews := make([]*github.PullRequestReview, 0, len(reviews))
+		for _, review := range reviews {
+			login := review.GetUser().GetLogin()
+			if login != "" {
+				isSafeContent, err := cache.IsSafeContent(ctx, login, owner, repo)
+				if err != nil {
+					return nil, fmt.Errorf("failed to check lockdown mode: %w", err)
+				}
+				if isSafeContent {
+					filteredReviews = append(filteredReviews, review)
+				}
+				reviews = filteredReviews
+			}
+		}
+	}
+

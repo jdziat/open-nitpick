@@ -1,0 +1,74 @@
+# commit 6f7dfbaa3f89 2026-06-29T18:22:03+02:00 tests/test_hub_mixin.py
+from pytest_mock import MockerFixture
+class TestHubMixin:
+    def assert_valid_config_json(self, cache_dir: Path) -> None:
+        with open(cache_dir / "config.json") as f:
+    def assert_no_config_json(self, cache_dir: Path) -> None:
+        files = os.listdir(cache_dir)
+    def test_save_pretrained_no_config(self, tmp_path):
+        model.save_pretrained(tmp_path)
+        self.assert_no_config_json(tmp_path)
+    def test_save_pretrained_as_dataclass_basic(self, tmp_path):
+        model.save_pretrained(tmp_path)
+        self.assert_valid_config_json(tmp_path)
+    def test_save_pretrained_as_dict_basic(self, tmp_path):
+        model.save_pretrained(tmp_path)
+        self.assert_valid_config_json(tmp_path)
+    def test_save_pretrained_optional_dataclass(self, tmp_path):
+        model.save_pretrained(tmp_path)
+        self.assert_no_config_json(tmp_path)
+        model.save_pretrained(tmp_path)
+        self.assert_valid_config_json(tmp_path)
+    def test_save_pretrained_optional_dict(self, tmp_path):
+        model.save_pretrained(tmp_path)
+        self.assert_no_config_json(tmp_path)
+        model.save_pretrained(tmp_path)
+        self.assert_valid_config_json(tmp_path)
+    def test_save_pretrained_with_dataclass_config(self, tmp_path):
+        model.save_pretrained(tmp_path, config=CONFIG_AS_DATACLASS)
+        self.assert_valid_config_json(tmp_path)
+    def test_save_pretrained_with_dict_config(self, tmp_path):
+        model.save_pretrained(tmp_path, config=CONFIG_AS_DICT)
+        self.assert_valid_config_json(tmp_path)
+    def test_init_accepts_kwargs_no_config(self, tmp_path):
+        model.save_pretrained(tmp_path)
+            model = DummyModelWithKwargs.from_pretrained(tmp_path)
+    def test_init_accepts_kwargs_with_config(self, tmp_path):
+        model.save_pretrained(tmp_path, config=CONFIG_AS_DICT)
+            DummyModelFromPretrainedExpectsConfig.from_pretrained(tmp_path)
+    def test_init_accepts_kwargs_save_and_load(self, tmp_path):
+        model.save_pretrained(tmp_path)
+            DummyModelWithKwargs.from_pretrained(tmp_path)
+    def test_save_pretrained_with_push_to_hub(self, tmp_path):
+        save_directory = tmp_path / repo_id
+    def test_from_pretrained_model_id_only(self, mocker: MockerFixture) -> None:
+        from_pretrained_mock = mocker.patch.object(DummyModelNoConfig, "_from_pretrained")
+    def test_from_pretrained_model_id_and_revision(self, mocker: MockerFixture) -> None:
+        from_pretrained_mock = mocker.patch.object(DummyModelNoConfig, "_from_pretrained")
+    def test_from_pretrained_from_absolute_path(self, tmp_path):
+        save_directory = tmp_path / "subfolder"
+    def test_from_pretrained_from_absolute_string_path(self, tmp_path):
+        save_directory = str(tmp_path / "subfolder")
+    def test_push_to_hub(self, api: HfApi, tmp_path):
+        api.model_info(repo_id)
+        tmp_config_path = hf_hub_download(repo_id=repo_id, filename="config.json", token=TOKEN, cache_dir=tmp_path)
+            "cache_dir": tmp_path,
+        api.delete_repo(repo_id=repo_id)
+    def test_save_pretrained_do_not_overwrite_new_config(self, tmp_path):
+        model.save_pretrained(tmp_path)
+        with open(tmp_path / "config.json") as f:
+    def test_save_pretrained_does_overwrite_legacy_config(self, tmp_path):
+        (tmp_path / "config.json").write_text(json.dumps({"something_legacy": 123}))
+        model.save_pretrained(tmp_path)
+        with open(tmp_path / "config.json") as f:
+    def test_from_pretrained_when_cls_is_a_dataclass(self, tmp_path):
+        (tmp_path / "config.json").write_text('{"foo": 42, "bar": "baz", "other": "value"}')
+        model = DummyModelThatIsAlsoADataclass.from_pretrained(tmp_path)
+    def test_from_cls_with_custom_type(self, tmp_path):
+        model.save_pretrained(tmp_path)
+        config = json.loads((tmp_path / "config.json").read_text())
+        model_reloaded = DummyModelWithCustomTypes.from_pretrained(tmp_path)
+    def test_with_dataclass_inputs(self, tmp_path):
+        model.save_pretrained(tmp_path)
+        config = json.loads((tmp_path / "config.json").read_text())
+        model_reloaded = DummyWithDataclassInputs.from_pretrained(tmp_path)

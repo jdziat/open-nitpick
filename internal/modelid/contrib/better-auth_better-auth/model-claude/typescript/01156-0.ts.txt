@@ -1,0 +1,73 @@
+// commit dabed1ba06cc 2026-01-20T05:38:20+00:00 packages/core/src/context/transaction.ts
+type HookContext = {
+	adapter: DBTransactionAdapter;
+	pendingHooks: Array<() => Promise<void>>;
+};
+
+		.adapterAsyncStorage as AsyncLocalStorage<HookContext>;
+			const store = als.getStore();
+			return store?.adapter || fallback;
+	let called = false;
+		.then(async (als) => {
+			const pendingHooks: Array<() => Promise<void>> = [];
+			let result: Awaited<R>;
+			let error: unknown;
+			let hasError = false;
+			try {
+				result = await als.run({ adapter, pendingHooks }, fn);
+			} catch (err) {
+				error = err;
+				hasError = true;
+			}
+			// Execute pending hooks after the function completes (even if it threw)
+			for (const hook of pendingHooks) {
+				await hook();
+			}
+			if (hasError) {
+				throw error;
+			}
+			return result!;
+		.then(async (als) => {
+			const pendingHooks: Array<() => Promise<void>> = [];
+			let result: Awaited<R>;
+			let error: unknown;
+			let hasError = false;
+			try {
+				result = await adapter.transaction(async (trx) => {
+					return als.run({ adapter: trx, pendingHooks }, fn);
+				});
+			} catch (e) {
+				hasError = true;
+				error = e;
+			}
+			for (const hook of pendingHooks) {
+				await hook();
+			}
+			if (hasError) {
+				throw error;
+			}
+			return result!;
+
+/**
+ * Queue a hook to be executed after the current transaction commits.
+ * If not in a transaction, the hook will execute immediately.
+ */
+export const queueAfterTransactionHook = async (
+	hook: () => Promise<void>,
+): Promise<void> => {
+	return ensureAsyncStorage()
+		.then((als) => {
+			const store = als.getStore();
+			if (store) {
+				// We're in a transaction context, queue the hook
+				store.pendingHooks.push(hook);
+			} else {
+				// Not in a transaction, execute immediately
+				return hook();
+			}
+		})
+		.catch(() => {
+			// No async storage available, execute immediately
+			return hook();
+		});
+};

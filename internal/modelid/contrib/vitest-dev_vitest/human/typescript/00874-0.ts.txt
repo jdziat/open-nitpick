@@ -1,0 +1,42 @@
+// commit d006a6869c22 2026-05-07T15:46:15+01:00 packages/utils/src/diff/index.ts
+export interface StringifiedMemory {
+  expected?: string
+  actual?: string
+}
+
+interface Memorize {
+  (pointer: 'expected' | 'actual', stringifiedValue: string): string
+}
+
+const DEFAULT_MEMORIZE: Memorize = (_, v) => v
+
+export function diff(a: any, b: any, options?: DiffOptions, memorize: Memorize = DEFAULT_MEMORIZE): string | undefined {
+    aDisplay = memorize('expected', truncate(aDisplay))
+    bDisplay = memorize('actual', truncate(bDisplay))
+      return comparePrimitive(a, b, options, memorize)
+      return compareObjects(sortMap(a), sortMap(b), options, memorize)
+      return compareObjects(sortSet(a), sortSet(b), options, memorize)
+      return compareObjects(a, b, options, memorize)
+  }
+}
+
+function createMemorize(memory: StringifiedMemory) {
+  return (pointer: 'expected' | 'actual', stringifiedValue: string) => {
+    memory[pointer] = stringifiedValue
+    return stringifiedValue
+  memorize: Memorize = DEFAULT_MEMORIZE,
+  const aFormat = memorize('expected', prettyFormat(a, FORMAT_OPTIONS))
+  const bFormat = memorize('actual', prettyFormat(b, FORMAT_OPTIONS))
+  memorize: Memorize = DEFAULT_MEMORIZE,
+    difference = getObjectsDifference(a, b, formatOptions, options, memorize)
+    difference = getObjectsDifference(a, b, formatOptions, options, memorize)
+export function getDefaultFormatOptions(options?: DiffOptions): PrettyFormatOptions {
+  return getFormatOptions(FORMAT_OPTIONS, options)
+}
+
+  memorize: Memorize = DEFAULT_MEMORIZE,
+    const aDisplay = memorize('expected', prettyFormat(a, formatOptions))
+    const bDisplay = memorize('actual', prettyFormat(b, formatOptions))
+  memory?: StringifiedMemory,
+  const memorize = memory ? createMemorize(memory) : DEFAULT_MEMORIZE
+  const difference = diff(replacedExpected, replacedActual, options, memorize)

@@ -1,0 +1,47 @@
+// commit 18cf7273e10f 2025-11-21T00:57:30+00:00 packages/better-auth/src/plugins/jwt/index.ts
+import { verifyJWT as verifyJWTHelper } from "./verify";
+export { verifyJWT } from "./verify";
+			verifyJWT: createAuthEndpoint(
+				"/verify-jwt",
+				{
+					method: "POST",
+					metadata: {
+						SERVER_ONLY: true,
+						$Infer: {
+							body: {} as {
+								token: string;
+								issuer?: string;
+							},
+							response: {} as {
+								payload: {
+									sub: string;
+									aud: string;
+									[key: string]: any;
+								} | null;
+							},
+						},
+					},
+					body: z.object({
+						token: z.string(),
+						issuer: z.string().optional(),
+					}),
+				},
+				async (ctx) => {
+					const overrideOptions = ctx.body.issuer
+						? {
+								...options,
+								jwt: {
+									...options?.jwt,
+									issuer: ctx.body.issuer,
+								},
+							}
+						: options;
+
+					const payload = await verifyJWTHelper(
+						ctx.body.token,
+						overrideOptions,
+					);
+
+					return ctx.json({ payload });
+				},
+			),

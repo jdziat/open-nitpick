@@ -1,0 +1,251 @@
+// commit ed61b4798e0c 2026-07-22T06:53:55-04:00 packages/sso/src/routes/sso.ts
+import {
+	getCurrentAdapter,
+	runWithTransaction,
+} from "@better-auth/core/context";
+import {
+	deleteSessionCookie,
+	setAccountCookie,
+	setSessionCookie,
+} from "better-auth/cookies";
+import type { SSOProviderReference } from "../provider-reference";
+import {
+	computeSSOProviderReference,
+	isCurrentSSOProviderReference,
+	parseSSOProviderReference,
+	SSO_PROVIDER_STATE_KEY,
+} from "../provider-reference";
+import {
+	assertSSOUserResolutionAsyncContextSupport,
+	assertSSOUserResolutionNativeTransactionSupport,
+	assertSSOUserResolutionSessionStorage,
+	getFailedSSOAuthenticationResult,
+	requireSuccessfulSSOAuthentication,
+	resolveSSOUser,
+} from "../user-resolution";
+				await addOAuthServerContext({
+					[SSO_PROVIDER_STATE_KEY]: await computeSSOProviderReference(provider),
+				});
+	parsedProviderReference?: SSOProviderReference,
+	const providerReference =
+		parsedProviderReference ??
+		parseSSOProviderReference(
+			stateData.serverContext?.[SSO_PROVIDER_STATE_KEY],
+		);
+	if (!(await isCurrentSSOProviderReference(provider, providerReference))) {
+		redirectOIDCError(
+			"invalid_state",
+			"sso_provider_changed_during_authentication",
+		);
+	}
+	type OIDCUserInfo = {
+	} & Record<string, unknown>;
+	let userInfo: OIDCUserInfo | null = null;
+	const readStringClaim = (
+		claims: Record<string, unknown>,
+		claim: string,
+	): string | undefined => {
+		const value = claims[claim];
+		return typeof value === "string" && value.length > 0 ? value : undefined;
+	};
+	let verifiedIdToken: Awaited<ReturnType<typeof validateOIDCIdToken>> | null =
+		null;
+
+	if (tokenResponse.idToken) {
+		const jwksEndpoint = config.jwksEndpoint;
+		if (!jwksEndpoint) {
+			redirectOIDCError("invalid_provider", "jwks_endpoint_not_found");
+		}
+		const verified = await validateOIDCIdToken(
+			tokenResponse.idToken,
+			jwksEndpoint!,
+			{ audience: config.clientId, issuer: provider.issuer },
+			(url) => ctx.context.isTrustedOrigin(url),
+		).catch((error) => {
+			if (error instanceof DiscoveryError) {
+				redirectOIDCError("invalid_provider", error.message);
+			}
+			ctx.context.logger.error(error);
+			return null;
+		});
+		if (!verified) {
+			redirectOIDCError("invalid_provider", "token_not_verified");
+		}
+		if (!readStringClaim(verified!.payload, "sub")) {
+			redirectOIDCError("invalid_provider", "id_token_subject_missing");
+		}
+		verifiedIdToken = verified!;
+	}
+	if (options?.resolveUser && !verifiedIdToken) {
+		redirectOIDCError(
+			"invalid_provider",
+			"id_token_required_for_user_resolution",
+		);
+	}
+		if (verifiedIdToken && rawUserInfo.sub !== verifiedIdToken.payload.sub) {
+			redirectOIDCError(
+				"invalid_provider",
+				"id_token_userinfo_subject_mismatch",
+			);
+		}
+			id: readStringClaim(rawUserInfo, "sub"),
+			email: readStringClaim(rawUserInfo, mapping.email || "email"),
+			name: readStringClaim(rawUserInfo, mapping.name || "name"),
+			image: readStringClaim(rawUserInfo, mapping.image || "picture"),
+	} else if (verifiedIdToken) {
+		const idToken = verifiedIdToken.payload;
+		rawProfile = idToken;
+					idToken[value],
+			id: idToken.sub,
+			email: readStringClaim(idToken, mapping.email || "email"),
+			name: readStringClaim(idToken, mapping.name || "name"),
+			image: readStringClaim(idToken, mapping.image || "picture"),
+	const providerUserAttributes = Object.fromEntries(
+		Object.entries(userInfo).filter(([key]) => key !== "id"),
+	);
+	const providerUser = {
+		...providerUserAttributes,
+		email: userInfoEmail,
+		name: typeof userInfo.name === "string" ? userInfo.name : "",
+		image: typeof userInfo.image === "string" ? userInfo.image : undefined,
+		emailVerified: options?.trustEmailVerified
+			? userInfo.emailVerified === true
+			: false,
+	};
+	const accountKey = {
+		issuer:
+			(verifiedIdToken && readStringClaim(verifiedIdToken.payload, "iss")) ||
+			provider.issuer,
+		providerAccountId: userInfoId,
+	};
+		if (options?.resolveUser) {
+			assertSSOUserResolutionNativeTransactionSupport(ctx.context.adapter);
+			assertSSOUserResolutionSessionStorage(ctx.context.options);
+			await assertSSOUserResolutionAsyncContextSupport();
+		}
+		linked = await runWithTransaction(
+			ctx.context.adapter,
+			async () => {
+				await lockSSOProviderForAccountLink(ctx, provider);
+				const currentProvider = await resolveOIDCProvider(
+					ctx,
+					options,
+					providerId,
+					await getCurrentAdapter(ctx.context.adapter),
+				);
+				if (
+					!currentProvider ||
+					!(await isCurrentSSOProviderReference(
+						currentProvider,
+						providerReference,
+					))
+				) {
+					throw new APIError("CONFLICT", {
+						code: "SSO_PROVIDER_CHANGED",
+						message:
+							"SSO provider changed while account linking was in progress",
+					});
+				}
+				const resolution = options?.resolveUser
+					? await resolveSSOUser(
+							options.resolveUser,
+							{
+								protocol: "oidc",
+								providerId: provider.providerId,
+								accountKey,
+								providerUser,
+								providerClaims: rawProfile ?? {},
+							},
+							await getCurrentAdapter(ctx.context.adapter),
+							ctx.context.logger,
+						)
+					: undefined;
+				if (resolution?.action === "reject") {
+					throw new APIError("FORBIDDEN", {
+						code: resolution.code,
+						...(resolution.message === undefined
+							? {}
+							: { message: resolution.message }),
+					});
+				}
+				const authentication = await handleOAuthUserInfo(ctx, {
+					userInfo: {
+						...providerUser,
+						email: providerUser.email,
+						name: providerUser.name,
+						id: userInfoId,
+						image: providerUser.image,
+						emailVerified: providerUser.emailVerified,
+					},
+					account: {
+						idToken: tokenResponse.idToken,
+						accessToken: tokenResponse.accessToken,
+						refreshToken: tokenResponse.refreshToken,
+						issuer: accountKey.issuer,
+						providerAccountId: userInfoId,
+						providerId: provider.providerId,
+						accessTokenExpiresAt: tokenResponse.accessTokenExpiresAt,
+						refreshTokenExpiresAt: tokenResponse.refreshTokenExpiresAt,
+						scope: tokenResponse.scopes?.join(","),
+					},
+					callbackURL,
+					disableSignUp: options?.disableImplicitSignUp && !requestSignUp,
+					overrideUserInfo: config.overrideUserInfo,
+					source: {
+						method: "sso-oidc",
+						sso: { providerId: provider.providerId, profile: rawProfile },
+					},
+					isTrustedProvider,
+					// SSO provider ids are user-controlled and live in the same namespace
+					// as social providers. Never inherit trust from the global
+					// `trustedProviders` list by name — rely solely on the SSO-specific
+					// `isTrustedProvider` (verified domain ownership) computed above.
+					trustProviderByName: false,
+					selectedUser:
+						resolution?.action === "link"
+							? {
+									userId: resolution.userId,
+									profile: resolution.profile,
+								}
+							: undefined,
+					deferNonDatabaseWrites: !!options?.resolveUser,
+					requireExactAccountBinding: !!options?.resolveUser,
+				});
+				return options?.resolveUser
+					? requireSuccessfulSSOAuthentication(authentication)
+					: authentication;
+			},
+			{
+				onAfterCommitHookError(error) {
+					ctx.context.logger.error(
+						"Committed SSO authentication after-hook failed",
+						error,
+					);
+			},
+		);
+		const failedAuthentication = getFailedSSOAuthenticationResult(e);
+		if (failedAuthentication) {
+			linked = failedAuthentication;
+		} else if (isAPIError(e) && e.body?.code) {
+		} else {
+			throw e;
+	if ("accountCookie" in linked && linked.accountCookie) {
+		await setAccountCookie(ctx, linked.accountCookie);
+	}
+	adapter = ctx.context.adapter,
+	return adapter
+	await addOAuthServerContext({
+		[SSO_PROVIDER_STATE_KEY]: await computeSSOProviderReference(provider),
+	});
+			const providerReference = parseSSOProviderReference(
+				stateData.serverContext?.[SSO_PROVIDER_STATE_KEY],
+			);
+			if (!providerReference) {
+					`${errorURL}?error=invalid_state&error_description=missing_sso_provider_reference`,
+			return handleOIDCCallback(
+				ctx,
+				options,
+				providerReference.providerId,
+				stateData,
+				providerReference,
+			);

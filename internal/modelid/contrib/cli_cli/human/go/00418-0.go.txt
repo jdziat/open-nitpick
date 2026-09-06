@@ -1,0 +1,59 @@
+// commit 1e36e9f1e386 2025-09-05T12:44:11+01:00 pkg/cmd/agent-task/capi/sessions.go
+	UserID        int64     `json:"user_id"`
+	UserID        int64
+	User        *api.GitHubUser
+	result, err := c.hydrateSessionPullRequestsAndUsers(sessions)
+	result, err := c.hydrateSessionPullRequestsAndUsers(sessions)
+// hydrateSessionPullRequestsAndUsers hydrates pull request and user information in sessions
+func (c *CAPIClient) hydrateSessionPullRequestsAndUsers(sessions []session) ([]*Session, error) {
+	userNodeIds := make([]string, 0, len(sessions))
+		if !slices.Contains(prNodeIds, prNodeID) {
+			prNodeIds = append(prNodeIds, prNodeID)
+		userNodeId := generateUserNodeID(session.UserID)
+		if !slices.Contains(userNodeIds, userNodeId) {
+			userNodeIds = append(userNodeIds, userNodeId)
+		}
+	}
+			User        api.GitHubUser     `graphql:"... on User"`
+	ids := make([]string, 0, len(prNodeIds)+len(userNodeIds))
+	ids = append(ids, prNodeIds...)
+	ids = append(ids, userNodeIds...)
+
+	err := apiClient.Query(host, "FetchPRsAndUsersForAgentTaskSessions", &resp, map[string]any{
+		"ids": ids,
+	userMap := make(map[int64]*api.GitHubUser, len(userNodeIds))
+		switch node.TypeName {
+		case "User":
+			userMap[node.User.DatabaseID] = &node.User
+		case "PullRequest":
+			prMap[node.PullRequest.FullDatabaseID] = &api.PullRequest{
+				ID:             node.PullRequest.ID,
+				FullDatabaseID: node.PullRequest.FullDatabaseID,
+				Number:         node.PullRequest.Number,
+				Title:          node.PullRequest.Title,
+				State:          node.PullRequest.State,
+				URL:            node.PullRequest.URL,
+				Body:           node.PullRequest.Body,
+				CreatedAt:      node.PullRequest.CreatedAt,
+				UpdatedAt:      node.PullRequest.UpdatedAt,
+				ClosedAt:       node.PullRequest.ClosedAt,
+				MergedAt:       node.PullRequest.MergedAt,
+				Repository:     node.PullRequest.Repository,
+			}
+		newSession.User = userMap[s.UserID]
+func generateUserNodeID(userID int64) string {
+	buf := bytes.Buffer{}
+	parts := []int64{0, userID}
+
+	encoder := msgpack.NewEncoder(&buf)
+	encoder.UseCompactInts(true)
+
+	if err := encoder.Encode(parts); err != nil {
+		panic(err)
+	}
+
+	encoded := base64.RawURLEncoding.EncodeToString(buf.Bytes())
+
+	return "U_" + encoded
+}
+

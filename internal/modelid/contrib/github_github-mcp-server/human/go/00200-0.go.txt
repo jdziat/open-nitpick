@@ -1,0 +1,45 @@
+// commit fe31428f80a0 2025-06-10T15:44:49+02:00 pkg/toolsets/toolsets.go
+func NewServerResourceTemplate(resourceTemplate mcp.ResourceTemplate, handler server.ResourceTemplateHandlerFunc) ServerResourceTemplate {
+	return ServerResourceTemplate{
+		resourceTemplate: resourceTemplate,
+		handler:          handler,
+	}
+}
+
+// ServerResourceTemplate represents a resource template that can be registered with the MCP server.
+type ServerResourceTemplate struct {
+	resourceTemplate mcp.ResourceTemplate
+	handler          server.ResourceTemplateHandlerFunc
+}
+
+// Toolset represents a collection of MCP functionality that can be enabled or disabled as a group.
+	// resources are not tools, but the community seems to be moving towards namespaces as a broader concept
+	// and in order to have multiple servers running concurrently, we want to avoid overlapping resources too.
+	resourceTemplates []ServerResourceTemplate
+func (t *Toolset) AddResourceTemplates(templates ...ServerResourceTemplate) *Toolset {
+	t.resourceTemplates = append(t.resourceTemplates, templates...)
+	return t
+}
+
+func (t *Toolset) GetActiveResourceTemplates() []ServerResourceTemplate {
+	if !t.Enabled {
+		return nil
+	}
+	return t.resourceTemplates
+}
+
+func (t *Toolset) GetAvailableResourceTemplates() []ServerResourceTemplate {
+	return t.resourceTemplates
+}
+
+func (t *Toolset) RegisterResourcesTemplates(s *server.MCPServer) {
+	if !t.Enabled {
+		return
+	}
+	for _, resource := range t.resourceTemplates {
+		s.AddResourceTemplate(resource.resourceTemplate, resource.handler)
+	}
+}
+
+func (tg *ToolsetGroup) RegisterAll(s *server.MCPServer) {
+		toolset.RegisterResourcesTemplates(s)

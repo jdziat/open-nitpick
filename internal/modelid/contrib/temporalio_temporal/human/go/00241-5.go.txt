@@ -1,0 +1,41 @@
+// commit bf79f386a4c7 2025-12-19T11:01:46-05:00 chasm/lib/activity/gen/activitypb/v1/service_grpc.pb.go
+	ActivityService_StartActivityExecution_FullMethodName         = "/temporal.server.chasm.lib.activity.proto.v1.ActivityService/StartActivityExecution"
+	ActivityService_PollActivityExecution_FullMethodName          = "/temporal.server.chasm.lib.activity.proto.v1.ActivityService/PollActivityExecution"
+	ActivityService_TerminateActivityExecution_FullMethodName     = "/temporal.server.chasm.lib.activity.proto.v1.ActivityService/TerminateActivityExecution"
+	ActivityService_RequestCancelActivityExecution_FullMethodName = "/temporal.server.chasm.lib.activity.proto.v1.ActivityService/RequestCancelActivityExecution"
+	RequestCancelActivityExecution(ctx context.Context, in *RequestCancelActivityExecutionRequest, opts ...grpc.CallOption) (*RequestCancelActivityExecutionResponse, error)
+func (c *activityServiceClient) RequestCancelActivityExecution(ctx context.Context, in *RequestCancelActivityExecutionRequest, opts ...grpc.CallOption) (*RequestCancelActivityExecutionResponse, error) {
+	out := new(RequestCancelActivityExecutionResponse)
+	err := c.cc.Invoke(ctx, ActivityService_RequestCancelActivityExecution_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+	RequestCancelActivityExecution(context.Context, *RequestCancelActivityExecutionRequest) (*RequestCancelActivityExecutionResponse, error)
+func (UnimplementedActivityServiceServer) RequestCancelActivityExecution(context.Context, *RequestCancelActivityExecutionRequest) (*RequestCancelActivityExecutionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequestCancelActivityExecution not implemented")
+}
+func _ActivityService_RequestCancelActivityExecution_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestCancelActivityExecutionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ActivityServiceServer).RequestCancelActivityExecution(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ActivityService_RequestCancelActivityExecution_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ActivityServiceServer).RequestCancelActivityExecution(ctx, req.(*RequestCancelActivityExecutionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+		{
+			MethodName: "RequestCancelActivityExecution",
+			Handler:    _ActivityService_RequestCancelActivityExecution_Handler,
+		},

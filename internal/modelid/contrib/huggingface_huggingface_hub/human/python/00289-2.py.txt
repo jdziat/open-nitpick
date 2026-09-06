@@ -1,0 +1,52 @@
+# commit 36f65542efdd 2026-02-02T16:24:10+01:00 src/huggingface_hub/cli/jobs.py
+@jobs_cli.command(
+    "run",
+    context_settings={"ignore_unknown_options": True},
+    examples=[
+        "hf jobs run python:3.12 python -c 'print(\"Hello!\")'",
+        "hf jobs run -e FOO=foo python:3.12 python script.py",
+        "hf jobs run --secrets HF_TOKEN python:3.12 python script.py",
+    ],
+)
+    """Run a Job."""
+@jobs_cli.command("logs", examples=["hf jobs logs <job_id>"])
+    """Fetch the logs of a Job"""
+@jobs_cli.command("stats", examples=["hf jobs stats <job_id>"])
+    """Fetch the resource usage statistics and metrics of Jobs"""
+@jobs_cli.command("ps", examples=["hf jobs ps", "hf jobs ps -a"])
+    """List Jobs."""
+@jobs_cli.command("hardware", examples=["hf jobs hardware"])
+    """List available hardware options for Jobs"""
+@jobs_cli.command("inspect", examples=["hf jobs inspect <job_id>"])
+    """Display detailed information on one or more Jobs"""
+@jobs_cli.command("cancel", examples=["hf jobs cancel <job_id>"])
+    """Cancel a Job"""
+uv_app = typer_factory(help="Run UV scripts (Python with inline dependencies) on HF infrastructure.")
+    examples=[
+        "hf jobs uv run my_script.py",
+        "hf jobs uv run ml_training.py --flavor a10g-small",
+        "hf jobs uv run --with transformers train.py",
+    ],
+    """Run a UV script (local file or URL) on HF infrastructure"""
+@scheduled_app.command(
+    "run",
+    context_settings={"ignore_unknown_options": True},
+    examples=['hf jobs scheduled run "0 0 * * *" python:3.12 python script.py'],
+)
+    """Schedule a Job."""
+@scheduled_app.command("ps", examples=["hf jobs scheduled ps"])
+    """List scheduled Jobs"""
+@scheduled_app.command("inspect", examples=["hf jobs scheduled inspect <id>"])
+    """Display detailed information on one or more scheduled Jobs"""
+@scheduled_app.command("delete", examples=["hf jobs scheduled delete <id>"])
+    """Delete a scheduled Job."""
+@scheduled_app.command("suspend", examples=["hf jobs scheduled suspend <id>"])
+    """Suspend (pause) a scheduled Job."""
+@scheduled_app.command("resume", examples=["hf jobs scheduled resume <id>"])
+    """Resume (unpause) a scheduled Job."""
+scheduled_uv_app = typer_factory(help="Schedule UV scripts on HF infrastructure.")
+    examples=[
+        'hf jobs scheduled uv run "0 0 * * *" script.py',
+        'hf jobs scheduled uv run "0 0 * * *" script.py --with pandas',
+    ],
+    """Run a UV script (local file or URL) on HF infrastructure"""

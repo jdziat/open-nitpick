@@ -1,0 +1,49 @@
+# commit dbf1ff2a8a6c 2026-06-05T14:15:56+00:00 browser_use/rust/service.py
+			input_tokens = max(input_tokens, total_input_tokens, token_count_input_tokens)
+			cached_input_tokens = max(cached_input_tokens, total_cached_input_tokens, token_count_cached_input_tokens)
+			cache_creation_tokens = max(cache_creation_tokens, total_cache_creation_tokens, token_count_cache_creation_tokens)
+			completion_tokens = max(completion_tokens, total_completion_tokens, token_count_completion_tokens)
+			total_tokens = max(total_tokens, total_usage_tokens, token_count_total_tokens)
+	summed_prompt_tokens = 0
+	summed_prompt_cached_tokens = 0
+	summed_prompt_cache_creation_tokens = 0
+	summed_completion_tokens = 0
+	summed_total_tokens = 0
+	summed_invocations = 0
+		summed_invocations += 1
+		summed_prompt_tokens += chat_usage.prompt_tokens
+		summed_prompt_cached_tokens += chat_usage.prompt_cached_tokens or 0
+		summed_prompt_cache_creation_tokens += chat_usage.prompt_cache_creation_tokens or 0
+		summed_completion_tokens += chat_usage.completion_tokens
+		summed_total_tokens += chat_usage.total_tokens
+	if priced_invocations == 0 and summed_invocations == 0:
+	if summed_invocations:
+		stats.prompt_tokens = summed_prompt_tokens
+		stats.completion_tokens = summed_completion_tokens
+		stats.total_tokens = summed_total_tokens
+		stats.invocations = max(stats.invocations, summed_invocations)
+	if priced_invocations:
+		stats.cost = total_cost
+	update: dict[str, Any] = {'by_model': model_stats}
+	if summed_invocations:
+		update.update(
+			{
+				'total_prompt_tokens': summed_prompt_tokens,
+				'total_prompt_cached_tokens': summed_prompt_cached_tokens,
+				'total_prompt_cache_creation_tokens': summed_prompt_cache_creation_tokens,
+				'total_completion_tokens': summed_completion_tokens,
+				'total_tokens': summed_total_tokens,
+				'entry_count': max(summary.entry_count, summed_invocations),
+			}
+		)
+	if priced_invocations:
+		update.update(
+			{
+				'total_prompt_cost': total_prompt_cost,
+				'total_prompt_cached_cost': total_prompt_cached_cost,
+				'total_prompt_cache_creation_cost': total_prompt_cache_creation_cost,
+				'total_completion_cost': total_completion_cost,
+				'total_cost': total_cost,
+			}
+		)
+	return summary.model_copy(update=update)

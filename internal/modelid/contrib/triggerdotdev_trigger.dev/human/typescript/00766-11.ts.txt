@@ -1,0 +1,49 @@
+// commit 469b03909074 2026-02-20T13:16:34+00:00 packages/cli-v3/src/dev/taskRunProcessPool.ts
+  generateFriendlyId,
+  private readonly idleTimers: Map<TaskRunProcess, NodeJS.Timeout> = new Map();
+  private static readonly IDLE_TIMEOUT_MS = 30_000;
+    processesToKill.forEach((process) => this.clearIdleTimer(process));
+        this.clearIdleTimer(reusableProcess);
+        TRIGGER_MACHINE_ID: generateFriendlyId("machine"),
+        this.startIdleTimer(process, version);
+  private startIdleTimer(process: TaskRunProcess, version: string): void {
+    this.clearIdleTimer(process);
+
+    const timer = setTimeout(() => {
+      // Synchronously remove from available pool before async kill to prevent race with getProcess()
+      const available = this.availableProcessesByVersion.get(version);
+      if (available) {
+        const index = available.indexOf(process);
+        if (index !== -1) {
+          available.splice(index, 1);
+        }
+      }
+      this.idleTimers.delete(process);
+
+      logger.debug("[TaskRunProcessPool] Idle timeout reached, killing process", {
+        pid: process.pid,
+        version,
+      });
+
+      this.killProcess(process);
+    }, TaskRunProcessPool.IDLE_TIMEOUT_MS);
+
+    this.idleTimers.set(process, timer);
+  }
+
+  private clearIdleTimer(process: TaskRunProcess): void {
+    const timer = this.idleTimers.get(process);
+    if (timer) {
+      clearTimeout(timer);
+      this.idleTimers.delete(process);
+    }
+  }
+
+    this.clearIdleTimer(process);
+
+    // Clear all idle timers
+    for (const timer of this.idleTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.idleTimers.clear();
+

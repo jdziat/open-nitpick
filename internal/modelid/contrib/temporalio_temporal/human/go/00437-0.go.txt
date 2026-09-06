@@ -1,0 +1,45 @@
+// commit 8728c4b1a278 2026-01-26T15:52:55-08:00 service/worker/migration/activities.go
+		LastNotVerifiedWorkflowExecution *ExecutionInfo
+		Executions    []*ExecutionInfo
+		Executions       []*ExecutionInfo
+		Executions            []*ExecutionInfo
+		execution *ExecutionInfo,
+	execution *ExecutionInfo,
+		archetype, err := a.archetypeIDToName(ctx, execution.ArchetypeID)
+				WorkflowId: execution.BusinessID,
+				RunId:      execution.RunID,
+				WorkflowId: execution.BusinessID,
+				RunId:      execution.RunID,
+			ArchetypeId:    execution.ArchetypeID,
+	executions := make([]*ExecutionInfo, 0, len(resp.Executions))
+		executionInfo := &ExecutionInfo{
+			executionInfoNewJSON: executionInfoNewJSON{
+				BusinessID: e.Execution.GetWorkflowId(),
+				RunID:      e.Execution.GetRunId(),
+				// Ideally we should use chasm.WorkflowArchetypeID by default,
+				// but for backward compatibility reason we need this field to be 0
+				// to avoid unmarshaling errors since the previous type returned in
+				// ListWorkflowExecutions.Executions is commonpb.WorkflowExecution
+				// which does not have ArchetypeId field.
+				//
+				// TODO: switch to chasm.WorkflowArchetypeID in release 1.31.0
+				ArchetypeID: chasm.UnspecifiedArchetypeID,
+			},
+			executionInfo.ArchetypeID = archetypeID
+					tag.WorkflowID(we.BusinessID),
+					tag.WorkflowRunID(we.RunID),
+				tag.WorkflowID(we.BusinessID),
+				tag.WorkflowRunID(we.RunID),
+	execution *ExecutionInfo,
+	tags := []tag.Tag{
+		tag.WorkflowNamespaceID(namespaceID),
+		tag.WorkflowID(execution.BusinessID),
+		tag.WorkflowRunID(execution.RunID),
+	}
+			WorkflowId: execution.BusinessID,
+			RunId:      execution.RunID,
+		ArchetypeId:     execution.ArchetypeID,
+	execution *ExecutionInfo,
+	archetype, err := a.archetypeIDToName(ctx, execution.ArchetypeID)
+			WorkflowId: execution.BusinessID,
+			RunId:      execution.RunID,

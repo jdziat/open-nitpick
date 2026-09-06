@@ -1,0 +1,61 @@
+// commit 7170baa5465e 2026-04-23T22:49:17-07:00 chasm/lib/nexusoperation/operation.go
+	OnNexusOperationTimedOut(ctx chasm.MutableContext, operation *Operation, cause *failurepb.Failure, fromAttempt bool) error
+	if store, ok := o.Store.TryGet(ctx); ok {
+func (o *Operation) onTimedOut(ctx chasm.MutableContext, cause *failurepb.Failure, fromAttempt bool) error {
+		return store.OnNexusOperationTimedOut(ctx, o, cause, fromAttempt)
+	return TransitionTimedOut.Apply(o, ctx, EventTimedOut{
+		Failure:     cause,
+		FromAttempt: fromAttempt,
+	})
+}
+
+func (o *Operation) HandleNexusCompletion(
+	ctx chasm.MutableContext,
+	completion *persistencespb.ChasmNexusCompletion,
+) error {
+	if completion.GetRequestId() != "" && o.GetRequestId() != completion.GetRequestId() {
+		return serviceerror.NewNotFound("operation not found")
+	}
+
+	links := completion.GetLinks()
+
+	if o.GetStatus() == nexusoperationpb.OPERATION_STATUS_SCHEDULED {
+		startTime := timestamp.TimeValuePtr(completion.GetStartTime())
+		if err := o.onStarted(ctx, completion.GetOperationToken(), startTime, links); err != nil {
+			return err
+		links = nil
+	}
+
+	switch outcome := completion.Outcome.(type) {
+	case *persistencespb.ChasmNexusCompletion_Success:
+		return o.onCompleted(ctx, outcome.Success, links)
+	case *persistencespb.ChasmNexusCompletion_Failure:
+		if outcome.Failure.GetCanceledFailureInfo() != nil {
+			return o.onCanceled(ctx, outcome.Failure)
+		}
+		return o.onFailed(ctx, outcome.Failure)
+	default:
+		return serviceerror.NewInvalidArgument("invalid completion outcome")
+		return nil, o.onTimedOut(ctx, r.failure, true)
+// resolveUnsuccessfully finalizes the operation. When fromAttempt is true, the failure is recorded as
+// LastAttemptFailure. Otherwise the failure is recorded as the terminal Outcome.
+func (o *Operation) resolveUnsuccessfully(ctx chasm.MutableContext, failure *failurepb.Failure, closeTime time.Time, fromAttempt bool) error {
+	softassert.That(ctx.Logger(), failure != nil, "resolveUnsuccessfully called with nil failure")
+	if fromAttempt {
+	} else {
+	o.ClosedTime = timestamppb.New(closeTime)
+
+	// NextAttemptScheduleTime is only valid in BACKING_OFF; clear on close
+	o.NextAttemptScheduleTime = nil
+			if failure.GetTimeoutFailureInfo() != nil {
+				failure = &failurepb.Failure{
+					Message: "nexus operation timed out",
+					Cause:   failure,
+				}
+			}
+			if failure.GetTimeoutFailureInfo() != nil {
+				failure = &failurepb.Failure{
+					Message: "nexus operation timed out",
+					Cause:   failure,
+				}
+			}

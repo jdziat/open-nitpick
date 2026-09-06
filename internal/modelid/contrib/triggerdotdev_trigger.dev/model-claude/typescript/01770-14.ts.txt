@@ -1,0 +1,48 @@
+// commit 15dd973f92d5 2026-08-27T15:57:32+01:00 internal-packages/run-store/src/runOpsStore.ts
+    // `residency` names only NEW or LEGACY, so a stamped gen-2 id wins.
+    const stamped = typeof waitpointId === "string" ? this.#shardKeyOfSafe(waitpointId) : undefined;
+    const isGen2Stamped =
+      stamped !== undefined && stamped !== NEW_SHARD && stamped !== LEGACY_SHARD;
+
+    if (residency !== undefined && !isGen2Stamped) {
+    return this.#shardStore(stamped ?? this.#idlessWaitpointShard);
+    residency?: Residency,
+    shardKey?: ShardKey
+    //
+    const store =
+      shardKey !== undefined && shardKey !== NEW_SHARD && shardKey !== LEGACY_SHARD
+        ? this.#shardStore(shardKey)
+        : this.#waitpointWriteStore(undefined, residency, data.id);
+  // Both keys, in order. Drain can mirror a tag onto NEW keeping its id, and NEW wins. Then by
+  // name, because the per-database unique index lets a store mint its own cuid for a tag it has
+  // not seen. Dropping a row is safe: nothing reads a tag's id.
+  #mergeTags<R extends Record<string, unknown>>(legs: Array<{ key: ShardKey; rows: R[] }>): R[] {
+    const survivors = this.#mergeById(legs);
+    const survivorSet = new Set<R>(survivors as R[]);
+
+    // Survivors only, so a stale mirror cannot win its name back.
+    const winnerByName = new Map<string, R>();
+    for (const { rows } of legs) {
+      for (const row of rows) {
+        if (!survivorSet.has(row)) continue;
+        const key = RoutingRunStore.#tagNameKey(row);
+        if (key !== undefined) winnerByName.set(key, row);
+      }
+    }
+
+    // Filter, not rebuild: position matters when `orderBy` is absent.
+    return (survivors as R[]).filter((row) => {
+      const key = RoutingRunStore.#tagNameKey(row);
+      return key === undefined || winnerByName.get(key) === row;
+    });
+  }
+
+  static #tagNameKey(row: Record<string, unknown>): string | undefined {
+    const environmentId = row.environmentId;
+    const name = row.name;
+    return typeof environmentId === "string" && typeof name === "string"
+      ? `${environmentId}\u0000${name}`
+      : undefined;
+  }
+
+    const deduped = this.#mergeTags(legs) as unknown as WaitpointTag[];

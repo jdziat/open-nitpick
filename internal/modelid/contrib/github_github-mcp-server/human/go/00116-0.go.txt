@@ -1,0 +1,48 @@
+// commit ff3036d59625 2025-04-15T01:11:53+02:00 cmd/github-mcp-server/main.go
+
+			enabledToolsets := viper.GetStringSlice("toolsets")
+
+				enabledToolsets:    enabledToolsets,
+	rootCmd.PersistentFlags().StringSlice("toolsets", github.DefaultTools, "An optional comma separated list of groups of tools to allow, defaults to enabling all")
+	rootCmd.PersistentFlags().Bool("dynamic-toolsets", false, "Enable dynamic toolsets")
+	_ = viper.BindPFlag("toolsets", rootCmd.PersistentFlags().Lookup("toolsets"))
+	_ = viper.BindPFlag("dynamic_toolsets", rootCmd.PersistentFlags().Lookup("dynamic-toolsets"))
+	_ = viper.BindPFlag("host", rootCmd.PersistentFlags().Lookup("gh-host"))
+	viper.SetEnvPrefix("github")
+	enabledToolsets    []string
+	token := viper.GetString("personal_access_token")
+	host := viper.GetString("host")
+	// Create server
+	ghServer := github.NewServer(version, server.WithHooks(hooks))
+
+	enabled := cfg.enabledToolsets
+	dynamic := viper.GetBool("dynamic_toolsets")
+	if dynamic {
+		// filter "all" from the enabled toolsets
+		enabled = make([]string, 0, len(cfg.enabledToolsets))
+		for _, toolset := range cfg.enabledToolsets {
+			if toolset != "all" {
+				enabled = append(enabled, toolset)
+			}
+		}
+	}
+
+	// Create default toolsets
+	toolsets, err := github.InitToolsets(enabled, cfg.readOnly, getClient, t)
+	context := github.InitContextToolset(getClient, t)
+
+	if err != nil {
+		stdlog.Fatal("Failed to initialize toolsets:", err)
+	}
+
+	// Register resources with the server
+	github.RegisterResources(ghServer, getClient, t)
+	// Register the tools with the server
+	toolsets.RegisterTools(ghServer)
+	context.RegisterTools(ghServer)
+
+	if dynamic {
+		dynamic := github.InitDynamicToolset(ghServer, toolsets, t)
+		dynamic.RegisterTools(ghServer)
+	}
+

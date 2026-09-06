@@ -1,0 +1,51 @@
+# commit 4c7b420ff74f 2026-03-31T10:49:04+02:00 src/huggingface_hub/hub_mixin.py
+from collections.abc import Callable
+from typing import Any, ClassVar, Protocol, TypeVar
+    docs_url: str | None = None
+    paper_url: str | None = None
+    repo_url: str | None = None
+    _hub_mixin_config: dict | DataclassInstance | None = None
+    _hub_mixin_jsonable_custom_types: tuple[type, ...]  # custom types that can be encoded/decoded
+    _hub_mixin_coders: dict[type, CODER_T]  # encoders/decoders for custom types
+        repo_url: str | None = None,
+        paper_url: str | None = None,
+        docs_url: str | None = None,
+        language: list[str] | None = None,
+        library_name: str | None = None,
+        license: str | None = None,
+        license_name: str | None = None,
+        license_link: str | None = None,
+        pipeline_tag: str | None = None,
+        tags: list[str] | None = None,
+        coders: None
+        | (
+            dict[type, CODER_T]
+        ) = None,
+    def _decode_arg(cls, expected_type: type[ARGS_T], value: Any) -> ARGS_T | None:
+        save_directory: str | Path,
+        config: dict | DataclassInstance | None = None,
+        repo_id: str | None = None,
+        model_card_kwargs: dict[str, Any] | None = None,
+    ) -> str | None:
+        pretrained_model_name_or_path: str | Path,
+        token: str | bool | None = None,
+        cache_dir: str | Path | None = None,
+        revision: str | None = None,
+        config_file: str | None = None
+            with open(config_file, encoding="utf-8") as f:
+        revision: str | None,
+        cache_dir: str | Path | None,
+        token: str | bool | None,
+        config: dict | DataclassInstance | None = None,
+        private: bool | None = None,
+        token: str | None = None,
+        branch: str | None = None,
+        create_pr: bool | None = None,
+        allow_patterns: list[str] | str | None = None,
+        ignore_patterns: list[str] | str | None = None,
+        delete_patterns: list[str] | str | None = None,
+        model_card_kwargs: dict[str, Any] | None = None,
+    def __init_subclass__(cls, *args, tags: list[str] | None = None, **kwargs) -> None:
+        revision: str | None,
+        cache_dir: str | Path | None,
+        token: str | bool | None,

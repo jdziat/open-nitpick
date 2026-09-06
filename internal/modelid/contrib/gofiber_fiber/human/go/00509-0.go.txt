@@ -1,0 +1,57 @@
+// commit 2bfe431ae6f5 2026-01-15T14:02:48+01:00 middleware/timeout/timeout.go
+// c.Context(). If the timeout expires, the middleware returns immediately with
+// fiber.ErrRequestTimeout, even if the handler is still running. The handler
+// can detect the timeout via c.Context().Done().
+			return h(ctx)
+		// Create timeout context - handler can check c.Context().Done()
+
+		// Channels for handler result and panics
+		done := make(chan error, 1)
+		panicChan := make(chan any, 1)
+
+		// Run handler in goroutine
+		go func() {
+			defer func() {
+				if p := recover(); p != nil {
+					panicChan <- p
+				}
+			}()
+			done <- h(ctx)
+		}()
+
+		// Wait for handler completion or timeout
+		select {
+		case err := <-done:
+			// Handler finished - cleanup and handle errors
+			if err != nil && isTimeoutError(err, cfg.Errors) {
+				if cfg.OnTimeout != nil {
+					if toErr := cfg.OnTimeout(ctx); toErr != nil {
+						return toErr
+					}
+				}
+				return fiber.ErrRequestTimeout
+			}
+			return err
+
+		case <-panicChan:
+			// Handler panicked - treat as internal server error
+			// We don't re-panic because we're in a different goroutine context
+			cancel()
+			ctx.SetContext(parent)
+			return fiber.ErrInternalServerError
+
+		case <-tCtx.Done():
+			// Timeout reached - return immediately
+			// Note: handler goroutine may still be running but we return immediately
+			cancel()
+			ctx.SetContext(parent)
+// isTimeoutError checks if err is a timeout-like error (context.DeadlineExceeded
+// or any of the custom errors).
+func isTimeoutError(err error, customErrors []error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	if len(customErrors) > 0 {
+		for _, e := range customErrors {
+			if errors.Is(err, e) {
+				return true
+			}

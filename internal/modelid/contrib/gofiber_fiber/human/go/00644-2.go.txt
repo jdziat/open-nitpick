@@ -1,0 +1,71 @@
+// commit 58f06e4aec09 2026-02-08T02:40:19-05:00 redirect_msgp.go
+package fiber
+
+// Size limits for msgp deserialization
+const (
+	zc920acdalimitArrays = 256
+	zc920acdalimitMaps   = 32
+)
+
+		return
+	}
+	if zb0001 > zc920acdalimitMaps {
+		err = msgp.ErrLimitExceeded
+		return
+			return
+				return
+				return
+				return
+				return
+				return
+	return
+		return
+		return
+		return
+		return
+		return
+		return
+		return
+		return
+	return
+	return
+		return
+	}
+	if zb0001 > zc920acdalimitMaps {
+		err = msgp.ErrLimitExceeded
+		return
+			return
+				return
+				return
+				return
+				return
+				return
+	return
+	return
+		return
+	}
+	if zb0002 > zc920acdalimitArrays {
+		err = msgp.ErrLimitExceeded
+		return
+			return
+	return
+		return
+	}
+	if uint32(len(z)) > zc920acdalimitArrays {
+		err = msgp.ErrLimitExceeded
+		return
+			return
+	return
+	if uint32(len(z)) > zc920acdalimitArrays {
+		return nil, msgp.ErrLimitExceeded
+	}
+			return
+	return
+		return
+	}
+	if zb0002 > zc920acdalimitArrays {
+		err = msgp.ErrLimitExceeded
+		return
+			return
+	return
+	return

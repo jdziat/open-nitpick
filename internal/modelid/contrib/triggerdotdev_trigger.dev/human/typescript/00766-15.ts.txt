@@ -1,0 +1,121 @@
+// commit 469b03909074 2026-02-20T13:16:34+00:00 packages/core/src/v3/otel/tracingSDK.ts
+  metrics,
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
+import { HostMetrics } from "@opentelemetry/host-metrics";
+import {
+  AggregationType,
+  MeterProvider,
+  PeriodicExportingMetricReader,
+  type MetricReader,
+  type PushMetricExporter,
+} from "@opentelemetry/sdk-metrics";
+  BufferingMetricExporter,
+  TaskContextMetricExporter,
+import { machineId } from "./machineId.js";
+import { startDiskIoMetrics } from "./diskIoMetrics.js";
+import { startFilesystemMetrics } from "./filesystemMetrics.js";
+import { startNodejsRuntimeMetrics } from "./nodejsRuntimeMetrics.js";
+  metricsUrl?: string;
+  metricExporters?: PushMetricExporter[];
+  metricReaders?: MetricReader[];
+  hostMetrics?: boolean;
+  /** Limit host metrics collection to specific groups (e.g. ["process.cpu", "process.memory"]) */
+  hostMetricGroups?: string[];
+  /** Enable Node.js runtime metrics (event loop utilization, heap usage, etc.) */
+  nodejsRuntimeMetrics?: boolean;
+  /** Enable filesystem metrics (Linux only, reads /proc/mounts + fs.statfs) */
+  filesystemMetrics?: boolean;
+  /** Enable disk I/O metrics (Linux only, reads /proc/diskstats) */
+  diskIoMetrics?: boolean;
+  /** Metric instrument name patterns to drop (supports wildcards, e.g. "system.cpu.*") */
+  droppedMetrics?: string[];
+  private readonly _meterProvider: MeterProvider;
+          "cloud.provider": "trigger.dev",
+          "service.name": getEnvVar("TRIGGER_OTEL_SERVICE_NAME") ?? "trigger.dev",
+          [SemanticInternalAttributes.MACHINE_ID]: machineId,
+    // Metrics setup
+    const metricsUrl =
+      config.metricsUrl ??
+      getEnvVar("TRIGGER_OTEL_METRICS_ENDPOINT") ??
+      `${config.url}/v1/metrics`;
+
+    const rawMetricExporter = new OTLPMetricExporter({
+      url: metricsUrl,
+      timeoutMillis: config.forceFlushTimeoutMillis,
+    });
+
+    const collectionIntervalMs = parseInt(
+      getEnvVar("TRIGGER_OTEL_METRICS_COLLECTION_INTERVAL_MILLIS") ?? "10000"
+    );
+    const exportIntervalMs = parseInt(
+      getEnvVar("TRIGGER_OTEL_METRICS_EXPORT_INTERVAL_MILLIS") ?? "30000"
+    );
+
+    // Chain: PeriodicReader(10s) → TaskContextMetricExporter → BufferingMetricExporter(30s) → OTLP
+    const bufferingExporter = new BufferingMetricExporter(rawMetricExporter, exportIntervalMs);
+    const metricExporter = new TaskContextMetricExporter(bufferingExporter);
+
+    const exportTimeoutMillis = parseInt(
+      getEnvVar("TRIGGER_OTEL_METRICS_EXPORT_TIMEOUT_MILLIS") ?? "30000"
+    );
+
+    const metricReaders: MetricReader[] = [
+      new PeriodicExportingMetricReader({
+        exporter: metricExporter,
+        exportIntervalMillis: collectionIntervalMs,
+        exportTimeoutMillis: Math.min(exportTimeoutMillis, collectionIntervalMs),
+      }),
+      ...(config.metricExporters ?? []).map(
+        (exporter) =>
+          new PeriodicExportingMetricReader({
+            exporter,
+            exportIntervalMillis: collectionIntervalMs,
+            exportTimeoutMillis: Math.min(exportTimeoutMillis, collectionIntervalMs),
+          })
+      ),
+      ...(config.metricReaders ?? []),
+    ];
+
+    const meterProvider = new MeterProvider({
+      resource: commonResources,
+      readers: metricReaders,
+      views: (config.droppedMetrics ?? []).map((pattern) => ({
+        instrumentName: pattern,
+        aggregation: { type: AggregationType.DROP },
+      })),
+    });
+
+    this._meterProvider = meterProvider;
+    metrics.setGlobalMeterProvider(meterProvider);
+
+    if (config.hostMetrics) {
+      const hostMetrics = new HostMetrics({
+        meterProvider,
+        metricGroups: config.hostMetricGroups,
+      });
+      hostMetrics.start();
+    }
+
+    if (config.nodejsRuntimeMetrics) {
+      startNodejsRuntimeMetrics(meterProvider);
+    }
+
+    if (config.filesystemMetrics) {
+      startFilesystemMetrics(meterProvider);
+    }
+
+    if (config.diskIoMetrics) {
+      startDiskIoMetrics(meterProvider);
+    }
+
+    await Promise.all([
+      this._traceProvider.forceFlush(),
+      this._logProvider.forceFlush(),
+      this._meterProvider.forceFlush(),
+    ]);
+    await Promise.all([
+      this._traceProvider.shutdown(),
+      this._logProvider.shutdown(),
+      this._meterProvider.shutdown(),
+    ]);
+  const httpUrl = span.attributes["http.url"] ?? span.attributes["url.full"];

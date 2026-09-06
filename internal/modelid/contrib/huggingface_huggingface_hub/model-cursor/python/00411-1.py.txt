@@ -1,0 +1,58 @@
+# commit 778d306a0848 2026-03-24T15:36:54+01:00 src/huggingface_hub/cli/repos.py
+    EnvFileOpt,
+    EnvOpt,
+    SecretsFileOpt,
+    SecretsOpt,
+    env_map_to_key_value_list,
+    parse_env_map,
+SpaceHardwareOpt = Annotated[
+    Optional[str],
+    typer.Option(
+        "--flavor",
+        help="Space hardware flavor (e.g. 'cpu-basic', 't4-medium', 'l4x4'). Only for Spaces.",
+    ),
+]
+
+SpaceStorageOpt = Annotated[
+    Optional[str],
+    typer.Option(
+        "--storage",
+        help="Space persistent storage tier ('small', 'medium', or 'large'). Only for Spaces.",
+    ),
+]
+
+SpaceSleepTimeOpt = Annotated[
+    Optional[int],
+    typer.Option(
+        "--sleep-time",
+        help="Seconds of inactivity before the Space is put to sleep. Use -1 to disable. Only for Spaces.",
+    ),
+]
+
+
+        "hf repos create my-space --type space --space-sdk gradio --flavor t4-medium --secrets HF_TOKEN -e THEME=dark",
+    hardware: SpaceHardwareOpt = None,
+    storage: SpaceStorageOpt = None,
+    sleep_time: SpaceSleepTimeOpt = None,
+    secrets: SecretsOpt = None,
+    secrets_file: SecretsFileOpt = None,
+    env: EnvOpt = None,
+    env_file: EnvFileOpt = None,
+        space_hardware=hardware,  # type: ignore[arg-type]
+        space_storage=storage,  # type: ignore[arg-type]
+        space_sleep_time=sleep_time,
+        space_secrets=env_map_to_key_value_list(parse_env_map(secrets, secrets_file)),
+        space_variables=env_map_to_key_value_list(parse_env_map(env, env_file)),
+        "hf repos duplicate multimodalart/dreambooth-training my-dreambooth --type space --flavor l4x4 --secrets HF_TOKEN --private",
+    hardware: SpaceHardwareOpt = None,
+    storage: SpaceStorageOpt = None,
+    sleep_time: SpaceSleepTimeOpt = None,
+    secrets: SecretsOpt = None,
+    secrets_file: SecretsFileOpt = None,
+    env: EnvOpt = None,
+    env_file: EnvFileOpt = None,
+        space_hardware=hardware,  # type: ignore[arg-type]
+        space_storage=storage,  # type: ignore[arg-type]
+        space_sleep_time=sleep_time,
+        space_secrets=env_map_to_key_value_list(parse_env_map(secrets, secrets_file)),
+        space_variables=env_map_to_key_value_list(parse_env_map(env, env_file)),

@@ -1,0 +1,50 @@
+# commit c08336fdb086 2025-04-17T20:23:16-07:00 aider/coders/patch_prompts.py
+    # --------------------------------------------------------------------- #
+    #  SYSTEM PROMPT
+    # --------------------------------------------------------------------- #
+   • If you need to propose edits to existing files not already added to the chat, you *MUST* tell the user their full path names and ask them to *add the files to the chat*.
+   • End your reply and wait for their approval.
+   • You can keep asking if you then decide you need to edit more files.
+2. Think step‑by‑step and explain the needed changes in a few short sentences.
+IMPORTANT: Each file MUST appear only once in the patch.
+Consolidate **all** edits for a given file into a single `*** [ACTION] File:` block.
+    # --------------------------------------------------------------------- #
+    #  EXAMPLE MESSAGES
+    # --------------------------------------------------------------------- #
+        # --- Example 1 ---------------------------------------------------- #
+            content="""To make this change we need to modify `mathweb/flask/app.py`:
+1. Import the `math` module.
+2. Replace the custom recursive `factorial()` helper with `math.factorial`.
+3. Update `get_factorial()` to call `math.factorial`.
+@@
+-from flask import Flask
+-
+-from flask import Flask
++from flask import Flask
++import math
+@@
++def factorial(n):
++    "compute factorial"
++
++    return math.factorial(n)
+        # --- Example 2 ---------------------------------------------------- #
+            content="""To make this change we need to modify `main.py` and create a new file `hello.py`:
+1. Create `hello.py` with the `hello()` function.
+2. Remove `hello()` from `main.py` and import it instead.
+@@
+    # --------------------------------------------------------------------- #
+    #  SYSTEM REMINDER
+    # --------------------------------------------------------------------- #
+
+
+    *** [ACTION] File: [path/to/file]
+
+
+⇨ **Each file MUST appear only once in the patch.**  
+   Consolidate all changes for that file into the same block.  
+   If you are moving code within a file, include both the deletions and the
+   insertions as separate hunks inside this single `*** Update File:` block
+   (do *not* open a second block for the same file).
+When moving code *within* a single file, keep everything inside one
+`*** Update File:` block. Provide one hunk that deletes the code from its
+original location and another hunk that inserts it at the new location.

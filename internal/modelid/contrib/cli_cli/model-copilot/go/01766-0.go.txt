@@ -1,0 +1,34 @@
+// commit 4a75987727d9 2026-09-03T17:14:06+02:00 pkg/cmd/api/api.go
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	AppVersion        string
+	InvokingAgent     string
+	BaseRepo          func() (ghrepo.Interface, error)
+	Branch            func() (string, error)
+	Config            func() (gh.Config, error)
+	HttpClient        func(api.HTTPClientOptions) (*http.Client, error)
+	IO                *iostreams.IOStreams
+	TelemetryDisabler ghtelemetry.Disabler
+		AppVersion:        f.AppVersion,
+		InvokingAgent:     f.InvokingAgent,
+		BaseRepo:          f.BaseRepo,
+		Branch:            f.Branch,
+		Config:            f.Config,
+		HttpClient:        api.NewHTTPClient,
+		IO:                f.IOStreams,
+		TelemetryDisabler: f.TelemetryDisabler,
+		opts.HttpClient = api.NewHTTPClient
+	}
+	log := opts.IO.ErrOut
+	if opts.Verbose {
+		log = opts.IO.Out
+	httpClient, err := opts.HttpClient(api.HTTPClientOptions{
+		AppVersion:        opts.AppVersion,
+		InvokingAgent:     opts.InvokingAgent,
+		CacheTTL:          opts.CacheTTL,
+		Config:            cfg.Authentication(),
+		EnableCache:       opts.CacheTTL > 0,
+		Log:               log,
+		LogColorize:       opts.IO.ColorEnabled(),
+		LogVerboseHTTP:    opts.Verbose,
+		TelemetryDisabler: opts.TelemetryDisabler,
+	})

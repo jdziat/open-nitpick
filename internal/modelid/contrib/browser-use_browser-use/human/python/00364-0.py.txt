@@ -1,0 +1,41 @@
+# commit 815fbace3d07 2025-06-06T00:52:56-07:00 browser_use/browser/session.py
+						# Add timeout to prevent hanging on close if context is already closed
+						try:
+							async with asyncio.timeout(5):  # 5 second timeout for close operation
+								await (self.browser or self.browser_context.browser).close()
+						except TimeoutError:
+							self.logger.warning('⏱️ Timeout while closing browser/context - it may already be closed')
+						# Add timeout for process termination
+						try:
+							async with asyncio.timeout(5):  # 5 second timeout
+								proc.terminate()
+								# Wait for process to actually terminate
+								await asyncio.to_thread(proc.wait, timeout=4)
+						except (TimeoutError, psutil.TimeoutExpired):
+							self.logger.warning(
+								f'⏱️ Process did not terminate gracefully, force killing browser_pid={self.browser_pid}'
+							)
+							proc.kill()  # Force kill if terminate didn't work
+				# Cancel any remaining background tasks to prevent hanging on exit
+				if hasattr(self, '_background_tasks'):
+					for task in list(self._background_tasks):
+						if not task.done():
+							task.cancel()
+					self._background_tasks.clear()
+
+
+		# Cancel any background tasks to prevent hanging
+		if hasattr(self, '_background_tasks'):
+			for task in list(self._background_tasks):
+				if not task.done():
+					task.cancel()
+			self._background_tasks.clear()
+			# Use create_task but store reference to allow cleanup
+			task = asyncio.create_task(self.save_cookies())
+			# Set task name for debugging
+			task.set_name(f'save_cookies_{self.id[-4:]}')
+			# Fire and forget, but the task will complete quickly
+			# If we were initialized but lost connection, reset state first to avoid infinite loops
+			if self.initialized and not self.is_connected():
+				self.logger.warning('Browser was initialized but lost connection, resetting state before restart')
+				self._reset_connection_state()

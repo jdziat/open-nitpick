@@ -1,0 +1,44 @@
+// commit 69b6d434d62b 2026-06-20T15:17:10-03:00 extractors/extractors.go
+// ErrChainCycle is returned when a chain extractor recursively invokes itself.
+var ErrChainCycle = errors.New("cyclic extractor chain")
+
+// Contains reports whether this extractor, or any extractor in its chain, matches pred.
+//
+// If pred is nil, Contains returns false.
+func (e Extractor) Contains(pred func(Extractor) bool) bool {
+	if pred == nil {
+		return false
+	}
+
+	stack := make([]*Extractor, 0, len(e.Chain)+1)
+	stack = append(stack, &e)
+
+	for len(stack) > 0 {
+		last := len(stack) - 1
+		curr := stack[last]
+		stack = stack[:last]
+
+		if pred(*curr) {
+			return true
+		}
+
+		for i := range curr.Chain {
+			stack = append(stack, &curr.Chain[i])
+		}
+	}
+
+	return false
+}
+
+type chainGuardKey struct {
+	id *byte
+}
+
+	guardKey := chainGuardKey{id: new(byte)}
+			if active, ok := c.Locals(guardKey).(bool); ok && active {
+				return "", ErrChainCycle
+			}
+
+			c.Locals(guardKey, true)
+			defer c.Locals(guardKey, false)
+

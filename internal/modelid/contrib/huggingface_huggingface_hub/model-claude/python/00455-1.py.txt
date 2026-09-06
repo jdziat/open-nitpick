@@ -1,0 +1,95 @@
+# commit 993d6456afe2 2026-04-02T16:11:30+02:00 src/huggingface_hub/cli/skills.py
+from huggingface_hub.errors import CLIError
+
+from . import _skills
+CLAUDE_LOCAL = Path(".claude/skills")
+CLAUDE_GLOBAL = Path("~/.claude/skills")
+        raise CLIError(f"Skill already exists at {path}.\nRe-run with --force to overwrite.")
+def _install_to(skills_dir: Path, skill_name: str, force: bool) -> Path:
+    """Install a marketplace skill into a skills directory. Returns the installed path."""
+    skill = _skills.get_marketplace_skill(skill_name)
+    try:
+        return _skills.install_marketplace_skill(skill, skills_dir, force=force)
+    except FileExistsError as exc:
+        raise CLIError(f"{exc}\nRe-run with --force to overwrite.") from exc
+def _create_symlink(agent_skills_dir: Path, skill_name: str, central_skill_path: Path, force: bool) -> Path:
+    link_path = agent_skills_dir / skill_name
+def _resolve_update_roots(
+    *,
+    claude: bool,
+    global_: bool,
+    dest: Path | None,
+) -> list[Path]:
+    if dest is not None:
+        if claude or global_:
+            raise CLIError("--dest cannot be combined with --claude or --global.")
+        return [dest.expanduser().resolve()]
+
+    roots: list[Path] = [CENTRAL_GLOBAL if global_ else CENTRAL_LOCAL]
+    if claude:
+        roots.append(CLAUDE_GLOBAL if global_ else CLAUDE_LOCAL)
+    return [root.expanduser().resolve() for root in roots]
+
+
+    """Print the generated `hf-cli` SKILL.md to stdout."""
+        "hf skills add huggingface-gradio --dest=~/my-skills",
+        "hf skills add --claude",
+        "hf skills add huggingface-gradio --claude --global",
+    name: Annotated[
+        str,
+        typer.Argument(help="Marketplace skill name.", show_default=False),
+    ] = DEFAULT_SKILL_ID,
+    """Download a Hugging Face skill and install it for an AI assistant.
+    If `--claude` is specified, the skill is also symlinked into Claude's legacy skills directory.
+    if dest is not None:
+        if claude or global_:
+            raise CLIError("--dest cannot be combined with --claude or --global.")
+        skill_dest = _install_to(dest, name, force)
+        print(f"Installed '{name}' to {skill_dest}")
+    central_skill_path = _install_to(central_path, name, force)
+    print(f"Installed '{name}' to central location: {central_skill_path}")
+        agent_target = CLAUDE_GLOBAL if global_ else CLAUDE_LOCAL
+        link_path = _create_symlink(agent_target, name, central_skill_path, force)
+
+
+@skills_cli.command(
+    "upgrade",
+    examples=[
+        "hf skills upgrade",
+        "hf skills upgrade hf-cli",
+        "hf skills upgrade huggingface-gradio --dest=~/my-skills",
+        "hf skills upgrade --claude",
+    ],
+)
+def skills_upgrade(
+    name: Annotated[
+        str | None,
+        typer.Argument(help="Optional installed skill name to upgrade.", show_default=False),
+    ] = None,
+    claude: Annotated[bool, typer.Option("--claude", help="Upgrade skills installed for Claude.")] = False,
+    global_: Annotated[
+        bool,
+        typer.Option(
+            "--global",
+            "-g",
+            help="Use global skills directories instead of the current project.",
+        ),
+    ] = False,
+    dest: Annotated[
+        Path | None,
+        typer.Option(
+            help="Upgrade skills in a custom skills directory.",
+        ),
+    ] = None,
+) -> None:
+    """Upgrade installed Hugging Face marketplace skills."""
+    roots = _resolve_update_roots(claude=claude, global_=global_, dest=dest)
+
+    results = _skills.apply_updates(roots, selector=name)
+    if not results:
+        print("No installed skills found.")
+        return
+
+    for result in results:
+        detail = f" ({result.detail})" if result.detail else ""
+        print(f"{result.name}: {result.status}{detail}")

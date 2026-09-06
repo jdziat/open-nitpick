@@ -1,0 +1,40 @@
+// commit c0d871bc9af7 2026-06-11T17:44:13+00:00 api/matchingservice/v1/service_grpc.pb.go
+	MatchingService_CountWorkers_FullMethodName                           = "/temporal.server.api.matchingservice.v1.MatchingService/CountWorkers"
+	// CountWorkers counts workers in the specified namespace that match the provided query.
+	CountWorkers(ctx context.Context, in *CountWorkersRequest, opts ...grpc.CallOption) (*CountWorkersResponse, error)
+func (c *matchingServiceClient) CountWorkers(ctx context.Context, in *CountWorkersRequest, opts ...grpc.CallOption) (*CountWorkersResponse, error) {
+	out := new(CountWorkersResponse)
+	err := c.cc.Invoke(ctx, MatchingService_CountWorkers_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+	// CountWorkers counts workers in the specified namespace that match the provided query.
+	CountWorkers(context.Context, *CountWorkersRequest) (*CountWorkersResponse, error)
+func (UnimplementedMatchingServiceServer) CountWorkers(context.Context, *CountWorkersRequest) (*CountWorkersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CountWorkers not implemented")
+}
+func _MatchingService_CountWorkers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountWorkersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MatchingServiceServer).CountWorkers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MatchingService_CountWorkers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MatchingServiceServer).CountWorkers(ctx, req.(*CountWorkersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+		{
+			MethodName: "CountWorkers",
+			Handler:    _MatchingService_CountWorkers_Handler,
+		},

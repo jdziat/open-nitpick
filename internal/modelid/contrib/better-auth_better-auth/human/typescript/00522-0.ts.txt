@@ -1,0 +1,45 @@
+// commit e9f5b2b6f398 2025-11-21T18:25:02+00:00 packages/better-auth/src/db/internal-adapter.ts
+			const currentAdapter = await getCurrentAdapter(adapter);
+			const result = await currentAdapter.findOne<
+				Session & { user: User | null }
+			>({
+				model: "session",
+						value: token,
+						field: "token",
+				join: {
+					user: true,
+				},
+			if (!result) return null;
+
+			const { user, ...session } = result;
+			if (!user) return null;
+			const sessions = await (await getCurrentAdapter(adapter)).findMany<
+				Session & { user: User | null }
+			>({
+				join: {
+					user: true,
+				},
+
+			if (!sessions.length) return [];
+			if (sessions.some((session) => !session.user)) return [];
+
+			return sessions.map((_session) => {
+				const { user, ...session } = _session;
+					user: user!,
+			});
+				.findMany<Account & { user: User | null }>({
+					join: {
+						user: true,
+					},
+				if (account.user) {
+						user: account.user,
+			const currentAdapter = await getCurrentAdapter(adapter);
+			const result = await currentAdapter.findOne<
+				User & { account: Account[] | undefined }
+			>({
+				join: {
+					...(options?.includeAccounts ? { account: true } : {}),
+				},
+			if (!result) return null;
+			const { account: accounts, ...user } = result;
+				accounts: accounts ?? [],

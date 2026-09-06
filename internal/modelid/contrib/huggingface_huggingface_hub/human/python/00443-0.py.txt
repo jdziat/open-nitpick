@@ -1,0 +1,35 @@
+# commit 03e00fcfe79c 2026-03-31T18:09:17+02:00 src/huggingface_hub/cli/_cli_utils.py
+            self._rewrite_quiet_shorthand(cmd, args)
+    @staticmethod
+    def _rewrite_quiet_shorthand(cmd: click.Command, args: list[str]) -> None:
+        """Rewrite ``-q`` / ``--quiet`` shorthand to ``--format quiet``.
+
+        Only applies to commands that accept ``--format`` but do NOT already
+        have their own ``--quiet`` / ``-q`` option.
+        """
+        has_quiet = "-q" in args or "--quiet" in args
+        if not has_quiet:
+            return
+        has_format_option = any(isinstance(param, click.Option) and "--format" in param.opts for param in cmd.params)
+        has_quiet_option = any(
+            isinstance(param, click.Option) and ("--quiet" in param.opts or "-q" in param.opts) for param in cmd.params
+        )
+        if has_format_option and not has_quiet_option:
+            if any(arg == "--format" or arg.startswith("--format=") for arg in args):
+                raise click.UsageError("'--quiet' and '--format' are mutually exclusive.")
+            flag = "-q" if "-q" in args else "--quiet"
+            idx = args.index(flag)
+            args[idx : idx + 1] = ["--format", "quiet"]
+
+# TODO: remove OutputFormat once all commands are migrated to OutputFormatWithAuto.
+class OutputFormatWithAuto(str, Enum):
+    """Output format for CLI commands with auto detection of agent/human mode."""
+
+    agent = "agent"
+    auto = "auto"
+    human = "human"
+    json = "json"
+    quiet = "quiet"
+
+
+        format: Output format.

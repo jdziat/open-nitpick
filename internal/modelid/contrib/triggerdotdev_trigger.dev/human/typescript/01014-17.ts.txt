@@ -1,0 +1,40 @@
+// commit be1a6cf8dece 2026-05-14T13:12:36+01:00 packages/core/src/v3/realtimeStreams/types.ts
+export type StreamWriteResult = {
+  lastEventId?: string;
+};
+
+  wait(): Promise<StreamWriteResult>;
+  wait(): Promise<StreamWriteResult>;
+  /** Override the default span name for this operation. */
+  spanName?: string;
+  /** When true, the span will be collapsed in the dashboard. */
+  collapsed?: boolean;
+  waitUntilComplete: () => Promise<StreamWriteResult>;
+  /**
+   * Wait for data with an idle phase before suspending.
+   *
+   * Keeps the task active (using compute) for `idleTimeoutInSeconds`,
+   * then suspends via `.wait()` if no data arrives. If data arrives during
+   * the idle phase the task responds instantly without suspending.
+   */
+  waitWithIdleTimeout: (options: InputStreamWaitWithIdleTimeoutOptions) => Promise<{ ok: true; output: TData } | { ok: false; error?: any }>;
+  /** Override the default span name for this operation. */
+  spanName?: string;
+
+  /** Override the default span name for this operation. */
+  spanName?: string;
+};
+
+export type InputStreamWaitWithIdleTimeoutOptions = {
+  /** Seconds to keep the task idle (active, using compute) before suspending. */
+  idleTimeoutInSeconds: number;
+  /** Maximum time to wait after suspending (duration string, e.g. "1h"). */
+  timeout?: string;
+  /** Override the default span name for the outer operation. */
+  spanName?: string;
+  /** Called right before suspending (after idle phase times out). Not called if data arrives during idle. */
+  onSuspend?: () => void | Promise<void>;
+  /** Called right after resuming from suspension with data. Not called if data arrived during idle or on timeout. */
+  onResume?: () => void | Promise<void>;
+  /** When true, skip the suspend phase entirely. If idle times out, return `{ ok: false }` immediately. */
+  skipSuspend?: boolean;

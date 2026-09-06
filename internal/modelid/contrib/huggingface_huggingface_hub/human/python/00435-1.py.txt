@@ -1,0 +1,41 @@
+# commit 4c7b420ff74f 2026-03-31T10:49:04+02:00 src/huggingface_hub/_jobs_api.py
+from typing import Any, Literal
+    revision: str | None = None
+    read_only: bool | None = None
+    path: str | None = None
+    message: str | None
+    created_at: datetime | None
+    docker_image: str | None
+    space_id: str | None
+    command: list[str] | None
+    arguments: list[str] | None
+    environment: dict[str, Any] | None
+    secrets: dict[str, Any] | None
+    flavor: SpaceHardware | None
+    labels: dict[str, str] | None
+    volumes: list[Volume] | None
+    docker_image: str | None
+    space_id: str | None
+    command: list[str] | None
+    arguments: list[str] | None
+    environment: dict[str, Any] | None
+    secrets: dict[str, Any] | None
+    flavor: SpaceHardware | None
+    timeout: int | None
+    tags: list[str] | None
+    arch: str | None
+    labels: dict[str, str] | None
+    volumes: list[Volume] | None
+    last_job: LastJobInfo | None
+    next_job_run_at: datetime | None
+    created_at: datetime | None
+    schedule: str | None
+    suspend: bool | None
+    concurrency: bool | None
+    accelerator: JobAccelerator | None
+    env: dict[str, Any] | None,
+    secrets: dict[str, Any] | None,
+    flavor: SpaceHardware | None,
+    timeout: int | float | str | None,
+    labels: dict[str, str] | None = None,
+    volumes: list[Volume] | None = None,

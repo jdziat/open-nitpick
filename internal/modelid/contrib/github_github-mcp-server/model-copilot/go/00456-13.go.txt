@@ -1,0 +1,183 @@
+// commit 60aef5d2e3da 2025-12-01T14:30:59+01:00 pkg/github/search.go
+	"net/http"
+	"github.com/github/github-mcp-server/pkg/utils"
+	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+func SearchRepositories(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, mcp.ToolHandlerFor[map[string]any, any]) {
+	schema := &jsonschema.Schema{
+		Type: "object",
+		Properties: map[string]*jsonschema.Schema{
+			"query": {
+				Type:        "string",
+				Description: "Repository search query. Examples: 'machine learning in:name stars:>1000 language:python', 'topic:react', 'user:facebook'. Supports advanced search syntax for precise filtering.",
+			},
+			"sort": {
+				Type:        "string",
+				Description: "Sort repositories by field, defaults to best match",
+				Enum:        []any{"stars", "forks", "help-wanted-issues", "updated"},
+			},
+			"order": {
+				Type:        "string",
+				Description: "Sort order",
+				Enum:        []any{"asc", "desc"},
+			},
+			"minimal_output": {
+				Type:        "boolean",
+				Description: "Return minimal repository information (default: true). When false, returns full GitHub API repository objects.",
+				Default:     json.RawMessage(`true`),
+			},
+		},
+		Required: []string{"query"},
+	}
+	WithPagination(schema)
+	return mcp.Tool{
+			Name:        "search_repositories",
+			Description: t("TOOL_SEARCH_REPOSITORIES_DESCRIPTION", "Find GitHub repositories by name, description, readme, topics, or other metadata. Perfect for discovering projects, finding examples, or locating specific repositories across GitHub."),
+			Annotations: &mcp.ToolAnnotations{
+				ReadOnlyHint: true,
+			},
+			InputSchema: schema,
+		},
+		func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
+			query, err := RequiredParam[string](args, "query")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			sort, err := OptionalParam[string](args, "sort")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			order, err := OptionalParam[string](args, "order")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			pagination, err := OptionalPaginationParams(args)
+				return utils.NewToolResultError(err.Error()), nil, nil
+			minimalOutput, err := OptionalBoolParamWithDefault(args, "minimal_output", true)
+				return utils.NewToolResultError(err.Error()), nil, nil
+				return utils.NewToolResultErrorFromErr("failed to get GitHub client", err), nil, nil
+				), nil, nil
+			if resp.StatusCode != http.StatusOK {
+					return utils.NewToolResultErrorFromErr("failed to read response body", err), nil, nil
+				return utils.NewToolResultError(fmt.Sprintf("failed to search repositories: %s", string(body))), nil, nil
+					return utils.NewToolResultErrorFromErr("failed to marshal minimal response", err), nil, nil
+					return utils.NewToolResultErrorFromErr("failed to marshal full response", err), nil, nil
+			return utils.NewToolResultText(string(r)), nil, nil
+func SearchCode(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, mcp.ToolHandlerFor[map[string]any, any]) {
+	schema := &jsonschema.Schema{
+		Type: "object",
+		Properties: map[string]*jsonschema.Schema{
+			"query": {
+				Type:        "string",
+				Description: "Search query using GitHub's powerful code search syntax. Examples: 'content:Skill language:Java org:github', 'NOT is:archived language:Python OR language:go', 'repo:github/github-mcp-server'. Supports exact matching, language filters, path filters, and more.",
+			},
+			"sort": {
+				Type:        "string",
+				Description: "Sort field ('indexed' only)",
+			},
+			"order": {
+				Type:        "string",
+				Description: "Sort order for results",
+				Enum:        []any{"asc", "desc"},
+			},
+		},
+		Required: []string{"query"},
+	}
+	WithPagination(schema)
+
+	return mcp.Tool{
+			Name:        "search_code",
+			Description: t("TOOL_SEARCH_CODE_DESCRIPTION", "Fast and precise code search across ALL GitHub repositories using GitHub's native search engine. Best for finding exact symbols, functions, classes, or specific code patterns."),
+			Annotations: &mcp.ToolAnnotations{
+				ReadOnlyHint: true,
+			},
+			InputSchema: schema,
+		},
+		func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
+			query, err := RequiredParam[string](args, "query")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			sort, err := OptionalParam[string](args, "sort")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			order, err := OptionalParam[string](args, "order")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			pagination, err := OptionalPaginationParams(args)
+				return utils.NewToolResultError(err.Error()), nil, nil
+				return utils.NewToolResultErrorFromErr("failed to get GitHub client", err), nil, nil
+				), nil, nil
+			if resp.StatusCode != http.StatusOK {
+					return utils.NewToolResultErrorFromErr("failed to read response body", err), nil, nil
+				return utils.NewToolResultError(fmt.Sprintf("failed to search code: %s", string(body))), nil, nil
+				return utils.NewToolResultErrorFromErr("failed to marshal response", err), nil, nil
+			return utils.NewToolResultText(string(r)), nil, nil
+func userOrOrgHandler(accountType string, getClient GetClientFn) mcp.ToolHandlerFor[map[string]any, any] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
+		query, err := RequiredParam[string](args, "query")
+			return utils.NewToolResultError(err.Error()), nil, nil
+		sort, err := OptionalParam[string](args, "sort")
+			return utils.NewToolResultError(err.Error()), nil, nil
+		order, err := OptionalParam[string](args, "order")
+			return utils.NewToolResultError(err.Error()), nil, nil
+		pagination, err := OptionalPaginationParams(args)
+			return utils.NewToolResultError(err.Error()), nil, nil
+			return utils.NewToolResultErrorFromErr("failed to get GitHub client", err), nil, nil
+			), nil, nil
+		if resp.StatusCode != http.StatusOK {
+				return utils.NewToolResultErrorFromErr("failed to read response body", err), nil, nil
+			return utils.NewToolResultError(fmt.Sprintf("failed to search %ss: %s", accountType, string(body))), nil, nil
+			return utils.NewToolResultErrorFromErr("failed to marshal response", err), nil, nil
+		return utils.NewToolResultText(string(r)), nil, nil
+func SearchUsers(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, mcp.ToolHandlerFor[map[string]any, any]) {
+	schema := &jsonschema.Schema{
+		Type: "object",
+		Properties: map[string]*jsonschema.Schema{
+			"query": {
+				Type:        "string",
+				Description: "User search query. Examples: 'john smith', 'location:seattle', 'followers:>100'. Search is automatically scoped to type:user.",
+			},
+			"sort": {
+				Type:        "string",
+				Description: "Sort users by number of followers or repositories, or when the person joined GitHub.",
+				Enum:        []any{"followers", "repositories", "joined"},
+			},
+			"order": {
+				Type:        "string",
+				Description: "Sort order",
+				Enum:        []any{"asc", "desc"},
+			},
+		},
+		Required: []string{"query"},
+	}
+	WithPagination(schema)
+
+	return mcp.Tool{
+		Name:        "search_users",
+		Description: t("TOOL_SEARCH_USERS_DESCRIPTION", "Find GitHub users by username, real name, or other profile information. Useful for locating developers, contributors, or team members."),
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint: true,
+		},
+		InputSchema: schema,
+	}, userOrOrgHandler("user", getClient)
+func SearchOrgs(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, mcp.ToolHandlerFor[map[string]any, any]) {
+	schema := &jsonschema.Schema{
+		Type: "object",
+		Properties: map[string]*jsonschema.Schema{
+			"query": {
+				Type:        "string",
+				Description: "Organization search query. Examples: 'microsoft', 'location:california', 'created:>=2025-01-01'. Search is automatically scoped to type:org.",
+			},
+			"sort": {
+				Type:        "string",
+				Description: "Sort field by category",
+				Enum:        []any{"followers", "repositories", "joined"},
+			},
+			"order": {
+				Type:        "string",
+				Description: "Sort order",
+				Enum:        []any{"asc", "desc"},
+			},
+		},
+		Required: []string{"query"},
+	}
+	WithPagination(schema)
+	return mcp.Tool{
+		Name:        "search_orgs",
+		Description: t("TOOL_SEARCH_ORGS_DESCRIPTION", "Find GitHub organizations by name, location, or other organization metadata. Ideal for discovering companies, open source foundations, or teams."),
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint: true,
+		},
+		InputSchema: schema,
+	}, userOrOrgHandler("org", getClient)

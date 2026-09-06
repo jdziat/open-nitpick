@@ -1,0 +1,103 @@
+# commit 6fab25c043e4 2025-08-14T14:32:32-07:00 tests/scripts/debug_iframe_scrolling.py
+from browser_use.agent.views import ActionModel
+
+	print('Starting iframe scrolling debug test...')
+
+		""",
+
+
+
+		print('Browser session started')
+
+			task='Navigate to the iframe test page and scroll inside the iframe',
+
+			print(f'\n📸 Capturing DOM state: {label}')
+					include_dom=True, include_screenshot=False, cache_clickable_elements_hashes=True, include_recent_events=False
+
+
+					('First Name', ['firstName', 'first name']),
+					('Last Name', ['lastName', 'last name']),
+					('Email', ['email']),
+					('City', ['city']),
+					('State', ['state']),
+					('Zip', ['zip', 'zipCode']),
+
+
+					'label': label,
+					'total_elements': element_count,
+					'found_elements': found_elements,
+					'selector_map': selector_map,
+			return {'label': label, 'error': 'No DOM state available'}
+
+		print('\n' + '=' * 80)
+		print('PHASE 1: INITIAL PAGE LOAD')
+		print('=' * 80)
+
+
+
+
+		initial_state = await capture_dom_state('INITIAL (after page load)')
+
+		print('\n' + '=' * 80)
+		print('PHASE 2: EXECUTING ACTIONS')
+		print('=' * 80)
+
+			task='Input text and scroll inside the iframe',
+
+
+			action_type = 'unknown'
+				action_type = 'input_text'
+				state = await capture_dom_state('AFTER INPUT_TEXT')
+				action_type = 'scroll'
+				state = await capture_dom_state('AFTER SCROLL')
+
+
+		print(f'\nAgent completed with result: {result}')
+
+		print('\n' + '=' * 80)
+		print('PHASE 3: ANALYSIS OF DOM STATES')
+		print('=' * 80)
+
+
+			if 'error' in state:
+				print(f'\n❌ {state["label"]}: {state["error"]}')
+				print(f'\n📊 {state["label"]}:')
+				print(f'  Total elements: {state["total_elements"]}')
+				print('  Found elements:')
+					status = '✓' if found else '✗'
+					print(f'    {status} {elem_name}')
+
+		print('\n' + '=' * 80)
+		print('COMPARISON SUMMARY')
+		print('=' * 80)
+
+
+			print('\nElement count changes:')
+			print(f'  Initial: {initial.get("total_elements", 0)} elements')
+				print(f'  After input_text: {after_input.get("total_elements", 0)} elements')
+				print(f'  After scroll: {after_scroll.get("total_elements", 0)} elements')
+
+			if after_scroll and 'found_elements' in after_scroll:
+				lower_fields = ['City', 'State', 'Zip']
+				missing_fields = [f for f in lower_fields if not after_scroll['found_elements'].get(f, False)]
+
+					print('\n⚠️  BUG CONFIRMED: Lower form fields missing after scroll:')
+						print(f'    ✗ {field}')
+					print('\nThis confirms that scrolling inside iframes does not update the DOM tree properly.')
+					print('\n✅ SUCCESS: All lower form fields are visible after scrolling!')
+
+		if states and 'selector_map' in states[-1]:
+			print('\n' + '=' * 80)
+			print('DEBUG: First 5 elements in final selector_map')
+			print('=' * 80)
+			final_map = states[-1]['selector_map']
+				print(f'\n  [{index}]: {elem_preview}...')
+
+		print('\n' + '=' * 80)
+		print('Test complete. Browser will remain open for 10 seconds for inspection...')
+		print('=' * 80)
+
+		print('\nCleaning up...')
+		print('Browser session closed')
+if __name__ == '__main__':
+	asyncio.run(debug_iframe_scrolling())

@@ -1,0 +1,36 @@
+# commit fff445dc638d 2025-09-09T12:53:32-07:00 examples/apps/ad-use/ad_generator.py
+    def __init__(self, api_key: str | None = GOOGLE_API_KEY):
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY is missing or empty – set the environment variable or pass api_key explicitly")
+
+    async def generate_ad_image(self, prompt: str, screenshot_path: Path | None = None) -> bytes:
+        """Generate ad image bytes using Gemini. Returns *empty bytes* on failure."""
+
+            from typing import Any, List
+
+            contents: List[Any] = [prompt]
+
+                screenshot_prompt = (
+                    "\n\nHere is the actual landing page screenshot to reference for design inspiration, "
+                    "colors, layout, and visual style:"
+                )
+
+                img = Image.open(screenshot_path)
+                w, h = img.size
+                side = min(w, h)
+                img = img.crop(((w - side) // 2, (h - side) // 2, (w + side) // 2, (h + side) // 2))
+
+                contents = [prompt + screenshot_prompt, img]
+
+                contents=contents,  
+
+            cand = getattr(response, "candidates", None)
+            if cand:
+                for part in getattr(cand[0].content, "parts", []):
+                    inline = getattr(part, "inline_data", None)
+                    if inline:
+                        return inline.data
+
+
+        return b""
+

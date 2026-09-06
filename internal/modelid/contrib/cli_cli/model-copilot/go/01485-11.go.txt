@@ -1,0 +1,31 @@
+// commit 0c2eea6338a2 2026-07-30T19:22:49-06:00 pkg/cmd/variable/set/http.go
+	"strconv"
+	"github.com/cli/cli/v2/internal/safeurl"
+func postVariable(client *api.Client, host string, path safeurl.SafeURL, payload interface{}) error {
+	return client.REST(host, "POST", path.String(), requestBody, nil)
+	path, err := safeurl.JoinPath("orgs", orgName, "actions", "variables")
+	if err != nil {
+		return err
+	}
+	path, err := safeurl.JoinPath("repositories", strconv.FormatInt(repoID, 10), "environments", envName, "variables")
+	if err != nil {
+		return err
+	}
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "variables")
+	if err != nil {
+		return err
+	}
+func patchVariable(client *api.Client, host string, path safeurl.SafeURL, payload interface{}) error {
+	return client.REST(host, "PATCH", path.String(), requestBody, nil)
+	path, err := safeurl.JoinPath("orgs", orgName, "actions", "variables", variableName)
+	if err != nil {
+		return err
+	}
+	path, err := safeurl.JoinPath("repositories", strconv.FormatInt(repoID, 10), "environments", envName, "variables", variableName)
+	if err != nil {
+		return err
+	}
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "actions", "variables", variableName)
+	if err != nil {
+		return err
+	}

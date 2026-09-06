@@ -1,0 +1,58 @@
+# commit f1cd1494e968 2026-04-23T11:38:00+02:00 src/huggingface_hub/cli/buckets.py
+    FormatWithAutoOpt,
+from ._output import OutputFormatWithAuto, out
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Bucket created", handle=bucket_url.handle, url=bucket_url.url)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    items = [
+        {
+            "id": bucket.id,
+            "private": bucket.private,
+            "size": _format_size(bucket.size, human_readable) if human_readable else bucket.size,
+            "total_files": bucket.total_files,
+            "created_at": bucket.created_at,
+        }
+        for bucket in api.list_buckets(namespace=namespace, search=search)
+    ]
+    out.table(items, alignments={"size": "right", "total_files": "right"})
+    if as_tree and out.mode == OutputFormatWithAuto.json:
+        out.text("(empty)")
+    if as_tree:
+        # Tree is a human-only view — print directly regardless of mode
+        quiet = out.mode == OutputFormatWithAuto.quiet
+        for line in _build_tree(items, human_readable=human_readable, quiet=quiet):
+    elif out.mode == OutputFormatWithAuto.json:
+        print(json.dumps([api_object_to_dict(item) for item in items], indent=2))
+    elif out.mode == OutputFormatWithAuto.quiet:
+        out.hint("Use -R to list files recursively.")
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.dict(bucket, id_key="id")
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Bucket deleted", bucket_id=bucket_id)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+        status = StatusLine(enabled=out.mode == OutputFormatWithAuto.human)
+            out.text("No files to remove.")
+            out.text("\n".join(f"  {path}" for path in file_paths))
+            out.text("\n".join(f"delete: {BUCKET_PREFIX}{bucket_id}/{path}" for path in file_paths))
+            out.text(f"(dry run) {count_label} would be removed.")
+        out.result(
+            f"Removed {count_label} from '{bucket_id}'",
+            bucket_id=bucket_id,
+            files_deleted=len(file_paths),
+            size=size_str,
+        )
+            out.text(f"delete: {BUCKET_PREFIX}{bucket_id}/{file_path}")
+            out.text("(dry run) 1 file would be removed.")
+        out.result("File removed", path=file_path, bucket_id=bucket_id)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.result("Bucket moved", from_id=parsed_from_id, to_id=parsed_to_id)
+    if plan and not quiet:
+        out.hint(f"Run `hf buckets sync --apply {plan}` to execute this plan.")
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+        out.result("Copied", src=src, dst=dst)
+            api.download_bucket_files(bucket_id, [(prefix, local_path)])
+            out.result("Downloaded", src=src, dst=local_path)
+        api.batch_bucket_files(bucket_id, add=[(data, remote_path)])
+        out.result("Uploaded", src="stdin", dst=dst)
+        api.batch_bucket_files(bucket_id, add=[(src, remote_path)])
+        out.result("Uploaded", src=src, dst=f"{BUCKET_PREFIX}{bucket_id}/{remote_path}")

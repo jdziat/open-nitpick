@@ -1,0 +1,36 @@
+// commit 85f5b37c68d6 2026-08-05T15:49:44+01:00 packages/trigger-sdk/test/declaration-emit.test.ts
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+  readFileSync,
+  writeFileSync,
+import { dirname, join, resolve } from "node:path";
+        writeFileSync(fixturePath, FIXTURE_SOURCE);
+        writeFileSync(
+          join(consumerDir, "tsconfig.json"),
+          JSON.stringify({
+            compilerOptions: {
+              target: "ES2022",
+              module: "NodeNext",
+              moduleResolution: "NodeNext",
+              strict: true,
+              declaration: true,
+              emitDeclarationOnly: true,
+              skipLibCheck: true,
+              outDir: "out",
+              rootDir: ".",
+            },
+            files: ["agent.ts"],
+          })
+        );
+        const require = createRequire(import.meta.url);
+        const typescriptRoot = dirname(require.resolve("typescript/package.json"));
+        const result = spawnSync(
+          process.execPath,
+          [join(typescriptRoot, "bin", "tsc"), "-p", consumerDir],
+          {
+            encoding: "utf8",
+          }
+        const compilerOutput = [result.stdout, result.stderr].filter(Boolean).join("\n");
+        expect(result.error, compilerOutput).toBeUndefined();
+        expect(result.status, compilerOutput).toBe(0);
+        const dts = readFileSync(join(consumerDir, "out", "agent.d.ts"), "utf8");

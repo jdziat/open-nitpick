@@ -1,0 +1,102 @@
+// commit aedcb974f055 2026-06-14T18:28:21-07:00 packages/mcp/src/require-mcp-auth.test.ts
+import { APIError } from "better-call";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+const { verifyAccessTokenRequest } = vi.hoisted(() => ({
+	verifyAccessTokenRequest: vi.fn(),
+// Partial mock: only `verifyAccessTokenRequest` is stubbed. The real exports
+// (e.g. `DPOP_SIGNING_ALGORITHMS`, used by the DPoP challenge builder) stay so
+// the resource-server challenge path works.
+vi.mock("better-auth/oauth2", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("better-auth/oauth2")>();
+	return { ...actual, verifyAccessTokenRequest };
+});
+
+// These tests mock `verifyAccessTokenRequest`, so the replay store is never
+// exercised; the stub only needs to satisfy the context type.
+const internalAdapterStub = {
+	reserveVerificationValue: async () => true,
+};
+	$context: Promise.resolve({
+		baseURL: resolvedBaseURL,
+		internalAdapter: internalAdapterStub,
+	}),
+	beforeEach(() => {
+		verifyAccessTokenRequest.mockReset();
+	});
+
+		verifyAccessTokenRequest.mockResolvedValue({
+			sub: "user-1",
+		} satisfies JWTPayload);
+		expect(verifyAccessTokenRequest).toHaveBeenCalledWith(
+			expect.objectContaining({
+				authorizationHeader: "Bearer access-token",
+				dpopProofJwt: null,
+				method: "GET",
+				url: "https://app.example.com/mcp",
+			}),
+		verifyAccessTokenRequest.mockRejectedValue(
+			new APIError("UNAUTHORIZED", {
+				message: "missing authorization header",
+			}),
+		);
+	it("answers a DPoP-bound failure with an RFC 9449 DPoP challenge", async () => {
+		verifyAccessTokenRequest.mockRejectedValue(
+			new APIError("UNAUTHORIZED", {
+				message: "DPoP proof header is required",
+				error: "invalid_dpop_proof",
+				error_description: "DPoP proof header is required",
+			}),
+		);
+		const response = await requireMcpAuth(
+			authWith("https://app.example.com", "https://app.example.com/api/auth"),
+			async () => new Response("unreachable"),
+		)(
+			new Request("https://app.example.com/mcp", {
+				headers: { Authorization: "DPoP access-token" },
+			}),
+		);
+
+		expect(response.status).toBe(401);
+		expect(response.headers.get("WWW-Authenticate")).toMatch(/^DPoP /);
+	});
+
+	it("advertises the configured DPoP signing algorithms in the challenge", async () => {
+		verifyAccessTokenRequest.mockRejectedValue(
+			new APIError("UNAUTHORIZED", {
+				message: "DPoP proof header is required",
+				error: "invalid_dpop_proof",
+				error_description: "DPoP proof header is required",
+			}),
+		);
+		const response = await requireMcpAuth(
+			authWith("https://app.example.com", "https://app.example.com/api/auth"),
+			async () => new Response("unreachable"),
+			{ dpop: { signingAlgorithms: ["ES256"] } },
+		)(
+			new Request("https://app.example.com/mcp", {
+				headers: { Authorization: "DPoP access-token" },
+			}),
+		);
+
+		expect(response.status).toBe(401);
+		// The challenge advertises the configured alg, not the default set.
+		expect(response.headers.get("WWW-Authenticate")).toContain('algs="ES256"');
+	});
+
+		verifyAccessTokenRequest.mockResolvedValue({
+			sub: "user-2",
+		} satisfies JWTPayload);
+		expect(verifyAccessTokenRequest).toHaveBeenCalledWith(
+			expect.objectContaining({
+				authorizationHeader: "Bearer access-token",
+			}),
+		verifyAccessTokenRequest.mockRejectedValue(
+			new APIError("UNAUTHORIZED", {
+				message: "missing authorization header",
+			}),
+		);
+		verifyAccessTokenRequest.mockRejectedValue(
+			new APIError("UNAUTHORIZED", {
+				message: "missing authorization header",
+			}),
+		);

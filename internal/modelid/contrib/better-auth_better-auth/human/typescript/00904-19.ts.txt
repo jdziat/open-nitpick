@@ -1,0 +1,73 @@
+// commit 7d8786cd8790 2025-12-23T23:55:50+08:00 packages/better-auth/src/plugins/username/index.ts
+import { APIError, BASE_ERROR_CODES } from "@better-auth/core/error";
+						throw APIError.from(
+							"UNAUTHORIZED",
+							ERROR_CODES.INVALID_USERNAME_OR_PASSWORD,
+						);
+						throw APIError.from(
+							"UNPROCESSABLE_ENTITY",
+							ERROR_CODES.USERNAME_TOO_SHORT,
+						);
+						throw APIError.from(
+							"UNPROCESSABLE_ENTITY",
+							ERROR_CODES.USERNAME_TOO_LONG,
+						);
+						throw APIError.from(
+							"UNPROCESSABLE_ENTITY",
+							ERROR_CODES.INVALID_USERNAME,
+						);
+						throw APIError.from(
+							"UNAUTHORIZED",
+							ERROR_CODES.INVALID_USERNAME_OR_PASSWORD,
+						);
+						throw APIError.from(
+							"UNAUTHORIZED",
+							ERROR_CODES.INVALID_USERNAME_OR_PASSWORD,
+						);
+						throw APIError.from(
+							"UNAUTHORIZED",
+							ERROR_CODES.INVALID_USERNAME_OR_PASSWORD,
+						);
+						throw APIError.from(
+							"UNAUTHORIZED",
+							ERROR_CODES.INVALID_USERNAME_OR_PASSWORD,
+						);
+							throw APIError.from("FORBIDDEN", ERROR_CODES.EMAIL_NOT_VERIFIED);
+						throw APIError.from("FORBIDDEN", ERROR_CODES.EMAIL_NOT_VERIFIED);
+								message: BASE_ERROR_CODES.FAILED_TO_CREATE_SESSION.message,
+						throw APIError.from(
+							"UNPROCESSABLE_ENTITY",
+							ERROR_CODES.INVALID_USERNAME,
+						);
+						throw APIError.from(
+							"UNPROCESSABLE_ENTITY",
+							ERROR_CODES.USERNAME_TOO_SHORT,
+						);
+						throw APIError.from(
+							"UNPROCESSABLE_ENTITY",
+							ERROR_CODES.USERNAME_TOO_LONG,
+						);
+						throw APIError.from(
+							"UNPROCESSABLE_ENTITY",
+							ERROR_CODES.INVALID_USERNAME,
+						);
+								throw APIError.from(
+									"BAD_REQUEST",
+									ERROR_CODES.USERNAME_TOO_SHORT,
+								);
+								throw APIError.from(
+									"BAD_REQUEST",
+									ERROR_CODES.USERNAME_TOO_LONG,
+								);
+								throw APIError.from(
+									"BAD_REQUEST",
+									ERROR_CODES.INVALID_USERNAME,
+								);
+								throw APIError.from(
+									"BAD_REQUEST",
+									ERROR_CODES.USERNAME_IS_ALREADY_TAKEN,
+								);
+									throw APIError.from(
+										"BAD_REQUEST",
+										ERROR_CODES.INVALID_DISPLAY_USERNAME,
+									);

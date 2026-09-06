@@ -1,0 +1,51 @@
+// commit 0c2b360e401b 2025-11-26T16:04:44-08:00 service/history/api/consistency_checker.go
+// TODO: rename to ExecutionConsistencyChecker
+var _ WorkflowConsistencyChecker = (*WorkflowConsistencyCheckerImpl)(nil)
+
+		GetCurrentWorkflowRunID(
+		GetCurrentChasmRunID(
+			ctx context.Context,
+			namespaceID string,
+			workflowID string,
+			archetypeID chasm.ArchetypeID,
+			lockPriority locks.Priority,
+		) (string, error)
+
+			archetypeID chasm.ArchetypeID,
+			archetypeID chasm.ArchetypeID,
+func (c *WorkflowConsistencyCheckerImpl) GetCurrentWorkflowRunID(
+		chasm.WorkflowArchetypeID,
+	return c.getWorkflowLeaseImpl(ctx, reqClock, nil, workflowKey, chasm.WorkflowArchetypeID, lockPriority)
+	return c.getWorkflowLeaseImpl(ctx, reqClock, consistencyPredicate, workflowKey, chasm.WorkflowArchetypeID, lockPriority)
+}
+
+func (c *WorkflowConsistencyCheckerImpl) GetCurrentChasmRunID(
+	ctx context.Context,
+	namespaceID string,
+	workflowID string,
+	archetypeID chasm.ArchetypeID,
+	lockPriority locks.Priority,
+) (runID string, retErr error) {
+	return wcache.GetCurrentRunID(
+		ctx,
+		c.shardContext,
+		c.workflowCache,
+		namespaceID,
+		workflowID,
+		archetypeID,
+		lockPriority,
+	)
+	archetypeID chasm.ArchetypeID,
+	return c.getWorkflowLeaseImpl(ctx, reqClock, nil, workflowKey, archetypeID, lockPriority)
+	archetypeID chasm.ArchetypeID,
+	return c.getWorkflowLeaseImpl(ctx, reqClock, consistencyPredicate, workflowKey, archetypeID, lockPriority)
+	archetypeID chasm.ArchetypeID,
+		return c.getWorkflowLease(ctx, consistencyPredicate, workflowKey, archetypeID, lockPriority)
+		archetypeID,
+	archetypeID chasm.ArchetypeID,
+	runID, err := c.GetCurrentChasmRunID(
+		archetypeID,
+		archetypeID,
+	currentRunID, err := c.GetCurrentChasmRunID(ctx, namespaceID, workflowID, archetypeID, lockPriority)
+	archetypeID chasm.ArchetypeID,
+		archetypeID,

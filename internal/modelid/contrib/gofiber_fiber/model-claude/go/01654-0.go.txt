@@ -1,0 +1,68 @@
+// commit fc441afd72be 2026-07-09T13:17:15+00:00 middleware/proxy/proxy.go
+// guardMu serializes installation of the dial-time SSRF guard onto a
+// client. guardedClients records the *fasthttp.Client values whose Dial
+// has already been wrapped, so ensureClientGuarded wraps each exactly
+// once — a second wrap would compose the guard with itself and re-resolve
+// on every dial for no benefit.
+var (
+	guardMu        sync.Mutex
+	guardedClients = map[*fasthttp.Client]struct{}{}
+)
+
+// ensureClientGuarded installs the policy-aware dial-time SSRF guard on cli
+// exactly once. Every dispatch path funnels through here before it calls
+// cli.Do, so the wrap — performed under guardMu — establishes a
+// happens-before edge to every later read of cli.Dial by fasthttp; the
+// field is therefore never mutated concurrently with a dial. The guard
+// composes with any dialer the caller already set (see
+// newGuardedClientDialer).
+func ensureClientGuarded(cli *fasthttp.Client) {
+	guardMu.Lock()
+	defer guardMu.Unlock()
+	if _, ok := guardedClients[cli]; ok {
+		return
+	}
+	cli.Dial = newGuardedClientDialer(cli.Dial, cli.DialDualStack)
+	guardedClients[cli] = struct{}{}
+}
+
+	ensureClientGuarded(defaultClient)
+//
+// The supplied client is fitted with the dial-time SSRF guard (composing
+// with any Dial it already carries) so requests dispatched through it
+// re-validate the resolved IP at connect time, matching the default
+// client's behavior.
+	ensureClientGuarded(cli)
+// SSRF note: Forward validates the upstream host against the active
+// SecurityPolicy up front and, when AllowPrivateIPs is false, re-validates
+// the resolved IP at dial time via the guard installed on the dispatching
+// client, so a rebinding-capable resolver cannot swap a public answer for
+// a private one between validation and connection.
+// SecurityPolicy before the request is sent, and when AllowPrivateIPs is
+// false the resolved IP is re-validated at dial time by the guard
+// installed on the dispatching *fasthttp.Client. The connection therefore
+// targets exactly the address that passed the blocklist, so a
+// rebinding-capable resolver cannot slip a private IP past the check.
+// SSRF note: every hop's host is validated against the policy, and when
+// AllowPrivateIPs is false each dial is re-validated by the guard on the
+// dispatching client — so per-hop redirects (including cross-host ones)
+// cannot be rebound to a private IP between validation and connection.
+// SSRF note: same protection as Do — up-front host validation plus the
+// dial-time validated-IP guard when AllowPrivateIPs is false.
+// SSRF note: same protection as Do — up-front host validation plus the
+// dial-time validated-IP guard when AllowPrivateIPs is false.
+	// Install the dial-time SSRF guard on whichever client dispatches this
+	// request (default, WithClient override, or per-call variadic). The
+	// validateUpstream call below only checks the host up front; the guard
+	// re-validates the resolved IP at connect time, closing the
+	// DNS-rebinding window. Idempotent — each client is wrapped once.
+	ensureClientGuarded(cli)
+
+// SSRF note: the per-request validation is an up-front host check, and
+// when AllowPrivateIPs is false the dispatching client's dial-time guard
+// re-validates the resolved IP at connect time — so a rebinding-capable
+// resolver cannot reach a private address through this handler.
+// shared/user-supplied client rather than a Balancer HostClient, but it
+// gets the same protection as Do — up-front host validation plus the
+// dial-time validated-IP guard on the dispatching client when
+// AllowPrivateIPs is false.

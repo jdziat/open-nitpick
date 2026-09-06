@@ -1,0 +1,40 @@
+// commit 8ea84d0dee4f 2026-04-15T15:46:58+02:00 pkg/cmd/skills/search/search.go
+// Each function collects results into a map; merges happen after both complete
+// to avoid concurrent writes to the shared skills slice.
+	var descMap map[int]string
+	var starsMap map[int]int
+
+		descMap = fetchDescriptions(client, host, skills)
+		starsMap = fetchRepoStars(client, host, skills)
+
+	for i := range skills {
+		if desc, ok := descMap[i]; ok {
+			skills[i].Description = desc
+		}
+		if stars, ok := starsMap[i]; ok {
+			skills[i].Stars = stars
+		}
+	}
+		text.Pluralize(len(skills), "skill"),
+			starStr = "  " + cs.Muted("★ "+formatStars(s.Stars))
+			desc := strings.Join(strings.Fields(s.Description), " ")
+			descStr = "\n       " + cs.Muted(text.Truncate(descWidth, desc))
+		options[i] = s.SkillName + "  " + cs.Muted(s.Repo) + starStr + descStr
+//   - Repository stars (sqrt bonus, ~2 400 for 6k stars)
+		score += 3_000
+	// Stars bonus: use √n scaling so popular repos rank meaningfully higher
+	// without completely drowning out less-popular but more relevant results.
+		score += int(math.Sqrt(float64(s.Stars)) * 30)
+func fetchDescriptions(client *api.Client, host string, skills []skillResult) map[int]string {
+	descs := make(map[int]string)
+
+			descs[idx] = result.Metadata.Description
+
+	return descs
+// TODO kw: Could be swaped for go-humanize.
+func fetchRepoStars(client *api.Client, host string, skills []skillResult) map[int]int {
+	result := make(map[int]int, len(skills))
+	for i, s := range skills {
+		if stars, ok := repoStars[s.Repo]; ok {
+			result[i] = stars
+	return result

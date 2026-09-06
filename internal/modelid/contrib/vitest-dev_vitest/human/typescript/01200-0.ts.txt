@@ -1,0 +1,62 @@
+// commit 66c1cbb53a1b 2026-08-18T11:56:42+02:00 test/e2e/test/config/browser-configs.test.ts
+test('negation filter excludes a single browser instance', async () => {
+  const projects = await config({
+    project: '!myproject (chromium)',
+    projects: [
+      {
+        test: {
+          name: 'myproject',
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            headless: true,
+            instances: [
+              { browser: 'chromium' },
+              { browser: 'firefox' },
+            ],
+          },
+        },
+      },
+      {
+        test: {
+          name: 'other',
+        },
+      },
+    ],
+  })
+  expect(projects.map(p => p.projectConfig.name)).toEqual([
+    'other',
+    'myproject (firefox)',
+  ])
+})
+
+test('negation filter excludes a browser instance of a matching project', async () => {
+  const projects = await config({
+    project: ['myproject', '!myproject (chromium)'],
+    projects: [
+      {
+        test: {
+          name: 'myproject',
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            headless: true,
+            instances: [
+              { browser: 'chromium' },
+              { browser: 'firefox' },
+            ],
+          },
+        },
+      },
+      {
+        test: {
+          name: 'other',
+        },
+      },
+    ],
+  })
+  expect(projects.map(p => p.projectConfig.name)).toEqual([
+    'myproject (firefox)',
+  ])
+})
+

@@ -1,0 +1,41 @@
+# commit 52c718a54382 2025-10-23T14:48:03+02:00 tests/testing_utils.py
+from typing import Callable, Optional, TypeVar, Union
+import httpx
+from huggingface_hub.utils import is_package_available, logging
+        Timeout errors are created by mocking httpx.request
+    # Store the original httpx.request to avoid recursion
+    original_httpx_request = httpx.request
+            return original_httpx_request(method, invalid_url, **kwargs)
+            if hasattr(e, "request"):
+                e.request.url = url
+            if hasattr(e, "args") and e.args:
+                max_retry_error = e.args[0]
+                if hasattr(max_retry_error, "args"):
+                    max_retry_error.args = (max_retry_error.args[0].replace("10.255.255.1", f"OfflineMock[{url}]"),)
+                e.args = (max_retry_error,)
+                mock_client = Mock()
+
+                # Mock the request method to raise connection error
+                def mock_request(*args, **kwargs):
+                    raise httpx.ConnectError("Connection failed")
+
+                # Mock the stream method to raise connection error
+                def mock_stream(*args, **kwargs):
+                    raise httpx.ConnectError("Connection failed")
+
+                mock_client.request = mock_request
+                mock_client.stream = mock_stream
+                get_session_mock.return_value = mock_client
+        with patch("httpx.request", timeout_request):
+                mock_client = Mock()
+                mock_client.request = timeout_request
+
+                # Mock the stream method to raise timeout
+                def mock_stream(*args, **kwargs):
+                    raise httpx.ConnectTimeout("Connection timed out")
+
+                mock_client.stream = mock_stream
+                get_session_mock.return_value = mock_client
+    file_download = patch("huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE", ENDPOINT_PRODUCTION_URL_SCHEME)
+def xfail_on_windows(reason: str, raises: Optional[type[Exception]] = None):
+        raises (`type[Exception]`):

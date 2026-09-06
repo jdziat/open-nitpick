@@ -1,0 +1,31 @@
+# commit 872ca53d04bb 2026-08-15T10:00:22-07:00 browser_use/skills/browser_use.py
+
+def _canonical_skill_path() -> Path:
+	return Path(__file__).resolve().parent / 'browser-use' / 'SKILL.md'
+
+
+def _canonical_metadata_lines() -> list[str]:
+	"""Read the metadata block from the canonical Browser Use skill."""
+	skill_path = _canonical_skill_path()
+	if not skill_path.exists():
+		return []
+
+	try:
+		_, frontmatter, _ = skill_path.read_text(encoding='utf-8').split('---\n', 2)
+	except ValueError:
+		return []
+
+	lines = frontmatter.splitlines()
+	try:
+		start = lines.index('metadata:')
+	except ValueError:
+		return []
+
+	end = len(lines)
+	for index in range(start + 1, len(lines)):
+		if lines[index] and not lines[index][0].isspace():
+			end = index
+			break
+	return lines[start:end]
+		lines.extend(_canonical_metadata_lines())
+	skill_path = _canonical_skill_path()

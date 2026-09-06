@@ -1,0 +1,36 @@
+// commit 7689727b3eda 2026-09-03T15:02:03+02:00 pkg/github/feature_flags.go
+import (
+	"slices"
+
+	"github.com/github/github-mcp-server/pkg/inventory"
+)
+func featureEnabledRule(feature string) inventory.FeatureRule {
+	flag := inventory.FeatureFlag(feature)
+	return inventory.NewFeatureRule(
+		[]inventory.FeatureFlag{flag},
+		func(featureAsBool inventory.FeatureResolver) bool {
+			return featureAsBool(flag)
+		},
+	)
+}
+
+func featureDisabledRule(feature string) inventory.FeatureRule {
+	flag := inventory.FeatureFlag(feature)
+	return inventory.NewFeatureRule(
+		[]inventory.FeatureFlag{flag},
+		func(featureAsBool inventory.FeatureResolver) bool {
+			return !featureAsBool(flag)
+		},
+	)
+}
+
+var (
+	issuesGranularFeatureRule       = featureEnabledRule(FeatureFlagIssuesGranular)
+	issuesConsolidatedFeatureRule   = featureDisabledRule(FeatureFlagIssuesGranular)
+	pullRequestsGranularFeatureRule = featureEnabledRule(FeatureFlagPullRequestsGranular)
+	pullRequestsConsolidatedRule    = featureDisabledRule(FeatureFlagPullRequestsGranular)
+)
+
+	for _, feature := range enabledFeatures {
+		if slices.Contains(AllowedFeatureFlags, feature) {
+			effective[feature] = true

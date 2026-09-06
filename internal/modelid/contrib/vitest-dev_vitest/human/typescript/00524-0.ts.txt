@@ -1,0 +1,49 @@
+// commit 5d0fd3b62724 2026-01-23T19:10:46+01:00 packages/spy/src/index.ts
+    return mock.mockImplementation(function () {
+      if (new.target) {
+        throwConstructorError('mockReturnValue')
+      }
+
+      return value
+    })
+    return mock.mockImplementationOnce(function () {
+      if (new.target) {
+        throwConstructorError('mockReturnValueOnce')
+      }
+
+      return value
+    })
+    return mock.mockImplementation(function () {
+      if (new.target) {
+        throwConstructorError('mockResolvedValue')
+      }
+
+      return Promise.resolve(value)
+    })
+    return mock.mockImplementationOnce(function () {
+      if (new.target) {
+        throwConstructorError('mockResolvedValueOnce')
+      }
+
+      return Promise.resolve(value)
+    })
+    return mock.mockImplementation(function () {
+      if (new.target) {
+        throwConstructorError('mockRejectedValue')
+      }
+
+      return Promise.reject(value)
+    })
+    return mock.mockImplementationOnce(function () {
+      if (new.target) {
+        throwConstructorError('mockRejectedValueOnce')
+      }
+
+      return Promise.reject(value)
+    })
+function throwConstructorError(shorthand: string): never {
+  throw new TypeError(
+    `Cannot use \`${shorthand}\` when called with \`new\`. Use \`mockImplementation\` with a \`class\` keyword instead. See https://vitest.dev/api/mock#class-support for more information.`,
+  )
+}
+

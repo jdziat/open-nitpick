@@ -1,0 +1,40 @@
+# commit 52c718a54382 2025-10-23T14:48:03+02:00 src/huggingface_hub/_commit_api.py
+from typing import TYPE_CHECKING, Any, BinaryIO, Iterable, Iterator, Literal, Optional, Union
+        ...     httpx.put(..., data=file)
+def _warn_on_overwriting_operations(operations: list[CommitOperation]) -> None:
+    nb_additions_per_path: dict[str, int] = defaultdict(int)
+    additions: list[CommitOperationAdd],
+    headers: dict[str, str],
+    xet_additions: list[CommitOperationAdd] = []
+    lfs_actions: list[dict[str, Any]] = []
+    lfs_oid2addop: dict[str, CommitOperationAdd] = {}
+        transfers: list[str] = ["basic", "multipart"]
+    actions: list[dict[str, Any]],
+    oid2addop: dict[str, CommitOperationAdd],
+    headers: dict[str, str],
+        actions (`list[dict[str, Any]]`):
+        oid2addop (`dict[str, CommitOperationAdd]`):
+        headers (`dict[str, str]`):
+        headers (`dict[str, str]`):
+        [`HfHubHTTPError`]
+    if len(filtered_actions) == 1:
+    additions: list[CommitOperationAdd],
+    headers: dict[str, str],
+        additions (`` of `CommitOperationAdd`):
+        headers (`dict[str, str]`):
+        [`HfHubHTTPError`]
+    def token_refresher() -> tuple[str, int]:
+    headers: dict[str, str],
+        headers (`dict[str, str]`):
+    upload_modes: dict[str, UploadMode] = {}
+    should_ignore_info: dict[str, bool] = {}
+    oid_info: dict[str, Optional[str]] = {}
+        payload: dict = {
+    headers: dict[str, str],
+) -> dict[tuple[str, Optional[str]], Union["RepoFile", bytes]]:
+        headers (`dict[str, str]`):
+    Returns: `dict[tuple[str, Optional[str]], Union[RepoFile, bytes]]]`
+    files_to_copy: dict[tuple[str, Optional[str]], Union["RepoFile", bytes]] = {}
+    oid_info: dict[tuple[str, Optional[str]], Optional[str]] = {}
+    files_to_copy: dict[tuple[str, Optional[str]], Union["RepoFile", bytes]],
+) -> Iterable[dict[str, Any]]:

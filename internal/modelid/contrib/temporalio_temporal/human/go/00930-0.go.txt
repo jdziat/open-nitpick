@@ -1,0 +1,136 @@
+// commit a7cc3d7a0ac2 2026-04-22T10:10:41-07:00 service/frontend/health_check.go
+	"slices"
+	"sync"
+	"time"
+		Check(ctx context.Context, now time.Time) (HealthCheckResult, error)
+		hostFailureTimeThreshold      dynamicconfig.DurationPropertyFn
+		recentUnhealthyHosts          *unhealthyHostTracker
+	unhealthyHostTracker struct {
+		mu    sync.Mutex
+		hosts map[string]unhealthyHostRecord
+	}
+	unhealthyHostRecord struct {
+		address        string
+		lastSeenHealth enumsspb.HealthState
+		failedAt       time.Time
+	}
+// Compile-time assert: healthCheckerImpl implements HealthChecker
+var _ HealthChecker = (*healthCheckerImpl)(nil)
+
+// trackUnhealthyHost tracks the last time a host failed health check.
+// Must be called with mu held.
+func (u *unhealthyHostTracker) trackUnhealthyHost(address string, now time.Time, state enumsspb.HealthState) {
+	if existing, present := u.hosts[address]; !present || existing.lastSeenHealth != state {
+		// Preserve the earliest time that the host failed, even if it changes states
+		var failedAt time.Time
+		if present {
+			failedAt = slices.MinFunc([]time.Time{now, existing.failedAt}, time.Time.Compare)
+		} else {
+			failedAt = now
+		}
+		u.hosts[address] = unhealthyHostRecord{
+			address:        address,
+			lastSeenHealth: state,
+			failedAt:       failedAt,
+		}
+	}
+}
+
+// clearStaleEntries removes any entries from the tracker that are no longer in the list of hosts.
+// Must be called with mu held.
+func (u *unhealthyHostTracker) clearStaleEntries(hosts []*healthspb.HostHealthDetail) {
+	validAddresses := make(map[string]struct{})
+	for _, host := range hosts {
+		// Keep any addresses that are failing or declined serving.
+		if host.GetState() == enumsspb.HEALTH_STATE_SERVING {
+			continue
+		}
+		validAddresses[host.GetAddress()] = struct{}{}
+	}
+	for address := range u.hosts {
+		if _, present := validAddresses[address]; !present {
+			delete(u.hosts, address)
+		}
+	}
+}
+
+// unhealthyHosts returns a list of hosts that have failed health check recently.
+// Must be called with mu held.
+func (u *unhealthyHostTracker) unhealthyHosts(now time.Time, duration time.Duration) (declinedServing []unhealthyHostRecord, otherUnhealthy []unhealthyHostRecord) {
+	for _, record := range u.hosts {
+		if now.Sub(record.failedAt) >= duration {
+			if record.lastSeenHealth == enumsspb.HEALTH_STATE_DECLINED_SERVING {
+				declinedServing = append(declinedServing, record)
+			} else {
+				otherUnhealthy = append(otherUnhealthy, record)
+			}
+		}
+	}
+	return
+}
+
+// updateUnhealthyHosts updates the local host health entries while holding mu, then returns the unhealthy hosts.
+func (u *unhealthyHostTracker) updateUnhealthyHosts(hostHealths []*healthspb.HostHealthDetail, now time.Time,
+	threshold time.Duration) (declinedServing []unhealthyHostRecord, otherUnhealthy []unhealthyHostRecord) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	for _, result := range hostHealths {
+		// Only track unhealthy hosts, healthy hosts will be cleaned up in clearStaleEntries
+		if result.GetState() != enumsspb.HEALTH_STATE_SERVING {
+			u.trackUnhealthyHost(result.Address, now, result.State)
+		}
+	}
+	u.clearStaleEntries(hostHealths)
+	return u.unhealthyHosts(now, threshold)
+}
+
+	hostFailureTimeThreshold dynamicconfig.DurationPropertyFn,
+		hostFailureTimeThreshold:      hostFailureTimeThreshold,
+		recentUnhealthyHosts:          &unhealthyHostTracker{hosts: make(map[string]unhealthyHostRecord)},
+func (h *healthCheckerImpl) Check(ctx context.Context, now time.Time) (HealthCheckResult, error) {
+	hostDetails := h.collectHostHealth(ctx, hosts)
+	declinedServing, otherUnhealthy := h.recentUnhealthyHosts.updateUnhealthyHosts(hostDetails, now, h.hostFailureTimeThreshold())
+
+	overallState := enumsspb.HEALTH_STATE_SERVING
+	hostDeclinedServingProportion := float64(len(declinedServing)) / float64(len(hosts))
+	failedHostCountProportion := float64(len(otherUnhealthy)) / float64(len(hosts))
+
+	if failedHostCountProportion+hostDeclinedServingProportion > h.hostFailurePercentage() {
+		overallState = enumsspb.HEALTH_STATE_NOT_SERVING
+	}
+	if len(declinedServing) > 2 && hostDeclinedServingProportion > h.hostDeclinedServingProportion() {
+		overallState = enumsspb.HEALTH_STATE_DECLINED_SERVING
+	}
+	if overallState != enumsspb.HEALTH_STATE_SERVING {
+		var exampleFailedHost *healthspb.HostHealthDetail
+		for _, host := range hostDetails {
+			if host.State != enumsspb.HEALTH_STATE_SERVING {
+				exampleFailedHost = host
+				break
+			}
+		}
+		h.logger.Warn("Health check determined the service is unhealthy!",
+			tag.Int("host failure count", len(otherUnhealthy)),
+			tag.Float64("host failure percentage threshold", h.hostFailurePercentage()),
+			tag.Float64("host failure percentage", failedHostCountProportion),
+			tag.Int("host declined serving count", len(declinedServing)),
+			tag.Float64("host declined serving percentage", hostDeclinedServingProportion),
+			tag.Float64("host declined serving percentage threshold", h.hostDeclinedServingProportion()),
+			tag.NewStringTag("example_failed_host", failedHostSummary(exampleFailedHost)),
+		)
+	}
+
+	return HealthCheckResult{
+		State: overallState,
+		ServiceDetail: &healthspb.ServiceHealthDetail{
+			Service: string(h.serviceName),
+			State:   overallState,
+			Hosts:   hostDetails,
+		},
+	}, nil
+}
+
+func (h *healthCheckerImpl) collectHostHealth(ctx context.Context, hosts []membership.HostInfo) []*healthspb.HostHealthDetail {
+	hostDetails := make([]*healthspb.HostHealthDetail, 0, len(hosts))
+	defer close(receiveCh)
+	return hostDetails

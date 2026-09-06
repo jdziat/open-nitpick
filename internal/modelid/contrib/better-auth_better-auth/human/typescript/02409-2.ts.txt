@@ -1,0 +1,64 @@
+// commit a787e0b66b36 2026-06-15T06:29:21+00:00 packages/core/src/db/adapter/factory.test.ts
+import { runWithTransaction } from "../../context/transaction";
+import type {
+	CleanedWhere,
+	CustomAdapter,
+	DBAdapter,
+	DBTransactionAdapter,
+} from "./index";
+	transaction,
+	transaction?: <R>(
+		callback: (trx: DBTransactionAdapter<BetterAuthOptions>) => Promise<R>,
+	) => Promise<R>;
+			transaction,
+	/**
+	 * @see https://github.com/better-auth/better-auth/issues/9869
+	 */
+	it("reuses the active transaction for the fallback", async () => {
+		let transactionCalls = 0;
+		let isTransactionActive = false;
+		let adapter: DBAdapter<BetterAuthOptions> | null = null;
+
+		const transaction = async <R>(
+			callback: (trx: DBTransactionAdapter<BetterAuthOptions>) => Promise<R>,
+		): Promise<R> => {
+			transactionCalls += 1;
+			if (isTransactionActive) {
+				throw new Error("nested transaction");
+			}
+			if (!adapter) {
+				throw new Error("adapter has not been initialized");
+			}
+			isTransactionActive = true;
+			try {
+				return await callback(adapter);
+			} finally {
+				isTransactionActive = false;
+			}
+		};
+
+		adapter = createTestAdapter({
+			transaction,
+			adapter: createCustomAdapter({
+				findMany: async <T>() =>
+					[
+						{
+							id: "verification-id",
+							identifier_text: "stored-token",
+						},
+					] as T[],
+				deleteMany: async () => 1,
+			}),
+		});
+
+		const result = await runWithTransaction(adapter, async () =>
+			adapter!.consumeOne<{ id: string; identifier: string }>({
+				model: "verification",
+				where: [{ field: "identifier", value: "token" }],
+			}),
+		);
+
+		expect(result?.id).toBe("verification-id");
+		expect(transactionCalls).toBe(1);
+	});
+

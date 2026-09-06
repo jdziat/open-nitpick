@@ -1,0 +1,47 @@
+# commit ce81ada89a99 2026-04-20T15:22:30-07:00 browser_use/tools/service.py
+# Global per-action timeout: last-resort guard against hung event handlers.
+# Individual CDP calls (Page.navigate etc.) have their own shorter timeouts,
+# but event-bus `await event` and `event_result()` calls have none — if a
+# watchdog handler blocks on a dead CDP WebSocket, the action can hang past
+# any agent-level watchdog. This cap ensures every action returns within a
+# bounded window with an ActionResult(error=...) instead of hanging silently.
+# Override per-call via BROWSER_USE_ACTION_TIMEOUT_S env var or tools.act(action_timeout=...).
+_DEFAULT_ACTION_TIMEOUT_S = float(os.getenv('BROWSER_USE_ACTION_TIMEOUT_S', '90'))
+
+
+		action_timeout: float | None = None,
+		"""Execute an action.
+
+		action_timeout: per-action wall-clock cap (seconds). Prevents actions from hanging
+		indefinitely when a CDP WebSocket goes silent — a common failure mode with remote
+		browsers where internal CDP calls (tab switches, lifecycle waits) have no timeouts.
+		Defaults to BROWSER_USE_ACTION_TIMEOUT_S env var or 90s.
+		"""
+
+		timeout_s = action_timeout if action_timeout is not None else _DEFAULT_ACTION_TIMEOUT_S
+						result = await asyncio.wait_for(
+							self.registry.execute_action(
+								action_name=action_name,
+								params=params,
+								browser_session=browser_session,
+								page_extraction_llm=page_extraction_llm,
+								file_system=file_system,
+								sensitive_data=sensitive_data,
+								available_file_paths=available_file_paths,
+								extraction_schema=extraction_schema,
+							),
+							timeout=timeout_s,
+					except TimeoutError:
+						# Covers both the per-action asyncio.wait_for cap and any inner
+						# TimeoutError that bubbled out of the handler.
+						logger.error(
+							f'❌ Action {action_name} hit the per-action timeout ({timeout_s:.0f}s) '
+							f'— likely an unresponsive CDP connection. Returning error so the agent can recover.'
+						)
+						result = ActionResult(
+							error=(
+								f'Action {action_name} timed out after {timeout_s:.0f}s. '
+								f'The browser may be unresponsive (dead CDP WebSocket). '
+								f'Try again or a different approach.'
+							)
+						)

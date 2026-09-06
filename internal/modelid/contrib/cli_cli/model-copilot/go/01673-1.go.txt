@@ -1,0 +1,60 @@
+// commit e95424515725 2026-08-26T12:05:07-06:00 pkg/cmd/project/shared/queries/queries.go
+func (c *hostScopedClient) Query(queryName string, query any, variables map[string]any) error {
+func (c *hostScopedClient) Mutate(queryName string, query any, variables map[string]any) error {
+	Query(queryName string, query any, variables map[string]any) error
+	Mutate(queryName string, query any, variables map[string]any) error
+func (c *Client) doQueryWithProgressIndicator(name string, query any, variables map[string]any) error {
+func (c *Client) Mutate(operationName string, query any, variables map[string]any) error {
+func (c *Client) Query(operationName string, query any, variables map[string]any) error {
+func (p Project) DetailedItems() map[string]any {
+	return map[string]any{
+func (p Project) ExportData(_ []string) map[string]any {
+	return map[string]any{
+		"items": map[string]any{
+		"fields": map[string]any{
+		"owner": map[string]any{
+func (p ProjectMutationQuery) ExportData(_ []string) map[string]any {
+	return map[string]any{
+		"items": map[string]any{
+		"fields": map[string]any{
+		"owner": map[string]any{
+func (p Projects) ExportData(_ []string) map[string]any {
+	v := make([]map[string]any, len(p.Nodes))
+	return map[string]any{
+	case map[string]any:
+func (i DraftIssue) ExportData(_ []string) map[string]any {
+	v := map[string]any{
+func (pr PullRequest) ExportData(_ []string) map[string]any {
+	return map[string]any{
+func (i Issue) ExportData(_ []string) map[string]any {
+	return map[string]any{
+func (p ProjectItem) ExportData(_ []string) map[string]any {
+	v := map[string]any{
+	variables := map[string]any{
+func (f SingleSelectFieldOptions) ExportData(_ []string) map[string]any {
+	return map[string]any{
+func (p ProjectField) ExportData(_ []string) map[string]any {
+	v := map[string]any{
+		options := make([]map[string]any, len(opts))
+func (p ProjectFields) ExportData(_ []string) map[string]any {
+	fields := make([]map[string]any, len(p.Nodes))
+	return map[string]any{
+	variables := map[string]any{
+	err := c.doQueryWithProgressIndicator("Viewer", &query, map[string]any{})
+	variables := map[string]any{
+	variables := map[string]any{
+	variables := map[string]any{
+	variables := map[string]any{
+		variables := map[string]any{
+	variables := map[string]any{
+	variables := map[string]any{
+	variables := map[string]any{
+	variables := map[string]any{
+	variables := map[string]any{
+func projectFieldValueData(v FieldValueNodes) any {
+		return map[string]any{
+		return map[string]any{
+func serializeProjectWithItems(project *Project) []map[string]any {
+	itemsSlice := make([]map[string]any, 0)
+		o := make(map[string]any)
+	ExportData([]string) map[string]any

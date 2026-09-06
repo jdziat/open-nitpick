@@ -1,0 +1,200 @@
+# commit d2429779cadf 2026-06-16T15:15:38+02:00 src/huggingface_hub/_login.py
+import html
+import sys
+import time
+from datetime import datetime
+from ._oauth_device import OAuthTokenResponse, poll_device_token, request_device_code
+from .errors import DeviceCodeError
+    select_choice,
+    tabulate,
+    _read_stored_tokens_full,
+    _save_stored_tokens_full,
+    components. If `token` is not provided, a browser-based OAuth flow is used to
+    authenticate: open a URL, enter a short code, and the token is retrieved and saved.
+    In a terminal, you can also choose to paste an existing access token instead.
+            is configured, a warning will be displayed to the user. Only used when `token`
+            is provided; ignored by the browser-based flow.
+        [`DeviceCodeError`]
+            If the browser-based login fails (authorization denied, code expired, ...).
+        _validate_and_save_token(token, add_to_git_credential=add_to_git_credential)
+        return
+    if add_to_git_credential:
+        logger.warning(
+            "`add_to_git_credential=True` is only supported when a token is passed directly. "
+            "It is ignored by the browser-based login."
+        )
+    if is_notebook():
+    # Resolve the current token before reading the file: `get_token()` may refresh an OAuth
+    # token and rewrite the stored tokens on the way.
+    current_token = get_token()
+    stored_tokens = _read_stored_tokens_full()
+    if not stored_tokens:
+    show_expires = any("expires_at" in fields for fields in stored_tokens.values())
+    headers = [" ", "name", "token"] + (["expires"] if show_expires else [])
+
+    rows: list[list[str | int]] = []
+    for token_name, fields in stored_tokens.items():
+        token = fields.get("hf_token", "<not set>")
+        if token == current_token:
+        row: list[str | int] = ["*" if token == current_token else "", token_name, masked_token]
+        if show_expires:
+            row.append(_format_expiration(fields.get("expires_at")))
+        rows.append(row)
+    print(tabulate(rows, headers=headers))
+###
+# Device Code OAuth login (RFC 8628)
+###
+
+
+def _device_code_login() -> None:
+    """Run the Device Code OAuth flow: request a code, prompt the user to authorize it in a browser,
+    poll for the token and save it."""
+    device_info = request_device_code()
+
+    # The complete URI has the code pre-filled when the server supports it.
+    print(f"\n    Open this URL in your browser:\n        {device_info['verification_uri_complete']}\n")
+    print(f"    And enter the code: {device_info['user_code']}\n")
+
+    print("    Waiting for authorization", end="", flush=True)
+    try:
+        response = poll_device_token(device_info, on_pending=lambda: print(".", end="", flush=True))
+    finally:
+        print()  # newline after the progress dots, also on failure
+
+    _save_oauth_token(response)
+
+
+def _save_oauth_token(response: OAuthTokenResponse) -> tuple[str, str]:
+    """Validate and persist a token response from the device code flow, including refresh metadata."""
+    expires_in = response.get("expires_in")
+    token_name, username = _validate_and_save_token(
+        response["access_token"],
+        add_to_git_credential=False,
+        refresh_token=response.get("refresh_token"),
+        expires_at=int(time.time()) + int(expires_in) if expires_in else None,
+    )
+    if note := _expiration_note(response):
+        logger.info(f"Note: {note}")
+    return token_name, username
+
+
+def _expiration_note(response: OAuthTokenResponse) -> str | None:
+    """Human-readable note about the lifetime of a freshly obtained OAuth token, if known."""
+    expires_in = response.get("expires_in")
+    if not expires_in:
+        return None
+    if response.get("refresh_token"):
+        return "This token will be refreshed automatically when it expires."
+    days = max(1, int(expires_in) // 86400)
+    return f"This token expires in {days} days. Log in again to renew it."
+
+
+    instead of a notebook flow.
+        logger.info("Note: a token is already saved on this machine. Logging in again will replace the active token.")
+
+    if _prompt_login_method() == "token":
+        _paste_token_login()
+    else:
+        _device_code_login()
+
+
+def _prompt_login_method() -> str:
+    """Ask the user how to log in: "browser" (default) or "token". Never prompts without a TTY."""
+    if sys.stdin is None or not sys.stdin.isatty():
+        return "browser"
+    choice = select_choice("How would you like to log in?", ["Log in with your browser", "Paste an access token"])
+    return "browser" if choice == 0 else "token"
+
+def _paste_token_login() -> None:
+    _validate_and_save_token(token=token, add_to_git_credential=False)
+# Notebook-based login
+    Displays a prompt to log in to the HF website and store the token.
+    [`notebook_login`] is useful if you want to force the use of the notebook flow
+    try:
+        from IPython.display import HTML, display  # type: ignore
+    except ImportError:
+        # Not in a notebook environment: fall back to the terminal flow
+        interpreter_login(skip_if_logged_in=False)
+        return
+
+    device_info = request_device_code()
+    # Escape server-provided values: they end up in raw notebook HTML.
+    verification_uri = html.escape(device_info["verification_uri"])
+    verification_uri_complete = html.escape(device_info["verification_uri_complete"])
+
+    display(
+        HTML(
+            '<center><img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg"'
+            ' width="100" alt="Hugging Face"><br><br>'
+            "<p>To log in, open this URL and enter the code:</p>"
+            f'<p><a href="{verification_uri_complete}" target="_blank"><b>{verification_uri}</b></a></p>'
+            '<p style="font-size: 1.6em; letter-spacing: 0.3em; font-family: monospace;">'
+            f"<b>{html.escape(device_info['user_code'])}</b></p></center>"
+        )
+    display(HTML("<center><i>Waiting for authorization...</i></center>"))
+    try:
+        response = poll_device_token(device_info)
+    except DeviceCodeError as e:
+        display(HTML(f"<center><b style='color: red;'>Login failed: {html.escape(str(e))}</b></center>"))
+        return
+
+    try:
+        token_name, username = _save_oauth_token(response)
+    except Exception as error:
+        display(HTML(f"<center><b style='color: red;'>{html.escape(str(error))}</b></center>"))
+        return
+
+    message = f"Login successful. Logged in as <b>{html.escape(username)}</b> (token: <code>{html.escape(token_name)}</code>)."
+    if note := _expiration_note(response):
+        message += f"<br>{html.escape(note)}"
+    display(HTML(f"<center>{message}</center>"))
+def _validate_and_save_token(
+    refresh_token: str | None = None,
+    expires_at: int | None = None,
+) -> tuple[str, str]:
+    """Validate a token against the Hub, save it to the stored tokens file and set it as active.
+
+    The token is stored under its `displayName` from the whoami response, or `oauth-{username}`
+    for OAuth tokens (which have no display name).
+
+    Args:
+        token (`str`):
+            The access token.
+        add_to_git_credential (`bool`):
+            Whether to save the token to the git credential helpers.
+        refresh_token (`str`, *optional*):
+            OAuth refresh token to persist alongside the access token.
+        expires_at (`int`, *optional*):
+            Unix timestamp at which the access token expires.
+
+    Returns:
+        `tuple[str, str]`: The token name and the username.
+    """
+    username = token_info["name"]
+
+    access_token_info = (token_info.get("auth") or {}).get("accessToken") or {}
+    if role := access_token_info.get("role"):
+        logger.info(f"Token is valid (permission: {role}).")
+    else:
+        logger.info("Token is valid.")
+
+    token_name = access_token_info.get("displayName") or f"oauth-{username}"
+    _save_token(token=token, token_name=token_name, refresh_token=refresh_token, expires_at=expires_at)
+    return token_name, username
+    stored_tokens = _read_stored_tokens_full()
+    if token_name not in stored_tokens:
+    fields = stored_tokens.pop(token_name)
+    _save_stored_tokens_full(stored_tokens)
+    if fields.get("hf_token") == _get_token_from_file():
+def _format_expiration(expires_at: str | None) -> str:
+    """Format an `expires_at` unix timestamp for display in `auth list`."""
+    if not expires_at:
+        return ""
+    try:
+        timestamp = int(expires_at)
+    except ValueError:
+        return ""
+    date_str = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
+    return f"{date_str} (expired)" if timestamp < time.time() else date_str
+
+

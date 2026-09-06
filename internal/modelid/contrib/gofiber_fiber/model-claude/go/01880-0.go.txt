@@ -1,0 +1,74 @@
+// commit e98ccd8aa286 2026-08-10T18:45:54+00:00 middleware/redirect/redirect.go
+			// label inside it and only has to stay one. What ends the authority
+			// is scheme-dependent — a backslash does so only under a special
+			// scheme — so "myapp://$1@example.com" takes a value of "user\name"
+			// as the userinfo it is, rather than refusing a redirect whose host
+			// the author had pinned.
+			if strings.ContainsAny(value, enders) {
+				return false
+			// Outside userinfo the "@" and the ":" matter too: either would move
+			// the host or open a port the author did not write. Inside it the
+			// author wrote the "@" that closes it, and a ":" only separates a
+			// password.
+			if !userinfoCloses(chunks[i+1:]) && strings.ContainsAny(value, "@:") {
+// and must not outrank the exact "/api/users". So are "^" and "$": an anchor
+// asserts a position and consumes nothing, and counting one as a path byte put
+// the broader "/p/[a-z]$" ahead of "/p/[a]" on a path they both match.
+const patternBytes = `*.[](){}+?^|\$`
+		switch s.rule[s.i] {
+		case '\\':
+		case '[':
+			n = clampWidth(n * s.classWidth())
+			continue
+		case '.':
+			// Any byte, so it is the widest single position there is.
+			n = clampWidth(n * 256)
+		case '(':
+		case ')':
+		case '|':
+// classWidth returns how many bytes the character class at the current position
+// matches, leaving the position just past its "]". A class pins nothing whatever
+// it lists, so this is the only place its breadth is read: it separates two
+// rules that pin the same amount, "[a-z]" matching twenty-six paths where "[a]"
+// matches one.
+func (s *literalScanner) classWidth() int {
+	rule := s.rule
+	j := s.i + 1
+	negated := false
+	if j < len(rule) && rule[j] == '^' {
+		negated, j = true, j+1
+	}
+
+	size := 0
+	if j < len(rule) && rule[j] == ']' {
+		// First inside the brackets, "]" is a member rather than the close.
+		size, j = 1, j+1
+	}
+
+	for j < len(rule) && rule[j] != ']' {
+		switch {
+		case rule[j] == '\\':
+			// A class escape stands for a set of its own, but one is enough to
+			// order it against the members beside it.
+			span, _ := escapeSpan(rule, j)
+			size, j = size+1, j+span
+		case j+2 < len(rule) && rule[j+1] == '-' && rule[j+2] != ']':
+			if lo, hi := rule[j], rule[j+2]; hi >= lo {
+				size += int(hi-lo) + 1
+			}
+			j += 3
+		default:
+			size, j = size+1, j+1
+		}
+	}
+	if j < len(rule) {
+		j++ // past the "]"
+	}
+	s.i = j
+
+	if negated {
+		size = 256 - size
+	}
+	return max(size, 1)
+}
+

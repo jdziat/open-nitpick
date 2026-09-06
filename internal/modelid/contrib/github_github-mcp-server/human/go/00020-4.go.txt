@@ -1,0 +1,46 @@
+// commit d24038cbd23b 2025-03-24T17:28:21+01:00 pkg/github/search.go
+			query, err := requiredStringParam(request, "query")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			page, err := optionalNumberParamWithDefault(request, "page", 1)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			perPage, err := optionalNumberParamWithDefault(request, "per_page", 30)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			query, err := requiredStringParam(request, "q")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			sort, err := optionalStringParam(request, "sort")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			order, err := optionalStringParam(request, "order")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			perPage, err := optionalNumberParamWithDefault(request, "per_page", 30)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			page, err := optionalNumberParamWithDefault(request, "page", 1)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			query, err := requiredStringParam(request, "q")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			sort, err := optionalStringParam(request, "sort")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			order, err := optionalStringParam(request, "order")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			perPage, err := optionalNumberParamWithDefault(request, "per_page", 30)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			page, err := optionalNumberParamWithDefault(request, "page", 1)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil

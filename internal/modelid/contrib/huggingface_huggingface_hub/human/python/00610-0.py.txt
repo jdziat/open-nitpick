@@ -1,0 +1,63 @@
+# commit c06e97659db2 2026-05-27T16:33:28+02:00 src/huggingface_hub/cli/_output.py
+import shutil
+from typing import Any, cast
+            case OutputFormatWithAuto.human:  # padded table, adaptive truncation, SCREAMING_SNAKE headers
+                formatted_rows: list[list[str]] = [[_format_table_value_human(v) for v in row] for row in rows]
+
+                is_truncated = _truncate_columns(screaming_headers, formatted_rows, no_truncate=self.no_truncate)
+
+                print(
+                    tabulate(
+                        cast("list[list[str | int]]", formatted_rows),
+                        headers=screaming_headers,
+                        alignments=screaming_alignments,
+                    )
+                )
+                if is_truncated:
+                    self.hint("Use `--no-truncate` or `--format json` to display full values.")
+def _truncate_columns(
+    headers: list[str],
+    rows: list[list[str]],
+    *,
+    no_truncate: bool,
+) -> bool:
+    """Truncate cells in-place to fit the current terminal width.
+
+    Returns `True` if any cell was truncated, so the caller can emit a hint.
+    `shutil.get_terminal_size` is cross-platform: it honors `$COLUMNS`, then
+    queries the OS-native API, then falls back to `(80, 24)`.
+    """
+    if no_truncate or not rows:
+        return False
+
+    n = len(headers)
+    # Per-column natural width: longest of header label and cell values.
+    natural = [max(len(headers[c]), *(len(rows[r][c]) for r in range(len(rows)))) for c in range(n)]
+
+    # `max(0, n - 1)` accounts for the single-space separator between columns.
+    budget = shutil.get_terminal_size().columns - max(0, n - 1)
+    if sum(natural) <= budget:
+        return False
+
+    # Shrink the widest column 1 char at a time. Floors keep the header label
+    # visible; the `4` is the smallest cap that still shows "x..." (one content
+    # char plus the "..." marker).
+    caps = natural.copy()
+    min_widths = [max(len(h), 4) for h in headers]
+    while sum(caps) > budget:
+        widest = max(
+            (i for i, w in enumerate(caps) if w > min_widths[i]),
+            key=lambda i: caps[i],
+            default=-1,
+        )
+        if widest < 0:
+            break  # everything at floor — table wraps slightly
+        caps[widest] -= 1
+
+    truncated = False
+    for row in rows:
+        for c, cell in enumerate(row):
+            if len(cell) > caps[c]:
+                truncated = True
+                row[c] = cell[: caps[c] - 3] + "..."
+    return truncated

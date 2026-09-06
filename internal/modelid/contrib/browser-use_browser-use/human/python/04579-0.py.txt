@@ -1,0 +1,31 @@
+# commit fa80226f1ba6 2026-06-02T21:50:12+00:00 browser_use/rust/service.py
+def _result_file_pointer(payload: dict[str, Any]) -> str | None:
+	result_file = payload.get('result_file')
+	if isinstance(result_file, dict):
+		for key in ('url', 'path'):
+			value = result_file.get(key)
+			if isinstance(value, str) and value:
+				return value
+	if isinstance(result_file, str) and result_file:
+		return result_file
+	for key in ('result_file_url', 'result_file_path', 'result_file'):
+		value = payload.get(key)
+		if isinstance(value, str) and value:
+			return value
+	return None
+
+
+		result_file = _result_file_pointer(payload)
+		if result_file:
+def _attachments_from_events(events: list[dict[str, Any]]) -> list[str] | None:
+	attachments: list[str] = []
+	for event in events:
+		if _event_type(event) != 'session.done':
+			continue
+		result_file = _result_file_pointer(_event_payload(event))
+		if result_file and result_file not in attachments:
+			attachments.append(result_file)
+	return attachments or None
+
+
+		attachments=_attachments_from_events(events),

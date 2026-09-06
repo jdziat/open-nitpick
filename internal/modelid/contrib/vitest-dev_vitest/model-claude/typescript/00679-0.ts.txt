@@ -1,0 +1,151 @@
+// commit a8216b0014b8 2026-03-05T10:03:42+01:00 test/cli/test/mocking.test.ts
+          "basic": "passed",
+import { test, expect, vi } from 'vitest'
+  expect(errorTree()).toMatchInlineSnapshot(`
+    {
+      "basic.test.js": {
+        "can mock invalid module": "passed",
+      },
+    }
+  `)
+})
+
+test('redirect mock with syntax error in original does not load original', async () => {
+  const { errorTree, stderr } = await runInlineTests({
+    './broken.js': `syntax error`,
+    './__mocks__/broken.js': `export const value = 'mocked'`,
+    './basic.test.js': `
+import { test, expect, vi } from 'vitest'
+import { value } from './broken.js'
+
+vi.mock('./broken.js')
+
+test('redirect mock works without loading broken original', () => {
+  expect(value).toBe('mocked')
+    `,
+  })
+
+  expect(stderr).toMatchInlineSnapshot(`""`)
+  expect(errorTree()).toMatchInlineSnapshot(`
+    {
+      "basic.test.js": {
+        "redirect mock works without loading broken original": "passed",
+      },
+    }
+  `)
+})
+
+function replaceRoot(tree: any, root: string): any {
+  for (const child of Object.values(tree) as any[]) {
+    if (child?.__module_errors__) {
+      child.__module_errors__ = child.__module_errors__.map((e: string) => e.replace(root, '<root>'))
+    }
+  }
+  return tree
+}
+    expect(replaceRoot(errorTree(), root)).toMatchInlineSnapshot(`
+
+test.for(['node', 'playwright', 'webdriverio'])('mocking actual module with factory skips loading original (%s)', async (mode) => {
+  const { stderr, errorTree, root } = await runInlineTests({
+    'vitest.config.js': `
+import { defineConfig } from 'vitest/config'
+export default defineConfig({
+  plugins: [{
+    name: 'guard-load',
+    transform(code, id) {
+      if (id.includes('do-not-load')) {
+        throw new Error('original module should not be transformed')
+      }
+    },
+  }],
+})
+    `,
+    './do-not-load.js': `export const value = 'original'`,
+    './basic.test.js': `
+import { test, expect, vi } from 'vitest'
+import * as dep from './do-not-load.js'
+
+vi.mock('./do-not-load.js', () => {
+  return { value: 'mocked' }
+})
+
+test('mock works without loading original', () => {
+  expect(dep).toMatchObject({ value: 'mocked' })
+})
+    `,
+  }, modeToConfig(mode))
+
+  if (mode === 'webdriverio') {
+    expect(replaceRoot(errorTree(), root)).toMatchInlineSnapshot(`
+      {
+        "basic.test.js": {
+          "__module_errors__": [
+            "Failed to import test file <root>/basic.test.js",
+          ],
+        },
+      }
+    `)
+    return
+  }
+
+  expect(stderr).toBe('')
+  expect(errorTree()).toMatchInlineSnapshot(`
+    {
+      "basic.test.js": {
+        "mock works without loading original": "passed",
+      },
+    }
+  `)
+})
+
+test.for(['node', 'playwright', 'webdriverio'])('mocking actual module via __mocks__ skips loading original (%s)', async (mode) => {
+  const { stderr, errorTree, root } = await runInlineTests({
+    'vitest.config.js': `
+import { defineConfig } from 'vitest/config'
+export default defineConfig({
+  plugins: [{
+    name: 'guard-load',
+    transform(code, id) {
+      if (id.includes('do-not-load') && !id.includes('__mocks__')) {
+        throw new Error('original module should not be transformed')
+      }
+    },
+  }],
+})
+    `,
+    './do-not-load.js': `export const value = 'original'`,
+    './__mocks__/do-not-load.js': `export const value = 'mocked'`,
+    './basic.test.js': `
+import { test, expect, vi } from 'vitest'
+import { value } from './do-not-load.js'
+
+vi.mock('./do-not-load.js')
+
+test('mock works without loading original', () => {
+  expect(value).toBe('mocked')
+})
+    `,
+  }, modeToConfig(mode))
+
+  if (mode === 'webdriverio') {
+    expect(replaceRoot(errorTree(), root)).toMatchInlineSnapshot(`
+      {
+        "basic.test.js": {
+          "__module_errors__": [
+            "Failed to import test file <root>/basic.test.js",
+          ],
+        },
+      }
+    `)
+    return
+  }
+
+  expect(stderr).toBe('')
+  expect(errorTree()).toMatchInlineSnapshot(`
+    {
+      "basic.test.js": {
+        "mock works without loading original": "passed",
+      },
+    }
+  `)
+})

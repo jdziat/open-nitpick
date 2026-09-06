@@ -1,0 +1,174 @@
+// commit 5c45abcd2094 2026-07-30T21:42:14-04:00 packages/mcp/src/plugin.test.ts
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
+import { createMcpProtectedRequestHandler, mcp, requireMcpAuth } from "./index";
+	const mcpPlugin = mcp({
+		loginPage: "/login",
+		consentPage: "/consent",
+		resource: baseURL,
+		silenceWarnings: {
+			oauthAuthServerConfig: true,
+			openidConfig: true,
+		},
+	});
+		plugins: [jwt(), mcpPlugin],
+		it("configures the MCP resource as a registration default", () => {
+			expect(mcpPlugin.options.clientRegistrationDefaultResources).toEqual([
+				baseURL,
+			]);
+		});
+
+		it("does not enable unauthenticated DCR by default", async () => {
+				application_type: "native",
+			expect(response.error?.status).toBe(403);
+		it("advertises and accepts DCR only when explicitly enabled", async () => {
+			const explicitBaseUrl = "http://localhost:3020";
+			const explicitResource = `${explicitBaseUrl}/api/auth`;
+			const { auth: explicitAuth, customFetchImpl: explicitFetch } =
+				await getTestInstance({
+					baseURL: explicitBaseUrl,
+					plugins: [
+						jwt(),
+						mcp({
+							loginPage: "/login",
+							consentPage: "/consent",
+							resource: explicitResource,
+							allowDynamicClientRegistration: true,
+							allowUnauthenticatedClientRegistration: true,
+							silenceWarnings: {
+								oauthAuthServerConfig: true,
+								openidConfig: true,
+							},
+						}),
+					],
+				});
+			const explicitClient = createAuthClient({
+				plugins: [oauthProviderClient()],
+				baseURL: explicitBaseUrl,
+				fetchOptions: { customFetchImpl: explicitFetch },
+			const metadata = await explicitAuth.api.getOAuthServerConfig();
+			expect(metadata.registration_endpoint).toBe(
+				`${explicitResource}/oauth2/register`,
+			expect(metadata.client_id_metadata_document_supported).toBeUndefined();
+			const registration = await explicitClient.oauth2.register({
+				client_name: "explicit DCR client",
+				redirect_uris: ["https://client.example.com/callback"],
+				token_endpoint_auth_method: "none",
+			});
+			expect(registration.error).toBeNull();
+			expect(registration.data).toMatchObject({
+				resources: [explicitResource],
+				token_endpoint_auth_method: "none",
+			});
+				registration_endpoint?: string;
+			expect(metadata.registration_endpoint).toBeUndefined();
+			expect(
+				(metadata as { client_id_metadata_document_supported?: boolean })
+					.client_id_metadata_document_supported,
+			).toBeUndefined();
+		it.each([
+			["opaque URI", "urn:example:mcp"],
+			["array", ["https://api.example.com/mcp"]],
+			["non-loopback HTTP", "http://api.example.com/mcp"],
+			["private HTTP hostname", "http://mcp.internal/mcp"],
+			["loopback-lookalike hostname", "http://127.example.com/mcp"],
+			["credentials", "https://user:pass@api.example.com/mcp"],
+			["fragment", "https://api.example.com/mcp#fragment"],
+			["query", "https://api.example.com/mcp?tenant=a"],
+		])("rejects an invalid canonical MCP resource: %s", (_name, resource) => {
+			expect(() =>
+				mcp({
+					loginPage: "/login",
+					consentPage: "/consent",
+					resource: resource as string,
+				}),
+			).toThrow("MCP resource");
+		});
+
+		it.each([
+			"https://api.example.com/mcp",
+			"http://localhost:3000/mcp",
+			"http://127.0.0.1:3000/mcp",
+			"http://127.42.0.1/mcp",
+			"http://[::1]:3000/mcp",
+		])("accepts a canonical MCP resource: %s", (resource) => {
+					resource,
+			).not.toThrow();
+
+		it("challenges for a missing scope and accepts a union-scope retry", async () => {
+			const { publicKey, privateKey } = await generateKeyPair("RS256", {
+				extractable: true,
+			});
+			const publicJwk = await exportJWK(publicKey);
+			publicJwk.kid = "mcp-real-verifier";
+			publicJwk.alg = "RS256";
+			const signToken = (scope: string) =>
+				new SignJWT({
+					sub: "user-real",
+					scope,
+				})
+					.setProtectedHeader({ alg: "RS256", kid: publicJwk.kid })
+					.setIssuer(baseURL)
+					.setAudience(baseURL)
+					.setIssuedAt()
+					.setExpirationTime("1h")
+					.sign(privateKey);
+			vi.stubGlobal(
+				"fetch",
+				vi.fn(async () => Response.json({ keys: [publicJwk] })),
+			);
+			onTestFinished(() => {
+				vi.unstubAllGlobals();
+			});
+
+			const handler = vi.fn(
+				async (_request: Request, accessTokenClaims: { sub?: string }) =>
+					Response.json({ sub: accessTokenClaims.sub }),
+			);
+			const protect = createMcpProtectedRequestHandler(
+				{
+					issuer: baseURL,
+					audience: baseURL,
+					jwksUrl: `${baseURL}/jwks`,
+					requiredScopes: ["mcp:write"],
+				},
+				handler,
+			);
+			const firstToken = await signToken("mcp:read");
+			const challenge = await protect(
+				new Request(`${authServerBaseUrl}/mcp`, {
+					headers: { Authorization: `Bearer ${firstToken}` },
+				}),
+			);
+
+			expect(challenge.status).toBe(403);
+			expect(challenge.headers.get("WWW-Authenticate")).toContain(
+				'scope="mcp:write"',
+			);
+			expect(challenge.headers.get("WWW-Authenticate")).not.toContain(
+				'scope="mcp:read',
+			);
+			expect(handler).not.toHaveBeenCalled();
+
+			const retryToken = await signToken("mcp:read mcp:write");
+			const response = await protect(
+				new Request(`${authServerBaseUrl}/mcp`, {
+					headers: { Authorization: `Bearer ${retryToken}` },
+				}),
+			);
+			expect(response.status).toBe(200);
+			expect(await response.json()).toEqual({ sub: "user-real" });
+			expect(handler).toHaveBeenCalledOnce();
+		});
+			const reg = await auth.api.adminCreateOAuthClient({
+				headers,
+				body: {
+					client_name: "test-pkce-client",
+					redirect_uris: [redirectUri],
+					token_endpoint_auth_method: "none",
+					application_type: "native",
+				},
+			if (!reg.client_id) throw new Error("client creation failed");
+			publicClientId = reg.client_id;
+				allowDynamicClientRegistration: true,
+				allowUnauthenticatedClientRegistration: true,
+			application_type: "native",

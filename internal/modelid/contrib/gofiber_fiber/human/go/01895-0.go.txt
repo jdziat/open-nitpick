@@ -1,0 +1,45 @@
+// commit 0de4fd726ed9 2026-08-11T15:00:15+00:00 middleware/redirect/redirect.go
+			// A "\Q ... \E" span quotes every byte it holds, so the pattern bytes
+			// inside name themselves: "/p/\Q*\E" matches the one path "/p/(.*)"
+			// once Fiber has expanded the star, and reading that star as a
+			// wildcard had the exact rule measured as a catch-all.
+			if quoteStart(s.rule, s.i) {
+				s.i = skipQuoted(s.rule, s.i)
+				continue
+			}
+			n = mulWidth(n, s.classWidth())
+		case '.', '*':
+			// "." is any byte, and Fiber expands its wildcard to "(.*)", so both
+			// are as wide as a single position gets. Measuring the wildcard is
+			// what stops a catch-all from tying — and then, on key order,
+			// shadowing — a character class pinning the same prefix. It is
+			// measured rather than saturated so that what follows still tells
+			// two wildcard rules apart: "/p/*[ab]" is narrower than "/p/*[a-z]".
+			n = mulWidth(n, 256)
+			n = mulWidth(n, s.width())
+// mulWidth multiplies two widths, clamping before the product is formed rather
+// than after. A nest of groups multiplies two already-clamped counts, which
+// overflows an int on a 32-bit build — and the negative that came out sorted the
+// widest rule first, ahead of the narrow one it shadows.
+func mulWidth(n, by int) int {
+	if by > 0 && n > maxPatternWidth/by {
+		return maxPatternWidth
+	}
+	return clampWidth(n * by)
+}
+
+// quoteStart reports whether a "\Q ... \E" span opens at i.
+func quoteStart(rule string, i int) bool {
+	return i+1 < len(rule) && rule[i+1] == 'Q'
+}
+
+// skipQuoted returns the position just past the "\Q ... \E" span opening at i.
+// An unterminated span quotes the rest of the rule, which is how Go's parser
+// reads one.
+func skipQuoted(rule string, i int) int {
+	if end := strings.Index(rule[i+2:], `\E`); end >= 0 {
+		return i + 2 + end + 2
+	}
+	return len(rule)
+}
+

@@ -1,0 +1,44 @@
+// commit 9be6121eee4b 2026-01-21T18:30:51+01:00 packages/mocker/src/browser/mocker.ts
+import type { ModuleMockContext, ModuleMockOptions, TestModuleMocker } from '../types'
+export class ModuleMocker implements TestModuleMocker {
+    const url = new URL(resolved.url, this.getBaseUrl())
+  protected getBaseUrl(): string {
+    return location.href
+  }
+
+        const resolvedRedirect = new URL(this.resolveMockPath(cleanVersion(redirectUrl)), this.getBaseUrl()).toString()
+      const url = new URL(`/@id/${resolvedId}`, this.getBaseUrl())
+      return this.mockObject(moduleObject, undefined, mock.type) as T
+    mockExports: Record<string | symbol, any> | undefined,
+    const result = mockObject(
+      {
+        globalConstructors: {
+          Object,
+          Function,
+          Array,
+          Map,
+          RegExp,
+        },
+        createMockInstance: this.createMockInstance,
+        type: moduleType,
+      object,
+      mockExports,
+    )
+    return result
+  }
+
+  public getMockContext(): ModuleMockContext {
+    return {
+      callstack: null,
+    }
+          ? new URL(this.resolveMockPath(cleanVersion(redirectUrl)), this.getBaseUrl()).toString()
+  public getMockedModuleById(id: string): MockedModule | undefined {
+    return this.registry.getById(id)
+  }
+
+  public reset(): void {
+    this.registry.clear()
+    this.mockedIds.clear()
+    this.queue.clear()
+  }
+

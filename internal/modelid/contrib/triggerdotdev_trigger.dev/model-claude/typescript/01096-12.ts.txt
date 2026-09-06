@@ -1,0 +1,67 @@
+// commit 4745754a7a14 2026-06-01T13:20:05+01:00 packages/redis-worker/src/mollifier/drainer.ts
+// Invoked once per entry before `buffer.fail()` on any terminal path —
+// non-retryable error OR retryable error after maxAttempts. Lets the caller
+// land a SYSTEM_FAILURE PG row so the customer sees the run instead of it
+// silently disappearing alongside the buffer entry. Throwing a retryable
+// error from the callback causes the drainer to requeue rather than fail
+// (so the PG write itself gets another chance once PG recovers); throwing
+// anything else falls through to `buffer.fail()` to avoid an infinite loop
+// on a genuinely bad payload.
+export type MollifierDrainerTerminalFailureCause = "non-retryable" | "max-attempts-exhausted";
+export type MollifierDrainerTerminalFailureHandler<TPayload> = (input: {
+  runId: string;
+  envId: string;
+  orgId: string;
+  payload: TPayload;
+  attempts: number;
+  createdAt: Date;
+  error: { code: string; message: string };
+  cause: MollifierDrainerTerminalFailureCause;
+}) => Promise<void>;
+
+  onTerminalFailure?: MollifierDrainerTerminalFailureHandler<TPayload>;
+  private readonly onTerminalFailure?: MollifierDrainerTerminalFailureHandler<TPayload>;
+    this.onTerminalFailure = options.onTerminalFailure;
+      const cause: MollifierDrainerTerminalFailureCause = this.isRetryable(err)
+        ? "max-attempts-exhausted"
+        : "non-retryable";
+      // Run the terminal-failure callback BEFORE buffer.fail() so a
+      // SYSTEM_FAILURE PG row can land while the entry is still around to
+      // read from (and so we don't lose the run if the callback's own
+      // write itself needs a retry). If the callback throws a retryable
+      // error, requeue the entry instead of fail()ing — PG is still
+      // unreachable, give it another tick. Any other callback failure
+      // falls through to buffer.fail() so a genuinely bad snapshot
+      // doesn't loop forever.
+      if (this.onTerminalFailure) {
+        try {
+          await this.onTerminalFailure({
+            runId: entry.runId,
+            envId: entry.envId,
+            orgId: entry.orgId,
+            payload: deserialiseSnapshot<TPayload>(entry.payload),
+            attempts: nextAttempts,
+            createdAt: entry.createdAt,
+            error: { code, message },
+            cause,
+          });
+        } catch (writeErr) {
+          if (this.isRetryable(writeErr)) {
+            await this.buffer.requeue(entry.runId);
+            this.logger.warn(
+              "MollifierDrainer: terminal-failure callback retryable; requeued",
+              {
+                runId: entry.runId,
+                attempts: nextAttempts,
+                writeErr,
+              },
+            );
+            return "failed";
+          }
+          this.logger.error("MollifierDrainer: terminal-failure callback failed", {
+            runId: entry.runId,
+            writeErr,
+          });
+        }
+      }
+        cause,

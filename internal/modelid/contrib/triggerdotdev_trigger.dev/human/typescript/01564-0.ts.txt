@@ -1,0 +1,35 @@
+// commit 63176a6d691d 2026-08-07T15:13:42+01:00 apps/webapp/app/v3/tracer.server.ts
+  type TextMapPropagator,
+  type TextMapGetter,
+  type TextMapSetter,
+import {
+  CompositePropagator,
+  W3CBaggagePropagator,
+  W3CTraceContextPropagator,
+} from "@opentelemetry/core";
+class NonInheritingTraceContextPropagator implements TextMapPropagator {
+  private readonly _delegate = new CompositePropagator({
+    propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
+  });
+
+  inject(context: Context, carrier: unknown, setter: TextMapSetter): void {
+    this._delegate.inject(context, carrier, setter);
+  }
+
+  extract(context: Context, carrier: unknown, getter: TextMapGetter): Context {
+    return trace.deleteSpan(this._delegate.extract(context, carrier, getter));
+  }
+
+  fields(): string[] {
+    return this._delegate.fields();
+  }
+}
+
+  const ratioSampler = new TraceIdRatioBasedSampler(samplingRate);
+
+      root: new CustomWebappSampler(ratioSampler),
+      remoteParentSampled: ratioSampler,
+  provider.register({
+    contextManager: createContextManager(),
+    propagator: new NonInheritingTraceContextPropagator(),
+  });

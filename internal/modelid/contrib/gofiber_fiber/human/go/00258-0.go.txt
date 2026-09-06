@@ -1,0 +1,62 @@
+// commit 56929f2d4b23 2025-09-22T08:36:36+02:00 path.go
+	parameterStartChars = [256]bool{
+		wildcardParam:    true,
+		plusParam:        true,
+		paramStarterChar: true,
+	}
+	parameterEndChars = [256]bool{
+		optionalParam:    true,
+		paramStarterChar: true,
+		escapeChar:       true,
+		slashDelimiter:   true,
+		'-':              true,
+		'.':              true,
+	}
+	next := -1
+	for i := range pattern {
+		if parameterStartChars[pattern[i]] && (i == 0 || pattern[i-1] != escapeChar) {
+			next = i
+			break
+		}
+	}
+	if next > 0 && pattern[next] != wildcardParam {
+		for i := next + 1; i < len(pattern); i++ {
+			if !parameterStartChars[pattern[i]] {
+				return i - 1
+		return len(pattern) - 1
+	return next
+	paramEndPosition := 0
+	paramConstraintStartPosition := -1
+	paramConstraintEndPosition := -1
+	if !isWildCard && !isPlusParam {
+		paramEndPosition = -1
+		search := pattern[1:]
+		for i := range search {
+			if paramConstraintStartPosition == -1 && search[i] == paramConstraintStart && (i == 0 || search[i-1] != escapeChar) {
+				paramConstraintStartPosition = i + 1
+				continue
+			}
+			if paramConstraintEndPosition == -1 && search[i] == paramConstraintEnd && (i == 0 || search[i-1] != escapeChar) {
+				paramConstraintEndPosition = i + 1
+				continue
+			}
+			if parameterEndChars[search[i]] {
+				if (paramConstraintStartPosition == -1 && paramConstraintEndPosition == -1) ||
+					(paramConstraintStartPosition != -1 && paramConstraintEndPosition != -1) {
+					paramEndPosition = i
+					break
+				}
+			}
+		}
+		switch {
+		case paramEndPosition == -1:
+			paramEndPosition = len(pattern) - 1
+		case bytes.IndexByte(parameterDelimiterChars, pattern[paramEndPosition+1]) == -1:
+			paramEndPosition++
+		}
+	processedPart := pattern[0 : paramEndPosition+1]
+	n := paramEndPosition + 1
+	if hasConstraint := paramConstraintStartPosition != -1 && paramConstraintEndPosition != -1; hasConstraint {
+		constraintString := pattern[paramConstraintStartPosition+1 : paramConstraintEndPosition]
+		paramName = RemoveEscapeChar(GetTrimmedParam(pattern[0:paramConstraintStartPosition]))
+		IsOptional: isWildCard || pattern[paramEndPosition] == optionalParam,

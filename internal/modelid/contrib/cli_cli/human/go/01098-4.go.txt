@@ -1,0 +1,99 @@
+// commit 45d0ec0b5173 2026-04-15T16:01:26+02:00 pkg/cmd/skills/install/install.go
+// InstallOptions holds all dependencies and user-provided flags for the install command.
+type InstallOptions struct {
+	SkillSource  string // owner/repo or local path (when --from-local is set)
+	SkillName    string // possibly with @version suffix
+	Agent        string
+	Scope        string
+	ScopeChanged bool // true when --scope was explicitly set
+	Pin          string
+	Dir          string // overrides --agent and --scope
+	Force        bool
+	FromLocal    bool // treat SkillSource as a local directory path
+	localPath string           // set when FromLocal is true
+	version   string           // parsed from SkillName@version
+func NewCmdInstall(f *cmdutil.Factory, runF func(*InstallOptions) error) *cobra.Command {
+	opts := &InstallOptions{
+		Use:   "install <repository> [<skill[@version]>] [flags]",
+		Short: "Install agent skills from a GitHub repository (preview)",
+			scope (in your home directory, available everywhere). Supported hosts
+			and their storage directories are (project, user):
+			- GitHub Copilot (%[1]s.agents/skills%[1]s, %[1]s~/.copilot/skills%[1]s)
+			- Claude Code    (%[1]s.claude/skills%[1]s, %[1]s~/.claude/skills%[1]s)
+			- Cursor         (%[1]s.agents/skills%[1]s, %[1]s~/.cursor/skills%[1]s)
+			- Codex          (%[1]s.agents/skills%[1]s, %[1]s~/.codex/skills%[1]s)
+			- Gemini CLI     (%[1]s.agents/skills%[1]s, %[1]s~/.gemini/skills%[1]s)
+			- Antigravity    (%[1]s.agents/skills%[1]s, %[1]s~/.gemini/antigravity/skills%[1]s)
+			The first argument is a GitHub repository in %[1]sOWNER/REPO%[1]s format.
+			Use %[1]s--from-local%[1]s to install from a local directory instead.
+			Local skills are auto-discovered using the same conventions as remote
+			repositories, and files are copied (not symlinked) with local-path
+			tracking metadata injected into frontmatter.
+			Installed skills have source tracking metadata injected into their
+			frontmatter. This metadata identifies the source repository and
+			enables %[1]sgh skill update%[1]s to detect changes.
+			# Install from a local directory
+			$ gh skill install ./my-skills-repo --from-local
+			# Install a specific local skill
+			$ gh skill install ./my-skills-repo git-commit --from-local
+			if opts.FromLocal {
+				if opts.SkillSource == "" {
+					return cmdutil.FlagErrorf("--from-local requires a directory path argument")
+				}
+			} else if len(args) == 0 && !opts.IO.CanPrompt() {
+				return cmdutil.FlagErrorf("must specify a repository to install from")
+			if err := cmdutil.MutuallyExclusive("--from-local and --pin cannot be used together", opts.FromLocal, opts.Pin != ""); err != nil {
+				return err
+	cmdutil.StringEnumFlag(cmd, &opts.Agent, "agent", "", "", registry.AgentIDs(), "Target agent")
+	cmd.Flags().StringVar(&opts.Pin, "pin", "", "Pin to a specific git tag or commit SHA")
+	cmd.Flags().StringVar(&opts.Dir, "dir", "", "Install to a custom directory (overrides --agent and --scope)")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing skills without prompting")
+	cmd.Flags().BoolVar(&opts.FromLocal, "from-local", false, "Treat the argument as a local directory path instead of a repository")
+func installRun(opts *InstallOptions) error {
+	printPreInstallDisclaimer(opts.IO.ErrOut, cs)
+
+			printFileTree(opts.IO.ErrOut, cs, result.Dir, result.Installed)
+func runLocalInstall(opts *InstallOptions) error {
+	printPreInstallDisclaimer(opts.IO.ErrOut, cs)
+
+		printFileTree(opts.IO.ErrOut, cs, result.Dir, result.Installed)
+func parseSkillFromOpts(opts *InstallOptions) {
+func resolveVersion(opts *InstallOptions, client *api.Client, hostname string) (*discovery.ResolvedRef, error) {
+func discoverSkills(opts *InstallOptions, client *api.Client, hostname string, resolved *discovery.ResolvedRef) ([]discovery.Skill, error) {
+		var treeTooLarge *discovery.TreeTooLargeError
+		if errors.As(err, &treeTooLarge) {
+			fmt.Fprintf(opts.IO.ErrOut, "%s\n  Use path-based install instead: gh skill install %s/%s skills/<skill-name>\n",
+				err, treeTooLarge.Owner, treeTooLarge.Repo)
+			return nil, err
+		}
+	matchByName func(opts *InstallOptions, skills []discovery.Skill) ([]discovery.Skill, error)
+func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, canPrompt bool, sel skillSelector) ([]discovery.Skill, error) {
+		if err := collisionError(ss); err != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "Hint: install individually using the full name: gh skill install %s namespace/skill-name\n", sel.sourceHint)
+			return err
+		}
+		return nil
+func matchSkillByName(opts *InstallOptions, skills []discovery.Skill) ([]discovery.Skill, error) {
+			"skill name %q is ambiguous, multiple matches found:\n  %s\n  Specify the full name (e.g. %s) to disambiguate",
+func matchLocalSkillByName(opts *InstallOptions, skills []discovery.Skill) ([]discovery.Skill, error) {
+				labels[i] = fmt.Sprintf("%s - %s", s.DisplayName(), truncateDescription(s.Description, descWidth))
+// collisionError checks for name collisions among the selected skills.
+func collisionError(ss []discovery.Skill) error {
+	return fmt.Errorf("cannot install skills with conflicting names; they would overwrite each other:\n  %s",
+		discovery.FormatCollisions(collisions))
+func resolveHosts(opts *InstallOptions, canPrompt bool) ([]*registry.AgentHost, error) {
+		h, err := registry.FindByID(registry.DefaultAgentID)
+func resolveScope(opts *InstallOptions, canPrompt bool) (registry.Scope, error) {
+func buildInstallPlans(opts *InstallOptions, selectedSkills []discovery.Skill, selectedHosts []*registry.AgentHost, scope registry.Scope, gitRoot, homeDir string, canPrompt bool) ([]installPlan, error) {
+func resolveInstallDir(opts *InstallOptions, host *registry.AgentHost, scope registry.Scope, gitRoot, homeDir string) (string, error) {
+func checkOverwrite(opts *InstallOptions, skills []discovery.Skill, targetDir string, canPrompt bool) ([]discovery.Skill, error) {
+	if home, err := os.UserHomeDir(); err == nil {
+		if rel, err := filepath.Rel(home, dir); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return "~/" + rel
+		}
+// printPreInstallDisclaimer prints a warning that installed skills are unverified
+// and should be inspected before use.
+func printPreInstallDisclaimer(w io.Writer, cs *iostreams.ColorScheme) {
+	fmt.Fprintf(w, "\n%s Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n", cs.WarningIcon())
+}
+

@@ -1,0 +1,33 @@
+// commit b131e1912d0f 2026-05-21T12:05:58+00:00 path.go
+// RegexMatcher defines the interface for regex pattern matching.
+type RegexMatcher interface {
+// with signature func(string) T where T implements RegexMatcher.
+	regexMatcherType = reflect.TypeFor[RegexMatcher]()
+	stringType       = reflect.TypeFor[string]()
+	if !handlerType.Out(0).Implements(regexMatcherType) {
+		panic("fiber: Config.RegexHandler return type must implement fiber.RegexMatcher")
+func isNilRegexMatcher(matcher RegexMatcher) bool {
+	if matcher == nil {
+		return true
+	}
+
+	matcherValue := reflect.ValueOf(matcher)
+	switch matcherValue.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return matcherValue.IsNil()
+	default:
+		return false
+	}
+}
+
+// compileRegex calls the RegexHandler function and returns a RegexMatcher.
+func compileRegex(handler RegexHandler, pattern string) RegexMatcher {
+	matcher, ok := result[0].Interface().(RegexMatcher)
+		panic("fiber: Config.RegexHandler return type must implement fiber.RegexMatcher")
+	if isNilRegexMatcher(matcher) {
+	return matcher
+	regexMatcher      RegexMatcher
+		var matcher RegexMatcher
+		if !isNilRegexMatcher(c.regexMatcher) {
+			matcher = c.regexMatcher
+		} else if c.RegexCompiler != nil {

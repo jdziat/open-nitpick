@@ -1,0 +1,36 @@
+# commit d712a13be0e0 2026-01-26T16:34:55+01:00 src/huggingface_hub/cli/jobs.py
+LabelsOpt = Annotated[
+    Optional[list[str]],
+    typer.Option(
+        "-l",
+        "--label",
+        help="Set labels. E.g. --label KEY=VALUE or --label LABEL",
+    ),
+]
+
+    label: LabelsOpt = None,
+        labels=_parse_labels_map(label),
+    label: LabelsOpt = None,
+        labels=_parse_labels_map(label),
+    label: LabelsOpt = None,
+        labels=_parse_labels_map(label),
+    label: LabelsOpt = None,
+        labels=_parse_labels_map(label),
+def _parse_labels_map(labels: Optional[list[str]]) -> Optional[dict[str, str]]:
+    """Parse label key-value pairs from CLI arguments.
+
+    Args:
+        labels: List of label strings in KEY=VALUE format. If KEY only, then VALUE is set to empty string.
+
+    Returns:
+        Dictionary mapping label keys to values, or None if no labels provided.
+    """
+    if not labels:
+        return None
+    labels_map: dict[str, str] = {}
+    for label_var in labels:
+        key, value = label_var.split("=", 1) if "=" in label_var else (label_var, "")
+        labels_map[key] = value
+    return labels_map
+
+

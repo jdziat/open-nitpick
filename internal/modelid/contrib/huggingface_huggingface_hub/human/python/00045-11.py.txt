@@ -1,0 +1,182 @@
+# commit e981dea4daa7 2025-07-23T15:51:23+02:00 tests/test_cli.py
+from huggingface_hub.cli.cache import CacheCommand
+from huggingface_hub.cli.download import DownloadCommand
+from huggingface_hub.cli.repo import RepoCommands
+from huggingface_hub.cli.repo_files import DeleteFilesSubCommand, RepoFilesCommand
+from huggingface_hub.cli.upload import UploadCommand
+        Set up cache scan/delete commands as in `src/huggingface_hub/cli/hf.py`.
+        self.parser = ArgumentParser("hf", usage="hf <command> [<args>]")
+        CacheCommand.register_subcommand(commands_parser)
+        """Test `hf cache scan`."""
+        args = self.parser.parse_args(["cache", "scan"])
+        assert args.dir is None
+        assert args.verbose == 0
+        assert args.func == CacheCommand
+        assert args.cache_command == "scan"
+        """Test `hf cache scan -v`."""
+        args = self.parser.parse_args(["cache", "scan", "-v"])
+        assert args.dir is None
+        assert args.verbose == 1
+        assert args.func == CacheCommand
+        assert args.cache_command == "scan"
+        """Test `hf cache scan --dir something`."""
+        args = self.parser.parse_args(["cache", "scan", "--dir", "something"])
+        assert args.dir == "something"
+        assert args.verbose == 0
+        assert args.func == CacheCommand
+        assert args.cache_command == "scan"
+        """Test `hf cache scan -vvv`."""
+        args = self.parser.parse_args(["cache", "scan", "-vvv"])
+        assert args.dir is None
+        assert args.verbose == 3
+        assert args.func == CacheCommand
+        assert args.cache_command == "scan"
+        """Test `hf cache delete --dir something`."""
+        args = self.parser.parse_args(["cache", "delete", "--dir", "something"])
+        assert args.dir == "something"
+        assert args.func == CacheCommand
+        assert args.cache_command == "delete"
+        Set up CLI as in `src/huggingface_hub/cli/hf.py`.
+        self.parser = ArgumentParser("hf", usage="hf <command> [<args>]")
+        """Test `hf upload my-folder to dummy-repo`."""
+        assert cmd.repo_id == DUMMY_MODEL_ID
+        assert cmd.local_path == "my-folder"
+        assert cmd.path_in_repo == "."  # implicit
+        assert cmd.repo_type == "model"
+        assert cmd.revision is None
+        assert cmd.include is None
+        assert cmd.exclude is None
+        assert cmd.delete is None
+        assert cmd.commit_message is None
+        assert cmd.commit_description is None
+        assert cmd.create_pr is False
+        assert cmd.every is None
+        assert cmd.api.token is None
+        assert cmd.quiet is False
+            assert cmd.local_path == "."
+            assert cmd.include == "*.safetensors"
+            assert cmd.path_in_repo == "."
+            assert cmd.repo_id == DUMMY_MODEL_ID
+            assert cmd.local_path == "."
+            assert cmd.include == "subdir/*.safetensors"
+            assert cmd.path_in_repo == "."
+        """Test `hf upload my-file to dummy-repo with all options selected`."""
+        assert cmd.repo_id == DUMMY_MODEL_ID
+        assert cmd.local_path == "my-file"
+        assert cmd.path_in_repo == "data/"
+        assert cmd.repo_type == "dataset"
+        assert cmd.revision == "v1.0.0"
+        assert cmd.include == ["*.json", "*.yaml"]
+        assert cmd.exclude == ["*.log", "*.txt"]
+        assert cmd.delete == ["*.config", "*.secret"]
+        assert cmd.commit_message == "My commit message"
+        assert cmd.commit_description == "My commit description"
+        assert cmd.create_pr is True
+        assert cmd.every == 5
+        assert cmd.api.token == "my-token"
+        assert cmd.quiet is True
+        assert cmd.local_path == "my-cool-model"
+        assert cmd.path_in_repo == "."
+        assert cmd.local_path == "my-cool-model"
+        assert cmd.path_in_repo == "my-cool-model"
+        assert cmd.local_path == "my-cool-model"
+        assert cmd.path_in_repo == "."
+        assert cmd.local_path == "./path/to/folder"
+        assert cmd.path_in_repo == "."  # Always upload the folder at the root of the repo
+        assert cmd.local_path == "./path/to/file.txt"
+        assert cmd.path_in_repo == "file.txt"  # If a file, upload it at the root of the repo and keep name
+        assert cmd.local_path == "./path/to/folder"
+        assert cmd.path_in_repo == "data/"
+        assert cmd.every == 10
+        assert cmd.every == 0.5
+    @patch("huggingface_hub.cli.upload.HfApi.repo_info")
+    @patch("huggingface_hub.cli.upload.HfApi.upload_folder")
+    @patch("huggingface_hub.cli.upload.HfApi.create_repo")
+    @patch("huggingface_hub.cli.upload.HfApi.repo_info")
+    @patch("huggingface_hub.cli.upload.HfApi.upload_file")
+    @patch("huggingface_hub.cli.upload.HfApi.create_repo")
+    @patch("huggingface_hub.cli.upload.HfApi.repo_info")
+    @patch("huggingface_hub.cli.upload.HfApi.upload_file")
+    @patch("huggingface_hub.cli.upload.HfApi.create_repo")
+    @patch("huggingface_hub.cli.upload.HfApi.create_branch")
+    @patch("huggingface_hub.cli.upload.HfApi.repo_info")
+    @patch("huggingface_hub.cli.upload.HfApi.upload_file")
+    @patch("huggingface_hub.cli.upload.HfApi.create_repo")
+    @patch("huggingface_hub.cli.upload.HfApi.repo_info")
+    @patch("huggingface_hub.cli.upload.HfApi.upload_file")
+    @patch("huggingface_hub.cli.upload.HfApi.create_repo")
+    @patch("huggingface_hub.cli.upload.HfApi.create_repo")
+        Set up CLI as in `src/huggingface_hub/cli/hf.py`.
+        self.parser = ArgumentParser("hf", usage="hf <command> [<args>]")
+        """Test `hf download dummy-repo`."""
+        assert args.repo_id == DUMMY_MODEL_ID
+        assert len(args.filenames) == 0
+        assert args.repo_type == "model"
+        assert args.revision is None
+        assert args.include is None
+        assert args.exclude is None
+        assert args.cache_dir is None
+        assert args.local_dir is None
+        assert args.force_download is False
+        assert args.token is None
+        assert args.quiet is False
+        assert args.func == DownloadCommand
+        """Test `hf download dummy-repo` with all options selected."""
+        assert args.repo_id == DUMMY_MODEL_ID
+        assert args.repo_type == "dataset"
+        assert args.revision == "v1.0.0"
+        assert args.include == ["*.json", "*.yaml"]
+        assert args.exclude == ["*.log", "*.txt"]
+        assert args.force_download is True
+        assert args.cache_dir == "/tmp"
+        assert args.local_dir == "."
+        assert args.token == "my-token"
+        assert args.quiet is True
+        assert args.max_workers == 4
+        assert args.func == DownloadCommand
+
+    @patch("huggingface_hub.cli.download.hf_hub_download")
+            library_name="hf",
+    @patch("huggingface_hub.cli.download.snapshot_download")
+            library_name="hf",
+    @patch("huggingface_hub.cli.download.snapshot_download")
+            library_name="hf",
+    @patch("huggingface_hub.cli.download.snapshot_download")
+            library_name="hf",
+        Set up CLI as in `src/huggingface_hub/cli/hf.py`.
+        self.parser = ArgumentParser("hf", usage="hf <command> [<args>]")
+        RepoCommands.register_subcommand(commands_parser)
+        args = self.parser.parse_args(["repo", "tag", "create", DUMMY_MODEL_ID, "1.0", "-m", "My tag message"])
+        assert args.repo_id == DUMMY_MODEL_ID
+        assert args.tag == "1.0"
+        assert args.message is not None
+        assert args.revision is None
+        assert args.token is None
+        assert args.repo_type == "model"
+                "repo",
+                "create",
+        assert args.repo_id == DUMMY_MODEL_ID
+        assert args.tag == "1.0"
+        assert args.message == "My tag message"
+        assert args.revision == "v1.0.0"
+        assert args.token == "my-token"
+        assert args.repo_type == "dataset"
+        args = self.parser.parse_args(["repo", "tag", "list", DUMMY_MODEL_ID])
+        assert args.repo_id == DUMMY_MODEL_ID
+        assert args.token is None
+        assert args.repo_type == "model"
+        args = self.parser.parse_args(["repo", "tag", "delete", DUMMY_MODEL_ID, "1.0"])
+        assert args.repo_id == DUMMY_MODEL_ID
+        assert args.tag == "1.0"
+        assert args.token is None
+        assert args.repo_type == "model"
+        assert args.yes is False
+        Set up CLI as in `src/huggingface_hub/cli/hf.py`.
+        self.parser = ArgumentParser("hf", usage="hf <command> [<args>]")
+    @patch("huggingface_hub.cli.repo_files.HfApi.delete_files")
+                    DUMMY_MODEL_ID,
+                    DUMMY_MODEL_ID,
+                    DUMMY_MODEL_ID,
+                    DUMMY_MODEL_ID,
+                    DUMMY_MODEL_ID,
+                    DUMMY_MODEL_ID,

@@ -1,0 +1,39 @@
+// commit 7eddd273de3b 2026-04-23T11:12:41+02:00 packages/browser/src/client/tester/runner.ts
+import { getBrowserState, getWorkerState, moduleRunner, now } from '../utils'
+import { getBrowserTrace, recordBrowserTraceEntry } from './trace'
+      const shouldTraceView = this.config.browser.traceView.enabled
+      if (!shouldTraceView && !shouldTrace) {
+        getBrowserState().activeTraceTaskIds.delete(test.id)
+        getBrowserState().browserTraceAttempts.delete(test.id)
+        return
+      }
+      if (shouldTraceView) {
+        getBrowserState().browserTraceDomSnapshot = await import('rrweb-snapshot')
+        getBrowserState().browserTraceAttempts.set(test.id, { retry, repeats, startTime: now() })
+      }
+      else {
+        getBrowserState().browserTraceAttempts.delete(test.id)
+      }
+      const hasActiveTraceView = getBrowserState().browserTraceAttempts.has(test.id)
+      if (hasActiveTraceView) {
+        const status = test.result?.state
+        const stack = status === 'fail' ? test.result?.errors?.[0].stack : undefined
+        const location = test.location ? { ...test.location, file: test.file.filepath } : undefined
+        recordBrowserTraceEntry(test, {
+          name: `vitest:onAfterRetryTask`,
+          kind: 'lifecycle',
+          ...(status === 'pass' || status === 'fail' ? { status } : {}),
+          ...(stack ? { stack } : location ? { location } : {}),
+        })
+        // TODO: model the same retention mechanism as playwright e.g. retain-on-failure
+        const traceData = getBrowserTrace(test.id, repeats, retry)
+        if (traceData) {
+          await this.commands.triggerCommand(
+            '__vitest_recordBrowserTrace',
+            [{ testId: test.id, data: traceData }],
+          )
+        }
+        getBrowserState().browserTraceAttempts.delete(test.id)
+      }
+      const hasActiveTrace = getBrowserState().activeTraceTaskIds.has(test.id)
+      if (!hasActiveTrace) {

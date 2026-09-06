@@ -1,0 +1,74 @@
+// commit 76ace39e7bba 2026-06-06T22:29:01+03:00 req.go
+	"net/netip"
+	headerValue := r.Get(header)
+	hasTrustedProxyConfig := r.hasTrustedProxyConfig()
+	if !hasTrustedProxyConfig {
+		start := 0
+		for {
+			end := start
+			for end < len(headerValue) && headerValue[end] != ',' {
+				end++
+			}
+
+			ipStr := utils.Trim(headerValue[start:end], ' ')
+			if isValidProxyIP(ipStr) {
+				return ipStr
+			}
+			if end == len(headerValue) {
+				break
+			}
+			start = end + 1
+	var leftmostIP string
+	for end := len(headerValue); end > 0; {
+		start := end
+		for start > 0 && headerValue[start-1] != ',' {
+			start--
+
+		ipStr := utils.Trim(headerValue[start:end], ' ')
+		if isValidProxyIP(ipStr) {
+			leftmostIP = ipStr
+			if !r.isTrustedProxyIP(ipStr) {
+				return ipStr
+			}
+		}
+
+		if start == 0 {
+			break
+		}
+		end = start - 1
+	}
+
+	if leftmostIP != "" {
+		return leftmostIP
+	if ip := r.c.fasthttp.RemoteIP(); ip != nil {
+		return ip.String()
+	}
+	return ""
+}
+func isValidProxyIP(ipStr string) bool {
+	hasIPv4Separator := strings.IndexByte(ipStr, '.') >= 0
+	hasIPv6Separator := strings.IndexByte(ipStr, ':') >= 0
+	return (hasIPv4Separator || hasIPv6Separator) &&
+		(!hasIPv4Separator || utils.IsIPv4(ipStr)) &&
+		(!hasIPv6Separator || utils.IsIPv6(ipStr))
+	ip, err := netip.ParseAddr(ipStr)
+	if err != nil {
+
+	var canonicalIP [net.IPv6len * 3]byte
+	if _, trusted := cfg.ips[utils.UnsafeString(ip.AppendTo(canonicalIP[:0]))]; trusted {
+	if len(cfg.ranges) == 0 {
+		return false
+	}
+
+	if ip.Is4() {
+		ipv4 := ip.As4()
+		for _, ipNet := range cfg.ranges {
+			if ipNet.Contains(ipv4[:]) {
+				return true
+			}
+		}
+		return false
+	}
+
+	ipv6 := ip.As16()
+		if ipNet.Contains(ipv6[:]) {

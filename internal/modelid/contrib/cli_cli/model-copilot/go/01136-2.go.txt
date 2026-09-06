@@ -1,0 +1,59 @@
+// commit 998b6212b38f 2026-04-17T19:58:59+02:00 pkg/cmd/skills/preview/preview.go
+	"time"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	Telemetry      ghtelemetry.EventRecorder
+func NewCmdPreview(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF func(*PreviewOptions) error) *cobra.Command {
+		Telemetry:      telemetry,
+	// Kick off the visibility fetch in parallel with the preview work so
+	// the extra API roundtrip doesn't add latency on the critical path.
+	// The result is consumed when the telemetry event is emitted below.
+	type visResult struct {
+		vis discovery.RepoVisibility
+		err error
+	}
+	visCh := make(chan visResult, 1)
+	go func() {
+		vis, err := discovery.FetchRepoVisibility(apiClient, hostname, owner, repoName)
+		visCh <- visResult{vis: vis, err: err}
+	}()
+
+		renderAllFiles(opts, cs, skill, files, rendered, extraFiles, apiClient, hostname, owner, repoName)
+	} else {
+		// Interactive with multiple files: show tree, then file picker
+		renderInteractive(opts, cs, skill, files, rendered, extraFiles, apiClient, hostname, owner, repoName)
+	dims := map[string]string{
+		"skill_host_type": ghinstance.CategorizeHost(opts.repo.RepoHost()),
+	}
+	select {
+	case r := <-visCh:
+		if r.err == nil {
+			dims["repo_visibility"] = string(r.vis)
+			if r.vis == discovery.RepoVisibilityPublic {
+				dims["skill_owner"] = opts.repo.RepoOwner()
+				dims["skill_repo"] = opts.repo.RepoName()
+				dims["skill_name"] = skill.DisplayName()
+			}
+		} else {
+			dims["repo_visibility"] = "unknown"
+		}
+	case <-time.After(visibilityWaitTimeout):
+		dims["repo_visibility"] = "unknown"
+	}
+	opts.Telemetry.Record(ghtelemetry.Event{
+		Type:       "skill_preview",
+		Dimensions: dims,
+	})
+
+	return nil
+// visibilityWaitTimeout is how long to wait at telemetry-emit time for
+// the in-flight repo visibility fetch before giving up and emitting
+// repo_visibility="unknown". By this point the command has already done
+// several serial API calls and rendering work, so the fetch has almost
+// always completed; this budget is a short safety net for the case
+// where that single REST call has stalled.
+const visibilityWaitTimeout = 200 * time.Millisecond
+
+	apiClient *api.Client, hostname, owner, repo string) {
+	apiClient *api.Client, hostname, owner, repo string) {
+			return // Prompter returns error on Esc/Ctrl-C; treat as graceful exit

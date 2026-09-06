@@ -1,0 +1,70 @@
+// commit 04e495506e8d 2026-07-02T14:45:07+00:00 req.go
+		// (RFC 9110 Section 5.6.6). A DQUOTE only opens a quoted-string at
+		// the start of a parameter value (right after "="), so a stray quote
+		// inside an unquoted value cannot swallow the rest of the header.
+		expectValue := false
+			ch := params[i]
+			case inQuotes:
+				switch ch {
+				case '\\':
+					escaped = true
+				case '"':
+					inQuotes = false
+				}
+			case ch == '=':
+				expectValue = true
+			case ch == '"' && expectValue:
+				inQuotes = true
+				expectValue = false
+			case ch == ';':
+			case ch != ' ' && ch != '\t':
+				expectValue = false
+		if len(v) > 0 && v[0] == '"' {
+			// A quoted value must be a complete quoted-string, and its
+			// quoted-pairs must be replaced with the escaped octet
+			// (RFC 9110 Section 5.6.4).
+			if len(v) < 2 || v[len(v)-1] != '"' {
+				return ""
+			}
+		return r.currentMethod()
+		return r.currentMethod()
+// currentMethod resolves the context's method, falling back to the raw
+// request header value when the method is not registered in RequestMethods
+// (methodInt < 0), so unregistered methods are reported instead of panicking.
+func (r *DefaultReq) currentMethod() string {
+	if r.c.methodInt < 0 {
+		return r.c.app.toString(r.c.fasthttp.Request.Header.Method())
+	}
+	return r.c.app.method(r.c.methodInt)
+}
+
+	// parseBound parses a present (non-empty) range bound. A bound that is
+	// not a valid integer makes the range-spec, and therefore the whole
+	// ranges-specifier, invalid (RFC 9110 Section 14.1.1).
+	if !found {
+		// do, so signal it distinctly. This check runs before any syntax
+		// checks on the range-set, since the other-range grammar permits
+		// characters (such as "=") that byte ranges do not.
+	if strings.IndexByte(after, '=') >= 0 {
+		return Range{}, ErrRangeMalformed
+	}
+		elementCount int  // every list element, including empty ones (MaxRanges bound)
+		sawRangeSpec bool // at least one non-empty range-spec was present
+		sawRangeSpec = true
+		var (
+			start, end int64
+			err        error
+		)
+		if startStr != "" {
+			if start, err = parseBound(startStr); err != nil {
+				return Range{}, err
+			}
+		}
+		if endStr != "" {
+			if end, err = parseBound(endStr); err != nil {
+				return Range{}, err
+			}
+		case startStr == "" && endStr == "":
+		case startStr == "": // -nnn (suffix range)
+		case endStr == "": // nnn- (open-ended range)
+		if !sawRangeSpec {

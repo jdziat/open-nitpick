@@ -1,0 +1,34 @@
+// commit d6d3359ddb86 2025-11-17T16:23:52+01:00 packages/vitest/src/runtime/workers/base.ts
+import type { Traces } from '../../utils/traces'
+  // we could load @vite/env, but it would take ~8ms, while this takes ~0,02ms
+  if (context.config.serializedDefines) {
+    try {
+      runInThisContext(`(() =>{\n${context.config.serializedDefines}})()`, {
+        lineOffset: 1,
+        filename: 'virtual:load-defines.js',
+      })
+    }
+    catch (error: any) {
+      throw new Error(`Failed to load custom "defines": ${error.message}`)
+    }
+  }
+  const otel = context.traces
+
+  const { environment, loader } = await loadEnvironment(environmentName, config.root, rpc, otel)
+  const env = await otel.$(
+    'vitest.runtime.environment.setup',
+    {
+      attributes: {
+        'vitest.environment': environment.name,
+        'vitest.environment.vite_environment': environment.viteEnvironment || environment.name,
+      },
+    },
+    () => environment.setup(globalThis, environmentOptions || config.environmentOptions || {}),
+  )
+    await otel.$(
+      'vitest.runtime.environment.teardown',
+      () => env.teardown(globalThis),
+    )
+export async function runBaseTests(method: 'run' | 'collect', state: WorkerGlobalState, traces: Traces): Promise<void> {
+    traces,
+    traces,

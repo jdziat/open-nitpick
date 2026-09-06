@@ -1,0 +1,90 @@
+// commit 71d98b4e6b4d 2026-05-22T14:43:03+01:00 apps/webapp/app/v3/otlpExporter.server.ts
+import type { ClickhouseFactory } from "~/services/clickhouse/clickhouseFactory.server";
+import { clickhouseFactory } from "~/services/clickhouse/clickhouseFactoryInstance.server";
+
+type OTLPExporterConfig = {
+  clickhouseFactory: ClickhouseFactory;
+  verbose: boolean;
+  spanAttributeValueLengthLimit: number;
+};
+
+  private readonly _clickhouseFactory: ClickhouseFactory;
+  private readonly _verbose: boolean;
+  private readonly _spanAttributeValueLengthLimit: number;
+  constructor(config: OTLPExporterConfig) {
+    this._clickhouseFactory = config.clickhouseFactory;
+    this._verbose = config.verbose;
+    this._spanAttributeValueLengthLimit = config.spanAttributeValueLengthLimit;
+  async exportMetrics(request: ExportMetricsServiceRequest): Promise<ExportMetricsServiceResponse> {
+      const rows = this.#filterResourceMetrics(request.resourceMetrics).flatMap((resourceMetrics) =>
+        convertMetricsToClickhouseRows(resourceMetrics, this._spanAttributeValueLengthLimit)
+        await this.#exportMetricRows(rows);
+    await waitForLlmPricingReady();
+
+    // Group by unique event repositories
+    const routeCache = new Map<string, { key: string; repository: IEventRepository }>();
+    const groups = new Map<string, { repository: IEventRepository; events: CreateEventInput[] }>();
+    for (const { events, taskEventStore } of eventsWithStores) {
+      for (const event of events) {
+        const routeKey = `${event.organizationId}\0${taskEventStore}`;
+        let resolved = routeCache.get(routeKey);
+        if (!resolved) {
+          resolved = this._clickhouseFactory.getEventRepositoryForOrganizationSync(
+            taskEventStore,
+            event.organizationId
+          );
+          routeCache.set(routeKey, resolved);
+        }
+        let group = groups.get(resolved.key);
+        if (!group) {
+          group = { repository: resolved.repository, events: [] };
+          groups.set(resolved.key, group);
+        }
+        group.events.push(event);
+      }
+    }
+    let eventCount = 0;
+    for (const [repoKey, { repository, events }] of groups) {
+      this.#logEventsVerbose(enrichedEvents, `exportEvents ${repoKey}`);
+      repository.insertMany(enrichedEvents);
+  async #exportMetricRows(rows: MetricsV1Input[]): Promise<void> {
+    const routeCache = new Map<string, { key: string; repository: IEventRepository }>();
+    const groups = new Map<string, { repository: IEventRepository; rows: MetricsV1Input[] }>();
+
+    for (const row of rows) {
+      const routeKey = row.organization_id;
+      let resolved = routeCache.get(routeKey);
+      if (!resolved) {
+        resolved = this._clickhouseFactory.getEventRepositoryForOrganizationSync(
+          "clickhouse_v2",
+          row.organization_id
+        );
+        routeCache.set(routeKey, resolved);
+      }
+      let group = groups.get(resolved.key);
+      if (!group) {
+        group = { repository: resolved.repository, rows: [] };
+        groups.set(resolved.key, group);
+      }
+      group.rows.push(row);
+    for (const [, { repository, rows: groupedRows }] of groups) {
+      repository.insertManyMetrics(groupedRows);
+    }
+        const runTags = extractArrayAttribute(
+          span.attributes ?? [],
+          SemanticInternalAttributes.RUN_TAGS
+        );
+  return date
+    .toISOString()
+    .replace("T", " ")
+    .replace(/\.\d{3}Z$/, "");
+    resourceCtx.runId ?? extractStringAttribute(dpAttributes, SemanticInternalAttributes.RUN_ID);
+async function initializeOTLPExporter() {
+  await clickhouseFactory.isReady();
+  return new OTLPExporter({
+    clickhouseFactory,
+    verbose: process.env.OTLP_EXPORTER_VERBOSE === "1",
+    spanAttributeValueLengthLimit: process.env.SERVER_OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT
+      : 8192,
+  });
+}

@@ -1,0 +1,108 @@
+# commit 8ade5748e2c3 2026-03-30T18:43:21-07:00 browser_use/skill_cli/daemon.py
+		self._is_shutting_down: bool = False
+
+	def _write_state(self, phase: str) -> None:
+		"""Atomically write session state file for CLI observability."""
+		import time
+
+		from browser_use.skill_cli.utils import get_home_dir
+
+		state = {
+			'phase': phase,
+			'pid': os.getpid(),
+			'updated_at': time.time(),
+			'config': {
+				'headed': self.headed,
+				'profile': self.profile,
+				'cdp_url': self.cdp_url,
+				'use_cloud': self.use_cloud,
+			},
+		}
+		state_path = get_home_dir() / f'{self.session}.state.json'
+		tmp_path = state_path.with_suffix('.state.json.tmp')
+		try:
+			with open(tmp_path, 'w') as f:
+				json.dump(state, f)
+				f.flush()
+				os.fsync(f.fileno())
+			os.replace(tmp_path, state_path)
+		except OSError as e:
+			logger.debug(f'Failed to write state file: {e}')
+
+	def _request_shutdown(self) -> None:
+		"""Request shutdown exactly once. Safe from any context."""
+		if self._is_shutting_down:
+			return
+		self._is_shutting_down = True
+		self._shutdown_task = asyncio.create_task(self._shutdown())
+			self._write_state('starting')
+
+				await bs.start()
+				self._write_state('starting')  # refresh updated_at after bs.start() returns
+				# Wait for Chrome to stabilize after CDP setup before accepting commands
+				try:
+					await bs.get_browser_state_summary()
+				except Exception:
+					pass
+				# Create action handler for direct command execution (no event bus)
+				from browser_use.skill_cli.actions import ActionHandler
+				actions = ActionHandler(bs)
+
+				self._session = SessionInfo(
+					name=self.session,
+					headed=self.headed,
+					profile=self.profile,
+					cdp_url=self.cdp_url,
+					browser_session=bs,
+					actions=actions,
+					use_cloud=self.use_cloud,
+				)
+				self._browser_watchdog_task = asyncio.create_task(self._watch_browser())
+				# Initialize tab ownership for multi-agent isolation
+				from browser_use.skill_cli.tab_ownership import TabOwnershipManager
+				from browser_use.skill_cli.utils import get_home_dir
+				self._tab_ownership = TabOwnershipManager(bs)
+				self._tab_ownership.set_agents_file(get_home_dir() / 'agents.json')
+				# Register initial tabs with tab ownership (no event bus)
+				if bs.session_manager:
+					for target in bs.session_manager.get_all_page_targets():
+						self._tab_ownership.on_tab_created(target.target_id)
+				# Start periodic agent cleanup
+				self._agent_cleanup_task = asyncio.create_task(self._cleanup_stale_agents())
+				# Start idle timeout watchdog
+				self._idle_watchdog_task = asyncio.create_task(self._watch_idle())
+			except Exception:
+				# Startup failed — rollback browser resources
+				logger.exception('Session startup failed, rolling back')
+				self._write_state('failed')
+				try:
+					if self.use_cloud and hasattr(bs, '_cloud_browser_client') and bs._cloud_browser_client.current_session_id:
+						await asyncio.wait_for(bs._cloud_browser_client.stop_browser(), timeout=10.0)
+					elif not self.cdp_url and not self.use_cloud:
+						await asyncio.wait_for(bs.kill(), timeout=10.0)
+					else:
+						await asyncio.wait_for(bs.stop(), timeout=10.0)
+				except Exception as cleanup_err:
+					logger.debug(f'Rollback cleanup error: {cleanup_err}')
+				raise
+
+			self._write_state('running')
+				self._request_shutdown()
+					self._request_shutdown()
+				self._request_shutdown()
+						'pid': os.getpid(),
+		self._write_state('initializing')
+
+			self._request_shutdown()
+		self._write_state('ready')
+	async def _shutdown(self) -> None:
+		"""Graceful shutdown. Only called via _request_shutdown().
+		self._write_state('shutting_down')
+		self._write_state('stopped')
+
+		# Write failed state if we crashed without a clean shutdown
+		if not daemon._is_shutting_down:
+			try:
+				daemon._write_state('failed')
+			except Exception:
+				pass

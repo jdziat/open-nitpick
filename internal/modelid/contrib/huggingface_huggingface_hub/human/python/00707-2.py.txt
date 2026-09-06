@@ -1,0 +1,31 @@
+# commit 6f7dfbaa3f89 2026-06-29T18:22:03+02:00 tests/test_commit_api.py
+import pytest
+class TestCommitOperationDelete:
+        assert not CommitOperationDelete(path_in_repo="path/to/file").is_folder
+        assert not CommitOperationDelete(path_in_repo="path/to/file.md").is_folder
+        assert CommitOperationDelete(path_in_repo="path/to/folder/").is_folder
+        assert CommitOperationDelete(path_in_repo="path/to/folder.md/").is_folder
+        assert not CommitOperationDelete(path_in_repo="path/to/folder/", is_folder=False).is_folder
+        assert not CommitOperationDelete(path_in_repo="path/to/folder.md/", is_folder=False).is_folder
+        assert CommitOperationDelete(path_in_repo="path/to/folder", is_folder=True).is_folder
+        assert CommitOperationDelete(path_in_repo="path/to/folder.md", is_folder=True).is_folder
+        with pytest.raises(ValueError):
+class TestCommitOperationPathInRepo:
+            assert CommitOperationAdd(path_in_repo=input, path_or_fileobj=b"").path_in_repo == expected
+            assert CommitOperationDelete(path_in_repo=input).path_in_repo == expected
+            with pytest.raises(ValueError):
+                CommitOperationAdd(path_in_repo=input, path_or_fileobj=b"")
+            with pytest.raises(ValueError):
+                CommitOperationDelete(path_in_repo=input)
+class TestCommitOperationForbiddenPathInRepo:
+            with pytest.raises(ValueError):
+                CommitOperationAdd(path_in_repo=path, path_or_fileobj=b"content")
+            with pytest.raises(ValueError):
+                CommitOperationDelete(path_in_repo=path)
+            CommitOperationAdd(path_in_repo=path, path_or_fileobj=b"content")
+            CommitOperationDelete(path_in_repo=path)
+class TestWarnOnOverwritingOperations:
+        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning):
+        with pytest.warns(UserWarning):

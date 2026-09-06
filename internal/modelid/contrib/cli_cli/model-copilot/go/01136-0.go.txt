@@ -1,0 +1,49 @@
+// commit 998b6212b38f 2026-04-17T19:58:59+02:00 internal/skills/discovery/discovery.go
+type RepoVisibility string
+
+const (
+	RepoVisibilityPublic   RepoVisibility = "public"
+	RepoVisibilityPrivate  RepoVisibility = "private"
+	RepoVisibilityInternal RepoVisibility = "internal"
+)
+func parseRepoVisibility(s string) (RepoVisibility, error) {
+	switch s {
+	case "public":
+		return RepoVisibilityPublic, nil
+	case "private":
+		return RepoVisibilityPrivate, nil
+	case "internal":
+		return RepoVisibilityInternal, nil
+	default:
+		return "", fmt.Errorf("unknown repository visibility: %q", s)
+	}
+// FetchRepoVisibility returns the repository visibility: "public", "private", or "internal".
+func FetchRepoVisibility(client *api.Client, host, owner, repo string) (RepoVisibility, error) {
+	apiPath := fmt.Sprintf("repos/%s/%s", url.PathEscape(owner), url.PathEscape(repo))
+	var resp struct {
+		Visibility string `json:"visibility"`
+	}
+	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+		return "", err
+	}
+	return parseRepoVisibility(resp.Visibility)
+	var resp struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+	if resp.TagName == "" {
+	return resolveTagRef(client, host, owner, repo, resp.TagName)
+	var resp struct {
+		DefaultBranch string `json:"default_branch"`
+	}
+	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+	branch := resp.DefaultBranch
+	var resp struct {
+		SHA      string `json:"sha"`
+		Content  string `json:"content"`
+		Encoding string `json:"encoding"`
+	}
+	if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
+	if resp.Encoding != "base64" {
+		return "", fmt.Errorf("unexpected blob encoding: %s", resp.Encoding)
+	decoded, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, strings.NewReader(resp.Content)))

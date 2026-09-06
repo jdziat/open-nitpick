@@ -1,0 +1,47 @@
+# commit 94c336407d37 2026-02-09T18:38:39-08:00 browser_use/skill_cli/main.py
+	# Handle tunnel command - runs independently of browser session
+		from browser_use.skill_cli import tunnel_manager
+
+
+			result = tunnel_manager.list_tunnels()
+				# Check if it's 'stop --all'
+				if '--all' in sys.argv:
+					result = asyncio.get_event_loop().run_until_complete(tunnel_manager.stop_all_tunnels())
+				else:
+					print('Usage: browser-use tunnel stop <port>', file=sys.stderr)
+					return 1
+			else:
+				result = asyncio.get_event_loop().run_until_complete(tunnel_manager.stop_tunnel(port_arg))
+			result = asyncio.get_event_loop().run_until_complete(tunnel_manager.start_tunnel(port))
+		# Output result
+		if args.json:
+			print(json.dumps(result))
+		else:
+			if 'error' in result:
+				print(f'Error: {result["error"]}', file=sys.stderr)
+				return 1
+			elif 'url' in result:
+				existing = ' (existing)' if result.get('existing') else ''
+				print(f'url: {result["url"]}{existing}')
+			elif 'tunnels' in result:
+				if result['tunnels']:
+					for t in result['tunnels']:
+						print(f'  port {t["port"]}: {t["url"]}')
+				else:
+					print('No active tunnels')
+			elif 'stopped' in result:
+				if isinstance(result['stopped'], list):
+					if result['stopped']:
+						print(f'Stopped {len(result["stopped"])} tunnel(s): {", ".join(map(str, result["stopped"]))}')
+					else:
+						print('No tunnels to stop')
+				else:
+					print(f'Stopped tunnel on port {result["stopped"]}')
+		return 0
+
+	# Build params from args
+	params = {}
+	skip_keys = {'command', 'session', 'browser', 'headed', 'profile', 'json', 'api_key', 'server_command'}
+	for key, value in vars(args).items():
+		if key not in skip_keys and value is not None:
+			params[key] = value

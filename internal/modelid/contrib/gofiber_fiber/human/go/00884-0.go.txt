@@ -1,0 +1,49 @@
+// commit 26faa1d8e1be 2026-04-07T05:37:34+00:00 router.go
+	use           bool // USE matches path prefixes
+	mount         bool // Indicated a mounted app on a specific route
+	star          bool // Path equals '*'
+	root          bool // Path equals '/'
+	autoHead      bool // Automatically generated HEAD route
+	caseSensitive bool // Whether parameter matching is case-sensitive
+// Parameter matching respects the app's CaseSensitive configuration:
+// case-insensitive by default, case-sensitive when CaseSensitive is true.
+		var (
+			val   any
+			found bool
+		)
+
+		// Prefer an exact parameter name match
+		if val, found = params[segment.ParamName]; !found && !r.caseSensitive {
+			// Fall back to a case-insensitive match
+			for key := range params {
+				if utils.EqualFold(key, segment.ParamName) {
+					val = params[key]
+					found = true
+					break
+			}
+		}
+
+		// For greedy parameters, fall back to generic greedy keys
+		if !found && segment.IsGreedy {
+			for _, greedyParam := range greedyParameters {
+				if val, found = params[string(greedyParam)]; found {
+					break
+				}
+			}
+		}
+
+		if found {
+			_, err := buf.WriteString(utils.ToString(val))
+			if err != nil {
+				return "", fmt.Errorf("failed to write string: %w", err)
+		use:           route.use,
+		mount:         route.mount,
+		star:          route.star,
+		root:          route.root,
+		autoHead:      route.autoHead,
+		caseSensitive: route.caseSensitive,
+			use:           isUse,
+			mount:         isMount,
+			star:          isStar,
+			root:          isRoot,
+			caseSensitive: app.config.CaseSensitive,

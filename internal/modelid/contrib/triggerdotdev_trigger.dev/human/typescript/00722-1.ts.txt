@@ -1,0 +1,89 @@
+// commit 9b21f8d322c5 2026-02-10T10:37:09+01:00 apps/webapp/app/presenters/v3/EnvironmentVariablesPresenter.server.ts
+import type { EnvironmentVariableUpdater } from "~/v3/environmentVariables/repository";
+import {
+  SyncEnvVarsMapping,
+  EnvSlug,
+} from "~/v3/vercel/vercelProjectIntegrationSchema";
+import { VercelIntegrationService } from "~/services/vercelIntegration.server";
+            version: true,
+            lastUpdatedBy: true,
+            updatedAt: true,
+    const userIds = new Set(
+      environmentVariables
+        .flatMap((envVar) => envVar.values)
+        .map((value) => value.lastUpdatedBy)
+        .filter(
+          (lastUpdatedBy): lastUpdatedBy is { type: "user"; userId: string } =>
+            lastUpdatedBy !== null &&
+            typeof lastUpdatedBy === "object" &&
+            "type" in lastUpdatedBy &&
+            lastUpdatedBy.type === "user" &&
+            "userId" in lastUpdatedBy &&
+            typeof lastUpdatedBy.userId === "string"
+        )
+        .map((lastUpdatedBy) => lastUpdatedBy.userId)
+    );
+
+    const users =
+      userIds.size > 0
+        ? await this.#prismaClient.user.findMany({
+            where: {
+              id: {
+                in: Array.from(userIds),
+              },
+            },
+            select: {
+              id: true,
+              name: true,
+              displayName: true,
+              avatarUrl: true,
+            },
+          })
+        : [];
+
+    const usersRecord: Record<string, { id: string; name: string | null; displayName: string | null; avatarUrl: string | null }> =
+      Object.fromEntries(users.map((u) => [u.id, u]));
+
+    // Get Vercel integration data if it exists
+    const vercelService = new VercelIntegrationService(this.#prismaClient);
+    const vercelIntegration = await vercelService.getVercelProjectIntegration(project.id);
+
+    let vercelSyncEnvVarsMapping: SyncEnvVarsMapping = {};
+    let vercelPullEnvVarsBeforeBuild: EnvSlug[] | null = null;
+
+    if (vercelIntegration) {
+      vercelSyncEnvVarsMapping = vercelIntegration.parsedIntegrationData.syncEnvVarsMapping;
+      vercelPullEnvVarsBeforeBuild = vercelIntegration.parsedIntegrationData.config.pullEnvVarsBeforeBuild ?? null;
+    }
+
+            const valueRecord = environmentVariable.values.find((v) => v.environmentId === env.id);
+            const isSecret = valueRecord?.isSecret ?? false;
+            if (!val || !valueRecord) {
+            const lastUpdatedBy = valueRecord.lastUpdatedBy as EnvironmentVariableUpdater | null;
+
+            const updatedByUser =
+              lastUpdatedBy?.type === "user"
+                ? (() => {
+                    const user = usersRecord[lastUpdatedBy.userId];
+                    return user
+                      ? {
+                          id: user.id,
+                          name: user.displayName || user.name || "Unknown",
+                          avatarUrl: user.avatarUrl,
+                        }
+                      : null;
+                  })()
+                : null;
+
+                version: valueRecord.version,
+                lastUpdatedBy,
+                updatedByUser,
+                updatedAt: valueRecord.updatedAt,
+      // Vercel integration data
+      vercelIntegration: vercelIntegration
+        ? {
+            enabled: true,
+            pullEnvVarsBeforeBuild: vercelPullEnvVarsBeforeBuild,
+            syncEnvVarsMapping: vercelSyncEnvVarsMapping,
+          }
+        : null,

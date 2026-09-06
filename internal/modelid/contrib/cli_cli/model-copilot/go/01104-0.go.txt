@@ -1,0 +1,52 @@
+// commit 92e40eabea26 2026-04-15T23:01:09+02:00 pkg/cmd/skills/search/search.go
+	"namespace",
+	Namespace   string // author/scope prefix for namespaced skills
+// qualifiedName returns the namespace-qualified skill name (e.g. "author/skill")
+// or just the skill name if there is no namespace.
+func (s skillResult) qualifiedName() string {
+	if s.Namespace != "" {
+		return s.Namespace + "/" + s.SkillName
+	}
+	return s.SkillName
+}
+
+			data[f] = s.qualifiedName()
+		case "namespace":
+			data[f] = s.Namespace
+// deduplicateByName caps the number of results with the same qualified skill
+// name. Since results are pre-sorted by relevance score, the first occurrences
+// a few alternative sources. Namespaced skills (e.g. "author/skill") are
+// treated as distinct from bare names.
+		key := strings.ToLower(s.qualifiedName())
+		table.AddField(s.qualifiedName())
+		options[i] = s.qualifiedName() + "  " + cs.Muted(s.Repo) + starStr + descStr
+		displayName := s.qualifiedName()
+			cs.Blue("::"), displayName, s.Repo)
+
+		// Use the repo-relative path (e.g. "skills/author/name") for
+		// disambiguation when installing namespaced skills, so the
+		// install command can resolve the exact skill without ambiguity.
+		installArg := s.SkillName
+		if s.Namespace != "" {
+			installArg = s.Path
+		}
+		cmd := exec.Command(opts.Executable, "skills", "install", s.Repo, installArg,
+				cs.Red("!"), displayName, s.Repo, err)
+//   - Namespace match (500 points)
+	// Namespace match.
+	if s.Namespace != "" && strings.Contains(strings.ToLower(s.Namespace), term) {
+		score += 500
+	}
+
+// the namespace, the YAML description, or the repository owner or name.
+		namespaceLower := strings.ToLower(s.Namespace)
+			strings.Contains(namespaceLower, queryTerm) ||
+// deduplicateResults extracts unique (repo, namespace, skill name) triples from code search hits.
+		skillName, namespace := extractSkillInfo(item.Path)
+		key := item.Repository.FullName + "/" + namespace + "/" + skillName
+			Namespace: namespace,
+// extractSkillInfo derives the skill name and namespace from a SKILL.md path,
+// but only if the path matches a known skill convention. Returns empty strings
+// for non-conforming paths.
+func extractSkillInfo(filePath string) (name, namespace string) {
+	return discovery.MatchSkillPath(filePath)

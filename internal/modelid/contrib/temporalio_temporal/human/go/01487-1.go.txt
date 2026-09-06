@@ -1,0 +1,53 @@
+// commit 53322ea450de 2026-07-15T18:54:18+00:00 service/history/timer_queue_active_task_executor.go
+	"go.temporal.io/server/common/softassert"
+	// Route by execution archetype. Treat an unspecified archetype — a record persisted before
+	// archetype IDs existed, or a not-yet-initialized chasm tree — as the built-in workflow archetype.
+	archetypeID := mutableState.ChasmTree().ArchetypeID()
+	if archetypeID == chasm.UnspecifiedArchetypeID {
+		archetypeID = chasm.WorkflowArchetypeID
+	}
+	if archetypeID != chasm.WorkflowArchetypeID {
+		// TODO@time-skipping: chasm execution path is not implemented yet.
+		release(nil)
+		return nil
+	}
+
+	// task staleness check
+	// 1) time skipping is disabled
+	tsi := mutableState.GetExecutionInfo().GetTimeSkippingInfo()
+	tsiUtil := workflow.NewTimeSkippingInfoUtil(tsi)
+	if !tsiUtil.IsEnabled() {
+		release(nil)
+		return errNoTimerFired
+	}
+
+	// 2) match current pending fast-forward
+	if !tsiUtil.HasPendingFastForward() {
+		release(nil)
+		return errNoTimerFired
+	}
+
+	ffVT := tsi.GetFastForwardInfo().GetLastUpdateVersionedTransition()
+	if ffVT == nil || task.VersionedTransition == nil {
+		// Invariant: when a pending fast-forward and a task both exist, they must both have a
+		// non-nil versioned transition. A nil here is a "should never happen" state bug, not lost
+		// data, so we soft-assert (loud in dev/test) and return a terminal task error. The task
+		// framework then records failure/corruption metrics, logs, and drops the task (or DLQs it
+		// only if that is enabled for the category).
+		errorMsg := fmt.Sprintf(
+			"time-skipping timer task validation failed: VersionedTransition is nil (task: %t, pending fast-forward: %t)",
+			task.VersionedTransition == nil,
+			ffVT == nil,
+		)
+		softassert.Fail(t.logger, errorMsg)
+		return queues.NewTerminalTaskError(errorMsg)
+	}
+
+	if ffVT.GetTransitionCount() != task.VersionedTransition.GetTransitionCount() {
+	taskVersion := task.VersionedTransition.GetNamespaceFailoverVersion()
+	ffVersion := ffVT.GetNamespaceFailoverVersion()
+	if err := CheckTaskVersion(t.shardContext, t.logger, mutableState.GetNamespaceEntry(), ffVersion, taskVersion, task); err != nil {
+		return err
+	}
+	// 3) firing fast-forward timer (only turns off time skipping, and no task regeneration)
+	// TODO@time-skipping: chasm execution path is not implemented yet.

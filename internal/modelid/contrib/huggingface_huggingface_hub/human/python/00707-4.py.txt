@@ -1,0 +1,171 @@
+# commit 6f7dfbaa3f89 2026-06-29T18:22:03+02:00 tests/test_file_download.py
+from huggingface_hub import HfApi, constants
+from .conftest import RepoFactory
+from .testing_constants import OTHER_TOKEN, TOKEN
+class TestDiskUsageWarning:
+    @pytest.fixture(scope="class", autouse=True)
+    def setup(self, request):
+        request.cls.expected_size = 100 * 1024 * 1024
+        yield
+    def test_disk_usage_warning(self, mocker) -> None:
+        disk_usage_mock = mocker.patch("huggingface_hub.file_download.shutil.disk_usage")
+class TestStagingDownload:
+    def test_download_from_a_gated_repo_with_hf_hub_download(self, api: HfApi, repo_factory: RepoFactory) -> None:
+        repo_url = repo_factory()
+            f"{api.endpoint}/api/models/{repo_url.repo_id}/settings",
+            headers=api._build_hf_headers(),
+            with pytest.raises(
+                GatedRepoError, match="Access to model .* is restricted and you are not in the authorized list"
+    def test_download_regular_file_from_private_renamed_repo(self, api: HfApi, repo_factory: RepoFactory) -> None:
+        repo_url = repo_factory()
+        api.update_repo_settings(repo_id_before, private=True)
+        api.upload_file(repo_id=repo_id_before, path_in_repo="file.txt", path_or_fileobj=b"content")
+        api.move_repo(repo_id_before, repo_id_after)
+        path = api.hf_hub_download(repo_id_before, filename="file.txt")
+            assert f.read() == "content"
+        api.move_repo(repo_id_after, repo_id_before)
+@pytest.mark.production
+class TestCachedDownload:
+    def test_private_repo_and_file_cached_locally(self, api: HfApi):
+    @pytest.mark.skipif(os.name == "nt", reason="umask is UNIX-specific")
+                assert stat.S_IMODE(os.stat(filepath).st_mode) == 0o640
+            assert os.path.exists(filepath)
+            assert os.path.exists(filepath)
+        assert filepath.is_file()
+        assert filepath.name == constants.CONFIG_NAME
+        assert Path(filepath).parent.parent.name == "snapshots"
+            with pytest.raises(LocalEntryNotFoundError):
+        assert url.endswith(
+            # "./resolve/main/config.json" and not "./resolve/main//config.json"
+            f"{DUMMY_MODEL_ID}/resolve/main/config.json",
+    def test_hf_hub_url_with_endpoint(self, mocker):
+        mocker.patch("huggingface_hub.constants.ENDPOINT", "https://huggingface.co")
+        mocker.patch(
+            "huggingface_hub.constants.HUGGINGFACE_CO_URL_TEMPLATE",
+            "https://huggingface.co/{repo_id}/resolve/{revision}/{filename}",
+        )
+        assert (
+            )
+            == "https://hf-ci.co/julien-c/dummy-unknown/resolve/main/config.json"
+        assert filepath == new_file_path
+        assert filepath == new_file_path
+        assert try_to_load_from_cache(DUMMY_MODEL_ID, filename="conf.json") is None
+        assert (
+            is None
+        assert try_to_load_from_cache("bert-base", filename=constants.CONFIG_NAME) is None
+        assert file_path == new_file_path
+        assert try_to_load_from_cache(DUMMY_MODEL_ID, filename="conf.json", revision="refs/pr/1") is None
+        assert (
+            try_to_load_from_cache(DUMMY_MODEL_ID, filename=constants.CONFIG_NAME, revision="does-not-exist") is None
+        with pytest.raises(EntryNotFoundError):
+        assert new_file_path == _CACHED_NO_EXIST
+        assert new_file_path == _CACHED_NO_EXIST
+        assert try_to_load_from_cache(DUMMY_MODEL_ID, filename="dummy2") is None
+            assert filepath == attempt
+            with pytest.raises(EntryNotFoundError):
+            assert attempt == _CACHED_NO_EXIST
+        assert metadata.commit_hash == DUMMY_MODEL_ID_REVISION_ONE_SPECIFIC_COMMIT
+        assert metadata.etag is not None  # example: "85c2fc2dcdd86563aaa85ef4911..."
+        assert metadata.size == 851
+        assert metadata.size == 497933648  # Size of LFS file, not pointer
+                with pytest.raises(EnvironmentError):
+                with pytest.raises(EnvironmentError):
+            assert len(acquired_lock_paths) > 0, "no lock acquisition was recorded"
+            assert any(_is_lock_under_cache_locks(path) for path in acquired_lock_paths), (
+                "expected at least one lock acquisition in cache `.locks`"
+class TestHfHubDownloadToLocalDir:
+    @pytest.fixture(autouse=True)
+    def _setup_cache_dir(self, tmp_path: Path):
+        self.cache_dir = tmp_path
+
+    @pytest.fixture(scope="class", autouse=True)
+    def setup(self, request):
+        api = HfApi(endpoint=constants.ENDPOINT, token=TOKEN)
+        request.cls.api = api
+        request.cls.repo_id = api.create_repo(repo_id=repo_name()).repo_id
+        commit_1 = api.upload_file(
+            path_or_fileobj=b"content", path_in_repo=request.cls.file_name, repo_id=request.cls.repo_id
+        )
+        commit_2 = api.upload_file(
+            path_or_fileobj=b"content", path_in_repo=request.cls.lfs_name, repo_id=request.cls.repo_id
+        )
+        info = api.get_paths_info(repo_id=request.cls.repo_id, paths=[request.cls.file_name, request.cls.lfs_name])
+        request.cls.commit_hash_1 = commit_1.oid
+        request.cls.commit_hash_2 = commit_2.oid
+        request.cls.file_etag = info[request.cls.file_name].blob_id
+        request.cls.lfs_etag = info[request.cls.lfs_name].lfs.sha256
+        yield
+        api.delete_repo(repo_id=request.cls.repo_id)
+        with pytest.raises(LocalEntryNotFoundError):
+    def test_passing_token_false_is_respected(self, mocker):
+        mock = mocker.patch("huggingface_hub.file_download.build_hf_headers")
+@pytest.mark.production
+class TestFileDownloadDryRun:
+class TestStagingCachedDownloadOnAwfulFilenames:
+    @pytest.fixture(scope="class", autouse=True)
+    def setup(self, request):
+        api = HfApi(endpoint=constants.ENDPOINT, token=TOKEN)
+        request.cls.api = api
+        request.cls.repo_url = api.create_repo(repo_id=repo_name("awful_filename"))
+        request.cls.expected_resolve_url = (
+            f"{request.cls.repo_url}/resolve/main/subfolder/to%3F/awful%3Ffilename%25you%3Ashould%2Cnever.give"
+        api.upload_file(
+            path_in_repo=request.cls.filepath,
+            repo_id=request.cls.repo_url.repo_id,
+        yield
+        api.delete_repo(repo_id=request.cls.repo_url.repo_id)
+        assert hf_hub_url(self.repo_url.repo_id, self.filepath) == self.expected_resolve_url
+        assert hf_hub_url(self.repo_url.repo_id, self.filename, subfolder=self.subfolder) == self.expected_resolve_url
+    @pytest.mark.skipif(os.name == "nt", reason="Windows paths cannot contain a '?'.")
+    def test_hf_hub_download_on_awful_filepath(self, tmp_path: Path):
+        local_path = hf_hub_download(self.repo_url.repo_id, self.filepath, cache_dir=tmp_path)
+        assert local_path.endswith(self.filepath)
+    @pytest.mark.skipif(os.name == "nt", reason="Windows paths cannot contain a '?'.")
+    def test_hf_hub_download_on_awful_subfolder_and_filename(self, tmp_path: Path):
+            cache_dir=tmp_path,
+        assert local_path.endswith(self.filepath)
+class TestHfHubDownloadRelativePaths:
+    @pytest.fixture(scope="class", autouse=True)
+    def setup(self, request):
+        api = HfApi(endpoint=constants.ENDPOINT, token=TOKEN)
+        request.cls.api = api
+        request.cls.repo_id = api.create_repo(repo_id=repo_name()).repo_id
+        api.upload_file(
+            path_or_fileobj=b"content", path_in_repo="folder/..\\..\\..\\file", repo_id=request.cls.repo_id
+        )
+        yield
+        api.delete_repo(repo_id=request.cls.repo_id)
+    @pytest.mark.skipif(os.name == "nt", reason="Windows paths cannot contain '\\..\\'.")
+    def test_download_folder_file_in_cache_dir(self, tmp_path: Path) -> None:
+        hf_hub_download(self.repo_id, "folder/..\\..\\..\\file", cache_dir=tmp_path)
+    @pytest.mark.skipif(os.name == "nt", reason="Windows paths cannot contain '\\..\\'.")
+    def test_download_folder_file_to_local_dir(self, tmp_path: Path) -> None:
+            hf_hub_download(self.repo_id, "folder/..\\..\\..\\file", cache_dir=tmp_path, local_dir=local_dir)
+        assert _get_pointer_path("path/to/storage", "abcdef", "path/to/file.txt") == os.path.join(
+            "path/to/storage", "snapshots", "abcdef", "path/to/file.txt"
+        with pytest.raises(ValueError):
+class TestCreateSymlink:
+    @pytest.mark.skipif(os.name == "nt", reason="No symlinks on Windows")
+    def test_create_symlink_concurrent_access(self, mocker) -> None:
+        mock_are_symlinks_supported = mocker.patch("huggingface_hub.file_download.are_symlinks_supported")
+            assert os.path.realpath(dst) == os.path.realpath(src)
+            with pytest.raises(FileExistsError):
+        assert dst.resolve().is_file()
+            assert dst.resolve() == src.resolve()
+class TestNormalizeEtag:
+        assert (
+            _normalize_etag('"a16a55fda99d2f2e7b69cce5cf93ff4ad3049930"') == "a16a55fda99d2f2e7b69cce5cf93ff4ad3049930"
+        assert (
+            _normalize_etag('W/"a16a55fda99d2f2e7b69cce5cf93ff4ad3049930"')
+            == "a16a55fda99d2f2e7b69cce5cf93ff4ad3049930"
+    @pytest.mark.production
+        assert self._get_etag_and_normalize(response) == "a16a55fda99d2f2e7b69cce5cf93ff4ad3049930"
+    @pytest.mark.production
+        assert (
+            self._get_etag_and_normalize(response)
+            == "7c5d3f4b8b76583b422fcb9189ad6c89d5d97a094541ce8932dce3ecabde1421"
+@pytest.mark.production
+class TestExtraLargeFileDownloadPaths:
+    def test_large_file_http_path_error(self, mocker):
+        mocker.patch("huggingface_hub.file_download.constants.HF_HUB_DISABLE_XET", True)
+            with pytest.raises(ValueError):

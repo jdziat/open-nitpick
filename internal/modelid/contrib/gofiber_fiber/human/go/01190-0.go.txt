@@ -1,0 +1,32 @@
+// commit ca6f2a13fff8 2026-05-12T12:51:17+00:00 middleware/static/static.go
+func bytesToPathString(p []byte) string {
+		return utils.UnsafeString(b)
+	return utils.UnsafeString(p)
+}
+
+func unescapePathString(s string) (string, error) {
+			return "", ErrInvalidPath
+	return s, nil
+}
+
+func hasParentDirSegment(p []byte) (bool, error) {
+	s, err := unescapePathString(bytesToPathString(p))
+	if err != nil {
+		return false, err
+	}
+
+	for trimmed != "" {
+		segment, rest, found := strings.Cut(trimmed, "/")
+		if segment == ".." {
+			return true, nil
+		}
+		if !found {
+			return false, nil
+		}
+		trimmed = rest
+	}
+
+	return false, nil
+	s, err := unescapePathString(bytesToPathString(p))
+	if err != nil {
+		return nil, err

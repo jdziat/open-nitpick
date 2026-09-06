@@ -1,0 +1,43 @@
+// commit fced1a5d360c 2026-08-25T00:55:14+00:00 packages/better-auth/src/auth/trusted-origins.test.ts
+			query: {
+				url,
+				allowRelativePaths: settings?.allowRelativePaths.toString(),
+			},
+		/**
+		 * @see https://github.com/better-auth/better-auth/issues/10022
+		 */
+		it("should allow standards-compliant relative URLs", async () => {
+			const relativeURLs = [
+				"/docs/!$&'()*+,;=:@~",
+				"/café/profile",
+				"/search?next=/settings?tab=security",
+				"/callback?next=%2Fdashboard",
+			];
+			for (const url of relativeURLs) {
+				await expect(
+					isTrustedOrigin(url, { allowRelativePaths: true }),
+				).resolves.toBe(true);
+			}
+		});
+
+		it("should reject URLs with ambiguous path prefixes", async () => {
+			const { isTrustedOrigin } = await createAuthTestInstance();
+			const ambiguousURLs = ["//evil.com", "///evil.com", `/\\evil.com`];
+
+			for (const url of ambiguousURLs) {
+				await expect(
+					isTrustedOrigin(url, { allowRelativePaths: true }),
+				).resolves.toBe(false);
+			}
+				"/safe/%2f/evil.com",
+				"/safe/%2F/evil.com",
+				"/safe/%5c/evil.com",
+				"/safe/%5C/evil.com",
+				`/\u0000evil.com`,
+				`/\u007fevil.com`,
+				`/\u0085evil.com`,
+				`/\t/evil.com`,
+				`/\n/evil.com`,
+				`/\r/evil.com`,
+				"/profile#section",
+				"/profile#section?tab=security",

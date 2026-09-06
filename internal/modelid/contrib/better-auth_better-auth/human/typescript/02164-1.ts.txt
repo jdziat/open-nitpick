@@ -1,0 +1,43 @@
+// commit 5f09d566a64a 2026-05-12T12:50:38+00:00 test/unit/magic-link-secondary-storage.test.ts
+	/**
+	 * @see https://github.com/better-auth/better-auth/security/advisories/GHSA-hc7v-x88r-fmh4
+	 */
+	it("consumes the token atomically on first verify, INVALID_TOKEN on retries", async () => {
+		const firstHeaders = new Headers();
+		const firstResponse = await c.magicLink.verify({
+			query: { token },
+			fetchOptions: { onSuccess: ss(firstHeaders) },
+		});
+		expect(firstResponse.data?.token).toBeDefined();
+		for (let i = 0; i < 3; i++) {
+			await c.magicLink.verify(
+				{ query: { token } },
+				{
+					onError(context) {
+						expect(context.response.status).toBe(302);
+						const location = context.response.headers.get("location");
+						expect(location).toContain("?error=INVALID_TOKEN");
+					},
+			);
+		}
+	/**
+	 * @see https://github.com/better-auth/better-auth/security/advisories/GHSA-hc7v-x88r-fmh4
+	 */
+	it("consumes the token atomically with pre-parsed storage, INVALID_TOKEN on retries", async () => {
+		const firstHeaders = new Headers();
+		const firstResponse = await c.magicLink.verify({
+			query: { token },
+			fetchOptions: { onSuccess: ss(firstHeaders) },
+		});
+		expect(firstResponse.data?.token).toBeDefined();
+		for (let i = 0; i < 2; i++) {
+			await c.magicLink.verify(
+				{ query: { token } },
+				{
+					onError(context) {
+						expect(context.response.status).toBe(302);
+						const location = context.response.headers.get("location");
+						expect(location).toContain("?error=INVALID_TOKEN");
+					},
+			);
+		}

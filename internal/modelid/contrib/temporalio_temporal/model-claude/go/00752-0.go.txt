@@ -1,0 +1,35 @@
+// commit b45bbcadfb08 2026-03-26T22:20:27-07:00 common/metrics/tags.go
+	instance                = "instance"
+	namespace               = "namespace"
+	namespaceID             = "namespace_id"
+	namespaceState          = "namespace_state"
+	sourceCluster           = "source_cluster"
+	targetCluster           = "target_cluster"
+	taskSourceTag           = "source"
+	forwardedTag            = "forwarded"
+	fromCluster             = "from_cluster"
+	toCluster               = "to_cluster"
+	taskQueue               = "taskqueue"
+	workflowType            = "workflowType"
+	activityType            = "activityType"
+	commandType             = "commandType"
+	serviceName             = "service_name"
+	actionType              = "action_type"
+	workerVersion           = "worker_version"
+	workerDeploymentName    = "temporal_worker_deployment_name"
+	workerDeploymentBuildID = "temporal_worker_deployment_build_id"
+	destination             = "destination"
+func WorkerDeploymentNameTag(deploymentName string, versionBreakdown bool) Tag {
+	if !versionBreakdown {
+		deploymentName = ""
+	}
+	return Tag{Key: workerDeploymentName, Value: deploymentName}
+}
+
+func WorkerDeploymentBuildIDTag(buildID string, versionBreakdown bool) Tag {
+	if !versionBreakdown {
+		buildID = ""
+	}
+	return Tag{Key: workerDeploymentBuildID, Value: buildID}
+}
+

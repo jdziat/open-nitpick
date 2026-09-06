@@ -1,0 +1,216 @@
+// commit c266e96c87cc 2026-07-03T17:42:44+01:00 internal-packages/run-engine/src/engine/systems/waitpointSystem.ts
+import type { RunStore } from "@internal/run-store";
+import { UnclassifiableWaitpointId } from "../errors.js";
+    // A tx pins a specific client and must not be re-routed through the store.
+    const deleted = tx
+      ? await tx.taskRunWaitpoint.deleteMany({
+          where: {
+            taskRunId: runId,
+          },
+        })
+      : await this.$.runStore.deleteManyTaskRunWaitpoints({
+          where: {
+            taskRunId: runId,
+          },
+        });
+    // Residency store-selection guard. completeWaitpoint arrives with only
+    // (waitpointId, output) — no run id — so the owning run-ops store is selected
+    // by the waitpoint's own residency. In single-DB this is the one store
+    // (no classification). An unclassifiable id throws loud — never default-routes.
+    let store: RunStore;
+    try {
+      store = await this.$.runStore.forWaitpointCompletion(id, { routeKind: "MANUAL" });
+    } catch (error) {
+      this.$.logger.error("completeWaitpoint: unclassifiable waitpointId", {
+        waitpointId: id,
+        error,
+      });
+      throw new UnclassifiableWaitpointId(id, { cause: error });
+    }
+
+      store.updateManyWaitpoints({
+    // Re-read the just-written row from the RESOLVED store's PRIMARY: the replica (findWaitpoint's
+    // default) can miss it under lag → false "not found" → the parent hangs; this.$.prisma would
+    // instead hit the wrong DB. findWaitpointOnPrimary reads the owning store's primary.
+    const waitpoint = await store.findWaitpointOnPrimary({
+    // 2. Find the TaskRuns blocked by this waitpoint. The edge (TaskRunWaitpoint) co-locates
+    // with its RUN, not this token, so it can live on the OTHER run-ops DB: read via the router
+    // (which fans the waitpointId lookup across both DBs) rather than the token's own `store`,
+    // or a cross-DB blocked run is never found and hangs forever.
+    const affectedTaskRuns = await this.$.runStore.findManyTaskRunWaitpoints(
+      {
+        where: { waitpointId: id },
+        select: { taskRunId: true, spanIdToComplete: true, createdAt: true },
+      },
+      this.$.prisma
+    );
+    runId,
+    runId?: string;
+    // Co-location invariant: a DATETIME wait waitpoint lives on the same run-ops DB as the run that
+    // blocks on it (so the block edge's local `Waitpoint` join resolves and completion/resume stay
+    // local). The minted waitpoint id is always a cuid, so without `coLocateWithRunId` the upsert
+    // would always route to LEGACY and a ksuid run on NEW would hang. The (env,idempotencyKey) dedup
+    // is within the owning run/tree (co-resident on one DB), so the dedup probe + rotation target the
+    // SAME store. With no run id (a standalone token has no owning run yet) the lookup falls back to
+    // a cross-DB NEW-then-LEGACY scan and the upsert routes by id-shape. A caller-supplied tx pins a
+    // client (same physical DB as the control-plane tx → LEGACY), so it stays on direct prisma.
+    const colocate = runId ? { coLocateWithRunId: runId } : undefined;
+      ? tx
+        ? await tx.waitpoint.findFirst({
+            where: {
+              environmentId,
+              idempotencyKey,
+            },
+          })
+        : await this.$.runStore.findWaitpoint(
+            {
+              where: {
+                environmentId,
+                idempotencyKey,
+              },
+            },
+            undefined,
+            colocate
+          )
+        const rotateArgs = {
+        };
+        if (tx) {
+          await tx.waitpoint.update(rotateArgs);
+        } else {
+          await this.$.runStore.updateWaitpoint(rotateArgs, undefined, colocate);
+        }
+    const upsertArgs = {
+        type: "DATETIME" as const,
+    };
+    const waitpoint = tx
+      ? await tx.waitpoint.upsert(upsertArgs)
+      : await this.$.runStore.upsertWaitpoint(upsertArgs, undefined, colocate);
+    runId,
+    runId?: string;
+    // Co-location invariant (see createDateTimeWaitpoint): when a `runId` is supplied the waitpoint
+    // co-locates with that run's DB and the (env,idempotencyKey) dedup is per-run (co-resident). A
+    // standalone token (api.v1.waitpoints.tokens.ts) passes no run id — it is created without an
+    // owner, blocked later by whichever run waits on it (possibly cross-DB, resolved by the
+    // run-co-resident block edge + completion fan-out), so it routes by id-shape and dedups cross-DB. No tx here.
+    const colocate = runId ? { coLocateWithRunId: runId } : undefined;
+      ? await this.$.runStore.findWaitpoint(
+          {
+            where: {
+              environmentId,
+              idempotencyKey,
+            },
+          undefined,
+          colocate
+        )
+        await this.$.runStore.updateWaitpoint(
+          {
+            where: {
+              id: existingWaitpoint.id,
+            },
+            data: {
+              idempotencyKey: nanoid(24),
+              inactiveIdempotencyKey: existingWaitpoint.idempotencyKey,
+            },
+          undefined,
+          colocate
+        );
+        const waitpoint = await this.$.runStore.upsertWaitpoint(
+          {
+            where: {
+              environmentId_idempotencyKey: {
+                environmentId,
+                idempotencyKey: idempotencyKey ?? nanoid(24),
+              },
+            },
+            create: {
+              ...WaitpointId.generate(),
+              type: "MANUAL",
+              idempotencyKeyExpiresAt,
+              userProvidedIdempotencyKey: !!idempotencyKey,
+              environmentId,
+              projectId,
+              completedAfter: timeout,
+              tags,
+            update: {},
+          undefined,
+          colocate
+        );
+   * The block edge is written via the run-ops store, routed by the owning run id so it co-resides
+   * with the run (`blockRunWithWaitpointEdges`). It is NOT pinned to the caller's control-plane tx:
+   * doing so joined `Waitpoint` on the wrong DB for a run whose waitpoint lives on the run-ops DB,
+   * wrote 0 edges, and silently never suspended the parent. Like `blockRunWithCreatedBatch`, this is
+   * a routed, run-co-resident write rather than part of the control-plane trigger tx — there is no
+   * cross-DB transaction. The edge write is idempotent (ON CONFLICT DO NOTHING) and the snapshot
+   * transition is re-derivable, so a crash between the two leaves no corruption: a retry re-writes
+   * the same edge and re-checks the pending count.
+   * The pending check is a SEPARATE store call (not folded into the edge write) on purpose: under
+   * PostgreSQL READ COMMITTED each statement gets its own snapshot, so if a concurrent
+   * `completeWaitpoint` commits between the edge write and the check, this fresh query still sees the
+   * COMPLETED status. It queries ALL requested waitpoint IDs (not just the ones inserted): a row
+   * that already existed (ON CONFLICT skipped the insert) but is still PENDING must still block.
+      let snapshot: TaskRunExecutionSnapshot = await getLatestExecutionSnapshot(
+        prisma,
+        runId,
+        this.$.runStore
+      );
+
+      // Insert the blocking + historical connections via the run-ops store, routed by the owning
+      // run id so the edge co-resides with the run. Never pinned to the caller's control-plane tx:
+      // that joined `Waitpoint` on the wrong DB and wrote 0 edges. The pending check stays a
+      // SEPARATE store call so it gets its own READ COMMITTED snapshot (see the doc comment above).
+      await this.$.runStore.blockRunWithWaitpointEdges({
+        runId,
+        waitpointIds: $waitpoints,
+        projectId,
+        spanIdToComplete,
+        batchId: batch?.id,
+        batchIndex: batch?.index,
+      });
+
+      // Check if the run is actually blocked using a separate query (see above).
+      const pendingCount = await this.$.runStore.countPendingWaitpoints($waitpoints);
+
+      const isRunBlocked = pendingCount > 0;
+    // Same routed edge write as blockRunWithWaitpoint, routed by the owning run id. No lock
+    // needed: ON CONFLICT DO NOTHING makes concurrent inserts safe, and the parent snapshot is
+    // already EXECUTING_WITH_WAITPOINTS from blockRunWithCreatedBatch.
+    await this.$.runStore.blockRunWithWaitpointEdges({
+      runId,
+      waitpointIds: $waitpoints,
+      projectId,
+      spanIdToComplete,
+      batchId: batch.id,
+      batchIndex: batch.index,
+    });
+      const blockingWaitpoints = await this.$.runStore.findManyTaskRunWaitpoints(
+        {
+          where: { taskRunId: runId },
+          select: {
+            id: true,
+            batchId: true,
+            batchIndex: true,
+            waitpoint: {
+              select: { id: true, status: true, type: true, completedAfter: true },
+            },
+        this.$.prisma
+      );
+      // 3. Get the run (run-ops scalars) + resolve its environment via the control-plane resolver,
+      // so the run-ops DB can split without a cross-provider join.
+      const env = await this.$.controlPlaneResolver.resolveEnv(run.runtimeEnvironmentId);
+
+      if (!env) {
+        this.$.logger.error(`continueRunIfUnblocked: environment not found`, {
+          runId,
+          runtimeEnvironmentId: run.runtimeEnvironmentId,
+        });
+        throw new Error(
+          `continueRunIfUnblocked: environment not found: ${run.runtimeEnvironmentId}`
+        );
+      }
+
+      const snapshot = await getLatestExecutionSnapshot(this.$.prisma, runId, this.$.runStore);
+            env,
+        await this.$.runStore.deleteManyTaskRunWaitpoints({
+      const snapshot = await getLatestExecutionSnapshot(prisma, runId, this.$.runStore);
+      // RUN-type within-tree waitpoint that belongs to runId; routes by owning run id.
+      const waitpoint = await this.$.runStore.createWaitpoint({

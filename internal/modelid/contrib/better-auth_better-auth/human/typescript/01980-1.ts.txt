@@ -1,0 +1,62 @@
+// commit b70f025bfaad 2026-04-11T10:03:56+00:00 packages/sso/src/routes/sso.ts
+			const sp = createSP(
+				parsedSamlConfig,
+				ctx.context.baseURL,
+				ctx.query.providerId,
+				options?.saml?.enableSingleLogout
+					? {
+							sloOptions: {
+								wantLogoutRequestSigned: options?.saml?.wantLogoutRequestSigned,
+								wantLogoutResponseSigned:
+									options?.saml?.wantLogoutResponseSigned,
+						}
+					: undefined,
+			);
+			spMetadata: z
+				.object({
+					metadata: z.string().optional(),
+					entityID: z.string().optional(),
+					binding: z.string().optional(),
+					privateKey: z.string().optional(),
+					privateKeyPass: z.string().optional(),
+					isAssertionEncrypted: z.boolean().optional(),
+					encPrivateKey: z.string().optional(),
+					encPrivateKeyPass: z.string().optional(),
+				})
+				.optional(),
+				const sp = createSP(
+					parsedSamlConfig,
+					ctx.context.baseURL,
+					provider.providerId,
+					{ relayState },
+				);
+				const idp = createIdP(parsedSamlConfig);
+const acsEndpointBodySchema = z.object({
+export const acsEndpoint = (options?: SSOOptions) => {
+		"/sso/saml2/sp/acs/:providerId",
+			body: acsEndpointBodySchema.optional(),
+					operationId: "handleSAMLAssertionConsumerService",
+					summary: "SAML Assertion Consumer Service",
+						"Handles SAML responses from IdP after successful authentication. Supports GET for post-auth redirects and POST for SAML response processing.",
+							description:
+								"Redirects after authentication (success or error with query params)",
+							description: "Missing SAMLResponse in POST body",
+						"404": {
+							description: "SAML provider not found",
+			const currentCallbackPath = `${ctx.context.baseURL}/sso/saml2/sp/acs/${providerId}`;
+			// GET: post-auth redirect (e.g., after IdP-initiated flow completes)
+					const errorURL =
+						ctx.context.options.onAPIError?.errorURL || `${appOrigin}/error`;
+				throw ctx.redirect(
+					getSafeRedirectUrl(
+						relayState,
+						currentCallbackPath,
+						appOrigin,
+						(url, settings) => ctx.context.isTrustedOrigin(url, settings),
+					),
+			// POST: SAML response processing
+					const errorCode = (error.body?.code || "saml_error").toLowerCase();
+						ctx.body?.RelayState || undefined,
+	// LogoutRequest SessionIndex is a plain string (unlike login response
+	// where samlify nests it as { sessionIndex: string } from AuthnStatement)
+	const sessionIndex = parsed.extract.sessionIndex as string | undefined;

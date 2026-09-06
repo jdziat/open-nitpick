@@ -1,0 +1,31 @@
+// commit c961b5720c74 2026-08-23T16:35:33+02:00 middleware/redirect/redirect.go
+		// widths both reached the clamp would tie again. Only whether a rule
+		// carries one is read here: a second wildcard says nothing about what
+		// the rest of the rule pins, so counting them ahead of the width put
+		// the broad "/p/[a-d]*" in front of the narrow "/p/([a]*|[c]*)".
+		if d := cmp.Compare(carriesWildcard(a), carriesWildcard(b)); d != 0 {
+		// Whatever the width leaves tied is separated by how many wildcards the
+		// rules spend it on, since a width stands for none of them: "/p/*a*b"
+		// and "/p/*ab" both expand to a single alternative, and the key order
+		// below put the broader two-wildcard rule first.
+		if d := cmp.Compare(wildcardRank(a), wildcardRank(b)); d != 0 {
+			return d
+		}
+// carriesWildcard returns 1 for a rule holding at least one Fiber "*" wildcard
+// and 0 for one that holds none, so the wildcard rule sorts second.
+// measuring what separates two rules that both carry one. How many each carries
+// is read after the width, by wildcardRank: a second wildcard widens a rule but
+// says nothing about what the rest of it pins, so a rule holding two can still
+// be the narrower of the pair.
+func carriesWildcard(rule string) int {
+	return min(wildcardRank(rule), 1)
+}
+
+// wildcardRank returns the number of Fiber "*" wildcards in a rule, which is the
+// last thing separating two that the width leaves tied: "/p/*a*b" and "/p/*ab"
+// both expand to a single alternative, so nothing but the count stands between
+// the broader rule and the narrower one it would shadow.
+				// there is none, which is how Go's parser reads one. Only the
+				// quoted tail is given up: the wildcards standing before it are
+				// still expanded, so the count already reached is what holds.
+				return rank

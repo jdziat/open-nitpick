@@ -1,0 +1,49 @@
+// commit 947f33d55be6 2026-03-25T16:08:30+00:00 packages/redis-worker/src/worker.ts
+      const errorLogLevel =
+        error && typeof error === "object" && "logLevel" in error ? error.logLevel : undefined;
+      const logAttributes = {
+        name: this.options.name,
+        jobType,
+        batchSize: items.length,
+        error,
+        errorMessage,
+      };
+
+      if (!shouldLogError) {
+        this.logger.info(`Worker failed to process batch`, logAttributes);
+      } else if (errorLogLevel === "warn") {
+        this.logger.warn(`Worker error processing batch`, logAttributes);
+      } else if (errorLogLevel === "info") {
+        this.logger.info(`Worker error processing batch`, logAttributes);
+        this.logger.error(`Worker error processing batch`, logAttributes);
+            const dlqLogAttributes = {
+              name: this.options.name,
+              id: item.id,
+              jobType,
+              attempt: newAttempt,
+            };
+
+            if (!shouldLogError) {
+              this.logger.info(`Worker batch item reached max attempts. Moving to DLQ.`, dlqLogAttributes);
+            } else if (errorLogLevel === "warn") {
+              this.logger.warn(`Worker batch item reached max attempts. Moving to DLQ.`, dlqLogAttributes);
+            } else if (errorLogLevel === "info") {
+              this.logger.info(`Worker batch item reached max attempts. Moving to DLQ.`, dlqLogAttributes);
+              this.logger.error(`Worker batch item reached max attempts. Moving to DLQ.`, dlqLogAttributes);
+      const errorLogLevel =
+        error && typeof error === "object" && "logLevel" in error ? error.logLevel : undefined;
+      if (!shouldLogError) {
+      } else if (errorLogLevel === "warn") {
+        this.logger.warn(`Worker error processing item`, logAttributes);
+      } else if (errorLogLevel === "info") {
+        this.logger.info(`Worker error processing item`, logAttributes);
+      } else {
+        this.logger.error(`Worker error processing item`, logAttributes);
+          if (!shouldLogError || errorLogLevel === "info") {
+            this.logger.info(`Worker item reached max attempts. Moving to DLQ.`, {
+              ...logAttributes,
+              attempt: newAttempt,
+            });
+          } else if (errorLogLevel === "warn") {
+            this.logger.warn(`Worker item reached max attempts. Moving to DLQ.`, {
+            this.logger.error(`Worker item reached max attempts. Moving to DLQ.`, {

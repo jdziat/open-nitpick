@@ -1,0 +1,56 @@
+// commit 4ef11edebeb2 2026-06-01T02:14:11+00:00 ctx.go
+	"sync"
+	reclaim                *reclaimLatch        // Coordinates safe pool reclamation of an abandoned ctx; nil on the hot path
+	c.reclaim = nil
+// reclaimLatch coordinates the safe, automatic reclamation of an abandoned
+// context back into the pool. It is armed only via ScheduleReclaim (currently by
+// the timeout middleware) and stays nil on the common request path, so requests
+// that are not abandoned pay no additional cost.
+type reclaimLatch struct {
+	releasedCh chan struct{} // closed once the request handler has released the ctx (event b)
+	once       sync.Once     // guards the close-exactly-once of releasedCh
+}
+
+// This is used by the timeout and SSE middlewares to return immediately while a
+// goroutine continues using the context safely.
+// Callers that cannot make that guarantee themselves can instead call
+// ScheduleReclaim, which arranges a race-free ForceRelease once the handler has
+// finished and the request handler has released the context.
+// ScheduleReclaim arms automatic reclamation of an abandoned context, returning
+// it to the pool once it is safe to do so. It must be called after Abandon().
+//
+// handlerDone must be closed once the goroutine that still uses this context
+// (for the timeout middleware, the handler goroutine) has completely finished.
+// cancel, if non-nil, is the CancelFunc of the context installed for that
+// goroutine and is invoked as soon as it finishes.
+//
+// ForceRelease is performed only after BOTH handlerDone is closed AND the request
+// handler has released the context (signalled from ReleaseCtx/releaseDefaultCtx),
+// which makes the reclamation race-free. If handlerDone never closes — a handler
+// that never returns — the context is intentionally never reclaimed, because the
+// handler still owns it.
+func (c *DefaultCtx) ScheduleReclaim(handlerDone <-chan struct{}, cancel context.CancelFunc) {
+	latch := &reclaimLatch{releasedCh: make(chan struct{})}
+	c.reclaim = latch
+
+	go func() {
+		<-handlerDone
+		if cancel != nil {
+			cancel()
+		}
+		<-latch.releasedCh
+		c.ForceRelease()
+	}()
+}
+
+// signalReleased records that the request handler is done touching an abandoned,
+// reclaim-armed context (event b). It is a no-op when reclamation was not armed
+// and is safe to call multiple times.
+func (c *DefaultCtx) signalReleased() {
+	if c.reclaim != nil {
+		c.reclaim.once.Do(func() {
+			close(c.reclaim.releasedCh)
+		})
+	}
+}
+

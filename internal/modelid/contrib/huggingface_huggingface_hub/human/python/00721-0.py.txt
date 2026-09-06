@@ -1,0 +1,53 @@
+# commit 7b53d234c37a 2026-07-03T10:28:39+02:00 src/huggingface_hub/cli/_cli_utils.py
+from ._framework import Argument, HfCommand, HfGroup, Option
+class HFCliTyperGroup(HfGroup):
+    CLI Group that:
+    def command(  # type: ignore  # adds topic/examples on top of HfGroup.command
+        self,
+        name: str | None = None,
+        *,
+        topic: TOPIC_T = "main",
+        examples: list[str] | None = None,
+        epilog: str | None = None,
+        **kwargs: Any,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        # Generate the epilog from examples when not provided explicitly, then build the
+        # command with a topic/examples-aware command class.
+        if epilog is None and examples:
+            epilog = generate_epilog(examples)
+        return super().command(name, cls=HFCliCommand(topic, examples), epilog=epilog, **kwargs)
+
+def HFCliCommand(topic: TOPIC_T, examples: list[str] | None = None) -> type[HfCommand]:
+    def format_options(self: HfCommand, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        HfCommand.format_options(self, ctx, formatter)
+        return HfCommand.parse_args(self, ctx, args)
+        f"HfCommand{topic.capitalize()}",
+        (HfCommand,),
+def typer_factory(help: str, epilog: str | None = None, cls: type[HFCliTyperGroup] | None = None) -> "HFCliTyperGroup":
+    """Create a CLI command group with consistent settings.
+    The returned group is the app: register commands with ``@group.command(...)``,
+    subgroups with ``group.add_group(sub, name=...)``, and a group-level callback
+    with ``@group.callback(...)``.
+        help: Help text for the group.
+        cls: Optional group class to use (defaults to `HFCliTyperGroup`).
+        A configured `HFCliTyperGroup` instance.
+    return cls(
+    Argument(
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(help="Limit the number of results."),
+    Option(help="Filter by author or organization."),
+    Option(help="Filter by tags (e.g. 'text-classification'). Can be used multiple times."),
+    Option(help="Search query."),
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+                raise click.BadParameter(
+    Option("-i", "--identity-file", help="Path to the SSH identity file (forwarded to `ssh -i`)."),
+    Option("--dry-run", help="Print the SSH command instead of running it."),
+    raise click.exceptions.Exit(code=result.returncode)

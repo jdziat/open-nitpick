@@ -1,0 +1,40 @@
+// commit df0563d273fd 2026-08-10T14:59:46+00:00 res.go
+// formatDefaultMediaType is the sentinel MediaType marking a Format handler as
+// the fallback. It is not a media type and is never emitted as a Content-Type.
+const formatDefaultMediaType = "default"
+
+			if h.MediaType != formatDefaultMediaType {
+		if h.MediaType == formatDefaultMediaType {
+	isRef := true       // the open token is read as a name, not written as a property
+	start := 0          // first byte of the open token
+			if atStart || numeric || (isRef && isJSReservedWord(cb[start:i])) {
+			atStart, inIndex, afterClose, isRef = true, false, false, false
+			if atStart || numeric || (isRef && isJSReservedWord(cb[start:i])) {
+			atStart, inIndex, afterClose, isRef = true, true, false, true
+			start = i + 1
+			if isRef && !numeric && isJSReservedWord(cb[start:i]) {
+				return false
+			}
+			afterClose, numeric, isRef = true, false, false
+	if isRef && !numeric && isJSReservedWord(cb[start:]) {
+		return false
+	}
+// isJSReservedWord reports whether tok is a word JavaScript will not read as a
+// name. Only the positions that are read matter — the head of the expression and
+// the head inside each index — since "a.for" and "a[b.class]" name properties,
+// which any word may do. Emitting "for({…})" instead just ships a syntax error to
+// the browser, so those spellings fall back to the default callback.
+func isJSReservedWord(tok string) bool {
+	switch tok {
+	case "await", "break", "case", "catch", "class", "const", "continue",
+		"debugger", "default", "delete", "do", "else", "enum", "export",
+		"extends", "false", "finally", "for", "function", "if", "import", "in",
+		"instanceof", "new", "null", "return", "super", "switch", "this",
+		"throw", "true", "try", "typeof", "var", "void", "while", "with",
+		"yield":
+		return true
+	default:
+		return false
+	}
+}
+

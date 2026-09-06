@@ -1,0 +1,33 @@
+// commit d24038cbd23b 2025-03-24T17:28:21+01:00 pkg/github/code_scanning.go
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			alertNumber, err := requiredNumberParam(request, "alert_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			owner, err := requiredStringParam(request, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			repo, err := requiredStringParam(request, "repo")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			ref, err := optionalStringParam(request, "ref")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			state, err := optionalStringParam(request, "state")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			severity, err := optionalStringParam(request, "severity")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}

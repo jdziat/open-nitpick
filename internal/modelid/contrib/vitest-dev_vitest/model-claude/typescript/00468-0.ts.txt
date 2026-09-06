@@ -1,0 +1,63 @@
+// commit 0ed7e82f5e0c 2026-01-13T10:11:29+01:00 docs/.vitepress/config.ts
+  localIconLoader,
+import { extendConfig } from '@voidzero-dev/vitepress-theme/config'
+  return withPwa(extendConfig(defineConfig({
+      ['meta', { name: 'theme-color', content: '#22FF84' }],
+      ['link', { rel: 'icon', href: '/logo-without-border.svg', type: 'image/svg+xml' }],
+            'vitest.shims': localIconLoader(import.meta.url, '../public/logo-without-border.svg'),
+            'vitest.config': localIconLoader(import.meta.url, '../public/logo-without-border.svg'),
+            'vitest.workspace': localIconLoader(import.meta.url, '../public/logo-without-border.svg'),
+            'vite.config': localIconLoader(import.meta.url, '../public/logo-without-border-vite.svg'),
+      variant: 'vitest',
+        copyright: `© ${new Date().getFullYear()} VoidZero Inc. and Vitest contributors.`,
+        nav: [
+          {
+            title: 'Vitest',
+            items: [
+              { text: 'Guides', link: '/guide/' },
+              { text: 'API', link: '/api/' },
+              { text: 'Config', link: '/config/' },
+            ],
+          },
+          {
+            title: 'Resources',
+            items: [
+              { text: 'Team', link: '/team' },
+              { text: 'Blog', link: '/blog' },
+              { text: 'Releases', link: releases },
+            ],
+          },
+          {
+            title: 'Versions',
+            items: [
+              { text: 'Unreleased Docs', link: 'https://main.vitest.dev/' },
+              { text: 'Vitest v3 Docs', link: 'https://v3.vitest.dev/' },
+              { text: 'Vitest v2 Docs', link: 'https://v2.vitest.dev/' },
+              { text: 'Vitest v1 Docs', link: 'https://v1.vitest.dev/' },
+              { text: 'Vitest v0 Docs', link: 'https://v0.vitest.dev/' },
+            ],
+          },
+          /* {
+            title: 'Legal',
+            items: [
+              { text: 'Terms & Conditions', link: 'https://voidzero.dev/terms' },
+              { text: 'Privacy Policy', link: 'https://voidzero.dev/privacy' },
+              { text: 'Cookie Policy', link: 'https://voidzero.dev/cookies' },
+            ],
+          }, */
+        ],
+        social: [
+          { icon: 'github', link: github },
+          { icon: 'discord', link: discord },
+          // { icon: 'mastodon', link: mastodon }, -- the link shows github
+          { icon: 'bluesky', link: bluesky },
+        ],
+                  text: 'v3.x',
+                  link: 'https://v3.vitest.dev/',
+                  text: 'v1.x',
+                  link: 'https://v1.vitest.dev/',
+                },
+                {
+                  text: 'v0.x',
+                  link: 'https://v0.vitest.dev/',
+  })))

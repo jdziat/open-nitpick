@@ -1,0 +1,171 @@
+// commit e8d6ec279521 2025-12-19T11:01:46-05:00 chasm/lib/activity/activity.go
+	"slices"
+	// PopulateRecordStartedResponse populates the response for HandleStarted
+	PopulateRecordStartedResponse(ctx chasm.Context, key chasm.EntityKey, response *historyservice.RecordActivityTaskStartedResponse) error
+	// RecordCompleted applies the provided function to record activity completion
+	RecordCompleted(ctx chasm.MutableContext, applyFn func(ctx chasm.MutableContext) error) error
+	LastAttempt   chasm.Field[*activitypb.ActivityAttemptState]
+		LastAttempt: chasm.NewDataField(ctx, &activitypb.ActivityAttemptState{}),
+// HandleStarted updates the activity on recording activity task started and populates the response.
+func (a *Activity) HandleStarted(ctx chasm.MutableContext, request *historyservice.RecordActivityTaskStartedRequest) (
+	*historyservice.RecordActivityTaskStartedResponse, error) {
+	attempt, err := a.LastAttempt.Get(ctx)
+	attempt.StartedTime = timestamppb.New(ctx.Now(a))
+	attempt.LastWorkerIdentity = request.GetPollRequest().GetIdentity()
+	if versionDirective := request.GetVersionDirective().GetDeploymentVersion(); versionDirective != nil {
+		if err := a.PopulateRecordStartedResponse(ctx, ctx.ExecutionKey(), response); err != nil {
+		if err := store.PopulateRecordStartedResponse(ctx, ctx.ExecutionKey(), response); err != nil {
+func (a *Activity) PopulateRecordStartedResponse(ctx chasm.Context, key chasm.EntityKey, response *historyservice.RecordActivityTaskStartedResponse) error {
+	attempt, err := a.LastAttempt.Get(ctx)
+	response.StartedTime = attempt.StartedTime
+func (a *Activity) RecordCompleted(ctx chasm.MutableContext, applyFn func(ctx chasm.MutableContext) error) error {
+// HandleCompleted updates the activity on activity completion.
+func (a *Activity) HandleCompleted(ctx chasm.MutableContext, request *historyservice.RespondActivityTaskCompletedRequest) (
+	*historyservice.RespondActivityTaskCompletedResponse, error) {
+	if err := TransitionCompleted.Apply(a, ctx, request); err != nil {
+		return nil, err
+	}
+
+	return &historyservice.RespondActivityTaskCompletedResponse{}, nil
+}
+
+// HandleFailed updates the activity on activity failure. if the activity is retryable, it will be rescheduled
+// for retry instead.
+func (a *Activity) HandleFailed(ctx chasm.MutableContext, req *historyservice.RespondActivityTaskFailedRequest) (
+	*historyservice.RespondActivityTaskFailedResponse, error) {
+	failure := req.GetFailedRequest().GetFailure()
+
+	shouldRetry, retryInterval, err := a.shouldRetryOnFailure(ctx, failure)
+	if err != nil {
+		return nil, err
+	}
+
+	if shouldRetry {
+		if err := TransitionRescheduled.Apply(a, ctx, rescheduleEvent{
+			retryInterval: retryInterval,
+			failure:       failure,
+		}); err != nil {
+			return nil, err
+		}
+
+		return &historyservice.RespondActivityTaskFailedResponse{}, nil
+	}
+
+	// No more retries, transition to failed state
+	if err := TransitionFailed.Apply(a, ctx, req); err != nil {
+		return nil, err
+	}
+
+	return &historyservice.RespondActivityTaskFailedResponse{}, nil
+}
+
+// getLastHeartbeat retrieves the last heartbeat state, initializing it if not present. The heartbeat is lazily created
+// to avoid unnecessary writes when heartbeats are not used.
+func (a *Activity) getLastHeartbeat(ctx chasm.MutableContext) (*activitypb.ActivityHeartbeatState, error) {
+	heartbeat, err := a.LastHeartbeat.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if heartbeat == nil {
+		heartbeat = &activitypb.ActivityHeartbeatState{}
+		a.LastHeartbeat = chasm.NewDataField(ctx, heartbeat)
+	}
+
+	return heartbeat, nil
+}
+
+func (a *Activity) shouldRetryOnFailure(ctx chasm.Context, failure *failurepb.Failure) (bool, time.Duration, error) {
+	var isRetryable bool
+
+	if failure.GetApplicationFailureInfo() != nil {
+		appFailure := failure.GetApplicationFailureInfo()
+		isRetryable = !appFailure.GetNonRetryable() && !slices.Contains(
+			a.GetRetryPolicy().GetNonRetryableErrorTypes(),
+			appFailure.GetType(),
+		)
+	}
+
+	if !isRetryable {
+		return false, 0, nil
+	}
+
+	overridingRetryInterval := failure.GetApplicationFailureInfo().GetNextRetryDelay().AsDuration()
+
+	return a.shouldRetry(ctx, overridingRetryInterval)
+}
+
+// recordScheduleToStartOrCloseTimeoutFailure records schedule-to-start or schedule-to-close timeouts. Such timeouts are not retried so we
+func (a *Activity) recordScheduleToStartOrCloseTimeoutFailure(ctx chasm.MutableContext, timeoutType enumspb.TimeoutType) error {
+// recordFailedAttempt records any failures resulting from a tried attempt, including worker application failures and
+// start-to-close timeouts. Since the calls come from retried attempts we update the attempt failure info but leave
+// the outcome failure empty to avoid duplication.
+func (a *Activity) recordFailedAttempt(
+	ctx chasm.MutableContext,
+	retryInterval time.Duration,
+	failure *failurepb.Failure,
+	noRetriesLeft bool,
+) error {
+	attempt, err := a.LastAttempt.Get(ctx)
+	attempt.CompleteTime = currentTime
+func (a *Activity) shouldRetry(ctx chasm.Context, overridingRetryInterval time.Duration) (bool, time.Duration, error) {
+	attempt, err := a.LastAttempt.Get(ctx)
+		return false, 0, err
+	retryPolicy := a.RetryPolicy
+	enoughAttempts := retryPolicy.GetMaximumAttempts() == 0 || attempt.GetCount() < retryPolicy.GetMaximumAttempts()
+	enoughTime, retryInterval, err := a.hasEnoughTimeForRetry(ctx, overridingRetryInterval)
+	if err != nil {
+		return false, 0, err
+	}
+
+	return enoughAttempts && enoughTime, retryInterval, nil
+}
+
+// hasEnoughTimeForRetry checks if there is enough time left in the schedule-to-close timeout. If sufficient time
+// remains, it will also return a valid retry interval
+func (a *Activity) hasEnoughTimeForRetry(ctx chasm.Context, overridingRetryInterval time.Duration) (bool, time.Duration, error) {
+	attempt, err := a.LastAttempt.Get(ctx)
+	if err != nil {
+		return false, 0, err
+	}
+
+	// Use overriding retry interval if provided, else calculate based on retry policy
+	retryInterval := overridingRetryInterval
+	if retryInterval <= 0 {
+		retryInterval = backoff.CalculateExponentialRetryInterval(a.RetryPolicy, attempt.Count)
+	}
+	return ctx.Now(a).Add(retryInterval).Before(deadline), retryInterval, nil
+}
+
+func createStartToCloseTimeoutFailure() *failurepb.Failure {
+	return &failurepb.Failure{
+		Message: fmt.Sprintf(common.FailureReasonActivityTimeout, enumspb.TIMEOUT_TYPE_START_TO_CLOSE.String()),
+		FailureInfo: &failurepb.Failure_TimeoutFailureInfo{
+			TimeoutFailureInfo: &failurepb.TimeoutFailureInfo{
+				TimeoutType: enumspb.TIMEOUT_TYPE_START_TO_CLOSE,
+			},
+		},
+	}
+	attempt, err := a.LastAttempt.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	heartbeat, err := a.LastHeartbeat.Get(ctx)
+
+		ActivityId:              key.BusinessID,
+		ActivityType:            a.GetActivityType(),
+		Attempt:                 attempt.GetCount(),
+		Header:                  requestData.GetHeader(),
+		HeartbeatDetails:        heartbeat.GetDetails(),
+		LastAttemptCompleteTime: attempt.GetCompleteTime(),
+		LastFailure:             attempt.GetLastFailureDetails().GetFailure(),
+		LastHeartbeatTime:       heartbeat.GetRecordedTime(),
+		LastStartedTime:         attempt.GetStartedTime(),
+		LastWorkerIdentity:      attempt.GetLastWorkerIdentity(),
+		Priority:                a.GetPriority(),
+		RunId:                   key.EntityID,
+		RunState:                runState,
+		ScheduledTime:           a.GetScheduledTime(),
+		Status:                  status,
+				attempt, err := a.LastAttempt.Get(ctx)

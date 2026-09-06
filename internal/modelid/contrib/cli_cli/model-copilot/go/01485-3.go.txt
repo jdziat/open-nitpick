@@ -1,0 +1,76 @@
+// commit 0c2eea6338a2 2026-07-30T19:22:49-06:00 internal/skills/discovery/discovery.go
+	"github.com/cli/cli/v2/internal/safeurl"
+	apiPath, err := safeurl.JoinPath("repos", owner, repo)
+	if err != nil {
+		return "", err
+	}
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	commitPath, err := safeurl.JoinPath("repos", owner, repo, "commits", ref)
+	if err != nil {
+		return nil, err
+	}
+	if err := client.REST(host, "GET", commitPath.String(), nil, &commitResp); err == nil {
+	tagPath, err := safeurl.JoinPath("repos", owner, repo, "git", "ref", fmt.Sprintf("tags/%s", tag))
+	if err != nil {
+		return nil, err
+	}
+	if err := client.REST(host, "GET", tagPath.String(), nil, &refResp); err != nil {
+		derefPath, err := safeurl.JoinPath("repos", owner, repo, "git", "tags", sha)
+		if err != nil {
+			return nil, err
+		}
+		if err := client.REST(host, "GET", derefPath.String(), nil, &tagResp); err != nil {
+	refPath, err := safeurl.JoinPath("repos", owner, repo, "git", "ref", fmt.Sprintf("heads/%s", branch))
+	if err != nil {
+		return nil, err
+	}
+	if err := client.REST(host, "GET", refPath.String(), nil, &refResp); err != nil {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "releases", "latest")
+	if err != nil {
+		return nil, err
+	}
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo)
+	if err != nil {
+		return nil, err
+	}
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", commitSHA)
+	if err != nil {
+		return nil, err
+	}
+	apiPath.SetQuery("recursive", "true")
+	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "contents", parentPath)
+	if err != nil {
+		return nil, err
+	}
+	apiPath.SetQuery("ref", commitSHA)
+	if err := client.REST(host, "GET", apiPath.String(), nil, &contents); err != nil {
+	skillTreePath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", treeSHA)
+	if err != nil {
+		return nil, err
+	}
+	if err := client.REST(host, "GET", skillTreePath.String(), nil, &skillTree); err != nil {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", treeSHA)
+	if err != nil {
+		return nil, err
+	}
+	apiPath.SetQuery("recursive", "true")
+	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", treeSHA)
+	if err != nil {
+		return nil, err
+	}
+	apiPath.SetQuery("recursive", "true")
+	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "trees", sha)
+	if err != nil {
+		return nil, err
+	}
+	if err := client.REST(host, "GET", apiPath.String(), nil, &tree); err != nil {
+	apiPath, err := safeurl.JoinPath("repos", owner, repo, "git", "blobs", sha)
+	if err != nil {
+		return iostreams.Untrusted{}, err
+	}
+	if err := client.REST(host, "GET", apiPath.String(), nil, &resp); err != nil {

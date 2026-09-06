@@ -1,0 +1,77 @@
+// commit 3545fe78fa1f 2026-06-26T09:39:10+09:00 packages/browser/src/client/tester/tester.ts
+import type { BrowserRPC, IframeReceivedEvent } from '@vitest/browser/client'
+    await client.waitForConnection()
+  // tell the orchestrator we received the event before doing any work (which
+  // may be long-running or gated on the connection), so it can tell a busy
+  // tester apart from a crashed one. See `sendEventToIframe` in orchestrator.ts.
+  channel.postMessage({
+    event: `ack:${data.event}`,
+    iframeId: data.iframeId,
+    messageId: data.messageId,
+  })
+
+  await client.waitForConnection()
+  debug?.('event from orchestrator', JSON.stringify(e.data))
+
+  try {
+    switch (data.event) {
+      case 'execute': {
+        const { method, files, context, concurrencyId, workerId } = data
+        const state = getWorkerState()
+        const parsedContext = parse(context)
+
+        state.ctx.concurrencyId = concurrencyId
+        state.ctx.workerId = workerId
+        state.ctx.providedContext = parsedContext
+        state.providedContext = parsedContext
+        state.metaEnv.VITEST_POOL_ID = String(concurrencyId)
+        state.metaEnv.VITEST_WORKER_ID = String(workerId)
+
+        if (method === 'collect') {
+          await executeTests('collect', files).catch(err => unhandledError(err, 'Collect Error'))
+        }
+        else {
+          await executeTests('run', files).catch(err => unhandledError(err, 'Run Error'))
+        }
+        break
+      case 'cleanup': {
+        await cleanup().catch(err => unhandledError(err, 'Cleanup Error'))
+        rootTesterSpan?.span.end()
+        await traces.finish()
+        break
+      }
+      case 'prepare': {
+        await traces.waitInit()
+        const tracesContext = traces.getContextFromCarrier(data.otelCarrier)
+        traces.recordInitSpan(tracesContext)
+        rootTesterSpan = traces.startContextSpan(
+          `vitest.browser.tester.run`,
+          tracesContext,
+        )
+        traces.bind(rootTesterSpan.context)
+        await prepare(data).catch(err => unhandledError(err, 'Prepare Error'))
+        break
+      }
+      case 'viewport:done':
+      case 'viewport:fail':
+      case 'viewport': {
+        break
+      }
+      default: {
+        const error = new Error(`Unknown event: ${(data as any).event}`)
+        unhandledError(error, 'Unknown Event')
+  catch (error: any) {
+    // errors not handled by the cases above (e.g. tracing setup/teardown) must
+    // not stop us from responding, otherwise the orchestrator would wait forever
+    await unhandledError(error, 'Tester Error')
+  }
+  finally {
+    // always let the orchestrator know the event was handled so its
+    // `sendEventToIframe` promise resolves, even if the work above threw
+    channel.postMessage({
+      event: `response:${data.event}`,
+      iframeId: data.iframeId,
+      messageId: data.messageId,
+    })
+  }
+function isEvent(data: unknown): data is IframeReceivedEvent {

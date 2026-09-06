@@ -1,0 +1,95 @@
+// commit b83cf671de03 2026-08-18T18:59:00+01:00 packages/core/src/v3/otel/tracingSDK.ts
+    // Shared by every wrapper below so a run's spans and logs agree on the id.
+    const fallbackTraceIds = new FallbackExternalTraceIds(idGenerator.generateTraceId());
+          ? new BatchSpanProcessor(new ExternalSpanExporterWrapper(exporter, fallbackTraceIds), {
+          : new SimpleSpanProcessor(new ExternalSpanExporterWrapper(exporter, fallbackTraceIds))
+              new ExternalLogRecordExporterWrapper(externalLogExporter, fallbackTraceIds),
+              new ExternalLogRecordExporterWrapper(externalLogExporter, fallbackTraceIds)
+/** Only the current run and the tail of recently ended ones can still export. */
+export const MAX_TRACKED_INTERNAL_TRACES = 64;
+
+/**
+ * External trace ids for runs that carry no external trace context — with
+ * `processKeepAlive` the `TracingSDK` outlives the run, so an id captured at
+ * construction merges every run on the process into one trace.
+ *
+ * A record's id comes from its own internal trace id rather than from whatever
+ * run is current when the exporter is called. Batch processors drain
+ * asynchronously, so a run's records are routinely exported after the next run
+ * has started, and reading ambient state then would stamp them with the wrong
+ * run's id. It also makes a run's spans and logs agree without coordinating.
+ *
+ * Granularity therefore follows the internal trace, not the run: a run tree
+ * shares one internal trace, so a parent and the runs it triggers land on one
+ * external trace together, which is the grouping you want.
+ */
+export class FallbackExternalTraceIds {
+  private readonly byInternalTrace = new Map<string, string>();
+
+  constructor(
+    private seed: string,
+    private traceIdGenerator: Pick<RandomIdGenerator, "generateTraceId"> = idGenerator
+  ) {}
+
+  /** False when no external trace id was configured, i.e. external export is off. */
+  get enabled(): boolean {
+    return !!this.seed;
+  }
+
+  forInternalTrace(internalTraceId: string): string {
+    // An empty seed means external export is disabled — leave it that way
+    // rather than minting an id and switching the feature on.
+    if (!this.seed) {
+      return this.seed;
+    }
+
+    const known = this.byInternalTrace.get(internalTraceId);
+
+    if (known) {
+      // Re-insert so the map is ordered by last use rather than first. A run
+      // that is still exporting keeps its id even if enough unrelated traces
+      // appear alongside it to fill the map, which would otherwise split it
+      // across two external traces.
+      this.byInternalTrace.delete(internalTraceId);
+      this.byInternalTrace.set(internalTraceId, known);
+
+      return known;
+    }
+
+    // The first run reuses the id generated at construction, so the configured
+    // seed is not thrown away.
+    const traceId =
+      this.byInternalTrace.size === 0 ? this.seed : this.traceIdGenerator.generateTraceId();
+
+    this.byInternalTrace.set(internalTraceId, traceId);
+
+    if (this.byInternalTrace.size > MAX_TRACKED_INTERNAL_TRACES) {
+      // Map iterates in insertion order, so this drops the least recently used.
+      const stalest = this.byInternalTrace.keys().next().value;
+
+      if (stalest !== undefined) {
+        this.byInternalTrace.delete(stalest);
+      }
+    }
+
+    return traceId;
+  }
+}
+
+    private fallback: FallbackExternalTraceIds
+      : this.fallback.enabled;
+      : this.fallback.forInternalTrace(span.spanContext().traceId);
+export class ExternalLogRecordExporterWrapper {
+    private fallback: FallbackExternalTraceIds
+      : this.fallback.enabled;
+    // Without a spanContext there is no internal trace id to key the fallback
+    // on, and nothing to rewrite.
+    if (!logRecord.spanContext) {
+      return logRecord;
+    }
+
+    // Capture externalTraceId for use within the proxy's scope. Use
+    // externalTraceContext.traceId if available, otherwise the id belonging to
+    // the run this record came from.
+      : this.fallback.forInternalTrace(logRecord.spanContext.traceId);
+    if (!externalTraceId) {

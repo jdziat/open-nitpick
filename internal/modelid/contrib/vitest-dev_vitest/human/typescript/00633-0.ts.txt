@@ -1,0 +1,36 @@
+// commit f0ff1b2a0011 2026-02-20T12:26:35+01:00 test/browser/specs/playwright-connect.test.ts
+import { fileURLToPath } from 'node:url'
+import { x } from 'tinyexec'
+import { Cli } from '../../test-utils/cli'
+test.runIf(provider.name === 'playwright')('[playwright] runs in connect mode', async ({ onTestFinished }) => {
+  const cliPath = fileURLToPath(new URL('./cli.js', import.meta.resolve('@playwright/test')))
+  const subprocess = x(process.execPath, [cliPath, 'run-server', '--port', '9898']).process
+  const cli = new Cli({
+    stdin: subprocess.stdin,
+    stdout: subprocess.stdout,
+    stderr: subprocess.stderr,
+  })
+  let setDone: (value?: unknown) => void
+  const isDone = new Promise(resolve => (setDone = resolve))
+  subprocess.on('exit', () => setDone())
+  onTestFinished(async () => {
+    subprocess.kill('SIGILL')
+    await isDone
+  await cli.waitForStdout('Listening on ws://localhost:9898')
+  const result = await runBrowserTests({
+              wsEndpoint: 'ws://localhost:9898',
+            },
+            launchOptions: {
+              args: [`--user-agent=VitestLaunchOptionsTester`],
+  }, ['basic.test.js'])
+
+  expect(result.stderr).toMatchInlineSnapshot(`""`)
+  expect(result.errorTree()).toMatchInlineSnapshot(`
+    {
+      "basic.test.js": {
+        "[playwright] Run basic test in browser via connect mode": "passed",
+        "[playwright] Run browser-only test in browser via connect mode": "passed",
+        "[playwright] applies launch options from connect header": "passed",
+      },
+    }
+  `)

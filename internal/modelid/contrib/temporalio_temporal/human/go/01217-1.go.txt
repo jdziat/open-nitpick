@@ -1,0 +1,40 @@
+// commit e9ae575bfd00 2026-06-04T17:42:58+00:00 chasm/lib/scheduler/invoker_tasks.go
+	if len(invoker.GetTerminateWorkflows())+len(invoker.GetCancelWorkflows())+len(eligibleStarts) > 0 {
+		return true, nil
+	}
+	return false, nil
+	var now time.Time
+			// Captured here for applyBackoff (runs outside this closure): BackoffTime
+			// must be framework-clock to match LastProcessedTime and task deadlines.
+			now = ctx.Now(i)
+
+	result = result.Append(h.startWorkflows(ictx, logger, metricsHandler, scheduler, invoker, lastCompletionState, callback, now))
+			// Use newlyStarted (not len(result.CompletedStarts)) so a concurrent
+			// ExecuteTask's duplicate StartWorkflow can't inflate ActionCount.
+			newlyStarted, _ := i.recordExecuteResult(ctx, &result)
+			s.recordActionResult(&schedulerActionResult{actionCount: int64(newlyStarted)})
+	now time.Time,
+) (result executeResult) {
+			err := h.startWorkflow(newCtx, metricsHandler, scheduler, start, lastCompletionState, callback)
+					h.applyBackoff(start, err, now)
+	_ chasm.Context,
+	return validateTaskHighWaterMark(invoker.GetLastProcessedTime(), attrs.ScheduledTime)
+	// Add starting workflows to result, trim others. Catchup-window expiry is
+	// checked before useScheduledAction so that a start past its catchup
+	// window doesn't consume a LimitedActions slot.
+		if ctx.Now(invoker).After(h.startWorkflowDeadline(ctx, scheduler, start)) {
+			result.missedCatchupWindow++
+		// Ensure we can take more actions. Manual actions are always allowed.
+		if !start.Manual && !scheduler.useScheduledAction(true) {
+			// Drop buffered automated actions while paused or out of actions.
+// `now` is the framework clock captured at task start - using time.Now would
+// diverge from the LastProcessedTime/eligibility comparison in tests.
+func (h *InvokerExecuteTaskHandler) applyBackoff(start *schedulespb.BufferedStart, err error, now time.Time) {
+		// Elapsed time is left at 0 because we bound on number of attempts.
+	start.BackoffTime = timestamppb.New(now.Add(delay))
+) error {
+		return errRetryLimitExceeded
+			return err
+			return newRateLimitedError(delay)
+		return err
+	return nil

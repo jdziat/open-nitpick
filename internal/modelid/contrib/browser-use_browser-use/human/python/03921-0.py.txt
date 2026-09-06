@@ -1,0 +1,63 @@
+# commit 179484988678 2026-01-24T16:36:14-05:00 browser_use/dom/service.py
+		# Detect elements with JavaScript click event listeners (without mutating DOM)
+		js_click_listener_backend_ids: set[int] = set()
+			# Step 1: Run JS to find elements with click listeners and return them by reference
+							return null;
+						const elementsWithListeners = [];
+									elementsWithListeners.push(el);
+						return elementsWithListeners;
+					'returnByValue': False,  # Return object references, not values
+
+			result_object_id = js_listener_result.get('result', {}).get('objectId')
+			if result_object_id:
+				# Step 2: Get array properties to access each element
+				array_props = await cdp_session.cdp_client.send.Runtime.getProperties(
+					params={
+						'objectId': result_object_id,
+						'ownProperties': True,
+					},
+					session_id=cdp_session.session_id,
+				)
+
+				# Step 3: For each element, get its backend node ID via DOM.describeNode
+				element_object_ids: list[str] = []
+				for prop in array_props.get('result', []):
+					# Array indices are numeric property names
+					prop_name = prop.get('name', '') if isinstance(prop, dict) else ''
+					if isinstance(prop_name, str) and prop_name.isdigit():
+						prop_value = prop.get('value', {}) if isinstance(prop, dict) else {}
+						if isinstance(prop_value, dict):
+							object_id = prop_value.get('objectId')
+							if object_id and isinstance(object_id, str):
+								element_object_ids.append(object_id)
+
+				# Batch resolve backend node IDs (run in parallel)
+				async def get_backend_node_id(object_id: str) -> int | None:
+					try:
+						node_info = await cdp_session.cdp_client.send.DOM.describeNode(
+							params={'objectId': object_id},
+							session_id=cdp_session.session_id,
+						)
+						return node_info.get('node', {}).get('backendNodeId')
+					except Exception:
+						return None
+
+				# Resolve all element object IDs to backend node IDs in parallel
+				backend_ids = await asyncio.gather(*[get_backend_node_id(oid) for oid in element_object_ids])
+				js_click_listener_backend_ids = {bid for bid in backend_ids if bid is not None}
+
+				# Release the array object to avoid memory leaks
+				try:
+					await cdp_session.cdp_client.send.Runtime.releaseObject(
+						params={'objectId': result_object_id},
+						session_id=cdp_session.session_id,
+					)
+				except Exception:
+					pass  # Best effort cleanup
+
+				self.logger.debug(f'Detected {len(js_click_listener_backend_ids)} elements with JS click listeners')
+		js_listener_detection_ms = (time.time() - start_js_listener_detection) * 1000
+				'js_listener_detection_ms': js_listener_detection_ms,
+			js_click_listener_backend_ids=js_click_listener_backend_ids if js_click_listener_backend_ids else None,
+		js_click_listener_backend_ids = trees.js_click_listener_backend_ids or set()
+				has_js_click_listener=node['backendNodeId'] in js_click_listener_backend_ids,

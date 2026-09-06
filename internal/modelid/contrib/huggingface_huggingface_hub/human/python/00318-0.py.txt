@@ -1,0 +1,76 @@
+# commit ec80075fe9a4 2026-02-18T17:23:43+01:00 src/huggingface_hub/cli/skills.py
+from click import Context, Group
+from typer.main import get_command
+description: "Hugging Face Hub CLI (`hf`) for downloading, uploading, and managing repositories, models, datasets, and Spaces on the Hugging Face Hub. Replaces now deprecated `huggingface-cli` command."
+Install: `curl -LsSf https://hf.co/cli/install.sh | bash -s`.
+
+_SKILL_TIPS = """
+## Tips
+
+- Use `hf <command> --help` for full options, usage, and real-world examples
+- Use `--format json` for machine-readable output on list commands
+- Use `-q` / `--quiet` to print only IDs
+- Authenticate with `HF_TOKEN` env var (recommended) or with `--token`
+"""
+
+def _format_params(cmd) -> str:
+    """Format required params for a command as uppercase placeholders."""
+    parts = []
+    for p in cmd.params:
+        if p.required and not p.name.startswith("_") and p.human_readable_name != "--help":
+            parts.append(p.human_readable_name)
+    return " ".join(parts)
+
+
+def build_skill_md() -> str:
+    # Lazy import to avoid circular dependency (hf.py imports skills_cli from this module)
+    from huggingface_hub import __version__
+    from huggingface_hub.cli.hf import app
+
+    click_app = get_command(app)
+    ctx = Context(click_app, info_name="hf")
+
+    # wrap in list to widen list[LiteralString] -> list[str] for `ty``
+    lines: list[str] = list(_SKILL_YAML_PREFIX.splitlines())
+    lines.append("")
+    lines.append(f"Generated with `huggingface_hub v{__version__}`. Run `hf skills add --force` to regenerate.")
+    lines.append("")
+    lines.append("## Commands")
+    lines.append("")
+
+    top_level = []
+    groups = []
+    for name in sorted(click_app.list_commands(ctx)):  # type: ignore[attr-defined]
+        cmd = click_app.get_command(ctx, name)  # type: ignore[attr-defined]
+        if cmd is None or cmd.hidden:
+            continue
+        if isinstance(cmd, Group):
+            groups.append((name, cmd))
+        else:
+            top_level.append((name, cmd))
+
+    for name, cmd in top_level:
+        help_text = (cmd.help or "").split("\n")[0].strip()
+        params = _format_params(cmd)
+        parts = ["hf", name] + ([params] if params else [])
+        lines.append(f"- `{' '.join(parts)}` — {help_text}")
+
+    for name, cmd in groups:
+        help_text = (cmd.help or "").split("\n")[0].strip()
+        lines.append("")
+        lines.append(f"### `hf {name}` — {help_text}")
+        lines.append("")
+        sub_ctx = Context(cmd, parent=ctx, info_name=name)
+        for sub_name in cmd.list_commands(sub_ctx):
+            sub_cmd = cmd.get_command(sub_ctx, sub_name)
+            if sub_cmd is None or sub_cmd.hidden:
+                continue
+            sub_help = (sub_cmd.help or "").split("\n")[0].strip()
+            params = _format_params(sub_cmd)
+            parts = ["hf", name, sub_name] + ([params] if params else [])
+            lines.append(f"- `{' '.join(parts)}` — {sub_help}")
+
+    lines.extend(_SKILL_TIPS.splitlines())
+
+    return "\n".join(lines)
+    (dest / "SKILL.md").write_text(build_skill_md(), encoding="utf-8")

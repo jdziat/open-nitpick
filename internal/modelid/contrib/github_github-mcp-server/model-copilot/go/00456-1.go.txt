@@ -1,0 +1,103 @@
+// commit 60aef5d2e3da 2025-12-01T14:30:59+01:00 pkg/github/code_scanning.go
+	"github.com/github/github-mcp-server/pkg/utils"
+	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+func GetCodeScanningAlert(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, mcp.ToolHandlerFor[map[string]any, any]) {
+	return mcp.Tool{
+			Name:        "get_code_scanning_alert",
+			Description: t("TOOL_GET_CODE_SCANNING_ALERT_DESCRIPTION", "Get details of a specific code scanning alert in a GitHub repository."),
+			Annotations: &mcp.ToolAnnotations{
+				ReadOnlyHint: true,
+			},
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"owner": {
+						Type:        "string",
+						Description: "The owner of the repository.",
+					},
+					"repo": {
+						Type:        "string",
+						Description: "The name of the repository.",
+					},
+					"alertNumber": {
+						Type:        "number",
+						Description: "The number of the alert.",
+					},
+				},
+				Required: []string{"owner", "repo", "alertNumber"},
+			},
+		},
+		func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
+			owner, err := RequiredParam[string](args, "owner")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			repo, err := RequiredParam[string](args, "repo")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			alertNumber, err := RequiredInt(args, "alertNumber")
+				return utils.NewToolResultError(err.Error()), nil, nil
+				return utils.NewToolResultErrorFromErr("failed to get GitHub client", err), nil, nil
+				), nil, nil
+					return utils.NewToolResultErrorFromErr("failed to read response body", err), nil, nil
+				return utils.NewToolResultError(fmt.Sprintf("failed to get alert: %s", string(body))), nil, nil
+				return utils.NewToolResultErrorFromErr("failed to marshal alert", err), nil, nil
+			return utils.NewToolResultText(string(r)), nil, nil
+func ListCodeScanningAlerts(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, mcp.ToolHandlerFor[map[string]any, any]) {
+	return mcp.Tool{
+			Name:        "list_code_scanning_alerts",
+			Description: t("TOOL_LIST_CODE_SCANNING_ALERTS_DESCRIPTION", "List code scanning alerts in a GitHub repository."),
+			Annotations: &mcp.ToolAnnotations{
+				ReadOnlyHint: true,
+			},
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"owner": {
+						Type:        "string",
+						Description: "The owner of the repository.",
+					},
+					"repo": {
+						Type:        "string",
+						Description: "The name of the repository.",
+					},
+					"state": {
+						Type:        "string",
+						Description: "Filter code scanning alerts by state. Defaults to open",
+						Enum:        []any{"open", "closed", "dismissed", "fixed"},
+						Default:     json.RawMessage(`"open"`),
+					},
+					"ref": {
+						Type:        "string",
+						Description: "The Git reference for the results you want to list.",
+					},
+					"severity": {
+						Type:        "string",
+						Description: "Filter code scanning alerts by severity",
+						Enum:        []any{"critical", "high", "medium", "low", "warning", "note", "error"},
+					},
+					"tool_name": {
+						Type:        "string",
+						Description: "The name of the tool used for code scanning.",
+					},
+				},
+				Required: []string{"owner", "repo"},
+			},
+		},
+		func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
+			owner, err := RequiredParam[string](args, "owner")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			repo, err := RequiredParam[string](args, "repo")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			ref, err := OptionalParam[string](args, "ref")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			state, err := OptionalParam[string](args, "state")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			severity, err := OptionalParam[string](args, "severity")
+				return utils.NewToolResultError(err.Error()), nil, nil
+			toolName, err := OptionalParam[string](args, "tool_name")
+				return utils.NewToolResultError(err.Error()), nil, nil
+				return utils.NewToolResultErrorFromErr("failed to get GitHub client", err), nil, nil
+				), nil, nil
+					return utils.NewToolResultErrorFromErr("failed to read response body", err), nil, nil
+				return utils.NewToolResultError(fmt.Sprintf("failed to list alerts: %s", string(body))), nil, nil
+				return utils.NewToolResultErrorFromErr("failed to marshal alerts", err), nil, nil
+			return utils.NewToolResultText(string(r)), nil, nil

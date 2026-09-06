@@ -1,0 +1,47 @@
+# commit 9d258315ce58 2025-07-22T18:12:08+02:00 src/huggingface_hub/_upload_large_folder.py
+from .utils._runtime import is_xet_available
+UPLOAD_BATCH_SIZE_XET = 256  # Max 256 files per upload batch for XET-enabled repos
+UPLOAD_BATCH_SIZE_LFS = 1  # Otherwise, batches of 1 for regular LFS upload
+
+    # 2.1 Check if xet is enabled to set batch file upload size
+    is_xet_enabled = (
+        is_xet_available()
+        and api.repo_info(
+            repo_id=repo_id,
+            repo_type=repo_type,
+            revision=revision,
+            expand="xetEnabled",
+        ).xet_enabled
+    )
+    upload_batch_size = UPLOAD_BATCH_SIZE_XET if is_xet_enabled else UPLOAD_BATCH_SIZE_LFS
+    status = LargeUploadStatus(items, upload_batch_size)
+    def __init__(self, items: List[JOB_ITEM_T], upload_batch_size: int = 1):
+        self.upload_batch_size: int = upload_batch_size
+                _preupload_lfs(items, api=api, repo_id=repo_id, repo_type=repo_type, revision=revision)
+                for item in items:
+                    status.queue_commit.put(item)
+                for item in items:
+                    status.queue_preupload_lfs.put(item)
+        # 4. Preupload LFS file if at least `status.upload_batch_size` files and no worker is preuploading LFS
+        elif status.queue_preupload_lfs.qsize() >= status.upload_batch_size and status.nb_workers_preupload_lfs == 0:
+            return (WorkerJob.PREUPLOAD_LFS, _get_n(status.queue_preupload_lfs, status.upload_batch_size))
+        # 7. Preupload LFS file if at least `status.upload_batch_size` files
+        elif status.queue_preupload_lfs.qsize() >= status.upload_batch_size and (
+            return (WorkerJob.PREUPLOAD_LFS, _get_n(status.queue_preupload_lfs, status.upload_batch_size))
+        # 10. Preupload LFS file if at least 1 file
+        elif status.queue_preupload_lfs.qsize() > 0:
+            status.nb_workers_preupload_lfs += 1
+            logger.debug("Job: preupload LFS")
+            return (WorkerJob.PREUPLOAD_LFS, _get_n(status.queue_preupload_lfs, status.upload_batch_size))
+
+        # 11. Commit if at least 1 file and 1 min since last commit attempt
+        # 12. Commit if at least 1 file all other queues are empty and all workers are waiting
+        # 13. If all queues are empty, exit
+        # 14. If no task is available, wait
+def _preupload_lfs(items: List[JOB_ITEM_T], api: "HfApi", repo_id: str, repo_type: str, revision: str) -> None:
+    """Preupload LFS files and update metadata."""
+    additions = [_build_hacky_operation(item) for item in items]
+        additions=additions,
+    for paths, metadata in items:
+        metadata.is_uploaded = True
+        metadata.save(paths)

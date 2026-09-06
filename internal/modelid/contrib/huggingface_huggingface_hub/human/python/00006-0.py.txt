@@ -1,0 +1,55 @@
+# commit b4c01ed5ee18 2025-06-03T17:39:56+02:00 src/huggingface_hub/hf_api.py
+    TYPE_CHECKING,
+if TYPE_CHECKING:
+    from .inference._providers import PROVIDER_T
+
+    provider: "PROVIDER_T"  # Provider name
+    hf_model_id: str  # ID of the model on the Hugging Face Hub
+    provider_id: str  # ID of the model on the provider's side
+    type: Optional[Literal["single-model", "tag-filter"]] = None
+        self.provider = kwargs.pop("provider")
+        self.status = kwargs.pop("status")
+
+        self.type = kwargs.pop("type", None)
+        inference (`Literal["warm"]`, *optional*):
+            Status of the model on Inference Providers. Warm if the model is served by at least one provider.
+        inference_provider_mapping (`List[InferenceProviderMapping]`, *optional*):
+            A list of [`InferenceProviderMapping`] ordered after the user's provider order.
+    inference: Optional[Literal["warm"]]
+    inference_provider_mapping: Optional[List[InferenceProviderMapping]]
+
+        # little hack to simplify Inference Providers logic and make it backward and forward compatible
+        # right now, API returns a dict on model_info and a list on list_models. Let's harmonize to list.
+        mapping = kwargs.pop("inferenceProviderMapping", None)
+        if isinstance(mapping, list):
+            self.inference_provider_mapping = [
+                InferenceProviderMapping(**{**value, "hf_model_id": self.id}) for value in mapping
+            ]
+        elif isinstance(mapping, dict):
+            self.inference_provider_mapping = [
+                InferenceProviderMapping(**{**value, "hf_model_id": self.id, "provider": provider})
+                for provider, value in mapping.items()
+            ]
+        elif mapping is None:
+            self.inference_provider_mapping = None
+        else:
+            raise ValueError(
+                f"Unexpected type for `inferenceProviderMapping`. Expecting `dict` or `list`. Got {mapping}."
+            )
+        inference: Optional[Literal["warm"]] = None,
+        inference_provider: Optional[Union[Literal["all"], "PROVIDER_T", List["PROVIDER_T"]]] = None,
+            inference (`Literal["warm"]`, *optional*):
+                If "warm", filter models on the Hub currently served by at least one provider.
+            inference_provider (`Literal["all"]` or `str`, *optional*):
+                A string to filter models on the Hub that are served by a specific provider.
+                Pass `"all"` to get all models served by at least one provider.
+        Example:
+        # List text classification models
+        # List models from the KerasHub library
+        >>> api.list_models(filter="keras-hub")
+        # List models served by Cohere
+        >>> api.list_models(inference_provider="cohere")
+        # List models with "bert" in their name
+        # List models with "bert" in their name and pushed by google
+        if inference_provider is not None:
+            params["inference_provider"] = inference_provider

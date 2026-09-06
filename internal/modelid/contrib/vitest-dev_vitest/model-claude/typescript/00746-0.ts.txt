@@ -1,0 +1,40 @@
+// commit 7c06598dbb49 2026-03-24T09:30:33+01:00 packages/vitest/src/runtime/moduleRunner/bareModuleMocker.ts
+    const resolveMock = async (mock: PendingSuiteMock) => {
+      const { id, url, external } = await this.resolveId(
+        mock.id,
+        mock.importer,
+      )
+      if (mock.action === 'unmock') {
+        this.unmockPath(id)
+      }
+      if (mock.action === 'mock') {
+        this.mockPath(
+          id,
+          url,
+          external,
+          mock.type,
+          mock.factory,
+      }
+    }
+
+    // group consecutive mocks of the same action type together,
+    // resolve in parallel inside each group, but run groups sequentially
+    // to preserve mock/unmock ordering
+    const groups = groupByConsecutiveAction(BareModuleMocker.pendingIds)
+    for (const group of groups) {
+      await Promise.all(group.map(resolveMock))
+    }
+function groupByConsecutiveAction(mocks: PendingSuiteMock[]): PendingSuiteMock[][] {
+  const groups: PendingSuiteMock[][] = []
+  for (const mock of mocks) {
+    const last = groups.at(-1)
+    if (last?.[0].action === mock.action) {
+      last.push(mock)
+    }
+    else {
+      groups.push([mock])
+    }
+  }
+  return groups
+}
+

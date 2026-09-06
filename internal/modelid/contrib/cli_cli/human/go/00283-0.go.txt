@@ -1,0 +1,86 @@
+// commit 009138449549 2025-08-19T22:54:31+02:00 pkg/cmd/auth/status/status.go
+type authEntry struct {
+	State       string `json:"state"`
+	Error       string `json:"error"`
+	Active      bool   `json:"active"`
+	Host        string `json:"host"`
+	Login       string `json:"login"`
+	TokenSource string `json:"token_source"`
+	Token       string `json:"token"`
+	Scopes      string `json:"scopes"`
+	GitProtocol string `json:"git_protocol"`
+func (e authEntry) String(cs *iostreams.ColorScheme, showToken bool) string {
+	switch e.State {
+	case "valid":
+		sb.WriteString(
+			fmt.Sprintf("  %s Logged in to %s account %s (%s)\n", cs.SuccessIcon(), e.Host, cs.Bold(e.Login), e.TokenSource),
+		)
+		activeStr := fmt.Sprintf("%v", e.Active)
+		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+		sb.WriteString(fmt.Sprintf("  - Git operations protocol: %s\n", cs.Bold(e.GitProtocol)))
+		sb.WriteString(fmt.Sprintf("  - Token: %s\n", cs.Bold(displayToken(e.Token, showToken))))
+
+		if expectScopes(e.Token) {
+			sb.WriteString(fmt.Sprintf("  - Token scopes: %s\n", cs.Bold(displayScopes(e.Scopes))))
+			if err := shared.HeaderHasMinimumScopes(e.Scopes); err != nil {
+				var missingScopesError *shared.MissingScopesError
+				if errors.As(err, &missingScopesError) {
+					missingScopes := strings.Join(missingScopesError.MissingScopes, ",")
+					sb.WriteString(fmt.Sprintf("  %s Missing required token scopes: %s\n",
+						cs.WarningIcon(),
+						cs.Bold(displayScopes(missingScopes))))
+					refreshInstructions := fmt.Sprintf("gh auth refresh -h %s", e.Host)
+					sb.WriteString(fmt.Sprintf("  - To request missing scopes, run: %s\n", cs.Bold(refreshInstructions)))
+				}
+	case "timeout":
+		if e.Login != "" {
+			sb.WriteString(fmt.Sprintf("  %s Timeout trying to log in to %s account %s (%s)\n", cs.Red("X"), e.Host, cs.Bold(e.Login), e.TokenSource))
+		} else {
+			sb.WriteString(fmt.Sprintf("  %s Timeout trying to log in to %s using token (%s)\n", cs.Red("X"), e.Host, e.TokenSource))
+		}
+		activeStr := fmt.Sprintf("%v", e.Active)
+		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+
+	case "error":
+		if e.Login != "" {
+			sb.WriteString(fmt.Sprintf("  %s Failed to log in to %s account %s (%s)\n", cs.Red("X"), e.Host, cs.Bold(e.Login), e.TokenSource))
+		} else {
+			sb.WriteString(fmt.Sprintf("  %s Failed to log in to %s using token (%s)\n", cs.Red("X"), e.Host, e.TokenSource))
+		}
+		activeStr := fmt.Sprintf("%v", e.Active)
+		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+		sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.TokenSource))
+		if authTokenWriteable(e.TokenSource) {
+			loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
+			logoutInstructions := fmt.Sprintf("gh auth logout -h %s -u %s", e.Host, e.Login)
+			sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
+			sb.WriteString(fmt.Sprintf("  - To forget about this account, run: %s\n", cs.Bold(logoutInstructions)))
+		}
+	String(cs *iostreams.ColorScheme, showToken bool) string
+func (e Entries) Strings(cs *iostreams.ColorScheme, showToken bool) []string {
+		out = append(out, entry.String(cs, showToken))
+		fmt.Fprintf(stream, "%s", strings.Join(entries.Strings(cs, opts.ShowToken), "\n"))
+func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
+
+	entry := authEntry{
+		Active:      opts.active,
+		Host:        opts.hostname,
+		Login:       opts.username,
+		TokenSource: opts.tokenSource,
+		Token:       opts.token,
+		GitProtocol: opts.gitProtocol,
+	}
+		entry.TokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
+	if !authTokenWriteable(opts.tokenSource) {
+		entry.Login, err = api.CurrentLoginName(apiClient, opts.hostname)
+			entry.State = "error"
+			return entry
+			entry.State = "timeout"
+			return entry
+		entry.State = "error"
+		return entry
+	entry.State = "valid"
+	entry.Scopes = scopesHeader
+	return entry
+func isValidEntry(entry authEntry) bool {
+	return entry.State == "valid"

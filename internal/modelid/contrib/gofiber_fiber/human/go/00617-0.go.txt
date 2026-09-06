@@ -1,0 +1,48 @@
+// commit 292b40fe0fe3 2026-02-05T23:33:22+01:00 helpers.go
+	for i := 0; i < len(headerValue); i++ {
+		if headerValue[i] == ',' {
+	if n < len(noCacheValue) {
+		return false
+	}
+
+	const noCacheLen = len(noCacheValue)
+	const asciiCaseFold = byte(0x20)
+	for i := 0; i <= n-noCacheLen; i++ {
+		if (cacheControl[i] | asciiCaseFold) != 'n' {
+		if !matchNoCacheToken(cacheControl, i) {
+			continue
+		}
+		if i > 0 && !isNoCacheDelimiter(cacheControl[i-1]) {
+			continue
+
+		// Handle: "no-cache", "no-cache, ...", "no-cache=...", "no-cache ,"
+		if i+noCacheLen == n {
+		if isNoCacheDelimiter(cacheControl[i+noCacheLen]) || cacheControl[i+noCacheLen] == '=' {
+func isNoCacheDelimiter(c byte) bool {
+	return c == ' ' || c == '\t' || c == ','
+}
+
+func matchNoCacheToken(s string, i int) bool {
+	// ASCII-only case-insensitive compare for "no-cache".
+	const asciiCaseFold = byte(0x20)
+	b := s[i:]
+
+	return (b[0]|asciiCaseFold) == 'n' &&
+		(b[1]|asciiCaseFold) == 'o' &&
+		b[2] == '-' &&
+		(b[3]|asciiCaseFold) == 'c' &&
+		(b[4]|asciiCaseFold) == 'a' &&
+		(b[5]|asciiCaseFold) == 'c' &&
+		(b[6]|asciiCaseFold) == 'h' &&
+		(b[7]|asciiCaseFold) == 'e'
+}
+
+func containsUpperASCII(b []byte) bool {
+	for i := range b {
+		if b[i] >= 'A' && b[i] <= 'Z' {
+			return true
+		}
+	}
+	return false
+}
+

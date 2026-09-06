@@ -1,0 +1,43 @@
+// commit 47412e5c4bd6 2026-01-27T12:20:47+01:00 pkg/buffer/buffer.go
+	// storeLine saves the current line to the ring buffer and resets state
+	storeLine := func() {
+		line := currentLine.String()
+		if lineTruncated && len(line) > maxDisplayLength {
+			line = line[:maxDisplayLength]
+		}
+		if lineTruncated {
+			line += "... [TRUNCATED]"
+		}
+		lines[writeIndex] = line
+		validLines[writeIndex] = true
+		totalLines++
+		writeIndex = (writeIndex + 1) % maxJobLogLines
+		currentLine.Reset()
+		lineTruncated = false
+	}
+
+	// accumulate adds bytes to currentLine up to maxLineSize, sets lineTruncated if exceeded
+	accumulate := func(data []byte) {
+		if lineTruncated {
+			return
+		}
+		remaining := maxLineSize - currentLine.Len()
+		if remaining <= 0 {
+			lineTruncated = true
+			return
+		}
+		if remaining > len(data) {
+			remaining = len(data)
+		}
+		currentLine.Write(data[:remaining])
+		if currentLine.Len() >= maxLineSize {
+			lineTruncated = true
+		}
+	}
+
+				if newlineIdx < 0 {
+					accumulate(chunk)
+				accumulate(chunk[:newlineIdx])
+				storeLine()
+				chunk = chunk[newlineIdx+1:]
+				storeLine()

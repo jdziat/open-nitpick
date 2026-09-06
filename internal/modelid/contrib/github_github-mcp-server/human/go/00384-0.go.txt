@@ -1,0 +1,249 @@
+// commit e5522fca31eb 2025-10-10T16:56:01+02:00 pkg/github/pullrequests.go
+
+				mcp.Enum("get", "get_diff", "get_status", "get_files", "get_review_comments", "get_reviews"),
+type PullRequestReviewWriteParams struct {
+	Method     string
+	Owner      string
+	Repo       string
+	PullNumber int32
+	Body       string
+	Event      string
+	CommitID   *string
+}
+
+func PullRequestReviewWrite(getGQLClient GetGQLClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	return mcp.NewTool("pull_request_review_write",
+			mcp.WithDescription(t("TOOL_PULL_REQUEST_REVIEW_WRITE_DESCRIPTION", `Create and/or submit, delete review of a pull request.
+
+Available methods:
+- create: Create a new review of a pull request. If "event" parameter is provided, the review is submitted. If "event" is omitted, a pending review is created.
+- submit_pending: Submit an existing pending review of a pull request. This requires that a pending review exists for the current user on the specified pull request. The "body" and "event" parameters are used when submitting the review.
+- delete_pending: Delete an existing pending review of a pull request. This requires that a pending review exists for the current user on the specified pull request.
+`)),
+				Title:        t("TOOL_PULL_REQUEST_REVIEW_WRITE_USER_TITLE", "Write operations (create, submit, delete) on pull request reviews."),
+			mcp.WithString("method",
+				mcp.Required(),
+				mcp.Description("The write operation to perform on pull request review."),
+				mcp.Enum("create", "submit_pending", "delete_pending"),
+			),
+				mcp.Description("Review action to perform."),
+			var params PullRequestReviewWriteParams
+			switch params.Method {
+			case "create":
+				return CreatePullRequestReview(ctx, client, params)
+			case "submit_pending":
+				return SubmitPendingPullRequestReview(ctx, client, params)
+			case "delete_pending":
+				return DeletePendingPullRequestReview(ctx, client, params)
+			default:
+				return mcp.NewToolResultError(fmt.Sprintf("unknown method: %s", params.Method)), nil
+		}
+}
+func CreatePullRequestReview(ctx context.Context, client *githubv4.Client, params PullRequestReviewWriteParams) (*mcp.CallToolResult, error) {
+	var getPullRequestQuery struct {
+		Repository struct {
+			PullRequest struct {
+				ID githubv4.ID
+			} `graphql:"pullRequest(number: $prNum)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+	if err := client.Query(ctx, &getPullRequestQuery, map[string]any{
+		"owner": githubv4.String(params.Owner),
+		"repo":  githubv4.String(params.Repo),
+		"prNum": githubv4.Int(params.PullNumber),
+	}); err != nil {
+		return ghErrors.NewGitHubGraphQLErrorResponse(ctx,
+			"failed to get pull request",
+			err,
+		), nil
+	}
+
+	// Now we have the GQL ID, we can create a review
+	var addPullRequestReviewMutation struct {
+		AddPullRequestReview struct {
+			PullRequestReview struct {
+				ID githubv4.ID // We don't need this, but a selector is required or GQL complains.
+		} `graphql:"addPullRequestReview(input: $input)"`
+	}
+	addPullRequestReviewInput := githubv4.AddPullRequestReviewInput{
+		PullRequestID: getPullRequestQuery.Repository.PullRequest.ID,
+		CommitOID:     newGQLStringlikePtr[githubv4.GitObjectID](params.CommitID),
+	}
+
+	// Event and Body are provided if we submit a review
+	if params.Event != "" {
+		addPullRequestReviewInput.Event = newGQLStringlike[githubv4.PullRequestReviewEvent](params.Event)
+		addPullRequestReviewInput.Body = githubv4.NewString(githubv4.String(params.Body))
+	}
+
+	if err := client.Mutate(
+		ctx,
+		&addPullRequestReviewMutation,
+		addPullRequestReviewInput,
+		nil,
+	); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	// Return nothing interesting, just indicate success for the time being.
+	// In future, we may want to return the review ID, but for the moment, we're not leaking
+	// API implementation details to the LLM.
+	if params.Event == "" {
+		return mcp.NewToolResultText("pending pull request created"), nil
+	}
+	return mcp.NewToolResultText("pull request review submitted successfully"), nil
+func SubmitPendingPullRequestReview(ctx context.Context, client *githubv4.Client, params PullRequestReviewWriteParams) (*mcp.CallToolResult, error) {
+	// First we'll get the current user
+	var getViewerQuery struct {
+		Viewer struct {
+			Login githubv4.String
+		}
+	}
+	if err := client.Query(ctx, &getViewerQuery, nil); err != nil {
+		return ghErrors.NewGitHubGraphQLErrorResponse(ctx,
+			"failed to get current user",
+			err,
+		), nil
+	}
+	var getLatestReviewForViewerQuery struct {
+		Repository struct {
+			PullRequest struct {
+				Reviews struct {
+					Nodes []struct {
+						ID    githubv4.ID
+						State githubv4.PullRequestReviewState
+						URL   githubv4.URI
+					}
+				} `graphql:"reviews(first: 1, author: $author)"`
+			} `graphql:"pullRequest(number: $prNum)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	vars := map[string]any{
+		"author": githubv4.String(getViewerQuery.Viewer.Login),
+		"owner":  githubv4.String(params.Owner),
+		"name":   githubv4.String(params.Repo),
+		"prNum":  githubv4.Int(params.PullNumber),
+	}
+
+	if err := client.Query(context.Background(), &getLatestReviewForViewerQuery, vars); err != nil {
+		return ghErrors.NewGitHubGraphQLErrorResponse(ctx,
+			"failed to get latest review for current user",
+			err,
+		), nil
+	}
+
+	// Validate there is one review and the state is pending
+	if len(getLatestReviewForViewerQuery.Repository.PullRequest.Reviews.Nodes) == 0 {
+		return mcp.NewToolResultError("No pending review found for the viewer"), nil
+	}
+
+	review := getLatestReviewForViewerQuery.Repository.PullRequest.Reviews.Nodes[0]
+	if review.State != githubv4.PullRequestReviewStatePending {
+		errText := fmt.Sprintf("The latest review, found at %s is not pending", review.URL)
+		return mcp.NewToolResultError(errText), nil
+	}
+
+	// Prepare the mutation
+	var submitPullRequestReviewMutation struct {
+		SubmitPullRequestReview struct {
+			PullRequestReview struct {
+				ID githubv4.ID // We don't need this, but a selector is required or GQL complains.
+		} `graphql:"submitPullRequestReview(input: $input)"`
+	}
+	if err := client.Mutate(
+		ctx,
+		&submitPullRequestReviewMutation,
+		githubv4.SubmitPullRequestReviewInput{
+			PullRequestReviewID: &review.ID,
+			Event:               githubv4.PullRequestReviewEvent(params.Event),
+			Body:                newGQLStringlikePtr[githubv4.String](&params.Body),
+		},
+		nil,
+	); err != nil {
+		return ghErrors.NewGitHubGraphQLErrorResponse(ctx,
+			"failed to submit pull request review",
+			err,
+		), nil
+	}
+
+	// Return nothing interesting, just indicate success for the time being.
+	// In future, we may want to return the review ID, but for the moment, we're not leaking
+	// API implementation details to the LLM.
+	return mcp.NewToolResultText("pending pull request review successfully submitted"), nil
+}
+
+func DeletePendingPullRequestReview(ctx context.Context, client *githubv4.Client, params PullRequestReviewWriteParams) (*mcp.CallToolResult, error) {
+	// First we'll get the current user
+	var getViewerQuery struct {
+		Viewer struct {
+			Login githubv4.String
+		}
+	}
+
+	if err := client.Query(ctx, &getViewerQuery, nil); err != nil {
+		return ghErrors.NewGitHubGraphQLErrorResponse(ctx,
+			"failed to get current user",
+			err,
+		), nil
+	}
+
+	var getLatestReviewForViewerQuery struct {
+		Repository struct {
+			PullRequest struct {
+				Reviews struct {
+					Nodes []struct {
+						ID    githubv4.ID
+						State githubv4.PullRequestReviewState
+						URL   githubv4.URI
+				} `graphql:"reviews(first: 1, author: $author)"`
+			} `graphql:"pullRequest(number: $prNum)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	vars := map[string]any{
+		"author": githubv4.String(getViewerQuery.Viewer.Login),
+		"owner":  githubv4.String(params.Owner),
+		"name":   githubv4.String(params.Repo),
+		"prNum":  githubv4.Int(params.PullNumber),
+	}
+
+	if err := client.Query(context.Background(), &getLatestReviewForViewerQuery, vars); err != nil {
+		return ghErrors.NewGitHubGraphQLErrorResponse(ctx,
+			"failed to get latest review for current user",
+			err,
+		), nil
+	}
+
+	// Validate there is one review and the state is pending
+	if len(getLatestReviewForViewerQuery.Repository.PullRequest.Reviews.Nodes) == 0 {
+		return mcp.NewToolResultError("No pending review found for the viewer"), nil
+	}
+
+	review := getLatestReviewForViewerQuery.Repository.PullRequest.Reviews.Nodes[0]
+	if review.State != githubv4.PullRequestReviewStatePending {
+		errText := fmt.Sprintf("The latest review, found at %s is not pending", review.URL)
+		return mcp.NewToolResultError(errText), nil
+	}
+
+	// Prepare the mutation
+	var deletePullRequestReviewMutation struct {
+		DeletePullRequestReview struct {
+			PullRequestReview struct {
+				ID githubv4.ID // We don't need this, but a selector is required or GQL complains.
+		} `graphql:"deletePullRequestReview(input: $input)"`
+	}
+	if err := client.Mutate(
+		ctx,
+		&deletePullRequestReviewMutation,
+		githubv4.DeletePullRequestReviewInput{
+			PullRequestReviewID: &review.ID,
+		},
+		nil,
+	); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	// Return nothing interesting, just indicate success for the time being.
+	// In future, we may want to return the review ID, but for the moment, we're not leaking
+	// API implementation details to the LLM.
+	return mcp.NewToolResultText("pending pull request review successfully deleted"), nil

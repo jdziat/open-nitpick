@@ -1,0 +1,66 @@
+# commit c653d21284c7 2025-10-28T11:30:57-07:00 browser_use/init_cmd.py
+from InquirerPy.base.control import Choice
+from InquirerPy.prompts.list import ListPrompt
+from InquirerPy.utils import InquirerPyStyle
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
+# Rich console for styled output
+console = Console()
+
+# InquirerPy style for template selection (browser-use orange theme)
+inquirer_style = InquirerPyStyle(
+	{
+		'pointer': '#fe750e bold',
+		'highlighted': '#fe750e bold',
+		'question': 'bold',
+		'answer': '#fe750e bold',
+		'questionmark': '#fe750e bold',
+	}
+)
+
+		console.print(f'[yellow]⚠[/yellow]  File already exists: [cyan]{output_path}[/cyan]')
+			console.print('[red]✗[/red] Cancelled')
+		console.print(f'[red]✗[/red] Error writing file: {e}')
+		# Create choices with descriptions
+		choices = [
+			Choice(
+				name=f'{name:12} - {info["description"]}',
+				value=name,
+			)
+			for name, info in INIT_TEMPLATES.items()
+		]
+
+		template = ListPrompt(
+			message='Select a template:',
+			choices=choices,
+			pointer='❯',
+			style=inquirer_style,
+			instruction='(Use arrow keys)',
+		).execute()
+
+		# Handle user cancellation (Ctrl+C)
+		if template is None:
+			console.print('\n[red]✗[/red] Cancelled')
+			sys.exit(1)
+		console.print(f'[red]✗[/red] Error reading template: {e}')
+		console.print(f'\n[green]✓[/green] Created [cyan]{output_path}[/cyan]')
+
+		# Create a nice panel for next steps
+		next_steps = Text()
+		next_steps.append('\n1. Install browser-use:\n', style='bold')
+		next_steps.append('   uv pip install browser-use\n\n', style='dim')
+		next_steps.append('2. Set up your API key in .env file or environment:\n', style='bold')
+		next_steps.append('   BROWSER_USE_API_KEY=your-key\n', style='dim')
+		next_steps.append('   (Get your key at https://cloud.browser-use.com/dashboard/api)\n\n', style='dim italic')
+		next_steps.append('3. Run your script:\n', style='bold')
+		next_steps.append(f'   python {output_path.name}\n', style='dim')
+
+		console.print(
+			Panel(
+				next_steps,
+				title='[bold]Next steps[/bold]',
+				border_style='#fe750e',
+				padding=(1, 2),
+			)
+		)

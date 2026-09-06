@@ -1,0 +1,65 @@
+// commit bf79f386a4c7 2025-12-19T11:01:46-05:00 chasm/lib/activity/activity.go
+	"go.temporal.io/server/common/payload"
+	*historyservice.RecordActivityTaskStartedResponse, error,
+) {
+	*historyservice.RespondActivityTaskCompletedResponse, error,
+) {
+	*historyservice.RespondActivityTaskFailedResponse, error,
+) {
+// HandleCanceled updates the activity on activity canceled.
+func (a *Activity) HandleCanceled(ctx chasm.MutableContext, request *historyservice.RespondActivityTaskCanceledRequest) (
+	*historyservice.RespondActivityTaskCanceledResponse, error,
+) {
+	if err := TransitionCanceled.Apply(a, ctx, request.GetCancelRequest().GetDetails()); err != nil {
+		return nil, err
+	}
+
+	return &historyservice.RespondActivityTaskCanceledResponse{}, nil
+}
+
+	*activitypb.TerminateActivityExecutionResponse, error,
+) {
+func (a *Activity) handleCancellationRequested(ctx chasm.MutableContext, req *activitypb.RequestCancelActivityExecutionRequest) (
+	*activitypb.RequestCancelActivityExecutionResponse, error,
+) {
+	newReqID := req.GetFrontendRequest().GetRequestId()
+	existingReqID := a.GetCancelState().GetRequestId()
+
+	// If already in cancel requested state, fail if request ID is different, else no-op
+	if a.GetStatus() == activitypb.ACTIVITY_EXECUTION_STATUS_CANCEL_REQUESTED {
+		if existingReqID != newReqID {
+			return nil, serviceerror.NewFailedPrecondition(
+				fmt.Sprintf("cancellation already requested with request ID %s", existingReqID))
+		}
+
+		return &activitypb.RequestCancelActivityExecutionResponse{}, nil
+	}
+
+	// If in scheduled state, cancel immediately right after marking cancel requested
+	isCancelImmediately := a.GetStatus() == activitypb.ACTIVITY_EXECUTION_STATUS_SCHEDULED
+
+	if err := TransitionCancelRequested.Apply(a, ctx, req.GetFrontendRequest()); err != nil {
+		return nil, err
+	}
+
+	if isCancelImmediately {
+		details := &commonpb.Payloads{
+			Payloads: []*commonpb.Payload{
+				payload.EncodeString(req.GetFrontendRequest().GetReason()),
+			},
+		}
+
+		err := TransitionCanceled.Apply(a, ctx, details)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &activitypb.RequestCancelActivityExecutionResponse{}, nil
+}
+
+	if !TransitionRescheduled.Possible(a) {
+		return false, 0, nil
+	}
+
+		CanceledReason:          a.CancelState.GetReason(),

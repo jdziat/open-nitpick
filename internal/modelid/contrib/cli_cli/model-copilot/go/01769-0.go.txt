@@ -1,0 +1,39 @@
+// commit cbe04588f1b6 2026-09-04T14:12:21+02:00 internal/config/config.go
+	clipboardKey          = "clipboard"
+func (c *cfg) Clipboard() gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault("", clipboardKey).Unwrap()
+}
+
+# Whether to copy one-time OAuth device codes to the clipboard. Supported values: enabled, disabled
+clipboard: disabled
+// ConfigScope controls whether a configuration option can be set globally, per host, or both.
+type ConfigScope int
+
+const (
+	// ConfigScopeGlobalOrHost allows an option to be set globally or for a specific host.
+	ConfigScopeGlobalOrHost ConfigScope = iota
+	// ConfigScopeGlobalOnly allows an option to be set only at the global level.
+	ConfigScopeGlobalOnly
+	// ConfigScopeHostOnly requires an option to be set for a specific host.
+	ConfigScopeHostOnly
+)
+
+// ConfigOption describes a supported configuration key.
+	Scope         ConfigScope
+		Scope:        ConfigScopeHostOnly,
+		Scope:         ConfigScopeGlobalOnly,
+			return c.Prompt("").Value
+		Scope:         ConfigScopeGlobalOnly,
+			return c.PreferEditorPrompt("").Value
+	{
+		Key:           clipboardKey,
+		Description:   "whether to copy one-time OAuth device codes to the clipboard",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		Scope:         ConfigScopeGlobalOnly,
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Clipboard().Value
+		},
+	},
+		Scope:         ConfigScopeGlobalOnly,

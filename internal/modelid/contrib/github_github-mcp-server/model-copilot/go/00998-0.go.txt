@@ -1,0 +1,36 @@
+// commit e7f7bb8b31bd 2026-08-06T20:25:58-04:00 cmd/github-mcp-server/generate_docs.go
+			typeStr := schemaTypeString(prop)
+func schemaTypeString(schema *jsonschema.Schema) string {
+	switch {
+	case schema.Type == "array":
+		if schema.Items != nil {
+			return schema.Items.Type + "[]"
+		}
+		return "array"
+	case schema.Type != "":
+		return schema.Type
+	case len(schema.Types) > 0:
+		return strings.Join(schema.Types, " | ")
+	}
+
+	var union []*jsonschema.Schema
+	switch {
+	case len(schema.AnyOf) > 0:
+		union = schema.AnyOf
+	case len(schema.OneOf) > 0:
+		union = schema.OneOf
+	default:
+		// A schema without type constraints accepts any value.
+		return "any"
+	}
+
+	types := make([]string, 0, len(union))
+	for _, member := range union {
+		memberType := schemaTypeString(member)
+		if !slices.Contains(types, memberType) {
+			types = append(types, memberType)
+		}
+	}
+	return strings.Join(types, " | ")
+}
+

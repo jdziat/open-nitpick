@@ -1,0 +1,45 @@
+# commit 38d48d91fe18 2026-04-02T17:27:59+02:00 src/huggingface_hub/cli/_output.py
+import dataclasses
+        items: Sequence[dict[str, Any]],
+        *,
+        headers: list[str] | None = None,
+        id_key: str | None = None,
+            items: List of dicts. Headers are auto-detected from keys if not provided.
+            headers: Explicit column names. If None, derived from dict keys (all-None columns filtered).
+            id_key: Key to print in quiet mode. If None, uses the first header.
+        if not items:
+        if headers is None:
+            all_columns = list(items[0].keys())
+            headers = [col for col in all_columns if any(item.get(col) is not None for item in items)]
+        rows = [[item.get(h) for h in headers] for item in items]
+
+                print(json.dumps(list(items), default=str))
+            case OutputFormatWithAuto.quiet:  # id_key column (or first column), one per line
+                quiet_key = id_key or headers[0]
+                for item in items:
+                    print(item.get(quiet_key, ""))
+
+    def dict(self, data: Any) -> None:
+        """Print structured data as JSON in all modes (indented for human, compact otherwise).
+        Accepts a dict or a dataclass.
+        """
+        if dataclasses.is_dataclass(data) and not isinstance(data, type):
+            data = _dataclass_to_dict(data)
+
+def _serialize_value(v: object) -> object:
+    """Recursively serialize a value to be JSON-compatible."""
+    if isinstance(v, datetime.datetime):
+        return v.isoformat()
+    elif isinstance(v, dict):
+        return {key: _serialize_value(val) for key, val in v.items() if val is not None}
+    elif isinstance(v, list):
+        return [_serialize_value(item) for item in v]
+    return v
+
+
+def _dataclass_to_dict(info: Any) -> dict[str, Any]:
+    """Convert a dataclass to a json-serializable dict."""
+    return {k: _serialize_value(v) for k, v in dataclasses.asdict(info).items() if v is not None}
+
+
+    if value is None:

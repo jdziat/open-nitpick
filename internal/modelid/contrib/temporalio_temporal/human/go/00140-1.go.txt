@@ -1,0 +1,71 @@
+// commit 0c2b360e401b 2025-11-26T16:04:44-08:00 api/historyservice/v1/request_response.pb.go
+	// (-- api-linter: core::0141::forbidden-types=disabled --)
+	ArchetypeId   uint32 `protobuf:"varint,4,opt,name=archetype_id,json=archetypeId,proto3" json:"archetype_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+func (x *DescribeMutableStateRequest) GetArchetypeId() uint32 {
+	if x != nil {
+		return x.ArchetypeId
+	}
+	return 0
+}
+
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	NamespaceId string                 `protobuf:"bytes,1,opt,name=namespace_id,json=namespaceId,proto3" json:"namespace_id,omitempty"`
+	// (-- api-linter: core::0141::forbidden-types=disabled --)
+	ArchetypeId   uint32                            `protobuf:"varint,3,opt,name=archetype_id,json=archetypeId,proto3" json:"archetype_id,omitempty"`
+func (x *RefreshWorkflowTasksRequest) GetArchetypeId() uint32 {
+	if x != nil {
+		return x.ArchetypeId
+	}
+	return 0
+}
+
+	// (-- api-linter: core::0141::forbidden-types=disabled --)
+	ArchetypeId   uint32 `protobuf:"varint,4,opt,name=archetype_id,json=archetypeId,proto3" json:"archetype_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+func (x *GenerateLastHistoryReplicationTasksRequest) GetArchetypeId() uint32 {
+	if x != nil {
+		return x.ArchetypeId
+	}
+	return 0
+}
+
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	NamespaceId string                 `protobuf:"bytes,1,opt,name=namespace_id,json=namespaceId,proto3" json:"namespace_id,omitempty"`
+	// (-- api-linter: core::0141::forbidden-types=disabled --)
+	ArchetypeId   uint32                               `protobuf:"varint,3,opt,name=archetype_id,json=archetypeId,proto3" json:"archetype_id,omitempty"`
+func (x *ForceDeleteWorkflowExecutionRequest) GetArchetypeId() uint32 {
+	if x != nil {
+		return x.ArchetypeId
+	}
+	return 0
+}
+
+	// (-- api-linter: core::0141::forbidden-types=disabled --)
+	ArchetypeId   uint32 `protobuf:"varint,6,opt,name=archetype_id,json=archetypeId,proto3" json:"archetype_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+func (x *SyncWorkflowStateRequest) GetArchetypeId() uint32 {
+	if x != nil {
+		return x.ArchetypeId
+	}
+	return 0
+}
+
+	"\x14SyncActivityResponse\"\xf5\x01\n" +
+	"\x11skip_force_reload\x18\x03 \x01(\bR\x0fskipForceReload\x12!\n" +
+	"\farchetype_id\x18\x04 \x01(\rR\varchetypeId:\x1b\x92\xc4\x03\x17*\x15execution.workflow_id\"\xf8\x01\n" +
+	"\x0fnext_page_token\x18\x01 \x01(\fR\rnextPageToken\"\xe4\x01\n" +
+	"\fnamespace_id\x18\x01 \x01(\tR\vnamespaceId\x12!\n" +
+	"\farchetype_id\x18\x03 \x01(\rR\varchetypeId\x12Z\n" +
+	"\x1cRefreshWorkflowTasksResponse\"\x81\x02\n" +
+	"\x0ftarget_clusters\x18\x03 \x03(\tR\x0etargetClusters\x12!\n" +
+	"\farchetype_id\x18\x04 \x01(\rR\varchetypeId:\x1b\x92\xc4\x03\x17*\x15execution.workflow_id\"\x8a\x01\n" +
+	"\bresponse\x18\x01 \x01(\v2K.temporal.server.api.adminservice.v1.GetWorkflowExecutionRawHistoryResponseR\bresponse\"\xef\x01\n" +
+	"\fnamespace_id\x18\x01 \x01(\tR\vnamespaceId\x12!\n" +
+	"\farchetype_id\x18\x03 \x01(\rR\varchetypeId\x12]\n" +
+	"\x05state\x18\x01 \x01(\x0e2).temporal.server.api.enums.v1.HealthStateR\x05state\"\xbd\x03\n" +
+	"\x11target_cluster_id\x18\x05 \x01(\x05R\x0ftargetClusterId\x12!\n" +
+	"\farchetype_id\x18\x06 \x01(\rR\varchetypeId:\x1b\x92\xc4\x03\x17*\x15execution.workflow_id\"\xb9\x01\n" +

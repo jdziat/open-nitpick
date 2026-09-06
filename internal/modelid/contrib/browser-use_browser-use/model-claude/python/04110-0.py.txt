@@ -1,0 +1,82 @@
+# commit 8a9922291d11 2026-02-11T16:39:08-08:00 browser_use/skill_cli/commands/profile.py
+from browser_use_sdk import BrowserUse
+
+
+def _get_sdk_client() -> BrowserUse:
+	"""Get authenticated SDK client for cloud profile operations."""
+	from browser_use.skill_cli.api_key import require_api_key
+
+	api_key = require_api_key('Cloud profiles')
+	return BrowserUse(api_key=api_key)
+
+
+	from browser_use.skill_cli.api_key import APIKeyRequired
+
+	page = getattr(args, 'page', 1)
+	page_size = getattr(args, 'page_size', 20)
+		client = _get_sdk_client()
+		response = client.profiles.list_profiles(page_number=page, page_size=page_size)
+	except Exception as e:
+		print(f'Error: {e}', file=sys.stderr)
+		# Convert to dict for JSON output
+		data = {
+			'items': [{'id': p.id, 'name': p.name} for p in response.items],
+			'totalItems': response.total_items,
+			'pageNumber': response.page_number,
+			'pageSize': response.page_size,
+		}
+		print(json.dumps(data))
+		if response.items:
+			print(f'Cloud profiles ({len(response.items)}/{response.total_items}):')
+			for p in response.items:
+				name = p.name or 'Unnamed'
+				print(f'  {p.id}: {name}')
+	from browser_use.skill_cli.api_key import APIKeyRequired
+		client = _get_sdk_client()
+		profile = client.profiles.get_profile(args.id)
+	except Exception as e:
+		print(f'Error: {e}', file=sys.stderr)
+		data = {
+			'id': profile.id,
+			'name': profile.name,
+			'createdAt': profile.created_at.isoformat() if profile.created_at else None,
+			'updatedAt': profile.updated_at.isoformat() if profile.updated_at else None,
+		}
+		print(f'Profile: {profile.id}')
+		if profile.name:
+			print(f'  Name: {profile.name}')
+		if profile.created_at:
+			print(f'  Created: {profile.created_at.isoformat()}')
+		if profile.updated_at:
+			print(f'  Updated: {profile.updated_at.isoformat()}')
+	from browser_use.skill_cli.api_key import APIKeyRequired
+		client = _get_sdk_client()
+		profile = client.profiles.create_profile(name=args.name if args.name else None)
+	except Exception as e:
+		print(f'Error: {e}', file=sys.stderr)
+		print(json.dumps({'id': profile.id, 'name': profile.name}))
+		print(f'Created profile: {profile.id}')
+	from browser_use.skill_cli.api_key import APIKeyRequired
+		client = _get_sdk_client()
+		profile = client.profiles.update_profile(args.id, name=args.name)
+	except Exception as e:
+		print(f'Error: {e}', file=sys.stderr)
+		print(json.dumps({'id': profile.id, 'name': profile.name}))
+		print(f'Updated profile: {profile.id}')
+	from browser_use.skill_cli.api_key import APIKeyRequired
+		client = _get_sdk_client()
+		client.profiles.delete_browser_profile(args.id)
+	except Exception as e:
+		print(f'Error: {e}', file=sys.stderr)
+	from browser_use.skill_cli.api_key import APIKeyRequired
+	# Get SDK client (validates API key)
+		client = _get_sdk_client()
+	except Exception as e:
+		print(f'Error: {e}', file=sys.stderr)
+		return 1
+	try:
+		cloud_profile = client.profiles.create_profile(name=cloud_name)
+		cloud_profile_id = cloud_profile.id
+	except Exception as e:
+		print(f'Error creating cloud profile: {e}', file=sys.stderr)
+			client.profiles.delete_browser_profile(cloud_profile_id)

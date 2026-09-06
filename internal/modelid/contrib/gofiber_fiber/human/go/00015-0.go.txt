@@ -1,0 +1,37 @@
+// commit 80db4de1a5f8 2025-05-19T14:35:13+02:00 app.go
+	// App config
+	config Config
+	// Indicates if the value was explicitly configured
+	configured Config
+	// custom binders
+	customBinders []CustomBinder
+	// Route stack divided by HTTP methods and route prefixes
+	treeStack []map[int][]*Route
+
+	// Services is a list of services that are used by the app (e.g. databases, caches, etc.)
+	//
+	// Optional. Default: a zero value slice
+	Services []Service
+
+	// ServicesStartupContextProvider is a context provider for the startup of the services.
+	//
+	// Optional. Default: a provider that returns context.Background()
+	ServicesStartupContextProvider func() context.Context
+
+	// ServicesShutdownContextProvider is a context provider for the shutdown of the services.
+	//
+	// Optional. Default: a provider that returns context.Background()
+	ServicesShutdownContextProvider func() context.Context
+	// Initialize Services when needed,
+	// panics if there is an error starting them.
+	app.initServices()
+
+
+	// Register the Services shutdown handler once the app is initialized and unlocked.
+	app.Hooks().OnPostShutdown(func(_ error) error {
+		if err := app.shutdownServices(app.servicesShutdownCtx()); err != nil {
+			log.Errorf("failed to shutdown services: %v", err)
+		}
+		return nil
+	})
+

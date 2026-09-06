@@ -1,0 +1,42 @@
+// commit a24c0be254cd 2026-04-16T11:41:19+02:00 pkg/inventory/builder.go
+// mcpAppsFeatureFlag is the feature flag name that controls MCP Apps UI metadata.
+// This is defined here to avoid importing pkg/github (which imports pkg/inventory).
+// The value must match github.MCPAppsFeatureFlag.
+const mcpAppsFeatureFlag = "remote_mcp_ui_apps"
+
+// checkFeatureFlag checks a feature flag at build time using the builder's feature checker.
+// Returns false if no checker is configured or the flag is not enabled.
+func (b *Builder) checkFeatureFlag(flag string) bool {
+	if b.featureChecker == nil {
+		return false
+	}
+	enabled, err := b.featureChecker(context.Background(), flag)
+	if err != nil {
+		return false
+	}
+	return enabled
+}
+
+
+	// When MCP Apps feature flag is not enabled, strip UI metadata from tools
+	// so clients won't attempt to load UI resources.
+	// The feature checker is the single source of truth for flag evaluation.
+	if !b.checkFeatureFlag(mcpAppsFeatureFlag) {
+		tools = stripMCPAppsMetadata(tools)
+// mcpAppsMetaKeys lists the Meta keys controlled by the remote_mcp_ui_apps feature flag.
+var mcpAppsMetaKeys = []string{
+// stripMCPAppsMetadata removes MCP Apps UI metadata from tools when the
+// remote_mcp_ui_apps feature flag is not enabled.
+func stripMCPAppsMetadata(tools []ServerTool) []ServerTool {
+		if stripped := stripMetaKeys(tool, mcpAppsMetaKeys); stripped != nil {
+// stripMetaKeys removes the specified Meta keys from a single tool.
+func stripMetaKeys(tool ServerTool, keys []string) *ServerTool {
+	if tool.Tool.Meta == nil || len(keys) == 0 {
+	// Check if any of the specified keys exist
+	hasKeys := false
+	for _, key := range keys {
+		if _, ok := tool.Tool.Meta[key]; ok {
+			hasKeys = true
+	if !hasKeys {
+	// Make a shallow copy and remove specified keys
+		if !slices.Contains(keys, k) {

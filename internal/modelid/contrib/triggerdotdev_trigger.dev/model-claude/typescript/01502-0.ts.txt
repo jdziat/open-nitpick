@@ -1,0 +1,49 @@
+// commit 639eaf6e8240 2026-07-29T15:31:59+01:00 apps/webapp/app/models/member.server.ts
+  const uniqueEmails = new Set(emails);
+
+  const existingMembers = await prisma.orgMember.findMany({
+    where: {
+      organizationId: org.id,
+      user: { email: { in: [...uniqueEmails] } },
+    },
+    select: { user: { select: { email: true } } },
+  });
+  const existingMemberEmails = new Set(existingMembers.map((member) => member.user.email));
+
+  const alreadyMembers: string[] = [];
+  const alreadyInvited: string[] = [];
+
+  for (const email of uniqueEmails) {
+    if (existingMemberEmails.has(email)) {
+      alreadyMembers.push(email);
+      continue;
+    }
+        alreadyInvited.push(email);
+  return { created, alreadyMembers, alreadyInvited };
+  onlyWhenUnassigned,
+  onlyWhenUnassigned: boolean;
+    if (onlyWhenUnassigned) {
+      const currentRole = await rbac.getUserRole({ userId, organizationId });
+      if (currentRole !== null) {
+        return;
+      }
+    }
+
+      if (roleResult.code === "last_owner") {
+        logger.info("acceptInvite: kept last Owner, skipped RBAC role assignment", {
+          organizationId,
+          userId,
+          rbacRoleId,
+        });
+      } else {
+        logger.warn("acceptInvite: skipped RBAC role assignment", {
+          organizationId,
+          userId,
+          rbacRoleId,
+          reason: roleResult.error,
+        });
+      }
+  let membershipCreated = false;
+
+      membershipCreated = true;
+      onlyWhenUnassigned: !membershipCreated,

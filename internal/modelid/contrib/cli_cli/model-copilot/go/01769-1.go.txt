@@ -1,0 +1,39 @@
+// commit cbe04588f1b6 2026-09-04T14:12:21+02:00 internal/gh/mock/config.go
+	"sync"
+//			ClipboardFunc: func() gh.ConfigEntry {
+//				panic("mock out the Clipboard method")
+//			},
+	// ClipboardFunc mocks the Clipboard method.
+	ClipboardFunc func() gh.ConfigEntry
+
+		// Clipboard holds details about calls to the Clipboard method.
+		Clipboard []struct {
+		}
+	lockClipboard          sync.RWMutex
+// Clipboard calls ClipboardFunc.
+func (mock *ConfigMock) Clipboard() gh.ConfigEntry {
+	if mock.ClipboardFunc == nil {
+		panic("ConfigMock.ClipboardFunc: method is nil but Config.Clipboard was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockClipboard.Lock()
+	mock.calls.Clipboard = append(mock.calls.Clipboard, callInfo)
+	mock.lockClipboard.Unlock()
+	return mock.ClipboardFunc()
+}
+
+// ClipboardCalls gets all the calls that were made to Clipboard.
+// Check the length with:
+//
+//	len(mockedConfig.ClipboardCalls())
+func (mock *ConfigMock) ClipboardCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockClipboard.RLock()
+	calls = mock.calls.Clipboard
+	mock.lockClipboard.RUnlock()
+	return calls
+}
+

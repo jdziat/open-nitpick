@@ -1,0 +1,74 @@
+# commit ce880e5e354e 2025-06-19T23:11:55+02:00 browser_use/controller/service.py
+					long_term_memory=f'Task completed. Success Status: {params.success}',
+					is_done=True,
+					success=params.success,
+					extracted_content=user_message,
+					long_term_memory=memory,
+					attachments=attachments,
+			return ActionResult(
+				extracted_content=msg, include_in_memory=True, long_term_memory=f"Searched Google for '{params.query}'"
+			)
+				return ActionResult(extracted_content=msg, include_in_memory=True, long_term_memory=msg)
+						success=False, error=site_unavailable_msg, include_in_memory=True, long_term_memory=site_unavailable_msg
+			return ActionResult(extracted_content=msg, include_in_memory=True, long_term_memory='Navigated back')
+			return ActionResult(extracted_content=msg, include_in_memory=True, long_term_memory=f'Waited for {seconds} seconds')
+					return ActionResult(extracted_content=msg, include_in_memory=True, success=False, long_term_memory=msg)
+				return ActionResult(extracted_content=msg, include_in_memory=True, success=False, long_term_memory=msg)
+				return ActionResult(
+					extracted_content=msg, include_in_memory=True, long_term_memory=f'Clicked element {params.index}'
+				)
+				extracted_content=msg,
+				include_in_memory=True,
+				long_term_memory=f"Input '{params.text}' into element {params.index}.",
+			return ActionResult(
+				extracted_content=msg, include_in_memory=True, long_term_memory=f'Saved PDF to {sanitized_filename}'
+			)
+			return ActionResult(
+				extracted_content=msg, include_in_memory=True, long_term_memory=f'Switched to tab {params.page_id}'
+			)
+			return ActionResult(
+				extracted_content=msg, include_in_memory=True, long_term_memory=f'Opened new tab with URL {params.url}'
+			)
+				long_term_memory=f'Closed tab {params.page_id} with url {url}, now focused on tab {new_page_idx} with url {new_page.url}.',
+					update_only_read_state=True,
+					long_term_memory=memory,
+				extracted_content=msg,
+				include_in_memory=False,
+				long_term_memory='Retrieved accessibility tree',
+				update_only_read_state=True,
+			return ActionResult(
+				extracted_content=msg, include_in_memory=True, long_term_memory=f'Scrolled down the page by {amount_str}'
+			)
+			return ActionResult(
+				extracted_content=msg, include_in_memory=True, long_term_memory=f'Scrolled up the page by{amount_str}'
+			)
+			return ActionResult(extracted_content=msg, include_in_memory=True, long_term_memory=f'Sent keys: {params.keys}')
+							return ActionResult(
+								extracted_content=msg, include_in_memory=True, long_term_memory=f'Scrolled to text: {text}'
+							)
+					extracted_content=msg,
+					include_in_memory=True,
+					long_term_memory=f"Tried scrolling to text '{text}' but it was not found",
+						long_term_memory=f'Found dropdown options for index {index}.',
+						update_only_read_state=True,
+					return ActionResult(
+						extracted_content=msg, include_in_memory=True, long_term_memory='No dropdown options found'
+					)
+				return ActionResult(extracted_content=msg, include_in_memory=True, long_term_memory=msg)
+							return ActionResult(
+								extracted_content=msg, include_in_memory=True, long_term_memory=f"Selected option '{text}'"
+							)
+				return ActionResult(extracted_content=msg, include_in_memory=True, long_term_memory=msg)
+				return ActionResult(extracted_content=msg, include_in_memory=True, long_term_memory=msg)
+				extracted_content=extracted_tsv,
+				include_in_memory=True,
+				long_term_memory='Retrieved sheet contents',
+				update_only_read_state=True,
+				long_term_memory=f'Retrieved contents from {cell_or_range}',
+				update_only_read_state=True,
+				long_term_memory=f'Updated cells {cell_or_range} with {new_contents_tsv}',
+				long_term_memory=f'Cleared cells {cell_or_range}',
+				long_term_memory=f'Selected cells {cell_or_range}',
+				extracted_content=f'Inputted text {text}',
+				include_in_memory=False,
+				long_term_memory=f"Inputted text '{text}' into cell",

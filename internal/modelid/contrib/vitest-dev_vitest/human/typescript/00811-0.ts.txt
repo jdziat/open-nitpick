@@ -1,0 +1,57 @@
+// commit 122c25b5b157 2026-04-20T09:19:14+02:00 test/cli/test/assertion-helper.test.ts
+    ⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/11]⎯
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/11]⎯
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/11]⎯
+
+     FAIL  basic.test.ts > helper with context fail
+    AssertionError: expected 4321 to deeply equal 1234
+
+    - Expected
+    + Received
+
+    - 1234
+    + 4321
+
+     ❯ basic.test.ts:124:16
+        122|
+        123| test("helper with context fail", () => {
+        124|   helperObject.assertEqualProp(4321);
+           |                ^
+        125| });
+        126|
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/11]⎯
+
+     FAIL  basic.test.ts > async helper with context fail
+    AssertionError: expected 4321 to deeply equal 1234
+
+    - Expected
+    + Received
+
+    - 1234
+    + 4321
+
+     ❯ basic.test.ts:132:3
+        130|
+        131| test("async helper with context fail", async () => {
+        132|   await helperObject.assertEqualPropAsync(4321);
+           |   ^
+        133| });
+        134|
+
+    ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/11]⎯
+        "async helper with context fail": [
+          "expected 4321 to deeply equal 1234",
+        ],
+        "async helper with context pass": "passed",
+        "helper with context fail": [
+          "expected 4321 to deeply equal 1234",
+        ],
+        "helper with context pass": "passed",

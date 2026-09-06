@@ -1,0 +1,50 @@
+// commit 63d313a9735e 2026-06-25T14:26:13+01:00 pkg/github/ui_tools.go
+// uiGetMaxPages bounds how many pages each ui_get pagination loop will fetch.
+// ui_get backs a synchronous UI picker (dropdowns for labels/assignees/etc. in
+// the MCP App issue/PR write surfaces), so responsiveness matters more than
+// completeness. At PerPage 100 this caps a call at ~1000 items and a bounded
+// number of API round-trips, keeping latency predictable on very large
+// repos/orgs. Results past the cap are truncated and surfaced via a "has_more"
+// flag, which is acceptable because the picker pairs truncation with typeahead.
+const uiGetMaxPages = 10
+
+	hasMore := false
+	for page := 1; ; page++ {
+		if page >= uiGetMaxPages {
+			hasMore = true
+			break
+		}
+		"has_more":   hasMore,
+	hasMore := false
+	for page := 1; ; page++ {
+		if page >= uiGetMaxPages {
+			hasMore = true
+			break
+		}
+		"has_more":   hasMore,
+	hasMore := false
+	for page := 1; ; page++ {
+		if page >= uiGetMaxPages {
+			hasMore = true
+			break
+		}
+		"has_more":   hasMore,
+	hasMore := false
+	for page := 1; ; page++ {
+		if page >= uiGetMaxPages {
+			hasMore = true
+			break
+		}
+		"has_more":   hasMore,
+	hasMore := false
+	for page := 1; ; page++ {
+		if page >= uiGetMaxPages {
+			hasMore = true
+			break
+		}
+	for page := 1; ; page++ {
+		if page >= uiGetMaxPages {
+			hasMore = true
+			break
+		}
+		"has_more":   hasMore,

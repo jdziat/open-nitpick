@@ -1,0 +1,66 @@
+// commit aedcb974f055 2026-06-14T18:28:21-07:00 packages/mcp/src/require-mcp-auth.ts
+import {
+	ResourceUriSchema,
+	raiseResourceServerChallenge,
+} from "@better-auth/oauth-provider";
+import type {
+	DpopReplayReservations,
+	DpopReplayStore,
+} from "better-auth/oauth2";
+import {
+	createDpopReplayStore,
+	requestToResourceInput,
+	verifyAccessTokenRequest,
+} from "better-auth/oauth2";
+import { APIError } from "better-call";
+	/**
+	 * Maps a non-URL `resource` (an RFC 8707 `urn:` identifier or a client id) to
+	 * the URL of its protected resource metadata. Required when `resource` is not
+	 * an origin-based URL, so the `WWW-Authenticate` challenge can point at it.
+	 */
+	resourceMetadataMappings?: Record<string, string>;
+	/**
+	 * DPoP proof validation settings. By default the replay store is backed by
+	 * the auth instance's database adapter, so anti-replay holds across multiple
+	 * server instances. Override `replayStore` only to point at a different store.
+	 */
+	dpop?: {
+		proofMaxAgeSeconds?: number;
+		signingAlgorithms?: readonly string[];
+		replayStore?: DpopReplayStore;
+	};
+const unauthorized = (error: APIError): Response => {
+	const headers = new Headers(error.headers as HeadersInit);
+	headers.set("Content-Type", "application/json");
+			error: { code: -32000, message: error.message },
+			status: error.statusCode,
+			headers,
+		$context: Promise<{
+			baseURL: string;
+			internalAdapter: DpopReplayReservations;
+		}>;
+		const { baseURL, internalAdapter } = await auth.$context;
+			const jwt = await verifyAccessTokenRequest(requestToResourceInput(req), {
+				dpop: {
+					proofMaxAgeSeconds: opts?.dpop?.proofMaxAgeSeconds,
+					signingAlgorithms: opts?.dpop?.signingAlgorithms,
+					// Default to the database-backed store so proof replay is
+					// rejected across instances, not just within one process.
+					replayStore:
+						opts?.dpop?.replayStore ?? createDpopReplayStore(internalAdapter),
+				},
+		} catch (error) {
+			try {
+				raiseResourceServerChallenge(error, resource, {
+					scope: opts?.scope,
+					resourceMetadataMappings: opts?.resourceMetadataMappings,
+					dpopSigningAlgorithms: opts?.dpop?.signingAlgorithms,
+				});
+			} catch (challengeError) {
+				if (challengeError instanceof APIError) {
+					return unauthorized(challengeError);
+				}
+				if (challengeError instanceof Error) throw challengeError;
+				throw new Error(String(challengeError));
+			}
+			throw new Error(String(error));

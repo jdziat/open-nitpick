@@ -1,0 +1,225 @@
+# commit daa430435d2a 2025-08-06T06:23:45-07:00 browser_use/browser/session.py
+from pathlib import Path
+	
+	def model_post_init(self, __context) -> None:
+		"""Register event handlers after model initialization."""
+		# Register BrowserSession's event handlers manually since it's not a BaseWatchdog
+		self.event_bus.on('BrowserStartEvent', self.on_BrowserStartEvent)
+		self.event_bus.on('BrowserStopEvent', self.on_BrowserStopEvent)
+		port_number = (self.cdp_url or 'no-cdp').rsplit(':', 1)[-1].split('/', 1)[0]
+		return f'BrowserSession🆂 {self.id[-4:]}:{port_number} #{str(id(self))[-2:]} (cdp_url={self.cdp_url}, profile={self.browser_profile})'
+		port_number = (self.cdp_url or 'no-cdp').rsplit(':', 1)[-1].split('/', 1)[0]
+		return f'BrowserSession🆂 {self.id[-4:]}:{port_number} #{str(id(self))[-2:]}'  # ' 🅟 {str(id(self.current_target_id))[-2:]}'
+
+
+		self, cache_clickable_elements_hashes: bool = True, include_screenshot: bool = False
+
+
+
+
+				cache_clickable_elements_hashes=cache_clickable_elements_hashes,
+
+
+			cache_clickable_elements_hashes=cache_clickable_elements_hashes, include_screenshot=False
+					# Use helper to get document title
+						self._cdp_execute_on_target(
+							target_id,
+							commands=[('Runtime.evaluate', {'expression': 'document.title'})]
+						),
+					title = title_result.get('result', {}).get('value', '') if title_result else ''
+		url = await self.get_current_page_url() or 'unknown'
+			title = await asyncio.wait_for(self.get_current_page_title(), timeout=2.0)
+		# Get current page URL
+		page_url = await self.get_current_page_url()
+		is_empty_page = is_new_tab_page(page_url) or page_url.startswith('chrome://')
+				self.logger.debug(f'⚡ Fast path for empty page: {page_url}')
+					url=page_url,
+					title='New Tab' if is_new_tab_page(page_url) else 'Chrome Page',
+					self.logger.warning(f'DOM processing timed out after 45 seconds for {page_url}')
+				title = await asyncio.wait_for(self.get_current_page_title(), timeout=3.0)
+					f'DOM processing timed out for {page_url} - using minimal state. Basic navigation still available via go_to_url, scroll, and search actions.'
+				url=page_url,
+		session = await self.cdp_client.send.Target.attachToTarget(targetId=target_id, flatten=True)
+		# Get frame tree using helper
+		frame_tree = await self._cdp_execute_on_target(
+			target_id,
+			commands=[('Page.getFrameTree', {})]
+		)
+		session = await self.cdp_client.send.Target.attachToTarget(targetId=self.current_target_id, flatten=True)
+			session = await cdp_client.send.Target.attachToTarget(targetId=target_id, flatten=True)
+				autoAttach=True,
+				waitForDebuggerOnStart=False,
+				flatten=True,
+				sessionId=session_id
+				cdp_client.send.DOM.enable(sessionId=session_id),
+				cdp_client.send.Accessibility.enable(sessionId=session_id),
+				cdp_client.send.DOMSnapshot.enable(sessionId=session_id),
+				cdp_client.send.Page.enable(sessionId=session_id),
+				session = await search_client.send.Target.attachToTarget(targetId=target['targetId'], flatten=True)
+				await search_client.send.Page.enable(sessionId=temp_session_id)
+				frame_tree = await search_client.send.Page.getFrameTree(sessionId=temp_session_id)
+			result = await cdp_client.send.DOM.describeNode(backendNodeId=node.backend_node_id, sessionId=session_id)
+	async def get_current_target_info(self) -> dict | None:
+		"""Get info about the current active target using CDP."""
+		if not self.current_target_id:
+			return None
+		
+		targets = await self.cdp_client.send.Target.getTargets()
+		for target in targets.get('targetInfos', []):
+			if target.get('targetId') == self.current_target_id:
+				return target
+		return None
+	
+	async def get_current_page_url(self) -> str:
+		"""Get the URL of the current page using CDP."""
+		target = await self.get_current_target_info()
+		if target:
+			return target.get('url', '')
+		return ''
+	
+	async def get_current_page_title(self) -> str:
+		"""Get the title of the current page using CDP."""
+		if not self.current_target_id:
+			return ''
+		
+		try:
+			session = await self.cdp_client.send.Target.attachToTarget(targetId=self.current_target_id, flatten=True)
+			session_id = session['sessionId']
+			title_result = await self.cdp_client.send.Runtime.evaluate(
+				expression='document.title',
+				sessionId=session_id
+			)
+			title = title_result.get('result', {}).get('value', '')
+			await self.cdp_client.send.Target.detachFromTarget(sessionId=session_id)
+			return title
+		except Exception:
+			return ''
+	async def get_selector_map(self) -> dict[int, 'EnhancedDOMTreeNode']:
+		"""Get the current selector map from cached state or DOM watchdog.
+		
+		Returns:
+			Dictionary mapping element indices to EnhancedDOMTreeNode objects
+		"""
+		# First try cached selector map
+		if self._cached_selector_map:
+			return self._cached_selector_map
+		
+		# Try to get from DOM watchdog
+		if self._dom_watchdog and hasattr(self._dom_watchdog, 'selector_map'):
+			return self._dom_watchdog.selector_map or {}
+		
+		# Return empty dict if nothing available
+		return {}
+
+	async def remove_highlights(self) -> None:
+		"""Remove highlights from the page using CDP."""
+		if self.cdp_client and self.current_target_id:
+			try:
+				# Attach to current target
+				session = await self.cdp_client.send.Target.attachToTarget(
+					targetId=self.current_target_id, flatten=True
+				)
+				session_id = session['sessionId']
+				
+				# Remove highlights via JavaScript
+				script = """
+					// Remove all highlight elements
+					const highlights = document.querySelectorAll('[data-highlight-index]');
+					highlights.forEach(el => el.remove());
+				"""
+				await self.cdp_client.send.Runtime.evaluate(
+					expression=script,
+					sessionId=session_id
+				)
+				
+				# Detach from target
+				await self.cdp_client.send.Target.detachFromTarget(sessionId=session_id)
+			except Exception as e:
+				self.logger.debug(f'Failed to remove highlights: {e}')
+
+	@property
+	def downloaded_files(self) -> list[str]:
+		"""Get list of downloaded files from the downloads directory."""
+		if not self.browser_profile.downloads_path:
+			return []
+		
+		downloads_dir = Path(self.browser_profile.downloads_path)
+		if not downloads_dir.exists():
+			return []
+		
+		# Get all files in downloads directory (not directories)
+		files = [str(f) for f in downloads_dir.iterdir() if f.is_file()]
+		return sorted(files)
+
+	async def _cdp_execute_on_target(self, target_id: str, commands: list[tuple[str, dict]] | None = None, callable_fn: Any | None = None) -> Any:
+		"""Execute CDP commands on a specific target with automatic attach/detach.
+		
+		Args:
+			target_id: The target ID to attach to
+			commands: List of (method, params) tuples to execute, e.g. [('Runtime.evaluate', {'expression': '...'})]
+			callable_fn: Alternative - async function that receives (cdp_client, session_id) and returns result
+			
+		Returns:
+			Result of the last command or callable_fn return value
+		"""
+		# Attach to target
+		session = await self.cdp_client.send.Target.attachToTarget(targetId=target_id, flatten=True)
+		session_id = session['sessionId']
+		
+		try:
+			if callable_fn:
+				# Execute the provided async function
+				return await callable_fn(self.cdp_client, session_id)
+			elif commands:
+				# Execute the list of commands
+				result = None
+				for method, params in commands:
+					# Parse the method name to get domain and command
+					domain, command = method.split('.')
+					# Get the domain object dynamically
+					domain_obj = getattr(self.cdp_client.send, domain)
+					# Call the command with params and session_id
+					# CDP library expects params as first arg (can be None), session_id as second
+					cmd_func = getattr(domain_obj, command)
+					if params:
+						result = await cmd_func(params=params, session_id=session_id)
+					else:
+						result = await cmd_func(session_id=session_id)
+				return result
+			else:
+				return session_id  # Just return session_id if no commands
+		finally:
+			# Always detach from target
+			await self.cdp_client.send.Target.detachFromTarget(sessionId=session_id)
+
+		targets = await self.cdp_client.send.Target.getTargets()
+		result = await self.cdp_client.send.Target.createTarget(
+			url=url, newWindow=False, background=False
+		)
+		await self.cdp_client.send.Target.closeTarget(targetId=target_id)
+		await self.cdp_client.send.Target.activateTarget(targetId=target_id)
+		result = await self.cdp_client.send.Network.getCookies(**params)
+		await self.cdp_client.send.Network.setCookies(cookies=cookies)
+		await self.cdp_client.send.Network.clearBrowserCookies()
+		await self.cdp_client.send.Network.setExtraHTTPHeaders(headers=headers)
+		await self.cdp_client.send.Browser.grantPermissions(**params)
+		await self.cdp_client.send.Emulation.setGeolocationOverride(
+			latitude=latitude, longitude=longitude, accuracy=accuracy
+		await self.cdp_client.send.Emulation.clearGeolocationOverride()
+		result = await self.cdp_client.send.Page.addScriptToEvaluateOnNewDocument(source=script)
+		await self.cdp_client.send.Page.removeScriptToEvaluateOnNewDocument(identifier=identifier)
+		await self.cdp_client.send.Emulation.setDeviceMetricsOverride(
+			width=width, height=height, deviceScaleFactor=device_scale_factor, mobile=mobile
+		cookies_result = await self.cdp_client.send.Network.getCookies()
+		if target_id:
+			# Use helper to navigate on specific target
+			await self._cdp_execute_on_target(
+				target_id,
+				commands=[
+					('Page.enable', {}),
+					('Page.navigate', {'url': url})
+				]
+			)
+		else:
+			# Navigate on the default/current target
+			await self.cdp_client.send.Page.navigate(url=url)

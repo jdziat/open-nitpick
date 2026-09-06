@@ -1,0 +1,35 @@
+// commit 28b868dad4ac 2025-11-21T10:34:51+01:00 internal/ghmcp/server.go
+	"github.com/github/github-mcp-server/pkg/lockdown"
+
+	// RepoAccessTTL overrides the default TTL for repository access cache entries.
+	RepoAccessTTL *time.Duration
+	repoAccessOpts := []lockdown.RepoAccessOption{}
+	if cfg.RepoAccessTTL != nil {
+		repoAccessOpts = append(repoAccessOpts, lockdown.WithTTL(*cfg.RepoAccessTTL))
+	}
+	var repoAccessCache *lockdown.RepoAccessCache
+	if cfg.LockdownMode {
+		repoAccessCache = lockdown.GetInstance(gqlClient, repoAccessOpts...)
+	}
+		repoAccessCache,
+
+	// RepoAccessCacheTTL overrides the default TTL for repository access cache entries.
+	RepoAccessCacheTTL *time.Duration
+
+	ghServer, err := NewMCPServer(MCPServerConfig{
+		Version:           cfg.Version,
+		Host:              cfg.Host,
+		Token:             cfg.Token,
+		EnabledToolsets:   cfg.EnabledToolsets,
+		DynamicToolsets:   cfg.DynamicToolsets,
+		ReadOnly:          cfg.ReadOnly,
+		Translator:        t,
+		ContentWindowSize: cfg.ContentWindowSize,
+		LockdownMode:      cfg.LockdownMode,
+		RepoAccessTTL:     cfg.RepoAccessCacheTTL,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create MCP server: %w", err)
+	}
+
+	stdioServer := server.NewStdioServer(ghServer)

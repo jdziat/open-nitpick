@@ -1,0 +1,51 @@
+// commit 55818fb5bb8f 2025-06-28T21:29:19+02:00 helpers.go
+				unescaped, err := unescapeHeaderValue(value)
+				if err != nil {
+					allSpecParamsMatch = false
+					return false
+				}
+				allSpecParamsMatch = utils.EqualFold(specVal, unescaped)
+func joinHeaderValues(headers [][]byte) []byte {
+	switch len(headers) {
+	case 0:
+		return nil
+	case 1:
+		return headers[0]
+	default:
+		return bytes.Join(headers, []byte{','})
+	}
+}
+
+func unescapeHeaderValue(v []byte) ([]byte, error) {
+	if bytes.IndexByte(v, '\\') == -1 {
+		return v, nil
+	}
+	res := make([]byte, 0, len(v))
+	escaping := false
+	for i, c := range v {
+		if escaping {
+			res = append(res, c)
+			escaping = false
+			continue
+		}
+		if c == '\\' {
+			// invalid escape at end of string
+			if i == len(v)-1 {
+				return nil, errors.New("invalid escape sequence")
+			}
+			escaping = true
+			continue
+		}
+		res = append(res, c)
+	}
+	if escaping {
+		return nil, errors.New("invalid escape sequence")
+	}
+	return res, nil
+}
+
+					val, err := unescapeHeaderValue(value)
+					if err != nil {
+						return true
+					}
+					params[lowerKey] = val

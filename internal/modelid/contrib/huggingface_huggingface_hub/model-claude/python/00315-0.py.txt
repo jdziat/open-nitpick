@@ -1,0 +1,56 @@
+# commit 5c9ea9408439 2026-02-17T14:34:47+01:00 src/huggingface_hub/cli/jobs.py
+
+def _parse_namespace_from_job_id(job_id: str, namespace: Optional[str]) -> tuple[str, Optional[str]]:
+    """Extract namespace from job_id if provided in 'namespace/job_id' format.
+
+    Allows users to pass job IDs copied from the Hub UI (e.g. 'username/job_id')
+    instead of only bare job IDs. If the namespace is also provided explicitly via
+    --namespace and conflicts, a CLIError is raised.
+    """
+    if not job_id:
+        raise CLIError("Job ID cannot be empty.")
+
+    if job_id.count("/") > 1:
+        raise CLIError(f"Job ID must be in the form 'job_id' or 'namespace/job_id': '{job_id}'.")
+
+    if "/" not in job_id:
+        return job_id, namespace
+
+    extracted_namespace, parsed_job_id = job_id.split("/", 1)
+    if not extracted_namespace or not parsed_job_id:
+        raise CLIError(f"Job ID must be in the form 'job_id' or 'namespace/job_id': '{job_id}'.")
+
+    if namespace is not None and namespace != extracted_namespace:
+        raise CLIError(
+            f"Conflicting namespace: got --namespace='{namespace}' but job ID implies namespace='{extracted_namespace}'"
+        )
+
+    return parsed_job_id, extracted_namespace
+
+
+        help="Job ID (or 'namespace/job_id')",
+        help="Job IDs (or 'namespace/job_id')",
+        help="Scheduled Job ID (or 'namespace/scheduled_job_id')",
+    job_id, namespace = _parse_namespace_from_job_id(job_id, namespace)
+    if job_ids is not None:
+        parsed_ids = []
+        for job_id in job_ids:
+            job_id, namespace = _parse_namespace_from_job_id(job_id, namespace)
+            parsed_ids.append(job_id)
+        job_ids = parsed_ids
+            help="Job IDs to inspect (or 'namespace/job_id')",
+    parsed_ids = []
+    for job_id in job_ids:
+        job_id, namespace = _parse_namespace_from_job_id(job_id, namespace)
+        parsed_ids.append(job_id)
+    job_ids = parsed_ids
+    job_id, namespace = _parse_namespace_from_job_id(job_id, namespace)
+            help="Scheduled Job IDs to inspect (or 'namespace/scheduled_job_id')",
+    parsed_ids = []
+    for job_id in scheduled_job_ids:
+        job_id, namespace = _parse_namespace_from_job_id(job_id, namespace)
+        parsed_ids.append(job_id)
+    scheduled_job_ids = parsed_ids
+    scheduled_job_id, namespace = _parse_namespace_from_job_id(scheduled_job_id, namespace)
+    scheduled_job_id, namespace = _parse_namespace_from_job_id(scheduled_job_id, namespace)
+    scheduled_job_id, namespace = _parse_namespace_from_job_id(scheduled_job_id, namespace)

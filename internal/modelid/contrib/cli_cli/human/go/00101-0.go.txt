@@ -1,0 +1,34 @@
+// commit 169b909015a9 2025-06-19T10:18:23-04:00 pkg/cmd/release/verify-asset/verify_asset.go
+	"github.com/MakeNowJust/heredoc"
+		Use:   "verify-asset [<tag>] <file-path>",
+		Short: "Verify that a given asset originated from a specific GitHub Release.",
+		Long: heredoc.Doc(`
+			Verify that a given asset file originated from a specific GitHub Release using cryptographically signed attestations.
+
+			## Understanding Verification
+
+			An attestation is a claim made by GitHub regarding a release and its assets.
+
+			## What This Command Does
+
+			This command checks that the asset you provide matches an attestation produced by GitHub for a particular release. 
+			It ensures the asset's integrity by validating:
+			* The asset's digest matches the subject in the attestation
+			* The attestation is associated with the specified release
+		`),
+		Example: heredoc.Doc(`
+			# Verify an asset from the latest release
+			$ gh release verify-asset ./dist/my-asset.zip
+
+			# Verify an asset from a specific release tag
+			$ gh release verify-asset v1.2.3 ./dist/my-asset.zip
+
+			# Verify an asset from a specific release tag and output the attestation in JSON format
+			$ gh release verify-asset v1.2.3 ./dist/my-asset.zip --format json
+		`),
+	// Find attestations for the release tag SHA
+		// TODO: Allow this value to be set via a flag.
+		// The limit is set to 100 to ensure we fetch all attestations for a given SHA.
+		// While multiple attestations can exist for a single SHA,
+		// only one attestation is associated with each release tag.
+		Limit: 100,

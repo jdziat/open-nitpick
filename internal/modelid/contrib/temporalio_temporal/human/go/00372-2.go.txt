@@ -1,0 +1,42 @@
+// commit 58449b9d804b 2026-01-15T17:09:54-08:00 components/nexusoperations/statemachine.go
+			ScheduleToStartTimeout: attrs.ScheduleToStartTimeout,
+			StartToCloseTimeout:    attrs.StartToCloseTimeout,
+	var tasks []hsm.Task
+
+		tasks = append(tasks, ScheduleToCloseTimeoutTask{
+			deadline: o.ScheduledTime.AsTime().Add(o.ScheduleToCloseTimeout.AsDuration()),
+		})
+	}
+
+	if o.ScheduleToStartTimeout.AsDuration() != 0 {
+		tasks = append(tasks, ScheduleToStartTimeoutTask{
+			deadline: o.ScheduledTime.AsTime().Add(o.ScheduleToStartTimeout.AsDuration()),
+		})
+	}
+
+	return tasks, nil
+}
+
+// startToCloseTimeoutTask returns the StartToCloseTimeout task if the timeout is set.
+// This task is created when an operation transitions to the STARTED state.
+func (o Operation) startToCloseTimeoutTask() []hsm.Task {
+	if o.StartedTime.AsTime().IsZero() || o.StartToCloseTimeout.AsDuration() == 0 {
+		return nil
+	}
+	return []hsm.Task{
+		StartToCloseTimeoutTask{
+			deadline: o.StartedTime.AsTime().Add(o.StartToCloseTimeout.AsDuration()),
+		},
+	return append(append(transitionTasks, creationTasks...), o.startToCloseTimeoutTask()...), nil
+		op.StartedTime = timestamppb.New(event.Time)
+
+
+		output, err := op.output()
+		if err != nil {
+			return output, err
+		}
+
+		// Schedule start-to-close timeout task if configured
+		output.Tasks = append(output.Tasks, op.startToCloseTimeoutTask()...)
+
+		return output, nil

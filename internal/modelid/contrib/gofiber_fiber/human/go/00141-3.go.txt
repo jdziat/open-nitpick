@@ -1,0 +1,120 @@
+// commit 2a01f970d8b5 2025-07-29T09:42:39+02:00 res_interface_gen.go
+	"io"
+
+	"github.com/valyala/fasthttp"
+// Res is an interface for response-related Ctx methods.
+	// App returns the *App reference to the instance of the Fiber application
+	App() *App
+	// Append the specified value to the HTTP response header field.
+	// If the header is not already set, it creates the header with the specified value.
+	// Attachment sets the HTTP response Content-Disposition header field to attachment.
+	// ClearCookie expires a specific cookie by key on the client side.
+	// If no key is provided it expires all cookies that came with the request.
+	// RequestCtx returns *fasthttp.RequestCtx that carries a deadline
+	// a cancellation signal, and other values across API boundaries.
+	RequestCtx() *fasthttp.RequestCtx
+	// Cookie sets a cookie by passing a cookie struct.
+	// Download transfers the file from path as an attachment.
+	// Typically, browsers will prompt the user for download.
+	// By default, the Content-Disposition header filename= parameter is the filepath (this typically appears in the browser dialog).
+	// Override this default with the filename parameter.
+	// Response return the *fasthttp.Response object
+	// This allows you to use all fasthttp response methods
+	// https://godoc.org/github.com/valyala/fasthttp#Response
+	Response() *fasthttp.Response
+	// Format performs content-negotiation on the Accept HTTP header.
+	// It uses Accepts to select a proper format and calls the matching
+	// user-provided handler function.
+	// If no accepted format is found, and a format with MediaType "default" is given,
+	// that default handler is called. If no format is found and no default is given,
+	// StatusNotAcceptable is sent.
+	// AutoFormat performs content-negotiation on the Accept HTTP header.
+	// It uses Accepts to select a proper format.
+	// The supported content types are text/html, text/plain, application/json, and application/xml.
+	// For more flexible content negotiation, use Format.
+	// If the header is not specified or there is no proper format, text/plain is used.
+	AutoFormat(body any) error
+	// Get (a.k.a. GetRespHeader) returns the HTTP response header specified by field.
+	// Field names are case-insensitive
+	// Returned value is only valid within the handler. Do not store any references.
+	// Make copies or use the Immutable setting instead.
+	// GetHeaders (a.k.a GetRespHeaders) returns the HTTP response headers.
+	// Returned value is only valid within the handler. Do not store any references.
+	// Make copies or use the Immutable setting instead.
+	GetHeaders() map[string][]string
+	// JSON converts any interface or string to JSON.
+	// Array and slice values encode as JSON arrays,
+	// except that []byte encodes as a base64-encoded string,
+	// and a nil slice encodes as the null JSON value.
+	// If the ctype parameter is given, this method will set the
+	// Content-Type header equal to ctype. If ctype is not given,
+	// The Content-Type header will be set to application/json; charset=utf-8.
+	JSON(data any, ctype ...string) error
+	// MsgPack converts any interface or string to MessagePack encoded bytes.
+	// If the ctype parameter is given, this method will set the
+	// Content-Type header equal to ctype. If ctype is not given,
+	// The Content-Type header will be set to application/vnd.msgpack.
+	MsgPack(data any, ctype ...string) error
+	// CBOR converts any interface or string to CBOR encoded bytes.
+	// If the ctype parameter is given, this method will set the
+	// Content-Type header equal to ctype. If ctype is not given,
+	// The Content-Type header will be set to application/cbor.
+	CBOR(data any, ctype ...string) error
+	// JSONP sends a JSON response with JSONP support.
+	// This method is identical to JSON, except that it opts-in to JSONP callback support.
+	// By default, the callback name is simply callback.
+	// XML converts any interface or string to XML.
+	// This method also sets the content header to application/xml; charset=utf-8.
+	XML(data any) error
+	// Links joins the links followed by the property to populate the response's Link HTTP header field.
+	// Location sets the response Location HTTP header to the specified path parameter.
+	// OriginalURL contains the original request URL.
+	// Returned value is only valid within the handler. Do not store any references.
+	// Make copies or use the Immutable setting to use the value outside the Handler.
+	OriginalURL() string
+	// Redirect returns the Redirect reference.
+	// Use Redirect().Status() to set custom redirection status code.
+	// If status is not specified, status defaults to 303 See Other.
+	// You can use Redirect().To(), Redirect().Route() and Redirect().Back() for redirection.
+	Redirect() *Redirect
+	// ViewBind Add vars to default view var map binding to template engine.
+	// Variables are read by the Render method and may be overwritten.
+	ViewBind(vars Map) error
+	// getLocationFromRoute get URL location from route using parameters
+	getLocationFromRoute(route Route, params Map) (string, error)
+	// GetRouteURL generates URLs to named routes, with parameters. URLs are relative, for example: "/user/1831"
+	GetRouteURL(routeName string, params Map) (string, error)
+	// Render a template with data and sends a text/html response.
+	// We support the following engines: https://github.com/gofiber/template
+	renderExtensions(bind any)
+	// Send sets the HTTP response body without copying it.
+	// From this point onward the body argument must not be changed.
+	// SendFile transfers the file from the specified path.
+	// By default, the file is not compressed. To enable compression, set SendFile.Compress to true.
+	// The Content-Type response HTTP header field is set based on the file's extension.
+	// If the file extension is missing or invalid, the Content-Type is detected from the file's format.
+	// SendStatus sets the HTTP status code and if the response body is empty,
+	// it sets the correct status message in the body.
+	// SendString sets the HTTP response body for string types.
+	// This means no type assertion, recommended for faster performance
+	// SendStream sets response body stream and optional body size.
+	SendStream(stream io.Reader, size ...int) error
+	// SendStreamWriter sets response body stream writer
+	// Set sets the response's HTTP header field to the specified key, value.
+	setCanonical(key, val string)
+	// Status sets the HTTP status for the response.
+	// This method is chainable.
+	// Type sets the Content-Type HTTP header to the MIME type specified by the file extension.
+	// Vary adds the given header field to the Vary response header.
+	// This will append the header, if not already listed, otherwise leaves it listed in the current location.
+	// Write appends p into response body.
+	// Writef appends f & a into response body writer.
+	// WriteString appends s to response body.
+	// Release is a method to reset Res fields when to use ReleaseCtx()
+	release()
+	// Drop closes the underlying connection without sending any response headers or body.
+	// This can be useful for silently terminating client connections, such as in DDoS mitigation
+	// or when blocking access to sensitive endpoints.
+	Drop() error
+	// End immediately flushes the current response and closes the underlying connection.
+	End() error

@@ -1,0 +1,74 @@
+// commit f5e29eaf1e57 2026-05-18T21:44:09+00:00 packages/better-auth/src/plugins/organization/adapter.ts
+import {
+	getCurrentAdapter,
+	runWithTransaction,
+} from "@better-auth/core/context";
+			return runWithTransaction(baseAdapter, async () => {
+				const adapter = await getCurrentAdapter(baseAdapter);
+				let userId: string;
+				if (!_userId) {
+					const member = await adapter.findOne<Member>({
+						model: "member",
+						where: [{ field: "id", value: memberId }],
+					});
+					if (!member) {
+						throw new BetterAuthError("Member not found");
+					}
+					userId = member.userId;
+				} else {
+					userId = _userId;
+				const member = await adapter.delete<InferMember<O, false>>({
+					model: "member",
+					where: [
+						{
+							field: "id",
+							value: memberId,
+						},
+					],
+				if (options?.teams?.enabled) {
+					const teams = await adapter.findMany<Team>({
+						model: "team",
+						where: [{ field: "organizationId", value: organizationId }],
+					});
+					if (teams.length > 0) {
+						await adapter.deleteMany({
+								{
+									field: "teamId",
+									value: teams.map((team) => team.id),
+									operator: "in",
+								},
+						});
+					}
+				}
+				return member;
+			});
+			return runWithTransaction(baseAdapter, async () => {
+				const adapter = await getCurrentAdapter(baseAdapter);
+				await adapter.deleteMany({
+					model: "member",
+					where: [
+						{
+							field: "organizationId",
+							value: organizationId,
+						},
+					],
+				});
+				await adapter.deleteMany({
+					model: "invitation",
+					where: [
+						{
+							field: "organizationId",
+							value: organizationId,
+						},
+					],
+				});
+				await adapter.delete<InferOrganization<O, false>>({
+					model: "organization",
+					where: [
+						{
+							field: "id",
+							value: organizationId,
+						},
+					],
+				});
+				return organizationId;

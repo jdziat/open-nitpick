@@ -1,0 +1,71 @@
+// commit 32bbf315122e 2026-03-11T19:12:35+00:00 common/rpc/interceptor/business_id_extractor.go
+	deploymentpb "go.temporal.io/api/deployment/v1"
+	taskqueuepb "go.temporal.io/api/taskqueue/v1"
+	updatepb "go.temporal.io/api/update/v1"
+
+	taskQueueNameGetter interface {
+		GetTaskQueue() string
+	}
+
+	taskQueueNameFromMessageGetter interface {
+		GetTaskQueue() *taskqueuepb.TaskQueue
+	}
+
+	deploymentNameGetter interface {
+		GetDeploymentName() string
+	}
+
+	deploymentVersionGetter interface {
+		GetDeploymentVersion() *deploymentpb.WorkerDeploymentVersion
+	}
+
+	pollerGroupIDGetter interface {
+		GetPollerGroupId() string
+	}
+
+	namespaceGetter interface {
+		GetNamespace() string
+	}
+
+	updateRefGetter interface {
+		GetUpdateRef() *updatepb.UpdateRef
+	}
+	case PatternTaskQueueName:
+		if getter, ok := req.(taskQueueNameGetter); ok {
+			return getter.GetTaskQueue()
+		}
+
+	case PatternTaskQueueNameFromMessage:
+		if getter, ok := req.(taskQueueNameFromMessageGetter); ok {
+			if tq := getter.GetTaskQueue(); tq != nil {
+				return tq.GetName()
+			}
+		}
+
+	case PatternDeploymentName:
+		if getter, ok := req.(deploymentNameGetter); ok {
+			return getter.GetDeploymentName()
+		}
+
+	case PatternDeploymentVersion:
+		if getter, ok := req.(deploymentVersionGetter); ok {
+			if dv := getter.GetDeploymentVersion(); dv != nil {
+				return dv.GetDeploymentName()
+			}
+		}
+
+	case PatternPollerGroupID:
+		if getter, ok := req.(pollerGroupIDGetter); ok {
+			return getter.GetPollerGroupId()
+		}
+
+	case PatternNamespace:
+		if getter, ok := req.(namespaceGetter); ok {
+			return getter.GetNamespace()
+		}
+
+	case PatternUpdateRef:
+		if getter, ok := req.(updateRefGetter); ok {
+			return getter.GetUpdateRef().GetWorkflowExecution().GetWorkflowId()
+		}
+

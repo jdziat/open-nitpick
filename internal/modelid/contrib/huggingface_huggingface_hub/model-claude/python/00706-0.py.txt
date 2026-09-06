@@ -1,0 +1,40 @@
+# commit fa5b828bceb9 2026-06-29T16:32:23+02:00 src/huggingface_hub/cli/cache.py
+def _prune_summary(revision_count: int, incomplete_count: int) -> str:
+    """Build the human-readable summary of what `hf cache prune` is about to delete."""
+    parts: list[str] = []
+    if revision_count:
+        parts.append(f"{revision_count} unreferenced revision(s)")
+    if incomplete_count:
+        parts.append(f"{incomplete_count} incomplete download(s)")
+    return " and ".join(parts)
+
+
+    incomplete_files = hf_cache_info.incomplete_files
+    if incomplete_files:
+        out.hint(
+            f"Found {len(incomplete_files)} incomplete download(s) totalling "
+            f"{_format_size(hf_cache_info.incomplete_size_on_disk)}. "
+            "Remove them with 'hf cache prune'."
+        )
+
+    """Remove detached revisions and incomplete downloads from the cache."""
+    incomplete_files = hf_cache_info.incomplete_files
+
+    if len(revisions) == 0 and not incomplete_files:
+        out.text("No unreferenced revisions or incomplete downloads found. Nothing to prune.")
+    strategy = hf_cache_info.delete_revisions(*sorted(revisions))
+    total_freed = strategy.expected_freed_size + hf_cache_info.incomplete_size_on_disk
+    summary = _prune_summary(counts.total_revision_count, len(incomplete_files))
+    out.text(f"About to delete {summary} ({_format_size(total_freed)} total).")
+            incomplete=len(incomplete_files),  # might be overstated but it's fine
+            size=_format_size(total_freed),
+    for incomplete_file in incomplete_files:
+        try:
+            incomplete_file.file_path.unlink()
+        except FileNotFoundError:
+            pass  # already removed (e.g. by a full-repo deletion above)
+        except OSError as exc:
+            out.warning(f"Could not delete incomplete file {incomplete_file.file_path}: {exc}")
+        f"Deleted {summary}; freed {_format_size(total_freed)}.",
+        incomplete_deleted=len(incomplete_files),
+        freed=_format_size(total_freed),

@@ -1,0 +1,92 @@
+// commit 86d876fd34da 2026-03-26T14:26:16+01:00 internal/prompter/huh_prompter.go
+func (p *huhPrompter) buildSelectForm(prompt, defaultValue string, options []string) (*huh.Form, *int) {
+	form := p.newForm(
+	)
+	return form, &result
+}
+func (p *huhPrompter) Select(prompt, defaultValue string, options []string) (int, error) {
+	form, result := p.buildSelectForm(prompt, defaultValue, options)
+	err := form.Run()
+	return *result, err
+func (p *huhPrompter) buildMultiSelectForm(prompt string, defaults []string, options []string) (*huh.Form, *[]int) {
+	form := p.newForm(
+	)
+	return form, &result
+}
+func (p *huhPrompter) MultiSelect(prompt string, defaults []string, options []string) ([]int, error) {
+	form, result := p.buildMultiSelectForm(prompt, defaults, options)
+	err := form.Run()
+	return *result, nil
+func (p *huhPrompter) buildMultiSelectWithSearchForm(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) (*huh.Form, *[]string) {
+	searchCacheValid := false
+		if !searchCacheValid || query != cachedSearchQuery {
+			searchCacheValid = true
+	form := p.newForm(
+	)
+	return form, &selectedValues
+}
+
+func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
+	form, result := p.buildMultiSelectWithSearchForm(prompt, searchPrompt, defaultValues, persistentValues, searchFunc)
+	err := form.Run()
+	return *result, nil
+func (p *huhPrompter) buildInputForm(prompt, defaultValue string) (*huh.Form, *string) {
+	form := p.newForm(
+	)
+	return form, &result
+}
+func (p *huhPrompter) Input(prompt, defaultValue string) (string, error) {
+	form, result := p.buildInputForm(prompt, defaultValue)
+	err := form.Run()
+	return *result, err
+func (p *huhPrompter) buildPasswordForm(prompt string) (*huh.Form, *string) {
+	form := p.newForm(
+	)
+	return form, &result
+}
+func (p *huhPrompter) Password(prompt string) (string, error) {
+	form, result := p.buildPasswordForm(prompt)
+	err := form.Run()
+	return *result, nil
+func (p *huhPrompter) buildConfirmForm(prompt string, defaultValue bool) (*huh.Form, *bool) {
+	form := p.newForm(
+	)
+	return form, &result
+}
+func (p *huhPrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
+	form, result := p.buildConfirmForm(prompt, defaultValue)
+	err := form.Run()
+	return *result, nil
+func (p *huhPrompter) buildAuthTokenForm() (*huh.Form, *string) {
+	form := p.newForm(
+	)
+	return form, &result
+}
+func (p *huhPrompter) AuthToken() (string, error) {
+	form, result := p.buildAuthTokenForm()
+	err := form.Run()
+	return *result, err
+func (p *huhPrompter) buildConfirmDeletionForm(requiredValue string) *huh.Form {
+	)
+func (p *huhPrompter) ConfirmDeletion(requiredValue string) error {
+	return p.buildConfirmDeletionForm(requiredValue).Run()
+}
+func (p *huhPrompter) buildInputHostnameForm() (*huh.Form, *string) {
+	var result string
+	form := p.newForm(
+	)
+	return form, &result
+}
+func (p *huhPrompter) InputHostname() (string, error) {
+	form, result := p.buildInputHostnameForm()
+	err := form.Run()
+	return *result, nil
+func (p *huhPrompter) buildMarkdownEditorForm(prompt string, blankAllowed bool) (*huh.Form, *string) {
+	form := p.newForm(
+	)
+	return form, &result
+}
+func (p *huhPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
+	form, result := p.buildMarkdownEditorForm(prompt, blankAllowed)
+	err := form.Run()
+	if *result == "skip" {

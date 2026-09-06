@@ -1,0 +1,43 @@
+// commit cd667daadb88 2026-09-02T18:46:50-07:00 chasm/lib/scheduler/migration/migration.go
+	recentFromInfo := len(info.GetRecentActions()) > 0
+	if recentFromInfo {
+	}
+	ongoingBackfills, triggerStarts := convertBackfillersCHASMToLegacy(backfillers, migrationTime)
+
+	// recent is a concatenation of independently-ordered sources (stored info + invoker-derived),
+	// and RecentActions has no order-sensitive consumer -- it's just a display/history list -- so
+	// a plain re-sort by ActualTime is correct.
+	if recentFromInfo {
+
+	// bufferedStarts is different: it's already in invoker enqueue order, and that order is
+	// load-bearing -- it's fed into the same ProcessBuffer V1 uses, where BUFFER_ONE and
+	// "nothing running" both take whichever entry comes first in iteration order, never
+	// comparing ActualTime. A pending trigger Backfiller hasn't been enqueued yet --
+	// BackfillerTaskHandler.processTrigger builds its single BufferedStart and only appends it
+	// via Invoker.EnqueueBufferedStarts once its task actually executes, regardless of the
+	// trigger's own ActualTime -- so simulating "if CHASM kept running" means every still-pending
+	// trigger belongs after whatever's already buffered, not repositioned into it by time.
+	// triggerStarts are sorted only among themselves (built from a randomized map iteration, so
+	// they have no defined relative order of their own) purely for a deterministic tie-break,
+	// then appended after bufferedStarts unchanged.
+	bufferedStarts = appendSortedTriggerStarts(bufferedStarts, triggerStarts)
+// appendSortedTriggerStarts appends triggerStarts after bufferedStarts, leaving bufferedStarts'
+// own relative order untouched. See the comment at the call site for why: a pending trigger
+// Backfiller only ever gets enqueued (appended) once its task actually executes, never
+// repositioned earlier by its own ActualTime. triggerStarts are sorted only among themselves --
+// built from a randomized map iteration over pending backfillers, they have no defined relative
+// order of their own -- purely so that multiple simultaneously-pending triggers land in the
+// resulting list in a deterministic (not map-iteration-dependent) order.
+func appendSortedTriggerStarts(
+	bufferedStarts []*schedulespb.BufferedStart,
+	triggerStarts []*schedulespb.BufferedStart,
+) []*schedulespb.BufferedStart {
+	if len(triggerStarts) == 0 {
+		return bufferedStarts
+	}
+	slices.SortFunc(triggerStarts, func(a, b *schedulespb.BufferedStart) int {
+		return a.GetActualTime().AsTime().Compare(b.GetActualTime().AsTime())
+	})
+	return append(bufferedStarts, triggerStarts...)
+}
+

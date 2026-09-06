@@ -1,0 +1,117 @@
+// commit d2ed13e59c64 2026-08-18T22:40:42+05:30 extractors/extractors.go
+	"unsafe"
+// Extract is the extraction callback. Source is declared/static metadata (for a
+// chain, the first child). SourceHeader is the zero value, so a hand-rolled
+// Extract without an explicit Source reports SourceHeader.
+// Prefer ExtractWithSource when the caller needs the source that actually
+// supplied a value. For chains it re-walks children and returns the winning
+// child's Source. For leaves it returns Extract's result with the static Source.
+// No extra struct field is required, so existing unkeyed Extractor literals
+// keep compiling.
+// Runtime origin is meaningful only from a successful ExtractWithSource call
+// (err == nil). On failure the returned Source may be static or last-child
+// fallback metadata and must not be treated as the origin of a value.
+// continues to pass staticcheck.
+	Extract    func(fiber.Ctx) (string, error)
+	Key        string      // The parameter/header name used for extraction
+	AuthScheme string      // The auth scheme used, e.g., "Bearer"
+	Chain      []Extractor // For chained extractors, stores all extractors in the chain
+	Source     Source      // The type of source being extracted from
+//   - Non-empty Chain: walk children (same success rules as Chain.Extract),
+//     skip nil Extract, return the winning child's Source. Uses the same cycle
+//     guard identity as Chain.Extract so nested re-entry still yields ErrChainCycle.
+//   - Leaf with Extract: return Extract(c) with the static Source.
+//   - Neither: ErrNotFound.
+	if len(e.Chain) > 0 {
+		return extractChainWithSource(e, c)
+// chainGuardFor returns a Locals key shared by Chain.Extract and ExtractWithSource
+// for the same chain backing array.
+func chainGuardFor(chain []Extractor) (chainGuardKey, bool) {
+	if len(chain) == 0 {
+		return chainGuardKey{}, false
+	}
+	// Address of the first element is stable for the shared backing array.
+	return chainGuardKey{id: (*byte)(unsafe.Pointer(&chain[0]))}, true
+}
+
+func extractChainWithSource(e Extractor, c fiber.Ctx) (string, Source, error) {
+	guard, ok := chainGuardFor(e.Chain)
+	if !ok {
+		return "", SourceCustom, ErrNotFound
+	}
+	if active, ok := c.Locals(guard).(bool); ok && active {
+		return "", e.Source, ErrChainCycle
+	}
+	c.Locals(guard, true)
+	defer c.Locals(guard, false)
+
+	var lastErr error
+	lastSource := e.Source
+	for _, extractor := range e.Chain {
+		if extractor.Extract == nil && len(extractor.Chain) == 0 {
+			continue
+		}
+		// Nested chains and leaves both go through ExtractWithSource.
+		if extractor.Extract == nil && len(extractor.Chain) > 0 {
+			v, src, err := ExtractWithSource(extractor, c)
+			if err == nil && v != "" {
+				return v, src, nil
+			}
+			if err != nil {
+				lastErr = err
+				lastSource = src
+			}
+			continue
+		}
+		if extractor.Extract == nil {
+			continue
+		}
+		v, src, err := ExtractWithSource(extractor, c)
+		if err == nil && v != "" {
+			return v, src, nil
+		}
+		if err != nil {
+			lastErr = err
+			lastSource = src
+		}
+	}
+	if lastErr != nil {
+		return "", lastSource, lastErr
+	}
+	return "", e.Source, ErrNotFound
+}
+
+		Extract:    fn,
+		Key:     key,
+		Source:  SourceCookie,
+		Key:     param,
+		Source:  SourceParam,
+		Key:     param,
+		Source:  SourceForm,
+		Key:     header,
+		Source:  SourceHeader,
+		Key:     param,
+		Source:  SourceQuery,
+		Key:     key,
+		Source:  SourceCustom,
+//   - Skips children with a nil Extract function
+//   - ExtractWithSource on a chain walks the same children and reports the winning Source
+//	static metadata. ExtractWithSource reports the winning child's Source.
+//   - Extract and ExtractWithSource share one cycle guard so a child that
+//     re-enters the same chain still returns ErrChainCycle. The guard is cleared
+//     on return, so sequential Extract then ExtractWithSource is fine.
+			Extract: notFound,
+			Source:  SourceCustom,
+			Key:     "",
+			Chain:   []Extractor{},
+	// Defensive copy used for introspection and the shared cycle guard identity
+	// (address of kids[0] matches ExtractWithSource on this Chain value).
+	kids := append([]Extractor(nil), extractors...)
+	primarySource := kids[0].Source
+	primaryKey := kids[0].Key
+			guard, ok := chainGuardFor(kids)
+			if !ok {
+				return "", ErrNotFound
+			}
+			for _, extractor := range kids {
+		Chain:  kids,

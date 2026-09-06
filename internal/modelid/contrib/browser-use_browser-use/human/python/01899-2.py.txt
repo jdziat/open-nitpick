@@ -1,0 +1,60 @@
+# commit 93d6fe209bf1 2025-08-06T19:47:34-07:00 browser_use/browser/navigation_watchdog.py
+		self.browser_session.current_target_id = None
+			except Exception as e:
+				self.logger.warning(f'[NavigationWatchdog] get_or_create_target failed: {e}')
+				try:
+					targets = await self.browser_session._cdp_get_all_pages()
+					if targets:
+						target_id = targets[0]['targetId']
+				except Exception as e2:
+					self.logger.error(f'[NavigationWatchdog] Failed to get any targets: {e2}')
+					raise
+		return self.browser_session.current_target_id if self.browser_session else None
+		if self.browser_session.current_target_id is None:
+		return await self._get_tab_index_for_target(self.browser_session.current_target_id)
+		"""Initialize agent focus to first available target and dispatch TabCreatedEvent for initial pages."""
+		# Get all targets and filter for valid page/tab targets
+		all_targets = await self.browser_session.cdp_client.send.Target.getTargets()
+		targets = [
+			t for t in all_targets.get('targetInfos', [])
+			if self.browser_session._is_valid_target(t) and t.get('type') in ('page', 'tab')
+		]
+		
+			# Set initial focus to first target BEFORE dispatching events
+			self.browser_session.current_target_id = targets[0]['targetId']
+			
+			# Dispatch TabCreatedEvent for all initial pages so watchdogs can process them
+			from browser_use.browser.events import TabCreatedEvent
+			for i, target in enumerate(targets):
+				target_url = target.get('url', '')
+				self.logger.debug(f'[NavigationWatchdog] Dispatching TabCreatedEvent for initial tab {i}: {target_url}')
+				self.event_bus.dispatch(TabCreatedEvent(
+					tab_index=i,
+					url=target_url
+				))
+			
+			# Dispatch focus changed event
+			target_url = await self._get_target_url(self.browser_session.current_target_id)
+			self.browser_session.current_target_id = targets[-1]['targetId']
+			target_url = await self._get_target_url(self.browser_session.current_target_id)
+			self.browser_session.current_target_id = targets[tab_index]['targetId']
+			target_url = await self._get_target_url(self.browser_session.current_target_id)
+			self.browser_session.current_target_id = targets[new_index]['targetId']
+			target_url = await self._get_target_url(self.browser_session.current_target_id)
+		if self.browser_session.current_target_id:
+				target_url = await self._get_target_url(self.browser_session.current_target_id)
+		if self.browser_session.current_target_id:
+			target_url = await self._get_target_url(self.browser_session.current_target_id)
+					await self.browser_session._cdp_close_page(self.browser_session.current_target_id)
+				self.browser_session.current_target_id = None
+				return self.browser_session.current_target_id
+					self.browser_session.current_target_id = target['targetId']
+					return self.browser_session.current_target_id
+		except Exception as e:
+			self.logger.warning(f'[NavigationWatchdog] Failed to get targets: {e}')
+			# Don't pass TimeoutError, re-raise other exceptions
+			if not isinstance(e, TimeoutError):
+				raise
+			self.browser_session.current_target_id = targets[-1]['targetId']
+			return self.browser_session.current_target_id
+		raise ValueError('Failed to create or find an active target')

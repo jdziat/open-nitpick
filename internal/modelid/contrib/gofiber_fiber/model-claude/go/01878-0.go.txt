@@ -1,0 +1,179 @@
+// commit b81cd8983ec5 2026-08-10T18:17:10+00:00 middleware/redirect/redirect.go
+		if d := cmp.Compare(patternWidth(a), patternWidth(b)); d != 0 {
+		//
+		// Grouped first, because concatenation binds looser than "|": "/a|/b"
+		// anchored by hand is "(^/a)|(/b$)", which anchors neither branch at both
+		// ends and redirected "/a-extra" and "extra/b". Non-capturing, so the
+		// "$N" tokens still number the author's own groups.
+		pattern = "^(?:" + pattern + ")$"
+		case isFileScheme(target):
+			// "file state" takes one slash to reach "file slash state" and one
+			// more to reach the host, and both fold a backslash into a slash. So
+			// the authority opens after any two of them: "file:/\evil.com/share"
+			// and "file:\\evil.com/share" name the host evil.com exactly as
+			// "file://evil.com/share" does, and reading only "//" let a captured
+			// "\evil.com/share" pick the host of a rule targeting "file:/$1".
+			if i+2 >= len(target) || !isSlash(target[i+1]) || !isSlash(target[i+2]) {
+				// Fewer than two, so the parser leaves "file state" for "path
+				// state" and there is no authority: "file:tmp/x" is the path
+				// "/tmp/x" of an empty host, and dropping the rule told the author
+				// something untrue about it. What a value can still do is write
+				// the slashes itself, which the composed location is checked for.
+				return 0, 0
+			}
+			start = i + 3
+		case special:
+		for start < len(target) && isSlash(target[start]) {
+// isSlash reports whether c separates URL components. A backslash does under a
+// special scheme, which the parser folds into a slash before reading it.
+func isSlash(c byte) bool {
+	return c == '/' || c == '\\'
+}
+
+// Counted in what a path is pinned to rather than in bytes of the rule, since
+// the two part company over escapes: "\x{61}" is six bytes standing for the one
+// byte "a", and measuring the rule made it tie the class "[a-z]" it should
+// outrank, and outrank the "/p/a" it merely equals.
+		s := literalScanner{rule: branch}
+		return s.pinnedPrefix()
+			size, pins := escapeSpan(s.rule, s.i)
+			s.i += size
+			if pins && !inClass {
+// pinnedPrefix counts what the rule pins before its first wildcard, stopping at
+// the first construct that pins nothing — a class, a group, a wildcard, a class
+// escape, or an atom a quantifier makes optional.
+func (s *literalScanner) pinnedPrefix() int {
+	n := 0
+	for s.i < len(s.rule) {
+		size := 1
+		if c := s.rule[s.i]; c == '\\' {
+			pins := false
+			if size, pins = escapeSpan(s.rule, s.i); !pins {
+				return n
+			}
+		} else if strings.IndexByte(patternBytes, c) >= 0 {
+			return n
+		}
+		if quantifierAllowsNone(s.rule, s.i+size) {
+			return n
+		}
+		s.i += size
+		n++
+	}
+	return n
+}
+
+// patternWidth returns how many alternatives a rule expands to, which separates
+// two that pin the same amount: "/p/[a-z](x|y)" matches everything
+// "/p/[a-z]x" does and one path more, so it must not sort ahead of it. Counting
+// only top-level branches left the two tied, and key order put the wider first.
+func patternWidth(rule string) int {
+	s := literalScanner{rule: rule}
+	return s.width()
+}
+
+// width is patternWidth from the current position to the end of the rule or to
+// the ")" closing the group beginning there. The alternatives of a sequence
+// multiply and those of an alternation add, so a group counts wherever it sits.
+func (s *literalScanner) width() int {
+	total, n := 0, 1
+	inClass := false
+	for s.i < len(s.rule) {
+		switch c := s.rule[s.i]; {
+		case c == '\\':
+			size, _ := escapeSpan(s.rule, s.i)
+			s.i += size
+			continue
+		case inClass:
+			inClass = c != ']'
+		case c == '[':
+			inClass = true
+		case c == '(':
+			s.i = skipGroupPrefix(s.rule, s.i+1)
+			n = clampWidth(n * s.width())
+			continue
+		case c == ')':
+			s.i++
+			return clampWidth(total + n)
+		case c == '|':
+			total, n = clampWidth(total+n), 1
+		}
+		s.i++
+	}
+	return clampWidth(total + n)
+}
+
+// maxPatternWidth bounds the product a nest of groups builds, since the count is
+// only ever compared against another and nothing needs the exact figure.
+const maxPatternWidth = 1 << 20
+
+func clampWidth(n int) int {
+	return min(n, maxPatternWidth)
+}
+
+// quantifierAllowsNone reports whether a quantifier at i lets what precedes it
+// match nothing, which is what stops "/api/ab?" from pinning the "b".
+func quantifierAllowsNone(rule string, i int) bool {
+	if i >= len(rule) {
+		return false
+	}
+	if rule[i] == '?' {
+		return true
+	}
+	if rule[i] != '{' {
+		return false
+	}
+
+	_, zeroMin := skipQuantifier(rule, i)
+	return zeroMin
+}
+
+// escapeSpan measures the escape beginning at the backslash at i: how many bytes
+// of the rule it occupies, and whether it stands for one character of a path.
+//
+// Punctuation does — "/a\.b" pins "/a.b" — and so does every spelling that names
+// one character outright, including "\x{61}", "\x61", "\101" and "\t". A letter
+// leading anything else introduces a class or an assertion: "\d" matches any
+// digit, so "/api/\d+" pins no more than "/api/" and must not outrank the exact
+// "/api/1" it would otherwise shadow.
+func escapeSpan(rule string, i int) (int, bool) {
+	if i+1 >= len(rule) {
+		return 1, false // a trailing backslash names nothing
+	}
+
+	switch c := rule[i+1]; {
+	case c == 'a', c == 'f', c == 'n', c == 'r', c == 't', c == 'v':
+		return 2, true // a control character written by name
+	case c == 'x':
+		return hexEscapeSpan(rule, i)
+	case c >= '0' && c <= '7':
+		// Octal, up to three digits: "\101" is "A".
+		n := 2
+		for n < 4 && i+n < len(rule) && rule[i+n] >= '0' && rule[i+n] <= '7' {
+			n++
+		}
+		return n, true
+		// "\d", "\w", "\p{Greek}", "\b" — a class or an assertion. Measured as
+		// two bytes even where it runs longer, which only ends the prefix sooner.
+		return 2, false
+		return 2, true
+// hexEscapeSpan measures a "\xHH" or "\x{...}" escape, both of which name one
+// character. An incomplete one is no literal, and the regexp would not compile.
+func hexEscapeSpan(rule string, i int) (int, bool) {
+	if i+2 < len(rule) && rule[i+2] == '{' {
+		if end := strings.IndexByte(rule[i+2:], '}'); end >= 0 {
+			return 2 + end + 1, true
+		}
+		return 2, false
+	}
+	if i+3 < len(rule) && isHexDigit(rule[i+2]) && isHexDigit(rule[i+3]) {
+		return 4, true
+	}
+	return 2, false
+}
+
+func isHexDigit(c byte) bool {
+	_, ok := unhex(c)
+	return ok
+}
+

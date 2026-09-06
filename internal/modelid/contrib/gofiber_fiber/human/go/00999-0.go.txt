@@ -1,0 +1,52 @@
+// commit 42bde0699852 2026-04-25T15:37:37+02:00 router.go
+	"bytes"
+	detectionPath := utils.UnsafeString(c.detectionPath)
+	path := utils.UnsafeString(c.path)
+		if !route.match(detectionPath, path, &c.values) {
+			if route.match(detectionPath, path, &c.values) {
+func (app *App) defaultRequestHandler(rctx *fasthttp.RequestCtx) {
+	ctx := app.acquireDefaultCtx(rctx)
+	// Check if the HTTP method is valid
+	if ctx.methodInt == -1 {
+		_ = ctx.SendStatus(StatusNotImplemented) //nolint:errcheck // Always return nil
+		if !ctx.abandoned.Load() {
+			ctx.release()
+			app.pool.Put(ctx)
+		return
+	}
+
+	// Optional: check flash messages (hot path, see hasFlashCookie).
+	if rawHeaders := ctx.fasthttp.Request.Header.RawHeaders(); len(rawHeaders) > 0 &&
+		bytes.Contains(rawHeaders, flashCookieNeedle) &&
+		ctx.fasthttp.Request.Header.Cookie(FlashCookieName) != nil {
+		ctx.Redirect().parseAndClearFlashMessages()
+	}
+	_, err := app.next(ctx)
+	if err != nil {
+		if catch := ctx.App().ErrorHandler(ctx, err); catch != nil {
+			_ = ctx.SendStatus(StatusInternalServerError) //nolint:errcheck // Always return nil
+		if !ctx.abandoned.Load() {
+			ctx.release()
+			app.pool.Put(ctx)
+		return
+	}
+	if !ctx.abandoned.Load() {
+		ctx.release()
+		app.pool.Put(ctx)
+	}
+}
+func (app *App) customRequestHandler(rctx *fasthttp.RequestCtx) {
+	ctx := app.AcquireCtx(rctx)
+	defer app.ReleaseCtx(ctx)
+
+	// Check if the HTTP method is valid
+	if ctx.getMethodInt() == -1 {
+		_ = ctx.SendStatus(StatusNotImplemented) //nolint:errcheck // Always return nil
+		return
+	}
+
+	// Optional: check flash messages (hot path, see hasFlashCookie).
+	if hasFlashCookie(&ctx.Request().Header) {
+		ctx.Redirect().parseAndClearFlashMessages()
+
+	_, err := app.nextCustom(ctx)

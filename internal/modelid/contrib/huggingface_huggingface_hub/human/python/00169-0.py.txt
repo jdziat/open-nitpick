@@ -1,0 +1,44 @@
+# commit ffd97645005d 2025-11-12T16:33:39+01:00 src/huggingface_hub/utils/_xet.py
+import time
+XET_CONNECTION_INFO_SAFETY_PERIOD = 60  # seconds
+XET_CONNECTION_INFO_CACHE_SIZE = 1_000
+XET_CONNECTION_INFO_CACHE: dict[str, "XetConnectionInfo"] = {}
+
+
+
+    Result is cached to avoid redundant requests.
+
+    # Check cache first
+    cache_key = _cache_key(url, headers, params)
+    cached_info = XET_CONNECTION_INFO_CACHE.get(cache_key)
+    if cached_info is not None:
+        if not _is_expired(cached_info):
+            return cached_info
+
+    # Fetch from server
+
+    # Delete expired cache entries
+    for k, v in list(XET_CONNECTION_INFO_CACHE.items()):
+        if _is_expired(v):
+            XET_CONNECTION_INFO_CACHE.pop(k, None)
+
+    # Enforce cache size limit
+    if len(XET_CONNECTION_INFO_CACHE) >= XET_CONNECTION_INFO_CACHE_SIZE:
+        XET_CONNECTION_INFO_CACHE.pop(next(iter(XET_CONNECTION_INFO_CACHE)))
+
+    # Update cache
+    XET_CONNECTION_INFO_CACHE[cache_key] = metadata
+
+
+
+def _cache_key(url: str, headers: dict[str, str], params: Optional[dict[str, str]]) -> str:
+    """Return a unique cache key for the given request parameters."""
+    lower_headers = {k.lower(): v for k, v in headers.items()}  # casing is not guaranteed here
+    auth_header = lower_headers.get("authorization", "")
+    params_str = "&".join(f"{k}={v}" for k, v in sorted((params or {}).items(), key=lambda x: x[0]))
+    return f"{url}|{auth_header}|{params_str}"
+
+
+def _is_expired(connection_info: XetConnectionInfo) -> bool:
+    """Check if the given XET connection info is expired."""
+    return connection_info.expiration_unix_epoch <= int(time.time()) + XET_CONNECTION_INFO_SAFETY_PERIOD

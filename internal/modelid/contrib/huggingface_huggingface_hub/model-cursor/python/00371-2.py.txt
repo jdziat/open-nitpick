@@ -1,0 +1,76 @@
+# commit 098091fe425a 2026-03-06T14:30:17+01:00 src/huggingface_hub/utils/_http.py
+from typing import Any, Callable, Generator, Mapping, Optional, TypeVar, Union
+# Regex to extract repo_type and repo_id from API URLs.
+# Captures: group(1) = repo_type plural (models/datasets/spaces), group(2) = first path segment, group(3) = optional second segment.
+_REPO_ID_FROM_URL_REGEX = re.compile(r"^https?://[^/]+/api/(models|datasets|spaces)/([^/]+)(?:/([^/]+))?")
+
+# Regex to extract bucket_id (namespace/name) from bucket API URLs.
+_BUCKET_ID_FROM_URL_REGEX = re.compile(r"^https?://[^/]+/api/buckets/([^/]+/[^/]+)")
+
+# Sub-paths that follow a repo_id in API URLs (not part of the repo name).
+_REPO_URL_SUBPATHS = {"resolve", "tree", "blob", "raw", "refs", "commit", "discussions", "settings", "revision"}
+
+
+def _parse_repo_info_from_url(url: str) -> tuple[Optional[str], Optional[str]]:
+    """Extract (repo_type, repo_id) from an API URL.
+
+    Returns canonical repo_type values: "model", "dataset", "space" (or None).
+
+    Examples:
+        >>> _parse_repo_info_from_url("https://huggingface.co/api/models/user/repo")
+        ("model", "user/repo")
+        >>> _parse_repo_info_from_url("https://huggingface.co/api/datasets/user/repo/resolve/main/data.csv")
+        ("dataset", "user/repo")
+        >>> _parse_repo_info_from_url("https://huggingface.co/api/models/bert-base-cased/resolve/main/config.json")
+        ("model", "bert-base-cased")
+    """
+    match = _REPO_ID_FROM_URL_REGEX.search(url)
+    if not match:
+        return None, None
+    repo_type = constants.REPO_TYPES_MAPPING.get(match.group(1))
+    first, second = match.group(2), match.group(3)
+    if second and second not in _REPO_URL_SUBPATHS:
+        repo_id = f"{first}/{second}"
+    else:
+        repo_id = first
+    return repo_type, repo_id
+
+
+def _parse_bucket_id_from_url(url: str) -> Optional[str]:
+    """Extract bucket_id (namespace/name) from a bucket API URL."""
+    match = _BUCKET_ID_FROM_URL_REGEX.search(url)
+    return match.group(1) if match else None
+
+        # Parse repo info from request URL (used to enrich errors below)
+        request_url = (
+            str(response.request.url) if response.request is not None and response.request.url is not None else None
+        )
+        repo_type, repo_id = _parse_repo_info_from_url(request_url) if request_url else (None, None)
+
+            revision_err = _format(RevisionNotFoundError, message, response)
+            revision_err.repo_type = repo_type
+            revision_err.repo_id = repo_id
+            raise revision_err from e
+            entry_err = _format(RemoteEntryNotFoundError, message, response)
+            entry_err.repo_type = repo_type
+            entry_err.repo_id = repo_id
+            raise entry_err from e
+            gated_err = _format(GatedRepoError, message, response)
+            gated_err.repo_type = repo_type
+            gated_err.repo_id = repo_id
+            raise gated_err from e
+            and request_url is not None
+            and BUCKET_API_REGEX.search(request_url) is not None
+            bucket_err = _format(BucketNotFoundError, message, response)
+            bucket_err.bucket_id = _parse_bucket_id_from_url(request_url)
+            raise bucket_err from e
+            and request_url is not None
+            and REPO_API_REGEX.search(request_url) is not None
+            repo_err = _format(RepositoryNotFoundError, message, response)
+            repo_err.repo_type = repo_type
+            repo_err.repo_id = repo_id
+            raise repo_err from e
+_HfHubHTTPErrorT = TypeVar("_HfHubHTTPErrorT", bound=HfHubHTTPError)
+
+
+def _format(error_type: type[_HfHubHTTPErrorT], custom_message: str, response: httpx.Response) -> _HfHubHTTPErrorT:

@@ -1,0 +1,76 @@
+// commit b3ffc5ee6771 2026-04-10T11:53:20-07:00 chasm/lib/nexusoperation/operation_tasks.go
+type OperationScheduleToStartTimeoutTaskHandler struct {
+func NewOperationScheduleToStartTimeoutTaskHandler(opts OperationTaskHandlerOptions) *OperationScheduleToStartTimeoutTaskHandler {
+	return &OperationScheduleToStartTimeoutTaskHandler{
+func (h *OperationScheduleToStartTimeoutTaskHandler) Validate(
+	task *nexusoperationpb.ScheduleToStartTimeoutTask,
+func (h *OperationScheduleToStartTimeoutTaskHandler) Execute(
+	task *nexusoperationpb.ScheduleToStartTimeoutTask,
+) error {
+	return serviceerror.NewUnimplemented("unimplemented")
+}
+
+type OperationStartToCloseTimeoutTaskHandler struct {
+	chasm.PureTaskHandlerBase
+	config *Config
+
+	metricsHandler metrics.Handler
+	logger         log.Logger
+}
+
+func NewOperationStartToCloseTimeoutTaskHandler(opts OperationTaskHandlerOptions) *OperationStartToCloseTimeoutTaskHandler {
+	return &OperationStartToCloseTimeoutTaskHandler{
+		config:         opts.Config,
+		metricsHandler: opts.MetricsHandler,
+		logger:         opts.Logger,
+	}
+}
+
+func (h *OperationStartToCloseTimeoutTaskHandler) Validate(
+	ctx chasm.Context,
+	op *Operation,
+	attrs chasm.TaskAttributes,
+	task *nexusoperationpb.StartToCloseTimeoutTask,
+) (bool, error) {
+	return false, serviceerror.NewUnimplemented("unimplemented")
+}
+
+func (h *OperationStartToCloseTimeoutTaskHandler) Execute(
+	ctx chasm.MutableContext,
+	op *Operation,
+	attrs chasm.TaskAttributes,
+	task *nexusoperationpb.StartToCloseTimeoutTask,
+) error {
+	return serviceerror.NewUnimplemented("unimplemented")
+}
+
+type OperationScheduleToCloseTimeoutTaskHandler struct {
+	chasm.PureTaskHandlerBase
+	config *Config
+
+	metricsHandler metrics.Handler
+	logger         log.Logger
+}
+
+func NewOperationScheduleToCloseTimeoutTaskHandler(opts OperationTaskHandlerOptions) *OperationScheduleToCloseTimeoutTaskHandler {
+	return &OperationScheduleToCloseTimeoutTaskHandler{
+		config:         opts.Config,
+		metricsHandler: opts.MetricsHandler,
+		logger:         opts.Logger,
+	}
+}
+
+func (h *OperationScheduleToCloseTimeoutTaskHandler) Validate(
+	ctx chasm.Context,
+	op *Operation,
+	attrs chasm.TaskAttributes,
+	task *nexusoperationpb.ScheduleToCloseTimeoutTask,
+) (bool, error) {
+	return false, serviceerror.NewUnimplemented("unimplemented")
+}
+
+func (h *OperationScheduleToCloseTimeoutTaskHandler) Execute(
+	ctx chasm.MutableContext,
+	op *Operation,
+	attrs chasm.TaskAttributes,
+	task *nexusoperationpb.ScheduleToCloseTimeoutTask,

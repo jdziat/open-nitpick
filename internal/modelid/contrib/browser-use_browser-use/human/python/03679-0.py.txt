@@ -1,0 +1,63 @@
+# commit 77d7f161fb7b 2025-11-12T19:42:24-08:00 browser_use/browser/session.py
+		# If no target_id specified, ensure current agent focus is valid and wait for recovery if needed
+			# Validate and wait for focus recovery if stale (centralized protection)
+			focus_valid = await self.session_manager.ensure_valid_focus(timeout=5.0)
+			if not focus_valid:
+				raise ValueError(
+					'No valid agent focus available - target may have detached and recovery failed. '
+					'This indicates browser is in an unstable state.'
+				)
+
+			assert self.agent_focus_target_id is not None, 'Focus validation passed but agent_focus_target_id is None'
+		session = self.session_manager._get_session_for_target(target_id)
+				session = self.session_manager._get_session_for_target(target_id)
+				# Format current focus safely (could be None after detach)
+				current_focus = self.agent_focus_target_id[:8] if self.agent_focus_target_id else 'None'
+				self.logger.debug(f'[SessionManager] Switching focus: {current_focus}... → {target_id[:8]}...')
+				current_focus = self.agent_focus_target_id[:8] if self.agent_focus_target_id else 'None'
+					f'(agent_focus stays on {current_focus}...)'
+						# Use public API with focus=False to avoid changing focus during init
+						session = await self.get_or_create_cdp_session(target_id, focus=False)
+						await session.cdp_client.send.Page.navigate(params={'url': 'about:blank'}, session_id=session.session_id)
+						# Update target url
+						target.url = 'about:blank'
+			# Set up initial focus using the public API
+			# Note: get_or_create_cdp_session() will wait for attach event and set focus
+			try:
+				await self.get_or_create_cdp_session(target_id, focus=True)
+				# agent_focus_target_id is now set by get_or_create_cdp_session
+				self.logger.debug(f'📄 Agent focus set to {target_id[:8]}...')
+			except ValueError as e:
+				raise RuntimeError(f'Failed to get session for initial target {target_id}: {e}') from e
+					cdp_session = await self.get_or_create_cdp_session(self.agent_focus_target_id, focus=False)
+					await cdp_session.cdp_client.send.Fetch.enable(
+						params={'handleAuthRequests': True},
+						session_id=cdp_session.session_id,
+					)
+					self.logger.debug('Fetch.enable(handleAuthRequests=True) enabled on focused session')
+					cdp_session = await self.get_or_create_cdp_session(self.agent_focus_target_id, focus=False)
+					cdp_session.cdp_client.register.Fetch.authRequired(_on_auth_required)
+					cdp_session.cdp_client.register.Fetch.requestPaused(_on_request_paused)
+					# Use safe API with focus=False to avoid changing focus
+					cdp_session = await self.get_or_create_cdp_session(self.agent_focus_target_id, focus=False)
+					await cdp_session.cdp_client.send.Fetch.enable(
+						params={'handleAuthRequests': True, 'patterns': [{'urlPattern': '*'}]},
+						session_id=cdp_session.session_id,
+					)
+			# Use current focus - use safe API with focus=False to avoid changing focus
+			try:
+				cdp_session = await self.get_or_create_cdp_session(self.agent_focus_target_id, focus=False)
+			except ValueError:
+				# Use the existing agent_focus target's session - use safe API with focus=False
+				try:
+					cdp_session = await self.get_or_create_cdp_session(self.agent_focus_target_id, focus=False)
+				except ValueError:
+			try:
+				# Use safe API with focus=False to avoid changing focus
+				cdp_session = await self.get_or_create_cdp_session(self.agent_focus_target_id, focus=False)
+				if target:
+					self.logger.warning(
+						f'⚠️ Node {node.backend_node_id} has no session/frame/target info. Using agent_focus session: {target.url}'
+					)
+			except ValueError:
+				pass  # Fall through to last resort

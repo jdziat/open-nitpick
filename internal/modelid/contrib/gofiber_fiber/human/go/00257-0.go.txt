@@ -1,0 +1,34 @@
+// commit d5c593fbd63f 2025-09-22T08:33:09+02:00 middleware/cache/cache.go
+				idx := e.heapidx
+				manager.release(e)
+					_, size := heap.remove(idx)
+		var heapIdx int
+			heapIdx = heap.put(key, e.exp, bodySize)
+			e.heapidx = heapIdx
+		cleanupOnStoreError := func(releaseEntry, rawStored bool) error {
+			var cleanupErr error
+			if cfg.MaxBytes > 0 {
+				_, size := heap.remove(heapIdx)
+				storedBytes -= size
+			}
+			if releaseEntry {
+				manager.release(e)
+			}
+			if rawStored {
+				rawKey := key + "_body"
+				if err := manager.del(context.Background(), rawKey); err != nil {
+					cleanupErr = errors.Join(cleanupErr, fmt.Errorf("cache: failed to delete raw key %q after store error: %w", rawKey, err))
+				}
+			}
+			return cleanupErr
+		}
+
+				if cleanupErr := cleanupOnStoreError(true, false); cleanupErr != nil {
+					err = errors.Join(err, cleanupErr)
+				}
+				if cleanupErr := cleanupOnStoreError(false, true); cleanupErr != nil {
+					err = errors.Join(err, cleanupErr)
+				}
+				if cleanupErr := cleanupOnStoreError(true, false); cleanupErr != nil {
+					err = errors.Join(err, cleanupErr)
+				}

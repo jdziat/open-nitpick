@@ -1,0 +1,44 @@
+// commit 97530f7a1a41 2026-04-28T00:30:51-04:00 app.go
+	// shared state management (prefork-safe, storage-backed)
+	sharedState *SharedState
+	// SharedStorage configures storage-backed shared state that can be used
+	// safely across prefork workers and processes.
+	//
+	// Default: nil
+	SharedStorage Storage `json:"-"`
+
+	// SharedStatePrefix customizes the namespace prefix for keys written to
+	// SharedStorage. If empty, Fiber derives a prefixed namespace using
+	// AppName (when set) or an internal default.
+	//
+	// Default: ""
+	SharedStatePrefix string `json:"shared_state_prefix"`
+
+
+	sharedStatePrefix := app.config.SharedStatePrefix
+	if sharedStatePrefix == "" {
+		sharedStatePrefix = defaultSharedStatePrefix
+		if app.config.AppName != "" {
+			sharedStatePrefix += app.config.AppName + "-"
+		}
+	}
+	app.sharedState = newSharedState(
+		app.config.SharedStorage,
+		sharedStatePrefix,
+		app.config.JSONEncoder,
+		app.config.JSONDecoder,
+		app.config.MsgPackEncoder,
+		app.config.MsgPackDecoder,
+		app.config.CBOREncoder,
+		app.config.CBORDecoder,
+		app.config.XMLEncoder,
+		app.config.XMLDecoder,
+	)
+// State returns the in-process state struct to store global data between handlers.
+// State is process-local and is not shared across prefork workers.
+// SharedState returns storage-backed shared state.
+// SharedState is prefork-safe when Config.SharedStorage is configured.
+func (app *App) SharedState() *SharedState {
+	return app.sharedState
+}
+

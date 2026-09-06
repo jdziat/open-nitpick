@@ -1,0 +1,72 @@
+// commit 816d7f925225 2026-06-26T03:56:20+00:00 packages/core/src/social-providers/google.ts
+import type { JWTPayload } from "jose";
+	 * Set `hd: "*"` to require any Workspace hosted-domain claim. Sign-in is
+	 * rejected when the claim is missing or does not satisfy this restriction.
+const GOOGLE_ID_TOKEN_MAX_AGE = "1h";
+
+export interface VerifyGoogleIdTokenOptions {
+	token: string;
+	audience: string | string[];
+	nonce?: string | undefined;
+}
+
+/**
+ * Verifies a Google ID token against Google's issuer, audience, signature,
+ * expiry, and maximum token age.
+ */
+export const verifyGoogleIdToken = async ({
+	token,
+	audience,
+	nonce,
+}: VerifyGoogleIdTokenOptions): Promise<JWTPayload | null> => {
+	try {
+		const { kid, alg: jwtAlg } = decodeProtectedHeader(token);
+		if (!kid || !jwtAlg) return null;
+
+		const publicKey = await getGooglePublicKey(kid);
+		const { payload: jwtClaims } = await jwtVerify(token, publicKey, {
+			algorithms: [jwtAlg],
+			issuer: ["https://accounts.google.com", "accounts.google.com"],
+			audience,
+			maxTokenAge: GOOGLE_ID_TOKEN_MAX_AGE,
+		});
+
+		if (nonce && jwtClaims.nonce !== nonce) {
+			return null;
+		}
+
+		return jwtClaims;
+	} catch {
+		return null;
+	}
+};
+
+/**
+ * Checks whether Google's verified `hd` claim satisfies the configured hosted
+ * domain restriction. `hd: "*"` accepts any Google Workspace hosted domain.
+ */
+export const isGoogleHostedDomainAllowed = (
+	configuredHostedDomain: string | undefined,
+	tokenHostedDomain: unknown,
+) => {
+	if (!configuredHostedDomain) return true;
+	if (typeof tokenHostedDomain !== "string" || !tokenHostedDomain) {
+		return false;
+	}
+	if (configuredHostedDomain === "*") return true;
+	return tokenHostedDomain === configuredHostedDomain;
+};
+
+			const jwtClaims = await verifyGoogleIdToken({
+				token,
+				audience: options.clientId,
+				nonce,
+			});
+			if (!jwtClaims) {
+
+			return isGoogleHostedDomainAllowed(options.hd, jwtClaims.hd);
+			// Enforce the configured hosted domain on the callback profile path.
+			// The authorization-time `hd` value is only a UI hint; the verified
+			// token/profile claim is the authoritative Workspace signal.
+			if (!isGoogleHostedDomainAllowed(options.hd, user.hd)) {
+					}" does not satisfy the configured "hd" option "${options.hd}".`,

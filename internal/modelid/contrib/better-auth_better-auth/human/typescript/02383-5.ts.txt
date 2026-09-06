@@ -1,0 +1,78 @@
+// commit 34558bc52b0e 2026-06-12T15:03:33+00:00 packages/better-auth/src/cookies/index.ts
+import type { JSONWebKeySet } from "jose";
+	signJWT as signSecretJWT,
+	verifyJWT as verifySecretJWT,
+import {
+	getCookieCacheJwtSigningKey,
+	signCookieCacheJWT,
+	verifyCookieCacheJWTWithJWKS,
+} from "../plugins/jwt/cookie-cache";
+	const jwtSigningKey = getCookieCacheJwtSigningKey(ctx.context.options);
+		data =
+			jwtSigningKey === "jwt-plugin"
+				? await signCookieCacheJWT(ctx, sessionData, options.maxAge || 60 * 5)
+				: await signSecretJWT(
+						sessionData,
+						ctx.context.secret,
+						options.maxAge || 60 * 5,
+					);
+function isEmbeddedSessionExpired(
+	session: { expiresAt?: unknown } | undefined,
+) {
+	if (!session?.expiresAt) {
+		return false;
+	}
+
+	const expiresAt = new Date(
+		session.expiresAt as string | number | Date,
+	).getTime();
+	return Number.isFinite(expiresAt) && expiresAt < Date.now();
+}
+
+				jwt?:
+					| {
+							signingKey?: "secret" | "jwt-plugin";
+							jwks?: JSONWebKeySet;
+							issuer?: string;
+							audience?: string;
+					  }
+					| undefined;
+		const jwtSigningKey = config?.jwt?.signingKey ?? "secret";
+			const secret = config?.secret || env.BETTER_AUTH_SECRET;
+			if (!secret) {
+				throw new BetterAuthError(
+					"getCookieCache requires a secret to be provided. Either pass it as an option or set the BETTER_AUTH_SECRET environment variable",
+				);
+			}
+				if (isEmbeddedSessionExpired(payload.session)) {
+			const payload =
+				jwtSigningKey === "jwt-plugin"
+					? await (() => {
+							const jwks = config?.jwt?.jwks;
+							if (!jwks) {
+								throw new BetterAuthError(
+									'getCookieCache requires `jwt.jwks` when `jwt.signingKey` is set to `"jwt-plugin"`.',
+								);
+							}
+							return verifyCookieCacheJWTWithJWKS<S>(sessionData, jwks, {
+								issuer: config?.jwt?.issuer,
+								audience: config?.jwt?.audience,
+							});
+						})()
+					: await (() => {
+							const secret = config?.secret || env.BETTER_AUTH_SECRET;
+							if (!secret) {
+								throw new BetterAuthError(
+									"getCookieCache requires a secret to be provided. Either pass it as an option or set the BETTER_AUTH_SECRET environment variable",
+								);
+							}
+							return verifySecretJWT<S>(sessionData, secret);
+						})();
+				if (isEmbeddedSessionExpired(payload.session)) {
+			const secret = config?.secret || env.BETTER_AUTH_SECRET;
+			if (!secret) {
+				throw new BetterAuthError(
+					"getCookieCache requires a secret to be provided. Either pass it as an option or set the BETTER_AUTH_SECRET environment variable",
+				);
+			}
+			if (isEmbeddedSessionExpired(sessionDataPayload.session?.session)) {

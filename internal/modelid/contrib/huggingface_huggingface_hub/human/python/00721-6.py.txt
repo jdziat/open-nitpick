@@ -1,0 +1,41 @@
+# commit 7b53d234c37a 2026-07-03T10:28:39+02:00 src/huggingface_hub/cli/jobs.py
+from ._framework import Argument, Option
+    Argument(
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+    Option(
+    Argument(
+    Argument(
+    Argument(
+    Argument(
+    Argument(
+    Argument(
+    Argument(
+    Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Option(
+        Argument(
+        Argument(
+        Option(
+    clear: Annotated[bool, Option("--clear", help="Remove all labels from the job.")] = False,
+jobs_cli.add_group(uv_app, name="uv")
+jobs_cli.add_group(scheduled_app, name="scheduled")
+        Option(
+        Option(
+        Argument(
+    clear: Annotated[bool, Option("--clear", help="Remove all labels from the scheduled job.")] = False,
+scheduled_app.add_group(scheduled_uv_app, name="uv")

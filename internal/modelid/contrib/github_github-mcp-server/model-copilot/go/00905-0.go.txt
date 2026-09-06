@@ -1,0 +1,32 @@
+// commit 1654d32ad8c9 2026-06-11T14:16:33+02:00 pkg/errors/error.go
+	stderrors "errors"
+	"time"
+
+	var rateLimitErr *github.RateLimitError
+	if stderrors.As(err, &rateLimitErr) {
+		resetTime := rateLimitErr.Rate.Reset.Time
+		if !resetTime.IsZero() {
+			retryIn := time.Until(resetTime).Round(time.Second)
+			if retryIn > 0 {
+				return utils.NewToolResultError(fmt.Sprintf(
+					"%s: GitHub API rate limit exceeded. Retry after %v.", message, retryIn))
+			}
+		}
+		return utils.NewToolResultError(fmt.Sprintf(
+			"%s: GitHub API rate limit exceeded. Wait before retrying.", message))
+	}
+
+	var abuseErr *github.AbuseRateLimitError
+	if stderrors.As(err, &abuseErr) {
+		if abuseErr.RetryAfter != nil {
+			retryAfter := abuseErr.RetryAfter.Round(time.Second)
+			if retryAfter > 0 {
+				return utils.NewToolResultError(fmt.Sprintf(
+					"%s: GitHub secondary rate limit exceeded. Retry after %v.",
+					message, retryAfter))
+			}
+		}
+		return utils.NewToolResultError(fmt.Sprintf(
+			"%s: GitHub secondary rate limit exceeded. Wait before retrying.", message))
+	}
+

@@ -1,0 +1,49 @@
+# commit 70e6fd9ecea0 2026-05-19T14:49:51+02:00 src/huggingface_hub/hf_file_system.py
+from .utils import HFValidationError, hf_raise_for_status, http_backoff, http_stream_backoff, parse_hf_uri
+        if path.count("/") == 0:
+            raise ValueError(
+                f"Repository id must be 'namespace/name', got '{path}'. Single-segment ids (e.g. 'gpt2') are no longer supported."
+            )
+
+        parsed = parse_hf_uri(f"{constants.HF_PROTOCOL}{path}")
+
+        # --- Buckets ---
+        if parsed.is_bucket:
+            bucket_exists, err = self._bucket_exists(parsed.id)
+            return HfFileSystemResolvedBucketPath(bucket_id=parsed.id, path=parsed.path_in_repo)
+
+        # --- Repositories ---
+        # Align revision from path with explicit revision argument
+        if revision is not None and parsed.revision is not None and parsed.revision != revision:
+            # The caller provided an explicit revision that conflicts with what parse_hf_uri
+            # parsed. This can happen when a user has a branch literally named "refs" and a
+            # file at "pr/10" — parse_hf_uri would greedily match "refs/pr/10" as a special
+            # ref. Fall back to simple '@' splitting so the caller's revision wins.
+            path_without_type = path.split("/", 1)[1] if path.split("/")[0] in constants.HF_URI_TYPE_PREFIXES else path
+            repo_id, after_at = path_without_type.split("@", 1)
+            revision_in_path, path_in_repo = after_at.split("/", 1) if "/" in after_at else (after_at, "")
+            revision_in_path_decoded = unquote(revision_in_path)
+            if revision_in_path_decoded != revision:
+                raise ValueError(
+                    f'Revision specified in path ("{revision_in_path_decoded}") and in `revision` argument ("{revision}") are not the same.'
+                )
+            repo_and_revision_exist, err = self._repo_and_revision_exist(parsed.type, repo_id, revision)
+                _raise_file_not_found(path, err)
+            return HfFileSystemResolvedRepositoryPath(
+                parsed.type, repo_id, revision, path_in_repo, _raw_revision=revision_in_path
+            )
+
+        if parsed.revision is not None and revision is None:
+            revision = parsed.revision
+
+        repo_and_revision_exist, err = self._repo_and_revision_exist(parsed.type, parsed.id, revision)
+        if not repo_and_revision_exist:
+            _raise_file_not_found(path, err)
+
+        # Extract raw revision from original path for unresolve() fidelity
+        raw_revision: str | None = None
+        if "@" in path and parsed.revision is not None:
+            path_without_type = path.split("/", 1)[1] if path.split("/")[0] in constants.HF_URI_TYPE_PREFIXES else path
+            raw_after_at = path_without_type.split("@", 1)[1]
+            raw_revision = raw_after_at[: -(len(parsed.path_in_repo) + 1)] if parsed.path_in_repo else raw_after_at
+            parsed.type, parsed.id, revision, parsed.path_in_repo, _raw_revision=raw_revision

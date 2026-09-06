@@ -1,0 +1,78 @@
+# commit 9da6c485b740 2025-06-05T18:51:22-07:00 browser_use/agent/service.py
+from uuid import UUID
+from browser_use.agent.cloud_events import (
+	CreateAgentOutputFileEvent,
+	CreateAgentSessionEvent,
+	CreateAgentStepEvent,
+	CreateAgentTaskEvent,
+	UpdateAgentTaskEvent,
+)
+from uuid_extensions import uuid7str
+from browser_use.dom.history_tree_processor.service import DOMHistoryElement, HistoryTreeProcessor
+from browser_use.eventbus import EventBus
+from browser_use.telemetry.views import AgentTelemetryEvent
+		browser: Browser | BrowserSession | None = None,
+		sensitive_data: dict[str, str] | dict[str, dict[str, str]] | None = None,
+		if isinstance(browser, BrowserSession):
+			browser_session = browser_session or browser
+
+		# Generate unique IDs for this agent session and task
+		self.session_id: UUID = UUID(uuid7str())
+		self.task_id: UUID = UUID(uuid7str())
+
+		# Event bus with WAL persistence
+		# Default to ~/.config/browseruse/events/{agent_task_id}.jsonl
+		wal_path = Path.home() / '.config' / 'browseruse' / 'events' / f'{self.task_id}.jsonl'
+		self.eventbus = EventBus(name='Agent', wal_path=wal_path)
+
+		"""Add a new task to the agent, keeping the same task_id as tasks are continuous"""
+		# Simply delegate to message manager - no need for new task_id or events
+		# The task continues with new instructions, it doesn't end and start a new one
+		self.task = new_task
+			# Emit both step created and executed events
+			if browser_state_summary and model_output:
+				# Extract key step data for the event
+				actions_data = []
+				if model_output.action:
+					for action in model_output.action:
+						action_dict = action.model_dump() if hasattr(action, 'model_dump') else {}
+						actions_data.append(action_dict)
+
+				# Emit CreateAgentStepEvent
+				step_event = CreateAgentStepEvent.from_agent_step(self, model_output, result, actions_data, browser_state_summary)
+				self.eventbus.emit(step_event)
+
+			# Initialize timing for session and task
+			self._session_start_time = time.time()
+			self._task_start_time = self._session_start_time  # Initialize task start time
+
+			# Emit CreateAgentSessionEvent at the START of run()
+			self.eventbus.emit(CreateAgentSessionEvent.from_agent(self))
+
+			# Emit CreateAgentTaskEvent at the START of run()
+			self.eventbus.emit(CreateAgentTaskEvent.from_agent(self))
+
+
+					# Task completed
+			# NOTE: CreateAgentSessionEvent and CreateAgentTaskEvent are now emitted at the START of run()
+			# to match backend requirements for CREATE events to be fired when entities are created,
+			# not when they are completed
+
+			# Emit UpdateAgentTaskEvent at the END of run() with final task state
+			self.eventbus.emit(UpdateAgentTaskEvent.from_agent(self))
+			# Generate GIF if needed before stopping event bus
+				# Emit output file generated event for GIF
+				output_event = await CreateAgentOutputFileEvent.from_agent_and_file(self, output_path)
+				self.eventbus.emit(output_event)
+
+			# Stop the event bus gracefully, waiting for all events to be processed
+			await self.eventbus.stop(timeout=5.0)
+
+			await self.close()
+
+		# Task paused
+
+		# Task resumed
+
+		# Task stopped
+

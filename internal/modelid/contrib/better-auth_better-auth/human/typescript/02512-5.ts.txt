@@ -1,0 +1,60 @@
+// commit dfecb481fa04 2026-06-26T22:38:00+01:00 packages/scim/src/scim.test.ts
+	let defaultOrgPromise: Promise<string | undefined> | undefined;
+	function ensureDefaultOrg(headers: Headers) {
+		if (!defaultOrgPromise) {
+			defaultOrgPromise = auth.api
+				.createOrganization({
+					body: { slug: "default-org", name: "Default Org" },
+					headers,
+				})
+				.then((org) => org?.id);
+		}
+		return defaultOrgPromise;
+	}
+
+		const orgId = organizationId ?? (await ensureDefaultOrg(headers));
+		if (!orgId) throw new Error("Default organization not found");
+				organizationId: orgId,
+		if (!organizationId) throw new Error("SCIM token requires an organization");
+		it("only links a pre-existing user who belongs to the token's organization", async () => {
+			const { auth, authClient, getAuthCookieHeaders } = createTestInstance({
+				linkExistingUsers: { requireExistingOrgMembership: true },
+			const ownerHeaders = await getAuthCookieHeaders();
+			const org = await auth.api.createOrganization({
+				body: { slug: "link-org", name: "Link Org" },
+				headers: ownerHeaders,
+			const { scimToken } = await auth.api.generateSCIMToken({
+				body: { providerId: "member-link", organizationId: org!.id },
+				headers: ownerHeaders,
+			});
+
+				email: "outsider@company.com",
+				name: "outsider",
+						userName: "outsider",
+						emails: [{ value: "outsider@company.com" }],
+			const memberHeaders = new Headers();
+			await authClient.signUp.email({
+				email: "member@company.com",
+				password: "the password",
+				name: "member",
+			});
+			await authClient.signIn.email(
+				{ email: "member@company.com", password: "the password" },
+				{ throw: true, onSuccess: setCookieToHeader(memberHeaders) },
+			);
+			const memberSession = await auth.api.getSession({
+				headers: memberHeaders,
+			});
+			await auth.api.addMember({
+				body: {
+					organizationId: org!.id,
+					userId: memberSession!.user.id,
+					role: "member",
+				},
+				headers: ownerHeaders,
+			});
+
+					userName: "member",
+					emails: [{ value: "member@company.com" }],
+
+			expect(linked.id).toBe(memberSession!.user.id);

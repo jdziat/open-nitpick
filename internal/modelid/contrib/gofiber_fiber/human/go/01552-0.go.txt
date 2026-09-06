@@ -1,0 +1,148 @@
+// commit d69501fd7ba2 2026-06-28T08:35:37-04:00 client/client.go
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+

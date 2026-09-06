@@ -1,0 +1,93 @@
+// commit fb7cbc8b853f 2026-06-11T13:48:36+02:00 pkg/github/repositories.go
+			result := utils.NewToolResultText(string(r))
+			// Commit content is reachable from the repo's history; in public
+			// repos anyone can land it via a PR (untrusted), in private repos
+			// only collaborators can (trusted). Confidentiality follows repo
+			// visibility.
+			result = attachRepoVisibilityIFCLabel(ctx, deps, client, owner, repo, result, ifc.LabelCommitContents)
+			return result, nil, nil
+			result := utils.NewToolResultText(string(r))
+			// Commit content is reachable from the repo's history; integrity
+			// follows the same public-untrusted / private-trusted rule as file
+			// contents. Confidentiality follows repo visibility.
+			result = attachRepoVisibilityIFCLabel(ctx, deps, client, owner, repo, result, ifc.LabelCommitContents)
+			return result, nil, nil
+			result := utils.NewToolResultText(string(r))
+			// Branches are structural repo metadata that only collaborators
+			// with push access can create, so integrity is trusted.
+			// Confidentiality follows repo visibility.
+			result = attachRepoVisibilityIFCLabel(ctx, deps, client, owner, repo, result, ifc.LabelRepoMetadata)
+			return result, nil, nil
+			attachIFC := newRepoVisibilityIFCLabeler(ctx, deps, client, owner, repo, ifc.LabelGetFileContents)
+			result := utils.NewToolResultText(string(r))
+			// Tags are structural repo metadata created by collaborators with
+			// push access, so integrity is trusted. Confidentiality follows
+			// repo visibility.
+			result = attachRepoVisibilityIFCLabel(ctx, deps, client, owner, repo, result, ifc.LabelRepoMetadata)
+			return result, nil, nil
+				result := utils.NewToolResultText(string(r))
+				result = attachRepoVisibilityIFCLabel(ctx, deps, client, owner, repo, result, ifc.LabelRepoMetadata)
+				return result, nil, nil
+			result := utils.NewToolResultText(string(r))
+			// An annotated tag object is structural repo metadata created by a
+			// collaborator with push access. Confidentiality follows repo
+			// visibility.
+			result = attachRepoVisibilityIFCLabel(ctx, deps, client, owner, repo, result, ifc.LabelRepoMetadata)
+			return result, nil, nil
+			result := utils.NewToolResultText(string(r))
+			// Releases are published by collaborators with push access, so
+			// integrity is trusted. Confidentiality follows repo visibility,
+			// but draft releases are visible only to push-access users and are
+			// not world-readable even on a public repo, so the result is only
+			// public when no returned release is a draft.
+			hasDraft := false
+			for _, mr := range minimalReleases {
+				if mr.Draft {
+					hasDraft = true
+					break
+				}
+			}
+			result = attachRepoVisibilityIFCLabel(ctx, deps, client, owner, repo, result,
+				func(isPrivate bool) ifc.SecurityLabel {
+					return ifc.LabelRelease(isPrivate, hasDraft)
+				})
+			return result, nil, nil
+			result := utils.NewToolResultText(string(r))
+			// Releases are published by collaborators with push access, so
+			// integrity is trusted. The "latest release" endpoint never returns
+			// a draft, but the draft flag is honored defensively: a draft is
+			// not world-readable even on a public repo.
+			result = attachRepoVisibilityIFCLabel(ctx, deps, client, owner, repo, result,
+				func(isPrivate bool) ifc.SecurityLabel {
+					return ifc.LabelRelease(isPrivate, release.GetDraft())
+				})
+			return result, nil, nil
+			result := utils.NewToolResultText(string(r))
+			// Releases are published by collaborators with push access, so
+			// integrity is trusted. A release fetched by tag may be a draft,
+			// which is visible only to push-access users and not world-readable
+			// even on a public repo, so a draft forces private confidentiality.
+			result = attachRepoVisibilityIFCLabel(ctx, deps, client, owner, repo, result,
+				func(isPrivate bool) ifc.SecurityLabel {
+					return ifc.LabelRelease(isPrivate, release.GetDraft())
+				})
+			return result, nil, nil
+			result := utils.NewToolResultText(string(r))
+			// A starred-repository listing exposes repository data across many
+			// repos; reuse the multi-repo join shared with search_repositories
+			// (untrusted integrity; confidentiality private if any matched repo
+			// is private). Visibility is read directly from the response, so no
+			// extra API call is needed.
+			visibilities := make([]bool, 0, len(minimalRepos))
+			for _, mr := range minimalRepos {
+				visibilities = append(visibilities, mr.Private)
+			}
+			result = attachJoinedIFCLabel(ctx, deps, result, visibilities, ifc.LabelSearchIssues)
+			return result, nil, nil
+			callResult := MarshalledTextResult(response)
+			// The collaborator roster is GitHub-maintained membership data
+			// (trusted, not attacker-authored). Listing collaborators requires
+			// push access, so the roster is never world-readable — not even on
+			// a public repo — hence always private confidentiality.
+			callResult = attachStaticIFCLabel(ctx, deps, callResult, ifc.LabelCollaboratorRoster())
+			return callResult, nil, nil

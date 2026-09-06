@@ -1,0 +1,35 @@
+// commit 765daa10b1db 2026-05-02T12:36:59+02:00 log/context.go
+	// The built-in TagContextValue ("value:") tag cannot be overridden.
+var (
+	errContextTagInvalid  = errors.New("log: context tag name and function are required")
+	errContextTagReserved = errors.New("log: context tag is reserved")
+)
+	tags[TagContextValue] = defaultContextValueTag
+	if tag == TagContextValue {
+		return errContextTagReserved
+	}
+	tags[TagContextValue] = defaultContextValueTag
+		"api-key":       emptyContextTag,
+		"csrf-token":    emptyContextTag,
+		"request-id":    emptyContextTag,
+		"requestid":     emptyContextTag,
+		"session-id":    emptyContextTag,
+		"username":      emptyContextTag,
+		TagContextValue: defaultContextValueTag,
+	}
+}
+
+func defaultContextValueTag(output Buffer, ctx any, _ *ContextData, extraParam string) (int, error) {
+	switch v := contextValue(ctx, extraParam).(type) {
+	case []byte:
+		return output.Write(v)
+	case string:
+		return output.WriteString(v)
+	case nil:
+		return 0, nil
+	default:
+		n, err := fmt.Fprintf(output, "%v", v)
+		if err != nil {
+			return n, fmt.Errorf("write context value: %w", err)
+		}
+		return n, nil

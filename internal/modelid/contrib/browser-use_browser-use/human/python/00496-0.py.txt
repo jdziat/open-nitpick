@@ -1,0 +1,75 @@
+# commit ed2a503f0dc4 2025-06-10T03:18:28-07:00 tests/ci/test_agent_multiprocessing.py
+		# Give asyncio tasks a moment to complete
+		try:
+			loop.run_until_complete(asyncio.sleep(0.1))
+		except Exception:
+			pass
+		# Cancel all pending tasks
+		try:
+			pending = asyncio.all_tasks(loop)
+			for task in pending:
+				task.cancel()
+			if pending:
+				loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+		except Exception:
+			pass
+		loop.stop()
+		# Just run directly in the current event loop
+		agent = Agent(
+			task='Test task',
+			llm=mock_llm,
+			tool_calling_method='raw',
+			enable_memory=False,
+			browser_profile=BrowserProfile(headless=True, user_data_dir=None),
+		)
+		result = await agent.run()
+		# Just run agents sequentially in the same event loop
+		# This still tests sequential execution without creating new loops
+		agent1 = Agent(
+			task='First loop task',
+			llm=mock_llm,
+			tool_calling_method='raw',
+			enable_memory=False,
+			browser_profile=BrowserProfile(headless=True, user_data_dir=None),
+		)
+		result1 = await agent1.run()
+		agent2 = Agent(
+			task='Second loop task',
+			llm=mock_llm,
+			tool_calling_method='raw',
+			enable_memory=False,
+			browser_profile=BrowserProfile(headless=True, user_data_dir=None),
+		)
+		result2 = await agent2.run()
+				# Give asyncio tasks a moment to complete
+				try:
+					loop.run_until_complete(asyncio.sleep(0.1))
+				except Exception:
+					pass
+				# Cancel all pending tasks
+				try:
+					pending = asyncio.all_tasks(loop)
+					for task in pending:
+						task.cancel()
+					if pending:
+						loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+				except Exception:
+					pass
+				loop.stop()
+		# We need to suppress the warning about unawaited coroutine
+		import warnings
+		with warnings.catch_warnings():
+			warnings.simplefilter('ignore', RuntimeWarning)
+			with pytest.raises(RuntimeError, match='asyncio.run.*cannot be called from a running event loop'):
+				# This will create a coroutine that won't be awaited, but we're testing the exception
+				asyncio.run(asyncio.sleep(0))
+		# Just run in the current event loop
+		async def dummy_coroutine():
+			return 'test'
+		# Run directly without creating new loops
+		result1 = await dummy_coroutine()
+		# Subsequent calls also work
+		result2 = await dummy_coroutine()
+			# Clean up browser session first
+			# Then close browser to ensure all playwright tasks complete
+			await browser.close()

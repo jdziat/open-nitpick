@@ -1,0 +1,32 @@
+# commit 5530e2485e60 2025-08-18T23:37:03-07:00 browser_use/logging_config.py
+		def __init__(self, fmt, log_level):
+			super().__init__(fmt)
+			self.log_level = log_level
+
+			# Only clean up names in INFO mode, keep everything in DEBUG mode
+			if self.log_level > logging.DEBUG and isinstance(record.name, str) and record.name.startswith('browser_use.'):
+				# Extract clean component names from logger names
+				if 'Agent🅰' in record.name:
+					record.name = 'Agent'
+				elif 'BrowserSession🆂' in record.name:
+					record.name = 'BrowserSession'
+				elif 'controller' in record.name:
+					record.name = 'controller'
+				elif 'dom' in record.name:
+					record.name = 'dom'
+				elif record.name.startswith('browser_use.'):
+					# For other browser_use modules, use the last part
+					parts = record.name.split('.')
+					if len(parts) >= 2:
+						record.name = parts[-1]
+	# Determine the log level to use first
+	if log_type == 'result':
+		log_level = 35  # RESULT level value
+	elif log_type == 'debug':
+		log_level = logging.DEBUG
+	else:
+		log_level = logging.INFO
+
+		console.setFormatter(BrowserUseFormatter('%(message)s', log_level))
+		console.setFormatter(BrowserUseFormatter('%(levelname)-8s [%(name)s] %(message)s', log_level))
+		cdp_log_level = logging.ERROR  # Default to WARNING

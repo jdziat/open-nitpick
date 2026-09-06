@@ -1,0 +1,43 @@
+// commit 65f1379b07e5 2026-01-07T11:10:04-06:00 chasm/lib/scheduler/gen/schedulerpb/v1/service_grpc.pb.go
+	SchedulerService_CreateSchedule_FullMethodName            = "/temporal.server.chasm.lib.scheduler.proto.v1.SchedulerService/CreateSchedule"
+	SchedulerService_UpdateSchedule_FullMethodName            = "/temporal.server.chasm.lib.scheduler.proto.v1.SchedulerService/UpdateSchedule"
+	SchedulerService_PatchSchedule_FullMethodName             = "/temporal.server.chasm.lib.scheduler.proto.v1.SchedulerService/PatchSchedule"
+	SchedulerService_DeleteSchedule_FullMethodName            = "/temporal.server.chasm.lib.scheduler.proto.v1.SchedulerService/DeleteSchedule"
+	SchedulerService_DescribeSchedule_FullMethodName          = "/temporal.server.chasm.lib.scheduler.proto.v1.SchedulerService/DescribeSchedule"
+	SchedulerService_ListScheduleMatchingTimes_FullMethodName = "/temporal.server.chasm.lib.scheduler.proto.v1.SchedulerService/ListScheduleMatchingTimes"
+	ListScheduleMatchingTimes(ctx context.Context, in *ListScheduleMatchingTimesRequest, opts ...grpc.CallOption) (*ListScheduleMatchingTimesResponse, error)
+func (c *schedulerServiceClient) ListScheduleMatchingTimes(ctx context.Context, in *ListScheduleMatchingTimesRequest, opts ...grpc.CallOption) (*ListScheduleMatchingTimesResponse, error) {
+	out := new(ListScheduleMatchingTimesResponse)
+	err := c.cc.Invoke(ctx, SchedulerService_ListScheduleMatchingTimes_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+	ListScheduleMatchingTimes(context.Context, *ListScheduleMatchingTimesRequest) (*ListScheduleMatchingTimesResponse, error)
+func (UnimplementedSchedulerServiceServer) ListScheduleMatchingTimes(context.Context, *ListScheduleMatchingTimesRequest) (*ListScheduleMatchingTimesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListScheduleMatchingTimes not implemented")
+}
+func _SchedulerService_ListScheduleMatchingTimes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListScheduleMatchingTimesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SchedulerServiceServer).ListScheduleMatchingTimes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SchedulerService_ListScheduleMatchingTimes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SchedulerServiceServer).ListScheduleMatchingTimes(ctx, req.(*ListScheduleMatchingTimesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+		{
+			MethodName: "ListScheduleMatchingTimes",
+			Handler:    _SchedulerService_ListScheduleMatchingTimes_Handler,
+		},

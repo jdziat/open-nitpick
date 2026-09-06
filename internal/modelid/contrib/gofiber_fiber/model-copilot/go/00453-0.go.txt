@@ -1,0 +1,55 @@
+// commit 312d2e69b8bf 2025-12-18T13:30:08+01:00 redirect.go
+	if len(r.c.flashMessages) == 0 {
+		return []FlashMessage{}
+	}
+
+	flashMessages := make([]FlashMessage, 0, len(r.c.flashMessages))
+	writeIdx := 0
+		if msg.isOldInput {
+			r.c.flashMessages[writeIdx] = msg
+			writeIdx++
+			continue
+
+		flashMessages = append(flashMessages, FlashMessage{
+			Key:   msg.key,
+			Value: msg.value,
+			Level: msg.level,
+		})
+	}
+
+	for i := writeIdx; i < len(r.c.flashMessages); i++ {
+		r.c.flashMessages[i] = redirectionMsg{}
+	r.c.flashMessages = r.c.flashMessages[:writeIdx]
+
+	if len(r.c.flashMessages) == 0 {
+		return FlashMessage{}
+	}
+	var flashMessage FlashMessage
+	found := false
+	writeIdx := 0
+
+	for _, msg := range r.c.flashMessages {
+		if msg.isOldInput || found || msg.key != key {
+			r.c.flashMessages[writeIdx] = msg
+			writeIdx++
+			continue
+
+		flashMessage = FlashMessage{
+			Key:   msg.key,
+			Value: msg.value,
+			Level: msg.level,
+		}
+		found = true
+	}
+
+	for i := writeIdx; i < len(r.c.flashMessages); i++ {
+		r.c.flashMessages[i] = redirectionMsg{}
+	r.c.flashMessages = r.c.flashMessages[:writeIdx]
+
+	return flashMessage
+	r.c.Cookie(&Cookie{
+		Name:   FlashCookieName,
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})

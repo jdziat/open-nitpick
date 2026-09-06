@@ -1,0 +1,47 @@
+// commit 358f0a200a4d 2026-08-23T16:35:33+02:00 middleware/redirect/redirect.go
+	// empty marks the construct just read as one matching only the empty string.
+	// Every count of it spells the same path, so a quantifier on one is no width:
+	// counting it made "/p/(?:)?(?:)?[a]" twice as wide as the "/p/[ab]" that
+	// contains it, on a path only the first matches.
+	empty := false
+				atom, prev, quantified, empty = 1, n, false, q.text == ""
+			atom, prev, quantified, empty = 1, n, false, false
+			atom, prev, quantified, empty = s.classWidth(), n, false, false
+			atom, prev, quantified, empty = 256, n, false, false
+			empty = s.i < len(s.rule) && s.rule[s.i] == ')'
+			total, n, atom, prev, quantified, empty = clampWidth(total+n), 1, 1, 1, false, false
+			if !quantified && !empty {
+				atom, prev, quantified, empty = 1, n, false, false
+			if !bounds.runsOn && !empty {
+			atom, prev, quantified, empty = 1, n, false, false
+	// starts holds where the body of each still-open group begins, so a ")"
+	// standing there closes a group holding nothing. empty marks the construct
+	// just read as one matching only the empty string, whose repetitions are all
+	// the same path: "/p/(?:)+a" matches "/p/a" and nothing besides, and grading
+	// it as a run sorted it behind the broader "/p/b?a" it is contained in.
+	var starts []int
+	empty := false
+				empty = q.text == ""
+			empty = false
+			empty = false
+		case '(':
+			i = skipGroupPrefix(rule, i+1)
+			starts = append(starts, i)
+			empty = false
+			continue
+		case ')':
+			empty = len(starts) > 0 && starts[len(starts)-1] == i
+			if len(starts) > 0 {
+				starts = starts[:len(starts)-1]
+			}
+			i++
+			// Fiber's own wildcard, which is expanded to "(.*)" whatever stands
+			// before it, so it runs on even where that is an empty group.
+			empty = false
+			runs.unbounded = runs.unbounded || !empty
+			if !bounds.quantifies {
+				empty = false
+				break
+			}
+			runs.unbounded = runs.unbounded || (bounds.runsOn && !empty)
+			empty = false

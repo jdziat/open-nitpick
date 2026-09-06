@@ -1,0 +1,36 @@
+# commit fc075c0152d5 2025-06-26T07:07:13-07:00 tests/ci/test_browser_session_start.py
+		# Track browser PIDs to ensure only one browser is launched
+		browser_pids = []
+		original_setup = browser_session._unsafe_setup_new_browser_context
+		async def tracking_setup():
+			await original_setup()
+			if browser_session.browser_pid:
+				browser_pids.append(browser_session.browser_pid)
+		browser_session._unsafe_setup_new_browser_context = tracking_setup
+		# Both should succeed and return the same session
+		successful_results = [r for r in results if isinstance(r, type(browser_session)) and r is browser_session]
+		assert len(successful_results) == 2, f'Expected both starts to succeed, got results: {results}'
+
+		# The session should be initialized after concurrent calls
+		# Most importantly: only one browser should have been launched
+		assert len(browser_pids) <= 1, f'Multiple browsers launched! PIDs: {browser_pids}'
+		# Track if start() gets called again by monitoring the start method
+		start_call_count = 0
+		original_start = browser_session.start
+		async def counting_start():
+			nonlocal start_call_count
+			start_call_count += 1
+			return await original_start()
+		browser_session.start = counting_start
+		# Verify the method worked and start() wasn't called again
+		assert start_call_count == 0  # start() should not have been called
+		results = await asyncio.gather(*kill_tasks, return_exceptions=True)
+		# Check that no exceptions were raised during cleanup
+		for i, result in enumerate(results):
+			if isinstance(result, Exception):
+				print(f'Warning: Browser session kill raised exception: {type(result).__name__}: {result}')
+		results = await asyncio.gather(*kill_tasks, return_exceptions=True)
+		# Check that no exceptions were raised during cleanup
+		for i, result in enumerate(results):
+			if isinstance(result, Exception):
+				print(f'Warning: Browser session kill raised exception: {type(result).__name__}: {result}')

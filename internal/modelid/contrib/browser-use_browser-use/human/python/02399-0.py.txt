@@ -1,0 +1,101 @@
+# commit 0dd27ca9760c 2025-08-27T16:37:17-07:00 browser_use/browser/watchdogs/downloads_watchdog.py
+		# Note: Using network-based PDF detection that doesn't require JavaScript
+
+		"""Check if the current target is a PDF using network-based detection.
+		This method avoids JavaScript execution that can crash WebSocket connections.
+			# Method 1: Check URL patterns (fastest, most reliable)
+			url_is_pdf = self._check_url_for_pdf(page_url)
+			if url_is_pdf:
+				self.logger.debug(f'[DownloadsWatchdog] PDF detected via URL pattern: {page_url}')
+				self._pdf_viewer_cache[page_url] = True
+				return True
+			# Method 2: Check network response headers via CDP (safer than JavaScript)
+			header_is_pdf = await self._check_network_headers_for_pdf(target_id)
+			if header_is_pdf:
+				self.logger.debug(f'[DownloadsWatchdog] PDF detected via network headers: {page_url}')
+				self._pdf_viewer_cache[page_url] = True
+				return True
+			# Method 3: Check Chrome's PDF viewer specific URLs
+			chrome_pdf_viewer = self._is_chrome_pdf_viewer_url(page_url)
+			if chrome_pdf_viewer:
+				self.logger.debug(f'[DownloadsWatchdog] Chrome PDF viewer detected: {page_url}')
+			# Not a PDF
+	def _check_url_for_pdf(self, url: str) -> bool:
+		"""Check if URL indicates a PDF file."""
+		if not url:
+			return False
+
+		url_lower = url.lower()
+
+		# Direct PDF file extensions
+		if url_lower.endswith('.pdf'):
+			return True
+
+		# PDF in path
+		if '.pdf' in url_lower:
+			return True
+
+		# PDF MIME type in URL parameters
+		if any(
+			param in url_lower
+			for param in [
+				'content-type=application/pdf',
+				'content-type=application%2fpdf',
+				'mimetype=application/pdf',
+				'type=application/pdf',
+			]
+		):
+			return True
+
+		return False
+
+	def _is_chrome_pdf_viewer_url(self, url: str) -> bool:
+		"""Check if this is Chrome's internal PDF viewer URL."""
+		if not url:
+			return False
+
+		url_lower = url.lower()
+
+		# Chrome PDF viewer uses chrome-extension:// URLs
+		if 'chrome-extension://' in url_lower and 'pdf' in url_lower:
+			return True
+
+		# Chrome PDF viewer internal URLs
+		if url_lower.startswith('chrome://') and 'pdf' in url_lower:
+			return True
+
+		return False
+
+	async def _check_network_headers_for_pdf(self, target_id: TargetID) -> bool:
+		"""Check network response headers for PDF content-type."""
+		try:
+			import asyncio
+
+			# Get CDP session
+			temp_session = await self.browser_session.get_or_create_cdp_session(target_id, focus=False)
+
+			# Get navigation history to find the main resource
+			history = await asyncio.wait_for(
+				temp_session.cdp_client.send.Page.getNavigationHistory(session_id=temp_session.session_id), timeout=3.0
+			)
+
+			current_entry = history.get('entries', [])
+			if current_entry:
+				current_index = history.get('currentIndex', 0)
+				if 0 <= current_index < len(current_entry):
+					current_url = current_entry[current_index].get('url', '')
+
+					# Check if the URL itself suggests PDF
+					if self._check_url_for_pdf(current_url):
+						return True
+
+			# Note: CDP doesn't easily expose response headers for completed navigations
+			# For more complex cases, we'd need to set up Network.responseReceived listeners
+			# before navigation, but that's overkill for most PDF detection cases
+
+			return False
+
+		except Exception as e:
+			self.logger.debug(f'[DownloadsWatchdog] Network headers check failed (non-critical): {e}')
+			return False
+

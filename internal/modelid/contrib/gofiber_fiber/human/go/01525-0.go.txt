@@ -1,0 +1,31 @@
+// commit d6b666df674d 2026-06-26T03:53:35+00:00 middleware/proxy/proxy.go
+	"net/url"
+//
+// The currentURL flowing into req.SetRequestURI is tracked as a *url.URL
+// produced by validateUpstream (scheme allowlist + SSRF block + host
+// re-validation). That makes the policy check the only path data can
+// reach SetRequestURI through — including taint trackers like
+// CodeQL's go/request-forgery.
+	// Re-validate the initial URL even though doActionWithPolicy already
+	// did. Carrying the result as *url.URL guarantees every SetRequestURI
+	// inside the loop is fed a value produced by validateUpstream.
+	currentURL, err := validateUpstream(string(req.URI().FullURI()), policy)
+	if err != nil {
+		return err
+	}
+	currentHost := currentURL.Host
+		req.SetRequestURI(currentURL.String())
+		nextURL, err := resolveRedirect(currentURL.String(), location, policy)
+		if !utils.EqualFold(nextURL.Host, currentHost) {
+			currentHost = nextURL.Host
+// rejected to prevent header injection via Location. The returned value
+// is the validated *url.URL produced by validateUpstream, so callers
+// pass it straight into network sinks without re-parsing user-controlled
+// strings.
+func resolveRedirect(currentURL string, location []byte, policy SecurityPolicy) (*url.URL, error) {
+			return nil, fasthttp.ErrorInvalidURI
+		return nil, fasthttp.ErrorInvalidURI
+	target, err := validateUpstream(uri.String(), policy)
+		return nil, err
+		return nil, ErrRedirectDowngrade
+	return target, nil

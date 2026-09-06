@@ -1,0 +1,31 @@
+// commit f354b065c43e 2026-07-30T13:17:50+00:00 middleware/logger/tags.go
+			return writeSanitizedString(output, c.Get(fiber.HeaderReferer))
+			// Scheme echoes X-Forwarded-Proto / X-Url-Scheme once the proxy is
+			// trusted, so it is request-derived like ${ips} and ${ua}.
+			return writeSanitizedString(output, c.Scheme())
+			return writeSanitizedString(output, c.IP())
+			return writeSanitizedString(output, c.Get(fiber.HeaderXForwardedFor))
+			return writeSanitizedString(output, c.Hostname())
+			return writeSanitizedString(output, c.Path())
+			return writeSanitizedString(output, c.OriginalURL())
+			return writeSanitizedString(output, c.Get(fiber.HeaderUserAgent))
+			return writeSanitized(output, c.Body())
+			// Normally the registered pattern, but Ctx.Route falls back to a
+			// synthetic route carrying the raw request path when no route
+			// matched, so this can be request-derived too.
+			return writeSanitizedString(output, c.Route().Path)
+			return writeSanitized(output, c.Response().Body())
+			return writeSanitizedString(output, strings.Join(reqHeaders, "&"))
+			return writeSanitizedString(output, c.Request().URI().QueryArgs().String())
+					return writeSanitizedColored(output, colors.Red, data.ChainErr.Error(), colors.Reset)
+				return writeSanitizedString(output, data.ChainErr.Error())
+			return writeSanitizedString(output, c.Get(extraParam))
+			return writeSanitizedString(output, c.GetRespHeader(extraParam))
+			return writeSanitizedString(output, fiber.Query[string](c, extraParam))
+			return writeSanitizedString(output, c.FormValue(extraParam))
+			return writeSanitizedString(output, c.Cookies(extraParam))
+				return writeSanitized(output, v)
+				return writeSanitizedString(output, v)
+				// %v can render arbitrary text (e.g. a struct holding request
+				// data), so it goes through the same scrubbing.
+				return writeSanitizedValue(output, v)

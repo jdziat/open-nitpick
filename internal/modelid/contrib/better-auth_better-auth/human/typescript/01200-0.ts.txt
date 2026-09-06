@@ -1,0 +1,57 @@
+// commit 041dc17b2aef 2026-01-23T18:04:12+00:00 packages/cli/src/commands/mcp.ts
+		await handleCursorAction();
+		handleClaudeCodeAction();
+		handleOpenCodeAction();
+		handleManualAction();
+async function handleCursorAction() {
+	const remoteConfig = { url: REMOTE_MCP_URL };
+	const encodedRemote = base64.encode(
+		new TextEncoder().encode(JSON.stringify(remoteConfig)),
+	);
+	const remoteDeeplink = `cursor://anysphere.cursor-deeplink/mcp/install?name=${encodeURIComponent("better-auth-docs")}&config=${encodedRemote}`;
+	try {
+		const cmd =
+			platform === "win32"
+				? `start "" "${remoteDeeplink}"`
+				: `${openCommand} "${remoteDeeplink}"`;
+		execSync(cmd, { stdio: "inherit" });
+		console.log(chalk.green("\n✓ Better Auth MCP server installed!"));
+	} catch {
+		console.log(
+			chalk.yellow(
+				"\n⚠ Could not automatically open Cursor for MCP installation.",
+			),
+		chalk.gray("• The MCP server will be added to your Cursor configuration"),
+function handleClaudeCodeAction() {
+	const command = `claude mcp add --transport http better-auth-docs ${REMOTE_MCP_URL}`;
+	try {
+		execSync(command, { stdio: "inherit" });
+		console.log(chalk.green("\n✓ Claude Code MCP configured!"));
+	} catch {
+		console.log(
+			chalk.yellow(
+				"\n⚠ Could not automatically add to Claude Code. Please run this command manually:",
+			),
+		console.log(chalk.cyan(command));
+			"• The MCP server will be added to your Claude Code configuration",
+function handleOpenCodeAction() {
+		mcp: {
+			"better-auth-docs": {
+				type: "remote",
+				url: REMOTE_MCP_URL,
+				enabled: true,
+			},
+		},
+		console.log(chalk.green("✓ Better Auth MCP server added successfully!"));
+	console.log(chalk.gray("• Restart Open Code to load the new MCP server"));
+function handleManualAction() {
+	const manualConfig = {
+		"better-auth-docs": {
+		},
+	};
+		console.log(chalk.green("✓ Better Auth MCP server added successfully!"));
+	console.log(chalk.gray("• Restart your MCP client to load the new server"));
+	console.log(chalk.bold.blue("🔌 Better Auth MCP Server"));
+	console.log(chalk.bold.white("Server:"));
+			chalk.gray(" - Search documentation, code examples, setup assistance"),
+	.description("Add Better Auth MCP server to MCP Clients")

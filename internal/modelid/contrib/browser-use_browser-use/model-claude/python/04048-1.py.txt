@@ -1,0 +1,43 @@
+# commit 9d7a0c74ed12 2026-02-09T10:14:42-08:00 browser_use/skill_cli/main.py
+	# -------------------------------------------------------------------------
+	# Tunnel Commands
+	# -------------------------------------------------------------------------
+
+	tunnel_p = subparsers.add_parser('tunnel', help='Expose localhost via Cloudflare tunnel')
+	tunnel_p.add_argument(
+		'port_or_subcommand',
+		nargs='?',
+		default=None,
+		help='Port number to tunnel, or subcommand (list, stop)',
+	)
+	tunnel_p.add_argument('port_arg', nargs='?', type=int, help='Port number (for stop subcommand)')
+
+	# Handle tunnel subcommand parsing
+	if args.command == 'tunnel':
+		pos = getattr(args, 'port_or_subcommand', None)
+		if pos == 'list':
+			params = {'subcommand': 'list'}
+		elif pos == 'stop':
+			port_arg = getattr(args, 'port_arg', None)
+			if port_arg is None:
+				print('Usage: browser-use tunnel stop <port>', file=sys.stderr)
+				return 1
+			params = {'subcommand': 'stop', 'port': port_arg}
+		elif pos is not None:
+			try:
+				port = int(pos)
+			except ValueError:
+				print(f'Unknown tunnel subcommand: {pos}', file=sys.stderr)
+				return 1
+			params = {'subcommand': 'start', 'port': port}
+		else:
+			print('Usage: browser-use tunnel <port> | list | stop <port>', file=sys.stderr)
+			return 0
+
+	# Build params from args (unless already built for tunnel)
+	if args.command != 'tunnel':
+		params = {}
+		skip_keys = {'command', 'session', 'browser', 'headed', 'profile', 'json', 'api_key', 'server_command'}
+		for key, value in vars(args).items():
+			if key not in skip_keys and value is not None:
+				params[key] = value

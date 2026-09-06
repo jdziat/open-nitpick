@@ -1,0 +1,100 @@
+# commit ae0879026b6e 2025-09-23T15:33:58+02:00 tests/test_xet_upload.py
+from huggingface_hub._commit_api import CommitOperationAdd, _upload_files, _upload_lfs_files, _upload_xet_files
+    with patch("huggingface_hub._commit_api._upload_xet_files", wraps=_upload_xet_files) as mock_xet:
+        with patch("huggingface_hub._commit_api._upload_lfs_files", wraps=_upload_lfs_files) as mock_lfs:
+@pytest.fixture
+def xet_setup(request, tmp_path):
+    instance = getattr(request, "instance", None)
+    if instance is None:
+        yield
+        return
+    instance.folder_path = tmp_path
+    # Create a regular text file
+    text_file = instance.folder_path / "text_file.txt"
+    instance.text_content = "This is a regular text file"
+    text_file.write_text(instance.text_content)
+
+    # Create a binary file
+    instance.bin_file = instance.folder_path / "binary_file.bin"
+    instance.bin_content = b"0" * (1 * 1024 * 1024)
+    instance.bin_file.write_bytes(instance.bin_content)
+
+    # Create nested directory structure
+    nested_dir = instance.folder_path / "nested"
+    nested_dir.mkdir()
+
+    # Create a nested text file
+    nested_text_file = nested_dir / "nested_text.txt"
+    instance.nested_text_content = "This is a nested text file"
+    nested_text_file.write_text(instance.nested_text_content)
+
+    # Create a nested binary file
+    nested_bin_file = nested_dir / "nested_binary.safetensors"
+    instance.nested_bin_content = b"1" * (1 * 1024 * 1024)
+    nested_bin_file.write_bytes(instance.nested_bin_content)
+    yield
+
+
+@pytest.mark.usefixtures("xet_setup")
+        with patch("huggingface_hub._commit_api.is_xet_available", return_value=False):
+    def test_transfers_to_xet_when_server_returns_xet(self):
+        addition = CommitOperationAdd(path_in_repo="xet.bin", path_or_fileobj=self.bin_file)
+
+        def fake_batch(
+            upload_infos, token, repo_type, repo_id, revision=None, endpoint=None, headers=None, transfers=None
+        ):
+            action = {
+                "oid": upload_infos[0].sha256.hex(),
+                "size": upload_infos[0].size,
+                "actions": {"upload": {"href": "https://example.invalid", "header": {}}},
+            }
+            return ([action], [], "xet")
+
+        with patch("huggingface_hub._commit_api.post_lfs_batch_info", side_effect=fake_batch) as mock_batch:
+            with patch("huggingface_hub._commit_api._upload_lfs_files") as mock_lfs:
+                with patch("huggingface_hub._commit_api._upload_xet_files") as mock_xet:
+                    _upload_files(
+                        additions=[addition],
+                        repo_type="model",
+                        repo_id="dummy/user-repo",
+                        headers={},
+                        endpoint="https://hub-ci.huggingface.co",
+                        revision="main",
+                        create_pr=False,
+                    )
+            assert mock_batch.call_count == 1
+            mock_xet.assert_called_once()
+            mock_lfs.assert_not_called()
+
+    def test_transfers_bytesio_renegotiates_to_lfs_when_server_returns_xet(self):
+        addition = CommitOperationAdd(path_in_repo="bytesio.bin", path_or_fileobj=BytesIO(self.bin_content))
+
+        def fake_batch(
+            upload_infos, token, repo_type, repo_id, revision=None, endpoint=None, headers=None, transfers=None
+        ):
+            action = {
+                "oid": upload_infos[0].sha256.hex(),
+                "size": upload_infos[0].size,
+                "actions": {"upload": {"href": "https://example.invalid", "header": {}}},
+            }
+            return ([action], [], "xet")
+
+        with patch("huggingface_hub._commit_api.post_lfs_batch_info", side_effect=fake_batch) as mock_batch:
+            with patch("huggingface_hub._commit_api._upload_lfs_files") as mock_lfs:
+                with patch("huggingface_hub._commit_api._upload_xet_files") as mock_xet:
+                    _upload_files(
+                        additions=[addition],
+                        repo_type="model",
+                        repo_id="dummy/user-repo",
+                        headers={},
+                        endpoint="https://hub-ci.huggingface.co",
+                        revision="main",
+                        create_pr=False,
+                    )
+
+            # Ensure we retried negotiation and routed to LFS, not XET
+            assert mock_batch.call_count == 1
+            mock_xet.assert_not_called()
+            mock_lfs.assert_called_once()
+@pytest.mark.usefixtures("xet_setup")
+class TestXetE2E:

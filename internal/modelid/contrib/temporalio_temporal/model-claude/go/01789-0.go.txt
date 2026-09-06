@@ -1,0 +1,36 @@
+// commit c9fd978d45f2 2026-08-27T08:26:51-07:00 service/worker/scanner/scheduleinvariants/invariants.go
+	"google.golang.org/protobuf/types/known/timestamppb"
+		//nolint:forbidigo // scanner works per namespace, not per workflow.
+		if !ns.ActiveInCluster(a.currentClusterName) {
+			continue
+		}
+
+	// Confirm the invariant against what Describe just returned: the candidate came from
+	// a ScheduleNextActionTime index entry, which goes stale on replication or indexing
+	// lag.
+	if !a.nextActionTimeIsOverdue(desc.GetInfo().GetFutureActionTimes()) {
+		a.logger.Info("overdue candidate was not overdue on re-check; visibility entry was stale",
+			tag.WorkflowNamespace(nsName), tag.ScheduleID(scheduleID))
+		metrics.ScheduleInvariantsScannerOverdueNextActionTimeStaleCandidateCount.With(
+			a.metricsHandler.WithTags(metrics.NamespaceTag(nsName))).Record(1)
+		return true
+	}
+// nextActionTimeIsOverdue applies the candidate query's predicate to futureActionTimes.
+func (a *Activities) nextActionTimeIsOverdue(futureActionTimes []*timestamppb.Timestamp) bool {
+	var earliest time.Time
+	var found bool
+	for _, t := range futureActionTimes {
+		if t == nil {
+			continue
+		}
+		// Ordered soonest-first, but don't rely on it.
+		if ts := t.AsTime(); !found || ts.Before(earliest) {
+			earliest, found = ts, true
+		}
+	}
+	if !found {
+		return false
+	}
+	return earliest.Before(a.timeSource.Now().UTC().Add(-a.opts().OverdueNextActionTimeTolerance))
+}
+

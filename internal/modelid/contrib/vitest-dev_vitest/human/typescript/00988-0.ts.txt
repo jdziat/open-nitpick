@@ -1,0 +1,49 @@
+// commit f26552c63593 2026-06-07T17:58:40+02:00 packages/browser/src/client/orchestrator.ts
+import type { GlobalChannelIncomingEvent, IframeChannelEvent, IframeChannelOutgoingEvent, IframeViewportDoneEvent, IframeViewportFailEvent } from '@vitest/browser/client'
+  private readyIframes = new Set<string>()
+  private readyWaiters = new Map<string, () => void>()
+    this.readyIframes.clear()
+    this.readyWaiters.clear()
+      this.removeIframe(ID_ALL)
+      this.removeIframe(file)
+          this.waitForReady(iframeId)
+            .then(() => this.sendEventToIframe({
+              event: 'prepare',
+              iframeId,
+              startTime,
+              otelCarrier: this.traces.getContextCarrier(otelContext),
+            }))
+            .then(resolve, error => reject(this.dispatchIframeError(error)))
+  private markReady(iframeId: string) {
+    this.readyIframes.add(iframeId)
+
+    const waiter = this.readyWaiters.get(iframeId)
+    if (waiter) {
+      this.readyWaiters.delete(iframeId)
+      waiter()
+    }
+  }
+
+  private waitForReady(iframeId: string): Promise<void> {
+    if (this.readyIframes.has(iframeId)) {
+      return Promise.resolve()
+    }
+
+    return new Promise((resolve) => {
+      this.readyWaiters.set(iframeId, resolve)
+    })
+  }
+
+  private removeIframe(iframeId: string) {
+    const iframe = this.iframes.get(iframeId)
+    this.iframes.delete(iframeId)
+    this.readyIframes.delete(iframeId)
+    this.readyWaiters.delete(iframeId)
+    iframe?.remove()
+  }
+
+  private async onIframeEvent(e: MessageEvent<IframeChannelEvent>) {
+      case 'ready': {
+        this.markReady(e.data.iframeId)
+        break
+      }

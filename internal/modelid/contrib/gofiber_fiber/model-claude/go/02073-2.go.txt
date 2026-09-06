@@ -1,0 +1,34 @@
+// commit 03c15666c4e5 2026-09-02T05:13:07+00:00 listen.go
+	"errors"
+// ErrCertFileAndKeyRequired indicates that only one of CertFile and CertKeyFile
+// was set. Serving TLS needs both, so Listen refuses to fall back to plaintext.
+var ErrCertFileAndKeyRequired = errors.New("tls: CertFile and CertKeyFile must both be set to serve TLS")
+
+	// Set to a negative value to disable the timeout and wait indefinitely;
+	// zero applies the default.
+	if cfg.ShutdownTimeout == 0 {
+		cfg.ShutdownTimeout = 10 * time.Second
+	}
+
+		case cfg.CertFile != "" || cfg.CertKeyFile != "":
+			// Half a key pair is a misconfiguration, not a request for
+			// plaintext: refuse rather than quietly serve HTTP.
+			return ErrCertFileAndKeyRequired
+
+		stop := make(chan struct{})
+		defer close(stop)
+		go app.gracefulShutdown(cfg.GracefulContext, stop, &cfg)
+		stop := make(chan struct{})
+		defer close(stop)
+		go app.gracefulShutdown(cfg.GracefulContext, stop, &cfg)
+// gracefulShutdown shuts the app down once ctx is done. stop is closed when
+// Listen returns on its own, after an explicit Shutdown (whose hooks already
+// ran) or an error before serving (nothing to shut down), and ends the
+// goroutine without a second shutdown.
+func (app *App) gracefulShutdown(ctx context.Context, stop <-chan struct{}, cfg *ListenConfig) {
+	select {
+	case <-ctx.Done():
+	case <-stop:
+		return
+	}
+	if cfg != nil && cfg.ShutdownTimeout > 0 {

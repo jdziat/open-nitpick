@@ -1,0 +1,31 @@
+// commit 11f177a8c33f 2026-03-23T18:49:28-06:00 pkg/cmd/pr/shared/survey.go
+func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState, projectsV1Support gh.ProjectsV1Support, reviewerSearchFunc func(string) prompter.MultiSelectSearchResult, assigneeSearchFunc func(string) prompter.MultiSelectSearchResult) error {
+	useAssigneeSearch := state.ActorAssignees && assigneeSearchFunc != nil
+		Assignees:      isChosen("Assignees") && !useAssigneeSearch,
+		ActorAssignees: isChosen("Assignees") && !useAssigneeSearch && state.ActorAssignees,
+	// When search-based selection is available, skip building the static list.
+	if !useAssigneeSearch {
+		if state.ActorAssignees {
+			for _, u := range metadataResult.AssignableActors {
+				assignees = append(assignees, u.DisplayName())
+				if slices.Contains(state.Assignees, u.Login()) {
+					assigneesDefault = append(assigneesDefault, u.DisplayName())
+				}
+		} else {
+			for _, u := range metadataResult.AssignableUsers {
+				assignees = append(assignees, u.DisplayName())
+				if slices.Contains(state.Assignees, u.Login()) {
+					assigneesDefault = append(assigneesDefault, u.DisplayName())
+				}
+		if useAssigneeSearch {
+			selectedAssignees, err := p.MultiSelectWithSearch(
+				"Assignees",
+				"Search assignees",
+				state.Assignees,
+				[]string{},
+				assigneeSearchFunc)
+			if err != nil {
+				return err
+			}
+			values.Assignees = selectedAssignees
+		} else if len(assignees) > 0 {

@@ -1,0 +1,33 @@
+# commit 7eb26f03395b 2026-06-03T09:03:34+00:00 browser_use/rust/service.py
+def _reasoning_output_tokens(usage: dict[str, Any]) -> int:
+	return _int_value(
+		usage.get('reasoning_output_tokens')
+		or usage.get('output_reasoning_tokens')
+		or usage.get('reasoning_tokens')
+	)
+
+
+def _usage_completion_tokens(usage: dict[str, Any]) -> int:
+	return _int_value(usage.get('output_tokens')) + _reasoning_output_tokens(usage)
+
+
+def _usage_total_tokens(usage: dict[str, Any], input_tokens: int, completion_tokens: int) -> int:
+	reported_total = usage.get('total_tokens')
+	if reported_total is not None:
+		total_tokens = _int_value(reported_total)
+		if total_tokens > 0 or input_tokens + completion_tokens == 0:
+			return total_tokens
+	return input_tokens + completion_tokens
+
+
+	completion_tokens = 0
+	total_tokens = 0
+			event_input_tokens = _int_value(usage.get('input_tokens'))
+			event_completion_tokens = _usage_completion_tokens(usage)
+			input_tokens += event_input_tokens
+			completion_tokens += event_completion_tokens
+			total_tokens += _usage_total_tokens(usage, event_input_tokens, event_completion_tokens)
+			completion_tokens = _usage_completion_tokens(token_usage)
+			total_tokens = _usage_total_tokens(token_usage, input_tokens, completion_tokens)
+			completion_tokens=completion_tokens,
+		total_completion_tokens=completion_tokens,

@@ -1,0 +1,136 @@
+# commit 659c5145f6ff 2025-08-01T02:42:01-07:00 tests/ci/test_navigation_events.py
+		content_type='text/html',
+
+			NavigationCompleteEvent, await session.event_bus.expect(NavigationCompleteEvent, timeout=5.0)
+		assert (end_time - start_time) < 1.0, 'Navigation should complete quickly'
+		assert len(navigation_started_events) >= 1, 'Should have NavigationStartedEvent'
+		assert len(navigation_complete_events) >= 1, 'Should have NavigationCompleteEvent'
+		assert nav_complete.status == 200, 'Should have successful HTTP status'
+		assert nav_complete.error_message is None, 'Should have no error message'
+		assert nav_complete.loading_status is None, 'Should have no loading status issues'
+
+
+		wait_for_network_idle_page_load_time=0.5,  # 0.5 second network idle
+
+			NavigationCompleteEvent, await session.event_bus.expect(NavigationCompleteEvent, timeout=10.0)
+		assert len(navigation_started_events) >= 1, 'Should have NavigationStartedEvent'
+		assert len(navigation_complete_events) >= 1, 'Should have NavigationCompleteEvent'
+
+				nav_complete.error_message
+				and ('timeout' in nav_complete.error_message.lower() or 'pending' in nav_complete.error_message.lower())
+				or nav_complete.loading_status
+				and (
+					'aborted' in nav_complete.loading_status.lower()
+					or 'pending' in nav_complete.loading_status.lower()
+					or 'requests' in nav_complete.loading_status.lower()
+				)
+			)
+			print(
+				f"Navigation had issues - error_message: '{nav_complete.error_message}', loading_status: '{nav_complete.loading_status}'"
+				f'Should indicate timeout/loading issues when navigation has problems. '
+			print('Navigation succeeded despite being slow')
+			assert nav_complete.status == 200, 'Successful navigation should have HTTP 200'
+	html_content = """
+	"""
+
+	target_page = """
+	"""
+
+	httpserver.expect_request('/history-test').respond_with_data(html_content, status=200, content_type='text/html')
+	httpserver.expect_request('/target-page').respond_with_data(target_page, status=200, content_type='text/html')
+
+
+
+			if hasattr(element, 'attributes') and element.attributes.get('id') == 'push-btn':
+
+		assert push_button_found, 'Should find push state button'
+
+
+		assert len(navigation_complete_events) == 0, 'history.pushState should not trigger NavigationCompleteEvent'
+
+
+			if hasattr(element, 'attributes') and element.attributes.get('id') == 'same-tab-link':
+
+		assert same_tab_link_found, 'Should find same tab link'
+
+			NavigationCompleteEvent, await session.event_bus.expect(NavigationCompleteEvent, timeout=10.0)
+
+		assert nav_complete.url == target_url, f'Should navigate to {target_url}'
+		assert nav_complete.error_message is None, 'Link navigation should succeed'
+
+
+
+
+			if hasattr(element, 'attributes') and element.attributes.get('id') == 'new-tab-link':
+
+
+			assert has_new_tab_activity, 'New tab link should trigger tab creation or navigation'
+
+				assert target_url in nav_complete.url or nav_complete.error_message is None, (
+					f'New tab navigation should succeed, got: {nav_complete.error_message}'
+				)
+
+			NavigationCompleteEvent, await session.event_bus.expect(NavigationCompleteEvent, timeout=5.0)
+
+@pytest.mark.asyncio
+	main_page = """
+	"""
+
+	target_page = """
+	"""
+
+	js_target_page = """
+	"""
+
+
+
+			if hasattr(element, 'attributes') and element.attributes.get('id') == 'same-tab-link':
+
+		assert same_tab_link_found, 'Should find same tab link'
+
+			NavigationCompleteEvent, await session.event_bus.expect(NavigationCompleteEvent, timeout=5.0)
+
+		assert nav_complete.url == target_url, f'Should navigate to {target_url}'
+		assert nav_complete.error_message is None, 'Link navigation should succeed'
+
+
+
+
+			if hasattr(element, 'attributes') and element.attributes.get('id') == 'new-tab-link':
+
+
+			assert has_new_tab_activity, 'New tab link should trigger tab creation or navigation'
+
+
+
+
+
+			if hasattr(element, 'attributes') and element.attributes.get('id') == 'js-navigation':
+
+			nav_complete = cast(NavigationCompleteEvent, await session.event_bus.expect(NavigationCompleteEvent, timeout=5.0))
+
+			assert nav_complete.url == js_target_url, 'JS navigation should work'
+			assert nav_complete.error_message is None, 'JS navigation should succeed'
+		session.event_bus.dispatch(
+			NavigateToUrlEvent(
+				url='data:text/html,<h1>Should timeout</h1>',  # Use a data URL that should work
+				timeout_ms=1,  # 1ms timeout - should definitely timeout
+			)
+		)
+
+			NavigationCompleteEvent, await session.event_bus.expect(NavigationCompleteEvent, timeout=5.0)
+		assert nav_complete.error_message is not None, 'Should have error message for timeout'
+		assert 'timed out' in nav_complete.error_message.lower(), f'Error should mention timed out: {nav_complete.error_message}'
+		assert nav_complete.loading_status is not None, 'Should have loading status'
+		assert 'timeout' in nav_complete.loading_status.lower(), (
+			f'Loading status should mention timeout: {nav_complete.loading_status}'
+		)
+
+		assert '1ms' in nav_complete.error_message, 'Should mention the specific timeout duration'
+
+			NavigationCompleteEvent, await session.event_bus.expect(NavigationCompleteEvent, timeout=5.0)
+		assert nav_complete.error_message is not None, 'Should have error message for invalid URL'
+
+			NavigationCompleteEvent, await session.event_bus.expect(NavigationCompleteEvent, timeout=5.0)
+		assert nav_complete_recovery.error_message is None, 'Recovery navigation should succeed'
+		await session.stop()

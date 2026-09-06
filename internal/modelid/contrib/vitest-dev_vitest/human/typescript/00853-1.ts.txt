@@ -1,0 +1,290 @@
+// commit 80f07edf60ae 2026-04-28T16:11:22+02:00 test/browser/specs/trace.test.ts
+  const root = result.ctx!.config.root
+    return `${relative(root, location!.file)}:${location!.line}`
+    for (const _key in result) {
+      const key = _key as keyof typeof result
+        for (const subKey in result[key]) {
+          if ((result as any)[key][subKey] === undefined) {
+            delete (result as any)[key][subKey]
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": " body > button",
+                    },
+                    "element": {
+                      "locator": "getByTestId('trace-canvas')",
+                      "selector": " body > canvas",
+                    },
+                    "element": {
+                      "locator": "getByRole('button', { name: 'Custom element button' })",
+                      "selector": ">>>html > body > trace-widget > button",
+                    },
+                    "element": {
+                      "locator": "getByRole('button', { name: 'Shadow button' })",
+                      "selector": ">>>html > body > section > button",
+                    },
+                    "element": {
+                      "locator": "getByRole('button', { name: 'Hello' })",
+                      "selector": " body > button",
+                    },
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": " body > button",
+                    },
+                    "name": "toHaveTextContent [ERROR]",
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": " body > button",
+                    },
+                    "name": "toHaveTextContent",
+                    "element": {
+                      "locator": "getByRole('button', { name: 'Hello' })",
+                      "selector": " body > button",
+                    },
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": " body > button",
+                    },
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": " body > button",
+                    },
+                    "element": {
+                      "locator": "getByAltText('external trace asset')",
+                      "selector": " body > img",
+                    },
+                    "element": {
+                      "locator": "getByAltText('local trace asset')",
+                      "selector": " body > img",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": " body > ul",
+                    },
+                    "element": {
+                      "locator": "getByRole('button', { name: 'First pseudo state' })",
+                      "selector": " body > button:nth-child(1)",
+                    },
+                    "name": "toHaveStyle",
+                    "element": {
+                      "locator": "getByRole('button', { name: 'First pseudo state' })",
+                      "selector": " body > button:nth-child(1)",
+                    },
+                    "element": {
+                      "locator": "getByRole('button', { name: 'Second pseudo state' })",
+                      "selector": " body > button:nth-child(2)",
+                    },
+                    "element": {
+                      "locator": "getByLabel('Focused pseudo state')",
+                      "selector": " body > input",
+                    },
+                    "element": {
+                      "locator": "getByLabel('Focus within pseudo state')",
+                      "selector": " body > label > input",
+                    },
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": " body > main > button",
+                    },
+                    "element": {
+                      "locator": "getByTestId('scroll-box')",
+                      "selector": " body > section",
+                    },
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": "internal:role=button",
+                    },
+                    "element": {
+                      "locator": "getByTestId('trace-canvas')",
+                      "selector": "internal:testid=[data-testid="trace-canvas"s]",
+                    },
+                    "element": {
+                      "locator": "getByRole('button', { name: 'Custom element button' })",
+                      "selector": "internal:role=button[name="Custom element button"i]",
+                    },
+                    "element": {
+                      "locator": "getByRole('button', { name: 'Shadow button' })",
+                      "selector": "internal:role=button[name="Shadow button"i]",
+                    },
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": "internal:role=button",
+                    },
+                    "element": {
+                      "locator": "getByRole('button', { name: 'Missing' })",
+                      "selector": "internal:role=button[name="Missing"i]",
+                    },
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": "internal:role=button",
+                    },
+                    "name": "toHaveTextContent [ERROR]",
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": "internal:role=button",
+                    },
+                    "name": "toHaveTextContent",
+                    "element": {
+                      "locator": "getByRole('button', { name: 'Hello' })",
+                      "selector": "internal:role=button[name="Hello"i]",
+                    },
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": "internal:role=button",
+                    },
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": "internal:role=button",
+                    },
+                    "element": {
+                      "locator": "getByAltText('external trace asset')",
+                      "selector": "internal:attr=[alt="external trace asset"i]",
+                    },
+                    "element": {
+                      "locator": "getByAltText('local trace asset')",
+                      "selector": "internal:attr=[alt="local trace asset"i]",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('list')",
+                      "selector": "internal:role=list",
+                    },
+                    "element": {
+                      "locator": "getByRole('button', { name: 'First pseudo state' })",
+                      "selector": "internal:role=button[name="First pseudo state"i]",
+                    },
+                    "name": "toHaveStyle",
+                    "element": {
+                      "locator": "getByRole('button', { name: 'First pseudo state' })",
+                      "selector": "internal:role=button[name="First pseudo state"i]",
+                    },
+                    "element": {
+                      "locator": "getByRole('button', { name: 'Second pseudo state' })",
+                      "selector": "internal:role=button[name="Second pseudo state"i]",
+                    },
+                    "element": {
+                      "locator": "getByRole('textbox', { name: 'Focused pseudo state' })",
+                      "selector": "internal:role=textbox[name="Focused pseudo state"i]",
+                    },
+                    "element": {
+                      "locator": "getByRole('textbox', { name: 'Focus within pseudo state' })",
+                      "selector": "internal:role=textbox[name="Focus within pseudo state"i]",
+                    },
+                    "element": {
+                      "locator": "getByRole('button')",
+                      "selector": "internal:role=button",
+                    },
+                    "element": {
+                      "locator": "getByTestId('scroll-box')",
+                      "selector": "internal:testid=[data-testid="scroll-box"s]",
+                    },

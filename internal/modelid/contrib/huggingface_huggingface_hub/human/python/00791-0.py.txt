@@ -1,0 +1,35 @@
+# commit bbdef5b34d16 2026-07-28T18:05:35+02:00 tests/test_tree_cache.py
+VALID_XET_HASH = "63bed80836ee0758c8fd4f8975d59bb0b864263ee2753547c358e8a37cde8758"
+            xet_hash=VALID_XET_HASH,
+        ),
+    }
+
+
+MASKED_XET_HASH = "*" * 64
+
+
+def _entries_with_masked_xet_hash():
+    return {
+        "model.safetensors": TreeCacheEntry(
+            size=42,
+            blob_id="blob-model",
+            lfs_sha256="sha256-model",
+            lfs_size=1024,
+            xet_hash=MASKED_XET_HASH,
+    def test_invalid_entries_return_none(self, tmp_path: Path):
+        path = tmp_path / "trees" / f"{COMMIT_HASH}.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "format_version": TREE_CACHE_FORMAT_VERSION,
+                    "files": {
+                        file_path: entry.to_json() for file_path, entry in _entries_with_masked_xet_hash().items()
+                    },
+                }
+            )
+        )
+        assert read_tree_cache(str(tmp_path), COMMIT_HASH) is None
+
+        assert xet_file_data.file_hash == VALID_XET_HASH
+        assert model.xet_hash == VALID_XET_HASH

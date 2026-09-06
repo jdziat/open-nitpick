@@ -1,0 +1,54 @@
+// commit bf47e3eca9ae 2026-08-19T00:04:54+02:00 pkg/errors/error.go
+	"github.com/github/github-mcp-server/pkg/sanitize"
+	return utils.NewToolResultErrorFromErr(message, formatGitHubValidationError(resp, err))
+// formatGitHubValidationError exposes the parsed fields of 422 responses without
+// including request or response metadata from the underlying HTTP exchange.
+func formatGitHubValidationError(resp *github.Response, err error) error {
+	statusCode := 0
+	if ghErr.Response != nil {
+		statusCode = ghErr.Response.StatusCode
+	}
+	if statusCode == 0 && resp != nil {
+		statusCode = resp.StatusCode
+	}
+	if statusCode != http.StatusUnprocessableEntity {
+		return err
+	parts := make([]string, 0, len(ghErr.Errors)+1)
+	if summary := sanitizeGitHubValidationText(ghErr.Message); summary != "" {
+		parts = append(parts, summary)
+	}
+	for _, validationErr := range ghErr.Errors {
+		if detail := formatGitHubValidationDetail(validationErr); detail != "" {
+			parts = append(parts, detail)
+		}
+		return stderrors.New("GitHub API validation failed")
+func formatGitHubValidationDetail(validationErr github.Error) string {
+	resource := sanitizeGitHubValidationText(validationErr.Resource)
+	field := sanitizeGitHubValidationText(validationErr.Field)
+	code := sanitizeGitHubValidationText(validationErr.Code)
+	message := sanitizeGitHubValidationText(validationErr.Message)
+
+	location := strings.Trim(strings.Join([]string{resource, field}, "."), ".")
+	switch {
+	case location != "" && code != "":
+		location += " (" + code + ")"
+	case location == "":
+		location = code
+	}
+
+	switch {
+	case location != "" && message != "":
+		return location + ": " + message
+	case message != "":
+		return message
+	default:
+		return location
+	}
+}
+
+func sanitizeGitHubValidationText(value string) string {
+	// Tool errors are plain text; keep quoted branch patterns readable.
+	sanitized := strings.ReplaceAll(sanitize.Sanitize(value), "&#39;", "'")
+	return strings.Join(strings.Fields(sanitized), " ")
+}
+

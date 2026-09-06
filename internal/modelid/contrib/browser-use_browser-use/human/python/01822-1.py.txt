@@ -1,0 +1,57 @@
+# commit 659c5145f6ff 2025-08-01T02:42:01-07:00 browser_use/browser/session.py
+			# Initialize and attach all watchdogs FIRST
+			# THEN notify success - watchdogs are now ready to receive events
+			# Automatically save storage state before stopping and wait for completion
+			save_event = self.event_bus.dispatch(SaveStorageStateEvent())
+			await save_event
+			# Notify stop and wait for all handlers to complete
+			stop_event = self.event_bus.dispatch(
+			# Wait for all watchdog cleanup handlers to complete
+			await stop_event
+	def page(self) -> Page | None:
+		if self._navigation_watchdog and hasattr(self._navigation_watchdog, 'current_agent_page'):
+			page = self._navigation_watchdog.current_agent_page
+			if page is not None:
+				return page
+
+		# Fallback: return the first available page if browser context is ready
+		if self._browser_context and self._browser_context.pages:
+			return self._browser_context.pages[0]
+	async def close_tab(self, tab_index: int | None = None) -> None:
+		"""Close a tab by index. If no index provided, closes current tab."""
+		if tab_index is None:
+			# Close current tab - get the current page and close it
+			current_page = await self.get_current_page()
+			await current_page.close()
+		else:
+			# Close specific tab
+			event = self.event_bus.dispatch(CloseTabEvent(tab_index=tab_index))
+			await event
+
+	async def take_screenshot(self, full_page: bool = False, clip: dict | None = None) -> str | None:
+			return response.screenshot  # Return base64 string directly
+			return None
+	async def get_tabs_info(self) -> list[TabInfo]:
+			# Convert dictionaries to TabInfo models
+			tab_infos = []
+			for tab_dict in response.tabs:
+				tab_info = TabInfo(**tab_dict)
+				tab_infos.append(tab_info)
+			return tab_infos
+		tabs_info = await self.get_tabs_info()
+			tabs_info = await self.get_tabs_info()
+			else:
+				# Watchdog already exists, don't re-initialize to avoid duplicate handlers
+				logger.debug(f'[Session] {watchdog_class.__name__} already initialized, skipping')
+	# ========== Compatibility Methods for Old API ==========
+
+	async def click(self, selector: str) -> None:
+		"""Click an element by CSS selector (compatibility method)."""
+		page = await self.get_current_page()
+		await page.click(selector)
+
+	async def get_dom_element_by_index(self, index: int) -> Any | None:
+		"""Get DOM element by index (compatibility method)."""
+		selector_map = await self.get_selector_map()
+		return selector_map.get(index)
+

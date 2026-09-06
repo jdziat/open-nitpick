@@ -1,0 +1,37 @@
+// commit 6ba15d565789 2025-10-19T05:13:44+00:00 packages/better-auth/src/api/middlewares/origin-check.test.ts
+import { isSimpleRequest, originCheck } from "./origin-check";
+			disableOriginCheck: false,
+
+describe("is simple request", async (it) => {
+	it("should return true for simple requests", async () => {
+		const request = new Request("http://localhost:3000/test", {
+			method: "GET",
+		});
+		const isSimple = isSimpleRequest(request.headers);
+		expect(isSimple).toBe(true);
+	});
+
+	it("should return false for non-simple requests", async () => {
+		const request = new Request("http://localhost:3000/test", {
+			method: "POST",
+			headers: {
+				"custom-header": "value",
+			},
+		});
+		const isSimple = isSimpleRequest(request.headers);
+		expect(isSimple).toBe(false);
+	});
+
+	it("should return false for requests with a content type that is not simple", async () => {
+		const request = new Request("http://localhost:3000/test", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+			},
+		});
+		const isSimple = isSimpleRequest(request.headers);
+		expect(isSimple).toBe(false);
+	});
+
+	it;
+});

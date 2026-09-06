@@ -1,0 +1,43 @@
+// commit 063c5a491379 2026-07-23T18:06:08+00:00 service/matching/scale_manager.go
+	partition              tqid.Partition
+	logger                 log.Logger
+	metricsHandler         metrics.Handler
+	userDataManager        userDataManager
+	matchingClient         matchingservice.MatchingServiceClient
+	partitionScaler        PartitionScaler
+	batchSize              int64 // fixed at creation time
+	settings               dynamicconfig.TypedPropertyFn[dynamicconfig.PartitionScaleManagerSettings]
+	getWritePartitions     dynamicconfig.IntPropertyFn
+	shouldEmitGaugeMetrics dynamicconfig.BoolPropertyFn
+	timeSource             clock.TimeSource
+	background             *goro.Handle
+		partition:              partition,
+		logger:                 log.With(logger, tag.ComponentPartitionScaler),
+		metricsHandler:         metricsHandler,
+		userDataManager:        userDataManager,
+		matchingClient:         matchingClient,
+		partitionScaler:        partitionScaler,
+		batchSize:              int64(settings().BatchSize),
+		settings:               settings,
+		getWritePartitions:     getWritePartitions,
+		shouldEmitGaugeMetrics: emitGaugeMetrics,
+		timeSource:             timeSource,
+		background:             goro.NewHandle(baseCtx),
+		wakeup:                 make(chan struct{}, 1),
+	// this is unfortunate but at least allows max() across pods to get the right value
+	sm.emitGaugeMetricsIfEnabled(-1, -1, -1)
+			metrics.PartitionScaleEvents.With(sm.metricsHandler.WithTags(metrics.ScalerShadowModeTag(shadowMode))).Record(1)
+		// Untagged: read == write == 0 marks this as a shadow target rather than an applied one.
+		// Emit only when the target decision changed (like in real mode).
+		sm.emitGaugeMetricsIfEnabled(0, 0, float64(target))
+		sm.setState(newState, settings) // emits partition_scale_{read,write,target}
+	metrics.PartitionScaleEvents.With(sm.metricsHandler.WithTags(metrics.ScalerShadowModeTag(shadowMode))).Record(1)
+}
+
+func (sm *scaleManager) emitGaugeMetricsIfEnabled(read, write, target float64) {
+	if sm.shouldEmitGaugeMetrics() {
+		metrics.PartitionScaleRead.With(sm.metricsHandler).Record(read)
+		metrics.PartitionScaleWrite.With(sm.metricsHandler).Record(write)
+		metrics.PartitionScaleTarget.With(sm.metricsHandler).Record(target)
+	}
+	sm.emitGaugeMetricsIfEnabled(float64(newInfo.Read), float64(newInfo.Write), float64(sm.scaleState.GetTarget()))

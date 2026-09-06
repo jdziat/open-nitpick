@@ -1,0 +1,47 @@
+# commit f945c6f8dcef 2026-03-13T09:28:36+01:00 utils/release_notes/generate_release_notes.py
+def run_opencode_skill(
+    skill_name: str,
+    version: str,
+    missing_prs: list[int] | None = None,
+    extra_prs: list[int] | None = None,
+) -> bool:
+        extra_prs: List of extra PR numbers to remove (for validation skill)
+    if missing_prs or extra_prs:
+        # Validation skill - fix missing and/or extra PRs
+        parts = [
+            f"Run the {skill_name} skill. ",
+            f"The output directory is {OUTPUT_DIR}. ",
+            f"Fix the release notes at {OUTPUT_DIR}/RELEASE_NOTES_{version}.md. ",
+        ]
+        if missing_prs:
+            parts.append(
+                f"Add the following missing PRs: {', '.join(f'#{pr}' for pr in missing_prs)}. "
+                f"Read their details from {TMP_DIR}/pr_<number>.json files. "
+            )
+        if extra_prs:
+            parts.append(
+                f"Remove the following extra PRs that do not belong to this release: "
+                f"{', '.join(f'#{pr}' for pr in extra_prs)}. "
+            )
+        prompt = "".join(parts)
+    extra_at_end = []
+        missing, extra = validate_release_notes(version)
+        if not missing and not extra:
+            print("Release notes match the manifest exactly")
+        if missing:
+            print(f"Missing {len(missing)} PRs: {', '.join(f'#{pr}' for pr in missing)}")
+        if extra:
+            print(f"Extra {len(extra)} PRs: {', '.join(f'#{pr}' for pr in extra)}")
+            print("Running validation skill to fix release notes...")
+            if not run_opencode_skill("hf-release-notes:validate", version, missing or None, extra or None):
+        # Loop completed without exact match
+        missing, extra = validate_release_notes(version)
+        if missing or extra:
+            extra_at_end = extra
+            if missing:
+                print(f"\nWarning: Still missing {len(missing)} PRs after {max_iterations} iterations")
+                print(f"Missing: {', '.join(f'#{pr}' for pr in missing)}")
+            if extra:
+                print(f"\nWarning: Still {len(extra)} extra PRs after {max_iterations} iterations")
+                print(f"Extra: {', '.join(f'#{pr}' for pr in extra)}")
+    print(f"  PRs extra:             {len(extra_at_end)}")

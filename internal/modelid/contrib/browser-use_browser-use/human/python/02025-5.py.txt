@@ -1,0 +1,126 @@
+# commit 7a0889cf20df 2025-08-12T04:14:53-07:00 tests/ci/test_download_upload_full_circle.py
+from browser_use.agent.views import ActionModel
+from browser_use.browser.events import BrowserStateRequestEvent, FileDownloadedEvent
+from browser_use.controller.views import ClickElementAction, GoToUrlAction, UploadFileAction
+
+
+
+		test_content, content_type='text/plain', headers={'Content-Disposition': 'attachment; filename="test-file.txt"'}
+
+
+	server.expect_request('/upload-page').respond_with_data(upload_page_html, content_type='text/html')
+
+			uploaded_files.append(
+				{
+					'filename': file_data['filename'],
+					'content': file_data['body'],
+					'hash': hashlib.sha256(file_data['body']).hexdigest(),
+				}
+			)
+
+
+
+	server.expect_request('/download-page').respond_with_data(download_page_html, content_type='text/html')
+
+
+
+
+
+
+
+
+
+
+					GoToUrlActionModel(go_to_url=GoToUrlAction(url=f'{base_url}/download-page', new_tab=False)), browser_session
+				assert result.error is None, f'Navigation to download page failed: {result.error}'
+
+
+
+
+				assert download_link_index is not None, 'Download link not found'
+
+
+					ClickActionModel(click_element_by_index=ClickElementAction(index=download_link_index)), browser_session
+				assert result.error is None, f'Click on download link failed: {result.error}'
+
+				except TimeoutError:
+					pytest.fail('Download did not complete within timeout')
+
+				assert downloaded_file_path is not None, 'Downloaded file path is None'
+				assert Path(downloaded_file_path).exists(), f'Downloaded file does not exist: {downloaded_file_path}'
+
+				assert downloaded_file_path in browser_session.downloaded_files, (
+					f'Downloaded file not tracked by browser_session: {downloaded_file_path}'
+				)
+
+
+				print(f'✅ File downloaded: {downloaded_file_path}')
+				print(f'   Original hash: {download_upload_server.test_hash}')
+				print(f'   Downloaded hash: {downloaded_hash}')
+
+				print(f'\n🔄 Opening upload page in new tab: {base_url}/upload-page')
+
+				print(f'📑 Tabs before navigation: {len(tabs_before)} tabs')
+					print(f'  Tab {i}: {tab.url}')
+					GoToUrlActionModel(go_to_url=GoToUrlAction(url=f'{base_url}/upload-page', new_tab=True)), browser_session
+				assert result.error is None, f'Navigation to upload page failed: {result.error}'
+				print(f'✅ Navigation result: {result.extracted_content}')
+
+
+				print('\n📑 All tabs after opening upload page:')
+					print(f'  Tab {i}: {tab.url} - {tab.title}')
+
+
+				print('\n🔍 Getting DOM state:')
+				print(f'  Current page URL: {state_result.url}')
+				print(f'  Current page title: {state_result.title}')
+
+
+				print(f'Found {len(input_elements)} input elements: {input_elements}')
+				assert file_input_index is not None, 'File input not found'
+
+
+					UploadActionModel(upload_file_to_element=UploadFileAction(index=file_input_index, path=downloaded_file_path)),
+					file_system=file_system,
+				assert result.error is None, f'File upload failed: {result.error}'
+
+
+					if (
+						element.tag_name
+						and element.tag_name.lower() == 'button'
+						and element.attributes
+						and element.attributes.get('id') == 'submitButton'
+					):
+
+				assert submit_button_index is not None, 'Submit button not found'
+
+					ClickActionModel(click_element_by_index=ClickElementAction(index=submit_button_index)), browser_session
+				assert result.error is None, f'Click on submit button failed: {result.error}'
+
+
+
+						'returnByValue': True,
+					session_id=cdp_session.session_id,
+
+
+				assert upload_info.get('hasResult') is True, 'Upload result not displayed'
+				assert upload_info.get('fileName') == 'test-file.txt', (
+					f'Uploaded filename mismatch: {upload_info.get("fileName")}'
+				)
+				assert upload_info.get('fileHash') == download_upload_server.test_hash, (
+					f'Uploaded file hash mismatch. Expected: {download_upload_server.test_hash}, Got: {upload_info.get("fileHash")}'
+				)
+
+				print('✅ File uploaded successfully!')
+				print(f'   Uploaded filename: {upload_info.get("fileName")}')
+				print(f'   Uploaded hash: {upload_info.get("fileHash")}')
+				print(f'   Hash matches original: {upload_info.get("fileHash") == download_upload_server.test_hash}')
+
+					assert server_file['hash'] == download_upload_server.test_hash, (
+						f'Server-side hash mismatch. Expected: {download_upload_server.test_hash}, Got: {server_file["hash"]}'
+					)
+					print('✅ Server-side verification passed!')
+
+				print('\n🎉 Full circle test passed: Download → Upload with hash verification!')
+
+				await browser_session.stop()

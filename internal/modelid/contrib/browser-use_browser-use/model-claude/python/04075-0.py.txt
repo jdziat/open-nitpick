@@ -1,0 +1,34 @@
+# commit 35271ed80206 2026-02-10T15:38:01-08:00 browser_use/skill_cli/commands/profile.py
+	# Use stderr for progress when JSON output is requested
+	json_output = getattr(args, 'json', False)
+	out = sys.stderr if json_output else sys.stdout
+
+	def log(msg: str) -> None:
+		print(msg, file=out)
+
+		log(f'Syncing: {profile_name} → {domain_filter} cookies only')
+		log(f'Syncing: {profile_name} ({selected_profile["email"]})')
+	log('  Creating cloud profile...')
+	log(f'  ✓ Created: {cloud_profile_id}')
+
+	def cleanup_cloud_profile() -> None:
+		"""Delete the cloud profile on failure."""
+		try:
+			cloud_api_request('DELETE', f'/profiles/{cloud_profile_id}')
+		except Exception:
+			pass
+		log('  Exporting cookies from local profile...')
+			log(f'  ✓ Found {len(cookies)} cookies')
+		log(f'  ⚠ {cookies_file}')  # cookies_file contains error message
+		cleanup_cloud_profile()
+		log('  Importing cookies to cloud profile...')
+	except Exception as e:
+		log(f'  ⚠ Failed to import cookies: {e}')
+		cleanup_cloud_profile()
+		return 1
+	log('✓ Profile synced successfully!')
+	log(f'  Cloud profile ID: {cloud_profile_id}')
+	log('')
+	log('To use this profile:')
+	log(f'  browser-use -b remote --profile {cloud_profile_id} open <url>')
+	if json_output:

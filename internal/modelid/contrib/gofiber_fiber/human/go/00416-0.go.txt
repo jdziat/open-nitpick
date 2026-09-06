@@ -1,0 +1,54 @@
+// commit 74de4876e54b 2025-11-28T10:36:21+01:00 middleware/csrf/helpers.go
+
+	"github.com/gofiber/utils/v2"
+)
+
+const (
+	schemeHTTP  = "http"
+	schemeHTTPS = "https"
+func schemeAndHostMatch(schemeA, hostA, schemeB, hostB string) bool {
+	normalizedSchemeA := utils.ToLower(schemeA)
+	normalizedSchemeB := utils.ToLower(schemeB)
+
+	normalizedHostA := normalizeSchemeHost(normalizedSchemeA, hostA)
+	normalizedHostB := normalizeSchemeHost(normalizedSchemeB, hostB)
+
+	return normalizedSchemeA == normalizedSchemeB && normalizedHostA == normalizedHostB
+}
+
+func normalizeSchemeHost(scheme, host string) string {
+	host = utils.ToLower(host)
+
+	defaultPort := ""
+	switch scheme {
+	case schemeHTTP:
+		defaultPort = "80"
+	case schemeHTTPS:
+		defaultPort = "443"
+	default:
+		return host
+	}
+
+	parsedHost, err := url.Parse(scheme + "://" + host)
+	if err != nil {
+		return host
+	}
+
+	if port := parsedHost.Port(); port != "" {
+		return host
+	}
+
+	hostname := parsedHost.Hostname()
+	if hostname == "" {
+		return host
+	}
+
+	if strings.Contains(hostname, ":") && !strings.HasPrefix(hostname, "[") {
+		hostname = "[" + hostname + "]"
+	}
+
+	return hostname + ":" + defaultPort
+}
+
+	if parsedOrigin.Scheme != schemeHTTP && parsedOrigin.Scheme != schemeHTTPS {
+	return true, utils.ToLower(parsedOrigin.Scheme) + "://" + utils.ToLower(parsedOrigin.Host)

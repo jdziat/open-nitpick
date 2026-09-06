@@ -1,0 +1,72 @@
+// commit 6301e47ee6b5 2026-03-16T16:21:16-04:00 service/history/chasm_engine.go
+	commonpb "go.temporal.io/api/common/v1"
+	"go.temporal.io/server/service/history/deletemanager"
+// DeleteExecution deletes a CHASM execution. If the execution is still running on the active
+// cluster, it is terminated first. A DeleteExecutionTask is then queued to remove all execution
+// data from persistence. On standby clusters, the execution is deleted regardless of state.
+func (e *ChasmEngine) DeleteExecution(
+	ctx context.Context,
+	ref chasm.ComponentRef,
+	request chasm.DeleteExecutionRequest,
+) (retError error) {
+	shardContext, executionLease, err := e.getExecutionLease(ctx, ref)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		executionLease.GetReleaseFn()(retError)
+	}()
+
+	mutableState := executionLease.GetMutableState()
+	we := mutableState.GetWorkflowKey()
+
+	log.With(shardContext.GetLogger(),
+		tag.WorkflowNamespaceID(ref.NamespaceID),
+		tag.WorkflowID(we.WorkflowID),
+		tag.WorkflowRunID(we.RunID),
+	).Info("Deleting CHASM execution")
+
+	if mutableState.IsWorkflowExecutionRunning() {
+		ns, err := shardContext.GetNamespaceRegistry().GetNamespaceByID(namespace.ID(ref.NamespaceID))
+		if err != nil {
+			return err
+		}
+		if ns.ActiveInCluster(shardContext.GetClusterMetadata().GetCurrentClusterName()) {
+			chasmTree, ok := mutableState.ChasmTree().(*chasm.Node)
+			if !ok {
+				return serviceerror.NewInternalf(
+					"CHASM tree implementation not properly wired up, encountered type: %T, expected type: %T",
+					mutableState.ChasmTree(),
+					&chasm.Node{},
+				)
+			}
+
+			chasmTree.SetDeleteAfterClose(true)
+			if err := chasmTree.Terminate(request.TerminateComponentRequest); err != nil {
+				return err
+			}
+
+			taskGenerator := workflow.GetTaskGeneratorProvider().NewTaskGenerator(shardContext, mutableState)
+			deleteTask, err := taskGenerator.GenerateDeleteExecutionTask()
+			if err != nil {
+				return err
+			}
+			mutableState.AddTasks(deleteTask)
+
+			return executionLease.GetContext().UpdateWorkflowExecutionAsActive(ctx, shardContext)
+		}
+	}
+
+	// Execution is closed or namespace is standby: add delete task directly.
+	return deletemanager.AddDeleteExecutionTask(
+		ctx,
+		shardContext,
+		namespace.ID(ref.NamespaceID),
+		&commonpb.WorkflowExecution{
+			WorkflowId: we.WorkflowID,
+			RunId:      we.RunID,
+		},
+		mutableState,
+	)
+}
+

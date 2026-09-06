@@ -1,0 +1,57 @@
+# commit 20554ecd9d7c 2026-06-16T08:40:42+02:00 src/huggingface_hub/cli/jobs.py
+from urllib.parse import urlsplit
+    SshDryRunOpt,
+    SshIdentityFileOpt,
+    exec_ssh,
+SshEnabledOpt = Annotated[
+    bool,
+    typer.Option(
+        "--ssh",
+        help="Make the job's container reachable over SSH. Connect with `hf jobs ssh <job_id>`. Requires an SSH public key registered on https://huggingface.co/settings/keys.",
+    ),
+]
+
+    ssh: SshEnabledOpt = False,
+        ssh=ssh,
+    if isinstance(job.status.ssh_url, str):
+        out.hint(f"Use `hf jobs ssh {job.owner.name}/{job.id}` to open an SSH session into the job.")
+@jobs_cli.command(
+    "ssh",
+    examples=[
+        "hf jobs ssh <job_id>",
+        "hf jobs ssh <job_id> --dry-run",
+        "hf jobs ssh <job_id> -i ~/.ssh/id_ed25519",
+    ],
+)
+def jobs_ssh(
+    job_id: JobIdArg,
+    identity_file: SshIdentityFileOpt = None,
+    dry_run: SshDryRunOpt = False,
+    namespace: NamespaceOpt = None,
+    token: TokenOpt = None,
+) -> None:
+    """SSH into a running Job.
+
+    Requires the Job to be started with SSH enabled (`hf jobs run --ssh ...`) and your SSH
+    public key to be registered at https://huggingface.co/settings/keys.
+    """
+    job_id, namespace = _parse_namespace_from_job_id(job_id, namespace)
+    api = get_hf_api(token=token)
+    job = api.inspect_job(job_id=job_id, namespace=namespace)
+    if job.status.ssh_url is None:
+        raise CLIError("SSH is not enabled on this job. Start a job with SSH support using `hf jobs run --ssh ...`.")
+    if job.status.stage != "RUNNING":
+        raise CLIError(f"Cannot SSH into job '{job.id}': job is not running (stage: '{job.status.stage}').")
+    ssh_url = urlsplit(job.status.ssh_url)
+    exec_ssh(
+        f"{ssh_url.username}@{ssh_url.hostname}",
+        port=ssh_url.port,
+        identity_file=identity_file,
+        dry_run=dry_run,
+    )
+
+
+    ssh: SshEnabledOpt = False,
+        ssh=ssh,
+    if isinstance(job.status.ssh_url, str):
+        out.hint(f"Use `hf jobs ssh {job.owner.name}/{job.id}` to open an SSH session into the job.")

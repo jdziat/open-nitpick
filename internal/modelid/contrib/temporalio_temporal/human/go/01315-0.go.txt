@@ -1,0 +1,44 @@
+// commit b486c469d5f3 2026-06-16T14:24:16-07:00 service/history/api/updateworkflowoptions/api.go
+	"strings"
+// OptionsToReapply is used to track options that need to be reapplied on every update,
+// whose changes cannot be detected simply by options equality check.
+type OptionsToReapply struct {
+	timeSkippingConfigHasChanged bool
+}
+
+func (u OptionsToReapply) hasChanges() bool {
+	return u.timeSkippingConfigHasChanged
+}
+
+	mergedOpts, optionsToReapply, err := mergeWorkflowExecutionOptions(
+	hasChanges := !proto.Equal(mergedOpts, getOptionsFromMutableState(ms)) || optionsToReapply.hasChanges()
+	unsetOverride := mergedOpts.GetVersioningOverride() == nil
+	_, err = ms.AddWorkflowExecutionOptionsUpdatedEvent(
+		mergedOpts.GetVersioningOverride(), unsetOverride, "", nil, nil, identity, mergedOpts.GetPriority(),
+		mergedOpts.GetTimeSkippingConfig(),
+		optionsToReapply.timeSkippingConfigHasChanged, nil)
+// mergeWorkflowExecutionOptions copies the given paths in `src` struct to `dst` struct and returns
+// the merged opts and the options to reapply
+) (*workflowpb.WorkflowExecutionOptions, OptionsToReapply, error) {
+		return nil, OptionsToReapply{}, err
+
+			return nil, OptionsToReapply{}, serviceerror.NewInvalidArgument("versioning_override fields must be updated together")
+			return nil, OptionsToReapply{}, serviceerror.NewInvalidArgument("versioning_override fields must be updated together")
+	// - fast forward need reapplication so equality check is not enough;
+	// - We only support validating and updating the TSC as a whole;
+	var originalTSC *commonpb.TimeSkippingConfig
+	if tsc := mergeInto.GetTimeSkippingConfig(); tsc != nil {
+		if cloned, ok := proto.Clone(tsc).(*commonpb.TimeSkippingConfig); ok {
+			originalTSC = cloned
+	var fastForwardSet bool
+	if _, ok := updateFields["timeSkippingConfig"]; ok {
+		mergeInto.TimeSkippingConfig = mergeFrom.GetTimeSkippingConfig()
+		if mergeFrom.GetTimeSkippingConfig().GetFastForward() != nil {
+			fastForwardSet = true
+	for key := range updateFields {
+		if strings.HasPrefix(key, "timeSkippingConfig.") {
+			return nil, OptionsToReapply{}, serviceerror.NewInvalidArgument(
+				"time_skipping_config doesn't support partial update")
+	var optionsToReapply OptionsToReapply
+	optionsToReapply.timeSkippingConfigHasChanged = fastForwardSet || (!proto.Equal(mergeInto.GetTimeSkippingConfig(), originalTSC))
+	return mergeInto, optionsToReapply, nil

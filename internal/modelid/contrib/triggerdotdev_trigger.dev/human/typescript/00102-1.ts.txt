@@ -1,0 +1,47 @@
+// commit 0f3179f4933f 2025-06-26T15:13:26+01:00 packages/trigger-sdk/src/v3/auth.ts
+import {
+  type ApiClientConfiguration,
+  apiClientManager,
+  RealtimeRunSkipColumns,
+} from "@trigger.dev/core/v3";
+
+  realtime?: {
+    /**
+     * Skip columns from the subscription.
+     *
+     * @default []
+     *
+     * @example
+     * ```ts
+     * auth.createPublicToken({
+     *  realtime: {
+     *    skipColumns: ["payload", "output"]
+     *  }
+     * });
+     * ```
+     */
+    skipColumns?: RealtimeRunSkipColumns;
+  };
+ * @param options.realtime - Options for realtime subscriptions.
+ * @param options.realtime.skipColumns - Skip columns from the subscription.
+      realtime: options?.realtime,
+
+  realtime?: {
+    /**
+     * Skip columns from the subscription.
+     *
+     * @default []
+     *
+     * @example
+     * ```ts
+     * auth.createTriggerPublicToken("my-task", {
+     *  realtime: {
+     *    skipColumns: ["payload", "output"]
+     *  }
+     * });
+     * ```
+     */
+    skipColumns?: RealtimeRunSkipColumns;
+  };
+      realtime: options?.realtime,
+      realtime: options?.realtime,

@@ -1,0 +1,290 @@
+// commit 5be6a4fe38c5 2026-07-03T20:01:56+01:00 apps/webapp/app/services/runsReplicationService.server.ts
+  composeTaskRunVersion,
+export type RunsReplicationSource = {
+  /**
+   * Stable per-source id. MUST be unique across sources. It is the key off
+   * which every per-source identity is derived: the LogicalReplicationClient
+   * `name` (and therefore the redlock leader-lock resource key), metrics tags,
+   * logs. e.g. "legacy" | "new".
+   */
+  id: string;
+  pgConnectionUrl: string;
+  slotName: string;
+  publicationName: string;
+  /** 0 = legacy/control-plane DB, 1 = dedicated run-ops DB. Packed into _version via composeTaskRunVersion. */
+  originGeneration: number;
+};
+
+  /**
+   * Optional list of replication sources. When provided (and non-empty), the
+   * service fans in from each named source into the single shared flush
+   * scheduler. When omitted, the scalar `pgConnectionUrl`/`slotName`/
+   * `publicationName` are used as a single implicit `"default"` source,
+   * preserving the legacy single-source behavior exactly.
+   */
+  sources?: RunsReplicationSource[];
+type CurrentTransaction =
+  | (Omit<Transaction<TaskRun>, "commitEndLsn" | "replicationLagMs"> & {
+      commitEndLsn?: string | null;
+      replicationLagMs?: number;
+    })
+  | null;
+
+type SourceRuntime = {
+  source: RunsReplicationSource;
+  client: LogicalReplicationClient;
+  latestCommitEndLsn: string | null;
+  lastAcknowledgedLsn: string | null;
+  lastAcknowledgedAt: number | null;
+  acknowledgeInterval: NodeJS.Timeout | null;
+  currentTransaction: CurrentTransaction;
+  currentParseDurationMs: number | null;
+};
+
+
+  /**
+   * Per-source runtime state. Each source has its own replication client, leader
+   * lock, slot, and in-flight transaction state. All fan in to the single shared
+   * _concurrentFlushScheduler. Transaction/LSN state MUST be per-source because
+   * logical-replication transactions interleave per stream.
+   */
+  private _sources: Map<string, SourceRuntime>;
+
+  private _shutdownStopInFlight = false;
+    const sources: RunsReplicationSource[] =
+      options.sources && options.sources.length > 0
+        ? options.sources
+        : [
+            {
+              id: "default",
+              pgConnectionUrl: options.pgConnectionUrl,
+              slotName: options.slotName,
+              publicationName: options.publicationName,
+              originGeneration: 0,
+            },
+          ];
+
+    RunsReplicationService.#validateSources(sources);
+
+    this._sources = new Map<string, SourceRuntime>();
+
+    for (const source of sources) {
+      const client = new LogicalReplicationClient({
+        pgConfig: {
+          connectionString: source.pgConnectionUrl,
+        },
+        name: `${options.serviceName}:${source.id}`,
+        slotName: source.slotName,
+        publicationName: source.publicationName,
+        table: "TaskRun",
+        redisOptions: options.redisOptions,
+        autoAcknowledge: false,
+        publicationActions: ["insert", "update", "delete"],
+        logger:
+          options.logger ?? new Logger("LogicalReplicationClient", options.logLevel ?? "info"),
+        leaderLockTimeoutMs: options.leaderLockTimeoutMs ?? 30_000,
+        leaderLockExtendIntervalMs: options.leaderLockExtendIntervalMs ?? 10_000,
+        ackIntervalSeconds: options.ackIntervalSeconds ?? 10,
+        leaderLockAcquireAdditionalTimeMs: options.leaderLockAcquireAdditionalTimeMs ?? 10_000,
+        leaderLockRetryIntervalMs: options.leaderLockRetryIntervalMs ?? 500,
+        tracer: options.tracer,
+      });
+
+      const runtime: SourceRuntime = {
+        source,
+        client,
+        latestCommitEndLsn: null,
+        lastAcknowledgedLsn: null,
+        lastAcknowledgedAt: null,
+        acknowledgeInterval: null,
+        currentTransaction: null,
+        currentParseDurationMs: null,
+      };
+
+      this.#wireClientEvents(runtime);
+
+      this._sources.set(source.id, runtime);
+    }
+    // Initialize retry configuration
+    this._insertMaxRetries = options.insertMaxRetries ?? 3;
+    this._insertBaseDelayMs = options.insertBaseDelayMs ?? 100;
+    this._insertMaxDelayMs = options.insertMaxDelayMs ?? 2000;
+  }
+
+  static #validateSources(sources: RunsReplicationSource[]) {
+    const ids = new Set<string>();
+    const slotNames = new Set<string>();
+    const originGenerations = new Set<number>();
+
+    for (const source of sources) {
+      // Distinct id: a duplicate id derives a duplicate client name -> duplicate
+      // redlock leader-lock key -> only one source ever streams.
+      if (ids.has(source.id)) {
+        throw new Error(
+          `RunsReplicationService: duplicate source id "${source.id}" — source ids must be unique`
+        );
+      }
+      ids.add(source.id);
+
+      // Distinct slotName: two consumers on one WAL stream is a data race.
+      if (slotNames.has(source.slotName)) {
+        throw new Error(
+          `RunsReplicationService: duplicate slotName "${source.slotName}" — slot names must be unique across sources`
+        );
+      }
+      slotNames.add(source.slotName);
+
+      // Distinct originGeneration: a shared generation defeats the dedup tiebreak.
+      if (originGenerations.has(source.originGeneration)) {
+        throw new Error(
+          `RunsReplicationService: duplicate originGeneration "${source.originGeneration}" — originGeneration must be unique across sources`
+        );
+      }
+      originGenerations.add(source.originGeneration);
+    }
+  }
+
+  #wireClientEvents(runtime: SourceRuntime) {
+    const { client, source } = runtime;
+
+    client.events.on("data", async ({ lsn, log, parseDuration }) => {
+      this.#handleData(runtime, lsn, log, parseDuration);
+    client.events.on("heartbeat", async ({ lsn, shouldRespond }) => {
+        runtime.lastAcknowledgedLsn = lsn;
+        await client.acknowledge(lsn);
+    client.events.on("error", (error) => {
+        sourceId: source.id,
+    client.events.on("start", () => {
+      this.logger.info("Replication client started", { sourceId: source.id });
+    client.events.on("acknowledge", ({ lsn }) => {
+      this.logger.debug("Acknowledged", { sourceId: source.id, lsn });
+    client.events.on("leaderElection", (isLeader) => {
+      this.logger.info("Leader election", { sourceId: source.id, isLeader });
+    const hasCurrentTransaction = Array.from(this._sources.values()).some(
+      (runtime) => runtime.currentTransaction !== null
+    );
+
+    if (!hasCurrentTransaction) {
+      await Promise.all(Array.from(this._sources.values()).map((runtime) => runtime.client.stop()));
+    for (const runtime of this._sources.values()) {
+      this.logger.info("Starting replication client", {
+        sourceId: runtime.source.id,
+        lastLsn: runtime.latestCommitEndLsn,
+      });
+
+      await runtime.client.subscribe(runtime.latestCommitEndLsn ?? undefined);
+      runtime.acknowledgeInterval = setInterval(
+        () => this.#acknowledgeLatestTransaction(runtime),
+        1000
+      );
+    }
+    for (const runtime of this._sources.values()) {
+      this.logger.info("Stopping replication client", { sourceId: runtime.source.id });
+      await runtime.client.stop();
+      if (runtime.acknowledgeInterval) {
+        clearInterval(runtime.acknowledgeInterval);
+      }
+    for (const runtime of this._sources.values()) {
+      this.logger.info("Teardown replication client", { sourceId: runtime.source.id });
+      await runtime.client.teardown();
+      if (runtime.acknowledgeInterval) {
+        clearInterval(runtime.acknowledgeInterval);
+      }
+  async backfill(runs: PostgresTaskRun[], sourceId?: string) {
+
+    // Backfill and live replication of the SAME source share an origin generation
+    // and rely on raw-LSN ordering within that generation. Default to the single
+    // source self-host uses (gen 0 => passthrough).
+    const runtime = sourceId ? this._sources.get(sourceId) : this._sources.values().next().value;
+
+    if (!runtime) {
+      throw new Error(
+        sourceId
+          ? `RunsReplicationService.backfill: no source found with id "${sourceId}"`
+          : "RunsReplicationService.backfill: no sources configured"
+      );
+    }
+
+    const baseVersion = composeTaskRunVersion({
+      originGeneration: runtime.source.originGeneration,
+      lsnVersion: lsnToUInt64(syntheticLsn),
+    });
+  #handleData(
+    runtime: SourceRuntime,
+    lsn: string,
+    message: PgoutputMessage,
+    parseDuration: bigint
+  ) {
+      sourceId: runtime.source.id,
+        runtime.currentTransaction = {
+        runtime.currentParseDurationMs = Number(parseDuration) / 1_000_000;
+        if (!runtime.currentTransaction) {
+        if (runtime.currentParseDurationMs) {
+          runtime.currentParseDurationMs =
+            runtime.currentParseDurationMs + Number(parseDuration) / 1_000_000;
+        runtime.currentTransaction.events.push({
+        if (!runtime.currentTransaction) {
+        if (runtime.currentParseDurationMs) {
+          runtime.currentParseDurationMs =
+            runtime.currentParseDurationMs + Number(parseDuration) / 1_000_000;
+        runtime.currentTransaction.events.push({
+        if (!runtime.currentTransaction) {
+        if (runtime.currentParseDurationMs) {
+          runtime.currentParseDurationMs =
+            runtime.currentParseDurationMs + Number(parseDuration) / 1_000_000;
+        runtime.currentTransaction.events.push({
+        if (!runtime.currentTransaction) {
+        if (runtime.currentParseDurationMs) {
+          runtime.currentParseDurationMs =
+            runtime.currentParseDurationMs + Number(parseDuration) / 1_000_000;
+        runtime.currentTransaction.commitEndLsn = message.commitEndLsn;
+        runtime.currentTransaction.replicationLagMs = replicationLagMs;
+        const transaction = runtime.currentTransaction as Transaction<PostgresTaskRun>;
+        runtime.currentTransaction = null;
+          runtime.latestCommitEndLsn = transaction.commitEndLsn;
+        this.#handleTransaction(runtime, transaction);
+  #handleTransaction(runtime: SourceRuntime, transaction: Transaction<PostgresTaskRun>) {
+      // A global shutdown stops every source's client; mark complete once all
+      // have stopped. Guard against re-firing per incoming transaction, and
+      // swallow client.stop() rejections so they don't surface as unhandled.
+      if (!this._shutdownStopInFlight) {
+        this._shutdownStopInFlight = true;
+        Promise.all(Array.from(this._sources.values()).map((r) => r.client.stop()))
+          .catch((error) => {
+            this.logger.error("Error stopping replication clients during shutdown", { error });
+          })
+          .finally(() => {
+            this._isShutDownComplete = true;
+          });
+      }
+        sourceId: runtime.source.id,
+    // Compose the source's origin generation above the LSN so a higher-generation
+    // source wins the ClickHouse dedup tiebreak regardless of raw LSN. Gen 0 (the
+    // single-source default) is a passthrough.
+    const _version = composeTaskRunVersion({
+      originGeneration: runtime.source.originGeneration,
+      lsnVersion: lsnToUInt64(transaction.commitEndLsn),
+    });
+    this._replicationLagHistogram.record(transaction.replicationLagMs, {
+      source: runtime.source.id,
+      generation: runtime.source.originGeneration,
+    });
+      sourceId: runtime.source.id,
+        parseDurationMs: runtime.currentParseDurationMs,
+  async #acknowledgeLatestTransaction(runtime: SourceRuntime) {
+    if (!runtime.latestCommitEndLsn) {
+    if (runtime.lastAcknowledgedLsn === runtime.latestCommitEndLsn) {
+    if (runtime.lastAcknowledgedAt) {
+      const timeSinceLastAcknowledged = now - runtime.lastAcknowledgedAt;
+    runtime.lastAcknowledgedAt = now;
+    runtime.lastAcknowledgedLsn = runtime.latestCommitEndLsn;
+      sourceId: runtime.source.id,
+      commitEndLsn: runtime.latestCommitEndLsn,
+      lastAcknowledgedAt: runtime.lastAcknowledgedAt,
+    const [ackError] = await tryCatch(runtime.client.acknowledge(runtime.latestCommitEndLsn));
+      this.logger.error("Error acknowledging transaction", {
+        sourceId: runtime.source.id,
+        ackError,
+      });
+    if (this._isShutDownComplete && runtime.acknowledgeInterval) {
+      clearInterval(runtime.acknowledgeInterval);

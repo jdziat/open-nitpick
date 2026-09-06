@@ -1,0 +1,121 @@
+// commit 3ec72f7f128f 2026-01-16T00:05:37+00:00 chasm/lib/scheduler/invoker.go
+	enumspb "go.temporal.io/api/enums/v1"
+	schedulepb "go.temporal.io/api/schedule/v1"
+			BufferedStarts: []*schedulespb.BufferedStart{},
+	// Starts that executed successfully. Their RunId and StartTime should be
+	// copied to the corresponding BufferedStart in the buffer.
+	completed := make(map[string]*schedulespb.BufferedStart) // request ID -> BufferedStart with RunId/StartTime
+		completed[start.RequestId] = start
+	// Remove failed (non-retryable) starts from the buffer.
+		return failed[start.RequestId]
+	// Update BufferedStarts with results.
+		if completedStart, ok := completed[start.RequestId]; ok {
+			start.RunId = completedStart.GetRunId()
+			start.StartTime = completedStart.GetStartTime()
+		}
+// runningWorkflowID returns the workflow ID associated with the given
+// outstanding request.
+func (i *Invoker) runningWorkflowID(requestID string) string {
+	for _, start := range i.GetBufferedStarts() {
+		if start.GetRequestId() == requestID && start.GetCompleted() == nil {
+			return start.GetWorkflowId()
+		}
+	}
+	return ""
+// an action completes. It marks the BufferedStart as completed by setting
+// the Completed field.
+// Returns the schedule time of the completed action for metrics.
+	completed *schedulespb.CompletedResult,
+	// Find the BufferedStart and mark it as completed.
+	for _, start := range i.BufferedStarts {
+			start.Completed = completed
+			break
+	idx := slices.IndexFunc(i.BufferedStarts, func(start *schedulespb.BufferedStart) bool {
+		i.BufferedStarts[idx].DesiredTime = timestamppb.New(completed.GetCloseTime().AsTime())
+	// Apply retention to keep only the last N completed actions.
+	i.applyCompletedRetention()
+
+	if len(i.GetCancelWorkflows()) > 0 || len(i.GetTerminateWorkflows()) > 0 || eligibleStarts > 0 {
+// execution (Attempt > 0), haven't been started yet (no RunId), and aren't
+// presently backing off, based on last processed time.
+		return start.Attempt > 0 &&
+			start.GetRunId() == "" &&
+			start.BackoffTime.AsTime().Before(i.GetLastProcessedTime().AsTime())
+	})
+}
+
+// isWorkflowStarted returns true if a workflow with the given ID has already
+// been started (has a RunId set).
+func (i *Invoker) isWorkflowStarted(workflowID string) bool {
+	for _, start := range i.GetBufferedStarts() {
+		if start.GetWorkflowId() == workflowID && start.GetRunId() != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// runningWorkflowExecutions returns the list of workflow executions that
+// have been started but not yet completed.
+func (i *Invoker) runningWorkflowExecutions() []*commonpb.WorkflowExecution {
+	var running []*commonpb.WorkflowExecution
+	for _, start := range i.GetBufferedStarts() {
+		if start.GetRunId() != "" && start.GetCompleted() == nil {
+			running = append(running, &commonpb.WorkflowExecution{
+				WorkflowId: start.GetWorkflowId(),
+				RunId:      start.GetRunId(),
+			})
+		}
+	}
+	return running
+}
+
+// recentActions returns started/completed actions as ScheduleActionResults.
+// This includes both running workflows (with status RUNNING) and completed
+// workflows (with their final status).
+func (i *Invoker) recentActions() []*schedulepb.ScheduleActionResult {
+	var results []*schedulepb.ScheduleActionResult
+	for _, start := range i.GetBufferedStarts() {
+		// Only include workflows that have been started (have a RunId).
+		if start.GetRunId() == "" {
+			continue
+		}
+		status := enumspb.WORKFLOW_EXECUTION_STATUS_RUNNING
+		if start.GetCompleted() != nil {
+			status = start.GetCompleted().GetStatus()
+		}
+		results = append(results, &schedulepb.ScheduleActionResult{
+			ScheduleTime: start.GetActualTime(),
+			ActualTime:   start.GetStartTime(),
+			StartWorkflowResult: &commonpb.WorkflowExecution{
+				WorkflowId: start.GetWorkflowId(),
+				RunId:      start.GetRunId(),
+			},
+			StartWorkflowStatus: status,
+		})
+	}
+	return results
+}
+
+// applyCompletedRetention removes the oldest completed BufferedStarts beyond
+// the retention limit.
+func (i *Invoker) applyCompletedRetention() {
+	var completed []*schedulespb.BufferedStart
+	var nonCompleted []*schedulespb.BufferedStart
+
+	for _, start := range i.BufferedStarts {
+		if start.GetCompleted() != nil {
+			completed = append(completed, start)
+		} else {
+			nonCompleted = append(nonCompleted, start)
+		}
+	}
+
+	// Sort by oldest first.
+	slices.SortFunc(completed, func(a, b *schedulespb.BufferedStart) int {
+		return a.GetCompleted().GetCloseTime().AsTime().Compare(b.GetCompleted().GetCloseTime().AsTime())
+
+	keepFrom := max(0, len(completed)-recentActionCount)
+	completed = completed[keepFrom:]
+
+	i.BufferedStarts = append(nonCompleted, completed...)

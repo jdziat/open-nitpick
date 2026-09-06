@@ -1,0 +1,43 @@
+// commit d7187807d8d8 2026-04-23T22:49:17-07:00 chasm/lib/nexusoperation/frontend.go
+	if err := validateAndNormalizeStartRequest(req, h.config, h.logger, h.saMapperProvider, h.saValidator); err != nil {
+	if err := validateAndNormalizeDescribeRequest(req, h.config); err != nil {
+	ctx context.Context,
+
+	namespaceID, err := h.namespaceRegistry.GetNamespaceID(namespace.Name(req.GetNamespace()))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateAndNormalizeCancelRequest(req, h.config); err != nil {
+		return nil, err
+	}
+
+	_, err = h.client.RequestCancelNexusOperation(ctx, &nexusoperationpb.RequestCancelNexusOperationRequest{
+		NamespaceId:     namespaceID.String(),
+		FrontendRequest: req,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflowservice.RequestCancelNexusOperationExecutionResponse{}, nil
+	ctx context.Context,
+
+	namespaceID, err := h.namespaceRegistry.GetNamespaceID(namespace.Name(req.GetNamespace()))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateAndNormalizeTerminateRequest(req, h.config); err != nil {
+		return nil, err
+	}
+
+	_, err = h.client.TerminateNexusOperation(ctx, &nexusoperationpb.TerminateNexusOperationRequest{
+		NamespaceId:     namespaceID.String(),
+		FrontendRequest: req,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflowservice.TerminateNexusOperationExecutionResponse{}, nil

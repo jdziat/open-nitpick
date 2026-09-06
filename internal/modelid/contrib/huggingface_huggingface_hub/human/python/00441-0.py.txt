@@ -1,0 +1,77 @@
+# commit 6f5901db8df3 2026-03-31T17:32:24+02:00 src/huggingface_hub/cli/extensions.py
+    manifest = _install_extension_from_github(
+        owner=owner,
+        repo_name=repo_name,
+        short_name=short_name,
+        extension_dir=extension_dir,
+        branch=branch,
+        description=description,
+    ext_type = manifest.type.capitalize()
+    print(f"{ext_type} extension installed successfully from {owner}/{repo_name}.")
+    all_known = {a.strip() for cmd in known_commands for a in cmd.split("|")}
+    if command_name in all_known:
+    executable_path: Path | None = None
+        executable_path = _auto_install_official_extension(short_name)
+    if executable_path is None or not executable_path.is_file():
+def _auto_install_official_extension(short_name: str) -> Path | None:
+    """Try to auto-install huggingface/hf-<name>. Returns executable path or None."""
+    owner, repo_name = DEFAULT_EXTENSION_OWNER, f"hf-{short_name}"
+    try:
+        extension_dir = _get_extension_dir(short_name)
+    except Exception:
+        return None
+    if extension_dir.exists():
+        return None
+    try:
+        response = get_session().get(
+            f"https://api.github.com/repos/{owner}/{repo_name}",
+            follow_redirects=True,
+            timeout=_EXTENSIONS_DOWNLOAD_TIMEOUT,
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        branch = response.json()["default_branch"]
+    except Exception:
+        return None
+    if not typer.confirm(f"'{short_name}' is an official Hugging Face extension ({owner}/{repo_name}). Install it?"):
+        return None
+    try:
+        manifest = _install_extension_from_github(
+            owner=owner, repo_name=repo_name, short_name=short_name, extension_dir=extension_dir, branch=branch
+        )
+        return Path(manifest.executable_path).expanduser()
+    except Exception:
+        shutil.rmtree(extension_dir, ignore_errors=True)
+        return None
+
+
+def _install_extension_from_github(
+    *,
+    owner: str,
+    repo_name: str,
+    short_name: str,
+    extension_dir: Path,
+    branch: str,
+    description: str | None = None,
+) -> ExtensionManifest:
+    """Fetch, install (binary or Python), and save manifest for a GitHub extension."""
+    try:
+        binary = _fetch_remote_binary(owner=owner, repo_name=repo_name, branch=branch, short_name=short_name)
+    except Exception:
+        binary = None
+    if binary is not None:
+        manifest = _install_binary_extension(
+            owner=owner, repo_name=repo_name, short_name=short_name, extension_dir=extension_dir, binary=binary
+        )
+    else:
+        manifest = _install_python_extension(
+            owner=owner, repo_name=repo_name, short_name=short_name, extension_dir=extension_dir, branch=branch
+        )
+    manifest.description = _try_fetch_remote_description(
+        owner=owner, repo_name=repo_name, branch=branch, candidate_description=description
+    )
+    manifest.save(extension_dir)
+    return manifest
+
+

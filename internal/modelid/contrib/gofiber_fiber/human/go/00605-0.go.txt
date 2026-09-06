@@ -1,0 +1,55 @@
+// commit d4200a21f682 2026-02-04T23:52:03-05:00 helpers.go
+	if ln == nil {
+		return nil
+	}
+
+	type tlsConfigProvider interface {
+		TLSConfig() *tls.Config
+	}
+
+	type configProvider interface {
+		Config() *tls.Config
+	}
+
+	if provider, ok := ln.(tlsConfigProvider); ok {
+		return provider.TLSConfig()
+	}
+
+	if provider, ok := ln.(configProvider); ok {
+		return provider.Config()
+	}
+
+	if !pointer.IsValid() {
+		return nil
+	}
+	// Reflection fallback for listeners that do not expose a TLS config method.
+	val := reflect.Indirect(pointer)
+	if !val.IsValid() {
+	field := val.FieldByName("config")
+	if !field.IsValid() {
+		return nil
+	}
+
+	if field.Type() != reflect.TypeFor[*tls.Config]() {
+		return nil
+	}
+
+	if field.CanInterface() {
+		if cfg, ok := field.Interface().(*tls.Config); ok {
+			return cfg
+		return nil
+	}
+
+	if !field.CanAddr() {
+		return nil
+	}
+
+	value := reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem() //nolint:gosec // Access to unexported field is required for listeners that don't expose TLS config methods.
+	if !value.IsValid() {
+		return nil
+	}
+
+	cfg, ok := value.Interface().(*tls.Config)
+	if !ok {
+		return nil
+	return cfg

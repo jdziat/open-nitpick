@@ -1,0 +1,31 @@
+// commit c2188543bcd7 2026-08-24T23:06:50-06:00 internal/attachments/flags.go
+	"github.com/spf13/pflag"
+// Flag holds the repeatable attachment flag and the values it parsed.
+type Flag struct {
+	flag   *pflag.Flag
+	values []string
+}
+
+func AddFlag(cmd *cobra.Command) *Flag {
+	f := &Flag{}
+	cmd.Flags().StringArrayVar(&f.values, flagName, nil, "Attach an image or video `file`, in '<file>#<image alt text>' format")
+	f.flag = cmd.Flags().Lookup(flagName)
+	return f
+}
+
+// Changed reports whether the attachment flag was passed.
+func (f *Flag) Changed() bool {
+	return f.flag.Changed
+}
+
+// UserAssets validates the files named by the attachment flag, keeping them in
+// the order they were written. It returns nothing when the flag was not passed.
+func (f *Flag) UserAssets() ([]UserAsset, error) {
+	if !f.Changed() {
+		return nil, nil
+	}
+	return userAssetsFromArgs(f.values)
+	return userAssetsFromArgs(args)
+}
+
+func userAssetsFromArgs(args []string) ([]UserAsset, error) {

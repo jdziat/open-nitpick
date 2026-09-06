@@ -1,0 +1,122 @@
+// commit 58449b9d804b 2026-01-15T17:09:54-08:00 components/nexusoperations/tasks.go
+	// NOTE: the name `Timeout` is used for backward compatibility with existing persisted tasks and predates the addition of more flexible timeout types.
+	TaskTypeScheduleToCloseTimeout = "nexusoperations.Timeout"
+	TaskTypeScheduleToStartTimeout = "nexusoperations.ScheduleToStartTimeout"
+	TaskTypeStartToCloseTimeout    = "nexusoperations.StartToCloseTimeout"
+type ScheduleToCloseTimeoutTask struct {
+var _ hsm.Task = ScheduleToCloseTimeoutTask{}
+func (ScheduleToCloseTimeoutTask) Type() string {
+	return TaskTypeScheduleToCloseTimeout
+func (t ScheduleToCloseTimeoutTask) Deadline() time.Time {
+func (ScheduleToCloseTimeoutTask) Destination() string {
+func (t ScheduleToCloseTimeoutTask) Validate(ref *persistencespb.StateMachineRef, node *hsm.Node) error {
+	return ScheduleToCloseTimeoutTask{deadline: attrs.Deadline}, nil
+type ScheduleToStartTimeoutTask struct {
+	deadline time.Time
+}
+
+var _ hsm.Task = ScheduleToStartTimeoutTask{}
+
+func (ScheduleToStartTimeoutTask) Type() string {
+	return TaskTypeScheduleToStartTimeout
+}
+
+func (t ScheduleToStartTimeoutTask) Deadline() time.Time {
+	return t.deadline
+}
+
+func (ScheduleToStartTimeoutTask) Destination() string {
+	return ""
+}
+
+// Validate checks if the schedule-to-start timeout task is still valid.
+// Only valid if operation is still in SCHEDULED or BACKING_OFF state.
+func (t ScheduleToStartTimeoutTask) Validate(ref *persistencespb.StateMachineRef, node *hsm.Node) error {
+	if err := node.CheckRunning(); err != nil {
+		return err
+	}
+	op, err := hsm.MachineData[Operation](node)
+	if err != nil {
+		return err
+	}
+	// Only timeout if we haven't started yet
+	switch op.State() {
+	case enumsspb.NEXUS_OPERATION_STATE_SCHEDULED,
+		enumsspb.NEXUS_OPERATION_STATE_BACKING_OFF:
+		return nil
+	default:
+		// Already started or completed, timeout not applicable
+		return fmt.Errorf(
+			"%w: %w: cannot apply schedule-to-start timeout to machine in state %v",
+			consts.ErrStaleReference,
+			hsm.ErrInvalidTransition,
+			op.State(),
+		)
+	}
+}
+
+type ScheduleToStartTimeoutTaskSerializer struct{}
+
+func (ScheduleToStartTimeoutTaskSerializer) Deserialize(data []byte, attrs hsm.TaskAttributes) (hsm.Task, error) {
+	return ScheduleToStartTimeoutTask{deadline: attrs.Deadline}, nil
+}
+
+func (ScheduleToStartTimeoutTaskSerializer) Serialize(hsm.Task) ([]byte, error) {
+	return nil, nil
+}
+
+type StartToCloseTimeoutTask struct {
+	deadline time.Time
+}
+
+var _ hsm.Task = StartToCloseTimeoutTask{}
+
+func (StartToCloseTimeoutTask) Type() string {
+	return TaskTypeStartToCloseTimeout
+}
+
+func (t StartToCloseTimeoutTask) Deadline() time.Time {
+	return t.deadline
+}
+
+func (StartToCloseTimeoutTask) Destination() string {
+	return ""
+}
+
+// Validate checks if the start-to-close timeout task is still valid.
+// Only valid if operation is in STARTED state.
+func (t StartToCloseTimeoutTask) Validate(ref *persistencespb.StateMachineRef, node *hsm.Node) error {
+	if err := node.CheckRunning(); err != nil {
+		return err
+	}
+	op, err := hsm.MachineData[Operation](node)
+	if err != nil {
+		return err
+	}
+	// Only timeout if we're in started state
+	if op.State() != enumsspb.NEXUS_OPERATION_STATE_STARTED {
+		return fmt.Errorf(
+			"%w: %w: cannot apply start-to-close timeout to machine in state %v",
+			consts.ErrStaleReference,
+			hsm.ErrInvalidTransition,
+			op.State(),
+		)
+	}
+	return nil
+}
+
+type StartToCloseTimeoutTaskSerializer struct{}
+
+func (StartToCloseTimeoutTaskSerializer) Deserialize(data []byte, attrs hsm.TaskAttributes) (hsm.Task, error) {
+	return StartToCloseTimeoutTask{deadline: attrs.Deadline}, nil
+}
+
+func (StartToCloseTimeoutTaskSerializer) Serialize(hsm.Task) ([]byte, error) {
+	return nil, nil
+}
+
+	if err := reg.RegisterTaskSerializer(TaskTypeScheduleToCloseTimeout, TimeoutTaskSerializer{}); err != nil {
+	if err := reg.RegisterTaskSerializer(TaskTypeScheduleToStartTimeout, ScheduleToStartTimeoutTaskSerializer{}); err != nil {
+		return err
+	}
+	return reg.RegisterTaskSerializer(TaskTypeStartToCloseTimeout, StartToCloseTimeoutTaskSerializer{})

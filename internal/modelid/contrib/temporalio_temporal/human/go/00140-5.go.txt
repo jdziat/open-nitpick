@@ -1,0 +1,189 @@
+// commit 0c2b360e401b 2025-11-26T16:04:44-08:00 common/persistence/tests/execution_mutable_state.go
+	"go.temporal.io/server/chasm"
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+	archetypeID := rand.Uint32()
+		archetypeID,
+	s.AssertMSEqualWithDB(archetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+	archetypeID := rand.Uint32()
+		archetypeID,
+		ArchetypeID: archetypeID,
+
+	s.AssertMSEqualWithDB(archetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, prevSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot, currentMutation)
+	archetypeID := rand.Uint32()
+		archetypeID,
+		ArchetypeID: archetypeID,
+
+	s.AssertMSEqualWithDB(archetypeID, newSnapshot, currentMutation)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		chasm.WorkflowArchetypeID,
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, currentSnapshot, updateMutation)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, zombieSnapshot, zombieMutation)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, zombieSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, zombieSnapshot, zombieMutation)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newZombieSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot, currentMutation)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, nonCurrentSnapshot, nonCurrentMutation)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, currentSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, resetSnapshot)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, currentSnapshot, currentMutation)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, baseSnapshot)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, currentSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, baseSnapshot)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, currentSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, baseSnapshot)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, currentSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, resetSnapshot)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, currentSnapshot, currentMutation)
+	archetypeID := rand.Uint32()
+		archetypeID,
+		ArchetypeID: archetypeID,
+
+		ArchetypeID: archetypeID,
+
+	s.AssertMSEqualWithDB(archetypeID, resetSnapshot)
+	s.AssertMSEqualWithDB(archetypeID, newSnapshot)
+	s.AssertMSEqualWithDB(archetypeID, currentSnapshot, currentMutation)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, resetSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, baseSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, baseSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, resetSnapshot)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, resetSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, baseSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, baseSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, resetSnapshot)
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMissingFromDB(s.NamespaceID, s.WorkflowID, s.RunID, chasm.WorkflowArchetypeID)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, snapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, setSnapshot)
+	archetypeID := rand.Uint32()
+		archetypeID,
+		ArchetypeID: archetypeID,
+
+	s.AssertMSEqualWithDB(archetypeID, setSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+		ArchetypeID: chasm.WorkflowArchetypeID,
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+		ArchetypeID: chasm.WorkflowArchetypeID,
+	s.AssertMSEqualWithDB(chasm.WorkflowArchetypeID, newSnapshot)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+		ArchetypeID: chasm.WorkflowArchetypeID,
+	s.AssertMissingFromDB(s.NamespaceID, s.WorkflowID, s.RunID, chasm.WorkflowArchetypeID)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+	s.AssertMissingFromDB(s.NamespaceID, s.WorkflowID, s.RunID, chasm.WorkflowArchetypeID)
+		ArchetypeID: chasm.WorkflowArchetypeID,
+
+	archetypeID chasm.ArchetypeID,
+		ArchetypeID: archetypeID,
+
+	archetypeID chasm.ArchetypeID,
+		ArchetypeID: archetypeID,
+	archetypeID chasm.ArchetypeID,
+		ArchetypeID: archetypeID,

@@ -1,0 +1,49 @@
+// commit 72069b4a9e2a 2026-01-22T20:26:26+00:00 packages/better-auth/src/cookies/cookie-utils.ts
+/**
+ * Split `Set-Cookie` header, handling commas in `Expires` dates.
+ */
+export function splitSetCookieHeader(setCookie: string): string[] {
+	if (!setCookie) return [];
+
+	const result: string[] = [];
+	let current = "";
+	let i = 0;
+
+	while (i < setCookie.length) {
+		const c = setCookie[i];
+
+		if (c === ",") {
+			const lower = current.toLowerCase();
+			if (lower.includes("expires=") && !lower.includes("gmt")) {
+				current += c;
+				i++;
+			} else {
+				const trimmed = current.trim();
+				if (trimmed) {
+					result.push(trimmed);
+				}
+				current = "";
+				i++;
+				if (i < setCookie.length && setCookie[i] === " ") {
+					i++;
+				}
+			}
+			continue;
+		}
+
+		current += c;
+		i++;
+	}
+
+	const trimmed = current.trim();
+	if (trimmed) {
+		result.push(trimmed);
+	}
+
+	return result;
+}
+
+	const cookieArray = splitSetCookieHeader(setCookie);
+		const cookies = parseSetCookieHeader(setCookieHeader);
+		cookies.forEach((value, name) => {
+			cookieMap.set(name, value.value);

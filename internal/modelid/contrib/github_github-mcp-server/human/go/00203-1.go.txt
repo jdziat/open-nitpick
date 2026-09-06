@@ -1,0 +1,80 @@
+// commit 3e32f75cf4d7 2025-06-12T14:54:23+02:00 pkg/github/repository_resource.go
+	"strconv"
+	"github.com/github/github-mcp-server/pkg/raw"
+func GetRepositoryResourceContent(getClient GetClientFn, getRawClient raw.GetRawClientFn, t translations.TranslationHelperFunc) (mcp.ResourceTemplate, server.ResourceTemplateHandlerFunc) {
+		RepositoryResourceContentsHandler(getClient, getRawClient)
+func GetRepositoryResourceBranchContent(getClient GetClientFn, getRawClient raw.GetRawClientFn, t translations.TranslationHelperFunc) (mcp.ResourceTemplate, server.ResourceTemplateHandlerFunc) {
+		RepositoryResourceContentsHandler(getClient, getRawClient)
+func GetRepositoryResourceCommitContent(getClient GetClientFn, getRawClient raw.GetRawClientFn, t translations.TranslationHelperFunc) (mcp.ResourceTemplate, server.ResourceTemplateHandlerFunc) {
+		RepositoryResourceContentsHandler(getClient, getRawClient)
+func GetRepositoryResourceTagContent(getClient GetClientFn, getRawClient raw.GetRawClientFn, t translations.TranslationHelperFunc) (mcp.ResourceTemplate, server.ResourceTemplateHandlerFunc) {
+		RepositoryResourceContentsHandler(getClient, getRawClient)
+func GetRepositoryResourcePrContent(getClient GetClientFn, getRawClient raw.GetRawClientFn, t translations.TranslationHelperFunc) (mcp.ResourceTemplate, server.ResourceTemplateHandlerFunc) {
+		RepositoryResourceContentsHandler(getClient, getRawClient)
+func RepositoryResourceContentsHandler(getClient GetClientFn, getRawClient raw.GetRawClientFn) func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		rawOpts := &raw.RawContentOpts{}
+			rawOpts.SHA = sha[0]
+			rawOpts.Ref = "refs/heads/" + branch[0]
+			rawOpts.Ref = "refs/tags/" + tag[0]
+			// fetch the PR from the API to get the latest commit and use SHA
+			githubClient, err := getClient(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+			prNum, err := strconv.Atoi(prNumber[0])
+			if err != nil {
+				return nil, fmt.Errorf("invalid pull request number: %w", err)
+			}
+			pr, _, err := githubClient.PullRequests.Get(ctx, owner, repo, prNum)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get pull request: %w", err)
+			}
+			sha := pr.GetHead().GetSHA()
+			rawOpts.SHA = sha
+			opts.Ref = sha
+		//  if it's a directory
+		if path == "" || strings.HasSuffix(path, "/") {
+			return nil, fmt.Errorf("directories are not supported: %s", path)
+		rawClient, err := getRawClient(ctx)
+
+			return nil, fmt.Errorf("failed to get GitHub raw content client: %w", err)
+		resp, err := rawClient.GetRawContent(ctx, owner, repo, path, rawOpts)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		// If the raw content is not found, we will fall back to the GitHub API (in case it is a directory)
+		switch {
+		case err != nil:
+			return nil, fmt.Errorf("failed to get raw content: %w", err)
+		case resp.StatusCode == http.StatusOK:
+			ext := filepath.Ext(path)
+			mimeType := resp.Header.Get("Content-Type")
+			if ext == ".md" {
+				mimeType = "text/markdown"
+			} else if mimeType == "" {
+				mimeType = mime.TypeByExtension(ext)
+			content, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read file content: %w", err)
+			}
+			switch {
+			case strings.HasPrefix(mimeType, "text"), strings.HasPrefix(mimeType, "application"):
+				return []mcp.ResourceContents{
+					mcp.TextResourceContents{
+						URI:      request.Params.URI,
+						MIMEType: mimeType,
+						Text:     string(content),
+					},
+				}, nil
+			default:
+						Blob:     base64.StdEncoding.EncodeToString(content),
+		case resp.StatusCode != http.StatusNotFound:
+			// If we got a response but it is not 200 OK, we return an error
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read response body: %w", err)
+			}
+			return nil, fmt.Errorf("failed to fetch raw content: %s", string(body))
+		default:
+			// This should be unreachable because GetContents should return an error if neither file nor directory content is found.
+			return nil, errors.New("404 Not Found")

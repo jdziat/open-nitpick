@@ -1,0 +1,75 @@
+// commit dc8f90e66e9a 2026-08-14T17:32:43+01:00 apps/webapp/app/v3/runOpsMigration/controlPlaneResolver.server.ts
+  /**
+   * When true (the default when omitted), the dequeue worker-version resolve reads the matched
+   * task/queue fresh on every call (no cache). When false, it falls back to the legacy env-keyed
+   * cache over the whole task/queue set — a kill-switch, retained only so the read shape can be
+   * reverted via config.
+   */
+  workerVersionFreshReadEnabled?: () => boolean;
+type WorkerVersionWheres = {
+  taskWhere: { slug: string } | undefined;
+  queueWhere: { id: string } | { name: string } | undefined;
+};
+
+const ALL_WORKER_VERSION_WHERES: WorkerVersionWheres = {
+  taskWhere: undefined,
+  queueWhere: undefined,
+};
+
+  private readonly workerVersionFreshReadEnabled: () => boolean;
+    this.workerVersionFreshReadEnabled = opts.workerVersionFreshReadEnabled ?? (() => true);
+    taskIdentifier?: string;
+    queue?: { lockedQueueId?: string | null; name: string };
+    if (!this.workerVersionFreshReadEnabled()) {
+      if (!this.splitEnabled()) {
+        return this.#queryWorkerVersion(
+          this.controlPlanePrimary,
+          environmentId,
+          backgroundWorkerId,
+          type,
+          ALL_WORKER_VERSION_WHERES
+        );
+      }
+
+      const key = workerVersionKey(environmentId, backgroundWorkerId, type);
+      const cached = this.cache.getWorkerVersion(key);
+      if (cached !== undefined) {
+        return cached;
+      }
+
+      const resolved = await this.#queryWorkerVersion(
+        this.controlPlaneReplica,
+        type,
+        ALL_WORKER_VERSION_WHERES
+      this.cache.setWorkerVersion(key, resolved);
+      return resolved;
+    const wheres: WorkerVersionWheres = {
+      taskWhere: args.taskIdentifier ? { slug: args.taskIdentifier } : undefined,
+      queueWhere: args.queue
+        ? args.queue.lockedQueueId
+          ? { id: args.queue.lockedQueueId }
+          : { name: args.queue.name }
+        : undefined,
+    };
+    const client = this.splitEnabled() ? this.controlPlaneReplica : this.controlPlanePrimary;
+    return this.#queryWorkerVersion(client, environmentId, backgroundWorkerId, type, wheres);
+    backgroundWorkerId: string | undefined,
+    type: RuntimeEnvironmentType | undefined,
+    wheres: WorkerVersionWheres
+        ? this.#queryWorkerById(client, backgroundWorkerId, wheres)
+        : this.#queryMostRecentWorker(client, environmentId, wheres);
+          tasks: { where: wheres.taskWhere, select: resolvedWorkerTaskSelect },
+          queues: { where: wheres.queueWhere, select: resolvedTaskQueueSelect },
+                tasks: { where: wheres.taskWhere, select: resolvedWorkerTaskSelect },
+                queues: { where: wheres.queueWhere, select: resolvedTaskQueueSelect },
+            tasks: { where: wheres.taskWhere, select: resolvedWorkerTaskSelect },
+            queues: { where: wheres.queueWhere, select: resolvedTaskQueueSelect },
+    workerId: string,
+    wheres: WorkerVersionWheres
+        tasks: { where: wheres.taskWhere, select: resolvedWorkerTaskSelect },
+        queues: { where: wheres.queueWhere, select: resolvedTaskQueueSelect },
+    environmentId: string,
+    wheres: WorkerVersionWheres
+        tasks: { where: wheres.taskWhere, select: resolvedWorkerTaskSelect },
+        queues: { where: wheres.queueWhere, select: resolvedTaskQueueSelect },
+  workerVersionFreshReadEnabled: () => env.RUN_OPS_WORKER_VERSION_FRESH_READ_ENABLED,

@@ -1,0 +1,302 @@
+// commit c16cc577b060 2025-08-22T07:40:59+01:00 apps/webapp/app/v3/marqs/index.server.ts
+import { setInterval } from "node:timers/promises";
+import { tryCatch } from "@trigger.dev/core/utils";
+  sharedWorkerQueueConsumerIntervalMs?: number;
+  sharedWorkerQueueMaxMessageCount?: number;
+          const messages = await this.#callDequeueMessages({
+            maxCount: 1,
+          if (!messages || messages.length === 0) {
+          const messageData = messages[0];
+
+   * Dequeue a message from the shared worker queue (this should be used in production environments)
+  public async dequeueMessageFromSharedWorkerQueue(consumerId: string) {
+      "dequeueMessageFromSharedWorkerQueue",
+      async (span) => {
+        span.setAttribute(SemanticAttributes.CONSUMER_ID, consumerId);
+
+        const workerQueueKey = this.keys.sharedWorkerQueueKey();
+
+        span.setAttribute(SemanticAttributes.PARENT_QUEUE, workerQueueKey);
+
+        // Try and pop a message from the worker queue (redis list)
+        const messageId = await this.#trace("popMessageFromWorkerQueue", async (innerSpan) => {
+          innerSpan.setAttribute(SemanticAttributes.PARENT_QUEUE, workerQueueKey);
+          innerSpan.setAttribute(SemanticAttributes.CONSUMER_ID, consumerId);
+
+          const results = await this.redis.popMessageFromWorkerQueue(workerQueueKey);
+
+          if (!results) {
+            return null;
+          }
+
+          const [messageId, queueLength] = results;
+
+          innerSpan.setAttribute("queue_length", Number(queueLength));
+
+          return messageId;
+        });
+
+        if (!messageId) {
+          return;
+        }
+
+        const message = await this.readMessage(messageId);
+
+        if (!message) {
+          return;
+        }
+
+        if (this.options.subscriber) {
+          await this.#trace(
+            "postMessageDequeued",
+            async (subscriberSpan) => {
+              subscriberSpan.setAttributes({
+                [SemanticAttributes.MESSAGE_ID]: message.messageId,
+                [SemanticAttributes.QUEUE]: message.queue,
+                [SemanticAttributes.PARENT_QUEUE]: message.parentQueue,
+              });
+
+              return await this.options.subscriber?.messageDequeued(message);
+            },
+            {
+              kind: SpanKind.INTERNAL,
+              attributes: {
+                [SEMATTRS_MESSAGING_OPERATION]: "receive",
+                [SEMATTRS_MESSAGING_SYSTEM]: "marqs",
+              },
+            }
+          );
+        }
+
+        await this.#trace(
+          "startHeartbeat",
+          async (heartbeatSpan) => {
+            heartbeatSpan.setAttributes({
+              [SemanticAttributes.MESSAGE_ID]: message.messageId,
+              visibility_timeout_ms: this.visibilityTimeoutInMs,
+            });
+
+            return await this.options.visibilityTimeoutStrategy.startHeartbeat(
+              message.messageId,
+              this.visibilityTimeoutInMs
+            );
+          },
+          {
+            kind: SpanKind.INTERNAL,
+            attributes: {
+              [SEMATTRS_MESSAGING_OPERATION]: "receive",
+              [SEMATTRS_MESSAGING_SYSTEM]: "marqs",
+            },
+          }
+        );
+
+        return message;
+      },
+      {
+        kind: SpanKind.CONSUMER,
+        attributes: {
+          [SEMATTRS_MESSAGING_OPERATION]: "receive",
+          [SEMATTRS_MESSAGING_SYSTEM]: "marqs",
+        },
+      }
+    );
+  }
+
+  public startSharedWorkerQueueConsumer(consumerId: string) {
+    const abortController = new AbortController();
+
+    this.#startSharedWorkerQueueConsumer(consumerId, abortController).catch((error) => {
+      logger.error("Failed to start shared worker queue consumer", {
+        error,
+        service: this.name,
+        consumerId,
+      });
+    });
+
+    return () => {
+      abortController.abort();
+    };
+  }
+
+  async #startSharedWorkerQueueConsumer(consumerId: string, abortController: AbortController) {
+    let lastProcessedAt = Date.now();
+    let processedCount = 0;
+
+    try {
+      for await (const _ of setInterval(
+        this.options.sharedWorkerQueueConsumerIntervalMs ?? 500,
+        null,
+        {
+          signal: abortController.signal,
+        }
+      )) {
+        logger.debug(`Processing shared worker queue`, {
+          processedCount,
+          lastProcessedAt,
+          service: this.name,
+          consumerId,
+        });
+
+        const now = performance.now();
+
+        const [error, results] = await tryCatch(this.#processSharedWorkerQueue(consumerId));
+
+        if (error) {
+          logger.error(`Failed to process shared worker queue`, {
+            error,
+            service: this.name,
+            consumerId,
+          });
+
+          continue;
+        }
+
+        const duration = performance.now() - now;
+
+        logger.debug(`Processed shared worker queue`, {
+          processedCount,
+          lastProcessedAt,
+          service: this.name,
+          duration,
+          results,
+          consumerId,
+        });
+
+        processedCount++;
+        lastProcessedAt = Date.now();
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== "AbortError") {
+        throw error;
+      }
+
+      logger.debug(`Shared worker queue consumer stopped`, {
+        service: this.name,
+        processedCount,
+        lastProcessedAt,
+      });
+    }
+  }
+
+  /**
+   * Dequeue as many messages as possible from queues into the shared worker queue list
+   */
+  async #processSharedWorkerQueue(consumerId: string) {
+    return this.#trace(
+      "processSharedWorkerQueue",
+        let messageCount = 0;
+        // Try each queue in order, attempt to dequeue a message from each queue, keep going until we've tried all the queues
+            await this.#trace(
+              async (attemptDequeueSpan) => {
+                  attemptDequeueSpan.setAttributes({
+                  const messages = await this.#trace(
+                    "callDequeueMessages",
+                      return await this.#callDequeueMessages({
+                        maxCount: this.options.sharedWorkerQueueMaxMessageCount ?? 10,
+                  if (!messages || messages.length === 0) {
+                    attemptDequeueSpan.setAttribute("message_count", 0);
+                  messageCount += messages.length;
+
+                  attemptDequeueSpan.setAttribute("message_count", messages.length);
+
+                  await this.#trace(
+                    "addToWorkerQueue",
+                    async (addToWorkerQueueSpan) => {
+                      const workerQueueKey = this.keys.sharedWorkerQueueKey();
+
+                      addToWorkerQueueSpan.setAttributes({
+                        message_count: messages.length,
+                        [SemanticAttributes.PARENT_QUEUE]: workerQueueKey,
+                      });
+
+                      await this.redis.rpush(
+                        workerQueueKey,
+                        ...messages.map((message) => message.messageId)
+                      );
+                    },
+                    {
+                      kind: SpanKind.INTERNAL,
+                      attributes: {
+                        [SEMATTRS_MESSAGING_OPERATION]: "receive",
+                        [SEMATTRS_MESSAGING_SYSTEM]: "marqs",
+                    }
+                  );
+        span.setAttribute("message_count", messageCount);
+  async #callDequeueMessages({
+    maxCount,
+    maxCount: number;
+    logger.debug("Calling dequeueMessages", {
+    const result = await this.redis.dequeueMessages(
+      String(this.options.defaultEnvConcurrency),
+      String(maxCount)
+    const messages = [];
+    for (let i = 0; i < result.length; i += 2) {
+      const messageId = result[i];
+      const messageScore = result[i + 1];
+
+      messages.push({
+        messageId,
+        messageScore,
+      });
+    logger.debug("dequeueMessages parsed result", {
+      messages,
+      service: this.name,
+    });
+
+    return messages.filter(Boolean);
+    this.redis.defineCommand("dequeueMessages", {
+local maxCount = tonumber(ARGV[4] or '1')
+-- Calculate how many messages we can actually dequeue based on concurrency limits
+local envAvailableCapacity = totalEnvConcurrencyLimit - envCurrentConcurrency
+local queueAvailableCapacity = totalQueueConcurrencyLimit - queueCurrentConcurrency
+local actualMaxCount = math.min(maxCount, envAvailableCapacity, queueAvailableCapacity)
+if actualMaxCount <= 0 then
+-- Attempt to dequeue messages up to actualMaxCount
+local messagesWithScores = redis.call('ZRANGEBYSCORE', queueKey, '-inf', currentTime, 'WITHSCORES', 'LIMIT', 0, actualMaxCount)
+if #messagesWithScores == 0 then
+    return nil
+end
+
+local messageIds = {}
+for i = 1, #messagesWithScores, 2 do
+    table.insert(messageIds, messagesWithScores[i])
+end
+
+-- Remove the messages from the queue and update concurrency
+redis.call('ZREM', queueKey, unpack(messageIds))
+redis.call('ZREM', envQueueKey, unpack(messageIds))
+redis.call('SADD', queueCurrentConcurrencyKey, unpack(messageIds))
+redis.call('SADD', envCurrentConcurrencyKey, unpack(messageIds))
+redis.call('SREM', envReserveConcurrencyKey, unpack(messageIds))
+redis.call('SREM', queueReserveConcurrencyKey, unpack(messageIds))
+return messagesWithScores
+      `,
+    });
+
+    this.redis.defineCommand("popMessageFromWorkerQueue", {
+      numberOfKeys: 1,
+      lua: `
+local workerQueueKey = KEYS[1]
+
+-- lpop the first message from the worker queue
+local messageId = redis.call('LPOP', workerQueueKey)
+
+-- if there is no messageId, return nil
+if not messageId then
+    return nil
+end
+
+-- get the length of the worker queue
+local queueLength = tonumber(redis.call('LLEN', workerQueueKey) or '0')
+
+return {messageId, queueLength} -- Return message details
+    dequeueMessages(
+      maxCount: string,
+      callback?: Callback<string[]>
+    ): Result<string[] | null, Context>;
+
+    popMessageFromWorkerQueue(
+      workerQueueKey: string,
+      callback?: Callback<[string, string] | null>
+    sharedWorkerQueueConsumerIntervalMs: env.MARQS_SHARED_WORKER_QUEUE_CONSUMER_INTERVAL_MS,
+    sharedWorkerQueueMaxMessageCount: env.MARQS_SHARED_WORKER_QUEUE_MAX_MESSAGE_COUNT,

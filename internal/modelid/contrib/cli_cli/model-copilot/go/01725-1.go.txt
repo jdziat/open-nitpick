@@ -1,0 +1,31 @@
+// commit 62a6e9e052cd 2026-09-02T15:28:57+02:00 pkg/cmd/release/shared/fetch.go
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "git", "ref", fmt.Sprintf("tags/%s", tagName))
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).RequestWithContext(ctx, repo.RepoHost(), http.MethodGet, path.String(), nil)
+		if isNotFound(err) {
+			return "", ErrReleaseNotFound
+		}
+	publishedPath, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", "tags", tagName)
+		release, err := fetchReleasePath(cc, httpClient, repo.RepoHost(), publishedPath)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", "latest")
+	return fetchReleasePath(ctx, httpClient, repo.RepoHost(), path)
+	path, err := safeurl.JoinPath("repos", repo.RepoOwner(), repo.RepoName(), "releases", strconv.FormatInt(query.Repository.Release.DatabaseID, 10))
+	return fetchReleasePath(ctx, httpClient, repo.RepoHost(), path)
+func fetchReleasePath(ctx context.Context, httpClient *http.Client, host string, path safeurl.SafeURL) (*Release, error) {
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	resp, err := api.NewClientFromHTTP(httpClient).RequestWithContext(ctx, host, http.MethodGet, path.String(), nil)
+		if isNotFound(err) {
+			return nil, ErrReleaseNotFound
+		}
+// isNotFound reports whether err is an API error carrying a 404 status. The release lookups
+// treat a missing release as a sentinel rather than an error, and the api client reports the
+// status through an HTTPError rather than through a response the call site can inspect.
+func isNotFound(err error) bool {
+	var httpErr api.HTTPError
+	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
+}
+

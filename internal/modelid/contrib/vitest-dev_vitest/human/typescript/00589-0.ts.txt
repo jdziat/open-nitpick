@@ -1,0 +1,48 @@
+// commit 8182b77ad787 2026-02-08T12:36:11+01:00 test/cli/test/config/sequence-shuffle.test.ts
+
+test('should log seed when only shuffle.tests is enabled', async () => {
+  const { stdout } = await runInlineTests({
+    'basic.test.js': /* js */ `
+      import { test } from 'vitest'
+      test('example', () => {})
+    `,
+  }, {
+    sequence: {
+      seed: 12345,
+      shuffle: { files: false, tests: true },
+    },
+  })
+
+  expect(stdout).toContain('Running tests with seed "12345"')
+})
+
+test('should log seed when shuffle is true', async () => {
+  const { stdout } = await runInlineTests({
+    'basic.test.js': /* js */ `
+      import { test } from 'vitest'
+      test('example', () => {})
+    `,
+  }, {
+    sequence: {
+      seed: 67890,
+      shuffle: true,
+    },
+  })
+
+  expect(stdout).toContain('Running tests with seed "67890"')
+})
+
+test('should not log seed when shuffle is disabled', async () => {
+  const { stdout } = await runInlineTests({
+    'basic.test.js': /* js */ `
+      import { test } from 'vitest'
+      test('example', () => {})
+    `,
+  }, {
+    sequence: {
+      shuffle: false,
+    },
+  })
+
+  expect(stdout).not.toContain('Running tests with seed')
+})

@@ -1,0 +1,42 @@
+# commit ee0a4510f4bc 2026-08-20T13:44:43+02:00 tests/test_inference_providers.py
+from huggingface_hub import constants
+        payload = helper._prepare_payload_as_dict(
+            "a cat walking",
+            {"num_frames": 16},
+            InferenceProviderMapping(
+                provider="fal-ai",
+                hf_model_id="username/repo_name",
+                providerId="username/repo_name",
+                task="text-to-video",
+                status="live",
+            ),
+        )
+    def test_text_to_video_payload_with_lora(self):
+        helper = FalAITextToVideoTask()
+        payload = helper._prepare_payload_as_dict(
+            "a cat walking",
+            {},
+            InferenceProviderMapping(
+                provider="fal-ai",
+                hf_model_id="username/repo_name",
+                providerId="provider-id/text-to-video/lora",
+                task="text-to-video",
+                status="live",
+                adapter="lora",
+                adapterWeightsPath="pytorch_lora_weights.safetensors",
+            ),
+        )
+        assert payload == {
+            "prompt": "a cat walking",
+            "loras": [
+                {
+                    "path": constants.HUGGINGFACE_CO_URL_TEMPLATE.format(
+                        repo_id="username/repo_name",
+                        revision="main",
+                        filename="pytorch_lora_weights.safetensors",
+                    ),
+                    "scale": 1,
+                }
+            ],
+        }
+

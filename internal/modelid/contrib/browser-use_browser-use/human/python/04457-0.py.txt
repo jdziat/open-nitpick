@@ -1,0 +1,35 @@
+# commit a05a053da634 2026-04-02T17:41:15-07:00 browser_use/skill_cli/daemon.py
+		self._auth_token: str = ''
+				import hmac
+
+				req_id = request.get('id', '')
+				# Reject requests that don't carry the correct auth token.
+				# Use hmac.compare_digest to prevent timing-oracle attacks.
+				if self._auth_token and not hmac.compare_digest(
+					request.get('token', ''),
+					self._auth_token,
+				):
+					response = {'id': req_id, 'success': False, 'error': 'Unauthorized'}
+				else:
+					response = await self.dispatch(request)
+			if response.get('success') and request.get('action') == 'shutdown':
+		import secrets
+
+		from browser_use.skill_cli.utils import get_auth_token_path, get_pid_path, get_socket_path
+		# Generate and persist a per-session auth token.
+		# The client reads this file to authenticate its requests, preventing
+		# any other local process from sending commands to the daemon socket.
+		self._auth_token = secrets.token_hex(32)
+		token_path = get_auth_token_path(self.session)
+		tmp_token = token_path.with_suffix('.token.tmp')
+		try:
+			tmp_token.write_text(self._auth_token)
+			os.chmod(tmp_token, 0o600)
+			os.replace(tmp_token, token_path)
+		except OSError as e:
+			logger.warning(f'Failed to write auth token file: {e}')
+
+		# Delete PID and auth token files last, right before exit.
+		from browser_use.skill_cli.utils import get_auth_token_path, get_pid_path
+		get_auth_token_path(self.session).unlink(missing_ok=True)
+

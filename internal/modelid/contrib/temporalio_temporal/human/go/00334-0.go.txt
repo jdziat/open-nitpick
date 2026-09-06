@@ -1,0 +1,59 @@
+// commit 02f1fb1db058 2026-01-09T18:08:57-08:00 common/persistence/cassandra/mutable_state_store.go
+	"go.temporal.io/server/chasm"
+	"go.temporal.io/server/common/log"
+	"go.temporal.io/server/common/softassert"
+		logger  log.Logger
+func NewMutableStateStore(session gocql.Session, logger log.Logger) *MutableStateStore {
+		logger:  logger,
+	currentRecordRunID := d.getCurrentRecordRunID(request.ArchetypeID)
+			currentRecordRunID,
+			currentRecordRunID,
+			currentRecordRunID,
+	currentRecordRunID := d.getCurrentRecordRunID(request.ArchetypeID)
+
+			request.ArchetypeID,
+				currentRecordRunID,
+				currentRecordRunID,
+			currentRecordRunID,
+	currentRecordRunID := d.getCurrentRecordRunID(request.ArchetypeID)
+
+			request.ArchetypeID,
+			currentRecordRunID,
+			currentRecordRunID,
+	archetypeID chasm.ArchetypeID,
+		ArchetypeID: archetypeID,
+		d.getCurrentRecordRunID(request.ArchetypeID),
+		d.getCurrentRecordRunID(request.ArchetypeID),
+			"", // SetWorkflowExecution does not update current record
+			"", // SetWorkflowExecution does not update current record
+		if execution, ok := result["execution"]; ok {
+			executionBytes, ok := execution.([]byte)
+			if !ok {
+				return nil, newPersistedTypeMismatchError("execution", "", executionBytes, result)
+			}
+
+			if len(executionBytes) == 0 {
+				// current record has no value in execution column.
+				result = make(map[string]interface{})
+				continue
+			}
+
+
+func (d *MutableStateStore) getCurrentRecordRunID(
+	archetypeID chasm.ArchetypeID,
+) string {
+	if !softassert.That(
+		d.logger,
+		archetypeID != chasm.UnspecifiedArchetypeID,
+		"ArchetypeID not specified, defaulting to Workflow.",
+	) {
+		return permanentRunID
+	}
+
+	if archetypeID == chasm.WorkflowArchetypeID {
+		return permanentRunID
+	}
+
+	return gocql.ArchetypeIDToUUID(archetypeID)
+}
+

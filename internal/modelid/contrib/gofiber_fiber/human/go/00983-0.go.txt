@@ -1,0 +1,49 @@
+// commit 047de6498f7e 2026-04-23T04:22:14+00:00 middleware/cache/cache.go
+
+	// Pre-scan query string to detect excessive parameters before expensive parsing
+	// This prevents DoS via url.ParseQuery allocating large maps/slices
+	if len(query) > maxQueryBufferSize {
+		return boundKeySegment(query)
+	}
+
+	// Quick count of potential parameters (ampersands + 1)
+	paramCount := 1
+	for i := 0; i < len(query); i++ {
+		if query[i] == '&' {
+			paramCount++
+			if paramCount > maxQueryParams {
+				// Too many parameters detected, hash without parsing
+				return boundKeySegment(query)
+			}
+		}
+	}
+
+	// Double-check actual parameter count after parsing
+	actualCount := 0
+		actualCount += len(values)
+		if actualCount > maxQueryParams {
+		// Escape name (though names are normalized and trusted)
+		buf = append(buf, escapeKeyDelimiters(name)...)
+		// Escape value to prevent delimiter injection
+		escapedValue := escapeKeyDelimiters(utils.UnsafeString(headerValue))
+		buf = append(buf, utils.UnsafeBytes(boundKeySegment(escapedValue))...)
+		// Escape name (though names are normalized and trusted)
+		buf = append(buf, escapeKeyDelimiters(name)...)
+		// Escape value to prevent delimiter injection
+		escapedValue := escapeKeyDelimiters(cookieValue)
+		buf = append(buf, utils.UnsafeBytes(boundKeySegment(escapedValue))...)
+// escapeKeyDelimiters escapes pipe and colon characters used as delimiters in cache keys
+// to prevent injection attacks where crafted values could collide with different inputs
+func escapeKeyDelimiters(s string) string {
+	// Fast path: no delimiters to escape
+	if !strings.ContainsAny(s, "|:") {
+		return s
+	}
+
+	// Escape | as \p and : as \c, and \ as \\ (backslash must be escaped first)
+	result := strings.ReplaceAll(s, "\\", "\\\\")
+	result = strings.ReplaceAll(result, "|", "\\p")
+	result = strings.ReplaceAll(result, ":", "\\c")
+	return result
+}
+

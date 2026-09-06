@@ -1,0 +1,59 @@
+// commit 8aeb670b0ba0 2026-08-19T13:06:59+02:00 pkg/github/repositories.go
+				const maxContentSize = 1024 * 1024 // 1MB
+
+				inspection, respInspect, err := inspectRepositoryFile(ctx, client, owner, repo, ref, path, fileContent)
+				if err != nil {
+					if respInspect != nil {
+						return ghErrors.NewGitHubAPIErrorResponse(ctx,
+							"failed to inspect repository file",
+							respInspect,
+							err,
+						), nil, nil
+					}
+					return utils.NewToolResultError(fmt.Sprintf("failed to inspect repository file: %s", err)), nil, nil
+				}
+				if inspection.Submodule != nil {
+					return attachIFC(utils.NewToolResultText(marshalRepositorySubmoduleMetadata(inspection.Submodule))), nil, nil
+				}
+				if inspection.Symlink != nil &&
+					!inspection.ContentAvailable &&
+					(inspection.Symlink.Explicit || fileSize < maxContentSize) {
+					return attachIFC(utils.NewToolResultText(marshalRepositorySymlinkMetadata(
+						inspection.Symlink,
+						unavailableSymlinkContents,
+						successNote,
+					))), nil, nil
+				}
+				// Empty files are returned as empty text to avoid
+				// DetectContentType misclassifying them as binary.
+				if fileSize == 0 && inspection.ContentAvailable {
+					message := fmt.Sprintf("successfully downloaded empty file (SHA: %s)%s", fileSHA, successNote)
+					if inspection.Symlink != nil {
+						message = marshalRepositorySymlinkMetadata(inspection.Symlink, dereferencedContentLabel, successNote)
+					}
+					return attachIFC(utils.NewToolResultResource(message, result)), nil, nil
+					message := fmt.Sprintf("File %s is too large to display (%d bytes). Use the download URL to fetch the content: %s (SHA: %s)%s",
+						path, fileSize, fileContent.GetDownloadURL(), fileSHA, successNote)
+					if inspection.Symlink != nil {
+						targetPath := inspection.Symlink.ResolvedTargetPath
+						if targetPath == "" {
+							targetPath = inspection.Symlink.Target
+						}
+						resourceLink.Title = fmt.Sprintf("Dereferenced target %s via symlink %s", targetPath, path)
+						message = marshalRepositorySymlinkMetadata(inspection.Symlink, dereferencedContentLabel, successNote)
+					}
+						message,
+				if !inspection.ContentAvailable {
+					return utils.NewToolResultError(fmt.Sprintf("failed to inspect repository file: Contents API did not provide content for path %q", path)), nil, nil
+				contentBytes := inspection.Content
+						Text:     string(contentBytes),
+					message := fmt.Sprintf("successfully downloaded text file (SHA: %s)%s", fileSHA, successNote)
+					if inspection.Symlink != nil {
+						message = marshalRepositorySymlinkMetadata(inspection.Symlink, dereferencedContentLabel, successNote)
+					}
+					return attachIFC(utils.NewToolResultResource(message, result)), nil, nil
+				message := fmt.Sprintf("successfully downloaded binary file (SHA: %s)%s", fileSHA, successNote)
+				if inspection.Symlink != nil {
+					message = marshalRepositorySymlinkMetadata(inspection.Symlink, dereferencedContentLabel, successNote)
+				}
+				return attachIFC(utils.NewToolResultResource(message, result)), nil, nil

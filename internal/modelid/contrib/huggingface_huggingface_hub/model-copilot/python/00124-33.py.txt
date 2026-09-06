@@ -1,0 +1,40 @@
+# commit 52c718a54382 2025-10-23T14:48:03+02:00 tests/test_utils_errors.py
+from unittest.mock import Mock
+from httpx import Request, Response
+        response = Response(status_code=404, headers={"X-Error-Code": "RepoNotFound", X_REQUEST_ID: "123"})
+        response.request = Request(method="GET", url="https://huggingface.co/fake")
+        response = Response(
+            status_code=403, headers={"X-Error-Message": "Access to this resource is disabled.", X_REQUEST_ID: "123"}
+        )
+        response.request = Request(method="GET", url="https://huggingface.co/fake")
+        response = Response(status_code=401, headers={X_REQUEST_ID: "123"})
+        response.request = Request(method="GET", url="https://huggingface.co/api/models/username/reponame")
+        response = Response(
+            status_code=401,
+            headers={X_REQUEST_ID: "123", "X-Error-Message": "Invalid credentials in Authorization header"},
+        )
+        response.request = Request(method="GET", url="https://huggingface.co/api/models/username/reponame")
+        response = Response(
+            status_code=403, headers={X_REQUEST_ID: "123", "X-Error-Message": "specific error message"}
+        )
+        response.request = Request(method="GET", url="https://huggingface.co/api/repos/create")
+        response = Response(status_code=401, headers={X_REQUEST_ID: "123"})
+        response.request = Request(method="GET", url="https://huggingface.co/api/collections")
+        response = Response(status_code=404, headers={"X-Error-Code": "RevisionNotFound", X_REQUEST_ID: "123"})
+        response.request = Request(method="GET", url="https://huggingface.co/fake")
+        response = Response(status_code=404, headers={"X-Error-Code": "EntryNotFound", X_REQUEST_ID: "123"})
+        response.request = Request(method="GET", url="https://huggingface.co/fake")
+        response = Response(status_code=400)
+        response.request = Request(method="GET", url="https://huggingface.co/fake")
+        response = Response(status_code=400)
+        response.request = Request(method="GET", url="https://huggingface.co/fake")
+        response = Response(status_code=404, headers={X_REQUEST_ID: "test-id"})
+        response.request = Request(method="GET", url="https://huggingface.co/fake")
+        assert context.exception.response.url == "https://huggingface.co/fake"
+        self.response = Response(status_code=404, request=Request(method="GET", url="https://huggingface.co/fake"))
+
+
+def test_hf_hub_http_error_inherits_from_os_error() -> None:
+    """Test HfHubHTTPError inherits from OSError."""
+    with pytest.raises(OSError):
+        raise HfHubHTTPError("this is a message", response=Mock())

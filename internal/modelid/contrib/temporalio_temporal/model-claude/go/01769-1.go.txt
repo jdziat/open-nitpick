@@ -1,0 +1,41 @@
+// commit d899928abca0 2026-08-25T09:10:41-07:00 common/testing/testlogger/testlogger.go
+		captures     map[*Capture]struct{}
+	tl.state.mu.captures = make(map[*Capture]struct{})
+// StartCapture starts recording log calls that contain any of the provided exact tags.
+// It records all calls when no tags are provided.
+func (tl *TestLogger) StartCapture(anyTags ...tag.Tag) *Capture {
+	capture := newCapture(anyTags)
+	tl.state.mu.Lock()
+	tl.state.mu.captures[capture] = struct{}{}
+	tl.state.mu.Unlock()
+	return capture
+}
+
+// StopCapture stops recording log calls for capture.
+func (tl *TestLogger) StopCapture(capture *Capture) {
+	tl.state.mu.Lock()
+	delete(tl.state.mu.captures, capture)
+	tl.state.mu.Unlock()
+}
+
+func (tl *TestLogger) recordCaptures(level Level, msg string, tags []tag.Tag) {
+	if len(tl.state.mu.captures) == 0 {
+		return
+	}
+	record := CapturedLog{
+		Level:   level,
+		Message: msg,
+		Tags:    slices.Clone(tags),
+	}
+	for capture := range tl.state.mu.captures {
+		capture.record(record)
+	}
+}
+
+	tl.recordCaptures(DPanic, msg, tags)
+	tl.recordCaptures(Debug, msg, tags)
+	tl.recordCaptures(Error, msg, tags)
+	tl.recordCaptures(Fatal, msg, tags)
+	tl.recordCaptures(Info, msg, tags)
+	tl.recordCaptures(Panic, msg, tags)
+	tl.recordCaptures(Warn, msg, tags)

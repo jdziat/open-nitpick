@@ -1,0 +1,42 @@
+// commit bf79f386a4c7 2025-12-19T11:01:46-05:00 chasm/lib/activity/frontend.go
+	"github.com/google/uuid"
+	"go.temporal.io/api/serviceerror"
+func (h *frontendHandler) RequestCancelActivityExecution(
+	ctx context.Context,
+	req *workflowservice.RequestCancelActivityExecutionRequest,
+) (*workflowservice.RequestCancelActivityExecutionResponse, error) {
+	namespaceID, err := h.namespaceRegistry.GetNamespaceID(namespace.Name(req.GetNamespace()))
+	if err != nil {
+		return nil, err
+	}
+
+	// Since validation potentially mutates the request, we clone it first so that any retries use the original request.
+	req = common.CloneProto(req)
+
+	maxIDLen := dynamicconfig.MaxIDLengthLimit.Get(h.dc)()
+
+	if len(req.GetRequestId()) > maxIDLen {
+		return nil, serviceerror.NewInvalidArgument("RequestID length exceeds limit.")
+	}
+
+	if req.GetRequestId() == "" {
+		req.RequestId = uuid.NewString()
+	}
+
+	if len(req.GetReason()) > maxIDLen {
+		return nil, serviceerror.NewInvalidArgument("Reason length exceeds limit.")
+	}
+
+	_, err = h.client.RequestCancelActivityExecution(ctx, &activitypb.RequestCancelActivityExecutionRequest{
+		NamespaceId:     namespaceID.String(),
+		FrontendRequest: req,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflowservice.RequestCancelActivityExecutionResponse{}, nil
+}
+
+	err = validateAndNormalizeStartActivityExecutionRequest(
+		req,

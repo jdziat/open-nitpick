@@ -1,0 +1,49 @@
+// commit 034d8d8715ef 2026-07-09T15:23:37+00:00 middleware/proxy/proxy.go
+// guardMu serializes the read-modify-write of a client's ConfigureClient in
+// ensureClientGuarded. Serializing the whole operation (rather than a
+// LoadOrStore flag) guarantees the guard is actually installed on the field
+// before any concurrent guarder observes the client as "handled", closing
+// the check/install window a second caller could otherwise dispatch
+// through. composedGuards records clients whose own ConfigureClient we have
+// already wrapped, so a client passed repeatedly is composed with only once
+// (a second wrap would nest the guard on every request); it is consulted
+// only under guardMu.
+var (
+	guardMu        sync.Mutex
+	composedGuards = map[*fasthttp.Client]struct{}{}
+)
+
+// ensureClientGuarded installs the SSRF guard on cli via its ConfigureClient
+// hook. It is invoked at registration for the default client (init) and
+// WithClient clients — before either is used — and on the dispatch path only
+// for a per-call variadic client (the global client is already guarded), so
+// the common no-variadic request path pays nothing here.
+// Guarantee scope: the default client and WithClient clients are fully
+// protected. A client supplied as a per-call variadic argument is guarded on
+// first use — but a host it had already dialed keeps its cached, pre-hook
+// HostClient, and mutating a client shared with concurrent non-proxy use is
+// inherently racy. For a full guarantee with a custom client, register it
+// via WithClient before first use, or hand the proxy a dedicated client.
+	guardMu.Lock()
+	defer guardMu.Unlock()
+
+		return // already our guard
+	if _, done := composedGuards[cli]; done {
+		return // already composed with the user's hook
+	// Run the user's hook first, then install the guard, so the guard wraps
+	// whatever Dial/DialTimeout the user's hook finally sets — otherwise a
+	// hook that assigns hc.Dial would overwrite the guard and reopen the
+	// SSRF hole.
+	composedGuards[cli] = struct{}{}
+		if err := existing(hc); err != nil {
+			return err
+		}
+		return nil
+	// The global client (default or WithClient) is guarded at registration,
+	// so only a per-call variadic override needs guarding here. Skipping the
+	// global client keeps the common request path free of the guard lock.
+	// The guard re-validates the resolved IP at dial time; the
+	// validateUpstream call below is only the up-front host check.
+	if len(clients) != 0 {
+		ensureClientGuarded(cli)
+	}

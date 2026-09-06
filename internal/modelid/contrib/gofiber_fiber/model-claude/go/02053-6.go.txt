@@ -1,0 +1,31 @@
+// commit fe3ab8bdd26d 2026-08-27T02:33:47+00:00 res_interface_gen.go
+	//
+	// The headers fasthttp stores in a slot of their own cannot repeat, and Add
+	// does not append for them: Content-Type, Content-Encoding, Content-Length,
+	// Connection, Server and Trailer are replaced, and Transfer-Encoding and Date
+	// are ignored because fasthttp writes them itself. Use Set for those.
+	// The second result is false when no cookie of that name has been set, or when
+	// its Set-Cookie field value does not parse.
+	//
+	// Cookie names are case-sensitive (RFC 6265 Section 4.1.1). A name written more
+	// than once resolves to the first occurrence; use Cookies to see them all.
+	// Repeated names are kept apart, so a response that sets one name at two paths
+	// yields both. A Set-Cookie whose field value does not parse is skipped.
+	//
+	// When nothing has set one it reports what would be sent: fasthttp's default,
+	// "text/plain; charset=utf-8", or an empty string under
+	// Config.DisableDefaultContentType.
+	// A streamed body returns nil rather than being drained. Reading it would pull
+	// the whole stream into memory and turn the response into a buffered one, which
+	// would hang an SSE route and defeat a large SendFile; use Written to tell a
+	// streaming response from one that produced nothing, and the underlying
+	// Response.Body if you really do want to materialize the stream.
+	//
+	// it untouched. A streamed body counts as written without draining the stream,
+	// which is the case Body deliberately answers nil for.
+	// NoContent replies 204 No Content. SendStatus already discards the body for
+	// every status statusDisallowsBody names; this drops the Content-Type as well,
+	// since RFC 9110 Section 6.4.1 gives a 204 no content to describe.
+	//
+	// SendStatus(StatusNoContent) leaves a Content-Type a handler had set, so the
+	// two are not interchangeable: this is the one that sends nothing about content.

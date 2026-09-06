@@ -1,0 +1,46 @@
+# commit 70e6fd9ecea0 2026-05-19T14:49:51+02:00 src/huggingface_hub/hf_api.py
+from urllib.parse import quote
+    _parse_bucket_uri,
+    parse_hf_uri,
+def _parse_hf_copy_uri(hf_uri: str) -> _BucketCopyHandle | _RepoCopyHandle:
+    parsed = parse_hf_uri(hf_uri)
+    if parsed.is_bucket:
+        return _BucketCopyHandle(bucket_id=parsed.id, path=parsed.path_in_repo)
+        repo_type=parsed.type,  # type: ignore
+        repo_id=parsed.id,
+        revision=parsed.revision or constants.DEFAULT_REVISION,
+        path=parsed.path_in_repo,
+            >>> url.uri.to_uri()
+            parsed = _parse_bucket_uri(bucket_id)
+            if parsed.path_in_repo:
+            namespace, name = parsed.id.split("/")
+                Source location as an `hf://` URI. Can be a bucket path (e.g. `"hf://buckets/my-bucket/path/to/file"`)
+                Destination location as an `hf://` URI pointing to a bucket (e.g. `"hf://buckets/my-bucket/target/path"`).
+                If the destination is not a bucket or if the source/destination URIs are invalid.
+        source_uri = _parse_hf_copy_uri(source)
+        destination_uri = _parse_hf_copy_uri(destination)
+
+        if isinstance(destination_uri, _RepoCopyHandle):
+        destination_bucket_id = destination_uri.bucket_id
+        destination_path = destination_uri.path
+                        source_uri.repo_type,  # type: ignore
+                        source_uri.repo_id,  # type: ignore
+        if isinstance(source_uri, _BucketCopyHandle):
+            source_path = source_uri.path
+            source_path_info = list(self.get_bucket_paths_info(source_uri.bucket_id, [source_path], token=token))
+                    _build_copy_op(target_path, source_file.xet_hash, source_file.size, "bucket", source_uri.bucket_id)
+                    source_uri.bucket_id, prefix=source_path or None, recursive=True, token=token
+                        _build_copy_op(target_path, item.xet_hash, item.size, "bucket", source_uri.bucket_id)
+            source_path = source_uri.path
+                    repo_id=source_uri.repo_id,
+                    repo_type=source_uri.repo_type,
+                    revision=source_uri.revision,
+                    repo_id=source_uri.repo_id,
+                    repo_type=source_uri.repo_type,
+                    revision=source_uri.revision,
+            if isinstance(source_uri, _BucketCopyHandle):
+                raise EntryNotFoundError(f"No files found at '{source}' in bucket '{source_uri.bucket_id}'.")
+                    f"No files found at '{source}' in {source_uri.repo_type} '{source_uri.repo_id}'."
+                    repo_id=source_uri.repo_id,  # type: ignore
+                    repo_type=source_uri.repo_type,  # type: ignore
+                    revision=source_uri.revision,  # type: ignore

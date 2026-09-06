@@ -1,0 +1,50 @@
+// commit 9dc6d7b8ed3f 2026-08-20T13:16:31+05:30 extractors/extractors.go
+func chainWinDepth(c fiber.Ctx) int {
+	depth, ok := c.Locals(chainWinDepthKey{}).(int)
+	if !ok {
+		return 0
+	}
+	return depth
+}
+
+	c.Locals(chainWinDepthKey{}, chainWinDepth(c)+1)
+	depth := chainWinDepth(c)
+	return chainWinDepth(c) > 0
+func chainWinStack(c fiber.Ctx) []Source {
+	prev, ok := c.Locals(chainWinStackKey{}).([]Source)
+	if !ok {
+		return nil
+	return prev
+}
+
+func chainWinStackLen(c fiber.Ctx) int {
+	return len(chainWinStack(c))
+}
+
+func truncateChainWinStack(c fiber.Ctx, n int) {
+	prev := chainWinStack(c)
+	if len(prev) == 0 {
+		return
+	}
+	if n <= 0 {
+		c.Locals(chainWinStackKey{}, nil)
+		return
+	}
+	if len(prev) > n {
+		c.Locals(chainWinStackKey{}, prev[:n])
+	}
+}
+
+func pushChainWinningSource(c fiber.Ctx, src Source) {
+	stack := append(append([]Source(nil), chainWinStack(c)...), src)
+	prev := chainWinStack(c)
+	if len(prev) == 0 {
+				// Snapshot stack so a child that pushes then fails (e.g. decorated
+				// nested Chain that validates after base Extract) cannot leave a
+				// stale winner for a later successful sibling.
+				stackBefore := chainWinStackLen(c)
+						// Drop any extra leftover pushes from this child.
+						truncateChainWinStack(c, stackBefore)
+					} else {
+						truncateChainWinStack(c, stackBefore)
+				truncateChainWinStack(c, stackBefore)

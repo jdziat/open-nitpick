@@ -1,0 +1,83 @@
+// commit 1e9f80ec18c0 2026-08-24T15:38:47+02:00 packages/vitest/src/node/pools/rpc.ts
+import type { StaticMockCall } from '@vitest/mocker/node'
+        // pool (`cacheFs`) or by `fsModuleCache` — the worker can
+        const tmp = transformResult.__vitestTmp
+      function getStaticMocks(node: EnvironmentModuleNode): StaticMockCall[] | null | undefined {
+        return node.transformResult?.__vitestStaticMocks
+          ?? environment.pluginContainer.getModuleInfo(node.id!)?.meta?.vitestStaticMocks
+      }
+
+      // modules the root replaces with an inline factory are never requested
+      async function resolveMockedIds(root: EnvironmentModuleNode): Promise<Set<string>> {
+        const ids = new Set<string>()
+        const mocks = getStaticMocks(root)?.filter(
+          mock => mock.method === 'mock' && mock.hasFactory && !mock.factoryLoadsOriginal,
+        )
+        if (mocks?.length) {
+          await Promise.all(mocks.map(async (mock) => {
+            const resolved = await environment.pluginContainer.resolveId(mock.specifier, root.id ?? undefined).catch(() => null)
+            if (resolved) {
+              ids.add(resolved.id)
+            }
+          }))
+        }
+        return ids
+      }
+
+      // `import()` targets load on demand; a hoisted file's imports are all
+      // rewritten to `import()`, so none of them count
+      function getDynamicOnlyIds(node: EnvironmentModuleNode): Set<string> | undefined {
+        const result = node.transformResult
+        if (!result?.dynamicDeps?.length || getStaticMocks(node)) {
+          return undefined
+        }
+        const staticDeps = new Set(result.deps)
+        const dynamicOnly = new Set(result.dynamicDeps.filter(dep => !staticDeps.has(dep)))
+        if (!dynamicOnly.size) {
+          return undefined
+        }
+        const ids = new Set<string>()
+        for (const child of node.importedModules) {
+          if (child.id != null && dynamicOnly.has(child.url)) {
+            ids.add(child.id)
+          }
+        }
+        return ids
+      }
+
+      async function load(url: string, importer: string | undefined): Promise<EnvironmentModuleNode | undefined> {
+        try {
+          const fetchResult = await fetchModule(url, importer, environment, undefined, undefined, false)
+          if ('id' in fetchResult) {
+            return moduleGraph.getModuleById(fetchResult.id)
+          }
+        }
+        catch {
+          // the worker's own fetch will surface the error with the proper import context
+        }
+        return undefined
+      }
+
+      async function walkNode(node: EnvironmentModuleNode, skip: Set<string>): Promise<void> {
+        const dynamicOnly = getDynamicOnlyIds(node)
+          if (child.id == null || skip.has(child.id) || dynamicOnly?.has(child.id)) {
+          skip.add(child.id)
+            children.push(walkNode(child, skip))
+            children.push(
+              load(child.url, node.id ?? undefined)
+                .then(loaded => loaded && walkNode(loaded, skip)),
+            )
+      async function walkRoot(root: EnvironmentModuleNode): Promise<void> {
+        const skip = await resolveMockedIds(root)
+        skip.add(root.id!)
+        await walkNode(root, skip)
+      }
+
+      async function loadRoot(url: string): Promise<void> {
+        const root = await load(url, undefined)
+        if (root) {
+          await walkRoot(root)
+        if (nodes?.size) {
+          await Promise.all(Array.from(nodes, node =>
+            node.transformResult ? walkRoot(node) : loadRoot(node.url)))
+          await loadRoot(file)

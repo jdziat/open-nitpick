@@ -1,0 +1,90 @@
+// commit f929c58c6b97 2026-05-21T16:50:55+02:00 pkg/inventory/filters.go
+// featureFlagAllowed reports whether an item with the given enable/disable
+// flag pair is permitted under the supplied checker. The checker must be
+// non-nil — callers that don't want feature filtering should not call this at
+// all (this is also the contract for createFeatureFlagFilter, which is only
+// installed when WithFeatureChecker received a non-nil checker).
+//
+//   - If FeatureFlagEnable is set, the item is only allowed if the flag is enabled.
+//   - If FeatureFlagDisable is set, the item is excluded if the flag is enabled.
+func featureFlagAllowed(ctx context.Context, checker FeatureFlagChecker, enableFlag, disableFlag string) bool {
+	// Error semantics match the previous checkFeatureFlag helper: a checker
+	// error is logged and treated as "flag not enabled". So an enable-flag
+	// check on error excludes the tool, but a disable-flag check on error
+	// keeps it (the disable condition wasn't met).
+	check := func(flag string) bool {
+		enabled, err := checker(ctx, flag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Feature flag check error for %q: %v\n", flag, err)
+			return false
+		}
+		return enabled
+	}
+	if enableFlag != "" && !check(enableFlag) {
+	if disableFlag != "" && check(disableFlag) {
+// createFeatureFlagFilter returns a ToolFilter that gates tools on their
+// FeatureFlagEnable / FeatureFlagDisable annotations using the given checker.
+// Builder.Build() installs this filter exactly once when WithFeatureChecker
+// has been called with a non-nil checker, so "no feature filtering" is
+// expressed structurally — by the absence of the filter — rather than by a
+// runtime nil check inside the filter itself.
+func createFeatureFlagFilter(checker FeatureFlagChecker) ToolFilter {
+	return func(ctx context.Context, tool *ServerTool) (bool, error) {
+		return featureFlagAllowed(ctx, checker, tool.FeatureFlagEnable, tool.FeatureFlagDisable), nil
+	}
+}
+
+//  2. Read-only filter
+//  3. Builder filters (via WithFilter; the feature-flag filter, when
+//     installed via WithFeatureChecker, runs as part of this step)
+//  4. Toolset/additional tools
+	// 2. Check read-only filter (applies to all tools)
+	// 3. Apply builder filters (includes the feature-flag filter when set)
+	// 4. Check if tool is in additionalTools (bypasses toolset filter)
+	// 4. Check toolset filter
+// sortByToolsetThenName sorts items deterministically by their toolset ID,
+// breaking ties by name. The two extractor closures keep this generic helper
+// independent of the concrete inventory item shape (tools, resource templates,
+// prompts).
+func sortByToolsetThenName[T any](items []T, toolsetID func(T) ToolsetID, name func(T) string) {
+	sort.Slice(items, func(i, j int) bool {
+		idI, idJ := toolsetID(items[i]), toolsetID(items[j])
+		if idI != idJ {
+			return idI < idJ
+		}
+		return name(items[i]) < name(items[j])
+	})
+}
+
+func sortTools(tools []ServerTool) {
+	sortByToolsetThenName(tools,
+		func(t ServerTool) ToolsetID { return t.Toolset.ID },
+		func(t ServerTool) string { return t.Tool.Name },
+	)
+}
+
+	sortTools(result)
+func sortResourceTemplates(resourceTemplates []ServerResourceTemplate) {
+	sortByToolsetThenName(resourceTemplates,
+		func(r ServerResourceTemplate) ToolsetID { return r.Toolset.ID },
+		func(r ServerResourceTemplate) string { return r.Template.Name },
+	)
+}
+
+		// Resources have no filter pipeline, so feature gating runs inline.
+		// The featureChecker != nil guard mirrors the structural "no checker
+		// = no filtering" contract used for tools (where the absence of a
+		// pipeline step expresses the same thing).
+		if r.featureChecker != nil && !featureFlagAllowed(ctx, r.featureChecker, res.FeatureFlagEnable, res.FeatureFlagDisable) {
+	sortResourceTemplates(result)
+func sortPrompts(prompts []ServerPrompt) {
+	sortByToolsetThenName(prompts,
+		func(p ServerPrompt) ToolsetID { return p.Toolset.ID },
+		func(p ServerPrompt) string { return p.Prompt.Name },
+	)
+}
+
+		// Prompts have no filter pipeline; see AvailableResourceTemplates for
+		// the rationale behind the explicit nil guard.
+		if r.featureChecker != nil && !featureFlagAllowed(ctx, r.featureChecker, prompt.FeatureFlagEnable, prompt.FeatureFlagDisable) {
+	sortPrompts(result)

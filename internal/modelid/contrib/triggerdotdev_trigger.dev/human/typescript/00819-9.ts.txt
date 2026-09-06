@@ -1,0 +1,39 @@
+// commit 5f359be28613 2026-03-05T11:05:45+00:00 internal-packages/clickhouse/src/client/queryBuilder.ts
+  private havingClauses: string[] = [];
+  having(clause: string, params?: QueryParams): this {
+    this.havingClauses.push(clause);
+    if (params) {
+      Object.assign(this.params, params);
+    }
+    return this;
+  }
+
+  havingIf(condition: any, clause: string, params?: QueryParams): this {
+    if (condition) {
+      this.having(clause, params);
+    }
+    return this;
+  }
+
+    if (this.havingClauses.length > 0) {
+      query += " HAVING " + this.havingClauses.join(" AND ");
+    }
+  private havingClauses: string[] = [];
+  having(clause: string, params?: QueryParams): this {
+    this.havingClauses.push(clause);
+    if (params) {
+      Object.assign(this.params, params);
+    }
+    return this;
+  }
+
+  havingIf(condition: any, clause: string, params?: QueryParams): this {
+    if (condition) {
+      this.having(clause, params);
+    }
+    return this;
+  }
+
+    if (this.havingClauses.length > 0) {
+      query += " HAVING " + this.havingClauses.join(" AND ");
+    }

@@ -1,0 +1,89 @@
+// commit ee34a4b13710 2026-09-02T17:42:04+00:00 internal-packages/observability-map/src/integration.test.ts
+const CHONK_WORKFLOWS = resolve(__dirname, "../../../../.github/workflows");
+const MONO_WORKFLOWS = resolve(__dirname, "../../../.github/workflows");
+const USE_CHONK = existsSync(resolve(CHONK_WORKFLOWS, "pr_checks.yml"));
+const WORKFLOWS = USE_CHONK ? CHONK_WORKFLOWS : MONO_WORKFLOWS;
+const PATH_PREFIX = USE_CHONK ? "trigger.dev/" : "";
+const REPORT_PRESENT = existsSync(REPORT);
+describe.skipIf(!REPORT_PRESENT)("the report workflow's one source of the comment id", () => {
+describe.skipIf(!REPORT_PRESENT)(
+  "the report workflow reconciles a comment the paths no longer reach",
+  () => {
+    it("runs on every pull request rather than only on the paths it watches", () => {
+      const trigger = withoutComments(
+        read(REPORT).split("\non:\n")[1]!.split("\nconcurrency:")[0]!
+      );
+      expect(trigger).toContain("pull_request:");
+      expect(trigger).not.toContain("paths:");
+    });
+
+    it("starts the report job when the paths moved or when a comment already exists", () => {
+      expect(gate("report")).toContain("needs.changes.outputs.report == 'true'");
+      expect(gate("report")).toContain("needs.changes.outputs.comment != ''");
+    });
+
+    it("scans nothing on the run that only has a comment to reconcile", () => {
+      const scans = steps(job("report")).filter((step) => step.startsWith("🔎 Scan"));
+      expect(scans).toHaveLength(2);
+      for (const scan of scans) {
+        expect(scan.split("run:")[0]).toContain("if: needs.changes.outputs.report == 'true'");
+      }
+    });
+
+    it("renders the resolved state on that run instead of a report it did not produce", () => {
+      const render = steps(job("report")).find((step) => step.startsWith("📝 Render comment"))!;
+      expect(render).toContain("SCANNED: ${{ needs.changes.outputs.report }}");
+      expect(render).toMatch(/SCANNED" != "true" \]; then\s+emit --resolved/);
+    });
+
+    // The renderer takes the sha and the URL as data; building the URL is the workflow's job, because
+    // the workflow is what has the two shas.
+    it("forwards the head sha and a compare URL for the pull request's range", () => {
+      const render = steps(job("report")).find((step) => step.startsWith("📝 Render comment"))!;
+      expect(render).toContain("HEAD_SHA: ${{ github.event.pull_request.head.sha }}");
+      expect(render).toContain(
+        "/compare/${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+      );
+      expect(render).toContain('--commit-sha="$HEAD_SHA"');
+      expect(render).toContain('--commit-url="$COMPARE_URL"');
+    });
+  }
+);
+describe.skipIf(!REPORT_PRESENT)("the report workflow's scan and render steps", () => {
+    expect(filter).toContain(`'${PATH_PREFIX}apps/webapp/app/**'`);
+    const internal = text.split("            internal:")[1]!.split("            obsmap:")[0]!;
+    expect(internal).toContain(`'${PATH_PREFIX}packages/**'`);
+    expect(internal).toContain(`'${PATH_PREFIX}internal-packages/**'`);
+    expect(obsmap).not.toContain(`'${PATH_PREFIX}internal-packages/observability-map/**'`);
+    const internal = text.split("            internal:")[1]!.split("            obsmap:")[0]!;
+    expect(internal).toContain(`'${PATH_PREFIX}internal-packages/**'`);
+    expect(internal).not.toContain(`!${PATH_PREFIX}internal-packages/observability-map`);
+    expect(read(resolve(WORKFLOWS, "unit-tests-internal.yml"))).toContain('--filter "@internal/*"');
+  it.skipIf(!REPORT_PRESENT)("does not also run the same suite in the report workflow", () => {
+  it.skipIf(!REPORT_PRESENT)(
+    "runs the corpus on the package's own paths and on a schedule, not on every route PR",
+    () => {
+      const text = read(REPORT);
+      const corpus = text.split("  mutation-corpus:")[1]!.split("    steps:")[0]!;
+      expect(corpus).toContain("needs.changes.outputs.package == 'true'");
+
+      // The corpus filter alone, a separate entry from the report's own gate beside it, and this one
+      // has to stay off the route tree.
+      const filter = text.split("            package:")[1]!.split("            routes:")[0]!;
+      expect(filter).toContain(`'${PATH_PREFIX}internal-packages/observability-map/**'`);
+      expect(filter).not.toContain("apps/webapp/app/routes");
+
+      expect(text).toContain("schedule:");
+      expect(text).toContain("cron:");
+    }
+  );
+  it.skipIf(!REPORT_PRESENT)(
+    "describes the base the report workflow actually scans against",
+    () => {
+      expect(read(REPORT)).toContain("github.event.pull_request.base.sha");
+      const readme = readFileSync(resolve(__dirname, "../README.md"), "utf8");
+      const ci = readme.split("## CI")[1]!.split("\n## ")[0]!;
+      expect(ci).toContain("against the tip of the base branch");
+      expect(ci).not.toMatch(/scanning head\s+against the PR's merge base/);
+    }
+  );

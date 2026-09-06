@@ -1,0 +1,88 @@
+// commit c83395f2c9ec 2026-02-03T13:55:57+01:00 packages/runner/src/fixture.ts
+export interface WithFixturesOptions {
+  /**
+   * Whether this is a suite-level hook (beforeAll/afterAll/aroundAll).
+   * Suite hooks can only access file/worker scoped fixtures and static values.
+   */
+  suiteHook?: 'beforeAll' | 'afterAll' | 'aroundAll'
+  /**
+   * The test context to use. If not provided, the hookContext passed to the
+   * returned function will be used.
+   */
+  context?: Record<string, any>
+  /**
+   * Error with stack trace captured at hook registration time.
+   * Used to provide better error messages with proper stack traces.
+   */
+  stackTraceError?: Error
+  /**
+   * Current fixtures from the context.
+   */
+  fixtures?: TestFixtures
+}
+
+export function withFixtures(fn: Function, options?: WithFixturesOptions) {
+    const context: (TestContext & { [key: string]: any }) | undefined = hookContext || options?.context as TestContext
+      if (options?.suiteHook) {
+        validateSuiteHook(fn, options.suiteHook, options.stackTraceError)
+      }
+
+    const fixtures = options?.fixtures || getTestFixtures(context)
+    // Check if suite-level hook is trying to access test-scoped fixtures
+    // Suite hooks (beforeAll/afterAll/aroundAll) can only access file/worker scoped fixtures
+    if (options?.suiteHook) {
+      const testScopedFixtures = pendingFixtures.filter(f => f.scope === 'test')
+      if (testScopedFixtures.length > 0) {
+        const fixtureNames = testScopedFixtures.map(f => `"${f.name}"`).join(', ')
+        const alternativeHook = {
+          aroundAll: 'aroundEach',
+          beforeAll: 'beforeEach',
+          afterAll: 'afterEach',
+        }
+        const error = new FixtureDependencyError(
+          `Test-scoped fixtures cannot be used inside ${options.suiteHook} hook. `
+          + `The following fixtures are test-scoped: ${fixtureNames}. `
+          + `Use { scope: 'file' } or { scope: 'worker' } fixtures instead, or move the logic to ${alternativeHook[options.suiteHook]} hook.`,
+        )
+        // Use stack trace from hook registration for better error location
+        if (options.stackTraceError?.stack) {
+          error.stack = error.message + options.stackTraceError.stack.replace(options.stackTraceError.message, '')
+        }
+        throw error
+      }
+    }
+
+function validateSuiteHook(fn: Function, hook: string, error: Error | undefined) {
+  const usedProps = getUsedProps(fn)
+  if (usedProps.size) {
+    console.warn(`The ${hook} hook uses fixtures "${[...usedProps].join('", "')}", but has no access to context. Did you forget to call it as "test.${hook}()" instead of "${hook}()"? This will throw an error in a future major. See https://vitest.dev/guide/test-context#suite-level-hooks`)
+    if (error) {
+      const processor = (globalThis as any).__vitest_worker__?.onFilterStackTrace || ((s: string) => s || '')
+      const stack = processor(error.stack || '')
+      console.warn(stack)
+    }
+  }
+}
+
+const kPropsSymbol = Symbol('$vitest:fixture-props')
+
+interface FixturePropsOptions {
+  index?: number
+  original?: Function
+}
+export function configureProps(fn: Function, options: FixturePropsOptions): void {
+  Object.defineProperty(fn, kPropsSymbol, {
+    value: options,
+  const {
+    index: fixturesIndex = 0,
+    original: implementation = fn,
+  } = kPropsSymbol in fn ? fn[kPropsSymbol] as FixturePropsOptions : {}
+  let fnString = filterOutComments(implementation.toString())
+
+  const fixturesArgument = args[fixturesIndex]
+
+  if (!fixturesArgument) {
+    return new Set()
+  if (!(fixturesArgument[0] === '{' && fixturesArgument.endsWith('}'))) {
+      `The first argument inside a fixture must use object destructuring pattern, e.g. ({ test } => {}). Instead, received "${fixturesArgument}".`,
+  const _first = fixturesArgument.slice(1, -1).replace(/\s/g, '')

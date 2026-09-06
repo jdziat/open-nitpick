@@ -1,0 +1,35 @@
+// commit 21c3e886b1a8 2026-03-02T12:51:21+01:00 bind.go
+// returnBindErr runs returnErr and, if the result is not a *Error, wraps it in *BindError.
+// Use for binding parse failures; use returnErr directly for Custom and validation errors.
+func (b *Bind) returnBindErr(err error, source string) error {
+	if retErr := b.returnErr(err); retErr != nil {
+		var fiberErr *Error
+		if errors.As(retErr, &fiberErr) {
+			return retErr
+		}
+		return newBindError(source, err)
+	}
+	return nil
+}
+
+	if err := b.returnBindErr(bind.Bind(b.ctx.Request(), out), BindSourceHeader); err != nil {
+		return err
+	if err := b.returnBindErr(bind.Bind(b.ctx.Response(), out), BindSourceRespHeader); err != nil {
+		return err
+	if err := b.returnBindErr(bind.Bind(&b.ctx.RequestCtx().Request, out), BindSourceCookie); err != nil {
+		return err
+	if err := b.returnBindErr(bind.Bind(&b.ctx.RequestCtx().Request, out), BindSourceQuery); err != nil {
+		return err
+	if err := b.returnBindErr(bind.Bind(b.ctx.Body(), out), BindSourceBody); err != nil {
+		return err
+	if err := b.returnBindErr(bind.Bind(b.ctx.Body(), out), BindSourceBody); err != nil {
+		return err
+	if err := b.returnBindErr(bind.Bind(b.ctx.Body(), out), BindSourceBody); err != nil {
+		return err
+	if err := b.returnBindErr(bind.Bind(&b.ctx.RequestCtx().Request, out), BindSourceBody); err != nil {
+		return err
+	if err := b.returnBindErr(bind.Bind(b.ctx.Route().Params, b.ctx.Params, out), BindSourceURI); err != nil {
+		return err
+	if err := b.returnBindErr(bind.Bind(b.ctx.Body(), out), BindSourceBody); err != nil {
+		return err
+			return b.returnBindErr(customBinder.Parse(b.ctx, out), BindSourceBody)

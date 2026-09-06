@@ -1,0 +1,44 @@
+// commit e17bab79467a 2025-07-19T20:11:33+02:00 middleware/csrf/config.go
+// Config defines the config for CSRF middleware.
+	// Storage is used to store the state of the middleware.
+	// Session is used to store the state of the middleware.
+	// If set, the middleware will use the session store instead of the storage.
+	// KeyGenerator creates a new CSRF token.
+	// Optional. Default: utils.UUIDv4
+	// Optional. Default: defaultErrorHandler
+	// Extractor returns the CSRF token from the request.
+	// Optional. Default: FromHeader("X-Csrf-Token")
+	// Available extractors: FromHeader, FromQuery, FromParam, FromForm
+	//
+	// WARNING: Never create custom extractors that read from cookies with the same
+	// CookieName as this defeats CSRF protection entirely.
+	// CookieName is the name of the CSRF cookie.
+	// Optional. Default: "csrf_"
+	// CookieDomain is the domain of the CSRF cookie.
+	//
+	// Optional. Default: ""
+	// CookiePath is the path of the CSRF cookie.
+	//
+	// Optional. Default: ""
+	// CookieSameSite is the SameSite attribute of the CSRF cookie.
+	//
+	// Optional. Default: "Lax"
+	// For secure requests that do not include the Origin header, the Referer
+	// "https://*.example.com" to allow any subdomain of example.com to submit requests,
+	// including multiple subdomain levels such as "https://sub.sub.example.com".
+	// CookieSecure indicates if CSRF cookie is secure.
+	//
+	// Optional. Default: false
+	// CookieHTTPOnly indicates if CSRF cookie is HTTP only.
+	//
+	// Optional. Default: false
+	// CookieSessionOnly decides whether cookie should last for only the browser session.
+	// Ignores Expiration if set to true.
+	//
+	// Optional. Default: false
+	// SingleUseToken indicates if the CSRF token should be destroyed
+// HeaderName is the default header name for CSRF tokens.
+// ConfigDefault is the default config for CSRF middleware.
+// defaultErrorHandler is the default error handler that processes errors from fiber.Handler.
+// configDefault is a helper function to set default values.
+		cfg.Extractor = ConfigDefault.Extractor

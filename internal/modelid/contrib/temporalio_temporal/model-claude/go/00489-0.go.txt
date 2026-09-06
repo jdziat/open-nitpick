@@ -1,0 +1,32 @@
+// commit 604bb112591c 2026-02-04T23:42:42+00:00 service/frontend/configs/quotas.go
+	"go.temporal.io/server/common/log"
+	"go.temporal.io/server/common/quotas/calculator"
+		"/temporal.api.workflowservice.v1.WorkflowService/ListWorkerDeployments":             1,
+// NewGlobalNamespaceRateLimiter creates a namespace-aware rate limiter that uses
+// only a global quota with no per-instance fallback.
+func NewGlobalNamespaceRateLimiter(
+	memberCounter calculator.MemberCounter,
+	globalQuota dynamicconfig.IntPropertyFnWithNamespaceFilter,
+	logger log.Logger,
+) quotas.RequestRateLimiter {
+	rateFn := calculator.NewLoggedNamespaceCalculator(
+		calculator.ClusterAwareNamespaceQuotaCalculator{
+			MemberCounter:    memberCounter,
+			PerInstanceQuota: func(ns string) int { return 0 },
+			GlobalQuota:      globalQuota,
+		},
+		logger,
+	).GetQuota
+
+	return quotas.NewNamespaceRequestRateLimiter(
+		func(req quotas.Request) quotas.RequestRateLimiter {
+			return quotas.NewRequestRateLimiterAdapter(
+				quotas.NewDynamicRateLimiter(
+					quotas.NewDefaultIncomingRateBurst(func() float64 { return rateFn(req.Caller) }),
+					time.Minute,
+				),
+			)
+		},
+	)
+}
+

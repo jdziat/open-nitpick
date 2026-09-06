@@ -1,0 +1,53 @@
+// commit 122ff321cc98 2025-12-02T16:48:29+01:00 packages/vitest/src/api/setup.ts
+  ExternalResult,
+import { isFileServingAllowed } from 'vite'
+import { getTestFileEnvironment } from '../utils/environments'
+        async getExternalResult(moduleId: string, testFileTaskId: string) {
+          const testModule = ctx.state.getReportedEntityById(testFileTaskId) as TestModule | undefined
+          if (!testModule) {
+            return undefined
+          }
+
+          if (!isFileServingAllowed(testModule.project.vite.config, moduleId)) {
+            return undefined
+          }
+
+          const result: ExternalResult = {}
+
+          try {
+            result.source = await fs.readFile(moduleId, 'utf-8')
+          }
+          catch {}
+
+          return result
+        },
+        async getTransformResult(projectName: string, moduleId, testFileTaskId, browser = false) {
+          const testModule = ctx.state.getReportedEntityById(testFileTaskId) as TestModule | undefined
+          if (!testModule || !isFileServingAllowed(project.vite.config, moduleId)) {
+            return
+          }
+
+          const environment = getTestFileEnvironment(project, testModule.moduleId, browser)
+
+          const moduleNode = environment?.moduleGraph.getModuleById(moduleId)
+          if (!environment || !moduleNode?.transformResult) {
+            return
+          }
+
+          const result: TransformResultWithSource = moduleNode.transformResult
+          try {
+            result.source = result.source || (moduleNode.file ? await fs.readFile(moduleNode.file, 'utf-8') : undefined)
+          }
+          catch {}
+
+          // TODO: store this in HTML reporter separetly
+          const transformDuration = ctx.state.metadata[projectName]?.duration[moduleNode.url]?.[0]
+          if (transformDuration != null) {
+            result.transformTime = transformDuration
+          }
+          try {
+            const diagnostic = await ctx.experimental_getSourceModuleDiagnostic(moduleId, testModule)
+            result.modules = diagnostic.modules
+            result.untrackedModules = diagnostic.untrackedModules
+          catch {}
+          return result

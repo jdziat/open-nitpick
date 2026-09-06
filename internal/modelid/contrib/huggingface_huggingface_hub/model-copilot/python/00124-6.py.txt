@@ -1,0 +1,121 @@
+# commit 52c718a54382 2025-10-23T14:48:03+02:00 src/huggingface_hub/cli/download.py
+from typing import Annotated, Optional, Union
+
+import typer
+from huggingface_hub.file_download import DryRunFileInfo, hf_hub_download
+from huggingface_hub.utils import _format_size, disable_progress_bars, enable_progress_bars, tabulate
+
+from ._cli_utils import RepoIdArg, RepoTypeOpt, RevisionOpt, TokenOpt
+def download(
+    repo_id: RepoIdArg,
+    filenames: Annotated[
+        Optional[list[str]],
+        typer.Argument(
+            help="Files to download (e.g. `config.json`, `data/metadata.jsonl`).",
+        ),
+    ] = None,
+    repo_type: RepoTypeOpt = RepoTypeOpt.model,
+    revision: RevisionOpt = None,
+    include: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            help="Glob patterns to include from files to download. eg: *.json",
+        ),
+    ] = None,
+    exclude: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            help="Glob patterns to exclude from files to download.",
+        ),
+    ] = None,
+    cache_dir: Annotated[
+        Optional[str],
+        typer.Option(
+            help="Directory where to save files.",
+        ),
+    ] = None,
+    local_dir: Annotated[
+        Optional[str],
+        typer.Option(
+            help="If set, the downloaded file will be placed under this directory. Check out https://huggingface.co/docs/huggingface_hub/guides/download#download-files-to-local-folder for more details.",
+        ),
+    ] = None,
+    force_download: Annotated[
+        bool,
+        typer.Option(
+        ),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            help="If True, perform a dry run without actually downloading the file.",
+        ),
+    ] = False,
+    token: TokenOpt = None,
+    quiet: Annotated[
+        bool,
+        typer.Option(
+        ),
+    ] = False,
+    max_workers: Annotated[
+        int,
+        typer.Option(
+        ),
+    ] = 8,
+) -> None:
+    """Download files from the Hub."""
+    def run_download() -> Union[str, DryRunFileInfo, list[DryRunFileInfo]]:
+        filenames_list = filenames if filenames is not None else []
+        if len(filenames_list) > 0:
+            if include is not None and len(include) > 0:
+            if exclude is not None and len(exclude) > 0:
+        if len(filenames_list) == 1:
+                repo_id=repo_id,
+                repo_type=repo_type.value,
+                revision=revision,
+                filename=filenames_list[0],
+                cache_dir=cache_dir,
+                force_download=force_download,
+                token=token,
+                local_dir=local_dir,
+                dry_run=dry_run,
+        if len(filenames_list) == 0:
+            allow_patterns = include
+            ignore_patterns = exclude
+            allow_patterns = filenames_list
+            repo_id=repo_id,
+            repo_type=repo_type.value,
+            revision=revision,
+            force_download=force_download,
+            cache_dir=cache_dir,
+            token=token,
+            local_dir=local_dir,
+            max_workers=max_workers,
+            dry_run=dry_run,
+        )
+
+    def _print_result(result: Union[str, DryRunFileInfo, list[DryRunFileInfo]]) -> None:
+        if isinstance(result, str):
+            print(result)
+            return
+
+        # Print dry run info
+        if isinstance(result, DryRunFileInfo):
+            result = [result]
+        print(
+            f"[dry-run] Will download {len([r for r in result if r.will_download])} files (out of {len(result)}) totalling {_format_size(sum(r.file_size for r in result if r.will_download))}."
+        columns = ["File", "Bytes to download"]
+        items: list[list[Union[str, int]]] = []
+        for info in sorted(result, key=lambda x: x.filename):
+            items.append([info.filename, _format_size(info.file_size) if info.will_download else "-"])
+        print(tabulate(items, headers=columns))
+
+    if quiet:
+        disable_progress_bars()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            _print_result(run_download())
+        enable_progress_bars()
+    else:
+        _print_result(run_download())
+        logging.set_verbosity_warning()

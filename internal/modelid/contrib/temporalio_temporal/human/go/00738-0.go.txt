@@ -1,0 +1,46 @@
+// commit 24cea9d4f38b 2026-03-25T14:52:52-07:00 service/matching/user_data_manager.go
+// noEphemeralDataVersion as a value for LastKnownEphemeralDataVersion means
+// the caller does not want to receive ephemeral data.
+const noEphemeralDataVersion = -1
+
+		// noEphemeralDataVersion means the caller does not want ephemeral data
+		newEphData := lastEphVersion != noEphemeralDataVersion && ephData.GetVersion() > lastEphVersion
+			m.logger.Debug("returning user data",
+// LocalBacklogPriorityChanged can be called on any normal partition.
+	newPartition := []*taskqueuespb.EphemeralData_ByPartition{
+		&taskqueuespb.EphemeralData_ByPartition{
+			Partition: int32(normal.PartitionId()),
+			Version:   byVersion,
+	}
+
+	m.updateEphemeralData(func(newData *taskqueuespb.EphemeralData) {
+		newData.Partition = newPartition
+	})
+}
+
+func (m *userDataManagerImpl) gotIncomingEphemeralData(eph *taskqueuespb.VersionedEphemeralData) {
+	if m.partition.IsRoot() {
+		// Root activity/nexus partition should not get ephemeral data from its fetch source
+		// (root workflow partition). This is done by setting LastKnownEphemeralDataVersion to
+		// -1 on root non-wf partitions and having HandleGetUserDataRequest not send ephemeral
+		// data in that case. But if we do get it (e.g. during deployment), ignore it.
+		return
+	m.incomingEphemeralData = eph
+// updateEphemeralData updates the ephemeral data owned by this partition. The update function
+// will be given a non-nil clone of the current data, which it should mutate.
+func (m *userDataManagerImpl) updateEphemeralData(update func(*taskqueuespb.EphemeralData)) {
+	newData := common.CloneProto(m.myEphemeralData.GetData())
+	if newData == nil {
+		newData = &taskqueuespb.EphemeralData{}
+	}
+	update(newData)
+	m.myEphemeralData = &taskqueuespb.VersionedEphemeralData{
+		Data:    newData,
+		Version: time.Now().UnixNano(),
+	}
+	if m.partition.IsRoot() {
+		// The root activity/nexus partition should not fetch ephemeral data from the root
+		// workflow partition.
+		return noEphemeralDataVersion
+	}
+

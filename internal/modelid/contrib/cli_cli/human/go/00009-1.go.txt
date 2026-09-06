@@ -1,0 +1,66 @@
+// commit 3e5456827c0f 2025-05-20T18:02:13-04:00 pkg/cmd/release/verify/verify.go
+func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) error) *cobra.Command {
+	opts := &attestation.AttestOptions{}
+		Short: "Verify the attestation for a GitHub Release.",
+		Args:  cobra.ExactArgs(1),
+			httpClient, err := f.HttpClient()
+			baseRepo, err := f.BaseRepo()
+			logger := att_io.NewHandler(f.IOStreams)
+			opts.Repo = baseRepo.RepoOwner() + "/" + baseRepo.RepoName()
+			opts.APIClient = api.NewLiveClient(httpClient, hostname, logger)
+			opts.Limit = 10
+			opts.Owner = baseRepo.RepoOwner()
+			opts.PredicateType = "https://in-toto.io/attestation/release/v0.1"
+			opts.Logger = logger
+
+			opts.HttpClient = httpClient
+			opts.BaseRepo = baseRepo
+			opts.HttpClient = httpClient
+
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if runF != nil {
+				return runF(opts)
+			}
+			//
+
+			td, err := opts.APIClient.GetTrustDomain()
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to get trust domain"))
+			ec, err := attestation.NewEnforcementCriteria(opts, opts.Logger)
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build policy information"))
+				Logger:       opts.Logger,
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
+			opts.SigstoreVerifier = sigstoreVerifier
+			opts.EC = ec
+			return verifyRun(opts)
+	opts.Logger.Printf("Resolved %s to %s\n", opts.TagName, artifact.DigestWithAlg())
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), artifact.DigestWithAlg())
+		opts.Logger.Println(opts.Logger.ColorScheme.Red(logMsg))
+	filteredAttestations := attestation.FilterAttestationsByPURL(attestations, opts.Repo, opts.TagName, opts.Logger)
+
+	opts.Logger.Printf("Loaded %s from GitHub API\n", text.Pluralize(len(filteredAttestations), "attestation"))
+		opts.Logger.Println(opts.Logger.ColorScheme.Red(errMsg))
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Verification failed"))
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Failed to find an attestation for release %s in %s\n"), opts.TagName, opts.Repo)
+		return err
+	opts.Logger.Printf("The following %s matched the policy criteria\n\n", text.Pluralize(len(verified), "attestation"))
+	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!\n"))
+	opts.Logger.Printf("Attestation found matching release %s (%s)\n", opts.TagName, artifact.Digest())
+	printVerifiedSubjects(verified, opts.Logger)
+
+	return nil
+			name := s.Name
+			digest := s.Digest
+
+			if name != "" {
+				// digest is map[string]string and i want to be key:value
+				// so i need to iterate over the map and print key:value
+				digestStr := ""
+				for key, value := range digest {
+					digestStr += key + ":" + value
+				}
+				// output should like this
+				//   bin-linux.tgz          sha256:0c2524c2b002fda89f8b766c7d3dd8e6ac1de183556728a83182c6137f19643d
+				logger.Println("  " + name + "          " + digestStr)
+			}

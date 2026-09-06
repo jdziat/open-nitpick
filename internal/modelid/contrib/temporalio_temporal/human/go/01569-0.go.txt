@@ -1,0 +1,130 @@
+// commit e12825e1286f 2026-07-24T12:06:35-07:00 common/testing/mocksdk/client_mock.go
+// CompleteActivityByActivityIDWithOptions mocks base method.
+func (m *MockClient) CompleteActivityByActivityIDWithOptions(ctx context.Context, opts client.CompleteActivityByActivityIDOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CompleteActivityByActivityIDWithOptions", ctx, opts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CompleteActivityByActivityIDWithOptions indicates an expected call of CompleteActivityByActivityIDWithOptions.
+func (mr *MockClientMockRecorder) CompleteActivityByActivityIDWithOptions(ctx, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteActivityByActivityIDWithOptions", reflect.TypeOf((*MockClient)(nil).CompleteActivityByActivityIDWithOptions), ctx, opts)
+}
+
+// CompleteActivityByIDWithOptions mocks base method.
+func (m *MockClient) CompleteActivityByIDWithOptions(ctx context.Context, opts client.CompleteActivityByIDOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CompleteActivityByIDWithOptions", ctx, opts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CompleteActivityByIDWithOptions indicates an expected call of CompleteActivityByIDWithOptions.
+func (mr *MockClientMockRecorder) CompleteActivityByIDWithOptions(ctx, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteActivityByIDWithOptions", reflect.TypeOf((*MockClient)(nil).CompleteActivityByIDWithOptions), ctx, opts)
+}
+
+// CompleteActivityWithOptions mocks base method.
+func (m *MockClient) CompleteActivityWithOptions(ctx context.Context, opts client.CompleteActivityOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CompleteActivityWithOptions", ctx, opts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CompleteActivityWithOptions indicates an expected call of CompleteActivityWithOptions.
+func (mr *MockClientMockRecorder) CompleteActivityWithOptions(ctx, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteActivityWithOptions", reflect.TypeOf((*MockClient)(nil).CompleteActivityWithOptions), ctx, opts)
+}
+
+// CountNexusOperations mocks base method.
+func (m *MockClient) CountNexusOperations(ctx context.Context, options client.CountNexusOperationsOptions) (*client.CountNexusOperationsResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountNexusOperations", ctx, options)
+	ret0, _ := ret[0].(*client.CountNexusOperationsResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountNexusOperations indicates an expected call of CountNexusOperations.
+func (mr *MockClientMockRecorder) CountNexusOperations(ctx, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountNexusOperations", reflect.TypeOf((*MockClient)(nil).CountNexusOperations), ctx, options)
+}
+
+// GetNexusOperationHandle mocks base method.
+func (m *MockClient) GetNexusOperationHandle(options client.GetNexusOperationHandleOptions) client.NexusOperationHandle {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNexusOperationHandle", options)
+	ret0, _ := ret[0].(client.NexusOperationHandle)
+	return ret0
+}
+
+// GetNexusOperationHandle indicates an expected call of GetNexusOperationHandle.
+func (mr *MockClientMockRecorder) GetNexusOperationHandle(options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNexusOperationHandle", reflect.TypeOf((*MockClient)(nil).GetNexusOperationHandle), options)
+}
+
+// ListNexusOperations mocks base method.
+func (m *MockClient) ListNexusOperations(ctx context.Context, options client.ListNexusOperationsOptions) (client.ListNexusOperationsResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListNexusOperations", ctx, options)
+	ret0, _ := ret[0].(client.ListNexusOperationsResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListNexusOperations indicates an expected call of ListNexusOperations.
+func (mr *MockClientMockRecorder) ListNexusOperations(ctx, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNexusOperations", reflect.TypeOf((*MockClient)(nil).ListNexusOperations), ctx, options)
+}
+
+// NewNexusClient mocks base method.
+func (m *MockClient) NewNexusClient(options client.NexusClientOptions) (client.NexusClient, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewNexusClient", options)
+	ret0, _ := ret[0].(client.NexusClient)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewNexusClient indicates an expected call of NewNexusClient.
+func (mr *MockClientMockRecorder) NewNexusClient(options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewNexusClient", reflect.TypeOf((*MockClient)(nil).NewNexusClient), options)
+}
+
+// RecordActivityHeartbeatByIDWithOptions mocks base method.
+func (m *MockClient) RecordActivityHeartbeatByIDWithOptions(ctx context.Context, opts client.RecordActivityHeartbeatByIDOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordActivityHeartbeatByIDWithOptions", ctx, opts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecordActivityHeartbeatByIDWithOptions indicates an expected call of RecordActivityHeartbeatByIDWithOptions.
+func (mr *MockClientMockRecorder) RecordActivityHeartbeatByIDWithOptions(ctx, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordActivityHeartbeatByIDWithOptions", reflect.TypeOf((*MockClient)(nil).RecordActivityHeartbeatByIDWithOptions), ctx, opts)
+}
+
+// RecordActivityHeartbeatWithOptions mocks base method.
+func (m *MockClient) RecordActivityHeartbeatWithOptions(ctx context.Context, opts client.RecordActivityHeartbeatOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordActivityHeartbeatWithOptions", ctx, opts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecordActivityHeartbeatWithOptions indicates an expected call of RecordActivityHeartbeatWithOptions.
+func (mr *MockClientMockRecorder) RecordActivityHeartbeatWithOptions(ctx, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordActivityHeartbeatWithOptions", reflect.TypeOf((*MockClient)(nil).RecordActivityHeartbeatWithOptions), ctx, opts)
+}
+

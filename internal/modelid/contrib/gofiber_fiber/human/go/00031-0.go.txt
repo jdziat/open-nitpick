@@ -1,0 +1,47 @@
+// commit 9bd7a1c50df4 2025-05-26T08:53:18+02:00 ctx.go
+var (
+	_ io.Writer       = (*DefaultCtx)(nil) // Compile-time check
+	_ context.Context = (*DefaultCtx)(nil) // Compile-time check
+)
+
+type contextKey int //nolint:unused // need for future (nolintlint)
+// Deadline returns the time when work done on behalf of this context
+// should be canceled. Deadline returns ok==false when no deadline is
+// set. Successive calls to Deadline return the same results.
+//
+// Due to current limitations in how fasthttp works, Deadline operates as a nop.
+// See: https://github.com/valyala/fasthttp/issues/965#issuecomment-777268945
+func (*DefaultCtx) Deadline() (time.Time, bool) {
+	return time.Time{}, false
+}
+
+// Done returns a channel that's closed when work done on behalf of this
+// context should be canceled. Done may return nil if this context can
+// never be canceled. Successive calls to Done return the same value.
+// The close of the Done channel may happen asynchronously,
+// after the cancel function returns.
+//
+// Due to current limitations in how fasthttp works, Done operates as a nop.
+// See: https://github.com/valyala/fasthttp/issues/965#issuecomment-777268945
+func (*DefaultCtx) Done() <-chan struct{} {
+	return nil
+}
+
+// If Done is not yet closed, Err returns nil.
+// If Done is closed, Err returns a non-nil error explaining why:
+// context.DeadlineExceeded if the context's deadline passed,
+// or context.Canceled if the context was canceled for some other reason.
+// After Err returns a non-nil error, successive calls to Err return the same error.
+//
+// Due to current limitations in how fasthttp works, Err operates as a nop.
+// See: https://github.com/valyala/fasthttp/issues/965#issuecomment-777268945
+func (*DefaultCtx) Err() error {
+	return nil
+}
+
+// Value makes it possible to retrieve values (Locals) under keys scoped to the request
+// and therefore available to all following routes that match the request.
+func (c *DefaultCtx) Value(key any) any {
+	return c.fasthttp.UserValue(key)
+}
+

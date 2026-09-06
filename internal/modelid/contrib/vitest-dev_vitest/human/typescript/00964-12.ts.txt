@@ -1,0 +1,31 @@
+// commit 19f6e8947072 2026-05-29T13:05:07+02:00 packages/vitest/src/runtime/runners/test.ts
+  TestTryOptions,
+import type { Bench as Tinybench, Task as TinybenchTask } from 'tinybench'
+import type { Bench } from '../benchmark'
+import { createBench, kFinalize } from '../benchmark'
+  private benchInstances = new WeakMap<Readonly<Task>, Bench>()
+  /**
+   * @internal
+   */
+  public _otel!: Traces
+  onAfterRunFiles(_files: File[]): void {
+  onBeforeTryTask(test: Task, _options: TestTryOptions): void {
+    this.benchInstances.get(test)?.[kFinalize]()
+    let _bench: Bench | undefined
+    const runnerConfig = this.config
+    const benchInstances = this.benchInstances
+    Object.defineProperty(context, 'bench', {
+      get() {
+        if (!_bench) {
+          _bench = createBench(context.task, runnerConfig)
+          benchInstances.set(context.task, _bench)
+        }
+        return _bench
+      },
+    })
+   * @experimental
+   * A function that runs tinybench tasks.
+   * Can be overriden to run tasks in a special environment.
+  static async runBenchmarks(tinybench: Tinybench): Promise<TinybenchTask[]> {
+    return await tinybench.run()
+  }

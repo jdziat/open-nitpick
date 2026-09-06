@@ -1,0 +1,56 @@
+// commit 84f3e1b39c9f 2026-07-03T18:52:08+01:00 apps/webapp/app/v3/services/resumeBatchRun.server.ts
+import type { BatchTaskRun, Prisma } from "@trigger.dev/database";
+import { findEnvironmentById } from "~/models/runtimeEnvironment.server";
+import type { AuthenticatedEnvironment } from "~/services/apiAuth.server";
+const BATCH_RUN_INCLUDE = {
+  items: {
+    select: {
+      status: true,
+      taskRunAttemptId: true,
+    },
+  },
+} satisfies Prisma.BatchTaskRunInclude;
+
+type RetrieveBatchRunResult = Prisma.BatchTaskRunGetPayload<{
+  include: typeof BATCH_RUN_INCLUDE;
+}>;
+    const batchRun = await this.runStore.findBatchTaskRunById(batchRunId, {
+      include: BATCH_RUN_INCLUDE,
+    // BatchTaskRun -> RuntimeEnvironment FK is dropped; resolve the env from the scalar id.
+    const environment = await findEnvironmentById(batchRun.runtimeEnvironmentId);
+    if (!environment) {
+      logger.error("ResumeBatchRunService: Environment not found", {
+        batchRunId,
+        runtimeEnvironmentId: batchRun.runtimeEnvironmentId,
+      });
+
+      return "ERROR";
+    }
+
+    // The BatchTaskRun -> RuntimeEnvironment relation is dropped, so read the engine from the
+    // resolved environment's project rather than the unloaded batchRun.runtimeEnvironment relation.
+    if (isV3Disabled() && environment.project.engine === "V1") {
+      return await this.#handleV3BatchRun(batchRun, environment);
+      return await this.#handleLegacyBatchRun(batchRun, environment);
+  async #handleV3BatchRun(batchRun: RetrieveBatchRunResult, environment: AuthenticatedEnvironment) {
+    return await this.#handleDependentTaskAttempt(
+      batchRun,
+      batchRun.dependentTaskAttemptId,
+      environment
+    );
+  async #handleLegacyBatchRun(
+    batchRun: RetrieveBatchRunResult,
+    environment: AuthenticatedEnvironment
+  ) {
+    if (environment.type === "DEVELOPMENT" || !batchRun.dependentTaskAttemptId) {
+      await this.runStore.updateBatchTaskRun({
+        select: { id: true },
+    return await this.#handleDependentTaskAttempt(
+      batchRun,
+      batchRun.dependentTaskAttemptId,
+      environment
+    );
+    dependentTaskAttemptId: string,
+    environment: AuthenticatedEnvironment
+      const result = await this.runStore.updateManyBatchTaskRun({
+    const result = await this.runStore.updateManyBatchTaskRun({

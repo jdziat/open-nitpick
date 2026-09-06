@@ -1,0 +1,37 @@
+// commit 36d9f394a0ec 2025-07-23T16:27:03+02:00 ctx.go
+// The Content-Type header will be set to application/json; charset=utf-8.
+		c.fasthttp.Response.Header.SetContentType(MIMEApplicationJSONCharsetUTF8)
+// This method also sets the content header to application/xml; charset=utf-8.
+	c.fasthttp.Response.Header.SetContentType(MIMEApplicationXMLCharsetUTF8)
+	mimeType := utils.GetMIME(extension)
+
+		c.fasthttp.Response.Header.SetContentType(mimeType + "; charset=" + charset[0])
+		// Automatically add UTF-8 charset for text-based MIME types
+		if shouldIncludeCharset(mimeType) {
+			c.fasthttp.Response.Header.SetContentType(mimeType + "; charset=utf-8")
+		} else {
+			c.fasthttp.Response.Header.SetContentType(mimeType)
+		}
+// shouldIncludeCharset determines if a MIME type should include UTF-8 charset by default
+func shouldIncludeCharset(mimeType string) bool {
+	// Everything under text/ gets UTF-8 by default.
+	if strings.HasPrefix(mimeType, "text/") {
+		return true
+	}
+
+	// Explicit application types that should default to UTF-8.
+	switch mimeType {
+	case MIMEApplicationJSON,
+		MIMEApplicationJavaScript,
+		MIMEApplicationXML:
+		return true
+	}
+
+	// Any application/*+json or application/*+xml.
+	if strings.HasSuffix(mimeType, "+json") || strings.HasSuffix(mimeType, "+xml") {
+		return true
+	}
+
+	return false
+}
+

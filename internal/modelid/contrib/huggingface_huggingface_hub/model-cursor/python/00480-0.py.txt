@@ -1,0 +1,54 @@
+# commit 3b383dbdbfff 2026-04-09T17:27:22+02:00 src/huggingface_hub/cli/inference_endpoints.py
+from typing import Annotated
+from huggingface_hub._inference_endpoints import InferenceEndpointScalingMetric
+from ._cli_utils import FormatWithAutoOpt, TokenOpt, get_hf_api, typer_factory
+from ._output import OutputFormatWithAuto, out
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+        out.error(f"Listing failed: {error}")
+    results = []
+    for endpoint in endpoints:
+        raw = endpoint.raw
+        status = raw.get("status", {})
+        model = raw.get("model", {})
+        compute = raw.get("compute", {})
+        provider = raw.get("provider", {})
+        results.append(
+            {
+                "name": raw.get("name", ""),
+                "model": model.get("repository", "") if isinstance(model, dict) else "",
+                "status": status.get("state", "") if isinstance(status, dict) else "",
+                "task": model.get("task", "") if isinstance(model, dict) else "",
+                "framework": model.get("framework", "") if isinstance(model, dict) else "",
+                "instance": compute.get("instanceType", "") if isinstance(compute, dict) else "",
+                "vendor": provider.get("vendor", "") if isinstance(provider, dict) else "",
+                "region": provider.get("region", "") if isinstance(provider, dict) else "",
+            }
+        )
+    out.table(results, id_key="name")
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+    out.dict(endpoint.raw)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+        out.error(f"Deployment failed: {error}")
+    out.dict(endpoint.raw)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+        out.error(f"Catalog fetch failed: {error}")
+    out.dict({"models": models})
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+        out.error(f"Fetch failed: {error}")
+    out.dict(endpoint.raw)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+        out.error(f"Update failed: {error}")
+    out.dict(endpoint.raw)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+            out.text("Aborted.")
+        out.error(f"Delete failed: {error}")
+    out.result(f"Deleted '{name}'.", name=name)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+        out.error(f"Pause failed: {error}")
+    out.dict(endpoint.raw)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+        out.error(f"Resume failed: {error}")
+    out.dict(endpoint.raw)
+    format: FormatWithAutoOpt = OutputFormatWithAuto.auto,
+        out.error(f"Scale To Zero failed: {error}")
+    out.dict(endpoint.raw)

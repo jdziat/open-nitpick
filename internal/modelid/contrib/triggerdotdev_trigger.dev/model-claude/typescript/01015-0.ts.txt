@@ -1,0 +1,50 @@
+// commit 09f5354a03bc 2026-05-14T13:24:50+01:00 packages/core/src/v3/schemas/api.ts
+      idempotencyKey: z
+        .string()
+        // Caps user-supplied keys before they reach the unique idempotency index
+        // on the underlying table — values past this fail at the database layer
+        // rather than returning a clean 400.
+        .max(2048, "idempotencyKey must be 2048 characters or less")
+        .optional(),
+      idempotencyKey: z
+        .string()
+        // Caps user-supplied keys before they reach the unique idempotency index
+        // on the underlying table — values past this fail at the database layer
+        // rather than returning a clean 400.
+        .max(2048, "idempotencyKey must be 2048 characters or less")
+        .optional(),
+  idempotencyKey: z
+    .string()
+    // Caps user-supplied keys before they reach the unique idempotency index
+    // on the underlying table — values past this fail at the database layer
+    // rather than returning a clean 400.
+    .max(2048, "idempotencyKey must be 2048 characters or less")
+    .optional(),
+  idempotencyKey: z
+    .string()
+    // Caps user-supplied keys before they reach the unique idempotency index
+    // on the underlying table — values past this fail at the database layer
+    // rather than returning a clean 400.
+    .max(2048, "idempotencyKey must be 2048 characters or less")
+    .optional(),
+  idempotencyKey: z
+    .string()
+    // Caps user-supplied keys before they reach the unique idempotency index
+    // on the underlying table — values past this fail at the database layer
+    // rather than returning a clean 400.
+    .max(2048, "idempotencyKey must be 2048 characters or less")
+    .optional(),
+  idempotencyKey: z
+    .string()
+    // Caps user-supplied keys before they reach the unique idempotency index
+    // on the underlying table — values past this fail at the database layer
+    // rather than returning a clean 400.
+    .max(2048, "idempotencyKey must be 2048 characters or less")
+    .optional(),
+  idempotencyKey: z
+    .string()
+    // Caps user-supplied keys before they reach the unique idempotency index
+    // on the underlying table — values past this fail at the database layer
+    // rather than returning a clean 400.
+    .max(2048, "idempotencyKey must be 2048 characters or less")
+    .optional(),

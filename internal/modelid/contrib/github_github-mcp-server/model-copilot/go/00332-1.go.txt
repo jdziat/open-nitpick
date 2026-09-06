@@ -1,0 +1,39 @@
+// commit 358a41508135 2025-09-01T18:13:36+01:00 pkg/github/repositories.go
+			mcp.WithBoolean("include_diff",
+				mcp.Description("Whether to include file diffs and stats in the response. Default is true."),
+				mcp.DefaultBool(true),
+			),
+			includeDiff, err := OptionalBoolParamWithDefault(request, "include_diff", true)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+			// Convert to minimal commit
+			minimalCommit := convertToMinimalCommit(commit, includeDiff)
+
+			r, err := json.Marshal(minimalCommit)
+			// Convert to minimal commits
+			minimalCommits := make([]MinimalCommit, len(commits))
+			for i, commit := range commits {
+				minimalCommits[i] = convertToMinimalCommit(commit, false)
+			}
+
+			r, err := json.Marshal(minimalCommits)
+			// Convert to minimal branches
+			minimalBranches := make([]MinimalBranch, 0, len(branches))
+			for _, branch := range branches {
+				minimalBranches = append(minimalBranches, convertToMinimalBranch(branch))
+			}
+
+			r, err := json.Marshal(minimalBranches)
+			// Return minimal response with just essential information
+			minimalResponse := MinimalResponse{
+				URL: createdRepo.GetHTMLURL(),
+			}
+
+			r, err := json.Marshal(minimalResponse)
+			// Return minimal response with just essential information
+			minimalResponse := MinimalResponse{
+				URL: forkedRepo.GetHTMLURL(),
+			}
+
+			r, err := json.Marshal(minimalResponse)

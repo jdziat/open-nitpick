@@ -1,0 +1,57 @@
+// commit 9c468984a48c 2026-09-02T05:45:07+00:00 router.go
+	routeParser routeParser
+	// id is shared by the per-method copies of one registration, so a route
+	// can be found again in another method's tree (see routeIndexInTree).
+	id uint64 // Parameter parser
+// The star check has to come first, before the parametric branch: match
+// returns true for a star route unconditionally, before any parameter is
+// looked at.
+	// As in register: the constraints come from the pattern as written.
+	rawParser := parseRoute(prefixedPath, regexHandler, customConstraints...)
+	route.routeParser.adoptConstraints(&rawParser)
+	if app.config.StrictRouting {
+		route.routeParser.applyStrictRouting()
+	}
+// routeIDs hands out the ids shared by the per-method copies of a registration.
+var routeIDs atomic.Uint64
+
+	// The pretty pattern is what requests are matched against, but its
+	// constraints must be the ones written in the raw pattern: lowercasing
+	// would corrupt them (see routeParser.adoptConstraints).
+	parsedPretty.adoptConstraints(&parsedRaw)
+	if app.config.StrictRouting {
+		parsedPretty.applyStrictRouting()
+	}
+	registered := make([]string, 0, len(methods))
+	routeID := routeIDs.Add(1)
+		registered = append(registered, method)
+		// Derived from the pattern with its escapes intact: an escaped "/\*"
+		// is a literal path, not the catch-all route.
+		isStar := pathPretty == "/*"
+		isRoot := pathPretty == "/"
+			id:            routeID,
+
+	// Name applies to every route this call registered, whatever the method.
+	app.mutex.Lock()
+	app.latestRouteMethods = registered
+	app.mutex.Unlock()
+	// Routes registered since startup get their automatic HEAD companions
+	// here, as the ones registered before it did at startup.
+	app.ensureAutoHeadRoutesLocked()
+
+// routeIndexInTree returns the position of route in the bucket of another
+// method's tree, or current when it is not there. A middleware is registered
+// in every method's stack as a copy of its own, so the copies are told apart
+// by the id they share.
+func (app *App) routeIndexInTree(methodInt, treeHash int, route *Route, current int) int {
+	if route == nil || methodInt < 0 || methodInt >= len(app.treeIndex) {
+		return current
+	}
+	for i, candidate := range app.treeIndex[methodInt].lookup(treeHash) {
+		if candidate.id == route.id {
+			return i
+		}
+	}
+	return current
+}
+

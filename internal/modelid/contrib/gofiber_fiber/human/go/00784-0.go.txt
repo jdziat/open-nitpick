@@ -1,0 +1,32 @@
+// commit 970421f815d8 2026-03-03T16:54:25+01:00 middleware/paginate/config.go
+import (
+	"github.com/gofiber/fiber/v3"
+)
+	// OffsetKey is the query string key for offset.
+	//
+	// Optional. Default: "offset"
+	OffsetKey string
+
+
+	// AllowedSorts is the list of allowed sort fields.
+	//
+	// Optional. Default: nil
+	AllowedSorts []string
+
+	// DefaultPage is the default page number.
+	//
+	// Optional. Default: 1
+	DefaultPage int
+
+	// DefaultLimit is the default items per page.
+	//
+	// Optional. Default: 10
+	DefaultLimit int
+	DefaultSort:  "id",
+	OffsetKey:    "offset",
+	if cfg.DefaultSort == "" {
+		cfg.DefaultSort = ConfigDefault.DefaultSort
+	}
+	if cfg.OffsetKey == "" {
+		cfg.OffsetKey = ConfigDefault.OffsetKey
+	}

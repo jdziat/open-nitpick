@@ -1,0 +1,45 @@
+// commit 5f7e9d52c4ca 2026-07-23T21:02:02-07:00 tests/xdc/base.go
+		// clusterNames, if set, overrides the default two-cluster ("active"/"standby")
+		// topology. setupSuite provisions one TestCluster per name and connects every
+		// pair, so any count is supported. Leave empty for the historical two clusters.
+		clusterNames []string
+
+	config := make([]*replicationpb.ClusterReplicationConfig, len(s.clusters))
+
+	// The default topology is two clusters, named "active" and "standby". Suites
+	// that need a different number of clusters set s.clusterNames before calling
+	// setupSuite; everything below (including the connect-every-pair loop) scales
+	// to any cluster count.
+	clusterBaseNames := s.clusterNames
+	if len(clusterBaseNames) == 0 {
+		clusterBaseNames = []string{"active", "standby"}
+	}
+
+	suffix := common.GenerateRandomString(5)
+	clusterConfigs := make([]*testcore.TestClusterConfig, len(clusterBaseNames))
+	s.clusters = make([]*testcore.TestCluster, len(clusterBaseNames))
+
+	testClusterFactory := testcore.NewTestClusterFactory()
+	for clusterIndex, baseName := range clusterBaseNames {
+		clusterName := baseName + "_" + suffix
+		clusterConfig := &testcore.TestClusterConfig{
+				MasterClusterName:        clusterName,
+				CurrentClusterName:       clusterName,
+				ClusterInformation: map[string]cluster.ClusterInformation{
+					clusterName: {
+						Enabled:                true,
+						InitialFailoverVersion: int64(clusterIndex + 1),
+						// RPCAddress and HTTPAddress will be filled in
+					},
+				},
+			Persistence:               persistenceDefaults,
+			DynamicConfigOverrides:    s.dynamicConfigOverrides,
+			DCRedirectionPolicy:       params.DCRedirectionPolicy,
+			EnableArchival:            params.EnableArchival,
+			AdditionalServerOptions:   params.AdditionalServerOptions,
+			EnableMetricsCapture:      true,
+			EnableHistoryTaskRecorder: params.EnableHistoryTaskRecorder,
+			EnableReplicationRecorder: params.EnableReplicationRecorder,
+		clusterConfig.Persistence.DBName += "_" + clusterName
+		clusterConfigs[clusterIndex] = clusterConfig
+		s.clusters[clusterIndex], err = testClusterFactory.NewCluster(s.T(), clusterConfig, log.With(s.logger, tag.ClusterName(clusterName)))

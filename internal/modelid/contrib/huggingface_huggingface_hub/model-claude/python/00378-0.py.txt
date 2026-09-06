@@ -1,0 +1,32 @@
+# commit 2f9153e7e9b0 2026-03-11T12:06:32+01:00 src/huggingface_hub/cli/papers.py
+    FormatOpt,
+    OutputFormat,
+    QuietOpt,
+    _format_cell,
+    print_list_output,
+        "hf papers ls --format json",
+    format: FormatOpt = OutputFormat.table,
+    quiet: QuietOpt = False,
+    _HEADERS = ["id", "title", "upvotes", "comments", "published_at", "submitted_by"]
+
+    def _paper_row(item: dict) -> list[str]:
+        submitted_by = item.get("submitted_by") or {}
+        submitter = submitted_by.get("fullname") or submitted_by.get("username") or ""
+        return [
+            item.get("id", ""),
+            _format_cell(item.get("title", ""), max_len=60),
+            str(item.get("upvotes", "")),
+            str(item.get("comments", "")),
+            _format_cell(item.get("published_at", "")),
+            submitter,
+        ]
+
+    print_list_output(
+        results,
+        format=format,
+        quiet=quiet,
+        id_key="id",
+        headers=_HEADERS,
+        row_fn=_paper_row,
+        alignments={"upvotes": "right", "comments": "right"},
+    )

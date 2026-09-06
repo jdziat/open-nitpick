@@ -1,0 +1,41 @@
+// commit 78ed73afd841 2026-07-20T09:04:04+01:00 packages/vitest/src/node/cache/fsModuleCache.ts
+// Default location of the module cache. It lives inside `node_modules` at the
+// workspace root so it's shared by every project and is naturally invalidated
+// whenever dependencies are reinstalled.
+const DEFAULT_CACHE_DIRNAME = '.vitest-cache'
+
+   * Each project can point its module cache at a different directory with
+   * `fsModuleCachePath`; projects that don't override it fall back to the root
+   * cache. We still keep a single metadata file (in the root cache) for the whole
+   * workspace because
+   * - projects can reference files between each other
+  private warnedDeprecatedIgnore = new Set<string>()
+    this.rootCache = vitest.config.fsModuleCachePath
+      || join(searchForWorkspaceRoot(vitest.viteConfig.root), 'node_modules', DEFAULT_CACHE_DIRNAME)
+  // A plugin can exclude itself from the cache key via `api.vitest.ignoreFsModuleCache`.
+  private ignoresFsModuleCache(plugin: { name: string; api?: any }): boolean {
+    const api = plugin.api?.vitest
+    if (api?.ignoreFsModuleCache === true) {
+      return true
+    }
+    if (api?.experimental?.ignoreFsModuleCache === true) {
+      if (!this.warnedDeprecatedIgnore.has(plugin.name)) {
+        this.warnedDeprecatedIgnore.add(plugin.name)
+        this.vitest.logger.deprecate(
+          `The plugin "${plugin.name}" sets \`api.vitest.experimental.ignoreFsModuleCache\`, which is deprecated. Use \`api.vitest.ignoreFsModuleCache\` instead.`,
+        )
+      }
+      return true
+    }
+    return false
+  }
+
+    const fsCachePaths = [
+      // the root cache also holds the shared metadata file
+      this.rootCache,
+      ...this.vitest.projects.map(r => r.config.fsModuleCachePath || this.rootCache),
+    ]
+            .filter(p => !this.ignoresFsModuleCache(p))
+      cacheRoot = vitestConfig.fsModuleCachePath || this.rootCache
+    // metadata is shared between every project in the workspace, so we always read it from the root cache
+    ].some(p => p.config.fsModuleCache)

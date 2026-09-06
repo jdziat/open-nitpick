@@ -1,0 +1,40 @@
+// commit 469b03909074 2026-02-20T13:16:34+00:00 internal-packages/otlp-importer/src/index.ts
+import {
+  ExportMetricsPartialSuccess,
+  ExportMetricsServiceRequest,
+  ExportMetricsServiceResponse,
+} from "./generated/opentelemetry/proto/collector/metrics/v1/metrics_service";
+
+import {
+  ResourceMetrics,
+  ScopeMetrics,
+  Metric,
+  Gauge,
+  Sum,
+  Histogram,
+  ExponentialHistogram,
+  Summary,
+  NumberDataPoint,
+  HistogramDataPoint,
+  ExponentialHistogramDataPoint,
+  SummaryDataPoint,
+  AggregationTemporality,
+} from "./generated/opentelemetry/proto/metrics/v1/metrics";
+
+export { ExportMetricsPartialSuccess, ExportMetricsServiceRequest, ExportMetricsServiceResponse };
+
+export {
+  ResourceMetrics,
+  ScopeMetrics,
+  Metric,
+  Gauge,
+  Sum,
+  Histogram,
+  ExponentialHistogram,
+  Summary,
+  NumberDataPoint,
+  HistogramDataPoint,
+  ExponentialHistogramDataPoint,
+  SummaryDataPoint,
+  AggregationTemporality,
+};

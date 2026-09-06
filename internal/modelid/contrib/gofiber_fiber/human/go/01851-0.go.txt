@@ -1,0 +1,64 @@
+// commit ef681a21b0d7 2026-08-09T22:50:17+02:00 ctx.go
+	matchedRoute           *Route               // Cached next non-middleware route match (MatchedRoute)
+		// Path rewrite invalidates any cached MatchedRoute look-ahead.
+		c.matchedRoute = nil
+// MatchedRoute returns the next non-middleware route that matches the current
+// request without advancing the handler chain. It is useful inside global
+// middleware when you need to inspect the target route (path or name) before
+// calling Next. Returns nil when no endpoint matches.
+//
+// Unlike Route, which reflects the route currently being executed (often the
+// middleware itself before Next), MatchedRoute looks ahead in the route stack.
+func (c *DefaultCtx) MatchedRoute() *Route {
+	// Already on a non-middleware endpoint.
+	if c.route != nil && !c.route.use && !c.route.mount {
+		return c.route
+	}
+	if c.matchedRoute != nil {
+		return c.matchedRoute
+	}
+	if c.methodInt == -1 || c.app == nil {
+		return nil
+	}
+
+	// SkipUnmatchedRoutes already resolved the endpoint index.
+	if c.firstMatchIndex >= 0 {
+		tree := c.app.treeIndex[c.methodInt].lookup(c.treePathHash)
+		if c.firstMatchIndex < len(tree) {
+			route := tree[c.firstMatchIndex]
+			if route != nil && !route.use && !route.mount {
+				c.matchedRoute = route
+				return route
+			}
+		}
+	}
+
+	tree := c.app.treeIndex[c.methodInt].lookup(c.treePathHash)
+	detectionPath := utils.UnsafeString(c.detectionPath)
+	path := utils.UnsafeString(c.path)
+	pathSlashes := c.pathSlashCount(c.app)
+	// Use a scratch params buffer so look-ahead does not clobber c.values.
+	var scratch [maxParams]string
+
+	for i := c.indexRoute + 1; i < len(tree); i++ {
+		route := tree[i]
+		if route.mount || route.use {
+			continue
+		}
+		if route.prefixRejects(pathHeadWord(detectionPath)) {
+			continue
+		}
+		if route.match(detectionPath, path, &scratch, pathSlashes) {
+			c.matchedRoute = route
+			return route
+		}
+	}
+
+	return nil
+}
+
+	// Path normalization may change detectionPath / tree hash; drop look-ahead cache.
+	c.matchedRoute = nil
+	c.route = nil
+	c.matchedRoute = nil
+	c.matchedRoute = nil

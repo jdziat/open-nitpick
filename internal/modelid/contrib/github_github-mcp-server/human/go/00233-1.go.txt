@@ -1,0 +1,49 @@
+// commit 36e6add0ddb8 2025-06-25T08:12:38+02:00 pkg/github/issues.go
+	ghErrors "github.com/github/github-mcp-server/pkg/errors"
+				return nil, ghErrors.NewGitHubAPIError(
+					fmt.Sprintf("failed to get issue with number '%d'", issueNumber),
+					resp,
+					err,
+				)
+				return nil, ghErrors.NewGitHubAPIError(
+					fmt.Sprintf("failed to create comment on issue '%d'", issueNumber),
+					resp,
+					err,
+				)
+				return nil, ghErrors.NewGitHubAPIError(
+					"failed to search issues",
+					resp,
+					err,
+				)
+				return nil, ghErrors.NewGitHubAPIError(
+					"failed to create issue",
+					resp,
+					err,
+				)
+				return nil, ghErrors.NewGitHubAPIError(
+					"failed to list issues",
+					resp,
+					err,
+				)
+				return nil, ghErrors.NewGitHubAPIError(
+					"failed to update issue",
+					resp,
+					err,
+				)
+				return nil, ghErrors.NewGitHubAPIError(
+					"failed to get issue comments",
+					resp,
+					err,
+				)
+					return nil, ghErrors.NewGitHubGraphQLError(
+						"failed to list suggested actors",
+						err,
+					)
+				return nil, ghErrors.NewGitHubGraphQLError(
+					"failed to get issue ID",
+					err,
+				)
+				return nil, ghErrors.NewGitHubGraphQLError(
+					"failed to replace actors for assignable",
+					err,
+				)

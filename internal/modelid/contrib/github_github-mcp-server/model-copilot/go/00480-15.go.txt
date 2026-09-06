@@ -1,0 +1,190 @@
+// commit ce2e4f94725a 2025-12-17T09:56:24+01:00 pkg/github/search.go
+	"github.com/github/github-mcp-server/pkg/inventory"
+func SearchRepositories(t translations.TranslationHelperFunc) inventory.ServerTool {
+	return NewTool(
+		ToolsetMetadataRepos,
+		mcp.Tool{
+		func(deps ToolDependencies) mcp.ToolHandlerFor[map[string]any, any] {
+			return func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
+				query, err := RequiredParam[string](args, "query")
+				if err != nil {
+					return utils.NewToolResultError(err.Error()), nil, nil
+				}
+				sort, err := OptionalParam[string](args, "sort")
+				if err != nil {
+					return utils.NewToolResultError(err.Error()), nil, nil
+				}
+				order, err := OptionalParam[string](args, "order")
+				if err != nil {
+					return utils.NewToolResultError(err.Error()), nil, nil
+				}
+				pagination, err := OptionalPaginationParams(args)
+				if err != nil {
+					return utils.NewToolResultError(err.Error()), nil, nil
+				}
+				minimalOutput, err := OptionalBoolParamWithDefault(args, "minimal_output", true)
+				if err != nil {
+					return utils.NewToolResultError(err.Error()), nil, nil
+				}
+				opts := &github.SearchOptions{
+					Sort:  sort,
+					Order: order,
+					ListOptions: github.ListOptions{
+						Page:    pagination.Page,
+						PerPage: pagination.PerPage,
+					},
+				}
+				client, err := deps.GetClient(ctx)
+					return utils.NewToolResultErrorFromErr("failed to get GitHub client", err), nil, nil
+				result, resp, err := client.Search.Repositories(ctx, query, opts)
+				if err != nil {
+					return ghErrors.NewGitHubAPIErrorResponse(ctx,
+						fmt.Sprintf("failed to search repositories with query '%s'", query),
+						resp,
+						err,
+					), nil, nil
+				}
+				defer func() { _ = resp.Body.Close() }()
+				if resp.StatusCode != http.StatusOK {
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return utils.NewToolResultErrorFromErr("failed to read response body", err), nil, nil
+					return utils.NewToolResultError(fmt.Sprintf("failed to search repositories: %s", string(body))), nil, nil
+				}
+				// Return either minimal or full response based on parameter
+				var r []byte
+				if minimalOutput {
+					minimalRepos := make([]MinimalRepository, 0, len(result.Repositories))
+					for _, repo := range result.Repositories {
+						minimalRepo := MinimalRepository{
+							ID:            repo.GetID(),
+							Name:          repo.GetName(),
+							FullName:      repo.GetFullName(),
+							Description:   repo.GetDescription(),
+							HTMLURL:       repo.GetHTMLURL(),
+							Language:      repo.GetLanguage(),
+							Stars:         repo.GetStargazersCount(),
+							Forks:         repo.GetForksCount(),
+							OpenIssues:    repo.GetOpenIssuesCount(),
+							Private:       repo.GetPrivate(),
+							Fork:          repo.GetFork(),
+							Archived:      repo.GetArchived(),
+							DefaultBranch: repo.GetDefaultBranch(),
+						}
+
+						if repo.UpdatedAt != nil {
+							minimalRepo.UpdatedAt = repo.UpdatedAt.Format("2006-01-02T15:04:05Z")
+						}
+						if repo.CreatedAt != nil {
+							minimalRepo.CreatedAt = repo.CreatedAt.Format("2006-01-02T15:04:05Z")
+						}
+						if repo.Topics != nil {
+							minimalRepo.Topics = repo.Topics
+						}
+
+						minimalRepos = append(minimalRepos, minimalRepo)
+					minimalResult := &MinimalSearchRepositoriesResult{
+						TotalCount:        result.GetTotal(),
+						IncompleteResults: result.GetIncompleteResults(),
+						Items:             minimalRepos,
+					}
+					r, err = json.Marshal(minimalResult)
+					if err != nil {
+						return utils.NewToolResultErrorFromErr("failed to marshal minimal response", err), nil, nil
+					}
+				} else {
+					r, err = json.Marshal(result)
+					if err != nil {
+						return utils.NewToolResultErrorFromErr("failed to marshal full response", err), nil, nil
+					}
+				return utils.NewToolResultText(string(r)), nil, nil
+		},
+	)
+func SearchCode(t translations.TranslationHelperFunc) inventory.ServerTool {
+	return NewTool(
+		ToolsetMetadataRepos,
+		mcp.Tool{
+		func(deps ToolDependencies) mcp.ToolHandlerFor[map[string]any, any] {
+			return func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
+				query, err := RequiredParam[string](args, "query")
+				if err != nil {
+					return utils.NewToolResultError(err.Error()), nil, nil
+				}
+				sort, err := OptionalParam[string](args, "sort")
+				if err != nil {
+					return utils.NewToolResultError(err.Error()), nil, nil
+				}
+				order, err := OptionalParam[string](args, "order")
+				if err != nil {
+					return utils.NewToolResultError(err.Error()), nil, nil
+				}
+				pagination, err := OptionalPaginationParams(args)
+				if err != nil {
+					return utils.NewToolResultError(err.Error()), nil, nil
+				}
+				opts := &github.SearchOptions{
+					Sort:  sort,
+					Order: order,
+					ListOptions: github.ListOptions{
+						PerPage: pagination.PerPage,
+						Page:    pagination.Page,
+					},
+				}
+				client, err := deps.GetClient(ctx)
+				if err != nil {
+					return utils.NewToolResultErrorFromErr("failed to get GitHub client", err), nil, nil
+				}
+				result, resp, err := client.Search.Code(ctx, query, opts)
+				if err != nil {
+					return ghErrors.NewGitHubAPIErrorResponse(ctx,
+						fmt.Sprintf("failed to search code with query '%s'", query),
+						resp,
+						err,
+					), nil, nil
+				}
+				defer func() { _ = resp.Body.Close() }()
+				if resp.StatusCode != http.StatusOK {
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return utils.NewToolResultErrorFromErr("failed to read response body", err), nil, nil
+					}
+					return utils.NewToolResultError(fmt.Sprintf("failed to search code: %s", string(body))), nil, nil
+				}
+
+				r, err := json.Marshal(result)
+					return utils.NewToolResultErrorFromErr("failed to marshal response", err), nil, nil
+				return utils.NewToolResultText(string(r)), nil, nil
+		},
+	)
+func userOrOrgHandler(accountType string, deps ToolDependencies) mcp.ToolHandlerFor[map[string]any, any] {
+		client, err := deps.GetClient(ctx)
+func SearchUsers(t translations.TranslationHelperFunc) inventory.ServerTool {
+	return NewTool(
+		ToolsetMetadataUsers,
+		mcp.Tool{
+			Name:        "search_users",
+			Description: t("TOOL_SEARCH_USERS_DESCRIPTION", "Find GitHub users by username, real name, or other profile information. Useful for locating developers, contributors, or team members."),
+			Annotations: &mcp.ToolAnnotations{
+				Title:        t("TOOL_SEARCH_USERS_USER_TITLE", "Search users"),
+				ReadOnlyHint: true,
+			},
+			InputSchema: schema,
+		},
+		func(deps ToolDependencies) mcp.ToolHandlerFor[map[string]any, any] {
+			return userOrOrgHandler("user", deps)
+	)
+func SearchOrgs(t translations.TranslationHelperFunc) inventory.ServerTool {
+	return NewTool(
+		ToolsetMetadataOrgs,
+		mcp.Tool{
+			Name:        "search_orgs",
+			Description: t("TOOL_SEARCH_ORGS_DESCRIPTION", "Find GitHub organizations by name, location, or other organization metadata. Ideal for discovering companies, open source foundations, or teams."),
+			Annotations: &mcp.ToolAnnotations{
+				Title:        t("TOOL_SEARCH_ORGS_USER_TITLE", "Search organizations"),
+				ReadOnlyHint: true,
+			},
+			InputSchema: schema,
+		},
+		func(deps ToolDependencies) mcp.ToolHandlerFor[map[string]any, any] {
+			return userOrOrgHandler("org", deps)
+	)

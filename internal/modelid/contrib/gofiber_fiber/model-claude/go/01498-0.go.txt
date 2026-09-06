@@ -1,0 +1,43 @@
+// commit de241813129b 2026-06-24T10:33:06+02:00 middleware/cache/cache.go
+		buf = appendCanonicalQueryString(buf, c.Request().URI())
+		buf = appendCanonicalHeaderSubset(buf, &c.Request().Header, cfg.KeyHeaders)
+		buf = appendCanonicalCookieSubset(buf, c, cfg.KeyCookies)
+// appendCanonicalQueryString appends the canonicalized query segment to dst.
+// It avoids copying the raw query and the intermediate result string the caller
+// would otherwise have to re-append.
+func appendCanonicalQueryString(dst []byte, uri *fasthttp.URI) []byte {
+		return dst
+	// Safe: the segment is consumed synchronously (appended/hashed) before the
+	// request buffer can be mutated, so no stable copy is required.
+	query := utils.UnsafeString(raw)
+		return appendBoundKeySegment(dst, escapeKeyDelimiters(query))
+		return appendBoundKeySegment(dst, escapeKeyDelimiters(query))
+				return appendBoundKeySegment(dst, escapeKeyDelimiters(query))
+		return appendBoundKeySegment(dst, escapeKeyDelimiters(query))
+			return appendBoundKeySegment(dst, escapeKeyDelimiters(query))
+				return appendBoundKeySegment(dst, escapeKeyDelimiters(query))
+	dst = appendBoundKeySegment(dst, utils.UnsafeString(buf))
+	return dst
+func appendCanonicalHeaderSubset(dst []byte, header *fasthttp.RequestHeader, names []string) []byte {
+			dst = append(dst, '|')
+		dst = append(dst, escapeKeyDelimiters(name)...)
+		dst = append(dst, ':')
+		dst = appendBoundKeySegment(dst, escapedValue)
+	return dst
+func appendCanonicalCookieSubset(dst []byte, c fiber.Ctx, names []string) []byte {
+			dst = append(dst, '|')
+		dst = append(dst, escapeKeyDelimiters(name)...)
+		dst = append(dst, ':')
+		dst = appendBoundKeySegment(dst, escapedValue)
+	return dst
+// appendBoundKeySegment appends segment to dst, hashing it first when it exceeds
+// the per-dimension length bound (same policy as boundKeySegment).
+func appendBoundKeySegment(dst []byte, segment string) []byte {
+	if len(segment) <= maxKeyDimensionSegmentLength {
+		return append(dst, segment...)
+	}
+	hash := sha256.Sum256(utils.UnsafeBytes(segment))
+	dst = append(dst, "sha256:"...)
+	return hex.AppendEncode(dst, hash[:])
+}
+

@@ -1,0 +1,31 @@
+// commit d83b12e87e4f 2026-08-18T18:17:32-07:00 service/worker/deletenamespace/activities.go
+	otellog "go.opentelemetry.io/otel/log"
+	"go.temporal.io/server/common/wideevents"
+		metadataManager              persistence.MetadataManager
+		clusterMetadata              cluster.Metadata
+		nexusEndpointManager         persistence.NexusEndpointManager
+		logger                       log.Logger
+		eventLogger                  otellog.Logger
+		emitNamespaceLifecycleEvents dynamicconfig.BoolPropertyFn
+	eventLogger otellog.Logger,
+	emitNamespaceLifecycleEvents dynamicconfig.BoolPropertyFn,
+		metadataManager:              metadataManager,
+		clusterMetadata:              clusterMetadata,
+		nexusEndpointManager:         nexusEndpointManager,
+		logger:                       logger,
+		eventLogger:                  eventLogger,
+		emitNamespaceLifecycleEvents: emitNamespaceLifecycleEvents,
+		protectedNamespaces:          protectedNamespaces,
+func (a *localActivities) RenameNamespaceActivity(ctx context.Context, nsID namespace.ID, previousName namespace.Name, newName namespace.Name) error {
+
+	// Renaming the namespace to its tombstone name is the point it ceases to exist under its real
+	// name, so this is where the namespace_renamed lifecycle event is emitted. The physical record
+	// removal happens later, in the abandoned ReclaimResourcesWorkflow, by which point the original
+	// name is already gone.
+	if a.emitNamespaceLifecycleEvents != nil && a.emitNamespaceLifecycleEvents() {
+		wideevents.EmitNamespaceRenamed(a.eventLogger, wideevents.NamespaceRenamedInput{
+			Namespace:   previousName.String(),
+			NamespaceID: nsID.String(),
+			RenamedTo:   newName.String(),
+		})
+	}

@@ -1,0 +1,64 @@
+// commit f5bbb96d4e56 2025-11-15T16:55:50+00:00 packages/core/src/db/adapter/index.ts
+				action: "create" | "update" | "findOne" | "findMany";
+	/**
+	 * Whether to disable the transform join.
+	 * Do not use this option unless you know what you are doing.
+	 * @default false
+	 */
+	disableTransformJoin?: boolean | undefined;
+/**
+ * JoinOption configuration for relational queries.
+ *
+ * Allows you to join related tables/models in a single query operation.
+ * Each key represents the name of the joined table/model, and the value
+ * configures how the join should be performed.
+ */
+export type JoinOption = {
+	[model: string]: boolean | { limit?: number };
+};
+
+/**
+ * Once `JoinOption` has gone through the adapter factory, it will be transformed into a `JoinConfig`.
+ */
+export type JoinConfig = {
+	[model: string]: {
+		/**
+		 * The joining column names.
+		 */
+		on: {
+			/**
+			 * Column name from the main table
+			 */
+			from: string;
+			/**
+			 * Column name from the joined table
+			 */
+			to: string;
+		};
+		/**
+		 * Limit the number of rows to return.
+		 *
+		 * If the relation has `unique` constraint, then this option will be ignored and limit will be set to 1.
+		 *
+		 * @default 100
+		 */
+		limit?: number;
+		/**
+		 * The relation type. Determines the ouput joined model data.
+		 *
+		 * `one-to-one` would have a single object in the output.
+		 * `one-to-many` would have an array of objects in the output.
+		 * `many-to-many` would have an array of objects in the output.
+		 *
+		 * @default "one-to-many"
+		 */
+		relation?: "one-to-one" | "one-to-many" | "many-to-many";
+	};
+};
+
+		join?: JoinOption | undefined;
+		join?: JoinOption | undefined;
+		join,
+		join?: JoinConfig | undefined;
+		join,
+		join?: JoinConfig | undefined;

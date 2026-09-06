@@ -1,0 +1,39 @@
+// commit 78bb6f845eda 2026-05-06T02:22:36+00:00 path.go
+// Both *regexp.Regexp and alternative engines like *coregex.Regex implement this method.
+// with signature func(string) T where T has a MatchString method.
+var regexCompilerType = reflect.TypeOf((*RegexCompiler)(nil)).Elem()
+
+func validateRegexHandler(handler RegexHandler) RegexHandler {
+		return regexp.MustCompile
+	}
+
+	handlerValue := reflect.ValueOf(handler)
+	handlerType := handlerValue.Type()
+
+	if handlerType.Kind() != reflect.Func || handlerValue.IsNil() {
+		panic("fiber: Config.RegexHandler must be a non-nil function")
+	}
+	if handlerType.NumIn() != 1 || handlerType.In(0).Kind() != reflect.String || handlerType.NumOut() != 1 {
+		panic("fiber: Config.RegexHandler must have signature func(string) T")
+	if !handlerType.Out(0).Implements(regexCompilerType) {
+		panic("fiber: Config.RegexHandler return type must implement fiber.RegexCompiler")
+	}
+
+	return handler
+}
+// compileRegex calls the RegexHandler function and returns a RegexCompiler.
+func compileRegex(handler RegexHandler, pattern string) RegexCompiler {
+	compiler, _ := result[0].Interface().(RegexCompiler)
+	if compiler == nil {
+		panic("fiber: Config.RegexHandler must not return nil")
+	}
+	compilerValue := reflect.ValueOf(compiler)
+	if (compilerValue.Kind() == reflect.Chan ||
+		compilerValue.Kind() == reflect.Func ||
+		compilerValue.Kind() == reflect.Interface ||
+		compilerValue.Kind() == reflect.Map ||
+		compilerValue.Kind() == reflect.Pointer ||
+		compilerValue.Kind() == reflect.Slice) && compilerValue.IsNil() {
+		panic("fiber: Config.RegexHandler must not return nil")
+	return compiler
+	config.RegexHandler = validateRegexHandler(config.RegexHandler)

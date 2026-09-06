@@ -1,0 +1,33 @@
+// commit 8136af2df941 2025-09-21T00:20:02+02:00 middleware/limiter/manager.go
+	"fmt"
+func (m *manager) get(ctx context.Context, key string) (*item, error) {
+			return nil, fmt.Errorf("limiter: failed to get key %q from storage: %w", key, err)
+			it := m.acquire()
+				m.release(it)
+				return nil, fmt.Errorf("limiter: failed to unmarshal key %q: %w", key, err)
+			return it, nil
+		return m.acquire(), nil
+
+	value := m.memory.Get(key)
+	if value == nil {
+		return m.acquire(), nil
+	}
+
+	it, ok := value.(*item)
+	if !ok {
+		return nil, fmt.Errorf("limiter: unexpected entry type %T for key %q", value, key)
+
+	return it, nil
+func (m *manager) set(ctx context.Context, key string, it *item, exp time.Duration) error {
+		raw, err := it.MarshalMsg(nil)
+		if err != nil {
+			m.release(it)
+			return fmt.Errorf("limiter: failed to marshal key %q: %w", key, err)
+		}
+		if err := m.storage.SetWithContext(ctx, key, raw, exp); err != nil {
+			m.release(it)
+			return fmt.Errorf("limiter: failed to store key %q: %w", key, err)
+		return nil
+
+	m.memory.Set(key, it, exp)
+	return nil

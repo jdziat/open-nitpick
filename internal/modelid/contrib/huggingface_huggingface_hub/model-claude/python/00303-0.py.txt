@@ -1,0 +1,41 @@
+# commit e009079b75ef 2026-02-09T14:19:25+01:00 src/huggingface_hub/cli/jobs.py
+    # Print logs from a job (non-blocking)
+    # Stream logs from a job (blocking, like `docker logs -f`)
+    hf jobs logs -f <job-id>
+
+from collections import deque
+    for log in api.fetch_job_logs(job_id=job.id, namespace=job.owner.name, follow=True):
+@jobs_cli.command(
+    "logs", examples=["hf jobs logs <job_id>", "hf jobs logs -f <job_id>", "hf jobs logs --tail 20 <job_id>"]
+)
+    follow: Annotated[
+        bool,
+        typer.Option(
+            "-f",
+            "--follow",
+            help="Follow log output (stream until the job completes). Without this flag, only currently available logs are printed.",
+        ),
+    ] = False,
+    tail: Annotated[
+        Optional[int],
+        typer.Option(
+            "-n",
+            "--tail",
+            help="Number of lines to show from the end of the logs.",
+        ),
+    ] = None,
+    """Fetch the logs of a Job.
+
+    By default, prints currently available logs and exits (non-blocking).
+    Use --follow/-f to stream logs in real-time until the job completes.
+    """
+    if follow and tail is not None:
+        raise CLIError(
+            "Cannot use --follow and --tail together. Use --follow to stream logs or --tail to show recent logs."
+        )
+
+        logs = api.fetch_job_logs(job_id=job_id, namespace=namespace, follow=follow)
+        if tail is not None:
+            logs = deque(logs, maxlen=tail)
+        for log in logs:
+    for log in api.fetch_job_logs(job_id=job.id, namespace=job.owner.name, follow=True):

@@ -1,0 +1,32 @@
+// commit 73df8412479b 2026-08-27T21:46:37+00:00 req.go
+	// Fast path: no Content-Encoding header at all. ContentEncoding peeks the
+	// stored key byte-exactly, which is decisive only while fasthttp normalized
+	// the names on the way in — under DisableHeaderNormalizing a lower-case
+	// spelling would read as absent here and skip decompression entirely.
+	if !r.c.app.config.DisableHeaderNormalizing && request.Header.ContentEncoding() == nil {
+// headerField returns a request header's first non-empty field value, matching
+// the field name case-insensitively (RFC 9110 Section 5.1). fieldname.First
+// also steps over a present-but-empty first line, so a value on a later line
+// is found and this agrees with GetAll on whether the field is there.
+	return fieldname.First(&r.c.fasthttp.Request.Header, name, !r.c.app.config.DisableHeaderNormalizing)
+	v, err := genericParseType[V](c.App().toString(c.Req().headerField(key)))
+	rawScheme, rawCredentials := r.authorizationParts()
+	app := r.c.app
+	return app.toString(rawScheme), app.toString(rawCredentials)
+}
+
+// authorizationParts splits the Authorization header at the first space or tab
+// (RFC 9110 Section 11.4), on raw bytes so each caller materializes only the
+// strings it needs. A lone token is a scheme without credentials.
+func (r *DefaultReq) authorizationParts() (scheme, credentials []byte) { //nolint:nonamedreturns // the two halves need naming for clarity
+		return nil, nil
+		return raw, nil
+	return raw[:i], utils.TrimSpace(raw[i+1:])
+	scheme, credentials := r.authorizationParts()
+	if len(credentials) == 0 || !utils.EqualFold(utils.UnsafeString(scheme), "Bearer") {
+	return r.c.app.toString(credentials)
+	hdr := &r.c.fasthttp.Request.Header
+	canonical := !r.c.app.config.DisableHeaderNormalizing
+	if !headerListContainsToken(fieldname.Lines(hdr, HeaderConnection, canonical), "upgrade") {
+	return headerListContainsToken(fieldname.Lines(hdr, HeaderUpgrade, canonical), "websocket")
+	return utils.EqualFold(r.headerField(HeaderXRequestedWith), xmlHTTPRequestBytes)

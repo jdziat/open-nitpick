@@ -1,0 +1,71 @@
+// commit 2b352ab0b914 2026-01-05T13:27:32+01:00 pkg/github/repositories.go
+			var repositoryIsEmpty bool
+			var branchNotFound bool
+				ghErr, isGhErr := err.(*github.ErrorResponse)
+				if isGhErr {
+					if ghErr.Response.StatusCode == http.StatusConflict && ghErr.Message == "Git Repository is empty." {
+						repositoryIsEmpty = true
+					} else if ghErr.Response.StatusCode == http.StatusNotFound {
+						branchNotFound = true
+					}
+				}
+
+				if !repositoryIsEmpty && !branchNotFound {
+					return ghErrors.NewGitHubAPIErrorResponse(ctx,
+						"failed to get branch reference",
+						resp,
+						err,
+					), nil, nil
+				}
+			}
+			// Only close resp if it's not nil and not an error case where resp might be nil
+			if resp != nil && resp.Body != nil {
+				defer func() { _ = resp.Body.Close() }()
+			var baseCommit *github.Commit
+			if !repositoryIsEmpty {
+				if branchNotFound {
+					ref, err = createReferenceFromDefaultBranch(ctx, client, owner, repo, branch)
+					if err != nil {
+						return utils.NewToolResultError(fmt.Sprintf("failed to create branch from default: %v", err)), nil, nil
+					}
+				}
+
+				// Get the commit object that the branch points to
+				baseCommit, resp, err = client.Git.GetCommit(ctx, owner, repo, *ref.Object.SHA)
+				if err != nil {
+					return ghErrors.NewGitHubAPIErrorResponse(ctx,
+						"failed to get base commit",
+						resp,
+						err,
+					), nil, nil
+				}
+				if resp != nil && resp.Body != nil {
+					defer func() { _ = resp.Body.Close() }()
+				}
+			} else {
+				var base *github.Commit
+				// Repository is empty, need to initialize it first
+				ref, base, err = initializeRepository(ctx, client, owner, repo)
+				if err != nil {
+					return utils.NewToolResultError(fmt.Sprintf("failed to initialize repository: %v", err)), nil, nil
+				}
+
+				defaultBranch := strings.TrimPrefix(*ref.Ref, "refs/heads/")
+				if branch != defaultBranch {
+					// Create the requested branch from the default branch
+					ref, err = createReferenceFromDefaultBranch(ctx, client, owner, repo, branch)
+					if err != nil {
+						return utils.NewToolResultError(fmt.Sprintf("failed to create branch from default: %v", err)), nil, nil
+					}
+				}
+
+				baseCommit = base
+			// Create tree entries for all files (or remaining files if empty repo)
+			// Create a new tree with the file entries (baseCommit is now guaranteed to exist)
+			if resp != nil && resp.Body != nil {
+				defer func() { _ = resp.Body.Close() }()
+			}
+			// Create a new commit (baseCommit always has a value now)
+			if resp != nil && resp.Body != nil {
+				defer func() { _ = resp.Body.Close() }()
+			}

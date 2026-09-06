@@ -1,0 +1,37 @@
+// commit 5d77247a5a77 2026-06-10T15:15:23+01:00 pkg/cmd/discussion/view/view.go
+	if opts.Comments {
+		return printRawComments(opts.IO.Out, discussion.Comments)
+	}
+
+	return printRawView(opts.IO.Out, discussion)
+func printRawView(out io.Writer, d *client.Discussion) error {
+	return nil
+}
+
+// printRawComments writes the comments as a sequence of metadata blocks,
+// without any discussion-level fields or nested replies. Comments are
+// printed in chronological order regardless of how they were fetched.
+func printRawComments(out io.Writer, list client.DiscussionCommentList) error {
+	comments := slices.Clone(list.Comments)
+	if list.Direction == client.DiscussionCommentListDirectionBackward {
+		slices.Reverse(comments)
+	}
+
+	for _, c := range comments {
+		printRawComment(out, c)
+func printRawComment(out io.Writer, c client.DiscussionComment) {
+	fmt.Fprintf(out, "author:\t%s\n", c.Author.Login)
+	fmt.Fprintf(out, "created:\t%s\n", c.CreatedAt.Format(time.RFC3339))
+	fmt.Fprintf(out, "url:\t%s\n", c.URL)
+		fmt.Fprintln(out, "answer:\ttrue")
+	fmt.Fprintln(out, "--")
+	fmt.Fprintln(out, c.Body)
+	fmt.Fprintln(out, "--")
+// printRawReplies writes the replies of a comment as a sequence of metadata
+// blocks, without any fields of the parent comment. Replies are printed in
+// chronological order regardless of how they were fetched.
+	replies := slices.Clone(c.Replies.Comments)
+	if c.Replies.Direction == client.DiscussionCommentListDirectionBackward {
+		slices.Reverse(replies)
+	for _, reply := range replies {
+		printRawComment(out, reply)

@@ -1,0 +1,32 @@
+# commit 2d4f9e6882e8 2025-06-25T11:48:41+02:00 eval/judge_system.py
+	last_message: str,
+
+	Args:
+		task: The original task description
+		complete_history: Full execution history with steps and results
+		final_result: The final result returned to the user
+		last_message: The agent's final message/output before completion
+		screenshot_paths: List of screenshot file paths from execution
+		model: The LLM model to use for evaluation
+		max_images: Maximum number of images to include in evaluation
+	last_message_truncated = truncate_text(last_message or 'No last message', 40000)
+**IMPORTANT: DO NOT EVALUATE FOR HALLUCINATION**
+The agent has access to more information than you can see (browser_state text content, full DOM context, etc.). If the agent states something as fact or provides specific data, assume it is correct and extracted from information available to the agent. Focus on evaluating trajectory quality, tool usage, and task completion rather than data accuracy.
+
+**AGENT'S LAST MESSAGE:**
+{last_message_truncated}
+
+	last_message: str,
+
+	Args:
+		task: The original task description
+		complete_history: Full execution history with steps and results
+		final_result: The final result returned to the user
+		last_message: The agent's final message/output before completion
+		screenshot_paths: List of screenshot file paths from execution
+		model: The LLM model to use for evaluation
+		max_retries: Maximum number of retry attempts
+		max_images: Maximum number of images to include in evaluation
+				last_message,
+		last_message = result_data.get('last_message', '')
+			last_message=last_message,

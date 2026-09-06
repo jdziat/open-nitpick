@@ -1,0 +1,83 @@
+// commit 0c2b360e401b 2025-11-26T16:04:44-08:00 common/persistence/execution_manager.go
+	"runtime/debug"
+	"go.temporal.io/server/chasm"
+	"go.temporal.io/server/common/softassert"
+	archetypeID, _ := m.assertAndConvertArchetypeID(request.ArchetypeID, "CreateWorkflowExecution")
+		ArchetypeID:              archetypeID,
+	archetypeID, _ := m.assertAndConvertArchetypeID(request.ArchetypeID, "UpdateWorkflowExecution")
+		ArchetypeID: archetypeID,
+
+			archetypeID,
+	archetypeID, _ := m.assertAndConvertArchetypeID(request.ArchetypeID, "ConflictResolveWorkflowExecution")
+		ArchetypeID: archetypeID,
+
+			archetypeID,
+				archetypeID,
+	if archetypeID, converted := m.assertAndConvertArchetypeID(request.ArchetypeID, "GetWorkflowExecution"); converted {
+		request = &GetWorkflowExecutionRequest{
+			ShardID:     request.ShardID,
+			NamespaceID: request.NamespaceID,
+			WorkflowID:  request.WorkflowID,
+			RunID:       request.RunID,
+			ArchetypeID: archetypeID,
+		}
+	}
+	archetypeID, _ := m.assertAndConvertArchetypeID(request.ArchetypeID, "SetWorkflowExecution")
+		ArchetypeID: archetypeID,
+
+	_ context.Context,
+	if archetypeID, converted := m.assertAndConvertArchetypeID(request.ArchetypeID, "DeleteWorkflowExecution"); converted {
+		request = &DeleteWorkflowExecutionRequest{
+			ShardID:     request.ShardID,
+			NamespaceID: request.NamespaceID,
+			WorkflowID:  request.WorkflowID,
+			RunID:       request.RunID,
+			ArchetypeID: archetypeID,
+		}
+	}
+
+	if archetypeID, converted := m.assertAndConvertArchetypeID(request.ArchetypeID, "DeleteCurrentWorkflowExecution"); converted {
+		request = &DeleteCurrentWorkflowExecutionRequest{
+			ShardID:     request.ShardID,
+			NamespaceID: request.NamespaceID,
+			WorkflowID:  request.WorkflowID,
+			RunID:       request.RunID,
+			ArchetypeID: archetypeID,
+		}
+	}
+
+	if archetypeID, converted := m.assertAndConvertArchetypeID(request.ArchetypeID, "GetCurrentExecution"); converted {
+		request = &GetCurrentExecutionRequest{
+			ShardID:     request.ShardID,
+			NamespaceID: request.NamespaceID,
+			WorkflowID:  request.WorkflowID,
+			ArchetypeID: archetypeID,
+		}
+	}
+
+	archetypeID, _ := m.assertAndConvertArchetypeID(input.ArchetypeID, "AddHistoryTasks")
+		ArchetypeID: archetypeID,
+	archetypeID chasm.ArchetypeID,
+		ArchetypeID: archetypeID,
+func (m *executionManagerImpl) assertAndConvertArchetypeID(
+	archetypeID chasm.ArchetypeID,
+	methodName string,
+) (chasm.ArchetypeID, bool) {
+	if !softassert.That(
+		m.logger,
+		archetypeID != chasm.UnspecifiedArchetypeID,
+		"ArchetypeID not specified, defaulting to Workflow.",
+		tag.Operation(methodName),
+		tag.SysStackTrace(string(debug.Stack())),
+	) {
+		return chasm.WorkflowArchetypeID, true
+	}
+
+	// This is a temporary exception to allow Schedules run in the same ID space as workflows.
+	if archetypeID == chasm.SchedulerArchetypeID {
+		return chasm.WorkflowArchetypeID, true
+	}
+
+	return archetypeID, false
+}
+

@@ -1,0 +1,33 @@
+// commit 3f67b7e2c068 2026-08-25T15:52:53+02:00 pkg/inventory/server_tool.go
+// ScopeVisibility reports whether a token can use any form of a tool.
+type ScopeVisibility func(activeScopes []string) bool
+
+// ScopeChallenge returns the exact scopes to include in an OAuth challenge.
+// An empty result means the call can continue.
+type ScopeChallenge func(arguments map[string]any, activeScopes []string) []string
+
+// ScopeAccess contains scope metadata and the two checks used by the server.
+type ScopeAccess struct {
+	// Scopes lists every scope this tool may request. It is used for
+	// documentation and the list-scopes command.
+	Scopes []string
+
+	// Visible is used when filtering tools for a fixed-scope token.
+	// Nil means the tool remains visible.
+	Visible ScopeVisibility
+
+	// Challenge evaluates one call before its handler runs.
+	// Nil means the call does not use OAuth scope challenges.
+	Challenge ScopeChallenge
+}
+
+	// ScopeAccess controls fixed-token visibility and per-call OAuth challenges.
+	ScopeAccess ScopeAccess
+	// Project owner/repo routing params to standard MCP-Param-* headers (SEP-2243)
+	// so a remote proxy can route requests without re-parsing the JSON-RPC body.
+	// No-op for tools without these params.
+// HeaderParams maps owner/repo input properties to the MCP-Param-* headers a
+// header-aware proxy reads for repository routing. The enforcement test in
+// pkg/github guards full coverage.
+// AnnotateHeaderParams returns a copy of tool whose owner/repo input properties
+// carry an "x-mcp-header" annotation, which the

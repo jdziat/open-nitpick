@@ -1,0 +1,45 @@
+// commit 1c0ec34449b9 2026-07-07T11:24:52+02:00 packages/vitest/src/node/plugins/workspace.ts
+import type * as vite from 'vite'
+import type { PluginHarness } from '../config/pluginHarness'
+import type { ResolvedConfig, TestProjectInlineConfiguration } from '../types/config'
+import { VitestConfig } from './config'
+import { VitestConfigServer } from './server'
+import { SsrRunnerFixerPlugin } from './ssrRunnerFixer'
+  harness: PluginHarness,
+  globalViteConfig: vite.ResolvedConfig,
+  globalConfig: ResolvedConfig,
+): VitePlugin[] {
+  return [
+      enforce: 'post',
+        const root = options.root || testConfig.root || viteConfig.root
+        const config: ViteConfig = {
+          base: '/',
+              allow: globalViteConfig.server.fs.allow,
+        // TODO: remove this after "extends: false" is flipped
+        testConfig.experimental ??= {}
+
+        // always inherit the global `fsModuleCache` value even without `extends: true`
+        if (testConfig.experimental?.fsModuleCache == null && globalConfig.experimental?.fsModuleCache != null) {
+          testConfig.experimental.fsModuleCache = globalConfig.experimental.fsModuleCache
+        if (testConfig.experimental?.fsModuleCachePath == null && globalConfig.experimental?.fsModuleCachePath != null) {
+          testConfig.experimental.fsModuleCachePath = globalConfig.experimental.fsModuleCachePath
+        if (testConfig.experimental?.viteModuleRunner == null && globalConfig.experimental?.viteModuleRunner != null) {
+          testConfig.experimental.viteModuleRunner = globalConfig.experimental.viteModuleRunner
+        }
+        if (testConfig.experimental?.nodeLoader == null && globalConfig.experimental?.nodeLoader != null) {
+          testConfig.experimental.nodeLoader = globalConfig.experimental.nodeLoader
+        }
+        if (testConfig.experimental?.importDurations == null && globalConfig.experimental?.importDurations != null) {
+          testConfig.experimental.importDurations = globalConfig.experimental.importDurations
+      configResolved(config) {
+        // Projects always inherit non-project config options
+        config.test.coverage = globalConfig.coverage
+        config.test.attachmentsDir = globalConfig.attachmentsDir
+        // project servers never watch; the top-level server owns the watcher
+        config.server.watch = null
+    VitestConfigServer(harness, globalConfig),
+    SsrRunnerFixerPlugin(harness),
+    ...CSSEnablerPlugin(),
+    CoverageTransform(harness),
+    ...VitestConfig(harness),
+    VitestProjectResolver(harness),

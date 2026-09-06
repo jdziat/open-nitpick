@@ -1,0 +1,31 @@
+# commit 558987464c23 2026-06-18T10:47:45+02:00 src/huggingface_hub/hf_api.py
+        container_command: list[str] | None = None,
+        container_args: list[str] | None = None,
+        type: InferenceEndpointType | str = InferenceEndpointType.AUTHENTICATED,
+                Inference Endpoint running on the `text-generation-inference` (TGI) framework or a custom container
+                (see examples).
+            container_command (`list[str]`, *optional*):
+                Override the container entrypoint command (maps to `model.command` in the API payload). Typically
+                used together with `custom_image`.
+            container_args (`list[str]`, *optional*):
+                Arguments appended to the container entrypoint (maps to `model.args` in the API payload). Typically
+                used together with `custom_image` to pass runtime flags to the container.
+                The type of the Inference Endpoint, which can be `"authenticated"` (default), `"public"` or
+                `"private"`. `"protected"` is deprecated in favor of `"authenticated"` and will be removed in a
+                future release.
+            ...     type="authenticated",
+            ...     type="authenticated",
+            ...         "healthRoute": "/health",
+            ...     type="authenticated",
+        if type == InferenceEndpointType.PROTECTED:
+            warnings.warn(
+                "`type='protected'` is deprecated and will be removed in a future release. "
+                "Use `type='authenticated'` instead.",
+                FutureWarning,
+            )
+
+        model_payload: dict[str, Any] = payload["model"]
+        if container_command is not None:
+            model_payload["command"] = container_command
+        if container_args is not None:
+            model_payload["args"] = container_args

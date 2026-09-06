@@ -1,0 +1,37 @@
+# commit 9e0493cfdb4d 2025-07-16T10:57:43+02:00 src/huggingface_hub/inference/_mcp/cli.py
+        resolved_inputs: dict[str, str] = {}
+
+                env_special_value = f"${{input:{input_id}}}"
+                # Check if the input is used by any server or as an apiKey
+                input_usages = set()
+                            input_usages.add(key)
+
+                raw_api_key = config.get("apiKey")
+                if isinstance(raw_api_key, str) and env_special_value in raw_api_key:
+                    input_usages.add("apiKey")
+                if not input_usages:
+                    print(
+                        f"[yellow]Input '{input_id}' defined in config but not used by any server or as an API key."
+                        " Skipping.[/yellow]"
+                    )
+                # Fallback to environment variable when user left blank
+                final_value = user_input
+                if not final_value:
+                    final_value = os.getenv(env_variable_key, "")
+                    if final_value:
+                        print(f"[green]Value successfully loaded from '{env_variable_key}'[/green]")
+                    else:
+                        print(
+                            f"[yellow]No value found for '{env_variable_key}' in environment variables. Continuing.[/yellow]"
+                        )
+                resolved_inputs[input_id] = final_value
+
+                # Inject resolved value (can be empty) into stdio's env or http/sse's headers
+                            env_or_headers[key] = env_or_headers[key].replace(env_special_value, final_value)
+        raw_api_key = config.get("apiKey")
+        if isinstance(raw_api_key, str):
+            substituted_api_key = raw_api_key
+            for input_id, val in resolved_inputs.items():
+                substituted_api_key = substituted_api_key.replace(f"${{input:{input_id}}}", val)
+            config["apiKey"] = substituted_api_key
+            api_key=config.get("apiKey"),

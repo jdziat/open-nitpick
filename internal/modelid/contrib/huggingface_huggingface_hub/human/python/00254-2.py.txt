@@ -1,0 +1,31 @@
+# commit cb65cd66c7ec 2026-01-20T13:55:31+01:00 src/huggingface_hub/hf_api.py
+from ._jobs_api import JobHardware, JobInfo, JobSpec, ScheduledJobInfo, _create_job_spec
+    def list_jobs_hardware(self, token: Union[bool, str, None] = None) -> list[JobHardware]:
+        """
+        List available hardware options for Jobs on Hugging Face infrastructure.
+
+        Returns:
+            `list[JobHardware]`: A list of available hardware configurations.
+
+        Example:
+
+        ```python
+        >>> from huggingface_hub import HfApi
+        >>> api = HfApi()
+        >>> hardware_list = api.list_jobs_hardware()
+        >>> hardware_list[0]
+        JobHardware(name='cpu-basic', pretty_name='CPU Basic', cpu='2 vCPU', ram='16 GB', accelerator=None, unit_cost_micro_usd=167, unit_cost_usd=0.000167, unit_label='minute')
+        >>> hardware_list[0].name
+        'cpu-basic'
+
+        # Filter GPU options
+        >>> gpu_hardware = [hw for hw in hardware_list if hw.accelerator is not None]
+        >>> gpu_hardware[0].accelerator.model
+        'T4'
+        ```
+        """
+        response = get_session().get(f"{self.endpoint}/api/jobs/hardware", headers=self._build_hf_headers(token=token))
+        hf_raise_for_status(response)
+        return [JobHardware(**hardware) for hardware in response.json()]
+
+list_jobs_hardware = api.list_jobs_hardware

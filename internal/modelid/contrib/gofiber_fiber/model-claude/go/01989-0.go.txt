@@ -1,0 +1,37 @@
+// commit ed6cc9ef5357 2026-08-23T16:35:33+02:00 middleware/redirect/redirect.go
+	// back and count what it permits instead. quantified marks the construct
+	// just read as a quantifier itself, since the "?" following one is Go's
+	// non-greedy marker rather than a second quantifier of its own.
+	atom, prev, quantified := 1, 1, false
+			atom, prev, quantified = 1, n, false
+			atom, prev, quantified = s.classWidth(), n, false
+			atom, prev, quantified = 256, n, false
+			prev, quantified = n, false
+			total, n, atom, prev, quantified = clampWidth(total+n), 1, 1, 1, false
+			// A "?" following a quantifier only says the repetition is not
+			// greedy, and "/p/[b]+?" matches what "/p/[b]+" does: counting it
+			// as an atom that may be absent widened the narrower of a pair.
+			if !quantified {
+				// An atom that may be absent matches everything it does and
+				// one path more, so "/p/*a?" is wider than the "/p/*a" it ties
+				// with — and wider than "/p/*[a]*", which the count sorts below.
+				n, prev = repeated(prev, atom, 0, 1), n
+			}
+			atom, quantified = 1, true
+		case '+':
+			// The run it names is ranked by carriesRun rather than measured
+			// here, but it is a quantifier still: the "?" that may follow is
+			// Go's non-greedy marker.
+			atom, prev, quantified = 1, n, true
+			atom, quantified = 1, true
+			atom, prev, quantified = 1, n, false
+// maxRepeatCount is the largest count Go's regexp parser takes in a "{m,n}",
+// above which it refuses the pattern outright: regexp/syntax spells it 1000.
+const maxRepeatCount = 1000
+
+	// Go's parser refuses a count above maxRepeatCount, so a rule carrying one
+	// never compiles and the braces are left to be read as they stand. Capped
+	// here as well as there, since the sort measures a rule before it is
+	// compiled: walking to a bound of a billion spent seconds of startup on a
+	// rule that was going to be rejected anyway.
+	if err != nil || n > maxRepeatCount {

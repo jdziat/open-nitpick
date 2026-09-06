@@ -1,0 +1,107 @@
+// commit 1c0ec34449b9 2026-07-07T11:24:52+02:00 test/test-utils/index.ts
+import type { FSWatcher, UserConfig as ViteUserConfig } from 'vite'
+import { Logger, PluginHarness, resolveConfig, startVitest } from 'vitest/node'
+export function createConsole({ tty, std }: { tty?: boolean; std?: 'inherit' } = {}) {
+  const stdout = new Writable({
+    write(chunk, __, callback) {
+      if (std === 'inherit') {
+        process.stdout.write(chunk.toString())
+      }
+      callback()
+    },
+  })
+
+  if (tty) {
+    (stdout as typeof process.stdout).isTTY = true
+  }
+
+  const stderr = new Writable({
+    write(chunk, __, callback) {
+      if (std === 'inherit') {
+        process.stderr.write(chunk.toString())
+      }
+      callback()
+    },
+  })
+
+  // "node:tty".ReadStream doesn't work on Github Windows CI, let's simulate it
+  const stdin = new Readable({ read: () => '' }) as NodeJS.ReadStream
+  stdin.isTTY = true
+  stdin.setRawMode = () => stdin
+
+  return {
+    stdin,
+    stdout,
+    stderr,
+  }
+}
+
+export async function resolveTestConfig(
+  config: RunVitestConfig,
+  runnerOptions: VitestRunnerCLIOptions = {},
+) {
+  const { stdout, stderr, stdin } = createConsole(runnerOptions)
+
+  const cli = new Cli({ stdin, stdout, stderr, preserveAnsi: runnerOptions.preserveAnsi })
+  const { $cliOptions, $viteConfig, ...restConfig } = config
+  const harness = new PluginHarness(new Logger(stdout, stderr))
+  const resolved = await resolveConfig(
+    { config: false, ...$cliOptions },
+    { ...$viteConfig, test: restConfig },
+    harness,
+  )
+  return {
+    config: resolved,
+    vitest: cli,
+    stdout: cli.stdout,
+    stderr: cli.stderr,
+  }
+}
+
+  const { stdout, stderr, stdin } = createConsole(runnerOptions)
+  // In watch mode, `startVitest` can resolve before the file watcher finished
+  // its initial scan (especially in standalone mode, which doesn't run any
+  // tests on startup). A test file created right after would be folded into the
+  // watcher's baseline and ignored, so newly added files wouldn't trigger a
+  // rerun. Wait for the watcher to be ready before handing control back.
+  if (watch && ctx) {
+    await waitForWatcherReady(ctx.vite.watcher, ctx.config.root)
+  }
+
+// In watch mode `startVitest` can resolve before the file watcher has finished
+// establishing itself. chokidar's `ready`/`_readyEmitted` fires after the
+// initial scan, but with polling the root directory isn't fully watched for new
+// children until its parent shows up in `getWatched()`. A test file created
+// before that point gets folded into the watcher's baseline and never emits an
+// `add` event, so newly added files wouldn't trigger a rerun. Wait for both
+// signals (with a timeout safety net) before handing control back.
+async function waitForWatcherReady(watcher: FSWatcher, root: string): Promise<void> {
+  const slash = (p: string) => p.replace(/\\/g, '/')
+  const parent = slash(dirname(root))
+  const deadline = Date.now() + 2000
+  while (Date.now() < deadline) {
+    const isReady = (watcher as { _readyEmitted?: boolean })._readyEmitted
+    const watchesParent = Object.keys(watcher.getWatched()).some(dir => slash(dir) === parent)
+    if (isReady && watchesParent) {
+      return
+    }
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+}
+
+export function useTmpFS<T extends TestFsStructure>(structure: T, ensureConfig = true, task?: TestContext['task']) {
+  const root = resolve(process.cwd(), `vitest-test-${crypto.randomUUID()}`)
+  return useFS(root, structure, ensureConfig, task)
+}
+
+  task?.context.signal.addEventListener('abort', () => {
+    if (process.env.VITEST_FS_CLEANUP !== 'false') {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+    readdir: (file: string): string[] => {
+      return fs.readdirSync(resolve(root, file))
+    },
+  const fs = useTmpFS(structure, undefined, task ?? TestRunner.getCurrentTest())
+    root: fs.root,
+    root: fs.root,
