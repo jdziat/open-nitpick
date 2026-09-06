@@ -48,8 +48,8 @@ jobs:
         with:
           github-token: ${{ steps.app.outputs.token || github.token }}
           # Must agree with .nitpick.yaml. The config file wins on provider and
-          # model — these inputs only reach LLM_PROVIDER/LLM_MODEL, which are a
-          # fallback for what the file does not say — but api-key is passed as
+          # model; these inputs only reach LLM_PROVIDER/LLM_MODEL, which are a
+          # fallback for what the file does not say, but api-key is passed as
           # LLM_API_KEY regardless, so naming a different vendor's secret here
           # would hand that credential to whatever endpoint the file selected.
           provider: synthetic
