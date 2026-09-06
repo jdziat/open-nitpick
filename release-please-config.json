@@ -4,14 +4,43 @@
   "include-component-in-tag": false,
   "bump-minor-pre-major": false,
   "changelog-sections": [
-    { "type": "feat", "section": "Features" },
-    { "type": "fix", "section": "Fixes" },
-    { "type": "perf", "section": "Performance" },
-    { "type": "evals", "section": "Measurement" },
-    { "type": "prompt", "section": "Prompts" },
-    { "type": "docs", "section": "Documentation" },
-    { "type": "ci", "section": "CI", "hidden": true },
-    { "type": "chore", "section": "Chores", "hidden": true }
+    {
+      "type": "feat",
+      "section": "Features"
+    },
+    {
+      "type": "fix",
+      "section": "Fixes"
+    },
+    {
+      "type": "perf",
+      "section": "Performance"
+    },
+    {
+      "type": "evals",
+      "section": "Measurement"
+    },
+    {
+      "type": "prompt",
+      "section": "Prompts"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation"
+    },
+    {
+      "type": "ci",
+      "section": "CI",
+      "hidden": true
+    },
+    {
+      "type": "chore",
+      "section": "Chores",
+      "hidden": true
+    }
   ],
-  "packages": { ".": {} }
+  "packages": {
+    ".": {}
+  },
+  "release-as": "1.0.0"
 }
