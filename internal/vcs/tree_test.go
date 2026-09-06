@@ -84,3 +84,19 @@ func TestTreePullRequestDescribesTheReviewNotAChange(t *testing.T) {
 		t.Errorf("title %q body %q", pr.Title, pr.Body)
 	}
 }
+
+func TestLocalDiffIsTheMergeBaseDiff(t *testing.T) {
+	dir := newRepo(t)
+	base := strings.TrimSpace(gitIn(t, dir, "rev-parse", "HEAD"))
+	write(t, dir, "b.go", "package b\n")
+	gitIn(t, dir, "add", "-A")
+	gitIn(t, dir, "commit", "-qm", "add b")
+	head := strings.TrimSpace(gitIn(t, dir, "rev-parse", "HEAD"))
+	out, err := localDiff(context.Background(), dir, base, head)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), "+++ b/b.go") {
+		t.Errorf("diff lacks the added file:\n%s", out)
+	}
+}
