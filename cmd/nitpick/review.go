@@ -541,6 +541,13 @@ func runExplainConfig(args []string) error {
 		return err
 	}
 
+	return explainConfig(os.Stdout, repo, configPath, forPath)
+}
+
+// explainConfig writes the resolved configuration to w. Shared by the
+// command and the MCP server.
+func explainConfig(w io.Writer, repo, configPath, forPath string) error {
+	var b strings.Builder
 	root, err := filepath.Abs(repo)
 	if err != nil {
 		return err
@@ -556,7 +563,7 @@ func runExplainConfig(args []string) error {
 		source = fmt.Sprintf("(defaults and environment; no config file at %s)", cfg.Missing)
 	}
 
-	fmt.Println("Config source:", source)
+	b.WriteString(fmt.Sprintln("Config source:", source))
 
 	// Where the file is and which policy applies are different questions, and
 	// they have different answers for exactly one change: the one that edits
@@ -571,17 +578,17 @@ func runExplainConfig(args []string) error {
 	// one the defaults-fallback failure recommends.
 	switch rel, inRepo := cfg.RepoRelative(root); {
 	case inRepo:
-		fmt.Printf("Policy source:  this file, unless the change under review edits it.\n"+
+		b.WriteString(fmt.Sprintf("Policy source:  this file, unless the change under review edits it.\n"+
 			"                A change may not supply the policy it is reviewed under, so a change\n"+
 			"                that edits %s is reviewed under the version of it at the base\n"+
 			"                revision — or under built-in defaults when none can be read. Defaults\n"+
 			"                name no model, so that last fallback needs %s and %s set.\n",
-			rel, config.EnvProvider, config.EnvModel)
+			rel, config.EnvProvider, config.EnvModel))
 	case cfg.Source != "":
-		fmt.Printf("Policy source:  this file, always. It is outside %s, so no change under\n"+
-			"                review can edit it and nothing substitutes it away.\n", root)
+		b.WriteString(fmt.Sprintf("Policy source:  this file, always. It is outside %s, so no change under\n"+
+			"                review can edit it and nothing substitutes it away.\n", root))
 	}
-	fmt.Println()
+	b.WriteString("\n")
 
 	// The keys sanitize discarded, named here as well as in the review log.
 	// This command exists to answer "what does my config actually resolve to",
@@ -591,23 +598,23 @@ func runExplainConfig(args []string) error {
 	// was dropped is also what makes the empty case evidence rather than the
 	// same output any config would produce.
 	if len(cfg.Dropped) > 0 {
-		fmt.Println("Ignored (untrusted config; set NITPICK_TRUST_CONFIG_ENDPOINTS=1 where you control the file):")
+		b.WriteString(fmt.Sprintln("Ignored (untrusted config; set NITPICK_TRUST_CONFIG_ENDPOINTS=1 where you control the file):"))
 		for _, key := range cfg.Dropped {
-			fmt.Printf("  %s\n", key)
+			b.WriteString(fmt.Sprintf("  %s\n", key))
 		}
-		fmt.Println()
+		b.WriteString("\n")
 	}
 
 	printModel := func(role config.Role) {
 		spec := cfg.Models.ResolveModel(role)
-		fmt.Printf("  %-8s %s/%s", role, spec.Provider, spec.Model)
+		b.WriteString(fmt.Sprintf("  %-8s %s/%s", role, spec.Provider, spec.Model))
 		if spec.BaseURL != "" {
-			fmt.Printf(" @ %s", spec.BaseURL)
+			b.WriteString(fmt.Sprintf(" @ %s", spec.BaseURL))
 		}
-		fmt.Printf("  [structured output: %s]\n", cmp(spec.StructuredOutput, config.StructuredAuto))
+		b.WriteString(fmt.Sprintf("  [structured output: %s]\n", cmp(spec.StructuredOutput, config.StructuredAuto)))
 	}
 
-	fmt.Println("Models:")
+	b.WriteString(fmt.Sprintln("Models:"))
 	printModel(config.RoleReview)
 	printModel(config.RoleTriage)
 	printModel(config.RoleValidate)
@@ -615,27 +622,27 @@ func runExplainConfig(args []string) error {
 	// Printed whether or not validation is on, because "which model would
 	// check my findings" and "is checking switched on" are separate questions
 	// and an operator turning it on wants the answer to the first beforehand.
-	fmt.Printf("\nValidation (a domain expert re-checks each finding before it is published):\n  enabled %t\n  classes %s\n",
-		cfg.Validation.Enabled, describeClasses(cfg.Validation.Classes))
+	b.WriteString(fmt.Sprintf("\nValidation (a domain expert re-checks each finding before it is published):\n  enabled %t\n  classes %s\n",
+		cfg.Validation.Enabled, describeClasses(cfg.Validation.Classes)))
 
-	fmt.Printf("\nGating:\n  fail_on      %s\n  min_severity %s\n", cfg.Review.FailOn, cfg.Review.MinSeverity)
-	fmt.Printf("\nBudget:\n  max_files              %d\n  max_files_per_request  %d\n  token_budget_per_req   %d\n  concurrency            %d\n",
-		cfg.Review.MaxFiles, cfg.Review.MaxFilesPerRequest, cfg.Review.TokenBudgetPerRequest, cfg.Review.Concurrency)
+	b.WriteString(fmt.Sprintf("\nGating:\n  fail_on      %s\n  min_severity %s\n", cfg.Review.FailOn, cfg.Review.MinSeverity))
+	b.WriteString(fmt.Sprintf("\nBudget:\n  max_files              %d\n  max_files_per_request  %d\n  token_budget_per_req   %d\n  concurrency            %d\n",
+		cfg.Review.MaxFiles, cfg.Review.MaxFilesPerRequest, cfg.Review.TokenBudgetPerRequest, cfg.Review.Concurrency))
 
-	fmt.Printf("\nLinters (%s): %s\n", cfg.Linters.Mode, strings.Join(cfg.Linters.Enabled, ", "))
-	fmt.Printf("\nPersona: %s\n", prompt.Describe(cfg.Persona))
+	b.WriteString(fmt.Sprintf("\nLinters (%s): %s\n", cfg.Linters.Mode, strings.Join(cfg.Linters.Enabled, ", ")))
+	b.WriteString(fmt.Sprintf("\nPersona: %s\n", prompt.Describe(cfg.Persona)))
 
 	if forPath != "" {
-		fmt.Printf("\nFor %s:\n", forPath)
+		b.WriteString(fmt.Sprintf("\nFor %s:\n", forPath))
 		if cfg.Ignored(forPath) {
-			fmt.Println("  ignored by review.ignore")
+			b.WriteString(fmt.Sprintln("  ignored by review.ignore"))
 		}
 		instructions := cfg.InstructionsFor(forPath)
 		if len(instructions) == 0 {
-			fmt.Println("  no path-scoped instructions match")
+			b.WriteString(fmt.Sprintln("  no path-scoped instructions match"))
 		}
 		for _, ins := range instructions {
-			fmt.Printf("  - %s\n", ins)
+			b.WriteString(fmt.Sprintf("  - %s\n", ins))
 		}
 	}
 
@@ -648,9 +655,10 @@ func runExplainConfig(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\n===== review prompt =====\n\n%s", p.Explain())
+	b.WriteString(fmt.Sprintf("\n===== review prompt =====\n\n%s", p.Explain()))
 
-	return nil
+	_, err = io.WriteString(w, b.String())
+	return err
 }
 
 func runProviders() error {

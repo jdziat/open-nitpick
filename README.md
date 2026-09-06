@@ -117,6 +117,39 @@ A match is a style similarity against a small corpus of six models, not
 an attribution: a model outside the corpus, or a file a person has
 edited, is reported as whichever of the six it is nearest to.
 
+### From an agent session
+
+```
+nitpick mcp
+```
+
+Serves the review engine to an agent session over the Model Context
+Protocol on stdio: `review` (a change), `full_review` and `repo_score` (a
+tree, with the remediation plan and the coverage notice), `code_smell` and
+`ai_slop` (the tree review filtered to those classes), `identify_model`,
+and `explain_config`. Every tool returns text and structured findings with
+path, line, severity, class, rationale and suggestion; nothing is
+published, and the session decides what to do with what comes back. The
+plugin under [plugins/nitpick](plugins/nitpick) registers the server and
+adds skills that say when to reach for each tool and how to read the
+answer:
+
+```
+/plugin marketplace add jdziat/open-nitpick
+/plugin install nitpick@open-nitpick
+```
+
+Or, without the skills, in a project's `.mcp.json`:
+
+```json
+{"mcpServers": {"nitpick": {"command": "nitpick", "args": ["mcp"]}}}
+```
+
+The binary needs a model configured as for the command line (`.nitpick.yaml`
+in the repository, or `LLM_PROVIDER` and `LLM_MODEL` in the environment);
+a tree tool with no `paths` reviews the whole tree with the model on every
+batch, and the skills say to name paths or a budget.
+
 ### The slop class
 
 `review.slop: true` asks the model for, and publishes, findings in a tenth

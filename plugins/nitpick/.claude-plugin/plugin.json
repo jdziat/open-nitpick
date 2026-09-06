@@ -1,0 +1,12 @@
+{
+  "name": "nitpick",
+  "description": "open-nitpick from an agent session: review a change, review a whole repository with a remediation plan, find code smell and AI slop, and ask which model's style a file is nearest to. The MCP server is the nitpick binary; the skills say when to reach for each tool and what to do with the findings.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Jordan Dziat"
+  },
+  "homepage": "https://github.com/jdziat/open-nitpick",
+  "repository": "https://github.com/jdziat/open-nitpick",
+  "license": "Apache-2.0",
+  "keywords": ["code-review", "mcp", "slop", "security", "linters"]
+}
