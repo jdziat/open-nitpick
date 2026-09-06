@@ -23,6 +23,12 @@ type GitHub struct {
 	// Bot marks published comments so a follow-up run can recognize its own
 	// previous output rather than piling duplicates onto a pull request.
 	Bot string
+
+	// Checkout is a local clone with the pull request's history, when the
+	// caller has one (the Action always does). The API refuses a diff of
+	// more than 300 files; with a checkout the diff is taken from git
+	// instead, which has no such limit.
+	Checkout string
 }
 
 // GitHubOptions configure the provider.
@@ -112,9 +118,26 @@ func (g *GitHub) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 	raw, _, err := g.client.PullRequests.GetRaw(ctx, ref.Owner, ref.Repo, ref.Number,
 		github.RawOptions{Type: github.Diff})
 	if err != nil {
+		if g.Checkout != "" && strings.Contains(err.Error(), "too_large") {
+			pr, prErr := g.PullRequest(ctx, ref)
+			if prErr != nil {
+				return nil, fmt.Errorf("github: get diff for %s: %w (and the pull request could not be read for a local diff: %w)", ref, err, prErr)
+			}
+			out, localErr := localDiff(ctx, g.Checkout, pr.BaseSHA, pr.HeadSHA)
+			if localErr != nil {
+				return nil, fmt.Errorf("github: get diff for %s: %w (and a local diff failed: %w)", ref, err, localErr)
+			}
+			return out, nil
+		}
 		return nil, fmt.Errorf("github: get diff for %s: %w", ref, err)
 	}
 	return []byte(raw), nil
+}
+
+// localDiff is the pull request's diff from a checkout: head against the
+// merge base with base, which is what the API's diff shows.
+func localDiff(ctx context.Context, checkout, base, head string) ([]byte, error) {
+	return (&Local{Dir: checkout}).gitRaw(ctx, "diff", "--no-color", "--no-ext-diff", "--find-renames", base+"..."+head)
 }
 
 // BaseRevision returns the commit the pull request is measured against.

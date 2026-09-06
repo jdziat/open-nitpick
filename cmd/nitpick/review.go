@@ -348,7 +348,7 @@ func selectProvider(f *reviewFlags, repo string) (vcs.Provider, vcs.Ref, error) 
 	// review of the wrong code.
 	if f.dryRun {
 		if wantsPR {
-			gh, err := githubProvider()
+			gh, err := githubProvider(repo)
 			if err != nil {
 				return nil, vcs.Ref{}, err
 			}
@@ -361,7 +361,7 @@ func selectProvider(f *reviewFlags, repo string) (vcs.Provider, vcs.Ref, error) 
 		return local, localRef, nil
 	}
 
-	gh, err := githubProvider()
+	gh, err := githubProvider(repo)
 	if err != nil {
 		return nil, vcs.Ref{}, err
 	}
@@ -369,16 +369,26 @@ func selectProvider(f *reviewFlags, repo string) (vcs.Provider, vcs.Ref, error) 
 }
 
 // githubProvider builds the GitHub provider from the environment.
-func githubProvider() (*vcs.GitHub, error) {
+func githubProvider(repo string) (*vcs.GitHub, error) {
 	token := firstNonEmpty(os.Getenv("NITPICK_GITHUB_TOKEN"), os.Getenv("GITHUB_TOKEN"))
 	if token == "" {
 		return nil, errors.New("reviewing a pull request requires GITHUB_TOKEN")
 	}
 
-	return vcs.NewGitHub(vcs.GitHubOptions{
+	gh, err := vcs.NewGitHub(vcs.GitHubOptions{
 		Token:   token,
 		BaseURL: os.Getenv("GITHUB_API_URL"),
 	})
+	if err != nil {
+		return nil, err
+	}
+	// The checkout the command runs in, for a diff the API refuses as too
+	// large; a directory that is not a clone of the pull request's repository
+	// fails that fallback loudly rather than silently.
+	if _, err := os.Stat(filepath.Join(repo, ".git")); err == nil {
+		gh.Checkout = repo
+	}
+	return gh, nil
 }
 
 // dryRunProvider reads from a real forge but prints the review instead of
