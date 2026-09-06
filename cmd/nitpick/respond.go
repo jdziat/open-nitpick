@@ -101,7 +101,7 @@ func runRespond(ctx context.Context, args []string) error {
 	}
 
 	if cap := cfg.Review.Respond.MaxPerPullRequest; cap > 0 {
-		answered, err := gh.CountBotComments(ctx, ref)
+		answered, err := gh.CountAnswers(ctx, ref)
 		switch {
 		case err != nil:
 			// Not fatal, and not a silent pass either: the cap exists to bound
@@ -181,6 +181,10 @@ func runRespond(ctx context.Context, args []string) error {
 			_ = gh.React(ctx, ref, ev.CommentID, ev.Inline, "confused")
 			return err
 		}
+		// Marked as an answer, which is what review.respond.max_per_pull_request
+		// counts. Without it the cap would count published findings too, and a
+		// review that posted five of them would refuse the first question.
+		answer += "\n\n" + vcs.AnswerMarker
 		if ev.Inline {
 			err = gh.ReplyToReviewComment(ctx, ref, ev.RootID, answer)
 		} else {

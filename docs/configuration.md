@@ -232,9 +232,11 @@ reaction is deliberate: acknowledging a mention tells someone probing that
 something is listening.
 
 **`max_per_pull_request`** bounds the case the list does not, a person or an
-automation inside the set in a loop. The count comes from the reviewer's own
-comments on the pull request, so it survives a re-run and needs nothing
-persisted. Where the count cannot be read, the run says the cap is not being
+automation inside the set in a loop. The count comes from the answers already
+posted on the pull request, so it survives a re-run and needs nothing
+persisted. Answers carry their own marker, so published findings and the
+summary do not count against it: a review that posted five findings would
+otherwise exhaust a cap of five and refuse the first question anybody asked. Where the count cannot be read, the run says the cap is not being
 enforced rather than answering as though it were.
 
 **The workflow should gate too.** `nitpick respond` refuses these comments
