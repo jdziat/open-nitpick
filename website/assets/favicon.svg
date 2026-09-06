@@ -1,13 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="open-nitpick">
-  <rect width="512" height="512" rx="96" fill="#ffffff"/>
-  <g fill="#127482">
-    <rect x="89" y="37" width="311" height="65" rx="10"/>
-    <path d="M37 130h67v14H51v107h53v14H37z"/>
-    <rect x="89" y="289" width="336" height="55" rx="10"/>
-    <rect x="89" y="411" width="290" height="64" rx="10"/>
-  </g>
-  <g fill="#67eac7">
-    <rect x="88" y="169" width="386" height="54" rx="10"/>
-    <path d="M474 256h-60v14h46v93h-46v14h60z"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="334 124 312 312" role="img" aria-label="open-nitpick"><rect x="334" y="124" width="312" height="312" rx="48" fill="#fff"/><defs><linearGradient id="np-brand" gradientUnits="userSpaceOnUse" x1="350" y1="427" x2="631" y2="132"><stop stop-color="#0665cf"/><stop offset="1" stop-color="#10babb"/></linearGradient></defs><g fill="url(#np-brand)"><path d="M588 160C567 142 541 132 512 132c-67 0-121 55-121 124 0 26 8 51 22 71l-54 58c-11 12-11 26 0 36 10 10 25 8 36-3l55-55c18 11 40 17 62 17 67 0 122-55 122-124 0-26-7-50-18-71l-15 14c10 17 16 36 16 57 0 60-47 108-105 108-24 0-46-8-64-23l-65 65c-5 5-10 7-14 3s-2-10 2-14l64-67c-18-19-28-44-28-72 0-60 47-108 105-108 25 0 47 9 65 25Z"/><path fill="#0787ce" d="m466 203 13 10-36 46 36 45-13 11-43-56Zm111 24 24 32-43 56-13-11 35-45-14-20Z"/><path fill="#0ba9b8" d="m479 251 12-12 21 25 97-115h22L512 289Z"/></g></svg>
