@@ -20,9 +20,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
-	"github.com/jdziat/open-nitpick/v2/internal/diff"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // ANALYZER CONFIGURATION IS POLICY, AND POLICY COMES FROM OUTSIDE THE CHANGE.

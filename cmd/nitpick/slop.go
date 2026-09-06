@@ -12,11 +12,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
-	"github.com/jdziat/open-nitpick/v2/internal/fullreview"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
-	"github.com/jdziat/open-nitpick/v2/internal/slop"
-	"github.com/jdziat/open-nitpick/v2/internal/vcs"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/fullreview"
+	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/jdziat/open-nitpick/internal/slop"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // runSlop scores a tree for AI slop and says how to fix it. Two instruments:

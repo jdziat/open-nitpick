@@ -13,9 +13,9 @@ import (
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
-	"github.com/jdziat/open-nitpick/v2/internal/llm"
-	"github.com/jdziat/open-nitpick/v2/internal/prompt"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/jdziat/open-nitpick/internal/prompt"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // Event is one comment that mentioned the reviewer, in either shape GitHub

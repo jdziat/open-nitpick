@@ -5,7 +5,7 @@ import (
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // The findings schema is hand-authored rather than derived from the Result

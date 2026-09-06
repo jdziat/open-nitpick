@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/v2/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/diff"
 )
 
 // TestPathCannotForgePromptStructure is the regression test for an injection

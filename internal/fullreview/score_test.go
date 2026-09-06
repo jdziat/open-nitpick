@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/v2/internal/review"
-	"github.com/jdziat/open-nitpick/v2/internal/vcs"
+	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 func TestScoreIsPerLanguageWithDenominators(t *testing.T) {

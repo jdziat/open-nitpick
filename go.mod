@@ -1,4 +1,4 @@
-module github.com/jdziat/open-nitpick/v2
+module github.com/jdziat/open-nitpick
 
 go 1.25.5
 

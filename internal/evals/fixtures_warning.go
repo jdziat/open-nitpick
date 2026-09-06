@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/v2/internal/config"
+import "github.com/jdziat/open-nitpick/internal/config"
 
 // warningFixtures are the corpus's warning-level plants.
 //

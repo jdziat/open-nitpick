@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/v2/internal/config"
+import "github.com/jdziat/open-nitpick/internal/config"
 
 // MultiFileFixtures is the multi-file corpus: changes whose defect is only
 // visible by reading a file the change does not touch.

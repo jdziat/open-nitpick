@@ -17,8 +17,8 @@ import (
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
-	"github.com/jdziat/open-nitpick/v2/internal/llm"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // The cost block had NO test coverage at all when this file was written, which

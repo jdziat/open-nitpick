@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
-	"github.com/jdziat/open-nitpick/v2/internal/fullreview"
-	"github.com/jdziat/open-nitpick/v2/internal/linters"
-	"github.com/jdziat/open-nitpick/v2/internal/llm"
-	"github.com/jdziat/open-nitpick/v2/internal/review"
-	"github.com/jdziat/open-nitpick/v2/internal/vcs"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/fullreview"
+	"github.com/jdziat/open-nitpick/internal/linters"
+	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // TestFullReviewFixture is the acceptance test for `nitpick full-review`,

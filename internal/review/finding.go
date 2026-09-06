@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // Finding is one issue reported about the change.

@@ -7,7 +7,7 @@ import (
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
-	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // TestUnsetMaxTokensIsNotACap: with nothing configured, an OpenAI-compatible

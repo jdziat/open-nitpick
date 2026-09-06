@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/v2/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/diff"
 )
 
 func TestTreeDiffAddsEveryFileUnderThePathsAndSaysWhatItLeftOut(t *testing.T) {
