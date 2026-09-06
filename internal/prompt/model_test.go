@@ -44,7 +44,7 @@ func TestModelGuidanceIsALayerOnlyForFamiliesThatHaveOne(t *testing.T) {
 	for _, l := range p.Layers {
 		names = append(names, l.Name)
 	}
-	if strings.Join(names, ",") != LayerBase+","+LayerModel {
+	if strings.Join(names, ",") != LayerBase+","+LayerVoice+","+LayerModel {
 		t.Errorf("layers = %v", names)
 	}
 	if !strings.Contains(p.Explain(), "----- layer: model -----") {
