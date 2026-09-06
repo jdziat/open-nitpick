@@ -195,6 +195,18 @@ removes it. The measurements are in
 `nit` < `info` < `warning` < `error` < `critical`. `fail_on: none` never fails
 the build.
 
+## How findings are written
+
+Every prompt carries a voice layer: a title of at most 12 words, a
+rationale of at most 3 sentences, no em dashes, no filler, no hedging as
+prose, no chat. It is in `nitpick explain-config` under `layer: voice`.
+Because a prompt asks and cannot enforce, model-authored prose is scrubbed
+before it is published: em dashes and en-dash separators become commas,
+arrows become words, filler words and chat openers and offers of further
+help are removed, and code spans and fenced blocks are left exactly as the
+model wrote them. The same rules and the same scrub apply to an `@nitpick`
+answer, which is capped at 120 words.
+
 ## The mention
 
 `review.mention` (default `@nitpick`) is the handle a pull request comment
