@@ -108,6 +108,31 @@ in the repository, or `LLM_PROVIDER` and `LLM_MODEL` in the environment);
 a tree tool with no `paths` reviews the whole tree with the model on every
 batch, and the skills say to name paths or a budget.
 
+## AI slop only
+
+```bash
+nitpick slop                       # the whole tree
+nitpick slop docs README.md        # the paths given
+nitpick slop -no-model             # the tells only: free, no credentials
+nitpick slop -json                 # every tell and finding, for a script
+```
+
+Two instruments, each scored per thousand lines, and the fixes ordered by
+how much each would remove. The tells need no model and run first:
+an em dash in prose, an en dash used as a separator, an arrow standing in
+for a word, a filler qualifier (genuinely, honestly, actually, simply), a
+comment written as a chat reply, a comment that restates the line below
+it, a doc comment longer than the declaration it documents, and three
+adjectives of praise in a row. Prose files are scanned whole; source
+files in their comments only, so a string literal is never a tell. Then,
+unless `-no-model`, the model's nine slop rules run through the review
+engine over the same paths, filtered to the slop class, with the
+suggestions the model gave; findings it made outside that class are
+listed rather than dropped, since they were paid for. `-fail-over N`
+exits 1 when the tells exceed N per thousand lines, for a CI gate on
+prose. The MCP tool `ai_slop` returns the same result, with `no_model`
+for the free pass.
+
 ## The slop class
 
 `review.slop: true` asks the model for, and publishes, findings in a tenth

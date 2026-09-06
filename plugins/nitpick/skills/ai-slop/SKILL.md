@@ -7,9 +7,16 @@ description: Find code that reads as generated and left unread, under nine rules
 
 Call `ai_slop` from the nitpick server with `paths` naming what to check,
 relative to the repository root (`repo` as an absolute path when the
-session is not at the root). It is a full review filtered to the slop
-class, so name the paths rather than the tree. To check work you produced
-in this session, pass the files you wrote.
+session is not at the root). It runs two instruments. The tells need no
+model and come back first: em dashes, en dashes as separators, arrows in
+prose, filler qualifiers, chat prose, comments that restate their line,
+doc comments longer than what they document, three adjectives of praise
+in a row; each with its fix, counted per thousand lines. Then the model's
+nine rules below, through the review engine, filtered to the slop class.
+Pass `no_model: true` for the tells alone, which is free and instant; the
+model's pass costs a full review of the paths, so name the paths rather
+than the tree. To check work you produced in this session, pass the files
+you wrote, with `no_model` first.
 
 ## The rules
 
@@ -47,6 +54,8 @@ it is wrong, and saying so is part of the job.
    covered; `covered` and `skipped` are in the answer.
 5. `hidden` lists the findings the review made outside the slop class
    (bugs, security). They were paid for; relay them rather than drop them.
+6. `recommendations` is the fix list ordered by count. Work it from the
+   top: the first item removes the most.
 
 ## What this is not
 
