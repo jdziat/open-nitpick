@@ -147,12 +147,13 @@ type ReviewOut struct {
 // sections, the plan, and what was not covered.
 type TreeOut struct {
 	ReviewOut
-	Sections   string   `json:"sections" jsonschema:"known advisories, security risks, bugs and slop, as text"`
-	Plan       string   `json:"plan" jsonschema:"the remediation plan, most severe first, findings that share a fix grouped"`
-	Covered    []string `json:"covered"`
-	Unbudgeted []string `json:"unbudgeted,omitempty" jsonschema:"files the budget stopped before"`
-	Skipped    []string `json:"skipped,omitempty" jsonschema:"files left out, with the reason"`
-	Score      string   `json:"score,omitempty" jsonschema:"the scorecard, for repo_score"`
+	Sections   string    `json:"sections" jsonschema:"known advisories, security risks, bugs and slop, as text"`
+	Plan       string    `json:"plan" jsonschema:"the remediation plan, most severe first, findings that share a fix grouped"`
+	Covered    []string  `json:"covered"`
+	Unbudgeted []string  `json:"unbudgeted,omitempty" jsonschema:"files the budget stopped before"`
+	Skipped    []string  `json:"skipped,omitempty" jsonschema:"files left out, with the reason"`
+	Score      string    `json:"score,omitempty" jsonschema:"the scorecard, for repo_score"`
+	Hidden     []Finding `json:"hidden,omitempty" jsonschema:"findings outside the class filter; paid for, so listed rather than lost"`
 }
 
 // ReviewIn selects the change.
@@ -280,12 +281,15 @@ func (t *mcpTools) tree(ctx context.Context, in TreeIn, score bool) (*mcp.CallTo
 		for _, c := range in.Classes {
 			want[strings.ToLower(strings.TrimSpace(c))] = true
 		}
-		var kept []Finding
+		var kept, hidden []Finding
 		for _, f := range out.Findings {
 			if want[f.Class] {
 				kept = append(kept, f)
+			} else {
+				hidden = append(hidden, f)
 			}
 		}
+		out.Hidden = hidden
 		// The sections, the plan and the counts follow the filter; the
 		// walkthrough does not, since it was written over everything, so
 		// the text says how many findings the filter kept.
@@ -304,6 +308,12 @@ func (t *mcpTools) tree(ctx context.Context, in TreeIn, score bool) (*mcp.CallTo
 		out.Summary = strings.TrimSpace(out.Summary) + fmt.Sprintf("\n\nFiltered to %s: %d of %d finding(s) shown.", strings.Join(in.Classes, ", "), len(kept), total)
 	}
 	text := reviewText(out.ReviewOut) + "\n\n" + out.Sections + "\n\n" + out.Plan + "\n" + strings.TrimSpace(fullreview.CoverageNotice(tree))
+	if len(out.Hidden) > 0 {
+		text += fmt.Sprintf("\n\n%d finding(s) outside the filter, in hidden:", len(out.Hidden))
+		for _, f := range out.Hidden {
+			text += fmt.Sprintf("\n  [%s/%s] %s:%d  %s", f.Severity, f.Class, f.Path, f.Line, f.Title)
+		}
+	}
 	if out.Score != "" {
 		text += "\n\n" + out.Score
 	}

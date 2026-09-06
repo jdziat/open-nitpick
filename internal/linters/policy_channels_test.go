@@ -684,6 +684,7 @@ func TestTheDirectiveDetectorIsTheGrammarAndNotAPattern(t *testing.T) {
 		{"inside a string literal", "package p\n\nvar s = `\n" + slashes + "line z.go:1\n`\n", 0},
 		{"no line number", "package p\n\n" + slashes + "line z.go\nfunc F() {}\n", 0},
 		{"a directive that renumbers nothing", "package p\n\n" + slashes + "line probe.go:4\nfunc F() {}\n", 0},
+		{"a directive with no token after it", "package p\n\nfunc F() {}\n" + slashes + "line z.go:1\n", 0},
 		{"ordinary source", "package p\n\nfunc F() {}\n", 0},
 	}
 
