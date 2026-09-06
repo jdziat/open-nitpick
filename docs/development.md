@@ -81,7 +81,7 @@ fixtures. The multi-file corpus, `make benchmark-multifile`, is fourteen
 changes whose defect is only visible by reading a file the change does not
 touch; it measures `review.related_context` with the feature off and on,
 against every hosted reviewer with a cached or collectable review:
-Incumbent's CLI, and Contender's once `contender login` has been run. The
+Incumbent's CLI. The
 callers corpus (`FIXTURES='$(CALLERS)'`) is six changes where the file the
 change breaks is an untouched caller, and the info corpus is the severity band
 no reviewer had located. The last three live outside the ground-truth

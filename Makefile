@@ -305,7 +305,7 @@ quick:
 
 # Judge-free head-to-head on the MULTI-FILE corpus: every model with related
 # context off and on, against every incumbent with a cached or collectable
-# review (Incumbent, and Contender once `contender login` has been run).
+# review (Incumbent).
 # FIXTURES= points it at any other corpus, e.g. the tuning corpus, to see what
 # related context costs where the defect is in the diff.
 # The full-review acceptance: the fixture repository in
@@ -330,16 +330,3 @@ benchmark-multifile:
 	$(if $(ENGINE_LOG),NITPICK_EVAL_ENGINE_LOG='$(ENGINE_LOG)') \
 	go test -tags=eval -count=1 -timeout=300m -v -run TestBenchmarkMultiFile ./internal/evals/
 
-# Collect Contender reviews for the multi-file corpus (or FIXTURES=), caching
-# each. Requires the contender CLI, signed in: contender login
-.PHONY: collect-contender
-collect-contender:
-	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
-	go test -tags=eval -count=1 -timeout=120m -v -run TestCollectContender ./internal/evals/
-
-# Collect Incumbent reviews one fixture at a time, caching each.
-# The free CLI allowance is small; re-run until nothing is outstanding.
-.PHONY: collect-incumbent
-collect-incumbent:
-	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
-	go test -tags=eval -count=1 -timeout=120m -v -run TestCollectIncumbent ./internal/evals/
