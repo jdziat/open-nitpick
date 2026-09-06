@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/v2/internal/diff"
 )
 
 // modifiedFile fabricates a diff that changed the given 1-based lines of

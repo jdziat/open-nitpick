@@ -9,7 +9,7 @@
 // network. Run it with `make eval`.
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/jdziat/open-nitpick/v2/internal/config"
 
 // Defect is a bug deliberately planted in a fixture, with enough information to
 // recognize a finding that reports it.

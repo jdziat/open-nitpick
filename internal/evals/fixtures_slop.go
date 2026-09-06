@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/jdziat/open-nitpick/v2/internal/config"
 
 // SlopFixtures is the slop corpus: five rules of the slop class, each as a
 // pair. The planted fixture adds code that matches the rule as written; its

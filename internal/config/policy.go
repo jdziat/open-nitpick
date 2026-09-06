@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/jdziat/open-nitpick/v2/internal/vcs"
 )
 
 // A change may not supply the policy it is reviewed under.

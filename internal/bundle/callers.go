@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/v2/internal/diff"
 )
 
 // Callers: the functions in untouched files that call something the change

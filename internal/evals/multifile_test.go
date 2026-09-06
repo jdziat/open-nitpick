@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
-	"github.com/jdziat/open-nitpick/internal/review"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/jdziat/open-nitpick/v2/internal/diff"
+	"github.com/jdziat/open-nitpick/v2/internal/review"
+	"github.com/jdziat/open-nitpick/v2/internal/vcs"
 )
 
 // TestMultiFileCorpusIsWellFormed is the ground truth for the multi-file

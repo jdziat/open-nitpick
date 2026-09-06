@@ -21,7 +21,7 @@ import (
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/v2/internal/diff"
 )
 
 // numberedPrefix is the width a line number is padded to, by both numberLines

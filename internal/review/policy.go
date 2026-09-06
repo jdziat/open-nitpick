@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/diff"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/diff"
+	"github.com/jdziat/open-nitpick/v2/internal/vcs"
 )
 
 // PolicyResolver decides which configuration a review runs under.
