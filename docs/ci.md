@@ -36,6 +36,36 @@ jobs:
           skip-drafts: true
 ```
 
+**Posting as your own GitHub App.** With the job token the review is posted
+by `github-actions[bot]`. A GitHub App gives it a name and an avatar of your
+choosing, its own permissions, and reviews that count as a reviewer's in
+the pull request sidebar. Create one under your account or organisation
+(Settings, Developer settings, GitHub Apps): no webhook, repository
+permissions Contents read, Metadata read, Pull requests read and write;
+install it on the repositories to review; generate a private key. Save the
+App ID as a repository variable `NITPICK_APP_ID` and the key file's
+contents as a secret `NITPICK_APP_PRIVATE_KEY` (GitHub refuses secret names
+that start with `GITHUB_`). Then mint the token in the job and hand it to
+the Action:
+
+```yaml
+      - name: Token for the review app
+        id: app
+        if: vars.NITPICK_APP_ID != ''
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.NITPICK_APP_ID }}
+          private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
+      - uses: jdziat/open-nitpick@v1
+        with:
+          github-token: ${{ steps.app.outputs.token || github.token }}
+```
+
+The `if` and the `||` make the App optional: a repository without the
+variable posts with the job token as before. The token the step mints
+lasts an hour and is scoped to the installation, so the workflow's
+`permissions` block still governs only the default token.
+
 **What a run does.** The release binary for the runner is downloaded and its
 checksum verified; when no release matches `version`, or the repository is a
 private copy whose releases cannot be fetched, the binary is built from the
