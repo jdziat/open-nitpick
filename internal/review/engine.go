@@ -672,6 +672,15 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// Triage's drops are disclosed exactly as an expert's refutations are:
 	// on the pull request, under "reported, then withheld", with the reason.
 	report.Overruled = append(e.gateOverruled(overruled), withheldByTriage...)
+	// The last thing before the report is assembled: a finding that
+	// reaches a pull request carrying the habits this tool reports in
+	// other people's code is the worst kind of finding, and the prompt's
+	// voice layer asks but cannot enforce.
+	if n := scrubFindings(findings) + scrubOverruled(report.Overruled); n > 0 {
+		e.log().Debug("scrubbed model prose", "pieces", n)
+	}
+	summary, _ = Scrub(summary)
+
 	report.Findings = findings
 	report.Summary = summary
 	report.Counts = counts(findings)

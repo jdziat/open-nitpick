@@ -692,3 +692,41 @@ func TestLocalProviderRendersReview(t *testing.T) {
 		t.Errorf("local output should be clickable:\n%s", out.String())
 	}
 }
+
+// A model that writes an em dash, filler and a chat opener has all three
+// removed before the review is published: the prompt's voice layer asks,
+// this enforces. Code spans are left as the model wrote them.
+func TestPublishedProseIsScrubbed(t *testing.T) {
+	out := mustJSON(t, Result{
+		Summary: "Sure! This change actually adds a retry — with backoff.",
+		Findings: []Finding{{
+			Path: "app.go", Line: 4, Severity: "error", Category: "correctness",
+			Title:     "Deferred close panics — resp is nil",
+			Rationale: "It is actually unchecked. Use `a — b` as written. Let me know if you want more.",
+		}},
+	})
+	model := &scriptedLLM{fallback: out}
+	report, err := newEngine(t, model, &stubProvider{diff: engineDiff}, nil).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if len(report.Findings) != 1 {
+		t.Fatalf("findings = %+v", report.Findings)
+	}
+	f := report.Findings[0]
+	if strings.Contains(f.Title+f.Rationale+report.Summary, "—") && !strings.Contains(f.Rationale, "`a — b`") {
+		t.Errorf("an em dash survived outside code: %+v", f)
+	}
+	if f.Title != "Deferred close panics, resp is nil" {
+		t.Errorf("title = %q", f.Title)
+	}
+	if !strings.Contains(f.Rationale, "`a — b`") {
+		t.Errorf("a code span was rewritten: %q", f.Rationale)
+	}
+	if strings.Contains(f.Rationale, "actually") || strings.Contains(f.Rationale, "Let me know") {
+		t.Errorf("filler or chat survived: %q", f.Rationale)
+	}
+	if strings.HasPrefix(report.Summary, "Sure!") || strings.Contains(report.Summary, "actually") {
+		t.Errorf("summary = %q", report.Summary)
+	}
+}
