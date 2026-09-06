@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/fullreview"
@@ -76,6 +77,13 @@ func runTreeReview(ctx context.Context, name string, args []string, score bool) 
 	cfg.Review.Slop = true
 	cfg.Review.MaxFiles = 1 << 30 // the whole tree is the point; -budget bounds it
 	cfg.Review.Incremental = false
+	// osv-scanner is opt-in for a pull request review because it queries
+	// osv.dev; a whole-tree review wants the known advisories, so it is
+	// named here. Naming it is a request, not a promise: outside strict
+	// mode a binary that is not installed is a skip the roster reports.
+	if !slices.Contains(cfg.Linters.Enabled, "osv-scanner") {
+		cfg.Linters.Enabled = append(cfg.Linters.Enabled, "osv-scanner")
+	}
 
 	tree := vcs.NewTree(vcs.NewLocal(repo, os.Stdout), fs.Args())
 	tree.MaxBytes = cfg.Review.MaxFileBytes

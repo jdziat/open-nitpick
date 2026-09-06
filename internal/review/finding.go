@@ -2,6 +2,7 @@ package review
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -281,3 +282,19 @@ func (c Counts) String() string {
 	}
 	return strings.Join(parts, ", ")
 }
+
+// advisoryRule is the shape of a vulnerability identifier a dependency
+// scanner such as osv-scanner reports as its rule, bare or qualified with
+// the tool's name as the linters package publishes it: "CVE-2020-14040" and
+// "osv-scanner(CVE-2020-14040)" are the same advisory. An anchor on the
+// start of the string alone matched neither form a report ever carried.
+var advisoryRule = regexp.MustCompile(`(^|\()(GHSA-|CVE-|PYSEC-|GO-\d|RUSTSEC-|OSV-|MAL-)`)
+
+// IsAdvisoryRule reports whether an analyzer rule names a published
+// vulnerability advisory.
+func IsAdvisoryRule(rule string) bool { return advisoryRule.MatchString(rule) }
+
+// IsAdvisory reports whether a finding is a known advisory from a dependency
+// scanner: deterministic evidence, which no model pass judges. See
+// Engine.Review, which holds these out of triage and validation.
+func (f Finding) IsAdvisory() bool { return f.FromAnalyzer && IsAdvisoryRule(f.Source) }

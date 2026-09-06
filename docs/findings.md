@@ -1210,3 +1210,48 @@ similar to" with the confidence the classifier reports, and answers
 "unknown" below a confidence of 0.2 or for any other language, saying
 which of those it is. A confident wrong attribution is worse than none.
 
+
+## The advisories section had never worked (2026-09-05, late)
+
+`full-review` promised a section of known advisories from `osv-scanner`,
+listed rather than judged. The section was unverified because the scanner
+was not installed on any machine that had run the fixture. Installing it
+and running `make eval-fullreview` found the section empty, then found the
+advisories in the wrong place, then found them gone, and each step was a
+separate defect that a unit test now pins:
+
+- **No line, no finding.** osv-scanner reports an advisory against the
+  lockfile with no region, and the shared SARIF parser dropped every
+  result without one, so the catalog's "line 1 when the scanner gives
+  none" fallback was unreachable (`TestOSVScannerKeepsAdvisoriesWithoutARegion`).
+- **Opt-in, and nobody opted.** The scanner is not auto-detected because
+  it queries osv.dev, and neither `full-review` nor the eval named it in
+  `linters.enabled`. Both do now; a missing binary is still a skip.
+- **The rule is qualified.** The linters package publishes a rule as
+  `osv-scanner(CVE-2020-14040)`, and every advisory check matched
+  `^CVE-`. No scanner finding had ever been recognized as an advisory
+  (`TestAdvisoryRulesAreRecognizedQualifiedOrBare`).
+- **Triage rewords, and a rewording is a new finding.** Once recognized,
+  the CVEs still went through triage, which reworded them (losing the
+  analyzer attribution, by design) in one run and merged all four into
+  its own "has known CVEs" finding in the next. A CVE is deterministic
+  evidence; it is now held out of triage and validation and rejoined
+  before the ceiling and the gate (`TestKnownAdvisoriesAreNotTriaged`).
+
+Two smaller things from the same runs. The scanner repeats an advisory
+once per path by which the package is reachable (7 results for 4
+advisories on a one-line `go.mod`), so the parser keeps one per rule and
+message. And the remediation plan now sorts a security finding graded
+warning or above with the errors: the model graded the planted credential
+anywhere from warning to info across four runs, and a committed
+credential is an incident to contain before a crash is a bug to fix
+(`TestRemediationPlanPutsASecurityWarningWithTheErrors`).
+
+**One run each, Kimi-K3 on Synthetic, same-day fixture; Rule 15 applies.**
+The final run lists four advisories under their rules, the plan leads
+with them, both plants are located, and the control is silent. The model
+graded the secret `warning` in that run, so it sits sixth, behind the four
+advisories and its own finding on the same pin; the eval asserts
+the plan's first item is security class, which the advisories satisfy.
+What the run did not verify: the "set aside" line (an advisory the review
+dropped) never fired, since advisories no longer pass through the review.

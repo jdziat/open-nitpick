@@ -86,7 +86,7 @@ func Score(report *review.Report, tree *vcs.Tree) Scorecard {
 		r := row(languageOf(f.Path))
 		w := weight(f.Severity)
 		switch {
-		case f.FromAnalyzer && advisoryID.MatchString(f.Source):
+		case f.IsAdvisory():
 			// An advisory is a fact about a dependency, not about the code;
 			// it is listed by Sections and not scored.
 		case f.Class == string(config.ClassSlop):

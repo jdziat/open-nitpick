@@ -472,9 +472,14 @@ func parseSARIF(report []byte, defaultSeverity config.Severity) ([]Finding, erro
 				continue
 			}
 			loc := res.Locations[0].PhysicalLocation
-			if loc.ArtifactLocation.URI == "" || loc.Region.StartLine <= 0 {
+			if loc.ArtifactLocation.URI == "" {
 				continue
 			}
+			// A result with a file but no region is kept with Line 0: a
+			// dependency scanner reports against the lockfile as a whole,
+			// and the caller that knows the tool places it (osv-scanner puts
+			// it on line 1). A caller that does not is protected downstream,
+			// where a line the file does not have is dropped.
 			word := res.Level
 			if word == "" {
 				word = ruleLevel[res.RuleID]

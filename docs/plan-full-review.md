@@ -21,10 +21,31 @@ its acceptance test (`make eval-fullreview`, `TestFullReviewFixture`)
 exist. First run, Kimi-K3 on Synthetic, 2026-09-05: both plants located,
 the control silent, the secret first in the remediation plan, and the
 advisory named by the model from `go.mod` even without osv-scanner
-installed; the advisories section itself is unverified until the scanner
-is installed on the machine that runs the test. One run, same-day
-fixture, Rule 15 applies. Section 1 is done; the report helpers live in
-`internal/fullreview` so the test and the command share them.
+installed; the advisories section itself was unverified until the scanner
+was installed. One run, same-day fixture, Rule 15 applies. Section 1 is
+done; the report helpers live in `internal/fullreview` so the test and
+the command share them.
+
+Status 2026-09-05, late: osv-scanner installed and the advisories section
+verified, after four defects it exposed, each with a unit test. The
+scanner reports an advisory against the lockfile with no line, and the
+SARIF parser dropped every result without one; osv-scanner is opt-in
+(it queries osv.dev) and neither command named it, so auto-detection
+never ran it; the linters package qualifies a rule with its tool
+(`osv-scanner(CVE-...)`) and every advisory check was anchored to the
+start of the string, so no scanner finding was ever recognized as one;
+and triage rewords, which drops the analyzer attribution, so the CVEs
+that did arrive were published as the triage model's own correctness
+findings, or merged away. Now: advisories are held out of triage and
+validation (`review.Finding.IsAdvisory`), classed `security`, listed
+under their rule, deduplicated (the scanner repeats an advisory per path
+the package is reachable by), and named by both commands. The plan's
+order: a security finding graded warning or above sorts with the errors,
+since a committed credential is an incident before a crash is a bug. The
+eval asserts the plan's first item is security class; with advisories
+present they lead, and the planted secret follows at whatever the model
+graded it (info in one run, warning in the next), so "the secret first" holds only against
+the model's grade, not the scanner's.
 
 Review a whole repository, or the paths given, rather than a change. The
 engine already reviews batches of files with analyzers as evidence and

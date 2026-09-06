@@ -61,6 +61,33 @@ func TestRemediationPlanOrdersBySeverityAndGroupsSharedFixes(t *testing.T) {
 	}
 }
 
+// A committed credential the model graded warning still leads an error-grade
+// crash: the incident before the bug. A security nit does not.
+func TestRemediationPlanPutsASecurityWarningWithTheErrors(t *testing.T) {
+	plan := RemediationPlan([]review.Finding{
+		{Path: "b.go", Line: 3, Severity: "error", Class: "correctness", Title: "Deferred close panics on a request error"},
+		{Path: "c.go", Line: 1, Severity: "warning", Class: "security", Title: "AWS credentials hardcoded"},
+		{Path: "a.go", Line: 1, Severity: "critical", Class: "correctness", Title: "Data loss on restart"},
+		{Path: "d.go", Line: 2, Severity: "nit", Class: "security", Title: "Comment names an internal host"},
+		{Path: "e.go", Line: 2, Severity: "info", Class: "style", Title: "Naming"},
+	})
+	var items []string
+	for _, l := range strings.Split(plan, "\n") {
+		if strings.Contains(l, ". [") {
+			items = append(items, l)
+		}
+	}
+	want := []string{"[critical/correctness] Data loss", "[warning/security] AWS credentials", "[error/correctness] Deferred close", "[info/style] Naming", "[nit/security] Comment names"}
+	if len(items) != len(want) {
+		t.Fatalf("items = %q", items)
+	}
+	for i, w := range want {
+		if !strings.Contains(items[i], w) {
+			t.Errorf("item %d = %q, want %q\n%s", i+1, items[i], w, plan)
+		}
+	}
+}
+
 func TestCoverageNoticeNamesWhatWasLeftOut(t *testing.T) {
 	tree := &vcs.Tree{Covered: []string{"a.go"}, Unbudgeted: []string{"z.go"}, Skipped: []vcs.TreeSkip{{Path: "img.png", Reason: "binary"}}}
 	out := CoverageNotice(tree)
