@@ -277,7 +277,7 @@ func mergeTOML(path, command string, args []string) ([]byte, error) {
 	for _, line := range lines {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, "[") {
-			skipping = t == "[mcp_servers.nitpick]"
+			skipping = t == "[mcp_servers.nitpick]" || strings.HasPrefix(t, "[mcp_servers.nitpick.")
 		}
 		if !skipping {
 			kept = append(kept, line)

@@ -331,6 +331,7 @@ func (t *mcpTools) tree(ctx context.Context, in TreeIn, score bool) (*mcp.CallTo
 		}
 		out.Sections = strings.TrimSpace(fullreview.Sections(&filtered))
 		out.Plan = strings.TrimSpace(fullreview.RemediationPlan(filtered.Findings))
+		out.Failed = filtered.Failed(failOn)
 		out.Summary = strings.TrimSpace(out.Summary) + fmt.Sprintf("\n\nFiltered to %s: %d of %d finding(s) shown.", strings.Join(in.Classes, ", "), len(kept), total)
 	}
 	text := reviewText(out.ReviewOut) + "\n\n" + out.Sections + "\n\n" + out.Plan + "\n" + strings.TrimSpace(fullreview.CoverageNotice(report, tree))

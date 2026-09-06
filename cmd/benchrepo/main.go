@@ -268,7 +268,9 @@ func branches(dir string) error {
 		// harness leaves them, but a real pull request would not.
 		for p := range f.Base {
 			if _, keep := f.Head[p]; !keep {
-				_ = os.Remove(filepath.Join(dir, prefix, filepath.FromSlash(p)))
+				if err := os.Remove(filepath.Join(dir, prefix, filepath.FromSlash(p))); err != nil && !os.IsNotExist(err) {
+					return fmt.Errorf("remove %s: %w", p, err)
+				}
 			}
 		}
 		if err := writeTree(dir, prefix, f.Head); err != nil {
@@ -297,7 +299,7 @@ func gh(args ...string) (string, error) {
 }
 
 func openPRs(repo string) error {
-	manifest := map[string]string{} // branch -> fixture
+	manifest := map[string]string{} // branch to fixture
 	for i, f := range corpus() {
 		branch := branchFor(i)
 		manifest[branch] = f.Name
@@ -323,7 +325,7 @@ func openPRs(repo string) error {
 	return os.WriteFile(manifestPath(repo), append(blob, '\n'), 0o644)
 }
 
-// fixtureBranches reads the manifest `prs` wrote: fixture -> branch.
+// fixtureBranches reads the manifest `prs` wrote: fixture to branch.
 func fixtureBranches(repo string) (map[string]string, error) {
 	data, err := os.ReadFile(manifestPath(repo))
 	if err != nil {
@@ -416,7 +418,7 @@ func reviewerOf(login, body string) string {
 // reviewer's against the plants, with the same deterministic scorer the
 // harness uses. Only inline comments are scored: Incumbent folds what it
 // calls nitpicks into the review body, and those are neither anchored nor
-// counted here — for it or against it.
+// counted here, for it or against it.
 func score(repo string) error {
 	if botLogin == "" {
 		return errors.New("BENCHREPO_BOT_LOGIN is not set: the login prefix of the hosted reviewer's app, without which its comments score as a human's")
