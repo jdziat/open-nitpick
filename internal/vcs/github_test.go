@@ -364,3 +364,61 @@ func TestSummaryFallbackIsBounded(t *testing.T) {
 		t.Error("the fallback must still explain the degradation")
 	}
 }
+
+// The conversation methods hit the endpoints a reply, a comment, a thread
+// read and a reaction need, each marked or scoped as the tool's own.
+func TestGitHubConversationMethods(t *testing.T) {
+	var got []string
+	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.Method+" "+r.URL.Path)
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/pulls/7/comments") && r.Method == http.MethodGet:
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": 20, "body": "finding", "user": map[string]any{"login": "open-nitpick[bot]"}},
+				{"id": 21, "in_reply_to_id": 20, "body": "why?", "user": map[string]any{"login": "carol"}},
+				{"id": 22, "body": "other thread", "user": map[string]any{"login": "dave"}},
+			})
+		case strings.HasSuffix(r.URL.Path, "/pulls/7/comments"):
+			var body map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if s, _ := body["body"].(string); !strings.Contains(s, DefaultBotMarker) {
+				t.Errorf("reply body lacks the marker: %v", body)
+			}
+			if n, _ := body["in_reply_to"].(float64); n != 20 {
+				t.Errorf("reply is not on thread 20: %v", body)
+			}
+			got = append(got, "reply-to-20")
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 30})
+		case strings.HasSuffix(r.URL.Path, "/issues/7/comments"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 31})
+		case strings.Contains(r.URL.Path, "/reactions"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 1, "content": "eyes"})
+		default:
+			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+	})
+	ctx := context.Background()
+	ref := testRef()
+	if err := gh.ReplyToReviewComment(ctx, ref, 20, "answer"); err != nil {
+		t.Fatal(err)
+	}
+	if err := gh.CommentOnPullRequest(ctx, ref, "hello"); err != nil {
+		t.Fatal(err)
+	}
+	thread, err := gh.ThreadComments(ctx, ref, 20)
+	if err != nil || len(thread) != 2 || thread[0].ID != 20 || thread[1].Author != "carol" {
+		t.Errorf("thread = %+v, %v", thread, err)
+	}
+	if err := gh.React(ctx, ref, 21, true, "eyes"); err != nil {
+		t.Fatal(err)
+	}
+	if err := gh.React(ctx, ref, 40, false, "+1"); err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(got, "\n")
+	for _, want := range []string{"reply-to-20", "/issues/7/comments", "/pulls/comments/21/reactions", "/issues/comments/40/reactions"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("no request to %s:\n%s", want, joined)
+		}
+	}
+}
