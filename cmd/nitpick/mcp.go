@@ -29,6 +29,17 @@ import (
 // stdout is the protocol, so nothing else may write to it: the provider's
 // review text goes to io.Discard, and the log to stderr.
 func runMCP(ctx context.Context, args []string) error {
+	if len(args) > 0 {
+		switch args[0] {
+		case "install":
+			return runMCPInstall(args[1:], os.Stdout)
+		case "clients":
+			for _, c := range mcpClients {
+				fmt.Printf("%-15s %s\n", c.name, c.note)
+			}
+			return nil
+		}
+	}
 	var (
 		repo    string
 		verbose bool
@@ -37,7 +48,7 @@ func runMCP(ctx context.Context, args []string) error {
 	fs.StringVar(&repo, "repo", ".", "default repository root for tools that do not name one")
 	fs.BoolVar(&verbose, "v", false, "verbose logging on stderr")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: nitpick mcp [flags]\n\nServes the review tools over the Model Context Protocol on stdio, for an agent session.\nTools: review, full_review, repo_score, code_smell, ai_slop, identify_model, explain_config.\n\nFlags:")
+		fmt.Fprintln(os.Stderr, "Usage: nitpick mcp [flags]\n       nitpick mcp install <client> [-user] [-print]\n       nitpick mcp clients\n\nServes the review tools over the Model Context Protocol on stdio, for an agent session.\nTools: review, full_review, repo_score, code_smell, ai_slop, identify_model, explain_config.\ninstall writes the server into a client's configuration (claude-code, claude-desktop, cursor, windsurf, vscode, opencode, gemini-cli, codex).\n\nFlags:")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {

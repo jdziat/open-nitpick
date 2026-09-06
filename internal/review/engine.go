@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
@@ -857,6 +859,13 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 		sem = make(chan struct{}, max(1, e.Config.Review.Concurrency))
 	)
 
+	// Progress is logged per batch, since a review of a large change is
+	// minutes of silence otherwise: what is being read, and when it came
+	// back, with a running count so a reader can tell where the run is.
+	var done atomic.Int32
+	total := len(plan.Batches)
+	e.log().Info("reviewing", "batches", total, "files", plan.Files(), "concurrency", max(1, e.Config.Review.Concurrency))
+
 	for i, b := range plan.Batches {
 		wg.Add(1)
 
@@ -875,6 +884,8 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 				return
 			}
 
+			started := time.Now()
+			e.log().Info("batch started", "batch", i+1, "of", total, "files", len(b.Entries), "tokens", b.Tokens, "first", firstPath(b))
 			r, err := e.reviewersFor(ctx, b)
 			var result []Finding
 			if err == nil {
@@ -886,12 +897,13 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 
 			decisions = append(decisions, r.decision)
 			if err != nil {
-				e.log().Error("batch review failed", "batch", i, "files", b.Paths(), "error", err)
+				e.log().Error("batch review failed", "batch", i+1, "of", total, "files", b.Paths(), "error", err, "elapsed", time.Since(started).Round(time.Second))
 				failures++
 				unreviewed = append(unreviewed, b.Paths()...)
 				return
 			}
 			findings = append(findings, result...)
+			e.log().Info("batch done", "batch", i+1, "of", total, "done", done.Add(1), "findings", len(result), "elapsed", time.Since(started).Round(time.Second))
 		}(i, b)
 	}
 
@@ -1271,6 +1283,7 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) ([]Finding,
 // duplicated review is worth more than no review.
 func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Finding) (string, []Finding, []Overruled, error) {
 	findings = dedupe(findings)
+	e.log().Info("triaging", "findings", len(findings), "model", e.Roles.Triage.String())
 
 	if len(findings) == 0 && !e.Config.Review.Summary {
 		return "", nil, nil, nil
@@ -1555,6 +1568,7 @@ func (e *Engine) validateFindings(ctx context.Context, findings []Finding, plan 
 	if !e.Config.Validation.Enabled || len(findings) == 0 {
 		return findings, nil
 	}
+	e.log().Info("validating with domain experts", "findings", len(findings))
 
 	v := &Validator{
 		Client:      e.Roles.Validator(),
@@ -1646,6 +1660,7 @@ func renderedFiles(plan *bundle.Plan) map[string]string {
 
 // publish renders and delivers the review.
 func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files diff.Files) error {
+	e.log().Info("publishing", "findings", len(report.Findings), "provider", e.Provider.Name())
 	review := Render(report, files, e.Config)
 
 	if len(review.Comments) == 0 && review.Summary == "" {
@@ -1912,4 +1927,12 @@ func (e *Engine) log() *slog.Logger {
 		return e.Log
 	}
 	return slog.New(slog.DiscardHandler)
+}
+
+// firstPath names a batch in a log line by its first file.
+func firstPath(b bundle.Batch) string {
+	if len(b.Entries) == 0 {
+		return ""
+	}
+	return b.Entries[0].File.Path
 }
