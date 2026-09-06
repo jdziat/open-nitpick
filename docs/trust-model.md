@@ -24,6 +24,24 @@ including `.nitpick.yaml`. Three consequences:
   to `openrouter`; naming a router as the default is what makes the reachable
   set a whole catalogue rather than one vendor's. Review `.nitpick.yaml` changes
   on their own merits, exactly as you would a change to a CI workflow.
+- **A change that edits `.nitpick.yaml` is not reviewed under its own edit.**
+  The keys above bound what a config file may say; this bounds *which* config
+  file speaks. When the change under review modifies the configuration's own
+  source, the checkout's copy is set aside and policy is read from the base
+  revision instead, the revision the pull request is measured against. Where no
+  usable config exists there, the built-in defaults apply. Otherwise a change
+  could widen its own `ignore` list, drop `min_severity` to nothing, or disable
+  the analyzers that would have read it, in the same commit those settings
+  govern.
+
+  The substitution is published, never silent: the report names which of the
+  three sources applied (the checkout, the base revision and the revision it was
+  read at, or the defaults), the config file the change edits, and one sentence
+  saying why the checkout's copy was withheld. A forge that cannot name a base
+  revision is not an error; policy falls back to defaults and the run says so.
+  Running locally, where you wrote the file, there is no pull request and the
+  checkout's config is used as written.
+
 - **`api_key_env` may never name a forge credential** (`GITHUB_TOKEN` and
   friends), even in a trusted config. A model provider has no business receiving
   it, and the likeliest reason to ask is exfiltration.

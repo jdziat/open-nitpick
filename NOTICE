@@ -35,3 +35,24 @@ following components. Their licenses apply to those portions.
       Apache License 2.0
       Copyright The OpenTelemetry Authors
       https://github.com/open-telemetry/opentelemetry-go
+
+--------------------------------------------------------------------------------
+Documentation site assets
+--------------------------------------------------------------------------------
+
+The documentation site, and only the site, bundles two typefaces. They are not
+part of any release binary.
+
+  Inter (website/assets/fonts/Inter-var.woff2)
+      SIL Open Font License 1.1
+      Copyright (c) 2016 The Inter Project Authors
+      https://github.com/rsms/inter
+
+  JetBrains Mono (website/assets/fonts/JetBrainsMono-var.woff2)
+      SIL Open Font License 1.1
+      Copyright (c) 2020 The JetBrains Mono Project Authors
+      https://github.com/JetBrains/JetBrainsMono
+
+  Each license text ships beside the font it covers, as
+  website/assets/fonts/Inter-OFL.txt and
+  website/assets/fonts/JetBrainsMono-OFL.txt.

@@ -1,0 +1,24 @@
+name: Feature request
+description: Something the reviewer should do that it does not do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and where the tool stops you.
+    validations: {required: true}
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you want it to do
+      description: >-
+        If it changes what gets published, say how you would tell the new
+        behavior is better than the old one. A claim about review quality
+        needs a measurement; see docs/measurement.md.
+    validations: {required: true}
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: Configuration, instructions, or another tool.
