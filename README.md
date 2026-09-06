@@ -963,7 +963,14 @@ models:
 ```
 
 Slugs are OpenRouter's, with an endpoint suffix where one exists. The
-setting is only accepted with the `openrouter` provider. It is also a
+setting is only accepted with the `openrouter` provider. This repository's
+own OpenRouter config pins kimi-k3 to `moonshotai/mxfp4` with `fireworks`
+and `together` as fallbacks: unpinned, the router's cheapest-first order
+sent one review to an fp4 quantisation that stalled for ten minutes, ran
+past the output cap on the retry, and answered invalid JSON on the third;
+pinned, the same review returned in one attempt. `curl
+https://openrouter.ai/api/v1/models/<model>/endpoints` lists a model's
+upstreams with their tags and which support structured output. It is also a
 trust decision: a pull request that edits `.nitpick.yaml` can change it,
 which chooses which third party reads the code, exactly as `model` already
 can. Rates differ by upstream, so the eval harness prices a pinned run only
