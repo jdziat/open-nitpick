@@ -24,6 +24,9 @@ jobs:
     # Reviews of forked pull requests would need a token this workflow does not
     # safely have, and the model API key must never be exposed to fork code.
     if: github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      # A step's if cannot read the secrets context; it can read env.
+      NITPICK_APP_ID: ${{ secrets.NITPICK_APP_ID }}
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -38,10 +41,10 @@ jobs:
       # default job token posts as github-actions[bot].
       - name: Token for the review app
         id: app
-        if: ${{ secrets.NITPICK_APP_ID != '' }}
+        if: env.NITPICK_APP_ID != ''
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ secrets.NITPICK_APP_ID }}
+          app-id: ${{ env.NITPICK_APP_ID }}
           private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
 
       - uses: ./
