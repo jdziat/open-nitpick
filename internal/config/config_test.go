@@ -334,3 +334,10 @@ func TestEmptyConfigFileKeepsDefaults(t *testing.T) {
 		t.Error("empty document should leave defaults intact")
 	}
 }
+
+func TestSkipMarkersDefaultToTheTwoPhrases(t *testing.T) {
+	cfg := Defaults()
+	if got := strings.Join(cfg.Review.SkipMarkers, ","); got != "[skip review],[skip nitpick]" {
+		t.Errorf("skip_markers = %s", got)
+	}
+}

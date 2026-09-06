@@ -204,3 +204,9 @@ thread saying so. A comment on a file the run did not re-read is left
 alone, since nothing there was checked; so is every comment when the
 earlier revision could not be compared (a force push). The GitHub App or
 token needs Pull requests write, which posting reviews already needs.
+
+## Skipping a pull request
+
+`review.skip_markers` lists the phrases that, in a pull request's title,
+body or head commit message, ask for no review. The default is
+`["[skip review]", "[skip nitpick]"]`; the match is case-insensitive.

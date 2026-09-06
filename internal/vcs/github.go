@@ -108,6 +108,11 @@ func (g *GitHub) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error)
 		HeadSHA: pr.GetHead().GetSHA(),
 		Draft:   pr.GetDraft(),
 	}
+	// The head commit's message, for a skip marker; a failure to read it
+	// is not a failure to review, so it is logged by absence only.
+	if c, _, err := g.client.Repositories.GetCommit(ctx, ref.Owner, ref.Repo, out.HeadSHA, nil); err == nil {
+		out.HeadMessage = c.GetCommit().GetMessage()
+	}
 	return out, nil
 }
 

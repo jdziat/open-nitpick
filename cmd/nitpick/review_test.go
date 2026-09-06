@@ -470,3 +470,33 @@ models:
 		}
 	})
 }
+
+// A pull request is skipped for a draft under -skip-draft, or for a marker
+// anywhere a person can put one: the title, the body, or the head commit's
+// message, in any case; and for nothing else.
+func TestSkipReasonReadsDraftsAndMarkers(t *testing.T) {
+	markers := []string{"[skip review]", "[skip nitpick]"}
+	cases := []struct {
+		name  string
+		pr    vcs.PullRequest
+		draft bool
+		want  string
+	}{
+		{"plain", vcs.PullRequest{Title: "feat: x"}, true, ""},
+		{"draft without the flag", vcs.PullRequest{Draft: true}, false, ""},
+		{"draft with the flag", vcs.PullRequest{Draft: true}, true, "Draft"},
+		{"title", vcs.PullRequest{Title: "wip [Skip Review]"}, false, "[skip review]"},
+		{"body", vcs.PullRequest{Body: "notes\n\n[skip nitpick]\n"}, false, "[skip nitpick]"},
+		{"head commit", vcs.PullRequest{HeadMessage: "fix: y\n\n[skip review]"}, false, "[skip review]"},
+		{"a similar phrase", vcs.PullRequest{Body: "please skip the review of docs"}, false, ""},
+	}
+	for _, tc := range cases {
+		got := skipReason(&tc.pr, tc.draft, markers)
+		if (tc.want == "") != (got == "") || !strings.Contains(got, tc.want) {
+			t.Errorf("%s: reason = %q, want it to contain %q", tc.name, got, tc.want)
+		}
+	}
+	if skipReason(&vcs.PullRequest{Title: "[skip review]"}, false, nil) != "" {
+		t.Error("with no markers configured nothing is skipped")
+	}
+}
