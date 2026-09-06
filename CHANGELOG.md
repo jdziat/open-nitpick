@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.1](https://github.com/jdziat/open-nitpick/compare/v1.1.0...v1.1.1) (2026-09-06)
+
+
+### Fixes
+
+* **cli:** the slop pass over cmd, its tells and its hidden findings ([3b16b31](https://github.com/jdziat/open-nitpick/commit/3b16b31ae8b1f65f89498e6c09f37898672927b6))
+* **cli:** the slop pass over cmd, its tells and its hidden findings ([25ad978](https://github.com/jdziat/open-nitpick/commit/25ad9783214bcb830d7756120299c1f2265aabda))
+
+
+### Documentation
+
+* **readme:** the mark above the badges ([10470b5](https://github.com/jdziat/open-nitpick/commit/10470b56548fe788b25b971967d0fb499d1f98e5))
+* **readme:** the mark above the badges ([195da51](https://github.com/jdziat/open-nitpick/commit/195da5118df97123aca82a5c89329f9ef1c0d0c8))
+* **readme:** the mark resolves from the site's guide page ([38f3b9a](https://github.com/jdziat/open-nitpick/commit/38f3b9a481ca6768237ab2dfef6432faff419e17))
+* **site:** the four-bar mark as the site's logo, favicon and social card ([b522aa8](https://github.com/jdziat/open-nitpick/commit/b522aa8e1c781cc922e66afa87a6aff7a74abd7a))
+* **site:** the four-bar mark as the site's logo, favicon and social card ([e1526fa](https://github.com/jdziat/open-nitpick/commit/e1526faa9522543ff512479658303d0e4813d964))
+
 ## [1.1.0](https://github.com/jdziat/open-nitpick/compare/v1.0.0...v1.1.0) (2026-09-06)
 
 
