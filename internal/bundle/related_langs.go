@@ -88,6 +88,13 @@ func (c *relatedCollector) rustUseTargets(e *Entry, root string) map[string]stri
 		if idx := strings.Index(segs[len(segs)-1], "{"); idx >= 0 {
 			head := strings.TrimSpace(segs[len(segs)-1][:idx])
 			rest := segs[len(segs)-1][idx:]
+			// An unbalanced tree (`use a::{b;`) reaches here as "{b", which
+			// is neither a braced group nor a path, and walking it again
+			// walks the same text forever. A use that does not parse names
+			// nothing.
+			if rest == tree {
+				return
+			}
 			base := append(append([]string{}, prefix...), segs[:len(segs)-1]...)
 			if head != "" {
 				base = append(base, head)
