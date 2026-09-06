@@ -66,7 +66,7 @@ jobs:
             gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
           fi
 
-      # The Action is used as @v1; the major tag follows every v1.x.y
+      # The Action is used as @vN; the major tag follows every vN.x.y
       # release so that pin gets the fixes without a rewrite.
       - name: Move the major tag
         if: ${{ !contains(github.ref_name, '-') }}

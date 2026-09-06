@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/jdziat/open-nitpick/v2/internal/config"
 
 // The second half of the multi-file corpus: one fixture per language for
 // the resolution paths a real repository hits and a plain import-to-file

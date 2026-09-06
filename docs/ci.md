@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0        # the reviewer needs history to diff against base
-      - uses: jdziat/open-nitpick@v1
+      - uses: jdziat/open-nitpick@v2
         with:
           provider: synthetic
           model: hf:moonshotai/Kimi-K3
@@ -54,7 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {fetch-depth: 0}
-      - uses: jdziat/open-nitpick@v1
+      - uses: jdziat/open-nitpick@v2
         with:
           command: respond
           provider: synthetic
@@ -108,7 +108,7 @@ the Action:
         with:
           app-id: ${{ env.NITPICK_APP_ID }}
           private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
-      - uses: jdziat/open-nitpick@v1
+      - uses: jdziat/open-nitpick@v2
         with:
           github-token: ${{ steps.app.outputs.token || github.token }}
 ```

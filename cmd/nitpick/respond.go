@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/converse"
-	"github.com/jdziat/open-nitpick/internal/llm"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/converse"
+	"github.com/jdziat/open-nitpick/v2/internal/llm"
+	"github.com/jdziat/open-nitpick/v2/internal/vcs"
 )
 
 // runRespond answers a comment that mentioned the reviewer. It reads the

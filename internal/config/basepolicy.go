@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/jdziat/open-nitpick/v2/internal/vcs"
 )
 
 // BasePolicy resolves review policy from the revision a change is measured
