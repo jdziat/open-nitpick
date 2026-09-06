@@ -32,7 +32,7 @@ func mcpSession(t *testing.T, root string) *mcp.ClientSession {
 	return session
 }
 
-func TestMCPServerListsTheSevenTools(t *testing.T) {
+func TestMCPServerListsItsTools(t *testing.T) {
 	session := mcpSession(t, t.TempDir())
 	res, err := session.ListTools(context.Background(), nil)
 	if err != nil {
@@ -45,7 +45,7 @@ func TestMCPServerListsTheSevenTools(t *testing.T) {
 			t.Errorf("tool %s has no description or schema", tool.Name)
 		}
 	}
-	want := "ai_slop,code_smell,explain_config,full_review,identify_model,repo_score,review"
+	want := "ai_slop,code_smell,explain_config,full_review,repo_score,review"
 	got := strings.Join(sortedStrings(names), ",")
 	if got != want {
 		t.Errorf("tools = %s, want %s", got, want)
@@ -57,7 +57,7 @@ func TestMCPServerListsTheSevenTools(t *testing.T) {
 			continue
 		}
 		schema, _ := json.Marshal(tool.OutputSchema)
-		if tool.Name != "identify_model" && !strings.Contains(string(schema), `"findings"`) {
+		if !strings.Contains(string(schema), `"findings"`) {
 			t.Errorf("tool %s output schema lacks findings: %s", tool.Name, schema)
 		}
 	}
@@ -81,41 +81,6 @@ func TestMCPExplainConfigReadsTheRepository(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Errorf("explain_config output lacks %q:\n%s", want, text)
 		}
-	}
-}
-
-func TestMCPIdentifyModelAnswersWithTheCaveat(t *testing.T) {
-	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "a.go"), []byte("package a\n\nfunc F() int { return 1 }\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	session := mcpSession(t, root)
-	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "identify_model", Arguments: map[string]any{"files": []string{"a.go"}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.IsError {
-		t.Fatalf("identify_model errored: %v", res.Content)
-	}
-	var out IdentifyOut
-	raw, _ := json.Marshal(res.StructuredContent)
-	if err := json.Unmarshal(raw, &out); err != nil {
-		t.Fatal(err)
-	}
-	if len(out.Results) != 1 || out.Results[0].Author == "" || out.Caveat != identifyCaveat {
-		t.Errorf("identify_model = %+v", out)
-	}
-	if !strings.Contains(textOf(res), "not an attribution") {
-		t.Errorf("the caveat is not in the text: %s", textOf(res))
-	}
-
-	// No files is an error the client sees, not a silent empty answer.
-	res, err = session.CallTool(context.Background(), &mcp.CallToolParams{Name: "identify_model", Arguments: map[string]any{"files": []string{}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !res.IsError {
-		t.Error("identify_model with no files did not error")
 	}
 }
 

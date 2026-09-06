@@ -69,7 +69,7 @@ you cannot see and pricing per seat. open-nitpick inverts that:
 
 | page | what it covers |
 |---|---|
-| [Usage](docs/usage.md) | reviewing a change or a whole repository, the remediation plan and score, `identify-model`, the slop class, and the MCP server for agent sessions |
+| [Usage](docs/usage.md) | reviewing a change or a whole repository, the remediation plan and score, the slop class, and the MCP server for agent sessions |
 | [GitHub Actions and other CI](docs/ci.md) | the Action, its inputs and permissions, incremental review, forks, and running the CLI in any other CI |
 | [Configuration](docs/configuration.md) | `.nitpick.yaml`: models per role, budget, related context, personality and instructions, model-family notes, severities |
 | [Analyzers](docs/analyzers.md) | the 33 deterministic tools, how they are detected, isolated and fed to the model as evidence, and what strict mode means |
