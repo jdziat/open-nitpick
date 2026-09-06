@@ -76,6 +76,7 @@ func (l *Local) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error) 
 	out.Title = strings.TrimSpace(title)
 	out.Body = strings.TrimSpace(body)
 	out.Author = strings.TrimSpace(author)
+	out.HeadMessage = strings.TrimSpace(title + "\n\n" + body)
 
 	return out, nil
 }

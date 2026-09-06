@@ -128,15 +128,15 @@ func runReview(ctx context.Context, args []string) error {
 
 	actions := actionsFromEnv()
 
-	if f.skipDraft && ref.Number > 0 {
+	if ref.Number > 0 {
 		pr, err := provider.PullRequest(ctx, ref)
 		if err != nil {
 			return err
 		}
-		if pr.Draft {
-			fmt.Fprintln(os.Stderr, "Draft pull request; not reviewed (-skip-draft).")
+		if reason := skipReason(pr, f.skipDraft, cfg.Review.SkipMarkers); reason != "" {
+			fmt.Fprintln(os.Stderr, reason)
 			actions.setOutputs(resultSkipped, nil)
-			actions.writeSummary(resultSkipped, nil, nil, ref, "Draft pull request; not reviewed. Mark it ready for review to have it reviewed.")
+			actions.writeSummary(resultSkipped, nil, nil, ref, reason)
 			return nil
 		}
 	}
@@ -182,6 +182,19 @@ func runReview(ctx context.Context, args []string) error {
 		return errFindings
 	}
 	return nil
+}
+
+// skipReason says why a pull request is not reviewed, or "" when it is:
+// a draft under -skip-draft, or a skip marker in its title, body or head
+// commit message. The reason is what the job summary shows.
+func skipReason(pr *vcs.PullRequest, skipDraft bool, markers []string) string {
+	if skipDraft && pr.Draft {
+		return "Draft pull request; not reviewed. Mark it ready for review to have it reviewed."
+	}
+	if m, ok := vcs.SkipRequested(pr, markers); ok {
+		return fmt.Sprintf("Pull request carries %s; not reviewed. Remove the marker from the title, body or head commit and push to have it reviewed.", m)
+	}
+	return ""
 }
 
 // newEngine wires the review engine this command drives.
