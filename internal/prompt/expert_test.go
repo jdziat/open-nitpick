@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
 )
 
 // TestEveryClassRoutesToAnExpert is the invariant that keeps validation from

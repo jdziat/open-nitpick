@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/diff"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/diff"
+	"github.com/jdziat/open-nitpick/v2/internal/review"
 )
 
 // changedDiff adds lines 1..3 of app.go, so only those lines are commentable.

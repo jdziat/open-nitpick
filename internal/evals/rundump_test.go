@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/jdziat/open-nitpick/v2/internal/review"
 )
 
 // TestASecondarySpanSurvivesTheDump is what makes a retained run sufficient to

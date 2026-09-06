@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
 )
 
 // catalog lists every analyzer beyond the hand-written four.

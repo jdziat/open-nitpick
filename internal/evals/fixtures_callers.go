@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/jdziat/open-nitpick/v2/internal/config"
 
 // CallerFixtures is the callers corpus: the change IS the contract, and the file it breaks is
 // one the change does not touch.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/v2/internal/config"
 )
 
 // realAnswer is what the model actually reported. Every case below wraps it in

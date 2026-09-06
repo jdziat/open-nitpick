@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/jdziat/open-nitpick/v2/internal/config"
 
 // InfoFixtures is the fourth corpus: ten `info` plants and two clean
 // controls at the same level of subtlety.

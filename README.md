@@ -23,7 +23,7 @@ you can read and change.
 ## Quick start
 
 ```bash
-go install github.com/jdziat/open-nitpick/cmd/nitpick@latest
+go install github.com/jdziat/open-nitpick/v2/cmd/nitpick@latest
 
 export LLM_PROVIDER=synthetic LLM_MODEL=hf:moonshotai/Kimi-K3
 export SYNTHETIC_API_KEY=syn_...
