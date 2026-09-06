@@ -584,7 +584,7 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 		pf("Policy source:  this file, unless the change under review edits it.\n"+
 			"                A change may not supply the policy it is reviewed under, so a change\n"+
 			"                that edits %s is reviewed under the version of it at the base\n"+
-			"                revision — or under built-in defaults when none can be read. Defaults\n"+
+			"                revision, or under built-in defaults when none can be read. Defaults\n"+
 			"                name no model, so that last fallback needs %s and %s set.\n",
 			rel, config.EnvProvider, config.EnvModel)
 	case cfg.Source != "":
