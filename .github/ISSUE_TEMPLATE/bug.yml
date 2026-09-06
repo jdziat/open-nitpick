@@ -1,0 +1,44 @@
+name: Bug report
+description: The reviewer did something wrong, or refused to run.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For anything that lets a pull request reach a credential or run code on
+        the runner, use the Security tab instead of this form.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What the run did, and what you expected instead.
+    validations: {required: true}
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: >-
+        The command or workflow step, and the diff or repository if you can
+        share one. `nitpick explain-config` prints the resolved configuration
+        without sending anything to a model; its output is usually the fastest
+        way to see which policy applied.
+      render: shell
+    validations: {required: true}
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`nitpick version`, or the Action tag you pinned."
+    validations: {required: true}
+  - type: input
+    id: model
+    attributes:
+      label: Provider and model
+      description: "For example: synthetic, hf:moonshotai/Kimi-K3."
+    validations: {required: true}
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log output
+      description: Redact tokens before pasting.
+      render: shell

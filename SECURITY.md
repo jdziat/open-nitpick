@@ -2,8 +2,8 @@
 
 open-nitpick runs in CI, holds a model credential and a forge token, and
 executes third-party analyzers against code it did not write. Its trust
-model is written down in the README under "Trust model"; a report that
-shows that section and the code disagree is the most useful kind.
+model is written down in [docs/trust-model.md](docs/trust-model.md); a report
+that shows that document and the code disagree is the most useful kind.
 
 ## Reporting
 
@@ -21,5 +21,5 @@ before the advisory is published.
 In scope: anything reachable from a pull request the tool reviews, from the
 config it reads at the base revision, from analyzer output, or from model
 output. Out of scope: the upstream analyzers' own bugs, the model providers,
-and the exposure the README already states (unpinned analyzer installs in
-the Action; a pull request choosing the `model` a router sends code to).
+and the exposure the trust model already states (unpinned analyzer installs
+in the Action; a pull request choosing the `model` a router sends code to).

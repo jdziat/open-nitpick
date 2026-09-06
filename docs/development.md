@@ -18,10 +18,10 @@ asset with Sigstore keyless signing, so a download is checkable against this
 repository's workflow identity and nothing else:
 
 ```bash
-cosign verify-blob --bundle nitpick_v1.2.0_linux_amd64.sigstore.json \
+cosign verify-blob --bundle nitpick_v1.4.0_linux_amd64.sigstore.json \
   --certificate-identity-regexp '^https://github.com/jdziat/open-nitpick/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  nitpick_v1.2.0_linux_amd64
+  nitpick_v1.4.0_linux_amd64
 ```
 
 The `v1` tag follows every `v1.x.y` release, which is what the Action's

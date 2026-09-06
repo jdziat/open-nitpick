@@ -139,6 +139,21 @@ persona:
     Reference our ADRs by number when a finding contradicts one.
 ```
 
+!!! warning "`custom` is dropped unless the config is trusted"
+
+    `persona.custom` is free text that lands in the **system** prompt, the
+    highest-trust position there is. Every other string from the config file
+    reaches the model as user-message data. A pull request can edit
+    `.nitpick.yaml`, so a change could otherwise instruct the reviewer to stay
+    quiet about itself.
+
+    It is therefore stripped unless `NITPICK_TRUST_CONFIG_ENDPOINTS=true` is
+    set in the environment, the same out-of-band switch that unlocks
+    `base_url` and `api_key_env`. Stripping is reported, not silent: the
+    dropped key is named in the run's log and in `nitpick explain-config`. The
+    enumerated axes above are always honored, because they are bounded and
+    validated. See [Trust model](trust-model.md).
+
 **`nitpick`** is the setting people argue about. It selects which
 *classes* of finding get published, where `min_severity` selects how serious
 they must be: independent questions, applied independently.
@@ -189,6 +204,78 @@ asked to look for, and shows up in `nitpick explain-config` as the `model`
 layer so it can be read without spending tokens. `review.model_notes: false`
 removes it. The measurements are in
 [docs/comparison.md](comparison.md#tuning-for-glm-53-flash-and-qwen38-27b-2026-09-04).
+
+## Choosing the model per batch
+
+One model for everything is the default. Two optional mechanisms change that,
+and both overlay `models.default`, so each entry names only what differs.
+
+**Routes** pick the reviewing model for a batch. The first route whose match
+holds wins, and a batch no route matches goes to the review model.
+
+```yaml
+models:
+  default:
+    model: google/gemma-4-31b-it
+  router:                          # optional; only routes that match on kinds need it
+    model: z-ai/glm-5.3-flash
+  routes:
+    - name: security
+      match: {kinds: [security, concurrency]}
+      review: {model: qwen/qwen3.8-27b}
+    - name: typescript
+      match: {languages: [typescript, javascript]}
+      review: {model: qwen/qwen3.8-27b}
+    - name: cross-file
+      match: {min_files: 2}
+      review: {model: z-ai/glm-5.3-flash}
+```
+
+A match takes `languages` (the batch matches when any file is in one of them),
+`kinds`, and the bounds `min_files` and `max_files`. Kinds come from the
+**router**: a cheap model that reads each batch once and answers with what the
+change does. Naming a kind without configuring `models.router` is a
+configuration error, and routes that match only on languages or file counts
+never call it.
+
+**Ensembles** add reviewers rather than replacing one. Every model listed
+reviews every batch, the findings are pooled, and triage merges and reranks
+them, so a defect two models report independently becomes one finding whose
+agreement is a reason to trust its level.
+
+```yaml
+models:
+  ensemble:
+    - model: z-ai/glm-5.3-flash
+    - model: qwen/qwen3.8-27b
+```
+
+A route may carry its own `ensemble`, which replaces the global one for the
+batches it matches; an empty list on a route removes the ensemble there. Cost
+scales with the number of reviewers, near enough linearly. The measured
+configurations, and what each costs per review, are in
+[Findings](findings.md).
+
+## The validation pass
+
+Off by default. When on, each published finding is put to a domain expert,
+which may overrule it.
+
+```yaml
+validation:
+  enabled: false                   # default
+  classes: [security, correctness] # empty validates every class
+```
+
+It costs one model call per published finding, on `models.validate` if set and
+`models.default` otherwise, and a separate model is the point: an independent
+check is worth more when it is not the same weights re-reading their own claim.
+It is off because it is **unmeasured**, and what has not been measured is the
+direction that matters, how many real defects an expert talks itself out of.
+
+An unlisted class is published **without** validation, never dropped, so
+narrowing `classes` can only reduce refutations. Overruled findings are not
+discarded silently; they are reported with the reason.
 
 ## Severities
 

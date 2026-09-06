@@ -1285,7 +1285,7 @@ removed the same week. The two sections that follow are kept as the record
 of what was measured, and both still hold as measurements: on a same-prompt
 corpus the fingerprint tells six models apart well above chance. What the
 corpus could not tell us is whether the answer means anything on a file
-somebody actually wrote, and the contributor experiment (below) is the
+somebody wrote by hand, and the contributor experiment (below) is the
 evidence that it does not: on ten real repositories the same instrument is
 near chance in six of them. A command whose answer a reader cannot act on
 is worse than no command, so the command, its corpora and its package are

@@ -23,4 +23,14 @@ diff → select and batch files → review each batch → triage → render → 
 - **Anchor** snaps near-miss line numbers onto real changed lines and drops
   findings that cannot be placed, so comments land where they belong. An
   *analyzer* finding dropped here is counted and published rather than discarded
-  quietly; see the discard block above.
+  quietly, under *Analyzed less than it ran over*.
+- **Render** turns surviving findings into comments: a title, the rationale, and
+  a suggestion where one applies as a `suggestion` block the forge can commit.
+  The walkthrough and the file table become the summary comment.
+- **Publish** posts them. On a re-run it posts only what is new, edits what
+  moved, and resolves the threads whose findings the change has since fixed;
+  `review.incremental` and `review.resolve_superseded` govern both. A run that
+  reviewed only part of the diff still publishes, and says so: the summary names
+  the batches that failed and counts only the files it reviewed, because a
+  partial review that reads like a complete one is the failure mode this
+  pipeline is built to avoid.
