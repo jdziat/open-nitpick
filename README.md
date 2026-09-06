@@ -829,7 +829,10 @@ export OPENROUTER_API_KEY=sk-or-...
 
 Like `synthetic`, its endpoint is compiled into the binary, so a committed
 config can name it. The eval harness reaches every model in the sweep through
-it.
+it. This repository's own policy on OpenRouter is
+[.nitpick.openrouter.yaml](https://github.com/jdziat/open-nitpick/blob/main/.nitpick.openrouter.yaml): the same reviewer and
+triage models as `.nitpick.yaml` under their OpenRouter ids, with the policy
+block kept identical, for `nitpick review -config .nitpick.openrouter.yaml`.
 
 `LLM_API_KEY` is accepted as a fallback, which is how the GitHub Action's
 `api-key` input arrives. `OPENROUTER_API_KEY` wins when both are set, so a

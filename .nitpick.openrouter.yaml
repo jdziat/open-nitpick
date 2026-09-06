@@ -1,0 +1,76 @@
+# open-nitpick's own review configuration, on OpenRouter instead of
+# Synthetic: the same policy as .nitpick.yaml with the same weights reached
+# through a different host, for anyone who has an OpenRouter key and not a
+# Synthetic one. Use it with -config:
+#
+#   nitpick review -config .nitpick.openrouter.yaml
+#
+# or copy it over .nitpick.yaml. Everything below the models block is kept
+# identical to .nitpick.yaml on purpose; a change to the policy belongs in
+# both files.
+
+models:
+  # openrouter carries its endpoint in the binary (internal/llm), so a
+  # committed default can name it; only OPENROUTER_API_KEY is needed.
+  # Kimi-K3 is the same reviewer .nitpick.yaml names on Synthetic, priced
+  # per token here rather than on a subscription; the README's "Choosing a
+  # model by price" section has the sweep it came from.
+  default:
+    provider: openrouter
+    model: moonshotai/kimi-k3
+    # No max_tokens and no timeout here: unset, the model's own output
+    # maximum applies and the call has ten minutes, so a reasoning model's
+    # thinking neither truncates its answer nor times it out.
+
+  # Triage only merges and filters findings, so it does not need the
+  # expensive model; glm-5.3-flash is the iteration model (`make quick`)
+  # and docs/findings.md records how it compares as a reviewer.
+  triage:
+    provider: openrouter
+    model: z-ai/glm-5.3-flash
+    temperature: 0
+
+review:
+  # Advisory: this project reviews itself, and a false positive should not
+  # block its own PRs.
+  fail_on: none
+  min_severity: info
+  concurrency: 4
+  # A million-token model can read far more than 60k tokens per request; the
+  # budget is about how much one call is asked to judge at once, not what
+  # the model can hold. Raised here, where the reviewer is a frontier model.
+  token_budget_per_request: 120000
+  # Definitions the change imports are attached by default. The caller
+  # walk, which reads files the change never named, is off by default and
+  # on here, where reviews are advisory and the repository is this one;
+  # docs/findings.md's callers section is the evidence for what it finds.
+  related_context: true
+  related_context_callers: true
+
+instructions:
+  - path: "**/*.go"
+    prompt: >-
+      Flag unchecked errors, ignored context cancellation, and goroutines that
+      can outlive their caller. Do not comment on formatting or naming.
+
+  - path: "internal/diff/**"
+    prompt: >-
+      This package maps diff lines to review-comment anchors. An off-by-one
+      here misplaces every comment in a file, so treat any change to position
+      or line-number arithmetic as high risk and reason about it explicitly.
+
+  - path: "internal/llm/**"
+    prompt: >-
+      This package must keep working across providers with very different
+      capabilities. Flag anything that assumes a provider supports tools,
+      JSON-schema response formats, or a particular error shape.
+
+  - path: "**/*_test.go"
+    prompt: >-
+      Judge whether the test would actually fail if the behavior it describes
+      broke. Do not ask for more tests for their own sake.
+
+linters:
+  mode: auto
+  enabled: [golangci-lint]
+  only_changed_lines: true
