@@ -1382,7 +1382,24 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 	findings = dedupe(findings)
 	e.log().Info("triaging", "findings", len(findings), "model", e.Roles.Triage.String())
 
-	if len(findings) == 0 && !e.Config.Review.Summary {
+	// No findings, no triage — whatever review.summary asks for.
+	//
+	// Triage's user message is the numbered findings list and, when the forge
+	// supplies one, the pull request title. It never carries the diff. With an
+	// empty list that leaves "No findings were reported. Write the walkthrough
+	// only." and, for a worktree review, not even a title: vcs.Local withholds
+	// HEAD's message because it describes the PREVIOUS change. So the model is
+	// asked to describe a change it was never shown, and it answers with a
+	// fluent, confident, invented one — measured on a fine-tuned gemma-4-E4B,
+	// which described a retry wrapper around an HTTP client for a fixture whose
+	// change was a SQL migration. Nothing in a corpus or a larger model fixes
+	// an input that carries no information about its answer.
+	//
+	// A clean review therefore publishes its notices and nothing else, which is
+	// what review.summary=false already did. The notices are the part that
+	// matters here: they are what makes silence mean something, and they are
+	// rendered from the report, not from this pass.
+	if len(findings) == 0 {
 		return "", nil, nil, nil
 	}
 
