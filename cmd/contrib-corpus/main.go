@@ -82,7 +82,7 @@ func run(repo, out, clones, lang string, perClass, minLines, maxLines int, since
 		if err != nil {
 			return err
 		}
-		defer os.RemoveAll(tmp)
+		defer func() { _ = os.RemoveAll(tmp) }()
 		clones = tmp
 	}
 	dir := filepath.Join(clones, slug)
