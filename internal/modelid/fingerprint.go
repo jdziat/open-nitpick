@@ -240,6 +240,10 @@ var Methods = []Method{
 		c := TrainCombined(train)
 		return c.Predict
 	}},
+	{"bayes", func(train []Sample) func(Sample) (string, float64) {
+		b := TrainBayes(train)
+		return func(s Sample) (string, float64) { return b.Predict(s.Profile) }
+	}},
 }
 
 // Idiom is a token bigram one author uses far more than the others.
@@ -323,3 +327,98 @@ func RenderIdioms(idioms map[string][]Idiom) string {
 	b.WriteString("\n")
 	return b.String()
 }
+
+// Bayes is a Bernoulli naive Bayes classifier over the presence of grams,
+// with equal class priors and Laplace smoothing: the stronger of the two
+// simple instruments for a two-class question with unequal classes, where
+// a centroid splits its calls down the middle whatever the classes' sizes.
+// It scores the log-odds of each author over the grams a sample has, so an
+// author with many samples does not win by having a fuller centroid.
+type Bayes struct {
+	authors []string
+	docs    map[string]float64            // per author, files
+	present map[string]map[string]float64 // per author, per gram, files with it
+	vocab   map[string]bool
+}
+
+// TrainBayes fits on the samples given, over both gram channels.
+func TrainBayes(samples []Sample) *Bayes {
+	b := &Bayes{docs: map[string]float64{}, present: map[string]map[string]float64{}, vocab: map[string]bool{}}
+	df := map[string]int{}
+	for _, s := range samples {
+		for g := range grams(s.Profile) {
+			df[g]++
+		}
+	}
+	for _, s := range samples {
+		if b.present[s.Author] == nil {
+			b.present[s.Author] = map[string]float64{}
+			b.authors = append(b.authors, s.Author)
+		}
+		b.docs[s.Author]++
+		for g := range grams(s.Profile) {
+			if df[g] >= minDF {
+				b.present[s.Author][g]++
+				b.vocab[g] = true
+			}
+		}
+	}
+	sort.Strings(b.authors)
+	return b
+}
+
+// grams merges the two channels, prefixed so they cannot collide.
+func grams(p Profile) map[string]bool {
+	out := make(map[string]bool, len(p.Char)+len(p.Tok))
+	for g := range p.Char {
+		out["c:"+g] = true
+	}
+	for g := range p.Tok {
+		out["t:"+g] = true
+	}
+	return out
+}
+
+// Predict returns the author with the highest posterior and the margin of
+// that posterior over the runner-up, in probability, as the confidence.
+func (b *Bayes) Predict(p Profile) (string, float64) {
+	has := grams(p)
+	scores := map[string]float64{}
+	for _, a := range b.authors {
+		n := b.docs[a]
+		var ll float64
+		for g := range b.vocab {
+			pr := (b.present[a][g] + 1) / (n + 2)
+			if has[g] {
+				ll += math.Log(pr)
+			} else {
+				ll += math.Log(1 - pr)
+			}
+		}
+		scores[a] = ll
+	}
+	// Softmax to probabilities, for a margin a reader can read.
+	best, second := math.Inf(-1), math.Inf(-1)
+	for _, v := range scores {
+		if v > best {
+			second, best = best, v
+		} else if v > second {
+			second = v
+		}
+	}
+	var z float64
+	for a, v := range scores {
+		scores[a] = math.Exp(v - best)
+		z += scores[a]
+	}
+	for a := range scores {
+		scores[a] /= z
+	}
+	author, _ := best2(scores)
+	if len(scores) < 2 {
+		return author, 1
+	}
+	return author, scores[author] - math.Exp(second-best)/z
+}
+
+func best2(sims map[string]float64) (string, float64) { return best(sims) }

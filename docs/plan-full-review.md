@@ -157,8 +157,12 @@ headers stripped so the human control is not found by its copyright
 line. The command now uses the fingerprint, trains on both embedded
 generations, answers for Go, Python and TypeScript, and abstains below a
 margin of 0.05 (0.91 precision on the second corpus). The mined idioms
-per author are in `RESULTS.md`. Next: the contributor question on real
-repositories with commit trailers as ground truth (see the findings).
+per author are in `RESULTS.md`. The contributor question on ten real
+repositories with commit trailers as ground truth (`cmd/contrib-corpus`,
+`TestContributorExperiment`, findings "Contributors") is a mixed result
+that does not support a product: 0.70 to 0.80 balanced accuracy within an
+era in three repositories, chance in six, and decay over time in all but
+one. The command's scope is unchanged.
 
 Which model wrote a file. This is the one command whose premise needs a
 measurement before code: it is not known that current models leave a

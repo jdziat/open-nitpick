@@ -143,3 +143,39 @@ func TestLicenseHeaderIsStrippedBeforeMeasuring(t *testing.T) {
 		t.Error("the copyright line reached the fingerprint")
 	}
 }
+
+// TestContributorExperiment reads the corpus cmd/contrib-corpus builds
+// (NITPICK_CONTRIB_CORPUS, default ./contrib), which is not committed, and
+// logs a time split per repository: were the lines a commit added written
+// by a person or by the tool its trailer names.
+func TestContributorExperiment(t *testing.T) {
+	dir := os.Getenv("NITPICK_CONTRIB_CORPUS")
+	if dir == "" {
+		dir = "contrib"
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Skip("no contributor corpus")
+	}
+	corpus, err := LoadContrib(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(corpus) == 0 {
+		t.Skip("empty contributor corpus")
+	}
+	for _, split := range []struct {
+		name string
+		s    ContribSplit
+	}{{"older half trains", OlderHalf}, {"blocks of fifty alternate", Blocks}, {"interleaved by date", Interleaved}} {
+		for _, m := range Methods {
+			results := ContribExperiment(m, corpus, true, split.s)
+			t.Logf("method %s, human against model, %s:%s", m.Name, split.name, Render(results))
+			for _, r := range results {
+				recall, precision := ModelRecall(r)
+				t.Logf("%s, %s, %s: balanced accuracy %.2f against chance 0.50; model recall %.2f, precision %.2f", r.Language, r.Method, split.name, Balanced(r), recall, precision)
+			}
+		}
+	}
+	results := ContribExperiment(Methods[1], corpus, false, Interleaved)
+	t.Logf("fingerprint, by tool, interleaved:%s", Render(results))
+}
