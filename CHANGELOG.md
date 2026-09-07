@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.10.0](https://github.com/jdziat/open-nitpick/compare/v1.9.0...v1.10.0) (2026-09-07)
+
+
+### Features
+
+* **converse:** [@open-nitpick](https://github.com/open-nitpick) improve, the wider pass on request ([#68](https://github.com/jdziat/open-nitpick/issues/68)) ([08e44bc](https://github.com/jdziat/open-nitpick/commit/08e44bcefdfcb8cf61dfa2b392df5dfafcbe933f)), closes [#54](https://github.com/jdziat/open-nitpick/issues/54)
+* **config:** `models.fix`, the model that edits code on a fix command ([#61](https://github.com/jdziat/open-nitpick/issues/61)) ([1ab8ce5](https://github.com/jdziat/open-nitpick/commit/1ab8ce55cb9c254f9e2b955312883fb0441bf087))
+
+    There is no default and there should not be: every measurement in
+    docs/findings.md scores a reviewer on recall and noise, and neither says
+    whether a model can produce a change that compiles. **Without
+    `models.fix`, `@open-nitpick fix` refuses**, and `nitpick
+    explain-config` names the model or says none is set. A fix it writes
+    stays unverified until the checks on the pull request it opens have run.
+
+
+### Fixes
+
+* **cli:** explain-config names the handle that ships ([#70](https://github.com/jdziat/open-nitpick/issues/70)) ([3ca56e1](https://github.com/jdziat/open-nitpick/commit/3ca56e11343ef733ed8fcc35120d8674b21e011d))
+* **vcs:** say so in the thread when a fix cannot be written ([#66](https://github.com/jdziat/open-nitpick/issues/66)) ([7e9adce](https://github.com/jdziat/open-nitpick/commit/7e9adce83d99888acc21d058fb35a0ab3fc2285f))
+
+
+### Documentation
+
+* the 44-PR regression is noise, and Status links out ([#60](https://github.com/jdziat/open-nitpick/issues/60)) ([7d5e920](https://github.com/jdziat/open-nitpick/commit/7d5e920abf36b5b6730213a587bbefa99d664631))
+
 ## [1.9.0](https://github.com/jdziat/open-nitpick/compare/v1.8.0...v1.9.0) (2026-09-07)
 
 
