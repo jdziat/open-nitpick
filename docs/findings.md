@@ -1500,8 +1500,10 @@ title. It is never sent the diff. So the walkthrough describes the findings and
 infers the rest, and with no findings at all it describes nothing: the message
 is the title plus "No findings were reported. Write the walkthrough only."
 
-Two arms, `review.ground_triage` off and on, six fixtures, glm-5.3-flash, one
-run. Groundedness is the share of a walkthrough's content words that appear in
+Two arms, the diff withheld from triage and attached to it, six fixtures,
+glm-5.3-flash, one run. The switch that selected the arms and the harness
+that ran them are both removed: the walkthrough is no longer generated at
+all, so there is nothing left to ground. The numbers are the record of why. Groundedness is the share of a walkthrough's content words that appear in
 its own diff, stopwords removed.
 
 | arm | groundedness | content words | walkthrough words | wrote nothing | recall | unmatched findings |
@@ -1542,9 +1544,11 @@ are both zero is the eleventh instrument bug here, and the second to flatter
 the arm that produced less.
 
 **Not measured: cost.** Grounding sends the whole diff to the triage model on
-every review. The tokens were not counted, and `review.budget`'s `overhead`
+every review. The tokens were never counted, and `review.budget`'s `overhead`
 defaults to 1.0 on the assumption that triage input is a short list, so
-grounding would need that default re-derived before it ships on.
+grounding would have needed that default re-derived. It never shipped on, and
+the walkthrough is now counted from the report instead; see
+[Configuration](configuration.md#the-walkthrough-at-the-top-of-a-review).
 
 Rule 15 applies. One model, one run, six fixtures, and the headline number is
 a proxy the section above says cannot separate paraphrase from invention.

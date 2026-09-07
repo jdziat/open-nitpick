@@ -329,13 +329,3 @@ benchmark-multifile:
 	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
 	$(if $(ENGINE_LOG),NITPICK_EVAL_ENGINE_LOG='$(ENGINE_LOG)') \
 	go test -tags=eval -count=1 -timeout=300m -v -run TestBenchmarkMultiFile ./internal/evals/
-
-
-# Does attaching the change to the triage prompt produce a better review?
-# Two arms per fixture, review.ground_triage off and on, scored on the
-# walkthrough's groundedness and on detection.
-.PHONY: grounding
-grounding:
-	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
-	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
-	go test -tags=eval -count=1 -timeout=45m -v -run TestTriageGrounding ./internal/evals/
