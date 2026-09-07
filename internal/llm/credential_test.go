@@ -31,18 +31,31 @@ func stubKeyring(t *testing.T, entries map[string]string, err error) {
 }
 
 // printer writes a script that prints what it is told, for credential_command.
+//
+// The values go in files the script reads rather than into the script's own
+// text. Embedded, a value containing a quote, a dollar or a backtick would
+// break the script or be expanded by it, and the next caller would debug a
+// shell rather than the code under test.
 func printer(t *testing.T, stdout, stderr string, exit int) []string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("the script this test writes is a shell script")
 	}
-	path := filepath.Join(t.TempDir(), "cred.sh")
-	body := "#!/bin/sh\nprintf '%s\\n' \"" + stdout + "\"\nprintf '%s' \"" + stderr + "\" >&2\nexit " +
-		strconv.Itoa(exit) + "\n"
-	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+	dir := t.TempDir()
+	outFile := filepath.Join(dir, "out")
+	errFile := filepath.Join(dir, "err")
+	for path, content := range map[string]string{outFile: stdout, errFile: stderr} {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	script := filepath.Join(dir, "cred.sh")
+	body := "#!/bin/sh\ncat " + outFile + "\ncat " + errFile + " >&2\nexit " + strconv.Itoa(exit) + "\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	return []string{path}
+	return []string{script}
 }
 
 func resolve(t *testing.T, spec config.ModelSpec, env map[string]string) (string, bool, error) {
@@ -120,7 +133,7 @@ func TestCredentialCommandOutputIsTheKeyAndBeatsEverything(t *testing.T) {
 	spec := config.ModelSpec{
 		Provider:          "synthetic",
 		APIKeyEnv:         "MY_KEY",
-		CredentialCommand: printer(t, "op_secret", "", 0),
+		CredentialCommand: printer(t, "op_secret\n", "", 0),
 	}
 	key, ok, err := resolve(t, spec, map[string]string{"MY_KEY": "from_env"})
 	if err != nil || !ok {
