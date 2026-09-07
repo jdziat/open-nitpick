@@ -196,53 +196,77 @@ func TestTheCredentialCommandIsNotRunThroughAShell(t *testing.T) {
 	}
 }
 
-// A command that streams is cut off rather than buffered into the heap until
-// the timeout fires. The credential is one line; the rest is not kept.
+// What bounding a credential command's output actually guarantees, in the two
+// shapes a flood comes in.
+//
+// Not that the first line is recovered from a killed command: a command that
+// fails yields an error and no key, deliberately, because a partial read of a
+// secret is not a secret. The guarantees are that a command which floods and
+// exits has its output capped, and that one which never stops returns instead
+// of hanging or growing the heap until the timeout.
 func TestACredentialCommandThatFloodsIsBounded(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("the script this test writes is a shell script")
+		t.Skip("the scripts this test writes are shell scripts")
 	}
 	dir := t.TempDir()
-	script := filepath.Join(dir, "flood.sh")
-	// yes(1) never stops on its own, so returning at all proves the read was
-	// bounded and the process was not waited on forever.
-	body := "#!/bin/sh\nprintf 'thekey\\n'\nexec yes padding\n"
-	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
-		t.Fatal(err)
+
+	write := func(name, body string) []string {
+		t.Helper()
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return []string{path}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	t.Run("floods and exits: the output is capped", func(t *testing.T) {
+		argv := write("burst.sh", "#!/bin/sh\nhead -c 400000 /dev/zero | tr '\\0' 'a'\n")
 
-	type result struct {
-		key string
-		err error
-	}
-	// The result travels on a channel rather than through captured variables,
-	// so nothing is written by one goroutine while another reads it, and
-	// nothing touches t after this function has returned.
-	done := make(chan result, 1)
-	go func() {
-		key, _, err := resolveCredential(ctx,
-			config.ModelSpec{Provider: "synthetic", CredentialCommand: []string{script}}, nil)
-		done <- result{key, err}
-	}()
+		key, ok, err := resolveCredential(context.Background(),
+			config.ModelSpec{Provider: "synthetic", CredentialCommand: argv}, nil)
+		if err != nil || !ok {
+			t.Fatalf("ok = %v, err = %v", ok, err)
+		}
+		if len(key) > maxCredentialBytes {
+			t.Errorf("kept %d bytes, want at most %d", len(key), maxCredentialBytes)
+		}
+		if len(key) == 0 {
+			t.Error("the cap discarded everything")
+		}
+	})
 
-	var got result
-	select {
-	case got = <-done:
-	case <-time.After(30 * time.Second):
-		t.Fatal("a flooding credential command was not bounded")
-	}
+	t.Run("never stops: the call returns anyway", func(t *testing.T) {
+		argv := write("flood.sh", "#!/bin/sh\nprintf 'thekey\\n'\nexec yes padding\n")
 
-	// The command is killed by the context rather than exiting, so an error is
-	// expected. The key is asserted either way: the claim is that the first
-	// line survives the flood, and an assertion that only runs when there is
-	// no error does not test that.
-	if got.err == nil && got.key != "thekey" {
-		t.Errorf("key = %q, want the first line kept", got.key)
-	}
-	if got.err != nil && got.key != "" {
-		t.Errorf("key = %q alongside an error; a failed command must yield nothing", got.key)
-	}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		type result struct {
+			key string
+			err error
+		}
+		// On a channel rather than through captured variables, so the timeout
+		// path cannot read what the goroutine is still writing, and nothing
+		// touches t once this function has returned.
+		done := make(chan result, 1)
+		go func() {
+			key, _, err := resolveCredential(ctx,
+				config.ModelSpec{Provider: "synthetic", CredentialCommand: argv}, nil)
+			done <- result{key, err}
+		}()
+
+		var got result
+		select {
+		case got = <-done:
+		case <-time.After(30 * time.Second):
+			t.Fatal("a command that never stops was waited on rather than bounded")
+		}
+
+		if got.err == nil {
+			t.Fatalf("a killed command reported success, key = %q", got.key)
+		}
+		if got.key != "" {
+			t.Errorf("key = %q; a failed command must yield nothing", got.key)
+		}
+	})
 }
