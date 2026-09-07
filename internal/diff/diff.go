@@ -38,7 +38,8 @@ const (
 
 // File is one file's changes within a diff.
 type File struct {
-	// Path is the new path, or the old path for a deletion.
+	// Path names the file after the change, or before it when the change
+	// deletes.
 	Path string
 
 	// OldPath is set for renames and deletions.

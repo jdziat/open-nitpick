@@ -5,17 +5,11 @@ import (
 	"testing"
 )
 
-// These fixtures are real `git diff` output for content that renders as
-// something the parser could mistake for structure:
-//
-//   - an added line whose content starts with "++ " renders as "+++ ..."
-//     (a nested markdown bullet does this)
-//   - a removed line whose content starts with "-- " renders as "--- ..."
-//   - a file whose content is literally a diff header
-//
-// Getting these wrong silently misroutes or shifts every comment in the file,
-// which is why they are checked against output git produced rather
-// than against a hand-written string.
+// These fixtures are real `git diff` output for content the parser could
+// mistake for structure: an added line rendering as "+++ ", a removed line
+// rendering as "--- ", and a file whose content is a diff header. Getting one
+// wrong misroutes every comment in the file, so the fixtures are output git
+// produced rather than hand-written strings.
 const (
 	pseudoHeaderFixture = "testdata/pseudo-headers.diff"
 	removalFixture      = "testdata/removals.diff"

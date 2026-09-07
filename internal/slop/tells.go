@@ -77,9 +77,9 @@ var (
 		`BEFORE|AFTER|READ|SENT|UNDERSTOOD|HELD|THIS|THAT|WAS|WERE|ARE|DOES|DID|WILL|` +
 		`AND|BUT|NOTHING|NOBODY|ANYTHING|EACH|BOTH|SAME|WRONG|RIGHT|REAL|ACTUALLY)\b`)
 
-	// A comment telling the story of its own file: what the code used to do,
-	// which bug this fixed, what a previous version got wrong. It is a commit
-	// message that outlived its commit.
+	// A comment telling the story of its own file: which bug a change fixed,
+	// what an earlier version got wrong, what the code did in some other
+	// version. It is a commit message living past the commit that carried it.
 	changelog = regexp.MustCompile(`(?i)\b(used to (be|say|live|read|do|call|apply)|previously|the bug (this|that) (fixes|caused)|this used to|was once|had been|outlived|before this (change|fix)|the fix (above|below)|no longer (does|says|reads))\b`)
 	identRe   = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
 	declRe    = regexp.MustCompile(`^\s*(func |def |class |type |export |function |const |let |var |public |private |protected |static |async )`)
