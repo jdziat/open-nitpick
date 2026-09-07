@@ -19,13 +19,18 @@ type proposeFake struct {
 	baseRepo  string
 	refExists bool
 
-	reads      int
-	commitBody map[string]any
-	prBody     map[string]any
-	created    string
-	deleted    string
-	updated    bool
-	sameTree   bool
+	reads       int
+	commitBody  map[string]any
+	prBody      map[string]any
+	created     string
+	deleted     string
+	updated     bool
+	sameTree    bool
+	truncated   bool
+	treeEntries []map[string]any
+
+	failSecondRead bool
+	treeBody       map[string]any
 }
 
 func (f *proposeFake) handler(t *testing.T) http.HandlerFunc {
@@ -36,6 +41,10 @@ func (f *proposeFake) handler(t *testing.T) http.HandlerFunc {
 		// The pull request. The second read may report a moved head.
 		case r.Method == http.MethodGet && strings.HasSuffix(p, "/pulls/7"):
 			f.reads++
+			if f.reads > 1 && f.failSecondRead {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
 			head := f.head
 			if f.reads > 1 && f.movedTo != "" {
 				head = f.movedTo
@@ -46,10 +55,23 @@ func (f *proposeFake) handler(t *testing.T) http.HandlerFunc {
 				"head":   map[string]any{"ref": "topic", "sha": head, "repo": map[string]any{"full_name": f.headRepo}},
 			})
 
+		case r.Method == http.MethodGet && strings.Contains(p, "/git/trees/"):
+			entries := f.treeEntries
+			if entries == nil {
+				entries = []map[string]any{
+					{"path": "a.go", "mode": "100644", "type": "blob"},
+					{"path": "b.go", "mode": "100644", "type": "blob"},
+				}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sha": "tree-base", "truncated": f.truncated, "tree": entries,
+			})
+
 		case strings.Contains(p, "/git/commits/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"sha": f.head, "tree": map[string]any{"sha": "tree-base"}})
 
 		case r.Method == http.MethodPost && strings.HasSuffix(p, "/git/trees"):
+			_ = json.NewDecoder(r.Body).Decode(&f.treeBody)
 			sha := "tree-new"
 			if f.sameTree {
 				sha = "tree-base"
@@ -269,5 +291,106 @@ func TestProposeChangeReportsAnExistingBranch(t *testing.T) {
 
 	if _, err := propose(t, f, goodProposal()); !errors.Is(err, ErrRefExists) {
 		t.Fatalf("err = %v, want ErrRefExists", err)
+	}
+}
+
+// A fork the forge does not name is refused. GitHub reports a null head
+// repository for a fork that has since been deleted, and its head commit is
+// still reachable through the base repository's network, so treating unknown
+// as same is the fork case wearing a blank name.
+func TestProposeChangeRefusesAnUnnamedHeadRepository(t *testing.T) {
+	// Both cases, and the second is the one only this guard catches: with a
+	// base repository present the inequality below it would refuse an empty
+	// head anyway, so a test that stopped there would pass with the guard
+	// removed.
+	for name, f := range map[string]*proposeFake{
+		"head unnamed":     {head: "head01", headRepo: "", baseRepo: "o/r"},
+		"neither reported": {head: "head01", headRepo: "", baseRepo: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := propose(t, f, goodProposal())
+			if !errors.Is(err, ErrForbidden) {
+				t.Fatalf("err = %v, want ErrForbidden", err)
+			}
+			if f.created != "" {
+				t.Errorf("a branch was created anyway: %s", f.created)
+			}
+		})
+	}
+}
+
+// The mode comes from the tree. Writing every edit as a regular file clears
+// the executable bit on a script, and the pull request looks clean until the
+// file is run.
+func TestProposeChangeKeepsTheModeItFound(t *testing.T) {
+	f := &proposeFake{head: "head01", headRepo: "o/r", baseRepo: "o/r",
+		treeEntries: []map[string]any{{"path": "a.go", "mode": "100755", "type": "blob"}}}
+
+	if _, err := propose(t, f, goodProposal()); err != nil {
+		t.Fatalf("ProposeChange: %v", err)
+	}
+
+	tree, _ := f.treeBody["tree"].([]any)
+	if len(tree) != 1 {
+		t.Fatalf("tree = %v", f.treeBody["tree"])
+	}
+	if mode, _ := tree[0].(map[string]any)["mode"].(string); mode != "100755" {
+		t.Errorf("mode = %q, want the executable bit kept", mode)
+	}
+}
+
+// A symlink's content is its target and a submodule's is a revision. Neither
+// is a file a code-edit model should rewrite.
+func TestProposeChangeRefusesAModeItDoesNotWrite(t *testing.T) {
+	for name, mode := range map[string]string{"a symlink": "120000", "a submodule": "160000"} {
+		t.Run(name, func(t *testing.T) {
+			f := &proposeFake{head: "head01", headRepo: "o/r", baseRepo: "o/r",
+				treeEntries: []map[string]any{{"path": "a.go", "mode": mode, "type": "blob"}}}
+
+			if _, err := propose(t, f, goodProposal()); err == nil {
+				t.Fatal("accepted")
+			}
+			if f.created != "" {
+				t.Errorf("a branch was created anyway: %s", f.created)
+			}
+		})
+	}
+}
+
+// A path the revision does not hold would read as "this file is new", which
+// is the one case a proposal must not accept.
+func TestProposeChangeRefusesAPathTheRevisionDoesNotHold(t *testing.T) {
+	f := &proposeFake{head: "head01", headRepo: "o/r", baseRepo: "o/r",
+		treeEntries: []map[string]any{{"path": "b.go", "mode": "100644", "type": "blob"}}}
+
+	if _, err := propose(t, f, goodProposal()); err == nil {
+		t.Fatal("a path absent from the tree was accepted")
+	}
+}
+
+// A tree too large to read whole is refused rather than half-used.
+func TestProposeChangeRefusesATruncatedTree(t *testing.T) {
+	f := &proposeFake{head: "head01", headRepo: "o/r", baseRepo: "o/r", truncated: true}
+
+	if _, err := propose(t, f, goodProposal()); err == nil {
+		t.Fatal("a truncated tree was used")
+	}
+}
+
+// A re-read that fails is treated as moved. Opening the pull request with no
+// check at all on a transient error is the failure the guard exists to
+// prevent, arriving through a rate limit rather than a push.
+func TestProposeChangeTreatsAFailedRereadAsMoved(t *testing.T) {
+	f := &proposeFake{head: "head01", headRepo: "o/r", baseRepo: "o/r", failSecondRead: true}
+
+	_, err := propose(t, f, goodProposal())
+	if !errors.Is(err, ErrHeadMoved) {
+		t.Fatalf("err = %v, want ErrHeadMoved", err)
+	}
+	if f.prBody != nil {
+		t.Error("a pull request was opened without the re-read succeeding")
+	}
+	if f.deleted == "" {
+		t.Error("the branch was left behind")
 	}
 }

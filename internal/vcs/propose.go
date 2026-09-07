@@ -106,7 +106,16 @@ func (g *GitHub) ProposeChange(ctx context.Context, ref Ref, p Proposal) (*Propo
 	// branch in the base repository pointing at a commit parented on the
 	// fork's head: every call succeeds and fork-authored code ends up on an
 	// upstream branch under this tool's name.
-	if pr.HeadRepo != "" && pr.BaseRepo != "" && pr.HeadRepo != pr.BaseRepo {
+	//
+	// An unreported repository is refused rather than skipped. The forge sends
+	// a null head repository for a fork that has since been deleted, and its
+	// head commit is still reachable through the base repository's network, so
+	// treating "unknown" as "same" is the fork case wearing a blank name.
+	if pr.HeadRepo == "" || pr.BaseRepo == "" {
+		return nil, fmt.Errorf("github: %w: %s does not report which repository its head is in",
+			ErrForbidden, ref)
+	}
+	if pr.HeadRepo != pr.BaseRepo {
 		return nil, fmt.Errorf("github: %w: %s is a pull request from %s", ErrForbidden, ref, pr.HeadRepo)
 	}
 	if strings.EqualFold(p.Branch, pr.HeadRef) || strings.EqualFold(p.Branch, pr.BaseRef) {
@@ -116,14 +125,19 @@ func (g *GitHub) ProposeChange(ctx context.Context, ref Ref, p Proposal) (*Propo
 		return nil, fmt.Errorf("github: %w: read at %s, now at %s", ErrHeadMoved, short(p.Base), short(pr.HeadSHA))
 	}
 
-	entries, err := treeEntries(p)
+	base, _, err := g.client.Git.GetCommit(ctx, ref.Owner, ref.Repo, p.Base)
+	if err != nil {
+		return nil, fmt.Errorf("github: read commit %s: %w", short(p.Base), err)
+	}
+
+	modes, err := g.treeModes(ctx, ref, base.GetTree().GetSHA())
 	if err != nil {
 		return nil, err
 	}
 
-	base, _, err := g.client.Git.GetCommit(ctx, ref.Owner, ref.Repo, p.Base)
+	entries, err := treeEntries(p, modes)
 	if err != nil {
-		return nil, fmt.Errorf("github: read commit %s: %w", short(p.Base), err)
+		return nil, err
 	}
 
 	tree, _, err := g.client.Git.CreateTree(ctx, ref.Owner, ref.Repo, base.GetTree().GetSHA(), entries)
@@ -162,13 +176,27 @@ func (g *GitHub) ProposeChange(ctx context.Context, ref Ref, p Proposal) (*Propo
 		return nil, fmt.Errorf("github: create %s: %w", fullRef, err)
 	}
 
-	// The last chance to notice a push that landed while this was being
-	// built. The branch is removed rather than left dangling, and the caller
-	// is told why instead of receiving a pull request that reverts someone.
-	if moved, err := g.PullRequest(ctx, ref); err == nil && moved.HeadSHA != p.Base {
-		_, _ = g.client.Git.DeleteRef(ctx, ref.Owner, ref.Repo, fullRef)
-		return nil, fmt.Errorf("github: %w: read at %s, now at %s",
-			ErrHeadMoved, short(p.Base), short(moved.HeadSHA))
+	// The last chance to notice a push that landed while this was being built.
+	//
+	// A re-read that FAILS is treated as moved. The alternative is opening the
+	// pull request with no check at all on a transient error, which is the
+	// failure this guard exists to prevent, arriving through a rate limit
+	// rather than through a push.
+	moved, err := g.PullRequest(ctx, ref)
+	if err != nil || moved.HeadSHA != p.Base {
+		now := "unknown"
+		if err == nil {
+			now = short(moved.HeadSHA)
+		}
+
+		// A branch that cannot be removed is named in the error. Silence here
+		// would leave a commit that reverts someone's push sitting on a ref,
+		// and the next identical ask would report it as the earlier proposal.
+		if _, delErr := g.client.Git.DeleteRef(ctx, ref.Owner, ref.Repo, fullRef); delErr != nil {
+			return nil, fmt.Errorf("github: %w: read at %s, now at %s, and %s could not be removed: %w",
+				ErrHeadMoved, short(p.Base), now, p.Branch, delErr)
+		}
+		return nil, fmt.Errorf("github: %w: read at %s, now at %s", ErrHeadMoved, short(p.Base), now)
 	}
 
 	created, _, err := g.client.PullRequests.Create(ctx, ref.Owner, ref.Repo, &github.NewPullRequest{
@@ -198,7 +226,7 @@ func (g *GitHub) ProposeChange(ctx context.Context, ref Ref, p Proposal) (*Propo
 //
 // An entry carrying neither content nor a blob SHA is how the forge's API
 // spells DELETE, so content is asserted rather than assumed.
-func treeEntries(p Proposal) ([]*github.TreeEntry, error) {
+func treeEntries(p Proposal, modes map[string]string) ([]*github.TreeEntry, error) {
 	allow := make(map[string]bool, len(p.AllowPaths))
 	for _, a := range p.AllowPaths {
 		if clean, err := cleanPath(a); err == nil {
@@ -222,12 +250,46 @@ func treeEntries(p Proposal) ([]*github.TreeEntry, error) {
 			return nil, fmt.Errorf("github: %s carries no content, which would delete it", clean)
 		}
 
+		// The mode comes from the tree rather than a constant. Writing every
+		// edit as 100644 silently clears the executable bit on a script, and
+		// the pull request looks clean until the file is run.
+		mode, ok := modes[clean]
+		if !ok {
+			return nil, fmt.Errorf("github: %s is not in the revision this was read at", clean)
+		}
+		if mode != "100644" && mode != "100755" {
+			// A symlink's content is its target and a submodule's is a
+			// revision. Neither is a file a code-edit model should rewrite.
+			return nil, fmt.Errorf("github: %s is mode %s, which this does not write", clean, mode)
+		}
+
 		out = append(out, &github.TreeEntry{
 			Path:    github.Ptr(clean),
-			Mode:    github.Ptr("100644"),
+			Mode:    github.Ptr(mode),
 			Type:    github.Ptr("blob"),
 			Content: github.Ptr(string(e.Content)),
 		})
+	}
+	return out, nil
+}
+
+// treeModes maps every path in a revision's tree to its file mode.
+//
+// One recursive read rather than one call per edit. A truncated tree is
+// refused rather than half-used: a missing path would otherwise read as "this
+// file is new", which is the one case a proposal must not accept.
+func (g *GitHub) treeModes(ctx context.Context, ref Ref, treeSHA string) (map[string]string, error) {
+	tree, _, err := g.client.Git.GetTree(ctx, ref.Owner, ref.Repo, treeSHA, true)
+	if err != nil {
+		return nil, fmt.Errorf("github: read tree %s: %w", short(treeSHA), err)
+	}
+	if tree.GetTruncated() {
+		return nil, fmt.Errorf("github: the tree at %s is too large to read whole", short(treeSHA))
+	}
+
+	out := make(map[string]string, len(tree.Entries))
+	for _, e := range tree.Entries {
+		out[e.GetPath()] = e.GetMode()
 	}
 	return out, nil
 }
