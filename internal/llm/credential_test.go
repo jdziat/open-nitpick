@@ -276,10 +276,29 @@ func TestACredentialCommandThatFloodsIsBounded(t *testing.T) {
 // hangs before its first request is the same outcome either way.
 func TestANamedKeystoreEntryIsBoundedToo(t *testing.T) {
 	prev := keyringGet
-	t.Cleanup(func() { keyringGet = prev })
 	release := make(chan struct{})
-	t.Cleanup(func() { close(release) })
+
+	// The lookup gives up while the stub is still inside the call, so the
+	// package variable must not be restored until that call has returned.
+	// Restoring it while the leaked goroutine is still reading it is a write
+	// racing a read, which -race fails on.
+	// The stub is called once and closes exited on its way out, so cleanup can
+	// wait for that one call to return before restoring the package variable.
+	// A WaitGroup does not work here: its Add would run inside the goroutine,
+	// after Wait may already have been reached.
+	exited := make(chan struct{})
+	t.Cleanup(func() {
+		close(release)
+		select {
+		case <-exited:
+		case <-time.After(10 * time.Second):
+			t.Error("the keystore stub never returned")
+		}
+		keyringGet = prev
+	})
+
 	keyringGet = func(string, string) (string, error) {
+		defer close(exited)
 		<-release // never answers within the test
 		return "", nil
 	}
