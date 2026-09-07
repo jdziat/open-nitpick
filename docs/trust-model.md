@@ -46,10 +46,10 @@ including `.nitpick.yaml`. Three consequences:
   the analyzers that would have read it, in the same commit those settings
   govern.
 
-  The substitution is published, never silent: the report names which of the
-  three sources applied (the checkout, the base revision and the revision it was
-  read at, or the defaults), the config file the change edits, and one sentence
-  saying why the checkout's copy was withheld. A forge that cannot name a base
+  The substitution is published, never silent. The report names which of the
+  three sources applied, whether that is the checkout, the base revision and the
+  revision it was read at, or the defaults. It also names the config file the
+  change edits, with one sentence saying why the checkout's copy was withheld. A forge that cannot name a base
   revision is not an error; policy falls back to defaults and the run says so.
   Running locally, where you wrote the file, there is no pull request and the
   checkout's config is used as written.
@@ -111,8 +111,8 @@ including `.nitpick.yaml`. Three consequences:
   (`/*line …*/`) needs no column 1 and works indented inside a function body.
 
   Nothing can recover the true position from the report, so the report is refused
-  whole: a package whose source carries a line directive is `did not run` with the
-  file and line of the directive, published on the pull request. The cost is a
+  whole. A package whose source carries a line directive is reported as `did not
+  run`, naming the file and line of the directive on the pull request. The cost is a
   repository that commits generated Go containing directives (`goyacc` and `cgo`
   output), which gets a named refusal for those packages rather than a silent
   one. Findings that reach normalization with a path outside the checkout anyway
@@ -202,15 +202,15 @@ including `.nitpick.yaml`. Three consequences:
   `go 1.15` and the run is byte-identical to a clean one: zero findings, roster
   `ran`, empty discard list. staticcheck reports a deprecation only for a module
   declaring the release that issued it or later, and the module's declared
-  language version wins over anything the analyzer is configured with: neither
-  `run.go` nor `staticcheck.checks: ["all"]` restores the check, and under
-  `checks: all` staticcheck demonstrably runs (ST1000 appears) while `SA1019`
-  still does not.
+  language version beats anything the analyzer is configured with. Neither
+  `run.go` nor `staticcheck.checks: ["all"]` restores the check. Under
+  `checks: all` staticcheck demonstrably runs, since ST1000 appears, while
+  `SA1019` still does not.
 
-  It therefore cannot be closed from the configuration open-nitpick owns, and
-  `go.mod` is the tree under review, so raising it is not ours to do either, so
-  it is named instead: the module's `go.mod` and the line of the directive, under
-  *Analyzed less than it ran over*.
+  It cannot be closed from the configuration open-nitpick owns. Raising the
+  directive is not ours to do either, since `go.mod` is the tree under review.
+  So the run names it instead, under *Analyzed less than it ran over*, with the
+  module's `go.mod` and the line of the directive.
 
   **The measure is the toolchain that loads the packages, and it used to be a
   constant floor of `go 1.21`.** The floor's argument was volume: every Go
@@ -341,9 +341,9 @@ repair attempt, remembering that downgrade so it is paid for once per run
 rather than once per request. Force either path with `structured_output: schema`
 or `json`.
 
-A provider that *accepts* the schema and then ignores it is handled separately
-and deliberately: the response is rejected, the same request is retried on the
-JSON path, and the client is **not** downgraded. Routers can hand consecutive
+A provider that *accepts* the schema and then ignores it is handled separately.
+The response is rejected and the same request is retried on the JSON path, but
+the client is **not** downgraded. Routers can hand consecutive
 requests to different upstreams, so one unenforced answer is a fact about that
 answer, not about the provider, and a downgrade would move every later batch of
 the run onto a different strategy with nothing in the report saying so. A

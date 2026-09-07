@@ -93,3 +93,61 @@ func TestCommentMarkersFollowTheLanguage(t *testing.T) {
 		t.Errorf("indented code was scanned: %+v", got)
 	}
 }
+
+// The rhetorical shapes a reader calls out as machine-written, which the
+// word-level rules were blind to. Each of these was in this repository's own
+// documentation when a reader identified it on sight.
+func TestTheAntithesisShapeIsFound(t *testing.T) {
+	for _, line := range []string{
+		"It is not a nicety, it is a correctness matter.\n",
+		"Surfacing skips is not decoration, that is the whole point.\n",
+		"These were not a bug, but a design choice.\n",
+	} {
+		got := Scan("x.md", line)
+		if !strings.Contains(rules(got), "antithesis") {
+			t.Errorf("not found in %q: %+v", line, got)
+		}
+	}
+
+	// A plain negation is not the shape. The tell is the pivot into a
+	// restatement, not the word "not".
+	if got := Scan("x.md", "The linters are not run from the repository.\n"); len(got) != 0 {
+		t.Errorf("a plain negation was flagged: %+v", got)
+	}
+}
+
+// One appositive tail is a sentence. Forty of them is a voice, and only a
+// whole-file measure can tell the two apart.
+func TestCadenceIsMeasuredOverAFileNotALine(t *testing.T) {
+	dense := strings.Repeat(
+		"The rule is simple: it holds everywhere.\nIt reads the diff, the config, and the tree.\n", 30)
+	got := Scan("dense.md", dense)
+	if !strings.Contains(rules(got), "prose-cadence") {
+		t.Errorf("dense prose was not flagged: %+v", got)
+	}
+
+	// The same two sentences alone are not a cadence, and a file that short
+	// has no rhythm to measure.
+	if got := Scan("short.md", "The rule is simple: it holds everywhere.\n"); len(got) != 0 {
+		t.Errorf("a single sentence was flagged: %+v", got)
+	}
+
+	sparse := strings.Repeat("The reviewer reads the diff and posts comments.\n", 60)
+	if got := Scan("sparse.md", sparse); len(got) != 0 {
+		t.Errorf("plain prose was flagged: %+v", got)
+	}
+}
+
+// Fenced code, tables and headings carry colons and lists that are not prose,
+// so counting them would flag every reference page.
+func TestCadenceIgnoresCodeTablesAndHeadings(t *testing.T) {
+	var b strings.Builder
+	for i := 0; i < 60; i++ {
+		b.WriteString("| a: b | c, d, and e |\n")
+		b.WriteString("## A heading: with a colon\n")
+	}
+	b.WriteString("```\ncfg := Config{a, b, and c}\nx is this: that\n```\n")
+	if got := Scan("ref.md", b.String()); len(got) != 0 {
+		t.Errorf("non-prose lines were counted: %+v", got)
+	}
+}

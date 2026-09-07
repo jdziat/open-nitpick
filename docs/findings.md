@@ -1361,6 +1361,52 @@ same prompts, not two months of a model's life. The command trains on
 both generations and answers "most similar to" for Go, Python and
 TypeScript, "unknown" below the floor or outside the corpus, and says so.
 
+## The slop scanner could not see its own class (2026-09-07)
+
+A reader looking at the front page named it as machine-written and quoted the
+sentence that gave it away: "what has been measured, what it supports, and every
+instrument bug found so far, in a table whose count is the number of rows.
+Several flattered one side of a comparison; one produced a published claim that
+had to be retracted."
+
+`nitpick slop -no-model` over the whole documentation set, 5,080 lines across
+sixteen files, reported **one** tell, a `filler-qualifier` on the line of
+`docs/usage.md` that documents the filler-qualifier rule.
+
+The eight rules were all about WORDS: an em dash, an arrow, a filler qualifier,
+a chat opener. The quoted sentence contains none of them. What it has is shape,
+three parallel clauses, an appositive tail that restates the noun it hangs off,
+and a balanced pair split by a semicolon. The `triplet-rhythm` rule came closest
+and still missed, because it required all three members to be adjectives by
+suffix, so "Usable, measured, and still early" did not match on `measured`.
+
+Measured across the documentation, counting three shapes per line (a
+comma-comma-and list, a colon expanding into a lower-case clause, and a
+`, which is` tail):
+
+| file | prose lines | markers | per 100 |
+|---|---|---|---|
+| docs/trust-model.md | 318 | 52 | 16.4 |
+| README.md | 82 | 13 | 15.9 |
+| docs/ci.md | 111 | 16 | 14.4 |
+| docs/configuration.md | 260 | 28 | 10.8 |
+| docs/findings.md | 1237 | 105 | 8.5 |
+| docs/comparison.md | 505 | 36 | 7.1 |
+| docs/measurement.md | 549 | 39 | 7.1 |
+| docs/remediation.md | 271 | 17 | 6.3 |
+
+The pages a reader objected to sit above 14; the pages nobody has objected to
+sit between 6 and 9. `prose-cadence` fires above 10 per 100 prose lines over a
+file of at least 40, and `antithesis` catches the "not X, it is Y" pivot on a
+line. Both are in `internal/slop/tells.go`, both are deterministic, and the
+threshold is this table rather than a preference.
+
+Rule 15 applies. This is one repository's documentation, judged once, by one
+reader, and the threshold separates two groups of eight files. What it is not
+is a measurement of whether a model wrote something: a careful human writer
+who likes colons will cross it, and a model told to write plainly will not.
+It measures sameness of rhythm, which is what was visible.
+
 ## Contributors: does the signature survive a real repository (2026-09-06)
 
 The corpus experiment asks which of six models wrote a whole file that
