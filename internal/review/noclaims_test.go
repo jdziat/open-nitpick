@@ -202,3 +202,31 @@ func TestAClaimAtAnUnreportedLineIsDropped(t *testing.T) {
 		}
 	}
 }
+
+// A suggestion replaces the lines it is attached to, so restoring the
+// reviewer's patch onto a line triage moved would offer a one-click commit
+// over the wrong code.
+func TestASuggestionKeepsItsOwnLine(t *testing.T) {
+	o := origin("a.go", 20, "t", "r")
+	o.Suggestion = "return err"
+	o.EndLine = 21
+
+	moved := Finding{Path: "a.go", Line: 26, Title: "x", Rationale: "y", Suggestion: "z"}
+	changed := restore(&moved, o)
+
+	if moved.Line != 20 || moved.EndLine != 21 {
+		t.Errorf("line = %d-%d, want the reviewer's 20-21", moved.Line, moved.EndLine)
+	}
+	if !strings.Contains(strings.Join(changed, ","), "line") {
+		t.Errorf("changed = %v, want line named", changed)
+	}
+
+	// Without a suggestion there is nothing to misapply, so triage keeps its
+	// re-anchor.
+	plain := origin("a.go", 20, "t", "r")
+	kept := Finding{Path: "a.go", Line: 26, Title: "x", Rationale: "y"}
+	restore(&kept, plain)
+	if kept.Line != 26 {
+		t.Errorf("line = %d, want triage's re-anchor at 26 kept", kept.Line)
+	}
+}

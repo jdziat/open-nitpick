@@ -70,9 +70,22 @@ func (o origins) find(path string, line int) (Finding, bool) {
 // line triage chose.
 //
 // Title, Rationale and Suggestion are the three fields that make a claim. The
-// line is triage's to move, because a line is a location rather than an
-// assertion and moving it onto changed code is the anchor pass's job too.
+// line is normally triage's to move, because a line is a location rather than
+// an assertion and moving it onto changed code is the anchor pass's job too.
+//
+// A SUGGESTION IS THE EXCEPTION, and it is the one that would have shipped a
+// wrong patch. A suggestion is rendered as a forge suggestion block, which
+// replaces the lines it is attached to. The reviewer wrote it against its own
+// line; restoring that text onto a line triage moved would offer a one-click
+// commit that overwrites the wrong code. So when the origin carries a
+// suggestion and triage moved the finding, the line comes back with it.
 func restore(f *Finding, origin Finding) (changed []string) {
+	if origin.Suggestion != "" && f.Line != origin.Line {
+		changed = append(changed, "line")
+		f.Line = origin.Line
+		f.EndLine = origin.EndLine
+	}
+
 	if f.Title != origin.Title {
 		changed = append(changed, "title")
 		f.Title = origin.Title
