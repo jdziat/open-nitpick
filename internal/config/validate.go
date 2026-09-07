@@ -117,6 +117,16 @@ func (s ModelSpec) validate(required bool) []error {
 			}
 		}
 	}
+	if s.Fallback != nil {
+		if s.Fallback.Fallback != nil {
+			errs = append(errs, errors.New("fallback may not name its own fallback: escalation is one step"))
+		}
+		if strings.TrimSpace(s.Fallback.Model) == "" {
+			errs = append(errs, errors.New("fallback: model is required"))
+		}
+		errs = append(errs, prefixAll("fallback", s.Fallback.validate(false))...)
+	}
+
 	for i, arg := range s.CredentialCommand {
 		if strings.TrimSpace(arg) == "" {
 			errs = append(errs, fmt.Errorf("credential_command[%d] is empty", i))

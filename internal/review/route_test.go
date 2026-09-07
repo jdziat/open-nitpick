@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -194,6 +195,51 @@ func sortStrings(s []string) {
 			if s[j] < s[i] {
 				s[i], s[j] = s[j], s[i]
 			}
+		}
+	}
+}
+
+// escalatingClient answers with err on the first spec and succeeds on the
+// fallback, so a test can drive the escalation without a model.
+func TestShouldEscalateSeparatesTheModelsFailuresFromTheTransports(t *testing.T) {
+	for msg, want := range map[string]bool{
+		"llms: structured output is not valid json: x":                  true,
+		"response was not valid JSON after one repair attempt: x":       true,
+		"no JSON object in the response matched the expected shape (x)": true,
+		"no JSON object found in response (x)":                          true,
+		"unexpected end of JSON input":                                  true,
+		"401 unauthorized":                                              false,
+		"context deadline exceeded":                                     false,
+		"dial tcp: connection refused":                                  false,
+	} {
+		if got := llm.ShouldEscalate(errors.New(msg)); got != want {
+			t.Errorf("ShouldEscalate(%q) = %v, want %v", msg, got, want)
+		}
+	}
+
+	if llm.ShouldEscalate(nil) {
+		t.Error("a nil error escalated")
+	}
+	if llm.ShouldEscalate(context.Canceled) {
+		t.Error("a cancelled context escalated")
+	}
+}
+
+// The notice names how many files a fallback answered for and which pair of
+// models, and says nothing when nothing escalated.
+func TestTheEscalationNoticeNamesBothModels(t *testing.T) {
+	if got := EscalationNotice(&Report{}); got != "" {
+		t.Errorf("a run with no escalation printed %q", got)
+	}
+
+	note := EscalationNotice(&Report{Escalated: []Escalation{
+		{Files: []string{"a.go", "b.go"}, From: "openrouter/qwen", To: "openrouter/glm-flash"},
+		{Files: []string{"c.go"}, From: "openrouter/qwen", To: "openrouter/glm-flash"},
+	}})
+
+	for _, want := range []string{"3 file(s)", "2 batch(es)", "openrouter/qwen", "openrouter/glm-flash"} {
+		if !strings.Contains(note, want) {
+			t.Errorf("the notice is missing %q:\n%s", want, note)
 		}
 	}
 }

@@ -166,14 +166,15 @@ const classificationSchema = `{
 // reviewWith runs every reviewer over a batch and pools their findings.
 // Reviewers run concurrently; one failing does not lose the others, and the
 // batch fails only when every reviewer did.
-func (e *Engine) reviewWith(ctx context.Context, r reviewers, prContext string, b bundle.Batch) ([]Finding, error) {
+func (e *Engine) reviewWith(ctx context.Context, r reviewers, prContext string, b bundle.Batch) ([]Finding, []Escalation, error) {
 	clients := append([]*llm.Client{r.primary}, r.extra...)
 
 	var (
-		mu       sync.Mutex
-		wg       sync.WaitGroup
-		findings []Finding
-		errs     []error
+		mu          sync.Mutex
+		wg          sync.WaitGroup
+		findings    []Finding
+		errs        []error
+		escalations []Escalation
 	)
 	for _, c := range clients {
 		wg.Add(1)
@@ -183,6 +184,27 @@ func (e *Engine) reviewWith(ctx context.Context, r reviewers, prContext string, 
 			if err == nil {
 				var out []Finding
 				out, err = e.analyzeBatchWith(ctx, c, base, prContext, b)
+
+				// A model that ran away or could not return the schema is not
+				// answered by asking it again, so the batch escalates to a
+				// different one once. Only these failures: a timeout or a
+				// refused credential is none of a second model's business.
+				if fb := c.Fallback(); err != nil && fb != nil && llm.ShouldEscalate(err) {
+					e.log().Warn("primary exhausted; escalating to the fallback model",
+						"from", c.String(), "to", fb.String(), "files", b.Paths(), "error", err)
+
+					if base, err = e.reviewPromptFor(fb); err == nil {
+						out, err = e.analyzeBatchWith(ctx, fb, base, prContext, b)
+						if err == nil {
+							mu.Lock()
+							escalations = append(escalations, Escalation{
+								Files: b.Paths(), From: c.String(), To: fb.String(),
+							})
+							mu.Unlock()
+						}
+					}
+				}
+
 				mu.Lock()
 				findings = append(findings, out...)
 				mu.Unlock()
@@ -201,9 +223,9 @@ func (e *Engine) reviewWith(ctx context.Context, r reviewers, prContext string, 
 
 	if len(errs) == len(clients) {
 		if len(errs) == 1 {
-			return nil, errs[0]
+			return nil, escalations, errs[0]
 		}
-		return nil, fmt.Errorf("every reviewer failed: %v", errs)
+		return nil, escalations, fmt.Errorf("every reviewer failed: %v", errs)
 	}
-	return findings, nil
+	return findings, escalations, nil
 }

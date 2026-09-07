@@ -52,6 +52,10 @@ type Client struct {
 	// question, how many times this deployment is willing to pay for one
 	// batch, and a config that lowers one has no reason to want the other.
 	stallRetries int
+
+	// fallback is the client a caller escalates to when this one cannot
+	// answer. Nil when the spec names none. See ShouldEscalate.
+	fallback *Client
 }
 
 // Provider returns the configured provider name.
@@ -110,6 +114,16 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 		return nil, fmt.Errorf("build model %s/%s: %w", spec.Provider, spec.Model, err)
 	}
 
+	// The fallback is built here rather than on demand, so a misconfigured one
+	// fails before any request is made instead of at the moment a batch has
+	// already lost its primary.
+	var fallback *Client
+	if fb, ok := spec.ResolveFallback(); ok {
+		if fallback, err = BuildContext(ctx, fb); err != nil {
+			return nil, fmt.Errorf("build fallback for %s/%s: %w", spec.Provider, spec.Model, err)
+		}
+	}
+
 	maxRetries := defaultMaxRetries
 	if spec.MaxRetries != nil {
 		maxRetries = *spec.MaxRetries
@@ -121,7 +135,7 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 		mode = config.StructuredAuto
 	}
 
-	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries}, nil
+	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries, fallback: fallback}, nil
 }
 
 // NewClientForTest wraps an arbitrary SDK client, bypassing provider

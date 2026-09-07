@@ -175,3 +175,40 @@ func capitalize(s string) string {
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
 }
+
+// Escalation records that a fallback model reviewed a batch the primary could
+// not, so a reader can tell which findings came from which model.
+//
+// Named rather than logged alone: a weaker model's findings sitting beside a
+// stronger one's with nothing to separate them is the kind of silence this
+// package reports everywhere else.
+type Escalation struct {
+	// Files are the batch's paths, From the model that could not answer, and
+	// To the one that did.
+	Files    []string
+	From, To string
+}
+
+// EscalationNotice says which batches a fallback model reviewed, and returns
+// "" when none did.
+func EscalationNotice(report *Report) string {
+	if report == nil || len(report.Escalated) == 0 {
+		return ""
+	}
+
+	byModel := map[string]int{}
+	files := 0
+	for _, e := range report.Escalated {
+		byModel[e.From+" to "+e.To]++
+		files += len(e.Files)
+	}
+
+	pairs := make([]string, 0, len(byModel))
+	for pair, n := range byModel {
+		pairs = append(pairs, fmt.Sprintf("%d batch(es) %s", n, pair))
+	}
+	sort.Strings(pairs)
+
+	return fmt.Sprintf("\n%d file(s) were reviewed by a fallback model after the primary could not answer: %s.\n",
+		files, strings.Join(pairs, "; "))
+}

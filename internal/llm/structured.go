@@ -785,3 +785,52 @@ func (c *Client) downgrade() {
 		c.mode = config.StructuredJSON
 	}
 }
+
+// Escalation: when a model cannot answer, try a different one rather than the
+// same one again.
+//
+// Runaway generation is the model looping on the input, not the endpoint
+// truncating early, so the same weights on another host reproduce it and a
+// further attempt against the same model buys minutes for the same answer. One
+// run spent 6m30s on a batch across three attempts before recovering. Nor is
+// the input the lever: the batch that looped was 37,118 tokens against a
+// 40,000 budget and a 262,144 context. See issue #49.
+
+// Fallback returns the client to escalate to, or nil when the spec names none.
+func (c *Client) Fallback() *Client {
+	if c == nil {
+		return nil
+	}
+	return c.fallback
+}
+
+// ShouldEscalate reports whether a failure is one a different model might
+// answer.
+//
+// Two classes, both about the model rather than the transport: a request cut
+// at the output cap after the retries above have already re-sampled it, and
+// structured output that never parsed. A timeout, a refused credential or a
+// cancelled context are none of a second model's business, and escalating on
+// them would spend a second budget to fail the same way.
+func ShouldEscalate(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	msg := strings.ToLower(err.Error())
+	for _, sign := range []string{
+		sdkSchemaParseFailure,
+		"was not valid json after one repair attempt",
+		"no json object in the response matched the expected shape",
+		"no json object found in response",
+		"unexpected end of json input",
+	} {
+		if strings.Contains(msg, sign) {
+			return true
+		}
+	}
+	return false
+}

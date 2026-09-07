@@ -32,6 +32,42 @@ It is **not read on a runner**, where `CI` or `GITHUB_ACTIONS` is set, because
 nobody there wrote it. `NITPICK_USER_CONFIG=/path/to/config.yaml` names one
 anyway, wherever you set it; `NITPICK_NO_USER_CONFIG=1` switches it off.
 
+## When a model cannot answer
+
+`fallback` escalates to a different model rather than retrying the same one:
+
+```yaml
+models:
+  default:
+    provider: openrouter
+    model: qwen/qwen3.8-27b
+    providers: ["parasail"]
+    fallback:
+      model: z-ai/glm-5.3-flash
+```
+
+Two failures trigger it, both about the model rather than the transport: a
+request cut at the output cap after the stall retries have already re-sampled
+it, and structured output that never parsed. A timeout, a refused credential or
+a cancelled context does not, since a second model would fail the same way and
+cost a second budget doing it.
+
+Retrying the same model is the wrong move for the first of those. Runaway
+generation is the model looping on the input, not the endpoint truncating
+early, so the same weights on another host reproduce it. Shrinking
+`token_budget_per_request` is not the lever either: a batch that looped at
+37,118 tokens was under a 40,000 budget and far under a 262,144 context.
+
+Escalation is one step. A fallback naming its own fallback is a config error,
+so a misconfiguration cannot walk a batch through every model in the file.
+
+The run says when it happened, in the log and in the published review:
+
+```
+3 file(s) were reviewed by a fallback model after the primary could not
+answer: 2 batch(es) openrouter/qwen/qwen3.8-27b to openrouter/z-ai/glm-5.3-flash.
+```
+
 ## Credentials
 
 Nothing needs configuring. Store the key once and every checkout finds it:
@@ -98,6 +134,14 @@ models:
     # max_tokens is unset by default: the model's own output maximum applies,
     # and reasoning tokens count against whatever you set here on most providers.
     timeout: 10m                     # default; per model call, not per review
+
+    # The model to escalate to when this one cannot answer: a request cut at
+    # the output cap because the model looped, or structured output that never
+    # parsed. Tried once; the batch fails if it fails too. It overlays this
+    # spec, so naming a model inherits the provider and credential, and the
+    # provider pin is dropped because a pin names the upstreams for one model.
+    fallback:
+      model: z-ai/glm-5.3-flash
 
     # Where the credential comes from. All three are optional and all three are
     # withheld from a repository's own file; see Credentials below.
