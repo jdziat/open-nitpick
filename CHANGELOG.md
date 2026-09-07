@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.8.0](https://github.com/jdziat/open-nitpick/compare/v1.7.0...v1.8.0) (2026-09-07)
+
+
+### Features
+
+* **config:** a fallback model a role escalates to when the primary fails ([#52](https://github.com/jdziat/open-nitpick/issues/52)) ([a472ee8](https://github.com/jdziat/open-nitpick/commit/a472ee816b1b1b26f43257bdbe8f6b5444736e56))
+* **converse:** read a fix command, and keep the finding it names ([#55](https://github.com/jdziat/open-nitpick/issues/55)) ([f44adaa](https://github.com/jdziat/open-nitpick/commit/f44adaa76e42e8e275c07a1cbadc293d3f407da1))
+* nitpick init, a user-level config, and a binding spend ceiling ([#35](https://github.com/jdziat/open-nitpick/issues/35)) ([cb60a2d](https://github.com/jdziat/open-nitpick/commit/cb60a2d16b6c4ad1de48d4149528442058c9d292))
+* resolve credentials from the OS keystore, and document every provider ([#44](https://github.com/jdziat/open-nitpick/issues/44)) ([e84dee6](https://github.com/jdziat/open-nitpick/commit/e84dee61ad93525576625d619d379d808aaa1704))
+* **review:** a fix prompt an agent can act on, under each finding ([#53](https://github.com/jdziat/open-nitpick/issues/53)) ([b50ca6b](https://github.com/jdziat/open-nitpick/commit/b50ca6b21e104d114fdbe60d2e69055c93d2f383))
+* **vcs:** publish file edits as a branch and a draft pull request ([#56](https://github.com/jdziat/open-nitpick/issues/56)) ([2c878e0](https://github.com/jdziat/open-nitpick/commit/2c878e0e23f19ad0272af46cfb6d414869eb16ef))
+
+
+### Fixes
+
+* **evals:** key composite cost meters by client, not by model id ([#48](https://github.com/jdziat/open-nitpick/issues/48)) ([110391f](https://github.com/jdziat/open-nitpick/commit/110391f9a7380f75f316269c63c5dcf362f8efa9)), closes [#45](https://github.com/jdziat/open-nitpick/issues/45)
+* **llm:** pin providers with only, and unwrap a single-element array ([#47](https://github.com/jdziat/open-nitpick/issues/47)) ([cae952e](https://github.com/jdziat/open-nitpick/commit/cae952e9ac17d9ae8e24ce75bb5559a7c1204beb))
+
 ## [1.7.0](https://github.com/jdziat/open-nitpick/compare/v1.6.0...v1.7.0) (2026-09-07)
 
 
