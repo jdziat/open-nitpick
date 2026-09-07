@@ -461,7 +461,7 @@ removes it. The measurements are in
 
 A comment event runs in the **base** repository, holding the base repository's
 secrets, whoever wrote the comment. On a public repository that means every
-account on the forge is one `@nitpick` away from your model credit, and a cap
+account on the forge is one `@open-nitpick` away from your model credit, and a cap
 on the size of each answer does not bound a total whose multiplier is the
 number of strangers.
 
@@ -742,12 +742,12 @@ Because a prompt asks and cannot enforce, model-authored prose is scrubbed
 before it is published: em dashes and en-dash separators become commas,
 arrows become words, filler words and chat openers and offers of further
 help are removed, and code spans and fenced blocks are left exactly as the
-model wrote them. The same rules and the same scrub apply to an `@nitpick`
+model wrote them. The same rules and the same scrub apply to an `@open-nitpick`
 answer, which is capped at 120 words.
 
 ## The mention
 
-`review.mention` (default `@nitpick`) is the handle a pull request comment
+`review.mention` (default `@open-nitpick`) is the handle a pull request comment
 uses to talk to the reviewer; see the CI page for the workflow that
 answers it.
 

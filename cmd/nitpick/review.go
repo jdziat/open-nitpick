@@ -644,7 +644,7 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 	if spec, ok := cfg.Models.ResolveFix(); ok {
 		pf("  %-8s %s/%s\n", "fix", spec.Provider, spec.Model)
 	} else {
-		pl("  fix      (none; \"@nitpick fix\" refuses without models.fix)")
+		pl("  fix      (none; \"@open-nitpick fix\" refuses without models.fix)")
 	}
 
 	// Printed whether or not validation is on, because "which model would
