@@ -65,7 +65,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		usd      float64
 		priced   int                        // reviews whose cost is known
 		byBand   map[config.Severity][2]int // located, plants
-		perFix   map[string]string          // fixture -> "located/plants (noise)"
+		perFix   map[string]string          // keyed by fixture, "located/plants (noise)"
 	}
 	var (
 		mu   sync.Mutex
@@ -325,7 +325,7 @@ func compositeCost(prices *PriceTable, byModel map[string]TokenUsage) Cost {
 // routeTally counts where a composite run's batches went, per contender.
 type routeTally struct {
 	mu     sync.Mutex
-	counts map[string]map[string]int // contender -> "route → model [+ensemble]" -> batches
+	counts map[string]map[string]int // contender, then "route/model [+ensemble]", then batches
 }
 
 func (r *routeTally) note(contender string, routes []review.RouteDecision) {

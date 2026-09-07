@@ -29,8 +29,8 @@ const EnvPrices = "NITPICK_EVAL_PRICES"
 // It is a display flag and it changes no number: every cost in the table is
 // computed from the recorded rate whatever its age. It exists because "captured
 // 47 days ago" is a fact a reader has to convert, and "STALE" is one they
-// cannot skim past. A month is the horizon over which this catalog has actually
-// moved, the gemini and qwen lines both re-tiered inside one, so it is the
+// cannot skim past. A month is the horizon over which this catalog has moved,
+// the gemini and qwen lines both re-tiering inside one, so it is the
 // point at which the right action is to recapture rather than to trust.
 const staleAfterDays = 30
 
@@ -43,8 +43,7 @@ var shippedPrices []byte
 
 // CallUsage is what ONE model call reported spending.
 //
-// The per-call granularity is not bookkeeping neatness, it is what makes a
-// tiered price computable at all. OpenRouter bills 11 of the 20 models in the
+// The per-call granularity is what makes a tiered price computable at all. OpenRouter bills 11 of the 20 models in the
 // shipped table at a rate chosen by the size of that REQUEST's prompt, and a
 // sum of calls cannot answer "how big was the prompt", an aggregate of 60,000
 // prompt tokens is one call over the qwen 32,000 step or thirty calls under it,
@@ -187,7 +186,7 @@ func (u TokenUsage) sum(of func(CallUsage) int) int {
 
 // Complete reports whether every call in this usage reported what it spent.
 // An incomplete usage may not be priced: the sum of the calls that did report
-// is not the cost of the run, it is a fraction of it with no way to know which.
+// is a fraction of the run's cost, with no way to know which fraction.
 func (u TokenUsage) Complete() bool { return len(u.PerCall) > 0 && u.Unreported == 0 }
 
 // observe records one response's reported usage, or the absence of it.
@@ -367,10 +366,10 @@ type Tier struct {
 
 // Routing is what the OTHER endpoints serving this model charge.
 //
-// It exists because the round-2 error was not a wrong number, it was a wrong
-// object. `/api/v1/models` returns one `pricing` block per model and every rate
-// in the previous table was a correct copy of it, but that block is ONE
-// ENDPOINT'S price. OpenRouter serves 15 of the 20 battery models from between
+// It exists because the round-2 error was a wrong object rather than a wrong
+// number. `/api/v1/models` returns one `pricing` block per model, every rate in
+// the previous table was a correct copy of it, and that block is one endpoint's
+// price. OpenRouter serves 15 of the 20 battery models from between
 // 5 and 34 endpoints, spanning 22x on openai/gpt-5.6-luna and 3.9x on
 // z-ai/glm-5.2, and open-nitpick pins no provider, so which one served a request
 // is the router's choice and is recorded nowhere. A $/DEFECT figure was
@@ -452,10 +451,9 @@ type Price struct {
 	// flatters a model into being the default.
 	//
 	// Nothing in open-nitpick enables prompt caching today, so this refusal
-	// should never fire. That is exactly why it is encoded rather than left as
-	// the comment it used to be: "no path sends these tokens" is a property of
-	// this month's call sites, and the accounting has to be right the month
-	// somebody adds one.
+	// should never fire, which is why it is encoded rather than left as a
+	// comment: "no path sends these tokens" is a property of this month's call
+	// sites, and the accounting has to be right the month somebody adds one.
 	//
 	// cacheWrite1hKnown separates an unpublished rate from a published free one,
 	// for the same reason cacheReadFree does on Rates.
@@ -543,8 +541,8 @@ type rawPrice struct {
 	CacheRead  *float64 `yaml:"cache_read"`
 	CacheWrite *float64 `yaml:"cache_write"`
 
-	// CacheWrite1h is recorded to be REFUSED on rather than to be billed. See
-	// Price.CacheWrite1h.
+	// CacheWrite1h is recorded to be refused on rather than billed, as the
+	// parsed form explains at length.
 	CacheWrite1h *float64 `yaml:"cache_write_1h"`
 
 	Tiers   []rawTier   `yaml:"tiers"`
@@ -697,8 +695,7 @@ func parsePrice(raw rawPrice) (Price, error) {
 			// The pair is what makes a call unpriceable. A 1-hour rate recorded
 			// beside no 5-minute rate would make the entry refuse against a
 			// fallback-to-input figure the vendor never published as a cache
-			// rate at all, which is a different statement from the one this
-			// field exists to make.
+			// rate at all, a different statement from the one being made here.
 			return Price{}, fmt.Errorf("records cache_write_1h with no cache_write: the field exists to " +
 				"say that TWO published rates could have applied, and one of them is missing")
 		}
@@ -715,9 +712,8 @@ func parsePrice(raw rawPrice) (Price, error) {
 			return Price{}, fmt.Errorf("tier %d has min_prompt_tokens %d: a threshold at or below zero restates the base rate rather than overriding it", i, mpt)
 		}
 		if mpt <= previous {
-			// rateAt walks the slice in order and stops at the first threshold
-			// above the prompt. Out of order, it would stop early and bill a
-			// large prompt at a small prompt's rate.
+			// rateAt walks the slice in order, stopping at the first threshold
+			// over the prompt, so it cannot recover from an unsorted list.
 			return Price{}, fmt.Errorf("tier %d has min_prompt_tokens %d, which does not exceed the %d before it: tiers are selected by walking them in order, so an unsorted list bills a large prompt at a small prompt's rate", i, mpt, previous)
 		}
 		previous = mpt
@@ -1244,13 +1240,13 @@ type Detections struct {
 	//     file reaches recall 1.00 BELOW the calibrated reviewer's token cost.
 	//     Its $/DEFECT heads the table. NOISE is what sees it.
 	//
-	//     This bullet used to say "forty one-line findings are cheaper to
-	//     generate than three explained ones", and the degenerate table's row for
-	//     it declared its own token count to make that true. Run over the real
-	//     corpus, a comment on every line of a twenty-line file with one defect
-	//     costs MORE than explaining that defect, so the dollar columns caught
-	//     the spammer and NOISE could have been deleted with every guard green.
-	//     What is cheap is refusing to explain, not filing more.
+	//     "Forty one-line findings are cheaper to generate than three explained
+	//     ones" is false, and only the degenerate table's own declared token
+	//     count made it look true. Run over the real corpus, a comment on every
+	//     line of a twenty-line file with one defect costs more than explaining
+	//     that defect, so the dollar columns catch the spammer and NOISE could
+	//     be deleted with every guard green. What is cheap is refusing to
+	//     explain, rather than filing more.
 	//   - Point at everything. A finding covering the whole file, as one span,
 	//     or as a list of one-line regions, which is the shape Incumbent's
 	//     secondary locations parse into, is credited with every plant inside it
@@ -1528,8 +1524,8 @@ func (s ShortFixture) String() string {
 // fixture but measured some of them fewer times than the standard it is held to.
 //
 // ONE WORDING FOR TWO TABLES. The cost ledger reached this reading first and got
-// it right. The shortfall is not merely a smaller sample, it is a sample the row
-// did not choose, while the judged report grew the identical failure and printed
+// it right. The shortfall is a sample the row did not choose rather than merely
+// a smaller one, while the judged report grew the identical failure and printed
 // nothing at all about it, so one loss was described two ways by two tables seven
 // hundred lines apart. The parts that differ between the two are
 // arguments, not a second sentence.
@@ -1719,9 +1715,9 @@ func (r CostRow) coverageReason() string {
 // it: whether it may be ranked against its neighbours, and how old the rate
 // behind it is.
 //
-// Every amount this row publishes goes through here, which is the point. The
-// age used to be added by the table's formatter, so it existed only for a
-// reader of that one table.
+// Every amount this row publishes goes through here, which is the point.
+// Adding the age in the table's formatter instead gives it to a reader of that
+// one table and nobody else.
 func (r CostRow) qualify(usd float64) Cost {
 	cost := knownCost(usd)
 	if !r.Comparable() {
@@ -1899,8 +1895,8 @@ func (c CostReading) Maxes(strategy, reference CostRow) (maxed, comparable bool)
 // for having spent less in total than a row that reviewed a different number of
 // fixtures, and the table prints them as evidence for the ratios rather than as
 // a ranking. REVIEWS, PRICED, COV, FAILED, DEFECTS and AGE are descriptive for
-// the same reason, COV in particular is not an achievement, it is the
-// precondition under which the ratios may be read at all.
+// the same reason, COV in particular being the precondition under which the
+// ratios may be read at all rather than an achievement.
 func PublishedCostReadings() []CostReading {
 	return []CostReading{
 		{

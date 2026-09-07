@@ -242,7 +242,7 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 	// SEV is accurate/inflated/understated against each fixture's own
 	// WantSeverity, summed over the runs. No judge is involved: this battery
 	// measures the prompt against ground truth, and severity is part of that
-	// ground truth even though nothing outside fixtures.go used to read it.
+	// ground truth, declared on every fixture Defect as WantSeverity.
 	//
 	// It is graded once per LOCATED defect, so the three numbers add up to the
 	// left-hand side of RECALL on the same row. RUNS is printed because NOISE

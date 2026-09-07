@@ -1435,10 +1435,10 @@ func TestOurOwnTranslationsAreNotPublishedAsOurContendersWords(t *testing.T) {
 		}
 	}
 
-	// THE CASE that ACTUALLY EXERCISES THE PREDICATE, and the reason it is here:
-	// with RawSeverity set, severityAsSaid quotes the word and never asks whether
-	// anything translated it, so the two cases above pass under the OLD
-	// source-keyed rule as well. The question only bites when the word is GONE,
+	// The case that exercises the predicate, and the reason it is here: with
+	// RawSeverity set, severityAsSaid quotes the word and never asks whether
+	// anything translated it, so the two cases above pass under a source-keyed
+	// rule as well. The question only bites when the word is gone,
 	// where "nobody translated this, so Severity is the reporter's word" and
 	// "somebody did and the original did not survive" are opposite claims about
 	// the same empty string.
@@ -5670,7 +5670,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 			"sentences below describe a corpus that moved", len(majorSpread), majorSpread)
 	}
 
-	// --- the tuning half ----------------------------------------------------
+	// Everything below measures the tuning corpus rather than the held-out one.
 	tuning := sum(Fixtures(), func(f Fixture) triple {
 		findings, ok := CachedIncumbent(crCacheDir, f)
 		if !ok {

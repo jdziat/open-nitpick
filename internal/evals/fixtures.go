@@ -860,8 +860,8 @@ def fetch(url):
 // multiDefectFixture plants three independent defects in one change.
 //
 // Single-defect fixtures cannot distinguish "found the bug" from "stopped after
-// the first bug", and stopping early is the failure mode a reviewer actually
-// exhibits: it satisfices. This is the fixture that measures whether the prompt
+// the first bug", and stopping early is the failure mode a reviewer exhibits:
+// it satisfices. This is the fixture that measures whether the prompt
 // keeps looking.
 func multiDefectFixture() Fixture {
 	return Fixture{
@@ -1047,8 +1047,8 @@ func MovingAverage(samples []float64, n int) []float64 {
 			// `resource` is the least-wrong box, not a correct answer: the class
 			// means "leaks and unbounded growth" and this is a single bounded
 			// reallocation. The closed set has no home for an allocation that is
-			// merely unnecessary, which is exactly why nothing scores a model
-			// against Class.
+			// merely unnecessary, which is why no score is computed from the
+			// class a model chooses.
 			Class:        config.ClassResource,
 			WantSeverity: config.SeverityNit,
 			SeverityNote: "nit under \"minor and optional\" — one reallocation, bounded by the window's " +

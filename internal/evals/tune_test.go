@@ -148,11 +148,11 @@ func TestTunePersona(t *testing.T) {
 
 // runLevels reviews each fixture once and derives every level from that corpus.
 //
-// IT JUDGES WHAT each LEVEL ACTUALLY SHOWS, and that is a deliberate change of
-// cost. It used to judge the whole corpus once per fixture and reuse those
-// verdicts for every level, copying Grade, SignalToNoise, ToneAdherence and
-// Missed into all four rows verbatim. Two things were wrong with that and only
-// one of them was about the second judge.
+// It judges what each level shows, at a cost accepted deliberately. Judging
+// the whole corpus once per fixture and reusing those verdicts for every level
+// copies Grade, SignalToNoise, ToneAdherence and Missed into all four rows
+// verbatim. Two things are wrong with that, and only one is about the second
+// judge.
 //
 // The second judge was handed each level's FILTERED list, so the delta printed
 // beside those four figures compared a whole-corpus judgement against a subset
@@ -1007,8 +1007,8 @@ func reportJudgedModels(
 			// Not a Logf. Zero coverage means every attempt failed, so this row
 			// is not a weak result. It is no result, and the table around it is
 			// not the comparison its caption claims. That has to fail the run,
-			// or "we beat the incumbent" gets read off a run in which the
-			// incumbent was never successfully invoked.
+			// or "we beat the incumbent" gets read off a run where no judge
+			// call for that row ever succeeded.
 			t.Errorf("%s was never successfully judged on any fixture; the table is not a comparison "+
 				"and its row is not a score", r.model)
 		case n < most:

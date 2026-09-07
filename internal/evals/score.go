@@ -86,15 +86,14 @@ func ScoreRun(r RunResult, f Fixture) Score {
 		Severity:  SeverityScore{Planted: PlantedLevels{}},
 	}
 
-	// The census is a fact about the FIXTURE, so it is taken before anything
-	// that can return early. THE BUG this FIXES: it was taken inside
-	// ScoreSeverity, which the two returns below skip, so a run that failed
-	// contributed its plants to Total and nothing to the per-level census. Over
-	// AllFixtures with every third run failing, TallyScores reported a census
-	// summing to 17 against a planted total of 29, and the block rendered
-	// beside that RECALL cell carried no "(0 of N located): nothing located"
-	// line anywhere, which is precisely the absence-is-invisible failure
-	// SeverityUsage.Lines exists to close, re-created by an ordinary provider
+	// The census is a fact about the fixture, so it is taken before anything
+	// that can return early. Taken inside ScoreSeverity, which the two returns
+	// below skip, a failed run contributes its plants to Total and nothing to
+	// the per-level census. Over AllFixtures with every third run failing, that
+	// reports a census summing to 17 against a planted total of 29, and the
+	// block beside the recall cell carries no "(0 of N located): nothing
+	// located" line anywhere, the absence-is-invisible failure
+	// SeverityUsage.Lines exists to close, reached by an ordinary provider
 	// error rather than by a degenerate reviewer.
 	//
 	// ScoreSeverity takes the same census again on the path that reaches it, and
@@ -285,14 +284,14 @@ const (
 )
 
 // NoCrossToolSeverityScore is printed wherever a reader might go looking for a
-// cross-tool severity accuracy figure, because one used to be there.
+// cross-tool severity accuracy figure.
 //
-// A BANDED cross-tool severity accuracy number (B-ACC: both sides reduced to
+// A banded cross-tool severity accuracy number (B-ACC: both sides reduced to
 // blocking/medium/low, then compared) was published from this package and is
-// WITHDRAWN. It was not a mis-tuned constant, it was the wrong instrument, and
-// two measurements say so rather than two opinions:
+// withdrawn as the wrong instrument, on two measurements rather than two
+// opinions:
 //
-//   - IT IS MAXIMISED BY A REVIEWER that ALSO CHOOSES WHAT TO REPORT. This
+//   - it is maximised by a reviewer that also chooses what to report. This
 //     corpus plants 29 defects over 30 fixtures and bands them 12 blocking, 6
 //     medium, 11 low. Reconstructed over AllFixtures, the strategy that stays
 //     silent unless the defect is ALREADY blocking and then calls it critical
@@ -399,18 +398,18 @@ const NoCrossToolSeverityScore = "NO CROSS-TOOL SEVERITY ACCURACY IS OFFERED, BY
 // Undeclared is the zero value and prints n/a, so a contender added without a
 // declaration is withheld rather than ranked.
 //
-// IT REPLACES AN IDENTITY CHECK. The withdrawal used to be
-// PublishesOurSeverityLevels(model) == (model != IncumbentModel): a reporter's
-// NAME standing in for a fact about its vocabulary. That is live rather than
-// hypothetical, internal/linters' mapSeverity translates semgrep's HIGH onto
-// our error and its MEDIUM onto warning, which is the exact shape of the first
-// retraction, and semgrep's CRITICAL now reaches our critical with the spelling
-// unchanged, which is worse rather than better: semgrep's own documentation
-// makes ERROR a synonym for HIGH inside ITS scale, so a matching spelling is
-// never evidence of a matching scale. Those findings are spared today only
-// because evalConfig sets cfg.Linters.Mode = LinterOff. Under the name check
-// they would have been published at our resolution the moment anyone turned
-// linters on. TestAnUndeclaredScaleIsWithheld and
+// It replaces an identity check. Deciding the withdrawal by
+// PublishesOurSeverityLevels(model) == (model != IncumbentModel) puts a
+// reporter's name in place of a fact about its vocabulary. That is live rather
+// than hypothetical: internal/linters' mapSeverity translates semgrep's HIGH
+// onto our error and its MEDIUM onto warning, the shape of the first
+// retraction, and semgrep's CRITICAL reaches our critical with the spelling
+// unchanged, which is worse, since semgrep's documentation makes ERROR a
+// synonym for HIGH inside its own scale and a matching spelling is never
+// evidence of a matching one. Those findings are spared only because
+// evalConfig sets cfg.Linters.Mode = LinterOff; under a name check they would
+// publish at our resolution the moment anyone turned linters on.
+// TestAnUndeclaredScaleIsWithheld and
 // TestEverySeverityCellIsWithdrawnForAForeignVocabulary pin the three states.
 type SeverityScale string
 
@@ -506,11 +505,12 @@ type SeverityWord struct {
 // worth, which is exactly the judgement a single accuracy figure was making
 // silently on their behalf and getting wrong.
 //
-// THE BUG: the inner key used to be the severity this package had RECORDED, and
-// the doc comment here claimed both keys were "recorded as the reviewer spelled
-// them". They were not. Incumbent prints "critical" and "major" and printed
-// neither "error" nor "warning" anywhere in the shipped corpus, yet the published
-// block read "planted error (7 located): critical x4, warning x3", and swapping
+// The inner key is the severity the reviewer spelled, not the one this package
+// recorded. Keyed on the recorded severity while the doc comment claims both
+// keys are "recorded as the reviewer spelled them", the two disagree: Incumbent
+// prints "critical" and "major" and neither "error" nor "warning" anywhere in
+// the shipped corpus, yet the published block reads "planted error (7 located):
+// critical x4, warning x3", and swapping
 // crSeverity's free "major" constant, with the cached bytes untouched, re-rendered
 // the same line as "critical x4, error x3". The block that replaced a withdrawn
 // score was therefore itself a function of the free parameter the withdrawal was
@@ -542,12 +542,11 @@ func (u SeverityUsage) Add(planted config.Severity, said SeverityWord) {
 //
 // Summing it gives the planted total the coverage cell divides by, Score.Total
 // on one run, Aggregate.SevPlanted on a judged row, so the description and the
-// coverage cell are read against the same number. That SENTENCE USED TO BE FALSE
-// FOR any RUN that PRODUCED NO REPORT: the census was taken inside
-// ScoreSeverity, which ScoreRun skips when a provider errors, so a failed run
-// added its plants to the total and nothing to the census. It is now taken from
-// the fixture before ScoreRun can return early, which is the only place both
-// halves are available whatever the provider did.
+// coverage cell are read against the same number. That holds for a run that
+// produced no report only because the census is taken from the fixture before
+// ScoreRun can return early. Taken inside ScoreSeverity, which ScoreRun skips
+// when a provider errors, a failed run adds its plants to the total and nothing
+// to the census.
 // TestEveryPlantedLevelAppearsWithItsDenominator covers a failing corpus as well
 // as a clean one, because the flattering direction here is the one only a
 // failure produces.
@@ -630,10 +629,9 @@ const UndeclaredPlantedTotal = "PLANTED TOTAL NOT DECLARED"
 // whether or not anything was located there, with the planted count as its
 // denominator.
 //
-// THE BUG this FIXES: levels nobody located were omitted, on the reasoning that
-// a miss is RECALL's job. Measured, that made the worst strategy's page the
-// cleanest one. The reviewer that reports only the plants we rate critical and
-// calls them critical rendered
+// Omitting levels nobody located, on the reasoning that a miss is recall's
+// job, makes the worst strategy's page the cleanest one. The reviewer that
+// reports only the plants we rate critical and calls them critical renders
 //
 //	planted critical (4 located): critical x4
 //
@@ -798,21 +796,21 @@ type SeverityCall struct {
 
 // SeverityScore compares assigned severities against the planted ones.
 //
-// It exists because severity correctness used to be an LLM opinion and nothing
-// else: every fixture Defect declares WantSeverity and nothing outside
-// fixtures.go read it. That opinion is measurably blind in one direction, the
+// It exists because an LLM opinion is the only alternative: every fixture
+// Defect declares WantSeverity, and without this nothing outside fixtures.go
+// reads it. That opinion is measurably blind in one direction, the
 // judge reported Incumbent understating nothing, on a corpus whose own ground
 // truth says it understated defects it had located. A prompt tuned to reduce
 // inflation against a scorer that cannot see under-claiming optimizes toward
 // saying less and calls it progress.
 //
-// The comparison is at our FULL five-level resolution and is a score only
-// between reviewers that publish those five levels. It used to be accompanied
-// by a coarsened cross-tool figure; that figure is withdrawn and the reasons are
-// measurements, not taste, see NoCrossToolSeverityScore. Usage is what a
-// cross-vocabulary reader gets instead, and it is a description.
+// The comparison is at our full five-level resolution and is a score only
+// between reviewers that publish those five levels. The coarsened cross-tool
+// figure that once accompanied it is withdrawn on measurements rather than
+// taste, see NoCrossToolSeverityScore. Usage is what a cross-vocabulary reader
+// gets instead, and it is a description.
 //
-// WantSeverity is the TARGET, not a floor: over-claiming above the planted
+// WantSeverity is the target rather than a floor: over-claiming above the planted
 // level is precisely the failure being tuned away, so it is counted rather than
 // tolerated. Defect.WantSeverity documents the same contract, and the two must
 // not be allowed to drift, a fixture authored against a floor reading silently
@@ -869,10 +867,10 @@ func (s SeverityScore) Usage() SeverityUsage {
 //     previous parser's output; and an analyzer that published no severity at
 //     all, where the level is entirely ours and there is no word to quote.
 //
-// The second case USED TO BE "this is every one of our own models", and that was
-// the defect: review.Engine rewrites a model's severity through Normalize, so
-// our contenders belonged in the first or third case and were answered into the
-// second. See severityWasTranslated.
+// The second case is not "this is every one of our own models":
+// review.Engine rewrites a model's severity through Normalize, so our
+// contenders belong in the first or third case and reading them into the second
+// is the defect. See severityWasTranslated.
 func severityAsSaid(f review.Finding) SeverityWord {
 	w := SeverityWord{Said: f.RawSeverity, Recorded: f.Sev()}
 	if w.Said == "" && !severityWasTranslated(f) {
@@ -1007,12 +1005,12 @@ func severityVerdict(got, want config.Severity) string {
 // planted warning, [error, info] scored inflated and [info, error] understated
 // on the same review.
 //
-// Ties are broken on the PUBLISHED WORD, not on report order, and the difference
-// is not cosmetic. The comment here used to say ties were between findings
-// carrying the same severity so order decided only which comment a diagnostic
-// NAMED. Ties are on NORMALIZED rank, and the credited finding's word is what
-// SeverityUsage records, which is PUBLISHED, as the description that replaced
-// the withdrawn cross-tool score. Two findings on one planted-info defect spelled
+// Ties are broken on the published word rather than on report order, and the
+// difference is not cosmetic. Ties are on normalized rank, and the credited
+// finding's word is what SeverityUsage records and publishes, as the
+// description that replaced the withdrawn cross-tool score. Reading ties as
+// between findings carrying the same severity, so that order decides only which
+// comment a diagnostic names, misses that. Two findings on one planted-info defect spelled
 // "info" and "P1" both normalize to info and tie; [info, P1] published `planted
 // info: info x1` and [P1, info] published `planted info: p1 x1`. Same review,
 // same verdict, two different published descriptions of the reviewer's
@@ -1177,8 +1175,8 @@ func spanDistance(s review.LineSpan, line int) int {
 //   - THE WIDEST REGION is what was here. It answers a different question,
 //     how long is the longest thing it pointed at, and that question has no
 //     reader. Someone handed 38 one-line regions has 38 lines to read; being
-//     told the answer is 1 is not an approximation of their work, it is
-//     unrelated to it.
+//     told the answer is 1 is unrelated to their work rather than an
+//     approximation of it.
 //   - THE HULL, first line to last, charges for the gaps. A finding naming 3-6
 //     and 15-18 has claimed two tight regions, not one sixteen-line smear, and
 //     billing it for the eight lines between them invents vagueness it does not
@@ -1186,8 +1184,8 @@ func spanDistance(s review.LineSpan, line int) int {
 //     against the hull. It is not an argument for the widest region against the
 //     union.
 //   - THE UNION counts every line claimed once and no line that was not. It is
-//     the only one of the three that is a function of what the reviewer actually
-//     said, and it is exactly the reader's work.
+//     the only one of the three that is a function of what the reviewer said,
+//     and it is the reader's work.
 //
 // The decisive asymmetry is with anchorDistance, which takes the MIN over the
 // same regions: every region a finding adds can only ever help it match. A width
@@ -1526,8 +1524,8 @@ type Summary struct {
 	WidestAnchor int
 
 	// AnchoredLines is the total lines pointed at while claiming the defects
-	// these runs located, printed as L/DEF against Matched. See
-	// DetectionScore.AnchoredLines.
+	// these runs located, printed as L/DEF against Matched. The per-run form
+	// carries the same name.
 	AnchoredLines int
 
 	// FindingCounts is the number of findings produced per run, which is how
@@ -1681,9 +1679,9 @@ func CorpusResolution(fixtures []Fixture) string {
 //
 // It is the ground-truth table's rendering of the same reading the judged tables
 // spread over O-ACC/O-INFL/O-UNDER, so it passes the same vocabulary gate:
-// "n/a" for a row that does not publish our five levels. The cell used to be
-// formatted inline at the table, which meant the withdrawal lived in ONE of the
-// metric's two renderings. That the battery printing this table happens to run
+// "n/a" for a row that does not publish our five levels. Formatting the cell
+// inline at the table puts the withdrawal in one of the metric's two
+// renderings. That the battery printing this table happens to run
 // no foreign reviewer today is a property of a caller, not of the withdrawal,
 // and the guard has already been defeated once by a table the mechanism did not
 // know about. SeverityCells registers both renderings so neither can be the one
@@ -1815,8 +1813,8 @@ type CorpusTally struct {
 	// It is the fold that sees a reviewer hedging everywhere rather than blobbing
 	// once, which is the shape a MAX is blind to and the shape a threshold read
 	// against ANOTHER reviewer's max invites: that reviewer's single worst
-	// finding becomes a width every finding may spend. See
-	// DetectionScore.AnchoredLines.
+	// finding becomes a width every finding may spend. The per-run form carries
+	// the same name.
 	AnchoredLines int
 }
 
@@ -1884,9 +1882,9 @@ type PublishedMetric struct {
 	// the denominator, and the judged tables spread the same triple over
 	// O-ACC/O-INFL/O-UNDER with O-COV as the denominator.
 	//
-	// THE BUG this SHAPE FIXES: the type's whole justification is that a single
-	// column cannot be asked "what maximises this?" honestly, O-INFL alone is
-	// maximised by silence, and nothing enforced the grouping at the table
+	// This shape is what enforces the grouping. The type's justification is that
+	// a single column cannot be asked "what maximises this?", O-INFL alone
+	// being maximised by silence, and nothing else enforces it at the table
 	// level. Deleting O-ACC and O-UNDER from VariantTableHeader, leaving O-INFL
 	// published by itself, passed every guard in this package including the one
 	// named after the failure. Columns were checked for being DECLARED somewhere
@@ -2248,7 +2246,8 @@ var (
 		"MODEL                                FIXTURE                   RUNS  RECALL   "+
 			"SEV A/I/U  NOISE  ANCHOR  L/DEF  STABLE  FAILED")
 
-	// VariantTableHeader is the prompt-variant comparison.
+	// VariantTableHeader compares one prompt variant against another over the
+	// same corpus.
 	VariantTableHeader = registerTableHeader(tableScored,
 		"VARIANT                 N     FAIL  FINDINGS  REAL  WORTH  PRECISION  J-INFL  "+
 			"J-UNDER  O-INFL  O-UNDER  O-ACC  O-COV  MISCLASS  TONE-OFF  MISSED  SIGNAL  GRADE")

@@ -77,7 +77,7 @@ var crEscape = regexp.MustCompile("\x1b\\][^\x07\x1b]*(?:\x07|\x1b\\\\)|\x1b\\[[
 // exactly that reason), and a closed set here would silently drop it.
 var crFindingHeader = regexp.MustCompile(`^\s*([A-Za-z]+)\s+\[([^\]]+)\]\s*$`)
 
-// crAnchor matches the structured location line, "  → store.go:10-12".
+// crAnchor matches the structured location line, an arrow then a location.
 var crAnchor = regexp.MustCompile(`^\s*(?:→|->)\s*(.*)$`)
 
 // crLocation splits a location into path and line range. The path group is
@@ -115,12 +115,12 @@ var crDeclaredCount = regexp.MustCompile(`(?m)^\s*(\d+)\s+findings?\b`)
 // It sits beside crSeverity because crSeverity is the reason: the words arriving
 // here are translated into ours, and the incumbent's own vocabulary across the
 // shipped corpus is {critical, major, minor}. Declaring it here rather than
-// recognizing the reviewer by name downstream is the whole point, the
-// withdrawal used to be `model != IncumbentModel`, a reporter's identity
-// standing in for a fact about its vocabulary, and it would have kept holding
-// for exactly one reviewer however many others were added. See SeverityScale.
+// recognizing the reviewer by name downstream is the whole point. Deciding the
+// withdrawal by `model != IncumbentModel` puts a reporter's identity in place
+// of a fact about its vocabulary, and it holds for exactly one reviewer however
+// many others are added. See SeverityScale.
 //
-// SPELLING IS not SCALE, and this reviewer is the counterexample: it prints
+// Spelling is not scale, and this reviewer is the counterexample: it prints
 // "critical", identical to ours, and the shipped cache credits that one word on
 // 2 plants of critical and 4 of error. A gate that compared the printed word
 // against our five levels would have scored those findings at our resolution
@@ -320,12 +320,12 @@ func RunIncumbent(ctx context.Context, dir string, timeout time.Duration) ([]rev
 		return findings, raw, nil
 	}
 
-	// Everything below is the failure path, and the ORDER is the fix. parseErr
-	// used to be returned first, so a missing binary, a cancelled context, an
-	// expired timeout and an exhausted allowance all reported the same "the
-	// plain-text format has changed" message and sent the operator to the wrong
-	// problem. The parse error is the symptom of every one of them; it is
-	// reported only once nothing else explains the output.
+	// Everything below is the failure path, and the order carries the meaning.
+	// Returning parseErr first reports "the plain-text format has changed" for
+	// a missing binary, a cancelled context, an expired timeout and an
+	// exhausted allowance alike, sending the operator to the wrong problem. The
+	// parse error is the symptom of every one of them, so it is reported only
+	// once nothing else explains the output.
 	switch {
 	case runCtx.Err() != nil:
 		// Both wrapped: callers match on the context error, and the parse error
@@ -946,11 +946,11 @@ func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
 // severityWasTranslated reports whether a finding's Severity is this project's
 // word rather than the reporter's own.
 //
-// It reads the FACT the rewriter recorded. It used to read the finding's SOURCE
-// , `f.Source == IncumbentModel`, and the comment here justified that by
-// claiming crSeverity was "the only place in the tree that rewrites a reviewer's
-// severity vocabulary" and that "everything else writes its own severity and is
-// quoted verbatim". Both HALVES were FALSE, and the second one is the defect.
+// It reads the fact the rewriter recorded. Reading the finding's source
+// instead, as `f.Source == IncumbentModel`, rests on crSeverity being "the only
+// place in the tree that rewrites a reviewer's severity vocabulary" and on
+// "everything else writes its own severity and is quoted verbatim". Both halves
+// are false, and the second is the defect.
 // review.Engine rewrites every model's severity through Normalize, and
 // linters.mapSeverity collapses four analyzers' vocabularies onto three levels;
 // neither recorded anything, so this function answered "nothing was translated"
@@ -973,8 +973,8 @@ func severityWasTranslated(f review.Finding) bool {
 //
 // It distinguishes the two reasons CachedIncumbent says no. "Never collected"
 // costs an operator a review against a rate-limited allowance; "collected, and
-// the parser no longer reads it" is a bug in the parser or a change in the CLI's
-// output, and re-collecting would spend that allowance to hide it.
+// the parser cannot read it" is a bug in the parser or a change in the CLI's
+// output, and re-collecting spends that allowance to hide it.
 func StaleIncumbentCache(cacheDir string, f Fixture) (stale bool, why error) {
 	c, ok := readCRCache(cacheDir, f)
 	if !ok || c.Raw == "" {

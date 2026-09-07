@@ -167,8 +167,8 @@ func shippedPromptTexts(t *testing.T) map[string]string {
 
 	// Every level, not only config.GenerationLevel. A branch nothing renders
 	// today ships the day that constant moves, and a guard that could only see
-	// today's branch would report the collision after it had been measured
-	// against rather than before.
+	// today's branch reports the collision only after something has been
+	// measured against it.
 	for _, level := range []config.NitpickLevel{
 		config.NitpickOff, config.NitpickMinimal, config.NitpickNormal, config.NitpickPedantic,
 	} {

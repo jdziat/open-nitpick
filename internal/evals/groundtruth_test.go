@@ -74,8 +74,8 @@ func TestPlantedDefectsPointAtRealLines(t *testing.T) {
 // left it green, and 10 is the wrong line. The needle is now looked up per
 // DEFECT, so the only line number in the assertion is the one scoring uses.
 func TestPlantedDefectsAreOnTheRightLine(t *testing.T) {
-	// fixture -> the substring each defect's line must contain, in the order
-	// the fixture declares its defects.
+	// Each fixture maps to the substring its defect's line must contain, in the
+	// order the fixture declares its defects.
 	want := map[string][]string{
 		"go-nil-deref":             {"http.Get"},
 		"go-sql-injection":         {"Sprintf"},
@@ -715,7 +715,7 @@ func declaredProbes() map[string]fixtureProbes {
 			},
 		},
 
-		// The nit plants.
+		// The fixtures whose plants are rated nit.
 		"cross-file-copy-nit": {
 			hit: []probe{
 				{"names the contract the callee already provides",
@@ -797,8 +797,8 @@ func declaredProbes() map[string]fixtureProbes {
 					review.Finding{Path: "slug/slug_test.go", Line: 15, Severity: "nit", Category: "tests",
 						Title:     "Five cases expect the same output",
 						Rationale: "Most rows are identical in their expectation, which makes a failure hard to localize."}},
-				// The same observation in the two words a reviewer actually
-				// reaches for. "identical to" was chosen with its preposition
+				// The same observation in the two words a reviewer reaches for
+				// first. "identical to" was chosen with its preposition
 				// to exclude exactly this reviewer, and then "duplicate",
 				// "duplicates" and "repeats" were put in the same list and let
 				// it back in: both of these were credited with finding the
@@ -1124,9 +1124,9 @@ func declaredProbes() map[string]fixtureProbes {
 				// This fixture's OWN PROPOSED FIX, which came back MISSED. The
 				// doc comment argues that the alternative is "one keyword
 				// argument at the one call site that wanted it"; a reviewer that
-				// proposes exactly that scored no recall, because every phrase
-				// naming the new default had been removed and nothing measured
-				// what their removal cost. "rows by default" is what credits it,
+				// proposes exactly that scores no recall once every phrase
+				// naming the new default is removed, and nothing measures what
+				// that removal costs. "rows by default" is what credits it,
 				// and it is charged below by the offset objection wearing the
 				// bare "by default" that was tried first.
 				//
@@ -1952,8 +1952,8 @@ func TestNoBareWordFromAnotherFixtureCreditsAPlant(t *testing.T) {
 		"csharp-client-per-request|exhaust": "shared mechanism: a resource acquired and not released, which is what the whole word `exhaust` reaches it with here. It is separately a substring of `exhaustive`, which is ordinary review prose about test coverage and no kind of shared mechanism at all",
 		// The one that cannot be found by reading a keyword list, because the
 		// keyword is not a word in the sentence at all. "oUTCome" contains `utc`,
-		// so any remark using an ordinary English word is credited with detecting
-		// a timezone bug.
+		// so an ordinary English word credits a reviewer with detecting a
+		// timezone bug it never mentioned.
 		"timezone-boundary|utc": "SUBSTRING INSIDE A LONGER WORD: `utc` sits in \"outcome\". This is not a shared mechanism and not a topic collision, it is the keyword being three letters long",
 	}
 

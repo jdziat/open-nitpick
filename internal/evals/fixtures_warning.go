@@ -38,14 +38,12 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // And a failing input, so none of them is a matter of taste the author may
 // decline.
 //
-// That argument deliberately does not quote the ladder's current info examples,
-// which is a repair rather than a style choice. This comment used to name them
-// , "widening an exported type, adding a dependency", and those two sentences
-// were deleted from review.md for naming two plants; the quotation outlived
-// them because it sat in an em-dash aside rather than in double quotes, where
-// the sweep that fixed every other stale reference was looking. A comment keyed
-// to prompt prose goes stale every time the prompt is edited, and the property
-// this paragraph needs is a property of the LEVEL.
+// That argument deliberately does not quote the ladder's current info examples.
+// Naming them here, as "widening an exported type, adding a dependency", is a
+// quotation that survives their deletion from review.md when it sits in an
+// aside rather than in double quotes, where a sweep for stale references
+// looks. A comment keyed to prompt prose goes stale every time the prompt is
+// edited, and the property this paragraph needs belongs to the level.
 //
 // TWO CLASSES, and WHY not MORE. Every plant here is `security` or `resource`.
 // That is not because warnings only occur there, the natural home for several

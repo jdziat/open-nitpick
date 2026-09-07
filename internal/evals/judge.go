@@ -578,10 +578,10 @@ type Aggregate struct {
 	// is what a reader comparing two vocabularies gets instead of a cross-tool
 	// accuracy figure.
 	//
-	// A banded cross-tool accuracy triple used to be carried here and printed as
-	// B-INFL/B-UNDER/B-ACC. It is withdrawn: it was maximised by a reviewer that
-	// picked which defects to mention and stamped one blocking word on those,
-	// and it could not see the parser bug it was written in response to. See
+	// No banded cross-tool accuracy triple is carried here. Printed as
+	// B-INFL/B-UNDER/B-ACC, it is maximised by a reviewer that picks which
+	// defects to mention and stamps one blocking word on those, and it cannot
+	// see the parser bug it was written in response to. See
 	// NoCrossToolSeverityScore.
 	SevUsage SeverityUsage
 
@@ -634,8 +634,8 @@ type Aggregate struct {
 	// attempted and folded are how many reviews of each fixture this row TRIED
 	// and how many reached the scorer.
 	//
-	// The gap is not a smaller sample, it is a NON-RANDOM smaller sample: a run
-	// drops out because its review errored or its judge call failed, and nothing
+	// The gap is a non-random smaller sample: a run drops out because its
+	// review errored or its judge call failed, and nothing
 	// here can rule out that those correlate with what the review said. The
 	// direction is one-sided. The incumbent is served at depth one per fixture,
 	// so any loss on its side removes the fixture and moves Coverage, while our
@@ -722,10 +722,10 @@ func (a Aggregate) Attempts() int {
 // Lost is how many attempted reviews never reached the scorer, which is what the
 // FAIL cell prints.
 //
-// That CELL USED TO BE A NOTE COUNT. It was len(notes[model]), and notes are
-// appended for four things, three of which are not lost reviews and all of which
-// fold normally: findings on a clean change, a suspect judge output, a dump
-// error. A row that folded every review it attempted could render FAIL 3, which
+// The cell is not a note count. len(notes[model]) counts four things, three of
+// which are not lost reviews and all of which fold normally: findings on a
+// clean change, a suspect judge output, a dump error. A row that folded every
+// review it attempted then renders FAIL 3, which
 // is the one cell a reader would subtract from fixtures x RUNS. FAIL is in
 // DescriptiveColumns, so no degenerate-strategy guard asks what maximises it, and
 // nothing else was going to notice.
@@ -750,7 +750,7 @@ func (a Aggregate) Lost() int {
 // mark every row of a battery that has not been wired up. That is a real blind
 // spot rather than a safe default, TestEveryJudgedBatteryStatesWhatItAttempted
 // is what stops a battery staying in it.
-// A fixture folded ZERO times is not short, it is absent, and it is returned by
+// A fixture folded zero times is absent rather than short, and is returned by
 // UnmeasuredFixtures instead. The split is the cost ledger's, see CostRow's
 // Missing beside its Shallow, and this function was extracted from that one
 // without it, which made ShallowSampleWarning open "covers every fixture" over a
@@ -836,8 +836,8 @@ const shortSampleMark = "*"
 // second call, because the cheaper spelling is the one that gets used: a method
 // that folded a judgement in without stating its stimulus would leave every
 // future axis one forgotten line away from a delta the legend describes as a
-// confidence interval and that is nothing of the kind. Callers that genuinely
-// cannot state it pass a stimulus with no fingerprint and get no delta.
+// confidence interval and that is nothing of the kind. A caller that cannot
+// state it passes a stimulus with no fingerprint and gets no delta.
 func (a *Aggregate) Add(r *JudgeResult, shown Stimulus) []string {
 	if r == nil {
 		return []string{"judge returned no result"}
@@ -1289,10 +1289,10 @@ type VocabularyRow struct {
 // judgement for them was maximised by answering "critical" to everything. See
 // NoCrossToolSeverityScore.
 //
-// The words are the reviewer's own. They used to be OURS: the block printed the
-// level crSeverity had translated each foreign word to, captioned as what the
-// contender called the defect, so a description offered in place of a score was
-// itself a function of the free constant the withdrawal rested on. Where a word
+// The words are the reviewer's own rather than ours. Printing the level
+// crSeverity translated each foreign word to, captioned as what the contender
+// called the defect, makes a description offered in place of a score a function
+// of the free constant the withdrawal rested on. Where a word
 // was translated the reading is now printed beside it and marked as ours; see
 // SeverityUsage.
 //
@@ -1370,11 +1370,11 @@ func SeverityVocabularyBlock(rows []VocabularyRow) string {
 // writes "error" and is recorded at error was not translated, and listing it
 // would bury the words that were.
 //
-// TWO WAYS this NOTE CONTRADICTED THE ROWS IT INTRODUCES, both fixed here.
+// Two ways this note can contradict the rows it introduces, both closed here.
 //
-// A DESTROYED WORD IS not AN UNTRANSLATED ONE. Said == "" was skipped as though
-// it were nothing to report, so a block in which every word had been destroyed
-// printed "NO WORD IN this BLOCK was TRANSLATED ... each line quotes its
+// A destroyed word is not an untranslated one. Skipping Said == "" as though it
+// were nothing to report makes a block whose every word was destroyed print
+// "NO WORD IN this BLOCK was TRANSLATED ... each line quotes its
 // reviewer directly" directly above rows reading "(word not recorded) x1 [we
 // read as warning]", the preamble asserting the exact opposite of every line
 // under it, in the one published block whose entire purpose is to keep our
@@ -2425,7 +2425,7 @@ var CrossJudgedVariantTableHeader = registerTableHeader(tableScored,
 // `eval` build tag, and a guard that only compiles under that tag cannot run in
 // `go test ./...`. Putting the row here means the default build can render one
 // and assert that every judged cell carries its disagreement, which is the
-// claim, and which was previously unassertable without spending money.
+// claim, and is otherwise unassertable without spending money.
 //
 // It takes a CrossJudged and not an Aggregate. That is the structural half: this
 // function has no bare judged number available to print, because CrossJudged

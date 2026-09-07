@@ -511,8 +511,8 @@ func GroupDump(records []DumpRecord) ([]RejudgeGroup, []string, error) {
 	// lines, so the matrix had to be inferred, and inference is wrong in both
 	// directions: it invents a group for every fixture the contender was never
 	// given, and it cannot see a contender that was silent on every fixture in a
-	// run. Restricting the cross product to the CORPUS each contender actually
-	// appears in removes the worst of it; the rest is warned about, because each
+	// run. Restricting the cross product to the corpus each contender appears
+	// in removes the worst of it; the rest is warned about, because each
 	// fabricated group costs a real judge call on an empty list.
 	if !newFormat {
 		for ck, seenRuns := range runs {
@@ -668,11 +668,10 @@ func sameFinding(a, b DumpRecord) bool {
 //
 // Every field judgeRequest renders is here, and so is AlsoAt, which it does not
 // render. Source and Triager are excluded because the judge never sees them and
-// nothing else reads them; the secondary spans used to be excluded on that same
-// argument, and the argument was half right. The judge is shown one location per
-// finding, so a secondary span changes not one character of the prompt, the
-// previous comment here said so and then said it therefore "does not need to be"
-// recorded, which followed only if re-judging were the sole thing done to a
+// nothing else reads them. Excluding the secondary spans on that same argument
+// is half right: the judge is shown one location per finding, so a secondary
+// span changes not one character of the prompt, and concluding it therefore
+// "does not need to be" recorded holds only if re-judging were the sole thing done to a
 // rebuilt finding. A rebuilt finding is also SCORED, and anchorDistance,
 // anchoredLines and defectAnchoredLines all read this field, so dropping it made
 // the two columns the dump exists to make re-derivable un-re-derivable.
@@ -980,8 +979,8 @@ func RejudgeReport(baselineJudge, newJudge string, outcomes []RejudgeOutcome, wa
 		// key GroupDump groups on. Keying on the model alone re-merged what
 		// GroupDump had deliberately separated: the nitpick axis derives four
 		// levels from ONE review, so a finding surviving all four was counted
-		// four times in one row, and the persona axis, four genuinely
-		// different reviews, collapsed into a single contender, leaving the
+		// four times in one row, and the persona axis, four separate reviews,
+		// collapsed into a single contender, leaving the
 		// axis the dump exists to compare absent from the table.
 		s := statsFor(contenderLabel(g.Model, g.Variant))
 		s.groups++
@@ -1028,9 +1027,9 @@ func RejudgeReport(baselineJudge, newJudge string, outcomes []RejudgeOutcome, wa
 		// What this cannot verify is the dump's own claim, DumpSample.Judged
 		// says it "assesses exactly these findings", and a producer that wrote a
 		// judgement formed over some other list would be believed here. The
-		// persona axis used to be such a producer: it judged the whole corpus
-		// once and dumped a filtered list beside those verdicts. It no longer
-		// does; see runLevels, which judges each distinct filtered list.
+		// persona axis is such a producer whenever it judges the whole corpus
+		// once and dumps a filtered list beside those verdicts. See runLevels,
+		// which judges each distinct filtered list instead.
 		shown := JudgedOver(g.Fixture.Name, g.Findings)
 		s.baseline.sawStimulus(shown)
 		s.updated.sawStimulus(shown)

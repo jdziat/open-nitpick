@@ -24,14 +24,14 @@ import (
 
 // Environment variables controlling a run.
 const (
-	// EnvAPIKey holds the OpenRouter credential.
+	// EnvAPIKey names the variable every eval provider reads its key from.
 	EnvAPIKey = "OPENROUTER_API_KEY"
 
 	// EnvModels overrides the model list (comma-separated OpenRouter ids).
 	EnvModels = "NITPICK_EVAL_MODELS"
 
-	// EnvRuns sets how many times each fixture is reviewed, for measuring
-	// run-to-run stability.
+	// EnvRuns sets how many times each fixture is reviewed, which is what makes
+	// a stability column possible.
 	EnvRuns = "NITPICK_EVAL_RUNS"
 
 	// EnvFixtures limits the run to named fixtures.
@@ -78,12 +78,12 @@ const (
 	EnvTimeout = "NITPICK_EVAL_TIMEOUT"
 )
 
-// The endpoint constant that used to live here is gone. internal/llm registers
-// "openrouter" in its package init, and this package imports it, so the harness
-// names that provider instead of rebuilding an equivalent from base_url. Two
-// copies of the endpoint meant two owners that could drift, and the harness
-// resolved its credential by the openai provider's rules rather than the ones
-// production uses.
+// No endpoint constant lives here. internal/llm registers "openrouter" in its
+// package init and this package imports it, so the harness names that provider
+// rather than rebuilding an equivalent from base_url. Two copies of the
+// endpoint are two owners that drift, and the rebuilt version resolves its
+// credential by the openai provider's rules rather than the ones production
+// uses.
 
 // DefaultModels is a deliberately small, cheap matrix that exercises the
 // distinct code paths structured output can take.
@@ -255,8 +255,8 @@ type Options struct {
 	// Without a seam here the only way to prove that reported usage reaches
 	// RunResult is to spend money at a real provider, and an assertion nobody
 	// can afford to run is not a guard, which matters for exactly this field's
-	// neighbours, since a cost column silently reading zero looks identical to
-	// a cheap model.
+	// neighbours, since a cost column silently reading zero is indistinguishable
+	// from a model that charged almost nothing.
 	buildClient func(config.ModelSpec) (*llm.Client, error)
 }
 
@@ -675,10 +675,10 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	// on nothing that can. ourSeverityScale reads the configuration and the
 	// configuration is fully determined by evalConfig; a temp directory that
 	// cannot be made says nothing about which vocabulary this adapter publishes
-	// on. THE BUG this FIXES: it was assigned after the MkdirTemp and buildRepo
-	// returns, so a run that died there carried no declaration, and the two
-	// halves of one infrastructure failure then published DIFFERENT severity
-	// cells. Folded with a good run, a failure carrying the declaration renders
+	// on. Assigned after the MkdirTemp and buildRepo returns, a run that dies
+	// there carries no declaration, and the two halves of one infrastructure
+	// failure then publish different severity cells. Folded with a good run, a
+	// failure carrying the declaration renders
 	// SEV as the good run's own triple; a failure carrying none withdraws the
 	// whole row to n/a. Which of the two a reader sees depended on where in this
 	// function the provider happened to break.

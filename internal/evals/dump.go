@@ -146,9 +146,9 @@ type DumpRecord struct {
 	// "model":"incumbent/cli", so the artifact every downstream reading is
 	// re-derived from published our translation of a foreign vocabulary as the
 	// reviewer's own severity. review.Finding.RawSeverity carries `json:"-"`, so
-	// the word the reviewer printed could not reach this file at all,
-	// the substitution the tables had been fixed for survived one layer down, in
-	// the file a reader goes to when they doubt the tables.
+	// the word the reviewer printed cannot reach this file on its own, so the
+	// substitution the tables were fixed for reappears one layer down, in the
+	// file a reader goes to when they doubt the tables.
 	Severity string `json:"severity"`
 
 	// SeveritySaid is the word the REVIEWER printed, when this project rewrote it
@@ -207,11 +207,10 @@ type DumpRecord struct {
 	// understated, against WantSeverity, comparing EXACT levels. Precomputed so
 	// a reader does not reimplement the severity ordering to recover it.
 	//
-	// A second, banded verdict used to be written beside it as band_delta, for
-	// the cross-tool columns that are now withdrawn. It is gone rather than
-	// merely unprinted: a field carried in the dump is a number someone will
-	// aggregate, and this one is maximised by rating everything critical. See
-	// NoCrossToolSeverityScore.
+	// No banded verdict is written beside it as band_delta. The cross-tool
+	// columns it served are withdrawn, and a field carried in the dump is a
+	// number someone will aggregate, this one maximised by rating everything
+	// critical. See NoCrossToolSeverityScore.
 	SeverityDelta string `json:"severity_delta,omitempty"`
 
 	// DefectWhy is the planted defect's own description, so a line of this file
@@ -312,19 +311,17 @@ const runDumpDir = ".eval-runs"
 // It does not change OpenDump. That function's nil-on-unset contract is shared
 // by the remaining callers and pinned by TestDumpDisabledCostsNothing, and the
 // nil no-op is what lets every call site drop a record unconditionally; a
-// default resolved inside it would also leave EnvDump empty, which is what the
-// re-judge path's collision check used to be the whole of. Batteries that want
-// retention ask for it here.
+// default resolved inside it would also leave EnvDump empty, which the re-judge
+// path's collision check reads. Batteries that want retention ask for it here.
 //
-// WHICH BATTERIES THOSE are IS DERIVED, not LISTED, and the earlier version of
-// this sentence is why. It said the tuning axes still used OpenDump deliberately
-// because "their corpus can be reviewed again", true of TestTunePersona, the
-// one battery that remains on OpenDump, and false of TestJudgeModels, which
-// prints the same judged table the head-to-head does and which
-// `make judge-models FIXTURES=$(HELD_OUT)` points at the spent-once corpus. A
-// class of caller was named where a property of one was meant.
-// TestEveryJudgedBatteryRetainsItsFindingsWithoutBeingAsked now derives the list
-// from the table: anything calling reportJudgedModels must open through here.
+// Which batteries those are is derived rather than listed. Saying the tuning
+// axes stay on OpenDump because "their corpus can be reviewed again" is true of
+// TestTunePersona, the one battery that remains there, and false of
+// TestJudgeModels, which prints the same judged table the head-to-head does and
+// which `make judge-models FIXTURES=$(HELD_OUT)` points at the spent-once
+// corpus: a class of caller named where a property of one was meant.
+// TestEveryJudgedBatteryRetainsItsFindingsWithoutBeingAsked derives the list
+// from the table, so anything calling reportJudgedModels must open through here.
 //
 // battery names the caller, so a directory of retained runs says which produced
 // each file.

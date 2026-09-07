@@ -6,9 +6,8 @@ import "github.com/jdziat/open-nitpick/internal/config"
 //
 // Measured over AllFixtures() before these were written, the corpus planted 4
 // critical, 8 error, 6 warning, 0 info and 6 nit, 24 plants across 25
-// fixtures, which is one more fixture than this sentence used to claim. Every
-// other level had been given at least two plants and an argument; info had
-// none, so no claim about it was falsifiable. A reviewer that never emits the
+// fixtures. Every other level carried at least two plants and an argument;
+// info carried none, so no claim about it was falsifiable. A reviewer that never emits the
 // word `info` and a reviewer that emits it perfectly scored identically, and
 // the O-INFL and O-UNDR columns could not see the level at all: with nothing
 // planted at info, a reviewer rating a nit as info was charged inflation and a
@@ -53,8 +52,8 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // config.ClassStyle, which allowedClasses drops below pedantic, so a reader of
 // the default configuration could never have seen the finding it illustrated.
 //
-// THE LADDER'S TWO INFO EXAMPLES USED TO BE TWO OF THESE PLANTS and were
-// REPLACED, which is why two SeverityNotes below argue from a clause rather
+// The ladder's two info examples were two of these plants and have been
+// replaced, which is why two SeverityNotes below argue from a clause rather
 // than from an example. review.md illustrated `info` with "Widening an exported
 // type's accepted input is info. Adding a dependency for one helper function is
 // info.", kotlin-widened-input and rust-crate-for-one-call stated almost

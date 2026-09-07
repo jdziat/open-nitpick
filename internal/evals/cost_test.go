@@ -1156,7 +1156,7 @@ func TestJudgeSpendIsNotAContenderCost(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Tiers and cache pricing, honestly.
+// Tiers and cache pricing.
 // -----------------------------------------------------------------------------
 
 // TestATierIsChosenPerCallAndNotFromAnAggregate is why usage is kept call by
@@ -1279,9 +1279,9 @@ func TestAPublishedFreeCacheRateIsNotTheInputFallback(t *testing.T) {
 // and nothing here can say which. It was billed silently at the 5-minute rate,
 // the cheaper of the two, which is the flattering direction.
 //
-// Nothing in open-nitpick enables prompt caching today, which is exactly why
-// this is encoded rather than left as the comment it used to be: "no path sends
-// these tokens" is a property of this month's call sites.
+// Nothing in open-nitpick enables prompt caching today, which is why this is
+// encoded rather than left as a comment: "no path sends these tokens" is a
+// property of this month's call sites.
 func TestTwoPublishedCacheWriteRatesMakeTheCallUnpriceable(t *testing.T) {
 	table := mustPrices(t, "models:\n"+priceEntry("test/ttl", "2026-08-01", 1, 10,
 		"    cache_write: 4\n    cache_write_1h: 6.4\n"))

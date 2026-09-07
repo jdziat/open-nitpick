@@ -481,7 +481,7 @@ func TestAnUnrecordedStimulusMatchesNothing(t *testing.T) {
 	}
 
 	// And a stimulus whose fingerprint exists matches an identical one, or the
-	// refusal above is not a guard, it is a blanket.
+	// refusal above is a blanket rather than a guard.
 	one := JudgedOver("go-nil-deref", judgedCorpus()[0].findings)
 	two := JudgedOver("go-nil-deref", judgedCorpus()[0].findings)
 	if !one.Recorded() || one != two {
@@ -720,8 +720,8 @@ func TestCrossJudgedHeadersCarryTheSameColumnsAsTheHeadersTheyDeriveFrom(t *test
 			// The LAST column has no width to check: nothing follows it, so a
 			// cell of any length there cannot push another column out of line.
 			// Both these headers happen to end on a judged column, SIGNAL and
-			// GRADE, so exempting it is not a loophole being opened, it is the
-			// one column where the widening is a no-op.
+			// GRADE, so exempting it covers the one column where the widening
+			// is a no-op rather than opening a loophole.
 			last := i == len(from)-1
 
 			switch {

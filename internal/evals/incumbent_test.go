@@ -91,11 +91,11 @@ func TestParseRealSample(t *testing.T) {
 		t.Errorf("line = %d, want 10 (the first line of the 10-12 range)", f.Line)
 	}
 
-	// Recorded, not reinterpreted. This used to assert `error`, because
-	// crSeverity demoted every Incumbent critical so its coarser vocabulary
-	// would not read as inflation; the effect was that no Incumbent review
-	// could score accurate on a plant we planted critical, and a headline
-	// number was published on it. The vocabulary mismatch is not handled by
+	// Recorded, not reinterpreted. Asserting `error` here matches a crSeverity
+	// that demotes every Incumbent critical so its coarser vocabulary does not
+	// read as inflation, and the effect is that no Incumbent review can score
+	// accurate on a plant we planted critical, with a headline number published
+	// on it. The vocabulary mismatch is not handled by
 	// correcting it anywhere, the attempt to handle it at comparison time was
 	// withdrawn too, see NoCrossToolSeverityScore. It is described rather than
 	// scored, and the parser records what the reviewer said.
@@ -517,9 +517,9 @@ func TestFixtureRepoHasOriginRemote(t *testing.T) {
 
 // --- RunIncumbent ------------------------------------------------------------
 //
-// Nothing in this package used to call RunIncumbent or CollectIncumbent, so
-// every guard inside them was untested: deleting the free-tier check outright
-// left the suite green. The tests below drive the real function through a shim
+// With nothing in this package calling RunIncumbent or CollectIncumbent, every
+// guard inside them goes untested: deleting the free-tier check outright leaves
+// the suite green. The tests below drive the real function through a shim
 // on PATH, which is the only way to reach the branches that decide whether a
 // number gets recorded at all.
 
@@ -628,8 +628,8 @@ func TestRunIncumbentReturnsCompleteReviews(t *testing.T) {
 // this file passing.
 //
 // It also pins the ORDER. The warning is checked before parsing, because a
-// free-allowance review parses perfectly well. Its findings are simply
-// measuring the allowance rather than the reviewer, and must not be usable.
+// free-allowance review parses perfectly well, and its findings measure the
+// allowance rather than the reviewer, so they must not be usable.
 func TestRunIncumbentDetectsFreeTierFallback(t *testing.T) {
 	const warning = "Incumbent couldn't find a Git remote for this repository, so it can't " +
 		"match the review to one of your organizations. This review will use the free CLI allowance."
@@ -671,8 +671,8 @@ func TestRunIncumbentReportsRateLimitsFromEitherStream(t *testing.T) {
 	for name, script := range map[string]string{
 		"on stdout": "echo '" + message + "'\nexit 1\n",
 		"on stderr": "echo '" + message + "' >&2\nexit 1\n",
-		// Past the 200-byte stderr truncation, which is the other way the
-		// message used to be lost.
+		// Past the 200-byte stderr truncation, the other way the message is
+		// lost.
 		"on stdout behind a wall of noise": "head -c 4000 /dev/zero | tr '\\0' 'x'\necho\necho '" +
 			message + "'\nexit 1\n",
 	} {

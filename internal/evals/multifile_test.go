@@ -154,7 +154,7 @@ func importsFile(source, p string) bool {
 			camel += strings.ToUpper(part[:1]) + part[1:]
 		}
 	}
-	// TS: a tsconfig alias (@/* -> src/*) to a barrel or a module.
+	// TS: a tsconfig alias mapping @/* onto src/*, to a barrel or a module.
 	aliased := strings.TrimPrefix(dir, "src/")
 	alias := `from "@/` + strings.TrimSuffix(aliased, "/") + `"`
 	if base != "index" {

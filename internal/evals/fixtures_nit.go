@@ -17,10 +17,10 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // corpus that looks like evidence and is not: the plant's Why still describes a
 // descriptor leak, and the number beside it now says nit. Nothing here was
 // moved. Every defect below is newly authored and is one a senior reviewer
-// would rate nit on its own terms, against the anchor the model is actually
-// given: "`nit`, minor and optional."
+// would rate nit on its own terms, against the anchor the model is given:
+// "`nit`, minor and optional."
 //
-// THE ANCHOR'S ILLUSTRATION CHANGED UNDER THESE PLANTS, and every note below
+// The anchor's illustration changed under these plants, and every note below
 // was rewritten in the same commit rather than left quoting it. The rung used
 // to read "`nit`, minor and optional. *An unnecessary intermediate copy is a
 // nit.*", and five plants, cross-file-copy-nit, cross-file-sort-nit,
@@ -106,7 +106,7 @@ func nitFixtures() []Fixture {
 // two files.
 //
 // This is the shape the corpus has never had. Read report/summary.go alone and
-// the copy is not merely defensible, it is the careful thing to do: a caller
+// the copy is the careful thing to do rather than merely defensible: a caller
 // holding a slice another goroutine can append to is a real bug, and the
 // comment above the copy says exactly that. Read store/store.go, changed by
 // the same pull request, so it is in the diff, and Snapshot's contract says
@@ -605,7 +605,7 @@ func TestSlug(t *testing.T) {
 			},
 			// tests is the only plant of its class in the corpus, so nothing
 			// disagrees with it and no note is owed by the consistency check.
-			// One is written anyway: a level with no reason recorded is a level
+			// One is written anyway. A level with no reason recorded is a level
 			// the next editor moves.
 			Class:        config.ClassTests,
 			WantSeverity: config.SeverityNit,
@@ -626,7 +626,7 @@ func TestSlug(t *testing.T) {
 //
 // A fourth language, and a wasted copy in the form it most often takes in
 // review: a defensive copy that is defensive everywhere except
-// here. labels is created inside forIds, is never stored, and is unreachable
+// here. labels is created inside forIds, is never stored and is unreachable
 // once the method returns, so wrapping it directly is as immutable as wrapping
 // a copy of it. The comment above the return states the reason a real pull
 // request would give, and it is false about this variable specifically, which
@@ -638,10 +638,10 @@ func TestSlug(t *testing.T) {
 // escapes, not on the shape of the expression.
 //
 // Two false positives are invited. A reviewer may object that forIds throws on
-// a null ids, which is true, unrelated, and shared with every method in the
+// a null ids, true but unrelated and shared with every method in the
 // file. Or it may propose List.copyOf as a tidier spelling, which copies too
 // and so misses the point entirely. Neither reaches for a word about
-// reachability, which is why the keywords are built on "never escapes", "no
+// reachability, so the keywords are built on "never escapes", "no
 // other reference" and "copies a list it just built" rather than on "copy",
 // which the change itself supplies.
 func defensiveCopyOfLocalNitFixture() Fixture {
