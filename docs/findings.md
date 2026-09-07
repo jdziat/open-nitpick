@@ -1491,3 +1491,60 @@ reader, and the threshold separates two groups of eight files. What it is not
 is a measurement of whether a model wrote something: a careful human writer
 who likes colons will cross it, and a model told to write plainly will not.
 It measures sameness of rhythm, which is what was visible.
+
+## Should triage see the change (2026-09-07)
+
+The triage template asks for "a short walkthrough of the change". Triage is
+sent the findings list and, when the forge supplies one, the pull request
+title. It is never sent the diff. So the walkthrough describes the findings and
+infers the rest, and with no findings at all it describes nothing: the message
+is the title plus "No findings were reported. Write the walkthrough only."
+
+Two arms, `review.ground_triage` off and on, six fixtures, glm-5.3-flash, one
+run. Groundedness is the share of a walkthrough's content words that appear in
+its own diff, stopwords removed.
+
+| arm | groundedness | content words | walkthrough words | wrote nothing | recall | unmatched findings |
+|---|---|---|---|---|---|---|
+| ungrounded | 0.22 | 76 | 183 | 2 of 6 | 1.00 (6/6) | 1 |
+| grounded | 0.34 | 105 | 226 | 0 of 6 | 1.00 (6/6) | 0 |
+
+**Recall is at the ceiling in both arms, so this run cannot answer the question
+it was built for.** Six of six planted defects were found either way. A corpus
+where both arms score 1.00 has no room to show that grounding helps or harms
+detection, and the one unmatched finding that disappeared is a single event.
+
+On the walkthrough the arms do separate. The right comparison is the four
+fixtures where both arms write, 0.22 against 0.32, because the two clean
+fixtures have no ungrounded walkthrough to score.
+
+An earlier version of this paragraph said the headline 0.22 against 0.34 was
+flattered by those two empty walkthroughs. That was wrong about the
+arithmetic. The aggregate pools matched and total word counts, and an empty
+summary returns zero for both, so it contributes to neither the numerator nor
+the denominator and cannot move the pooled rate. The four-fixture figure is
+the honest one because it compares the same fixtures, not because it removes a
+depressing zero.
+
+**What the metric cannot do.** It counts vocabulary overlap, so it cannot tell
+paraphrase from invention. Reading the words it flagged as absent from the
+diff, most are ordinary description: `dereferences`, `panics`, `vulnerable`,
+`placeholder`. A low score is consistent with a careful paraphrase. What it
+does catch is a walkthrough drawn from somewhere other than this change, which
+is the failure that prompted the question.
+
+**The first instrument measured nothing and said 1.00.** It counted identifiers
+and file names, scored both arms a perfect 1.00 over six walkthroughs, and the
+reason was that it found zero tokens: the same template forbids naming files
+("no bullet lists of files, no statistics, no restating the diff"). An
+instrument that returns a perfect score because its numerator and denominator
+are both zero is the eleventh instrument bug here, and the second to flatter
+the arm that produced less.
+
+**Not measured: cost.** Grounding sends the whole diff to the triage model on
+every review. The tokens were not counted, and `review.budget`'s `overhead`
+defaults to 1.0 on the assumption that triage input is a short list, so
+grounding would need that default re-derived before it ships on.
+
+Rule 15 applies. One model, one run, six fixtures, and the headline number is
+a proxy the section above says cannot separate paraphrase from invention.
