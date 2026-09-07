@@ -160,3 +160,46 @@ func TestCadenceIgnoresInlineCode(t *testing.T) {
 		t.Errorf("inline code was counted: %+v", got)
 	}
 }
+
+// Shouting is a closed list of ordinary words, not a shape. A name in capitals
+// is a name.
+func TestShoutingIsWordsNotShape(t *testing.T) {
+	for _, line := range []string{
+		"// The cap bounds what is READ, not what is SENT.\n",
+		"// IT MUST BE RENDERED, and this paragraph said it was not.\n",
+		"// how much of the file it is NOT being shown\n",
+	} {
+		if got := Scan("a.go", line); !strings.Contains(rules(got), "shouting-emphasis") {
+			t.Errorf("not flagged: %q -> %s", line, rules(got))
+		}
+	}
+
+	for _, line := range []string{
+		"// a README that explains what the place is\n",
+		"// exceeded review.MAX_FILES on the TOML PATH\n",
+		"// parses SARIF from the HTTP endpoint, see GHSA and CVE ids\n",
+	} {
+		if got := Scan("a.go", line); strings.Contains(rules(got), "shouting-emphasis") {
+			t.Errorf("a name was flagged: %q -> %+v", line, got)
+		}
+	}
+}
+
+// A comment that narrates its own history is a commit message that outlived
+// its commit.
+func TestChangelogCommentsAreFound(t *testing.T) {
+	for _, line := range []string{
+		"// That check used to live here, and rejecting a file was wrong.\n",
+		"// THE BUG THIS FIXES: it was taken inside ScoreSeverity.\n",
+		"// The note here outlived the fix by two changes.\n",
+		"// It was previously refused its content outright.\n",
+	} {
+		if got := Scan("a.go", line); !strings.Contains(rules(got), "changelog-comment") {
+			t.Errorf("not flagged: %q -> %s", line, rules(got))
+		}
+	}
+
+	if got := Scan("a.go", "// fetchContent reads a file's contents at the reviewed revision.\n"); len(got) != 0 {
+		t.Errorf("an ordinary doc comment was flagged: %+v", got)
+	}
+}
