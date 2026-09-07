@@ -17,6 +17,14 @@
 
 * **evals:** key composite cost meters by client, not by model id ([#48](https://github.com/jdziat/open-nitpick/issues/48)) ([110391f](https://github.com/jdziat/open-nitpick/commit/110391f9a7380f75f316269c63c5dcf362f8efa9)), closes [#45](https://github.com/jdziat/open-nitpick/issues/45)
 * **llm:** pin providers with only, and unwrap a single-element array ([#47](https://github.com/jdziat/open-nitpick/issues/47)) ([cae952e](https://github.com/jdziat/open-nitpick/commit/cae952e9ac17d9ae8e24ce75bb5559a7c1204beb))
+* **review:** the default mention is `@open-nitpick`, not `@nitpick` ([#34](https://github.com/jdziat/open-nitpick/issues/34)) ([38b4a41](https://github.com/jdziat/open-nitpick/commit/38b4a4162839c5d55ea6afa2819d2b9819af6e3e))
+
+    `@nitpick` is a real GitHub account, and every published comment naming
+    it tagged a person with no connection to this tool. **A repository that
+    triggers the reviewer with `@nitpick review` or `@nitpick resolve` has to
+    say `@open-nitpick` after upgrading**, or set `review.mention` back. The
+    skip markers are unchanged: `[skip review]` and `[skip nitpick]` both
+    still work.
 
 ## [1.7.0](https://github.com/jdziat/open-nitpick/compare/v1.6.0...v1.7.0) (2026-09-07)
 
