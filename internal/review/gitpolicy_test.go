@@ -243,8 +243,8 @@ func instructionBlocks(prompt string) []string {
 	}
 }
 
-// recordingLocal is the local provider with the published review kept, since
-// a local review is written to a writer rather than posted.
+// recordingLocal keeps the published review, which a local run writes to a
+// writer rather than posting.
 type recordingLocal struct {
 	*vcs.Local
 	published *vcs.Review

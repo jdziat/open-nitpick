@@ -10,20 +10,14 @@ import (
 	"github.com/jdziat/open-nitpick/internal/diff"
 )
 
-// Complexity ranks how much review attention a changed file warrants.
+// Complexity ranks how much review attention a changed file warrants. When a
+// spending ceiling cannot pay for the whole diff, filename order would review
+// whatever sorts first. The score is deterministic and computed from the diff
+// alone, since a ranking costing a model call spends the budget it protects.
 //
-// It exists for one job: when a spending ceiling cannot pay for the whole
-// diff, something has to choose which files are reviewed, and choosing by
-// filename order would review whatever sorts first. The score is deterministic
-// and computed from the diff alone, with no model call, because a ranking that
-// costs a model call to produce is a ranking that spends the budget it exists
-// to protect.
-//
-// It is a PRIORITY, not a claim about defect density. Nothing here knows which
-// file holds the bug. What it knows is which changes have historically been
-// worth a careful read: control flow, error handling, many separate edits, new
-// code rather than deletions. A team that disagrees can turn the ceiling off
-// and review everything, which is the default.
+// It is a priority rather than a claim about defect density. Nothing here
+// knows which file holds the bug; it knows which changes have been worth a
+// careful read: control flow, error handling, many edits, new code.
 type Complexity struct {
 	Path  string
 	Score float64

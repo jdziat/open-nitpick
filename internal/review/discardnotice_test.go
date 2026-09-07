@@ -245,14 +245,11 @@ func TestAModelFindingDroppedByAnchoringIsNotCounted(t *testing.T) {
 
 // uncovered is the ledger of a run where golangci-lint ran and covered less of
 // the change than "ran" implies: one file the build excludes, one suppression
-// the change added, and one module whose go directive switched off checks that
-// would otherwise have run.
-//
-// The third is here because it is the one that does not describe a file of the
-// change at all. It anchors to the module's go.mod, which the change need not
-// have touched, and it is the one entry that means REDUCED coverage rather
-// than absent coverage, so a renderer that assumed every entry names an unread
-// file of the diff is wrong about it.
+// the change added, one module whose go directive switched checks off. The
+// third does not describe a file of the change. It anchors to the module's
+// go.mod, which the change need not have touched, and it alone means reduced
+// rather than absent coverage, so a renderer assuming every entry names an
+// unread file of the diff is wrong about it.
 func uncovered() []LinterUncovered {
 	return []LinterUncovered{
 		{Linter: "golangci-lint", Path: "app_windows.go", Reason: UncoveredBuildExcluded},
@@ -533,8 +530,8 @@ func TestTheUncoveredListIsBoundedPerReason(t *testing.T) {
 	}
 }
 
-// TestAChangeNothingReviewedSaysSoRatherThanReadingClean is the emptiest review
-// there is, and it used to be the cleanest-looking one.
+// TestAChangeNothingReviewedSaysSoRatherThanReadingClean is the emptiest
+// review there is, and the one most at risk of reading as the cleanest.
 //
 // When every changed file is set aside there are no batches to send, so the
 // engine returns before any model or analyzer is asked anything and the

@@ -102,6 +102,7 @@ func Scan(p, content string) []Tell {
 		block = nil
 	}
 	inRawString := false
+	inBlockComment := false
 	for i, raw := range lines {
 		n := i + 1
 
@@ -137,7 +138,8 @@ func Scan(p, content string) []Tell {
 			}
 			text = stripInlineCode(raw)
 		} else {
-			c, ok := commentText(raw, comment)
+			c, ok := commentTextIn(raw, comment, inBlockComment)
+			inBlockComment = blockCommentAfter(raw, inBlockComment)
 			if !ok {
 				flush(raw)
 				// A comment after code on the same line carries the line
@@ -181,12 +183,30 @@ func Scan(p, content string) []Tell {
 // and counting them would score a file by how many struct fields it declares.
 func commentLines(lines []string, marker string) []string {
 	var out []string
+	inBlock := false
 	for _, l := range lines {
-		if c, ok := commentText(l, marker); ok {
+		c, ok := commentTextIn(l, marker, inBlock)
+		inBlock = blockCommentAfter(l, inBlock)
+		if ok {
 			out = append(out, c)
 		}
 	}
 	return out
+}
+
+// blockCommentAfter reports whether a `/* */` block is open once the line has
+// been read. It counts markers rather than parsing, which is wrong for one
+// inside a string literal and right for every block comment written here.
+func blockCommentAfter(raw string, inBlock bool) bool {
+	for i := 0; i+1 < len(raw); i++ {
+		switch raw[i : i+2] {
+		case "/*":
+			inBlock = true
+		case "*/":
+			inBlock = false
+		}
+	}
+	return inBlock
 }
 
 // cadenceLimit is how many cadence markers per hundred prose lines stop being
@@ -380,8 +400,19 @@ func kind(p string) (prose bool, comment string) {
 // the // languages the block forms (/*, *, ///, //!); for the # languages
 // the docstring quotes. A bare * is a comment only where /* */ exists.
 func commentText(raw, comment string) (string, bool) {
+	return commentTextIn(raw, comment, true)
+}
+
+// commentTextIn is commentText told whether the line sits inside a `/* */`
+// block. The `*` continuation prefix is only a comment there. Outside one it
+// is Go's embedded pointer field, `*vcs.Local`, and reading that as prose
+// scored ten struct lines in this tree as comments they are not.
+func commentTextIn(raw, comment string, inBlock bool) (string, bool) {
 	t := strings.TrimSpace(raw)
-	prefixes := []string{"//", "///", "//!", "/*", "*"}
+	prefixes := []string{"//", "///", "//!", "/*"}
+	if inBlock {
+		prefixes = append(prefixes, "*")
+	}
 	if comment == "#" {
 		prefixes = []string{"#", "\"\"\"", "'''"}
 	}

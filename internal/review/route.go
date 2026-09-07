@@ -55,8 +55,8 @@ func (e *Engine) reviewersFor(ctx context.Context, b bundle.Batch) (reviewers, e
 		if models.NeedsRouter() {
 			kinds, err := e.classify(ctx, b)
 			if err != nil {
-				// A router that fails does not fail the batch: the batch is
-				// reviewed as if unclassified, and the report says so.
+				// A router failure is not a batch failure. Every route runs
+				// against an empty kind set and the report discloses it.
 				e.log().Warn("router failed; batch reviewed unclassified", "files", paths, "error", err)
 			}
 			d.Kinds = kinds

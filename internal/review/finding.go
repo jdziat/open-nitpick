@@ -131,14 +131,13 @@ type Finding struct {
 	FixValidated bool `json:"-"`
 
 	// Source names where the finding came from: a linter's rule id, or the
-	// reviewing model. It is not part of the model-facing schema (the model does
-	// not get to claim provenance), but it IS shown to the reader.
+	// reviewing model. It is not part of the model-facing schema, since the
+	// model does not get to claim provenance, and it is shown to the reader.
 	//
 	// "flagged by golangci-lint(gosec), triaged by claude" is the sentence this
-	// tool exists to be able to write. A deterministic analyzer found it, a
-	// model judged whether it mattered here, and the reader can see both. That
-	// is the whole differentiated claim, and it was previously destroyed in
-	// triage and never rendered.
+	// tool exists to be able to write: a deterministic analyzer found it, a
+	// model judged whether it mattered here, and the reader sees both. Triage
+	// must carry it through, and render must print it.
 	Source string `json:"-"`
 
 	// Triager records which model triaged the finding, so Source can keep

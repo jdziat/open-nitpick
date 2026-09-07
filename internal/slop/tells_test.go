@@ -259,3 +259,28 @@ func TestChangelogCommentsAreFound(t *testing.T) {
 		t.Errorf("an ordinary doc comment was flagged: %+v", got)
 	}
 }
+
+// TestAnEmbeddedPointerFieldIsNotAComment covers Go's `*T` embed, which shares
+// its first character with a `/* */` continuation line. Reading one as prose
+// scores a struct field as a comment, and the field below it then looks like a
+// line the comment restates.
+func TestAnEmbeddedPointerFieldIsNotAComment(t *testing.T) {
+	src := "package p\n\n" +
+		"// recordingLocal keeps the review a local run writes to a writer.\n" +
+		"type recordingLocal struct {\n" +
+		"\t*vcs.Local\n" +
+		"\tpublished *vcs.Review\n" +
+		"}\n"
+	if got := Scan("x.go", src); len(got) != 0 {
+		t.Errorf("an embedded pointer field was scanned as a comment: %+v", got)
+	}
+}
+
+// TestABlockCommentContinuationIsStillAComment is the other side of it: inside
+// `/* */` the same prefix is prose and the rules have to see it.
+func TestABlockCommentContinuationIsStillAComment(t *testing.T) {
+	src := "package p\n\n/*\n * The prose — this part — is a comment.\n */\nvar x = 1\n"
+	if !strings.Contains(rules(Scan("x.go", src)), "em-dash") {
+		t.Error("a block comment's continuation line was not scanned")
+	}
+}

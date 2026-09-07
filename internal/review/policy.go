@@ -131,13 +131,12 @@ func (e *Engine) resolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.PullReq
 // modifiedName is the file a contributor has to look at, in a form worth
 // printing on a pull request.
 //
-// The resolver's own answer is preferred because it is the only one that is
-// right: it is the repository-relative path the resolver MATCHED, so it names
-// a config below the root in full and survives the change that adds or deletes
-// the file. The fallbacks are for a resolver that does not record one,
-// loaded.Source is absolute, so in CI it carries the runner's workspace path,
-// and its basename reports tools/ci/.nitpick.yaml as `.nitpick.yaml`, a path
-// that does not exist in the repository.
+// The resolver's own answer is the repository-relative path it matched, so it
+// names a config below the root in full and survives a change adding or
+// deleting the file. The fallbacks cover a resolver that records none:
+// loaded.Source is absolute and in CI carries the runner's workspace path,
+// while its basename reports tools/ci/.nitpick.yaml as `.nitpick.yaml`, which
+// does not exist in the repository.
 func modifiedName(resolved, loaded *config.Config) string {
 	if resolved != nil && strings.TrimSpace(resolved.Policy.Modified) != "" {
 		return resolved.Policy.Modified

@@ -35,7 +35,7 @@ var (
 func Scrub(s string) (string, bool) {
 	out := mapOutsideCode(s, func(text string) string {
 		text = fillerLead.ReplaceAllString(text, "")
-		// Openers stack ("Sure! Here's the answer:"), so strip until none.
+		// Openers stack, so strip until a pass removes nothing.
 		for range 3 {
 			stripped := chatOpen.ReplaceAllString(text, "")
 			if stripped == text {

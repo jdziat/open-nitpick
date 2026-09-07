@@ -145,12 +145,10 @@ func attribution(f Finding) string {
 // suggestionIsApplicable reports whether a suggestion can safely be offered as
 // a one-click replacement.
 //
-// A review comment anchors to one line, and GitHub replaces exactly that line
-// with the block's contents. Two things therefore disqualify a suggestion:
-// spanning multiple lines (the extra lines would be inserted while the
-// originals survive, which is how a duplicated `if` block and an unbalanced
-// brace get committed), and being prose rather than code (observed live: the
-// model answered "Sanitize and validate the user input before using it").
+// A review comment anchors to one line, and GitHub replaces that line with the
+// block's contents. Spanning lines disqualifies a suggestion, since the extra
+// lines are inserted while the originals survive, committing a duplicated `if`
+// block. So does prose, observed live as "Sanitize and validate the input".
 func suggestionIsApplicable(s string) bool {
 	if strings.Contains(strings.TrimRight(s, "\n"), "\n") {
 		return false

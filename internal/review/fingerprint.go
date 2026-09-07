@@ -12,14 +12,12 @@ import (
 // Fingerprint identifies a finding across runs of this tool on the same pull
 // request, independently of the line it lands on.
 //
-// Lines move: a push that inserts a function above the defect shifts every
-// finding below it, and a fingerprint that included the line would have every
-// such finding re-posted as new. Wording moves too, but less, and a model at
-// temperature zero handed the same file mostly titles the same defect the same
-// way. So the fingerprint is the path, the class and the normalized title. The
-// class is in it because two findings of different kinds can share a title's
-// words ("unchecked error" as a correctness bug and as a style nit) and should
-// not be taken for the same one.
+// Lines move: a push inserting a function above the defect shifts every
+// finding below it, and a fingerprint carrying the line re-posts each as new.
+// Wording moves less, and a model at temperature zero mostly titles a defect
+// the same way, so the fingerprint is the path, class and normalized title.
+// The class is in it because two findings of different kinds can share a
+// title's words, "unchecked error" as a correctness bug and as a style nit.
 func Fingerprint(f Finding) string {
 	h := sha256.New()
 	h.Write([]byte(f.Path))
@@ -50,7 +48,7 @@ func fingerprintTitle(s string) string {
 	return b.String()
 }
 
-// priorLineTolerance is how far a previously posted comment may sit from a new
+// priorLineTolerance is how far an already posted comment may sit from a new
 // finding of the same class on the same file and still be taken for the same
 // finding. Two lines covers the ordinary case (a push that edits the lines
 // beside the defect), without swallowing a distinct defect a screen away.
