@@ -405,7 +405,15 @@ func writeVerified(path, body string, c chosenModel) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.Remove(keep) }()
+	// Cleared once the rename has taken it, because the deferred remove names a
+	// path that a successful rename has already consumed. On Unix removing it
+	// fails harmlessly; on Windows the source can survive a rename, and the
+	// remove would delete the config just written.
+	defer func() {
+		if keep != "" {
+			_ = os.Remove(keep)
+		}
+	}()
 
 	validated := keep
 	if check != body {
@@ -424,7 +432,11 @@ func writeVerified(path, body string, c chosenModel) error {
 	if err := os.Chmod(keep, 0o644); err != nil {
 		return err
 	}
-	return os.Rename(keep, path)
+	if err := os.Rename(keep, path); err != nil {
+		return err
+	}
+	keep = ""
+	return nil
 }
 
 // without returns the paths that are not the named repository-relative file.

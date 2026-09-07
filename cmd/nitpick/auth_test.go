@@ -6,18 +6,21 @@ import (
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/llm"
+	llms "github.com/nocturnium/llm-go-sdk/v6"
 	"github.com/zalando/go-keyring"
 )
 
-// mockKeystore replaces the operating system's keystore for one test, so the
-// suite neither reads nor writes the developer's real one.
-func mockKeystore(t *testing.T) {
+// clearKeystore empties the mock keystore TestMain installed, so each test
+// starts from nothing rather than from what an earlier one stored.
+func clearKeystore(t *testing.T) {
 	t.Helper()
-	keyring.MockInit()
+	for _, p := range llms.RegisteredProviders() {
+		_ = keyring.Delete(llm.KeyringService, p)
+	}
 }
 
 func TestAuthStoresACredentialWhereAReviewLooksForIt(t *testing.T) {
-	mockKeystore(t)
+	clearKeystore(t)
 	var out bytes.Buffer
 
 	if err := runAuth([]string{"set", "synthetic"}, strings.NewReader("syn_abc123\n"), &out); err != nil {
@@ -40,7 +43,7 @@ func TestAuthStoresACredentialWhereAReviewLooksForIt(t *testing.T) {
 // The credential is read from standard input rather than an argument, so it
 // does not reach the shell's history or the process table.
 func TestAuthTakesTheCredentialFromStandardInputAndTrimsIt(t *testing.T) {
-	mockKeystore(t)
+	clearKeystore(t)
 	var out bytes.Buffer
 
 	if err := runAuth([]string{"set", "openai"}, strings.NewReader("  sk-trailing  \n"), &out); err != nil {
@@ -58,7 +61,7 @@ func TestAuthTakesTheCredentialFromStandardInputAndTrimsIt(t *testing.T) {
 
 // A typo becomes a secret nothing ever reads, so it is refused here.
 func TestAuthRefusesAProviderTheRegistryDoesNotKnow(t *testing.T) {
-	mockKeystore(t)
+	clearKeystore(t)
 	var out bytes.Buffer
 
 	err := runAuth([]string{"set", "sinthetic"}, strings.NewReader("k\n"), &out)
@@ -71,7 +74,7 @@ func TestAuthRefusesAProviderTheRegistryDoesNotKnow(t *testing.T) {
 }
 
 func TestAuthDeleteRemovesTheCredential(t *testing.T) {
-	mockKeystore(t)
+	clearKeystore(t)
 	var out bytes.Buffer
 
 	if err := runAuth([]string{"set", "groq"}, strings.NewReader("gsk_1\n"), &out); err != nil {
@@ -87,7 +90,7 @@ func TestAuthDeleteRemovesTheCredential(t *testing.T) {
 
 // list answers which providers are configured and never what the secret is.
 func TestAuthListNamesProvidersAndNotSecrets(t *testing.T) {
-	mockKeystore(t)
+	clearKeystore(t)
 	var out bytes.Buffer
 
 	if err := runAuth([]string{"list"}, nil, &out); err != nil {
