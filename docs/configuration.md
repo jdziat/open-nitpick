@@ -260,7 +260,14 @@ review:
 
 **`receipt`**, the default, is counted from the run. It states how many changed
 files were read out of how many there were, the findings by severity, which
-analyzers ran, and how many files could not be reviewed. No model is asked, so
+analyzers ran, and how many files could not be reviewed.
+
+Files it did not read are reported in two groups, because they are not the same
+news. A deletion, a binary, a generated file or a change with no added lines had
+nothing a comment could attach to. A file whose contents would not fetch, or one
+cut off by `max_file_bytes`, `token_budget_per_request`, `max_files` or the
+spending ceiling, is a hole. Pooling them made a routine review read like a
+partial one. No model is asked, so
 nothing in it can be invented, and two runs over the same change print the same
 line.
 

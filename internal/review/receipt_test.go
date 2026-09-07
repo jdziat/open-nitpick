@@ -137,3 +137,37 @@ func TestTheStyleMarkerIsNotCountedAsAFile(t *testing.T) {
 		t.Errorf("both facts must appear:\n%s", got)
 	}
 }
+
+// A deletion and a fetch failure are both absent from the numerator and are
+// not the same news, so the receipt reports them apart.
+func TestTheReceiptSeparatesRoutineSkipsFromHoles(t *testing.T) {
+	plan := planOfFiles(2)
+	plan.Skipped = []bundle.Skip{
+		{Path: "gone.go", Reason: bundle.ReasonDeleted},
+		{Path: "doc.md", Reason: bundle.ReasonNoChanges},
+		{Path: "big.go", Reason: bundle.ReasonTooLarge + " (300 KB)"},
+	}
+	report := &Report{
+		Files: diff.Files{{Path: "a.go"}, {Path: "b.go"}, {Path: "gone.go"}, {Path: "doc.md"}, {Path: "big.go"}},
+		Plan:  plan,
+	}
+
+	got := receipt(report)
+	if !strings.Contains(got, "2 files had nothing to review") {
+		t.Errorf("routine skips miscounted:\n%s", got)
+	}
+	if !strings.Contains(got, "1 file could not be read") {
+		t.Errorf("a size limit was counted as routine, despite its suffix:\n%s", got)
+	}
+}
+
+// With nothing skipped the receipt says nothing about skips.
+func TestTheReceiptIsQuietWhenNothingWasSkipped(t *testing.T) {
+	report := &Report{Files: diff.Files{{Path: "a.go"}}, Plan: planOfFiles(1)}
+	got := receipt(report)
+	for _, forbidden := range []string{"nothing to review", "could not be read"} {
+		if strings.Contains(got, forbidden) {
+			t.Errorf("receipt mentions %q with no skips:\n%s", forbidden, got)
+		}
+	}
+}

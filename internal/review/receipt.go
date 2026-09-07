@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/jdziat/open-nitpick/internal/bundle"
 )
 
 // Receipt is the walkthrough written from facts instead of generated.
@@ -39,6 +41,22 @@ func receipt(report *Report) string {
 		parts = append(parts, fmt.Sprintf("Read %s.", plural(reviewed, "changed file")))
 	default:
 		parts = append(parts, fmt.Sprintf("Read %d of %s.", reviewed, plural(changed, "changed file")))
+	}
+
+	// A file with nothing to review and a file the reviewer could not read are
+	// both absent from the numerator, and they are not the same news. Deleting
+	// a file is routine; failing to fetch one is a hole. Pooling them made
+	// "Read 2 of 5" read like a coverage failure on a change whose other three
+	// files were a deletion and two with no added lines.
+	if routine, unread := classifySkips(report); routine > 0 || unread > 0 {
+		var notes []string
+		if routine > 0 {
+			notes = append(notes, fmt.Sprintf("%s had nothing to review", plural(routine, "file")))
+		}
+		if unread > 0 {
+			notes = append(notes, fmt.Sprintf("%s could not be read", plural(unread, "file")))
+		}
+		parts = append(parts, capitalize(strings.Join(notes, ", "))+".")
 	}
 
 	if n := len(report.Findings); n > 0 {
@@ -111,4 +129,52 @@ func stylePassFailed(report *Report) bool {
 		}
 	}
 	return false
+}
+
+// unreadable names the skip reasons that mean the reviewer wanted the file and
+// did not get it, or a limit cut it off.
+//
+// Everything else is routine: a deletion, a binary, a generated file, an
+// ignored path, or a change with no added lines carries nothing a comment
+// could attach to. Reporting the two together is what made a clean review look
+// like a partial one.
+// The reasons are PREFIXES, not whole strings. The planner appends detail to
+// several of them, a size or a budget figure, and an exact-match table would
+// silently reclassify every one that carries it as routine.
+var unreadable = []string{
+	bundle.ReasonUnavailable,
+	bundle.ReasonTooLarge,
+	bundle.ReasonOverBudget,
+	bundle.ReasonFileLimit,
+	"over the review.budget.max_spend ceiling",
+}
+
+// classifySkips splits the planner's skips into the two kinds.
+func classifySkips(report *Report) (routine, unread int) {
+	if report.Plan == nil {
+		return 0, 0
+	}
+	for _, s := range report.Plan.Skipped {
+		hole := false
+		for _, prefix := range unreadable {
+			if strings.HasPrefix(s.Reason, prefix) {
+				hole = true
+				break
+			}
+		}
+		if hole {
+			unread++
+			continue
+		}
+		routine++
+	}
+	return routine, unread
+}
+
+// capitalize upper-cases the first letter, since these notes are sentences.
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
