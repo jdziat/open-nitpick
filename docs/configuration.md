@@ -8,6 +8,30 @@ checkout's languages call for. The reference below is what to reach for when
 changing a key it left at its default. `nitpick explain-config` prints what any
 of it resolves to without spending a token.
 
+## Two files
+
+Settings you want in every checkout go in a user-level file, which each
+repository's own `.nitpick.yaml` then overlays:
+
+```
+$XDG_CONFIG_HOME/nitpick/config.yaml     # or ~/.config/nitpick/config.yaml
+```
+
+Precedence runs built-in defaults, then that file, then the repository's, then
+the environment for what neither said, then flags. It takes the same keys in the
+same shape.
+
+It is also the only file trusted with `base_url`, `api_key_env`, `extra`,
+`allow_private_endpoint` and `persona.custom`, and it needs no
+`NITPICK_TRUST_CONFIG_ENDPOINTS` to use them: you wrote it, and it sits outside
+every checkout where no pull request can reach it. A repository that names any
+of those keys still has them dropped, and `nitpick explain-config` names both
+the file and what it supplied. See [Trust model](trust-model.md).
+
+It is **not read on a runner**, where `CI` or `GITHUB_ACTIONS` is set, because
+nobody there wrote it. `NITPICK_USER_CONFIG=/path/to/config.yaml` names one
+anyway, wherever you set it; `NITPICK_NO_USER_CONFIG=1` switches it off.
+
 ```yaml
 models:
   default:

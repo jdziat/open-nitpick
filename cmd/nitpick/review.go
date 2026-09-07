@@ -562,6 +562,21 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 
 	pl("Config source:", source)
 
+	// A value that arrived from outside the checkout is the hardest one to
+	// account for when a review does something unexpected, so the file is named
+	// along with what it supplied and what this repository overruled. Printing
+	// nothing when no user-level file applied is what makes these lines
+	// evidence rather than boilerplate.
+	if cfg.User != "" {
+		pf("User config:    %s\n", cfg.User)
+		if len(cfg.UserKeys) > 0 {
+			pf("                supplied: %s\n", strings.Join(cfg.UserKeys, ", "))
+		}
+		if len(cfg.UserOverridden) > 0 {
+			pf("                overruled by this repository: %s\n", strings.Join(cfg.UserOverridden, ", "))
+		}
+	}
+
 	// Where the file is and which policy applies are different questions, and
 	// they have different answers for exactly one change: the one that edits
 	// this file. An operator asking this command what their configuration

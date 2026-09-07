@@ -13,6 +13,22 @@ including `.nitpick.yaml`. Three consequences:
   Providers whose endpoint is compiled in (`openrouter`, `anthropic`, `ollama`,
   and the rest) are unaffected, which is why the shipped default names one
   rather than a `base_url`.
+- **A user-level file may supply exactly those keys, and needs no variable to
+  do it.** `$XDG_CONFIG_HOME/nitpick/config.yaml`, or
+  `~/.config/nitpick/config.yaml`, is written by the person running the tool and
+  lies outside every checkout, so no pull request can reach it. The repository's
+  own file overlays it for every other key. The two documents are merged in one
+  order and only one: the keys above are deleted from the repository's document
+  **before** it is merged, rather than scrubbed from the result afterwards, so a
+  repository value can never be written into a position the user-level file
+  owns, and the user-level value is never cleared by the scrub that keeps the
+  repository out. A YAML alias is followed rather than skipped, so an anchored
+  model spec is pruned wherever it is used. `api_key_env: GITHUB_TOKEN` stays
+  refused in both files. The user-level file is **not read on a runner** (`CI`
+  or `GITHUB_ACTIONS`): there is nobody there who wrote it. Name one with
+  `NITPICK_USER_CONFIG` to opt a runner in deliberately, or switch it off
+  anywhere with `NITPICK_NO_USER_CONFIG=1`. `nitpick explain-config` names the
+  file, the settings it supplied, and the ones this repository overruled.
 - **`provider` and `model` are *not* stripped, and that is the residual risk.**
   A pull request editing its own `.nitpick.yaml` cannot change the endpoint or
   the bearer token, but it can still choose which model reads the diff. Two
