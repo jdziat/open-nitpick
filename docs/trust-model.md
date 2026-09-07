@@ -246,10 +246,10 @@ including `.nitpick.yaml`. Three consequences:
   What it is answered by is the entry claiming less. It says the version gate was
   closed, not that anything was behind it, which is true whether or not the table
   has caught up. Moving the ceiling down to the newest version that gates
-  something was rejected: that number can only be a constant measured against one
-  analyzer release, and when the table moves past it the error turns into
-  silence, which is the failure this whole list exists to prevent, and the
-  reason the `go 1.21` floor above was removed.
+  something was rejected. That number can only be a constant measured against
+  one analyzer release, and once the table moves past it the error turns into
+  silence. Silence is what this whole list exists to prevent, and it is why the
+  `go 1.21` floor above was removed.
 - **Your own ignore list is a silencing channel, and it is the one that is not
   the change's doing.** Changed paths matching `review.ignore` are dropped before
   any analyzer is handed a path, and `**/vendor/**` and `**/testdata/**` are
