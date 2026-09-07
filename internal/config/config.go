@@ -401,16 +401,6 @@ type Review struct {
 	// not author them. See internal/review/noclaims.go.
 	TriageNoNewClaims bool `yaml:"triage_no_new_claims"`
 
-	// GroundTriage attaches the change itself to the triage prompt.
-	//
-	// Triage is asked for "a short walkthrough of the change" and is shown the
-	// findings list, never the diff, so what it writes is a description of the
-	// findings presented as a description of the change. This makes the
-	// template's promise true, at the cost of the diff's tokens on the triage
-	// model for every review. EXPERIMENTAL: see the arms in
-	// internal/evals/grounding_eval_test.go before turning it on.
-	GroundTriage bool `yaml:"ground_triage"`
-
 	// Respond bounds who may make the reviewer spend money by mentioning it.
 	// See spend.go.
 	Respond Respond `yaml:"respond"`
