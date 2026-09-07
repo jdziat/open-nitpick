@@ -26,6 +26,21 @@ models:
     model: hf:zai-org/GLM-5.3-Flash
     temperature: 0
 
+  # The model that edits code on "@open-nitpick fix". There is no default for
+  # this and there should not be: every measurement in docs/findings.md scores
+  # a reviewer on recall and noise, and neither says whether a model can
+  # produce a change that compiles.
+  #
+  # So this line is a choice rather than a result, and worth naming as one.
+  # Kimi-K3 is picked because it is the model this repository already runs and
+  # is known to return correctly shaped structured output here. It has not been
+  # measured as an editor; nothing has. A fix it writes stays unverified until
+  # the checks on the pull request it opens have run.
+  fix:
+    provider: synthetic
+    model: hf:moonshotai/Kimi-K3
+    temperature: 0
+
 review:
   # Advisory: this project reviews itself, and a false positive should not
   # block its own PRs.

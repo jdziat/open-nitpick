@@ -638,6 +638,15 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 	printModel(config.RoleTriage)
 	printModel(config.RoleValidate)
 
+	// The editing model, when one is configured. It is not a role, so it has
+	// no printModel arm; an operator asking what this file resolves to is owed
+	// it either way, and its absence is the answer to "why did fix refuse".
+	if spec, ok := cfg.Models.ResolveFix(); ok {
+		pf("  %-8s %s/%s\n", "fix", spec.Provider, spec.Model)
+	} else {
+		pl("  fix      (none; \"@nitpick fix\" refuses without models.fix)")
+	}
+
 	// Printed whether or not validation is on, because "which model would
 	// check my findings" and "is checking switched on" are separate questions
 	// and an operator turning it on wants the answer to the first beforehand.
