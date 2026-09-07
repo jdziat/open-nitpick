@@ -129,10 +129,13 @@ func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref
 		return reply(ctx, gh, ref, ev, fmt.Sprintf(
 			"@%s this pull request moved while I was writing, so I stopped rather than revert the push. Ask again.", ev.Author))
 	case errors.Is(err, vcs.ErrNoWriteAccess):
-		// Named because it is the one failure whose fix is a setting rather
-		// than a retry, and because the run log says only 403.
+		// Named separately because its remedy is a setting rather than a
+		// retry, and the usual cause is worth saying: a workflow asking for
+		// contents: write does not give the App installation behind its token
+		// that permission. Said as the likely cause rather than the certain
+		// one, since SSO enforcement refuses a write the same way.
 		if rerr := reply(ctx, gh, ref, ev, fmt.Sprintf(
-			"@%s I am not allowed to write here, so nothing was created. The workflow asks for `contents: write`; the credential it was handed does not have it.",
+			"@%s the forge refused the write, so nothing was created. The usual cause is the App installation not holding `contents: write` even though the workflow asks for it. The run log has what the forge said.",
 			ev.Author)); rerr != nil {
 			return errors.Join(err, rerr)
 		}
@@ -143,10 +146,12 @@ func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref
 		// watching, and the conversation they asked in stays silent, which
 		// reads the same as a fix still being written.
 		//
-		// The error is returned afterwards regardless, so the check still
-		// fails. Saying it twice is the point.
+		// The text is fixed rather than the error, which carries forge
+		// response bodies and the internal labels of whichever call failed.
+		// The run log is where those belong. The error is returned afterwards
+		// regardless, so the check still fails.
 		if rerr := reply(ctx, gh, ref, ev, fmt.Sprintf(
-			"@%s I could not write the change: %v", ev.Author, err)); rerr != nil {
+			"@%s I could not write the change. The failure is in the workflow run log.", ev.Author)); rerr != nil {
 			return errors.Join(err, rerr)
 		}
 		return err

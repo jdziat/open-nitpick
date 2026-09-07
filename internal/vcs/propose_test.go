@@ -32,6 +32,7 @@ type proposeFake struct {
 	failSecondRead bool
 	failCreatePR   bool
 	forbidWrites   bool
+	rateLimited    bool
 	treeBody       map[string]any
 }
 
@@ -71,6 +72,14 @@ func (f *proposeFake) handler(t *testing.T) http.HandlerFunc {
 
 		case strings.Contains(p, "/git/commits/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"sha": f.head, "tree": map[string]any{"sha": "tree-base"}})
+
+		case f.rateLimited && r.Method == http.MethodPost:
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"message":           "API rate limit exceeded",
+				"documentation_url": "https://docs.github.com/rest/rate-limit",
+			})
 
 		case f.forbidWrites && r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusForbidden)
@@ -438,6 +447,29 @@ func TestProposeChangeNamesARefusedCredential(t *testing.T) {
 	}
 	if f.created != "" {
 		t.Errorf("created ref %q after a refused write", f.created)
+	}
+	// The forge's own answer has to survive, or the run log cannot tell a
+	// missing permission from the other things that arrive as 403.
+	if !strings.Contains(err.Error(), "not accessible by integration") {
+		t.Errorf("error = %v, want the forge response kept", err)
+	}
+}
+
+// A rate limit is a 403 and is not a permission problem. Reporting it as one
+// sends the reader to the App settings to wait out a number that resets on its
+// own.
+//
+// This passes because go-github decodes a rate-limited 403 into its own type
+// rather than an ErrorResponse, not because writeErr tests for it. The test is
+// here to fail if that ever changes.
+func TestProposeChangeDoesNotCallARateLimitAPermission(t *testing.T) {
+	f := &proposeFake{head: "head01", headRepo: "o/r", baseRepo: "o/r", rateLimited: true}
+	_, err := propose(t, f, goodProposal())
+	if err == nil {
+		t.Fatal("a rate-limited write succeeded")
+	}
+	if errors.Is(err, ErrNoWriteAccess) {
+		t.Errorf("a rate limit was reported as ErrNoWriteAccess: %v", err)
 	}
 }
 

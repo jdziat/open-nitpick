@@ -281,14 +281,16 @@ func treeEntries(p Proposal, modes map[string]string) ([]*github.TreeEntry, erro
 	return out, nil
 }
 
-// writeErr labels a failed write, naming a refused credential when that is
-// what happened. An App installation's permissions are granted separately from
-// the workflow that asks for them, and the forge reports the disagreement as a
-// bare 403.
+// writeErr labels a failed write, marking one the forge refused outright.
+//
+// 403 covers SSO enforcement as well as a missing permission, so the caller
+// names the likely cause rather than asserting one, and the original error is
+// wrapped alongside. Rate limits never reach here: go-github gives them types
+// of their own.
 func writeErr(op string, err error) error {
 	var resp *github.ErrorResponse
 	if errors.As(err, &resp) && resp.Response != nil && resp.Response.StatusCode == http.StatusForbidden {
-		return fmt.Errorf("github: %s: %w", op, ErrNoWriteAccess)
+		return fmt.Errorf("github: %s: %w: %w", op, ErrNoWriteAccess, err)
 	}
 	return fmt.Errorf("github: %s: %w", op, err)
 }
