@@ -6,8 +6,8 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // the resolution paths a real repository hits and a plain import-to-file
 // walk misses. Each is wired into MultiFileFixtures through
 // deepMultiFileFixtures, and each contract sits behind the mechanism named
-// in its comment — a method rather than a type, a barrel behind an alias, a
-// package re-export, a Rails constant with no require — so a reviewer that
+// in its comment, a method rather than a type, a barrel behind an alias, a
+// package re-export, a Rails constant with no require, so a reviewer that
 // only follows the first hop cannot see it.
 
 func deepMultiFileFixtures() []Fixture {

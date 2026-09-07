@@ -72,9 +72,9 @@ func voiceVariants() []variant {
 
 // scored is one variant's judged outcome.
 type scored struct {
-	// model is the reviewer the variant was produced by. It is not printed —
+	// model is the reviewer the variant was produced by. It is not printed,
 	// the persona axis holds one model and the table identifies its rows by
-	// variant — and it is carried because Corroborate files the second judge's
+	// variant, and it is carried because Corroborate files the second judge's
 	// aggregate under contenderLabel(model, variant). Asking for it by variant
 	// alone finds nothing, pays for a corroboration, and prints "+?".
 	model string
@@ -94,7 +94,7 @@ type scored struct {
 // This is the payoff of generate-once-then-filter, and the harness has to match
 // the design or it measures nothing: running a separate review per level would
 // send three byte-identical prompts, pay three times for it, and reintroduce
-// exactly the model-variance confound the design removes — two levels would
+// exactly the model-variance confound the design removes, two levels would
 // differ because the model answered differently, not because the filter did
 // anything.
 func TestTunePersona(t *testing.T) {
@@ -112,7 +112,7 @@ func TestTunePersona(t *testing.T) {
 	model := opts.Models[0]
 
 	// AXIS was exported by the Makefile and read by nothing, so `make tune
-	// AXIS=voice` silently measured the nitpick axis instead — a paid flag that
+	// AXIS=voice` silently measured the nitpick axis instead, a paid flag that
 	// did nothing, which is the worst kind of instrument.
 	if axis := strings.TrimSpace(os.Getenv("NITPICK_EVAL_AXIS")); axis != "" &&
 		axis != "nitpick" && axis != "voice" {
@@ -165,7 +165,7 @@ func TestTunePersona(t *testing.T) {
 // A GRADE for nitpick=off produced by judging findings that nitpick=off
 // suppresses is not that level's grade under any reading, and MISSED for a level
 // that hides a defect's only finding cannot be measured by a judge that was
-// shown it. Refusing to publish the delta — the other honest fix — would have
+// shown it. Refusing to publish the delta, the other honest fix, would have
 // left a wrong figure wearing an honest caveat. So the primary judges each level
 // on the list that level presents.
 //
@@ -174,7 +174,7 @@ func TestTunePersona(t *testing.T) {
 // four times the primary judging on the default axis; the reviews are unchanged
 // at one per fixture, and the second judge already cost one call per level per
 // fixture. Levels that filter to the same list share one call, which is the
-// usual case at the top of the axis — the corpus is generated at
+// usual case at the top of the axis. The corpus is generated at
 // config.GenerationLevel, so every level at or above it keeps everything and
 // they are one stimulus, judged once. The sharing is decided by the fingerprint
 // of the list, not by a rule about levels, so a filter change cannot make two
@@ -201,12 +201,12 @@ func runLevels(
 		sem = make(chan struct{}, 4)
 
 		// Every level's judged list, kept for the second judge. Each level is
-		// its own contender with its own finding list — the whole point of
-		// generate-once-then-filter — so corroborating the axis means judging
+		// its own contender with its own finding list, the whole point of
+		// generate-once-then-filter, so corroborating the axis means judging
 		// four lists, not one. It is still judging only: no level is reviewed.
 		samples []DumpSample
 
-		// What the primary judging actually cost, counted rather than
+		// What the primary judging cost, counted rather than
 		// estimated. The doc comment above says the bound is one call per level
 		// per fixture and the usual case is fewer; a bound in a comment is the
 		// kind of claim that stops being true quietly, so the run prints the
@@ -243,9 +243,9 @@ func runLevels(
 
 			corpus := result.Report.Findings
 
-			// What each level actually publishes, and its identity. The
+			// What each level publishes, and its identity. The
 			// identity is a fingerprint of the list, so two levels share a
-			// judgement only when they present the same review — which is a
+			// judgement only when they present the same review, which is a
 			// fact about those two levels, not an assumption about the axis.
 			kept := make([][]review.Finding, len(levels))
 			shown := make([]Stimulus, len(levels))
@@ -362,7 +362,7 @@ func runLevels(
 func reportVariants(t *testing.T, results []scored, panel JudgePanel) {
 	t.Helper()
 
-	// Looked up under contenderLabel — the key Corroborate files under — and
+	// Looked up under contenderLabel, the key Corroborate files under, and
 	// LABELLED by variant, which is what the table identifies its rows by. The
 	// two being different strings is the whole reason JudgePanel.Unpaired
 	// exists, and it is asserted below rather than assumed.
@@ -413,7 +413,7 @@ func reportVariants(t *testing.T, results []scored, panel JudgePanel) {
 	//
 	// A third group, B-*, used to sit between them: O-* recomputed after both
 	// severities were coarsened into bands, offered as the honest cross-tool
-	// reading. It is withdrawn, and no re-tuned replacement is coming — it was
+	// reading. It is withdrawn, and no re-tuned replacement is coming, it was
 	// maximised by a reviewer that stamped one blocking word on every finding,
 	// and it could not see the parser bug it was written in response to. The
 	// SEVERITY VOCABULARY block below is the description that replaces it. See
@@ -421,7 +421,7 @@ func reportVariants(t *testing.T, results []scored, panel JudgePanel) {
 	//
 	// Every count column is a PER-SAMPLE RATE, and N and FAIL are printed
 	// beside them. They used to be raw sums next to PRECISION, SIGNAL and GRADE
-	// which are means — the defect 595b0d4 fixed for the judged-model table and
+	// which are means, the defect 595b0d4 fixed for the judged-model table and
 	// which had been reintroduced here for three more columns. The denominator
 	// is not constant across rows: on the voice axis each variant runs its own
 	// reviews, and one failed review silently gives that row a total over fewer
@@ -468,7 +468,7 @@ func reportVariants(t *testing.T, results []scored, panel JudgePanel) {
 	}
 
 	// The suite fails only when the judge says the reviewer is not worth
-	// reading. A specific variant scoring poorly is information, not a defect —
+	// reading. A specific variant scoring poorly is information, not a defect,
 	// that is what the knob is for.
 	// Iterate every variant rather than guarding on the top row: the previous
 	// form short-circuited whenever the top-sorted variant had no findings,
@@ -493,7 +493,7 @@ func reportVariants(t *testing.T, results []scored, panel JudgePanel) {
 // TestJudgeModels ranks every model in the battery by JUDGED quality.
 //
 // TestPrompts measures keyword recall against planted defects: did the model
-// find a bug we already knew about. That is a floor, not a ranking — it cannot
+// find a bug we already knew about. That is a floor, not a ranking, it cannot
 // say whether a finding was worth a colleague's attention, whether its severity
 // was honest, or whether it labelled the problem correctly. Only a judgement
 // call answers those, which is what this test is for.
@@ -516,8 +516,8 @@ func TestJudgeModels(t *testing.T) {
 	// RETAINED WHETHER OR NOT ANYBODY ASKED, exactly as the head-to-head is. This
 	// battery was described as a tuning axis over a corpus that can be reviewed
 	// again, and it is not one: it prints the same reportJudgedModels table, and
-	// `make judge-models FIXTURES=$(HELD_OUT)` — a documented invocation, with
-	// HELD_OUT defined in the Makefile for it — points it at the corpus whose own
+	// `make judge-models FIXTURES=$(HELD_OUT)`, a documented invocation, with
+	// HELD_OUT defined in the Makefile for it, points it at the corpus whose own
 	// label says it is spent once. With DUMP unset that run used to retain
 	// nothing, which is the original incident verbatim.
 	dump, dumpPath, err := OpenRunDump("judge-models", opts.Fixtures)
@@ -605,8 +605,8 @@ func TestJudgeModels(t *testing.T) {
 
 			// Saw, which this battery did not call at all. Aggregate.Fixtures is
 			// written only here, so every row's Coverage() was 0 and
-			// reportJudgedModels' zero-coverage branch — the one that fails a run
-			// in which a contender was never successfully judged — fired on every
+			// reportJudgedModels' zero-coverage branch, the one that fails a run
+			// in which a contender was never successfully judged, fired on every
 			// row of every run. A guard that fires on everything reports nothing,
 			// and this battery shares that guard with the head-to-head.
 			agg.Saw(j.fixture.Name)
@@ -667,7 +667,7 @@ func TestJudgeModels(t *testing.T) {
 //
 // It runs no review. Every finding it submits is one the primary judge was just
 // shown, in the position it was shown in, handed over through the re-judge
-// path — the mechanism this harness already had for changing exactly one thing.
+// path, the mechanism this harness already had for changing exactly one thing.
 // The second judge therefore costs judging only, which is what makes publishing
 // a disagreement beside every figure affordable enough to be the default rather
 // than an occasional audit.
@@ -676,8 +676,8 @@ func TestJudgeModels(t *testing.T) {
 // figure in the report renders its disagreement as UNMEASURED. That is the
 // degradation this was asked for: weaker, and stated.
 // byVariant supplies the persona each variant was reviewed under, keyed by
-// variant name. It is nil everywhere the persona is held constant — the model
-// benchmark and the head-to-head — and populated on the voice axis, where four
+// variant name. It is nil everywhere the persona is held constant, the model
+// benchmark and the head-to-head, and populated on the voice axis, where four
 // variants ARE four personas and judging them all against the default would
 // score three of them against a voice they were never asked to use.
 func corroborate(
@@ -788,13 +788,13 @@ func reportJudgedModels(
 	}
 
 	// Rank by the judge's overall grade, then by the share of findings a senior
-	// reviewer would actually raise. Silence does not win: a model with no
+	// reviewer would raise. Silence does not win: a model with no
 	// findings has undefined precision and sorts last.
 	//
 	// Compared through JudgedFigure.Compare, which orders by the PRIMARY judge
 	// and never yields the number. That the primary judge decides the order is a
-	// limitation, not an oversight — it is the judge whose ranking has been
-	// published — and it is why the second judge's own order is printed below
+	// limitation, not an oversight. It is the judge whose ranking has been
+	// published, and it is why the second judge's own order is printed below
 	// the table rather than left to a reader to reconstruct from the deltas.
 	sort.Slice(rows, func(i, j int) bool {
 		a, b := rows[i].cross, rows[j].cross
@@ -824,7 +824,7 @@ func reportJudgedModels(
 	//
 	// THERE IS NO CROSS-TOOL SEVERITY COLUMN IN THIS TABLE, and that is a
 	// deliberate withdrawal rather than an omission. B-INFL/B-UNDER/B-ACC used to
-	// sit here — O-* recomputed after both severities were coarsened into bands —
+	// sit here, O-* recomputed after both severities were coarsened into bands,
 	// and were the columns the head-to-head was read from. They were maximised by
 	// a reviewer that stamps one blocking word on every finding, and they could
 	// not see the parser bug they were introduced to fix. The SEVERITY VOCABULARY
@@ -843,7 +843,7 @@ func reportJudgedModels(
 	// The header is CrossJudgedModelTableHeader, which is JudgedModelTableHeader
 	// with the judge-supplied columns widened to hold a figure AND its
 	// cross-judge delta. Same columns, same order, derived from the declared
-	// header rather than written out again — see WidenJudgedColumns.
+	// header rather than written out again, see WidenJudgedColumns.
 	b.WriteString(panel.Banner() + "\n\n")
 	b.WriteString(CrossJudgedModelTableHeader + "\n")
 	b.WriteString(strings.Repeat("-", len(CrossJudgedModelTableHeader)) + "\n")
@@ -878,7 +878,7 @@ func reportJudgedModels(
 	//
 	// It is a count and a list, not a correlation coefficient. Eight fixtures
 	// cannot support a statistic, and a number that looks like statistics gets
-	// quoted like statistics — the same reasoning GradeSpread records for not
+	// quoted like statistics, the same reasoning GradeSpread records for not
 	// becoming a confidence interval.
 	//
 	// It is also a COMPARISON, and so it is subject to the same rule the deltas
@@ -937,7 +937,7 @@ func reportJudgedModels(
 	// EVERY RATE IN THE TABLE ABOVE, AS THE COUNTS IT CAME FROM.
 	//
 	// The columns are rates because contenders are measured different numbers of
-	// times and raw sums are not comparable across that — but a rate hides its
+	// times and raw sums are not comparable across that, but a rate hides its
 	// own resolution, and these denominators are single digits. PREC 0.74 and
 	// PREC 0.67 read as a difference until you are told they are 17/23 and 2/3,
 	// at which point the second is one comment away from 1.00 and the comparison
@@ -947,13 +947,13 @@ func reportJudgedModels(
 	//
 	// Below rather than inside the row because the columns are fixed-width and a
 	// count pair outgrows its cell the moment a contender files a hundred
-	// findings — at which point the table silently misaligns, which is a defect
+	// findings, at which point the table silently misaligns, which is a defect
 	// this file has already had once.
 	//
 	// Rendered by CrossJudged.Denominators, which prints BOTH judges' counts,
 	// rather than formatted here. Formatting them here is what would put this
-	// report back in possession of the raw judged counters — the state that
-	// makes half a result printable — and it would also have published one
+	// report back in possession of the raw judged counters, the state that
+	// makes half a result printable, and it would also have published one
 	// judge's denominators under a table of two judges' figures.
 	var counts strings.Builder
 	counts.WriteString("DENOMINATORS — every rate above, as the counts it was computed from:\n")
@@ -976,7 +976,7 @@ func reportJudgedModels(
 
 		// The footnote the "*" on this row's detection cells points at. Rendered
 		// by the aggregate through the same sentence the cost table prints, so
-		// the two reports cannot describe one loss two ways — which is what they
+		// the two reports cannot describe one loss two ways, which is what they
 		// did while this table printed no sentence at all.
 		if why := r.agg.CoverageShortfall(r.model); why != "" {
 			fmt.Fprintf(&counts, "  %-36s %s: %s\n", "", shortSampleMark, why)
@@ -1005,7 +1005,7 @@ func reportJudgedModels(
 		switch {
 		case n == 0:
 			// Not a Logf. Zero coverage means every attempt failed, so this row
-			// is not a weak result — it is no result, and the table around it is
+			// is not a weak result. It is no result, and the table around it is
 			// not the comparison its caption claims. That has to fail the run,
 			// or "we beat the incumbent" gets read off a run in which the
 			// incumbent was never successfully invoked.
@@ -1017,8 +1017,8 @@ func reportJudgedModels(
 		}
 
 		// A row that was judged and never had its detection folded prints n/a in
-		// RECALL, NOISE, ANCHOR and L/DEF — the columns the ship decision is read off
-		// — and an n/a is otherwise the honest rendering of "no review here". The
+		// RECALL, NOISE, ANCHOR and L/DEF, the columns the ship decision is read off
+		//, and an n/a is otherwise the honest rendering of "no review here". The
 		// two spellings of a blank are indistinguishable to a reader, so the one
 		// that means "a caller forgot to wire this" is failed rather than
 		// printed. This function is shared by two batteries and both fold; a
@@ -1061,8 +1061,8 @@ func reportJudgedModels(
 		// RECALL and NOISE are rates over each side's own counts, so one review
 		// per fixture and three answer the same question and the counts are
 		// printed. ANCHOR is a MAXIMUM, and a maximum over more draws is weakly
-		// larger — our side draws runs x fixtures where the cache draws fixtures
-		// — so with RUNS above 1 the column is biased AGAINST us. That is the
+		// larger, our side draws runs x fixtures where the cache draws fixtures
+		//, so with RUNS above 1 the column is biased AGAINST us. That is the
 		// conservative direction for a "no wider than theirs" reading, and it is
 		// a bias rather than a comparability, which is why it is written down
 		// instead of left for a reader to derive.
@@ -1071,16 +1071,16 @@ func reportJudgedModels(
 		// that all four are defined on one review: the cache retains the raw
 		// text and is re-parsed through the current parser, so the secondary
 		// spans an "Also applies to" line carries reach anchorDistance and
-		// anchoredLines exactly as they did live. What is genuinely undefined for
+		// anchoredLines exactly as they did live. What is undefined for
 		// a one-review side is any VARIANCE of them, and no such reading is
-		// offered here — the same refusal the ASYMMETRIC VOCABULARY note makes
+		// offered here, the same refusal the ASYMMETRIC VOCABULARY note makes
 		// about severity, for the same reason.
 		//
 		// THE RATES SURVIVE A DIFFERENT NUMBER OF REVIEWS PER ROW ONLY WHILE EACH
 		// ROW'S REVIEWS ARE BALANCED ACROSS FIXTURES, and this note used to assert
 		// their survival unconditionally. A rate over reviews is a mean weighted
 		// by how many reviews of each fixture SURVIVED, so an unbalanced loss
-		// reweights the fixture mix — and the FAIL column beside this line is the
+		// reweights the fixture mix, and the FAIL column beside this line is the
 		// proof that losses happen. Only our side can lose depth without losing
 		// coverage (the cache is one review per fixture, so any loss there removes
 		// the fixture and moves COV), so the reweighting runs in the challenger's
@@ -1130,8 +1130,8 @@ func reportJudgedModels(
 //
 // This is the comparison that matters: Incumbent is the incumbent this project
 // exists to replace, and every other number here is self-referential without it.
-// The setup is deliberately like-for-like — identical fixture repositories, the
-// same uncommitted working-tree change, the same judge, the same scoring — and
+// The setup is deliberately like-for-like, identical fixture repositories, the
+// same uncommitted working-tree change, the same judge, the same scoring, and
 // deliberately NOT equalized on the thing being compared, which is each
 // reviewer's own prompt and model.
 //
@@ -1160,7 +1160,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 
 	// RETAINED WHETHER OR NOT ANYBODY ASKED. The two batteries that produced the
 	// Rule 14 evidence both ran with NITPICK_EVAL_DUMP unset, so their findings
-	// were held in memory for the whole paid run and written nowhere — and two of
+	// were held in memory for the whole paid run and written nowhere, and two of
 	// Rule 14's four conditions then needed a re-run of a corpus whose own label
 	// says it is spent once. RECALL, NOISE, ANCHOR and L/DEF are pure functions of
 	// (findings, fixture), so a retained file answers them offline for nothing.
@@ -1187,7 +1187,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 	// Which fixtures Incumbent has a cached review for, stated BEFORE the run
 	// rather than inferred from a low row afterwards. Anything listed here has
 	// to be collected live against a rate-limited free allowance, and the
-	// held-out corpus has no cache at all — a benchmark table whose Incumbent
+	// held-out corpus has no cache at all, a benchmark table whose Incumbent
 	// column came from failed invocations is not a comparison, however it reads.
 	var uncached []string
 	for _, f := range opts.Fixtures {
@@ -1198,7 +1198,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 
 		// A cached review the parser can no longer read is a different problem
 		// from one never collected, and re-collecting hides it. It is reported
-		// as an ERROR because the alternative — what this used to do — was to
+		// as an ERROR because the alternative, what this used to do, was to
 		// serve the previous parser's reading of those bytes into the table with
 		// no marker at all.
 		if stale, why := StaleIncumbentCache(crCacheDir, f); stale {
@@ -1234,7 +1234,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 
 		// The judged reviews, kept for the second judge. This is the table the
 		// head-to-head against the incumbent is printed in, so it is the one
-		// where a single judge's opinion carries the most weight — and the
+		// where a single judge's opinion carries the most weight, and the
 		// judge shares a vendor with three of the contenders on our side of it.
 		samples []DumpSample
 	)
@@ -1254,7 +1254,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		}
 		// BEFORE THE ERROR RETURN, because this is the only counter that knows
 		// what did not arrive. Every other column on the row is folded over the
-		// reviews that survived, and a lost run is not a random one — so without
+		// reviews that survived, and a lost run is not a random one, so without
 		// this the three rates would be means over a reweighted fixture mix with
 		// nothing on the cells saying so, and the coverage guard below cannot see
 		// it: it reads a set of fixture NAMES, and losing two of three runs of a
@@ -1272,8 +1272,8 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		agg.Saw(fx.Name)
 
 		// RETAINED BEFORE THE JUDGE IS ASKED, and retained whatever it answers.
-		// This review is already paid for — a model call on our side, an
-		// invocation of a rate-limited free allowance on the incumbent's — and
+		// This review is already paid for, a model call on our side, an
+		// invocation of a rate-limited free allowance on the incumbent's, and
 		// RECALL, NOISE, ANCHOR and L/DEF are pure functions of (findings, fixture).
 		// Recording it after the judge, as this did, meant a judge failure
 		// discarded the one artifact that needs no judge to be re-read. Deferred
@@ -1284,7 +1284,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		// It is registered after the review-error return above, which is
 		// deliberate and is the one path that must NOT record: there are no
 		// findings there, and Record writes a `silent: true` line for an empty
-		// list — a review that never ran would go into the file as a reviewer
+		// list, a review that never ran would go into the file as a reviewer
 		// that said nothing. TestEveryPaidReviewIsRetainedWhateverTheJudgeSays
 		// draws the line in exactly that place.
 		var judged *JudgeResult
@@ -1311,7 +1311,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		// ANCHOR and L/DEF are folded over exactly the reviews every other column on
 		// the row is folded over. The cost is stated where it lands: a review
 		// whose JUDGE call failed returned above and is scored by nothing, for
-		// four columns that need no judge, and the reviews actually behind them
+		// four columns that need no judge, and the reviews behind them
 		// are printed as the DENOMINATORS block's review count.
 		agg.AddDetection(ScoreDetection(fx, findings))
 
@@ -1455,8 +1455,8 @@ func TestCollectIncumbent(t *testing.T) {
 
 // runVoiceAxis compares the wording axes, holding scope constant.
 //
-// Unlike the nitpick levels, voice genuinely changes the prompt, so each
-// variant needs its own review — there is no shared corpus to filter.
+// Unlike the nitpick levels, voice changes the prompt, so each
+// variant needs its own review. There is no shared corpus to filter.
 func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options, dump *Dump) {
 	t.Helper()
 

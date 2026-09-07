@@ -46,13 +46,13 @@ func TestMain(m *testing.M) {
 // TestPrompts is the battery. It reviews every fixture with every model and
 // reports three separate things, which must not be conflated:
 //
-//  1. INVARIANTS — properties open-nitpick must uphold no matter how a model
+//  1. INVARIANTS, properties open-nitpick must uphold no matter how a model
 //     behaves (valid severities, placeable anchors, no corrupting suggestion).
 //     A breach is a bug in this repo and fails the test.
-//  2. RECALL — whether the prompt actually finds planted bugs. Reported always;
+//  2. RECALL, whether the prompt finds planted bugs. Reported always;
 //     fails only when a model finds nothing across the entire corpus, which
 //     means the prompt or the plumbing is broken rather than merely weak.
-//  3. NOISE — findings explaining no planted defect. Reported, because the
+//  3. NOISE, findings explaining no planted defect. Reported, because the
 //     acceptable level is a judgment call about this specific corpus.
 func TestPrompts(t *testing.T) {
 	opts, err := OptionsFromEnv()
@@ -86,7 +86,7 @@ func TestPrompts(t *testing.T) {
 	// The cost ledger had NO caller anywhere outside its own tests: nothing built
 	// one, nothing called ObserveScore, and nothing printed the table. A whole
 	// accounting block, its price table, its staleness marks and its routing
-	// bands existed as an artifact no run produced — which is also why three
+	// bands existed as an artifact no run produced, which is also why three
 	// mutations of ObserveScore left the suite green.
 	//
 	// A missing price table is reported and not fatal. A battery that refuses to
@@ -125,8 +125,8 @@ func TestPrompts(t *testing.T) {
 				score := ScoreRun(result, j.fixture)
 				scores = append(scores, score)
 
-				// Every term of the cost reading — the tokens, the detections,
-				// the noise, the widest anchor — already sits on the Score, which
+				// Every term of the cost reading, the tokens, the detections,
+				// the noise, the widest anchor, already sits on the Score, which
 				// is what ObserveScore takes. Booking it here is what makes the
 				// noise and anchor counts in the cost table the scorer's answer
 				// rather than a second derivation free to disagree with the score
@@ -174,7 +174,7 @@ func TestPrompts(t *testing.T) {
 	assertCorpusRecall(t, summaries)
 }
 
-// logRun prints what one review actually produced.
+// logRun prints what one review produced.
 func logRun(t *testing.T, model string, f Fixture, s Score) {
 	t.Helper()
 
@@ -249,7 +249,7 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 	// is a sum with no other divisor on the line, and because a row's counts
 	// scale with how many times it was measured.
 	//
-	// A BAND A/I/U column stood beside SEV — the same triple after both
+	// A BAND A/I/U column stood beside SEV, the same triple after both
 	// severities were coarsened into blocking/medium/low, so that this table and
 	// the head-to-head could be read in the same units. Both it and the
 	// head-to-head's version are withdrawn; the units they shared were maximised
@@ -289,7 +289,7 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 
 		// L/DEF is the same anchor measurement summed per LOCATED defect rather
 		// than maxed, which is what separates a reviewer that gestured once from
-		// one that gestures everywhere — a distinction ANCHOR cannot make. n/a
+		// one that gestures everywhere, a distinction ANCHOR cannot make. n/a
 		// rather than a number when the row located nothing: zero is the best
 		// value here and finding nothing has not earned it. See Summary.Spread.
 		spread := "n/a"
@@ -313,7 +313,7 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 
 	// The legend belongs under this table too. Its own doc comment said it was
 	// printed under every table carrying a severity column, and this one carries
-	// SEV A/I/U and printed no legend at all — so one of the three tables met a
+	// SEV A/I/U and printed no legend at all, so one of the three tables met a
 	// reader with a severity column and no retraction beside it, while the guard
 	// asserting the retraction inspected the const rather than the output.
 	t.Log(SeverityColumnLegend)
@@ -327,7 +327,7 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 		// A row that located nothing still belongs here once the denominators
 		// are on it: it renders every planted level as "(0 of N located)", which
 		// is the information the previous filter threw away. Only a row with
-		// nothing planted AND nothing said is skipped — a clean fixture, which
+		// nothing planted AND nothing said is skipped, a clean fixture, which
 		// has no severity to describe in either direction.
 		if len(s.SevUsage) == 0 && len(s.SevPlantedLevels) == 0 {
 			continue
@@ -345,7 +345,7 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 //
 // Per-fixture recall is deliberately NOT asserted: models disagree about
 // borderline findings and a hard threshold would make this suite flaky for no
-// benefit. Finding zero planted defects across every fixture is different — it
+// benefit. Finding zero planted defects across every fixture is different, it
 // means the prompt, the schema, or the plumbing is broken.
 func assertCorpusRecall(t *testing.T, summaries []Summary) {
 	t.Helper()

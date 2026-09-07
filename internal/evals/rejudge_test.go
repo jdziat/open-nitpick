@@ -72,7 +72,7 @@ func fixtureByName(t *testing.T, name string) Fixture {
 //
 // Verdict.Index is a POSITION, so reconstructing the list in any other order
 // hands each new verdict a different finding than the recorded verdict it is
-// compared against — and every downstream disagreement then reads as two judges
+// compared against, and every downstream disagreement then reads as two judges
 // disagreeing. The records are deliberately shuffled and two contenders'
 // samples interleaved, because that is what a concurrent run writes.
 func TestGroupDumpKeepsVerdictsOnTheirOwnFindings(t *testing.T) {
@@ -148,7 +148,7 @@ func TestGroupDumpKeepsVerdictsOnTheirOwnFindings(t *testing.T) {
 //
 // The duplicate is built at the record level rather than by planting a finding
 // that matches two defects in a real fixture. That route depends on the corpus
-// keeping two defects on adjacent lines of one file with overlapping keywords —
+// keeping two defects on adjacent lines of one file with overlapping keywords,
 // an accident of fixtures.go that an edit there would silently remove, turning
 // this into a test that skips instead of one that fails.
 func TestGroupDumpCollapsesDuplicateCreditLines(t *testing.T) {
@@ -407,7 +407,7 @@ func TestRejudgeReportShowsBothRankingsAndTheVendorCohort(t *testing.T) {
 // are always over the same sample.
 //
 // Keeping a group's recorded verdicts when the new judge could not assess it
-// would put the baseline column over more findings than the new one — a
+// would put the baseline column over more findings than the new one, a
 // difference of sample presented as a difference of judge, which is the exact
 // confound this path exists to remove.
 func TestRejudgeReportDropsAFailedGroupFromBothSides(t *testing.T) {
@@ -486,7 +486,7 @@ func line(report, s string) string {
 // A hole in the MIDDLE was already refused. A hole at the END was not: the
 // list's length was inferred from the largest index present, so a file missing
 // its last line rebuilt SHORT with no error and no warning. That is the worse
-// of the two — the new judge is shown a shorter review than the recorded
+// of the two. The new judge is shown a shorter review than the recorded
 // verdicts were made about, and the baseline precision then silently disagrees
 // with the published table it is printed beside. A killed run, a `head -n` or a
 // jq filter all produce exactly this file.
@@ -522,8 +522,8 @@ func TestGroupDumpRefusesATruncatedTail(t *testing.T) {
 //
 // Two runs of a deterministic reviewer produce IDENTICAL findings, so the
 // two-different-findings guard passes them; only the verdicts differ. That is
-// not an exotic file — Summary.Stable's own definition says identical inputs at
-// temperature 0 should produce identical findings — and it is precisely the
+// not an exotic file, Summary.Stable's own definition says identical inputs at
+// temperature 0 should produce identical findings, and it is precisely the
 // judge noise this whole path exists to measure. Resolving it by keeping
 // whichever line came last makes the surviving judgement a function of file
 // order, so it is refused in both orders.
@@ -563,7 +563,7 @@ func TestGroupDumpRefusesTwoJudgementsOfOneFinding(t *testing.T) {
 // A dump names its fixture and the re-judge resolves that name against the
 // corpus as it stands NOW. Edit a fixture's Head between collecting the dump
 // and re-judging it, and the new judge reads a different change than the one
-// the recorded verdicts were made about — which is exactly the "the findings
+// the recorded verdicts were made about, which is exactly the "the findings
 // AND the judge both moved" confound this path exists to eliminate, restored
 // silently. The fixture NAME surviving is not evidence its source did.
 func TestGroupDumpRefusesAnEditedFixture(t *testing.T) {
@@ -597,7 +597,7 @@ func TestGroupDumpRefusesAnEditedFixture(t *testing.T) {
 // all four levels from ONE review: a finding that survives every level is
 // written four times, under four variants. The report keyed its rows on the
 // model alone and merged them back, so that one comment was counted four times
-// in one row — the exact thing DumpRecord.Variant's own doc forbids — and the
+// in one row, the exact thing DumpRecord.Variant's own doc forbids, and the
 // four levels, which are the whole point of such a dump, could not be told
 // apart.
 func TestRejudgeReportRanksEachVariantSeparately(t *testing.T) {
@@ -632,7 +632,7 @@ func TestRejudgeReportRanksEachVariantSeparately(t *testing.T) {
 			t.Errorf("no row for variant %q: the axis this dump exists to compare is not in the table", level)
 			continue
 		}
-		// One review, one finding, one verdict — under each level.
+		// One review, one finding, one verdict, under each level.
 		if !strings.Contains(row, " 1 ") {
 			t.Errorf("row for %q counts something other than one verdict: %q", level, strings.TrimSpace(row))
 		}
@@ -698,7 +698,7 @@ func TestRejudgeReportCountsBothJudgesByTheSameRule(t *testing.T) {
 // TestRejudgeReportKeepsPhantomVerdictsOutOfPrecision pins the one asymmetry a
 // silent group creates.
 //
-// A silent review records no verdicts — there were no findings to judge — so its
+// A silent review records no verdicts. There were no findings to judge, so its
 // baseline is structurally zero. The new judge IS still asked, deliberately,
 // because a judge that answers an empty list is a failure mode worth showing.
 // Counting what it invents would let that failure raise the contender's
@@ -785,7 +785,7 @@ func TestRejudgeReportSaysItsRankingIsNotThePublishedOne(t *testing.T) {
 // may not guess.
 //
 // Before silence was recorded, the matrix was reconstructed as the cross product
-// of every contender against every fixture in the file — so a dump holding both
+// of every contender against every fixture in the file, so a dump holding both
 // corpora credited a tuning contender with silence on a held-out fixture it was
 // never given, and each fabricated group cost a real judge call on an empty
 // list. DumpRecord.HeldOut exists to keep the two corpora apart in a shared
@@ -861,7 +861,7 @@ func (f *fakeJudge) Judge(_ context.Context, fx Fixture, _ config.Persona, findi
 //
 // The outcomes are read positionally by every caller and the report prints them
 // in the order it receives them, so a slice filled in completion order would
-// attach each verdict set to a different group — and, since every group carries
+// attach each verdict set to a different group, and, since every group carries
 // its own Model and Fixture, the mismatch would look like an ordinary
 // disagreement rather than like a bug. The delay is deliberately inverted so
 // completion order cannot coincide with submission order.

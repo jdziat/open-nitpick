@@ -17,8 +17,8 @@ import "github.com/jdziat/open-nitpick/internal/config"
 //
 // So this corpus answers two questions the others cannot:
 //
-//   - whether review.related_context — attaching the definitions a changed
-//     line uses from files the change does not touch — finds defects a
+//   - whether review.related_context, attaching the definitions a changed
+//     line uses from files the change does not touch, finds defects a
 //     diff-only review misses, and what it costs in precision on the two clean
 //     fixtures, which honour their helpers' contracts exactly;
 //   - how this reviewer compares with hosted ones that index the repository,
@@ -27,7 +27,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // It is a THIRD corpus rather than more held-out fixtures because it will be
 // re-run: the feature it measures is new and will be tuned, and a corpus that
 // is spent once cannot answer "did that change help?" twice. It is not a
-// tuning corpus either — the prompt is not tuned on it — but nothing here
+// tuning corpus either. The prompt is not tuned on it, but nothing here
 // should be read as a generalization claim.
 //
 // It is also outside AllFixtures, and therefore outside the ground-truth suite
@@ -41,8 +41,8 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // Every helper's contract is written the way a maintainer writes one: a doc
 // comment on the definition, in the language's own convention, stating what a
 // caller must do. None is hidden in a README or a test. The plants are
-// realistic in the sense that matters — each is a change a competent engineer
-// makes when they have not read the callee — and unrealistic in the sense that
+// realistic in the sense that matters, each is a change a competent engineer
+// makes when they have not read the callee, and unrealistic in the sense that
 // every corpus is: the repository is ten files, not ten thousand.
 func MultiFileFixtures() []Fixture {
 	fixtures := []Fixture{
@@ -82,8 +82,8 @@ type Store struct{}
 //
 // ctx must carry a deadline. The driver has no read timeout of its own, so a
 // call made with a context that never expires blocks for as long as the
-// connection stays half-open after the primary drops it — in practice
-// indefinitely — and the goroutine that made the call is never freed.
+// connection stays half-open after the primary drops it, in practice
+// indefinitely, and the goroutine that made the call is never freed.
 // Handlers should pass the request's own context or wrap it with a timeout.
 func (s *Store) Query(ctx context.Context, q string, args ...any) ([]Row, error) {
 	return nil, nil
@@ -197,8 +197,8 @@ import (
 
 // Slug reduces title to lower-case letters, digits and hyphens.
 //
-// It returns "" for a title containing no letters or digits at all — "???",
-// "…", a string of emoji — and callers using the result as a path segment
+// It returns "" for a title containing no letters or digits at all, "???",
+// "…", a string of emoji, and callers using the result as a path segment
 // must check for that first: a post whose slug is empty is published at the
 // bare collection URL, and every such post lands on the same page.
 func Slug(title string) string {
@@ -313,7 +313,7 @@ type Store struct{}
 //
 // An EMPTY Filter matches every row: with no Owner and a zero Before there is
 // no WHERE clause at all. Callers that build a Filter from optional input must
-// refuse an empty one themselves — this function cannot tell "delete
+// refuse an empty one themselves, this function cannot tell "delete
 // everything" from "the caller forgot to constrain it", and it does the first.
 func (s *Store) DeleteWhere(ctx context.Context, f Filter) (int, error) {
 	return 0, nil
@@ -906,7 +906,7 @@ def mint(user_id: str) -> tuple[str, str]:
 
 // pythonCleanContractFixture uses with_retry the way its contract allows: on
 // a balance read, which is idempotent. It is the control for
-// python-retry-nonidempotent — a reviewer that flags every retry has not read
+// python-retry-nonidempotent, a reviewer that flags every retry has not read
 // the contract, and a reviewer that flags a GET wrapped in it is guessing.
 func pythonCleanContractFixture() Fixture {
 	retry := `import time

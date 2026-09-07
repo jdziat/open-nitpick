@@ -26,7 +26,7 @@ const (
 // completed appends the trailer the CLI prints when a review runs to the end.
 //
 // The fragments below exercise the finding parser, and without a trailer each
-// one is indistinguishable from a stream that was cut off — which parseIncumbent
+// one is indistinguishable from a stream that was cut off, which parseIncumbent
 // now refuses outright rather than returning as a short review. Writing the
 // trailer here rather than dropping the requirement keeps the fragments honest:
 // they are complete reviews that happen to be small.
@@ -96,8 +96,8 @@ func TestParseRealSample(t *testing.T) {
 	// would not read as inflation; the effect was that no Incumbent review
 	// could score accurate on a plant we planted critical, and a headline
 	// number was published on it. The vocabulary mismatch is NOT handled by
-	// correcting it anywhere — the attempt to handle it at comparison time was
-	// withdrawn too, see NoCrossToolSeverityScore — it is described rather than
+	// correcting it anywhere, the attempt to handle it at comparison time was
+	// withdrawn too, see NoCrossToolSeverityScore. It is described rather than
 	// scored, and the parser records what the reviewer said.
 	if f.Severity != string(config.SeverityCritical) {
 		t.Errorf("severity = %q, want %q: the review says \"critical [Security & Privacy]\", and a "+
@@ -204,7 +204,7 @@ Review complete
 			// len(findings) == 0, so a stream cut after k of N findings was
 			// recorded as a complete review of k. Incumbent's recall on the
 			// fixture then reads k/N, which is a result nobody can tell is
-			// wrong. The declared-count check cannot save it either — a run
+			// wrong. The declared-count check cannot save it either, a run
 			// that died never printed the trailer that check reads.
 			name:    "interrupted stream is refused, not silently thinned",
 			in:      truncated,
@@ -346,7 +346,7 @@ Review complete
 func TestParseRefusesToUnderreport(t *testing.T) {
 	sample := readSample(t)
 
-	// The header shape moves — exactly what a CLI release could do.
+	// The header shape moves, exactly what a CLI release could do.
 	drifted := strings.Replace(sample, "critical [Security & Privacy]",
 		"critical <Security & Privacy>", 1)
 
@@ -496,7 +496,7 @@ func TestFixtureRepoHasOriginRemote(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
 		// Cleared explicitly: this subtest is about what buildRepo does with NO
 		// override, and it failed for exactly the operator the override exists
-		// for — someone benchmarking from a fork with NITPICK_CR_REMOTE
+		// for, someone benchmarking from a fork with NITPICK_CR_REMOTE
 		// exported in their shell.
 		t.Setenv(EnvIncumbentRemote, "")
 
@@ -628,7 +628,7 @@ func TestRunIncumbentReturnsCompleteReviews(t *testing.T) {
 // this file passing.
 //
 // It also pins the ORDER. The warning is checked before parsing, because a
-// free-allowance review parses perfectly well — its findings are simply
+// free-allowance review parses perfectly well. Its findings are simply
 // measuring the allowance rather than the reviewer, and must not be usable.
 func TestRunIncumbentDetectsFreeTierFallback(t *testing.T) {
 	const warning = "Incumbent couldn't find a Git remote for this repository, so it can't " +
@@ -660,7 +660,7 @@ func TestRunIncumbentDetectsFreeTierFallback(t *testing.T) {
 // a backoff that could never fire.
 //
 // IsRateLimited reads err.Error(), and the error carried only stderr truncated
-// to 200 bytes — but plain-text mode is the human-facing mode and announces the
+// to 200 bytes, but plain-text mode is the human-facing mode and announces the
 // limit on STDOUT. So CollectIncumbent fell to its default branch and attacked
 // the next fixture inside the same exhausted window, and the benchmark's own
 // "never let an exhausted allowance masquerade as a low score" fallback was
@@ -729,7 +729,7 @@ func TestRunIncumbentNamesTheRealFailure(t *testing.T) {
 // edited would still load: every model would review the new code while
 // Incumbent's row was the old code's findings scored against the new ground
 // truth, with nothing saying the two sides reviewed different source. The same
-// applies across review modes — this benchmark has already switched from
+// applies across review modes. This benchmark has already switched from
 // --agent to plain text once.
 func TestCacheIsRejectedWhenItMeasuredSomethingElse(t *testing.T) {
 	fx := Fixtures()[0]
@@ -775,7 +775,7 @@ func TestCacheIsRejectedWhenItMeasuredSomethingElse(t *testing.T) {
 // parser is the part that keeps turning out to be wrong: crSeverity demoted
 // every Incumbent "critical" to our "error" for the whole of the first
 // benchmark. If loading replayed the stored reading, that fix would have
-// applied to nothing already collected — the shipped corpus would still be
+// applied to nothing already collected. The shipped corpus would still be
 // scored under the buggy parser, and correcting the published number would have
 // meant buying fifteen reviews again against a rate-limited allowance to
 // recover text already on disk.
@@ -847,8 +847,8 @@ func TestCachedReviewIsServedFromRawNotFromTheStoredParse(t *testing.T) {
 	// longer parsed, the loader served the STORED findings with ok=true and no
 	// marker of any kind, on the reasoning that a stale reading beats an absent
 	// review. That is wrong in the only direction that matters: the fallback
-	// fires exactly when the parser and the evidence have diverged — the one
-	// moment the difference is not cosmetic — and it hands a previous parser's
+	// fires exactly when the parser and the evidence have diverged, the one
+	// moment the difference is not cosmetic, and it hands a previous parser's
 	// output to a table captioned as this parser's result, looking identical to a
 	// fresh review. A cache that silently serves a stale parse is how a corpus
 	// drifts under a measurement.

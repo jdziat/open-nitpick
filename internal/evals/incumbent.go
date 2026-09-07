@@ -115,7 +115,7 @@ var crDeclaredCount = regexp.MustCompile(`(?m)^\s*(\d+)\s+findings?\b`)
 // It sits beside crSeverity because crSeverity is the reason: the words arriving
 // here are translated into ours, and the incumbent's own vocabulary across the
 // shipped corpus is {critical, major, minor}. Declaring it here rather than
-// recognizing the reviewer by name downstream is the whole point — the
+// recognizing the reviewer by name downstream is the whole point, the
 // withdrawal used to be `model != IncumbentModel`, a reporter's identity
 // standing in for a fact about its vocabulary, and it would have kept holding
 // for exactly one reviewer however many others were added. See SeverityScale.
@@ -139,10 +139,10 @@ const IncumbentSeverityScale = ForeignSeverityScale
 // score accurate on any of the four plants we plant at critical, however it
 // worded the finding, and its raw output for go-sql-injection literally reads
 // "critical [Security & Privacy]". Mapping down did not remove the bias, it
-// swapped an inflation bias for an understatement bias — and no choice of
+// swapped an inflation bias for an understatement bias, and no choice of
 // constant here can fix what is a difference in RESOLUTION rather than in
 // meaning. It does not belong at comparison time either: that was the second
-// attempt, a banded cross-tool score, and it is withdrawn — see
+// attempt, a banded cross-tool score, and it is withdrawn, see
 // NoCrossToolSeverityScore in score.go for the two measurements that killed it.
 // What is left is a faithful record and a description of it.
 //
@@ -151,9 +151,9 @@ const IncumbentSeverityScale = ForeignSeverityScale
 // distrust:
 //
 //   - "major" is Incumbent's own word and has no counterpart among our five.
-//     It is recorded at warning — the weakest anchor in review.md that still
+//     It is recorded at warning, the weakest anchor in review.md that still
 //     asserts a defect ("likely a bug, or a genuine hazard under plausible
-//     conditions") — because a foreign token we cannot resolve should not be
+//     conditions"), because a foreign token we cannot resolve should not be
 //     handed the benefit of the doubt. THAT IS A GUESS, AND THE CORPUS CANNOT
 //     SETTLE IT: across the shipped cache "major" is credited on plants of
 //     critical, error AND warning, so it straddles three of our levels and no
@@ -161,7 +161,7 @@ const IncumbentSeverityScale = ForeignSeverityScale
 //     instead, with Incumbent's bytes unchanged, moves the full-resolution
 //     triple from 6/4/4 to 5/8/1. (The swing was published first as "0.62 to
 //     0.88" and then as a banded "0.600 to 1.000"; neither reproduces from this
-//     tree, and the banded column turns out not to move at all — see
+//     tree, and the banded column turns out not to move at all, see
 //     NoCrossToolSeverityScore.) Warning is the PLURALITY landing, which is why
 //     the constant is left where it is; a plurality of a straddling word is
 //     still an approximation, which is why no cross-tool figure is published
@@ -173,7 +173,7 @@ const IncumbentSeverityScale = ForeignSeverityScale
 //     grades it. The arm is a translation with no observation behind it at all.
 //
 // The vocabulary observed across the whole shipped corpus is {critical, major,
-// minor} — the three words above, of which two are ever credited. Every other
+// minor}, the three words above, of which two are ever credited. Every other
 // arm is defensive: the CLI's tiers are not contractual, and an unrecognized
 // word still has to produce a finding, which is what the default is for.
 func crSeverity(s string) config.Severity {
@@ -195,7 +195,7 @@ func crSeverity(s string) config.Severity {
 		// THE BUG: this arm returned warning, while a finding of ours carrying
 		// an unknown severity goes through config.Severity.Normalize and lands
 		// at info. The identical unusable token therefore scored a whole level
-		// apart depending on which contender emitted it — an advantage handed to
+		// apart depending on which contender emitted it, an advantage handed to
 		// the incumbent by the scorer, in a comparison whose entire purpose is to
 		// be like-for-like.
 		//
@@ -203,7 +203,7 @@ func crSeverity(s string) config.Severity {
 		// asymmetric on purpose and the asymmetry is live: "major", "warn" and
 		// "nitpick" are translated here and would Normalize to info if one of
 		// our models emitted them, so the same word is worth a different level
-		// depending on who said it — and "major" carries more than half the
+		// depending on who said it, and "major" carries more than half the
 		// incumbent's severity words in the shipped cache. That is a translation
 		// of a foreign vocabulary, which is why it is enumerated rather than
 		// inferred, why every translated token is a guess this file marks as
@@ -222,7 +222,7 @@ func crSeverity(s string) config.Severity {
 // The category is the reviewer's own judgement about its own finding, so it
 // beats guessing from prose and is preferred wherever it is recognized.
 //
-// Only "[Security & Privacy]" has actually been observed; the rest are the
+// Only "[Security & Privacy]" has been observed; the rest are the
 // obvious neighbours. Guessing wrong about a label we have never seen is cheap:
 // an unrecognized category falls through to classifyText, whose default is
 // correctness, so no finding can be silenced by a bad guess here.
@@ -264,7 +264,7 @@ func crCategoryClass(category string) (config.Class, bool) {
 //
 // The comparison is deliberately like-for-like: the same fixture repository,
 // the same uncommitted working-tree change, and the same judge afterwards. What
-// is NOT equalized is the reviewer's own prompt and model — that is the thing
+// is NOT equalized is the reviewer's own prompt and model. That is the thing
 // being compared.
 //
 // --agent is deliberately absent. That mode emits codegen INSTRUCTIONS for an
@@ -273,7 +273,7 @@ func crCategoryClass(category string) (config.Class, bool) {
 // fixed instruction to the agent. Scoring review quality against it compared
 // the wrong artifact. The default mode is the actual review.
 // The raw return is the review as printed, escapes stripped, and is returned on
-// EVERY path including the failures — a review that did not parse is precisely
+// EVERY path including the failures. A review that did not parse is precisely
 // the one whose text someone needs to read.
 func RunIncumbent(ctx context.Context, dir string, timeout time.Duration) ([]review.Finding, string, error) {
 	if timeout <= 0 {
@@ -400,7 +400,7 @@ func parseIncumbent(out []byte) ([]review.Finding, error) {
 	// bug: a stream cut off after k of N findings printed no trailer either, so
 	// it took this branch only when k was zero and was otherwise returned as a
 	// complete review of k findings. The recall figure then reads k/N with
-	// nothing anywhere saying the review was truncated — a wrong number, which
+	// nothing anywhere saying the review was truncated, a wrong number, which
 	// is strictly worse than a missing one.
 	//
 	// It is also what makes the count check below reachable at all: crDeclared
@@ -413,7 +413,7 @@ func parseIncumbent(out []byte) ([]review.Finding, error) {
 
 	// The CLI counts its own findings in the trailer. If it says it produced
 	// some and this parser produced fewer, the format has moved and the corpus
-	// would be silently thin — which is worse than a failed collection, because
+	// would be silently thin, which is worse than a failed collection, because
 	// a thin corpus still yields a plausible-looking benchmark number.
 	if declared := crDeclared(text); len(findings) < declared {
 		return nil, fmt.Errorf("parsed %d of the %d finding(s) incumbent reported: "+
@@ -487,13 +487,13 @@ func parseCRFinding(lines []string, start int, severity, category string) (revie
 	// Suggestion is left empty: a plain-text review states the problem in prose
 	// and offers no replacement code, which is exactly the difference from
 	// --agent mode. The judge treats it as optional.
-	// RawSeverity keeps the word the CLI actually printed, beside the level
+	// RawSeverity keeps the word the CLI printed, beside the level
 	// crSeverity translates it to.
 	//
 	// THE BUG IT FIXES: only the translation survived the parse, and the eval
 	// report published it as the reviewer's own vocabulary. Incumbent never
-	// printed "warning" anywhere in the shipped corpus — it prints "critical" and
-	// "major" — yet the block captioned "what each contender called the defects it
+	// printed "warning" anywhere in the shipped corpus, it prints "critical" and
+	// "major", yet the block captioned "what each contender called the defects it
 	// located" read "critical x4, warning x3", and swapping crSeverity's free
 	// "major" constant re-rendered the identical cached bytes as "critical x4,
 	// error x3". A description that moves when we change our own constant, with
@@ -605,7 +605,7 @@ func crParseAlsoApplies(line, path string) []review.LineSpan {
 //
 // The first paragraph is the one-sentence title; the rest is the rationale.
 // Hard wrapping is a terminal artifact rather than authored structure, so each
-// paragraph is unwrapped back onto one line — the judge reads this text, and a
+// paragraph is unwrapped back onto one line. The judge reads this text, and a
 // sentence broken every 72 columns reads as mangled. The blank lines BETWEEN
 // paragraphs are the author's and are kept.
 func crSplitBody(body []string) (title, rationale string) {
@@ -712,8 +712,8 @@ func IncumbentAvailable(ctx context.Context) bool {
 // ErrFreeTier reports that Incumbent could not match the review to an
 // organization and billed it to the free CLI allowance.
 //
-// It is a sentinel because the caller has to make a decision about it — never
-// cache the result — and a run that quietly degrades to the allowance produces
+// It is a sentinel because the caller has to make a decision about it, never
+// cache the result, and a run that quietly degrades to the allowance produces
 // a number that measures the allowance rather than the reviewer.
 var ErrFreeTier = errors.New("incumbent fell back to the free CLI allowance: " +
 	"the repository has no git remote it can match to an organization")
@@ -734,7 +734,7 @@ func freeTierError() error {
 //	match the review to one of your organizations. This review will use the
 //	free CLI allowance, even if you're signed in.
 //
-// Each is specific enough that review prose cannot produce it by accident —
+// Each is specific enough that review prose cannot produce it by accident,
 // note that the ordinary footer advertising "free promotional credits" must NOT
 // trip this.
 var crFreeTierMarkers = []string{
@@ -780,7 +780,7 @@ func crFreeTierFallback(out string) bool {
 // It is stored so a cache collected under a different mode cannot be loaded and
 // ranked as though it were this one. The benchmark has already switched once,
 // from --agent to plain text, and the code comment on RunIncumbent calls the
-// --agent output "the wrong artifact" — but a cache written under it carried no
+// --agent output "the wrong artifact", but a cache written under it carried no
 // record of that and would have been scored as a plain-text review.
 const crReviewMode = "plaintext"
 
@@ -801,7 +801,7 @@ type crCache struct {
 	// Mode and Fingerprint answer "what was reviewed, and how". Without them
 	// the cache keyed on fixture NAME alone, so editing a fixture's Head left
 	// every model reviewing the new code while Incumbent's row was the old
-	// code's findings scored against the new ground truth — two sides of a
+	// code's findings scored against the new ground truth, two sides of a
 	// head-to-head reviewing different source with no signal that it happened.
 	Mode        string `json:"mode"`
 	Fingerprint string `json:"fingerprint"`
@@ -810,10 +810,10 @@ type crCache struct {
 	//
 	// Kept because the parsed findings are a LOSSY read of it, and every
 	// question about whether a number is real turns out to be a question about
-	// what was actually printed. The first such question cost a re-review: the
+	// what was printed. The first such question cost a re-review: the
 	// parser reduces "client.go:7-12" to line 7, so a defect on line 12 scored
 	// as a miss, and nothing on disk could say whether Incumbent had reported
-	// a span or genuinely pointed at the wrong line. Re-running to find out
+	// a span or pointed at the wrong line. Re-running to find out
 	// spends the account's allowance to recover something the collection
 	// already had in hand.
 	Raw string `json:"raw,omitempty"`
@@ -832,20 +832,20 @@ func IsRateLimited(err error) bool {
 	if err == nil {
 		return false
 	}
-	// The substring arm is kept for errors this package did not build — a
+	// The substring arm is kept for errors this package did not build, a
 	// transport layer reporting a 429 in prose, say.
 	return errors.Is(err, ErrRateLimited) ||
 		strings.Contains(strings.ToLower(err.Error()), "rate limit")
 }
 
 // fixtureFingerprint hashes the exact source a fixture puts in front of a
-// reviewer, so a recorded review can be matched to the code it actually read.
+// reviewer, so a recorded review can be matched to the code it read.
 //
 // Two callers, one question. The Incumbent cache asks it to avoid replaying a
 // review of code that has since changed; DumpRecord asks it so a re-judge can
 // refuse a dump whose fixture was edited between the benchmark and the
-// re-judge. Both are the same failure — a verdict compared against a prompt
-// nobody made it against — so both read the same hash rather than two that can
+// re-judge. Both are the same failure, a verdict compared against a prompt
+// nobody made it against, so both read the same hash rather than two that can
 // drift.
 //
 // Defects are deliberately excluded: they are the ground truth the judge scores
@@ -878,7 +878,7 @@ func fixtureFingerprint(f Fixture) string {
 // The findings are re-derived from the recorded Raw review whenever there is
 // one, and c.Findings is used only for an entry collected before Raw was kept.
 // Raw is the evidence; c.Findings is one PARSER'S READING of it, and the parser
-// is the part that keeps turning out to be wrong — crSeverity demoted every
+// is the part that keeps turning out to be wrong, crSeverity demoted every
 // Incumbent "critical" for the whole of the first benchmark, and a headline
 // number was published on the result. Replaying the stored reading freezes each
 // such bug into the corpus permanently, so fixing one would cost a full
@@ -894,7 +894,7 @@ func fixtureFingerprint(f Fixture) string {
 // merely older, it is a DIFFERENT PARSER'S output being scored in a table
 // captioned as this parser's result, and it arrives looking exactly like a fresh
 // one. A cache that silently serves a stale parse is how a corpus drifts under a
-// measurement — and the fallback fired precisely when the parser had changed,
+// measurement, and the fallback fired precisely when the parser had changed,
 // which is precisely when the difference matters. The absent-review worry it was
 // answering is handled where it belongs: every caller lists what has no cache
 // before it runs, and a contender judged on nothing is failed rather than ranked.
@@ -904,7 +904,7 @@ func fixtureFingerprint(f Fixture) string {
 // "never collected".
 //
 // A fingerprint or mode mismatch is likewise reported as "no cache" rather than
-// as an error: the caller's remedy is identical either way — review it again —
+// as an error: the caller's remedy is identical either way, review it again,
 // and a stale entry is overwritten by the next collection.
 func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
 	c, ok := readCRCache(cacheDir, f)
@@ -929,7 +929,7 @@ func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
 	// load-bearing one: these findings' Severity is crSeverity's word, their
 	// RawSeverity was never serialized, and a replayed finding that came back
 	// claiming nothing had translated it would have its TRANSLATION republished
-	// as the reviewer's own spelling — the exact substitution RawSeverity exists
+	// as the reviewer's own spelling, the exact substitution RawSeverity exists
 	// to stop, reintroduced by a field that was never serialized. Setting the
 	// flag with no word is the honest pair: something rewrote this, and the
 	// original is gone. The vocabulary block prints UnrecordedWord for each of
@@ -947,7 +947,7 @@ func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
 // word rather than the reporter's own.
 //
 // It reads the FACT the rewriter recorded. It used to read the finding's SOURCE
-// — `f.Source == IncumbentModel` — and the comment here justified that by
+// , `f.Source == IncumbentModel`, and the comment here justified that by
 // claiming crSeverity was "the only place in the tree that rewrites a reviewer's
 // severity vocabulary" and that "everything else writes its own severity and is
 // quoted verbatim". BOTH HALVES WERE FALSE, and the second one is the defect.
@@ -956,13 +956,13 @@ func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
 // neither recorded anything, so this function answered "nothing was translated"
 // for every contender this project ships and the vocabulary block quoted each of
 // them as having printed the word we had substituted. That is the same defect the
-// incumbent's side was fixed for, reintroduced on ours — and worse, because there
+// incumbent's side was fixed for, reintroduced on ours, and worse, because there
 // a lost word prints UnrecordedWord and here the substitute was published
 // silently as a quotation.
 //
 // Keying on the reporter could not have been right at any value. "Whose word is
 // this?" is a fact about what happened to the finding, and a reviewer's identity
-// only correlates with it — so the answer was guaranteed to drift the moment any
+// only correlates with it, so the answer was guaranteed to drift the moment any
 // other path rewrote a severity, which two already had.
 func severityWasTranslated(f review.Finding) bool {
 	return f.SeverityTranslated

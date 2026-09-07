@@ -69,7 +69,7 @@ func degenerateNamed(t *testing.T, want string) func(Fixture) []review.Finding {
 //
 // It is asserted against ScoreRun rather than against the two cells alone. Both
 // cells come from locatedShare, so comparing them to each other would pass on
-// any expression whatever, including a wrong one — what makes the identity worth
+// any expression whatever, including a wrong one, what makes the identity worth
 // anything is that ScoreSeverity grades a defect exactly when ScoreRun counts it
 // as detected, and that is a property of two functions in score.go which this
 // test reads directly.
@@ -125,7 +125,7 @@ func TestRecallAndCoverageAreOneReadingOfOneCorpus(t *testing.T) {
 // cells carry it. Defects located, findings invented and lines pointed at are
 // counted against the fixtures' own plants, in nobody's severity vocabulary, so
 // blanking them for the incumbent would withdraw a measurement that is defined
-// and computed — the opposite error from the one the retraction fixed. Rule 14's
+// and computed, the opposite error from the one the retraction fixed. Rule 14's
 // conditions 3 and 4 are read off these cells on exactly this row.
 //
 // It is the only test that turns red when DetectionCells is gated on the severity
@@ -174,7 +174,7 @@ func TestTheDetectionColumnsAreFilledForAForeignVocabulary(t *testing.T) {
 // Three spellings, because the scorer needs both of its anchor measurements to
 // see them all and this column has to inherit both. One span per file and a
 // finding carrying thirty-eight secondary regions are counted by anchoredLines,
-// which unions a finding's own regions — the second is the shape
+// which unions a finding's own regions. The second is the shape
 // crParseAlsoApplies emits from an "Also applies to" line, which is the
 // incumbent's own. Vagueness spread across SEPARATE one-line findings is 1 there,
 // and is counted only by defectAnchoredLines, which unions every finding
@@ -217,7 +217,7 @@ func TestRecallAndNoiseCannotSeeAVagueReviewerAndAnchorCan(t *testing.T) {
 //
 // Any width above one exhibits the conflation a MAXIMUM cannot see; this one is
 // wide enough to be legible in a failure message. It is not tuned to any
-// fixture: the assertions that depend on it check the width they actually got
+// fixture: the assertions that depend on it check the width they got
 // rather than assuming this one.
 const hedgeSpan = 13
 
@@ -226,8 +226,8 @@ const hedgeSpan = 13
 //
 // It needs no oracle beyond the one every reviewer in this file has: it is the
 // calibrated reviewer with each anchor smeared over `span` lines centred on the
-// same place. The widening is strictly free — spanDistance is zero anywhere
-// inside a span, so matches() and explainsAny() can only improve — which is the
+// same place. The widening is strictly free, spanDistance is zero anywhere
+// inside a span, so matches() and explainsAny() can only improve, which is the
 // "somewhere in this function" behaviour anchorDistance's own comment warns
 // about, spelled as a reviewer.
 func hedgedTo(span int) func(Fixture) []review.Finding {
@@ -242,7 +242,7 @@ func hedgedTo(span int) func(Fixture) []review.Finding {
 }
 
 // preciseExceptOnce is line-precise everywhere, with ONE finding in the whole
-// corpus smeared over the same span hedgedTo uses — the shape ANCHOR's maximum
+// corpus smeared over the same span hedgedTo uses, the shape ANCHOR's maximum
 // reports identically to a reviewer that hedges every anchor.
 // TestAUniformlyVagueReviewerIsNotOneWideFinding asserts that identity as its
 // own premise before asking whether anything else separates the two.
@@ -304,7 +304,7 @@ func detectionRow(t *testing.T, name string, agg Aggregate) map[string]string {
 //
 // ANCHOR IS A MAXIMUM, AND A MAXIMUM HIDES UNIFORM VAGUENESS exactly as a mean
 // hides one blob. CorpusTally.WidestAnchor justified the max one-sidedly for
-// years — "a mean over precise findings hides it" — and the converse went
+// years, "a mean over precise findings hides it", and the converse went
 // unstated: a reviewer that smears EVERY anchor over k lines and one that is
 // line-precise except for a single k-line comment are the same number, and to a
 // reader they are not remotely the same review.
@@ -368,7 +368,7 @@ func TestAUniformlyVagueReviewerIsNotOneWideFinding(t *testing.T) {
 // The same conflation, read the way the ship decision reads it: against the
 // INCUMBENT rather than against a calibrated reviewer. The package's own
 // degenerate guard scores every strategy against `calibratedReview`, and Rule 14
-// does not — its four conditions threshold against what Incumbent did. A
+// does not, its four conditions threshold against what Incumbent did. A
 // reviewer hedged to exactly the incumbent's own worst anchored span ties or
 // beats it on every published rate AND on the worst case, because the worst case
 // is where its budget came from.
@@ -446,7 +446,7 @@ func TestTheIncumbentsWorstAnchorIsNotABudgetEveryFindingMaySpend(t *testing.T) 
 // denominator.
 //
 // The cells are fixed-width and a count pair outgrows one, so the counts go in
-// the DENOMINATORS block beneath the table — the arrangement the cost table
+// the DENOMINATORS block beneath the table. The arrangement the cost table
 // arrived at after inlining them misaligned every column to their right. ANCHOR
 // is not a rate and has no denominator to divide by; what it needs printed is the
 // number of DRAWS its maximum was taken over, since a maximum over more draws is
@@ -480,7 +480,7 @@ func TestEveryDetectionRateIsPrintedWithTheCountsItCameFrom(t *testing.T) {
 // TestADetectionCellIsBlankRatherThanFlatteringWhenNothingWasMeasured.
 //
 // Zero invented findings, a zero-line anchor and a zero spread are the BEST
-// values in their columns — they are what a reviewer that said nothing earns — so
+// values in their columns. They are what a reviewer that said nothing earns, so
 // a row no review was folded into rendering 0.00 in any of them would publish the
 // top of the column for an absence of measurement. That is the shape of failure
 // this package has retracted an instrument over twice, and n/a is what keeps the
@@ -503,7 +503,7 @@ func TestADetectionCellIsBlankRatherThanFlatteringWhenNothingWasMeasured(t *test
 		}
 	}
 
-	// And a row that WAS measured and genuinely invented nothing still prints
+	// And a row that WAS measured and invented nothing still prints
 	// its zero: 0.00 earned over reviews is a reading, and blanking it would
 	// hide the difference between the two rows this test is about.
 	clean := foldDetection([]Fixture{cleanFixtureForDetection()}, func(Fixture) []review.Finding {
@@ -590,13 +590,13 @@ func firstPath(f Fixture) string {
 // surviving subset is not chosen at random: a lost run is one whose review
 // errored or whose judge call failed, and nothing rules out that those correlate
 // with what the review said. The only comparability guard the judged report has
-// reads Coverage — a set of fixture NAMES — so losing runs of a fixture that
+// reads Coverage, a set of fixture NAMES, so losing runs of a fixture that
 // other runs still cover moves every rate on the row and trips nothing.
 //
 // The asymmetry runs one way. The incumbent is served at depth one per fixture,
 // so any loss on its side removes the fixture, drops Coverage and fires the
 // existing guard. Only OUR side can lose depth without losing coverage, so only
-// our side can be silently flattered — which is why the marker is not optional.
+// our side can be silently flattered, which is why the marker is not optional.
 func TestARowShortOfItsOwnAttemptedRunsSaysSo(t *testing.T) {
 	corpus := AllFixtures()
 
@@ -664,7 +664,7 @@ func TestARowShortOfItsOwnAttemptedRunsSaysSo(t *testing.T) {
 //
 // docs/findings.md carried "the benchmark table has no ANCHOR column" in the
 // present tense for as long as it took somebody to notice, while
-// docs/measurement.md said the opposite two files away — and the stale one is the
+// docs/measurement.md said the opposite two files away, and the stale one is the
 // document a reader quotes the ship verdict from. Nothing tests a document, so a
 // claim about the instrument outlives the instrument silently.
 //
@@ -725,7 +725,7 @@ func cleanFixtureForDetection() Fixture {
 // between a row that measured a fixture thinly and one that did not measure it.
 //
 // ShortFixtures was extracted from the cost ledger's shortfall reading and lost
-// that ledger's `runs == 0` arm on the way — CostRow keeps Missing separate from
+// that ledger's `runs == 0` arm on the way, CostRow keeps Missing separate from
 // Shallow, the extraction kept only the second. So a fixture folded ZERO times
 // satisfied `got < tried` and joined the short list, under a sentence that opens
 // "covers every fixture" and then names it "(0 of 1)". The two halves of that
@@ -734,12 +734,12 @@ func cleanFixtureForDetection() Fixture {
 //
 // The direction is what makes it worth a test. A not-comparable row reading as
 // merely thin tells a reader to discount a number they should refuse, and the
-// case is most reachable on exactly the battery this was built for — one lost
+// case is most reachable on exactly the battery this was built for, one lost
 // run of a fixture served at depth one removes it outright.
 //
 // The marker half is a regression guard on the fix rather than on the bug. Once
-// the zero-fold case moved out of ShortFixtures, the marker predicate — which
-// asked only that list — stopped firing for it, which would have printed four
+// the zero-fold case moved out of ShortFixtures, the marker predicate, which
+// asked only that list, stopped firing for it, which would have printed four
 // unmarked cells for the worse of the two shortfalls. Both halves are asserted
 // here because the fix is only correct with both.
 func TestAFixtureFoldedNoTimesIsReportedAsAbsentAndNotAsThin(t *testing.T) {

@@ -19,7 +19,7 @@ import (
 // NOISE and ANCHOR are pure functions of (findings, fixture): explainsAny,
 // anchorDistance, anchoredLines and defectAnchoredLines consult no judge, no
 // model and no network. All four read review.Finding.AlsoAt, and the incumbent
-// is precisely the reviewer that fills it — crParseAlsoApplies populates it from
+// is precisely the reviewer that fills it, crParseAlsoApplies populates it from
 // an "Also applies to" line. A round trip that drops the secondary spans
 // understates ANCHOR and can overstate NOISE, because a finding whose only near
 // span lived in AlsoAt is reclassified as invented; and a reader has no way to
@@ -33,7 +33,7 @@ func TestASecondarySpanSurvivesTheDump(t *testing.T) {
 	defect := fixture.Defects[0]
 
 	// One finding whose PRIMARY anchor is far from the plant and whose secondary
-	// span sits on it — the shape the incumbent's cache actually carries, and the
+	// span sits on it, the shape the incumbent's cache carries, and the
 	// shape in which the two readings disagree.
 	findings := []review.Finding{{
 		Path:      defect.Path,
@@ -109,7 +109,7 @@ func plantedFixtureForDump(t *testing.T) Fixture {
 // time. NewDump opens with os.Create, which truncates, and its comment gives the
 // reason that has to stay true: records are keyed by (model, fixture, run),
 // every experiment reuses those keys, and GroupDump refuses a concatenated file
-// outright — so appending is not the alternative. A default path therefore has
+// outright, so appending is not the alternative. A default path therefore has
 // to be a NAME nobody else took, and the name has to be enforced rather than
 // assumed, because the file it would land on may be the only copy of a held-out
 // run that cannot be re-collected.
@@ -209,7 +209,7 @@ func TestARetainedRunIsNamedForTheCorpusItSpent(t *testing.T) {
 //
 // Re-judging a file a battery is still filling measures whatever had been
 // flushed. The guard against it compared NITPICK_EVAL_DUMP with the re-judge
-// input, which covers the operator who exported both — and covers nothing once a
+// input, which covers the operator who exported both, and covers nothing once a
 // battery resolves its own path, because then NITPICK_EVAL_DUMP is empty and the
 // comparison reads "" and skips. Dump.Close renames a retained run out of its
 // in-progress suffix, so the completeness answer is in the name; both branches
@@ -265,7 +265,7 @@ func TestAPartialDumpIsRefusedAsARejudgeInput(t *testing.T) {
 // IT COVERS EVERY BATTERY THAT PRINTS THE JUDGED TABLE, not the head-to-head
 // alone, and that is the correction rather than a generalisation for its own
 // sake. Retention was fixed on the benchmark and TestJudgeModels was described
-// as a tuning axis over a re-reviewable corpus — which it is not. It prints the
+// as a tuning axis over a re-reviewable corpus, which it is not. It prints the
 // same reportJudgedModels table, and `make judge-models FIXTURES=$(HELD_OUT)`
 // points it at the spent-once corpus, which is the original incident exactly.
 // Deriving the list from the table means a third battery inherits the
@@ -358,7 +358,7 @@ func batteriesCalling(t *testing.T, name string) map[string]bool {
 //
 // Retention makes this file the only record of a corpus that is spent once, and
 // the decoder discarded every record it had already read the moment one was
-// malformed. A short write is the ordinary way to get one — ENOSPC on a
+// malformed. A short write is the ordinary way to get one, ENOSPC on a
 // ninety-minute run, whose error Record returns and the battery demotes to a
 // single line in its notes while continuing to append after the mangled record.
 // Refusing the file is still right; refusing it while THROWING AWAY the eighty
@@ -415,7 +415,7 @@ func TestATruncatedTailCostsTheTailAndNotTheFile(t *testing.T) {
 //
 // openRunDumpAt refuses both collision shapes at OPEN, and a benchmark runs for
 // tens of minutes between opening and closing. Nothing in this package reaches
-// the window, so this is a latent hazard rather than an observed one — but the
+// the window, so this is a latent hazard rather than an observed one, but the
 // argument the open-time refusal is built on ("the file it would land on may be
 // the only copy of a held-out run") is not weaker at close time, and os.Rename
 // is silent.
@@ -505,8 +505,8 @@ func calledAt(n ast.Node, recv, method string) []token.Pos {
 // TestEveryPaidReviewIsRetainedWhateverTheJudgeSays.
 //
 // RETENTION WAS GATED ON THE JUDGE. A review whose judge call failed returned
-// before dump.Record, so its findings — already paid for, a model call on our
-// side and a rate-limited free-tier `incumbent review` on the incumbent's —
+// before dump.Record, so its findings, already paid for, a model call on our
+// side and a rate-limited free-tier `incumbent review` on the incumbent's,
 // were discarded. RECALL, NOISE, ANCHOR and L/DEF need no judge, which is the entire
 // argument for retaining a run at all; the arithmetic needed none and the
 // RECORDING did. Worse on the incumbent's side, where the benchmark's live
@@ -517,7 +517,7 @@ func calledAt(n ast.Node, recv, method string) []token.Pos {
 //
 // THE PROPERTY, and it is narrower than "every return records": a review that
 // reached the judge is written down whatever the judge answers. Returns BEFORE
-// the judge call are exempt and must be — those are the paths where the review
+// the judge call are exempt and must be. Those are the paths where the review
 // itself failed and there is no finding list, and Dump.Record writes a
 // `silent: true` line for an empty one, which would record "this reviewer said
 // nothing" about a review that never ran.
@@ -628,7 +628,7 @@ func TestEveryJudgedBatteryStatesWhatItAttempted(t *testing.T) {
 }
 
 // returnsIn returns the position of every return statement directly inside a
-// closure, excluding those in closures nested within it — a deferred recorder's
+// closure, excluding those in closures nested within it, a deferred recorder's
 // own body is not a path out of the function that registered it.
 func returnsIn(lit *ast.FuncLit) []token.Pos {
 	var out []token.Pos

@@ -18,17 +18,17 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // descriptor leak, and the number beside it now says nit. Nothing here was
 // moved. Every defect below is newly authored and is one a senior reviewer
 // would rate nit on its own terms, against the anchor the model is actually
-// given: "`nit` — minor and optional."
+// given: "`nit`, minor and optional."
 //
 // THE ANCHOR'S ILLUSTRATION CHANGED UNDER THESE PLANTS, and every note below
 // was rewritten in the same commit rather than left quoting it. The rung used
-// to read "`nit` — minor and optional. *An unnecessary intermediate copy is a
-// nit.*", and five plants — cross-file-copy-nit, cross-file-sort-nit,
-// sorted-for-min-nit, defensive-copy-nit and capacity-hint-nit in fixtures.go —
+// to read "`nit`, minor and optional. *An unnecessary intermediate copy is a
+// nit.*", and five plants, cross-file-copy-nit, cross-file-sort-nit,
+// sorted-for-min-nit, defensive-copy-nit and capacity-hint-nit in fixtures.go,
 // derived their level from that one sentence. It was a CATEGORY where every
 // other rung illustrates with a scenario, and three lines below it review.md
 // says the examples are "drawn from defect classes you are unlikely to meet in
-// this change; do not go looking for them" — which is plainly false of an
+// this change; do not go looking for them", which is plainly false of an
 // unnecessary copy for any reviewer of any repository, and named the class of
 // three of the plants below. So the illustration was replaced and the plants
 // were not: their level now rests on "minor and optional", which is the clause
@@ -38,12 +38,12 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // this rung under either wording, so nothing here says what the old sentence
 // did to nit recall. Its measurable half was also weaker than the info pair's:
 // the info line contained two crediting keywords verbatim ("accepted input",
-// "for one helper") while the nit line contained none — cross-file-copy-nit's
+// "for one helper") while the nit line contained none, cross-file-copy-nit's
 // keyword is "unnecessary copy" and the intervening word "intermediate" breaks
-// the substring — so the argument for replacing it was the user-facing one
+// the substring, so the argument for replacing it was the user-facing one
 // above, not a leak.
 //
-// Two constraints shaped what could honestly be planted here, and both are
+// Two constraints shaped what could be planted here, and both are
 // worth writing down because they eliminate most of what the word "nit"
 // normally means:
 //
@@ -54,8 +54,8 @@ import "github.com/jdziat/open-nitpick/internal/config"
 //     corpus that penalizes obedience measures nothing. So every plant below is
 //     in a class the reviewer is asked for and carries a runtime cost.
 //   - The same scope says "or anything a formatter or linter already enforces".
-//     That rules out the pattern-matchable nits — gosimple's S1025, clippy's
-//     needless_collect, rubocop-performance's Detect — because a reviewer that
+//     That rules out the pattern-matchable nits, gosimple's S1025, clippy's
+//     needless_collect, rubocop-performance's Detect, because a reviewer that
 //     stays silent on those is obeying, not missing. What is left, and what
 //     these use, is waste that only becomes visible from a CONTRACT: what
 //     another function already guarantees, what a table already covers, what a
@@ -68,8 +68,8 @@ import "github.com/jdziat/open-nitpick/internal/config"
 //
 // Two of the five are multi-file, which nothing else in the corpus is, and in
 // both the defect is invisible from either file alone: the call site looks
-// prudent, and only the callee's contract — changed by the same pull request,
-// so it is in the diff — shows that it is buying nothing. That is the property
+// prudent, and only the callee's contract, changed by the same pull request,
+// so it is in the diff, shows that it is buying nothing. That is the property
 // worth having. Be precise about what it does NOT buy: two files fit in one
 // batch under the default MaxFilesPerRequest of 6, so these exercise
 // cross-file REASONING inside a single request and leave the 6-file cap, the
@@ -79,7 +79,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // two batches. Cross-batch DEDUP is reached but runs trivially, and it is NOT
 // owed by either file: it cannot be authored. bundle.batch appends each entry
 // to exactly one Batch, so no path is ever in two batches, and review.dedupe
-// keys on path:line:title — two batches therefore cannot collide by
+// keys on path:line:title, two batches therefore cannot collide by
 // construction. The only way one could is a reviewer inventing an anchor inside
 // a file it was never shown, which is a model failure and not something a
 // fixture can force. Recording this so the next reader does not spend an
@@ -90,7 +90,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // directly; what this returns is the record of what was AUTHORED at this level,
 // and TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus is what makes the two
 // facts agree. Without it a fixture can be written, reviewed, merged and never
-// wired into anything — passing every test in the tree while measuring nothing,
+// wired into anything, passing every test in the tree while measuring nothing,
 // which is the quietest way this corpus has to lose a plant.
 func nitFixtures() []Fixture {
 	return []Fixture{
@@ -108,8 +108,8 @@ func nitFixtures() []Fixture {
 // This is the shape the corpus has never had. Read report/summary.go alone and
 // the copy is not merely defensible, it is the careful thing to do: a caller
 // holding a slice another goroutine can append to is a real bug, and the
-// comment above the copy says exactly that. Read store/store.go — changed by
-// the same pull request, so it is in the diff — and Snapshot's contract says
+// comment above the copy says exactly that. Read store/store.go, changed by
+// the same pull request, so it is in the diff, and Snapshot's contract says
 // the slice is already fresh, built under the lock, sharing no backing array.
 // The copy defends against something that cannot happen.
 //
@@ -121,7 +121,7 @@ func nitFixtures() []Fixture {
 // The false positive it invites is the mirror image: a reviewer that reasons
 // only from summary.go and concludes the store may append after Snapshot
 // returns, making the summary stale or racy. That objection is a hallucination
-// — the contract in the diff rules it out — so none of "race", "concurrent",
+// , the contract in the diff rules it out, so none of "race", "concurrent",
 // "stale" or the bare word "copy" is a keyword. Detection requires the
 // cross-file inference, so every keyword names the redundancy ("already returns
 // a copy", "copy of a copy") rather than the copying, which is a word the
@@ -257,9 +257,9 @@ func Build(s *store.Store) Summary {
 // TypeScript.
 //
 // The second multi-file plant, and the second where one file cannot decide it.
-// members.ts changes in this pull request for a reason that is not a defect —
+// members.ts changes in this pull request for a reason that is not a defect,
 // its doc comment is corrected to state the ordering the function has always
-// produced — which is what puts the file in the diff and the contract in front
+// produced, which is what puts the file in the diff and the contract in front
 // of the reviewer. roster.ts is new, and re-sorts what it was handed.
 //
 // The sort is not wrong, which is the point: listMembers spreads before
@@ -269,7 +269,7 @@ func Build(s *store.Store) Summary {
 //
 // Two false positives are invited and both are excluded. The first is the
 // standard JavaScript objection that Array.prototype.sort mutates in place and
-// therefore corrupts the caller's data — untrue here, and visibly so, since
+// therefore corrupts the caller's data, untrue here, and visibly so, since
 // both files spread first; no keyword contains "sort" alone or "mutat". The
 // second is a reviewer noticing that the inline comparator duplicates
 // byDisplayName and asking for it to be imported: that is a real observation
@@ -320,7 +320,7 @@ export function listMembers(members: Member[]): Member[] {
 			// every single line was charged NO noise, because each comment was
 			// "near" the defect by virtue of the file being short.
 			// TestTheNoiseToleranceIsPinnedByTheCorpus calls that vacuous and
-			// fails on it, correctly — the NOISE column measures nothing on a
+			// fails on it, correctly, the NOISE column measures nothing on a
 			// fixture smaller than its own radius. Nothing here is a second
 			// defect: the singular case is handled, and no keyword of the plant
 			// appears, so a finding about this function cannot score as a
@@ -384,15 +384,15 @@ export function rosterHeading(teamName: string, count: number): string {
 // Python, so the corpus is not measuring a Go-shaped prompt, and a defect with
 // no cross-file component: everything needed is on one line. sorted() builds a
 // full copy of the list and orders all of it; min() with the same key walks it
-// once and allocates nothing. The two agree on ties as well as on the answer —
+// once and allocates nothing. The two agree on ties as well as on the answer,
 // sorted() is stable, so [0] is the first minimum, which is what min() returns
-// — so this is a pure cost with no behavioral difference to weigh.
+// , so this is a pure cost with no behavioral difference to weigh.
 //
 // The false positive it invites is the empty-list objection: sorted(...)[0]
 // raising IndexError is a real bug in the general case, and a reviewer that
 // reaches for it here has not read the two lines above, which return None
 // first. That guard is deliberate, and it is why no keyword contains "empty",
-// "IndexError" or "sorted" — the last of those is the changed line's own most
+// "IndexError" or "sorted", the last of those is the changed line's own most
 // typed token, and "this sorts the list and takes the first element, which
 // raises IndexError when empty" must not score as a detection of a cost the
 // comment never mentions. "min(" carries the parenthesis for the same reason:
@@ -482,8 +482,8 @@ def coldest(readings):
 // in the diff at all and every finding must come from the table itself. The
 // last case has the same input and the same expectation as the second under a
 // different name, so it runs the same assertion twice and exercises no line the
-// table did not already reach. It is not a typo with an intent behind it —
-// "space becomes a hyphen" is what "replaces spaces" already says — which
+// table did not already reach. It is not a typo with an intent behind it,
+// "space becomes a hyphen" is what "replaces spaces" already says, which
 // matters, because a case that MEANT to test something else would be a
 // different and larger finding.
 //
@@ -625,11 +625,11 @@ func TestSlug(t *testing.T) {
 // Java.
 //
 // A fourth language, and a wasted copy in the form it most often takes in
-// review: a defensive copy that is genuinely defensive everywhere except
+// review: a defensive copy that is defensive everywhere except
 // here. labels is created inside forIds, is never stored, and is unreachable
 // once the method returns, so wrapping it directly is as immutable as wrapping
 // a copy of it. The comment above the return states the reason a real pull
-// request would give, and it is false about this variable specifically — which
+// request would give, and it is false about this variable specifically, which
 // is what makes the review a judgement about escape rather than a lookup of an
 // idiom.
 //
@@ -701,7 +701,7 @@ public final class Labels {
 			// this defect's own comment two paragraphs up: the keywords are
 			// supposed to be built on reachability rather than on "copy", which
 			// the change itself supplies. They credited the second false
-			// positive that comment names and dismisses — "prefer List.copyOf",
+			// positive that comment names and dismisses, "prefer List.copyOf",
 			// which allocates the same second list and so has made none of the
 			// escape judgement this plant is about. What is left cannot be
 			// written without having looked at where labels goes.

@@ -13,8 +13,8 @@ package evals
 // case the CODE was close to right. The prose beside it claimed more than the
 // code delivered, and prose is not executable, so nothing went red.
 //
-// The comments here are also this codebase's best asset — they carry the
-// argument, the alternatives, the failure that was prevented — so the answer is
+// The comments here are also this codebase's best asset, they carry the
+// argument, the alternatives, the failure that was prevented, so the answer is
 // not to write fewer of them. It is to separate the two things a comment can do.
 // Prose that ARGUES gives the reader the reasoning and lets them check it. Prose
 // that ASSERTS gives them a guarantee and nothing to check it with, and that is
@@ -28,7 +28,7 @@ package evals
 // or a model is about the world rather than about this code, and is left alone.
 //
 // This narrowness is a real recall cost, not a rhetorical hedge, and it is the
-// failure mode that has bitten this package twice — a scan that quietly saw less
+// failure mode that has bitten this package twice, a scan that quietly saw less
 // than its comment claimed. So the exact shapes that are and are not seen are
 // written into claimShapes as sources with expected verdicts, and
 // TestTheClaimScanSeesExactlyTheShapesItClaimsTo runs the scan over every one of
@@ -53,7 +53,7 @@ import (
 //
 // fires and quiet are the pattern's own test. A regexp that has been widened
 // into a catch-all, or narrowed into something that matches nothing, is a scan
-// that reports zero violations and looks exactly like a clean tree — so every
+// that reports zero violations and looks exactly like a clean tree, so every
 // pattern has to be shown matching the idiom it names and NOT matching the plain
 // statement of the same fact. TestClaimTriggersMatchTheIdiomsTheyName runs both
 // halves.
@@ -67,7 +67,7 @@ type claimTrigger struct {
 // claimTriggers are the assertion idioms, taken from the defects that shipped
 // rather than invented.
 //
-// Two of them — "is not published" and "nothing has to be added" — match nothing
+// Two of them, "is not published" and "nothing has to be added", match nothing
 // in the package today, because the comments that used them have been corrected.
 // They stay because the guard's job is to catch the NEXT one, and a trigger is
 // retired when the idiom stops being an assertion, not when the corpus stops
@@ -138,7 +138,7 @@ var claimTriggers = []claimTrigger{
 // guarantee; "the verdict is not part of the finding, so X cannot see it" hands
 // them the reasoning and invites them to check it against the code. The second
 // needs no citation because it has already given its evidence. Both forms are
-// carried as executable rows in claimShapes, spelled with a real identifier —
+// carried as executable rows in claimShapes, spelled with a real identifier,
 // which is why the illustration here is not.
 var claimReason = regexp.MustCompile(`(?i)(\bbecause\b|\bso\b|\bsince\b|\bwhich\b|\bwhere\b|\bwhen\b|\bwhile\b|\bunless\b|\bif\b|\bbut\b|\band\b|\bor\b|\brather than\b|,|;|:|\(|—)`)
 
@@ -147,7 +147,7 @@ var claimReason = regexp.MustCompile(`(?i)(\bbecause\b|\bso\b|\bsince\b|\bwhich\
 // History is the most valuable prose in this package and the least dangerous: a
 // reader cannot act on "the banded column shipped green" as though it were a
 // guarantee about the tree in front of them. Only auxiliaries and explicit
-// time-markers are listed, never ordinary past participles — "printed",
+// time-markers are listed, never ordinary past participles, "printed",
 // "declared" and "scored" all appear in live present-tense assertions here, and
 // matching them would silently retire the guard over most of the package.
 var claimHistory = regexp.MustCompile(`(?i)\b(was|were|had|have been|has been|used to|did|would|could|might|previously|originally|historically|no longer|until|before|once)\b`)
@@ -166,7 +166,7 @@ type claimShape struct {
 	// claim is what behaviouralClaim must answer. The false rows are the
 	// coverage this scan does NOT have, stated where the build can check it:
 	// widen the rule and a false row starts reporting a claim, and the test
-	// fails until this table — the disclosure itself — is corrected.
+	// fails until this table, the disclosure itself, is corrected.
 	claim bool
 }
 
@@ -186,12 +186,12 @@ var claimShapeNames = map[string]bool{
 
 // claimShapes is the executable statement of what this scan sees.
 //
-// Every row is a sentence in the style this package actually writes, and the
+// Every row is a sentence in the style this package writes, and the
 // verdict beside it is what TestTheClaimScanSeesExactlyTheShapesItClaimsTo
 // requires. The five false rows are the honest limits: a claim argued in a
 // subordinate clause, a claim about the past, a claim with no named subject, a
 // claim about the world rather than about this code, and a plain description.
-// Three of those are deliberate — they are the prose worth keeping. Two of them,
+// Three of those are deliberate. They are the prose worth keeping. Two of them,
 // the unnamed subject and the outside subject, are genuine misses: a real
 // assertion written as "A cross-stimulus figure must not be readable as a
 // single-judge one" goes unseen here, and the only reason that is tolerable is
@@ -252,8 +252,8 @@ var claimShapes = []claimShape{
 // commentedPackageAST parses every Go file in this package WITH its comments.
 //
 // A second parse beside packageAST, and the duplication is the point. That one
-// blanks comments deliberately — "the comments are exactly what these scans must
-// not be able to read" — because a header registered in prose satisfied it once.
+// blanks comments deliberately, "the comments are exactly what these scans must
+// not be able to read", because a header registered in prose satisfied it once.
 // This scan has the opposite requirement: prose is the only thing it looks at.
 // Sharing one parse would mean one of the two guards reading input it was
 // designed to be blind to.
@@ -346,8 +346,8 @@ func glued(text string) string { return strings.ReplaceAll(text, "\n", "") }
 // than the way English is.
 //
 // The discriminator is a capital after the first letter: unknownCost,
-// HeldOutFixtures, sameFinding. A single-capital word — Fixtures, Defect, Score
-// — is not accepted even when the package declares it, because at the start of a
+// HeldOutFixtures, sameFinding. A single-capital word, Fixtures, Defect, Score
+// , is not accepted even when the package declares it, because at the start of a
 // sentence it is indistinguishable from an ordinary capitalized noun, and the
 // direction to be wrong in is the one that leaves good prose alone. That costs
 // recall on doc comments whose subject is a one-word exported name, and
@@ -364,7 +364,7 @@ func codeShaped(word string) bool {
 // namesDeclared reports whether a fragment of prose refers to something this
 // package declares, spelled as code.
 //
-// A dotted selector counts on its trailing half — bundle.batch, Aggregate.Add —
+// A dotted selector counts on its trailing half, bundle.batch, Aggregate.Add,
 // because the receiver is often a type from another package while the method is
 // the thing the sentence is about.
 func namesDeclared(fragment string, declared map[string]bool) bool {
@@ -385,7 +385,7 @@ func namesDeclared(fragment string, declared map[string]bool) bool {
 // sentences splits a paragraph of prose on terminal punctuation.
 //
 // Crude on purpose: an over-eager split produces fragments, and a fragment
-// carrying an idiom without its subject simply fails the subject test and is
+// carrying an idiom without its subject fails the subject test and is
 // dropped. The error direction of a bad split is silence, not a false report.
 func sentences(paragraph string) []string {
 	var out []string
@@ -459,7 +459,7 @@ func citedTests(text string, tests map[string]bool) []string {
 // Candidates are read from the WRAPPED text and resolved against the unwrapped
 // one, and the split matters in both directions. Reading candidates from the
 // unwrapped text loses the word boundary in front of a citation that begins a
-// line — "which" and the name behind it fuse into one word that no longer looks
+// line, "which" and the name behind it fuse into one word that no longer looks
 // like a test name at all, which silently exempted every citation wrapped that
 // way. Resolving against the wrapped text loses the other end: a name broken
 // mid-way arrives truncated, which is the state real citations here are in.
@@ -500,7 +500,7 @@ func danglingTests(text string, tests map[string]bool) []string {
 // this package has shipped two guards that were silently matching nothing. Every
 // pattern therefore has to be shown firing on the idiom it is named for and
 // staying quiet on the plain statement of the same fact, so that a pattern
-// mutated in either direction — into a catch-all or into a dead letter — fails
+// mutated in either direction, into a catch-all or into a dead letter, fails
 // here rather than going green over the whole package.
 func TestClaimTriggersMatchTheIdiomsTheyName(t *testing.T) {
 	if len(claimTriggers) == 0 {
@@ -533,7 +533,7 @@ func TestClaimTriggersMatchTheIdiomsTheyName(t *testing.T) {
 //
 // The comment at the top of this file says the scan is narrow and says which
 // sentences it therefore misses. That is a claim about behaviour in a doc
-// comment, which is the exact thing this file exists to distrust — so it is
+// comment, which is the exact thing this file exists to distrust, so it is
 // written as claimShapes and run rather than asserted. Widen behaviouralClaim
 // and a false row starts reporting a claim; narrow it and a true row stops. In
 // both directions the build fails until the table, which IS the disclosure, is
@@ -580,7 +580,7 @@ func TestTheClaimScanSeesExactlyTheShapesItClaimsTo(t *testing.T) {
 // tests in its opening paragraph and made an unbacked promise about future
 // fixture sets four paragraphs down, and any rule scoped to the comment as a
 // whole reads that as covered. A paragraph is the unit of one argument, so it is
-// the unit a citation can honestly cover.
+// the unit a citation can cover.
 //
 // What this CANNOT check is that the named test verifies the claim rather than
 // something adjacent to it. That is a judgement no scan makes, and pretending

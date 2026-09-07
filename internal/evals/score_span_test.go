@@ -52,7 +52,7 @@ func TestAnchorSpanScoring(t *testing.T) {
 // wide anchor can earn credit, so the width has to be reportable.
 //
 // The multi-region cases live in severity_test.go, untagged. This file is behind
-// the `eval` tag, so nothing here runs under `go test ./...` — which is how
+// the `eval` tag, so nothing here runs under `go test ./...`, which is how
 // anchoredLines shipped measuring the widest single region for three rounds with
 // the suite green.
 func TestSpanLengthMakesVaguenessVisible(t *testing.T) {

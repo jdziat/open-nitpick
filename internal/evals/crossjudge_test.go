@@ -4,7 +4,7 @@ package evals
 //
 // Everything here runs in the DEFAULT build, deliberately. The reports are
 // rendered from files behind the `eval` build tag and the judges cost money, so
-// a guard written beside either would never run — which is how this harness
+// a guard written beside either would never run, which is how this harness
 // arrived at a published table whose GRADE column was one vendor's opinion of
 // three of its own models with nothing on the page saying so. The row renderers
 // and the figure type live in non-test code precisely so that `go test ./...`
@@ -73,7 +73,7 @@ func TestVendorConflictsDetectsAJudgeScoringItsOwnVendor(t *testing.T) {
 //
 // The brief that commissioned this work listed the contender vendors as "openai,
 // anthropic, z-ai, moonshotai and qwen" and concluded that google, deepseek and
-// minimax were therefore clean — while DefaultModels carries a contender from
+// minimax were therefore clean, while DefaultModels carries a contender from
 // each of those three. A judge chosen off that list would have re-created the
 // conflict it was chosen to remove and nothing would have said so. This test is
 // what makes the vendor claim survive an edit to the battery.
@@ -119,13 +119,13 @@ func TestTwoJudgesDisagreeingProduceAVisibleDelta(t *testing.T) {
 	}
 
 	// The other direction, because an unsigned spread would render both the
-	// same and hide which judge scored higher — the exact question a vendor
+	// same and hide which judge scored higher, the exact question a vendor
 	// comparison asks.
 	if got, want := Corroborated(3.90, 3.66).String(), "3.90-0.24"; got != want {
 		t.Errorf("Corroborated(3.90, 3.66) renders %q, want %q", got, want)
 	}
 
-	// The four temperature-0 grades this harness actually measured on identical
+	// The four temperature-0 grades this harness measured on identical
 	// cached findings. The instrument has to be able to show that spread.
 	for _, tc := range []struct{ a, b, want float64 }{
 		{3.66, 3.98, 0.32},
@@ -141,7 +141,7 @@ func TestTwoJudgesDisagreeingProduceAVisibleDelta(t *testing.T) {
 // TestAJudgedFigureCarriesItsDisagreementUnderEveryVerb is the lock.
 //
 // A judged figure reaches a report through fmt, and a Format that honoured %f
-// or %.2f would hand back the bare primary — the half-value this type exists to
+// or %.2f would hand back the bare primary, the half-value this type exists to
 // prevent, obtainable by a format string nobody would look at twice.
 func TestAJudgedFigureCarriesItsDisagreementUnderEveryVerb(t *testing.T) {
 	f := Corroborated(0.74, 0.68)
@@ -251,7 +251,7 @@ func filteredCorpus() []shownList {
 // second scored each level's FILTERED list, so GRADE, SIGNAL, TONE and MISSED
 // published a difference between two different questions under a legend saying
 // the size of that difference was the confidence interval on the figure beside
-// it. MISSED was biased in a known direction on top of that — filtering more
+// it. MISSED was biased in a known direction on top of that, filtering more
 // findings legitimately raises the second judge's missed count against a primary
 // frozen at the whole-corpus value.
 //
@@ -316,8 +316,8 @@ func TestADeltaFromTwoStimuliCannotRenderAsAConfidenceInterval(t *testing.T) {
 	}
 
 	// The three states stay distinguishable. A cross-stimulus figure must not
-	// be readable as a single-judge one — two judges answered and were paid
-	// for — nor as an agreement, nor as nothing.
+	// be readable as a single-judge one, two judges answered and were paid
+	// for, nor as an agreement, nor as nothing.
 	crossed := mismatched.GradeFigure()
 	for _, other := range []JudgedFigure{
 		SingleJudged(2.0),
@@ -428,7 +428,7 @@ func TestASecondJudgeThatGradedFewerSamplesPublishesNoDelta(t *testing.T) {
 // TestAnUnrecordedStimulusMatchesNothing pins the SAFE DIRECTION of the default.
 //
 // An aggregate folded in without stating what produced it costs a delta. The
-// alternative — two unstated stimuli comparing equal — is how a future axis
+// alternative, two unstated stimuli comparing equal, is how a future axis
 // would reintroduce exactly this defect while every guard here still passed,
 // because the zero value of a struct is the one value nobody writes on purpose.
 func TestAnUnrecordedStimulusMatchesNothing(t *testing.T) {
@@ -542,7 +542,7 @@ func TestTheLegendClaimsAConfidenceIntervalOnlyForTheMatchedForm(t *testing.T) {
 // This is the assertion the type system cannot make. JudgedFigure guarantees
 // that a figure prints as a pair; only rendering the row proves the row uses one
 // in every judged column, which is where the equivalent guarantee about severity
-// was broken before — the withdrawal lived in a renderer the table did not call.
+// was broken before, the withdrawal lived in a renderer the table did not call.
 func TestEveryJudgedCellInAPublishedRowCarriesItsDisagreement(t *testing.T) {
 	corroborated := CrossJudged{
 		Primary:    sampleAggregate(4),
@@ -586,7 +586,7 @@ func TestEveryJudgedCellInAPublishedRowCarriesItsDisagreement(t *testing.T) {
 
 		// The two aggregates differ in every judged quantity, so every judged
 		// cell must show a NON-ZERO delta. A renderer that paired an aggregate
-		// with itself — or that read the second judge's figure off the first —
+		// with itself, or that read the second judge's figure off the first,
 		// produces well-formed "+0.00" cells that the grammar check above
 		// accepts and that a reader would take as perfect agreement.
 		zero := 0
@@ -719,9 +719,9 @@ func TestCrossJudgedHeadersCarryTheSameColumnsAsTheHeadersTheyDeriveFrom(t *test
 
 			// The LAST column has no width to check: nothing follows it, so a
 			// cell of any length there cannot push another column out of line.
-			// Both these headers happen to end on a judged column — SIGNAL and
-			// GRADE — so exempting it is not a loophole being opened, it is the
-			// one column where the widening is genuinely a no-op.
+			// Both these headers happen to end on a judged column, SIGNAL and
+			// GRADE, so exempting it is not a loophole being opened, it is the
+			// one column where the widening is a no-op.
 			last := i == len(from)-1
 
 			switch {
@@ -760,8 +760,8 @@ func TestCrossJudgedHeadersCarryTheSameColumnsAsTheHeadersTheyDeriveFrom(t *test
 func TestTableRowSaysSoWhenItCannotAlign(t *testing.T) {
 	// A REGISTERED header, and its widths read back out of it rather than
 	// written here. A probe header declared in this file would be an
-	// unregistered table — which the package's own registry guard correctly
-	// refuses — and hard-coded widths would stop describing the header the
+	// unregistered table, which the package's own registry guard correctly
+	// refuses, and hard-coded widths would stop describing the header the
 	// moment a column moved.
 	header := SummaryTableHeader
 	cols := tableColumns(header)
@@ -824,7 +824,7 @@ func TestSecondJudgeFromEnvResolvesTheVettedDefault(t *testing.T) {
 // other axis, and RUNS was not forwarded at all, so the SPREAD column measured
 // fixture difficulty while reading as run-to-run variance. A second judge that
 // one target forwards and another silently drops is the same defect with a
-// larger bill — the operator pays for a corroboration and reads a table that
+// larger bill, the operator pays for a corroboration and reads a table that
 // says "+?".
 //
 // The exemption is derived from the recipe rather than from a list of target
@@ -927,7 +927,7 @@ var makeTargetLine = regexp.MustCompile(`^([A-Za-z0-9_.-]+):(?:[^=]|$)`)
 type recordingJudge struct {
 	// Rejudge calls this from bounded-concurrency goroutines, so the recording
 	// needs a lock. Writing it without one lost half the calls and reported the
-	// loss as "the second judge was asked once for two groups" — which is
+	// loss as "the second judge was asked once for two groups", which is
 	// exactly what a broken corroboration would look like, and is the reason
 	// `make check` runs the race detector over this package.
 	mu       sync.Mutex
@@ -970,7 +970,7 @@ func (r *recordingJudge) Judge(
 //
 // The second judge is affordable only because it re-judges. This checks the two
 // properties that makes it worth anything: it is shown the SAME findings, and it
-// is shown them in the SAME positions — a verdict identifies its finding by
+// is shown them in the SAME positions, a verdict identifies its finding by
 // position, so a reordered list would produce a full set of plausible, wrong
 // pairings that look exactly like two judges disagreeing.
 func TestCorroborationJudgesTheRecordedFindingsAndRunsNoReview(t *testing.T) {
@@ -1047,8 +1047,8 @@ func TestCorroborationJudgesTheRecordedFindingsAndRunsNoReview(t *testing.T) {
 // TestCorroborationIsFiledUnderTheKeyTheReportsAskFor.
 //
 // THE BUG THIS PINS, found by rendering the persona table rather than by reading
-// the code: Corroborate files each aggregate under contenderLabel — model AND
-// variant — while the persona tables identify their rows by variant alone. Ask
+// the code: Corroborate files each aggregate under contenderLabel, model AND
+// variant, while the persona tables identify their rows by variant alone. Ask
 // for "nitpick=off" when the aggregate is under "z-ai/glm-5.2 [nitpick=off]" and
 // Pair returns an uncorroborated figure. The second judge is called, billed, and
 // answers; every cell still prints "+?"; and the run is indistinguishable from
@@ -1171,10 +1171,10 @@ func TestCorroborationExcludesASampleTheSecondJudgeCouldNotAssess(t *testing.T) 
 
 // TestCorroborationJudgesEachGroupUnderItsOwnPersona.
 //
-// The voice axis is four genuinely different personas, and judgeRequest shows
+// The voice axis is four different personas, and judgeRequest shows
 // the persona to the judge and asks it to score tone against that voice. Judging
 // all four against the default would score three of them for adhering to a voice
-// they were never asked to use — a change of prompt masquerading as a change of
+// they were never asked to use, a change of prompt masquerading as a change of
 // judge, which is the confound this whole path exists to eliminate.
 func TestCorroborationJudgesEachGroupUnderItsOwnPersona(t *testing.T) {
 	blunt := config.DefaultPersona()
@@ -1211,7 +1211,7 @@ func TestCorroborationJudgesEachGroupUnderItsOwnPersona(t *testing.T) {
 //
 // The re-judge diagnostic table prints both absolute precisions and their delta,
 // which is right for the one table whose subject IS the two judges. They still
-// arrive from a single call, so a row cannot render two of the three — the same
+// arrive from a single call, so a row cannot render two of the three, the same
 // shape ObjectiveSeverityCells uses for the severity triple and its denominator.
 func TestRejudgePrecisionCellsAllComeFromOneFigure(t *testing.T) {
 	a, b, d := Corroborated(0.80, 0.60).SplitCells()
@@ -1237,14 +1237,14 @@ func TestRejudgePrecisionCellsAllComeFromOneFigure(t *testing.T) {
 //
 // JudgedFigure proves a figure prints as a pair, and JudgedModelRow proves the
 // published rows use one. Neither can prove that some OTHER report does not
-// format Aggregate.MeanGrade into a cell — which is the identical shape of the
+// format Aggregate.MeanGrade into a cell, which is the identical shape of the
 // defect this package already found in its severity columns, where the
 // withdrawal lived in a renderer the ground-truth table never called.
 //
 // The names are DERIVED, not listed: every method of Aggregate that returns a
 // float64 is a way to obtain a judged number, including the next one somebody
 // adds. Only formatting calls are inspected, because ranking and aggregating
-// legitimately need the value — it is publishing it alone that is the defect.
+// legitimately need the value. It is publishing it alone that is the defect.
 //
 // The set of report files is derived too, from whether the file underlines a
 // table, so a new report is covered on the day it is written.
@@ -1352,8 +1352,8 @@ func report() string {
 // number.
 //
 // Float-returning methods only. The int counters are reachable by the same
-// spelling on Verdict, JudgeResult, RejudgeGroup, DumpSample and Score — "Real",
-// "Missed" and "Findings" all name something else in this package — so a
+// spelling on Verdict, JudgeResult, RejudgeGroup, DumpSample and Score, "Real",
+// "Missed" and "Findings" all name something else in this package, so a
 // name-based scan over them reports correct code as a violation, and a guard
 // that cries wolf gets exemptions until it guards nothing. The float accessors
 // are unique to Aggregate, and they are the whole surface through which GRADE,
@@ -1415,7 +1415,7 @@ func parseProbe(t *testing.T, src string) *ast.File {
 // distinguishable, so a cell that renders the wrong one is visible.
 //
 // seed shifts every value, which is what makes two of these disagree in every
-// column at once — the state the corroborated table is being checked in.
+// column at once, the state the corroborated table is being checked in.
 func sampleAggregate(seed int) Aggregate { return sampleAggregateOver(seed, judgedCorpus()) }
 
 // shownList is one judged sample: a fixture, and the findings the judge was
@@ -1450,7 +1450,7 @@ func judgedCorpus() []shownList {
 // the given lists.
 //
 // The per-sample slices are grown per shown list rather than pinned at two, so
-// an aggregate's sample count and its stimulus count cannot disagree — a helper
+// an aggregate's sample count and its stimulus count cannot disagree, a helper
 // that claimed two grades over one judged list would be a helper capable of
 // passing a test that a real aggregate could not.
 func sampleAggregateOver(seed int, shown []shownList) Aggregate {
@@ -1502,7 +1502,7 @@ func sampleAggregateOver(seed int, shown []shownList) Aggregate {
 // One end is pinned and the other climbs an ASCENDING ladder, which makes both
 // quantities monotone in the seed by construction. Two grades picked
 // independently is what the first draft did, and it produced two different means
-// with an identical spread — a SPREAD cell reading "+0.00" that this helper was
+// with an identical spread, a SPREAD cell reading "+0.00" that this helper was
 // written to make impossible.
 func gradeLadder(seed int) []string {
 	ladder := []string{"D", "C", "C+", "B-", "B", "B+", "A-", "A"}

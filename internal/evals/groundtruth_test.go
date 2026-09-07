@@ -24,7 +24,7 @@ import (
 
 // TestPlantedDefectsPointAtRealLines validates the corpus itself.
 //
-// Every Defect.Line was hand-counted, and four of five were wrong — one pointed
+// Every Defect.Line was hand-counted, and four of five were wrong, one pointed
 // past the end of its file. Nothing failed, because the scorer's line tolerance
 // silently absorbed the error. A wrong anchor corrupts every recall measurement
 // taken with it, so the ground truth needs a test as much as the code does.
@@ -67,8 +67,8 @@ func TestPlantedDefectsPointAtRealLines(t *testing.T) {
 // TestPlantedDefectsAreOnTheRightLine reads each Defect.Line and checks the
 // text sitting on it is the defect.
 //
-// The previous version of this test stated the line number itself — "line 17 of
-// go-sql-injection contains Sprintf" — and never consulted Defect.Line. That
+// The previous version of this test stated the line number itself, "line 17 of
+// go-sql-injection contains Sprintf", and never consulted Defect.Line. That
 // tests the fixture against a second hand-written copy of the ground truth,
 // which is exactly the thing being doubted: changing Defect.Line from 9 to 10
 // left it green, and 10 is the wrong line. The needle is now looked up per
@@ -184,7 +184,7 @@ func TestPlantedDefectsAreOnTheRightLine(t *testing.T) {
 // SUBSTRINGS of title+rationale+category, so deleting a phrase from the keyword
 // list does nothing to stop a finding CONTAINING that phrase from matching
 // through some other keyword. It was green on six fixtures that each credited
-// the exact objection its ban list was written to exclude — "prefer for...of
+// the exact objection its ban list was written to exclude, "prefer for...of
 // for readability" scored full recall on the unawaited-promise plant through
 // the keyword "promise", and so did "fine as written".
 //
@@ -246,7 +246,7 @@ func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
 // THE HOLE IT CLOSES. Ten recall keywords were added to the info plants in one
 // round, and six of them survived deletion with the whole suite green: each was
 // pairwise-redundant with a keyword that already credited the same probe, so it
-// bought nothing measurable while widening what the corpus credits — and every
+// bought nothing measurable while widening what the corpus credits, and every
 // one of the six was separately shown to credit a finding that had noticed
 // nothing. Two mutations were named in that round's report and both did fail;
 // the other eight were never run. Under the house rule that a test must fail
@@ -259,7 +259,7 @@ func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
 // handful of sentences per fixture and most keywords are synonyms no sentence
 // distinguishes. Asserting the property for all of them would demand roughly one
 // probe per keyword. What this list does instead is bind the keywords that have
-// been ARGUED FOR in prose — the ones a comment claims are load-bearing — to a
+// been ARGUED FOR in prose, the ones a comment claims are load-bearing, to a
 // probe that fails without them.
 //
 // A stale entry fails as loudly as a missing one: deleting the keyword, or
@@ -278,7 +278,7 @@ func soleCreditors() map[string][]string {
 //
 // The mutation is applied to a COPY of the Defect and scored through matches(),
 // rather than reasoned about from the keyword strings, because the last round's
-// redundancy was invisible to anyone reading the list — "one binary" and "whole
+// redundancy was invisible to anyone reading the list, "one binary" and "whole
 // binary" look independent and are not.
 func checkSoleCreditors(t *testing.T, byName map[string]Fixture, cases map[string]fixtureProbes) {
 	t.Helper()
@@ -336,7 +336,7 @@ type fixtureProbes struct {
 //
 // The hit list is the negative set's raw material: a finding that reports
 // fixture A's plant, moved to fixture B's anchor, is review prose that says
-// nothing about B — so B's keywords must not credit it. Written as a literal
+// nothing about B, so B's keywords must not credit it. Written as a literal
 // inside one test function, that material was reachable only by the assertions
 // beside it, and the sixteen leaks Round 7 removed were each found by hand
 // because nothing could enumerate them.
@@ -538,8 +538,8 @@ func declaredProbes() map[string]fixtureProbes {
 			}},
 			miss: []probe{{
 				// Also Incumbent's, from the same cached review. It matched the
-				// injection plant through the keyword "subprocess" — the word its
-				// own recommended fix uses — and was then graded for the severity
+				// injection plant through the keyword "subprocess", the word its
+				// own recommended fix uses, and was then graded for the severity
 				// of a bug it never mentions.
 				"is about tar's ignored exit status and recommends subprocess",
 				review.Finding{Path: "tools.py", Line: 12, Severity: "warning", Category: "Stability & Availability",
@@ -552,7 +552,7 @@ func declaredProbes() map[string]fixtureProbes {
 
 		// The warning plants. Each miss below is the false positive its fixture's
 		// own doc comment names, and each is anchored WITHIN anchorTolerance of
-		// the plant wherever the objection would really be made there — otherwise
+		// the plant wherever the objection would really be made there, otherwise
 		// the exclusion could be coming from the line number and the keyword list
 		// would be untested. The two exceptions are marked where they occur.
 		"ts-unbounded-memo-key": {
@@ -578,7 +578,7 @@ func declaredProbes() map[string]fixtureProbes {
 				// Anchored in the OTHER file on purpose: cache.ts is correct as
 				// documented and plans.ts uses it correctly, so the defect is the
 				// call site. This probe is the receipt for that judgement being
-				// deliberate — it fails by PATH, not by keyword, and if a later
+				// deliberate, it fails by PATH, not by keyword, and if a later
 				// editor decides the helper is the defect this is the line that
 				// tells them the current answer was chosen rather than inherited.
 				{"reports the growth but blames the helper instead of the caller that broke its contract",
@@ -705,7 +705,7 @@ func declaredProbes() map[string]fixtureProbes {
 				// what a real reviewer writes. OUT=$(mktemp) plus a trap is the
 				// idiomatic answer to "nothing removes the file", so the word
 				// mktemp reached this plant attached to the false positive at
-				// least as often as to the security finding — and it was
+				// least as often as to the security finding, and it was
 				// credited until the keyword came out. The probe above passed
 				// only because its fix was worded "add a trap to clean it up".
 				{"the cleanup objection carrying the mktemp fix",
@@ -834,7 +834,7 @@ func declaredProbes() map[string]fixtureProbes {
 						Rationale: "List.copyOf(labels) is the modern spelling and returns an unmodifiable list in one call."}},
 				// The same suggestion using the ordinary phrase for a double
 				// wrap. It was credited until "unnecessary copy", "redundant
-				// copy", "needless copy" and "no need to copy" came out — four
+				// copy", "needless copy" and "no need to copy" came out, four
 				// keywords that contradicted this defect's own comment, which
 				// says the list is built on reachability rather than on "copy".
 				// A reviewer proposing List.copyOf has made none of the escape
@@ -854,7 +854,7 @@ func declaredProbes() map[string]fixtureProbes {
 
 		// The info plants. Every miss below was CREDITED when these five were
 		// written, and every one was found by running it through matches()
-		// rather than by reading the keyword list — which is the only way any
+		// rather than by reading the keyword list, which is the only way any
 		// of them could have been found, since each list had a paragraph beside
 		// it asserting the opposite. The fixtures' own comments name the
 		// objections; these are those objections, in the words a reviewer would
@@ -921,8 +921,8 @@ func declaredProbes() map[string]fixtureProbes {
 				// under a comment claiming all the additions "name summarize's
 				// INPUT, which is the one thing the visibility objection never
 				// mentions"; the first two probes here are the visibility
-				// objection doing exactly that. The narrowed forms — "what
-				// summarize accepts" and "parameter is wider" — deny all three.
+				// objection doing exactly that. The narrowed forms, "what
+				// summarize accepts" and "parameter is wider", deny all three.
 				{"the visibility objection naming the parameter to say it is fine",
 					review.Finding{Path: "src/main/kotlin/com/example/report/Summary.kt", Line: 27, Severity: "nit", Category: "api",
 						Title:     "Mark Summarizable internal",
@@ -1002,7 +1002,7 @@ func declaredProbes() map[string]fixtureProbes {
 						Rationale: "The two denials should return the same response envelope."}},
 				// The same remark in the wording that charges "identical
 				// response". That keyword was struck out beside "same response"
-				// and, restored alone, changed no verdict on this fixture — it
+				// and, restored alone, changed no verdict on this fixture, it
 				// was removed on a reading rather than on a run. The removal is
 				// right and this probe is what makes it cost something: putting
 				// the keyword back fails here.
@@ -1014,7 +1014,7 @@ func declaredProbes() map[string]fixtureProbes {
 				// "now learns" and "learns the project" went in under a comment
 				// claiming each "requires the sentence to say what the caller
 				// LEARNS"; neither does, and both of these were credited. What
-				// is left — "learns the project exists" — requires the sentence
+				// is left, "learns the project exists", requires the sentence
 				// to name what is learned about EXISTENCE, which is the rule the
 				// surviving "whether"/"that" forms already follow.
 				{"an N+1 remark about the second repository call",
@@ -1049,8 +1049,8 @@ func declaredProbes() map[string]fixtureProbes {
 			},
 			miss: []probe{
 				// "package-level" was a keyword AND is in the change's own added
-				// doc comment three lines from the plant, so this nit — which
-				// noticed nothing and asks for prose — scored full recall by
+				// doc comment three lines from the plant, so this nit, which
+				// noticed nothing and asks for prose, scored full recall by
 				// quoting the diff back at it.
 				{"a docs nit quoting the change's own comment",
 					review.Finding{Path: "features/features.go", Line: 30, Severity: "nit", Category: "docs",
@@ -1130,8 +1130,8 @@ func declaredProbes() map[string]fixtureProbes {
 				// and it is charged below by the offset objection wearing the
 				// bare "by default" that was tried first.
 				//
-				// The same fix stated as a LOCATION — "setting it at the call
-				// site leaves the mobile client alone" — was a fourth probe
+				// The same fix stated as a LOCATION, "setting it at the call
+				// site leaves the mobile client alone", was a fourth probe
 				// here, credited by "the call site". That keyword is a strict
 				// superset of the "at the call site" it replaced and is gone
 				// with it, so the sentence is uncredited and the probe would be
@@ -1145,8 +1145,8 @@ func declaredProbes() map[string]fixtureProbes {
 			},
 			miss: []probe{
 				// "pass per_page", "rows per request" and "payload" were all
-				// keywords, and this objection — which accepts the new default
-				// entirely and argues about a ceiling the change did not touch —
+				// keywords, and this objection, which accepts the new default
+				// entirely and argues about a ceiling the change did not touch,
 				// matched three at once, inside anchorTolerance of the plant.
 				{"the cap objection, about a line this change did not touch",
 					review.Finding{Path: "app/queries/comments_query.rb", Line: 9, Severity: "warning", Category: "resource",
@@ -1179,7 +1179,7 @@ func declaredProbes() map[string]fixtureProbes {
 				// all three, because no objection here can call 200 a default or
 				// count returned rows. The second probe charges "the call site",
 				// which replaced "at the call site" and credited a strict
-				// superset of it — every sentence below fired on the article
+				// superset of it, every sentence below fired on the article
 				// alone.
 				{"the offset objection wearing the bare stem",
 					review.Finding{Path: "app/queries/comments_query.rb", Line: 12, Severity: "warning", Category: "performance",
@@ -1234,8 +1234,8 @@ func creditedByAnyDefect(f Fixture, finding review.Finding) bool {
 // Everything below builds candidate findings out of material this repository
 // already holds, so no assertion in this file depends on a person having thought
 // of the sentence that breaks it. Four cross-fixture leaks were closed by hand in
-// the change before this one — `nil`, `concurrent`, `capacity`, `arbitrary`,
-// `close` — and the same class had recurred three times, always found by reading
+// the change before this one, `nil`, `concurrent`, `capacity`, `arbitrary`,
+// `close`, and the same class had recurred three times, always found by reading
 // lists. Reading lists finds what the reader imagines.
 //
 // TWO FACTS ABOUT mentionsAny SHAPE ALL OF IT, and getting them wrong produces a
@@ -1245,7 +1245,7 @@ func creditedByAnyDefect(f Fixture, finding review.Finding) bool {
 //     credit is MONOTONE in the text: adding words to a credited finding cannot
 //     uncredit it, and removing words cannot credit it. A negative probe built by
 //     splitting a source sentence into fragments therefore cannot find a credit
-//     the whole sentence does not already produce — splitting is worth doing to
+//     the whole sentence does not already produce, splitting is worth doing to
 //     ATTRIBUTE a credit (explainCredit), not to generate new ones. And a recall
 //     probe built by padding Why with "please fix" is credited by construction,
 //     which is why whyPhrasings only ever shortens.
@@ -1275,7 +1275,7 @@ const (
 	// the source the previous generator did not read, and every leak this change
 	// reports came from it.
 	sourceObjection = "declared objection"
-	// sourceCache is prose the incumbent reviewer actually wrote, replayed from
+	// sourceCache is prose the incumbent reviewer wrote, replayed from
 	// testdata/incumbent. It is the half no authored probe can supply, because
 	// every probe in this file was written by someone who knew which keywords
 	// existed.
@@ -1351,8 +1351,8 @@ func firedKeywords(haystack string, d Defect) []string {
 // earns the credit, and names the keywords that fragment fires.
 //
 // This is the half the humans were doing by hand. The generated test that found
-// the last four leaks reported a whole sentence — "Prevent Enabled from panicking
-// when Default is nil" — and a person then worked out that `nil` was the word
+// the last four leaks reported a whole sentence, "Prevent Enabled from panicking
+// when Default is nil", and a person then worked out that `nil` was the word
 // doing the damage. Shrinking is mechanical, so the test does it: the answer is
 // always a substring, sentences are tried before words, and a one-word answer is
 // itself the verdict that the keyword is too generic to carry alone.
@@ -1367,14 +1367,14 @@ func firedKeywords(haystack string, d Defect) []string {
 // between them and fire while neither half fires alone: with Keywords
 // ["foo bar"], creditsAt("this ends in foo", "bar", d) is true. That fell into
 // the category branch, which returned an EMPTY keyword list under a message
-// positively blaming the category — an attribution step that answers wrongly is
+// positively blaming the category, an attribution step that answers wrongly is
 // worse than one that answers "I do not know", because the whole point of this
 // function is that a person stops re-deriving the cause by hand.
 //
 // It is latent rather than live: no credit in today's corpus reaches it (the
 // cross-fixture loop asserts that, below). The corpus does carry multi-word
-// keywords whose first or last word sits at a join — `error return`,
-// `api contract`, `every row`, `where clause`, `redundant copy` — so the
+// keywords whose first or last word sits at a join, `error return`,
+// `api contract`, `every row`, `where clause`, `redundant copy`, so the
 // arrangement that reaches it is one cached review away.
 func explainCredit(text, category string, d Defect) (fragment string, fired []string) {
 	switch {
@@ -1414,7 +1414,7 @@ func explainCredit(text, category string, d Defect) (fragment string, fired []st
 // probeSentences splits prose into sentences.
 //
 // The boundary test requires a following capital because review prose is full of
-// dotted identifiers — r.URL.Query(), http.Get, List.copyOf, sync.Mutex — and
+// dotted identifiers, r.URL.Query(), http.Get, List.copyOf, sync.Mutex, and
 // splitting on every period turns one sentence about a race into three fragments
 // about nothing.
 func probeSentences(text string) []string {
@@ -1450,9 +1450,9 @@ func probeSentences(text string) []string {
 // the ordinary word "outcome" comes from a fixture's source text.
 //
 // SeverityNote IS DELIBERATELY EXCLUDED, and the measurement is the reason. Notes
-// argue a plant's level by comparing it to OTHER plants by name — "every
+// argue a plant's level by comparing it to OTHER plants by name, "every
 // successful upload loses a descriptor", written in the goroutine leak's note
-// about multi-defect's — so including them manufactured seven overlaps in which
+// about multi-defect's, so including them manufactured seven overlaps in which
 // the corpus's own cross-reference was read as a reviewer's sentence. They are
 // prose about the severity table, which is also why the recall direction does not
 // assert them; see TestEveryPlantIsCreditedForItsOwnDescription.
@@ -1563,16 +1563,16 @@ const inertProse = "A remark on this change. It refers to %s and asserts nothing
 //   - EVERY OTHER FIXTURE'S DECLARED OBJECTIONS. Its miss probes: prose the
 //     corpus already says reports NOTHING, even in the fixture it was written
 //     about. This source was not being read, and every leak this change reports
-//     came from it — the loop was drawing only on sentences that were correct
+//     came from it. The loop was drawing only on sentences that were correct
 //     somewhere, which is the half of the material least likely to collide.
-//   - THE SHIPPED INCUMBENT CACHE. Prose a real reviewer actually wrote, which
+//   - THE SHIPPED INCUMBENT CACHE. Prose a real reviewer wrote, which
 //     is the half authored probes cannot supply: every hit probe in this file was
 //     written by someone who knew which keywords existed.
 //
 // SPLITTING THOSE SENTENCES INTO SENTENCES WOULD ADD NOTHING and is deliberately
 // not done. mentionsAny is strings.Contains over one haystack, so a fragment
 // credits only if the text containing it credits: a fragment probe cannot fail
-// where the whole-text probe passed. Fragments are used where they do pay — by
+// where the whole-text probe passed. Fragments are used where they do pay, by
 // explainCredit, to name which sentence and which word caused a credit that has
 // already been found.
 //
@@ -1580,29 +1580,29 @@ const inertProse = "A remark on this change. It refers to %s and asserts nothing
 // text names the SOURCE fixture's identifiers, so no reviewer would ever write
 // it at this anchor: a credit is evidence that two keyword lists share
 // vocabulary, not that a reachable false credit exists. That is still the signal
-// worth having — every leak Round 7 removed was a keyword generic enough to be
-// typed by a sentence that had noticed something else — but this loop measures
+// worth having, every leak Round 7 removed was a keyword generic enough to be
+// typed by a sentence that had noticed something else, but this loop measures
 // OVERLAP and the declared miss probes measure REACHABILITY, and neither
 // substitutes for the other. TestAFixturesOwnObjectionsAreNotCreditedAtItsPlants
 // is the reachability half generated the same way, and
 // TestNoBareWordFromAnotherFixtureCreditsAPlant is the attribution.
 //
 // WHAT ITS SILENCE DOES NOT MEAN, and the first version of this comment got
-// this wrong in a way worth keeping. It read the loop's output — every overlap
-// lands in a fixture file this change does not own, none in fixtures_info.go —
+// this wrong in a way worth keeping. It read the loop's output, every overlap
+// lands in a fixture file this change does not own, none in fixtures_info.go,
 // as evidence that the info keyword lists were clean. The loop CANNOT reach
 // them, because the stems those lists carry appear only in the info fixtures'
 // own probes, which it skips (`if s.fixture == f.Name { continue }`). So no
 // number of probes here can produce a credit against an info plant from a keyword
 // that file rewrote: zero collisions there was a property of the SOURCE CORPUS,
-// not a verdict on the keywords — and eleven hand-written sentences were credited
+// not a verdict on the keywords, and eleven hand-written sentences were credited
 // by them at the time. Reachability is what the declared miss probes measure.
 // This loop measures overlap. Neither reads on the other's behalf.
 //
 // TRIPLING THE SOURCE SET DID NOT CHANGE THAT, which is the same lesson arriving
 // twice. Adding every fixture's declared objections took the sources from 63 to
 // 142 and found thirteen new overlaps, and not one of them TARGETS an info plant
-// — the info fixtures appear only as sources, where kotlin's visibility objection
+// , the info fixtures appear only as sources, where kotlin's visibility objection
 // reaches contract-break's `consumer`. More material does not make a loop reach
 // where its exclusion rule forbids.
 //
@@ -1613,8 +1613,8 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 	// knownOverlaps is keyed TARGET PLANT | source fixture | source kind |
 	// title. Each entry says what the credit fires on, because "these two
 	// collide" is not actionable and "these two collide on the bare stem
-	// `leak`" is — and checkReasonFires below holds that sentence to what
-	// actually fires, which nothing did until a mutation showed an entry staying
+	// `leak`" is, and checkReasonFires below holds that sentence to what
+	// fires, which nothing did until a mutation showed an entry staying
 	// green while the stem it names stopped being the cause.
 	//
 	// THE KEY CARRIES THE PLANT AND THE KIND because target|source|title
@@ -1625,8 +1625,8 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 	// go-package-singleton's "Concurrent map access" objection credit two plants
 	// under a single entry whose reason names only the counter, and this test
 	// stayed green. Kind is in it because two different sources can carry the
-	// same title — a cached review and a declared objection with the same
-	// opening sentence, measured twice in today's corpus — and one entry
+	// same title, a cached review and a declared objection with the same
+	// opening sentence, measured twice in today's corpus, and one entry
 	// covering both cannot go stale in either direction.
 	//
 	// They fall into two kinds, and the difference is the whole reason this is a
@@ -1646,8 +1646,8 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 		// interpreted context. `injection` and `concatenat` name that mechanism
 		// and all three plants have it, so a sentence about one names the next.
 		//
-		// The first two are the SAME opening sentence from two sources — the
-		// shipped cache and the hit probe someone wrote afterwards — which one
+		// The first two are the SAME opening sentence from two sources, the
+		// shipped cache and the hit probe someone wrote afterwards, which one
 		// title-keyed entry used to cover. They are listed separately because a
 		// reword of either has to be re-derived on its own.
 		"go-sql-injection|0|store.go:17|python-command-injection|cached review|Do not interpolate name into a shell command.": "shared mechanism: `injection`",
@@ -1669,7 +1669,7 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 		// Found BY this loop, on its first run, against a probe added in the
 		// same change: the recall probe restoring ruby's proposed fix reaches
 		// contract-break's `consumer` too. It is the receipt for the loop being
-		// worth having — nobody would have thought to write this pair down.
+		// worth having, nobody would have thought to write this pair down.
 		"contract-break|0|event.go:9|ruby-default-page-size|hit probe|Set this where it is needed":                                                   "bare stem `consumer`",
 		"contract-break|0|event.go:9|clean-sql-allowlist|cached review|Validate and cap limit before the query.":                                     "bare stem `api contract`, reached by the cached review's \"the API contract\"",
 		"data-loss-migration|0|migrations/0007_backfill_plan.sql:8|go-sql-injection|cached review|Use a parameterized query in SearchUsers.":         "bare stem `where clause`: changing a WHERE clause by injection is not a missing one, and this one is REACHABLE — an injection remark on a migration would be credited with the missing predicate",
@@ -1688,7 +1688,7 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 		// until now. Every entry below is a sentence the corpus already says
 		// reports nothing, credited at another fixture's plant. Four of them are
 		// the same stems the change before this one narrowed in the fixture files
-		// it owned — `race`, `consumer`, `discard` — reached from a source it was
+		// it owned, `race`, `consumer`, `discard`, reached from a source it was
 		// not looking at, which is the argument for the source rather than for the
 		// stems.
 		"multi-defect|1|handler.go:25|go-package-singleton|declared objection|Concurrent map access":                                             "bare stem `race`: `concurrent` was removed from this plant for exactly this sentence and `race` was left, so the same objection still credits the counter. `race` is also four letters long and matched as a substring, which TestNoOrdinaryEnglishWordCreditsAPlant is where that half is recorded",
@@ -1803,7 +1803,7 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 //
 // This is the reachability question the cross-fixture loop cannot ask. A probe
 // declared under `miss` is a sentence a reviewer really might write about THIS
-// change — that is why it was written — and the corpus says it reports nothing.
+// change. That is why it was written, and the corpus says it reports nothing.
 // TestKeywordsAdmitOnlyRealDetections already runs it, but at the anchor its
 // author chose, so an objection can pass on DISTANCE while the keyword list would
 // have credited it: three of the corpus's miss probes are deliberately anchored
@@ -1811,7 +1811,7 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 //
 // Moving it is not unfair. The anchor is the plant's own line, so this asks only
 // what the keyword list does with the sentence, and a reviewer who wrote the same
-// objection while pointing at the plant is not a rare event — anchoring is the
+// objection while pointing at the plant is not a rare event, anchoring is the
 // thing reviewers are worst at, which is why the scorer has a tolerance at all.
 //
 // A credit here therefore has one of two meanings, and the registry has to say
@@ -1875,8 +1875,8 @@ func TestAFixturesOwnObjectionsAreNotCreditedAtItsPlants(t *testing.T) {
 
 // TestNoBareWordFromAnotherFixtureCreditsAPlant isolates the cause.
 //
-// Every leak the previous change closed by hand was ONE WORD — `nil`,
-// `concurrent`, `capacity`, `arbitrary`, `close` — and each was found by a person
+// Every leak the previous change closed by hand was ONE WORD, `nil`,
+// `concurrent`, `capacity`, `arbitrary`, `close`, and each was found by a person
 // reading a credited sentence and working out which of its words did the damage.
 // This does that mechanically: one word, wrapped in prose that says nothing, is
 // either credited or it is not, and if it is, the word and the keyword are both
@@ -1884,21 +1884,21 @@ func TestAFixturesOwnObjectionsAreNotCreditedAtItsPlants(t *testing.T) {
 //
 // THE VOCABULARY IS MEASURED, NOT JUDGED, which makes the verdict checkable
 // instead of a matter of taste. A word counts as generic for a plant when this
-// repository already uses it about a DIFFERENT fixture — in prose written about
+// repository already uses it about a DIFFERENT fixture, in prose written about
 // that fixture, in that fixture's own Why, or in its source text. So `sk-live`
 // is never tried against the secret plant (nothing else in the corpus contains
 // it) and `nil` would be tried against every plant in the tree.
 //
 // MEASURING AGAINST THE CORPUS IS ALSO THE BLIND SPOT, and this paragraph used
 // to call the measurement "the only defensible way" to decide a word is too
-// generic — backwards about which half is at risk. The corpus is a few thousand
+// generic, backwards about which half is at risk. The corpus is a few thousand
 // words of Go, Python and review prose. Ordinary English is not, and it is what
 // reviewers type. Run twenty-five plain words through this sweep's own wrapper
 // and predicate and thirteen credit a plant; twelve of the thirteen are words
 // the corpus never uses, so this loop cannot try them. `race` sits inside trace,
 // embrace, grace, brace, terrace and bracelet; `dst` inside midst and amidst;
 // `idor` inside corridor. Through the REAL scorer that is a variable-rename nit
-// — "corridor is a confusing name for this local; call it path" — taking FULL
+// , "corridor is a confusing name for this local; call it path", taking FULL
 // recall on removed-guard's critical authorization plant, at zero cost in
 // precision.
 //
@@ -1918,7 +1918,7 @@ func TestAFixturesOwnObjectionsAreNotCreditedAtItsPlants(t *testing.T) {
 // reaches 2 keywords the sentence loop cannot: `utc`, via the word "outcome" in
 // another fixture's code comment, and `placeholder`, via an identifier in
 // clean-sql-allowlist's source. The first of those targets timezone-boundary,
-// which the entire 3963-probe sentence loop credits zero times — so the claim
+// which the entire 3963-probe sentence loop credits zero times, so the claim
 // was not merely unproven, its own headline example was the counterexample. Both
 // figures are recomputed below and read back out of this comment, because the
 // retracted version was a proof nothing reproduced.
@@ -2038,7 +2038,7 @@ func checkVocabularyReachesBeyondSentences(t *testing.T, vocab map[string]map[st
 	t.Helper()
 
 	sources := generatedSources()
-	// Only sources the sentence loop would actually run against a given target:
+	// Only sources the sentence loop would run against a given target:
 	// it skips a fixture's own prose, so a keyword that appears only in its own
 	// fixture's sources is out of that loop's reach.
 	inSomeCrossFixtureSource := func(target, kw string) bool {
@@ -2108,13 +2108,13 @@ func checkVocabularyReachesBeyondSentences(t *testing.T, vocab map[string]map[st
 // away from, and it finds what its author thought of and nothing else. Worse,
 // the honest account of how it was built is that a handful of these words were
 // chosen AFTER a run showed which keywords were short enough to hide inside one
-// — trace, midst and corridor are answers, not questions. The rest is filler,
+// , trace, midst and corridor are answers, not questions. The rest is filler,
 // and the filler found two things the targeted words did not: `secret` inside
 // "secretly", and `exhaust` inside "exhaustive", ordinary prose about test
 // coverage taking full credit for a socket-exhaustion plant.
 //
 // That asymmetry is the argument for TestShortKeywordsAreSubstringHazards
-// beside it, which needs no list and so cannot be short of imagination — not an
+// beside it, which needs no list and so cannot be short of imagination, not an
 // argument that this list is adequate. It is not, and a keyword six or seven
 // letters long is exactly where it and the shape rule are both weakest.
 func ordinaryEnglishWords() []string {
@@ -2163,17 +2163,17 @@ func ordinaryEnglishWords() []string {
 //
 // What makes that deferral safe rather than convenient is a measurement, and it
 // is a SNAPSHOT rather than an invariant. Auditing the shipped cache for these
-// stems inside a longer word — title, rationale and category of every
-// CachedIncumbent finding — finds none: every substring credit the cache does
+// stems inside a longer word, title, rationale and category of every
+// CachedIncumbent finding, finds none: every substring credit the cache does
 // earn is a legitimate inflection (discards, parameterized, hardcode,
 // metacharacters, descriptors, sockets). So no published number rests on one of
 // these accidents today. Nothing here asserts that, because separating
 // "secretary" from "secrets" mechanically needs a rule about English this file
-// has no business inventing — which is exactly why the hazard is recorded here
+// has no business inventing, which is exactly why the hazard is recorded here
 // instead of being trusted to stay latent. Re-collecting the cache can spend it.
 func TestNoOrdinaryEnglishWordCreditsAPlant(t *testing.T) {
 	// Keyed fixture|keyword. Each reason must NAME the ordinary word, and the
-	// named word is run back through the scorer — a registry whose reasons are
+	// named word is run back through the scorer, a registry whose reasons are
 	// not checked against what fires is how the last one went stale.
 	knownEnglishSubstrings := map[string]string{
 		"multi-defect|race":                 "`race` is four letters, matched inside trace, embrace, grace, brace, terrace and bracelet. \"Log the stack trace when the upload handler fails\" scores multi-defect matched=1/3 with the raced counter marked detected",
@@ -2261,7 +2261,7 @@ func checkWitnessCredits(t *testing.T, key, reason string, d Defect, keyword str
 //
 // It is a PROXY and it is arbitrary, so it is named rather than buried in a
 // comparison. It was picked by measuring: exactly four purely-alphabetic
-// keywords in the corpus are this short — `utc`, `dst`, `race`, `idor` — and
+// keywords in the corpus are this short, `utc`, `dst`, `race`, `idor`, and
 // those are precisely the four that an independent sweep of ordinary English
 // reaches by substring. The next size up (`reuse`, `yagni`, `mutex`, `shell`,
 // `sleep`) is reached by no English word in that list.
@@ -2281,7 +2281,7 @@ const substringHazardLength = 4
 // property of the KEYWORD's shape.
 //
 // It cannot say which English word does the damage, so each entry has to, and
-// the named word is run through the scorer — the registry supplies the
+// the named word is run through the scorer, the registry supplies the
 // counterexample and the test proves it, rather than the other way round.
 func TestShortKeywordsAreSubstringHazards(t *testing.T) {
 	// Keyed fixture|keyword. The witness goes in backticks.
@@ -2370,7 +2370,7 @@ func backtickedStems(reason string) []string {
 // checkReasonFires holds a registry reason to the credit it excuses.
 //
 // The reason is the only actionable part of an entry, and until now nothing
-// compared it against what actually fired — only the KEY was checked for
+// compared it against what fired, only the KEY was checked for
 // liveness. Rewording one probe so a different stem fires left the entry green
 // under a reason naming the old one: replacing "permission errors" with
 // "ownership errors" in python-command-injection's objection kept
@@ -2382,8 +2382,8 @@ func backtickedStems(reason string) []string {
 // The rule is the weakest one a stale entry cannot satisfy: every backticked
 // fragment that IS one of this plant's keywords must be among the keywords that
 // fired, and at least one backticked fragment must be a keyword at all. Reasons
-// quote other things too — `concurrent` is named to say it was REMOVED from the
-// plant — so a fragment that is not a keyword of this defect is prose about the
+// quote other things too, `concurrent` is named to say it was REMOVED from the
+// plant, so a fragment that is not a keyword of this defect is prose about the
 // history, not a claim about the firing, and is left alone.
 func checkReasonFires(t *testing.T, key, reason string, fired []string, d Defect) {
 	t.Helper()
@@ -2430,12 +2430,12 @@ func usedBy(vocab map[string]map[string]bool, word, except string) []string {
 // That doc comment says a keyword "must not be a token a reviewer would type
 // merely by QUOTING the change", and names six that were: created_at is the line
 // the diff removes, foreach and await are the changed line itself. Every one was
-// found by hand. The rule is mechanical — the added lines are right there in
-// Head — so the corpus can be asked directly, and it answers with two keywords
+// found by hand. The rule is mechanical. The added lines are right there in
+// Head, so the corpus can be asked directly, and it answers with two keywords
 // the six removals left behind.
 //
-// It compares against the lines the DIFF SHOWS — added to the head and removed
-// from the base — and it asks whether the keyword is IN one, not whether it
+// It compares against the lines the DIFF SHOWS, added to the head and removed
+// from the base, and it asks whether the keyword is IN one, not whether it
 // equals a token of one: quoting a line reproduces the whole line, so `sk-live`
 // inside the literal "sk-live-51H..." is quoted just as surely as a bare
 // identifier is.
@@ -2445,12 +2445,12 @@ func usedBy(vocab map[string]map[string]bool, word, except string) []string {
 // and `created_at` is the line contract-break DELETES: it appears nowhere in the
 // head, so a rule reading Head-minus-Base could never have found it. Restoring
 // `created_at` left this test green (four others caught it, none of them this
-// one), and `json:"created_at"` — a verbatim token of the removed line, which
+// one), and `json:"created_at"`, a verbatim token of the removed line, which
 // anyone pasting the hunk types, and which no other source in the corpus
-// contains — left the ENTIRE deterministic suite green. A reviewer reads both
+// contains, left the ENTIRE deterministic suite green. A reviewer reads both
 // halves of a hunk; a rule that reads one half checks half the claim.
 //
-// Lines that survive untouched into the head are still out of scope — that is a
+// Lines that survive untouched into the head are still out of scope. That is a
 // weaker complaint (the doc comment lists `owner` as one) and it would flag most
 // of the corpus, because naming the function under review is ordinary and
 // useful. That exclusion is a judgement, not a consequence of the mechanism, so
@@ -2606,7 +2606,7 @@ func plantKey(fixture string, i int, d Defect) string {
 // Sixteen keywords were removed in one round, each with a probe proving it no
 // longer credited an objection, and nothing anywhere asserted that what was left
 // still credited a DETECTION. Six plain statements of a correct finding came
-// back MISSED as a result — including one fixture's own proposed fix — and the
+// back MISSED as a result, including one fixture's own proposed fix, and the
 // harness would have reported a reviewer that found the plant and said so as
 // having missed it. Every removal is cheap in that direction and nothing was
 // charging for it.
@@ -2619,7 +2619,7 @@ func plantKey(fixture string, i int, d Defect) string {
 // SeverityNote WAS MEASURED AS A SECOND SOURCE AND REJECTED, which is worth
 // recording because it is the obvious next field to reach for. Run through
 // matches() over every plant it is credited for 13, uncredited for 10, and absent
-// from 6 — and the first version of this paragraph said "credited for 14 and
+// from 6, and the first version of this paragraph said "credited for 14 and
 // uncredited for 15", which folded the six plants that carry NO NOTE AT ALL into
 // the evidence. An empty haystack is uncredited by construction, so 40 percent of
 // the count the argument rested on was never a measurement of anything. The
@@ -2678,12 +2678,12 @@ func TestEveryPlantIsCreditedForItsOwnDescription(t *testing.T) {
 // THE FAILURE IT IS BUILT FOR is a keyword removal that quietly costs recall.
 // That has happened: sixteen were removed in one round, each with a probe proving
 // it no longer credited an objection, and six plain statements of a correct
-// finding came back MISSED — nothing was charging for the other direction. The
+// finding came back MISSED, nothing was charging for the other direction. The
 // repair at the time was to hand-author more hit probes, which is the same
 // method, and the same method finds the same things.
 //
 // ONLY SHORTENING CAN GENERATE A PROBE HERE. mentionsAny is strings.Contains, so
-// a phrasing built by adding words to Why — "I think ...", "... please fix" — is
+// a phrasing built by adding words to Why, "I think ...", "... please fix", is
 // credited by construction and proves nothing about the keywords. What can fail
 // is a reviewer who said LESS: the same finding with a clause dropped, or one
 // clause of it on its own. Both families are generated from the Why, which is the
@@ -2693,7 +2693,7 @@ func TestEveryPlantIsCreditedForItsOwnDescription(t *testing.T) {
 // SAYING LESS IS NOT THE SAME AS BEING A SUBSTRING, and the two were conflated
 // here. One clause on its own IS a substring of the Why. Dropping a middle
 // clause is not: the survivors are rejoined with ", ", a string the Why never
-// contained, so that family manufactures adjacencies the corpus never wrote —
+// contained, so that family manufactures adjacencies the corpus never wrote,
 // three of today's fifty-two phrasings, all from python-timing-unsafe-hmac. A
 // keyword spanning the new seam would be credited on text no reviewer typed, and
 // this test would read that as the plant staying credited, which is a recall
@@ -2704,7 +2704,7 @@ func TestEveryPlantIsCreditedForItsOwnDescription(t *testing.T) {
 // things it is, because a list that calls both "gaps" is a list of excuses:
 //
 //   - BY DESIGN. Most Whys are "<what the change did>, so <what goes wrong>", and
-//     several fixtures deliberately refuse to credit the first half — a reviewer
+//     several fixtures deliberately refuse to credit the first half, a reviewer
 //     who says only "created_at is renamed to createdAt on a public payload" has
 //     noticed the edit and not that it breaks anyone, which is contract-break's
 //     whole distinction. Crediting these would undo a decision, not close a hole.
@@ -2715,14 +2715,14 @@ func TestEveryPlantIsCreditedForItsOwnDescription(t *testing.T) {
 //
 // THE EIGHT ARE RECORDED RATHER THAN CLOSED, deliberately. Adding a keyword
 // changes which cached Incumbent findings match a plant, and those matches feed
-// figures that are pinned as evidence elsewhere in this package — the shipped
+// figures that are pinned as evidence elsewhere in this package, the shipped
 // cache's severity triple among them. Closing a recall hole is worth doing and it
 // is a change that has to re-derive those numbers in the same commit, not a
 // side effect of building the instrument that found them.
 //
 // SeverityNote is NOT a source, and it is the obvious second one to reach for, so
 // the refusal is measured rather than asserted. Split into sentences it runs
-// 15 credited, 63 uncredited — because a note argues which anchor in review.md a
+// 15 credited, 63 uncredited, because a note argues which anchor in review.md a
 // level sits under and compares the plant to others BY NAME, so most of its
 // sentences are prose about the severity table. Requiring them would pull every
 // keyword list toward that table's vocabulary, which is not where a reviewer's
@@ -2793,8 +2793,8 @@ func TestNaturalPhrasingsOfAPlantStayCredited(t *testing.T) {
 					// For a single clause this is a proof: a clause is a
 					// substring of the Why, mentionsAny is containment, so no
 					// keyword inside the Why means none inside a piece of it.
-					// For the leave-one-out family it is not — those are not
-					// substrings — and skipping them is a judgement that a gap
+					// For the leave-one-out family it is not. Those are not
+					// substrings, and skipping them is a judgement that a gap
 					// derived from a gap is the same gap, backed by the seam
 					// check above rather than by an argument they cannot be
 					// credited.
@@ -2872,7 +2872,7 @@ func checkSeverityNoteSentenceCensus(t *testing.T) {
 // with ", ", which the Why never contained, so it can spell an adjacency no
 // reviewer wrote. A keyword that fires only across that seam is credited on
 // manufactured text, and the recall test would count it as the plant staying
-// credited — the probe would be answering its own question.
+// credited. The probe would be answering its own question.
 //
 // It is not reachable on today's corpus: the three non-substring phrasings all
 // come from a plant whose whole Why is a known gap, and none of them fires
@@ -2899,12 +2899,12 @@ func checkNoSeamCredit(t *testing.T, fixture string, d Defect, phrasing string) 
 // its own, and the Why with each single clause dropped.
 //
 // FEWER WORDS, NOT ALWAYS A SUBSTRING. A single clause is a substring of the
-// Why. A leave-one-out phrasing is not — the survivors are rejoined with ", ",
-// which the original may never have contained — so the family creates strings
+// Why. A leave-one-out phrasing is not. The survivors are rejoined with ", ",
+// which the original may never have contained, so the family creates strings
 // the corpus did not write. checkNoSeamCredit is what keeps that from being
 // scored as recall.
 //
-// The separators are the ones this corpus's Whys are actually built from — a
+// The separators are the ones this corpus's Whys are built from, a
 // statement of what the change did, then what goes wrong, joined by "so", "which"
 // or a semicolon. A clause shorter than three words is dropped because it is
 // punctuation noise rather than a phrasing.
@@ -2958,7 +2958,7 @@ func whyPhrasings(why string) []string {
 // The number that mattered was the one nobody separated: six plants carry no
 // SeverityNote, so they are uncredited because there is nothing to credit, and
 // counting them as evidence about severity-table vocabulary made a 14-to-9 split
-// look like 14-to-15. Recording the absent count is the whole repair — it is the
+// look like 14-to-15. Recording the absent count is the whole repair. It is the
 // figure that says how much of the argument is measurement.
 func checkSeverityNoteCensus(t *testing.T) {
 	t.Helper()
@@ -3018,8 +3018,8 @@ func checkSeverityNoteCensus(t *testing.T) {
 //
 // WHAT WOULD ACTUALLY FIX IT, none of which is a keyword:
 //
-//   - A CONJUNCTION. Let a defect require one phrase from each of two lists —
-//     here, a fix phrase AND a phrase naming what the caller learns — so "the
+//   - A CONJUNCTION. Let a defect require one phrase from each of two lists,
+//     here, a fix phrase AND a phrase naming what the caller learns, so "the
 //     same response" credits only when the finding also says why. This is a
 //     change to Defect and to matches().
 //   - A VETO. Let a defect name phrases that withdraw credit, which would also
@@ -3028,13 +3028,13 @@ func checkSeverityNoteCensus(t *testing.T) {
 //     unfalsifiable, so it needs its own probe direction.
 //   - THE JUDGE. Detection at info could be scored by the model judge against
 //     Defect.Why rather than by substring, keeping keywords for the levels whose
-//     vocabulary is distinctive — nil, injection, WHERE clause. It costs money
+//     vocabulary is distinctive, nil, injection, WHERE clause. It costs money
 //     per run and imports the judge's variance into recall, which is the column
 //     the harness is most often read for.
 //
 // A fourth option is not on the list and should be named so it is not chosen by
-// default: adding a keyword that encodes tense or modality — "now receives" as
-// against "can still receive" — would separate a looser version of this pair. It
+// default: adding a keyword that encodes tense or modality, "now receives" as
+// against "can still receive", would separate a looser version of this pair. It
 // is not impossible, it is a DIFFERENT KIND of keyword: every other entry in
 // this corpus names subject matter, and one that names grammar is a rule about
 // how a sentence is built rather than about what it says. That is the
@@ -3042,7 +3042,7 @@ func checkSeverityNoteCensus(t *testing.T) {
 //
 // RUBY IS THE SECOND CASE AND IT IS A CHOICE, NOT AN IMPOSSIBILITY, which is why
 // it is recorded here beside the proof rather than inside it. Its finding and
-// its cap objection are separable on subject matter after all — the cap is 200
+// its cap objection are separable on subject matter after all. The cap is 200
 // and the new default is 100, so a keyword naming the ROWS reaches one and not
 // the other, and "rows by default" is that keyword. What stays out of reach is
 // the same fix stated as a LOCATION: "set it at the call site instead" is this
@@ -3071,7 +3071,7 @@ func TestTheInfoRecallThisInstrumentCannotBuy(t *testing.T) {
 	// The objection is READ OUT OF THE PROBE TABLE rather than built from the
 	// detection. It used to be `detection + " envelope; ..."` with a
 	// strings.Contains guard underneath, which is true for every possible value
-	// of detection — run with "", with unrelated prose and with a non-ASCII
+	// of detection, run with "", with unrelated prose and with a non-ASCII
 	// string, the guard passed each time. An unfalsifiable check inside the test
 	// whose stated purpose is to make an impossibility argument checkable is
 	// this round's own defect one level up. Now the objection is a sentence the
@@ -3120,8 +3120,8 @@ func TestTheInfoRecallThisInstrumentCannotBuy(t *testing.T) {
 
 	// WHY it is a miss, run rather than argued. Any keyword crediting that
 	// sentence through its location clause is a substring of "at the call site",
-	// and these three remarks — about ordering, about an allocation, and about
-	// where the clamp belongs — contain it while noticing nothing.
+	// and these three remarks, about ordering, about an allocation, and about
+	// where the clamp belongs, contain it while noticing nothing.
 	for _, elsewhere := range []string{
 		"Set the ordering at the call site rather than in the query object.",
 		"This allocation happens at the call site, which is fine.",
@@ -3135,7 +3135,7 @@ func TestTheInfoRecallThisInstrumentCannotBuy(t *testing.T) {
 
 	// The one candidate that credited the fix without naming a call site. It
 	// leaks nothing across the probe table and was still rejected, because the
-	// cap objection reaches it in one ordinary sentence — which is the run that
+	// cap objection reaches it in one ordinary sentence, which is the run that
 	// decided it, and the reason it is here rather than in the keyword list.
 	candidate := "what everyone gets"
 	capObjection := "The clamp is what everyone gets in the end, so MAX_PER_PAGE is the real ceiling, not this constant."
@@ -3160,7 +3160,7 @@ func TestTheInfoRecallThisInstrumentCannotBuy(t *testing.T) {
 // WantSeverity now drives a reported column, and its zero value is not inert:
 // config.Severity("").Rank() falls through to SeverityInfo's rank, so a defect
 // added without the field would silently grade every warning and above as
-// INFLATED and every nit as UNDERSTATED — in the exact column the prompt is
+// INFLATED and every nit as UNDERSTATED, in the exact column the prompt is
 // being tuned against, with nothing to say it happened.
 func TestEveryDefectDeclaresAUsableSeverity(t *testing.T) {
 	for _, f := range AllFixtures() {
@@ -3189,14 +3189,14 @@ type classPlant struct {
 // severities: the criticals show the untrusted source, the removed guard or the
 // credential IN the diff, and the two injections show only the sink, with
 // reachability asserted by a Defect.Why the reviewer is never given. Unwritten,
-// a reader sees a corpus answering one question two ways — and someone will
+// a reader sees a corpus answering one question two ways, and someone will
 // eventually "fix" it in whichever direction the week's numbers prefer, since
 // both directions look equally like tidying.
 //
 // A judgement about severity cannot be asserted mechanically, so this asserts
 // the property that can be: that the corpus does not contradict itself in
-// silence. Divergence stays legal — resource genuinely holds an error, a
-// warning and a nit — but it has to be written down where the next editor
+// silence. Divergence stays legal, resource holds an error, a
+// warning and a nit, but it has to be written down where the next editor
 // reads it, and the note has to name the level it is defending, or moving the
 // level leaves prose that argues for a number that is no longer there.
 //
@@ -3249,7 +3249,7 @@ func TestSeverityIsConsistentWithinADefectClass(t *testing.T) {
 			case !strings.Contains(strings.ToLower(note), strings.ToLower(p.defect.WantSeverity.String())):
 				// A note that never names its own level cannot go stale
 				// visibly. Move the plant and the prose still reads as a
-				// justification — for a number it no longer justifies — and the
+				// justification, for a number it no longer justifies, and the
 				// next editor trusts it. Requiring the word is the only part of
 				// a note a test can hold to the plant beside it.
 				stale = append(stale, where)
@@ -3288,11 +3288,11 @@ func plantSeverities(plants []classPlant) string {
 }
 
 // TestTuningCorpusCanFalsifyInflation is TestHeldOutCorpusCanFalsifyInflation's
-// twin, for the corpus that actually shapes the prompt.
+// twin, for the corpus that shapes the prompt.
 //
 // The held-out set is spent once; the tuning set is what every iteration reads,
 // so a one-sided severity distribution there is the more expensive of the two.
-// capacity-hint-nit is the only plant in it below error — one fixture away from
+// capacity-hint-nit is the only plant in it below error, one fixture away from
 // a corpus that cannot tell "rates everything at least error" from a calibrated
 // reviewer.
 //
@@ -3326,12 +3326,12 @@ func TestTuningCorpusCanFalsifyInflation(t *testing.T) {
 // explicit one.
 //
 // WantSeverity is the target both severity columns are measured against, so
-// editing it moves the score of every reviewer at once — including the
-// incumbent it is being compared to — without touching a line of reviewer code.
+// editing it moves the score of every reviewer at once, including the
+// incumbent it is being compared to, without touching a line of reviewer code.
 // Nothing else in the tree could see such an edit. The class-consistency check
 // cannot: it groups on Class, which the same editor declares, so moving a plant
 // and its class together silences it. And it exempts any class with one member,
-// which is three of these fourteen — contract-break, data-loss-migration and
+// which is three of these fourteen, contract-break, data-loss-migration and
 // multi-defect's race could each be demoted to a nit with every other test
 // still green.
 //
@@ -3343,15 +3343,15 @@ func TestTuningCorpusCanFalsifyInflation(t *testing.T) {
 // When this fails: check the new level against the anchor clause in
 // internal/prompt/templates/review.md, check what it does to the corpus's
 // ability to observe INFLATION (raising plants removes that ability), check what
-// it does to TestNoDegenerateReviewerCanMaxOutAPublishedMetric — a corpus whose
+// it does to TestNoDegenerateReviewerCanMaxOutAPublishedMetric, a corpus whose
 // plants all sit at one level is one no severity metric can be falsified on, and
 // that is how the withdrawn cross-tool column came to be maximised by a reviewer
-// with no severity opinion at all — and then update the entry, along with the
+// with no severity opinion at all, and then update the entry, along with the
 // pinned incumbent numbers in TestIncumbentObjectiveSeverityOnTheShippedCache.
 func TestPlantedSeveritiesArePinned(t *testing.T) {
 	// Keyed "fixture/path:line/class". The class is in the key because two of
-	// multi-defect's plants sit on the SAME line of the same file — the
-	// traversal and the descriptor leak both anchor at handler.go:19 — and
+	// multi-defect's plants sit on the SAME line of the same file, the
+	// traversal and the descriptor leak both anchor at handler.go:19, and
 	// without it they would collide and this table would silently pin one of
 	// them twice.
 	want := map[string]config.Severity{
@@ -3365,8 +3365,8 @@ func TestPlantedSeveritiesArePinned(t *testing.T) {
 		"capacity-hint-nit/window.go:17/resource":       config.SeverityNit,
 
 		// The warning and nit plants that ended the skew. These are the levels
-		// the corpus previously could not resolve at all — one warning and one
-		// nit across fifteen fixtures — so a drift here is not one plant moving,
+		// the corpus previously could not resolve at all, one warning and one
+		// nit across fifteen fixtures, so a drift here is not one plant moving,
 		// it is the bottom of the scale becoming unmeasurable again.
 		"ts-unbounded-memo-key/src/search.ts:13/resource":   config.SeverityWarning,
 		"go-cancel-goroutine-leak/resolve.go:24/resource":   config.SeverityWarning,
@@ -3376,7 +3376,7 @@ func TestPlantedSeveritiesArePinned(t *testing.T) {
 
 		// The info plants, which took the corpus from four resolvable levels to
 		// five. Each is argued against the anchors in its own SeverityNote, and
-		// each is the FIRST plant of its class at this level — so unlike the
+		// each is the FIRST plant of its class at this level, so unlike the
 		// levels above, nothing else in the corpus disagrees with them yet and
 		// the pin is the only record of what they were.
 		"kotlin-widened-input/src/main/kotlin/com/example/report/Summary.kt:27/maintainability": config.SeverityInfo,
@@ -3473,8 +3473,8 @@ func renderHistogram(h map[config.Severity]int) string {
 // It had exactly one warning and one nit across fifteen fixtures. Two things
 // follow from a shape like that, and both were live defects rather than
 // theoretical ones. A reviewer that answers "critical" to everything scored
-// perfectly on a severity metric — which is why one such metric has already been
-// withdrawn — and ONE defect was the entire unit of resolution for every claim
+// perfectly on a severity metric, which is why one such metric has already been
+// withdrawn, and ONE defect was the entire unit of resolution for every claim
 // either report made about the bottom of the scale: "the reviewer calibrates
 // warnings" and "the reviewer got retry-no-backoff right" were the same
 // sentence, indistinguishable by construction.
@@ -3490,7 +3490,7 @@ func renderHistogram(h map[config.Severity]int) string {
 //  1. A level is ABSENT or it is RESOLVED. One plant at a level cannot
 //     distinguish a calibrated reviewer from a lucky one, so a level present at
 //     all needs at least two. Zero is legal and is not an oversight being
-//     tolerated silently — see the note on info below.
+//     tolerated silently, see the note on info below.
 //  2. No level may hold more than half a corpus's plants, which bounds what a
 //     reviewer with no severity opinion at all can score by answering that level
 //     to everything.
@@ -3499,19 +3499,19 @@ func renderHistogram(h map[config.Severity]int) string {
 //
 // WHAT THIS TEST DOES NOT CLAIM. Balance is not calibration. Nothing here can
 // check that a plant's WantSeverity is the level a senior reviewer would really
-// pick — that is a judgement, argued per plant against the anchors in
+// pick. That is a judgement, argued per plant against the anchors in
 // internal/prompt/templates/review.md and pinned by
 // TestPlantedSeveritiesArePinned. This test is the guard against the OTHER
 // failure, the one that looks like tidying: a corpus rebalanced by RELABELLING
 // is worse than a skewed one, because it looks like evidence. Rule 1 is what
-// stops the cheapest version of that — dialling a single plant down to fill an
-// empty bucket — from ever being enough.
+// stops the cheapest version of that, dialling a single plant down to fill an
+// empty bucket, from ever being enough.
 //
 // INFO IS NO LONGER EMPTY, and the history is worth keeping because rule 1 is
 // what made it end properly. This comment used to say the level was assigned to
 // an author that produced nothing. Five plants were then written and wired into
 // neither corpus, so for a while the level was empty in exactly the way that
-// looks solved in a diff — the fixtures existed, and this test could not see
+// looks solved in a diff, the fixtures existed, and this test could not see
 // them, because it counts what the corpora contain rather than what the package
 // authors. It still counts only that; TestEveryAuthoredFixtureIsWiredIntoExactly
 // OneCorpus is what makes the two agree, and it had the same blind spot until it
@@ -3588,25 +3588,25 @@ func TestTheSeverityDistributionStaysBalanced(t *testing.T) {
 // AllFixtures... except that it is not IN AllFixtures, so it is exercised by
 // nothing at all: no line check, no keyword probe, no severity pin. It is a
 // plant that measures nothing while looking, in the diff that added it, exactly
-// like a plant that does. The reverse — the same fixture in both corpora — is
+// like a plant that does. The reverse, the same fixture in both corpora, is
 // the leak TestHeldOutCorpusStaysHeldOut catches by name; this catches it for
 // everything this package authors.
 //
 // IT MISSED FIVE, AND THE REASON IS THE POINT. It used to read
-// warningFixtures() and nitFixtures() — a hand-written list of the authored sets
+// warningFixtures() and nitFixtures(), a hand-written list of the authored sets
 // that existed on the day it was written. fixtures_info.go then added five info
 // plants and a sixth authored set, and this test was blind to them by
 // construction: golangci-lint reported six unused functions and this test
 // reported nothing, while five fixtures sat in the tree with unchecked lines and
 // unprobed keywords. A guard that has to be edited to keep working is a guard
 // that stops working, and the failure is silent in exactly the case it exists
-// for — the case where somebody authored a fixture and forgot a step.
+// for, the case where somebody authored a fixture and forgot a step.
 //
 // So it DISCOVERS instead. Every zero-argument function in this package's
 // non-test source that returns a Fixture is an authored fixture, and the Name it
 // plants is read out of the source rather than declared here. Nothing has to be
 // added to this test when the next set lands, and a fixture whose Name this scan
-// cannot read is a failure rather than a silent omission — because the one thing
+// cannot read is a failure rather than a silent omission, because the one thing
 // a discovery-based guard must never do is discover nothing and pass.
 func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 	// Fixtures deliberately in NEITHER corpus, with the reason each is out.
@@ -3627,15 +3627,15 @@ func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 
 	// The scan validated against runtime values.
 	//
-	// The authored sets are the record of INTENT — what somebody meant to write
-	// at each level — and the scan is the record of FACT. This map is not what
+	// The authored sets are the record of INTENT, what somebody meant to write
+	// at each level, and the scan is the record of FACT. This map is not what
 	// drives the check above and adding a set to it is not what makes a new
 	// fixture visible: a set nobody lists here is still discovered constructor
 	// by constructor, which is the whole reason the test was rewritten. What it
 	// buys is a check on the SCAN. If constructors ever stop matching the shape
 	// buildsAFixture looks for, every loop driven by the scan quietly measures a
 	// smaller corpus, and cross-batch-replay is the one fixture where nothing
-	// else would notice — it is in no corpus, so the AllFixtures sweep below
+	// else would notice. It is in no corpus, so the AllFixtures sweep below
 	// cannot see it either.
 	for set, fixtures := range map[string][]Fixture{
 		"warningFixtures": warningFixtures(),
@@ -3722,7 +3722,7 @@ func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 // fixture plants.
 //
 // It parses rather than calls, because a Go test cannot invoke a function it
-// only knows the name of — and the alternative, a written-down list of the
+// only knows the name of, and the alternative, a written-down list of the
 // authored sets, is the thing that failed. Constructors in _test.go files are
 // skipped: severity_test.go and crossjudge_test.go build Fixture values for
 // unit tests, and those are not corpus plants and must not be reported as
@@ -3832,7 +3832,7 @@ func plantedFixtureName(fn *ast.FuncDecl) (string, bool) {
 // one either. A headline claim was published on the resulting number and had to
 // be retracted. Fidelity now lives in the parser, and the vocabulary difference
 // is not corrected for anywhere: the second attempt, a banded comparison, was
-// retracted too. It is DESCRIBED instead — see NoCrossToolSeverityScore.
+// retracted too. It is DESCRIBED instead, see NoCrossToolSeverityScore.
 //
 // A word that IS one of our levels must therefore round-trip. That is the whole
 // property: a parsed severity is evidence about the reviewer, and a parser that
@@ -3857,7 +3857,7 @@ func TestIncumbentSeverityIsRecordedNotRewritten(t *testing.T) {
 		}
 	}
 
-	// Unrecognized input must still produce a usable severity — an unknown word
+	// Unrecognized input must still produce a usable severity, an unknown word
 	// has to yield a finding, which is why crSeverity has a default at all.
 	for _, word := range []string{"blocker", "trivial", "", "  ", "banana"} {
 		if got := crSeverity(word); !got.IsFinding() {
@@ -3868,7 +3868,7 @@ func TestIncumbentSeverityIsRecordedNotRewritten(t *testing.T) {
 	// The words crSeverity translates rather than degrades, enumerated.
 	//
 	// crSeverity's default arm is symmetric with our own models by construction
-	// — it calls the same Normalize — and the guard for that only ever tested
+	//, it calls the same Normalize, and the guard for that only ever tested
 	// words that REACH the default. These three do not: they are foreign tokens
 	// given bespoke arms, so the identical word is worth a different level
 	// depending on which contender emitted it, and "major" carries more than
@@ -3914,7 +3914,7 @@ func TestIncumbentSeverityIsRecordedNotRewritten(t *testing.T) {
 //
 // Read that carefully, because the obvious summary of the parser fix is wrong.
 // Recording Incumbent's criticals faithfully does not hand it points back at
-// full resolution — it LOSES one there. Two calls it could not previously win
+// full resolution, it LOSES one there. Two calls it could not previously win
 // became accurate (the hardcoded secret and multi-defect's traversal, both
 // planted critical), and three that were accurate became INFLATED, because the
 // same word it uses for those two is the word it used on plants of error
@@ -3923,7 +3923,7 @@ func TestIncumbentSeverityIsRecordedNotRewritten(t *testing.T) {
 // no constant in crSeverity could have fixed it.
 //
 // A THIRD COLUMN USED TO BE PINNED HERE and is deleted: the banded triple, whose
-// 5/0/2 on this corpus was quoted as "0.62" — it is 0.714 — and offered as the
+// 5/0/2 on this corpus was quoted as "0.62". It is 0.714, and offered as the
 // cross-tool result. It is withdrawn, and reconstructing it says why: a reviewer
 // stamping one blocking word on every finding bands 7/1/0 here against the
 // incumbent's 5/0/2, one that reports only the already-blocking plants bands
@@ -3931,8 +3931,8 @@ func TestIncumbentSeverityIsRecordedNotRewritten(t *testing.T) {
 // See NoCrossToolSeverityScore.
 //
 // WHAT SURVIVES IS NOT A CROSS-TOOL SCORE. These counts are pinned as EVIDENCE
-// about this cache — they catch a fixture edited without re-collecting, and a
-// scorer change that silently moves the incumbent — and Incumbent's own O-*
+// about this cache, they catch a fixture edited without re-collecting, and a
+// scorer change that silently moves the incumbent, and Incumbent's own O-*
 // remains a statement about vocabulary rather than about review quality, because
 // its one "critical" spans two of our levels. The per-plant lines are logged on
 // failure so a disagreement can be read rather than guessed at.
@@ -3944,7 +3944,7 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 	// skew that made these very columns unreadable, and re-collecting the
 	// incumbent's opinion of them is a paid, networked, rate-limited operation
 	// that is not part of authoring a fixture. The guard could not tell that
-	// apart from the failure it exists for — a cached fixture EDITED without
+	// apart from the failure it exists for, a cached fixture EDITED without
 	// re-collecting, which zeroes its counts and reads as the numbers improving.
 	//
 	// So the set is written down instead of derived. Both directions are checked
@@ -3956,8 +3956,8 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 	// incumbent's severity reading now covers EIGHT of the sixteen tuning
 	// fixtures, not all of them, and the eight it omits are exactly the warning,
 	// nit and info plants. Its 2/3/2 is therefore a statement about the corpus
-	// as it stood when it was collected — which was already the honest reading
-	// of it, since it was never a cross-tool score — and it is not evidence
+	// as it stood when it was collected, which was already the honest reading
+	// of it, since it was never a cross-tool score, and it is not evidence
 	// about how the incumbent rates the three levels this corpus previously
 	// could not resolve. Answering that takes a collection run.
 	// Every tuning fixture the incumbent has a cached review for. It was the
@@ -4044,7 +4044,7 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 	// Read it as the whole argument in four numbers. On plants of ERROR the
 	// incumbent prints "critical" three times and "major" twice; on plants of
 	// CRITICAL it prints "critical" twice. One word covering both kinds of plant
-	// is exactly the resolution difference no mapping can repair — and it is why
+	// is exactly the resolution difference no mapping can repair, and it is why
 	// the banded reduction that "fixed" it scored a reviewer with no severity
 	// opinion at all as perfect.
 	//
@@ -4108,8 +4108,8 @@ func TestHeldOutCorpusCanFalsifyInflation(t *testing.T) {
 // set worth having.
 //
 // Its value is entirely that the prompt was never tuned against it. A fixture
-// that leaks into Fixtures() — by being listed in both accessors, or by someone
-// "consolidating" the two — is silently converted into a training example, and
+// that leaks into Fixtures(), by being listed in both accessors, or by someone
+// "consolidating" the two, is silently converted into a training example, and
 // the final generalization number quietly becomes another training score. That
 // is not a failure anyone would notice from a passing run, so it is asserted.
 func TestHeldOutCorpusStaysHeldOut(t *testing.T) {
@@ -4134,11 +4134,11 @@ func TestHeldOutCorpusStaysHeldOut(t *testing.T) {
 	}
 }
 
-// TestHeldOutFixturesAreSelectableByName proves the corpus can actually be run.
+// TestHeldOutFixturesAreSelectableByName proves the corpus can be run.
 //
 // Both halves matter and they pull in opposite directions: naming a held-out
-// fixture must select it — otherwise the set can only be spent by editing code
-// — and naming nothing must not, or a tuning loop consumes the held-out corpus
+// fixture must select it, otherwise the set can only be spent by editing code
+// , and naming nothing must not, or a tuning loop consumes the held-out corpus
 // on its first iteration and no one finds out.
 func TestHeldOutFixturesAreSelectableByName(t *testing.T) {
 	// OptionsFromEnv reads the whole environment, so the sibling variables are
@@ -4193,7 +4193,7 @@ func TestHeldOutFixturesAreSelectableByName(t *testing.T) {
 // HeldOutFixtures() does not add it there, and nothing in the tree noticed:
 // five were added to the corpus in one change and the Makefile still named
 // seven, so the generalization run would have measured a subset and printed a
-// table saying "HELD-OUT corpus (7 fixtures)" — which is true, and is not the
+// table saying "HELD-OUT corpus (7 fixtures)", which is true, and is not the
 // claim anyone reading it would take away.
 //
 // This is the omission twin of TestMistypedFixtureNameIsAnError. That test
@@ -4247,8 +4247,8 @@ func TestTheMakefileSpendsTheWholeHeldOutCorpus(t *testing.T) {
 // corpus unsafe to spend.
 //
 // Selection used to keep whatever it could resolve and silently ignore the
-// rest, so the two cases below both returned the eight TUNING fixtures — the
-// exact wrong answer — with no error, no warning, and a table that does not
+// rest, so the two cases below both returned the eight TUNING fixtures, the
+// exact wrong answer, with no error, no warning, and a table that does not
 // name its corpus. The held-out set is a one-shot instrument selected by a
 // hand-typed six-name line in the Makefile; a typo in it must stop the run.
 func TestMistypedFixtureNameIsAnError(t *testing.T) {
@@ -4290,7 +4290,7 @@ func TestMistypedFixtureNameIsAnError(t *testing.T) {
 // TestFixturesWhoseCorrectReviewIsSilenceHaveNoDefects pins the clean fixtures.
 //
 // A clean fixture only measures precision while it stays clean. Planting a
-// defect in one — or listing a defect for a change that does not have one —
+// defect in one, or listing a defect for a change that does not have one,
 // converts the corpus's only test of restraint into a test of recall, and the
 // precision number stops meaning anything. clean-sql-allowlist is the one that
 // matters most: it is deliberately built to look like the SQL-injection
@@ -4320,7 +4320,7 @@ func TestFixturesWhoseCorrectReviewIsSilenceHaveNoDefects(t *testing.T) {
 // its base.
 //
 // That fixture produces an empty diff, which the engine reports as nothing to
-// review — so it scores as a perfect clean run no matter what the prompt says.
+// review, so it scores as a perfect clean run no matter what the prompt says.
 // A silent free pass is the worst kind of corpus bug: it raises the score.
 func TestEveryFixtureChangesSomething(t *testing.T) {
 	for _, f := range AllFixtures() {
@@ -4338,7 +4338,7 @@ func TestEveryFixtureChangesSomething(t *testing.T) {
 }
 
 // TestEveryPlantedDefectIsReportable builds each fixture into a real repository
-// and checks the engine could actually publish a comment on the planted line.
+// and checks the engine could publish a comment on the planted line.
 //
 // Comparing head text to base text is not enough, which the corpus proved: the
 // held-out SQL migration ADDS a file, `git diff HEAD` omits untracked files, and
@@ -4349,8 +4349,8 @@ func TestEveryFixtureChangesSomething(t *testing.T) {
 // not on an added line and has no added line within snapDistance, so a defect
 // planted on a context line is invisible no matter how well a model reviews:
 // its recall would read as a prompt weakness forever. removed-guard sits on
-// exactly such a line — its defect is the deleted check, and the statement left
-// behind is unchanged text — so this is checked, not reasoned about.
+// exactly such a line. Its defect is the deleted check, and the statement left
+// behind is unchanged text, so this is checked, not reasoned about.
 func TestEveryPlantedDefectIsReportable(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
@@ -4410,8 +4410,8 @@ func TestEveryPlantedDefectIsReportable(t *testing.T) {
 // than one batch. HeldOutFixtures argues its whole tuning/held-out split on
 // that fact, fixtures_warning.go calls the file count load-bearing, and the
 // fixture's own comment declares an invariant tighter still: the three files a
-// reviewer needs in order to SEE the defect — the caller that breaks the
-// contract, the helper that states it, and the control that honours it — must
+// reviewer needs in order to SEE the defect, the caller that breaks the
+// contract, the helper that states it, and the control that honours it, must
 // land in the SAME batch, "because a defect split across batches would be one
 // no reviewer could see, and a plant nothing can find scores as a prompt
 // weakness forever".
@@ -4422,13 +4422,13 @@ func TestEveryPlantedDefectIsReportable(t *testing.T) {
 //   - Deleting the two files the fixture calls "ordinary PR filler" drops it to
 //     five files and ONE batch. The corpus then has zero multi-batch coverage
 //     and every comment above is false.
-//   - Adding one more ordinary file whose path sorts before src/search.ts —
-//     src/format.ts, say — fills the first batch with the six alphabetically
+//   - Adding one more ordinary file whose path sorts before src/search.ts,
+//     src/format.ts, say, fills the first batch with the six alphabetically
 //     earliest paths and pushes search.ts into the second, ALONE with types.ts.
 //     The planted defect is then structurally unfindable: the reviewer reading
 //     the batch that contains it has never seen cache.ts's contract or plans.ts
 //     honouring it, so every model scores a miss and the eval reports a corpus
-//     bug as a prompt weakness — the exact outcome the fixture says must be
+//     bug as a prompt weakness, the exact outcome the fixture says must be
 //     prevented.
 //
 // Both invariants turn on alphabetical position at an exact boundary, which is
