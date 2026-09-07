@@ -95,6 +95,21 @@ type ModelSpec struct {
 	// empty the SDK provider resolves its own conventional variable.
 	APIKeyEnv string `yaml:"api_key_env"`
 
+	// APIKeyKeyring names a secret in the operating system's keystore as
+	// "service/account", for example "open-nitpick/synthetic". Empty still
+	// consults the keystore under a default name; see internal/llm/credential.go.
+	APIKeyKeyring string `yaml:"api_key_keyring"`
+
+	// CredentialCommand is a command whose standard output is the credential,
+	// for a secret manager the keystore cannot reach: 1Password, AWS Secrets
+	// Manager, Vault.
+	//
+	// It is a command and its arguments, not a shell line, and it is run
+	// without a shell. A string split on spaces would make quoting decide
+	// whether an argument containing one is an argument or two, and a shell
+	// would make every character in this field a program.
+	CredentialCommand []string `yaml:"credential_command"`
+
 	Temperature *float64      `yaml:"temperature"`
 	MaxTokens   int           `yaml:"max_tokens"`
 	Timeout     time.Duration `yaml:"timeout"`

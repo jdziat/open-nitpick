@@ -53,7 +53,16 @@ func trustEndpointKeys(getenv func(string) string) bool {
 
 // untrustedSpecKeys are the model-spec keys a repository's own file may not
 // supply. They decide WHERE a request goes and WHICH credential rides along.
-var untrustedSpecKeys = []string{"base_url", "api_key_env", "extra", "allow_private_endpoint"}
+var untrustedSpecKeys = []string{
+	"base_url", "api_key_env", "extra", "allow_private_endpoint",
+
+	// api_key_keyring chooses WHICH stored secret is read and credential_command
+	// is a program this process runs. A repository that could set either would
+	// be choosing the credential sent to an endpoint, or running arbitrary code
+	// in the job holding that credential, which is the same attack base_url and
+	// api_key_env are withheld to prevent.
+	"api_key_keyring", "credential_command",
+}
 
 // pruneUntrusted deletes, from a repository's configuration document, the keys
 // that file is not trusted to supply, and returns a note naming each one.

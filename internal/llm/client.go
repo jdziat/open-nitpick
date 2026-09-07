@@ -8,6 +8,7 @@
 package llm
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -83,10 +84,14 @@ func Build(spec config.ModelSpec) (*Client, error) {
 		// documents allow_private_endpoint as granting both.
 		AllowHTTP: spec.AllowPrivateEndpoint,
 	}
-	if key, ok := spec.APIKey(nil); ok {
+	// Credential resolution: the keystore and a secret manager before the
+	// environment, and the SDK's own conventional variable only when none of
+	// them said anything. See credential.go for the order and why.
+	switch key, ok, err := resolveCredential(context.Background(), spec, nil); {
+	case err != nil:
+		return nil, fmt.Errorf("model %s/%s: %w", spec.Provider, spec.Model, err)
+	case ok:
 		cfg.APIKey = key
-	} else if spec.APIKeyEnv != "" {
-		return nil, fmt.Errorf("model %s/%s: %s is empty", spec.Provider, spec.Model, spec.APIKeyEnv)
 	}
 
 	client, err := llms.New(spec.Provider, cfg)

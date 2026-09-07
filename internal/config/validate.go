@@ -117,6 +117,15 @@ func (s ModelSpec) validate(required bool) []error {
 			}
 		}
 	}
+	for i, arg := range s.CredentialCommand {
+		if strings.TrimSpace(arg) == "" {
+			errs = append(errs, fmt.Errorf("credential_command[%d] is empty", i))
+		}
+	}
+	if n := strings.Count(s.APIKeyKeyring, "/"); s.APIKeyKeyring != "" && n != 1 {
+		errs = append(errs, fmt.Errorf("api_key_keyring %q must be \"service/account\"", s.APIKeyKeyring))
+	}
+
 	if s.Timeout < 0 {
 		errs = append(errs, fmt.Errorf("timeout must not be negative, got %s", s.Timeout))
 	}
