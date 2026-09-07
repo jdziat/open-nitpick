@@ -2,9 +2,9 @@
 // schema.
 //
 // Provider construction goes through the SDK's by-name registry, so every
-// provider the SDK supports — including local ollama and llama.cpp servers and
-// any OpenAI-compatible gateway reached via base_url — is usable from
-// .nitpick.yaml without changes here.
+// provider the SDK supports, including local ollama and llama.cpp servers and
+// any OpenAI-compatible gateway reached via base_url, is usable from.
+// nitpick.yaml without changes here.
 package llm
 
 import (
@@ -48,8 +48,8 @@ type Client struct {
 	// stallRetries is how many times a request whose answer never finished
 	// arriving is sent again; see generateTyped. It shares max_retries with
 	// the SDK's transient-failure retries, because both answer the same
-	// question — how many times this deployment is willing to pay for one
-	// batch — and a config that lowers one has no reason to want the other.
+	// question, how many times this deployment is willing to pay for one
+	// batch, and a config that lowers one has no reason to want the other.
 	stallRetries int
 }
 
@@ -149,9 +149,9 @@ type Roles struct {
 	Review *Client
 	Triage *Client
 
-	// Validate is the expert-validation client. It may be nil — callers that
+	// Validate is the expert-validation client. It may be nil, callers that
 	// assemble Roles by hand, such as the eval harness, only name the roles
-	// they are measuring — so read it through Validator rather than directly.
+	// they are measuring, so read it through Validator rather than directly.
 	Validate *Client
 
 	// Router is the batch classifier, nil when no route needs one.
@@ -342,7 +342,7 @@ func (c *Client) CallOptions() []llms.CallOption {
 		opts = append(opts, llms.WithMaxTokens(c.Spec.MaxTokens))
 	case strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "anthropic"):
 		// Anthropic's API requires max_tokens, and the SDK fills an unset
-		// one with 4,096 — a cap a reasoning model's thinking exhausts on
+		// one with 4,096, a cap a reasoning model's thinking exhausts on
 		// an ordinary review. Every other provider is sent no cap at all
 		// when none is configured, so the model's own maximum applies;
 		// this is the closest the direct Anthropic path can get without

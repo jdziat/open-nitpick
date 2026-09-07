@@ -194,8 +194,8 @@ func TestExplainConfigNamesThePolicySource(t *testing.T) {
 // TestGateIgnoresTheChangesOwnFailOn is the last knob the invariant has to
 // cover. The engine reviews a config-editing change under a policy resolved
 // elsewhere, and then the CLI decides the exit status, so reading fail_on from
-// the loaded file here would hand the change back the only setting that decides
-// whether CI goes red, after every other setting had been taken away.
+// the loaded file here would hand the change back the one setting that decides
+// whether CI goes red, when every other setting comes from the resolved policy.
 func TestGateIgnoresTheChangesOwnFailOn(t *testing.T) {
 	// The configuration as the change wrote it: never fail the build.
 	supplied := config.Defaults()
@@ -348,11 +348,11 @@ func TestExplainConfigDoesNotPromiseSubstitutionForAnOutsideConfig(t *testing.T)
 	}
 }
 
-// TestExplainConfigNamesTheFileItLookedFor covers the silence a missing config
-// used to produce. LoadFile treats an absent file as "use built-in defaults", so
-// a mistyped -config path resolves to a configuration the operator never wrote,
-// and the command that exists to answer "what does my config resolve to"
-// answered as though the file had been read.
+// TestExplainConfigNamesTheFileItLookedFor covers the silence around a missing
+// config. LoadFile treats an absent file as "use built-in defaults", so a
+// mistyped -config path resolves to a configuration the operator never wrote,
+// and the command that exists to answer "what does my config resolve to" must
+// name the file it looked for rather than report defaults as though it read one.
 func TestExplainConfigNamesTheFileItLookedFor(t *testing.T) {
 	t.Setenv(config.EnvProvider, "openai")
 	t.Setenv(config.EnvModel, "gpt-4o")

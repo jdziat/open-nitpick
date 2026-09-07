@@ -14,12 +14,12 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
-// clearModelEnv empties every variable that can supply a model's credential OR
+// clearModelEnv empties every variable that can supply a model's credential or
 // its endpoint, so a test claiming "only OPENROUTER_API_KEY is set" is telling
 // the truth on a developer machine that has the others exported.
 //
-// LLM_BASE_URL is in the list because config.LoadFile calls applyEnv AFTER
-// sanitize, and applyEnv fills Models.Default.BaseURL whenever it is empty —
+// LLM_BASE_URL is in the list because config.LoadFile calls applyEnv after
+// sanitize, and applyEnv fills Models.Default.BaseURL whenever it is empty,
 // which is exactly the post-sanitize state of the shipped config. Without this,
 // TestDefaultConfigSurvivesSanitize passed or failed according to the
 // developer's shell rather than according to the code.
@@ -56,8 +56,8 @@ func TestOpenRouterBuildsWithOnlyItsOwnKey(t *testing.T) {
 	}
 }
 
-// TestOpenRouterMissingKeyIsNamed covers the failure an operator will actually
-// hit. The OPENAI_API_KEY case is the one with teeth: delegating the lookup to
+// TestOpenRouterMissingKeyIsNamed covers the failure an operator hits in
+// practice. The OPENAI_API_KEY case is the one with teeth: delegating the lookup to
 // the openai provider would accept that key, send a credential minted for
 // api.openai.com to openrouter.ai, and report the wrong variable when it was
 // rejected.
@@ -89,7 +89,7 @@ func TestOpenRouterConfigDefaults(t *testing.T) {
 		}
 		// Spelled out rather than compared to openRouterBaseURL: restating the
 		// constant would pass for any value, including the openai provider's
-		// own default, which is precisely the failure this guards.
+		// own default, and that is the failure this guards.
 		if got.BaseURL != "https://openrouter.ai/api/v1" {
 			t.Errorf("BaseURL = %q, want OpenRouter's endpoint", got.BaseURL)
 		}
@@ -127,8 +127,8 @@ func TestOpenRouterConfigDefaults(t *testing.T) {
 	})
 
 	t.Run("the vendor-specific key beats the generic one", func(t *testing.T) {
-		// The subtest above proves LLM_API_KEY is ACCEPTED, which is silent
-		// about ORDER: swapping the two lookups in openRouterConfig left the
+		// The subtest above proves LLM_API_KEY is accepted and says nothing
+		// about order. Swapping the two lookups in openRouterConfig left the
 		// whole package green. Order is the point of this factory. An operator
 		// with OPENROUTER_API_KEY set, and LLM_API_KEY exported by some other
 		// tool for some other vendor, must not have that other credential sent
@@ -164,7 +164,7 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 
 	// The stub is on loopback, which the SDK's SSRF guard blocks by default.
 	// Both opt-ins are set here on the spec directly; a config file cannot do
-	// this, which is the property TestDefaultConfigSurvivesSanitize covers.
+	// this, and TestDefaultConfigSurvivesSanitize covers that property.
 	client, err := Build(config.ModelSpec{
 		Provider:             ProviderOpenRouter,
 		Model:                "qwen/qwen3.7-flash",
@@ -189,7 +189,7 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 }
 
 // TestDefaultConfigSurvivesSanitize is the property the whole provider exists
-// for, asserted against the file this repository actually ships.
+// for, asserted against the file this repository ships.
 //
 // sanitize() strips base_url and api_key_env from an untrusted config, so a
 // default built on those keys would work only for whoever exported
@@ -197,9 +197,9 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 // neither: nothing is dropped, and both roles build with only OPENROUTER_API_KEY
 // in the environment.
 //
-// What it does NOT assert: that the endpoint is unreachable by any means. An
+// What it does not assert: that the endpoint is unreachable by any means. An
 // operator who exports LLM_BASE_URL still redirects it, because applyEnv fills
-// an empty BaseURL from the environment. That is deliberate — the environment
+// an empty BaseURL from the environment. That is deliberate, the environment
 // belongs to whoever runs the tool, and the untrusted input this guards against
 // is the config FILE, which a pull request can rewrite. clearModelEnv is what
 // keeps the distinction from turning into a flaky assertion.
@@ -208,7 +208,7 @@ func TestDefaultConfigSurvivesSanitize(t *testing.T) {
 	t.Setenv(config.EnvTrustConfigEndpoints, "")
 	t.Setenv(envSyntheticAPIKey, "syn_test")
 
-	// Relative to the package directory, which is where go test runs.
+	// Relative to the package directory, where go test runs.
 	cfg, err := config.LoadFile("../../.nitpick.yaml")
 	if err != nil {
 		t.Fatalf("load the repository's own config: %v", err)

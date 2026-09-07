@@ -94,7 +94,7 @@ func TestCRParseLocationKeepsBothEnds(t *testing.T) {
 // TestAlsoAppliesIsScored is the regression test for a false MISS.
 //
 // Incumbent reported the SQL injection with its primary anchor on the import
-// block -- because the fix it proposed deletes the fmt import -- and named the
+// block (because the fix it proposed deletes the fmt import) and named the
 // interpolation itself only under "Also applies to: 15-18". The planted defect
 // is store.go:17. Reading the primary anchor alone put it 11 lines away and
 // recorded Incumbent as having missed a defect it had explicitly located.

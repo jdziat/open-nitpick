@@ -492,7 +492,7 @@ func scriptValidation(t *testing.T, finding Finding, verdict string) *scriptedLL
 }
 
 // TestRefutedFindingsAreReportedNotVanished is the end-to-end guarantee: an
-// overruled finding is withheld from the pull request AND recorded, with who
+// overruled finding is withheld from the pull request and recorded, with who
 // overruled it and why. A finding that disappeared would be a bug that
 // looks like quality.
 func TestRefutedFindingsAreReportedNotVanished(t *testing.T) {
@@ -910,9 +910,9 @@ func TestExpertSystemCarriesBothThePersonaAndTheContract(t *testing.T) {
 		}
 	}
 	// Routing is done on the words in a claim and is sometimes wrong. Without
-	// this clause a misroute is not a less informed opinion, it is a deletion:
-	// every prompt's refutation list is a set of domain-membership tests, and
-	// "this is not a credential" is a named reason.
+	// this clause a misroute is a deletion: every prompt's refutation list is a
+	// set of domain-membership tests, and "this is not a credential" is a named
+	// reason.
 	if !strings.Contains(system, "wrong specialist") {
 		t.Errorf("nothing tells the expert that being misrouted refutes nothing:\n%s", system)
 	}
@@ -951,10 +951,9 @@ func TestRevisedSeverityIsNotSchemaRequired(t *testing.T) {
 	if _, ok := schema.Properties["revised_severity"]; !ok {
 		t.Error("revised_severity is missing from the schema entirely")
 	}
-	// reason is required on every verdict: it is the one field that makes a
-	// verdict auditable in the log, and the engine's own check that a refutation
-	// carries one is not a substitute, JSON-mode providers do not enforce
-	// required either.
+	// A verdict is auditable in the log only through its reason, so the schema
+	// has to require it. The engine's own check that a refutation carries one
+	// is no substitute, since JSON-mode providers do not enforce required.
 	if !slices.Contains(schema.Required, "reason") || !slices.Contains(schema.Required, "verdict") {
 		t.Errorf("required = %v, want both verdict and reason", schema.Required)
 	}

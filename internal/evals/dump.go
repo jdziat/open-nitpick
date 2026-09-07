@@ -65,7 +65,7 @@ type DumpRecord struct {
 	// fails on it rather than inserting a blank finding at 0.
 	Index int `json:"index"`
 
-	// Silent marks a review that reported NOTHING.
+	// Silent marks a review that reported nothing.
 	//
 	// Such a review used to write no lines at all, which made it indomitably
 	// ambiguous: a contender that stayed correctly silent on a clean fixture
@@ -87,7 +87,7 @@ type DumpRecord struct {
 	Findings int `json:"findings,omitempty"`
 
 	// Verdicts is how many verdicts the judge returned for the whole sample,
-	// which is NOT recoverable from the lines themselves.
+	// which is not recoverable from the lines themselves.
 	//
 	// This file attaches at most one verdict per finding position, so a judge
 	// that answered index 0 twice, or answered an index that has no finding,
@@ -112,11 +112,11 @@ type DumpRecord struct {
 
 	// AlsoAt are the further regions the finding claimed.
 	//
-	// IT IS RECORDED FOR THE SCORER, NOT FOR THE JUDGE, and it was omitted for
+	// IT IS RECORDED FOR THE SCORER, not FOR THE JUDGE, and it was omitted for
 	// exactly that reason: judgeRequest shows one location per finding, so a
 	// secondary span changes nothing about the prompt a re-judge rebuilds. What
 	// it does change is every detection number. anchorDistance takes the minimum
-	// over the primary span AND every region here, and coverInto unions them, so
+	// over the primary span and every region here, and coverInto unions them, so
 	// ANCHOR and NOISE are both computed from this field, and Incumbent is the
 	// reviewer that fills it, from its "Also applies to" lines.
 	//
@@ -139,16 +139,16 @@ type DumpRecord struct {
 	// loss would be invisible in most of the file and decisive in the rest.
 	AlsoAt []review.LineSpan `json:"also_at,omitempty"`
 
-	// Severity is the level THIS PROJECT recorded the finding at. It is not
+	// Severity is the level this PROJECT recorded the finding at. It is not
 	// necessarily a word the reviewer used, and the two fields below say which.
 	//
 	// THE BUG: it was written under a bare "severity" key beside
 	// "model":"incumbent/cli", so the artifact every downstream reading is
 	// re-derived from published our translation of a foreign vocabulary as the
 	// reviewer's own severity. review.Finding.RawSeverity carries `json:"-"`, so
-	// the word the reviewer printed could not reach this file at all,
-	// the substitution the tables had been fixed for survived one layer down, in
-	// the file a reader goes to when they doubt the tables.
+	// the word the reviewer printed cannot reach this file on its own, so the
+	// substitution the tables were fixed for reappears one layer down, in the
+	// file a reader goes to when they doubt the tables.
 	Severity string `json:"severity"`
 
 	// SeveritySaid is the word the REVIEWER printed, when this project rewrote it
@@ -207,11 +207,10 @@ type DumpRecord struct {
 	// understated, against WantSeverity, comparing EXACT levels. Precomputed so
 	// a reader does not reimplement the severity ordering to recover it.
 	//
-	// A second, banded verdict used to be written beside it as band_delta, for
-	// the cross-tool columns that are now withdrawn. It is gone rather than
-	// merely unprinted: a field carried in the dump is a number someone will
-	// aggregate, and this one is maximised by rating everything critical. See
-	// NoCrossToolSeverityScore.
+	// No banded verdict is written beside it as band_delta. The cross-tool
+	// columns it served are withdrawn, and a field carried in the dump is a
+	// number someone will aggregate, this one maximised by rating everything
+	// critical. See NoCrossToolSeverityScore.
 	SeverityDelta string `json:"severity_delta,omitempty"`
 
 	// DefectWhy is the planted defect's own description, so a line of this file
@@ -291,43 +290,7 @@ const runDumpDir = ".eval-runs"
 // OpenRunDump opens the dump a battery writes its own findings to, whether or
 // not anybody asked for one.
 //
-// THE RUN IT EXISTS FOR HAS ALREADY HAPPENED. The held-out battery that produced
-// the Rule 14 evidence ran with EnvDump unset, so OpenDump returned nil, every
-// Record call was a no-op, and the finding lists sat in memory for the whole of
-// a paid run and were written nowhere. Two of Rule 14's four conditions then
-// needed a re-run to evaluate, against a corpus whose own label says it is
-// spent once. Retention is not a diagnostic convenience here; it is what makes
-// the next held-out spend the last one required for a model-free column, because
-// RECALL, NOISE, ANCHOR and L/DEF are pure functions of (findings, fixture) and
-// need no judge and no network to recompute.
-//
-// THE RECORDING IS NOT GATED ON THE JUDGE, and saying so is load-bearing rather
-// than decorative: the arithmetic needing no judge is worth nothing if the write
-// happens after a judge call that can fail. It did, and a review whose judge call
-// errored was discarded, findings already paid for, and on the incumbent's side
-// drawn from a rate-limited allowance the benchmark's live path does not even
-// cache. TestEveryPaidReviewIsRetainedWhateverTheJudgeSays holds the write above
-// every return that follows the judge.
-//
-// It does NOT change OpenDump. That function's nil-on-unset contract is shared
-// by the remaining callers and pinned by TestDumpDisabledCostsNothing, and the
-// nil no-op is what lets every call site drop a record unconditionally; a
-// default resolved inside it would also leave EnvDump empty, which is what the
-// re-judge path's collision check used to be the whole of. Batteries that want
-// retention ask for it here.
-//
-// WHICH BATTERIES THOSE ARE IS DERIVED, NOT LISTED, and the earlier version of
-// this sentence is why. It said the tuning axes still used OpenDump deliberately
-// because "their corpus can be reviewed again", true of TestTunePersona, the
-// one battery that remains on OpenDump, and false of TestJudgeModels, which
-// prints the same judged table the head-to-head does and which
-// `make judge-models FIXTURES=$(HELD_OUT)` points at the spent-once corpus. A
-// class of caller was named where a property of one was meant.
-// TestEveryJudgedBatteryRetainsItsFindingsWithoutBeingAsked now derives the list
-// from the table: anything calling reportJudgedModels must open through here.
-//
-// battery names the caller, so a directory of retained runs says which produced
-// each file.
+// The note behind it is in docs/measurement.md#openrundump.
 func OpenRunDump(battery string, fixtures []Fixture) (*Dump, string, error) {
 	return openRunDumpAt(runDumpDir, battery, fixtures, time.Now().UTC(), os.Getpid())
 }

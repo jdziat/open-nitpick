@@ -7,15 +7,14 @@ import (
 	"github.com/jdziat/open-nitpick/internal/bundle"
 )
 
-// TestWindowedFilesAreDisclosed is the regression test for a disclosure that
-// went missing while the context handling got better.
+// TestWindowedFilesAreDisclosed guards a disclosure that better context
+// handling can quietly drop.
 //
-// A file too large for its full content used to be refused outright, landing
-// in Plan.Degraded, which the summary prints. Windowing it instead is an
-// improvement (a window beats a bare diff), but it moved the file onto
-// Plan.Windowed, which nothing rendered. The reader went from being told "this
-// was reviewed from the diff alone" to being told nothing, on a file where
-// most of the content had been elided.
+// Refusing a file too large for its full content lands it in Plan.Degraded,
+// which the summary prints. Windowing it instead is the better review, and it
+// moves the file onto Plan.Windowed, so a renderer that skips that list takes
+// the reader from "this was reviewed from the diff alone" to nothing at all,
+// on a file where most of the content is elided.
 func TestWindowedFilesAreDisclosed(t *testing.T) {
 	report := &Report{
 		Summary: "Walkthrough.",
@@ -38,8 +37,8 @@ func TestWindowedFilesAreDisclosed(t *testing.T) {
 	if !strings.Contains(summary, "Reviewed with reduced file context") {
 		t.Errorf("the windowed section must carry the heading bundle.Plan.Windowed's doc cites:\n%s", summary)
 	}
-	// The wording has to distinguish it from both neighbours: this file WAS
-	// reviewed, and it DID carry file context, just not all of it.
+	// The wording has to distinguish it from both neighbours: this file was
+	// reviewed, and it did carry file context, just not all of it.
 	if strings.Contains(summary, "Files not reviewed") {
 		t.Errorf("a reviewed file must not be listed as unreviewed:\n%s", summary)
 	}

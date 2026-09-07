@@ -6,8 +6,8 @@ package linters
 // mapSeverity is one expression away from the behaviour that matters, and the
 // defect these tests exist for was invisible from there: the function returned a
 // perfectly reasonable severity, and the hole was that review.fail_on accepts a
-// level the function could not produce. Only the composition — analyzer output,
-// mapping, publication policy, exit gate — can be wrong in that way, so that is
+// level the function could not produce. Only the composition, analyzer output,
+// mapping, publication policy, exit gate, can be wrong in that way, so that is
 // what is asserted. The analyzer's JSON goes in at one end and a CI verdict
 // comes out at the other; the only thing stubbed is process execution.
 
@@ -47,24 +47,14 @@ const semgrepCritical = `{"results":[{"check_id":"go.lang.security.audit.dangero
 	`"extra":{"message":"Command built from user input","severity":"CRITICAL"}}]}`
 
 // scriptedTriage is a triage model with two modes, and choosing the wrong one
-// makes a test decorative.
-//
-// With rerate empty it ECHOES: it reads each severity back out of the rendered
-// prompt rather than being handed one, so the analyzer's level stays
-// load-bearing all the way to the gate. A scripted `"severity":"critical"` would
-// publish a critical no matter what mapSeverity did.
-//
-// With rerate set it RE-RATES every finding to that level, ignoring what it was
-// shown. That is not an exotic model: prompt/templates/triage.md rule 3 tells
-// the triage pass to "raise anything whose blast radius is larger than the
-// original reviewer could see", and Validator.revise moves severities in both
-// directions on purpose. Any claim that a policy caps what a run ACTS on has to
-// be asserted against this mode — the echoing mode can only ever return the
-// level the policy already produced, so it would confirm the claim whether the
-// policy reached the gate or not.
-//
-// retitle rewords every finding, which changes review.Finding.Key() and is how
-// a test reaches the one case the ceiling cannot describe.
+// makes a test decorative. With rerate empty it echoes, reading each severity
+// out of the rendered prompt, so the analyzer's level stays load-bearing to
+// the gate. With rerate set it re-rates every finding to that level, the
+// ordinary case, since triage.md rule 3 tells the pass to raise anything whose
+// blast radius is larger than the original reviewer could see. A claim that a
+// policy caps what a run acts on has to be asserted against the second mode.
+// retitle rewords findings, changing review.Finding.Key(), the one case the
+// ceiling cannot describe.
 type scriptedTriage struct {
 	mu sync.Mutex
 
@@ -72,11 +62,12 @@ type scriptedTriage struct {
 	retitle string
 
 	// rendered is every triage prompt seen, so a test can assert on the level
-	// the pipeline actually put in front of the model.
+	// the pipeline put in front of the model.
 	rendered []string
 }
 
-// triageLine matches renderForTriage's "1. [severity] path:line — title".
+// triageLine matches renderForTriage's numbered line: an index, the severity in
+// brackets, the location, an em dash, then the title.
 var triageLine = regexp.MustCompile(`(?m)^\d+\. \[([^\]]+)\] ([^:\n]+):(\d+) — (.+)$`)
 
 func (e *scriptedTriage) GenerateContent(_ context.Context, msgs []llms.Message, _ ...llms.CallOption) (*llms.Response, error) {
@@ -214,8 +205,8 @@ func reviewLinterFindings(t *testing.T, runner string, found []Finding, model *s
 //
 // THE BUG: mapSeverity's codomain excluded critical, because "CRITICAL" folded
 // onto error alongside "HIGH". review.fail_on accepts "critical", so a
-// repository configured `fail_on: critical` got ZERO gating from semgrep — the
-// only one of the four analyzers whose own scale HAS a critical — and from any
+// repository configured `fail_on: critical` got ZERO gating from semgrep, the
+// only one of the four analyzers whose own scale HAS a critical, and from any
 // golangci-lint whose severity settings name one. The build went green on a
 // finding the analyzer itself called critical, which is the one case that
 // configuration exists to stop, and nothing reported the gap.
@@ -274,8 +265,8 @@ func TestFailOnCriticalGatesOnAnAnalyzerCritical(t *testing.T) {
 // belongs to the operator, so it is configuration.
 //
 // THE BUG: moving the reduction to policy time put it in linters' normalize,
-// which runs BEFORE triage. Triage is told to raise severities and the expert
-// pass revises in both directions, and neither reapplied the ceiling — so an
+// which runs before triage. Triage is told to raise severities and the expert
+// pass revises in both directions, and neither reapplied the ceiling, so an
 // operator who wrote max_severity: warning had capped what triage was SHOWN and
 // nothing else, and a re-rated semgrep finding still failed a critical gate. The
 // first version of this test could not see that: it used the echoing double, and
@@ -343,7 +334,7 @@ func TestMaxSeverityHoldsAgainstATriageThatRaises(t *testing.T) {
 // loses all three together: the finding is published with no analyzer named, as
 // triage's own. The ceiling is documented as a ceiling on findings ATTRIBUTED to
 // an analyzer, and this is the run where that qualifier does work. Pinning it
-// means widening the hole — restoring Source but not the marker, say — fails
+// means widening the hole, restoring Source but not the marker, say, fails
 // here instead of silently disabling a policy an operator set.
 func TestARewordedAnalyzerFindingIsNoLongerTheAnalyzers(t *testing.T) {
 	model := &scriptedTriage{
@@ -412,7 +403,7 @@ const semgrepExperiment = `{"results":[{"check_id":"go.lang.correctness.experime
 // TestAnUnreadableAnalyzerWordStillClearsAMinSeverityOfWarning is the
 // publication consequence the mapping table cannot show on its own.
 //
-// THE BUG IT PINS: aligning the unreadable-word floor with a MODEL's — info —
+// THE BUG IT PINS: aligning the unreadable-word floor with a MODEL's, info,
 // looked like a symmetry fix and was a silent deletion. A repository with
 // review.min_severity: warning, which an operator sets to cut noise, published
 // nothing at all for these findings; before the alignment it published them at
@@ -436,7 +427,7 @@ func TestAnUnreadableAnalyzerWordStillClearsAMinSeverityOfWarning(t *testing.T) 
 
 // golangciNit is real golangci-lint 2.8.0 JSON, produced by running it over a
 // bad Printf with `severity: {default: nit}` in .golangci.yml. The Severity
-// field is that configured text verbatim — golangci-lint has no severity
+// field is that configured text verbatim, golangci-lint has no severity
 // vocabulary of its own.
 const golangciNit = `{"Issues":[{"FromLinter":"govet",` +
 	`"Text":"printf: fmt.Printf format %d has arg \"x\" of wrong type string",` +
@@ -449,7 +440,7 @@ const golangciNit = `{"Issues":[{"FromLinter":"govet",` +
 // it up to info would be an unjustified reduction pointed the other way. But nit
 // is the ONE level below review.min_severity's default of info, so
 // `severity.default: nit` in a .golangci.yml publishes no Go analyzer findings
-// at all — including compile errors, which golangci-lint reports through
+// at all, including compile errors, which golangci-lint reports through
 // typecheck and severity.default blankets like everything else. Both
 // configurations are doing what they say; the combination is the surprise, and
 // the second half of this test shows the operator's own floor is what decides

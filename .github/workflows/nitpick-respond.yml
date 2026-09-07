@@ -1,4 +1,4 @@
-# open-nitpick answering @nitpick comments on its own pull requests.
+# open-nitpick answering @open-nitpick comments on its own pull requests.
 name: Respond
 
 on:
@@ -29,12 +29,12 @@ jobs:
     # A comment event runs HERE, in the base repository, with this
     # repository's secrets, whoever wrote the comment. Without the
     # author_association test, every account on GitHub can spend the model
-    # credit one "@nitpick" at a time, and each attempt also burns a runner.
+    # credit one "@open-nitpick" at a time, and each attempt also burns a runner.
     # `nitpick respond` refuses the same set by itself (review.respond.from),
     # so this is the cheap half of the same gate: it stops the runner from
     # starting rather than stopping it after checkout.
     if: >-
-      contains(github.event.comment.body, '@nitpick') &&
+      contains(github.event.comment.body, '@open-nitpick') &&
       (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request != null) &&
       contains(
         fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),

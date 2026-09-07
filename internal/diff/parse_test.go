@@ -148,8 +148,8 @@ func TestPositionsContinueAcrossHunks(t *testing.T) {
 	if last.Position != 4 {
 		t.Errorf("last position of hunk 1 = %d, want 4", last.Position)
 	}
-	// The *second* header is an ordinary diff line and takes position 5, so
-	// hunk 2's first line is 6.
+	// Position 5 goes to the *second* header, an ordinary diff line, so the
+	// next hunk opens at 6.
 	first := f.Hunks[1].Lines[0]
 	if first.Position != 6 {
 		t.Errorf("first position of hunk 2 = %d, want 6 (the second header consumes a position)", first.Position)
@@ -403,7 +403,7 @@ func TestPositionLookup(t *testing.T) {
 func TestSideAndAnchorLine(t *testing.T) {
 	// line+side is the supported anchor; position is closing down. Deletions
 	// must anchor to the old file on LEFT, everything else to the new file on
-	// RIGHT, or comments land on unrelated code.
+	// Right, or comments land on unrelated code.
 	files, _ := Parse([]byte(modifiedDiff))
 	lines := files[0].Hunks[0].Lines
 
@@ -426,7 +426,7 @@ func TestSideAndAnchorLine(t *testing.T) {
 		t.Errorf("added line anchor = %d, want new-file line 13", added.AnchorLine())
 	}
 
-	// Unchanged lines are commentable on the right side.
+	// A context line is commentable, and it belongs to the right-hand file.
 	if lines[0].Side() != SideRight {
 		t.Errorf("context line side = %q, want RIGHT", lines[0].Side())
 	}

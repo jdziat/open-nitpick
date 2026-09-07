@@ -841,7 +841,7 @@ func TestPromptSizeCountsTheCachedSubset(t *testing.T) {
 //
 // THE BUG the presence test fixes: the whole llms.Usage was compared against its
 // zero value, and TotalTokens is copied through verbatim from any OpenAI-shaped
-// endpoint. A provider reporting ONLY a total therefore passed as a complete
+// endpoint. A provider reporting only a total therefore passed as a complete
 // report, contributed no priced tokens, and rendered as $0.000000 across every
 // cost column, known, unfootnoted, and the cheapest row in the table.
 func TestACallReportingNoUsageIsNotPricedAsZero(t *testing.T) {
@@ -1156,7 +1156,7 @@ func TestJudgeSpendIsNotAContenderCost(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Tiers and cache pricing, honestly.
+// Tiers and cache pricing.
 // -----------------------------------------------------------------------------
 
 // TestATierIsChosenPerCallAndNotFromAnAggregate is why usage is kept call by
@@ -1274,14 +1274,14 @@ func TestAPublishedFreeCacheRateIsNotTheInputFallback(t *testing.T) {
 // a charge this table cannot represent.
 //
 // The two anthropic entries publish a 1-hour cache TTL at 1.6x the 5-minute
-// rate. A usage report says how many cache-creation tokens were written and NOT
+// rate. A usage report says how many cache-creation tokens were written and not
 // which TTL they were written at, so the amount is one of two numbers 1.6x apart
 // and nothing here can say which. It was billed silently at the 5-minute rate,
 // the cheaper of the two, which is the flattering direction.
 //
-// Nothing in open-nitpick enables prompt caching today, which is exactly why
-// this is encoded rather than left as the comment it used to be: "no path sends
-// these tokens" is a property of this month's call sites.
+// Nothing in open-nitpick enables prompt caching today, which is why this is
+// encoded rather than left as a comment: "no path sends these tokens" is a
+// property of this month's call sites.
 func TestTwoPublishedCacheWriteRatesMakeTheCallUnpriceable(t *testing.T) {
 	table := mustPrices(t, "models:\n"+priceEntry("test/ttl", "2026-08-01", 1, 10,
 		"    cache_write: 4\n    cache_write_1h: 6.4\n"))
@@ -1446,23 +1446,9 @@ func TestTwoAmountsWithOverlappingBandsAreNotOrderable(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 // costFixture is one fixture of the battery the strategies below are run over:
-// a REAL fixture, plus what reviewing it costs to send.
+// a real fixture, plus what reviewing it costs to send.
 //
-// It was a synthetic tuple, a name, a planted count and a prompt size, and the
-// strategies returned hand-written Detections beside it. That made this whole
-// block a test of CostRow's arithmetic over numbers a person typed, and the two
-// numbers most often typed were FALSE for the behaviours their own rows named:
-// the line-spammer declared `Noise: 40` and the wide-anchor strategy declared
-// `WidestAnchor: 900`, while the real scorer, run over reviews of that shape,
-// returned 0 and 1. A guard cannot demonstrate that a column sees a behaviour by
-// being handed the number the column would print if it did.
-//
-// So the corpus is the corpus, and every strategy publishes findings that go
-// through ScoreRun. What remains declared is the USAGE, and that is not the same
-// kind of thing: token usage is what a provider REPORTS about a call, it is not
-// derivable from the findings, and the ledger's job is precisely to combine a
-// reported usage with an observed detection. Faking the reported half is
-// modelling a provider; faking the observed half was faking the answer.
+// The note behind it is in docs/measurement.md#costfixture.
 type costFixture struct {
 	Fixture
 
@@ -1514,21 +1500,10 @@ func dearFixture(f costFixture) bool {
 // without being short on coverage, the gap a set-based check could not see.
 const costRunsPerFixture = 2
 
-// costPrices is the rate table the degenerate-strategy rows are priced against.
+// costPrices is the rate table the degenerate-strategy rows are priced
+// against.
 //
-// THIS COMMENT USED TO CLAIM it "prices the two models every strategy is run
-// as", and that was FALSE when it was written. The "a model nobody priced"
-// strategy sets costStrategy.model to test/unpriced precisely so that it is
-// absent from here, being unpriced IS that row's behaviour, and it is the one
-// strategy in the table whose whole argument depends on a missing entry. Read as
-// a guarantee of complete coverage, the old sentence said no such row could
-// exist, in a file where one does. Two of the three ids the strategies run as
-// are below; the third is deliberately missing, and
-// TestAModelWithNoPriceEntryReportsUnknownAndNotZero pins the reading its
-// absence has to produce.
-//
-// Deliberately a literal rather than the shipped table: a degeneracy guard that
-// moves when somebody recaptures a rate is a guard nobody will trust.
+// The note behind it is in docs/measurement.md#costprices.
 func costPrices(t *testing.T) *PriceTable {
 	t.Helper()
 	return mustPrices(t, "models:\n"+
@@ -1554,7 +1529,7 @@ type costStrategy struct {
 	// while still having happened.
 	run func(f costFixture, run int) (findings []review.Finding, usage CallUsage, reported bool)
 
-	// maxes declares, for EVERY published cost reading by name, whether this
+	// maxes declares, for every published cost reading by name, whether this
 	// strategy is expected to score at least as well as the calibrated reviewer.
 	// Every cell must be filled: publishing a new cost column means answering,
 	// for each of these, "can this behaviour score as well as being useful?"
@@ -1575,14 +1550,11 @@ type costStrategy struct {
 }
 
 // calibratedCostRun is the reference: it publishes the calibrated review of
-// every fixture, and its provider reports what it spent. A cost reading is worth
+// every fixture, and its provider reports what it spent. A cost reading is
+// worth
 // publishing only if being useful beats being degenerate on it.
 //
-// Its completion cost is per finding because that is the term every strategy
-// below moves: a reviewer is billed for what it wrote, and "say forty empty
-// things instead of three explained ones" is a claim about output tokens that
-// has to be expressible or the NOISE column has nothing to be load-bearing
-// against.
+// The note behind it is in docs/measurement.md#calibratedcostrun.
 func calibratedCostRun(f costFixture, _ int) ([]review.Finding, CallUsage, bool) {
 	findings := calibratedReview(f.Fixture)
 	return findings, CallUsage{Prompt: f.prompt, Completion: explainedTokens * len(findings)}, true
@@ -1591,11 +1563,7 @@ func calibratedCostRun(f costFixture, _ int) ([]review.Finding, CallUsage, bool)
 // explainedTokens is what one EXPLAINED finding costs to write, and spamTokens
 // what one empty one costs.
 //
-// The gap between them is the whole content of the line-spammer row: a comment
-// carrying a reason is many times the output of a comment carrying none, which
-// is why saying everything is cheaper than saying three useful things. Ten to
-// one is conservative. A real rationale runs longer than ten times a one-line
-// nit, and the row is only claiming the sign of the difference.
+// The note behind it is in docs/measurement.md#explainedtokens-is-what-one-explained-finding-costs-to-write.
 const (
 	explainedTokens = 120
 	spamTokens      = 12
@@ -1666,7 +1634,7 @@ func degenerateCostStrategies() []costStrategy {
 				return findings, CallUsage{Prompt: f.prompt, Completion: spamTokens * len(findings)}, true
 			},
 			maxes: map[string]bool{"cost effectiveness": false},
-			// NOISE AND ANCHOR, and the second name is here because this guard
+			// NOISE and ANCHOR, and the second name is here because this guard
 			// put it here. The row declared NOISE alone, and once ANCHOR began
 			// counting the union of every finding claiming ONE defect, the
 			// guesses this strategy scatters through the file started landing in
@@ -1771,16 +1739,11 @@ func ledgerFor(t *testing.T, s costStrategy) (strategy, reference CostRow) {
 	return ledger.Row(model), ledger.Row("test/reference")
 }
 
-// observeCostRun scores one published review and books it, along the SAME path a
+// observeCostRun scores one published review and books it, along the same path
+// a
 // real run takes: findings into ScoreRun, the Score into ObserveScore.
 //
-// Going through ObserveScore rather than calling Observe with assembled
-// Detections is the point of the rewrite twice over. It is what makes the
-// noise and anchor counts in this file the scorer's answer rather than a
-// person's, and it is what gives ObserveScore a caller reachable from
-// `go test ./...`: it had none, no test, and three separate mutations of it left
-// the suite green, an inert function that the cost table's whole premise rested
-// on.
+// The note behind it is in docs/measurement.md#observecostrun.
 func observeCostRun(l *CostLedger, model string, f costFixture, run int,
 	publish func(costFixture, int) ([]review.Finding, CallUsage, bool)) {
 	findings, usage, reported := publish(f, run)
@@ -1823,7 +1786,7 @@ func costScoreOf(c CostReading, r CostRow) string {
 
 // TestNoDegenerateCostStrategyCanMaxOutAPublishedCostReading asks of every cost
 // number these reports publish the question nobody asked of the severity column
-// that was withdrawn: WHAT MAXIMISES THIS?
+// that was withdrawn: WHAT MAXIMISES this?
 //
 // Cost has an ugly answer available to it that severity does not. A reviewer
 // that fails most runs and succeeds cheaply on the easy ones is priced only on
@@ -1948,7 +1911,7 @@ func withoutColumns(c CostReading, drop []string) CostReading {
 // publishing five columns instead of one, and until this test they were
 // comments. Removing the named columns must let the strategy through; if it does
 // not, either the column is not doing the work the comment claims or the
-// strategy does not embody the behaviour it describes, and BOTH are things this
+// strategy does not embody the behaviour it describes, and both are things this
 // table is supposed to know about itself.
 //
 // It found one on the way in. The line-by-line spammer was written spending MORE

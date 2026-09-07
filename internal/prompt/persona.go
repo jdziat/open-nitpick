@@ -15,7 +15,7 @@ const LayerPersona = "persona"
 // Two rules govern everything here. First, each instruction is phrased as a
 // concrete behavior rather than an adjective: "one sentence of rationale" is
 // followable, "be terse" is not, and models comply with the former far more
-// reliably. Second, voice instructions never soften the *bar* for reporting —
+// reliably. Second, voice instructions never soften the *bar* for reporting,
 // a warm reviewer and a blunt one must find the same defects and differ only in
 // wording, or the tone knob silently becomes a quality knob.
 func Persona(p config.Persona) string {
@@ -73,7 +73,7 @@ func StylePass(p config.Persona) string {
 //
 // Scope is stated as an inclusion list plus an explicit exclusion list. Models
 // are markedly better at "report X, Y, Z and nothing else" than at calibrating
-// a vague threshold, and the exclusions are what actually keep the output
+// a vague threshold, and the exclusions are what keep the output
 // scannable.
 func nitpickScope(level config.NitpickLevel) string {
 	const core = "correctness, concurrency, security, resource handling, and data loss"
@@ -104,50 +104,25 @@ func nitpickScope(level config.NitpickLevel) string {
 	default: // normal
 		return "Report defects in " + core + ", contract breakage, and missing tests where new " +
 			"branching logic is genuinely risky.\n\n" +
-			// THE EXAMPLE USED TO BE A CORRECTNESS BUG. It read "not 'this is
-			// complex', but 'this shadows err, so the outer error is silently
-			// discarded'" — and an error being silently discarded is not a
-			// maintainability cost, it is something going wrong. It is the only
-			// example given for what "concretely" means, so it set the bar for
-			// reporting a maintainability problem at the warning definition:
-			// "likely a bug, or a genuine hazard under plausible conditions".
+			// 2026-09-07: the example is duplication, and it has to stay something
+			// the eval corpus does not plant. "Widening an exported type's accepted
+			// input" and "adding a dependency for one helper function" are two of the
+			// three maintainability plants stated almost verbatim, so using either
+			// here tunes the prompt to the corpus.
+			// internal/evals/promptcollision_test.go is the guard.
 			//
-			// The replacement is duplication rather than either of the two
-			// illustrations the severity ladder carried at the time, and
-			// deliberately: those were "widening an exported type's accepted input"
-			// and "adding a dependency for one helper function", which are two of
-			// the three maintainability plants in the eval corpus stated almost
-			// verbatim. Repeating them here would tune the prompt to the corpus.
-			// Duplication costs a future change and matches nothing planted.
+			// The wording is not measured to help: kimi-k3, three runs over each of
+			// the five info fixtures, 3 of 15 under both this wording and the
+			// correctness-bug example it replaced, with every hit the security
+			// plant and the three maintainability plants 0 of 9 either way. The
+			// prediction that a mis-anchored example suppressed them did not hold.
+			// That comparison cannot be re-run as it stands: review.md's ladder has
+			// since been rewritten and names none of the three plants, so the
+			// 3-of-15 records what was measured rather than the prompt shipping now.
 			//
-			// Both of those ladder illustrations have since been replaced, because
-			// naming a planted defect three lines above "do not go looking for
-			// them" measured 0 of 3 on each — and because the sentence was false
-			// for a user with no corpus at all. See review.md's `info` rung and
-			// internal/evals/promptcollision_test.go, which is now the guard
-			// against a prompt example naming what the corpus plants.
-			//
-			// THE CHANGE BOUGHT NOTHING MEASURABLE AND IS KEPT ONLY BECAUSE THE OLD
-			// EXAMPLE WAS WRONG. Measured, kimi-k3, three runs over each of the five
-			// info fixtures, before and after: 3 of 15 both times, every hit the
-			// security plant, and the three maintainability plants 0 of 9 under both
-			// wordings. The prediction was that the mis-anchored example suppressed
-			// them and that correcting it would move go-package-singleton, which was
-			// then the one maintainability plant the severity ladder did not name. It
-			// did not move.
-			//
-			// THAT CONTROL NO LONGER EXISTS, and the number above was taken while it
-			// did. review.md's ladder has since been rewritten and now names none of
-			// the three maintainability plants, so nothing separates
-			// go-package-singleton from its two neighbours any more. Re-running the
-			// comparison would measure a different ladder; the 3-of-15 stands as a
-			// record of what was measured, not as a claim about the prompt that ships
-			// today. A first version of this also added "nothing has to go wrong for
-			// it to be worth raising", which lowers the reporting bar; that sentence
-			// was removed rather than kept, because the measurement that was meant
-			// to justify it came back flat and invented findings went 1 to 2 over
-			// the same 15 reviews. Loosening a bar on a prediction the numbers did
-			// not support is how a prompt acquires noise it cannot account for.
+			// Do not add "nothing has to go wrong for it to be worth raising". It
+			// lowers the reporting bar, the measurement meant to justify it came
+			// back flat, and invented findings went 1 to 2 over the same 15 reviews.
 			"You may report a maintainability problem only when you can name what it will cost " +
 			"concretely — not \"this is complex\", but \"this is the third place the retry policy " +
 			"is written, so the next change to it has three sites to find\".\n\n" +

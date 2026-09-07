@@ -1,0 +1,19 @@
+# The best per-dollar reviewer under the documented triager.
+#
+# docs/providers.md names GLM-5.3-Flash as the triage model this repository's
+# own configuration uses and pairs it with Kimi-K3 as the reviewer. This file
+# swaps the reviewer for qwen3.8-27b, which docs/comparison.md measures at the
+# lowest noise of any model under $0.03 and sonnet's weighted recall. Each
+# half is measured; the pair is not.
+#
+# Written against OpenRouter rather than Synthetic, which is where it would be
+# deployed. Same weights either way, and this side meters per call, so the run
+# is priced and is not shaped by Synthetic's one-concurrent-request-per-model
+# cap. Read the dollar columns as what the pair costs metered, not as what a
+# subscription charges, which is nothing at the margin.
+models:
+  default:
+    model: qwen/qwen3.8-27b
+  triage:
+    model: z-ai/glm-5.3-flash
+    temperature: 0

@@ -201,7 +201,7 @@ func (o *orderedLLM) Model() string           { return "ordered" }
 // does. The sibling slice one line away, unreviewed, was sorted for this exact
 // reason; findings was missed.
 //
-// The test runs the SAME review twice with the batches finishing in opposite
+// The test runs the same review twice with the batches finishing in opposite
 // orders and requires one prompt.
 func TestTriageSeesTheSameOrderWhicheverBatchAnswersFirst(t *testing.T) {
 	run := func(delay string) string {

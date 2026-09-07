@@ -33,13 +33,13 @@ func runRespond(ctx context.Context, args []string) error {
 	fs.StringVar(&f.configPath, "config", "", "path to .nitpick.yaml (default: <repo>/.nitpick.yaml)")
 	fs.StringVar(&eventPath, "event", os.Getenv("GITHUB_EVENT_PATH"), "the event payload (default: GITHUB_EVENT_PATH)")
 	fs.StringVar(&eventName, "event-name", os.Getenv("GITHUB_EVENT_NAME"), "the event name (default: GITHUB_EVENT_NAME)")
-	fs.StringVar(&mention, "mention", "", "the handle to answer to (default: review.mention, @nitpick)")
+	fs.StringVar(&mention, "mention", "", "the handle to answer to (default: review.mention, @open-nitpick)")
 	fs.StringVar(&f.owner, "owner", "", "GitHub repository owner (default: GITHUB_REPOSITORY)")
 	fs.StringVar(&f.repoName, "repo-name", "", "GitHub repository name (default: GITHUB_REPOSITORY)")
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
 	fs.StringVar(&f.logFormat, "log-format", "text", "log format: text or json")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: nitpick respond [flags]\n\nAnswers a pull request comment that mentions the reviewer: \"@nitpick review\" reviews the whole change again,\n\"@nitpick resolve\" on a thread resolves it, anything else is a question answered in the thread.\nRuns inside GitHub Actions on issue_comment and pull_request_review_comment events.\n\nFlags:")
+		fmt.Fprintln(os.Stderr, "Usage: nitpick respond [flags]\n\nAnswers a pull request comment that mentions the reviewer: \"@open-nitpick review\" reviews the whole change again,\n\"@open-nitpick resolve\" on a thread resolves it, anything else is a question answered in the thread.\nRuns inside GitHub Actions on issue_comment and pull_request_review_comment events.\n\nFlags:")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {

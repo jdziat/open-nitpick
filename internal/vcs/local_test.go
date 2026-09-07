@@ -133,7 +133,7 @@ func TestLocalPullRequestUsesCommitMetadata(t *testing.T) {
 // For a working-tree review the changes are uncommitted, so HEAD's commit
 // message describes the PREVIOUS change. Passing it through made every local
 // review open with "This change initializes a new project" regardless of what
-// the diff actually did.
+// the diff did.
 func TestLocalWorktreeHasNoTitle(t *testing.T) {
 	dir := newRepo(t)
 	write(t, dir, "a.go", "package a\n\nfunc F() int {\n\treturn 2\n}\n")

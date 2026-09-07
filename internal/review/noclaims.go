@@ -19,7 +19,7 @@ import "fmt"
 // chain this tool sells. The rewrite is exactly the case the restore was
 // written for and exactly the case it misses.
 //
-// So identity here is PATH AND LINE, not the title, and the reviewer's words
+// So identity here is PATH and LINE, not the title, and the reviewer's words
 // are restored over whatever triage returned.
 
 // anchorTolerance is how far a triage finding may move from the line its

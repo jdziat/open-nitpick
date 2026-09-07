@@ -9,17 +9,17 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
-// realAnswer is what the model actually reported. Every case below wraps it in
+// realAnswer is what the model reported. Every case below wraps it in
 // something a real model plausibly emits.
 const realAnswer = `{"findings":[{"path":"a.go","line":7,"severity":"error","title":"real finding"}],"summary":"walk"}`
 
 // TestNeverSilentlyReturnsZeroFindings is the regression test for the worst
 // failure this tool can have.
 //
-// Previously, any response whose first balanced brace pair was not the answer
-// decoded to an empty Result with a NIL error. The engine recorded no failure,
-// the batch contributed nothing, and the run exited 0 reporting a clean pull
-// request — while the model's real findings were thrown away.
+// A response whose first balanced brace pair is not the answer must not decode
+// to an empty Result with a nil error: the engine would record no failure, the
+// batch would contribute nothing, and the run would exit 0 reporting a clean
+// pull request while the model's real findings were thrown away.
 //
 // The contract now: either the findings come back, or an error does. Never
 // silence.
@@ -71,7 +71,7 @@ func TestNeverSilentlyReturnsZeroFindings(t *testing.T) {
 }
 
 // TestTopLevelArrayIsNotMistakenForTheAnswer covers the case where the model
-// returns a bare array. Previously the first array *element* was extracted and
+// returns a bare array, which must not have its first *element* extracted and
 // decoded into Result as all-zero.
 func TestTopLevelArrayIsNotMistakenForTheAnswer(t *testing.T) {
 	_, err := decodeLenient[result](`[{"path":"a.go","line":7,"title":"boom"}]`)
@@ -142,11 +142,11 @@ func TestDowngradeOnlyOnCapabilityErrors(t *testing.T) {
 		errors.New("connection reset by peer"),
 
 		// The SDK's own wording when GenerateTyped cannot unmarshal what came
-		// back. Previously this matched two entries of capabilitySignals at
-		// once ("structured output", "schema"), so one garbled reply from a
-		// fully schema-capable model downgraded the shared client for the rest
-		// of the run. The list above is hand-written provider wording, which is
-		// why it never caught this: the string that mattered was ours.
+		// back. It must not match two entries of capabilitySignals at once
+		// ("structured output", "schema"), or one garbled reply from a fully
+		// schema-capable model downgrades the shared client for the rest of the
+		// run. The list above is hand-written provider wording, and this string
+		// is ours, which is why the list alone does not cover it.
 		errors.New("llms: structured output is not valid JSON: invalid character 'I' looking for beginning of value"),
 	}
 	for _, err := range transient {
@@ -173,7 +173,7 @@ func TestDowngradeOnlyOnCapabilityErrors(t *testing.T) {
 // through decodeLenient.
 //
 // That distinction is the whole bug. decodeLenient guards the JSON path and the
-// test above calls it directly, so it never touched the SCHEMA path — which
+// test above calls it directly, so it never touched the SCHEMA path, which
 // returned llms.GenerateTyped's value whenever its error was nil, and
 // GenerateTyped is a bare json.Unmarshal. `{}`, `null` and an unrelated object
 // therefore decoded to an empty Result with a NIL error, the batch was counted
@@ -199,7 +199,7 @@ func TestSchemaPathNeverSilentlyReturnsZero(t *testing.T) {
 	}
 
 	// The boundary: an explicitly empty review is a real answer and must still
-	// come back clean, or every genuinely clean diff becomes a failed batch.
+	// come back clean, or every clean diff becomes a failed batch.
 	fake := newFakeLLM(turn{content: `{"findings":[]}`})
 	got, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredAuto), nil)
 	if err != nil {
@@ -217,7 +217,7 @@ func TestSchemaPathNeverSilentlyReturnsZero(t *testing.T) {
 // the same defect: recovery must not be permanent.
 //
 // A response the schema should have prevented says nothing about whether the
-// provider supports schemas — under a router, consecutive requests can land on
+// provider supports schemas, under a router, consecutive requests can land on
 // different upstreams. Downgrading on one would move every remaining batch of
 // the run onto the unenforced JSON path, and nothing in Report records that it
 // happened, so half a run would execute under a different strategy than the

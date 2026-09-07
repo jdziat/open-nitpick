@@ -107,7 +107,7 @@ Usage:
   nitpick repo-score [flags] [path...]
                                    The same, plus slop, bug and security findings per thousand lines, by language
   nitpick slop [flags] [path...]   AI slop only: the tells without a model, the model's slop rules, a score, and fixes
-  nitpick respond [flags]          Answer an @nitpick comment on a pull request (review again, resolve, or a question)
+  nitpick respond [flags]          Answer an @open-nitpick comment on a pull request (review again, resolve, or a question)
   nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
   nitpick mcp install <client>     Register that server with an agent client (claude-code, cursor, opencode, codex, ...)
   nitpick init [flags]             Write a .nitpick.yaml for this repository

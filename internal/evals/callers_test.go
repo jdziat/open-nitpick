@@ -95,7 +95,7 @@ func TestCallersCorpusIsWellFormed(t *testing.T) {
 			t.Errorf("%s: no unchanged file imports a file the change touches, so nothing here has a caller to break", f.Name)
 		}
 
-		// And the multi-file rule must NOT hold, or this is that corpus's
+		// And the multi-file rule must not hold, or this is that corpus's
 		// fixture in the wrong place.
 		for _, file := range files {
 			for p := range unchanged {

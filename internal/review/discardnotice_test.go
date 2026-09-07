@@ -97,7 +97,7 @@ func TestForgedPathsAreNamedIndividually(t *testing.T) {
 		t.Errorf("a path that is not in this checkout was counted but not named:\n%s", published)
 	}
 
-	// And the ordinary ones are NOT listed one by one, or the block is unusable
+	// And the ordinary ones are not listed one by one, or the block is unusable
 	// on the pull requests where it matters most.
 	if strings.Contains(published, "sibling.go:4") {
 		t.Errorf("routine policy drops are listed per finding; the block will be collapsed and "+
@@ -130,7 +130,7 @@ func TestTheDiscardNoticeSurvivesSummariesBeingOff(t *testing.T) {
 //
 // A newline would break out of the bullet and leave the rest of the block
 // reading as though it described something else, and raw HTML in a comment
-// posted under this bot's name renders. Markdown is NOT neutralized here (see
+// posted under this bot's name renders. Markdown is not neutralized here (see
 // inline), which is why these two are wrapped in code spans and why the README
 // records that residual rather than implying otherwise.
 func TestADiscardedPathCannotLeaveItsBullet(t *testing.T) {
@@ -168,7 +168,7 @@ const anchorDiff = "diff --git a/app.go b/app.go\n--- a/app.go\n+++ b/app.go\n@@
 //
 // Set.normalize's bare `continue` statements were replaced with counted, named
 // discards. filterAnchors kept two of its own and runs immediately afterwards,
-// and Report.Discarded was read BEFORE it, so a finding that survived
+// and Report.Discarded was read before it, so a finding that survived
 // normalization and died here was invisible in exactly the way the first fix
 // was about, and the published headline said zero about a run that had dropped
 // one.
@@ -203,7 +203,7 @@ func TestAnAnalyzerFindingDroppedByAnchoringIsCounted(t *testing.T) {
 	if len(dropped) != 1 {
 		t.Fatalf("an analyzer finding was dropped and not recorded: %+v", dropped)
 	}
-	// The reason has to be the one that is true of THIS finding. The diff
+	// The reason has to be the one that is true of this finding. The diff
 	// carries the line, so "the diff does not carry it" would be a wrong
 	// explanation published on a pull request.
 	if dropped[0].Reason != DiscardUnchangedLine {
@@ -245,14 +245,11 @@ func TestAModelFindingDroppedByAnchoringIsNotCounted(t *testing.T) {
 
 // uncovered is the ledger of a run where golangci-lint ran and covered less of
 // the change than "ran" implies: one file the build excludes, one suppression
-// the change added, and one module whose go directive switched off checks that
-// would otherwise have run.
-//
-// The third is here because it is the one that does not describe a file of the
-// change at all. It anchors to the module's go.mod, which the change need not
-// have touched, and it is the one entry that means REDUCED coverage rather
-// than absent coverage, so a renderer that assumed every entry names an unread
-// file of the diff is wrong about it.
+// the change added, one module whose go directive switched checks off. The
+// third does not describe a file of the change. It anchors to the module's
+// go.mod, which the change need not have touched, and it alone means reduced
+// rather than absent coverage, so a renderer assuming every entry names an
+// unread file of the diff is wrong about it.
 func uncovered() []LinterUncovered {
 	return []LinterUncovered{
 		{Linter: "golangci-lint", Path: "app_windows.go", Reason: UncoveredBuildExcluded},
@@ -533,8 +530,8 @@ func TestTheUncoveredListIsBoundedPerReason(t *testing.T) {
 	}
 }
 
-// TestAChangeNothingReviewedSaysSoRatherThanReadingClean is the emptiest review
-// there is, and it used to be the cleanest-looking one.
+// TestAChangeNothingReviewedSaysSoRatherThanReadingClean is the emptiest
+// review there is, and the one most at risk of reading as the cleanest.
 //
 // When every changed file is set aside there are no batches to send, so the
 // engine returns before any model or analyzer is asked anything and the

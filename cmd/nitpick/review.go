@@ -225,16 +225,16 @@ func newEngine(f *reviewFlags, repo string, cfg *config.Config, provider vcs.Pro
 
 		// Built from the policy the engine resolved, never from the file on
 		// disk: models.* names the model, its temperature and its token ceiling,
-		// so clients built here from cfg would let a change that edits
-		// .nitpick.yaml still choose what reviews it.
+		// so clients built here from cfg would let a change that edits.
+		// nitpick.yaml still choose what reviews it.
 		Models: func(policy *config.Config) (*llm.Roles, error) { return llm.BuildRoles(policy) },
 
 		Instruction: f.instruction,
 	}
 
 	// Built per review from the resolved policy for the same reason. The
-	// analyzers read review.ignore themselves, so a change that edits
-	// .nitpick.yaml would otherwise silence them on exactly the paths it named
+	// analyzers read review.ignore themselves, so a change that edits.
+	// nitpick.yaml would otherwise silence them on exactly the paths it named
 	// even though the model no longer honors that file.
 	if !f.noLinters {
 		engine.Linters = func(policy *config.Config) review.LinterRunner {

@@ -12,13 +12,13 @@ package evals
 // rather than trusting this paragraph.
 //
 // Swapping the judge and re-running the reviews cannot test it either: that
-// changes the findings AND the judge at once, and the two are then inseparable.
-// Judging the SAME recorded findings twice changes exactly one thing.
+// changes the findings and the judge at once, and the two are then inseparable.
+// Judging the same recorded findings twice changes exactly one thing.
 //
 // The second thing this path is for is noise. The same cached Incumbent
 // findings were scored 2 missed on one benchmark run and 5 on the next, same
 // input, different verdict, and no number anywhere says how much of the table
-// that accounts for. Pointing this at a dump with the SAME judge id measures
+// that accounts for. Pointing this at a dump with the same judge id measures
 // that directly, because the only difference between the two judgements is the
 // judge's own variance.
 //
@@ -88,7 +88,7 @@ func ReadDump(path string) ([]DumpRecord, error) {
 // line ceiling, and one finding with a long rationale beside a long judge
 // reasoning would turn into a parse error on a file that is perfectly valid.
 //
-// A MALFORMED RECORD IS STILL AN ERROR AND THE RECORDS ABOVE IT ARE STILL
+// A MALFORMED RECORD IS STILL AN ERROR and THE RECORDS ABOVE IT are STILL
 // RETURNED. This discarded everything it had decoded, which was defensible while
 // a dump was an opt-in diagnostic and is not now that a battery retains its own
 // findings by default: the file is the only record of a corpus that is spent
@@ -297,7 +297,7 @@ func GroupDump(records []DumpRecord) ([]RejudgeGroup, []string, error) {
 		withSuggestion int
 
 		// newFormat is set by any field only the current writer emits. It
-		// decides whether the silent groups are READ from the file or guessed
+		// decides whether the silent groups are read from the file or guessed
 		// from the holes in it, and guessing is wrong in both directions, so it
 		// must not be reached for while the file can answer.
 		newFormat bool
@@ -511,8 +511,8 @@ func GroupDump(records []DumpRecord) ([]RejudgeGroup, []string, error) {
 	// lines, so the matrix had to be inferred, and inference is wrong in both
 	// directions: it invents a group for every fixture the contender was never
 	// given, and it cannot see a contender that was silent on every fixture in a
-	// run. Restricting the cross product to the CORPUS each contender actually
-	// appears in removes the worst of it; the rest is warned about, because each
+	// run. Restricting the cross product to the corpus each contender appears
+	// in removes the worst of it; the rest is warned about, because each
 	// fabricated group costs a real judge call on an empty list.
 	if !newFormat {
 		for ck, seenRuns := range runs {
@@ -652,11 +652,8 @@ func RejudgeInputProblem(input, writing string) string {
 // sameFinding reports whether two records describe the same finding, ignoring
 // the ground-truth fields that legitimately differ between the duplicate lines
 // one finding gets when it is credited with several planted defects.
-// The secondary spans are compared with the rest. They reach no prompt, so
-// leaving them out would be defensible for a re-judge and is not defensible for
-// the file: two runs that differed only in which further regions a finding named
-// would collide under one key, and the collision would be silent in exactly the
-// field the detection columns are computed from.
+//
+// The note behind it is in docs/measurement.md#samefinding.
 func sameFinding(a, b DumpRecord) bool {
 	return a.Path == b.Path && a.Line == b.Line && a.EndLine == b.EndLine &&
 		slices.Equal(a.AlsoAt, b.AlsoAt) &&
@@ -666,25 +663,7 @@ func sameFinding(a, b DumpRecord) bool {
 
 // findingFromRecord rebuilds the finding a dump line was written from.
 //
-// Every field judgeRequest renders is here, and so is AlsoAt, which it does not
-// render. Source and Triager are excluded because the judge never sees them and
-// nothing else reads them; the secondary spans used to be excluded on that same
-// argument, and the argument was half right. The judge is shown one location per
-// finding, so a secondary span changes not one character of the prompt, the
-// previous comment here said so and then said it therefore "does not need to be"
-// recorded, which followed only if re-judging were the sole thing done to a
-// rebuilt finding. A rebuilt finding is also SCORED, and anchorDistance,
-// anchoredLines and defectAnchoredLines all read this field, so dropping it made
-// the two columns the dump exists to make re-derivable un-re-derivable.
-// TestASecondarySpanSurvivesTheDump scores the round trip.
-//
-// The severity provenance IS restored, even though the judge never sees that
-// either. A rebuilt finding is scored as well as judged, and a finding that came
-// back claiming nobody had translated its severity would have OUR word published
-// as its reviewer's, which is exactly the substitution these two fields exist to
-// stop, arriving through the file that was written to prevent it. A record from a
-// dump predating them carries neither, and reads as an untranslated finding,
-// which is what it was recorded as.
+// The note behind it is in docs/measurement.md#findingfromrecord.
 func findingFromRecord(r DumpRecord) review.Finding {
 	return review.Finding{
 		Path:               r.Path,
@@ -714,12 +693,7 @@ type RejudgeOutcome struct {
 
 // rejudger is the one call Rejudge makes, named so it can be substituted.
 //
-// *Judge satisfies it, and taking the interface rather than the concrete type
-// is what makes Rejudge reachable at all without a paid network run: its two
-// stated properties, that outcomes come back in the order the groups went in
-// under bounded concurrency, and that a SILENT group is submitted rather than
-// assumed to produce nothing, are exactly the kind that a wrong
-// implementation still returns plausible numbers for.
+// The note behind it is in docs/measurement.md#rejudger.
 type rejudger interface {
 	Judge(ctx context.Context, f Fixture, persona config.Persona, findings []review.Finding) (*JudgeResult, error)
 }
@@ -763,7 +737,7 @@ func Rejudge(ctx context.Context, judge rejudger, persona config.Persona, groups
 			}
 
 			// A silent group is judged too, rather than assumed to produce
-			// nothing. The original judge WAS called with an empty list, and a
+			// nothing. The original judge was called with an empty list, and a
 			// judge that answers an empty list with verdicts is a failure mode
 			// the report has to be able to show rather than one this code hides
 			// by never asking.
@@ -838,20 +812,7 @@ func CorroborationGroups(samples []DumpSample) []RejudgeGroup {
 // Corroborate scores groups with a second judge and folds the answer into one
 // Aggregate per contender, keyed the way the report keys its rows.
 //
-// The returned aggregates are the SECOND half of every published figure. They
-// are built with Aggregate.Add, the same call the primary pass uses, so a
-// precision on one side of a delta and a precision on the other cannot come from
-// two implementations of the word.
-//
-// Severity is deliberately NOT folded in. The O-* columns compare each located
-// defect to the WantSeverity its fixture declares with no model involved, so
-// both judges would compute byte-identical values over the same findings;
-// carrying them twice would invite a reader to treat two copies of one
-// measurement as two measurements.
-//
-// A group the second judge could not assess is counted nowhere and reported.
-// Substituting a zero would publish a disagreement against a judgement that was
-// never made, which is the one thing a delta must never be able to mean.
+// The note behind it is in docs/measurement.md#corroborate.
 func Corroborate(
 	ctx context.Context,
 	judge rejudger,
@@ -917,7 +878,7 @@ type rejudgeStats struct {
 	silent int
 	failed int
 
-	// pairs counts findings BOTH judges returned a verdict for, which is the
+	// pairs counts findings both judges returned a verdict for, which is the
 	// only population on which agreement is defined.
 	pairs         int
 	agreeReal     int
@@ -980,8 +941,8 @@ func RejudgeReport(baselineJudge, newJudge string, outcomes []RejudgeOutcome, wa
 		// key GroupDump groups on. Keying on the model alone re-merged what
 		// GroupDump had deliberately separated: the nitpick axis derives four
 		// levels from ONE review, so a finding surviving all four was counted
-		// four times in one row, and the persona axis, four genuinely
-		// different reviews, collapsed into a single contender, leaving the
+		// four times in one row, and the persona axis, four separate reviews,
+		// collapsed into a single contender, leaving the
 		// axis the dump exists to compare absent from the table.
 		s := statsFor(contenderLabel(g.Model, g.Variant))
 		s.groups++
@@ -1003,7 +964,7 @@ func RejudgeReport(baselineJudge, newJudge string, outcomes []RejudgeOutcome, wa
 
 		where := fmt.Sprintf("%s/%s run %d", contenderLabel(g.Model, g.Variant), g.Fixture.Name, g.Run)
 
-		// A group the new judge could not assess is dropped from BOTH sides.
+		// A group the new judge could not assess is dropped from both sides.
 		// Keeping its recorded verdicts would put the two precisions over
 		// different samples, and a difference in sample is exactly what this
 		// whole path exists to eliminate.
@@ -1019,7 +980,7 @@ func RejudgeReport(baselineJudge, newJudge string, outcomes []RejudgeOutcome, wa
 		s.baseline.Saw(g.Fixture.Name)
 		s.updated.Saw(g.Fixture.Name)
 
-		// Both sides are attributed the SAME stimulus, in one statement, because
+		// Both sides are attributed the same stimulus, in one statement, because
 		// in this report they have one: the group IS a finding list,
 		// the new judge was handed exactly it, and the recorded baseline is the
 		// verdicts the dump filed against exactly it. Recording them apart would
@@ -1028,14 +989,14 @@ func RejudgeReport(baselineJudge, newJudge string, outcomes []RejudgeOutcome, wa
 		// What this cannot verify is the dump's own claim, DumpSample.Judged
 		// says it "assesses exactly these findings", and a producer that wrote a
 		// judgement formed over some other list would be believed here. The
-		// persona axis used to be such a producer: it judged the whole corpus
-		// once and dumped a filtered list beside those verdicts. It no longer
-		// does; see runLevels, which judges each distinct filtered list.
+		// persona axis is such a producer whenever it judges the whole corpus
+		// once and dumps a filtered list beside those verdicts. See runLevels,
+		// which judges each distinct filtered list instead.
 		shown := JudgedOver(g.Fixture.Name, g.Findings)
 		s.baseline.sawStimulus(shown)
 		s.updated.sawStimulus(shown)
 
-		// Both sides are reduced by the SAME rule before either is counted.
+		// Both sides are reduced by the same rule before either is counted.
 		//
 		// The recorded baseline has already been through this reduction, because
 		// the dump attaches at most one verdict per finding position; the new

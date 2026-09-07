@@ -18,6 +18,7 @@ coverage.out
 # make dist output
 dist/
 resume.md
+RESUME.md
 
 # Documentation site staging and output (make docs)
 .website/

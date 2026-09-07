@@ -7,8 +7,8 @@ import (
 
 // Validation configures the expert-validation pass.
 //
-// Before a finding is published it is routed to a domain expert — someone who
-// knows SQL for an injection claim, memory models for a data race — which
+// Before a finding is published it is routed to a domain expert, someone who
+// knows SQL for an injection claim, memory models for a data race, which
 // independently decides whether the claim holds. The point is to stop false
 // positives reaching a pull request.
 //
@@ -19,8 +19,8 @@ type Validation struct {
 	// Enabled turns the pass on.
 	//
 	// Off by default because it is UNMEASURED. It costs one model call per
-	// published finding, and its effect on recall — the number of real defects
-	// an expert talks itself out of — has not been measured yet. Flipping this
+	// published finding, and its effect on recall, the number of real defects
+	// an expert talks itself out of, has not been measured yet. Flipping this
 	// one field is what the eval harness A/B tests; nothing else about a run
 	// needs to change.
 	Enabled bool `yaml:"enabled"`
@@ -30,7 +30,7 @@ type Validation struct {
 	//
 	// An unlisted class is published WITHOUT validation, never dropped:
 	// narrowing this list can only reduce refutations. That direction is
-	// deliberate — a configuration mistake here costs precision, not findings.
+	// deliberate, a configuration mistake here costs precision, not findings.
 	Classes []Class `yaml:"classes"`
 }
 
@@ -41,7 +41,7 @@ func (v Validation) ValidatesClass(c Class) bool {
 	}
 
 	// Both sides are normalized so an alias in the config file ("injection")
-	// still matches the class a finding actually carries ("security").
+	// still matches the class a finding carries ("security").
 	target, _ := c.Normalize()
 	for _, allowed := range v.Classes {
 		if normalized, _ := allowed.Normalize(); normalized == target {
@@ -56,7 +56,7 @@ func (v Validation) validate() []error {
 	var errs []error
 
 	// A typo here would normalize to unknown, match no finding, and silently
-	// validate nothing — the failure shape this package refuses everywhere
+	// validate nothing, the failure shape this package refuses everywhere
 	// else. Fail at load time instead, naming the valid values.
 	for i, c := range v.Classes {
 		if _, ok := c.Normalize(); !ok {

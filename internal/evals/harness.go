@@ -24,14 +24,14 @@ import (
 
 // Environment variables controlling a run.
 const (
-	// EnvAPIKey holds the OpenRouter credential.
+	// EnvAPIKey names the variable every eval provider reads its key from.
 	EnvAPIKey = "OPENROUTER_API_KEY"
 
 	// EnvModels overrides the model list (comma-separated OpenRouter ids).
 	EnvModels = "NITPICK_EVAL_MODELS"
 
-	// EnvRuns sets how many times each fixture is reviewed, for measuring
-	// run-to-run stability.
+	// EnvRuns sets how many times each fixture is reviewed, which is what makes
+	// a stability column possible.
 	EnvRuns = "NITPICK_EVAL_RUNS"
 
 	// EnvFixtures limits the run to named fixtures.
@@ -71,19 +71,19 @@ const (
 	//
 	// The default suits a one-file fixture. It is not enough for a multi-file
 	// one: collecting the seven-file ts-unbounded-memo-key against the incumbent
-	// CLI exceeded four minutes and was refused -- correctly, since a truncated
+	// CLI exceeded four minutes and was refused, correctly, since a truncated
 	// review must never be cached, but the run then had no way to ask for more
 	// time without editing this file. A corpus that now contains fixtures of very
 	// different sizes needs the bound to be settable per run.
 	EnvTimeout = "NITPICK_EVAL_TIMEOUT"
 )
 
-// The endpoint constant that used to live here is gone. internal/llm registers
-// "openrouter" in its package init, and this package imports it, so the harness
-// names that provider instead of rebuilding an equivalent from base_url. Two
-// copies of the endpoint meant two owners that could drift, and the harness
-// resolved its credential by the openai provider's rules rather than the ones
-// production uses.
+// No endpoint constant lives here. internal/llm registers "openrouter" in its
+// package init and this package imports it, so the harness names that provider
+// rather than rebuilding an equivalent from base_url. Two copies of the
+// endpoint are two owners that drift, and the rebuilt version resolves its
+// credential by the openai provider's rules rather than the ones production
+// uses.
 
 // DefaultModels is a deliberately small, cheap matrix that exercises the
 // distinct code paths structured output can take.
@@ -251,12 +251,12 @@ type Options struct {
 	// buildClient constructs the model client. It is unexported and nil in
 	// every real run, where llm.Build is used.
 	//
-	// It exists so a test can drive the WHOLE harness from a scripted model.
+	// It exists so a test can drive the whole harness from a scripted model.
 	// Without a seam here the only way to prove that reported usage reaches
 	// RunResult is to spend money at a real provider, and an assertion nobody
 	// can afford to run is not a guard, which matters for exactly this field's
-	// neighbours, since a cost column silently reading zero looks identical to
-	// a cheap model.
+	// neighbours, since a cost column silently reading zero is indistinguishable
+	// from a model that charged almost nothing.
 	buildClient func(config.ModelSpec) (*llm.Client, error)
 }
 
@@ -304,7 +304,7 @@ func LoadDotEnv(path string) error {
 // is the tuning corpus and the thing being named is usually the held-out one.
 // NITPICK_EVAL_FIXTURES used to keep whatever it could resolve and ignore the
 // rest: a single mistyped name in the six-name line the Makefile documents
-// silently measured five of six, and a typo in the ONLY name ran all eight
+// silently measured five of six, and a typo in the only name ran all eight
 // tuning fixtures with no warning anywhere. Neither table names its corpus, so
 // the result was indistinguishable from the held-out run it claimed to be,
 // a silent failure that returns exactly the wrong answer to the one question
@@ -349,7 +349,7 @@ func OptionsFromEnv() (Options, error) {
 	}
 
 	if raw := strings.TrimSpace(os.Getenv(EnvFixtures)); raw != "" {
-		// Resolved against BOTH corpora, not against the default list: naming a
+		// Resolved against both corpora, not against the default list: naming a
 		// held-out fixture has to select it, or the held-out set could only be
 		// run by editing code. Naming nothing still yields Fixtures() alone, so
 		// no tuning run picks up the held-out corpus by accident, spending it
@@ -671,14 +671,14 @@ func Run(ctx context.Context, model Model, f Fixture, runIndex int, opts Options
 func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, opts Options, persona config.Persona) RunResult {
 	started := time.Now()
 
-	// The declaration is made BEFORE anything that can fail, because it depends
+	// The declaration is made before anything that can fail, because it depends
 	// on nothing that can. ourSeverityScale reads the configuration and the
 	// configuration is fully determined by evalConfig; a temp directory that
 	// cannot be made says nothing about which vocabulary this adapter publishes
-	// on. THE BUG THIS FIXES: it was assigned after the MkdirTemp and buildRepo
-	// returns, so a run that died there carried no declaration, and the two
-	// halves of one infrastructure failure then published DIFFERENT severity
-	// cells. Folded with a good run, a failure carrying the declaration renders
+	// on. Assigned after the MkdirTemp and buildRepo returns, a run that dies
+	// there carries no declaration, and the two halves of one infrastructure
+	// failure then publish different severity cells. Folded with a good run, a
+	// failure carrying the declaration renders
 	// SEV as the good run's own triple; a failure carrying none withdraws the
 	// whole row to n/a. Which of the two a reader sees depended on where in this
 	// function the provider happened to break.
@@ -769,7 +769,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	engine := &review.Engine{
 		Config: cfg,
 
-		// One model in BOTH roles, which is a deliberate limit on what the
+		// One model in both roles, which is a deliberate limit on what the
 		// matrix measures: it ranks reviewers, and giving each contender a
 		// different triager would confound the two. The shipped .nitpick.yaml
 		// splits the roles, so no number produced here is a measurement of the
@@ -975,22 +975,7 @@ func evalConfig(model Model) *config.Config {
 // ourSeverityScale declares the severity vocabulary a run under this
 // configuration publishes on.
 //
-// It is DERIVED FROM THE CONFIGURATION RATHER THAN ASSERTED, and the one
-// question it asks is the one that can make the assertion false. review.Engine
-// writes our five levels for a model's own findings, but a report is the union
-// of the model's findings and the analyzers', and internal/linters' mapSeverity
-// folds HIGH onto our error and MEDIUM onto warning, a translation between
-// vocabularies, which is the exact shape of the first retraction this package
-// made. Its codomain now covers all five of our levels, so a report could carry
-// an analyzer's word and our word spelled identically, and that makes the risk
-// worse rather than better: an analyzer's "critical" is a rule author's
-// judgement in the analyzer's own scale, not a severity written on ours, and
-// linters.max_severity may have moved it after the fact. Those findings are
-// absent today only
-// because evalConfig turns linters off. Deriving the declaration means turning
-// them back on WITHDRAWS the severity comparison instead of quietly publishing
-// analyzer levels at our resolution; asserting it would have published them.
-// TestTurningLintersOnWithdrawsTheSeverityComparison pins that.
+// The note behind it is in docs/measurement.md#ourseverityscale.
 func ourSeverityScale(cfg *config.Config) SeverityScale {
 	if cfg == nil || cfg.Linters.Mode != config.LinterOff {
 		return UndeclaredSeverityScale

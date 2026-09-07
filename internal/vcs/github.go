@@ -48,14 +48,12 @@ type GitHubOptions struct {
 // DefaultBotMarker identifies comments this tool published.
 const DefaultBotMarker = "<!-- open-nitpick -->"
 
-// requestTimeout bounds a single API call.
-//
-// github.NewClient(nil) uses http.DefaultClient, which has no timeout at all,
-// and the only context in play comes from signal.NotifyContext with no deadline
-// — so a connection the far side accepts and never answers hangs the review
-// forever with nothing logged after "parsed diff". It is generous because one
-// of these calls streams a file body; the point is that there is a ceiling, not
-// where it sits.
+// requestTimeout bounds a single API call. github.NewClient(nil) uses
+// http.DefaultClient, which has no timeout, and signal.NotifyContext supplies
+// no deadline, so without this a connection the far side accepts and never
+// answers hangs the review with nothing logged after "parsed diff". It is
+// generous because one of these calls streams a file body; what matters is
+// that a ceiling exists, not where it sits.
 const requestTimeout = 2 * time.Minute
 
 // NewGitHub builds a GitHub provider.
@@ -248,7 +246,7 @@ func (g *GitHub) ListDir(ctx context.Context, ref Ref, dir string) ([]string, er
 //
 // GitHub rejects oversized review payloads, and a pull request buried under a
 // hundred bot comments is unreviewable anyway. Findings are sorted most severe
-// first, so truncation drops the least important ones — and says so.
+// first, so truncation drops the least important ones, and says so.
 const maxCommentsPerReview = 40
 
 // PublishReview submits the review.
@@ -316,7 +314,7 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	}
 
 	// GitHub documents body as required for COMMENT and REQUEST_CHANGES, so an
-	// omitted body rejects the whole review — which is exactly what happened
+	// omitted body rejects the whole review, which is exactly what happened
 	// with review.summary disabled.
 	if strings.TrimSpace(body) == "" {
 		body = defaultReviewBody(len(comments), g.Bot)
@@ -376,7 +374,7 @@ func isForbidden(err error) bool {
 //
 // Both come from the forge rather than from state kept anywhere else, because
 // a GitHub Actions job has nowhere else. A comment a human deleted is gone from
-// the answer, which is the right reading — deleting the bot's comment is how a
+// the answer, which is the right reading, deleting the bot's comment is how a
 // reviewer asks for it not to be there, not for it to be re-posted.
 func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error) {
 	if err := validateRef(ref); err != nil {
@@ -532,8 +530,8 @@ func defaultReviewBody(comments int, marker string) string {
 
 // maxSummaryBytes keeps the fallback body inside GitHub's limit.
 //
-// The original body may itself be why the review was rejected — a PR deleting
-// thousands of files produces an enormous skipped-files section — so resending
+// The original body may itself be why the review was rejected, a PR deleting
+// thousands of files produces an enormous skipped-files section, so resending
 // it verbatim would fail identically and lose the review entirely.
 const maxSummaryBytes = 60000
 
@@ -804,20 +802,17 @@ func (g *GitHub) ThreadComments(ctx context.Context, ref Ref, rootID int64) ([]T
 }
 
 // AnswerMarker distinguishes an answer to a mention from every other comment
-// the reviewer posts.
-//
-// The general bot marker cannot serve here. It is on published findings and on
-// the summary too, so counting it would let a review that posted five findings
+// the reviewer posts. The general bot marker sits on findings and on the
+// summary too, so counting it would let a review that posted five findings
 // exhaust a five-answer cap and refuse the first question anybody asked. The
-// cap is about how often the reviewer is TALKED TO, and only these comments
-// are that.
+// cap bounds how often the reviewer is addressed, and only these comments are.
 const AnswerMarker = "<!-- nitpick:answer -->"
 
 // CountAnswers counts the replies the reviewer has posted to mentions on a
 // pull request, conversation comments and inline ones alike.
 //
 // It is how a per-pull-request answer cap is enforced without persisting a
-// counter anywhere: the answers already posted ARE the record of how many
+// counter anywhere: the answers already posted are the record of how many
 // times it has answered, and they survive a re-run, a new runner, and a
 // cleared cache.
 func (g *GitHub) CountAnswers(ctx context.Context, ref Ref) (int, error) {

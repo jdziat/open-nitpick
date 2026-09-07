@@ -15,7 +15,7 @@ import (
 
 // Local reviews a git checkout without contacting any forge. Reviews are
 // rendered to a writer instead of being posted, which makes the whole engine
-// runnable with no credentials — the fast path for development and for anyone
+// runnable with no credentials, the fast path for development and for anyone
 // evaluating the tool before wiring it into CI.
 type Local struct {
 	// Dir is the repository root.
@@ -54,7 +54,7 @@ func (l *Local) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error) 
 
 	// For a working-tree review the changes are uncommitted, so HEAD's commit
 	// message describes the PREVIOUS change, not this one. Passing it through
-	// primes the reviewer with a description that contradicts the diff — every
+	// primes the reviewer with a description that contradicts the diff, every
 	// finding then gets framed against the wrong intent.
 	if ref.Head == Worktree {
 		return out, nil
@@ -114,9 +114,9 @@ func (l *Local) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 // BaseRevision resolves the revision the ref's diff was computed against.
 //
 // Every case below mirrors a case in Diff, and that correspondence is the whole
-// point: a caller reading a file "as it was before this change" has to read it
-// at the same revision the diff subtracted, or the two disagree about what the
-// change did.
+// point: a caller reading a file as it stood ahead of the change has to read
+// it at the same revision the diff subtracted, or the two disagree about what
+// the change did.
 func (l *Local) BaseRevision(ctx context.Context, ref Ref) (string, error) {
 	switch {
 	case ref.Head == Worktree && ref.Base == "":
@@ -135,8 +135,8 @@ func (l *Local) BaseRevision(ctx context.Context, ref Ref) (string, error) {
 // mergeBase resolves the fork point, matching the three-dot range Diff uses.
 //
 // Unrelated histories and shallow clones have no merge base. The named base is
-// still a revision this change did not author — the property a caller is after
-// — so it is used rather than failing the resolution outright.
+// still a revision this change did not author, the property a caller is after,
+// so it is used rather than failing the resolution outright.
 func (l *Local) mergeBase(ctx context.Context, base, head string) (string, error) {
 	out, err := l.git(ctx, "merge-base", base, head)
 	if err != nil {
@@ -146,14 +146,15 @@ func (l *Local) mergeBase(ctx context.Context, base, head string) (string, error
 }
 
 // FileContent reads a file at the ref's head. For a working-tree review the
-// file is read from disk, so uncommitted edits are reviewed as they actually
-// are rather than as they were last committed.
+// file is read from disk, so uncommitted edits are reviewed as they stand
+// rather than as they were last committed.
 //
 // Working-tree reads are confined to the repository. The reviewed branch is
-// frequently untrusted — `gh pr checkout` on an outside contributor's PR is the
-// documented workflow — and its diff decides which paths get read and sent to
+// frequently untrusted, `gh pr checkout` on an outside contributor's PR is the
+// documented workflow, and its diff decides which paths get read and sent to
 // the model. Without containment, a committed symlink such as
-// `notes.md -> ~/.ssh/id_rsa` would put a private key in the prompt.
+// `notes.md` pointing at `~/.ssh/id_rsa` would put a private key in the
+// prompt.
 func (l *Local) FileContent(ctx context.Context, ref Ref, path string) ([]byte, error) {
 	if ref.Head == Worktree {
 		return l.readContained(path)
@@ -229,7 +230,7 @@ func (l *Local) ListDir(ctx context.Context, ref Ref, dir string) ([]string, err
 	}
 	// ls-tree prints names without a type marker in this form; a second call
 	// with the long form is not worth it, so directories are told apart by
-	// asking the tree whether each entry has children — cheaply, by mode.
+	// asking the tree whether each entry has children, cheaply, by mode.
 	long, err := l.gitRaw(ctx, "ls-tree", spec)
 	if err != nil {
 		return nil, err

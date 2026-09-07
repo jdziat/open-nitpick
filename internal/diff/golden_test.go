@@ -165,7 +165,7 @@ func rawPositions(text string) map[string]map[string]int {
 		case strings.HasPrefix(line, "diff --git "):
 			path, pos, seenHunk = "", 0, false
 
-		// Header arms only apply BEFORE the first hunk. Inside a hunk these
+		// Header arms only apply before the first hunk. Inside a hunk these
 		// prefixes are ordinary content: an added line reading "++ x" renders
 		// as "+++ x", and a removed "-- x" renders as "--- x".
 		case !seenHunk && strings.HasPrefix(line, "--- "):

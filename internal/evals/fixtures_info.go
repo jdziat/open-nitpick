@@ -4,189 +4,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 
 // infoFixtures are the corpus's info-level plants.
 //
-// Measured over AllFixtures() before these were written, the corpus planted 4
-// critical, 8 error, 6 warning, 0 info and 6 nit, 24 plants across 25
-// fixtures, which is one more fixture than this sentence used to claim. Every
-// other level had been given at least two plants and an argument; info had
-// none, so no claim about it was falsifiable. A reviewer that never emits the
-// word `info` and a reviewer that emits it perfectly scored identically, and
-// the O-INFL and O-UNDR columns could not see the level at all: with nothing
-// planted at info, a reviewer rating a nit as info was charged inflation and a
-// reviewer rating a warning as info was charged understatement, but no reviewer
-// was ever charged for MISSING info, because there was nothing there to miss.
-//
-// WHY THIS LEVEL RESISTED TWO PREVIOUS ATTEMPTS, and it is worth writing down
-// because it is a property of the level rather than of the authors. Every other
-// severity is defined by a failure: something returns the wrong answer, leaks,
-// deadlocks or breaches. Authoring one is a matter of choosing the failure and
-// then choosing how much has to go right for it not to happen. Info has no
-// failure. The shipped anchor is "`info`, a defensible concern the author
-// should consciously accept or reject", and what a published example of it has
-// to do is name a cost WITHOUT naming an input that breaks.
-//
-// This paragraph deliberately does not quote the ladder's current examples, for
-// the reason fixtures_warning.go stopped quoting them: a comment keyed to prompt
-// prose goes stale every time the prompt is edited, and the property argued here
-// is a property of the LEVEL. It went stale twice already. The version before
-// this one quoted an example reading "so a rise in failures reads as a fall in
-// traffic" and asserted in the same sentence that the ladder's examples "name no
-// input that breaks", the quotation names the input, a failure, and the wrong
-// output, traffic reading as falling. Both the example and the claim about it
-// were wrong, and the claim was refuted by the text it quoted.
-//
-// THE AUTHORING TEST, which is what survives when the quotations are removed and
-// is the reason both of those examples were replaced: ask whether the AUTHOR
-// COULD BE WRONG. If the author could be wrong, the finding is at least a
-// warning. The usual move, take a defect and turn the dial down, therefore
-// does not produce an info finding at all; it produces a warning whose
-// consequence has been made small. Info is the level where reasonable engineers
-// split, and where the reviewable fact is that the author should have DECIDED
-// rather than drifted.
-//
-// The test cuts both ways, and the ladder has now failed it in each direction.
-// An example may not state a wrong answer as a fact, because then the author IS
-// wrong and the rung is a warning. And an example may not name a mere DIFFERENCE
-// either: one earlier version was "a subcommand configured on the command line
-// where the tool's other subcommands read a config file", which named no cost at
-// all, failed review.md's own bar ("report a finding only when you can name a
-// concrete consequence"), and was besides a consistency observation,
-// config.ClassStyle, which allowedClasses drops below pedantic, so a reader of
-// the default configuration could never have seen the finding it illustrated.
-//
-// THE LADDER'S TWO INFO EXAMPLES USED TO BE TWO OF THESE PLANTS AND WERE
-// REPLACED, which is why two SeverityNotes below argue from a clause rather
-// than from an example. review.md illustrated `info` with "Widening an exported
-// type's accepted input is info. Adding a dependency for one helper function is
-// info.", kotlin-widened-input and rust-crate-for-one-call stated almost
-// verbatim, three lines above "These examples ... are deliberately drawn from
-// defect classes you are unlikely to meet in this change; do not go looking for
-// them." So the prompt named two planted defects and then told the reviewer to
-// ignore them. Measured, kimi-k3, two independent three-run batteries: both
-// fixtures 0 of 3 every time, usually with an empty findings list.
-//
-// THE FIX WAS ON THE PROMPT AND NOT ON THESE PLANTS, and the reason is not the
-// corpus. Every other rung illustrates with a SCENARIO, "Writing a decrypted
-// secret to a log that ships off-host", "A check-then-act on a file that
-// another process can replace between the two steps", while those two were
-// CATEGORIES, and the anti-anchoring sentence's claim of rarity was therefore
-// false of them for any reader: widening an exported signature and adding a
-// dependency for one helper are among the most ordinary things a reviewer
-// meets, so in a real repository the prompt was suppressing two legitimate
-// findings. Nothing here moved: the diffs, anchors, keywords, classes and
-// levels are untouched, and testdata/incumbent stays keyed to them. What could
-// not stay is a note deriving its level from a sentence that no longer exists.
-//
-// Every plant below was tested against that question before it was written:
-// name the case FOR the change, in one sentence, and refuse to plant it unless
-// that sentence is one a senior engineer would say. Those sentences
-// are in each fixture's doc comment, alongside the case against. A plant whose
-// "for" side is a straw man is a warning with the dial turned down, and the
-// previous round's gate audited for exactly that.
-//
-// THE PROMPT MAY NOT BE ABLE TO REACH THIS LEVEL, and that is a measurement
-// these plants make rather than a reason not to author them. review.md's bar
-// section says "Report a finding only when you can name a concrete consequence:
-// an input that produces a wrong result, a state that deadlocks or panics, a
-// request that leaks data, a path that loses an error. If you cannot describe
-// how it fails, it is not a finding." No info finding can clear that bar as
-// written, because no info finding fails. The severity anchors define the level
-// anyway, and the normal-level scope adds the one clause that lets a reviewer
-// reach it: "You may report a maintainability problem only when you can name
-// what it will cost concretely". So the shipped prompt contains a genuine
-// tension, and until now nothing in the corpus could see it. If every model
-// misses all five of these while scoring well elsewhere, that is evidence about
-// review.md's bar and not about the models, and it is the first evidence this
-// tree has ever had either way. Every plant below therefore states a CONCRETE
-// COST, because that clause is the only door into the level and a plant that
-// does not fit through it measures nothing.
-//
-// FOUR CLASSES WERE UNAVAILABLE, and the reason is mechanical rather than
-// editorial. TestSeverityIsConsistentWithinADefectClass requires a SeverityNote
-// from EVERY member of a class that carries more than one severity.
-// correctness, concurrency, contract and data-loss are each planted in
-// fixtures.go at a single level with no notes at all, so an info plant in any
-// of them turns green plants red in a file this change does not own,
-// correctness alone would need notes on three. That is a real cost and it lands
-// on the most natural home for two of these: widening an exported type's
-// accepted input is contract-flavoured, and it is planted here as
-// `maintainability` instead. The declared class is honest on its own terms,
-// ClassContract is "a change that breaks existing callers", and nothing below
-// breaks a caller, which is precisely why these are info and not error, but a
-// reader should know the taxonomy was not the only pressure. Closing that needs
-// notes on contract-break, in a change that owns fixtures.go.
-//
-// LANGUAGES. Rust, Kotlin, Ruby and PHP are all new to the corpus; one plant is
-// Go. Before these, fourteen of twenty-five fixtures were Go, counted rather
-// than remembered, and the previous count in this sentence, sixteen of
-// twenty-four, was wrong in both figures, so a prompt tuned on this corpus
-// could be Go-shaped without anyone noticing.
-//
-// THIS FUNCTION IS NOT A CORPUS and nothing runs it as one. The five below are
-// split across Fixtures() and HeldOutFixtures(), which name each of them
-// directly; what this returns is the record of what was AUTHORED at this level,
-// and TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus is what makes the two
-// facts agree. Without it a fixture can be written, reviewed, merged and never
-// wired into anything, passing every test in the tree while measuring nothing,
-// which is the quietest way this corpus has to lose a plant.
-//
-// THAT IS EXACTLY WHAT HAPPENED TO THESE FIVE, and the paragraph above was true
-// of them for as long as it was false. They were authored and never named by
-// either accessor, so AllFixtures did not contain them and no ground-truth test
-// touched one: unchecked lines, unprobed keywords, unpinned severity, in a diff
-// where a plant that measures nothing looks exactly like a plant that does.
-// Three defects survived that silence and were found by running the fixtures
-// rather than reading them, a Kotlin head that broke every named-argument
-// caller, a Rust crate cargo would not build, and a keyword the change's own doc
-// comment supplied, and each is written up in the fixture it belongs to.
-//
-// The guard could not have caught it either: it knew the names warningFixtures
-// and nitFixtures and was written as a list, so a set added after it was blind
-// to it by construction. It now DISCOVERS every authored fixture out of the
-// package source instead, which is the only version of that test that survives
-// the next file. Where each of these five went, and why, is argued in Fixtures()
-// and HeldOutFixtures().
-//
-// SUBSTRING KEYWORDS ARE THE WRONG INSTRUMENT FOR PART OF THIS LEVEL, and this
-// is the third round to edit these lists, so it is written here rather than
-// discovered a fourth time. Every other level in this corpus is defined by a
-// failure, and a failure brings its own nouns: nil, injection, WHERE clause,
-// symlink, socket. A reviewer that has found the defect uses them and one that
-// has not cannot. Info has no failure, so the vocabulary is shared, at this
-// level the finding and the objection are frequently the SAME WORDS ABOUT THE
-// SAME LINE, differing in what the reviewer is asserting.
-//
-// Two of the five demonstrate it, and the two are not equally bad:
-//
-//   - php-forbidden-vs-404 is UNREACHABLE, provably. The finding's fix and the
-//     error-body objection's fix are both "make the two denials the same", and
-//     "the two denials should return the same response envelope" contains "the
-//     two denials should return the same response" as a substring. mentionsAny
-//     is strings.Contains, so any keyword crediting the first credits the second:
-//     no word list separates them, whatever it contains.
-//     TestTheInfoRecallThisInstrumentCannotBuy carries the proof and pins the
-//     price, the corpus denies both, so a terse reviewer proposing exactly this
-//     plant's fix is scored a miss.
-//   - ruby-default-page-size is REACHABLE BUT FRAGILE. "Other consumers now
-//     receive 100 rows" is the finding and "other consumers can still receive
-//     200" is the cap objection; a keyword could separate them, but only by
-//     naming TENSE. Every other keyword in this corpus names subject matter, and
-//     one that names grammar is a rule about how a sentence is built rather than
-//     about what it says. "other caller" and "other consumer" were removed
-//     rather than qualified for that reason. The number is the seam that DOES
-//     work. The cap is 200 and the new default is 100, so "rows by default"
-//     separates them on subject matter, and it only reaches the sentences that
-//     quote the size. The fix stated as a location, "set it at the call site
-//     instead", stays uncredited: every phrase reaching it is one a reviewer
-//     types about any line in any file.
-//
-// WHAT THIS MEANS FOR THE NUMBER. Info recall on these two plants is a LOWER
-// BOUND and not a measurement: correct terse findings are uncredited by
-// construction, and no keyword edit changes that. The three options that would
-// , a required conjunction, a veto phrase, or judging detection at info against
-// Defect.Why with the model judge, are all changes to Defect and matches(),
-// argued in that test. None was made here: this round's scope was the keyword
-// damage, and a scorer change to close a measurement gap belongs in a change
-// that owns the scorer and can probe it in both directions.
+// The note behind it is in docs/measurement.md#infofixtures.
 func infoFixtures() []Fixture {
 	return []Fixture{
 		rustCrateForOneCallFixture(),
@@ -199,52 +17,7 @@ func infoFixtures() []Fixture {
 
 // rustCrateForOneCallFixture adds a crate to format one string.
 //
-// This was the anchor's own second example. The ladder read "adding a
-// dependency for one helper function is info" until that illustration was
-// replaced, for the reason in this file's header, planted in the language
-// where a manifest change is most visible. The change is small and entirely
-// reasonable: the nightly report printed durations as a seconds count, someone
-// on the rota misread 150 as minutes, and the fix spells them "2m 30s".
-//
-// THE CASE FOR IT, which is why this is not a warning with the dial turned
-// down: humantime is small, widely used, and formats plural units and unit
-// breaks correctly, which is exactly the kind of tedious code a team should not
-// be writing itself. THE CASE AGAINST: it is one call site, the output this
-// report needs is a few lines of arithmetic, and a dependency is not a local
-// cost. It is in every build, every lockfile bump and whatever audit the team
-// runs, forever. Both sentences are ones a senior engineer says. Neither is
-// wrong, and the reviewable fact is that the author should have weighed them.
-//
-// The anchor is the manifest line, not the call site, because the manifest line
-// is what the decision IS: the call site is fine either way, and it is the
-// second half of a fix that begins by deleting the dependency.
-//
-// THE FALSE POSITIVE THIS INVITES is the version-specification objection:
-// `humantime = "2"` accepts any 2.x, so a reviewer reaches for pinning, an exact
-// version, or a lockfile. That is a real remark about supply-chain hygiene and
-// it accepts the dependency, which is the opposite of this finding, so
-// "version", "pin", "semver" and "supply chain" are all absent, and so is the
-// bare word "dependency", which both objections type in their first sentence.
-// The second is the output-format remark: humantime prints sub-second
-// components, so a job that took 5.2s now renders "5s 200ms". That is an
-// intended consequence of the change rather than a defect, and it shares no
-// keyword here. Both were run through matches() rather than reasoned about, and
-// both are in TestKeywordsAdmitOnlyRealDetections.
-//
-// IT DID NOT BUILD, and that is worth recording because this is the one fixture
-// in either corpus whose plant is IN the manifest. Cargo.toml and src/report.rs
-// were its only files, so cargo refused the manifest before compiling anything:
-// "no targets specified in the manifest, either src/lib.rs, src/main.rs, a
-// [lib] section, or [[bin]] section must be present". A manifest that does not
-// build is not a manifest a reviewer is reading, and the finding this fixture
-// scores is a judgement about a manifest. src/lib.rs supplies the missing
-// target; see the note on Extra below for why it lives there.
-//
-// IT IS BUILT AND RUN NOW. Both states were extracted and driven under `cargo
-// test` with an integration test calling render on a 150-second job: base
-// answers "nightly: 150s" and head answers "nightly: 2m 30s". So the change
-// does exactly the one thing its doc comment claims and nothing else, and the
-// crate a reviewer is asked to judge is one that compiles.
+// The note behind it is in docs/measurement.md#rustcrateforonecallfixture.
 func rustCrateForOneCallFixture() Fixture {
 	return Fixture{
 		Name: "rust-crate-for-one-call",
@@ -282,7 +55,7 @@ pub fn render(jobs: &[Job]) -> String {
 `,
 		},
 		Head: map[string]string{
-			// The dev-dependency and profile sections are in BOTH states and
+			// The dev-dependency and profile sections are in both states and
 			// exist for one reason: the plant sits at line 7, and without them
 			// the file is short enough that every line of it falls within
 			// noiseTolerance of the plant. A comment-on-every-line spammer is
@@ -386,61 +159,7 @@ pub fn render(jobs: &[Job]) -> String {
 // kotlinWidenedInputFixture lifts an exported function off the type it was
 // written for.
 //
-// The anchor's own first example until that illustration was replaced, the
-// ladder read "widening an exported type's accepted input is info", which is
-// this plant, for the reason in this file's header. The reason it is planted in
-// Kotlin rather than Go is that Kotlin's non-null types make the widening carry
-// NO new failure. Widening a Go parameter from a struct to an interface makes
-// nil a newly reachable input, and a reviewer reporting the nil panic would be
-// reporting a real defect this fixture never meant to plant. Here summarize
-// cannot be handed null, iterates nothing, and reads only members every
-// implementer must provide, so the change is exactly the design decision and
-// nothing else.
-//
-// THE CASE FOR IT: the weekly mail is the next thing on the board, it has no
-// day to report, and an interface introduced now can be shaped by the caller
-// that needs it rather than retrofitted around one that already shipped. THE
-// CASE AGAINST: there is one implementation in this change and the second
-// caller does not exist yet; `summarize` is public API, so the wider input can
-// never be narrowed back, and DailyReport has grown three public properties
-// that are aliases of fields it already had. Both are ordinary review
-// positions. The reviewable fact is the fork, not a failure.
-//
-// THE FALSE POSITIVE THIS INVITES is the aliasing remark: label, gained and
-// lost are second names for day, signups and cancellations, so a reviewer asks
-// for one set or the other. That is a naming observation, the generation scope
-// excludes naming, and its fix leaves the widened signature exactly where it
-// is, so "alias", "duplicate", "two names" and "rename" are all absent.
-//
-// THE SECOND IS THE VISIBILITY REMARK ("make Summarizable internal"), which
-// accepts the abstraction and argues about who may SEE it. This comment used to
-// claim it was "admitted only through phrases that also name the widening", and
-// that was false: "public api", "public surface" and "surface area" were all
-// keywords, and all three match a remark that has noticed nothing about the
-// parameter, "this adds public API surface area; internal would keep the public
-// surface smaller" scored full recall, and survived only by an accident of
-// anchor distance. The three are gone.
-//
-// What is left admits that remark only when it reaches for the widening or for
-// the one-implementation argument, and that is deliberate rather than a residual
-// leak: a reviewer that writes "there is only one implementation" has made this
-// plant's case whatever fix it goes on to propose. The pure form, the one that
-// argues visibility and nothing else, is the probe in
-// TestKeywordsAdmitOnlyRealDetections, and it is run through matches() rather
-// than described. "interface" stays absent for its own reason: it is the
-// change's own most typed token.
-//
-// IT WAS COMPILED, and doing so is how this fixture's second, unplanted defect
-// was found. Head used to rename the public parameter from `report` to `source`,
-// which is not a change Kotlin lets a caller ignore: named arguments are part of
-// the signature, so `summarize(report = r)` compiled against Base and failed
-// against Head with "no parameter with name 'report' found" under kotlinc
-// 2.0.21. That falsified two sentences of the SeverityNote below verbatim,
-// "every caller that compiled before compiles now", and "this breaks none, which
-// is exactly why it is not an error", and it made the fixture plant a contract
-// break at info. The rename bought nothing, so the name stays: the widening is
-// now the only change. Both states were recompiled with that named caller and
-// run, and both print "2026-08-04: +12 / -3".
+// The note behind it is in docs/measurement.md#kotlinwidenedinputfixture.
 func kotlinWidenedInputFixture() Fixture {
 	return Fixture{
 		Name: "kotlin-widened-input",
@@ -612,12 +331,12 @@ fun summarize(report: Summarizable): String =
 // argument at the one call site that wanted it. Reasonable engineers split on
 // this every week.
 //
-// NOTHING HERE IS A DEFECT AND THAT IS DELIBERATE. The cap still applies, the
+// Nothing HERE IS A DEFECT and that IS DELIBERATE. The cap still applies, the
 // clamp is unchanged, the offset arithmetic is unchanged, and 100 rows is not a
 // size anything falls over at. The moment it were, this would be a warning
 // about a named failure rather than an info about a decision.
 //
-// THE FALSE POSITIVE THIS INVITES is the offset-pagination remark: deep pages
+// THE FALSE POSITIVE this INVITES is the offset-pagination remark: deep pages
 // scan and discard rows, so a reviewer asks for keyset pagination. It is a real
 // observation about a line this change did not touch, and it is about the same
 // method, so distance does not exclude it. The second is the cap: MAX_PER_PAGE
@@ -628,7 +347,7 @@ fun summarize(report: Summarizable): String =
 // DEFAULT_PER_PAGE is the changed line's own identifier, so any finding quoting
 // it, including both objections above, would have scored as a detection.
 //
-// THE CAP OBJECTION WAS CREDITED ANYWAY, which is what running it rather than
+// THE CAP OBJECTION was CREDITED ANYWAY, which is what running it rather than
 // reasoning about it found: "a client can still pass per_page: 200 and get 200
 // rows per request; consider lowering the cap now that the payload is larger"
 // matched three keywords at once, on a line inside anchorTolerance of the plant,
@@ -636,7 +355,7 @@ fun summarize(report: Summarizable): String =
 // TestKeywordsAdmitOnlyRealDetections and both come back uncredited; see the
 // note on Keywords for which words went and why.
 //
-// IT WAS RUN. Both states were driven under ruby 3.2.3 against a stub Comment
+// IT was RUN. Both states were driven under ruby 3.2.3 against a stub Comment
 // that records the relation it is handed. Base answers offset 0 limit 25 and
 // head answers offset 0 limit 100; an explicit per_page: 10 is honoured
 // unchanged by both, and per_page: 5000 is clamped to 200 by both. So the cap,
@@ -699,7 +418,7 @@ end
 			// "the web client" and "one client" were considered and dropped:
 			// the change's own comment names the web client, so a finding about
 			// anything in this file can quote it, and the objection this plant
-			// is about is precisely the callers the comment does NOT name.
+			// is about is precisely the callers the comment does not name.
 			//
 			// FIVE MORE CAME OUT, each for the same reason and each measured
 			// through matches() rather than argued about. "pass per_page" and
@@ -724,14 +443,14 @@ end
 			// accepts the new default has a reason to mention them. Singular
 			// stems are used where they match both numbers.
 			//
-			// The rule covers the caller keywords and NOT the whole list, which
+			// The rule covers the caller keywords and not the whole list, which
 			// this sentence used to imply: "four times", "quadruple", "opt in"
 			// and "rows by default" name the change's magnitude rather than any
 			// caller, and they are held to the other bar instead, no objection
 			// this fixture excludes reaches them, which is a probe rather than a
 			// claim.
 			//
-			// "other caller" and "other consumer" DID NOT SURVIVE THAT RULE, and
+			// "other caller" and "other consumer" did not SURVIVE that RULE, and
 			// they are the reason it is written here rather than assumed. Neither
 			// names a caller negatively: the cap objection reaches both without
 			// noticing anything, "other consumers can still request up to
@@ -754,7 +473,7 @@ end
 			// default, and the offset remark counts rows SCANNED rather than
 			// returned.
 			//
-			// "AT THE CALL SITE" WAS REPLACED BY "THE CALL SITE" AND THAT WAS
+			// "AT THE CALL SITE" was REPLACED BY "THE CALL SITE" and that was
 			// STRICTLY WORSE, which is written down because the reasoning that
 			// produced it sounded careful: the bare form is "a phrase a reviewer
 			// types about any line in any file" and the form with its article,
@@ -764,7 +483,7 @@ end
 			// and more, "this allocation happens at the call site, which is
 			// fine" scored full recall on this plant.
 			//
-			// Both are gone and NOTHING REPLACES THEM. The alternative stated as
+			// Both are gone and nothing REPLACES THEM. The alternative stated as
 			// "set it at the call site instead" is therefore uncredited, and
 			// TestTheInfoRecallThisInstrumentCannotBuy runs that sentence and
 			// records the price rather than leaving it to this paragraph. The
@@ -808,51 +527,7 @@ end
 // phpForbiddenVsNotFoundFixture chooses which of two correct answers to give a
 // caller who may not read something.
 //
-// The change ADDS the membership check: before it, any signed-in viewer could
-// read any project, and after it they cannot. That is the shape worth having at
-// this level, because it makes the fixture unmistakably not a defect with the
-// dial turned down. The change is a security improvement, and the only thing
-// left to review is which of two correct denials it should send.
-//
-// THE CASE FOR 403: it is what the status code means, it tells a legitimate
-// user who has landed on a colleague's link that they need access rather than
-// that they mistyped, and support can tell the two apart. THE CASE FOR 404: a
-// 403 confirms to anyone holding an id, from a shared link, a log line, a
-// referrer, a support ticket, that a project with that id exists and that they
-// are not on it, and hiding that costs nothing but debuggability. Serious
-// products ship both: most APIs answer 403, and GitHub answers 404 for a
-// private repository. That is the strongest available evidence that this is a
-// decision rather than a defect, and it is why the level is info.
-//
-// THE FALSE POSITIVE THIS INVITES is the authorization objection: a reviewer
-// that reads the added branch as missing rather than present reports an IDOR,
-// and one that has not read the docblock asks who $viewerId is. Both are
-// hallucinations about a check that is in the diff, so "authorization", "access
-// control", "idor" and "permission" are all absent. The second is the
-// error-body remark, the two responses carry different bodies, so a reviewer
-// may ask for a shared error shape, which is a consistency observation whose
-// fix leaves the disclosure exactly where it is.
-//
-// THIS FIXTURE CREDITED BOTH OF THEM, and it took running them through
-// matches() to see it, which is the point. "enumerat" credited the IDOR
-// hallucination in the same paragraph that declares it must not be credited:
-// "an attacker can enumerate project ids" is how that finding writes itself, and
-// enumeration is the attack that FOLLOWS this disclosure rather than a sign the
-// disclosure was noticed. "exists" is a bare English verb and credited "No test
-// exists for the non-member path", a remark about coverage, scored as a
-// security detection. "hide" and "hides" credited the error-body remark, which
-// asks the 403 body to "hide internal details". All four are gone and the
-// probes are in TestKeywordsAdmitOnlyRealDetections. What is left either names
-// the disclosure as a noun or requires the sentence to say what the response
-// tells the caller.
-//
-// IT WAS RUN, under php 8.3, against stub Response, Project and
-// ProjectRepository classes with one project the viewer is a member of, one it
-// is not, and one that does not exist. Base answers 200, 200, 404: any
-// signed-in viewer reads any project. Head answers 200, 403, 404, which is
-// both the security improvement the change is for and, in the last two rows,
-// the disclosure this plant is about, since the pair of denials is exactly what
-// tells a caller holding an id which of the two it is holding.
+// The note behind it is in docs/measurement.md#phpforbiddenvsnotfoundfixture.
 func phpForbiddenVsNotFoundFixture() Fixture {
 	return Fixture{
 		Name: "php-forbidden-vs-404",
@@ -933,7 +608,7 @@ final class ProjectController
 			// which objection each one was crediting.
 			//
 			// "same response" CAME OUT NEXT, and it is where this instrument
-			// stops. The finding says the two denials ARE distinguishable; the
+			// stops. The finding says the two denials are distinguishable; the
 			// error-body objection says they SHOULD return the same envelope.
 			// Both sentences are about two responses being the same, both are
 			// ordinary English, and they differ by what the reviewer is
@@ -945,7 +620,7 @@ final class ProjectController
 			// say. See this file's header for what substring matching cannot
 			// separate here.
 			//
-			// "identical response" was struck out in the same edit and DID NO
+			// "identical response" was struck out in the same edit and did NO
 			// WORK, which was found by restoring it alone and re-running every
 			// probe on this fixture: not one verdict changed. It was removed on
 			// a reading of the sentence rather than on a run, in the round whose
@@ -996,47 +671,11 @@ final class ProjectController
 	}
 }
 
-// goPackageSingletonFixture adds a process-wide value and the helpers that read
+// goPackageSingletonFixture adds a process-wide value and the helpers that
+// read
 // it.
 //
-// The one Go plant in this set. It is the seed in its most familiar form: a
-// package-level default plus thin wrappers, so a caller can ask one question
-// without being handed a *Set first.
-//
-// THE CASE FOR IT: this is what the standard library does, http.DefaultClient,
-// log.Default, flag.CommandLine, and threading a value through four layers so
-// one leaf can ask "is this flag on" is a real cost paid by everything in
-// between. THE CASE AGAINST: the answer is now fixed at process start from the
-// environment, so a test that wants a different set has to reach into the
-// package and put it back, and two consumers in one binary cannot differ. The
-// alternative is already written: Load returns a *Set and Enabled is a method
-// on it, so passing one costs a parameter.
-//
-// Nothing here is a defect and the code is deliberately built so that nothing
-// is. Load skips empty names, so an unset variable yields an empty set rather
-// than a set containing "". Set is read-only once built and says so, so there
-// is no race to report. Enabled cannot panic. Strip any of that and the fixture
-// stops being about the decision.
-//
-// THE FALSE POSITIVE THIS INVITES is the configuration objection: os.Getenv
-// returns "" for an unset variable, so a reviewer asks for validation or a log
-// line at startup. It is a different concern with a different fix and it
-// accepts the singleton, so "env", "environment", "getenv" and "features" are
-// all absent. The second is a race report about the shared map, which the
-// type's own doc rules out. And "thread" is absent for a mechanical reason: the
-// change's own comment contains "thread a *Set through every layer", so it is a
-// word a reviewer can type by quoting.
-//
-// "package-level" WAS NOT ABSENT, and the same comment contains it too, the
-// exact failure the sentence above describes, in the same fixture, one clause
-// later. See the note on Keywords. Both objections above are now probes in
-// TestKeywordsAdmitOnlyRealDetections, and so is the docs nit that found it.
-//
-// IT WAS BUILT AND RUN. Both states were extracted as a module and driven under
-// `go vet` and `go run` with FEATURES=alpha,beta. Load("alpha, beta, ,gamma")
-// answers true, true, false, false in both, so the empty name really is skipped
-// and no input makes Enabled wrong; head additionally answers through the
-// package-level helper, which is the whole of what the change adds.
+// The note behind it is in docs/measurement.md#gopackagesingletonfixture.
 func goPackageSingletonFixture() Fixture {
 	return Fixture{
 		Name: "go-package-singleton",
@@ -1115,7 +754,7 @@ func Enabled(name string) bool { return Default.Enabled(name) }
 			// back deletes this line first. The wrapper is three lines away,
 			// inside anchorTolerance, so a finding there is still credited.
 			//
-			// THE BARE STEMS "package-level" AND "package level" ARE GONE, and
+			// THE BARE STEMS "package-level" and "package level" are GONE, and
 			// they are the reason this list needed rereading: the change's own
 			// added doc comment says "the package-level helpers read", three
 			// lines from the plant, so a docs nit that quoted it, "the comment
@@ -1126,7 +765,7 @@ func Enabled(name string) bool { return Default.Enabled(name) }
 			// reached by quoting: each one names the standing cost rather than
 			// the location.
 			//
-			// THE COST OF THAT REMOVAL WAS PAID IN RECALL AND NOT MEASURED, which
+			// THE COST OF that REMOVAL was PAID IN RECALL and not MEASURED, which
 			// is the half Round 7 left out. "Adding a package-level default fixes
 			// the answer for the whole binary; keep returning a *Set and let
 			// callers hold it" is this finding stated plainly, and it came back
@@ -1135,8 +774,8 @@ func Enabled(name string) bool { return Default.Enabled(name) }
 			// is what the added line changes. "answer for the whole" closes it
 			// and requires the sentence to say what is fixed for that scope.
 			//
-			// THREE COMPOUNDS WERE TRIED FIRST UNDER A CLAIM THAT NONE OF THEM
-			// WAS "reachable by quoting: each one names the standing cost rather
+			// THREE COMPOUNDS were TRIED FIRST UNDER A CLAIM that NONE OF THEM
+			// Was "reachable by quoting: each one names the standing cost rather
 			// than the location". Running them says otherwise, and two of the
 			// three were pure widening besides:
 			//
@@ -1159,7 +798,7 @@ func Enabled(name string) bool { return Default.Enabled(name) }
 			// no test charges for in either direction is not evidence of
 			// anything, so the rule for ADDING one to this corpus is now checked
 			// rather than stated: TestKeywordsAdmitOnlyRealDetections carries a
-			// soleCreditors list, and a keyword on it must be the ONLY keyword
+			// soleCreditors list, and a keyword on it must be the only keyword
 			// crediting some hit probe, deleting it then fails a test, while
 			// the miss probes keep charging it in the other direction. 345 of
 			// the corpus's 358 keywords predate that list and nothing enforces

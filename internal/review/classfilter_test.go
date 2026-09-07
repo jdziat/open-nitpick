@@ -235,8 +235,8 @@ func TestLinterAttributionSurvivesTriage(t *testing.T) {
 // The second case is a triage RE-RATING, and who reported the finding decides
 // the answer. THE BUG: it did not. Both kinds were treated as a model's (the
 // word dropped, on the theory that a level somebody else chose makes the
-// reporter's spelling stale), which for an analyzer is wrong twice over.
-// semgrep does not retract "HIGH" because triage re-rated the impact, and the
+// reporter's spelling stale), which for an analyzer is wrong twice over
+// .semgrep does not retract "HIGH" because triage re-rated the impact, and the
 // finding is still published as "flagged by semgrep(...)", so dropping the
 // pair leaves the report asserting semgrep's own word for it is our "warning".
 // An analyzer's level is never its own claim, whatever the level ends up

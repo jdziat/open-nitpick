@@ -26,12 +26,7 @@ const EnvPrices = "NITPICK_EVAL_PRICES"
 // staleAfterDays is when a price stops being reported as merely dated and
 // starts being reported as STALE.
 //
-// It is a display flag and it changes no number: every cost in the table is
-// computed from the recorded rate whatever its age. It exists because "captured
-// 47 days ago" is a fact a reader has to convert, and "STALE" is one they
-// cannot skim past. A month is the horizon over which this catalog has actually
-// moved, the gemini and qwen lines both re-tiered inside one, so it is the
-// point at which the right action is to recapture rather than to trust.
+// The note behind it is in docs/measurement.md#staleafterdays.
 const staleAfterDays = 30
 
 // shippedPrices is the price table compiled in, so cost reporting works from
@@ -43,9 +38,8 @@ var shippedPrices []byte
 
 // CallUsage is what ONE model call reported spending.
 //
-// The per-call granularity is not bookkeeping neatness, it is what makes a
-// tiered price computable at all. OpenRouter bills 11 of the 20 models in the
-// shipped table at a rate chosen by the size of THAT REQUEST's prompt, and a
+// The per-call granularity is what makes a tiered price computable at all. OpenRouter bills 11 of the 20 models in the
+// shipped table at a rate chosen by the size of that REQUEST's prompt, and a
 // sum of calls cannot answer "how big was the prompt", an aggregate of 60,000
 // prompt tokens is one call over the qwen 32,000 step or thirty calls under it,
 // at rates 3.3x apart. The previous version of this file recorded base rates
@@ -187,7 +181,7 @@ func (u TokenUsage) sum(of func(CallUsage) int) int {
 
 // Complete reports whether every call in this usage reported what it spent.
 // An incomplete usage may not be priced: the sum of the calls that did report
-// is not the cost of the run, it is a fraction of it with no way to know which.
+// is a fraction of the run's cost, with no way to know which fraction.
 func (u TokenUsage) Complete() bool { return len(u.PerCall) > 0 && u.Unreported == 0 }
 
 // observe records one response's reported usage, or the absence of it.
@@ -367,10 +361,10 @@ type Tier struct {
 
 // Routing is what the OTHER endpoints serving this model charge.
 //
-// It exists because the round-2 error was not a wrong number, it was a wrong
-// object. `/api/v1/models` returns one `pricing` block per model and every rate
-// in the previous table was a correct copy of it, but that block is ONE
-// ENDPOINT'S price. OpenRouter serves 15 of the 20 battery models from between
+// It exists because the round-2 error was a wrong object rather than a wrong
+// number. `/api/v1/models` returns one `pricing` block per model, every rate in
+// the previous table was a correct copy of it, and that block is one endpoint's
+// price. OpenRouter serves 15 of the 20 battery models from between
 // 5 and 34 endpoints, spanning 22x on openai/gpt-5.6-luna and 3.9x on
 // z-ai/glm-5.2, and open-nitpick pins no provider, so which one served a request
 // is the router's choice and is recorded nowhere. A $/DEFECT figure was
@@ -398,7 +392,7 @@ type Routing struct {
 	Dearest  string
 
 	// Low and High are the extremes across every endpoint, with each endpoint's
-	// own cache fallback applied BEFORE the extremum is taken, so they bound
+	// own cache fallback applied before the extremum is taken, so they bound
 	// what could be billed rather than what happens to be published.
 	//
 	// They are base rates. An endpoint's own prompt-size overrides are not
@@ -444,7 +438,7 @@ type Price struct {
 	// and it exists to make a row REFUSE rather than approximate.
 	//
 	// The two anthropic entries publish it at 1.6x their five-minute rate. A
-	// usage report says how many cache-creation tokens were written and NOT
+	// usage report says how many cache-creation tokens were written and not
 	// which TTL they were written at, so on a model publishing both, a call that
 	// wrote any is not priceable from this table. The amount is one of two
 	// numbers 1.6x apart and nothing here can say which. Billing it at the
@@ -452,10 +446,9 @@ type Price struct {
 	// flatters a model into being the default.
 	//
 	// Nothing in open-nitpick enables prompt caching today, so this refusal
-	// should never fire. That is exactly why it is encoded rather than left as
-	// the comment it used to be: "no path sends these tokens" is a property of
-	// this month's call sites, and the accounting has to be right the month
-	// somebody adds one.
+	// should never fire, which is why it is encoded rather than left as a
+	// comment: "no path sends these tokens" is a property of this month's call
+	// sites, and the accounting has to be right the month somebody adds one.
 	//
 	// cacheWrite1hKnown separates an unpublished rate from a published free one,
 	// for the same reason cacheReadFree does on Rates.
@@ -543,8 +536,8 @@ type rawPrice struct {
 	CacheRead  *float64 `yaml:"cache_read"`
 	CacheWrite *float64 `yaml:"cache_write"`
 
-	// CacheWrite1h is recorded to be REFUSED on rather than to be billed. See
-	// Price.CacheWrite1h.
+	// CacheWrite1h is recorded to be refused on rather than billed, as the
+	// parsed form explains at length.
 	CacheWrite1h *float64 `yaml:"cache_write_1h"`
 
 	Tiers   []rawTier   `yaml:"tiers"`
@@ -678,7 +671,7 @@ func parsePrice(raw rawPrice) (Price, error) {
 			"and an entry that cannot say which one is the confusion that produced a whole round of cost numbers")
 	}
 
-	// An entry has to price BOTH sides or it is not an entry. A half-written one
+	// An entry has to price both sides or it is not an entry. A half-written one
 	// is worse than a missing one: missing reports unknown, half-written reports
 	// a confident dollar figure with one rate silently at zero, and output is
 	// 4-6x input across this table, so the half that goes missing costs the
@@ -697,8 +690,7 @@ func parsePrice(raw rawPrice) (Price, error) {
 			// The pair is what makes a call unpriceable. A 1-hour rate recorded
 			// beside no 5-minute rate would make the entry refuse against a
 			// fallback-to-input figure the vendor never published as a cache
-			// rate at all, which is a different statement from the one this
-			// field exists to make.
+			// rate at all, a different statement from the one being made here.
 			return Price{}, fmt.Errorf("records cache_write_1h with no cache_write: the field exists to " +
 				"say that TWO published rates could have applied, and one of them is missing")
 		}
@@ -715,9 +707,8 @@ func parsePrice(raw rawPrice) (Price, error) {
 			return Price{}, fmt.Errorf("tier %d has min_prompt_tokens %d: a threshold at or below zero restates the base rate rather than overriding it", i, mpt)
 		}
 		if mpt <= previous {
-			// rateAt walks the slice in order and stops at the first threshold
-			// above the prompt. Out of order, it would stop early and bill a
-			// large prompt at a small prompt's rate.
+			// Selection walks the tiers in order and stops at the first
+			// threshold over the prompt, with no way back from a bad order.
 			return Price{}, fmt.Errorf("tier %d has min_prompt_tokens %d, which does not exceed the %d before it: tiers are selected by walking them in order, so an unsorted list bills a large prompt at a small prompt's rate", i, mpt, previous)
 		}
 		previous = mpt
@@ -1042,7 +1033,7 @@ func (p *PriceTable) Price(model string) (Price, bool) {
 	return price, ok
 }
 
-// Cost is a USD amount that may be UNKNOWN or merely NOT COMPARABLE, and knows
+// Cost is a USD amount that may be UNKNOWN or merely not COMPARABLE, and knows
 // which and why.
 //
 // A float64 cannot hold "we do not know", and every unset one in Go renders as
@@ -1074,7 +1065,7 @@ type Cost struct {
 	// behind it had moved on. Staleness is a property of the number, so it
 	// travels with the number.
 	//
-	// It is deliberately NOT a downgrade of Known or Comparable: the arithmetic
+	// It is deliberately not a downgrade of Known or Comparable: the arithmetic
 	// is right and the rows are still each other's peers. It is a disclosure.
 	Stale       bool
 	StaleReason string
@@ -1244,13 +1235,13 @@ type Detections struct {
 	//     file reaches recall 1.00 BELOW the calibrated reviewer's token cost.
 	//     Its $/DEFECT heads the table. NOISE is what sees it.
 	//
-	//     This bullet used to say "forty one-line findings are cheaper to
-	//     generate than three explained ones", and the degenerate table's row for
-	//     it declared its own token count to make that true. Run over the real
-	//     corpus, a comment on every line of a twenty-line file with one defect
-	//     costs MORE than explaining that defect, so the dollar columns caught
-	//     the spammer and NOISE could have been deleted with every guard green.
-	//     What is cheap is refusing to explain, not filing more.
+	//     "Forty one-line findings are cheaper to generate than three explained
+	//     ones" is false, and only the degenerate table's own declared token
+	//     count made it look true. Run over the real corpus, a comment on every
+	//     line of a twenty-line file with one defect costs more than explaining
+	//     that defect, so the dollar columns catch the spammer and NOISE could
+	//     be deleted with every guard green. What is cheap is refusing to
+	//     explain, rather than filing more.
 	//   - Point at everything. A finding covering the whole file, as one span,
 	//     or as a list of one-line regions, which is the shape Incumbent's
 	//     secondary locations parse into, is credited with every plant inside it
@@ -1436,27 +1427,7 @@ func (l *CostLedger) rowsAt(in map[string]*modelSpend, now time.Time) []CostRow 
 // was priced on, and the DEPTH, priced runs per fixture, the most thorough row
 // reached on each of them.
 //
-// The set is a set, not a count. Keyed on the count, which is what this was,
-// two models that each completed two of four fixtures AND FAILED DIFFERENT ONES
-// both report Covered=2 against a peer coverage of 2, both pass as comparable,
-// and their $/DEFECT figures describe disjoint corpora. That is the same "priced
-// on an easier subset" error the coverage check was added to catch, wearing a
-// number that matches, and it is reachable by ordinary flakiness rather than by
-// anything adversarial: one timeout each on different fixtures produces it.
-//
-// The depth is per fixture and is the MAXIMUM any row reached there, rather than
-// one chosen row's profile. What it defends against is a row assembled from the
-// runs that went well: being priced on a fixture ONCE satisfies the set, so a
-// reviewer whose barren runs happen not to report usage is priced only on the
-// runs that found something. The comparison a reader makes is between rows, so
-// the standard is what a peer achieved on that fixture, no synthetic
-// number, and no row is asked for work none of its peers managed.
-//
-// Ties on set size are broken on the sorted fixture list rather than on map
-// order, so two runs of the same battery choose the same reference and print the
-// same table. Where two rows hold equal-sized different sets, at most one of them
-// can contain the reference, so the pair is never declared mutually comparable.
-// The caller holds the lock.
+// The note behind it is in docs/measurement.md#referencecorpus.
 func (l *CostLedger) referenceCorpus(in map[string]*modelSpend) (fixtures []string, depth map[string]int) {
 	depth = map[string]int{}
 
@@ -1524,26 +1495,12 @@ func (s ShortFixture) String() string {
 	return fmt.Sprintf("%s (%d of %d)", s.Fixture, s.Priced, s.Peer)
 }
 
-// ShallowSampleWarning is the sentence a table prints when a row measured every
-// fixture but measured some of them fewer times than the standard it is held to.
+// ShallowSampleWarning is the sentence a table prints when a row measured
+// every
+// fixture but measured some of them fewer times than the standard it is held
+// to.
 //
-// ONE WORDING FOR TWO TABLES. The cost ledger reached this reading first and got
-// it right. The shortfall is not merely a smaller sample, it is a sample the row
-// did not choose, while the judged report grew the identical failure and printed
-// nothing at all about it, so one loss was described two ways by two tables seven
-// hundred lines apart. The parts that differ between the two are
-// arguments, not a second sentence.
-//
-// standard is what the row fell short OF, and the two callers differ here for a
-// reason: the cost table compares against its PEERS, because a row priced on
-// fewer runs than another row is the shape that reading is maxed out by; the
-// judged table compares against the row's OWN attempted depth, because the
-// incumbent is served at depth one by design and a peer-max test would mark it
-// short on every run with RUNS>1.
-//
-// dropped names what the missing runs have in common, which is the whole content
-// of the warning: a random shortfall costs precision and a selected one costs the
-// result. readings names the figures a reader must not rank.
+// The note behind it is in docs/measurement.md#shallowsamplewarning.
 func ShallowSampleWarning(model, standard, dropped, readings string, short []ShortFixture) string {
 	if len(short) == 0 {
 		return ""
@@ -1579,13 +1536,13 @@ type CostRow struct {
 	Covered      int
 	PeerCoverage int
 
-	// Missing names the fixtures in that reference corpus this row was NOT
+	// Missing names the fixtures in that reference corpus this row was not
 	// priced on, and is what comparability turns on. The count alone
 	// cannot see two rows priced on equal numbers of DIFFERENT fixtures; see
 	// CostLedger.referenceCorpus.
 	Missing []string
 
-	// Shallow names the fixtures this row WAS priced on but fewer times than its
+	// Shallow names the fixtures this row was priced on but fewer times than its
 	// most thorough peer. It is the second half of the same defence and it is the
 	// half that stops the reading being maxed out: a row priced on every fixture
 	// at least once passes Missing, and a reviewer whose empty runs report no
@@ -1644,21 +1601,14 @@ func (r CostRow) PriceAgeDays() (int, bool) {
 //
 // Zero coverage is not comparable because it is not a result at all; otherwise
 // the test is that the row covers the whole reference corpus, fixture by fixture
-// rather than by count, AND to the depth its peers reached on each.
+// rather than by count, and to the depth its peers reached on each.
 func (r CostRow) Comparable() bool {
 	return r.Covered > 0 && len(r.Missing) == 0 && len(r.Shallow) == 0
 }
 
 // Recall is the share of planted defects this row's MEASURED reviews found.
 //
-// It is a cost method, not a duplicate of the score table's column, because it
-// is the other half of the only cost reading this file publishes: it is
-// computed over exactly the reviews the dollar amount was computed over, so the
-// pair describes one set of runs. Reading the score table's recall, which
-// includes reviews that reported no usage and are therefore absent from the
-// cost, beside this row's $/DEFECT would pair a numerator and a denominator
-// drawn from different corpora, which is the error this whole file exists to
-// avoid making with dollars.
+// The note behind it is in docs/measurement.md#recall.
 func (r CostRow) Recall() (float64, bool) {
 	if r.Planted == 0 {
 		return 0, false
@@ -1719,9 +1669,9 @@ func (r CostRow) coverageReason() string {
 // it: whether it may be ranked against its neighbours, and how old the rate
 // behind it is.
 //
-// Every amount this row publishes goes through here, which is the point. The
-// age used to be added by the table's formatter, so it existed only for a
-// reader of that one table.
+// Every amount this row publishes goes through here, which is the point.
+// Adding the age in the table's formatter instead gives it to a reader of that
+// one table and nobody else.
 func (r CostRow) qualify(usd float64) Cost {
 	cost := knownCost(usd)
 	if !r.Comparable() {
@@ -1805,18 +1755,7 @@ func (r CostRow) PerReview() Cost {
 
 // PerDefect is what this model costs per planted defect it found.
 //
-// This is the number a default is chosen on, and it is the reason cost per
-// review is not: a model at a fifth of the price that finds half as much is not
-// cheaper, and only this ratio says so. When nothing was detected it is
-// UNDEFINED, a division by zero, not an infinite cost, and not the free lunch
-// a zero would read as.
-//
-// It is also the number with a degenerate maximum, which is what Comparable
-// defends. The cheapest possible cost per defect is bought by failing every run
-// that is expensive or hard and completing only the cheap ones the model finds
-// easy: the surviving runs are priced correctly, the ratio is computed
-// correctly, and the answer is a lie about the corpus. Coverage is the only
-// thing in the row that can see it.
+// The note behind it is in docs/measurement.md#perdefect.
 func (r CostRow) PerDefect() Cost {
 	total := r.Total()
 	if !total.Known {
@@ -1858,16 +1797,16 @@ type CostReading struct {
 	// maxes it out is a counterexample to exactly this sentence.
 	Doc string
 
-	// Score returns the components ORIENTED SO THAT HIGHER IS BETTER, so
+	// Score returns the components ORIENTED SO that HIGHER IS BETTER, so
 	// "maxed out" is componentwise >= without each caller re-deriving which way
 	// a dollar amount points. ok is false when the row gives the reading nothing
-	// to measure, including when the row is NOT COMPARABLE, which is the whole
+	// to measure, including when the row is not COMPARABLE, which is the whole
 	// defence against the strategy that quits on the expensive fixtures.
 	Score func(CostRow) (components []float64, ok bool)
 }
 
 // Maxes reports whether a strategy's row is at least as good as a reference row
-// on EVERY component.
+// on every component.
 //
 // The reference is a reviewer that works, so this answers "did this
 // strategy do as well as being useful?". A TIE counts as maxing it out: a
@@ -1899,8 +1838,8 @@ func (c CostReading) Maxes(strategy, reference CostRow) (maxed, comparable bool)
 // for having spent less in total than a row that reviewed a different number of
 // fixtures, and the table prints them as evidence for the ratios rather than as
 // a ranking. REVIEWS, PRICED, COV, FAILED, DEFECTS and AGE are descriptive for
-// the same reason, COV in particular is not an achievement, it is the
-// precondition under which the ratios may be read at all.
+// the same reason, COV in particular being the precondition under which the
+// ratios may be read at all rather than an achievement.
 func PublishedCostReadings() []CostReading {
 	return []CostReading{
 		{
@@ -1955,7 +1894,7 @@ func PublishedCostReadings() []CostReading {
 				// Negated so that higher is better in every position: cheaper is
 				// better, more of the corpus found is better, less invented is
 				// better, and a narrower worst-case span is better. The anchor
-				// is NOT divided by anything. It is a worst case, following the
+				// is not divided by anything. It is a worst case, following the
 				// detection metric, which is what makes it survive a strategy
 				// that files one wide span among many narrow ones.
 				return []float64{
@@ -1969,12 +1908,7 @@ func PublishedCostReadings() []CostReading {
 // DescriptiveCostColumns identify a row, state how much measurement is behind
 // it, or disclose a limit on it. None of them is a score.
 //
-// The distinction is the whole mechanism: a column here is never asked what
-// maximises it, so putting a score here by mistake is how one escapes the
-// degenerate-strategy table. COST and TOKENS are the clearest case. A row is
-// not better for having spent less in total than a row that reviewed a
-// different number of fixtures, and COV is not an achievement but the
-// precondition under which the ratios may be compared at all.
+// The note behind it is in docs/measurement.md#descriptivecostcolumns.
 func DescriptiveCostColumns() []string {
 	return []string{
 		"MODEL", "REVIEWS", "PRICED", "COV", "FAILED", "DEFECTS", "TOKENS", "COST", "SPREAD", "AGE",
@@ -2064,7 +1998,7 @@ func (l *CostLedger) ComparabilityNotes() []string {
 	return notes
 }
 
-// OrderingNotes names the pairs of rows a reader must NOT order on $/DEFECT
+// OrderingNotes names the pairs of rows a reader must not order on $/DEFECT
 // because their routing bands overlap, which
 // TestTwoAmountsWithOverlappingBandsAreNotOrderable checks on two rows built to
 // overlap.
@@ -2128,35 +2062,7 @@ func (l *CostLedger) OrderingNotes() []string {
 
 // CostTableHeader is the cost block's header.
 //
-// It is a package-level const, beside the other published table headers, so a
-// guard running in the DEFAULT build can check that every column in it is
-// declared. The reports themselves are behind the `eval` tag, where no
-// ordinary `go test ./...` would reach them. That is the mechanism that would
-// have stopped the withdrawn banded severity columns being added to a header
-// and a legend with nothing anywhere asking what maximised them.
-//
-// PRICED is the number of reviews that fed the cost, and COV the number of
-// distinct fixtures behind them. Both are printed beside REVIEWS rather than
-// hidden: when PRICED and REVIEWS disagree every cost cell on the row describes
-// a subset of the run, and when COV disagrees between rows the rows describe
-// different corpora. FAILED is calls that errored, whose charge, if the
-// provider raised one, is not visible from here at all, which makes the cost on
-// that row a lower bound. RECALL is printed immediately left of $/DEFECT and not
-// at the far end of the row, because the two are one reading and a reader who
-// has to look for the second half will not.
-// SPREAD is the width of the model's routing band, printed beside the amounts
-// rather than only in a footnote: it is the difference between a figure that is
-// exact and one that could be several times either way, and a reader comparing
-// two rows needs it in the same glance as the dollars.
-//
-// NOISE and ANCHOR sit between RECALL and $/DEFECT because the five are one
-// reading and those two are the ones a reader would not think to want. RECALL
-// was printed here without either for a round, score.go's AllTableHeaders
-// records the gap and hands it to this track, and each of them is the only
-// column that sees one of the two cheap ways to buy recall.
-// The RECALL field is 11 wide and not 8: its cell is "14/14 1.00", which is ten
-// characters, and at 8 it pushed every column to its right out of line on every
-// row in the table.
+// The note behind it is in docs/measurement.md#costtableheader.
 const CostTableHeader = "MODEL                                REVIEWS  PRICED  COV  FAILED  DEFECTS  TOKENS     COST        $/REVIEW    RECALL      NOISE  ANCHOR  $/DEFECT     SPREAD     AGE"
 
 // CostReadingLegend is printed under the cost table, for the same reason

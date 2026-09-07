@@ -232,7 +232,7 @@ func TestReviewEndToEnd(t *testing.T) {
 // model's own.
 //
 // Both directions are asserted, and the second is the one that keeps the fix
-// honest: a model writing a level we already use has NOT been translated, and
+// honest: a model writing a level we already use has not been translated, and
 // marking it as though it had would make every finding in the tree unquotable
 // and the flag meaningless.
 func TestRewritingAModelsSeverityRecordsTheModelsWord(t *testing.T) {

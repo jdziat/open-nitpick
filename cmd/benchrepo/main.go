@@ -95,7 +95,7 @@ func presentation(f evals.Fixture) (title, body string) {
 }
 
 // manifestPath is where `prs` records which pull request holds which fixture,
-// on THIS side, so the benchmark repository never carries the answer key.
+// on this side, so the benchmark repository never carries the answer key.
 func manifestPath(repo string) string {
 	return filepath.Join("cmd", "benchrepo", "manifests", strings.ReplaceAll(repo, "/", "__")+".json")
 }

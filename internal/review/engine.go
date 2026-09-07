@@ -40,8 +40,8 @@ type Engine struct {
 	//
 	// It is a constructor for the same reason Linters is, and the omission was
 	// worse: models.* names the model that reads the diff, its temperature, its
-	// token ceiling and its timeout, so roles built from the change's own
-	// .nitpick.yaml meant a change could still choose the model that reviewed it
+	// token ceiling and its timeout, so roles built from the change's own.
+	// nitpick.yaml meant a change could still choose the model that reviewed it
 	// (a one-billion-parameter model returns an empty findings list and the run
 	// looks clean), while the published notice said its configuration had not
 	// been applied. Optional; a caller that wires Roles by hand instead cannot
@@ -94,23 +94,15 @@ type LinterDiscardReporter interface {
 // LinterDiscard is one finding a deterministic analyzer reported that this
 // review did not publish.
 //
-// It is a separate list from Report.Overruled because the two describe
-// different events. An overruled finding was judged: a domain expert read it
-// and said no, and the reader can weigh that. A discarded one was never judged
-// at all (it was removed by ANCHORING, because no comment could be attached to
-// the line it named), and until this existed nothing recorded that it had been
-// reported.
+// It is separate from Report.Overruled because the two describe different
+// events. An overruled finding was judged, so a reader can weigh the expert
+// who said no; a discarded one was removed by anchoring when no comment could
+// attach to its line, and this list is the only record it was reported at all.
 //
-// "Before triage" is what that used to say, and it stopped being true when the
-// anchor pass that runs AFTER triage started reporting its own drops. The
-// distinction survives the correction (these were not weighed and rejected,
-// they were never weighed), but the list now spans the whole pipeline rather
-// than its first stage.
-//
-// Path is the path THE ANALYZER PRINTED, not a path this tool resolved. For the
-// reason that separates DiscardNotInChange from DiscardPathNotInCheckout, that
-// distinction is the whole content of the record: a forged path is evidence
-// exactly because it is what the analyzer was made to say.
+// Path is what the analyzer printed rather than a path this tool resolved,
+// which is the whole content of the record where DiscardNotInChange and
+// DiscardPathNotInCheckout differ: a forged path is evidence precisely because
+// it is what the analyzer was made to say.
 type LinterDiscard struct {
 	// Rule is the analyzer-qualified rule id, as it would have appeared in the
 	// published finding's attribution.
@@ -194,7 +186,7 @@ type LinterUncoveredReporter interface {
 // Every route in UncoveredReason was measured against golangci-lint 2.8.0 and
 // every one of them left the roster reporting a clean Go review.
 //
-// NOT EVERY ROUTE MEANS THE FILE WENT UNREAD, and the wording here has to hold
+// Not every ROUTE MEANS THE FILE WENT UNREAD, and the wording here has to hold
 // for all of them. It said "reported nothing about ... because the tree arranged
 // for it not to look" while every entry was a file nobody read. Two entries have
 // since arrived that the sentence is false of: UncoveredLanguageVersion, where
@@ -318,12 +310,11 @@ type LinterStatus struct {
 
 // LinterOutcome is what happened to one analyzer.
 //
-// The three are separate because two of them look identical in a report and
-// are not the same fact. An analyzer that was ENABLED AND APPLICABLE and did
-// not run is a hole in the review; one that had nothing of its kind to read
-// (ruff in a Go-only change) is a non-event. Collapsing them is what made a
-// status block worth skipping: three lines of "did not run" on every pull
-// request, of which only one ever meant anything.
+// The three are separate because two look identical in a report and are not
+// the same fact. An analyzer enabled and applicable that did not run is a hole
+// in the review; one with nothing of its kind to read, such as ruff in a
+// Go-only change, is a non-event. Collapsing them makes a status block worth
+// skipping: three "did not run" lines per pull request, one of which matters.
 type LinterOutcome string
 
 // The outcomes an analyzer can have.
@@ -377,7 +368,7 @@ type Report struct {
 	// configuration instead of through a failure.
 	Budget *Fit
 
-	// Incomplete lists files whose review batch failed. These files were NOT
+	// Incomplete lists files whose review batch failed. These files were not
 	// reviewed, so the absence of findings for them means nothing. Reporting
 	// them is a correctness requirement: a partially-failed review that prints
 	// "no issues found" is indistinguishable from a clean one.
@@ -398,8 +389,8 @@ type Report struct {
 	// before anything judged them. See LinterDiscard.
 	Discarded []LinterDiscard
 
-	// Uncovered lists the parts of the change an analyzer ran over and did not
-	// fully cover. See LinterUncovered.
+	// Uncovered lists the parts of the change an analyzer read without checking
+	// them, each with the reason it could not. See LinterUncovered.
 	Uncovered []LinterUncovered
 
 	// Files is the diff this review was made against, after any incremental
@@ -427,8 +418,8 @@ type Report struct {
 	AlreadyReported []Finding
 }
 
-// Incremental describes a run that reviewed part of a change because the rest
-// had been reviewed before.
+// Incremental describes a run that reviewed part of a change because an
+// earlier run covered the rest.
 type Incremental struct {
 	// Since is the revision the earlier review looked at.
 	Since string
@@ -520,7 +511,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA}
 	defer func() { report.Routes = e.routeDecisions }()
 
-	// What an earlier run left on the pull request, read AFTER the policy is
+	// What an earlier run left on the pull request, read after the policy is
 	// settled because review.incremental is policy. A provider that cannot answer
 	// (the local one, every test double that does not opt in) leaves prior nil
 	// and the whole change is reviewed, which is also what happens on a first
@@ -595,7 +586,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 			// because a linter misbehaved would be a bad trade.
 			e.log().Warn("linters failed", "error", err)
 		}
-		// Read AFTER Run and regardless of its error: the statuses are how the
+		// Read after Run and regardless of its error: the statuses are how the
 		// analyzers were configured and which of them did not run, which is
 		// most worth publishing exactly when something went wrong.
 		if reporter, ok := runner.(LinterStatusReporter); ok {
@@ -652,7 +643,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	discarded = append(discarded, dropped...)
 
 	// Assembled here rather than where the analyzer set was read, BECAUSE READING
-	// IT THERE WAS THE BUG. Report.Discarded was frozen before the first
+	// IT THERE was THE BUG. Report.Discarded was frozen before the first
 	// filterAnchors call, and filterAnchors is a second sink for exactly the same
 	// kind of finding: with linters.only_changed_lines off, an analyzer finding
 	// on a diff CONTEXT line passes normalize's remaining gate (the diff carries
@@ -1183,26 +1174,20 @@ func (e *Engine) normalizeClass(f Finding) string {
 }
 
 // recordSeverity maps a model-supplied severity onto a real level, logging
-// anything unrecognized and KEEPING the model's own word when it rewrites one.
+// anything unrecognized and keeping the model's own word when it rewrites one.
 //
 // The schema constrains severity to an enum, but JSON-mode providers do not
 // enforce it, so an unexpected value still reaches here. Left alone, "none"
-// would outrank critical and trip every gate, and "P1" would silently become
-// info with nothing to explain the surprise.
+// outranks critical and trips every gate, and "P1" becomes info unexplained.
 //
-// THE BUG IT FIXES: this used to return only the normalized level, so a model
-// that said "P1" or "Critical" had its word destroyed here and nothing
-// recorded that a substitution had happened. internal/evals then published a
-// block captioned as each contender's own severity vocabulary, and answered it
-// from "was this finding produced by the Incumbent adapter?", so every model
-// this project ships was reported as having printed the word we had just
-// written over it. The identical defect had already been found and fixed on
-// the incumbent's side, where a lost word at least prints "(word not
-// recorded)"; here the substitute was quoted silently as the model's own.
+// Both the normalized level and the model's own word are returned. Returning
+// only the level destroys the word with nothing recording the substitution,
+// and internal/evals then captions a block as each model's own vocabulary
+// while quoting words this tool wrote over it.
 //
-// Only a REWRITE is recorded. A model that writes a level we already use has not
+// Only a rewrite is recorded. A model writing a level already in use has not
 // been translated and must not be marked as though it had, or every finding in
-// the tree would report its own severity as unquotable.
+// the tree reports its own severity as unquotable.
 func (e *Engine) recordSeverity(f *Finding) {
 	normalized, ok := config.Severity(f.Severity).Normalize()
 	if !ok {
@@ -1234,32 +1219,23 @@ func holdAdvisories(findings []Finding) (rest, advisories []Finding) {
 
 // restoreSeverityProvenance puts back who reported a finding and, where it
 // still describes something, the word that reporter used, both lost by a pass
-// that decodes findings from JSON, where they carry `json:"-"`.
+// that decodes findings from JSON, where they carry `json:"-"`. FromAnalyzer
+// comes back for any finding still recognized, since it is a fact about origin
+// that no re-rating touches, and the other two fields follow from it.
 //
-// For any finding still recognized, FromAnalyzer comes back whatever else
-// changed, because it is a fact about the finding's ORIGIN and no re-rating
-// touches it. The two other fields then follow different rules depending on it:
+// A model's raw word is its own rating, so a pass that moved the severity
+// leaves that word describing a rating nobody holds, and it is dropped, as
+// applyOutcomes does when an expert re-rates.
 //
-// A MODEL's raw word is its own rating. If the pass moved the severity, that
-// word describes a rating nobody now holds and is dropped, the same rule
-// applyOutcomes applies when an expert re-rates: a review model's "P1"
-// travelling beside a level somebody else chose describes a finding that never
-// existed.
+// An analyzer's raw word is what the tool printed, and semgrep printed
+// CRITICAL however triage re-rated the finding. Dropping it would publish
+// Source="semgrep(rule)" with SeverityTranslated false and no raw word,
+// asserting semgrep's word is this tool's level. SeverityTranslated is
+// likewise always true for one.
 //
-// An ANALYZER's raw word is not a rating we are publishing, it is what the
-// tool PRINTED, and semgrep still printed CRITICAL however triage re-rated the
-// finding afterwards. THE BUG: dropping it on a re-rating published
-// Source="semgrep(rule)" with SeverityTranslated false and no raw word, which
-// asserts "semgrep's own word for this is <our level>", verbatim the
-// substitution RawSeverity exists to prevent, and only reachable for findings
-// this report attributes to a named analyzer. SeverityTranslated is likewise
-// always true for one: the level is never the analyzer's claim.
-//
-// It is keyed on Finding.Key(), so a reworded finding is not
-// recognized and keeps whatever the pass itself said. That is the conservative
-// direction: failing to restore prints "(word not recorded)", which is
-// visible, while restoring onto the wrong finding quotes a reviewer as saying
-// something it did not, the failure this whole field pair exists to prevent.
+// Keying on Finding.Key() means a reworded finding keeps whatever the pass
+// said. Failing to restore prints "(word not recorded)" and is visible, where
+// restoring onto the wrong finding misquotes a reviewer.
 func (e *Engine) restoreSeverityProvenance(f *Finding, before map[string]Finding) {
 	original, ok := before[f.Key()]
 	if !ok {
@@ -1281,13 +1257,13 @@ func (e *Engine) restoreSeverityProvenance(f *Finding, before map[string]Finding
 }
 
 // filterAnchors drops findings that cannot be placed, snaps near-misses onto a
-// real changed line, AND RETURNS THE ANALYZER FINDINGS IT DROPPED.
+// real changed line, and RETURNS THE ANALYZER FINDINGS IT DROPPED.
 //
 // Models routinely anchor a finding a line or two off. Discarding those loses
 // genuine issues; snapping them recovers the comment while keeping the
 // guarantee that every published comment lands on a line in the diff.
 //
-// THE SECOND RETURN VALUE IS THE FIX FOR THE SAME DEFECT THIS PROJECT ALREADY
+// THE SECOND RETURN VALUE IS THE FIX FOR THE same DEFECT this PROJECT ALREADY
 // FIXED ONE FUNCTION UPSTREAM. Set.normalize's bare `continue` statements were
 // replaced with counted, named discards; this function kept two of its own,
 // and it runs immediately after, so a finding that survived normalize and died
@@ -1308,7 +1284,7 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) ([]Finding,
 	out := make([]Finding, 0, len(findings))
 	var dropped []LinterDiscard
 
-	// The reason has to describe what happened to THIS finding, and
+	// The reason has to describe what happened to this finding, and
 	// the two cases here are different facts. A line the diff carries as
 	// context is a line this change did not touch; a line the diff does not
 	// carry at all cannot be commented on by anyone.
@@ -1441,7 +1417,7 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 	// THE BUG IT FIXES: SeverityTranslated and RawSeverity are `json:"-"`, so
 	// they arrive from triage's decode zeroed. recordSeverity below could not
 	// restore them either, because renderForTriage shows triage `[%s]` of
-	// f.Severity (THIS PROJECT'S word, already normalized), so a triage model
+	// f.Severity (this PROJECT'S word, already normalized), so a triage model
 	// that echoes what it was shown normalizes to itself and the call returns
 	// early. Every finding that survived triage was therefore published claiming
 	// nobody had translated it, and internal/evals' severityAsSaid reads that as
@@ -1519,19 +1495,12 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		kept = append(kept, f)
 	}
 
-	// Every finding triage was given is accounted for: published (possibly merged
-	// or reworded, same file, within a few lines), merged into a finding that was
-	// published, or restored. THE BUG THIS CLOSES, twice over. Three of eight
-	// misses on the benchmark repository were findings the reviewer made and
-	// triage threw away as "an info-level nit" or "a harmless redundancy". The
-	// first repair let triage drop with a stated reason, and it then dropped a
-	// correct milliseconds-versus-seconds finding as "the rationale contradicts
-	// itself" and a correct redundant copy as naming "no concrete cost beyond a
-	// future reader". Which is the cost. A reason channel is a rationalisation
-	// channel. So triage may not drop at all: it merges duplicates, naming the
-	// survivor, and it re-rates; severity is what says a claim is thin, and the
-	// nitpick filter decides who sees it. Anything else that went missing comes
-	// back.
+	// Every finding triage was given is accounted for: published, merged or
+	// reworded within a few lines of the same file, or restored. Three of eight
+	// misses on the benchmark repository were findings triage threw away as
+	// nits, and letting it drop with a stated reason only bought a
+	// rationalisation channel. So triage may not drop: it merges duplicates
+	// naming the survivor, and it re-rates. Anything else missing comes back.
 	var merged []Overruled
 	keptNumber := map[int]bool{}
 	for i, f := range findings {
@@ -1588,31 +1557,21 @@ func triageAccountedFor(f Finding, kept []Finding) bool {
 // capAnalyzerFindings applies linters.max_severity to the findings a
 // deterministic analyzer reported.
 //
-// THE BUG IT FIXES: the ceiling was applied once, in linters' normalize, which
-// runs BEFORE triage and before the expert pass. Both of those may raise a
-// severity (triage.md instructs the model to "raise anything whose blast
-// radius is larger than the original reviewer could see", and Validator.revise
-// runs in both directions on purpose), and neither reapplied the ceiling. So
-// an operator who wrote `linters.max_severity: warning` to keep analyzers away
-// from their gate still had a build failed at `fail_on: critical` by a semgrep
-// finding triage had re-rated. The ceiling capped what triage was SHOWN and
-// nothing else, while the configuration reference said it capped what the run
-// acts on.
+// Applying it once in linters' normalize is not enough. That runs ahead of
+// triage and the expert pass, both of which may raise a severity, so an
+// operator writing `linters.max_severity: warning` to keep analyzers off their
+// gate still gets a build failed at `fail_on: critical` by a semgrep finding
+// triage re-rated: the ceiling caps what triage is shown and nothing else.
 //
 // It sits after validation and before applyGate because the gate is the first
-// reader of a severity that matters: min_severity decides publication and
-// fail_on decides the exit code, and a ceiling that does not reach both is
-// decoration. Reducing here can carry a finding below min_severity and delete
-// it, which is the correct reading of "an analyzer's word is worth at most a
-// warning here" combined with "do not show me warnings".
+// reader of a severity that matters. Reducing here can carry a finding below
+// min_severity and delete it, the correct reading of "an analyzer's word is
+// worth at most a warning here" plus "do not show me warnings".
 //
 // It binds every finding still recognizable as the analyzer's. A triage
-// rewording that changes Finding.Key() loses FromAnalyzer exactly as it
-// already loses Source and Class (the finding is then published as triage's
-// own, with no analyzer named), so the ceiling no longer describes it either.
-// That is the same conservative direction the other restorations take, and it
-// is why the ceiling is documented as a ceiling on what is attributed to an
-// analyzer.
+// rewording that changes Finding.Key() loses FromAnalyzer as it already loses
+// Source and Class, publishing the finding as triage's own with no analyzer
+// named, so this is documented as a ceiling on what an analyzer is credited.
 func (e *Engine) capAnalyzerFindings(findings []Finding) []Finding {
 	for i, f := range findings {
 		if !f.FromAnalyzer {
@@ -1650,24 +1609,18 @@ func (e *Engine) applyGate(findings []Finding) []Finding {
 	return kept
 }
 
-// Filter applies the publication policy to a set of findings, returning what is
-// kept and what is dropped.
-//
-// It is a pure function, exported, and deliberately separate from the engine:
-// the whole point of generating one corpus and narrowing afterwards is that the
-// narrowing can be evaluated offline, against a fixed corpus, at zero API cost.
-// A filter that could only be exercised by making a model call would not
-// deliver that.
+// Filter applies the publication policy to a set of findings, returning what
+// is kept and what is dropped. It is pure, exported and separate from the
+// engine so the narrowing can be evaluated offline against a fixed corpus at
+// zero API cost, which a filter reachable only through a model call cannot be.
 func Filter(findings []Finding, level config.NitpickLevel, minimum config.Severity) (kept, dropped []Finding) {
 	return FilterWith(findings, level, minimum, false)
 }
 
-// FilterWith is Filter with the slop switch: the slop class is published by
-// review.slop alone, at whatever nitpick level. The schema offers the class
-// whether or not the switch is on, so a model may label a finding slop
-// unasked; with the switch off that finding is not dropped for its label
-// but read as style, the class it is nearest to, and published or not as
-// style is at the configured level.
+// FilterWith is Filter with the slop switch. review.slop alone publishes the
+// slop class, at any nitpick level. The schema offers the class either way, so
+// a model may label a finding slop unasked; with the switch off that finding
+// is read as style rather than dropped for its label.
 func FilterWith(findings []Finding, level config.NitpickLevel, minimum config.Severity, slop bool) (kept, dropped []Finding) {
 	for _, f := range findings {
 		if f.Cls() == config.ClassSlop && !slop {
@@ -1810,7 +1763,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 
 // reviewPrompt builds the system prompt for the analysis pass.
 //
-// Note what is NOT here: the pull request's title and body. Those are authored
+// Note what is not here: the pull request's title and body. Those are authored
 // by whoever opened the pull request, so they belong in the user message as
 // untrusted data, not in the system prompt where the repository's own
 // instructions live.
@@ -1930,9 +1883,9 @@ func renderForTriage(pr *vcs.PullRequest, findings []Finding) string {
 	fmt.Fprintf(&b, "%d findings were reported across separate batches:\n\n", len(findings))
 	for i, f := range findings {
 		// The title is flattened onto one line. An analyzer message can contain
-		// newlines -- a semgrep rule whose `message:` is a YAML block scalar
+		// newlines. A semgrep rule whose `message:` is a YAML block scalar
 		// arrives as "shell=True passes the string to /bin/sh.\nUse a list
-		// argument instead.\n", measured against semgrep 1.172.0 -- and an
+		// argument instead.\n", measured against semgrep 1.172.0, and an
 		// unflattened one breaks the numbered list the triage model answers
 		// against, so its reply cannot be matched back through Finding.Key().
 		// The finding then arrives at the gate with no Source and no

@@ -91,11 +91,11 @@ func TestParseRealSample(t *testing.T) {
 		t.Errorf("line = %d, want 10 (the first line of the 10-12 range)", f.Line)
 	}
 
-	// Recorded, not reinterpreted. This used to assert `error`, because
-	// crSeverity demoted every Incumbent critical so its coarser vocabulary
-	// would not read as inflation; the effect was that no Incumbent review
-	// could score accurate on a plant we planted critical, and a headline
-	// number was published on it. The vocabulary mismatch is NOT handled by
+	// Recorded, not reinterpreted. Asserting `error` here matches a crSeverity
+	// that demotes every Incumbent critical so its coarser vocabulary does not
+	// read as inflation, and the effect is that no Incumbent review can score
+	// accurate on a plant we planted critical, with a headline number published
+	// on it. The vocabulary mismatch is not handled by
 	// correcting it anywhere, the attempt to handle it at comparison time was
 	// withdrawn too, see NoCrossToolSeverityScore. It is described rather than
 	// scored, and the parser records what the reviewer said.
@@ -517,9 +517,9 @@ func TestFixtureRepoHasOriginRemote(t *testing.T) {
 
 // --- RunIncumbent ------------------------------------------------------------
 //
-// Nothing in this package used to call RunIncumbent or CollectIncumbent, so
-// every guard inside them was untested: deleting the free-tier check outright
-// left the suite green. The tests below drive the real function through a shim
+// With nothing in this package calling RunIncumbent or CollectIncumbent, every
+// guard inside them goes untested: deleting the free-tier check outright leaves
+// the suite green. The tests below drive the real function through a shim
 // on PATH, which is the only way to reach the branches that decide whether a
 // number gets recorded at all.
 
@@ -628,8 +628,8 @@ func TestRunIncumbentReturnsCompleteReviews(t *testing.T) {
 // this file passing.
 //
 // It also pins the ORDER. The warning is checked before parsing, because a
-// free-allowance review parses perfectly well. Its findings are simply
-// measuring the allowance rather than the reviewer, and must not be usable.
+// free-allowance review parses perfectly well, and its findings measure the
+// allowance rather than the reviewer, so they must not be usable.
 func TestRunIncumbentDetectsFreeTierFallback(t *testing.T) {
 	const warning = "Incumbent couldn't find a Git remote for this repository, so it can't " +
 		"match the review to one of your organizations. This review will use the free CLI allowance."
@@ -671,8 +671,8 @@ func TestRunIncumbentReportsRateLimitsFromEitherStream(t *testing.T) {
 	for name, script := range map[string]string{
 		"on stdout": "echo '" + message + "'\nexit 1\n",
 		"on stderr": "echo '" + message + "' >&2\nexit 1\n",
-		// Past the 200-byte stderr truncation, which is the other way the
-		// message used to be lost.
+		// Past the 200-byte stderr truncation, the other way the message is
+		// lost.
 		"on stdout behind a wall of noise": "head -c 4000 /dev/zero | tr '\\0' 'x'\necho\necho '" +
 			message + "'\nexit 1\n",
 	} {
@@ -781,7 +781,7 @@ func TestCacheIsRejectedWhenItMeasuredSomethingElse(t *testing.T) {
 // recover text already on disk.
 //
 // The last subtests pin the corollary the first version of this got wrong: when
-// the retained text does NOT parse, the entry is refused rather than quietly
+// the retained text does not parse, the entry is refused rather than quietly
 // served from the stored reading.
 func TestCachedReviewIsServedFromRawNotFromTheStoredParse(t *testing.T) {
 	fx := Fixtures()[0]
@@ -854,7 +854,7 @@ func TestCachedReviewIsServedFromRawNotFromTheStoredParse(t *testing.T) {
 	// drifts under a measurement.
 	//
 	// The absent-review worry it was answering is real and is handled where it
-	// belongs: callers list what has no usable cache BEFORE they run, and a
+	// belongs: callers list what has no usable cache before they run, and a
 	// contender judged on nothing is failed rather than ranked.
 	t.Run("unparseable raw is refused, and says why", func(t *testing.T) {
 		dir := t.TempDir()
@@ -1008,8 +1008,8 @@ func TestFingerprintDistinguishesWhatTheReviewerSaw(t *testing.T) {
 // TestReparseCachedRaw re-derives every cached review from its retained raw
 // text and rewrites the cache in place.
 //
-// This is what retaining raw bought. Both anchor fixes -- keeping the end of a
-// span, and reading the "Also applies to" line -- changed how a review parses,
+// This is what retaining raw bought. Both anchor fixes (keeping the end of a
+// span, and reading the "Also applies to" line) changed how a review parses,
 // and every cached entry predates them. Without the raw text the only way to
 // apply a parser fix to an existing corpus is to buy the reviews again, which
 // is how a benchmark ends up quietly scored under two different parsers.

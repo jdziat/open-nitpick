@@ -512,8 +512,8 @@ func sqlfluffSpec() toolSpec {
 			for _, f := range files {
 				for _, v := range f.Violations {
 					// PRS and TMP are sqlfluff saying it could not parse or
-					// template the file — almost always the wrong dialect for
-					// this repository — which is a fact about the analyzer's
+					// template the file, almost always the wrong dialect for
+					// this repository, which is a fact about the analyzer's
 					// configuration, not a finding about the change. Publishing
 					// "unparsable SQL" on a valid migration is noise the
 					// operator fixes with linters.configs.sqlfluff.
@@ -837,7 +837,7 @@ func phpstanSpec() toolSpec {
 	return toolSpec{
 		name: "phpstan", languages: "PHP",
 		exts: []string{".php"},
-		// operatorOnly AND trusted: phpstan needs a configuration naming the
+		// operatorOnly and trusted: phpstan needs a configuration naming the
 		// project's autoloader, and running it loads that autoloader.
 		isolation: operatorOnly, trusted: true,
 		args: func(inv invocation) []string {

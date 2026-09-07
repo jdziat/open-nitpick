@@ -11,7 +11,7 @@ import (
 // TestEveryClassRoutesToAnExpert is the invariant that keeps validation from
 // being skipped.
 //
-// A finding that routes nowhere would return a zero Expert — no name to
+// A finding that routes nowhere would return a zero Expert, no name to
 // attribute a refutation to, and no system prompt, so the model would be asked
 // to judge a claim with no expertise at all. ClassUnknown and an empty class
 // are in the table on purpose: they are exactly where a model's unexpected
@@ -192,7 +192,7 @@ func TestSignalsOverrideAWrongClass(t *testing.T) {
 //
 // Two runs over the same diff have to be diffable against each other, and an
 // expert chosen by map iteration order would make the same finding validated by
-// a different specialist on every run — turning a real disagreement between two
+// a different specialist on every run, turning a real disagreement between two
 // runs into noise nobody can attribute.
 func TestRoutingIsDeterministic(t *testing.T) {
 	inputs := []struct{ class, title, rationale string }{
@@ -219,7 +219,7 @@ func TestRoutingIsDeterministic(t *testing.T) {
 // The asymmetry is the whole design: the reviewer reports only what it can name
 // a consequence for, and the expert refutes only what it can name a reason
 // against. An expert that drops whatever it merely doubts converts a precision
-// gain into a silent recall collapse — and a wrongly deleted true finding is
+// gain into a silent recall collapse, and a wrongly deleted true finding is
 // invisible in a way a false positive never is, because nobody reviews the
 // comments that were not posted.
 //
@@ -294,8 +294,8 @@ func TestEveryExpertPromptUsesTheReviewerSeverityScale(t *testing.T) {
 					t.Errorf("prompt uses %q, which is not a severity this schema accepts", f)
 				}
 			}
-			// The calibration rules from review.md, which are what actually
-			// hold severity down.
+			// The calibration rules from review.md, which are what holds
+			// severity down.
 			if !strings.Contains(e.prose, "not the worst one") {
 				t.Error("prompt must tell the expert to rate the demonstrated consequence")
 			}
@@ -367,8 +367,8 @@ func TestRosterCoversEveryEmbeddedPrompt(t *testing.T) {
 
 // TestEverySignalCanMatch is the teeth on the routing table.
 //
-// Signals are matched against normalized text — lowercase, punctuation
-// collapsed to single spaces — so a signal written as "db.Query" or "SQL
+// Signals are matched against normalized text, lowercase, punctuation
+// collapsed to single spaces, so a signal written as "db.Query" or "SQL
 // injection" can never fire. Nothing fails when that happens: the finding
 // quietly falls through to a less specialised expert, which is the exact shape
 // of silent degradation this package is built to avoid.
@@ -460,7 +460,7 @@ func allExpertPrompts(t *testing.T) []expertPrompt {
 // test.
 //
 // A decisive signal overrides the class, so a word that merely APPEARS in
-// findings about a domain — rather than naming that domain — hands the claim to
+// findings about a domain, rather than naming that domain, hands the claim to
 // a specialist who cannot judge it. That is not the bounded cost the decisive
 // routes are justified by: each expert's refutation list is a set of
 // domain-membership tests, and its severity scale has no anchor for a defect
@@ -468,7 +468,7 @@ func allExpertPrompts(t *testing.T) []expertPrompt {
 // expert both delete the finding.
 //
 // Every case here is a real defect whose text happens to use another domain's
-// words. The assertion is on the expert NOT reached; which of the remaining
+// words. The assertion is on the expert not reached; which of the remaining
 // experts takes it matters less than that it is not the one whose scale would
 // rate it away.
 func TestIncidentalVocabularyDoesNotCaptureAFinding(t *testing.T) {
@@ -484,7 +484,7 @@ func TestIncidentalVocabularyDoesNotCaptureAFinding(t *testing.T) {
 			// "untested" is how a reviewer states the RISK attached to a real
 			// defect. Routed on it, an off-by-one met the test-design expert,
 			// whose scale says a test gap "is rarely critical and rarely
-			// error" — and a nit is below the default publication gate.
+			// error", and a nit is below the default publication gate.
 			name:      "a defect described as untested is not a test-design finding",
 			class:     "correctness",
 			title:     "Off-by-one in the pagination offset",
@@ -546,7 +546,7 @@ func TestIncidentalVocabularyDoesNotCaptureAFinding(t *testing.T) {
 }
 
 // TestDomainVocabularyStillRoutes is the control for the test above. Narrowing
-// the signals must keep the findings that genuinely belong to those experts, or
+// the signals must keep the findings that belong to those experts, or
 // this table has bought recall by giving up the routing it exists for.
 func TestDomainVocabularyStillRoutes(t *testing.T) {
 	cases := []struct {
@@ -606,8 +606,8 @@ func TestDomainVocabularyStillRoutes(t *testing.T) {
 // cannot see.
 //
 // That test checks a signal against its own normalized spelling, so "sha256"
-// passes — while signalText collapses punctuation, and the way anyone actually
-// writes it, SHA-256, arrives as two tokens. The route is then live in the
+// passes, while signalText collapses punctuation, so the ordinary spelling,
+// SHA-256, arrives as two tokens. The route is then live in the
 // table and dead in practice, which is the silent degradation the table's tests
 // exist to prevent.
 func TestSignalsMatchHowThePrimitivesAreWritten(t *testing.T) {

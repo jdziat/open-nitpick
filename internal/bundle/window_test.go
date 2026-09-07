@@ -751,7 +751,7 @@ func denselyEdited(n, stride int) (diff.Files, ContentFetcher) {
 
 // TestDenselyEditedFileKeepsContextItsBudgetCanPayFor pins the dead zone shut.
 // A file whose edits sit closer together than twice the narrowest width used
-// to lose ALL of its context, every rung covered the whole file, the search
+// to lose all of its context, every rung covered the whole file, the search
 // fell through, and the request went out with 93% of its budget unspent and no
 // file attached. Losing the file entirely is the worst answer available, and
 // it was reached while the budget could have paid for most of it.

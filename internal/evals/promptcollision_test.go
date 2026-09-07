@@ -9,8 +9,8 @@ package evals
 // limit neither of them can cover.
 //
 // WHAT HAPPENED. review.md illustrated `info` with "Widening an exported type's
-// accepted input is info. Adding a dependency for one helper function is info."
-//, kotlin-widened-input and rust-crate-for-one-call stated almost verbatim,
+// accepted input is info. Adding a dependency for one helper function is info.",
+// kotlin-widened-input and rust-crate-for-one-call stated almost verbatim,
 // three lines above "These examples ... are deliberately drawn from defect
 // classes you are unlikely to meet in this change; do not go looking for them."
 // The prompt named two planted defects and then told the reviewer to ignore
@@ -21,7 +21,7 @@ package evals
 // replaced in the same change. fixtures_info.go, fixtures_nit.go and
 // timezone-boundary's own comment in fixtures.go carry the full arguments.
 //
-// WHY TWO GUARDS AND NOT ONE. The two halves of that defect are not detectable
+// WHY TWO GUARDS and not ONE. The two halves of that defect are not detectable
 // the same way.
 //
 //   - The MEASUREMENT half is literal. "accepted input" is a kotlin-widened-input
@@ -31,7 +31,7 @@ package evals
 //     title, rationale or category contains a keyword as a substring, so that
 //     costs full recall for a comment that noticed nothing. That half is
 //     mechanical, and TestNoPlantedKeywordAppearsInTheShippedPrompt runs it.
-//     Restoring the pre-fix `info` rung makes it report BOTH "accepted input"
+//     Restoring the pre-fix `info` rung makes it report both "accepted input"
 //     and "for one helper"; an earlier version of this comment claimed no
 //     keyword was involved, and the file's own fail-first evidence refutes it.
 //   - The USER-FACING half is semantic and no scan reaches it. The collision
@@ -45,7 +45,7 @@ package evals
 //     tripwire for that half: it forces a human to look, and it decides nothing
 //     itself.
 //
-// NOT BEHIND `//go:build eval`, AND THAT IS THE POINT OF IT. These tests sat
+// Not BEHIND `//go:build eval`, and that IS THE POINT OF IT. These tests sat
 // behind that tag when they were written, which made "the build goes red" false:
 // the project gate runs `go test ./...` untagged, CI runs `go test -race ./...`,
 // and every Makefile eval target is `-run`-filtered to a named paid battery, so
@@ -77,70 +77,7 @@ import (
 // shippedPromptTexts renders the prompt text a review is generated from, keyed
 // by a stable source label.
 //
-// It is built from the real embedded templates and the real persona renderers
-// rather than from a copy pasted into this file, because a copy is a second
-// source of truth that goes stale silently, which is the failure mode this
-// whole file exists to catch, one level up.
-//
-// THE VALIDATION SURFACE IS HALF COVERED, on purpose, and the line runs between
-// text every expert gets and text one domain gets.
-//
-// review.ValidationContract() is IN. It is the task every expert is given
-// whatever the finding was about, so a plant's vocabulary there is not a domain
-// naming its domain, and scanning it costs one exception: measured, the whole
-// contract collides with exactly one keyword in the corpus, timezone-boundary's
-// "utc" inside "the worst imaginable outcome".
-//
-// THE 14 PER-DOMAIN PROMPTS IN templates/experts ARE OUT, and that is a
-// decision with a cost rather than an oversight. Three measurements, in the
-// order that decided it:
-//
-//   - A KEYWORD SCAN WOULD NOT HAVE CAUGHT THE ONE REAL DEFECT FOUND THERE.
-//     api.md's `info` rung read "a change the author should accept knowingly:
-//     widened input, a new optional field, a default that moved within its
-//     documented range", review.md's defect exactly, a list of categories with
-//     two plants in it, and it was found by hand and rewritten in the same
-//     change. Measured: that sentence, scanned with asRendered against every
-//     keyword in AllFixtures() and dedupFixtures(), produces ZERO hits.
-//     "widened input" is not on kotlin-widened-input's list, and no phrasing of
-//     the moved default is on ruby-default-page-size's.
-//   - IT WOULD FIRE 100 TIMES ON THE PRODUCT. Measured across the 14 files: 100
-//     collisions, 61 distinct fixture/keyword pairs, every file between 2 and
-//     12. Nearly all are a domain checklist naming its domain, sql.md says
-//     "injection", authz.md says "authoriz", crypto.md says "constant time",
-//     secrets.md says "credential". Each would need a promptKeywordException
-//     with an argued `why`, and then the next paragraph anyone writes in
-//     appsec.md breaks the build for saying "symlink". A guard that fires on
-//     ordinary domain prose in the domain's own file is deleted, and this file
-//     has already had to repair two smaller false positives of that kind.
-//   - NO FALSE CREDIT IS REACHABLE FROM AN EXPERT PROMPT ANYWAY. An expert's
-//     prose never enters the haystack mentionsAny searches: applyOutcomes
-//     republishes the reviewer's own Finding on confirm, and on a revision it
-//     changes the severity fields and nothing a keyword is read from.
-//
-// THE UNCOVERED DIRECTION IS SUPPRESSION, AND IT IS RECALL RATHER THAN
-// SEVERITY. An earlier version of this comment said an expert prompt could only
-// "push a confirm or a re-rating toward the level a plant wants, which is a
-// severity-channel problem". That is wrong about the code: on `refuted`
-// applyOutcomes appends to overruled and appends NOTHING to kept, so the
-// finding is deleted rather than re-rated, the reasoned-refutation case in
-// internal/review/validate_test.go asserts kept is empty, and is named by file
-// rather than by identifier because this package's citation lint resolves only
-// tests it declares. A sentence in an expert's refutation list that describes a
-// plant's mechanism therefore costs the whole finding. The demonstrated attack
-// is one line added to durability.md's refutation list, "the statement is a
-// one-time backfill whose author meant it to touch every row", which carries
-// data-loss-migration's keyword verbatim AND tells the expert to refute the
-// corpus's only critical data-loss plant. Run against this tree: the guard stays
-// green, as it is documented to.
-//
-// LATENT TODAY, WHICH IS WHY IT IS A DISCLOSURE AND NOT A HOLE LEFT OPEN.
-// config.Defaults() sets Validation{Enabled: false} and no eval path turns it
-// on, so no expert prompt reaches a model in any measurement this corpus
-// reports. The day validation ships on by default this paragraph is the thing
-// to re-read, and what it needs is not a bigger scan. It is a reader of the 14
-// prompts asking whether any refutation reason describes something planted,
-// which is question 2 of the ladder tripwire asked about a different file.
+// The note behind it is in docs/measurement.md#shippedprompttexts.
 func shippedPromptTexts(t *testing.T) map[string]string {
 	t.Helper()
 
@@ -167,8 +104,8 @@ func shippedPromptTexts(t *testing.T) map[string]string {
 
 	// Every level, not only config.GenerationLevel. A branch nothing renders
 	// today ships the day that constant moves, and a guard that could only see
-	// today's branch would report the collision after it had been measured
-	// against rather than before.
+	// today's branch reports the collision only after something has been
+	// measured against it.
 	for _, level := range []config.NitpickLevel{
 		config.NitpickOff, config.NitpickMinimal, config.NitpickNormal, config.NitpickPedantic,
 	} {
@@ -207,28 +144,7 @@ func shippedPromptTexts(t *testing.T) map[string]string {
 // run of whitespace collapsed to one space, and markdown's emphasis markers
 // dropped.
 //
-// BOTH HALVES ARE REPAIRS OF A MEASURED MISS, and they are the same miss twice
-// , markdown lets a phrase be written in more than one way and a byte-exact
-// scan measures the writing rather than the phrase.
-//
-//   - WRAPPING. The templates hard-wrap at about 76 columns. Of the two
-//     keywords the broken `info` illustration handed over, "accepted input" sat
-//     on one line and "for one helper" straddled the wrap ("...adding a
-//     dependency for\n  one helper function..."). Measured against the pre-fix
-//     review.md, a byte-exact scan found one of the two and this finds both.
-//   - EMPHASIS. `*`, `_` and backticks are dropped, because a model reads
-//     "package-level state" where the file says "package-level **state**".
-//     Measured: with the sentence "When a change introduces package-level
-//     **state** that outlives a single call..." added to review.md this test
-//     passed, and with the two `**` pairs removed and nothing else changed it
-//     failed on go-package-singleton's keyword. review.md already uses `**` in
-//     six places, so no adversarial intent is needed, a maintainer emphasising
-//     a word is enough. TestThePromptScanSeesThroughEmphasis is the
-//     permanent form of that experiment.
-//
-// Dropping rather than replacing with a space is deliberate: markdown renders
-// "**word**s" as "words". Both the prompt and the keyword go through this, so
-// the transform is symmetric and cannot lose a match it used to make.
+// The note behind it is in docs/measurement.md#asrendered.
 func asRendered(s string) string {
 	s = strings.Map(func(r rune) rune {
 		switch r {
@@ -255,8 +171,8 @@ func asRendered(s string) string {
 // nothing to an asterisk. Measured byteExact=false, wsCollapse=false,
 // asRendered=true on all four. (The sentence here used to read "pass a
 // byte-exact scan and the whitespace-collapsing one and fail both", which
-// contradicts itself and is wrong either way it is read.) A marker wrapping a WHOLE keyword
-// , "`data loss`", is not among them on purpose: it is found by every version
+// contradicts itself and is wrong either way it is read.) A marker wrapping a WHOLE keyword,
+// "`data loss`", is not among them on purpose: it is found by every version
 // of this function, so it would sit here proving nothing.
 func TestThePromptScanSeesThroughEmphasis(t *testing.T) {
 	for _, c := range []struct{ keyword, prompt string }{

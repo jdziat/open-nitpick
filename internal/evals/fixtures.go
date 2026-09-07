@@ -14,7 +14,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // Defect is a bug deliberately planted in a fixture, with enough information to
 // recognize a finding that reports it.
 type Defect struct {
-	// Path and Line locate the defect in the file AFTER the change.
+	// Path and Line locate the defect in the file after the change.
 	Path string
 	Line int
 
@@ -45,7 +45,7 @@ type Defect struct {
 	// Unwritten, that distinction is indistinguishable from drift, and a plant
 	// can then be moved in whichever direction the week's numbers want.
 	//
-	// It is NOT ground truth for a model's class assignment and nothing scores
+	// It is not ground truth for a model's class assignment and nothing scores
 	// against it. capacity-hint-nit is why: the closed set has no home for an
 	// allocation that is merely unnecessary, so `resource` there is the
 	// least-wrong box rather than a correct answer, and grading a model against
@@ -71,7 +71,7 @@ type Defect struct {
 	WantSeverity config.Severity
 
 	// SeverityNote is why this plant's WantSeverity departs from others of its
-	// Class. TestSeverityIsConsistentWithinADefectClass requires one from EVERY
+	// Class. TestSeverityIsConsistentWithinADefectClass requires one from every
 	// member of a class carrying more than one severity: with two plants
 	// disagreeing there is no fact about which is the outlier, and letting a
 	// single note excuse a whole class would reopen the hole this closes.
@@ -104,7 +104,7 @@ type Fixture struct {
 
 	// Extra files exist in both states and are never changed.
 	//
-	// THEY DO NOT REACH THE MODEL. This field used to claim it gave "the model
+	// THEY DO not REACH THE MODEL. This field used to claim it gave "the model
 	// surrounding context without appearing in the diff", and nine files across
 	// seven fixtures were authored on that reading, a tsconfig.json here, a
 	// pyproject.toml there, an Alerts.csproj to say the project is net8.0.
@@ -191,84 +191,7 @@ func Fixtures() []Fixture {
 // HeldOutFixtures is a second corpus the prompt tuning never sees, which
 // TestHeldOutCorpusStaysHeldOut checks by intersecting the two accessors.
 //
-// Tuning a prompt against Fixtures() and then reporting a score on Fixtures()
-// measures nothing: with enough iterations any prompt can be shaped to eight
-// specific changes, and the number that falls out says nothing about a real
-// pull request. This set is spent ONCE, at the end, to check the gain
-// generalized rather than memorized.
-//
-// It is deliberately unreachable from Fixtures() and from the default run, so
-// nothing picks it up by accident. Selecting it takes naming a fixture in
-// NITPICK_EVAL_FIXTURES, an explicit act by whoever is measuring.
-//
-// The defect classes here are chosen to be ones the tuning corpus does NOT
-// contain, because a held-out set drawn from the same distribution measures
-// memorization of that distribution rather than generalization:
-//
-//   - contract-break     a wire-format change that silently breaks consumers
-//   - data-loss-migration an UPDATE with no WHERE, in SQL
-//   - ts-unawaited-async  a defect in TypeScript, so the prompt is not
-//     silently tuned to Go and Python
-//   - timezone-boundary   a correctness bug a careless reviewer waves through
-//   - clean-sql-allowlist code that pattern-matches SQL injection and is
-//     provably safe; the correct review is silence
-//   - removed-guard       the defect is in the REMOVED lines, which a reviewer
-//     that only reads additions cannot see
-//   - retry-no-backoff    a real defect that is only worth a WARNING, so the
-//     severity columns can be falsified in both directions
-//
-// That last one is about the instrument rather than the defect class. Without
-// it every plant here is error or critical, and a prompt that learned to answer
-// "at least error" to everything, the exact failure the O-INFL column exists
-// to catch, cannot be caught by the corpus that is supposed to check whether
-// the tuning generalized. TestHeldOutCorpusCanFalsifyInflation pins it.
-//
-// THE SECOND HALF OF THE SEVERITY REBALANCE lands here, and the split was made
-// on one question: what would a prompt tuned on Fixtures() have to GENERALIZE
-// to, rather than what is left over. Held-out fixtures chosen as leftovers make
-// the set thin and the generalization claim weak, which is the state this list
-// was in, seven fixtures, six plants, one of them below error.
-//
-//   - csharp-client-per-request  C#, a language NEITHER corpus contained
-//   - bash-fixed-temp-path       shell, likewise, and a security warning
-//   - defensive-copy-nit         Java, likewise
-//   - cross-file-sort-nit        cross-file reasoning in a different language
-//     from the tuning corpus's cross-file plant
-//   - duplicate-test-case-nit    the `tests` class, which appears NOWHERE in
-//     Fixtures(), and the only nit in either corpus that costs coverage rather
-//     than an allocation
-//
-// The three new languages are the load-bearing ones and they are here on
-// purpose. A language planted in Fixtures() can be tuned for, and a prompt that
-// was tuned until it worked on C# has demonstrated nothing about the next
-// language it meets; the same prompt working on C# it was never shown is the
-// only version of that claim worth publishing. The cost is the one every
-// held-out set pays and is worth stating: if the reviewer is bad at shell, this
-// corpus finds out once, at the end, and the finding cannot be acted on without
-// authoring a replacement.
-//
-// `tests` is here for a related but WEAKER reason than this comment first
-// claimed, and the difference matters. It said the class is one "NitpickNormal's
-// scope includes", which is not true of this plant: that scope asks for "missing
-// tests where new branching logic is risky", and duplicate-test-case-nit
-// is the opposite, a REDUNDANT case, in a change whose slug.go is byte-identical
-// between base and head, so there is no new branching logic for a missing-test
-// finding to attach to. A reviewer reading the tests clause literally stays
-// silent and is scored a miss, which is the "a corpus that penalizes obedience
-// measures nothing" trap fixtures_nit.go uses to rule out style nits.
-//
-// It stays because it is still reachable, through the maintainability clause of
-// the same scope. A duplicated case has a concrete cost a reviewer can name.
-// So it measures how far the prompt generalizes past the examples it was given,
-// which is worth measuring; it does NOT measure coverage of an instructed
-// class, and no claim resting on that reading should be made from it.
-//
-// WHAT DELIBERATELY DID NOT COME HERE: ts-unbounded-memo-key, the only fixture
-// that assembles into more than one batch. Batching is a property of the
-// assembly and prompt this project keeps changing, and a one-shot corpus cannot
-// answer whether a change to it helped. The first measurement would also be
-// the last. It is in Fixtures() so it can be measured repeatedly, and this list
-// therefore still tests no multi-batch behaviour at all.
+// The note behind it is in docs/measurement.md#heldoutfixtures.
 func HeldOutFixtures() []Fixture {
 	return []Fixture{
 		contractBreakFixture(),
@@ -309,14 +232,7 @@ func AllFixtures() []Fixture {
 
 // EveryFixture is AllFixtures plus the multi-file corpus, for name lookup.
 //
-// The multi-file corpus is deliberately NOT in AllFixtures. The ground-truth
-// suite that iterates AllFixtures carries hand-maintained registries for every
-// plant, anchor assertions, hit and miss probes, severity pins, and
-// cross-fixture prose sweeps, and the multi-file corpus is validated by its
-// own, narrower test (TestMultiFileCorpusIsWellFormed) instead. That is a
-// weaker guarantee, and a claim about that corpus should be read with it in
-// mind: its keywords have not been swept against every other fixture's
-// recorded prose.
+// The note behind it is in docs/measurement.md#everyfixture.
 func EveryFixture() []Fixture {
 	all := AllFixtures()
 	all = append(all, MultiFileFixtures()...)
@@ -580,14 +496,14 @@ func StartOfDay(t time.Time) time.Time {
 			// reachable path": every caller outside UTC gets the wrong day
 			// boundary, on every call, with no condition to meet.
 			//
-			// THE ERROR ANCHOR USED TO ILLUSTRATE WITH THIS DEFECT'S CLASS, and
+			// THE ERROR ANCHOR USED TO ILLUSTRATE WITH this DEFECT'S CLASS, and
 			// the illustration was replaced rather than this plant. review.md
 			// read "Comparing timestamps from two different timezones is an
 			// error", which this fixture's earlier comment called "this defect
 			// exactly", three lines above "do not go looking for them", and the
 			// keyword `timezone` sat verbatim in that sentence. That is the same
 			// shape as the info pair fixtures_info.go's header describes, on a
-			// HELD-OUT plant, where a contaminated number cannot be re-run
+			// Held-OUT plant, where a contaminated number cannot be re-run
 			// clean. Unmeasured here: no battery was run against this fixture
 			// under either wording, so the direction is argued, not counted.
 			WantSeverity: config.SeverityError,
@@ -672,7 +588,7 @@ func (s *Store) ListUsersBy(sortKey string, limit int) (*sql.Rows, error) {
 // lines are innocuous and the defect is what the change removed: any
 // authenticated caller can now delete any project. The doc comment carries the
 // plausible-sounding justification a real pull request would, and it is true as
-// far as it goes. The extra read WAS latency, which is what makes the review
+// far as it goes. The extra read was latency, which is what makes the review
 // a judgement rather than a lookup.
 //
 // That rewritten doc comment is also load-bearing, not decoration. The deleted
@@ -836,7 +752,7 @@ def fetch(url):
 			Path: "client.py",
 			Line: 11, // the retry loop
 			// None of these appear anywhere in the file, so nothing here can be
-			// earned by quoting the change. The two objections this must NOT
+			// earned by quoting the change. The two objections this must not
 			// credit are the broad `except urllib.error.URLError` and ATTEMPTS
 			// being a literal: both are about different code and neither reaches
 			// for a word about waiting.
@@ -860,8 +776,8 @@ def fetch(url):
 // multiDefectFixture plants three independent defects in one change.
 //
 // Single-defect fixtures cannot distinguish "found the bug" from "stopped after
-// the first bug", and stopping early is the failure mode a reviewer actually
-// exhibits: it satisfices. This is the fixture that measures whether the prompt
+// the first bug", and stopping early is the failure mode a reviewer exhibits:
+// it satisfices. This is the fixture that measures whether the prompt
 // keeps looking.
 func multiDefectFixture() Fixture {
 	return Fixture{
@@ -923,7 +839,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 				Line: 19,
 				Keywords: []string{
 					// "arbitrary" alone was here and was credited to a finding about
-					// another fixture's unbounded cache -- "remove this cache for
+					// another fixture's unbounded cache, "remove this cache for
 					// arbitrary queries". The adjective is common; what is specific
 					// is WHAT is arbitrary, so it now has to carry its noun.
 					"path traversal", "traversal", "sanitiz", "../", "untrusted",
@@ -945,8 +861,8 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 				Keywords: []string{
 					// "concurrent" was here and was credited to a finding about
 					// another fixture's package-level default. What is left names
-					// the mechanism -- a race, the mutex this struct already
-					// carries, the counter itself -- rather than the topic.
+					// the mechanism (a race, the mutex this struct already
+					// carries, the counter itself) rather than the topic.
 					"race", "data race", "mutex", "unsynchron", "atomic", "h.count",
 				},
 				Class:        config.ClassConcurrency,
@@ -959,7 +875,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 				Keywords: []string{
 					// "close", "defer" and bare "leak" were here. Every one is a
 					// word an ordinary Go review types about any deferred close
-					// anywhere -- including a nil-deref finding in another fixture
+					// anywhere, including a nil-deref finding in another fixture
 					// that says "the deferred Close still runs". What survives
 					// names the descriptor that is lost, not the mechanism that
 					// would have released it.
@@ -982,7 +898,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 
 // subtleLogicFixture plants a one-short capacity hint.
 //
-// Note what is NOT wrong here: the loop bound is correct. It runs
+// Note what is not wrong here: the loop bound is correct. It runs
 // len(samples)-n+1 times, which is exactly the number of sliding windows. Only
 // the capacity passed to make() is one short, so the final append reallocates.
 //
@@ -1047,8 +963,8 @@ func MovingAverage(samples []float64, n int) []float64 {
 			// `resource` is the least-wrong box, not a correct answer: the class
 			// means "leaks and unbounded growth" and this is a single bounded
 			// reallocation. The closed set has no home for an allocation that is
-			// merely unnecessary, which is exactly why nothing scores a model
-			// against Class.
+			// merely unnecessary, which is why no score is computed from the
+			// class a model chooses.
 			Class:        config.ClassResource,
 			WantSeverity: config.SeverityNit,
 			SeverityNote: "nit under \"minor and optional\" — one reallocation, bounded by the window's " +
@@ -1103,9 +1019,9 @@ func Fetch(url string) (int, error) {
 			Line: 10, // resp, _ := http.Get(url)
 			Keywords: []string{
 				// "nil", "panic" and "dereference" were here and were credited to
-				// a finding about another fixture's exported *Set -- prose that
+				// a finding about another fixture's exported *Set: prose that
 				// noticed nothing in this file. A keyword must be a phrase only a
-				// reviewer that saw THIS discarded error would write, so what is
+				// reviewer that saw this discarded error would write, so what is
 				// left names the error, the variable it leaves nil, or the
 				// deferred call that then runs on it.
 				"ignored error", "unchecked", "discard", "error return",

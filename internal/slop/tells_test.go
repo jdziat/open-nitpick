@@ -109,8 +109,8 @@ func TestTheAntithesisShapeIsFound(t *testing.T) {
 		}
 	}
 
-	// A plain negation is not the shape. The tell is the pivot into a
-	// restatement, not the word "not".
+	// A plain negation is not the shape. What the rule looks for is the pivot
+	// into a restatement.
 	if got := Scan("x.md", "The linters are not run from the repository.\n"); len(got) != 0 {
 		t.Errorf("a plain negation was flagged: %+v", got)
 	}
@@ -241,8 +241,8 @@ func TestShoutingIsWordsNotShape(t *testing.T) {
 	}
 }
 
-// A comment that narrates its own history is a commit message that outlived
-// its commit.
+// A comment that narrates its own history is a commit message living past the
+// commit that carried it.
 func TestChangelogCommentsAreFound(t *testing.T) {
 	for _, line := range []string{
 		"// That check used to live here, and rejecting a file was wrong.\n",
@@ -257,5 +257,30 @@ func TestChangelogCommentsAreFound(t *testing.T) {
 
 	if got := Scan("a.go", "// fetchContent reads a file's contents at the reviewed revision.\n"); len(got) != 0 {
 		t.Errorf("an ordinary doc comment was flagged: %+v", got)
+	}
+}
+
+// TestAnEmbeddedPointerFieldIsNotAComment covers Go's `*T` embed, which shares
+// its first character with a `/* */` continuation line. Reading one as prose
+// scores a struct field as a comment, and the field below it then looks like a
+// line the comment restates.
+func TestAnEmbeddedPointerFieldIsNotAComment(t *testing.T) {
+	src := "package p\n\n" +
+		"// recordingLocal keeps the review a local run writes to a writer.\n" +
+		"type recordingLocal struct {\n" +
+		"\t*vcs.Local\n" +
+		"\tpublished *vcs.Review\n" +
+		"}\n"
+	if got := Scan("x.go", src); len(got) != 0 {
+		t.Errorf("an embedded pointer field was scanned as a comment: %+v", got)
+	}
+}
+
+// TestABlockCommentContinuationIsStillAComment is the other side of it: inside
+// `/* */` the same prefix is prose and the rules have to see it.
+func TestABlockCommentContinuationIsStillAComment(t *testing.T) {
+	src := "package p\n\n/*\n * The prose — this part — is a comment.\n */\nvar x = 1\n"
+	if !strings.Contains(rules(Scan("x.go", src)), "em-dash") {
+		t.Error("a block comment's continuation line was not scanned")
 	}
 }

@@ -62,7 +62,7 @@ func TestValidationClassesAcceptAnAlias(t *testing.T) {
 
 // TestValidationRejectsAnUnknownClass fails a typo at load time. Left to run,
 // it would normalize to unknown, match no finding, and silently validate
-// nothing — the exact shape of failure this package refuses everywhere else.
+// nothing, the exact shape of failure this package refuses everywhere else.
 func TestValidationRejectsAnUnknownClass(t *testing.T) {
 	cfg := Defaults()
 	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}

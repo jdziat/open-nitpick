@@ -460,7 +460,7 @@ func TestPackingTable(t *testing.T) {
 	var out strings.Builder
 	w := tabwriter.NewWriter(&out, 0, 0, 2, ' ', 0)
 
-	// Total tokens is the spend: sizing each entry against the WHOLE request
+	// Total tokens is the spend: sizing each entry against the whole request
 	// budget means a file that needs a window grows until it fills a request by
 	// itself, so context per file and requests per run trade directly against
 	// each other. The column exists so that trade is priced rather than assumed.
@@ -485,10 +485,10 @@ func TestPackingTable(t *testing.T) {
 // packingNotes states the facts in the table a reader would otherwise have to
 // derive by hand, each a property of the policy rather than of any one case.
 //
-// Every number is measured AND every claim is asserted against the plan it
+// Every number is measured and every claim is asserted against the plan it
 // describes. The previous version interpolated live numbers into fixed prose,
 // which is how it came to print that a 60-hunk file "cannot fit a window, so
-// ALL of its content is discarded" and that "nothing in the Plan records that
+// All of its content is discarded" and that "nothing in the Plan records that
 // drop", four lines under a row showing that same file windowed, truncated and
 // recorded. Numbers that move under prose that does not are worse than no
 // notes: this table exists to be read by someone deciding packing policy.
@@ -573,7 +573,7 @@ func packingNotes(t *testing.T, measured map[string]*Plan) string {
 		scattered.ContextLines, len(scattered.Content))
 
 	// The trade the sizing policy makes, priced. fitEntry widens a window until
-	// it fills the WHOLE request budget, so a file that needs one never shares
+	// it fills the whole request budget, so a file that needs one never shares
 	// a request with anything: context per file is bought with requests per
 	// run, and this is the row where that is visible.
 	huge := get("6 huge (4000L)")
@@ -931,7 +931,7 @@ func TestSmallFilesReachTheFileCeiling(t *testing.T) {
 }
 
 // TestBudgetBoundFilesNeverReachTheFileCeiling records the interaction the
-// harness was built to expose. fitEntry sizes each entry against the WHOLE
+// harness was built to expose. fitEntry sizes each entry against the whole
 // request budget on its own, so a file that consumes more than half of it
 // "fits" and is then the only thing its batch can hold. MaxFilesPerRequest is
 // a ceiling such files cannot reach.

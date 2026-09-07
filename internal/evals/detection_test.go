@@ -119,7 +119,7 @@ func TestRecallAndCoverageAreOneReadingOfOneCorpus(t *testing.T) {
 }
 
 // TestTheDetectionColumnsAreFilledForAForeignVocabulary is the head-to-head's
-// half of the withdrawal, from the side the withdrawal does NOT cover.
+// half of the withdrawal, from the side the withdrawal does not cover.
 //
 // What was retracted is a comparison of two severity LADDERS, and the four O-*
 // cells carry it. Defects located, findings invented and lines pointed at are
@@ -302,17 +302,17 @@ func detectionRow(t *testing.T, name string, agg Aggregate) map[string]string {
 
 // TestAUniformlyVagueReviewerIsNotOneWideFinding.
 //
-// ANCHOR IS A MAXIMUM, AND A MAXIMUM HIDES UNIFORM VAGUENESS exactly as a mean
+// ANCHOR IS A MAXIMUM, and A MAXIMUM HIDES UNIFORM VAGUENESS exactly as a mean
 // hides one blob. CorpusTally.WidestAnchor justified the max one-sidedly for
 // years, "a mean over precise findings hides it", and the converse went
-// unstated: a reviewer that smears EVERY anchor over k lines and one that is
+// unstated: a reviewer that smears every anchor over k lines and one that is
 // line-precise except for a single k-line comment are the same number, and to a
 // reader they are not remotely the same review.
 //
 // This is not an argument about a hypothetical threshold. It is what makes the
 // incumbent-relative reading of Rule 14's condition 4 a per-finding budget: the
 // incumbent's ANCHOR is its single worst finding, so "no wider than theirs"
-// licenses that width on EVERY finding. The instrument's job is to publish a
+// licenses that width on every finding. The instrument's job is to publish a
 // reading that separates the two shapes; the ship rule's own reading of it is a
 // separate matter and is recorded in docs/measurement.md rather than retuned.
 //
@@ -370,7 +370,7 @@ func TestAUniformlyVagueReviewerIsNotOneWideFinding(t *testing.T) {
 // degenerate guard scores every strategy against `calibratedReview`, and Rule 14
 // does not, its four conditions threshold against what Incumbent did. A
 // reviewer hedged to exactly the incumbent's own worst anchored span ties or
-// beats it on every published rate AND on the worst case, because the worst case
+// beats it on every published rate and on the worst case, because the worst case
 // is where its budget came from.
 //
 // Both sides here are the real scorer over the real cache: the incumbent's
@@ -488,7 +488,7 @@ func TestEveryDetectionRateIsPrintedWithTheCountsItCameFrom(t *testing.T) {
 //
 // L/DEF is blank under a STRICTER condition than the other three, and the extra
 // case is the one that matters for Rule 6d: a row that was measured over real
-// reviews and LOCATED NOTHING has a numerator of zero, so a printed 0.00 would
+// reviews and LOCATED nothing has a numerator of zero, so a printed 0.00 would
 // hand the column's best value to the strategy this package spends the most
 // effort not rewarding.
 func TestADetectionCellIsBlankRatherThanFlatteringWhenNothingWasMeasured(t *testing.T) {
@@ -503,7 +503,7 @@ func TestADetectionCellIsBlankRatherThanFlatteringWhenNothingWasMeasured(t *test
 		}
 	}
 
-	// And a row that WAS measured and invented nothing still prints
+	// And a row that was measured and invented nothing still prints
 	// its zero: 0.00 earned over reviews is a reading, and blanking it would
 	// hide the difference between the two rows this test is about.
 	clean := foldDetection([]Fixture{cleanFixtureForDetection()}, func(Fixture) []review.Finding {

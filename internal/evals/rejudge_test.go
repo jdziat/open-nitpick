@@ -481,11 +481,11 @@ func line(report, s string) string {
 	return ""
 }
 
-// TestGroupDumpRefusesATruncatedTail pins the hole that used to be silent.
+// TestGroupDumpRefusesATruncatedTail pins the hole that goes silent.
 //
-// A hole in the MIDDLE was already refused. A hole at the END was not: the
-// list's length was inferred from the largest index present, so a file missing
-// its last line rebuilt SHORT with no error and no warning. That is the worse
+// A hole in the middle is refused on its own. A hole at the end is not, where
+// the list's length is inferred from the largest index present, so a file
+// missing its last line rebuilds short with no error and no warning. That is the worse
 // of the two. The new judge is shown a shorter review than the recorded
 // verdicts were made about, and the baseline precision then silently disagrees
 // with the published table it is printed beside. A killed run, a `head -n` or a
@@ -564,7 +564,7 @@ func TestGroupDumpRefusesTwoJudgementsOfOneFinding(t *testing.T) {
 // corpus as it stands NOW. Edit a fixture's Head between collecting the dump
 // and re-judging it, and the new judge reads a different change than the one
 // the recorded verdicts were made about, which is exactly the "the findings
-// AND the judge both moved" confound this path exists to eliminate, restored
+// And the judge both moved" confound this path exists to eliminate, restored
 // silently. The fixture NAME surviving is not evidence its source did.
 func TestGroupDumpRefusesAnEditedFixture(t *testing.T) {
 	first, _ := dumpFixtureNames(t)
@@ -672,7 +672,7 @@ func TestRejudgeReportCountsBothJudgesByTheSameRule(t *testing.T) {
 		t.Fatalf("group: %v", err)
 	}
 
-	// The SAME judgement, handed back as the new judge's answer.
+	// The same judgement, handed back as the new judge's answer.
 	outcomes := []RejudgeOutcome{{Group: groups[0], Result: &JudgeResult{Verdicts: raw}}}
 	report := RejudgeReport("openai/base", "openai/new", outcomes, warnings)
 

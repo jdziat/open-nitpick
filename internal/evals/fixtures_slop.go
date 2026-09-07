@@ -167,7 +167,7 @@ export function formatDuration(ms: number): string {
 }
 `},
 		Defects: []Defect{{
-			Path: "src/duration.ts", Line: 8, // // Sure! Here's a helper function
+			Path: "src/duration.ts", Line: 8, // the pasted chat reply
 			Keywords:     []string{"Here's a helper", "handle all the edge cases", "pasted", "formats a duration in milliseconds"},
 			Class:        config.ClassSlop,
 			WantSeverity: config.SeverityNit,

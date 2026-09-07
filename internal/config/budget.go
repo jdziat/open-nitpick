@@ -8,10 +8,10 @@ import (
 
 // Budget bounds what one review may spend.
 //
-// The ceiling changes what the run DOES rather than stopping it partway: a
+// The ceiling changes what the run does rather than stopping it partway: a
 // review that died at ninety cents would publish a partial result that reads
-// like a complete one, which is the failure this package spends most of its
-// effort preventing. Over the ceiling, files are ranked by how much review
+// like a complete one, the failure this package spends most of its effort
+// preventing. Over the ceiling, files are ranked by how much review
 // attention they warrant and the plan keeps as many as fit.
 type Budget struct {
 	// MaxSpend is the ceiling in US dollars. Zero, the default, is no ceiling
@@ -36,9 +36,8 @@ type Budget struct {
 	// since what a model will write is not knowable before it writes it.
 	//
 	// The default is deliberately generous. Under-estimating output spends
-	// more than the ceiling allows, which is the one direction a ceiling must
-	// not fail in; over-estimating reviews fewer files than it could have, and
-	// says so.
+	// more than the ceiling allows, the one direction a ceiling must not fail
+	// in; over-estimating reviews fewer files than it could have, and says so.
 	CompletionRatio float64 `yaml:"completion_ratio"`
 
 	// Overhead scales the review estimate to cover the triage pass, the
@@ -131,7 +130,7 @@ func (b Budget) validate() []error {
 		return errs
 	}
 
-	// A ceiling with no rate cannot bind, and the failure would be silent: the
+	// A ceiling with no rate cannot bind, and the failure would be silent. The
 	// estimate would be zero, every file would fit, and the run would report a
 	// budget it never applied.
 	if b.Prices.Input <= 0 || b.Prices.Output <= 0 {

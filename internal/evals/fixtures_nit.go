@@ -4,94 +4,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 
 // nitFixtures are the corpus's nit-level plants.
 //
-// Measured over AllFixtures() before these were written, the corpus planted 4
-// critical, 8 error, 1 warning, 0 info and 1 nit across 15 fixtures. A severity
-// distribution that shape cannot support a severity claim: "answer critical to
-// everything" scores perfectly against it, and at the bottom of the scale ONE
-// defect was the unit of resolution for every statement the reports made about
-// nits. A single plant cannot distinguish a reviewer that calibrates from a
-// reviewer that got one fixture right.
-//
-// The correction that would have been worthless is relabelling. Taking an
-// existing plant and dialling its severity down to fill this bucket produces a
-// corpus that looks like evidence and is not: the plant's Why still describes a
-// descriptor leak, and the number beside it now says nit. Nothing here was
-// moved. Every defect below is newly authored and is one a senior reviewer
-// would rate nit on its own terms, against the anchor the model is actually
-// given: "`nit`, minor and optional."
-//
-// THE ANCHOR'S ILLUSTRATION CHANGED UNDER THESE PLANTS, and every note below
-// was rewritten in the same commit rather than left quoting it. The rung used
-// to read "`nit`, minor and optional. *An unnecessary intermediate copy is a
-// nit.*", and five plants, cross-file-copy-nit, cross-file-sort-nit,
-// sorted-for-min-nit, defensive-copy-nit and capacity-hint-nit in fixtures.go,
-// derived their level from that one sentence. It was a CATEGORY where every
-// other rung illustrates with a scenario, and three lines below it review.md
-// says the examples are "drawn from defect classes you are unlikely to meet in
-// this change; do not go looking for them", which is plainly false of an
-// unnecessary copy for any reviewer of any repository, and named the class of
-// three of the plants below. So the illustration was replaced and the plants
-// were not: their level now rests on "minor and optional", which is the clause
-// the sentence only ever illustrated.
-//
-// TWO THINGS ARE UNMEASURED HERE AND ARE NOT CLAIMED. No battery was run at
-// this rung under either wording, so nothing here says what the old sentence
-// did to nit recall. Its measurable half was also weaker than the info pair's:
-// the info line contained two crediting keywords verbatim ("accepted input",
-// "for one helper") while the nit line contained none, cross-file-copy-nit's
-// keyword is "unnecessary copy" and the intervening word "intermediate" breaks
-// the substring, so the argument for replacing it was the user-facing one
-// above, not a leak.
-//
-// Two constraints shaped what could be planted here, and both are
-// worth writing down because they eliminate most of what the word "nit"
-// normally means:
-//
-//   - Style is not generated. config.GenerationLevel is NitpickNormal, whose
-//     scope tells the reviewer "Do NOT report: naming preferences, documentation
-//     wording, formatting, import order". A naming or doc-comment nit planted
-//     here would be a plant the reviewer is instructed not to report, and a
-//     corpus that penalizes obedience measures nothing. So every plant below is
-//     in a class the reviewer is asked for and carries a runtime cost.
-//   - The same scope says "or anything a formatter or linter already enforces".
-//     That rules out the pattern-matchable nits, gosimple's S1025, clippy's
-//     needless_collect, rubocop-performance's Detect, because a reviewer that
-//     stays silent on those is obeying, not missing. What is left, and what
-//     these use, is waste that only becomes visible from a CONTRACT: what
-//     another function already guarantees, what a table already covers, what a
-//     local variable can and cannot reach. No linter can see any of it.
-//
-// Each plant states its cost, because the shipped prompt says so outright at
-// the one level that invites nits at all: "A nit with no stated cost is noise
-// even here". "Minor" is not licence for vagueness. A nit a reviewer cannot act
-// on in one sentence should not have been written.
-//
-// Two of the five are multi-file, which nothing else in the corpus is, and in
-// both the defect is invisible from either file alone: the call site looks
-// prudent, and only the callee's contract, changed by the same pull request,
-// so it is in the diff, shows that it is buying nothing. That is the property
-// worth having. Be precise about what it does NOT buy: two files fit in one
-// batch under the default MaxFilesPerRequest of 6, so these exercise
-// cross-file REASONING inside a single request and leave the 6-file cap, the
-// 4-way concurrency and cross-batch triage dedup as untested as they were. That
-// gap is now closed elsewhere: ts-unbounded-memo-key, authored at warning,
-// changes seven files and is the first fixture in the corpus to assemble into
-// two batches. Cross-batch DEDUP is reached but runs trivially, and it is NOT
-// owed by either file: it cannot be authored. bundle.batch appends each entry
-// to exactly one Batch, so no path is ever in two batches, and review.dedupe
-// keys on path:line:title, two batches therefore cannot collide by
-// construction. The only way one could is a reviewer inventing an anchor inside
-// a file it was never shown, which is a model failure and not something a
-// fixture can force. Recording this so the next reader does not spend an
-// afternoon trying to write the fixture that closes it.
-//
-// THIS FUNCTION IS NOT A CORPUS and nothing runs it as one. The five below are
-// split across Fixtures() and HeldOutFixtures(), which name each of them
-// directly; what this returns is the record of what was AUTHORED at this level,
-// and TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus is what makes the two
-// facts agree. Without it a fixture can be written, reviewed, merged and never
-// wired into anything, passing every test in the tree while measuring nothing,
-// which is the quietest way this corpus has to lose a plant.
+// The note behind it is in docs/measurement.md#nitfixtures.
 func nitFixtures() []Fixture {
 	return []Fixture{
 		redundantSnapshotCopyNitFixture(),
@@ -102,30 +15,11 @@ func nitFixtures() []Fixture {
 	}
 }
 
-// redundantSnapshotCopyNitFixture copies a slice that is already a copy, across
+// redundantSnapshotCopyNitFixture copies a slice that is already a copy,
+// across
 // two files.
 //
-// This is the shape the corpus has never had. Read report/summary.go alone and
-// the copy is not merely defensible, it is the careful thing to do: a caller
-// holding a slice another goroutine can append to is a real bug, and the
-// comment above the copy says exactly that. Read store/store.go, changed by
-// the same pull request, so it is in the diff, and Snapshot's contract says
-// the slice is already fresh, built under the lock, sharing no backing array.
-// The copy defends against something that cannot happen.
-//
-// Nothing here is wrong in the sense the higher anchors describe. Build returns
-// the same Summary either way; there is no input that produces a different
-// answer. What it costs is one slice of len(events) allocated and copied on
-// every request, which is the whole finding and one sentence long.
-//
-// The false positive it invites is the mirror image: a reviewer that reasons
-// only from summary.go and concludes the store may append after Snapshot
-// returns, making the summary stale or racy. That objection is a hallucination
-// , the contract in the diff rules it out, so none of "race", "concurrent",
-// "stale" or the bare word "copy" is a keyword. Detection requires the
-// cross-file inference, so every keyword names the redundancy ("already returns
-// a copy", "copy of a copy") rather than the copying, which is a word the
-// change itself supplies twice.
+// The note behind it is in docs/measurement.md#redundantsnapshotcopynitfixture.
 func redundantSnapshotCopyNitFixture() Fixture {
 	return Fixture{
 		Name: "cross-file-copy-nit",
@@ -256,26 +150,7 @@ func Build(s *store.Store) Summary {
 // redundantSortNitFixture sorts an array the callee already sorted, in
 // TypeScript.
 //
-// The second multi-file plant, and the second where one file cannot decide it.
-// members.ts changes in this pull request for a reason that is not a defect,
-// its doc comment is corrected to state the ordering the function has always
-// produced, which is what puts the file in the diff and the contract in front
-// of the reviewer. roster.ts is new, and re-sorts what it was handed.
-//
-// The sort is not wrong, which is the point: listMembers spreads before
-// sorting, so renderRoster is reordering an array nobody else can see, and the
-// rendered output is identical with or without the line. It costs one array
-// plus one comparison sort per render.
-//
-// Two false positives are invited and both are excluded. The first is the
-// standard JavaScript objection that Array.prototype.sort mutates in place and
-// therefore corrupts the caller's data, untrue here, and visibly so, since
-// both files spread first; no keyword contains "sort" alone or "mutat". The
-// second is a reviewer noticing that the inline comparator duplicates
-// byDisplayName and asking for it to be imported: that is a real observation
-// about duplication which leaves the redundant sort exactly where it is, so
-// "comparator" and "duplicate" are absent and detection requires a word about
-// the work already being done ("already sorted", "sorted twice").
+// The note behind it is in docs/measurement.md#redundantsortnitfixture.
 func redundantSortNitFixture() Fixture {
 	return Fixture{
 		Name: "cross-file-sort-nit",
@@ -313,7 +188,7 @@ export function listMembers(members: Member[]): Member[] {
   return [...members].sort(byDisplayName);
 }
 `,
-			// rosterHeading is filler, and it is deliberately AFTER the plant so
+			// rosterHeading is filler, and it is deliberately after the plant so
 			// the defect stays on line 6. It is here because the file was 12
 			// lines long and the plant sits at line 6, which put every line of
 			// it within noiseTolerance of the plant: a reviewer commenting on
@@ -385,8 +260,8 @@ export function rosterHeading(teamName: string, count: number): string {
 // no cross-file component: everything needed is on one line. sorted() builds a
 // full copy of the list and orders all of it; min() with the same key walks it
 // once and allocates nothing. The two agree on ties as well as on the answer,
-// sorted() is stable, so [0] is the first minimum, which is what min() returns
-// , so this is a pure cost with no behavioral difference to weigh.
+// sorted() is stable, so [0] is the first minimum, which is what min() returns,
+// so this is a pure cost with no behavioral difference to weigh.
 //
 // The false positive it invites is the empty-list objection: sorted(...)[0]
 // raising IndexError is a real bug in the general case, and a reviewer that
@@ -473,27 +348,7 @@ def coldest(readings):
 
 // duplicateTestCaseNitFixture adds a table case that is already in the table.
 //
-// The other four plants cost an allocation. This one costs coverage the file
-// appears to have, which is a different kind of minor and worth having in the
-// set: a reviewer that has learned "nit means allocation" from the rest of the
-// corpus should not score well on it.
-//
-// The change is test-only. slug.go is identical in base and head, so it is not
-// in the diff at all and every finding must come from the table itself. The
-// last case has the same input and the same expectation as the second under a
-// different name, so it runs the same assertion twice and exercises no line the
-// table did not already reach. It is not a typo with an intent behind it,
-// "space becomes a hyphen" is what "replaces spaces" already says, which
-// matters, because a case that MEANT to test something else would be a
-// different and larger finding.
-//
-// The false positive it invites is the coverage complaint: no case covers the
-// empty string, or unicode, or an input that is already a slug. Those are
-// findings about tests that are absent rather than about the one that is
-// duplicated, and the phrasing they reach for shares no keyword here. "identical
-// to" carries its preposition on purpose: five of the six cases expect
-// "hello-world", so a bare "identical" would match a reviewer observing that the
-// expectations repeat, which is not this defect.
+// The note behind it is in docs/measurement.md#duplicatetestcasenitfixture.
 func duplicateTestCaseNitFixture() Fixture {
 	return Fixture{
 		Name: "duplicate-test-case-nit",
@@ -585,7 +440,7 @@ func TestSlug(t *testing.T) {
 		Defects: []Defect{{
 			Path: "slug/slug_test.go",
 			Line: 16, // the case that repeats line 12
-			// The bare stems "duplicate", "duplicates" and "repeats" WERE here
+			// The bare stems "duplicate", "duplicates" and "repeats" were here
 			// and had to go. They admitted precisely the reviewer "identical
 			// to" carries its preposition to exclude: five of the six cases
 			// expect "hello-world", so "five of the six cases duplicate the
@@ -605,7 +460,7 @@ func TestSlug(t *testing.T) {
 			},
 			// tests is the only plant of its class in the corpus, so nothing
 			// disagrees with it and no note is owed by the consistency check.
-			// One is written anyway: a level with no reason recorded is a level
+			// One is written anyway. A level with no reason recorded is a level
 			// the next editor moves.
 			Class:        config.ClassTests,
 			WantSeverity: config.SeverityNit,
@@ -624,26 +479,7 @@ func TestSlug(t *testing.T) {
 // defensiveCopyOfLocalNitFixture copies a list that nothing else can reach, in
 // Java.
 //
-// A fourth language, and a wasted copy in the form it most often takes in
-// review: a defensive copy that is defensive everywhere except
-// here. labels is created inside forIds, is never stored, and is unreachable
-// once the method returns, so wrapping it directly is as immutable as wrapping
-// a copy of it. The comment above the return states the reason a real pull
-// request would give, and it is false about this variable specifically, which
-// is what makes the review a judgement about escape rather than a lookup of an
-// idiom.
-//
-// It costs one list of the same length on every call. That is the whole
-// finding, and no linter can reach it: the answer depends on whether labels
-// escapes, not on the shape of the expression.
-//
-// Two false positives are invited. A reviewer may object that forIds throws on
-// a null ids, which is true, unrelated, and shared with every method in the
-// file. Or it may propose List.copyOf as a tidier spelling, which copies too
-// and so misses the point entirely. Neither reaches for a word about
-// reachability, which is why the keywords are built on "never escapes", "no
-// other reference" and "copies a list it just built" rather than on "copy",
-// which the change itself supplies.
+// The note behind it is in docs/measurement.md#defensivecopyoflocalnitfixture.
 func defensiveCopyOfLocalNitFixture() Fixture {
 	return Fixture{
 		Name: "defensive-copy-nit",
@@ -697,7 +533,7 @@ public final class Labels {
 			Path: "src/main/java/com/example/report/Labels.java",
 			Line: 26, // the copy taken of a list that never escaped
 			// "unnecessary copy", "redundant copy", "needless copy" and "no need
-			// to copy" WERE here and had to go, and their presence contradicted
+			// to copy" were here and had to go, and their presence contradicted
 			// this defect's own comment two paragraphs up: the keywords are
 			// supposed to be built on reachability rather than on "copy", which
 			// the change itself supplies. They credited the second false

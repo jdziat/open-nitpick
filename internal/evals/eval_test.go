@@ -242,7 +242,7 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 	// SEV is accurate/inflated/understated against each fixture's own
 	// WantSeverity, summed over the runs. No judge is involved: this battery
 	// measures the prompt against ground truth, and severity is part of that
-	// ground truth even though nothing outside fixtures.go used to read it.
+	// ground truth, declared on every fixture Defect as WantSeverity.
 	//
 	// It is graded once per LOCATED defect, so the three numbers add up to the
 	// left-hand side of RECALL on the same row. RUNS is printed because NOISE
@@ -327,7 +327,7 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 		// A row that located nothing still belongs here once the denominators
 		// are on it: it renders every planted level as "(0 of N located)", which
 		// is the information the previous filter threw away. Only a row with
-		// nothing planted AND nothing said is skipped, a clean fixture, which
+		// nothing planted and nothing said is skipped, a clean fixture, which
 		// has no severity to describe in either direction.
 		if len(s.SevUsage) == 0 && len(s.SevPlantedLevels) == 0 {
 			continue
@@ -343,7 +343,7 @@ func printTable(t *testing.T, corpus []Fixture, summaries []Summary) {
 
 // assertCorpusRecall fails a model that found nothing anywhere.
 //
-// Per-fixture recall is deliberately NOT asserted: models disagree about
+// Per-fixture recall is deliberately not asserted: models disagree about
 // borderline findings and a hard threshold would make this suite flaky for no
 // benefit. Finding zero planted defects across every fixture is different, it
 // means the prompt, the schema, or the plumbing is broken.

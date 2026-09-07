@@ -38,7 +38,8 @@ const (
 
 // File is one file's changes within a diff.
 type File struct {
-	// Path is the new path, or the old path for a deletion.
+	// Path names the file after the change, or before it when the change
+	// deletes.
 	Path string
 
 	// OldPath is set for renames and deletions.
@@ -89,8 +90,10 @@ type Line struct {
 	Position int
 }
 
-// Side identifies which side of a split diff a line belongs to, matching
-// GitHub's LEFT/RIGHT review-comment parameter.
+// Side identifies which side of a split diff a line belongs to. Its values are
+// GitHub's own review-comment parameter and are case-sensitive on the wire, so
+// build a request from SideLeft and SideRight below rather than from a spelling
+// written out in prose.
 type Side string
 
 // Diff sides. Deletions live on the left; additions and unchanged lines on the
@@ -188,7 +191,7 @@ func (f *File) Position(newLine int) (int, bool) {
 
 // NearestCommentableLine snaps a line number to the closest added line in the
 // same file, within maxDistance. Models routinely anchor a finding a line or
-// two off — to a closing brace, or to the line after the one they mean — and
+// two off, to a closing brace, or to the line after the one they mean, and
 // snapping recovers those comments instead of discarding them.
 //
 // Ties prefer the earlier line, which reads as the start of the construct being

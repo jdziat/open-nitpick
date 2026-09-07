@@ -4,92 +4,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 
 // warningFixtures are the corpus's warning-level plants.
 //
-// Measured over AllFixtures() before these were written, the corpus planted 4
-// critical, 8 error, 1 warning, 0 info and 1 nit across 15 fixtures. One plant
-// was the entire resolution of every claim the reports made about this level:
-// with a single warning, "the reviewer calibrates warnings" and "the reviewer
-// got retry-no-backoff right" are the same sentence, and a reviewer that
-// answers `error` to everything loses one plant out of fourteen for it.
-//
-// What would have been worthless is relabelling. Taking an existing error and
-// dialling it down to fill this bucket produces a corpus that looks like
-// evidence and is not: the plant's Why still describes a descriptor leak on
-// every request, and the number beside it now says warning. Nothing here was
-// moved. Every defect below is newly authored, and each is one a senior
-// reviewer would rate warning on its own terms against the anchor the model is
-// given: "`warning`, likely a bug, or a genuine hazard under
-// plausible conditions."
-//
-// The property that decides this level, and the one every plant here is built
-// around: NOTHING IS YET WRONG ON A NORMAL PATH. Each change below serves every
-// request correctly today. The failure needs a condition that is plausible
-// without being guaranteed, a cancelled context, a burst of traffic, a second
-// user on the host, an attacker who can time a response. That is the whole
-// distance to `error`, "a real bug that produces incorrect behavior on a
-// reachable path", and the corpus already states it in multi-defect's own note:
-// the descriptor leak there is an error because "every successful upload loses
-// a descriptor, with no condition to be met". Remove the condition from any
-// plant below and it becomes that; leave it and the plant is a hazard.
-//
-// The distance DOWNWARD is stated per plant too, because it is the easier one
-// to get wrong. `info` is "a defensible concern the author should consciously
-// accept or reject": a design choice with a cost the author may knowingly
-// accept and no failing input to point at. Every plant here names a mechanism
-// AND a failing input, so none of them is a matter of taste the author may
-// decline.
-//
-// That argument deliberately does not quote the ladder's current info examples,
-// which is a repair rather than a style choice. This comment used to name them
-// , "widening an exported type, adding a dependency", and those two sentences
-// were deleted from review.md for naming two plants; the quotation outlived
-// them because it sat in an em-dash aside rather than in double quotes, where
-// the sweep that fixed every other stale reference was looking. A comment keyed
-// to prompt prose goes stale every time the prompt is edited, and the property
-// this paragraph needs is a property of the LEVEL.
-//
-// TWO CLASSES, AND WHY NOT MORE. Every plant here is `security` or `resource`.
-// That is not because warnings only occur there, the natural home for several
-// warning-shaped defects, the anchor's own "retrying a non-idempotent request"
-// among them, is `correctness`, but because
-// TestSeverityIsConsistentWithinADefectClass requires a SeverityNote from EVERY
-// member of a class that carries more than one severity, and correctness,
-// concurrency, contract and data-loss are each planted in fixtures.go at a
-// single level with no notes at all. A warning planted in correctness turns
-// three green plants red in a file this change does not own; in the other three
-// classes, one each. security and resource already carry two or three levels,
-// every member already annotated, so a warning lands in them without reaching
-// into anyone else's file. The cost is real and is recorded here rather than
-// hidden: this level is now dominated by two classes, and a reviewer that
-// learned "resource implies warning" would score better than it deserves.
-// Closing that needs a correctness-class warning AND notes on the three
-// correctness plants, in one change that owns both files.
-//
-// THIS FUNCTION IS NOT A CORPUS and nothing runs it as one. The five below are
-// split across Fixtures() and HeldOutFixtures(), which name each of them
-// directly; what this returns is the record of what was AUTHORED at this level,
-// and TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus is what makes the two
-// facts agree. Without it a fixture can be written, reviewed, merged and never
-// wired into anything, passing every test in the tree while measuring nothing,
-// which is the quietest way this corpus has to lose a plant.
-//
-// LANGUAGES. Eleven of the fifteen fixtures before these were Go, two Python,
-// one TypeScript and one SQL migration, so a prompt tuned on that corpus can be
-// Go-shaped without anyone noticing. Only one of the five below is Go. Two of
-// the languages are new to the corpus: C# and shell.
-//
-// ONE MULTI-FILE FIXTURE, and what it does and does not exercise. Every other
-// fixture in this corpus changes exactly one file, so the 6-file request cap,
-// the 4-way concurrency and cross-batch triage have never been measured at all.
-// ts-unbounded-memo-key changes SEVEN files. At the shipped
-// max_files_per_request of 6 that is two batches, dispatched under the shipped
-// concurrency of 4, whose findings are merged before triage, a path no fixture
-// has ever taken. Be precise about the rest: the two files that carry the
-// defect are deliberately in the SAME batch (git orders the diff by path, and
-// cache.ts and search.ts are the first and sixth entries), because a defect
-// split across batches would be one no reviewer could see, and a plant nothing
-// can find scores as a prompt weakness forever. Cross-batch DEDUP is reached
-// but not tested: nothing here reports the same defect twice, and a fixture
-// that makes it do so is still owed.
+// The note behind it is in docs/measurement.md#warningfixtures.
 func warningFixtures() []Fixture {
 	return []Fixture{
 		tsUnboundedMemoKeyFixture(),
@@ -103,46 +18,7 @@ func warningFixtures() []Fixture {
 // tsUnboundedMemoKeyFixture feeds a process-lifetime memo table with request
 // text, across two files.
 //
-// This is the shape the corpus has never had: the defect is invisible from
-// either file alone. src/search.ts reads as ordinary caching, a repeated
-// search is answered from a table, and src/cache.ts reads as an ordinary memo
-// helper that says what it is, "a table of things that do not change", and
-// states its one requirement: keys must come from a set the caller can
-// enumerate. Neither is wrong. The defect is the pair: search.ts keys the table
-// by trimmed request text, which is not a set anyone can enumerate, so the
-// table gains an entry for every distinct string anyone ever searches for and
-// releases none of them.
-//
-// src/plans.ts is in the same change and is the control: it memoizes on
-// "plan:" + tier, three values, exactly the use cache.ts documents. A reviewer
-// that objects to cache.ts ITSELF has to explain plans.ts, and a reviewer that
-// reads only search.ts has nothing to object to. The remaining four files are
-// ordinary PR filler, deliberately dull, and they are what pushes the change
-// past the six-file batch ceiling.
-//
-// BOTH CALLERS NAMESPACE THEIR KEYS ("plan:" and "q:") and they must keep
-// doing so. The first draft of this fixture had search.ts call remember(q)
-// with the raw query, which shares one process-global Map with plans.ts's
-// "plan:" + tier, so searching the literal text "plan:free" returned the
-// cached Plan and `hits.slice` threw, and searching first made
-// planLimits("team").seats undefined. Both were reproduced by running the head
-// files under node. That was a SECOND, unplanted, user-reachable defect in a
-// fixture whose whole premise is that the only cross-file finding available is
-// the unbounded table: a reviewer reporting the collision was charged a false
-// positive, and if it used the word "key" it was credited with the memory
-// plant it had never mentioned. Disjoint prefixes remove it and cost the plant
-// nothing, "q:" + q is exactly as unenumerable as q, and they make the
-// remaining defect purely about CARDINALITY, which is what it was always
-// supposed to be about.
-//
-// THE FALSE POSITIVE THIS INVITES is the staleness objection: a table that is
-// never refreshed serves a document's old title forever. It is a real remark
-// about a different consequence, and a reviewer that makes only it has not
-// noticed that the process dies. The second is a rate-limit objection, which
-// reaches for "unbounded" about the REQUEST rate. Both are why the keywords are
-// about memory and growth and about what the key space IS, and why "unbounded",
-// "cache", "key" and "held for the lifetime", that last phrase being cache.ts's
-// own words, are not among them.
+// The note behind it is in docs/measurement.md#tsunboundedmemokeyfixture.
 func tsUnboundedMemoKeyFixture() Fixture {
 	return Fixture{
 		Name: "ts-unbounded-memo-key",
@@ -283,7 +159,7 @@ export interface Plan {
 			// unbounded number of searches") would have collected full recall
 			// for noticing nothing about the table.
 			//
-			// The bare stem "grow" WAS here and had to go. It is a substring of
+			// The bare stem "grow" was here and had to go. It is a substring of
 			// "grow stale", which is ordinary English for the staleness
 			// objection this fixture names as the false positive it invites,
 			// so the one stem undid the care taken to exclude "unbounded",
@@ -318,22 +194,7 @@ export interface Plan {
 // goCancelGoroutineLeakFixture sends a lookup result on an unbuffered channel
 // that nobody is left to receive.
 //
-// The added function is the standard shape for putting a context around a
-// blocking call that has no context-aware form, and it is right in every
-// respect but one: done is unbuffered. On the normal path the select takes the
-// receive and the goroutine finishes. When ctx is done first, ResolveContext
-// returns, nothing ever receives, and the send blocks for the life of the
-// process, holding the goroutine, the connection Lookup is using, and whatever
-// its result references. A one-character fix, make(chan result, 1), removes it.
-//
-// THE FALSE POSITIVE THIS INVITES is the design objection: "Directory.Lookup
-// should take a context so the work can be cancelled". It is a fair
-// remark and it is not this defect. It is about the upstream interface, and a
-// reviewer making only it has not noticed that this goroutine never exits even
-// after Lookup returns. The keywords therefore never mention context,
-// cancellation or the interface: every one of them is a word only a reviewer
-// reasoning about the CHANNEL would reach for, and "unbuffered" and "buffered"
-// appear nowhere in the change, so neither can be earned by quoting it.
+// The note behind it is in docs/measurement.md#gocancelgoroutineleakfixture.
 func goCancelGoroutineLeakFixture() Fixture {
 	return Fixture{
 		Name: "go-cancel-goroutine-leak",
@@ -435,7 +296,7 @@ func ResolveContext(ctx context.Context, d Directory, name string) (string, erro
 // signature a caller got right, and a caller that can measure that recovers a
 // valid signature one hex digit at a time rather than searching 2^256.
 //
-// THE FALSE POSITIVE THIS INVITES is the module-level secret: SECRET is read at
+// THE FALSE POSITIVE this INVITES is the module-level secret: SECRET is read at
 // import, so a missing WEBHOOK_SECRET raises KeyError at import time rather
 // than at first use. That is a real remark and a different one. The second is
 // replay: verify says nothing about a timestamp, so a captured request can be
@@ -517,7 +378,7 @@ def verify(body: bytes, provided: str) -> bool:
 //
 // It is also the corpus's first C# file.
 //
-// THE FALSE POSITIVE THIS INVITES is the timeout objection: a reviewer that
+// THE FALSE POSITIVE this INVITES is the timeout objection: a reviewer that
 // sees a bare new HttpClient often asks for an explicit timeout, and here that
 // is close to wrong. The default is 100 seconds and the change did not alter
 // it. The second is disposal ("EnsureSuccessStatusCode throws, so the response
@@ -582,10 +443,10 @@ public sealed class Notifier
 		Defects: []Defect{{
 			Path: "src/Notifier.cs",
 			Line: 17, // the per-call new HttpClient
-			// The bare token "port" WAS here and had to go. mentionsAny matches
+			// The bare token "port" was here and had to go. mentionsAny matches
 			// case-insensitive SUBSTRINGS, and "port" is inside "important",
 			// "support" and "reports", three words a reviewer reaches for
-			// without having noticed anything. It credited BOTH false positives
+			// without having noticed anything. It credited both false positives
 			// this fixture names: "it is important to set an explicit timeout"
 			// and "if the webhook reports a non-2xx status". This is the same
 			// failure Defect.Keywords already records fixing once, where
@@ -626,7 +487,7 @@ public sealed class Notifier
 //
 // It is also the corpus's first shell file.
 //
-// THE FALSE POSITIVE THIS INVITES is cleanup: "nothing removes the file; add a
+// THE FALSE POSITIVE this INVITES is cleanup: "nothing removes the file; add a
 // trap". True, weaker, and about a different line's worth of consequence. The
 // second is collision, two runs of the script clobbering each other, which is
 // a real hazard from the same fixed path but a different mechanism, and the
@@ -668,8 +529,8 @@ jq -r '.tag_name' "$OUT"
 			// The path, not the redirect: choosing the name is the defect and
 			// OUT=$(mktemp) is the single-line replacement. The redirect one
 			// line below is inside the scorer's tolerance either way.
-			// "mktemp" WAS here and had to go. It is the fix, and it is the fix
-			// for the WRONG finding too: "nothing removes the file, use
+			// "mktemp" was here and had to go. It is the fix, and it is the fix
+			// for the wrong finding too: "nothing removes the file, use
 			// OUT=$(mktemp) and trap rm EXIT" is the cleanup objection this
 			// fixture names as the false positive it invites, and it arrives
 			// carrying the word. The collision argument below was written about

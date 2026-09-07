@@ -19,7 +19,7 @@ import (
 // report the run already produced: no model is asked, so there is nothing to
 // hallucinate and nothing to guard.
 //
-// It deliberately does NOT restate the coverage notices. Those are rendered
+// It deliberately does not restate the coverage notices. Those are rendered
 // separately and carry the detail: which files were skipped, which analyzers
 // did not run, which batches failed. The receipt is the top line a reader sees
 // before deciding whether to open any of it.
@@ -132,15 +132,12 @@ func stylePassFailed(report *Report) bool {
 }
 
 // unreadable names the skip reasons that mean the reviewer wanted the file and
-// did not get it, or a limit cut it off.
-//
-// Everything else is routine: a deletion, a binary, a generated file, an
-// ignored path, or a change with no added lines carries nothing a comment
-// could attach to. Reporting the two together is what made a clean review look
-// like a partial one.
-// The reasons are PREFIXES, not whole strings. The planner appends detail to
-// several of them, a size or a budget figure, and an exact-match table would
-// silently reclassify every one that carries it as routine.
+// did not get it, or a limit cut it off. Everything else is routine: a
+// deletion, a binary, a generated file or an
+// ignored path carries nothing a comment could attach to, and reporting the
+// two together makes a clean review look partial. The reasons are prefixes,
+// since the planner appends a size or budget figure to several and an
+// exact-match table reclassifies each of those as routine.
 var unreadable = []string{
 	bundle.ReasonUnavailable,
 	bundle.ReasonTooLarge,

@@ -49,7 +49,7 @@ type Config struct {
 	// does. A change that DELETES .nitpick.yaml leaves a checkout with no
 	// Source, so a review that only knows about files it read cannot tell that
 	// the change replaced the repository's accepted policy with built-in
-	// defaults — and a mistyped -config path silently reviews a repository under
+	// defaults, and a mistyped -config path silently reviews a repository under
 	// settings its maintainers never chose.
 	Missing string `yaml:"-"`
 
@@ -74,7 +74,7 @@ type Config struct {
 	UserOverridden []string `yaml:"-"`
 
 	// Policy records which configuration decided this review's behavior, and
-	// why it is not simply the file named by Source. Like Dropped, callers
+	// why it is not the file named by Source. Like Dropped, callers
 	// should surface it: a maintainer whose newly added ignore rule did nothing
 	// has no other way to learn that their rule was not the one in force.
 	Policy Policy `yaml:"-"`
@@ -108,8 +108,8 @@ type ModelSpec struct {
 	// loopback or private address.
 	//
 	// It is off by default and must be opted into deliberately. open-nitpick
-	// runs in CI against pull requests, and a pull request can edit
-	// .nitpick.yaml — so an endpoint pointing at an internal address turns the
+	// runs in CI against pull requests, and a pull request can edit.
+	// nitpick.yaml, so an endpoint pointing at an internal address turns the
 	// reviewer into an SSRF vector. The ollama and llamacpp providers already
 	// allow loopback themselves, so the ordinary local-model path does not
 	// need this.
@@ -161,8 +161,8 @@ type Models struct {
 	// weights re-reading their own claim.
 	Validate *ModelSpec `yaml:"validate"`
 
-	// Router classifies each batch of files by what the change does — a
-	// security-sensitive edit, a cross-file contract change, a migration —
+	// Router classifies each batch of files by what the change does, a
+	// security-sensitive edit, a cross-file contract change, a migration,
 	// so a route can match on that rather than only on which languages the
 	// files are in. It is a cheap model reading the diff once per batch and
 	// answering with a list of kinds. Optional: routes that name no kinds
@@ -204,7 +204,7 @@ type Route struct {
 type RouteMatch struct {
 	// Languages the batch's files are in, by the extension map in the
 	// bundle package ("go", "python", "typescript", ...). The batch matches
-	// when ANY of its files is in one of them.
+	// when any of its files is in one of them.
 	Languages []string `yaml:"languages"`
 
 	// Kinds the router assigned the batch. The batch matches when it has any
@@ -217,7 +217,7 @@ type RouteMatch struct {
 	MaxFiles int `yaml:"max_files"`
 }
 
-// The kinds a router may assign. They name what a change DOES, which is what
+// The kinds a router may assign. They name what a change does, which is what
 // the eval corpora vary and what the measured strengths differ on: the
 // multi-file corpus is contract changes, the tuning corpus is largely
 // security and logic, the info corpus is judgement calls.
@@ -354,7 +354,7 @@ type Review struct {
 	Summary bool `yaml:"summary"`
 
 	// Mention is the handle a comment uses to talk to the reviewer:
-	// "@nitpick review" reviews again, "@nitpick resolve" closes the
+	// "@open-nitpick review" reviews again, "@open-nitpick resolve" closes the
 	// thread, anything else is a question answered in the thread.
 	Mention string `yaml:"mention"`
 
@@ -366,7 +366,7 @@ type Review struct {
 	// Incremental makes a run on a pull request this tool has reviewed before
 	// read only the files changed since that review, and withhold findings it
 	// has already posted. It has no effect on a first review, on a local
-	// review, or when the earlier revision is no longer reachable — a force
+	// review, or when the earlier revision is no longer reachable, a force
 	// push reviews the whole change again.
 	Incremental bool `yaml:"incremental"`
 
@@ -452,8 +452,8 @@ type Linters struct {
 	// deterministic analyzer is published and gated at, whatever the analyzer
 	// called it. It defaults to critical, which reduces nothing.
 	//
-	// It is the operator's answer to a question that used to be answered by a
-	// constant. The sharpest case is not a security scanner: golangci-lint's
+	// It is the operator's answer to a question a constant cannot answer. The
+	// sharpest case is golangci-lint rather than a security scanner: its
 	// severity is arbitrary text an operator wrote in .golangci.yml, applied by
 	// `severity.default` to every issue it reports including typecheck compile
 	// errors, so one line there can make lll or misspell speak at the same
@@ -463,7 +463,7 @@ type Linters struct {
 	//
 	// The ceiling reaches the gate. review.Engine applies it after triage and
 	// the expert pass, both of which may raise a severity, so the level it
-	// caps is the one min_severity and fail_on read — see
+	// caps is the one min_severity and fail_on read, see
 	// Engine.capAnalyzerFindings, which also documents the one finding it
 	// cannot describe: one triage reworded past recognition, which is published
 	// with no analyzer attribution at all.
@@ -476,17 +476,17 @@ type Linters struct {
 	// all.
 	//
 	// "No configuration at all" is what golangci-lint used to get, and it was
-	// not neutral. Its own defaults let the tree decide — a generated-file
-	// header on line 1 of the file under review skipped that file entirely —
+	// not neutral. Its own defaults let the tree decide, a generated-file
+	// header on line 1 of the file under review skipped that file entirely,
 	// so open-nitpick now owns those defaults; see internal/linters/golangci.yml.
 	//
 	// WHY THERE IS NO "read it from the repository" OPTION. This project
 	// already refuses to execute an analyzer binary that resolves inside the
 	// tree under review, on the reasoning that the tree is written by the change
 	// being reviewed. Analyzer configuration is the same object: it is policy,
-	// and a change may not supply the policy it is reviewed under — the
-	// invariant internal/config/basepolicy.go enforces for .nitpick.yaml. A
-	// .golangci.yml carrying `linters: {default: none}` switches off the entire
+	// and a change may not supply the policy it is reviewed under, the
+	// invariant internal/config/basepolicy.go enforces for .nitpick.yaml. A.
+	// golangci.yml carrying `linters: {default: none}` switches off the entire
 	// deterministic half of its own review; a ruff `select = []` in
 	// pyproject.toml does the same for Python; adding an eslint.config.js is
 	// arbitrary JavaScript that eslint loads and EXECUTES with the review's
@@ -496,7 +496,7 @@ type Linters struct {
 	// persona.custom. Those name a network endpoint or free text that reaches a
 	// model, both of which a change can supply outright. A value here can only
 	// name a file the change cannot write, because internal/linters refuses any
-	// configuration that resolves inside the repository — so the worst a merged
+	// configuration that resolves inside the repository, so the worst a merged
 	// value does is point at a file the operator's own environment already has.
 
 	// GolangciConfig is an absolute path to a .golangci.yml outside the
@@ -513,7 +513,7 @@ type Linters struct {
 	//
 	// It is off rather than isolated because eslint has no useful isolated mode:
 	// --no-config-lookup yields zero configured rules and therefore zero
-	// findings, for every repository, forever — which is the silencing this
+	// findings, for every repository, forever, which is the silencing this
 	// change exists to prevent, executed globally by our own hand. An external
 	// config also has to resolve its own plugin imports, so pointing this at a
 	// bare file is not enough; see the README.
@@ -525,14 +525,14 @@ type Linters struct {
 	//
 	// It is off rather than isolated because semgrep has no default ruleset:
 	// with no --config it analyzes nothing. Keying detection on this rather than
-	// on files in the tree is also what closes ENABLEMENT — semgrep used to
+	// on files in the tree is also what closes ENABLEMENT, semgrep used to
 	// switch itself on when the tree contained .semgrep.yml or .semgrepignore,
 	// so a pull request that ADDED one turned semgrep on with rules the pull
 	// request wrote, in the run reviewing it.
 	SemgrepConfig string `yaml:"semgrep_config"`
 
 	// Configs names an analyzer configuration per catalog tool, keyed by the
-	// tool's name in linters.enabled — an absolute path that must resolve
+	// tool's name in linters.enabled, an absolute path that must resolve
 	// outside the repository, for the four keys' reasons. A tool with no
 	// entry runs under the configuration open-nitpick ships for it, under
 	// its own isolation flag, or not at all; `nitpick linters` says which.
@@ -540,15 +540,15 @@ type Linters struct {
 
 	// AutoDetect runs every catalog analyzer that is installed, isolated from
 	// the tree, and executes nothing from it, whenever the change contains
-	// files it reads — without each being named in Enabled. One that is not
+	// files it reads, without each being named in Enabled. One that is not
 	// installed is skipped, silently in auto mode and in strict mode alike:
 	// strict is a promise about the analyzers an operator NAMED, and naming
 	// one here is how to make its absence fail the run. Defaults to on.
 	AutoDetect *bool `yaml:"auto_detect"`
 
 	// Trusted names analyzers that EXECUTE the tree's own code in order to
-	// analyze it — cargo clippy runs build scripts and procedural macros,
-	// phpstan loads the project's autoloader — and that are therefore
+	// analyze it, cargo clippy runs build scripts and procedural macros,
+	// phpstan loads the project's autoloader, and that are therefore
 	// refused by default. Name one here only where every change reviewed
 	// comes from people who could already run code in this CI job.
 	Trusted []string `yaml:"trusted"`
@@ -558,20 +558,15 @@ type Linters struct {
 func (l Linters) AutoDetects() bool { return l.AutoDetect == nil || *l.AutoDetect }
 
 // CapSeverity reduces an analyzer-reported severity to the ceiling this
-// repository lets a deterministic tool claim.
-//
-// It is POLICY, applied after parsing, and the split is the point. What the
-// analyzer said is a fact to record; what this repository will act on is a
-// decision. mapSeverity used to make the second decision by destroying the first
-// — folding "CRITICAL" onto error — which took the choice away from every
-// operator at once and left `fail_on: critical` gating on nothing, since no
-// analyzer finding could reach the level it names.
-//
-// An unset or unrecognized ceiling caps nothing. Config.Validate rejects both
-// before a review runs, so the only way to arrive here with one is a Config
-// assembled in code; the alternative reading of an empty ceiling is Rank()'s
-// unknown floor, which would silently reduce every analyzer finding to info —
-// the same class of invisible severity loss this exists to end.
+// repository lets a deterministic tool claim. It is policy applied after
+// parsing: what the analyzer said is a fact to
+// record, what this repository acts on is a decision. Mapping "CRITICAL" onto
+// error at parse time folds the two, taking the choice from every operator and
+// leaving `fail_on: critical` gating on nothing. An unset or unrecognized
+// ceiling caps nothing; Config.Validate rejects both, so the only way here
+// with one is a Config assembled in code. Reading an empty ceiling as Rank()'s
+// unknown floor would reduce every analyzer finding to info, the severity loss
+// this exists to end.
 func (l Linters) CapSeverity(s Severity) Severity {
 	ceiling := l.MaxSeverity.normalized()
 	if !ceiling.IsFinding() {
@@ -622,8 +617,8 @@ func LoadFile(path string) (*Config, error) {
 // loadBytes builds a validated Config from one config file's contents.
 //
 // LoadFile and base-revision policy resolution both go through it so the two
-// cannot drift apart. Every step here — scrubbing before anything reads the
-// values, the environment fallback after, persona resolution, validation — has
+// cannot drift apart. Every step here, scrubbing before anything reads the
+// values, the environment fallback after, persona resolution, validation, has
 // to apply to a config read out of git exactly as it applies to one read off
 // disk, and a second hand-maintained copy of this sequence would eventually
 // miss one.

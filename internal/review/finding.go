@@ -54,7 +54,7 @@ type Finding struct {
 	// Severity is one of nit, info, warning, error, critical.
 	Severity string `json:"severity"`
 
-	// SeverityTranslated records that Severity above is THIS PROJECT'S word
+	// SeverityTranslated records that Severity above is this PROJECT'S word
 	// rather than the reporter's own, because an adapter mapped a foreign
 	// vocabulary onto our five levels, because the reporter published no severity
 	// at all and we assigned one, or because the reporter published a word we did
@@ -67,7 +67,7 @@ type Finding struct {
 	// RawSeverity is the state of both. Reporting the second as the first is what
 	// quotes a reviewer as having said a word we chose for it.
 	//
-	// Whoever sets Severity to something the reporter did not write MUST set this,
+	// Whoever sets Severity to something the reporter did not write must set this,
 	// and the invariant is that RawSeverity is never populated without it.
 	SeverityTranslated bool `json:"-"`
 
@@ -82,7 +82,7 @@ type Finding struct {
 	// original is destroyed at parse time and every downstream report describes
 	// the reviewer using words the reviewer never used.
 	//
-	// That is not hypothetical, and it happened on BOTH sides. internal/evals
+	// That is not hypothetical, and it happened on both sides. internal/evals
 	// published a block captioned "what each contender called the defects it
 	// located" that read "critical x4, warning x3" for a reviewer which had
 	// printed "critical" and "major", our translation, presented as their
@@ -131,14 +131,13 @@ type Finding struct {
 	FixValidated bool `json:"-"`
 
 	// Source names where the finding came from: a linter's rule id, or the
-	// reviewing model. It is not part of the model-facing schema (the model does
-	// not get to claim provenance), but it IS shown to the reader.
+	// reviewing model. It is not part of the model-facing schema, since the
+	// model does not get to claim provenance, and it is shown to the reader.
 	//
 	// "flagged by golangci-lint(gosec), triaged by claude" is the sentence this
-	// tool exists to be able to write. A deterministic analyzer found it, a
-	// model judged whether it mattered here, and the reader can see both. That
-	// is the whole differentiated claim, and it was previously destroyed in
-	// triage and never rendered.
+	// tool exists to be able to write: a deterministic analyzer found it, a
+	// model judged whether it mattered here, and the reader sees both. Triage
+	// must carry it through, and render must print it.
 	Source string `json:"-"`
 
 	// Triager records which model triaged the finding, so Source can keep

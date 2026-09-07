@@ -14,7 +14,7 @@ import (
 //
 // A pull request can add node_modules/.bin/eslint as an executable shell script
 // (git preserves the exec bit). Running it would execute attacker code with
-// GITHUB_TOKEN and the model API key in the environment — and because
+// GITHUB_TOKEN and the model API key in the environment, and because
 // **/node_modules/** is in the default ignore list, the malicious file would
 // never appear in the posted review.
 func TestEslintRefusesRepoLocalBinary(t *testing.T) {
@@ -119,8 +119,8 @@ func TestSafePathsDropsFlagLikePaths(t *testing.T) {
 	}
 }
 
-// The end-of-options property moved to TestRunnersTerminateTheirFlagsBeforeThe
-// FileList in containment_test.go. What used to be here grepped runners.go for
-// literal argument strings, which broke whenever an argument moved and never
-// showed that any of it reached a process. The replacement drives each runner
-// and reads the argv its binary received.
+// The end-of-options property is asserted by
+// TestRunnersTerminateTheirFlagsBeforeTheFileList in containment_test.go. It
+// drives each runner and reads the argv its binary received, where grepping
+// runners.go for literal argument strings breaks whenever an argument moves
+// and never shows that any of it reached a process.

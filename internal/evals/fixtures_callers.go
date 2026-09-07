@@ -2,47 +2,11 @@ package evals
 
 import "github.com/jdziat/open-nitpick/internal/config"
 
-// CallerFixtures is the callers corpus: the change IS the contract, and the file it breaks is
+// CallerFixtures is the callers corpus: the change IS the contract, and the
+// file it breaks is
 // one the change does not touch.
 //
-// The multi-file corpus measures one direction of cross-file reasoning: a
-// change USES a contract that lives in an unchanged file, and related context
-// attaches that contract so the reviewer can read it. This corpus measures
-// the other direction. A change alters what a function returns, raises, or
-// promises, its own file is self-consistent afterwards. The doc comment is
-// updated, nothing in the diff contradicts itself, and the defect exists only
-// because an untouched file still calls it the old way.
-//
-// No reviewer shown the diff alone can find these. The diff is a plausible,
-// motivated change; the evidence is a call site the diff never mentions. That
-// is the point: this corpus exists to measure what a caller-aware collector
-// buys, one that finds the untouched files which import the changed symbol
-// and attaches how they use it. Before that collector exists the honest
-// number here is the floor, and it is measured first so the gain has
-// something to be measured against.
-//
-// Every fixture here inverts the multi-file corpus's structural rule, and
-// TestCallersCorpusIsWellFormed holds the inverted rule: the changed file is
-// imported by a file that is byte-identical in Base and Head, and every plant
-// sits on a line the change added IN THE CONTRACT FILE, because that is the
-// line a reviewer comments on, "this breaks web/users.go" belongs on the
-// line that breaks it.
-//
-// Keywords credit only a finding that has SEEN the caller: its file, its
-// function, or a detail that exists nowhere else, the body length the upload
-// handler compares against, the page of 500 the exporter asks for. Nothing
-// about consequences. Three floor runs showed why: a reviewer that reasons
-// well from the diff alone writes "callers passing this to setTimeout now run
-// 1000x too short" and "any caller comparing against a byte limit", and one
-// said outright that the diff showed no callers and it was assuming some.
-// Those are good comments and they are not what this corpus measures; the
-// clean pair is what keeps them from being free.
-//
-// Two of the six are clean. Each is the control for a planted fixture beside
-// it: the same files, the same caller, and a change to the same function that
-// keeps its contract. A reviewer that flags "this might break callers" on
-// every signature change has not looked at the callers, and the clean pair
-// is what catches it.
+// The note behind it is in docs/measurement.md#callerfixtures.
 func CallerFixtures() []Fixture {
 	return []Fixture{
 		goErrorIdentityChangedFixture(),

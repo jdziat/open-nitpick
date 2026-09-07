@@ -12,8 +12,8 @@ import (
 //
 // It is the only part of this defense that needs a forge, and it is separate
 // for that reason: detection and resolution are pure and exercised without a
-// repository, while this supplies the two things only a provider can answer —
-// which revision counts as "before this change", and what a file contained
+// repository, while this supplies the two things only a provider can answer,
+// which revision the change is measured against, and what a file contained
 // there.
 type BasePolicy struct {
 	// RepoRoot is the checkout that diff paths are relative to.
@@ -37,9 +37,9 @@ type BasePolicy struct {
 // synced between the two reads would hand back a base revision belonging to a
 // different diff than the one being reviewed.
 //
-// modified is false — with a nil config — for the overwhelmingly common change
+// modified is false, with a nil config, for the overwhelmingly common change
 // that leaves the config file alone, so the ordinary run costs nothing: no
-// forge round trip is made until a change has actually touched the file.
+// forge round trip is made until a change has touched the file.
 func (b *BasePolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, changed []string) (*Config, bool, error) {
 	if b == nil || b.Loaded == nil {
 		return nil, false, nil
@@ -49,7 +49,7 @@ func (b *BasePolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.Pul
 	// here: detection has to run first so an ordinary change costs no forge
 	// round trip, and SelfModified with an empty root resolves it to the process
 	// working directory, finds the config outside that, and answers "not
-	// modified" — the answer that reviews the change under its own policy. The
+	// modified", the answer that reviews the change under its own policy. The
 	// guard is repeated rather than relied upon.
 	if strings.TrimSpace(b.RepoRoot) == "" {
 		return nil, false, errNoRepoRoot
@@ -85,8 +85,8 @@ func (b *BasePolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.Pul
 // the answer the caller already has.
 //
 // Only a SHA is taken from the pull request. A branch name moves, and the
-// provider's own resolution knows things this cannot — Local computes the merge
-// base, which is the revision its diff actually subtracted.
+// provider's own resolution knows things this cannot, Local computes the merge
+// base, which is the revision its diff subtracted.
 func (b *BasePolicy) baseRevision(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest) (string, error) {
 	if pr != nil {
 		if sha := strings.TrimSpace(pr.BaseSHA); sha != "" {

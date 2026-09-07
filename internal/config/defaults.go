@@ -3,7 +3,7 @@ package config
 import "time"
 
 // DefaultIgnore excludes paths where review comments are noise: vendored and
-// generated code, lockfiles, and fixtures. A repository can replace this list
+// generated code, lockfiles and fixtures. A repository can replace this list
 // wholesale via review.ignore.
 var DefaultIgnore = []string{
 	"**/vendor/**",
@@ -34,25 +34,24 @@ var DefaultIgnore = []string{
 // DefaultLinters lists the runners enabled out of the box. Only those with
 // something to read in the change are executed.
 //
-// eslint and semgrep are NOT here, and their absence is the whole point: both
-// refuse to run without an operator configuration outside the repository —
+// eslint and semgrep are not here, and their absence is the whole point: both
+// refuse to run without an operator configuration outside the repository,
 // eslint because its config is JavaScript it would execute, semgrep because it
-// has no default rule set — so neither can ever run under the shipped defaults.
+// has no default rule set, so neither can ever run under the shipped defaults.
 //
-// THE BUG THAT CAUSED: with all four listed, `mode: strict` failed EVERY review
-// out of the box, on "linter semgrep is enabled but not available: not
-// configured". Strict means "an analyzer I asked for did not run", and nobody
-// asked for these two — the default list did. Listing an analyzer that cannot
-// run also spent a line of the published roster, on every pull request forever,
-// saying nothing; that is how a reader learns to skip the block where a real
-// absence is announced.
+// Listing all four fails every review under `mode: strict` out of the box, on
+// "linter semgrep is enabled but not available: not configured". Strict means
+// "an analyzer I asked for did not run", and nobody asked for these two; the
+// default list did. An analyzer that cannot run also spends a line of the
+// published roster on every pull request saying nothing. That is how a reader
+// learns to skip the block where a real absence is announced.
 //
 // Naming either in linters.enabled still works and still means it: strict then
 // does catch an operator who enabled one without configuring it.
 var DefaultLinters = []string{"golangci-lint", "ruff"}
 
 // The catalog analyzers (internal/linters) are not listed here because they
-// are not ENABLED by default: they are auto-detected. Naming one in
+// are auto-detected rather than enabled by default. Naming one in
 // linters.enabled makes it a promise strict mode checks; leaving it to
 // linters.auto_detect runs it when it is installed and skips it when it is
 // not.
@@ -68,15 +67,15 @@ func Defaults() *Config {
 				StructuredOutput: StructuredAuto,
 
 				// The timeout is generous on purpose, and max_tokens is
-				// deliberately NOT set. A reasoning model spends its thinking
+				// deliberately not set. A reasoning model spends its thinking
 				// inside max_tokens on most providers and inside the wall
-				// clock on all of them, and the two-minute, 8k-token defaults
-				// this used to ship lost one review in five on glm-5.3-flash:
-				// the schema-path answer came back truncated to prose, and
+				// clock on all of them. Two-minute, 8k-token defaults lose one
+				// review in five on glm-5.3-flash: the schema-path answer
+				// comes back truncated to prose, and
 				// the JSON fallback then died on the HTTP timeout while the
 				// model was still generating. Unset, an OpenAI-compatible
 				// request carries no max_tokens and the model's own output
-				// maximum applies — which is the only number that is not a
+				// maximum applies, the only number here that is not a
 				// guess. The one provider whose SDK path substitutes a small
 				// constant for "unset" is handled in llm.Client.CallOptions.
 				Timeout: 10 * time.Minute,
@@ -84,7 +83,7 @@ func Defaults() *Config {
 				// Reviews should be reproducible. Left unset, providers apply
 				// their own default (1.0 on Anthropic), and identical runs over
 				// the same diff then disagree about both which findings exist
-				// and how severe they are — which makes a severity gate a coin
+				// and how severe they are, which makes a severity gate a coin
 				// flip.
 				Temperature: ptr(0.0),
 			},
@@ -95,7 +94,7 @@ func Defaults() *Config {
 			MaxFilesPerRequest:    6,
 			Concurrency:           4,
 			// Advisory by default. A reviewer that blocks merges on its first
-			// false positive is a reviewer the team switches off — and this
+			// false positive is a reviewer the team switches off, and this
 			// one has not yet earned that trust. Opt in with fail_on.
 			FailOn:           SeverityNone,
 			MinSeverity:      SeverityInfo,
@@ -109,7 +108,7 @@ func Defaults() *Config {
 			// the same findings again on every push.
 			Incremental:       true,
 			ResolveSuperseded: true,
-			Mention:           "@nitpick",
+			Mention:           "@open-nitpick",
 			SkipMarkers:       []string{"[skip review]", "[skip nitpick]"},
 			// On: it reads only what the change already imports, and every
 			// price in the model sweep was measured with it on (see
@@ -126,7 +125,7 @@ func Defaults() *Config {
 		Persona: DefaultPersona(),
 		// Stated rather than left to the zero value, because "off" here is a
 		// decision with a reason: the pass is unmeasured and its risk is to
-		// recall. See Validation.Enabled.
+		// recall. Validation.Enabled carries the rest of it.
 		Validation: Validation{Enabled: false},
 		Linters: Linters{
 			Enabled:          append([]string(nil), DefaultLinters...),
@@ -135,7 +134,7 @@ func Defaults() *Config {
 			OnlyChangedLines: true,
 			// No reduction by default: an analyzer that named a level we have
 			// is reported at that level. Capping here by default would be the
-			// old fold wearing a configuration key — the same silent policy for
+			// old fold wearing a configuration key, the same silent policy for
 			// every repository, just spelled differently. A team that does not
 			// want semgrep, or a line in someone's .golangci.yml, deciding its
 			// gate says so.

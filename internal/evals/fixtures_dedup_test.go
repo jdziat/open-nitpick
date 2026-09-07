@@ -372,7 +372,7 @@ func TestACrossBatchDuplicateIsPublishedOnce(t *testing.T) {
 				model := &batchLLM{
 					failTriage: arm.failTriage,
 					byFile: map[string]string{
-						// Both batches report the SAME defect at the SAME line.
+						// Both batches report the same defect at the same line.
 						effectPath: finding(causePath, causeLine, title),
 						causePath:  finding(causePath, causeLine, title),
 					},
