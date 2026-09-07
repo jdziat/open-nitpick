@@ -63,11 +63,7 @@ func incumbentRemote() string {
 // crEscape matches the terminal escapes Incumbent writes into its output: OSC
 // sequences (ESC ] ... BEL or ST) and CSI sequences (ESC [ ... final byte).
 //
-// The OSC-8 hyperlink wrapping the location is the one that must go: its URI
-// ends in "<abs-tmp-dir>/store.go:10", so leaving it in yields the absolute
-// scratch path as the finding's file and the link target's line instead of the
-// range. The captured sample carries no CSI colour codes, but escapes clearly
-// survive redirection, so colour is stripped too rather than assumed absent.
+// The note behind it is in docs/measurement.md#crescape.
 var crEscape = regexp.MustCompile("\x1b\\][^\x07\x1b]*(?:\x07|\x1b\\\\)|\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
 // crFindingHeader matches a block's first line: "  critical [Security & Privacy]".
@@ -112,70 +108,12 @@ var crDeclaredCount = regexp.MustCompile(`(?m)^\s*(\d+)\s+findings?\b`)
 // IncumbentSeverityScale is this adapter's DECLARATION that the reviewer it
 // parses does not publish our five levels.
 //
-// It sits beside crSeverity because crSeverity is the reason: the words arriving
-// here are translated into ours, and the incumbent's own vocabulary across the
-// shipped corpus is {critical, major, minor}. Declaring it here rather than
-// recognizing the reviewer by name downstream is the whole point. Deciding the
-// withdrawal by `model != IncumbentModel` puts a reporter's identity in place
-// of a fact about its vocabulary, and it holds for exactly one reviewer however
-// many others are added. See SeverityScale.
-//
-// Spelling is not scale, and this reviewer is the counterexample: it prints
-// "critical", identical to ours, and the shipped cache credits that one word on
-// 2 plants of critical and 4 of error. A gate that compared the printed word
-// against our five levels would have scored those findings at our resolution
-// and withheld only the ones spelled "major", which publishes a fraction of the
-// retracted comparison and calls the remainder a withdrawal.
+// The note behind it is in docs/measurement.md#incumbentseverityscale.
 const IncumbentSeverityScale = ForeignSeverityScale
 
 // crSeverity records the severity Incumbent assigned, in our vocabulary.
 //
-// It USED to demote "critical" to our "error", on the reasoning that
-// Incumbent's single critical spans what we split into critical and error and
-// that passing it through would read as inflation. The reasoning identified a
-// real problem and fixed it in the wrong place. A parsed severity is EVIDENCE
-// about the reviewer, and rewriting the evidence to make a comparison come out
-// fairly destroys the thing being measured: no Incumbent review could then
-// score accurate on any of the four plants we plant at critical, however it
-// worded the finding, and its raw output for go-sql-injection literally reads
-// "critical [Security & Privacy]". Mapping down did not remove the bias, it
-// swapped an inflation bias for an understatement bias, and no choice of
-// constant here can fix what is a difference in RESOLUTION rather than in
-// meaning. It does not belong at comparison time either: that was the second
-// attempt, a banded cross-tool score, and it is withdrawn, see
-// NoCrossToolSeverityScore in score.go for the two measurements that killed it.
-// What is left is a faithful record and a description of it.
-//
-// So: a word that IS one of our levels is recorded as that level. Only the
-// foreign tokens are a judgement, and they are the ones a reader should
-// distrust:
-//
-//   - "major" is Incumbent's own word and has no counterpart among our five.
-//     It is recorded at warning, the weakest anchor in review.md that still
-//     asserts a defect ("likely a bug, or a genuine hazard under plausible
-//     conditions"), because a foreign token we cannot resolve should not be
-//     handed the benefit of the doubt. That IS A GUESS, and THE CORPUS CANNOT
-//     SETTLE IT: across the shipped cache "major" is credited on plants of
-//     critical, error and warning, so it straddles three of our levels and no
-//     single value is right for every plant it lands on. Recording it at error
-//     instead, with Incumbent's bytes unchanged, moves the full-resolution
-//     triple from 6/4/4 to 5/8/1. (The swing was published first as "0.62 to
-//     0.88" and then as a banded "0.600 to 1.000"; neither reproduces from this
-//     tree, and the banded column turns out not to move at all, see
-//     NoCrossToolSeverityScore.) Warning is the PLURALITY landing, which is why
-//     the constant is left where it is; a plurality of a straddling word is
-//     still an approximation, which is why no cross-tool figure is published
-//     from it and why re-tuning it is not the remedy.
-//     TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered measures it.
-//   - "minor" is the same judgement one step down. It is credited with NO plant
-//     in the shipped cache: the one "minor" finding there sits inside a planted
-//     span but names none of its keywords, so matches() rejects it and nothing
-//     grades it. The arm is a translation with no observation behind it at all.
-//
-// The vocabulary observed across the whole shipped corpus is {critical, major,
-// minor}, the three words above, of which two are ever credited. Every other
-// arm is defensive: the CLI's tiers are not contractual, and an unrecognized
-// word still has to produce a finding, which is what the default is for.
+// The note behind it is in docs/measurement.md#crseverity.
 func crSeverity(s string) config.Severity {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "critical":
@@ -730,13 +668,7 @@ func freeTierError() error {
 
 // crFreeTierMarkers are the distinguishing phrases of the warning:
 //
-//	Incumbent couldn't find a Git remote for this repository, so it can't
-//	match the review to one of your organizations. This review will use the
-//	free CLI allowance, even if you're signed in.
-//
-// Each is specific enough that review prose cannot produce it by accident,
-// note that the ordinary footer advertising "free promotional credits" must not
-// trip this.
+// The note behind it is in docs/measurement.md#crfreetiermarkers.
 var crFreeTierMarkers = []string{
 	"free cli allowance",
 	"couldn't find a git remote",
@@ -946,24 +878,7 @@ func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
 // severityWasTranslated reports whether a finding's Severity is this project's
 // word rather than the reporter's own.
 //
-// It reads the fact the rewriter recorded. Reading the finding's source
-// instead, as `f.Source == IncumbentModel`, rests on crSeverity being "the only
-// place in the tree that rewrites a reviewer's severity vocabulary" and on
-// "everything else writes its own severity and is quoted verbatim". Both halves
-// are false, and the second is the defect.
-// review.Engine rewrites every model's severity through Normalize, and
-// linters.mapSeverity collapses four analyzers' vocabularies onto three levels;
-// neither recorded anything, so this function answered "nothing was translated"
-// for every contender this project ships and the vocabulary block quoted each of
-// them as having printed the word we had substituted. That is the same defect the
-// incumbent's side was fixed for, reintroduced on ours, and worse, because there
-// a lost word prints UnrecordedWord and here the substitute was published
-// silently as a quotation.
-//
-// Keying on the reporter could not have been right at any value. "Whose word is
-// this?" is a fact about what happened to the finding, and a reviewer's identity
-// only correlates with it, so the answer was guaranteed to drift the moment any
-// other path rewrote a severity, which two already had.
+// The note behind it is in docs/measurement.md#severitywastranslated.
 func severityWasTranslated(f review.Finding) bool {
 	return f.SeverityTranslated
 }

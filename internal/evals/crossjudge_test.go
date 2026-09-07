@@ -1421,12 +1421,7 @@ func sampleAggregate(seed int) Aggregate { return sampleAggregateOver(seed, judg
 // shownList is one judged sample: a fixture, and the findings the judge was
 // shown for it.
 //
-// The tests carry it because a cross-judge delta is only a confidence interval
-// when both sides were built over the same lists, so an aggregate that does not
-// say what it was shown cannot be paired with one that does. Two aggregates
-// built from the same lists disagree; two built from different ones do not
-// disagree at all, and the difference between those two sentences is what
-// JudgedFigure now has a fourth state for.
+// The note behind it is in docs/measurement.md#shownlist.
 type shownList struct {
 	fixture  string
 	findings []review.Finding
@@ -1496,14 +1491,12 @@ func sampleAggregateOver(seed int, shown []shownList) Aggregate {
 	return a
 }
 
-// gradeLadder returns two grades whose mean and whose spread both move with the
-// seed, so a corroborated GRADE and SPREAD cell have something to disagree about.
+// gradeLadder returns two grades whose mean and whose spread both move with
+// the
+// seed, so a corroborated GRADE and SPREAD cell have something to disagree
+// about.
 //
-// One end is pinned and the other climbs an ASCENDING ladder, which makes both
-// quantities monotone in the seed by construction. Two grades picked
-// independently is what the first draft did, and it produced two different means
-// with an identical spread, a SPREAD cell reading "+0.00" that this helper was
-// written to make impossible.
+// The note behind it is in docs/measurement.md#gradeladder.
 func gradeLadder(seed int) []string {
 	ladder := []string{"D", "C", "C+", "B-", "B", "B+", "A-", "A"}
 	return []string{ladder[0], ladder[seed%len(ladder)]}

@@ -77,70 +77,7 @@ import (
 // shippedPromptTexts renders the prompt text a review is generated from, keyed
 // by a stable source label.
 //
-// It is built from the real embedded templates and the real persona renderers
-// rather than from a copy pasted into this file, because a copy is a second
-// source of truth that goes stale silently, which is the failure mode this
-// whole file exists to catch, one level up.
-//
-// THE VALIDATION SURFACE IS HALF COVERED, on purpose, and the line runs between
-// text every expert gets and text one domain gets.
-//
-// review.ValidationContract() is IN. It is the task every expert is given
-// whatever the finding was about, so a plant's vocabulary there is not a domain
-// naming its domain, and scanning it costs one exception: measured, the whole
-// contract collides with exactly one keyword in the corpus, timezone-boundary's
-// "utc" inside "the worst imaginable outcome".
-//
-// THE 14 PER-DOMAIN PROMPTS IN templates/experts are OUT, and that is a
-// decision with a cost rather than an oversight. Three measurements, in the
-// order that decided it:
-//
-//   - A KEYWORD SCAN WOULD not HAVE CAUGHT THE ONE real DEFECT FOUND THERE.
-//     api.md's `info` rung read "a change the author should accept knowingly:
-//     widened input, a new optional field, a default that moved within its
-//     documented range", review.md's defect exactly, a list of categories with
-//     two plants in it, and it was found by hand and rewritten in the same
-//     change. Measured: that sentence, scanned with asRendered against every
-//     keyword in AllFixtures() and dedupFixtures(), produces ZERO hits.
-//     "widened input" is not on kotlin-widened-input's list, and no phrasing of
-//     the moved default is on ruby-default-page-size's.
-//   - IT WOULD FIRE 100 TIMES ON THE PRODUCT. Measured across the 14 files: 100
-//     collisions, 61 distinct fixture/keyword pairs, every file between 2 and
-//     12. Nearly all are a domain checklist naming its domain, sql.md says
-//     "injection", authz.md says "authoriz", crypto.md says "constant time",
-//     secrets.md says "credential". Each would need a promptKeywordException
-//     with an argued `why`, and then the next paragraph anyone writes in
-//     appsec.md breaks the build for saying "symlink". A guard that fires on
-//     ordinary domain prose in the domain's own file is deleted, and this file
-//     has already had to repair two smaller false positives of that kind.
-//   - NO FALSE CREDIT IS REACHABLE FROM AN EXPERT PROMPT ANYWAY. An expert's
-//     prose never enters the haystack mentionsAny searches: applyOutcomes
-//     republishes the reviewer's own Finding on confirm, and on a revision it
-//     changes the severity fields and nothing a keyword is read from.
-//
-// THE UNCOVERED DIRECTION IS SUPPRESSION, and IT IS RECALL RATHER THAN
-// SEVERITY. An earlier version of this comment said an expert prompt could only
-// "push a confirm or a re-rating toward the level a plant wants, which is a
-// severity-channel problem". That is wrong about the code: on `refuted`
-// applyOutcomes appends to overruled and appends nothing to kept, so the
-// finding is deleted rather than re-rated, the reasoned-refutation case in
-// internal/review/validate_test.go asserts kept is empty, and is named by file
-// rather than by identifier because this package's citation lint resolves only
-// tests it declares. A sentence in an expert's refutation list that describes a
-// plant's mechanism therefore costs the whole finding. The demonstrated attack
-// is one line added to durability.md's refutation list, "the statement is a
-// one-time backfill whose author meant it to touch every row", which carries
-// data-loss-migration's keyword verbatim and tells the expert to refute the
-// corpus's only critical data-loss plant. Run against this tree: the guard stays
-// green, as it is documented to.
-//
-// LATENT TODAY, WHICH IS WHY IT IS A DISCLOSURE and not A HOLE LEFT OPEN.
-// config.Defaults() sets Validation{Enabled: false} and no eval path turns it
-// on, so no expert prompt reaches a model in any measurement this corpus
-// reports. The day validation ships on by default this paragraph is the thing
-// to re-read, and what it needs is not a bigger scan. It is a reader of the 14
-// prompts asking whether any refutation reason describes something planted,
-// which is question 2 of the ladder tripwire asked about a different file.
+// The note behind it is in docs/measurement.md#shippedprompttexts.
 func shippedPromptTexts(t *testing.T) map[string]string {
 	t.Helper()
 
@@ -207,28 +144,7 @@ func shippedPromptTexts(t *testing.T) map[string]string {
 // run of whitespace collapsed to one space, and markdown's emphasis markers
 // dropped.
 //
-// Both HALVES are REPAIRS OF A MEASURED MISS, and they are the same miss twice
-// , markdown lets a phrase be written in more than one way and a byte-exact
-// scan measures the writing rather than the phrase.
-//
-//   - WRAPPING. The templates hard-wrap at about 76 columns. Of the two
-//     keywords the broken `info` illustration handed over, "accepted input" sat
-//     on one line and "for one helper" straddled the wrap ("...adding a
-//     dependency for\n  one helper function..."). Measured against the pre-fix
-//     review.md, a byte-exact scan found one of the two and this finds both.
-//   - EMPHASIS. `*`, `_` and backticks are dropped, because a model reads
-//     "package-level state" where the file says "package-level **state**".
-//     Measured: with the sentence "When a change introduces package-level
-//     **state** that outlives a single call..." added to review.md this test
-//     passed, and with the two `**` pairs removed and nothing else changed it
-//     failed on go-package-singleton's keyword. review.md already uses `**` in
-//     six places, so no adversarial intent is needed, a maintainer emphasising
-//     a word is enough. TestThePromptScanSeesThroughEmphasis is the
-//     permanent form of that experiment.
-//
-// Dropping rather than replacing with a space is deliberate: markdown renders
-// "**word**s" as "words". Both the prompt and the keyword go through this, so
-// the transform is symmetric and cannot lose a match it used to make.
+// The note behind it is in docs/measurement.md#asrendered.
 func asRendered(s string) string {
 	s = strings.Map(func(r rune) rune {
 		switch r {

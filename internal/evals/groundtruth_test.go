@@ -239,31 +239,12 @@ func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
 	checkSoleCreditors(t, byName, cases)
 }
 
-// soleCreditors is the set of keywords this corpus can PROVE it needs: each one
+// soleCreditors is the set of keywords this corpus can PROVE it needs: each
+// one
 // must be the only keyword crediting some hit probe, so deleting it turns a
 // green test red.
 //
-// THE HOLE IT CLOSES. Ten recall keywords were added to the info plants in one
-// round, and six of them survived deletion with the whole suite green: each was
-// pairwise-redundant with a keyword that already credited the same probe, so it
-// bought nothing measurable while widening what the corpus credits, and every
-// one of the six was separately shown to credit a finding that had noticed
-// nothing. Two mutations were named in that round's report and both did fail;
-// the other eight were never run. Under the house rule that a test must fail
-// under mutation, six of ten additions were unguarded, which is why the rule is
-// a list here rather than a sentence.
-//
-// IT IS not A CORPUS-WIDE INVARIANT and CANNOT BE ONE TODAY. Measured over
-// AllFixtures, 345 of the corpus's 358 keywords are the sole creditor of no
-// probe: the probe table was written to catch false credit, so it holds a
-// handful of sentences per fixture and most keywords are synonyms no sentence
-// distinguishes. Asserting the property for all of them would demand roughly one
-// probe per keyword. What this list does instead is bind the keywords that have
-// been ARGUED FOR in prose, the ones a comment claims are load-bearing, to a
-// probe that fails without them.
-//
-// A stale entry fails as loudly as a missing one: deleting the keyword, or
-// widening another until it credits the same probe, both break this.
+// The note behind it is in docs/measurement.md#solecreditors.
 func soleCreditors() map[string][]string {
 	return map[string][]string{
 		"kotlin-widened-input":   {"what summarize accepts", "parameter is wider"},
@@ -2256,20 +2237,11 @@ func checkWitnessCredits(t *testing.T, key, reason string, d Defect, keyword str
 		"none: %s", key, keyword, reason)
 }
 
-// substringHazardLength is where TestShortKeywordsAreSubstringHazards draws its
+// substringHazardLength is where TestShortKeywordsAreSubstringHazards draws
+// its
 // line.
 //
-// It is a PROXY and it is arbitrary, so it is named rather than buried in a
-// comparison. It was picked by measuring: exactly four purely-alphabetic
-// keywords in the corpus are this short, `utc`, `dst`, `race`, `idor`, and
-// those are precisely the four that an independent sweep of ordinary English
-// reaches by substring. The next size up (`reuse`, `yagni`, `mutex`, `shell`,
-// `sleep`) is reached by no English word in that list.
-//
-// Being ABOVE the line is not evidence of safety and must not be read as any.
-// The same English sweep reaches `secret` at six characters and `exhaust` at
-// seven. What this rule buys is that it needs no word list, so a short keyword
-// added tomorrow is caught by nobody having imagined the word that hides it.
+// The note behind it is in docs/measurement.md#substringhazardlength.
 const substringHazardLength = 4
 
 // TestShortKeywordsAreSubstringHazards asks the question no list can answer.

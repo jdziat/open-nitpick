@@ -652,11 +652,8 @@ func RejudgeInputProblem(input, writing string) string {
 // sameFinding reports whether two records describe the same finding, ignoring
 // the ground-truth fields that legitimately differ between the duplicate lines
 // one finding gets when it is credited with several planted defects.
-// The secondary spans are compared with the rest. They reach no prompt, so
-// leaving them out would be defensible for a re-judge and is not defensible for
-// the file: two runs that differed only in which further regions a finding named
-// would collide under one key, and the collision would be silent in exactly the
-// field the detection columns are computed from.
+//
+// The note behind it is in docs/measurement.md#samefinding.
 func sameFinding(a, b DumpRecord) bool {
 	return a.Path == b.Path && a.Line == b.Line && a.EndLine == b.EndLine &&
 		slices.Equal(a.AlsoAt, b.AlsoAt) &&
@@ -666,24 +663,7 @@ func sameFinding(a, b DumpRecord) bool {
 
 // findingFromRecord rebuilds the finding a dump line was written from.
 //
-// Every field judgeRequest renders is here, and so is AlsoAt, which it does not
-// render. Source and Triager are excluded because the judge never sees them and
-// nothing else reads them. Excluding the secondary spans on that same argument
-// is half right: the judge is shown one location per finding, so a secondary
-// span changes not one character of the prompt, and concluding it therefore
-// "does not need to be" recorded holds only if re-judging were the sole thing done to a
-// rebuilt finding. A rebuilt finding is also SCORED, and anchorDistance,
-// anchoredLines and defectAnchoredLines all read this field, so dropping it made
-// the two columns the dump exists to make re-derivable un-re-derivable.
-// TestASecondarySpanSurvivesTheDump scores the round trip.
-//
-// The severity provenance IS restored, even though the judge never sees that
-// either. A rebuilt finding is scored as well as judged, and a finding that came
-// back claiming nobody had translated its severity would have OUR word published
-// as its reviewer's, which is exactly the substitution these two fields exist to
-// stop, arriving through the file that was written to prevent it. A record from a
-// dump predating them carries neither, and reads as an untranslated finding,
-// which is what it was recorded as.
+// The note behind it is in docs/measurement.md#findingfromrecord.
 func findingFromRecord(r DumpRecord) review.Finding {
 	return review.Finding{
 		Path:               r.Path,
@@ -713,12 +693,7 @@ type RejudgeOutcome struct {
 
 // rejudger is the one call Rejudge makes, named so it can be substituted.
 //
-// *Judge satisfies it, and taking the interface rather than the concrete type
-// is what makes Rejudge reachable at all without a paid network run: its two
-// stated properties, that outcomes come back in the order the groups went in
-// under bounded concurrency, and that a SILENT group is submitted rather than
-// assumed to produce nothing, are exactly the kind that a wrong
-// implementation still returns plausible numbers for.
+// The note behind it is in docs/measurement.md#rejudger.
 type rejudger interface {
 	Judge(ctx context.Context, f Fixture, persona config.Persona, findings []review.Finding) (*JudgeResult, error)
 }
@@ -837,20 +812,7 @@ func CorroborationGroups(samples []DumpSample) []RejudgeGroup {
 // Corroborate scores groups with a second judge and folds the answer into one
 // Aggregate per contender, keyed the way the report keys its rows.
 //
-// The returned aggregates are the SECOND half of every published figure. They
-// are built with Aggregate.Add, the same call the primary pass uses, so a
-// precision on one side of a delta and a precision on the other cannot come from
-// two implementations of the word.
-//
-// Severity is deliberately not folded in. The O-* columns compare each located
-// defect to the WantSeverity its fixture declares with no model involved, so
-// both judges would compute byte-identical values over the same findings;
-// carrying them twice would invite a reader to treat two copies of one
-// measurement as two measurements.
-//
-// A group the second judge could not assess is counted nowhere and reported.
-// Substituting a zero would publish a disagreement against a judgement that was
-// never made, which is the one thing a delta must never be able to mean.
+// The note behind it is in docs/measurement.md#corroborate.
 func Corroborate(
 	ctx context.Context,
 	judge rejudger,

@@ -51,12 +51,7 @@ import (
 
 // claimTrigger is one idiom that turns a sentence into a guarantee.
 //
-// fires and quiet are the pattern's own test. A regexp that has been widened
-// into a catch-all, or narrowed into something that matches nothing, is a scan
-// that reports zero violations and looks exactly like a clean tree, so every
-// pattern has to be shown matching the idiom it names and not matching the plain
-// statement of the same fact. TestClaimTriggersMatchTheIdiomsTheyName runs both
-// halves.
+// The note behind it is in docs/measurement.md#claimtrigger.
 type claimTrigger struct {
 	name    string
 	pattern *regexp.Regexp
@@ -133,23 +128,12 @@ var claimTriggers = []claimTrigger{
 
 // claimReason opens a clause that ARGUES rather than asserts.
 //
-// Reaching one of these before the assertion idiom is what separates the two
-// kinds of prose. A bare "X cannot see the verdict" hands the reader a
-// guarantee; "the verdict is not part of the finding, so X cannot see it" hands
-// them the reasoning and invites them to check it against the code. The second
-// needs no citation because it has already given its evidence. Both forms are
-// carried as executable rows in claimShapes, spelled with a real identifier,
-// which is why the illustration here is not.
+// The note behind it is in docs/measurement.md#claimreason.
 var claimReason = regexp.MustCompile(`(?i)(\bbecause\b|\bso\b|\bsince\b|\bwhich\b|\bwhere\b|\bwhen\b|\bwhile\b|\bunless\b|\bif\b|\bbut\b|\band\b|\bor\b|\brather than\b|,|;|:|\(|—)`)
 
 // claimHistory marks a sentence as a record of what HAPPENED.
 //
-// History is the most valuable prose in this package and the least dangerous: a
-// reader cannot act on "the banded column shipped green" as though it were a
-// guarantee about the tree in front of them. Only auxiliaries and explicit
-// time-markers are listed, never ordinary past participles, "printed",
-// "declared" and "scored" all appear in live present-tense assertions here, and
-// matching them would silently retire the guard over most of the package.
+// The note behind it is in docs/measurement.md#claimhistory.
 var claimHistory = regexp.MustCompile(`(?i)\b(was|were|had|have been|has been|used to|did|would|could|might|previously|originally|historically|no longer|until|before|once)\b`)
 
 // claimTestRef is how a comment cites a test. Go's own convention: the test's
@@ -345,13 +329,7 @@ func glued(text string) string { return strings.ReplaceAll(text, "\n", "") }
 // codeShaped reports whether a word is spelled the way code is spelled rather
 // than the way English is.
 //
-// The discriminator is a capital after the first letter: unknownCost,
-// HeldOutFixtures, sameFinding. A single-capital word, Fixtures, Defect, Score
-// , is not accepted even when the package declares it, because at the start of a
-// sentence it is indistinguishable from an ordinary capitalized noun, and the
-// direction to be wrong in is the one that leaves good prose alone. That costs
-// recall on doc comments whose subject is a one-word exported name, and
-// claimShapes does not pretend otherwise.
+// The note behind it is in docs/measurement.md#codeshaped.
 func codeShaped(word string) bool {
 	for i, r := range word {
 		if i > 0 && r >= 'A' && r <= 'Z' {

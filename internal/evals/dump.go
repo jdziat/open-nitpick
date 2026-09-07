@@ -290,41 +290,7 @@ const runDumpDir = ".eval-runs"
 // OpenRunDump opens the dump a battery writes its own findings to, whether or
 // not anybody asked for one.
 //
-// THE RUN IT EXISTS FOR HAS ALREADY HAPPENED. The held-out battery that produced
-// the Rule 14 evidence ran with EnvDump unset, so OpenDump returned nil, every
-// Record call was a no-op, and the finding lists sat in memory for the whole of
-// a paid run and were written nowhere. Two of Rule 14's four conditions then
-// needed a re-run to evaluate, against a corpus whose own label says it is
-// spent once. Retention is not a diagnostic convenience here; it is what makes
-// the next held-out spend the last one required for a model-free column, because
-// RECALL, NOISE, ANCHOR and L/DEF are pure functions of (findings, fixture) and
-// need no judge and no network to recompute.
-//
-// THE RECORDING IS not GATED ON THE JUDGE, and saying so is load-bearing rather
-// than decorative: the arithmetic needing no judge is worth nothing if the write
-// happens after a judge call that can fail. It did, and a review whose judge call
-// errored was discarded, findings already paid for, and on the incumbent's side
-// drawn from a rate-limited allowance the benchmark's live path does not even
-// cache. TestEveryPaidReviewIsRetainedWhateverTheJudgeSays holds the write above
-// every return that follows the judge.
-//
-// It does not change OpenDump. That function's nil-on-unset contract is shared
-// by the remaining callers and pinned by TestDumpDisabledCostsNothing, and the
-// nil no-op is what lets every call site drop a record unconditionally; a
-// default resolved inside it would also leave EnvDump empty, which the re-judge
-// path's collision check reads. Batteries that want retention ask for it here.
-//
-// Which batteries those are is derived rather than listed. Saying the tuning
-// axes stay on OpenDump because "their corpus can be reviewed again" is true of
-// TestTunePersona, the one battery that remains there, and false of
-// TestJudgeModels, which prints the same judged table the head-to-head does and
-// which `make judge-models FIXTURES=$(HELD_OUT)` points at the spent-once
-// corpus: a class of caller named where a property of one was meant.
-// TestEveryJudgedBatteryRetainsItsFindingsWithoutBeingAsked derives the list
-// from the table, so anything calling reportJudgedModels must open through here.
-//
-// battery names the caller, so a directory of retained runs says which produced
-// each file.
+// The note behind it is in docs/measurement.md#openrundump.
 func OpenRunDump(battery string, fixtures []Fixture) (*Dump, string, error) {
 	return openRunDumpAt(runDumpDir, battery, fixtures, time.Now().UTC(), os.Getpid())
 }

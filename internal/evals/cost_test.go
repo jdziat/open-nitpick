@@ -1448,21 +1448,7 @@ func TestTwoAmountsWithOverlappingBandsAreNotOrderable(t *testing.T) {
 // costFixture is one fixture of the battery the strategies below are run over:
 // a real fixture, plus what reviewing it costs to send.
 //
-// It was a synthetic tuple, a name, a planted count and a prompt size, and the
-// strategies returned hand-written Detections beside it. That made this whole
-// block a test of CostRow's arithmetic over numbers a person typed, and the two
-// numbers most often typed were FALSE for the behaviours their own rows named:
-// the line-spammer declared `Noise: 40` and the wide-anchor strategy declared
-// `WidestAnchor: 900`, while the real scorer, run over reviews of that shape,
-// returned 0 and 1. A guard cannot demonstrate that a column sees a behaviour by
-// being handed the number the column would print if it did.
-//
-// So the corpus is the corpus, and every strategy publishes findings that go
-// through ScoreRun. What remains declared is the USAGE, and that is not the same
-// kind of thing: token usage is what a provider REPORTS about a call, it is not
-// derivable from the findings, and the ledger's job is precisely to combine a
-// reported usage with an observed detection. Faking the reported half is
-// modelling a provider; faking the observed half was faking the answer.
+// The note behind it is in docs/measurement.md#costfixture.
 type costFixture struct {
 	Fixture
 
@@ -1514,21 +1500,10 @@ func dearFixture(f costFixture) bool {
 // without being short on coverage, the gap a set-based check could not see.
 const costRunsPerFixture = 2
 
-// costPrices is the rate table the degenerate-strategy rows are priced against.
+// costPrices is the rate table the degenerate-strategy rows are priced
+// against.
 //
-// This COMMENT USED TO CLAIM it "prices the two models every strategy is run
-// as", and that was FALSE when it was written. The "a model nobody priced"
-// strategy sets costStrategy.model to test/unpriced precisely so that it is
-// absent from here, being unpriced IS that row's behaviour, and it is the one
-// strategy in the table whose whole argument depends on a missing entry. Read as
-// a guarantee of complete coverage, the old sentence said no such row could
-// exist, in a file where one does. Two of the three ids the strategies run as
-// are below; the third is deliberately missing, and
-// TestAModelWithNoPriceEntryReportsUnknownAndNotZero pins the reading its
-// absence has to produce.
-//
-// Deliberately a literal rather than the shipped table: a degeneracy guard that
-// moves when somebody recaptures a rate is a guard nobody will trust.
+// The note behind it is in docs/measurement.md#costprices.
 func costPrices(t *testing.T) *PriceTable {
 	t.Helper()
 	return mustPrices(t, "models:\n"+
@@ -1575,14 +1550,11 @@ type costStrategy struct {
 }
 
 // calibratedCostRun is the reference: it publishes the calibrated review of
-// every fixture, and its provider reports what it spent. A cost reading is worth
+// every fixture, and its provider reports what it spent. A cost reading is
+// worth
 // publishing only if being useful beats being degenerate on it.
 //
-// Its completion cost is per finding because that is the term every strategy
-// below moves: a reviewer is billed for what it wrote, and "say forty empty
-// things instead of three explained ones" is a claim about output tokens that
-// has to be expressible or the NOISE column has nothing to be load-bearing
-// against.
+// The note behind it is in docs/measurement.md#calibratedcostrun.
 func calibratedCostRun(f costFixture, _ int) ([]review.Finding, CallUsage, bool) {
 	findings := calibratedReview(f.Fixture)
 	return findings, CallUsage{Prompt: f.prompt, Completion: explainedTokens * len(findings)}, true
@@ -1591,11 +1563,7 @@ func calibratedCostRun(f costFixture, _ int) ([]review.Finding, CallUsage, bool)
 // explainedTokens is what one EXPLAINED finding costs to write, and spamTokens
 // what one empty one costs.
 //
-// The gap between them is the whole content of the line-spammer row: a comment
-// carrying a reason is many times the output of a comment carrying none, which
-// is why saying everything is cheaper than saying three useful things. Ten to
-// one is conservative. A real rationale runs longer than ten times a one-line
-// nit, and the row is only claiming the sign of the difference.
+// The note behind it is in docs/measurement.md#explainedtokens-is-what-one-explained-finding-costs-to-write.
 const (
 	explainedTokens = 120
 	spamTokens      = 12
@@ -1771,16 +1739,11 @@ func ledgerFor(t *testing.T, s costStrategy) (strategy, reference CostRow) {
 	return ledger.Row(model), ledger.Row("test/reference")
 }
 
-// observeCostRun scores one published review and books it, along the same path a
+// observeCostRun scores one published review and books it, along the same path
+// a
 // real run takes: findings into ScoreRun, the Score into ObserveScore.
 //
-// Going through ObserveScore rather than calling Observe with assembled
-// Detections is the point of the rewrite twice over. It is what makes the
-// noise and anchor counts in this file the scorer's answer rather than a
-// person's, and it is what gives ObserveScore a caller reachable from
-// `go test ./...`: it had none, no test, and three separate mutations of it left
-// the suite green, an inert function that the cost table's whole premise rested
-// on.
+// The note behind it is in docs/measurement.md#observecostrun.
 func observeCostRun(l *CostLedger, model string, f costFixture, run int,
 	publish func(costFixture, int) ([]review.Finding, CallUsage, bool)) {
 	findings, usage, reported := publish(f, run)

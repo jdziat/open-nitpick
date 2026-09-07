@@ -5,45 +5,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // MultiFileFixtures is the multi-file corpus: changes whose defect is only
 // visible by reading a file the change does not touch.
 //
-// Every fixture in the other two corpora is judged from the diff and the files
-// it names. That is also what a hosted reviewer with the whole repository
-// indexed is supposed to be better at, and nothing here had ever measured it:
-// the one cross-file plant in the tuning corpus (ts-unbounded-memo-key) puts
-// the contract in a file the change ADDS, so the reviewer is shown it. Here the
-// contract sits in a file that is byte-identical in Base and Head. A reviewer
-// that reads only the diff cannot see it and must either guess or stay quiet;
-// a reviewer that follows the import can read the sentence that makes the
-// change wrong.
-//
-// So this corpus answers two questions the others cannot:
-//
-//   - whether review.related_context, attaching the definitions a changed
-//     line uses from files the change does not touch, finds defects a
-//     diff-only review misses, and what it costs in precision on the two clean
-//     fixtures, which honour their helpers' contracts exactly;
-//   - how this reviewer compares with hosted ones that index the repository,
-//     on the changes those products are built for.
-//
-// It is a THIRD corpus rather than more held-out fixtures because it will be
-// re-run: the feature it measures is new and will be tuned, and a corpus that
-// is spent once cannot answer "did that change help?" twice. It is not a
-// tuning corpus either. The prompt is not tuned on it, but nothing here
-// should be read as a generalization claim.
-//
-// It is also outside AllFixtures, and therefore outside the ground-truth suite
-// that sweeps every plant's keywords against every other fixture's recorded
-// prose. TestMultiFileCorpusIsWellFormed checks what can be checked without
-// those registries: that every plant is on an added line, that its Why is
-// credited by its own keywords, that no keyword is a token of the change
-// itself, and that the contract really is in a file the change does not
-// touch. See EveryFixture for what that leaves unchecked.
-//
-// Every helper's contract is written the way a maintainer writes one: a doc
-// comment on the definition, in the language's own convention, stating what a
-// caller must do. None is hidden in a README or a test. The plants are
-// realistic in the sense that matters, each is a change a competent engineer
-// makes when they have not read the callee, and unrealistic in the sense that
-// every corpus is: the repository is ten files, not ten thousand.
+// The note behind it is in docs/measurement.md#multifilefixtures.
 func MultiFileFixtures() []Fixture {
 	fixtures := []Fixture{
 		goQueryWithoutDeadlineFixture(),

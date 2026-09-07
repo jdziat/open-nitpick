@@ -25,11 +25,10 @@ import (
 // TestFullReviewFixture is the acceptance test for `nitpick full-review`,
 // section 1 of notes/plan-full-review.md: the fixture repository reviewed
 // whole finds the planted bug and the planted secret, says nothing about the
-// clean file, lists the known advisory when osv-scanner is installed, and
-// puts the secret first in the remediation plan. Judge-free: a finding is
-// credited by the keyword rule the other corpora use.
-// advisoryID is a line of the known-advisories section: the scanner's rule,
-// qualified with its name, then the lockfile anchor.
+// clean file, lists the known advisory when osv-scanner is installed, and puts
+// the secret first in the remediation plan.
+//
+// The note behind it is in docs/measurement.md#advisoryid.
 var advisoryID = regexp.MustCompile(`(?m)^\s+osv-scanner\((GHSA-|CVE-|GO-20)[^)]*\)\s+go\.mod:\d+ `)
 
 func TestFullReviewFixture(t *testing.T) {

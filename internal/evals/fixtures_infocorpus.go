@@ -5,20 +5,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // InfoFixtures is the fourth corpus: ten `info` plants and two clean
 // controls at the same level of subtlety.
 //
-// It exists because no reviewer, this one, the hosted incumbent, kimi, glm
-// , has ever located the four `info` plants in the other corpora on any run,
-// and the tables could not say whether that is the plants or the reviewers.
-// Each plant here is a change whose consequence a senior reviewer would name
-// in one sentence and want the author to decide about: not a wrong result on
-// any path, but a cost, reproducibility, a lost type, a shared mutable
-// value, a scan the database will make on every request, that the change
-// takes on without saying so. The clean controls take a similar-looking step
-// and pay no such cost, so a reviewer that objects to every change of this
-// shape is scored for it.
-//
-// Rule 15 applies: re-runnable, not tuned on, and outside AllFixtures.
-// TestInfoCorpusIsWellFormed checks what can be checked without the
-// registries.
+// The note behind it is in docs/measurement.md#infofixtures.
 func InfoFixtures() []Fixture {
 	return []Fixture{
 		infoGoTimeoutHalved(),

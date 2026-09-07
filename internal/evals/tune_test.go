@@ -146,39 +146,10 @@ func TestTunePersona(t *testing.T) {
 	reportVariants(t, results, corroborateVariants(t, judge, results, samples, nil))
 }
 
-// runLevels reviews each fixture once and derives every level from that corpus.
+// runLevels reviews each fixture once and derives every level from that
+// corpus.
 //
-// It judges what each level shows, at a cost accepted deliberately. Judging
-// the whole corpus once per fixture and reusing those verdicts for every level
-// copies Grade, SignalToNoise, ToneAdherence and Missed into all four rows
-// verbatim. Two things are wrong with that, and only one is about the second
-// judge.
-//
-// The second judge was handed each level's FILTERED list, so the delta printed
-// beside those four figures compared a whole-corpus judgement against a subset
-// judgement under a legend calling it the confidence interval on the figure
-// beside it. MISSED was biased in a known direction on top: filtering more
-// findings legitimately raises the second judge's missed count against a
-// primary frozen at the corpus value.
-//
-// The deeper problem is that the figure was wrong before any delta was computed.
-// A GRADE for nitpick=off produced by judging findings that nitpick=off
-// suppresses is not that level's grade under any reading, and MISSED for a level
-// that hides a defect's only finding cannot be measured by a judge that was
-// shown it. Refusing to publish the delta, the other honest fix, would have
-// left a wrong figure wearing an honest caveat. So the primary judges each level
-// on the list that level presents.
-//
-// WHAT IT COSTS: one judging call per DISTINCT filtered list per fixture,
-// against one per fixture before. The bound is the number of levels, so at worst
-// four times the primary judging on the default axis; the reviews are unchanged
-// at one per fixture, and the second judge already cost one call per level per
-// fixture. Levels that filter to the same list share one call, which is the
-// usual case at the top of the axis. The corpus is generated at
-// config.GenerationLevel, so every level at or above it keeps everything and
-// they are one stimulus, judged once. The sharing is decided by the fingerprint
-// of the list, not by a rule about levels, so a filter change cannot make two
-// different lists share a judgement.
+// The note behind it is in docs/measurement.md#runlevels.
 func runLevels(
 	t *testing.T, judge *Judge, model Model, levels []config.NitpickLevel, opts Options, dump *Dump,
 ) ([]scored, []DumpSample) {
@@ -665,21 +636,7 @@ func TestJudgeModels(t *testing.T) {
 // corroborate scores the same judged reviews again with a second judge from a
 // vendor no contender shares, and returns the panel the report renders from.
 //
-// It runs no review. Every finding it submits is one the primary judge was just
-// shown, in the position it was shown in, handed over through the re-judge
-// path, the mechanism this harness already had for changing exactly one thing.
-// The second judge therefore costs judging only, which is what makes publishing
-// a disagreement beside every figure affordable enough to be the default rather
-// than an occasional audit.
-//
-// With no second judge configured it returns a panel that says so, and every
-// figure in the report renders its disagreement as UNMEASURED. That is the
-// degradation this was asked for: weaker, and stated.
-// byVariant supplies the persona each variant was reviewed under, keyed by
-// variant name. It is nil everywhere the persona is held constant, the model
-// benchmark and the head-to-head, and populated on the voice axis, where four
-// variants are four personas and judging them all against the default would
-// score three of them against a voice they were never asked to use.
+// The note behind it is in docs/measurement.md#corroborate.
 func corroborate(
 	t *testing.T,
 	ctx context.Context,
@@ -870,25 +827,7 @@ func reportJudgedModels(
 
 	// WHETHER THE ORDER SURVIVES THE OTHER JUDGE.
 	//
-	// The rows above are ordered by the primary judge, which is the ranking this
-	// project has published. The deltas say how far each figure moves; they do
-	// not say whether the ORDER moves, and a reader cannot reliably recover that
-	// by eye from eighteen columns. So it is computed and printed: the second
-	// judge's own order, and how many contenders sit in a different place in it.
-	//
-	// It is a count and a list, not a correlation coefficient. Eight fixtures
-	// cannot support a statistic, and a number that looks like statistics gets
-	// quoted like statistics, the same reasoning GradeSpread records for not
-	// becoming a confidence interval.
-	//
-	// It is also a COMPARISON, and so it is subject to the same rule the deltas
-	// are: two orders built from different stimuli do not disagree, they answer
-	// different questions, and "3 of 6 contenders sit in a different position"
-	// would read as judge disagreement while measuring the change of question.
-	// So a contender whose two judges did not score the same finding lists
-	// suppresses the line entirely, and the report says which contenders and
-	// why. Printing the order for the rest would be worse than printing none:
-	// an order over a subset of the rows is not the order of the table.
+	// The note behind it is in docs/measurement.md#mismatched.
 	var mismatched []string
 	for _, r := range rows {
 		if r.cross.HaveSecond && !r.cross.SameStimulus() {
@@ -936,25 +875,7 @@ func reportJudgedModels(
 
 	// Every RATE IN THE TABLE ABOVE, AS THE COUNTS IT CAME FROM.
 	//
-	// The columns are rates because contenders are measured different numbers of
-	// times and raw sums are not comparable across that, but a rate hides its
-	// own resolution, and these denominators are single digits. PREC 0.74 and
-	// PREC 0.67 read as a difference until you are told they are 17/23 and 2/3,
-	// at which point the second is one comment away from 1.00 and the comparison
-	// is not one. The methodology gate called this the cheapest high-value item
-	// available to this harness and it is: the numbers were already here, and
-	// nothing printed them.
-	//
-	// Below rather than inside the row because the columns are fixed-width and a
-	// count pair outgrows its cell the moment a contender files a hundred
-	// findings, at which point the table silently misaligns, which is a defect
-	// this file has already had once.
-	//
-	// Rendered by CrossJudged.Denominators, which prints both judges' counts,
-	// rather than formatted here. Formatting them here is what would put this
-	// report back in possession of the raw judged counters, the state that
-	// makes half a result printable, and it would also have published one
-	// judge's denominators under a table of two judges' figures.
+	// The note behind it is in docs/measurement.md#counts.
 	var counts strings.Builder
 	counts.WriteString("DENOMINATORS — every rate above, as the counts it was computed from:\n")
 	for _, r := range rows {
@@ -1270,22 +1191,12 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		}
 		agg.Saw(fx.Name)
 
-		// RETAINED before THE JUDGE IS ASKED, and retained whatever it answers.
-		// This review is already paid for, a model call on our side, an
-		// invocation of a rate-limited free allowance on the incumbent's, and
-		// RECALL, NOISE, ANCHOR and L/DEF are pure functions of (findings, fixture).
-		// Recording it after the judge, as this did, meant a judge failure
-		// discarded the one artifact that needs no judge to be re-read. Deferred
-		// rather than written out on both branches so that no future branch can
-		// be added without it, and registered after `defer mu.Unlock()` so it
-		// runs while the lock is still held: it appends to notes.
+		// Retained before the judge is asked, and retained whatever it answers.
+		// The review is already paid for and RECALL, NOISE, ANCHOR and L/DEF are
+		// pure functions of (findings, fixture), so recording it after the judge
+		// lets a judge failure discard the one artifact that needs no judge.
 		//
-		// It is registered after the review-error return above, which is
-		// deliberate and is the one path that must not record: there are no
-		// findings there, and Record writes a `silent: true` line for an empty
-		// list, a review that never ran would go into the file as a reviewer
-		// that said nothing. TestEveryPaidReviewIsRetainedWhateverTheJudgeSays
-		// draws the line in exactly that place.
+		// The note behind it is in docs/measurement.md#judged.
 		var judged *JudgeResult
 		defer func() {
 			if derr := dump.Record(DumpSample{
@@ -1541,12 +1452,7 @@ func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options, dump *D
 // corroborateVariants runs the second judge over a persona axis and folds its
 // complaints back onto the rows they belong to.
 //
-// The notes matter as much as the aggregates. A second judge that failed on two
-// fixtures produces a delta over fewer samples than the figure beside it, and
-// dropping the note that says so leaves a row whose N cell reads "8/6" with
-// nothing anywhere explaining the six. Both axes report per variant, and
-// Corroborate keys by contenderLabel, so the notes are translated back the same
-// way the aggregates are looked up.
+// The note behind it is in docs/measurement.md#corroboratevariants.
 func corroborateVariants(
 	t *testing.T, judge *Judge, results []scored, samples []DumpSample, personas map[string]config.Persona,
 ) JudgePanel {

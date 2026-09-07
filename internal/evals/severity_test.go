@@ -1800,10 +1800,13 @@ func TestTheFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 
 	// Read verbatim, comments included: the claim under test IS a comment, so
 	// packageSources, which blanks them, is the wrong reader here.
+	measurement := filepath.Join("..", "..", "docs", "measurement.md")
 	quoted := map[string][]string{
-		"score.go": {
+		measurement: {
 			"A finding naming %d separate one-line regions scored 1",
 			"Someone handed %d one-line regions has %d lines to read",
+		},
+		"score.go": {
 			"so %d scattered lines read as 1",
 		},
 		"severity_test.go": {
@@ -1811,13 +1814,10 @@ func TestTheFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 		},
 	}
 	for file, claims := range quoted {
-		src, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatalf("reading %s: %v", file, err)
-		}
+		prose := verbatim(t, file)
 		for _, claim := range claims {
 			want := strings.ReplaceAll(claim, "%d", strconv.Itoa(widest))
-			if !strings.Contains(string(src), want) {
+			if !strings.Contains(prose, want) {
 				t.Errorf("%s no longer says %q. The corpus's widest scattered anchor measures %d; "+
 					"a sentence quoting any other number is evidence nobody can reproduce, which is "+
 					"the defect this package has now retracted three times", file, want, widest)
@@ -1825,15 +1825,37 @@ func TestTheFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 		}
 	}
 
-	src, err := os.ReadFile("score.go")
-	if err != nil {
-		t.Fatalf("reading score.go: %v", err)
-	}
 	gridClaim := fmt.Sprintf("%s boilerplate one-liners on a grid", numberWord(grid))
-	if !strings.Contains(string(src), gridClaim) {
+	if !strings.Contains(verbatim(t, measurement), gridClaim) {
 		t.Errorf("explainsAny no longer says %q. boilerplateGridReview files %d comments on the "+
 			"%d-plant fixture it is described against", gridClaim, grid, plants)
 	}
+}
+
+// quotedProse reads a claim's home, whether that is a Go file's comments or a
+// shipped document. A note that outgrew its declaration moved to docs/ and the
+// figure in it still has to reproduce, so the reader follows it there.
+func quotedProse(t *testing.T, path string) string {
+	t.Helper()
+	if strings.HasSuffix(path, ".md") {
+		return docProse(t, path)
+	}
+	return commentProse(t, path)
+}
+
+// verbatim is quotedProse for a claim that may sit in a string literal as well
+// as in a comment, which is the case for a failure message quoting its own
+// figure back at the reader.
+func verbatim(t *testing.T, path string) string {
+	t.Helper()
+	if strings.HasSuffix(path, ".md") {
+		return docProse(t, path)
+	}
+	src, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading %s: %v", path, err)
+	}
+	return string(src)
 }
 
 // numberWord spells the small integers these comments write out, so the assertion
@@ -2412,18 +2434,7 @@ func keywordsPerFile(f Fixture) (map[string][]string, []string) {
 // scatteredAnchorReview is a line-precise reviewer that ALSO gestures at the
 // whole file, one line at a time.
 //
-// Every finding is the calibrated reviewer's, right defect, right line, right
-// severity, right words, with one extra region per line of the file attached to
-// it. That costs it nothing anywhere: anchorDistance takes the MIN over regions,
-// so the primary anchor still lands on the plant, and it is noise for nothing.
-// Under the widest-single-region rule it also cost nothing in ANCHOR, because
-// every region it added was one line long, so it tied a perfectly calibrated
-// reviewer on every column of the detection metric while pointing at the whole
-// file. anchoredLines is what tells them apart.
-//
-// This is not an invented shape. crParseAlsoApplies produces exactly it,
-// "Also applies to: 3, 7, 12, ...", so the escape was one Incumbent review
-// away from being live, not a thought experiment about a reviewer nobody has.
+// The note behind it is in docs/measurement.md#scatteredanchorreview.
 func scatteredAnchorReview(f Fixture) []review.Finding {
 	_, lines := fixturePaths(f)
 
@@ -2505,58 +2516,22 @@ func radiusSpamReview(f Fixture) []review.Finding {
 	return out
 }
 
-// terseGuessSpacing is how often the guesser files a comment: dense enough to be
-// visibly a guess, sparse enough that it stays CHEAPER THAN EXPLAINING, which is
+// terseGuessSpacing is how often the guesser files a comment: dense enough to
+// be
+// visibly a guess, sparse enough that it stays CHEAPER THAN EXPLAINING, which
+// is
 // the whole content of the cost strategy it serves.
 //
-// The second half is arithmetic over the corpus, not a matter of taste, and it
-// is why this constant is not 3 any more. A guess costs spamTokens and an
-// explained finding explainedTokens, so the guesser undercuts the calibrated
-// reviewer only while
-//
-//	spamTokens * (defects + guesses) < explainedTokens * defects
-//
-// and `guesses` is one per terseGuessSpacing lines of every head file in
-// AllFixtures, while `defects` grows only when a plant is added. Ten fixtures
-// authored to fix the severity skew added far more lines than plants, and at a
-// spacing of 3 the guesser tipped over into costing 3036 against the explainer's
-// 2880, so it was caught by $/DEFECT, stopped demonstrating that NOISE is
-// load-bearing, and TestEachCostStrategyIsCaughtByTheColumnItClaims failed
-// exactly as it is designed to. At 5 it is 2040 against 2880.
-//
-// The value is a band rather than a point: 4 also clears it, by 17% rather than
-// 29%. 5 is chosen for the headroom, because the margin is consumed by every
-// fixture anyone adds and a guard that has to be re-derived on each one teaches
-// people to adjust the constant instead of reading it. That test is the guard,
-// this comment is not, and a change here that breaks the inequality fails there.
+// The note behind it is in docs/measurement.md#terseguessspacing.
 const terseGuessSpacing = 5
 
 // terseGuessReview publishes a title and nothing else for every finding it
-// files: it names each planted defect on its own line in as few words as it can,
+// files: it names each planted defect on its own line in as few words as it
+// can,
 // and scatters one-line guesses through the rest of the file, each repeating
 // that file's own vocabulary.
 //
-// It is the honest cheap-and-noisy strategy, and it replaced one that was not.
-// The row it stands in for was a line-by-line spammer justified as "forty
-// one-line findings are FEWER output tokens than three explained ones", a claim
-// that only held because the row declared its own token count. Run over the real
-// corpus with output billed per finding, a comment on every line of a 20-line
-// file with one defect costs MORE than explaining that one defect, so $/DEFECT
-// caught it and NOISE could have been deleted with every guard still green. That
-// is the failure TestEachCostStrategyIsCaughtByTheColumnItClaims exists to
-// report, and it reported it.
-//
-// What is cheap is refusing to explain. Every comment here is a title
-// and nothing else, so it buys the same recall for a fraction of the output, and
-// the only thing separating it from a useful reviewer is that most of what it
-// filed is invented.
-//
-// The guesses borrow the file's PLANTED WORDS rather than saying nothing, and
-// that is what makes this row test the position half of the noise rule as well
-// as the text half: a guess saying "sql injection" nine lines from the SQL
-// injection is exactly the finding a text-only rule credits and a positional one
-// does not. A file with no plants has no vocabulary to borrow, so its guesses
-// fall back to text that names nothing.
+// The note behind it is in docs/measurement.md#terseguessreview.
 func terseGuessReview(f Fixture) []review.Finding {
 	paths, lines := fixturePaths(f)
 	keywords, _ := keywordsPerFile(f)
@@ -3494,43 +3469,7 @@ func TestEveryHeaderPrintsAWholeMetric(t *testing.T) {
 // packageSources returns every Go file in this package, test files included,
 // keyed by name, WITH COMMENTS BLANKED OUT.
 //
-// Test files are read because the eval reports are RENDERED from test files
-// behind the `eval` build tag. A source scan that skipped them could not see the
-// two tables the head-to-head is printed in, so a header declared beside its own
-// renderer, the obvious place to put one, was invisible to the guard that
-// exists to notice new tables.
-//
-// THE BUG COMMENTS CAUSED: the scans over this text were regexps, and
-// registeredHeaderNames matched `registerTableHeader(kind, X)` ANYWHERE in it,
-// including inside a doc comment. So a file could declare
-//
-//	// Registered by reference from score.go: registerTableHeader(tableUnscored, BandedTableHeader).
-//	const BandedTableHeader = "MODEL     RECALL  B-ACC"
-//
-// and be recorded as registered by its own prose. registerTableHeader was never
-// called, AllTableHeaders never contained the header, and
-// TestNoTableOffersACrossToolSeverityScore therefore never saw its columns: the
-// withdrawn B-ACC column shipped with the whole suite green, and deleting only
-// that comment sentence made both bypass scans fire.
-//
-// Blanking the comments does not fix it, and that is the lesson this function
-// is left here to carry. It closes the one spelling of the bypass that was
-// found and leaves the family open: a comment is not the only prose in a Go file,
-// and a STRING LITERAL is not a comment. This package is full of long prose
-// constants, NoCrossToolSeverityScore, SeverityColumnLegend, CostReadingLegend,
-// and a sentence inside any of them registered a header just as effectively:
-//
-//	const legend = "Registered from score.go by registerTableHeader(tableUnscored, BandedTableHeader)."
-//
-// passed every guard in this package with a withdrawn B-ACC column shipped
-// beside it, reproduced on this tree. The remedy is not a third exclusion. It is
-// to stop asking a text search what the code does: the registration scans parse
-// the package with go/ast and look at call expressions, which neither a comment
-// nor a string can be. See registeredHeaderNames.
-//
-// What is left for this function is the scans that are textual,
-// "does any report print this identifier", where blanking comments is still the
-// right precaution and the remaining error direction is safe.
+// The note behind it is in docs/measurement.md#packagesources.
 func packageSources(t *testing.T) map[string]string {
 	t.Helper()
 
@@ -3749,15 +3688,7 @@ func init() { _ = registerTableHeader(tableUnscored, ByReferenceHeader) }
 // TestARegistrationThatNeverRunsDoesNotCount closes the hole the AST rewrite
 // opened while it was closing the prose ones.
 //
-// Every column guard reads the RUNTIME registry through AllTableHeaders, and the
-// source scan was changed to accept a registerTableHeader call ANYWHERE, so a
-// call inside an ordinary function body satisfied the scan while the registry
-// stayed empty. The withdrawn banded columns shipped from a perfectly reachable
-// renderer with build, vet, the full suite and golangci-lint all green;
-// `unused` would have caught a dead function, and caught nothing here because
-// the function was reachable, it just was not called before the tests read the
-// registry. The old `var X = registerTableHeader(...)` shape had the guarantee
-// built in and nobody had written down that it was load-bearing.
+// The note behind it is in docs/measurement.md#testaregistrationthatneverrunsdoesnotcount.
 func TestARegistrationThatNeverRunsDoesNotCount(t *testing.T) {
 	const src = `package evals
 
@@ -4211,16 +4142,7 @@ func rendersATable(file *ast.File) bool { return len(tableUnderlines(file)) > 0 
 // forwardsRegisteredHeaders reports whether an identifier is a helper's string
 // parameter that every caller passes a registered header to.
 //
-// rejudge prints both its tables through one helper that takes the header as a
-// parameter, so the identifier at the underline is that parameter rather than
-// the header itself. Exempting parameters by name would open the rule to
-// anything called "header"; this follows the indirection instead and checks the
-// call sites, so the helper is covered rather than excused.
-//
-// The helper is looked for in the file that draws the underline, not across the
-// package: `registerTableHeader(kind tableKind, header string)` also takes a
-// parameter named header, and searching every file made the answer depend on map
-// iteration order, the guard passed or failed at random.
+// The note behind it is in docs/measurement.md#forwardsregisteredheaders.
 func forwardsRegisteredHeaders(files map[string]*ast.File, file, ident string, registered map[string]bool) bool {
 	for _, decl := range files[file].Decls {
 		fn, ok := decl.(*ast.FuncDecl)
@@ -4799,46 +4721,7 @@ func namesAVerdict(field string) bool {
 // TestNoReportFormatsSeverityCountersDirectly ties the tables to the gated
 // renderers.
 //
-// SeverityCells proves the gate is IN the renderer. It cannot prove a table used
-// the renderer, and the defect was exactly that: the ground-truth table formatted
-// SevAccurate/SevInflated/SevUnderstated inline, so the withdrawal was in a
-// function that cell never called.
-//
-// The set of report files is derived rather than listed, a file that underlines
-// a table is a report renderer, so a new report is covered on the day it is
-// written rather than on the day someone remembers this test exists.
-//
-// THE COUNTER NAMES are DERIVED TOO, and that is the second half of the same
-// bug. This scan used to hold the literal list {SevAccurate, SevInflated,
-// SevUnderstated}, the field names on Summary and Aggregate, while the
-// counters are ALSO reachable as CorpusTally.Severity.Accurate/.Inflated/
-// .Understated, which is a different spelling of the same three integers. A
-// report doing
-//
-//	fmt.Fprintf(&b, "%-21s %d/%d/%d\n", model,
-//	    t.Severity.Accurate, t.Severity.Inflated, t.Severity.Understated)
-//
-// rendered `incumbent/cli  4/1/2`, the withdrawn full-resolution cross-tool
-// severity triple, on the foreign row, where the gated renderer returns "n/a"
-// for the identical tally, and the whole suite stayed green. A list of what to
-// guard guards what was on the list; reflecting over the types the counters live
-// on covers spellings nobody thought of.
-//
-// WHAT IT does not COVER, stated here because the previous version of this
-// paragraph claimed it covered "the next one" and two next ones got past it.
-//
-//   - A SHAPE MISSING FROM THE WALK. severityCounterSpellings reflects over
-//     reportRowShapes, and Aggregate was absent from it for two rounds while
-//     this scan passed, because Summary spells the same three counters
-//     identically. Nothing in the scan's OUTPUT can show that;
-//     TestTheCounterScanCoversEveryShapeAReportRendersFrom asserts the list by
-//     type identity instead.
-//   - THE INSIDE OF THE GATED RENDERER. This scan skips judge.go, which draws no
-//     table and is where ObjectiveSeverityCells and ObjectiveSeverityCounts
-//     legitimately name the counters. Appending a banded triple to the WITHDRAWN
-//     branch of ObjectiveSeverityCounts, the prose line under the table for the
-//     row whose four O-* cells read n/a, is therefore invisible here.
-//     TestAWithdrawnRowsProseDoesNotLeakASeverityVerdict is that position.
+// The note behind it is in docs/measurement.md#testnoreportformatsseveritycountersdirectly.
 func TestNoReportFormatsSeverityCountersDirectly(t *testing.T) {
 	counters := severityCounterSpellings()
 	if len(counters) < 6 {
@@ -4876,46 +4759,12 @@ func TestNoReportFormatsSeverityCountersDirectly(t *testing.T) {
 // severityCounterSpellings derives every way a report could name one of the
 // severity counters, from the types that hold them.
 //
-// Every SHAPE A REPORT READS IS REFLECTED OVER, and the omission was the bug.
-// This walked Summary and CorpusTally only. Aggregate, the type judge.go
-// records the withdrawn B-INFL/B-UNDER/B-ACC triple as having lived on, and the
-// one whose four O-* cells read n/a for the incumbent, was never walked, so its
-// counters were covered purely because Summary happens to spell them
-// identically. Adding `SevBandedAccurate int` to Aggregate and printing it from
-// ObjectiveSeverityCounts's WITHDRAWN branch put the retracted cross-tool figure
-// back on the incumbent's row with the whole default suite green. A guard over
-// two of the three shapes guards the two.
-//
-// Spellings come in two forms because the counters are reached two ways: Summary
-// and Aggregate flatten them as SevAccurate/SevInflated/SevUnderstated, and
-// CorpusTally nests a SeverityScore whose fields are Accurate/Inflated/
-// Understated. The nested ones are qualified with the field that reaches them
-// (".Severity.Accurate") rather than searched for bare: "Accurate" on its own
-// matches the flattened spelling too, and matches SevAccurate's own declaration
-// in score.go, so an unqualified scan reports the definitions as violations.
-//
-// What counts as a counter is decided by the verdict vocabulary plus the type,
-// neither half sufficing alone. "Every Sev* field except SevUsage" is a
-// name-shaped rule with a hand-written exception, and it fires on
-// SevPlantedLevels the day that field exists. Narrowing that to "Sev*
-// and an int" fixed the map case and re-broke the same way on Aggregate, whose
-// SevPlanted is an int and is a DENOMINATOR: how many defects the corpus planted
-// is a fact about the fixtures that a report is supposed to print. A counter
-// counts VERDICTS, so the names are derived from the verdict constants
-// themselves, SevAccurate, SevInflated, SevUnderstated, which means a counter
-// added at a new resolution (SevBandedAccurate, a nested BandedUnderstated) is
-// caught by the word it must contain to be one, while a census, a usage map or
-// the per-finding Calls slice is not.
+// The note behind it is in docs/measurement.md#severitycounterspellings.
 func severityCounterSpellings() []string { return counterSpellingsOver(reportRowShapes()) }
 
 // reportRowShapes is every type a published row is rendered from.
 //
-// It is a named list rather than an inline one because the omission it exists to
-// prevent is INVISIBLE FROM THE OUTSIDE: Summary and Aggregate spell the
-// counters identically today, so dropping Aggregate changes nothing about the
-// derived spellings and no behavioural assertion can tell a walked shape from an
-// unwalked one. TestTheCounterScanCoversEveryShapeAReportRendersFrom checks this
-// list by type identity for exactly that reason.
+// The note behind it is in docs/measurement.md#reportrowshapes.
 func reportRowShapes() []reflect.Type {
 	return []reflect.Type{
 		reflect.TypeOf(Summary{}),
@@ -5687,8 +5536,11 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	// Checked against the prose a reader reads rather than the bytes gofmt
 	// produced: a claim that fails only because a line was rewrapped is a false
 	// alarm, and a guard that cries wolf gets exemptions until it guards nothing.
+	docPath := filepath.Join("..", "..", "docs", "measurement.md")
 	quoted := map[string][]string{
-		"score.go": {
+		// The notes carrying these figures live in the measurement document;
+		// the declarations they were attached to point at it.
+		docPath: {
 			fmt.Sprintf("plants %d defects over %d fixtures and bands them %d blocking, %d medium, %d low",
 				plants, len(corpus), bands[2], bands[1], bands[0]),
 			fmt.Sprintf("bands a perfect %s", render(selectiveBanded)),
@@ -5703,19 +5555,15 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 			fmt.Sprintf("moves the incumbent's triple from %s to %s", render(crFull), render(crDemoted)),
 			fmt.Sprintf("B-ACC %.3f either way (%s to %s)", acc(crBanded), render(crBanded), render(crBandedSwapped)),
 			fmt.Sprintf("FULL-RESOLUTION triple from %s to %s", render(crFull), render(crSwapped)),
-			fmt.Sprintf("%d/%d against %d/%d", critOnlyGraded, plants, plants, plants),
-		},
-		"score.go?interval": {
 			fmt.Sprintf("the incumbent scores %d accurate / %d not, and %d/%d BOTH with the",
 				fitAcc, fitNot, demotedAcc, demotedNot),
-		},
-		"incumbent.go": {
 			fmt.Sprintf("triple from %s to %s", render(crFull), render(crSwapped)),
-		},
-		"judge.go": {
 			fmt.Sprintf("is credited on %d plants, %d of them blocking", majorPlants, majorBlocking),
 			fmt.Sprintf("Of the %d cached reviews that locate anything, exactly one locates defects at two or more distinct planted levels",
 				locating),
+		},
+		"score.go": {
+			fmt.Sprintf("%d/%d against %d/%d", critOnlyGraded, plants, plants, plants),
 		},
 		"severity_test.go": {
 			fmt.Sprintf("%d of the %d plants sit in the blocking band", bands[2], plants),
@@ -5736,7 +5584,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	for file, claims := range quoted {
 		// One file carries two independent groups of claims, so the key names
 		// the group and the path is taken from in front of the "?".
-		prose := commentProse(t, strings.SplitN(file, "?", 2)[0])
+		prose := quotedProse(t, strings.SplitN(file, "?", 2)[0])
 		for _, claim := range claims {
 			if !strings.Contains(prose, claim) {
 				t.Errorf("%s no longer says %q. That figure reproduces from this corpus today, and a "+
@@ -5748,28 +5596,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 
 	// A "SEE X" BESIDE A PINNED FIGURE HAS TO NAME THE GUARD that PINS IT.
 	//
-	// Two paragraphs of NoCrossToolSeverityScore cited
-	// TestTheFiguresTheseCommentsQuoteStillReproduce, a real test, one word
-	// different from this one, which reads anchor-width and grid figures and
-	// whose claim list contains no severity figure at all. Changing "bands
-	// 10/0/4 over them" to "bands 11/0/4" left the cited guard green and turned
-	// this one red. A citation pointing at a guard that does not check the
-	// sentence is worse than no citation: it tells the next reader the number is
-	// covered, which is how the banded column stayed on the page for as long as
-	// it did.
-	//
-	// The unit is the COMMENT GROUP, one contiguous run of comment lines, and
-	// the rule admits no "but it also cites the right one somewhere" exemption.
-	// Both attempts at something narrower failed on a real case: naming the
-	// wrong guard is excused per-group by a correct citation elsewhere in the
-	// same paragraph, which is exactly the state score.go was in, and a
-	// sentence-proximity window missed the second occurrence entirely because
-	// three sentences separated the figure from the citation that claimed it.
-	//
-	// Guard names are derived from the package, so renaming either keeps this
-	// honest. If a paragraph ever needs to discuss the other guard for a good
-	// reason, the answer is to split the paragraph. A "see X" is a promise
-	// about the sentences around it.
+	// The note behind it is in docs/measurement.md#self.
 	const self = "TestTheSeverityFiguresTheseCommentsQuoteStillReproduce"
 	guards := figurePinningGuards(t)
 	if !slices.Contains(guards, self) {
@@ -5920,11 +5747,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 // commentProse is a source file's COMMENTS as continuous prose: the leading
 // slashes stripped and every run of whitespace collapsed to one space.
 //
-// The claims above are sentences, and gofmt decides where they break. Comparing
-// raw bytes makes a re-wrap look identical to a corrected figure, and the guard
-// that cries wolf is the guard that gets exemptions. Code lines are dropped
-// rather than merged in, so a phrase cannot be satisfied by an identifier that
-// happens to sit next to a comment.
+// The note behind it is in docs/measurement.md#commentprose.
 func commentProse(t *testing.T, name string) string {
 	t.Helper()
 	return strings.Join(commentGroups(t, name), " \x00 ")

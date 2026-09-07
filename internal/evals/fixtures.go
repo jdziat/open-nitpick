@@ -191,84 +191,7 @@ func Fixtures() []Fixture {
 // HeldOutFixtures is a second corpus the prompt tuning never sees, which
 // TestHeldOutCorpusStaysHeldOut checks by intersecting the two accessors.
 //
-// Tuning a prompt against Fixtures() and then reporting a score on Fixtures()
-// measures nothing: with enough iterations any prompt can be shaped to eight
-// specific changes, and the number that falls out says nothing about a real
-// pull request. This set is spent ONCE, at the end, to check the gain
-// generalized rather than memorized.
-//
-// It is deliberately unreachable from Fixtures() and from the default run, so
-// nothing picks it up by accident. Selecting it takes naming a fixture in
-// NITPICK_EVAL_FIXTURES, an explicit act by whoever is measuring.
-//
-// The defect classes here are chosen to be ones the tuning corpus does not
-// contain, because a held-out set drawn from the same distribution measures
-// memorization of that distribution rather than generalization:
-//
-//   - contract-break     a wire-format change that silently breaks consumers
-//   - data-loss-migration an UPDATE with no WHERE, in SQL
-//   - ts-unawaited-async  a defect in TypeScript, so the prompt is not
-//     silently tuned to Go and Python
-//   - timezone-boundary   a correctness bug a careless reviewer waves through
-//   - clean-sql-allowlist code that pattern-matches SQL injection and is
-//     provably safe; the correct review is silence
-//   - removed-guard       the defect is in the REMOVED lines, which a reviewer
-//     that only reads additions cannot see
-//   - retry-no-backoff    a real defect that is only worth a WARNING, so the
-//     severity columns can be falsified in both directions
-//
-// That last one is about the instrument rather than the defect class. Without
-// it every plant here is error or critical, and a prompt that learned to answer
-// "at least error" to everything, the exact failure the O-INFL column exists
-// to catch, cannot be caught by the corpus that is supposed to check whether
-// the tuning generalized. TestHeldOutCorpusCanFalsifyInflation pins it.
-//
-// THE SECOND HALF OF THE SEVERITY REBALANCE lands here, and the split was made
-// on one question: what would a prompt tuned on Fixtures() have to GENERALIZE
-// to, rather than what is left over. Held-out fixtures chosen as leftovers make
-// the set thin and the generalization claim weak, which is the state this list
-// was in, seven fixtures, six plants, one of them below error.
-//
-//   - csharp-client-per-request  C#, a language NEITHER corpus contained
-//   - bash-fixed-temp-path       shell, likewise, and a security warning
-//   - defensive-copy-nit         Java, likewise
-//   - cross-file-sort-nit        cross-file reasoning in a different language
-//     from the tuning corpus's cross-file plant
-//   - duplicate-test-case-nit    the `tests` class, which appears NOWHERE in
-//     Fixtures(), and the only nit in either corpus that costs coverage rather
-//     than an allocation
-//
-// The three new languages are the load-bearing ones and they are here on
-// purpose. A language planted in Fixtures() can be tuned for, and a prompt that
-// was tuned until it worked on C# has demonstrated nothing about the next
-// language it meets; the same prompt working on C# it was never shown is the
-// only version of that claim worth publishing. The cost is the one every
-// held-out set pays and is worth stating: if the reviewer is bad at shell, this
-// corpus finds out once, at the end, and the finding cannot be acted on without
-// authoring a replacement.
-//
-// `tests` is here for a related but WEAKER reason than this comment first
-// claimed, and the difference matters. It said the class is one "NitpickNormal's
-// scope includes", which is not true of this plant: that scope asks for "missing
-// tests where new branching logic is risky", and duplicate-test-case-nit
-// is the opposite, a REDUNDANT case, in a change whose slug.go is byte-identical
-// between base and head, so there is no new branching logic for a missing-test
-// finding to attach to. A reviewer reading the tests clause literally stays
-// silent and is scored a miss, which is the "a corpus that penalizes obedience
-// measures nothing" trap fixtures_nit.go uses to rule out style nits.
-//
-// It stays because it is still reachable, through the maintainability clause of
-// the same scope. A duplicated case has a concrete cost a reviewer can name.
-// So it measures how far the prompt generalizes past the examples it was given,
-// which is worth measuring; it does not measure coverage of an instructed
-// class, and no claim resting on that reading should be made from it.
-//
-// WHAT DELIBERATELY did not COME HERE: ts-unbounded-memo-key, the only fixture
-// that assembles into more than one batch. Batching is a property of the
-// assembly and prompt this project keeps changing, and a one-shot corpus cannot
-// answer whether a change to it helped. The first measurement would also be
-// the last. It is in Fixtures() so it can be measured repeatedly, and this list
-// therefore still tests no multi-batch behaviour at all.
+// The note behind it is in docs/measurement.md#heldoutfixtures.
 func HeldOutFixtures() []Fixture {
 	return []Fixture{
 		contractBreakFixture(),
@@ -309,14 +232,7 @@ func AllFixtures() []Fixture {
 
 // EveryFixture is AllFixtures plus the multi-file corpus, for name lookup.
 //
-// The multi-file corpus is deliberately not in AllFixtures. The ground-truth
-// suite that iterates AllFixtures carries hand-maintained registries for every
-// plant, anchor assertions, hit and miss probes, severity pins, and
-// cross-fixture prose sweeps, and the multi-file corpus is validated by its
-// own, narrower test (TestMultiFileCorpusIsWellFormed) instead. That is a
-// weaker guarantee, and a claim about that corpus should be read with it in
-// mind: its keywords have not been swept against every other fixture's
-// recorded prose.
+// The note behind it is in docs/measurement.md#everyfixture.
 func EveryFixture() []Fixture {
 	all := AllFixtures()
 	all = append(all, MultiFileFixtures()...)

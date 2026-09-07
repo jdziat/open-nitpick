@@ -2,95 +2,12 @@ package evals
 
 import "github.com/jdziat/open-nitpick/internal/config"
 
-// dedupFixtures is the corpus's cross-batch DEDUP fixture, and it is here for a
+// dedupFixtures is the corpus's cross-batch DEDUP fixture, and it is here for
+// a
 // property no other fixture has: the same defect is reportable from more than
 // one batch, so the merge that runs before triage has something to merge.
 //
-// WHAT was wrong. ts-unbounded-memo-key made this project's first multi-batch
-// review happen at all, seven files at the shipped max_files_per_request of 6
-// , but it was authored to keep the plant and the files needed to see it in the
-// Same batch, because a defect split across requests is one no reviewer can
-// find and a plant nothing can find scores as a prompt weakness forever. That
-// is the right call for a scored plant, and its cost is that the second batch
-// has nothing to say: only one batch ever reports the defect, so dedupe(),
-// which triage() runs over the combined findings, has never had two reports of
-// one defect to collapse. The engine's cross-batch merge, README calls it a
-// headline capability, has therefore never merged anything under any
-// measurement or any test. fixtures_warning.go says so in its own words: "a
-// fixture that makes it do so is still owed". This is that fixture.
-//
-// WHY both BATCHES REPORT IT. The defect is one bug with two faces, and each
-// batch holds a complete, independently reportable face of it:
-//
-//   - platform/retry/retry.go:16 (batch 2) is the CAUSE. Replayable used to
-//     admit only the read methods; it now admits everything except PATCH. A
-//     reviewer holding that file alone can name the consequence without seeing
-//     any caller: Do re-sends a POST the gateway may already have applied.
-//   - billing/charge.go:20 (batch 1) is the EFFECT. Capture hands a payment
-//     capture to that retry helper as a POST, with nothing on the request that
-//     lets the gateway recognise a repeat. A reviewer holding that file alone
-//     can name the consequence without seeing the helper: a capture that is
-//     retried captures twice. "Retrying a non-idempotent request" is the review
-//     prompt's own worked example of a warning, so this is not a defect a
-//     reviewer has to be clever to see from either end.
-//
-// Neither half needs the other to be reportable, which is exactly the shape
-// ts-unbounded-memo-key deliberately does not have: there, the defect is
-// invisible from either file alone, so splitting it across batches would erase
-// it. Here, splitting it across batches DUPLICATES it. That inversion is the
-// whole fixture.
-//
-// WHY both NAME THE same LINE. The two reports collapse only if they land on
-// the same path and line, because Finding.Key is path, line and normalized
-// title. review.md tells a reviewer to "anchor to the line where the problem
-// is, not where its effect surfaces", and for this defect that line is
-// retry.go:16, the predicate that declares a POST replayable. The effect side
-// reaches the same line from the other end: charge.go's own import names the
-// helper, the helper is part of this same change, and filterAnchors validates a
-// finding's path against the whole change rather than against the batch that
-// produced it, which is what lets a finding from batch 1 anchor there at all.
-//
-// THE RESIDUAL, STATED RATHER THAN HIDDEN: review.md also says "path must
-// exactly match one of the file paths given below", and a reviewer that obeys
-// that literally anchors in its own batch, charge.go:20 from batch 1,
-// retry.go:16 from batch 2. Those are two keys, and dedupe cannot collapse
-// them; only the triage model can. TestOneDefectAnchoredTwiceIsNotDeduped pins
-// that boundary so nobody reads the test above as a claim the engine merges
-// every cross-batch duplicate. It merges the ones that agree about where the
-// problem is.
-//
-// DELIBERATELY IN NEITHER CORPUS, and this is the one thing about this file
-// that has to be read before it is copied. Fixtures() and HeldOutFixtures() do
-// not name it, so AllFixtures() does not contain it and NO ground-truth test in
-// groundtruth_test.go touches it, which is precisely the failure
-// TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus exists to catch for
-// warningFixtures and nitFixtures. It is not an oversight here and the checks
-// are not skipped: fixtures_dedup_test.go re-derives this fixture's line
-// numbers out of Head by counting, checks the plant sits on a line the engine
-// could publish a comment on, and checks the batch split, rather than trusting
-// the paragraphs above. It stays out of the scored corpora because a fixture
-// whose point is that ONE defect gets reported TWICE would be scored as one
-// detection and one false positive by a reviewer that did exactly the right
-// thing, which would make the noise column read a correct review as a sloppy
-// one.
-//
-// IF IT IS EVER WIRED IN, two things have to move with it, and neither is free:
-// score.go would need a notion of a defect with more than one acceptable
-// anchor, and this plant is correctness at warning while every correctness
-// plant in fixtures.go is error with no SeverityNote, so
-// TestSeverityIsConsistentWithinADefectClass would turn three green plants red
-// in a file this change does not own. SeverityNote below is written for that
-// day; it changes nothing today.
-//
-// IT was RUN. Both states were extracted to a temp module and built, vetted,
-// gofmt-ed and executed under `go test`. Head reproduces the plant, a gateway
-// that applies a capture and then reports a timeout receives the same capture
-// body twice for one order, and base does not, because base refuses to replay
-// a POST at all. The filler files are exercised by the same run rather than
-// eyeballed, which is what would have caught the second, unplanted,
-// user-reachable defect ts-unbounded-memo-key shipped with: a Ledger that
-// handed out its internal slice, or a Level whose String fell through, are both
-// findings a reviewer would report and neither is planted.
+// The note behind it is in docs/measurement.md#dedupfixtures.
 func dedupFixtures() []Fixture {
 	return []Fixture{crossBatchReplayFixture()}
 }
@@ -98,43 +15,7 @@ func dedupFixtures() []Fixture {
 // crossBatchReplayFixture widens a retry helper's "safe to repeat" predicate
 // and, in the same change, sends a payment capture through it.
 //
-// THE BATCH SPLIT IS LOAD-BEARING and IT IS ALPHABETICAL. git orders a diff by
-// path, bundle.batch fills a request with up to max_files_per_request entries in
-// that order, and exactly six of the eight changed paths sort before platform/:
-// three under billing/, three under internal/. So batch 1 is billing/charge.go
-// plus five files with nothing wrong with them, and batch 2 is
-// platform/retry/retry.go plus platform/version/version.go. REMOVING one of
-// those six is what breaks it: five paths before platform/ leaves room for
-// retry.go in the first request, both halves arrive together, one reviewer sees
-// the whole defect and reports it once, and the fixture silently stops testing
-// anything while every test here still compiles. Adding one is survivable but
-// not free, the split moves, and whichever filler lands beside retry.go is the
-// file a reviewer of batch 2 has to ignore. TestTheDedupFixtureSplitsTheDefect
-// reads the split back out of bundle.Assemble rather than trusting this
-// paragraph, for the reason the corpus already learned once: two one-line edits
-// were enough to falsify the same claim about ts-unbounded-memo-key while
-// `go test ./...` printed ok.
-//
-// THE FILLER IS not PADDING and IT IS not DECORATION. Six files carry no
-// defect, five holding batch-1 slots and version.go riding along in batch 2,
-// and every one of them is a change a reviewer should wave through: a method
-// that reports whether a customer left an address, a total over entries the
-// ledger was already copying out defensively, a fixed clock for tests, a level
-// comparison, a prefix trim, a version bump. A filler file with
-// a defect in it would be a false positive charged to every reviewer that
-// reported it, and a filler file with no added lines at all would be dropped by
-// bundle for having nothing to comment on, which would shrink the change back
-// to one batch.
-//
-// WHAT THE FIXTURE IS CAREFUL not TO INVITE. The head's predicate excludes
-// PATCH and admits GET, HEAD, PUT and DELETE, all four of which are
-// idempotent, so there is exactly one thing wrong with it: POST. An earlier
-// draft excluded DELETE instead, which is idempotent, and that hands a reviewer
-// a second true remark, "your exclusion is backwards", in a fixture whose
-// whole premise is that there is one defect to report twice. Do itself is
-// byte-identical in both states for the same reason: a retry loop that is new
-// code invites remarks about backoff and jitter, and the corpus already plants
-// retry-no-backoff as a separate warning in the held-out set.
+// The note behind it is in docs/measurement.md#crossbatchreplayfixture.
 func crossBatchReplayFixture() Fixture {
 	return Fixture{
 		Name: "cross-batch-replay",

@@ -975,22 +975,7 @@ func evalConfig(model Model) *config.Config {
 // ourSeverityScale declares the severity vocabulary a run under this
 // configuration publishes on.
 //
-// It is DERIVED FROM THE CONFIGURATION RATHER THAN ASSERTED, and the one
-// question it asks is the one that can make the assertion false. review.Engine
-// writes our five levels for a model's own findings, but a report is the union
-// of the model's findings and the analyzers', and internal/linters' mapSeverity
-// folds HIGH onto our error and MEDIUM onto warning, a translation between
-// vocabularies, which is the exact shape of the first retraction this package
-// made. Its codomain now covers all five of our levels, so a report could carry
-// an analyzer's word and our word spelled identically, and that makes the risk
-// worse rather than better: an analyzer's "critical" is a rule author's
-// judgement in the analyzer's own scale, not a severity written on ours, and
-// linters.max_severity may have moved it after the fact. Those findings are
-// absent today only
-// because evalConfig turns linters off. Deriving the declaration means turning
-// them back on WITHDRAWS the severity comparison instead of quietly publishing
-// analyzer levels at our resolution; asserting it would have published them.
-// TestTurningLintersOnWithdrawsTheSeverityComparison pins that.
+// The note behind it is in docs/measurement.md#ourseverityscale.
 func ourSeverityScale(cfg *config.Config) SeverityScale {
 	if cfg == nil || cfg.Linters.Mode != config.LinterOff {
 		return UndeclaredSeverityScale

@@ -25,65 +25,13 @@ import (
 
 // DefaultJudgeModel stands in for a senior human reviewer.
 //
-// The judge must be stronger than anything under test, because its job is to
-// say whether a finding is worth a colleague's attention, a question keyword
-// matching cannot answer. Keyword scoring tells you a bug was found; only a
-// judgement call tells you the review was worth reading.
-//
-// DEFAULTJUDGEMODEL SHARES A VENDOR WITH CONTENDERS IT SCORES, and that is not
-// a defect this constant can fix on its own. DefaultModels carries three OpenAI
-// entries, gpt-5.6-luna, gpt-5.4, and this MODEL. The judge is not merely from
-// the same vendor as three contenders; it is one of them, grading its own
-// output. LLM-as-judge self-preference is a documented effect and every judged
-// column inherits whatever preference it carries.
-//
-// The exact list is not written down here, because a list in a comment is wrong
-// the first time somebody edits the battery, the brief that commissioned the
-// second judge named three OpenAI contenders that are not in DefaultModels at
-// all, and named three CLEAN vendors that are. VendorConflicts computes it.
-//
-// Swapping this constant for a clean vendor would move the conflict rather than
-// measure it: the new judge would have its own preferences and nothing would say
-// how much either one moved the table. SecondJudgeModel is the answer instead,
-// the same findings scored twice, with the disagreement published beside every
-// judged figure. VendorConflicts is what refuses to let the conflict go
-// unstated, and it is computed from DefaultModels rather than described here,
-// because a battery edit is what makes a sentence like this one wrong.
+// The note behind it is in docs/measurement.md#defaultjudgemodel.
 const DefaultJudgeModel = "openai/gpt-5.6-terra"
 
 // SecondJudgeModel corroborates the primary judge from a vendor NO contender
 // shares.
 //
-// x-ai has no entry in DefaultModels, checked against the live OpenRouter
-// catalog (GET /api/v1/models) on 2026-08-04, which listed 338 models across 8
-// contender vendors and 49 others. TestTheSecondJudgeSharesNoVendorWithAny
-// Contender recomputes that from the battery on every run, so adding an x-ai
-// contender fails the suite rather than quietly re-creating the conflict this
-// judge exists to remove.
-//
-// grok-4.5 specifically, on three requirements the judge has:
-//
-//   - STRONGER THAN THE FIELD. DefaultJudgeModel's doc comment states the
-//     requirement and it is not negotiable, the judge decides whether a finding
-//     was worth a colleague's attention. grok-4.5 is x-ai's flagship ("frontier
-//     performance on coding, knowledge work, and STEM"), and ~x-ai/grok-latest
-//     redirects to it. The clean vendors that are not this are all weaker: the
-//     brief that commissioned this work named mistral as a candidate, and
-//     mistralai/mistral-medium-3.1 was DROPPED from this battery for judging
-//     last at 2.74 with 7 inflated findings of 11.
-//   - STRUCTURED OUTPUT. The judge extracts a hand-authored JSON schema, so a
-//     model without json_schema support falls back to JSON mode and the verdict
-//     list stops being a reliable shape. grok-4.5 advertises both
-//     response_format and structured_outputs.
-//   - ENOUGH CONTEXT FOR judgeRequest. It renders every file of the fixture at
-//     Head and at Base, plus the persona and every finding. grok-4.5 carries
-//     500k tokens, against 1.05M for the primary judge, comfortably above the
-//     largest fixture, and the multi-file corpus is the axis to re-check this on.
-//
-// It is also, unlike the primary judge, a model that accepts `temperature`. The
-// harness pins 0 on both; on the primary that pin is silently ignored, which is
-// one of the reasons the same cached findings scored 3.66, 3.90, 3.95 and 3.98
-// across four runs at "temperature 0".
+// The note behind it is in docs/measurement.md#secondjudgemodel.
 const SecondJudgeModel = "x-ai/grok-4.5"
 
 // EnvJudgeModel overrides the judge.
@@ -101,16 +49,7 @@ const EnvSecondJudge = "NITPICK_EVAL_JUDGE2"
 // SecondJudgeFromEnv resolves the corroborating judge, returning "" when there
 // is none.
 //
-//	unset or empty   no second judge. Every judged figure renders "+?" and the
-//	                 report states that it is one opinion.
-//	"default"        SecondJudgeModel, with its vendor re-checked against the
-//	                 battery by the suite.
-//	anything else    that model id, used as given.
-//
-// The "default" spelling exists so the vetted id does not have to be copied
-// into the Makefile. A judge named in a Makefile is a judge no test can see: it
-// would not pass through VendorConflicts, and the conflict this whole path was
-// built to remove would be one shell variable away from coming back.
+// The note behind it is in docs/measurement.md#secondjudgefromenv.
 func SecondJudgeFromEnv() string {
 	raw := strings.TrimSpace(os.Getenv(EnvSecondJudge))
 	if raw == "default" {
@@ -392,28 +331,7 @@ func numbered(content string) string {
 
 // Stimulus is the finding list a judge was SHOWN, as an identity.
 //
-// It exists because a cross-judge delta is only a confidence interval when both
-// judges answered the same question, and this package published one that did
-// not. The nitpick axis judged the whole corpus once and handed the second
-// judge each level's FILTERED list, so GRADE, SIGNAL, TONE and MISSED compared
-// a whole-corpus judgement against a subset judgement and printed the
-// difference under a legend calling it the confidence interval on the figure
-// beside it. MISSED was biased in a known direction on top of that: filtering
-// more findings legitimately raises the second judge's missed count against a
-// primary frozen at the whole-corpus value.
-//
-// The identity is DERIVED FROM THE FINDINGS, not declared by the caller. A
-// boolean saying "these matched" is the kind of convention this package has
-// watched fail twice; a fingerprint cannot be wrong about what it covers, and
-// it self-corrects, two nitpick levels that filter to the same list produce
-// the same fingerprint and are corroborable, which is true of them rather than
-// assumed.
-//
-// The whole finding is hashed rather than review.Finding.Key(), which is only
-// path, line and title. A judge that is shown the same three findings with
-// different rationales is being shown a different prompt. Over-covering can
-// only refuse a delta that was legitimate; under-covering would publish one
-// that was not, and only one of those two errors is survivable.
+// The note behind it is in docs/measurement.md#stimulus.
 type Stimulus struct {
 	// n is how many findings were shown, and is the number of verdicts a
 	// judge owes back.
@@ -451,13 +369,7 @@ func (s Stimulus) Recorded() bool { return s.print != "" }
 // stimulusTrace is every stimulus behind one Aggregate, one per judgement
 // folded in.
 //
-// A multiset and not a single value: an aggregate spans a corpus, and two
-// judges have seen the same stimulus only when they have seen the same
-// fixtures with the same findings in each. Comparing a single rolled-up hash
-// would work as well, but the multiset also makes the LENGTHS visible, which is
-// how a second judge that failed on two fixtures is caught, its aggregate
-// covers six samples where the primary's covers eight, and the difference
-// between two rates over different sample sets is not a disagreement.
+// The note behind it is in docs/measurement.md#stimulustrace.
 type stimulusTrace struct {
 	prints []string
 }
@@ -719,19 +631,11 @@ func (a Aggregate) Attempts() int {
 	return total
 }
 
-// Lost is how many attempted reviews never reached the scorer, which is what the
+// Lost is how many attempted reviews never reached the scorer, which is what
+// the
 // FAIL cell prints.
 //
-// The cell is not a note count. len(notes[model]) counts four things, three of
-// which are not lost reviews and all of which fold normally: findings on a
-// clean change, a suspect judge output, a dump error. A row that folded every
-// review it attempted then renders FAIL 3, which
-// is the one cell a reader would subtract from fixtures x RUNS. FAIL is in
-// DescriptiveColumns, so no degenerate-strategy guard asks what maximises it, and
-// nothing else was going to notice.
-//
-// Non-negative by construction: it sums only the fixtures where the fold fell
-// short of the attempt.
+// The note behind it is in docs/measurement.md#lost.
 func (a Aggregate) Lost() int {
 	lost := 0
 	for fixture, tried := range a.attempted {
@@ -745,18 +649,7 @@ func (a Aggregate) Lost() int {
 // ShortFixtures names the fixtures this row attempted more reviews of than it
 // folded, with both counts, in fixture-name order.
 //
-// Empty when the battery never called Attempted: a row that does not state what
-// it tried cannot be short of it, and inferring a shortfall from silence would
-// mark every row of a battery that has not been wired up. That is a real blind
-// spot rather than a safe default, TestEveryJudgedBatteryStatesWhatItAttempted
-// is what stops a battery staying in it.
-// A fixture folded zero times is absent rather than short, and is returned by
-// UnmeasuredFixtures instead. The split is the cost ledger's, see CostRow's
-// Missing beside its Shallow, and this function was extracted from that one
-// without it, which made ShallowSampleWarning open "covers every fixture" over a
-// row that covered nothing of the fixture it then named "(0 of 1)". Reproduced
-// at Coverage() 3 of 5. A not-comparable row reading as merely thin is the wrong
-// direction: the reader is told to discount a number rather than to refuse it.
+// The note behind it is in docs/measurement.md#shortfixtures.
 func (a Aggregate) ShortFixtures() []ShortFixture {
 	var out []ShortFixture
 	for fixture, tried := range a.attempted {
@@ -865,20 +758,7 @@ func (a *Aggregate) Add(r *JudgeResult, shown Stimulus) []string {
 // review-level fields, and returns the same suspicions Add reports about the
 // verdict list.
 //
-// It is the pair verdictProblems + countVerdicts, kept together because that is
-// what Add wants and separating them at every call site would let the two drift
-// apart. Callers that must apply them to DIFFERENT lists, the re-judge report
-// validates what the judge returned and counts what the dump could carry, use
-// the two directly.
-//
-// The counting lives here rather than in each caller so that a number derived
-// from a dump and the same number in the published table cannot come from two
-// implementations. That guarantee covers the CODE and not the data: a dump
-// attaches at most one verdict per finding position, so a judge that answered a
-// position twice, or answered a position with no finding, arrives here through
-// a dump with fewer verdicts than it arrived with live. GroupDump reports that
-// shortfall; nothing here can see it, because by then the discarded verdicts
-// are gone.
+// The note behind it is in docs/measurement.md#addverdicts.
 func (a *Aggregate) AddVerdicts(verdicts []Verdict, expected int) []string {
 	problems := verdictProblems(verdicts, expected)
 	a.countVerdicts(verdicts)
@@ -981,19 +861,7 @@ func (a *Aggregate) AddSeverity(f Fixture, s SeverityScore) {
 
 // AddDetection folds one review's detection reading in.
 //
-// It is the judge-free twin of AddSeverity and is called beside it, at the same
-// site and for the same reason: the report divides the count columns on a row by
-// one sample count, and folding detection over a different set of reviews would
-// put NOISE over a larger denominator than every column beside it. That choice
-// costs a review whose judge call failed. Its findings are scored by nothing,
-// for two columns that need no judge, and the loss is reported rather than
-// hidden, as the review count in DetectionCounts and as a note on the row.
-//
-// It takes only the score, where AddSeverity also takes the fixture: O-COV needs
-// a plant census and these three columns do not, since a review that located
-// nothing still invented what it invented and still anchored where it anchored.
-// RECALL's denominator comes from AddSeverity's census, see locatedShare, which
-// is the one expression RECALL and O-COV are both rendered from.
+// The note behind it is in docs/measurement.md#adddetection.
 func (a *Aggregate) AddDetection(d DetectionScore) {
 	a.DetReviews++
 	a.DetNoise += d.Noise()
@@ -1004,20 +872,7 @@ func (a *Aggregate) AddDetection(d DetectionScore) {
 // DeclareScale folds one result's declared severity vocabulary into this row,
 // withdrawing the row when two results disagree.
 //
-// It is the Aggregate-shaped twin of commonScale, and it exists because the two
-// paths that build these rows had drifted apart. commonScale folds a Summary and
-// withdraws on disagreement; the judged path built `&Aggregate{Scale:
-// result.Scale}` on whichever goroutine reached the map first and never looked
-// at another result's declaration again. First-declaration-wins is exactly the
-// rule commonScale refuses: a row folding one adapter's runs together with
-// another's is on no single scale, and publishing it at our resolution states
-// more than anybody declared. One of the two judged call sites had grown its own
-// copy of the check and the other had not, which is the shape of a rule that is
-// written down twice.
-//
-// Withdrawal is sticky. Once two declarations have disagreed the row is on no
-// scale, and a third result agreeing with one of them does not restore it.
-// TestARowWithdrawsWhenItsAdaptersDisagree pins that.
+// The note behind it is in docs/measurement.md#declarescale.
 func (a *Aggregate) DeclareScale(s SeverityScale) {
 	if !a.scaleDeclared {
 		a.Scale, a.scaleDeclared = s, true
@@ -1036,16 +891,7 @@ func (a Aggregate) SevGraded() int {
 // locatedShare is the share of planted defects this contender LOCATED, and the
 // single expression both RECALL and O-COV are rendered from.
 //
-// The two cells sit three columns apart in one table and mean the same thing, so
-// they are computed once. ScoreSeverity grades a defect exactly when some
-// finding matches() it, the same predicate ScoreRun counts a detection with,
-// so SevGraded IS the located-defect count, and two expressions for it would be
-// two answers free to drift apart under an edit to either.
-// TestRecallAndCoverageAreOneReadingOfOneCorpus pins the identity against the
-// scorer itself rather than against this comment.
-//
-// ok is false when the reviews behind the row planted nothing: 0.00 there reads
-// as "found none of them" rather than "there were none to find".
+// The note behind it is in docs/measurement.md#locatedshare.
 func (a Aggregate) locatedShare() (float64, bool) {
 	if a.SevPlanted == 0 {
 		return 0, false
@@ -1129,23 +975,11 @@ func (a Aggregate) DetectionCells() (recall, noise, anchor, spread string) {
 	return recall, noise, anchor, spread
 }
 
-// DetectionCounts renders the COUNTS behind RECALL, NOISE, ANCHOR and L/DEF, for
+// DetectionCounts renders the COUNTS behind RECALL, NOISE, ANCHOR and L/DEF,
+// for
 // the DENOMINATORS block under the table.
 //
-// It is the judged tables' copy of the block the cost table already prints, in
-// the same shape and for the same reason: a rate over a single-digit denominator
-// is a quotient of two small integers, and 0.68 says less than 25/37 does.
-//
-// ANCHOR's "denominator" is the number of DRAWS its maximum was taken over,
-// which is why the review count is repeated after it. A maximum over more draws
-// is weakly larger, so two rows folded from different numbers of reviews are not
-// drawing from the same number of chances, and a reader comparing them needs
-// both counts in the same line.
-//
-// L/DEF's denominator is the LOCATED count, which is RECALL's numerator on the
-// same line. That is deliberate and is the point of printing them together: the
-// two readings share an integer, so a reader can see that a low spread bought by
-// finding almost nothing is a low spread over almost nothing.
+// The note behind it is in docs/measurement.md#detectioncounts.
 func (a Aggregate) DetectionCounts() string {
 	if a.DetReviews == 0 {
 		return fmt.Sprintf("RECALL %d/%d defects | NOISE, ANCHOR and L/DEF undefined: no review was "+
@@ -1165,24 +999,7 @@ func (a Aggregate) DetectionCounts() string {
 // ObjectiveSeverityCells renders this contender's O-INFL/O-UNDER/O-ACC/O-COV,
 // per sample for the first three and as a share of planted defects for O-COV.
 //
-// It returns "n/a" in all four for a row that has not declared our severity
-// scale. That is the retraction, applied where the numbers are printed rather
-// than only stated beneath them: filling the cells and adding a note saying not
-// to compare them is the mitigation the previous retraction had already recorded
-// as insufficient, and the row sits in a sorted ranking beside our models.
-// SeverityScale carries the reasoning, including why the row declares it rather
-// than being recognized by name.
-//
-// O-COV IS BLANKED HERE and PRINTED BY ObjectiveSeverityCounts, and the two are
-// not asserting opposite rules about one quantity. What O-COV measures, how
-// many planted defects the reviewer LOCATED, is a detection fact in nobody's
-// severity vocabulary, so it survives the gate as a NUMBER. What it does not
-// survive is this position: a CELL in a sorted ranking, on a row whose other
-// three severity cells read n/a, where a filled fourth invites reading the row
-// as partly scored on severity after all. The same quantity is published as
-// prose beneath the table, and as the RECALL cell, which is ungated and rendered
-// from the same locatedShare expression this one is.
-// TestSeverityCountsAreWithdrawnForAForeignVocabulary pins both halves.
+// The note behind it is in docs/measurement.md#objectiveseveritycells.
 func (a Aggregate) ObjectiveSeverityCells(samples int) (infl, under, acc, cov string) {
 	if !a.Scale.PublishesOurLevels() {
 		return "n/a", "n/a", "n/a", "n/a"
@@ -1201,31 +1018,11 @@ func (a Aggregate) ObjectiveSeverityCells(samples int) (infl, under, acc, cov st
 	return rate(a.SevInflated), rate(a.SevUnderstated), rate(a.SevAccurate), cov
 }
 
-// ObjectiveSeverityCounts renders the COUNTS behind O-INFL/O-UNDER/O-ACC/O-COV,
+// ObjectiveSeverityCounts renders the COUNTS behind
+// O-INFL/O-UNDER/O-ACC/O-COV,
 // so a reader can see what resolution those four rates have.
 //
-// It passes through the same vocabulary gate as the cells, and that is not
-// tidiness. The counts are the withdrawn thing: a foreign contender's severity
-// triple is blanked in the table precisely because our five levels and its three
-// are not commensurable, and printing "12 accurate of 14" underneath restores the
-// comparison the cells refused, in a form that is easier to quote. Rendering
-// these at the table rather than here is what
-// TestNoReportFormatsSeverityCountersDirectly exists to catch, and it caught this
-// function's first draft.
-//
-// O-COV's denominator survives the gate HERE while the O-COV CELL is blanked,
-// and the difference between the two positions is the whole rule. How many
-// planted defects a reviewer LOCATED is a statement about detection, in nobody's
-// severity vocabulary, so nothing about the withdrawal argues for suppressing
-// the number. What the withdrawal argues against is a filled cell sitting in a
-// sorted ranking beside three cells reading n/a, which reads as a partial score.
-// This line is prose under the table, it is not ranked, and it restates a
-// detection fact the RECALL cell publishes on the same row. That sentence used
-// to point at a column this table did not have, RECALL was absent from the
-// judged header while two doc comments cited it as the place a reader could
-// already see the number, and the fix was to print the column rather than to
-// delete the justification. Aggregate.ObjectiveSeverityCells says the same thing
-// from the other side, so the two stop appearing to disagree about one quantity.
+// The note behind it is in docs/measurement.md#objectiveseveritycounts.
 func (a Aggregate) ObjectiveSeverityCounts(model string) string {
 	located := fmt.Sprintf("%d located of %d planted", a.SevGraded(), a.SevPlanted)
 
@@ -1281,48 +1078,7 @@ type VocabularyRow struct {
 // SeverityVocabularyBlock renders what each contender CALLED the defects it
 // located, against the level each was planted at.
 //
-// This is the description that replaced a withdrawn cross-tool accuracy score,
-// and its shape is the point: there is no number in it. A reader comparing our
-// five levels against a foreign reviewer's three can see for themselves that one
-// answered "critical" to plants of critical and of error while another split
-// them, and can decide what that is worth. The figure that used to make that
-// judgement for them was maximised by answering "critical" to everything. See
-// NoCrossToolSeverityScore.
-//
-// The words are the reviewer's own rather than ours. Printing the level
-// crSeverity translated each foreign word to, captioned as what the contender
-// called the defect, makes a description offered in place of a score a function
-// of the free constant the withdrawal rested on. Where a word
-// was translated the reading is now printed beside it and marked as ours; see
-// SeverityUsage.
-//
-// WHAT this DESCRIPTION CANNOT SAY, stated here and printed in the block so a
-// reader does not read it in:
-//
-//   - DIRECTION. It shows which words landed on which plants, not whether the
-//     reviewer under- or over-claims against our ladder. On the shipped cache
-//     the incumbent's "major" is credited on 8 plants, 4 of them blocking, and
-//     our reading of it sits below every one of those 4. That is a real
-//     one-directional pattern this block leaves the reader to see for
-//     themselves, because ranking a word that has no rank in our ladder is the
-//     reduction being refused.
-//   - HEDGING. A reviewer answering all five severities renders exactly as one
-//     answering only the loudest: reportingFinding credits the loudest claim,
-//     and measured, "one comment per severity, on every plant" produces the same
-//     page as "always critical". That is defensible, fail_on gates on the worst
-//     thing said, and it is still a thing this page cannot show.
-//   - PER-REVIEW STRUCTURE. The table is pooled over the corpus. Of the 12
-//     cached reviews that locate anything, exactly one locates defects at two or
-//     more distinct planted levels, and no line here says so.
-//   - AN ORDER BETWEEN REVIEWERS. Two blocks are compared by eye. Nothing in
-//     this artifact says which is better, and no caller may compute one.
-//   - THE DEFECTS nobody REPORTED, beyond the (0 of N located) denominators.
-//
-// The printed version of that list names no reviewer's word, because the
-// preamble beneath it names exactly the words THESE rows translated and a fixed
-// sentence quoting one would be the hand-maintained claim this block already
-// removed once. TestTheVocabularyBlockStatesWhatItCannotSay pins that it is
-// printed.
+// The note behind it is in docs/measurement.md#severityvocabularyblock.
 func SeverityVocabularyBlock(rows []VocabularyRow) string {
 	var b strings.Builder
 
@@ -1451,16 +1207,7 @@ func translatedWordsNote(rows []VocabularyRow) string {
 
 // Precision is the share of findings a senior reviewer would raise.
 //
-// This, not recall, is what determines whether a review bot survives contact
-// with a team: a bot that finds everything and says twenty things nobody needed
-// gets switched off within a week.
-//
-// With no findings it is UNDEFINED, not perfect. Returning 1 made silence the
-// global optimum of the tuning objective: a variant that reported nothing
-// sorted to the top of the comparison table and, because the suite's only
-// assertion was guarded on the top row having findings, switched that
-// assertion off entirely. Any prompt change that reduced output looked like an
-// improvement.
+// The note behind it is in docs/measurement.md#precision.
 func (a Aggregate) Precision() float64 {
 	if a.Findings == 0 {
 		return math.NaN()
@@ -1530,21 +1277,7 @@ func (a Aggregate) MeanGrade() float64 {
 
 // GradeSpread is the range of the graded samples, worst to best.
 //
-// The samples are one per (fixture, run), so this is TOTAL dispersion: fixture
-// difficulty and run-to-run variance together, not separated. That is the right
-// quantity for the only question the table is asked, is this GRADE gap worth
-// anything, because a mean over eight fixtures moves for either reason and the
-// reader cannot act on the difference.
-//
-// It exists because this harness measured its own noise and the noise won: the
-// run-to-run spread on a single model reached 0.49 while the whole distance
-// from the best-ranked model to the twelfth was 0.28. A table of mean grades
-// with no dispersion column invites the one reading it cannot support, that
-// the order of the rows means something.
-//
-// Reported rather than turned into a confidence interval on purpose: eight
-// fixtures is too few for the interval to be honest, and a number that looks
-// like statistics gets quoted like statistics.
+// The note behind it is in docs/measurement.md#gradespread.
 func (a Aggregate) GradeSpread() float64 {
 	if len(a.Grades) < 2 {
 		return 0
@@ -1623,42 +1356,7 @@ func VendorConflicts(judge string) []string {
 // JudgedFigure is a number an LLM judge produced, BOUND TO the disagreement
 // between the judges who produced it.
 //
-// It is one value and not two columns, and that is the entire design. This
-// package has twice shipped a metric published without the thing that gives it
-// meaning, a severity triple with no coverage denominator, and a cross-tool
-// band with no vocabulary caveat, and both times the missing half existed,
-// correct, in a neighbouring function that the table did not call. A convention
-// that says "always print the delta beside it" is exactly the convention that
-// failed twice. So the delta is not beside the figure; it is INSIDE it, the
-// fields are unexported, and the type implements fmt.Formatter so that every
-// verb, %v, %s, %f, %.2f, renders the pair. There is no formatting route to
-// the bare number, from this package or any other.
-//
-// The four states it can be in are deliberately four, not two:
-//
-//	0.74-0.06   two judges, ONE QUESTION. 0.74 is the primary judge's figure;
-//	            the second judge's is 0.68. |delta| is the reader's confidence
-//	            interval.
-//	0.74+?      ONE judge. The disagreement is UNMEASURED, which is not the
-//	            same claim as +0.00 and must not be able to render as it.
-//	0.74+NC     two judges, TWO DIFFERENT QUESTIONS. Both scored something; the
-//	            difference between them is not a disagreement, so there is no
-//	            delta to publish and the second judge's figure is not carried
-//	            out of this type at all. See Stimulus.
-//	n/a         undefined, no findings, no graded sample. There is no figure
-//	            to disagree about, and printing 0.00 here is the bug
-//	            Aggregate.Precision's doc comment already records shipping.
-//
-// The +NC state is the one this type was missing, and its absence is what let
-// the nitpick axis publish a change of stimulus wearing the costume of a
-// disagreement. It renders as neither zero nor blank for the reason the "+?"
-// state does not: this package has shipped a zero that read as agreement and a
-// blank that read as nothing-was-wrong, and the only rendering that can be
-// quoted as neither is one that is not a number.
-//
-// The delta is SIGNED, so the pair is lossless: the second judge's figure is
-// exactly primary+delta. An unsigned spread would hide direction, and direction
-// is what says whether a vendor's own judge scores that vendor high.
+// The note behind it is in docs/measurement.md#judgedfigure.
 type JudgedFigure struct {
 	// primary is the first judge's value, second the corroborating judge's.
 	// Unexported so that no caller outside this package can format either one
@@ -1720,14 +1418,7 @@ func Corroborated(primary, second float64) JudgedFigure {
 
 // NotComparable builds a figure both judges scored, from different stimuli.
 //
-// It takes only the primary's value, and that is the point rather than an
-// omission. The second judge's number is a correct measurement of a different
-// question, and the one thing it must never be is the right-hand side of a
-// subtraction; a constructor that accepted it would be a constructor some later
-// edit could make render it.
-//
-// An undefined primary collapses to undefined, matching Corroborated: there is
-// no figure here to be uncomparable about.
+// The note behind it is in docs/measurement.md#notcomparable.
 func NotComparable(primary float64) JudgedFigure {
 	if math.IsNaN(primary) {
 		return JudgedFigure{}
@@ -1934,19 +1625,11 @@ func (c CrossJudged) figure(of func(Aggregate) float64) JudgedFigure {
 	return Corroborated(of(c.Primary), of(c.Second))
 }
 
-// SameStimulus reports whether the two judges behind this row answered the same
+// SameStimulus reports whether the two judges behind this row answered the
+// same
 // question.
 //
-// False has three causes and they are all the same defect: the two judges were
-// shown different finding lists, one of them was folded in without recording
-// what it was shown, or the second graded fewer samples than the primary. In
-// every case the difference between the two figures mixes a disagreement with a
-// change of question, and the legend beside them calls that difference a
-// confidence interval.
-//
-// A row with no second judge answers false as well, which no caller can
-// misread: HaveSecond is checked first everywhere it matters, and a figure with
-// one judge already renders as unmeasured.
+// The note behind it is in docs/measurement.md#samestimulus.
 func (c CrossJudged) SameStimulus() bool {
 	return c.HaveSecond && c.Primary.SameStimulusAs(c.Second)
 }
@@ -2243,26 +1926,13 @@ func (p JudgePanel) Banner() string {
 // judgedCellWidth is how wide a table cell must be to hold a corroborated
 // figure.
 //
-// The widest rendering is a two-decimal value with a two-decimal signed delta.
-// Eleven characters covers a rate that has gone into double digits against a
-// delta of the same size, "15.00-15.00", which a FIND column reaches the first
-// time a contender files fifteen findings a sample, and twelve leaves the
-// column from touching its neighbour. It is a constant rather than a measured
-// maximum because the header has to be built before any figure exists.
+// The note behind it is in docs/measurement.md#judgedcellwidth.
 const judgedCellWidth = 12
 
 // CorroboratedColumns are the columns whose value comes from a judge and must
 // therefore be printed as a JudgedFigure.
 //
-// It is JudgeOpinionColumns, the package's own register of what an LLM judge
-// supplies, plus the two counts that are TALLIED FROM VERDICTS. FIND and
-// FINDINGS are classed descriptive because no reviewer is better for a larger
-// one, and that classification is right about what they mean and wrong about
-// where they come from: Aggregate.countVerdicts increments Findings once per
-// verdict, so a judge that answers half the list halves the column.
-//
-// Derived from the register rather than listed, so a judged column added to
-// JudgeOpinionColumns is one that must carry a delta from the day it is added.
+// The note behind it is in docs/measurement.md#corroboratedcolumns.
 func CorroboratedColumns() []string {
 	out := append([]string(nil), JudgeOpinionColumns()...)
 	out = append(out, "FIND", "FINDINGS")
