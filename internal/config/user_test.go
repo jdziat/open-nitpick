@@ -339,12 +339,15 @@ func TestOneUserFileServesACheckoutThatNamesNoModel(t *testing.T) {
 	}
 }
 
-// A repository document the pruner cannot parse is refused, not merged.
+// A repository document that will not parse is refused rather than merged.
 //
-// Merging it would hand the decoder an untrusted document with nothing removed
-// from it, so a document this parser rejects that the decoder still accepts
-// would carry every key the prune exists to strip.
-func TestARepositoryDocumentThePrunerCannotParseIsRefused(t *testing.T) {
+// This input is a scanner-level error, which both the pruner's parser and the
+// struct decoder reject, so it does not by itself distinguish the overlay's
+// refusal from the decoder's. It pins the outcome that matters, that no
+// unparseable repository config is ever loaded, and the reason the refusal is
+// in the overlay rather than left to the decoder is that a document the pruner
+// rejects and the decoder accepts would carry every key the prune strips.
+func TestARepositoryDocumentThatWillNotParseIsRefused(t *testing.T) {
 	root := t.TempDir()
 	// Valid enough to reach the parser and invalid enough to fail it.
 	body := "models:\n  default:\n    provider: openai\n    model: gpt-4o\n\tbase_url: https://attacker.example\n"
@@ -355,5 +358,44 @@ func TestARepositoryDocumentThePrunerCannotParseIsRefused(t *testing.T) {
 	cfg, err := Load(root)
 	if err == nil {
 		t.Fatalf("an unparseable repository config was accepted: base_url = %q", cfg.Models.Default.BaseURL)
+	}
+}
+
+// A role's own credential source is carried through ResolveModel, and it
+// replaces the default's rather than layering under it.
+//
+// The three sources are alternatives. A role that says its key is a keystore
+// entry, under a default that names a credential_command, must not resolve the
+// command: it is checked first, so copying the fields independently sent every
+// overridden role the default model's credential.
+func TestARoleCredentialSourceReplacesTheDefaults(t *testing.T) {
+	writeUser(t, `
+models:
+  default:
+    provider: openai
+    model: gpt-4o
+    credential_command: ["print-the-default-key"]
+  triage:
+    provider: openai
+    model: gpt-4o-mini
+    api_key_keyring: vault/triage
+`)
+
+	cfg, err := Load(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	triage := cfg.Models.ResolveModel(RoleTriage)
+	if triage.APIKeyKeyring != "vault/triage" {
+		t.Errorf("api_key_keyring = %q; the role's own source was dropped", triage.APIKeyKeyring)
+	}
+	if len(triage.CredentialCommand) != 0 {
+		t.Errorf("credential_command = %v; it would be consulted before the role's keyring", triage.CredentialCommand)
+	}
+
+	// The role that overrides nothing still gets the default's.
+	if got := cfg.Models.ResolveModel(RoleReview).CredentialCommand; len(got) != 1 {
+		t.Errorf("the default's credential_command did not reach an unoverridden role: %v", got)
 	}
 }

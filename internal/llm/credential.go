@@ -99,10 +99,8 @@ func resolveCredential(ctx context.Context, spec config.ModelSpec, getenv func(s
 	// session with no D-Bus and a machine with no keystore at all, because
 	// nobody asked for this one and the environment is still to be tried.
 	if provider := strings.TrimSpace(spec.Provider); provider != "" {
-		if key, err := keyringGet(KeyringService, provider); err == nil {
-			if key = strings.TrimSpace(key); key != "" {
-				return key, true, nil
-			}
+		if key, ok := defaultKeystoreLookup(ctx, provider); ok {
+			return key, true, nil
 		}
 	}
 
@@ -110,6 +108,51 @@ func resolveCredential(ctx context.Context, spec config.ModelSpec, getenv func(s
 	// own conventional variable to read, and that is the path every
 	// configuration took before this file existed.
 	return "", false, nil
+}
+
+// keystoreTimeout bounds the lookup nobody asked for.
+//
+// go-keyring's Secret Service call has no timeout of its own, so a locked
+// keyring can sit on a D-Bus unlock prompt indefinitely. This lookup runs on
+// every build, including for an operator who configured an environment
+// variable and never wanted the keystore consulted, so it must not be able to
+// stall a review before its first request.
+const keystoreTimeout = 5 * time.Second
+
+// defaultKeystoreLookup reads the default entry, giving up quickly.
+//
+// Every failure is a miss: no keystore, no session bus, a locked keyring, or
+// one that did not answer in time. The environment is still to be tried, and
+// this lookup was not asked for.
+func defaultKeystoreLookup(ctx context.Context, provider string) (string, bool) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, keystoreTimeout)
+	defer cancel()
+
+	type answer struct {
+		key string
+		err error
+	}
+	// Buffered, and never read after the timeout, so the goroutine this leaves
+	// behind on a hung keyring can finish and exit rather than block forever.
+	done := make(chan answer, 1)
+	go func() {
+		key, err := keyringGet(KeyringService, provider)
+		done <- answer{key, err}
+	}()
+
+	select {
+	case got := <-done:
+		if got.err != nil {
+			return "", false
+		}
+		key := strings.TrimSpace(got.key)
+		return key, key != ""
+	case <-ctx.Done():
+		return "", false
+	}
 }
 
 // runCredentialCommand runs the command and takes its output as the key.

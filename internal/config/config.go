@@ -782,8 +782,15 @@ func (base ModelSpec) overlay(over ModelSpec) ModelSpec {
 	if over.BaseURL != "" {
 		out.BaseURL = over.BaseURL
 	}
-	if over.APIKeyEnv != "" {
+	// The three credential sources move as a group. They are alternatives
+	// rather than layers, so an override that names any one of them replaces
+	// all three: a role that says its key is in a keystore entry must not
+	// inherit the default's credential_command and have it win, which is what
+	// copying them independently produced.
+	if over.APIKeyEnv != "" || over.APIKeyKeyring != "" || len(over.CredentialCommand) > 0 {
 		out.APIKeyEnv = over.APIKeyEnv
+		out.APIKeyKeyring = over.APIKeyKeyring
+		out.CredentialCommand = append([]string(nil), over.CredentialCommand...)
 	}
 	if over.Temperature != nil {
 		out.Temperature = over.Temperature
