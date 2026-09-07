@@ -249,7 +249,7 @@ func (r *Roles) For(spec config.ModelSpec) (*Client, error) {
 		return nil, err
 	}
 	if r.log != nil {
-		c.Log = r.log
+		c.setLog(r.log)
 	}
 	if r.clients == nil {
 		r.clients = map[string]*Client{}
@@ -268,14 +268,24 @@ func (r *Roles) WithLogger(l *slog.Logger) *Roles {
 	defer r.mu.Unlock()
 	r.log = l
 	for _, c := range []*Client{r.Review, r.Triage, r.Validate, r.Router} {
-		if c != nil {
-			c.Log = l
-		}
+		c.setLog(l)
 	}
 	for _, c := range r.clients {
-		c.Log = l
+		c.setLog(l)
 	}
 	return r
+}
+
+// setLog points a client and its fallback at l.
+//
+// The fallback is reached only through its primary, so it is never in the
+// roster the loop above walks. Left out, a fallback's stalls and retries go to
+// a discarding logger, which is silence in the one place this feature exists
+// to make visible.
+func (c *Client) setLog(l *slog.Logger) {
+	for ; c != nil; c = c.fallback {
+		c.Log = l
+	}
 }
 
 // logger is Log, or a discarding logger.

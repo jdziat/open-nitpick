@@ -207,10 +207,13 @@ func TestShouldEscalateSeparatesTheModelsFailuresFromTheTransports(t *testing.T)
 		"response was not valid JSON after one repair attempt: x":       true,
 		"no JSON object in the response matched the expected shape (x)": true,
 		"no JSON object found in response (x)":                          true,
-		"unexpected end of JSON input":                                  true,
-		"401 unauthorized":                                              false,
-		"context deadline exceeded":                                     false,
-		"dial tcp: connection refused":                                  false,
+		// A bare truncation is the retry path's business, not a second
+		// model's: the fallback overlays its parent and inherits the same
+		// output cap, so it would be cut in the same place.
+		"unexpected end of JSON input": false,
+		"401 unauthorized":             false,
+		"context deadline exceeded":    false,
+		"dial tcp: connection refused": false,
 	} {
 		if got := llm.ShouldEscalate(errors.New(msg)); got != want {
 			t.Errorf("ShouldEscalate(%q) = %v, want %v", msg, got, want)

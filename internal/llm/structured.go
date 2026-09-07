@@ -807,11 +807,15 @@ func (c *Client) Fallback() *Client {
 // ShouldEscalate reports whether a failure is one a different model might
 // answer.
 //
-// Two classes, both about the model rather than the transport: a request cut
-// at the output cap after the retries above have already re-sampled it, and
-// structured output that never parsed. A timeout, a refused credential or a
-// cancelled context are none of a second model's business, and escalating on
-// them would spend a second budget to fail the same way.
+// One class, and it is about the model rather than the transport: structured
+// output that never parsed, which is what a runaway generation comes back as
+// once the cap has cut it mid-JSON.
+//
+// Not a bare truncation. A first attempt cut at a cap the caller chose never
+// reaches the re-sampling in retryAfter, and the fallback overlays its parent
+// and inherits that same cap, so escalating there would spend a second budget
+// to be cut in the same place. A timeout, a refused credential or a cancelled
+// context are none of a second model's business either.
 func ShouldEscalate(err error) bool {
 	if err == nil {
 		return false
@@ -826,7 +830,6 @@ func ShouldEscalate(err error) bool {
 		"was not valid json after one repair attempt",
 		"no json object in the response matched the expected shape",
 		"no json object found in response",
-		"unexpected end of json input",
 	} {
 		if strings.Contains(msg, sign) {
 			return true

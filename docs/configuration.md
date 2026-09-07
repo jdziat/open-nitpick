@@ -46,11 +46,13 @@ models:
       model: z-ai/glm-5.3-flash
 ```
 
-Two failures trigger it, both about the model rather than the transport: a
-request cut at the output cap after the stall retries have already re-sampled
-it, and structured output that never parsed. A timeout, a refused credential or
-a cancelled context does not, since a second model would fail the same way and
-cost a second budget doing it.
+One failure triggers it, and it is about the model rather than the transport:
+structured output that never parsed, which is what a runaway generation comes
+back as once the output cap has cut it mid-JSON. A bare truncation does not: a
+first attempt cut at a cap you chose never reaches the re-sampling retry, and
+the fallback inherits that same cap, so it would be cut in the same place. Nor
+does a timeout, a refused credential or a cancelled context, since a second
+model fails those the same way and spends a second budget doing it.
 
 Retrying the same model is the wrong move for the first of those. Runaway
 generation is the model looping on the input, not the endpoint truncating

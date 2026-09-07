@@ -180,6 +180,12 @@ func (e *Engine) reviewWith(ctx context.Context, r reviewers, prContext string, 
 		wg.Add(1)
 		go func(c *llm.Client) {
 			defer wg.Done()
+
+			// blamed is the model an error is reported under. It moves with an
+			// escalation: attributing the fallback's failure to the primary
+			// points diagnosis at the model that did not produce it.
+			blamed := c
+
 			base, err := e.reviewPromptFor(c)
 			if err == nil {
 				var out []Finding
@@ -193,6 +199,7 @@ func (e *Engine) reviewWith(ctx context.Context, r reviewers, prContext string, 
 					e.log().Warn("primary exhausted; escalating to the fallback model",
 						"from", c.String(), "to", fb.String(), "files", b.Paths(), "error", err)
 
+					blamed = fb
 					if base, err = e.reviewPromptFor(fb); err == nil {
 						out, err = e.analyzeBatchWith(ctx, fb, base, prContext, b)
 						if err == nil {
@@ -211,7 +218,7 @@ func (e *Engine) reviewWith(ctx context.Context, r reviewers, prContext string, 
 			}
 			if err != nil {
 				mu.Lock()
-				errs = append(errs, fmt.Errorf("%s: %w", c, err))
+				errs = append(errs, fmt.Errorf("%s: %w", blamed, err))
 				mu.Unlock()
 				if len(clients) > 1 {
 					e.log().Warn("one reviewer of an ensemble failed", "model", c.String(), "files", b.Paths(), "error", err)
