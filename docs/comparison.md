@@ -534,8 +534,8 @@ over every model the review reached for, each at its own rate.
 
 | config | tuning R / N | multi-file R / N | info R / N | weighted recall | $/review |
 |---|---|---|---|---|---|
-| ensemble-cheap: gemma pinned + glm-5.3-flash on every batch, qwen3.8-27b triages | 0.84 / 0.38 | 0.96 / 0.21 | 0.70 / 0.25 | 0.84 | $0.010 – $0.011 |
-| routed: glm-5.3-flash classifies; qwen3.8-27b for security, concurrency and TypeScript; gemma pinned otherwise; qwen triages | 0.84 / 0.12 | 0.92 / 0.04 | 0.65 / 0.00 | 0.81 | $0.005 – $0.011 |
+| ensemble-cheap: gemma pinned + glm-5.3-flash on every batch, qwen3.8-27b triages | 0.84 / 0.38 | 0.96 / 0.21 | 0.70 / 0.25 | 0.84 | $0.0075 – $0.0086 |
+| routed: glm-5.3-flash classifies; qwen3.8-27b for security, concurrency and TypeScript; gemma pinned otherwise; qwen triages | 0.84 / 0.12 | 0.92 / 0.04 | 0.65 / 0.00 | 0.81 | $0.0096 – $0.0152 |
 | qwen3.8-27b alone | 0.81 / 0.03 | 0.96 / 0.07 | 0.65 / 0.00 | 0.83 | $0.017 |
 | sonnet-4.6 alone | 0.88 / 0.16 | 1.00 / 0.18 | 0.55 / 0.21 | 0.83 | $0.021 |
 | glm-5.3-flash alone | 0.77 / 0.23 | 1.00 / 0.30 | 0.65 / 0.00 | 0.80 | $0.0015 |
@@ -545,12 +545,29 @@ Rows above are with related context on. Without it the ensemble reaches
 0.91 / 0.19 on the tuning corpus, the highest single-file recall of any
 configuration measured, above sonnet.
 
+**The two composite `$/review` cells were re-measured on 2026-09-07.** The
+figures this section shipped with (ensemble-cheap $0.010 – $0.011, routed
+$0.005 – $0.011) came from a harness that keyed its per-model meters by
+model id, so where two roles resolved to one model the second meter replaced
+the first and that model's spend left the total (issue 45). Neither route
+file names a `validate` model, so the validation client, built from
+`default`, carried the reviewer's model id and collided with it in both.
+The cells above are a fresh run under the fix: same two route files, same
+three corpora, two runs each, related context on. Every other cell in the
+table is unchanged and still from 2026-09-05, so read the two composite
+costs against each other rather than against the single-model rows below
+them.
+
 What that says:
 
-- **The routed configuration is qwen at a third of the price.** Same
-  weighted recall within a plant, same info-corpus silence, one more noise
-  finding per ten reviews on the tuning corpus. Of its cost, most is the
-  qwen triage pass; the reviewers themselves are under a cent together.
+- **The routed configuration buys quiet, not cheapness.** On the
+  2026-09-07 re-run it costs $0.0136 – $0.0152 per review against
+  ensemble-cheap's $0.0075 – $0.0086, and more per located defect on all
+  three corpora ($0.0153 – $0.0187 against $0.0087 – $0.0120). Its case
+  is the noise column, not the cost column. The claim that the qwen triage
+  pass carried most of its cost was an artefact of the same defect and is
+  withdrawn: the harness never printed a per-model split, so nothing here
+  measured it.
 - **The ensemble buys recall with noise.** Weighted recall 0.84 is the
   best measured, and its info recall (0.70) is the best of any
   configuration, but noise runs 0.21–0.38. The triage rerank merges
@@ -560,8 +577,8 @@ What that says:
   rate a single-reviewer finding against the other reviewer's silence.
 - **The router works.** Its tally sends every security, concurrency and
   TypeScript batch to qwen and the rest to gemma, and the ordering of
-  routes is visible in the report. It costs about a tenth of a cent per
-  batch.
+  routes is visible in the report. Its per-batch cost was read off the same
+  broken accounting and is withdrawn, not re-measured.
 - **The cross-file route never fired.** Batches hold one file each in these
   corpora (the cross-file signal travels as related context, not as batch
   size), so a `min_files: 2` match on batch size matched nothing. The
@@ -569,11 +586,12 @@ What that says:
   glm route. A match on the change's file count, rather than the batch's,
   is the missing feature.
 
-**Recommendation.** For a repository that wants one cheap configuration:
-`routed` as shipped in the route file, with `triage` on glm-5.3-flash
-instead of qwen if the triage cost matters more than the last point of
-noise. It beats every single model on price per located defect except
-gemma alone, and gemma alone finds a quarter fewer.
+**Recommendation.** Under review as of 2026-09-07. It named `routed` as the
+cheap configuration on cost figures the defect above understated; the re-run
+puts `ensemble-cheap` below `routed` on both price per review and price per
+located defect on all three corpora. Which of the two to run turns on the
+noise columns, which are still 2026-09-05 numbers and have not been
+re-measured under the fix. The route files themselves are unchanged.
 
 ### The callers corpus (2026-09-05)
 
