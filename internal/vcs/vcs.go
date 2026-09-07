@@ -32,6 +32,26 @@ var ErrForbidden = errors.New("vcs: the token may not publish here")
 // the change's own version.
 var ErrNoBaseRevision = errors.New("vcs: base revision unavailable")
 
+// ErrHeadMoved reports that the pull request was pushed to between the moment
+// a proposal's file contents were read and the moment it was published.
+//
+// It matters because the failure it prevents is silent. A proposal carries
+// whole files rather than a patch, so content read at the older revision would
+// be re-asserted over the newer tree and quietly revert whatever landed in
+// between, in a pull request that looks clean.
+var ErrHeadMoved = errors.New("vcs: the pull request moved while the change was being prepared")
+
+// ErrRefExists reports that the branch a proposal names is already there.
+//
+// Branch names are derived from the pull request and the finding, so the same
+// request twice produces the same name. This is how a repeated ask is
+// recognised rather than piling up branches.
+var ErrRefExists = errors.New("vcs: the branch already exists")
+
+// ErrOutsideChange reports that a proposal named a path the pull request under
+// review does not touch.
+var ErrOutsideChange = errors.New("vcs: the path is not part of this change")
+
 // Ref identifies what to review.
 type Ref struct {
 	// Owner and Repo identify the repository on a forge. Both are empty for
@@ -85,6 +105,13 @@ type PullRequest struct {
 
 	HeadRef string
 	HeadSHA string
+
+	// HeadRepo and BaseRepo are the full names, owner/name, of the
+	// repositories the two sides live in. They differ for a pull request from
+	// a fork, which is the only way to tell one from here: a fork's head ref
+	// looks like any other.
+	HeadRepo string
+	BaseRepo string
 
 	// HeadMessage is the head commit's full message, when the provider can
 	// read it; a [skip review] marker may sit there rather than in the
@@ -210,6 +237,77 @@ type PriorComment struct {
 	// published with. See Comment.Fingerprint.
 	Fingerprint string
 	Class       string
+}
+
+// FileEdit is one file a proposal rewrites.
+//
+// Content is the entire new file. The forge's data API commits blobs rather
+// than patches, so there is no way to express "these lines" here, and the
+// whole file is what a reader of the proposal has to read.
+type FileEdit struct {
+	Path    string
+	Content []byte
+}
+
+// Proposal is a set of file edits to publish as a branch and a pull request.
+type Proposal struct {
+	// Base is the commit the edits were read at, and the parent of the commit
+	// they are written as. Read and write have to name the same revision, or
+	// the result reverts whatever landed between them; see ErrHeadMoved.
+	Base string
+
+	// Branch is the ref to create, without refs/heads/. It is always new: a
+	// proposal may not write to a branch that already exists.
+	Branch string
+
+	// Into is the branch the pull request targets.
+	Into string
+
+	Message string
+	Title   string
+	Body    string
+
+	Edits []FileEdit
+
+	// AllowPaths is the set of paths that may be written, which is the set the
+	// pull request under review already changes.
+	//
+	// Empty refuses every edit. This is a containment boundary rather than a
+	// filter, so its absence fails closed: the content being written was
+	// produced by a model reading text a contributor wrote, and without this
+	// the capability is an arbitrary write driven by that text.
+	AllowPaths []string
+}
+
+// ProposedChange is what a published proposal became.
+type ProposedChange struct {
+	Branch    string
+	CommitSHA string
+	Number    int
+	URL       string
+}
+
+// ChangeProposer is implemented by providers that can publish file edits as a
+// branch and a pull request.
+//
+// Optional, like the other capabilities here: a caller feature-detects it and
+// does without rather than assuming. It is the only interface in this package
+// that writes to the repository rather than to a conversation about it.
+type ChangeProposer interface {
+	ProposeChange(ctx context.Context, ref Ref, p Proposal) (*ProposedChange, error)
+}
+
+// Permissioned is implemented by providers that can say what a person may do
+// to the repository.
+//
+// This is not what the forge calls an author's association. GitHub's
+// COLLABORATOR covers anyone invited to the repository, at read level
+// included, so an association is a reasonable gate on spending and a weak one
+// on writing.
+type Permissioned interface {
+	// Permission returns the forge's word for what login may do: on GitHub,
+	// one of admin, write, read or none.
+	Permission(ctx context.Context, ref Ref, login string) (string, error)
 }
 
 // ThreadComment is one comment on a review thread, for a conversation's
