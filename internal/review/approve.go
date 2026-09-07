@@ -19,6 +19,14 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 		return vcs.EventComment
 	}
 
+	// An incremental run withholds a finding an earlier run already posted, so
+	// it leaves Findings empty while the comment thread it made is still open
+	// on the pull request. Approving beside a standing finding describes a
+	// review nobody performed.
+	if len(report.AlreadyReported) > 0 {
+		return vcs.EventComment
+	}
+
 	// A run whose batches partly failed published no findings for the files it
 	// never read, which is the shape Report.Incomplete exists to name. Reading
 	// that as clean is how an approval comes to mean less than nothing.

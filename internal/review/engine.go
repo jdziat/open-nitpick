@@ -1767,7 +1767,11 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	e.log().Info("publishing", "findings", len(report.Findings), "provider", e.Provider.Name())
 	review := Render(report, files, e.Config)
 
-	if len(review.Comments) == 0 && review.Summary == "" {
+	// An empty body is not nothing when the review carries a disposition. A
+	// clean run under review.approve with review.summary off renders no
+	// comments and no summary, and returning here would drop the approval and
+	// log "nothing to publish" over a review that had something to say.
+	if len(review.Comments) == 0 && review.Summary == "" && review.Event == vcs.EventComment {
 		e.log().Info("nothing to publish")
 		return nil
 	}

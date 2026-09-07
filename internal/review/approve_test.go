@@ -95,3 +95,35 @@ func TestACoverageGapFailsTheAnalyzerGate(t *testing.T) {
 		t.Errorf("the coverage list blocked approval with the gate off: %q", got)
 	}
 }
+
+// TestAStandingFindingIsNotApproved covers the incremental case.
+//
+// An incremental run withholds a finding an earlier run posted, so Findings is
+// empty while the comment thread it made is still open. Approving there
+// describes a review nobody performed.
+func TestAStandingFindingIsNotApproved(t *testing.T) {
+	r := &Report{AlreadyReported: []Finding{{Path: "a.go", Line: 1, Title: "still open"}}}
+	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
+		t.Errorf("event with a withheld finding = %q, want %q", got, vcs.EventComment)
+	}
+}
+
+// TestAnApprovalWithNoBodyIsStillPublished pins the reason publish() cannot
+// return early on an empty render any more.
+//
+// A clean run with review.summary off produces no comments and no summary. The
+// disposition is the whole message, and dropping it logs "nothing to publish"
+// over a review that had something to say.
+func TestAnApprovalWithNoBodyIsStillPublished(t *testing.T) {
+	cfg := approving(false)
+	cfg.Review.Summary = false
+
+	review := Render(&Report{}, nil, cfg)
+	if review.Event != vcs.EventApprove {
+		t.Fatalf("event = %q, want %q", review.Event, vcs.EventApprove)
+	}
+	if len(review.Comments) != 0 || review.Summary != "" {
+		t.Fatalf("this case is only interesting when the body is empty: %d comments, summary %q",
+			len(review.Comments), review.Summary)
+	}
+}
