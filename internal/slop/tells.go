@@ -82,8 +82,30 @@ func Scan(p, content string) []Tell {
 		}
 		block = nil
 	}
+	inRawString := false
 	for i, raw := range lines {
 		n := i + 1
+
+		// A raw string literal holds other people's text. This package's own
+		// tests embed Kotlin and TypeScript fixtures whose doc comments start
+		// with the Go comment marker, and scanning them reported findings
+		// against source that is data here.
+		//
+		// Counting backquotes per line tracks the literal without parsing:
+		// an odd count opens or closes one. It is wrong for a backquote inside
+		// an interpreted string, which nothing in this tree writes.
+		if !prose {
+			if inRawString {
+				if strings.Count(raw, "`")%2 == 1 {
+					inRawString = false
+				}
+				continue
+			}
+			if strings.Count(raw, "`")%2 == 1 {
+				inRawString = true
+			}
+		}
+
 		var text string
 		if prose {
 			t := strings.TrimSpace(raw)

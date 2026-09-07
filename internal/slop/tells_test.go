@@ -196,3 +196,23 @@ func TestCadenceReadsSourceComments(t *testing.T) {
 		t.Errorf("commentLines returned %q, want the comment body", lines[0])
 	}
 }
+
+// A raw string literal holds other people's text. This package's own tests
+// embed fixtures whose doc comments start with the Go comment marker.
+func TestRawStringLiteralsAreNotScanned(t *testing.T) {
+	src := "package a\n\n" +
+		"var fixture = `\n" +
+		"/** toCents takes DOLLARS — and it MUST NOT round. */\n" +
+		"fun toCents(d: Double): Long = 0\n" +
+		"`\n\n" +
+		"// A real comment with an em dash — this one counts.\n" +
+		"func f() {}\n"
+
+	got := Scan("a.go", src)
+	if len(got) != 1 {
+		t.Fatalf("tells = %+v, want only the real comment's em dash", got)
+	}
+	if got[0].Line != 8 {
+		t.Errorf("flagged line %d, want 8: the fixture's own text was scanned", got[0].Line)
+	}
+}
