@@ -53,8 +53,15 @@ func receipt(report *Report) string {
 		parts = append(parts, fmt.Sprintf("Analyzers: %s.", strings.Join(analyzers, ", ")))
 	}
 
-	if n := len(report.Incomplete); n > 0 {
+	// Incomplete carries one entry that is not a file. A failed style pass
+	// appends the marker "(style pass)" so the notice can say the defect review
+	// is complete and the style findings are missing, and counting it as a file
+	// would report a file nobody can open.
+	if n := incompleteFiles(report); n > 0 {
 		parts = append(parts, fmt.Sprintf("%s could not be reviewed.", plural(n, "file")))
+	}
+	if stylePassFailed(report) {
+		parts = append(parts, "The style pass failed, so style findings are missing.")
 	}
 
 	return strings.Join(parts, " ") + "\n"
@@ -79,4 +86,29 @@ func plural(n int, noun string) string {
 		return fmt.Sprintf("1 %s", noun)
 	}
 	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// stylePassMarker is the entry Engine.Review adds to Report.Incomplete when the
+// style pass fails. It is a marker, not a path.
+const stylePassMarker = "(style pass)"
+
+// incompleteFiles counts the entries of Report.Incomplete that name a file.
+func incompleteFiles(report *Report) int {
+	n := 0
+	for _, p := range report.Incomplete {
+		if p != stylePassMarker {
+			n++
+		}
+	}
+	return n
+}
+
+// stylePassFailed reports whether the marker is present.
+func stylePassFailed(report *Report) bool {
+	for _, p := range report.Incomplete {
+		if p == stylePassMarker {
+			return true
+		}
+	}
+	return false
 }
