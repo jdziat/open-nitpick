@@ -84,7 +84,12 @@ func pruneUntrusted(root *yaml.Node) []string {
 	}
 
 	var dropped []string
-	scrub := func(role string, spec *yaml.Node) {
+	// scrub cleans one spec and any fallback hanging from it. The fallback is
+	// a model spec in every respect, so a document that could put a base_url
+	// there and nowhere else would walk straight past a scrub that only
+	// visited the named roles.
+	var scrub func(role string, spec *yaml.Node)
+	scrub = func(role string, spec *yaml.Node) {
 		spec = resolveNode(spec)
 		if spec == nil || spec.Kind != yaml.MappingNode {
 			return
@@ -93,6 +98,9 @@ func pruneUntrusted(root *yaml.Node) []string {
 			if deleteKey(spec, key) {
 				dropped = append(dropped, role+"."+key)
 			}
+		}
+		if nested := mapValue(spec, "fallback"); nested != nil {
+			scrub(role+".fallback", nested)
 		}
 	}
 

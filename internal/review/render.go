@@ -254,6 +254,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// what was reviewed is a fact about coverage, and review.summary turning
 	// the walkthrough off must not turn it into a silent trim.
 	b.WriteString(budgetNote(report))
+	b.WriteString(EscalationNotice(report))
 
 	if cfg == nil || cfg.Review.Summary {
 		b.WriteString(walkthrough(report, cfg))

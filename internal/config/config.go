@@ -137,6 +137,23 @@ type ModelSpec struct {
 	// MaxRetries bounds SDK-level retries for transient failures.
 	MaxRetries *int `yaml:"max_retries"`
 
+	// Fallback is the model a role escalates to when this one cannot answer:
+	// a request cut at the output cap because the model looped, or structured
+	// output that never parsed. It is tried once, and the batch fails if it
+	// fails too.
+	//
+	// Escalating beats retrying the same model again. Runaway generation is
+	// the model looping on the input rather than the endpoint truncating
+	// early, so the same weights on another host reproduce it, and a third
+	// attempt against a model that has already looped twice buys minutes for
+	// the same answer. See issue #49.
+	//
+	// It overlays its parent, so a fallback naming only a model inherits the
+	// provider, timeout and credential of the spec it hangs from. The provider
+	// pin is the exception: overlay drops it when the model changes, because a
+	// pin names the upstreams that serve ONE model.
+	Fallback *ModelSpec `yaml:"fallback"`
+
 	// Providers pins a router to these upstream providers, tried in order,
 	// with no fallback beyond them. OpenRouter only; slugs are OpenRouter's,
 	// with an endpoint suffix where one exists ("deepinfra/turbo"). It is
@@ -727,6 +744,28 @@ func (c *Config) merge(data []byte) error {
 
 // ModelNotesOn reports whether the model-family prompt layer is in force.
 func (r Review) ModelNotesOn() bool { return r.ModelNotes == nil || *r.ModelNotes }
+
+// ResolveFallback returns the effective spec for this model's fallback, or
+// false when it has none.
+//
+// The fallback overlays its parent for the same reason a role overlays the
+// default: naming a model should not mean restating a provider, a timeout and
+// a credential that have not changed.
+func (s ModelSpec) ResolveFallback() (ModelSpec, bool) {
+	if s.Fallback == nil {
+		return ModelSpec{}, false
+	}
+
+	// The parent's own fallback is not inherited: escalation is one step, and
+	// a chain would let a misconfiguration walk a batch through every model in
+	// the file before failing.
+	parent := s
+	parent.Fallback = nil
+
+	out := parent.overlay(*s.Fallback)
+	out.Fallback = nil
+	return out, true
+}
 
 // ResolveModel returns the effective spec for a role, falling back to the
 // default model for any field the role does not set.

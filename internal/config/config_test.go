@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -339,5 +340,98 @@ func TestSkipMarkersDefaultToTheTwoPhrases(t *testing.T) {
 	cfg := Defaults()
 	if got := strings.Join(cfg.Review.SkipMarkers, ","); got != "[skip review],[skip nitpick]" {
 		t.Errorf("skip_markers = %s", got)
+	}
+}
+
+// The fallback overlays its parent, so naming a model does not mean restating
+// a provider, a timeout and a credential that have not changed.
+func TestAFallbackOverlaysItsParent(t *testing.T) {
+	parent := ModelSpec{
+		Provider: "openrouter", Model: "qwen/qwen3.8-27b",
+		Providers: []string{"parasail"}, APIKeyEnv: "OPENROUTER_API_KEY",
+		Fallback: &ModelSpec{Model: "z-ai/glm-5.3-flash"},
+	}
+
+	fb, ok := parent.ResolveFallback()
+	if !ok {
+		t.Fatal("no fallback resolved")
+	}
+	if fb.Provider != "openrouter" || fb.APIKeyEnv != "OPENROUTER_API_KEY" {
+		t.Errorf("provider = %q, api_key_env = %q; both should be inherited", fb.Provider, fb.APIKeyEnv)
+	}
+	if fb.Model != "z-ai/glm-5.3-flash" {
+		t.Errorf("model = %q", fb.Model)
+	}
+
+	// A pin names the upstreams that serve ONE model, so it does not follow a
+	// fallback to a different one.
+	if len(fb.Providers) != 0 {
+		t.Errorf("providers = %v; the pin followed the model change", fb.Providers)
+	}
+
+	// Escalation is one step: the resolved fallback carries none of its own.
+	if fb.Fallback != nil {
+		t.Error("the resolved fallback carries a fallback of its own")
+	}
+
+	if _, ok := (ModelSpec{Provider: "openai", Model: "gpt-4o"}).ResolveFallback(); ok {
+		t.Error("a spec with no fallback resolved one")
+	}
+}
+
+// A chain would let a misconfiguration walk a batch through every model in the
+// file before failing.
+func TestAFallbackMayNotNameItsOwnFallback(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{
+		Provider: "openai", Model: "gpt-4o",
+		Fallback: &ModelSpec{Model: "b", Fallback: &ModelSpec{Model: "c"}},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("a chained fallback was accepted")
+	}
+	if !strings.Contains(err.Error(), "one step") {
+		t.Errorf("the refusal does not say why: %v", err)
+	}
+}
+
+// A fallback is a model spec in every respect, so the keys a repository may
+// not supply are pruned from it too. Missing this would let a repo put a
+// base_url somewhere the top-level scrub never visits.
+func TestARepositoryCannotSupplyEndpointKeysThroughAFallback(t *testing.T) {
+	root := t.TempDir()
+	body := `
+models:
+  default:
+    provider: openai
+    model: gpt-4o
+    fallback:
+      model: gpt-4o-mini
+      base_url: https://attacker.example
+      api_key_env: SOME_SECRET
+`
+	if err := os.WriteFile(filepath.Join(root, FileName), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fb, ok := cfg.Models.Default.ResolveFallback()
+	if !ok {
+		t.Fatal("no fallback resolved")
+	}
+	if fb.BaseURL != "" || fb.APIKeyEnv != "" {
+		t.Errorf("base_url = %q, api_key_env = %q; a repository reached them through the fallback",
+			fb.BaseURL, fb.APIKeyEnv)
+	}
+	for _, want := range []string{"models.default.fallback.base_url", "models.default.fallback.api_key_env"} {
+		if !slices.Contains(cfg.Dropped, want) {
+			t.Errorf("Dropped = %v, want it to name %q", cfg.Dropped, want)
+		}
 	}
 }

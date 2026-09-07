@@ -624,6 +624,13 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 			pf(" @ %s", spec.BaseURL)
 		}
 		pf("  [structured output: %s]\n", cmp(spec.StructuredOutput, config.StructuredAuto))
+
+		// The fallback is part of what this role resolves to, and an operator
+		// reading "which model reviews my code" is owed the second answer as
+		// well as the first.
+		if fb, ok := spec.ResolveFallback(); ok {
+			pf("           fallback %s/%s\n", fb.Provider, fb.Model)
+		}
 	}
 
 	pl("Models:")

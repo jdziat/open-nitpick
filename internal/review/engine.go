@@ -368,6 +368,12 @@ type Report struct {
 	// configuration instead of through a failure.
 	Budget *Fit
 
+	// Escalated records the batches a fallback model reviewed after the
+	// primary could not, so a reader can tell which findings came from which
+	// model. Silence here would put a weaker model's findings beside a
+	// stronger one's with nothing to separate them.
+	Escalated []Escalation
+
 	// Incomplete lists files whose review batch failed. These files were not
 	// reviewed, so the absence of findings for them means nothing. Reporting
 	// them is a correctness requirement: a partially-failed review that prints
@@ -552,11 +558,12 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		return report, e.publish(ctx, ref, report, files)
 	}
 
-	findings, unreviewed, err := e.analyze(ctx, pr, plan)
+	findings, unreviewed, escalated, err := e.analyze(ctx, pr, plan)
 	if err != nil {
 		return nil, err
 	}
 	report.Incomplete = append(report.Incomplete, unreviewed...)
+	report.Escalated = append(report.Escalated, escalated...)
 
 	// Pedantic wants findings the generation scope deliberately does not
 	// produce, and a filter can only narrow. They come from a separate pass so
@@ -922,11 +929,11 @@ func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publis
 //
 // A batch that fails does not fail the run: partial review output is far more
 // useful than none, and the failure is logged and surfaced rather than hidden.
-func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.Plan) ([]Finding, []string, error) {
+func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.Plan) ([]Finding, []string, []Escalation, error) {
 	// Built once for the default reviewer so a prompt error surfaces before
 	// any batch runs; routed reviewers build theirs on first use.
 	if _, err := e.reviewPromptFor(e.Roles.Review); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Forge-authored text rides in the user message, fenced as untrusted.
@@ -936,6 +943,10 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 		mu       sync.Mutex
 		findings []Finding
 		failures int
+		// escalated collects the batches a fallback model answered after the
+		// primary could not.
+		escalated []Escalation
+
 		// unreviewed collects the files whose batch never produced a result,
 		// so the report can say so instead of implying they were clean.
 		unreviewed []string
@@ -975,7 +986,13 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 			r, err := e.reviewersFor(ctx, b)
 			var result []Finding
 			if err == nil {
-				result, err = e.reviewWith(ctx, r, prContext, b)
+				var esc []Escalation
+				result, esc, err = e.reviewWith(ctx, r, prContext, b)
+				if len(esc) > 0 {
+					mu.Lock()
+					escalated = append(escalated, esc...)
+					mu.Unlock()
+				}
 			}
 
 			mu.Lock()
@@ -1001,12 +1018,12 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 	e.routeDecisions = decisions
 
 	if err := ctx.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	// Every batch failing means something systemic (bad credentials, a wrong
 	// model name), and reporting "no issues found" would be a lie.
 	if failures > 0 && failures == len(plan.Batches) {
-		return nil, nil, fmt.Errorf("all %d review batches failed; see log for details", failures)
+		return nil, nil, nil, fmt.Errorf("all %d review batches failed; see log for details", failures)
 	}
 	if failures > 0 {
 		e.log().Warn("review is incomplete",
@@ -1030,7 +1047,7 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 	sortFindings(findings)
 
 	sort.Strings(unreviewed)
-	return findings, unreviewed, nil
+	return findings, unreviewed, escalated, nil
 }
 
 // analyzeStyle runs the separate style review that pedantic requires.

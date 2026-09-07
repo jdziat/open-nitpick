@@ -52,6 +52,10 @@ type Client struct {
 	// question, how many times this deployment is willing to pay for one
 	// batch, and a config that lowers one has no reason to want the other.
 	stallRetries int
+
+	// fallback is the client a caller escalates to when this one cannot
+	// answer. Nil when the spec names none. See ShouldEscalate.
+	fallback *Client
 }
 
 // Provider returns the configured provider name.
@@ -110,6 +114,16 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 		return nil, fmt.Errorf("build model %s/%s: %w", spec.Provider, spec.Model, err)
 	}
 
+	// The fallback is built here rather than on demand, so a misconfigured one
+	// fails before any request is made instead of at the moment a batch has
+	// already lost its primary.
+	var fallback *Client
+	if fb, ok := spec.ResolveFallback(); ok {
+		if fallback, err = BuildContext(ctx, fb); err != nil {
+			return nil, fmt.Errorf("build fallback for %s/%s: %w", spec.Provider, spec.Model, err)
+		}
+	}
+
 	maxRetries := defaultMaxRetries
 	if spec.MaxRetries != nil {
 		maxRetries = *spec.MaxRetries
@@ -121,7 +135,7 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 		mode = config.StructuredAuto
 	}
 
-	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries}, nil
+	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries, fallback: fallback}, nil
 }
 
 // NewClientForTest wraps an arbitrary SDK client, bypassing provider
@@ -235,7 +249,7 @@ func (r *Roles) For(spec config.ModelSpec) (*Client, error) {
 		return nil, err
 	}
 	if r.log != nil {
-		c.Log = r.log
+		c.setLog(r.log)
 	}
 	if r.clients == nil {
 		r.clients = map[string]*Client{}
@@ -254,14 +268,24 @@ func (r *Roles) WithLogger(l *slog.Logger) *Roles {
 	defer r.mu.Unlock()
 	r.log = l
 	for _, c := range []*Client{r.Review, r.Triage, r.Validate, r.Router} {
-		if c != nil {
-			c.Log = l
-		}
+		c.setLog(l)
 	}
 	for _, c := range r.clients {
-		c.Log = l
+		c.setLog(l)
 	}
 	return r
+}
+
+// setLog points a client and its fallback at l.
+//
+// The fallback is reached only through its primary, so it is never in the
+// roster the loop above walks. Left out, a fallback's stalls and retries go to
+// a discarding logger, which is silence in the one place this feature exists
+// to make visible.
+func (c *Client) setLog(l *slog.Logger) {
+	for ; c != nil; c = c.fallback {
+		c.Log = l
+	}
 }
 
 // logger is Log, or a discarding logger.

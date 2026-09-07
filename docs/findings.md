@@ -9,15 +9,43 @@ than the original figures.
 
 ## The headline
 
-On a corpus of 8 single-file fixtures with planted defects, judged by
-`openai/gpt-5.6-terra`:
+**Detection is ahead of Incumbent on both counted corpora. Noise is the open
+question, and the change that improved detection made noise worse.** That is
+the whole of what is supportable, and the two halves have to be read together.
 
-**open-nitpick is competitive with Incumbent on detection and behind it on
-precision.** Nothing stronger than that is supportable yet.
+Counted, no judge, on real pull requests (2026-09-03, 44 pull requests on
+`jdziat/nitpick-bench`, [remediation.md](remediation.md)):
 
-Concretely, `anthropic/claude-sonnet-4.6` at 3 runs per fixture: detection 71%,
-precision 0.82, grade 3.69 against 3.90. The grade gap is inside the judge's own
-noise and is **not** a ranking.
+| | open-nitpick | Incumbent |
+|---|---|---|
+| plants located | 33 of 41 | 30 of 41 |
+| noise findings over 44 pull requests | 1 | 5 |
+
+Counted, no judge, on the held-out fixture corpus ([v1 head-to-head](#v1-head-to-head),
+13 plants): **10 of 13 against 4 of 13**. Restricted to Incumbent's own
+reporting range, `critical` through `warning`, **8 of 8 against 4 of 8**. Single
+run against single run, so the run-count asymmetry does not flatter us: 9 of 11
+against 4.
+
+**The cost side moved the wrong way.** Re-running the same 44 pull requests
+under the remediated `v1` (2026-09-04) took detection to 36 of 41 and noise
+findings from 1 to 17, over 53 inline comments. Detection improved by three
+plants and noise by sixteen findings, which is not a trade this project has
+argued is worth it, and it is the reason the headline stops at detection.
+
+Prefer these numbers to the judged ones below them. They come from counting
+plants and findings, not from a model scoring a review.
+
+### The older judged corpus
+
+Superseded by the two above, kept because the corrections under it are the
+reason this document has a measurement section at all.
+
+On 8 single-file fixtures judged by `openai/gpt-5.6-terra`, open-nitpick was
+competitive with Incumbent on detection and behind it on precision:
+`anthropic/claude-sonnet-4.6` at 3 runs per fixture, detection 71%, precision
+0.82, grade 3.69 against 3.90. The grade gap is inside the judge's own noise and
+is **not** a ranking.
 
 **Two figures that used to sit in that sentence are removed rather than
 restated.** It read "detection 71% against Incumbent's 75%, precision 0.82
