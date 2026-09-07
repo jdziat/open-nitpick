@@ -95,3 +95,44 @@ func TestAFindingWithASuggestionStillCarriesTheBlock(t *testing.T) {
 		t.Error("the fix prompt was suppressed by the suggestion")
 	}
 }
+
+// Title and Rationale are model-authored and can quote the diff under review.
+// A triple backtick in either must not close the block's fence early and spill
+// the rest, the closing tag included, as rendered markdown.
+func TestTheAgentPromptFenceOutlivesBackticksInModelText(t *testing.T) {
+	f := agentFinding()
+	f.Rationale = "the guard reads:\n```go\nif m == nil { return }\n```\nand b.go depends on it"
+
+	body := renderComment(f, true, map[string][]string{"internal/a.go": {"internal/b.go"}})
+
+	// The closing tag survives, which it cannot if the fence was broken.
+	if !strings.Contains(body, "</details>") {
+		t.Fatalf("the block did not close:\n%s", body)
+	}
+
+	// The fence is wider than anything inside it.
+	start := strings.Index(body, "<details><summary>Fix prompt</summary>")
+	block := body[start:]
+	fence := block[strings.Index(block, "`"):]
+	fence = fence[:strings.IndexFunc(fence, func(r rune) bool { return r != '`' })]
+	if len(fence) < 4 {
+		t.Errorf("fence is %d backticks against content holding three:\n%s", len(fence), body)
+	}
+}
+
+// An analyzer read one file and knows nothing of the batch, so naming its
+// mates would assert reading that did not happen.
+func TestAnAnalyzerFindingDoesNotClaimItReadTheBatch(t *testing.T) {
+	f := agentFinding()
+	f.FromAnalyzer = true
+	f.Source = "golangci-lint(errcheck)"
+
+	body := renderComment(f, true, map[string][]string{"internal/a.go": {"internal/b.go"}})
+
+	if strings.Contains(body, "also read:") {
+		t.Errorf("an analyzer finding claimed it read the batch:\n%s", body)
+	}
+	if !strings.Contains(body, "found by:  golangci-lint(errcheck)") {
+		t.Errorf("the analyzer is not named:\n%s", body)
+	}
+}

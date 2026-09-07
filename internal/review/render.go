@@ -130,31 +130,42 @@ func batchMates(plan *bundle.Plan) map[string][]string {
 // nothing in a finding records that, and inventing it would be the kind of
 // unmeasured claim this project refuses everywhere else.
 func agentPromptBlock(f Finding, read map[string][]string) string {
-	var b strings.Builder
+	var inner strings.Builder
 
-	b.WriteString("\n<details><summary>Fix prompt</summary>\n\n```\n")
-	fmt.Fprintf(&b, "anchor:    %s\n", span(f.Path, f.Line, f.EndLine))
+	fmt.Fprintf(&inner, "anchor:    %s\n", span(f.Path, f.Line, f.EndLine))
 	for _, also := range f.AlsoAt {
-		fmt.Fprintf(&b, "also:      %s\n", span(f.Path, also.Line, also.EndLine))
+		fmt.Fprintf(&inner, "also:      %s\n", span(f.Path, also.Line, also.EndLine))
 	}
 	if f.Class != "" {
-		fmt.Fprintf(&b, "class:     %s\n", f.Class)
+		fmt.Fprintf(&inner, "class:     %s\n", f.Class)
 	}
-	fmt.Fprintf(&b, "severity:  %s\n", f.Sev())
+	fmt.Fprintf(&inner, "severity:  %s\n", f.Sev())
 	if src := strings.TrimSpace(f.Source); src != "" {
-		fmt.Fprintf(&b, "found by:  %s\n", src)
-	}
-	if mates := read[f.Path]; len(mates) > 0 {
-		fmt.Fprintf(&b, "also read: %s\n", strings.Join(mates, ", "))
+		fmt.Fprintf(&inner, "found by:  %s\n", src)
 	}
 
-	fmt.Fprintf(&b, "\n%s\n", strings.TrimSpace(f.Title))
+	// Only for a finding a model wrote. An analyzer read one file and knows
+	// nothing of the batch, so naming its mates here would assert reading that
+	// did not happen, which is the claim this block promises not to make.
+	if mates := read[f.Path]; len(mates) > 0 && !f.FromAnalyzer {
+		fmt.Fprintf(&inner, "also read: %s\n", strings.Join(mates, ", "))
+	}
+
+	fmt.Fprintf(&inner, "\n%s\n", strings.TrimSpace(f.Title))
 	if r := strings.TrimSpace(f.Rationale); r != "" {
-		fmt.Fprintf(&b, "\n%s\n", r)
+		fmt.Fprintf(&inner, "\n%s\n", r)
 	}
-	b.WriteString("```\n\n</details>\n")
 
-	return b.String()
+	// The fence is widened past anything the content holds. Title and
+	// Rationale are model-authored and can quote the diff under review, so a
+	// triple backtick in either would close a fixed fence early and spill the
+	// rest, the closing tag included, as rendered markdown in a comment posted
+	// under this tool's name.
+	body := inner.String()
+	fence := fenceFor(body)
+
+	return fmt.Sprintf("\n<details><summary>Fix prompt</summary>\n\n%s\n%s%s\n\n</details>\n",
+		fence, body, fence)
 }
 
 // span renders a path and the lines a finding covers.
