@@ -40,6 +40,8 @@ var Rules = []Rule{
 	{"oversized-doc-comment", "a doc comment longer than the declaration it documents", "keep the one sentence a caller needs; move the rest to a design note or delete it"},
 	{"triplet-rhythm", "three parallel adjectives or nouns in a row (fast, reliable, and secure)", "keep the one that is true and specific; the other two are padding"},
 	{"antithesis", "a sentence that sets up a contrast to sound decisive (not a nicety, it is a correctness matter)", "state the second half only; the negated half was never the claim"},
+	{"shouting-emphasis", "capitals used for emphasis in a comment (NOT, WHOLE, MUST)", "the sentence should carry the emphasis; if it cannot, the sentence is the problem"},
+	{"changelog-comment", "a comment narrating what the code used to do or which bug it fixed", "say what the code does now; the history belongs in the commit that changed it"},
 	{"prose-cadence", "a whole file written in one rhythm: appositive tails, colon expansions and three-part lists, above 10 per 100 lines", "vary the sentences. Split the longest into two, and let some of them end where the fact ends"},
 }
 
@@ -62,9 +64,26 @@ var (
 	cadenceTriplet = regexp.MustCompile(`[^.;:!?]{4,}?,[^.;:!?]{4,}?, and [^.;:!?]{3,}`)
 	cadenceColon   = regexp.MustCompile(`\b(is|are|was|were|means|says)\b[^.;!?]{0,40}:\s+[a-z]`)
 	cadenceTail    = regexp.MustCompile(`,\s+which is [^.;!?]{5,}`)
-	identRe        = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
-	declRe         = regexp.MustCompile(`^\s*(func |def |class |type |export |function |const |let |var |public |private |protected |static |async )`)
-	stopword       = map[string]bool{"the": true, "and": true, "for": true, "this": true, "that": true, "with": true, "from": true, "into": true, "then": true, "returns": true, "return": true, "a": true, "an": true, "of": true, "to": true, "is": true}
+
+	// Emphasis in capitals, from a CLOSED LIST of ordinary words.
+	//
+	// The first version matched any capitalized run of three or more and
+	// flagged README, TOML, PATH and every screaming-snake constant in the
+	// tree: 2,074 hits, most of them names. A name in capitals is a name. What
+	// this is for is the sentence that shouts one of its own words because the
+	// sentence could not carry the weight, so the list is the words that get
+	// shouted rather than a rule about shape.
+	shouting = regexp.MustCompile(`\b(NOT|MUST|NEVER|ALWAYS|ONLY|EVERY|WHOLE|ALL|ANY|` +
+		`BEFORE|AFTER|READ|SENT|UNDERSTOOD|HELD|THIS|THAT|WAS|WERE|ARE|DOES|DID|WILL|` +
+		`AND|BUT|NOTHING|NOBODY|ANYTHING|EACH|BOTH|SAME|WRONG|RIGHT|REAL|ACTUALLY)\b`)
+
+	// A comment telling the story of its own file: what the code used to do,
+	// which bug this fixed, what a previous version got wrong. It is a commit
+	// message that outlived its commit.
+	changelog = regexp.MustCompile(`(?i)\b(used to (be|say|live|read|do|call|apply)|previously|the bug (this|that) (fixes|caused)|this used to|was once|had been|outlived|before this (change|fix)|the fix (above|below)|no longer (does|says|reads))\b`)
+	identRe   = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
+	declRe    = regexp.MustCompile(`^\s*(func |def |class |type |export |function |const |let |var |public |private |protected |static |async )`)
+	stopword  = map[string]bool{"the": true, "and": true, "for": true, "this": true, "that": true, "with": true, "from": true, "into": true, "then": true, "returns": true, "return": true, "a": true, "an": true, "of": true, "to": true, "is": true}
 )
 
 // Scan finds the tells in one file. Prose files (Markdown, plain text) are
@@ -245,6 +264,8 @@ func lineRules(p string, n int, text string) []Tell {
 	add("filler-qualifier", filler.FindStringIndex(text))
 	add("chat-prose", chat.FindStringIndex(text))
 	add("antithesis", antithesis.FindStringIndex(text))
+	add("changelog-comment", changelog.FindStringIndex(text))
+	add("shouting-emphasis", shouting.FindStringIndex(text))
 	if m := triplet.FindStringSubmatchIndex(text); m != nil {
 		a, b, c := strings.ToLower(text[m[2]:m[3]]), strings.ToLower(text[m[4]:m[5]]), strings.ToLower(text[m[6]:m[7]])
 		// A list of three nouns (tools, files, names) is a list; the tell
