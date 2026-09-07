@@ -14,9 +14,17 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      # The toolchain go.mod declares, not the newest one. golangci-lint is
+      # pinned in tools/go.mod and its type checker refuses export data from a
+      # Go newer than the one it was built against: `stable` reaching go1.27.1
+      # failed every analyzer test with "export data version 4 is greater than
+      # maximum supported version 2". Pinning the analyzer without pinning the
+      # toolchain moves the floating part rather than removing it. The build
+      # job below stays on `stable`, so a Go release that breaks this module
+      # is still caught, just not by the job that measures analyzer output.
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: stable
+          go-version-file: go.mod
 
       - name: Verify formatting
         run: |
@@ -72,9 +80,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # go.mod's toolchain, for the reason the test job pins it: golangci-lint
+      # 2.8.0 cannot read a newer Go's export data.
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: stable
+          go-version-file: go.mod
       # Built with the repository's own toolchain: a prebuilt golangci-lint
       # compiled with an older Go refuses a go.mod that targets a newer one.
       # The version is tools/go.mod's, the same one the analyzer tests measure
