@@ -59,3 +59,31 @@ func TestUnknownAssociationsAreRejectedByValidation(t *testing.T) {
 		t.Errorf("a valid block was rejected: %v", errs)
 	}
 }
+
+// The fix gate refuses "none" whatever the config says. Opening who may spend
+// to everyone is a decision an operator can make; opening who may write to the
+// repository to everyone is not.
+func TestTheFixGateRefusesNoneEvenWhenWrittenDown(t *testing.T) {
+	open := FixRespond{From: []Association{AssocNone}}
+
+	for _, assoc := range []string{"NONE", "CONTRIBUTOR", "COLLABORATOR", "OWNER", ""} {
+		if open.Allows(assoc) {
+			t.Errorf("a fix gate listing none allowed %q", assoc)
+		}
+	}
+
+	if errs := open.validate(); len(errs) == 0 {
+		t.Error("review.respond.fix.from: none was accepted by validation")
+	}
+
+	// The default set still works, and still excludes a contributor.
+	def := FixRespond{}
+	for assoc, want := range map[string]bool{
+		"OWNER": true, "MEMBER": true, "COLLABORATOR": true,
+		"CONTRIBUTOR": false, "FIRST_TIME_CONTRIBUTOR": false, "": false,
+	} {
+		if got := def.Allows(assoc); got != want {
+			t.Errorf("default fix gate allows %q = %v, want %v", assoc, got, want)
+		}
+	}
+}

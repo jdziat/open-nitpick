@@ -44,6 +44,15 @@ type Budget struct {
 	// optional router, and validation. One, the default, adds nothing.
 	Overhead float64 `yaml:"overhead"`
 
+	// MaxFixSpend is the ceiling on one fix pass, in US dollars, priced at the
+	// same rates. Zero, the default, is no ceiling and no estimation.
+	//
+	// Its own key rather than a share of MaxSpend. FitToBudget trims a review
+	// by dropping the lowest-ranked FILES from a packed plan, and a fix pass
+	// has no plan and no ranking to trim, so the two ceilings cannot share
+	// machinery. One number covering both would suggest they do.
+	MaxFixSpend float64 `yaml:"max_fix_spend"`
+
 	// MinFiles is how many of the highest-ranked files are reviewed even when
 	// the estimate says they do not fit. Zero refuses to exceed the ceiling at
 	// any cost, and a diff whose cheapest file is over it is then reviewed not
@@ -115,6 +124,14 @@ func (b Budget) validate() []error {
 
 	if b.MaxSpend < 0 {
 		errs = append(errs, errors.New("review.budget.max_spend cannot be negative"))
+	}
+	if b.MaxFixSpend < 0 {
+		errs = append(errs, errors.New("review.budget.max_fix_spend cannot be negative"))
+	}
+	if b.MaxFixSpend > 0 && (b.Prices.Input <= 0 || b.Prices.Output <= 0) {
+		errs = append(errs, errors.New(
+			"review.budget.max_fix_spend needs review.budget.prices.input and .output, "+
+				"in US dollars per million tokens, or the ceiling cannot be computed"))
 	}
 
 	switch b.EffectiveScope() {

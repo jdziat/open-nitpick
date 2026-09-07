@@ -201,6 +201,14 @@ type Models struct {
 	// never call it.
 	Router *ModelSpec `yaml:"router"`
 
+	// Fix is the model that edits code when a maintainer asks for a finding to
+	// be applied. It has no default, deliberately: the model that reviews well
+	// is not the one that edits well, every measurement in this repository
+	// scores a reviewer on recall and noise, and neither says whether a model
+	// can produce a change that compiles. Falling back to models.default would
+	// ship an unmeasured capability under a measured model's name.
+	Fix *ModelSpec `yaml:"fix"`
+
 	// Routes choose the reviewing model per batch. The first route whose
 	// match holds wins; a batch no route matches is reviewed by the review
 	// model. Every model here overlays Default the way a role does, so a
@@ -319,6 +327,17 @@ func (m Models) ResolveEnsemble(r *Route) []ModelSpec {
 		out = append(out, m.Default.overlay(s))
 	}
 	return out
+}
+
+// ResolveFix returns the model that edits code, and false when none is named.
+//
+// Unlike a role, this has no fallback to the default model. A caller with no
+// fix model refuses rather than reaching for the reviewer.
+func (m Models) ResolveFix() (ModelSpec, bool) {
+	if m.Fix == nil {
+		return ModelSpec{}, false
+	}
+	return m.Default.overlay(*m.Fix), true
 }
 
 // ResolveRouter returns the router spec, overlaid on Default, and whether

@@ -33,8 +33,13 @@ jobs:
     # `nitpick respond` refuses the same set by itself (review.respond.from),
     # so this is the cheap half of the same gate: it stops the runner from
     # starting rather than stopping it after checkout.
+    #
+    # A fix is answered by nitpick-fix.yml, which carries contents: write and
+    # a fork test this workflow does not need. Excluded here so one ask does
+    # not start two runs that both try to create the same branch.
     if: >-
       contains(github.event.comment.body, '@open-nitpick') &&
+      !contains(github.event.comment.body, '@open-nitpick fix') &&
       (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request != null) &&
       contains(
         fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),

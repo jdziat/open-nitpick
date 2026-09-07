@@ -67,6 +67,56 @@ claim beside a measured one.
 The block appears on every finding, including one carrying a suggestion GitHub
 can apply: the suggestion says what to type, not where else the finding reaches.
 
+## Applying a finding
+
+`@open-nitpick fix` on a review thread applies that finding; `@open-nitpick fix
+all` applies every published finding it can. The result is a draft pull request
+against the branch under review, never a write to that branch.
+
+```yaml
+models:
+  fix:
+    model: an-editing-model   # provider inherited from models.default
+
+review:
+  budget:
+    max_fix_spend: 0.50       # priced with the same rates as max_spend
+  respond:
+    fix:
+      from: [owner, member]   # defaults to owner, member, collaborator
+      max_per_pull_request: 5
+```
+
+There is no default fix model, deliberately. Every measurement in this
+repository scores a reviewer on recall and noise, and neither says whether a
+model can produce a change that compiles, so falling back to `models.default`
+would ship an unmeasured capability under a measured model's name. Without
+`models.fix` the command refuses and says why.
+
+**Nothing is compiled, run, tested, formatted or linted before the pull request
+opens.** There is no checkout: the change is written through the forge's data
+API. The body says so, and the checks on the fix pull request are the only
+verification, which is why the workflow requires the GitHub App token. A pull
+request opened with the default `GITHUB_TOKEN` raises no workflow, so it would
+arrive with no checks at all while its body says the checks are the
+verification.
+
+Four refusals, and they are separate on purpose:
+
+- `review.respond.fix.from` may not contain `none`. Deciding that anyone may
+  spend your model credit is a choice; deciding that anyone may write to your
+  repository is not one, so it is refused at validation.
+- The asker needs write or admin permission, which the forge is asked for
+  directly. `COLLABORATOR` covers read-level access, so an association is the
+  cheap half of this gate rather than the gate.
+- A pull request from a fork is refused, in the workflow and again at the write.
+- Only paths the pull request already changes may be written, and `.github`,
+  `.nitpick.yaml` and `.git` are refused whatever the diff says.
+
+Whole files are replaced, so a fix pull request reverts anything pushed after
+the revision it was written against. The run refuses when it notices, and the
+body names the revision either way.
+
 ## When a model cannot answer
 
 `fallback` escalates to a different model rather than retrying the same one:
