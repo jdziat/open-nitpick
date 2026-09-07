@@ -39,11 +39,9 @@ type Entry struct {
 	// ContextLines is how many lines of surrounding code the window kept on
 	// each side of every change, meaningful only when Truncated.
 	//
-	// It is recorded rather than assumed because the width is now chosen per
-	// file against the budget. A reader who cannot tell a 200-line window from
-	// a 12-line one cannot tell a well-contextualised review from a thin one,
-	// and Render states it in the prompt so the model knows how much of the
-	// file it is NOT being shown.
+	// The width is chosen per file against the budget, so it has to be
+	// recorded. Render puts it in the prompt, which tells the model how much
+	// of the file it is not being shown.
 	ContextLines int
 
 	// Instructions are the configured path-scoped prompts that apply here.

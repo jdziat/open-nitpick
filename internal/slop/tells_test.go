@@ -161,6 +161,62 @@ func TestCadenceIgnoresInlineCode(t *testing.T) {
 	}
 }
 
+// The rule was prose-only, so a struct-field comment built out of parallel
+// clauses was invisible. This is the shape a reader picks out of a diff first.
+func TestCadenceReadsSourceComments(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("package a\n\n")
+	for i := 0; i < 60; i++ {
+		b.WriteString("// The width is chosen per file: it has to be recorded.\n")
+		b.WriteString("// A reader who cannot tell one, another, and a third apart is lost.\n")
+		b.WriteString("var x int\n\n")
+	}
+	if got := Scan("a.go", b.String()); !strings.Contains(rules(got), "prose-cadence") {
+		t.Errorf("dense comments were not flagged: %s", rules(got))
+	}
+
+	// commentLines must return comment text and nothing else. Code lines carry
+	// colons and commas that are syntax, and cadence would score them.
+	//
+	// Call commentLines directly. Asserting through Scan would pass whether or
+	// not the filter works: cadence skips indented lines, and a file this short
+	// is under its 40-line floor, so Scan returns zero either way.
+	code := []string{
+		"package a",
+		"var A, B, and C = 1, 2, 3",
+		"type T struct{ X, Y, and Z int }",
+		"// the only comment: it carries the voice",
+		"func f() { m := map[string]int{\"a\": 1, \"b\": 2}; _ = m }",
+	}
+	lines := commentLines(code, "//")
+	if len(lines) != 1 {
+		t.Fatalf("commentLines returned %d line(s), want the one comment: %q", len(lines), lines)
+	}
+	if !strings.Contains(lines[0], "carries the voice") {
+		t.Errorf("commentLines returned %q, want the comment body", lines[0])
+	}
+}
+
+// A raw string literal holds other people's text. This package's own tests
+// embed fixtures whose doc comments start with the Go comment marker.
+func TestRawStringLiteralsAreNotScanned(t *testing.T) {
+	src := "package a\n\n" +
+		"var fixture = `\n" +
+		"/** toCents takes DOLLARS — and it MUST NOT round. */\n" +
+		"fun toCents(d: Double): Long = 0\n" +
+		"`\n\n" +
+		"// A real comment with an em dash — this one counts.\n" +
+		"func f() {}\n"
+
+	got := Scan("a.go", src)
+	if len(got) != 1 {
+		t.Fatalf("tells = %+v, want only the real comment's em dash", got)
+	}
+	if got[0].Line != 8 {
+		t.Errorf("flagged line %d, want 8: the fixture's own text was scanned", got[0].Line)
+	}
+}
+
 // Shouting is a closed list of ordinary words, not a shape. A name in capitals
 // is a name.
 func TestShoutingIsWordsNotShape(t *testing.T) {

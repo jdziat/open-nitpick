@@ -101,8 +101,30 @@ func Scan(p, content string) []Tell {
 		}
 		block = nil
 	}
+	inRawString := false
 	for i, raw := range lines {
 		n := i + 1
+
+		// A raw string literal holds other people's text. This package's own
+		// tests embed Kotlin and TypeScript fixtures whose doc comments start
+		// with the Go comment marker, and scanning them reported findings
+		// against source that is data here.
+		//
+		// Counting backquotes per line tracks the literal without parsing:
+		// an odd count opens or closes one. It is wrong for a backquote inside
+		// an interpreted string, which nothing in this tree writes.
+		if !prose {
+			if inRawString {
+				if strings.Count(raw, "`")%2 == 1 {
+					inRawString = false
+				}
+				continue
+			}
+			if strings.Count(raw, "`")%2 == 1 {
+				inRawString = true
+			}
+		}
+
 		var text string
 		if prose {
 			t := strings.TrimSpace(raw)
@@ -134,8 +156,14 @@ func Scan(p, content string) []Tell {
 		out = append(out, lineRules(p, n, text)...)
 	}
 	flush("")
+	// Cadence over prose files whole, and over source files' COMMENTS, which
+	// is where the same voice lands in Go. The rule was prose-only and so
+	// could not see a five-line struct-field comment built out of parallel
+	// clauses, which is the shape a reader picks out of a diff first.
 	if prose {
 		out = append(out, cadence(p, lines)...)
+	} else if comment != "" {
+		out = append(out, cadence(p, commentLines(lines, comment))...)
 	}
 	sort.SliceStable(out, func(a, b int) bool {
 		if out[a].Line != out[b].Line {
@@ -143,6 +171,21 @@ func Scan(p, content string) []Tell {
 		}
 		return out[a].Rule < out[b].Rule
 	})
+	return out
+}
+
+// commentLines extracts the comment text from a source file, so the cadence
+// rule measures what was written rather than what was coded.
+//
+// A line of code carries colons, commas and lists that are syntax, not voice,
+// and counting them would score a file by how many struct fields it declares.
+func commentLines(lines []string, marker string) []string {
+	var out []string
+	for _, l := range lines {
+		if c, ok := commentText(l, marker); ok {
+			out = append(out, c)
+		}
+	}
 	return out
 }
 
