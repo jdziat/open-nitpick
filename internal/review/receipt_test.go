@@ -70,11 +70,12 @@ func TestTheReceiptIsDeterministic(t *testing.T) {
 		Files: diff.Files{{Path: "a.go"}}, Plan: planOfFiles(1),
 		Linters: []LinterStatus{{Linter: "ruff", Outcome: LinterRan}, {Linter: "actionlint", Outcome: LinterRan}},
 	}
-	if receipt(report) != receipt(report) {
-		t.Error("two renderings of one report differ")
+	first, second := receipt(report), receipt(report)
+	if first != second {
+		t.Errorf("two renderings of one report differ:\n%s\n%s", first, second)
 	}
-	if !strings.Contains(receipt(report), "actionlint, ruff") {
-		t.Errorf("analyzers are not in name order: %q", receipt(report))
+	if !strings.Contains(first, "actionlint, ruff") {
+		t.Errorf("analyzers are not in name order: %q", first)
 	}
 }
 
