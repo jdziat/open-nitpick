@@ -28,8 +28,16 @@ go install github.com/jdziat/open-nitpick/cmd/nitpick@latest
 export LLM_PROVIDER=synthetic LLM_MODEL=hf:moonshotai/Kimi-K3
 export SYNTHETIC_API_KEY=syn_...
 
+nitpick init            # writes .nitpick.yaml for this repository
 nitpick review          # reviews your uncommitted changes
 ```
+
+`init` is optional: with those two variables set, a review runs with no config
+file at all. What it buys is a file that names the model and the analyzers this
+checkout's languages call for, with every other key written out at its shipped
+default and commented, so the settings worth changing are in front of you rather
+than in the documentation. It refuses to overwrite an existing file without
+`-force`, and `-workflow` writes the Actions workflow beside it.
 
 The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR),
 which serves open-weight models on a flat subscription. Their pricing page read

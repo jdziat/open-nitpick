@@ -44,9 +44,9 @@ func TestSuggestNeverNamesSemgrep(t *testing.T) {
 	}
 }
 
-// The suggestion has to agree with what a review would actually run: an
-// analyzer suggested here and skipped there would be a config that documents a
-// tool the repository never sees.
+// The suggestion has to agree with what a review runs: an analyzer suggested
+// here and skipped there would be a config that documents a tool the
+// repository never sees.
 func TestSuggestAgreesWithTheDetectionAReviewUses(t *testing.T) {
 	files := []string{"main.go", "Dockerfile", "chart/values.yaml"}
 	suggested := names(Suggest(files))

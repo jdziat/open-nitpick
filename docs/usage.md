@@ -1,5 +1,32 @@
 # Usage
 
+## Starting a repository off
+
+```bash
+nitpick init                            # writes .nitpick.yaml here
+nitpick init -provider synthetic -model hf:moonshotai/Kimi-K3
+nitpick init -workflow                  # also .github/workflows/nitpick.yml
+nitpick init -force                     # overwrite an existing file
+```
+
+The file it writes is the shipped defaults, spelled out and commented, plus the
+one thing a default cannot supply: a model, taken from `-provider` and `-model`
+or from `LLM_PROVIDER` and `LLM_MODEL`. Because every value written is already
+the one in force, deleting a key changes nothing and the file can be trimmed to
+taste.
+
+The analyzers are the part hardest to get right by hand. `init` matches this
+checkout against the same targets a review detects on, names the ones that ship
+enabled in `linters.enabled`, and lists the rest as comments: those the catalog
+runs on its own when installed, and those that need a configuration from outside
+the repository or your word that their code may run. Nothing is enabled that
+would fail a run under `mode: strict` on a runner that lacks it.
+
+Nothing is written until the generated file has been loaded and validated, so a
+first command cannot leave a repository with a config the reviewer rejects. With
+no model named anywhere the `models` block is written commented out and `init`
+says which two variables would fill it.
+
 ## Locally
 
 ```bash

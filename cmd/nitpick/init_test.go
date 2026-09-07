@@ -100,10 +100,9 @@ func TestInitLeavesEnabledEmptyWhenNoDefaultAnalyzerApplies(t *testing.T) {
 	}
 }
 
-// An analyzer that runs itself is named in a comment and NOT in enabled.
-// Putting it in enabled would make its absence an error under mode: strict,
-// which is a promise about the operator's runner that init has no standing to
-// make.
+// An analyzer that runs itself belongs in a comment, not in enabled. Putting
+// it in enabled would make its absence an error under mode: strict, which is a
+// promise about the operator's runner that init has no standing to make.
 func TestInitCommentsTheAutoDetectedAnalyzersRatherThanEnablingThem(t *testing.T) {
 	root := initRepo(t, "main.go", "go.mod", "Dockerfile", ".github/workflows/ci.yml")
 	runInitIn(t, "-repo", root, "-provider", "openai", "-model", "gpt-4o")

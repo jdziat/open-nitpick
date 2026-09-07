@@ -3,6 +3,11 @@
 Everything is optional: with no config file at all, `LLM_PROVIDER` and
 `LLM_MODEL` are enough to run. `.nitpick.yaml` at the repository root:
 
+`nitpick init` writes one of these for you, commented, with the analyzers this
+checkout's languages call for. The reference below is what to reach for when
+changing a key it left at its default. `nitpick explain-config` prints what any
+of it resolves to without spending a token.
+
 ```yaml
 models:
   default:

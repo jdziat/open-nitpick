@@ -46,8 +46,8 @@ func Builtins() []CatalogEntry {
 // It is what `nitpick init` writes a config from, and it answers the question
 // a person is least likely to get right by hand: which of thirty-three
 // analyzers this repository's languages call for. Matching is the same
-// matching a review does, so an analyzer suggested here is one that would
-// actually have targets.
+// matching a review does, so an analyzer suggested here is one that would have
+// targets.
 //
 // An entry with no inputs at all is never suggested. semgrep is the case: its
 // coverage is its rules, so a checkout cannot imply it.
