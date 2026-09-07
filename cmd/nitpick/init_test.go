@@ -263,9 +263,13 @@ func read(t *testing.T, path string) string {
 	return string(data)
 }
 
-// The generated file is renamed into place, so a run that fails validation
-// leaves what was there before and leaves nothing behind.
-func TestAFailedGenerationLeavesTheDirectoryAsItWas(t *testing.T) {
+// The generated file is renamed into place, so nothing is left beside it and a
+// second run with the same inputs writes the same file.
+//
+// This does not exercise a validation failure. The generator has no input that
+// produces a config the loader rejects, so there is nothing to inject from out
+// here; what a failure would leave behind is covered by the rename itself.
+func TestInitLeavesNoTemporaryFileAndIsIdempotent(t *testing.T) {
 	root := initRepo(t, "main.go", "go.mod")
 	runInitIn(t, "-repo", root, "-provider", "openai", "-model", "gpt-4o")
 
