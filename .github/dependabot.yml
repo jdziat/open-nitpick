@@ -1,0 +1,30 @@
+# Dependabot keeps the pins current, since nothing in this repository is
+# allowed to float.
+#
+# The analyzer version is the reason this file exists. internal/linters
+# measures golangci-lint's real output and internal/linters/golangci.yml is
+# written against one release, so a floating version means CI can go red on a
+# pull request that changed nothing, or a behaviour change can land unseen.
+# Pinning alone would leave the pin to rot, so the bump arrives as a pull
+# request that has to pass those same tests before it lands.
+version: 2
+updates:
+  # tools/go.mod holds the analyzer binaries CI installs. It is separate from
+  # the root module so golangci-lint's dependency graph stays out of the go.sum
+  # anyone installing `nitpick` downloads.
+  - package-ecosystem: gomod
+    directory: /tools
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+
+  # The workflows pin every action to a commit SHA with the tag in a comment.
+  # Dependabot rewrites both together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
