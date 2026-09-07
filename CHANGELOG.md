@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.6.0](https://github.com/jdziat/open-nitpick/compare/v1.5.1...v1.6.0) (2026-09-07)
+
+
+### Features
+
+* **review:** the receipt tells a routine skip from a hole ([#26](https://github.com/jdziat/open-nitpick/issues/26)) ([03dd406](https://github.com/jdziat/open-nitpick/commit/03dd4063978ef28505301e8ba67f18def733a88c))
+* **review:** the walkthrough is counted, not written ([#23](https://github.com/jdziat/open-nitpick/issues/23)) ([4c39920](https://github.com/jdziat/open-nitpick/commit/4c3992029f9c54dff804ce3387f5825f6adef8c7))
+* **triage:** the reviewer's words survive triage, behind a flag ([#21](https://github.com/jdziat/open-nitpick/issues/21)) ([80ca927](https://github.com/jdziat/open-nitpick/commit/80ca927dc7614bd981a38f77cfd4d1a3b727a5b3))
+
+
+### Fixes
+
+* **review:** the receipt counts files, not the style-pass marker ([#24](https://github.com/jdziat/open-nitpick/issues/24)) ([e6a330d](https://github.com/jdziat/open-nitpick/commit/e6a330db3bb987f57f6d871dc53adeeccbcfb526))
+
+
+### Documentation
+
+* **triage:** a second opinion on the invention options, and my errors ([#20](https://github.com/jdziat/open-nitpick/issues/20)) ([8aa117c](https://github.com/jdziat/open-nitpick/commit/8aa117c44d6095328212d818d528969618cae039))
+
 ## [1.5.1](https://github.com/jdziat/open-nitpick/compare/v1.5.0...v1.5.1) (2026-09-07)
 
 
