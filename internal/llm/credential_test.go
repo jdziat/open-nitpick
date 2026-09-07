@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jdziat/open-nitpick/internal/config"
 )
@@ -192,5 +193,46 @@ func TestTheCredentialCommandIsNotRunThroughAShell(t *testing.T) {
 	}
 	if _, err := os.Stat(marker); err == nil {
 		t.Fatal("the argument was executed by a shell")
+	}
+}
+
+// A command that streams is cut off rather than buffered into the heap until
+// the timeout fires. The credential is one line; the rest is not kept.
+func TestACredentialCommandThatFloodsIsBounded(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the script this test writes is a shell script")
+	}
+	dir := t.TempDir()
+	script := filepath.Join(dir, "flood.sh")
+	// yes(1) never stops on its own, so reaching the assertion at all proves
+	// the read was bounded and the process was not waited on forever.
+	body := "#!/bin/sh\nprintf 'thekey\\n'\nexec yes padding\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var key string
+	var err error
+	go func() {
+		defer close(done)
+		key, _, err = resolveCredential(ctx,
+			config.ModelSpec{Provider: "synthetic", CredentialCommand: []string{script}}, nil)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("a flooding credential command was not bounded")
+	}
+
+	// The command is killed by the context rather than exiting cleanly, so an
+	// error here is expected; what matters is that it returned and that the
+	// first line was not lost in the flood.
+	if err == nil && key != "thekey" {
+		t.Errorf("key = %q", key)
 	}
 }

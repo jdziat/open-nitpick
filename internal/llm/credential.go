@@ -122,10 +122,15 @@ func runCredentialCommand(ctx context.Context, argv []string) (string, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
+	var stdout, stderr strings.Builder
+	// A credential is one line. Bounding both pipes means a command that
+	// streams, whether by fault or because it was pointed at the wrong thing,
+	// is cut off rather than buffered into the heap until the timeout fires.
+	cmd.Stdout = &limitedWriter{w: &stdout, left: maxCredentialBytes}
+	cmd.Stderr = &limitedWriter{w: &stderr, left: maxCredentialBytes}
 
-	out, err := cmd.Output()
+	err := cmd.Run()
+	out := []byte(stdout.String())
 	if err != nil {
 		if msg := strings.TrimSpace(stderr.String()); msg != "" {
 			return "", fmt.Errorf("credential_command %s: %w: %s", argv[0], err, oneLine(msg))
@@ -140,6 +145,33 @@ func runCredentialCommand(ctx context.Context, argv []string) (string, error) {
 		return "", fmt.Errorf("credential_command %s printed nothing", argv[0])
 	}
 	return key, nil
+}
+
+// maxCredentialBytes bounds what is kept from a credential command's output.
+// A bearer token is a few hundred bytes; this leaves room for a long one and
+// for a multi-line error on the other pipe.
+const maxCredentialBytes = 64 << 10
+
+// limitedWriter keeps the first left bytes and discards the rest, reporting
+// success either way so the command is not killed by a broken pipe for
+// printing more than was wanted.
+type limitedWriter struct {
+	w    *strings.Builder
+	left int
+}
+
+func (l *limitedWriter) Write(p []byte) (int, error) {
+	if l.left > 0 {
+		keep := p
+		if len(keep) > l.left {
+			keep = keep[:l.left]
+		}
+		if _, err := l.w.Write(keep); err != nil {
+			return 0, err
+		}
+		l.left -= len(keep)
+	}
+	return len(p), nil
 }
 
 // oneLine flattens a message for a single-line error.
