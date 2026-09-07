@@ -210,6 +210,15 @@ type PriorComment struct {
 	// published with. See Comment.Fingerprint.
 	Fingerprint string
 	Class       string
+
+	// Body is the comment as published: the title, the rationale, any
+	// suggestion, and the markers.
+	//
+	// A finding is not persisted anywhere. The fingerprint identifies one and
+	// carries nothing, so this text is the only record of what a review said,
+	// and a later run that wants to act on a finding rather than merely
+	// recognise it has nothing else to read.
+	Body string
 }
 
 // ThreadComment is one comment on a review thread, for a conversation's

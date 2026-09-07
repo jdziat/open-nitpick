@@ -118,6 +118,9 @@ const (
 	KindResolve Kind = "resolve"
 	// KindAsk is a question, answered in the thread.
 	KindAsk Kind = "ask"
+	// KindFix asks for the finding to be applied, as a branch and a pull
+	// request. See FixesAll for the "fix all" variant.
+	KindFix Kind = "fix"
 )
 
 // Command reads the mention out of a comment: the kind, and for a question
@@ -138,9 +141,30 @@ func Command(body, mention string) (Kind, string, bool) {
 	case "review", "re-review", "rereview":
 		return KindReview, rest, true
 	case "resolve", "resolved", "done", "fixed":
+		// "fixed" is the person saying they fixed it, and it stays here rather
+		// than joining the case below. It is one letter from its own opposite,
+		// which is the reason this switch matches whole words and not
+		// prefixes: "fix" asks the reviewer to do the work, "fixed" tells it
+		// the work is done.
 		return KindResolve, rest, true
+	case "fix", "apply":
+		return KindFix, rest, true
 	}
 	return KindAsk, rest, true
+}
+
+// FixesAll reports whether a fix command asked for every finding rather than
+// the one thread it was written on.
+//
+// Read from the text rather than carried in Kind, because a second kind for
+// one adverb would put "fix" and "fix all" in different arms of every switch
+// that handles them, and they differ only in how many findings they cover.
+func FixesAll(text string) bool {
+	fields := strings.Fields(strings.ToLower(text))
+	if len(fields) < 2 {
+		return false
+	}
+	return strings.Trim(fields[1], ".!?,") == "all"
 }
 
 // Context is what the model sees beside the question.

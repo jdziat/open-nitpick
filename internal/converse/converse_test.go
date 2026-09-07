@@ -89,3 +89,61 @@ func TestTheAuthorAssociationIsCarriedFromBothEvents(t *testing.T) {
 		t.Errorf("Association = %q, want NONE", ev.Association)
 	}
 }
+
+// "fix" asks the reviewer to do the work; "fixed" tells it the work is done.
+// One letter apart, opposite meanings, and the second was already mapped
+// before the first existed.
+func TestFixIsNotResolve(t *testing.T) {
+	for body, want := range map[string]Kind{
+		"@open-nitpick fix":                    KindFix,
+		"@open-nitpick fix all":                KindFix,
+		"@open-nitpick apply this":             KindFix,
+		"@open-nitpick Fix.":                   KindFix,
+		"@open-nitpick fixed":                  KindResolve,
+		"@open-nitpick fixed in the last push": KindResolve,
+		"@open-nitpick done":                   KindResolve,
+		"@open-nitpick why is this wrong?":     KindAsk,
+	} {
+		got, _, ok := Command(body, "@open-nitpick")
+		if !ok {
+			t.Errorf("%q was not read as a mention", body)
+			continue
+		}
+		if got != want {
+			t.Errorf("Command(%q) = %q, want %q", body, got, want)
+		}
+	}
+}
+
+// "fix all" covers every published finding; "fix" covers the thread it is on.
+func TestFixesAllReadsTheAdverbAndNotThePrefix(t *testing.T) {
+	for text, want := range map[string]bool{
+		"fix all":              true,
+		"fix ALL":              true,
+		"fix all.":             true,
+		"fix all of them":      true,
+		"fix":                  false,
+		"fix this one":         false,
+		"fix allocation logic": false, // the prefix is not the word
+		"":                     false,
+	} {
+		if got := FixesAll(text); got != want {
+			t.Errorf("FixesAll(%q) = %v, want %v", text, got, want)
+		}
+	}
+}
+
+// The text a fix command returns still carries the verb, like every other
+// kind, so a caller reading fields[1] sees the adverb rather than the verb.
+func TestAFixCommandKeepsItsVerbInTheText(t *testing.T) {
+	_, text, ok := Command("@open-nitpick fix all", "@open-nitpick")
+	if !ok {
+		t.Fatal("not read as a mention")
+	}
+	if text != "fix all" {
+		t.Errorf("text = %q, want the whole remainder", text)
+	}
+	if !FixesAll(text) {
+		t.Error("the text a command returns does not satisfy FixesAll")
+	}
+}
