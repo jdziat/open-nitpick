@@ -103,13 +103,12 @@ scores byte-identical input anywhere from 3.66 to 3.98.
 
 ## Status
 
-Early, but usable and measured. These work end to end: the engine, the GitHub
-and local providers, structured output, analyzers, related context in both
-directions, per-batch routing, ensembles, and the Action. A push to a reviewed
-pull request is reviewed incrementally.
+Early. Everything described above is built and runs. What is thin is the
+evidence about review quality. [docs/findings.md](docs/findings.md) sets out
+what has been measured, and the instrument bugs found along the way.
 
-[docs/findings.md](docs/findings.md) records what has been measured. A GitLab
-provider is not built yet.
+GitHub and a local checkout are the only forges. There is no GitLab provider.
+Reviews default to advisory, so nothing blocks a merge until you set `fail_on`.
 
 ## License
 

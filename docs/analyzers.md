@@ -68,10 +68,10 @@ golangci-lint runs isolated under a config open-nitpick ships and ruff runs
 `--isolated`; eslint and semgrep do not run at all until you point them at a
 configuration you control, which is also why they are not in the default
 `enabled` list. Adding them there without setting their config is a mistake
-`mode: strict` will fail on, and that is the point; having them enabled by
-default only meant strict failed on every review. The reason for all of it is the
-one this project already applies to `.nitpick.yaml`: a change may not
-supply the policy it is reviewed under, and analyzer configuration is policy. A
+`mode: strict` should fail on. Having them enabled by default meant strict
+failed on every review instead. All of it follows the rule this project already
+applies to `.nitpick.yaml`. A change may not supply the policy it is reviewed
+under, and analyzer configuration is policy. A
 pull request adding a `.golangci.yml` with `linters: {default: none}` was
 switching off the entire deterministic half of its own review, and the run
 reported success.
@@ -102,7 +102,7 @@ repository the analyzer does not run and says so; it never falls back to the
 defaults it exists to replace. The other three are passed as command-line flags
 (`--max-same-issues 0`, `--max-issues-per-linter 0`, `--uniq-by-line=false`,
 alongside `--path-mode abs`), which means **they apply to your `golangci_config`
-too**. That is deliberately overriding you, and the reason is that none of the
+too**. That deliberately overrides you, because none of the
 four decides which rules run: they decide how much of the analyzer's own output
 survives to be gated, and a finding golangci-lint dropped is one this review
 cannot tell you about. Your `min_severity`, your nitpick level and your own
@@ -147,10 +147,9 @@ open-nitpick's own analyzer config` or `operator config <path>`, `did not run:
 published **on the pull request**, in the summary comment beside the notice about
 a substituted `.nitpick.yaml`, and repeated on stderr; the counts are in the
 collapsed heading, so a reviewer who never opens the block still sees that
-something did not run. The reason is that a review which quietly ran less than
-you think looks exactly like a clean one, and `skipped` is separated from `did
-not run` so that the line which means something is not buried among three that
-never do.
+something did not run. A review that quietly ran less than you think looks like
+a clean one. `skipped` is kept separate from `did not run` so the line that
+means something is not buried among the ones that never do.
 
 `did not run` is not only about missing binaries. golangci-lint reports a failure
 to load your packages *inside the same JSON it reports issues in*, and a pull
