@@ -32,6 +32,64 @@ It is **not read on a runner**, where `CI` or `GITHUB_ACTIONS` is set, because
 nobody there wrote it. `NITPICK_USER_CONFIG=/path/to/config.yaml` names one
 anyway, wherever you set it; `NITPICK_NO_USER_CONFIG=1` switches it off.
 
+## Credentials
+
+Nothing needs configuring. Store the key once and every checkout finds it:
+
+```bash
+nitpick auth set synthetic      # reads the key from standard input
+nitpick auth list               # which providers have one, never what it is
+nitpick auth delete synthetic
+```
+
+That writes to the operating system's keystore under the service
+`open-nitpick` and the provider's name, which is where a review looks when no
+key is configured anywhere. Reading it from standard input keeps it out of the
+shell's history and out of the process table, which is where an environment
+variable puts it.
+
+Resolution runs explicit sources before implicit ones:
+
+| Order | Source | On failure |
+|---|---|---|
+| 1 | `credential_command` | error |
+| 2 | `api_key_keyring`, as `service/account` | error |
+| 3 | `api_key_env` | error |
+| 4 | keystore under `open-nitpick/<provider>` | falls through |
+| 5 | the provider's own variable | the provider reports it |
+
+The first three are what you wrote down for this model, so a failure in one is
+reported rather than fallen past: naming where your key lives says you do not
+want the environment used instead. Step 4 is a convenience, so a miss is
+silent, and a machine with no keystore or a Linux session with no D-Bus behaves
+as it did before.
+
+`credential_command` is a command and its arguments, never a shell line, so no
+character in a config file is interpreted by an expansion. Its standard output
+is the key, trimmed; its standard error is used for the error message and never
+for the key.
+
+```yaml
+# ~/.config/nitpick/config.yaml
+models:
+  default:
+    provider: anthropic
+    model: claude-sonnet-4-5
+    credential_command:
+      ["aws", "secretsmanager", "get-secret-value", "--secret-id", "nitpick/anthropic",
+       "--query", "SecretString", "--output", "text"]
+```
+
+!!! warning "These three keys are dropped from a repository's config"
+
+    `api_key_keyring`, `credential_command` and `api_key_env` join `base_url`,
+    `extra` and `allow_private_endpoint` on the list a repository's own
+    `.nitpick.yaml` may not supply. One chooses which stored secret is read and
+    another runs a program in the job holding your credentials, and a pull
+    request can edit that file. Put them in the user-level config above, which
+    no pull request can reach. Dropped keys are named by
+    `nitpick explain-config`, never silent. See [Trust model](trust-model.md).
+
 ```yaml
 models:
   default:
@@ -40,6 +98,12 @@ models:
     # max_tokens is unset by default: the model's own output maximum applies,
     # and reasoning tokens count against whatever you set here on most providers.
     timeout: 10m                     # default; per model call, not per review
+
+    # Where the credential comes from. All three are optional and all three are
+    # withheld from a repository's own file; see Credentials below.
+    api_key_keyring: open-nitpick/synthetic
+    api_key_env: SYNTHETIC_API_KEY
+    credential_command: ["op", "read", "op://Private/synthetic/credential"]
 
   triage:                          # cheap model for merging and filtering
     provider: synthetic
