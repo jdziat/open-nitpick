@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.1](https://github.com/jdziat/open-nitpick/compare/v1.5.0...v1.5.1) (2026-09-07)
+
+
+### Fixes
+
+* **docs:** the prose tells the word rules could not see ([#17](https://github.com/jdziat/open-nitpick/issues/17)) ([9e0aac0](https://github.com/jdziat/open-nitpick/commit/9e0aac0196dc84ba491e377d2700878656c89762))
+
+
+### Documentation
+
+* the status section and the aphorisms the cadence rule misses ([#19](https://github.com/jdziat/open-nitpick/issues/19)) ([8ad4eea](https://github.com/jdziat/open-nitpick/commit/8ad4eea391e6fe453fa13e98b27ea5595c6b2a67))
+
 ## [1.5.0](https://github.com/jdziat/open-nitpick/compare/v1.4.0...v1.5.0) (2026-09-07)
 
 
