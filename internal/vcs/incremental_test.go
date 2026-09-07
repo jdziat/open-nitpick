@@ -173,3 +173,49 @@ func TestGitHubPublishesRangeComments(t *testing.T) {
 		t.Error("a single-line comment must not carry start_line")
 	}
 }
+
+// A prior comment carries the text it was published with.
+//
+// A finding is persisted nowhere and the fingerprint identifies one without
+// carrying it, so this body is the only record of what the review said. A run
+// that wants to act on a finding rather than recognise it has nothing else to
+// read, and the API call already has the text in hand.
+func TestGitHubPriorReviewKeepsTheCommentBody(t *testing.T) {
+	const published = "**warning · correctness**\n\nGuard removed that a caller depends on\n\n" +
+		"b.go calls this with a nil map on the error path."
+
+	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/pulls/7/reviews"):
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": 30, "body": "Run.\n" + DefaultBotMarker + "\n" + headMarker("beef02")},
+			})
+		case strings.HasSuffix(r.URL.Path, "/pulls/7/comments"):
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": 1, "path": "a.go", "line": 12,
+					"body": published + "\n" + DefaultBotMarker + "\n" + fingerprintMarker("aa11", "correctness")},
+			})
+		default:
+			t.Errorf("unexpected request %s", r.URL.Path)
+		}
+	})
+
+	prior, err := gh.PriorReview(context.Background(), testRef())
+	if err != nil {
+		t.Fatalf("PriorReview: %v", err)
+	}
+	if len(prior.Comments) != 1 {
+		t.Fatalf("comments = %+v", prior.Comments)
+	}
+
+	body := prior.Comments[0].Body
+	if body == "" {
+		t.Fatal("the body was read and discarded")
+	}
+	if !strings.Contains(body, "Guard removed that a caller depends on") {
+		t.Errorf("the title did not survive:\n%s", body)
+	}
+	if !strings.Contains(body, "b.go calls this with a nil map") {
+		t.Errorf("the rationale did not survive:\n%s", body)
+	}
+}

@@ -439,6 +439,7 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 				Line:        c.GetLine(),
 				Fingerprint: fp,
 				Class:       class,
+				Body:        body,
 			})
 		}
 		if resp == nil || resp.NextPage == 0 {
