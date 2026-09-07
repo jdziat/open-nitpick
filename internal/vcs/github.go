@@ -104,7 +104,11 @@ func (g *GitHub) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error)
 		BaseSHA: pr.GetBase().GetSHA(),
 		HeadRef: pr.GetHead().GetRef(),
 		HeadSHA: pr.GetHead().GetSHA(),
-		Draft:   pr.GetDraft(),
+		// Empty when the forge does not report the repository, which is why
+		// a fork check compares for INEQUALITY only when both are known.
+		HeadRepo: pr.GetHead().GetRepo().GetFullName(),
+		BaseRepo: pr.GetBase().GetRepo().GetFullName(),
+		Draft:    pr.GetDraft(),
 	}
 	// The head commit's message, for a skip marker; a failure to read it
 	// is not a failure to review, so it is logged by absence only.
