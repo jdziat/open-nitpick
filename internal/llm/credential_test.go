@@ -105,8 +105,13 @@ func TestANamedSourceThatFailsIsReported(t *testing.T) {
 		t.Errorf("the error does not name the entry: %v", err)
 	}
 
+	// A keystore that ANSWERS, so this proves the empty variable is reported
+	// rather than that the keystore happened to fail too. With the stub above
+	// still erroring, the assertion would pass for the wrong reason.
+	stubKeyring(t, map[string]string{KeyringService + "/openai": "from_the_default_lookup"}, nil)
+
 	if _, _, err := resolve(t, config.ModelSpec{Provider: "openai", APIKeyEnv: "NOT_SET"}, nil); err == nil {
-		t.Error("an empty named environment variable was ignored")
+		t.Error("an empty named environment variable was ignored in favour of the default lookup")
 	}
 }
 
