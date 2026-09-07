@@ -251,6 +251,42 @@ at the price of dropping the questions cancelled while pending.
 shipped workflow, which skips them: reviewing one would need the model key
 present in a run whose code the contributor controls.
 
+## What triage may and may not do
+
+Triage merges duplicates across batches, drops findings the reviewer could not
+support, and writes the walkthrough. It runs on a cheap model and it sees the
+findings, not the code.
+
+Two guards bound it. Neither is on the walkthrough, which is a separate
+question tracked in [Findings](findings.md).
+
+**A finding for a path nobody reported is dropped**, always, with a line in the
+log. That guard has been there from the start.
+
+**`review.triage_no_new_claims`** closes the gap the path check leaves. A
+finding whose path *was* reported can still come back with a rewritten title
+and rationale, published under the original reporter's name, because the
+attribution is restored a few lines later. Turn this on and the reviewer's own
+title, rationale and suggestion are restored over whatever triage returned:
+
+```yaml
+review:
+  triage_no_new_claims: false   # default
+```
+
+Triage may still select, drop, group and re-anchor. It may move a finding up to
+ten lines onto the changed code, which is work worth keeping and
+what the anchor pass does anyway. Beyond that, or at a line no reviewer
+reported, the finding is dropped as a claim about somewhere else.
+
+Identity here is the path and the line, not the title. `Finding.Key()` includes
+the normalized title, so a reworded finding does not match its own origin by
+key, and matching on it would have missed the exact case this guard exists for.
+
+Off by default until the effect on merged findings is measured: triage
+sometimes rewords two findings into one, and this restores the words of
+whichever original the survivor sits closest to.
+
 ## A spending ceiling
 
 Off by default. Set one and the review stays under it by reviewing fewer files,
