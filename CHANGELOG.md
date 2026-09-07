@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.0](https://github.com/jdziat/open-nitpick/compare/v1.8.0...v1.9.0) (2026-09-07)
+
+
+### Features
+
+* **converse:** apply a finding on [@open-nitpick](https://github.com/open-nitpick) fix ([#57](https://github.com/jdziat/open-nitpick/issues/57)) ([af1a546](https://github.com/jdziat/open-nitpick/commit/af1a54679f7b28ca646e933a66362cd027c0b33f))
+
+
+### Measurement
+
+* price one real multi-batch pull request ([#58](https://github.com/jdziat/open-nitpick/issues/58)) ([1fb93e1](https://github.com/jdziat/open-nitpick/commit/1fb93e13468d8027840ff2d45df122708a133f4e))
+
 ## [1.8.0](https://github.com/jdziat/open-nitpick/compare/v1.7.0...v1.8.0) (2026-09-07)
 
 
