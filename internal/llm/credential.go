@@ -59,6 +59,9 @@ func resolveCredential(ctx context.Context, spec config.ModelSpec, getenv func(s
 	}
 
 	if len(spec.CredentialCommand) > 0 {
+		if strings.TrimSpace(spec.CredentialCommand[0]) == "" {
+			return "", false, errors.New("credential_command names no program")
+		}
 		key, err := runCredentialCommand(ctx, spec.CredentialCommand)
 		if err != nil {
 			return "", false, err
