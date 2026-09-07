@@ -98,7 +98,7 @@ func TestNoLevelSilencesADefect(t *testing.T) {
 }
 
 // TestClasslessFindingSurvivesTheStrictestLevel covers findings that never had
-// a class — every linter result before classForRule existed.
+// a class, every linter result before classForRule existed.
 func TestClasslessFindingSurvivesTheStrictestLevel(t *testing.T) {
 	f := Finding{
 		Path: "app.go", Line: 4, Severity: "critical",
@@ -112,7 +112,7 @@ func TestClasslessFindingSurvivesTheStrictestLevel(t *testing.T) {
 	}
 }
 
-// TestStyleIsFilteredBelowPedantic checks the knob actually does its job.
+// TestStyleIsFilteredBelowPedantic checks the knob does its job.
 func TestStyleIsFilteredBelowPedantic(t *testing.T) {
 	f := Finding{
 		Path: "app.go", Line: 4, Severity: "nit",
@@ -129,7 +129,7 @@ func TestStyleIsFilteredBelowPedantic(t *testing.T) {
 	}
 }
 
-// TestTestsClassRespectsLevel exercises a class that is genuinely level-gated.
+// TestTestsClassRespectsLevel exercises a class that is level-gated.
 func TestTestsClassRespectsLevel(t *testing.T) {
 	f := Finding{
 		Path: "app.go", Line: 4, Severity: "info",
@@ -181,7 +181,7 @@ func TestGenerationPromptIsLevelIndependent(t *testing.T) {
 // tool exists to be able to write: a deterministic analyzer found it, a model
 // judged whether it mattered here, and the reader sees both. Triage used to
 // overwrite Source with the triage model's name, so every linter finding
-// claimed to have come from the model — destroying the attribution chain — and
+// claimed to have come from the model (destroying the attribution chain), and
 // the renderer never printed it anyway.
 func TestLinterAttributionSurvivesTriage(t *testing.T) {
 	lint := Finding{
@@ -207,7 +207,7 @@ func TestLinterAttributionSurvivesTriage(t *testing.T) {
 		t.Error("Triager should record who triaged it")
 	}
 
-	// And the reader must actually see it.
+	// And the reader must see it.
 	body := renderComment(got, true)
 	if !strings.Contains(body, "flagged by golangci-lint(gosec)") {
 		t.Errorf("published comment must attribute the analyzer:\n%s", body)
@@ -221,26 +221,26 @@ func TestLinterAttributionSurvivesTriage(t *testing.T) {
 // above, and it was missing while Source had a test.
 //
 // THE BUG: SeverityTranslated and RawSeverity carry `json:"-"`, so triage's
-// decode zeroed both, and recordSeverity could not put them back — renderForTriage
-// shows the triage model `[%s]` of an ALREADY NORMALIZED Severity, so a model
-// that echoes what it was shown normalizes to itself and the call returns early.
-// Every finding that survived triage was published claiming nobody had
-// translated it. internal/evals' severityAsSaid reads that as "Severity is the
-// reporter's own word" and quotes it unmarked, so the eval report said semgrep
-// printed "error" when semgrep printed "HIGH", and said a review model printed
-// "info" when it printed "P1". That is the defect recordSeverity's doc comment
-// says it fixes, alive one pass downstream of the fix and on the path the eval
-// battery runs.
+// decode zeroed both, and recordSeverity could not put them back,
+// renderForTriage shows the triage model `[%s]` of an ALREADY NORMALIZED
+// Severity, so a model that echoes what it was shown normalizes to itself and
+// the call returns early. Every finding that survived triage was published
+// claiming nobody had translated it. internal/evals' severityAsSaid reads that
+// as "Severity is the reporter's own word" and quotes it unmarked, so the eval
+// report said semgrep printed "error" when semgrep printed "HIGH", and said a
+// review model printed "info" when it printed "P1". That is the defect
+// recordSeverity's doc comment says it fixes, alive one pass downstream of the
+// fix and on the path the eval battery runs.
 //
 // The second case is a triage RE-RATING, and who reported the finding decides
-// the answer. THE BUG: it did not. Both kinds were treated as a model's — the
+// the answer. THE BUG: it did not. Both kinds were treated as a model's (the
 // word dropped, on the theory that a level somebody else chose makes the
-// reporter's spelling stale — which for an analyzer is wrong twice over. semgrep
-// does not retract "HIGH" because triage re-rated the impact, and the finding is
-// still published as "flagged by semgrep(...)", so dropping the pair leaves the
-// report asserting semgrep's own word for it is our "warning". An analyzer's
-// level is never its own claim, whatever the level ends up being. The model case
-// is TestAModelsOwnWordIsStaleAfterATriageRerate below.
+// reporter's spelling stale), which for an analyzer is wrong twice over.
+// semgrep does not retract "HIGH" because triage re-rated the impact, and the
+// finding is still published as "flagged by semgrep(...)", so dropping the
+// pair leaves the report asserting semgrep's own word for it is our "warning".
+// An analyzer's level is never its own claim, whatever the level ends up
+// being. The model case is TestAModelsOwnWordIsStaleAfterATriageRerate below.
 func TestSeverityProvenanceSurvivesTriage(t *testing.T) {
 	lint := Finding{
 		Path: "app.go", Line: 4, Severity: "error",
@@ -251,7 +251,7 @@ func TestSeverityProvenanceSurvivesTriage(t *testing.T) {
 		SeverityTranslated: true, RawSeverity: "HIGH", FromAnalyzer: true,
 	}
 
-	// `echoed` is what triage's decode actually yields: the unserialized fields
+	// `echoed` is what triage's decode yields: the unserialized fields
 	// cleared. Passing `lint` itself would let the struct smuggle the provenance
 	// across a boundary that cannot carry it, and the test would pass against
 	// the broken code.
@@ -297,10 +297,10 @@ func TestSeverityProvenanceSurvivesTriage(t *testing.T) {
 // TestAModelsOwnWordIsStaleAfterATriageRerate is why the rule above is a rule
 // rather than "always restore".
 //
-// A model's RawSeverity is the level IT assigned. Once triage rates the finding
-// differently, that word describes a rating nobody now holds, and a report
-// quoting it beside the published level describes a finding that never existed —
-// the same judgement applyOutcomes makes about an expert's re-rate.
+// A model's RawSeverity is the level IT assigned. Once triage rates the
+// finding differently, that word describes a rating nobody now holds, and a
+// report quoting it beside the published level describes a finding that never
+// existed, the same judgement applyOutcomes makes about an expert's re-rate.
 func TestAModelsOwnWordIsStaleAfterATriageRerate(t *testing.T) {
 	found := Finding{
 		Path: "app.go", Line: 4, Severity: "info",

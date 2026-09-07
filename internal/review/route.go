@@ -21,11 +21,11 @@ import (
 // A review is a set of batches, and until now every batch went to the same
 // model. The eval battery says models differ by what a change is: one is the
 // quietest on cross-file contract changes and blind to info-level plants,
-// another is strongest on single-file security defects and expensive. A
-// route sends a batch to the model that measured best for it, by language,
-// by file count, and — when a router is configured — by what the change does.
-// An ensemble sends a batch to several models and lets triage merge and
-// rerank the pool.
+// another is strongest on single-file security defects and expensive. A route
+// sends a batch to the model that measured best for it, by language, by file
+// count, and (when a router is configured), by what the change does. An
+// ensemble sends a batch to several models and lets triage merge and rerank
+// the pool.
 
 // RouteDecision records where one batch went, for the report.
 type RouteDecision struct {
@@ -111,9 +111,9 @@ type classification struct {
 	Kinds []string `json:"kinds"`
 }
 
-// classify asks the router what a batch does. The router sees the diff
-// only — not the full files, not the related context — because the question
-// is what the change is, and the diff is the change.
+// classify asks the router what a batch does. The router sees the diff only
+// (not the full files, not the related context), because the question is what
+// the change is, and the diff is the change.
 func (e *Engine) classify(ctx context.Context, b bundle.Batch) ([]string, error) {
 	if e.Roles.Router == nil {
 		return nil, fmt.Errorf("routes match on kinds and no router is configured")

@@ -25,7 +25,7 @@ import "fmt"
 // anchorTolerance is how far a triage finding may move from the line its
 // origin reported and still be recognized as that finding.
 //
-// Not zero, because moving a finding onto the line that actually changed is
+// Not zero, because moving a finding onto the line that changed is
 // work worth keeping and the anchor pass downstream does the same thing. Not
 // unbounded, because a finding that travelled fifty lines is a claim about
 // somewhere else.

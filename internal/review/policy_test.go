@@ -118,7 +118,7 @@ func assertPolicyNotice(t *testing.T, summary string) {
 	}
 }
 
-// reviewedPaths lists the files a plan actually sent to the model.
+// reviewedPaths lists the files a plan sent to the model.
 func reviewedPaths(plan *bundle.Plan) []string {
 	var out []string
 	for _, b := range plan.Batches {
@@ -232,10 +232,10 @@ func TestHostileValidationSwitchIsNotHonored(t *testing.T) {
 	assertPolicyNotice(t, provider.published.Summary)
 }
 
-// TestValidationStillRunsWhenTheRepositoryEnabledIt is the control for the test
-// above. Without it, an engine that had simply stopped validating altogether
-// would pass — and the assertion that validation did not run would be measuring
-// nothing.
+// TestValidationStillRunsWhenTheRepositoryEnabledIt is the control for the
+// test above. Without it, an engine that had stopped validating
+// altogether would pass, and the assertion that validation did not run would
+// be measuring nothing.
 func TestValidationStillRunsWhenTheRepositoryEnabledIt(t *testing.T) {
 	model := findingModel(t)
 	provider := &stubProvider{diff: engineDiff}
@@ -261,8 +261,9 @@ func TestValidationStillRunsWhenTheRepositoryEnabledIt(t *testing.T) {
 
 // TestConfigurationTheChangeDidNotEditStillApplies pins the other half of the
 // invariant. Authority is withdrawn from a configuration file over the change
-// that EDITS it, and over nothing else — a resolver applied to every review
-// would discard every repository's configuration and still pass the tests above.
+// that EDITS it, and over nothing else, a resolver applied to every review
+// would discard every repository's configuration and still pass the tests
+// above.
 func TestConfigurationTheChangeDidNotEditStillApplies(t *testing.T) {
 	model := findingModel(t)
 	provider := &stubProvider{diff: engineDiff}
@@ -279,7 +280,7 @@ func TestConfigurationTheChangeDidNotEditStillApplies(t *testing.T) {
 	}
 
 	// The configuration survived because the resolver was asked and said the
-	// change does not touch it — not because nothing was checked.
+	// change does not touch it, not because nothing was checked.
 	if resolver.calls != 1 {
 		t.Errorf("resolver calls = %d, want exactly one before any policy is read", resolver.calls)
 	}
@@ -338,7 +339,7 @@ index 111..222 100644
 // outcome the check exists to prevent.
 //
 // It also pins what the pull request is told. The run reviews nothing and
-// publishes no verdict on the code — but the maintainer who wrote the
+// publishes no verdict on the code, but the maintainer who wrote the
 // configuration this failed on gets a red job and one line in a CI log
 // otherwise, on the pull request most likely to be their first.
 func TestPolicyResolutionFailureFailsTheRun(t *testing.T) {
@@ -395,8 +396,9 @@ func TestAReplacementPolicyIsRequired(t *testing.T) {
 
 // TestLintersAreBuiltFromTheResolvedPolicy covers the consumer the engine does
 // not own. The analyzers read review.ignore themselves, so a set constructed
-// from the change's own configuration goes quiet on exactly the paths the change
-// named — silencing them the same way the ignore rule silenced the model.
+// from the change's own configuration goes quiet on exactly the paths the
+// change named, silencing them the same way the ignore rule silenced the
+// model.
 func TestLintersAreBuiltFromTheResolvedPolicy(t *testing.T) {
 	model := findingModel(t)
 	provider := &stubProvider{diff: configEditDiff}
@@ -427,11 +429,11 @@ func TestLintersAreBuiltFromTheResolvedPolicy(t *testing.T) {
 // when the configuration was swapped but the clients were not.
 //
 // models.* is policy: it names the model that reads the diff, its temperature,
-// its token ceiling and its timeout. A change that named a one-billion-parameter
-// model for its own review was still reviewed by it — an empty findings list
-// that looks exactly like a clean run — while the published notice said the
-// change's configuration had not been applied. The notice was the lie, which is
-// worse than the omission.
+// its token ceiling and its timeout. A change that named a
+// one-billion-parameter model for its own review was still reviewed by it (an
+// empty findings list that looks exactly like a clean run), while the
+// published notice said the change's configuration had not been applied. The
+// notice was the lie, which is worse than the omission.
 func TestTheModelsComeFromTheResolvedPolicy(t *testing.T) {
 	const (
 		chosenByTheChange = "attacker-chosen-tiny"
@@ -459,7 +461,7 @@ func TestTheModelsComeFromTheResolvedPolicy(t *testing.T) {
 		t.Fatalf("findings = %+v, want the defect in app.go", report.Findings)
 	}
 	// Source is the attribution published under every inline comment, so it is
-	// also the record of which model actually did the reading.
+	// also the record of which model did the reading.
 	if got := report.Findings[0].Source; !strings.Contains(got, accepted) {
 		t.Errorf("finding was flagged by %q; the change named %q and the accepted policy named %q",
 			got, chosenByTheChange, accepted)
@@ -496,8 +498,8 @@ func TestASubstitutedPolicyWithoutAModelFactoryIsRefused(t *testing.T) {
 func TestASubstitutionDoesNotLeakIntoTheNextReview(t *testing.T) {
 	model := findingModel(t)
 
-	// The repository's own configuration reviews nothing. Defaults — what the
-	// resolver substitutes — review app.go, so the two runs are distinguishable.
+	// The repository's own configuration reviews nothing. Defaults (what the
+	// resolver substitutes), review app.go, so the two runs are distinguishable.
 	engine := hostileEngine(t, model, &stubProvider{diff: configEditDiff}, func(c *config.Config) {
 		c.Review.Ignore = []string{"**"}
 	})
@@ -578,10 +580,10 @@ func TestPolicyNoticeNamesTheSourceItRanUnder(t *testing.T) {
 }
 
 // TestTheNoticeContainsEveryLineItPrints covers the containment the notice
-// needs and did not have. It splices config.Policy.Reason — forge and parser
-// text — into a markdown blockquote, and only the first line carried the "> ".
-// Anything after a newline rendered at top level of a comment posted under this
-// bot's name, where GitHub renders an <img> or an <a>.
+// needs and did not have. It splices config.Policy.Reason (forge and parser
+// text), into a markdown blockquote, and only the first line carried the "> ".
+// Anything after a newline rendered at top level of a comment posted under
+// this bot's name, where GitHub renders an <img> or an <a>.
 func TestTheNoticeContainsEveryLineItPrints(t *testing.T) {
 	policy := config.Defaults()
 	policy.Policy = config.Policy{
@@ -614,10 +616,10 @@ func TestTheNoticeContainsEveryLineItPrints(t *testing.T) {
 func writeConfig(t *testing.T, body string) (root string, cfg *config.Config) {
 	t.Helper()
 
-	// Built-in defaults name no model, and the change's own file is the one
-	// thing that may not supply one — so the fallback has nothing to run on
-	// unless the environment does. This is the shape a repository whose only
-	// model lives in .nitpick.yaml has to be run in.
+	// Built-in defaults name no model, and the change's own file is the one thing
+	// that may not supply one. So the fallback has nothing to run on unless the
+	// environment does. This is the shape a repository whose only model lives in
+	// .nitpick.yaml has to be run in.
 	t.Setenv(config.EnvProvider, "openai")
 	t.Setenv(config.EnvModel, "gpt-4o")
 
@@ -648,7 +650,7 @@ func engineFor(t *testing.T, root string, cfg *config.Config, model *scriptedLLM
 }
 
 // TestTheRealResolverFallsBackToDefaults runs the attack through the resolver
-// the CLI actually wires, from a hostile .nitpick.yaml on disk rather than a
+// the CLI wires, from a hostile .nitpick.yaml on disk rather than a
 // hand-built Config. The tests above pin the engine's half of the contract; this
 // one pins that the two halves fit, which no amount of stubbing can.
 //
@@ -679,10 +681,10 @@ func TestTheRealResolverFallsBackToDefaults(t *testing.T) {
 
 // TestTheNoticeNamesTheConfigurationInFull covers a repository whose config is
 // not at the root. The notice named the file twice in one sentence and spelled
-// it two ways: filepath.Base reported .github/nitpick.yaml as `nitpick.yaml`, a
-// path that does not exist in the repository, while the next clause spelled it
-// out — and in a repository carrying more than one nitpick config, the basename
-// leaves a contributor unable to tell which file was set aside.
+// it two ways: filepath.Base reported .github/nitpick.yaml as `nitpick.yaml`,
+// a path that does not exist in the repository, while the next clause spelled
+// it out, and in a repository carrying more than one nitpick config, the
+// basename leaves a contributor unable to tell which file was set aside.
 func TestTheNoticeNamesTheConfigurationInFull(t *testing.T) {
 	t.Setenv(config.EnvProvider, "openai")
 	t.Setenv(config.EnvModel, "gpt-4o")
@@ -731,11 +733,11 @@ func TestTheNoticeNamesTheConfigurationInFull(t *testing.T) {
 // legitimate config edit there is: the pull request that ADDS .nitpick.yaml.
 //
 // The base revision has no configuration by construction, so policy falls back
-// to built-in defaults — which name no model, because naming one is what the
+// to built-in defaults, which name no model, because naming one is what the
 // file being added is for. Nothing can run, and that is the right answer. What
 // was wrong was where it was said: the run died with one line in a CI log and
-// published nothing, on the one pull request whose author is trying to configure
-// the tool.
+// published nothing, on the one pull request whose author is trying to
+// configure the tool.
 func TestTheAdoptionPullRequestIsToldWhyNothingRan(t *testing.T) {
 	// The repository names its model only in the file it is adding, which is
 	// what README documents and what action.yml's optional inputs leave in place.
@@ -805,9 +807,9 @@ func (b *baseProvider) FileContent(ctx context.Context, ref vcs.Ref, path string
 
 // TestTheAcceptedConfigurationGoverns pins the three-way distinction the whole
 // design turns on. The change's own file would have reviewed nothing, built-in
-// defaults would have published the finding, and the version already accepted at
-// the base revision publishes nothing because ITS gate says so — so a passing
-// run here can only have used the accepted configuration.
+// defaults would have published the finding, and the version already accepted
+// at the base revision publishes nothing because ITS gate says so, so a
+// passing run here can only have used the accepted configuration.
 func TestTheAcceptedConfigurationGoverns(t *testing.T) {
 	root, cfg := writeConfig(t, "review:\n  ignore:\n    - \"**\"\n")
 

@@ -66,7 +66,7 @@ diff --git a/doomed.go b/doomed.go
 // TestPartialBatchFailureIsSurfaced is the regression test for the most
 // misleading thing this tool could print.
 //
-// When some batches fail, the surviving findings are still published — but the
+// When some batches fail, the surviving findings are still published, but the
 // files whose batch failed were never reviewed. Reporting that as a clean
 // review tells the user their code passed when nobody looked at it.
 func TestPartialBatchFailureIsSurfaced(t *testing.T) {
@@ -191,7 +191,7 @@ func (o *orderedLLM) Model() string           { return "ordered" }
 // a multi-batch review.
 //
 // analyze runs batches concurrently and appends each result under a mutex, so
-// the combined slice is in goroutine-COMPLETION order — a property of the
+// the combined slice is in goroutine-COMPLETION order, a property of the
 // scheduler, not of the change. Everything downstream reads that slice in
 // order: renderForTriage numbers the findings for the triage model exactly as
 // they sit, and dedupe keeps the FIRST of two equivalent findings. So a review

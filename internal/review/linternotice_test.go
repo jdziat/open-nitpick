@@ -23,11 +23,12 @@ func statuses() []LinterStatus {
 // TestAnalyzerStatusesArePublishedOnThePullRequest is the disclosure this
 // change's own README claimed and did not have.
 //
-// The statuses existed and reached os.Stderr — a CI log — while the README said
+// The statuses existed and reached os.Stderr (a CI log), while the README said
 // they appeared "beside the notice about a substituted .nitpick.yaml". That
 // notice is published where the REVIEWER reads. So a pull request could switch
-// off the deterministic half of its own Go review, by adding a go.work, and the
-// review it produced was indistinguishable on the pull request from a clean one.
+// off the deterministic half of its own Go review, by adding a go.work, and
+// the review it produced was indistinguishable on the pull request from a
+// clean one.
 func TestAnalyzerStatusesArePublishedOnThePullRequest(t *testing.T) {
 	report := &Report{Plan: &bundle.Plan{}, Linters: statuses()}
 
@@ -71,7 +72,7 @@ func TestTheAnalyzerHeadlineIsVisibleWithoutExpandingIt(t *testing.T) {
 
 // TestAnalyzerStatusesSurviveSummariesBeingOff: review.summary asks for less
 // narration. It is not permission to stop saying that a review covered less
-// than it looks like — the same rule the policy notice and the withheld list
+// than it looks like, the same rule the policy notice and the withheld list
 // already follow.
 func TestAnalyzerStatusesSurviveSummariesBeingOff(t *testing.T) {
 	cfg := config.Defaults()
@@ -89,8 +90,9 @@ func TestAnalyzerStatusesSurviveSummariesBeingOff(t *testing.T) {
 }
 
 // TestAnAnalyzerReasonCannotCarryMarkupOutOfItsBullet: an analyzer's reason
-// quotes the tree under review — golangci-lint's typechecking errors name paths
-// from it — and this text is rendered in a comment posted under the bot's name.
+// quotes the tree under review (golangci-lint's typechecking errors name paths
+// from it), and this text is rendered in a comment posted under the bot's
+// name.
 func TestAnAnalyzerReasonCannotCarryMarkupOutOfItsBullet(t *testing.T) {
 	report := &Report{Plan: &bundle.Plan{}, Linters: []LinterStatus{{
 		Linter:  "golangci-lint",

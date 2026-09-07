@@ -13,11 +13,12 @@ import (
 //
 // The SDK's SchemaFrom marks EVERY exported field as required, with no way to
 // opt out short of `json:"-"`. Applied to Finding that makes `suggestion`
-// mandatory on every finding — while the review prompt tells the model
+// mandatory on every finding, while the review prompt tells the model
 // suggestion is optional and should only be supplied when it can give exact
-// replacement code. The wire contract wins that argument silently, so the model
-// invents a suggestion for findings it has no fix for, and those get rendered
-// as one-click ```suggestion blocks that replace real code with prose.
+// replacement code. The wire contract wins that argument silently, so the
+// model invents a suggestion for findings it has no fix for, and those get
+// rendered as one-click ```suggestion blocks that replace real code with
+// prose.
 //
 // Authoring the schema here also lets severity be a closed enum, which stops
 // the model inventing severities that later degrade to info or, worse, to the
@@ -153,7 +154,7 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 // case of it: SchemaFrom marks every exported field required, which would make
 // `revised_severity` mandatory on every verdict. A model forced to fill that
 // field for a finding whose severity is already right invents a level, and the
-// engine would then apply it — turning a schema convenience into silent
+// engine would then apply it, turning a schema convenience into silent
 // severity churn on findings nobody disputed. Only verdict and reason are
 // required.
 //

@@ -91,7 +91,7 @@ func (e *Engine) applyBudget(
 	}
 	trimmed.Skipped = append(trimmed.Skipped, budgetSkips(fit.Dropped)...)
 
-	// The trimmed plan is what actually gets sent, so the reported estimate is
+	// The trimmed plan is what gets sent, so the reported estimate is
 	// recomputed from it rather than left as the projection that chose it.
 	fit.After = EstimatePlan(e.Config, trimmed)
 	fit.Forced = fit.After.Dollars > remaining
