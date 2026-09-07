@@ -39,18 +39,32 @@ var Rules = []Rule{
 	{"restating-comment", "a comment that restates the line below it", "delete it, or say why the line is there rather than what it does"},
 	{"oversized-doc-comment", "a doc comment longer than the declaration it documents", "keep the one sentence a caller needs; move the rest to a design note or delete it"},
 	{"triplet-rhythm", "three parallel adjectives or nouns in a row (fast, reliable, and secure)", "keep the one that is true and specific; the other two are padding"},
+	{"antithesis", "a sentence that sets up a contrast to sound decisive (not a nicety, it is a correctness matter)", "state the second half only; the negated half was never the claim"},
+	{"prose-cadence", "a whole file written in one rhythm: appositive tails, colon expansions and three-part lists, above 10 per 100 lines", "vary the sentences. Split the longest into two, and let some of them end where the fact ends"},
 }
 
 var (
-	emDash   = regexp.MustCompile(`—`)
-	enDash   = regexp.MustCompile(`\s–\s`)
-	arrow    = regexp.MustCompile(`(\s|^)(→|->)(\s|$)`)
-	filler   = regexp.MustCompile(`(?i)\b(genuinely|honestly|actually|truly|simply|crucially|importantly|it'?s worth noting( that)?)\b`)
-	chat     = regexp.MustCompile(`(?i)\b(sure!|here'?s (the|a|an|your)|note that this|hope this helps|let me know if|as an ai|i hope this|great question)\b`)
-	triplet  = regexp.MustCompile(`(?i)\b(\w+), (\w+),? and (\w+)\b`)
-	identRe  = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
-	declRe   = regexp.MustCompile(`^\s*(func |def |class |type |export |function |const |let |var |public |private |protected |static |async )`)
-	stopword = map[string]bool{"the": true, "and": true, "for": true, "this": true, "that": true, "with": true, "from": true, "into": true, "then": true, "returns": true, "return": true, "a": true, "an": true, "of": true, "to": true, "is": true}
+	emDash  = regexp.MustCompile(`—`)
+	enDash  = regexp.MustCompile(`\s–\s`)
+	arrow   = regexp.MustCompile(`(\s|^)(→|->)(\s|$)`)
+	filler  = regexp.MustCompile(`(?i)\b(genuinely|honestly|actually|truly|simply|crucially|importantly|it'?s worth noting( that)?)\b`)
+	chat    = regexp.MustCompile(`(?i)\b(sure!|here'?s (the|a|an|your)|note that this|hope this helps|let me know if|as an ai|i hope this|great question)\b`)
+	triplet = regexp.MustCompile(`(?i)\b(\w+), (\w+),? and (\w+)\b`)
+
+	// antithesis is the shape "it is not X, it is Y" and "not a X, but a Y".
+	// It reads as decisive and carries only the second half, since the first
+	// half is a claim nobody made.
+	antithesis = regexp.MustCompile(`(?i)\b(is|was|are|were)\s+not\s+(a|an|the)?[^,.;:!?]{2,50},\s*(it|they|that)\s+(is|are|was|were)\b|\bnot\s+(a|an)\s[^,.;:!?]{2,40},\s*but\s+(a|an)\b`)
+
+	// The three components of the cadence rule. None is a fault on its own,
+	// which is why they are counted over a file rather than flagged on a line:
+	// one appositive tail is a sentence, forty of them is a voice.
+	cadenceTriplet = regexp.MustCompile(`[^.;:!?]{4,}?,[^.;:!?]{4,}?, and [^.;:!?]{3,}`)
+	cadenceColon   = regexp.MustCompile(`\b(is|are|was|were|means|says)\b[^.;!?]{0,40}:\s+[a-z]`)
+	cadenceTail    = regexp.MustCompile(`,\s+which is [^.;!?]{5,}`)
+	identRe        = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
+	declRe         = regexp.MustCompile(`^\s*(func |def |class |type |export |function |const |let |var |public |private |protected |static |async )`)
+	stopword       = map[string]bool{"the": true, "and": true, "for": true, "this": true, "that": true, "with": true, "from": true, "into": true, "then": true, "returns": true, "return": true, "a": true, "an": true, "of": true, "to": true, "is": true}
 )
 
 // Scan finds the tells in one file. Prose files (Markdown, plain text) are
@@ -101,6 +115,9 @@ func Scan(p, content string) []Tell {
 		out = append(out, lineRules(p, n, text)...)
 	}
 	flush("")
+	if prose {
+		out = append(out, cadence(p, lines)...)
+	}
 	sort.SliceStable(out, func(a, b int) bool {
 		if out[a].Line != out[b].Line {
 			return out[a].Line < out[b].Line
@@ -108,6 +125,64 @@ func Scan(p, content string) []Tell {
 		return out[a].Rule < out[b].Rule
 	})
 	return out
+}
+
+// cadenceLimit is how many cadence markers per hundred prose lines stop being
+// sentences and start being a voice.
+//
+// It is a threshold rather than a per-line rule because every component is
+// ordinary English. The number comes from this repository's own documentation
+// at the point a reader called it out as machine-written: the front page was at
+// 15.9 and the trust model at 16.4, while the pages nobody complained about sat
+// between 6 and 9. Ten is the gap between them.
+const cadenceLimit = 10.0
+
+// cadence measures a prose file's sentence rhythm as a whole.
+//
+// The per-line rules above cannot see this. They found ONE tell in 5,080 lines
+// of documentation that a reader identified as machine-written on sight, which
+// is the instrument bug this rule exists to close: the tells are not words, they
+// are the same sentence shape arriving over and over.
+func cadence(p string, lines []string) []Tell {
+	var prose, hits int
+	inFence := false
+	for _, raw := range lines {
+		t := strings.TrimSpace(raw)
+		if strings.HasPrefix(t, "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence || t == "" || strings.HasPrefix(t, "|") || strings.HasPrefix(t, "#") ||
+			strings.HasPrefix(raw, "    ") || strings.HasPrefix(raw, "\t") {
+			continue
+		}
+		prose++
+		// Outside inline code, the same as every per-line rule. A config key
+		// written `a, b, and c` is a value, not a cadence, and counting it
+		// would score a reference page by how many options it documents.
+		t = stripInlineCode(t)
+		hits += len(cadenceTriplet.FindAllString(t, -1))
+		hits += len(cadenceColon.FindAllString(t, -1))
+		hits += len(cadenceTail.FindAllString(t, -1))
+	}
+
+	// Too short to have a rhythm. A three-line file with one colon is not a
+	// voice, and scoring it as one would make the rule noise.
+	if prose < 40 {
+		return nil
+	}
+
+	per := float64(hits) / float64(prose) * 100
+	if per <= cadenceLimit {
+		return nil
+	}
+
+	return []Tell{{
+		Path: p, Line: 1, Rule: "prose-cadence",
+		Excerpt: fmt.Sprintf("%d cadence markers over %d prose lines, %.1f per 100 against a limit of %.0f",
+			hits, prose, per, cadenceLimit),
+		Fix: fixFor("prose-cadence"),
+	}}
 }
 
 // lineRules are the tells one line shows on its own.
@@ -126,6 +201,7 @@ func lineRules(p string, n int, text string) []Tell {
 	add("arrow-in-prose", arrow.FindStringIndex(text))
 	add("filler-qualifier", filler.FindStringIndex(text))
 	add("chat-prose", chat.FindStringIndex(text))
+	add("antithesis", antithesis.FindStringIndex(text))
 	if m := triplet.FindStringSubmatchIndex(text); m != nil {
 		a, b, c := strings.ToLower(text[m[2]:m[3]]), strings.ToLower(text[m[4]:m[5]]), strings.ToLower(text[m[6]:m[7]])
 		// A list of three nouns (tools, files, names) is a list; the tell

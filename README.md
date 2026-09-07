@@ -12,13 +12,13 @@ Self-hosted, model-agnostic pull request review.
 
 Documentation: <https://jdziat.github.io/open-nitpick/>
 
-open-nitpick reads a pull request, reviews it with **a model you choose**, and
-posts inline comments. It runs as a GitHub Action, as a CLI in any CI system,
-as MCP tools inside an agent session, or against your uncommitted working
-tree before you open a pull request. There is no hosted service, no per-seat
-pricing, and no vendor holding your source: you bring the model (including a
-local one), and the review behavior is driven by configuration and prompts
-you can read and change.
+open-nitpick reads a pull request, reviews it with a model you choose, and posts
+inline comments. Run it as a GitHub Action, as a CLI in any CI system, as MCP
+tools inside an agent session, or against your uncommitted working tree.
+
+Nothing is hosted here. You supply the model, which can be one running on your
+own machine. The prompts and the configuration that drive the review are files
+in your repository that you can read and edit.
 
 ## Quick start
 
@@ -31,35 +31,36 @@ export SYNTHETIC_API_KEY=syn_...
 nitpick review          # reviews your uncommitted changes
 ```
 
-The quickstart and the badge above use [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR),
-the recommended route: open-weight models on a flat subscription ($30 a month
-for one pack, as read from their pricing page on 2026-09-05), so a review
-costs nothing per token. That link carries the author's referral code, and the
-author receives referral credit if you sign up through it; the plain
-<https://synthetic.new> is the same service at the same price. To spend
-nothing at all first, `nitpick explain-config` prints what a review would send
-without sending it, and `LLM_PROVIDER=ollama` runs against a local model.
-OpenRouter, any OpenAI-compatible endpoint and local models are one config
-line away: see [Providers](docs/providers.md).
+The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR),
+which serves open-weight models on a flat subscription. Their pricing page read
+$30 a month for one pack on 2026-09-05, so a review costs nothing per token.
+That link carries the author's referral code and pays the author referral credit
+if you sign up through it. Plain <https://synthetic.new> is the same service at
+the same price.
+
+You can spend nothing first. `nitpick explain-config` prints what a review would
+send without sending it, and `LLM_PROVIDER=ollama` runs against a local model.
+For OpenRouter, an OpenAI-compatible endpoint or a local model, see
+[Providers](docs/providers.md).
 
 ## Why this exists
 
-Most review bots are a hosted service wrapping one vendor's model, with a prompt
-you cannot see and pricing per seat. open-nitpick inverts that:
+Most review bots wrap one vendor's model in a hosted service, priced per seat,
+with a prompt you cannot read. This one is built the other way round.
 
 - **Any model.** 16 providers via [llm-go-sdk][sdk], plus built-in
   `synthetic` (open-weight models on a subscription) and `openrouter` (the rest
   of the catalogue on one key) for 18 in all, plus any OpenAI-compatible
   endpoint through `base_url`, plus local models via `ollama` and `llamacpp`.
   `nitpick providers` prints the list.
-- **Different models for different jobs.** A cheap model triages and deduplicates;
-  an expensive one does the actual reviewing. That split is most of the cost
-  saving available.
+- **Different models for different jobs.** A cheap model triages and
+  deduplicates while an expensive one reviews. Most of the available cost
+  saving comes from that split.
 - **Prompts as configuration.** Path-scoped instructions live in your repository
   next to the code they describe. `nitpick explain-config` prints the exact
   prompt that will be sent, before you spend a token on it.
-- **Linters as evidence.** golangci-lint, ruff, eslint, and semgrep findings are
-  fed to the model for triage, not dumped raw into your pull request.
+- **Linters as evidence.** Findings from golangci-lint, ruff, eslint and semgrep
+  go to the model for triage. Your pull request never receives the raw output.
 - **Runs offline.** The whole engine works against a local git checkout with no
   credentials and no network beyond the model call.
 
@@ -83,30 +84,32 @@ you cannot see and pricing per seat. open-nitpick inverts that:
 This project makes empirical claims about review quality, so how those numbers are
 produced is part of the product.
 
-- [docs/measurement.md](docs/measurement.md): what has to hold before a number
-  out of the eval harness is worth acting on. Fifteen rules, each written
-  because the harness produced a confident wrong number and something believed it.
+- [docs/measurement.md](docs/measurement.md): the fifteen rules a number out of
+  the eval harness has to satisfy before it is worth acting on. Each rule was
+  written after the harness produced a confident wrong number that something
+  believed.
 - [docs/comparison.md](docs/comparison.md): capabilities and measured results
   against Incumbent, by language, with what each iteration changed.
 - [docs/remediation.md](docs/remediation.md): every miss on the benchmark
   repository, its cause read from the pull request, and the plan.
-- [docs/findings.md](docs/findings.md): what has been measured, what it
-  supports, and every instrument bug found so far, in a table whose count is the
-  number of rows. Several flattered one side of a comparison; one produced a
-  published claim that had to be retracted.
+- [docs/findings.md](docs/findings.md): every measurement taken and what it
+  supports. It also tables the instrument bugs found so far. Some of those bugs
+  flattered one side of a comparison, and one put a claim on this page that had
+  to be retracted.
 
 
-The short version: prefer the judge-free columns. The LLM judge runs at
-temperature 0 and still scores byte-identical input anywhere from 3.66 to 3.98.
+Prefer the judge-free columns. The LLM judge runs at temperature 0 and still
+scores byte-identical input anywhere from 3.66 to 3.98.
 
 ## Status
 
-Usable, measured, and still early. The engine, the GitHub and local providers,
-structured output, analyzers, related context in both directions, per-batch
-routing, ensembles, and the Action work end to end; a push to a reviewed pull
-request is reviewed incrementally. [docs/findings.md](docs/findings.md) is the
-record of what has been measured and what it supports. Not yet done: a GitLab
-provider.
+Early, but usable and measured. These work end to end: the engine, the GitHub
+and local providers, structured output, analyzers, related context in both
+directions, per-batch routing, ensembles, and the Action. A push to a reviewed
+pull request is reviewed incrementally.
+
+[docs/findings.md](docs/findings.md) records what has been measured. A GitLab
+provider is not built yet.
 
 ## License
 

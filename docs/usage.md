@@ -99,14 +99,23 @@ nitpick slop -no-model             # the tells only: free, no credentials
 nitpick slop -json                 # every tell and finding, for a script
 ```
 
-Two instruments, each scored per thousand lines, and the fixes ordered by
-how much each would remove. The tells need no model and run first:
-an em dash in prose, an en dash used as a separator, an arrow standing in
-for a word, a filler qualifier (genuinely, honestly, actually, simply), a
-comment written as a chat reply, a comment that restates the line below
-it, a doc comment longer than the declaration it documents, and three
-adjectives of praise in a row. Prose files are scanned whole; source
-files in their comments only, so a string literal is never a tell. Then,
+Two instruments, each scored per thousand lines, with the fixes ordered by how
+much each would remove. The tells need no model and run first.
+
+| tell | what it catches |
+|---|---|
+| `em-dash`, `en-dash-separator` | a dash doing a comma's work |
+| `arrow-in-prose` | `->` or an arrow standing in for a word |
+| `filler-qualifier` | `genuinely`, `honestly`, `actually`, `simply` |
+| `chat-prose` | a comment written as a chat reply |
+| `restating-comment` | a comment that repeats the line below it |
+| `oversized-doc-comment` | a doc comment longer than what it documents |
+| `triplet-rhythm` | three adjectives of praise in a row |
+| `antithesis` | "not a nicety, it is a correctness matter" |
+| `prose-cadence` | a file written in one rhythm, measured over the file |
+
+Prose files are scanned whole. Source files are scanned in their comments only,
+so a string literal is never a tell. Then,
 unless `-no-model`, the model's nine slop rules run through the review
 engine over the same paths, filtered to the slop class, with the
 suggestions the model gave; findings it made outside that class are
