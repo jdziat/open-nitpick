@@ -9,7 +9,7 @@ import (
 // loopbackProviders target a local server by design. The SDK's own defaults for
 // these enable plain HTTP and loopback addresses (ollama defaults to
 // http://localhost:11434/v1), so requiring an opt-in for them would reject the
-// documented local-model workflow — including the provider's own default URL.
+// documented local-model workflow, including the provider's own default URL.
 var loopbackProviders = map[string]bool{
 	"ollama":   true,
 	"llamacpp": true,
@@ -20,7 +20,7 @@ var loopbackProviders = map[string]bool{
 //
 // This is a configuration-time convenience so the failure names its own fix; it
 // is not the security control. The SDK enforces the real policy at request
-// time, including for hostnames that only resolve to a private address later —
+// time, including for hostnames that only resolve to a private address later,
 // which is why a public hostname is not treated as safe here so much as
 // not-locally-decidable.
 func needsPrivateEndpoint(provider, raw string) bool {
@@ -71,7 +71,7 @@ func isPrivateIP(ip net.IP) bool {
 		return true
 	}
 
-	// Carrier-grade NAT, 100.64.0.0/10 — used by Tailscale and some cloud
+	// Carrier-grade NAT, 100.64.0.0/10, used by Tailscale and some cloud
 	// networks, and not covered by IsPrivate.
 	if v4 := ip.To4(); v4 != nil && v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127 {
 		return true

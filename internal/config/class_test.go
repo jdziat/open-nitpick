@@ -82,7 +82,7 @@ func TestUnknownClassIsNeverFiltered(t *testing.T) {
 			t.Errorf("%s drops unrecognized classes; they must stay visible", level)
 		}
 		// And an arbitrary unrecognized string must survive too, since that is
-		// how it actually arrives.
+		// how it arrives.
 		if !level.Publishes(Class("wat")) {
 			t.Errorf("%s drops an unrecognized class string", level)
 		}

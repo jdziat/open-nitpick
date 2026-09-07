@@ -17,8 +17,8 @@ func personaWith(mutate func(*config.Persona)) config.Persona {
 // post-hoc filtering design.
 //
 // Every review is generated at one scope and the configured level is applied
-// afterwards as a class filter. That is what makes levels comparable — a
-// difference between two levels is now the filter, not model variance — and it
+// afterwards as a class filter. That is what makes levels comparable, a
+// difference between two levels is now the filter, not model variance, and it
 // stops a narrower level from changing what the model was asked to look for.
 func TestNitpickDoesNotChangeTheGenerationPrompt(t *testing.T) {
 	want := Persona(personaWith(func(p *config.Persona) { p.Nitpick = config.NitpickNormal }))
@@ -35,7 +35,7 @@ func TestNitpickDoesNotChangeTheGenerationPrompt(t *testing.T) {
 
 // TestGenerationScopeExcludesStyle pins the scope every review is generated at.
 // Style must be absent, because including it measurably degraded the defect
-// hunt — and because pedantic reaches style through its own pass instead.
+// hunt, and because pedantic reaches style through its own pass instead.
 func TestGenerationScopeExcludesStyle(t *testing.T) {
 	text := Persona(config.DefaultPersona())
 
@@ -109,7 +109,7 @@ func TestVoiceAxesAreIndependent(t *testing.T) {
 // picked a different register.
 //
 // An earlier version of this test compared only the text BEFORE the voice
-// section — a region no voice axis can write to. It passed with
+// section, a region no voice axis can write to. It passed with
 // "Only report a finding if it is critical" injected into a voice branch, i.e.
 // it tested a different, trivially-true property. It now inspects exactly the
 // lines a voice setting ADDS.

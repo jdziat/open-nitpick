@@ -31,7 +31,7 @@ func gitIn(t *testing.T, dir string, args ...string) string {
 
 // TestLocalBaseRevisionMatchesTheDiffRange is the property that makes the base
 // revision usable at all: a file read there has to be the file the diff
-// subtracted. Diff uses a three-dot range, so the base is the fork point — the
+// subtracted. Diff uses a three-dot range, so the base is the fork point, the
 // tip of the base branch has moved on and describes a state this change was
 // never measured against.
 func TestLocalBaseRevisionMatchesTheDiffRange(t *testing.T) {
@@ -174,7 +174,7 @@ func TestGitHubBaseRevisionPrefersTheBaseSHA(t *testing.T) {
 		t.Fatalf("BaseRevision: %v", err)
 	}
 	// The branch name resolves to whatever has landed since; the SHA is the
-	// state this pull request was actually measured against.
+	// state this pull request was measured against.
 	if got != "basesha1" {
 		t.Errorf("BaseRevision = %q, want the base SHA", got)
 	}

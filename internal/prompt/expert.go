@@ -11,7 +11,7 @@ import (
 
 // Expert prompts sit in their own directory, embedded like review.md and
 // triage.md, so a specialist is a file of reviewable prose rather than a Go
-// string literal — and so adding one is a new file rather than an edit to a
+// string literal, and so adding one is a new file rather than an edit to a
 // switch statement.
 //
 //go:embed templates/experts/*.md
@@ -24,7 +24,7 @@ const expertDir = "templates/experts"
 //
 // It is deliberately narrow. The finding has already been reviewed by a
 // generalist and survived triage, so a second generalist opinion is mostly the
-// first opinion again — agreeing with yourself is not validation. What a
+// first opinion again, agreeing with yourself is not validation. What a
 // specialist adds is the ability to say *why* a claim is wrong: that this
 // driver binds the value, that this access is confined to one goroutine, that
 // this identifier is public and authenticates nobody.
@@ -136,7 +136,7 @@ var decisiveRoutes = []route{
 	}},
 
 	// Primitives only. The subject nouns a cryptography finding shares with
-	// every other kind — "encrypted", "tls", "certificate" — are class-scoped
+	// every other kind, "encrypted", "tls", "certificate", are class-scoped
 	// further down, because on their own they capture the finding rather than
 	// describe it: "the encrypted archive is overwritten in place" is a
 	// durability claim and "TLS connections are never closed" is a resource
@@ -145,7 +145,7 @@ var decisiveRoutes = []route{
 		"md5", "sha1", "sha256", "sha512", "des", "rc4", "ecb", "cbc", "gcm",
 		"aes", "rsa", "ecdsa", "ed25519", "hmac", "x509", "cipher", "ciphertext",
 		// signalText splits on punctuation, so the way these are usually
-		// written — SHA-1, SHA-256, X.509 — arrives as separate tokens. A
+		// written, SHA-1, SHA-256, X.509, arrives as separate tokens. A
 		// signal that only matches the unpunctuated spelling is a route that
 		// exists for half the findings that need it.
 		"sha 1", "sha 256", "sha 512", "x 509",
@@ -168,7 +168,7 @@ var decisiveRoutes = []route{
 		// Qualified, because "hardcoded" on its own is ordinary English used by
 		// findings of every class. A hardcoded timeout routed here met an
 		// expert whose prompt offers "the value is a public identifier and
-		// authenticates nothing" as a refutation — true of a timeout, and
+		// authenticates nothing" as a refutation, true of a timeout, and
 		// nothing to do with the claim.
 		"hardcoded credential", "hardcoded credentials", "hardcoded password",
 		"hardcoded secret", "hardcoded api key", "hardcoded token",
@@ -221,8 +221,8 @@ var decisiveRoutes = []route{
 
 	// Signals about the test itself, not about a gap in coverage. "untested",
 	// "no tests", "missing test" and "test coverage" are how a reviewer
-	// describes the RISK attached to a real defect — "the new branch is
-	// untested, so a 500 storms the upstream" — and routing on them sent
+	// describes the RISK attached to a real defect, "the new branch is
+	// untested, so a 500 storms the upstream", and routing on them sent
 	// correctness findings to an expert whose severity scale rates test gaps
 	// ("rarely critical and rarely error"). A genuine test-design finding
 	// carries class tests and reaches this expert through the class.
@@ -241,8 +241,8 @@ var decisiveRoutes = []route{
 }
 
 // classRoutes pick a specialist within a class, once no decisive phrase has
-// claimed the finding. These signals are too ordinary to route on their own —
-// "query" and "lock" mean different things in different classes — so they are
+// claimed the finding. These signals are too ordinary to route on their own,
+// "query" and "lock" mean different things in different classes, so they are
 // only consulted where the class has already narrowed the meaning.
 var classRoutes = map[config.Class][]route{
 	config.ClassSecurity: {
@@ -375,7 +375,7 @@ func (r route) matches(text string) bool {
 //
 // Signals then match on word boundaries with a plain substring test. That is
 // what stops "sql" from firing on "postgresql", and it lets a signal be written
-// the way a person says it — "prepared statement", "db query" — instead of as a
+// the way a person says it, "prepared statement", "db query", instead of as a
 // regexp. Every signal must already be in this form; a signal that is not can
 // never match, which is a route that silently does not exist, so the tests
 // check it.
@@ -410,7 +410,7 @@ var experts = loadExperts()
 // experts that exist.
 //
 // It panics on failure, which is the point: a missing prompt or a mistyped
-// route key would otherwise yield an Expert with an empty system prompt — a
+// route key would otherwise yield an Expert with an empty system prompt, a
 // specialist with no speciality, quietly judging findings in production. Both
 // are edits to this file, so the panic is unreachable without a code change and
 // the tests reach it first.

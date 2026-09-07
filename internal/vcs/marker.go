@@ -13,7 +13,7 @@ import (
 //
 // The bot marker alone says "this tool wrote this"; the two below say WHAT it
 // wrote: which finding a comment reports, and which revision a review looked
-// at. Both are needed for a push to be reviewed incrementally — the head to
+// at. Both are needed for a push to be reviewed incrementally, the head to
 // know what was already read, the fingerprints to know what was already said.
 
 // fingerprintMarker records the finding a comment reports.

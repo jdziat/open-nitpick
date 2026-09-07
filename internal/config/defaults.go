@@ -35,14 +35,14 @@ var DefaultIgnore = []string{
 // something to read in the change are executed.
 //
 // eslint and semgrep are NOT here, and their absence is the whole point: both
-// refuse to run without an operator configuration outside the repository —
+// refuse to run without an operator configuration outside the repository,
 // eslint because its config is JavaScript it would execute, semgrep because it
-// has no default rule set — so neither can ever run under the shipped defaults.
+// has no default rule set, so neither can ever run under the shipped defaults.
 //
 // THE BUG THAT CAUSED: with all four listed, `mode: strict` failed EVERY review
 // out of the box, on "linter semgrep is enabled but not available: not
 // configured". Strict means "an analyzer I asked for did not run", and nobody
-// asked for these two — the default list did. Listing an analyzer that cannot
+// asked for these two. The default list did. Listing an analyzer that cannot
 // run also spent a line of the published roster, on every pull request forever,
 // saying nothing; that is how a reader learns to skip the block where a real
 // absence is announced.
@@ -76,7 +76,7 @@ func Defaults() *Config {
 				// the JSON fallback then died on the HTTP timeout while the
 				// model was still generating. Unset, an OpenAI-compatible
 				// request carries no max_tokens and the model's own output
-				// maximum applies — which is the only number that is not a
+				// maximum applies, which is the only number that is not a
 				// guess. The one provider whose SDK path substitutes a small
 				// constant for "unset" is handled in llm.Client.CallOptions.
 				Timeout: 10 * time.Minute,
@@ -84,7 +84,7 @@ func Defaults() *Config {
 				// Reviews should be reproducible. Left unset, providers apply
 				// their own default (1.0 on Anthropic), and identical runs over
 				// the same diff then disagree about both which findings exist
-				// and how severe they are — which makes a severity gate a coin
+				// and how severe they are, which makes a severity gate a coin
 				// flip.
 				Temperature: ptr(0.0),
 			},
@@ -95,7 +95,7 @@ func Defaults() *Config {
 			MaxFilesPerRequest:    6,
 			Concurrency:           4,
 			// Advisory by default. A reviewer that blocks merges on its first
-			// false positive is a reviewer the team switches off — and this
+			// false positive is a reviewer the team switches off, and this
 			// one has not yet earned that trust. Opt in with fail_on.
 			FailOn:           SeverityNone,
 			MinSeverity:      SeverityInfo,
@@ -135,7 +135,7 @@ func Defaults() *Config {
 			OnlyChangedLines: true,
 			// No reduction by default: an analyzer that named a level we have
 			// is reported at that level. Capping here by default would be the
-			// old fold wearing a configuration key — the same silent policy for
+			// old fold wearing a configuration key, the same silent policy for
 			// every repository, just spelled differently. A team that does not
 			// want semgrep, or a line in someone's .golangci.yml, deciding its
 			// gate says so.

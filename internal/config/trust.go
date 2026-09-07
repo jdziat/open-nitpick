@@ -16,8 +16,8 @@ import (
 // point is that the config file must not be able to grant itself this power.
 const EnvTrustConfigEndpoints = "NITPICK_TRUST_CONFIG_ENDPOINTS"
 
-// The settings pruneUntrusted deletes (base_url, api_key_env, extra, and
-// allow_private_endpoint) are the ones that decide *where* a request goes and
+// The settings pruneUntrusted deletes, base_url, api_key_env, extra and
+// allow_private_endpoint, are the ones that decide *where* a request goes and
 // *which* credential rides along with it.
 //
 // open-nitpick reviews pull requests, and a pull request can edit the config

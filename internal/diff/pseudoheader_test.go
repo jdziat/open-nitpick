@@ -14,7 +14,7 @@ import (
 //   - a file whose content is literally a diff header
 //
 // Getting these wrong silently misroutes or shifts every comment in the file,
-// which is why they are checked against output git actually produced rather
+// which is why they are checked against output git produced rather
 // than against a hand-written string.
 const (
 	pseudoHeaderFixture = "testdata/pseudo-headers.diff"
@@ -109,7 +109,7 @@ func TestRemovedLineIsNotMistakenForAFileHeader(t *testing.T) {
 
 func TestDiffHeaderAsFileContentIsNotStructure(t *testing.T) {
 	// tricky.txt's contents are literally a diff header. As added lines they
-	// carry a '+' marker, so they are content — but a parser that scanned for
+	// carry a '+' marker, so they are content, but a parser that scanned for
 	// "diff --git" anywhere would split the file in two.
 	files := parseFixture(t, pseudoHeaderFixture)
 

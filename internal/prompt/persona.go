@@ -15,7 +15,7 @@ const LayerPersona = "persona"
 // Two rules govern everything here. First, each instruction is phrased as a
 // concrete behavior rather than an adjective: "one sentence of rationale" is
 // followable, "be terse" is not, and models comply with the former far more
-// reliably. Second, voice instructions never soften the *bar* for reporting —
+// reliably. Second, voice instructions never soften the *bar* for reporting,
 // a warm reviewer and a blunt one must find the same defects and differ only in
 // wording, or the tone knob silently becomes a quality knob.
 func Persona(p config.Persona) string {
@@ -73,7 +73,7 @@ func StylePass(p config.Persona) string {
 //
 // Scope is stated as an inclusion list plus an explicit exclusion list. Models
 // are markedly better at "report X, Y, Z and nothing else" than at calibrating
-// a vague threshold, and the exclusions are what actually keep the output
+// a vague threshold, and the exclusions are what keep the output
 // scannable.
 func nitpickScope(level config.NitpickLevel) string {
 	const core = "correctness, concurrency, security, resource handling, and data loss"
@@ -106,7 +106,7 @@ func nitpickScope(level config.NitpickLevel) string {
 			"branching logic is genuinely risky.\n\n" +
 			// THE EXAMPLE USED TO BE A CORRECTNESS BUG. It read "not 'this is
 			// complex', but 'this shadows err, so the outer error is silently
-			// discarded'" — and an error being silently discarded is not a
+			// discarded'", and an error being silently discarded is not a
 			// maintainability cost, it is something going wrong. It is the only
 			// example given for what "concretely" means, so it set the bar for
 			// reporting a maintainability problem at the warning definition:
@@ -122,7 +122,7 @@ func nitpickScope(level config.NitpickLevel) string {
 			//
 			// Both of those ladder illustrations have since been replaced, because
 			// naming a planted defect three lines above "do not go looking for
-			// them" measured 0 of 3 on each — and because the sentence was false
+			// them" measured 0 of 3 on each, and because the sentence was false
 			// for a user with no corpus at all. See review.md's `info` rung and
 			// internal/evals/promptcollision_test.go, which is now the guard
 			// against a prompt example naming what the corpus plants.

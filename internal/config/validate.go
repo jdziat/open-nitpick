@@ -225,12 +225,12 @@ func (l Linters) validate() []error {
 
 	// A relative analyzer config is refused HERE rather than at run time,
 	// because relative to the working directory means relative to the tree under
-	// review — the one place a configuration may not come from. Rejecting it
+	// review, the one place a configuration may not come from. Rejecting it
 	// before a review starts is the difference between an operator learning they
 	// typed a path wrong and an operator learning nothing, since the runtime
 	// answer to a bad path is a skipped analyzer.
 	//
-	// Whether an absolute path actually lands outside the repository is decided
+	// Whether an absolute path lands outside the repository is decided
 	// by internal/linters, which is the only layer that knows where the
 	// repository is.
 	for _, c := range []struct{ key, path string }{

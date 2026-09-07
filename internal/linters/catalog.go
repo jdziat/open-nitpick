@@ -512,8 +512,8 @@ func sqlfluffSpec() toolSpec {
 			for _, f := range files {
 				for _, v := range f.Violations {
 					// PRS and TMP are sqlfluff saying it could not parse or
-					// template the file — almost always the wrong dialect for
-					// this repository — which is a fact about the analyzer's
+					// template the file, almost always the wrong dialect for
+					// this repository, which is a fact about the analyzer's
 					// configuration, not a finding about the change. Publishing
 					// "unparsable SQL" on a valid migration is noise the
 					// operator fixes with linters.configs.sqlfluff.

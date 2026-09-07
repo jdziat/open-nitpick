@@ -33,7 +33,7 @@ var capabilitySignals = []string{
 // schema-constrained output", as opposed to "this request happened to fail".
 //
 // Only the former justifies the one-way downgrade to JSON mode. Transient
-// failures — rate limits, server errors, timeouts, an open circuit breaker —
+// failures, rate limits, server errors, timeouts, an open circuit breaker,
 // must not change strategy: the client is shared across every batch, so one bad
 // minute would otherwise move the entire run onto the unenforced path.
 func isCapabilityError(err error) bool {
@@ -72,7 +72,7 @@ func matchesCapabilitySignal(msg string) bool {
 	// as "llms: structured output is not valid JSON: ...", which contains two
 	// of the signals below, so a fully schema-capable model that returned one
 	// garbled reply was classified as incapable and downgraded the shared
-	// client for every remaining batch of the run — the exact outcome the
+	// client for every remaining batch of the run, the exact outcome the
 	// comment above says must not happen. Checked first, because the signal
 	// list cannot be made narrow enough to exclude it.
 	if strings.Contains(lower, sdkSchemaParseFailure) {

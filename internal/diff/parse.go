@@ -67,7 +67,7 @@ func Parse(data []byte) (Files, error) {
 		// While a hunk still owes lines, EVERY line is content. This arm must
 		// come first: an added line whose own text starts with "++ " renders
 		// as "+++ ...", and a removed "-- " renders as "--- ...", either of
-		// which would otherwise be parsed as a file header — silently
+		// which would otherwise be parsed as a file header, silently
 		// replacing the file's path and shifting every later line number.
 		case hunkOpen():
 			position++

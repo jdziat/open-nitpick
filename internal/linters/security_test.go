@@ -14,7 +14,7 @@ import (
 //
 // A pull request can add node_modules/.bin/eslint as an executable shell script
 // (git preserves the exec bit). Running it would execute attacker code with
-// GITHUB_TOKEN and the model API key in the environment — and because
+// GITHUB_TOKEN and the model API key in the environment, and because
 // **/node_modules/** is in the default ignore list, the malicious file would
 // never appear in the posted review.
 func TestEslintRefusesRepoLocalBinary(t *testing.T) {

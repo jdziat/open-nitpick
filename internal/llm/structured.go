@@ -18,7 +18,7 @@ import (
 // Extract runs a generation and decodes the result into T.
 //
 // Two strategies are available, because "every provider supports structured
-// output" is not true in practice — particularly for the local models this tool
+// output" is not true in practice, particularly for the local models this tool
 // is meant to support:
 //
 //   - schema: a JSON-Schema response format derived from T. Preferred, since
@@ -86,8 +86,8 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 		case schemaNotEnforced(err):
 			// The provider took the json_schema request format and answered
 			// anyway with something the schema forbids. That is a fact about
-			// this RESPONSE, not about the provider — a router hands
-			// consecutive requests to different upstreams — so the JSON path
+			// this RESPONSE, not about the provider, a router hands
+			// consecutive requests to different upstreams, so the JSON path
 			// is retried for this request only. Deliberately no downgrade:
 			// the client is shared by every batch, and half a run executing
 			// under a different strategy than the other half is not a result.
@@ -287,8 +287,8 @@ var errSchemaNotEnforced = errors.New("provider did not enforce the response sch
 // never reached Report.Incomplete, and the run exited 0 calling the pull request
 // clean. decodeLenient has rejected exactly those three shapes on the JSON path
 // from the start; only the schema path was unguarded. Routing through a provider
-// that forwards response_format to whichever upstream it picked — and does not
-// require that upstream to honor it — is what made an unenforced schema response
+// that forwards response_format to whichever upstream it picked, and does not
+// require that upstream to honor it, is what made an unenforced schema response
 // reachable in the shipped configuration rather than theoretical.
 func requireSchemaEnforced[T any](resp *llms.Response, value T) error {
 	if resp == nil {
@@ -327,7 +327,7 @@ func extractJSON[T any](ctx context.Context, c *Client, msgs []llms.Message, opt
 
 	// Prefer a caller-supplied schema so both strategies describe the same
 	// contract. Deriving it from T here would silently disagree with the
-	// schema the provider was given — notably about which fields are required.
+	// schema the provider was given, notably about which fields are required.
 	schema := suppliedSchema(opts)
 	if schema == nil {
 		var err error
@@ -463,7 +463,7 @@ func decodeLenient[T any](content string) (T, error) {
 	}
 
 	// Otherwise consider every candidate object in the text, preferring the
-	// last one that actually carries the fields we asked for. Taking the first
+	// last one that carries the fields we asked for. Taking the first
 	// balanced object is what let prose like "uses a map[string]struct{}" or a
 	// leading "Analysis: {}" swallow the real answer.
 	candidates := extractJSONCandidates(trimmed)
@@ -497,7 +497,7 @@ func decodeLenient[T any](content string) (T, error) {
 //
 // Go's json.Unmarshal happily decodes `{}`, `null`, or an unrelated object into
 // any struct, yielding a zero value and no error. For a review that means
-// "found nothing" — indistinguishable from a genuinely clean diff. Requiring at
+// "found nothing", indistinguishable from a clean diff. Requiring at
 // least one recognized key forces those into the repair path instead.
 func requirePopulated[T any](raw string, value T) error {
 	if strings.TrimSpace(raw) == "null" {

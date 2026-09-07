@@ -188,7 +188,7 @@ func (f *File) Position(newLine int) (int, bool) {
 
 // NearestCommentableLine snaps a line number to the closest added line in the
 // same file, within maxDistance. Models routinely anchor a finding a line or
-// two off — to a closing brace, or to the line after the one they mean — and
+// two off, to a closing brace, or to the line after the one they mean, and
 // snapping recovers those comments instead of discarding them.
 //
 // Ties prefer the earlier line, which reads as the start of the construct being

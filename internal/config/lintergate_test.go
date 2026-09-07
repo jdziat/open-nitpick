@@ -51,7 +51,7 @@ func TestLinterCapSeverityReducesOnlyAbove(t *testing.T) {
 
 // TestAnUnusableLinterCeilingCapsNothing pins the direction the fallback leans.
 //
-// Severity("").Rank() is the unknown floor, which is info's — so a ceiling
+// Severity("").Rank() is the unknown floor, which is info's, so a ceiling
 // comparison written without this guard would silently reduce EVERY analyzer
 // finding to info for any Config assembled in code rather than loaded from
 // disk. Silent severity loss is the failure this whole change exists to end, so
@@ -119,7 +119,7 @@ linters:
 // review starts.
 //
 // Relative means relative to the working directory, which is the tree under
-// review — the one place analyzer configuration may not come from. Catching it
+// review, the one place analyzer configuration may not come from. Catching it
 // here rather than at run time is the difference between an operator learning
 // they typed a path wrong and learning nothing at all, because the runtime
 // answer to a bad path is an analyzer that quietly did not run.

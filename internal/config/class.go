@@ -10,8 +10,8 @@ import "strings"
 //
 //   - Generating at a wider scope degrades the defect hunt. Across four eval
 //     runs, asking the model to also consider style consistently produced the
-//     worst results — more findings, lower precision, and more missed real
-//     defects — because attention spent on naming is attention not spent on
+//     worst results, more findings, lower precision, and more missed real
+//     defects, because attention spent on naming is attention not spent on
 //     the race condition.
 //   - Scope-as-generation makes levels incomparable. Changing the level changed
 //     the prompt, so any measured difference confounded scope with model
@@ -175,7 +175,7 @@ func (level NitpickLevel) Publishes(c Class) bool {
 	}
 
 	// Normalize defensively. An unrecognized or empty class reaching here would
-	// otherwise match nothing and silently drop the finding — turning a missing
+	// otherwise match nothing and silently drop the finding, turning a missing
 	// field into a disappeared defect, which is the failure mode this whole
 	// codebase is built to avoid.
 	normalized, _ := c.Normalize()
@@ -186,7 +186,7 @@ func (level NitpickLevel) Publishes(c Class) bool {
 // deliberately does not produce.
 //
 // Only pedantic does. Post-hoc filtering can narrow a corpus but never widen
-// it, so style findings — which the generation prompt forbids — have to come
+// it, so style findings, which the generation prompt forbids, have to come
 // from somewhere else.
 func (level NitpickLevel) NeedsStylePass() bool {
 	return level == NitpickPedantic

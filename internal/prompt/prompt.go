@@ -189,7 +189,7 @@ func Build(name string, opts Options) (Prompt, error) {
 
 // render executes a template. Templates are authored by the repository owner,
 // who can already run arbitrary code in CI, so this is a convenience rather
-// than a trust boundary — but missing keys are still an error, because a
+// than a trust boundary, but missing keys are still an error, because a
 // silently empty instruction is worse than a loud failure.
 func render(name, text string, data any) (string, error) {
 	tmpl, err := template.New(name).Option("missingkey=error").Parse(text)

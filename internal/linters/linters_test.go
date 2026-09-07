@@ -234,8 +234,8 @@ func TestFindingsAreAttributedToTheirLinter(t *testing.T) {
 // TestALinterFindingNeverClaimsOurSeverityAsItsOwn pins the provenance of a
 // severity nobody but this package chose.
 //
-// mapSeverity folds foreign vocabularies onto our levels — "HIGH" and "ERROR"
-// both land on error — and ruff publishes no severity at all, so a linter
+// mapSeverity folds foreign vocabularies onto our levels, "HIGH" and "ERROR"
+// both land on error, and ruff publishes no severity at all, so a linter
 // finding's level is our reading rather than the analyzer's own claim. It holds
 // even where the spelling coincides: semgrep documents ERROR as the older
 // spelling of HIGH, so it is a word inside SEMGREP'S scale, and
@@ -287,7 +287,7 @@ func TestALinterFindingNeverClaimsOurSeverityAsItsOwn(t *testing.T) {
 // own bug rather than a vocabulary we failed to read.
 //
 // It lands on the same level mapSeverity gives an unreadable analyzer word and
-// ruff's runner gives no word at all, because all three are the same state —
+// ruff's runner gives no word at all, because all three are the same state,
 // this project has no usable severity and picks one.
 func TestAnUnusableSeverityFromARunnerBecomesWarning(t *testing.T) {
 	cfg := baseConfig()
@@ -335,7 +335,7 @@ func TestMapSeverity(t *testing.T) {
 		// Analyzer vocabularies, folded onto ours. Semgrep documents
 		// ERROR/WARNING/INFO as the older spellings of HIGH/MEDIUM/LOW, so the
 		// pairs below are synonyms inside one scale rather than a foreign word
-		// and one of ours — and the fold is why RawSeverity exists.
+		// and one of ours, and the fold is why RawSeverity exists.
 		"HIGH":     config.SeverityError,
 		"high":     config.SeverityError,
 		"ERROR":    config.SeverityError,
@@ -390,13 +390,13 @@ func TestMapSeverity(t *testing.T) {
 // fails.
 //
 // THE BUG IT REPLACES: this floor was briefly aligned with
-// config.Severity.Normalize's info instead — the level an unrecognized word from
+// config.Severity.Normalize's info instead, the level an unrecognized word from
 // a MODEL gets. The symmetry is false. A model is handed our enum and writing
 // outside it is that reporter misbehaving; an analyzer was never given our
 // vocabulary, so an unreadable word is our translation failing, and quietening
 // our own failure deletes real findings under any review.min_severity above
 // info. It also ranked "the tool said something we could not read" below "the
-// tool said nothing", which is incoherent — those are the same state, and this
+// tool said nothing", which is incoherent. Those are the same state, and this
 // test is what says so.
 func TestAnUnreadableAnalyzerWordIsRankedWhereSilenceIs(t *testing.T) {
 	silence := mapSeverity("")
@@ -457,13 +457,13 @@ func TestDecodeJSONIgnoresSurroundingNoise(t *testing.T) {
 // TestDecodeJSONRequiresAPayload pins the assertion that an analyzer actually
 // reported.
 //
-// THE BUG IT REPLACES: this test used to assert the opposite — that output with
+// THE BUG IT REPLACES: this test used to assert the opposite, that output with
 // no JSON in it is "the analyzer found nothing and said so in prose", and
 // therefore not an error. None of the four analyzers behaves that way:
 // golangci-lint prints {"Issues":[]}, ruff and eslint print [], semgrep prints
 // its envelope. So the only things reaching that branch were failures, and
-// combined with runCommand — which errors only when stdout is empty AND the exit
-// was non-zero — an analyzer that exited 0 printing nothing was indistinguishable
+// combined with runCommand, which errors only when stdout is empty AND the exit
+// was non-zero, an analyzer that exited 0 printing nothing was indistinguishable
 // from clean code. `semgrep --config auto --metrics off` had been shipping in
 // exactly that state.
 func TestDecodeJSONRequiresAPayload(t *testing.T) {
@@ -489,7 +489,7 @@ func TestDecodeJSONReportsMalformedPayload(t *testing.T) {
 	if err == nil {
 		t.Fatal("want an error for malformed JSON")
 	}
-	// The error must show what was actually received, or diagnosing a new
+	// The error must show what was received, or diagnosing a new
 	// analyzer version means guessing.
 	if !strings.Contains(err.Error(), "Issues") {
 		t.Errorf("error should quote the output, got: %v", err)

@@ -38,12 +38,12 @@ type Finding struct {
 	//
 	// It is recorded even when the spelling coincides with one of our level
 	// names, because Severity above is still read on OUR scale: semgrep's ERROR
-	// is a level in semgrep's vocabulary — its own documentation makes it a
-	// synonym for HIGH — and has not thereby adopted this project's meaning.
+	// is a level in semgrep's vocabulary. Its own documentation makes it a
+	// synonym for HIGH, and has not thereby adopted this project's meaning.
 	// The operator's ceiling can move the level afterwards anyway.
 	//
 	// Empty means the analyzer published no severity at all and this package
-	// chose one — ruff is the case, and there the level is entirely ours.
+	// chose one, ruff is the case, and there the level is entirely ours.
 	// Either way Severity is not a quotation, which is why every runner that
 	// fills this in also sets review.Finding.SeverityTranslated downstream.
 	RawSeverity string
@@ -60,7 +60,7 @@ type Runner interface {
 	//
 	// IT RETURNS THE REASON RATHER THAN A BOOL because the caller was inventing
 	// one. A false used to be reported to the operator as "its binary is not on
-	// PATH, or this repository has none of the files it looks for" — a guess
+	// PATH, or this repository has none of the files it looks for", a guess
 	// between two causes, printed where the real cause (a config refused, a
 	// module the old detection could not see, no Python in a Go change) was
 	// already known here and thrown away.
@@ -88,13 +88,13 @@ func isAutoDetected(r Runner) bool {
 //
 // It says "was selected for review" and not "the change contains" because the
 // two come apart, and the wording that claimed the stronger one was measured
-// false. Detect is handed reviewablePaths' output — review.ignore already
-// applied — so a `go mod vendor` bump touching go.mod and vendor/dep/dep.go
+// false. Detect is handed reviewablePaths' output, review.ignore already
+// applied, so a `go mod vendor` bump touching go.mod and vendor/dep/dep.go
 // arrives as a one-element list holding go.mod, and the sentence "the change
 // contains no files it analyzes" was published over a change containing a Go
 // file with a real violation. The selection is the honest subject: this analyzer
 // was offered nothing it reads. Which files were withheld, and whether that
-// mattered, is the coverage list's job — see Set.Run's errNoTargets arm.
+// mattered, is the coverage list's job, see Set.Run's errNoTargets arm.
 var errNoTargets = errors.New("no files it analyzes were selected for review")
 
 // notOnPath is the reason an analyzer whose binary is missing did not run.
@@ -188,7 +188,7 @@ func builtins(repoRoot string, cfg *config.Config) []Runner {
 // the failure mode this whole change is about, so it must not be reproduced by
 // the fix.
 //
-// "Your linter did not run" must never be only a slog.Warn in a CI log — and for
+// "Your linter did not run" must never be only a slog.Warn in a CI log, and for
 // one release it was only a Fprintf to the same CI log, which is the letter of
 // that sentence and not its point. The reader who has to know is the one reading
 // the pull request, so review.Render publishes these; see linterNotice.
@@ -212,8 +212,8 @@ func (s *Set) Statuses() []review.LinterStatus {
 //
 // It exists because Set.normalize used to drop them with a bare `continue`: no
 // counter, no log, no status. That single line was the sink for the line
-// directive attack — golangci-lint reports real findings at a forged path, and
-// they arrive here as "a path not in the diff" — and it was also where the
+// directive attack, golangci-lint reports real findings at a forged path, and
+// they arrive here as "a path not in the diff", and it was also where the
 // opt-in analyzer config lost EVERY finding, because an operator config outside
 // the repository made golangci-lint print paths relative to that config's
 // directory.
@@ -225,8 +225,8 @@ func (s *Set) Statuses() []review.LinterStatus {
 // from clean code.
 //
 // This is NOT the whole published list. review.Engine's anchor filter runs after
-// normalize and drops analyzer findings of its own — it was found doing so
-// silently, downstream of this fix and with the same three symptoms — so the
+// normalize and drops analyzer findings of its own. It was found doing so
+// silently, downstream of this fix and with the same three symptoms, so the
 // engine merges its drops into the same block. See review.SortDiscards.
 func (s *Set) Discarded() []review.LinterDiscard {
 	s.mu.Lock()
@@ -250,7 +250,7 @@ func (s *Set) Discarded() []review.LinterDiscard {
 // different claims, and only the first one was being published. A build
 // constraint on the changed file with an ordinary sibling beside it, or a
 // //nolint on the package clause, both produce a run with zero findings, a nil
-// error and a roster line saying golangci-lint ran — which is what a clean Go
+// error and a roster line saying golangci-lint ran, which is what a clean Go
 // review looks like. See golangciLint.Uncovered.
 func (s *Set) Uncovered() []review.LinterUncovered {
 	s.mu.Lock()
@@ -323,7 +323,7 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 			// The runner's OWN reason, never a reconstruction. What was here
 			// sniffed the runner's state string for "not configured" and
 			// replaced everything else with a guess between a missing binary
-			// and missing project files — so the commonest real cause, a
+			// and missing project files, so the commonest real cause, a
 			// module the detection could not see, was reported as one of two
 			// things that were not true.
 			reason := oneLine(err.Error())
@@ -351,9 +351,9 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 				// But "nothing to read" and "nothing to say" are different
 				// claims, and this arm used to publish the first while meaning
 				// the second. Detect answers from the SELECTED paths, so a
-				// change whose every Go file is withheld by review.ignore —
+				// change whose every Go file is withheld by review.ignore,
 				// `go mod vendor`, where go.mod survives and vendor/dep/dep.go
-				// does not — reached here and produced a review whose entire
+				// does not, reached here and produced a review whose entire
 				// body was one skipped line. Measured: a real errcheck
 				// violation in the withheld file, findings=0, uncovered=[].
 				//
@@ -361,7 +361,7 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 				// mechanism of its own: notSelected compares the diff against
 				// the selection, and with no Go file selected there is no
 				// analyzed package to excuse one, so every withheld Go file is
-				// named. A change this analyzer genuinely has no stake in still
+				// named. A change this analyzer has no stake in still
 				// produces nothing, because notSelected filters on extension.
 				s.uncover(s.coverage(ctx, r, paths, files))
 				continue
@@ -443,8 +443,8 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 // that cannot be anchored to the change AND RECORDING EVERY ONE IT DROPS.
 //
 // What was here was three bare `continue` statements. They are the correct
-// behaviour — a comment cannot be published on a line the forge will not accept
-// — and they were the wrong accounting: an analyzer finding entered this
+// behaviour, a comment cannot be published on a line the forge will not accept
+// , and they were the wrong accounting: an analyzer finding entered this
 // function and nothing anywhere said it had left. Two live defects hid in that
 // gap, one of them an attack (a line directive forging the reported path) and
 // one of them our own (an operator's config making every path unresolvable), and
@@ -492,7 +492,7 @@ func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 		}
 
 		// The operator's ceiling, applied here so that TRIAGE is not shown a
-		// level the operator has already declined — a triage walkthrough calling
+		// level the operator has already declined, a triage walkthrough calling
 		// something critical while the published comment says warning would be
 		// this project disagreeing with itself in one report.
 		//
@@ -514,8 +514,8 @@ func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 		// EVERY analyzer finding's severity is this project's word, including
 		// the ones whose spelling happens to match ours. A shared spelling is not
 		// a shared scale: semgrep's ERROR is a rule author's judgement inside
-		// semgrep's own four-level vocabulary — where it is a synonym for HIGH,
-		// not for this project's error — and the ceiling above can move it again
+		// semgrep's own four-level vocabulary, where it is a synonym for HIGH,
+		// not for this project's error, and the ceiling above can move it again
 		// afterwards. Marking them all is therefore correct rather than
 		// conservative, and it is what stops a report captioning "semgrep said
 		// error" over a word semgrep never printed. RawSeverity carries the
@@ -542,7 +542,7 @@ func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 // publish.
 //
 // It logs as well as counting. The complaint against the bare `continue` was
-// three things — no counter, no log, no status — and a reader debugging a
+// three things, no counter, no log, no status, and a reader debugging a
 // missing finding reaches for the log first, while the reader who never knew a
 // finding existed is reached only by the status.
 func (s *Set) discard(f Finding, reason review.DiscardReason) {
@@ -566,7 +566,7 @@ func (s *Set) discard(f Finding, reason review.DiscardReason) {
 // env` to decide the cgo and language-version questions from the child's build
 // context rather than from this process's; sharing runCtx meant an analyzer that
 // returned with the timeout already spent left `go env` no time to answer, and
-// the fallback is build.Default — the exact guessed-build-context state two
+// the fallback is build.Default, the exact guessed-build-context state two
 // separate silencing routes were fixed for, arrived at silently and with nothing
 // on the review saying the answer was assumed. A coverage question is cheap and
 // bounded by directory reads, so it gets a deadline sized for itself.
@@ -619,7 +619,7 @@ func (s *Set) uncover(gaps []review.LinterUncovered) {
 // all: the analyzer was made to describe a file that does not exist. The only
 // way to reach it from a Go tree is a line directive, and the same directive
 // pointed at a real file relocates a finding onto code the change did not write
-// — so this is the visible half of a thing whose invisible half puts this bot's
+// , so this is the visible half of a thing whose invisible half puts this bot's
 // name on an accusation about somebody else's line.
 //
 // WHAT IS DONE WITH IT, AND WHY THAT AND NOT MORE. It is recorded under its own
@@ -627,13 +627,13 @@ func (s *Set) uncover(gaps []review.LinterUncovered) {
 // used to fail the analyzer from here. Two reasons. Publishing it as a finding
 // would mean anchoring it, and the only honest anchor is the file carrying the
 // directive, which this function cannot see: it holds a forged path and nothing
-// else. And failing the analyzer at this point would be late and partial —
+// else. And failing the analyzer at this point would be late and partial,
 // Set.Run has already recorded the analyzer as having run, and the SILENCING
 // variant of the attack produces no findings for this function to inspect at
 // all. The analyzer has to refuse before it reports, which is where the refusal
 // now is; see positionsRewritten. This is the backstop that names it if one
-// arrives anyway — from an analyzer with no such check, or along a path nobody
-// has thought of yet — and a named, published count is the minimum that makes
+// arrives anyway, from an analyzer with no such check, or along a path nobody
+// has thought of yet, and a named, published count is the minimum that makes
 // such a run distinguishable from a clean one.
 func (s *Set) reasonForUnknownPath(reported string) review.DiscardReason {
 	if reported == "" {
@@ -657,7 +657,7 @@ func (s *Set) reasonForUnknownPath(reported string) review.DiscardReason {
 // classForRule maps an analyzer rule to a finding class.
 //
 // Without this every linter finding arrived classless and normalized to
-// maintainability — which nitpick=off and nitpick=minimal do not publish. A
+// maintainability, which nitpick=off and nitpick=minimal do not publish. A
 // gosec or semgrep security result would have been silently dropped and the
 // build left green, which is the opposite of what a security linter is for.
 func classForRule(rule string) config.Class {
@@ -739,7 +739,7 @@ func prefixRule(linter, rule string) string {
 // Resolution is PATH-only and the result must not live inside the repository
 // being reviewed. A pull request can add `node_modules/.bin/eslint` (git
 // preserves the executable bit), and running it would execute attacker-supplied
-// code with GITHUB_TOKEN and the model API key in the environment — while
+// code with GITHUB_TOKEN and the model API key in the environment, while
 // `**/node_modules/**` is in the default ignore list, so the malicious file
 // would never even appear in the posted review.
 func available(name string) bool {
@@ -838,7 +838,7 @@ func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 // run" is the analyzer's own convention, so the code is returned and the runner
 // that knows reads it. golangci-lint is invoked with --issues-exit-code 0 and
 // semgrep documents 0 and 1 as success, and both of them report a failed
-// analysis with a non-zero exit AND a well-formed report on stdout — which used
+// analysis with a non-zero exit AND a well-formed report on stdout, which used
 // to arrive here as success and decode to zero findings.
 //
 // An exit of ZERO with no output is caught downstream by decodeJSON, which
@@ -849,7 +849,7 @@ func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 // repoRoot and workDir are separate arguments because they stopped being the
 // same thing: golangci-lint is invoked inside the module that owns the changed
 // package, which in a monorepo is a subdirectory. Containment has to stay
-// anchored to the CHECKOUT, since the whole checkout is what the change wrote —
+// anchored to the CHECKOUT, since the whole checkout is what the change wrote,
 // keyed on the working directory instead, a binary the pull request added at
 // <repo>/tools would be refused for a root module and accepted for a nested one.
 func runCommand(ctx context.Context, repoRoot, workDir, name string, env []string, args ...string) ([]byte, int, error) {
@@ -892,8 +892,8 @@ func runCommand(ctx context.Context, repoRoot, workDir, name string, env []strin
 
 // exitCode reads a process's exit status out of the error Run returned.
 //
-// A failure that is not an exit at all — the process was signalled, or never
-// started — reports -1 rather than 0, so that a caller reading "did it exit
+// A failure that is not an exit at all. The process was signalled, or never
+// started, reports -1 rather than 0, so that a caller reading "did it exit
 // cleanly" cannot be told yes by something that never exited.
 func exitCode(runErr error) int {
 	if runErr == nil {

@@ -20,7 +20,7 @@ import (
 // persona.nitpick filters whole classes away, the budgets decide how much of the
 // diff is read at all, validation.enabled switches on the one pass whose purpose
 // is removing findings, and instructions[].prompt is free text rendered at
-// column 0 under "Repository instructions for this path:" — the position the
+// column 0 under "Repository instructions for this path:", the position the
 // model is told to trust.
 //
 // sanitize() answers a narrower question and stays: a config the change did NOT
@@ -42,7 +42,7 @@ const (
 	OriginCheckout PolicyOrigin = "checkout"
 
 	// OriginBase means the change modifies the config file, so policy was read
-	// from the base revision — the version maintainers already accepted, which
+	// from the base revision, the version maintainers already accepted, which
 	// preserves every legitimate setting while ignoring what the change added.
 	OriginBase PolicyOrigin = "base"
 
@@ -56,7 +56,7 @@ const (
 //
 // It exists for the maintainer legitimately editing .nitpick.yaml: their new
 // ignore rule does nothing in the very pull request that adds it, and without
-// this they have no way to find out why. It is surfaced the way Dropped is —
+// this they have no way to find out why. It is surfaced the way Dropped is,
 // logged on every run and printed by explain-config.
 type Policy struct {
 	// Origin says which of the three sources applied.
@@ -71,13 +71,13 @@ type Policy struct {
 	Ref string
 
 	// Modified is the repository-relative path of the config file the change
-	// edits — the file whose policy was withheld. Set whenever the policy was
+	// edits, the file whose policy was withheld. Set whenever the policy was
 	// substituted, including for OriginDefaults, where Path is empty because no
 	// file supplied anything.
 	//
 	// It is separate from Path because a reader needs both halves of the
 	// sentence: which file to go and look at, and where the policy that ran
-	// instead came from. Deriving it later from Source cannot work — Source is
+	// instead came from. Deriving it later from Source cannot work, Source is
 	// absolute, so in CI it carries the runner's workspace path, and it is empty
 	// altogether when the change ADDS or DELETES the file.
 	Modified string
@@ -86,8 +86,8 @@ type Policy struct {
 	// maintainer can act on. Empty for OriginCheckout.
 	//
 	// One sentence means one LINE: it is published inside a blockquote on a pull
-	// request, and it carries forge and parser text — errors.Join separates its
-	// messages with newlines — so it is flattened where it is built rather than
+	// request, and it carries forge and parser text, errors.Join separates its
+	// messages with newlines, so it is flattened where it is built rather than
 	// at each of the places that print it.
 	Reason string
 }
@@ -119,8 +119,8 @@ func (p Policy) String() string {
 // revision.
 //
 // Its error is not classified by the caller. Any failure to obtain the accepted
-// version means defaults, because the one alternative — the version under
-// review — is what the base revision exists to keep out.
+// version means defaults, because the one alternative, the version under
+// review, is what the base revision exists to keep out.
 type BaseReader func(ctx context.Context, path string) ([]byte, error)
 
 // PolicyRequest describes the change under review and where a copy of the
@@ -157,7 +157,7 @@ type PolicyRequest struct {
 // review does not modify the file it came from, cfg is authoritative and comes
 // back with nothing but its Policy stated. When the change DOES modify that
 // file, the file describes policy its author wrote for their own review, so it
-// is set aside in favor of the version at the base revision — and of built-in
+// is set aside in favor of the version at the base revision, and of built-in
 // defaults when that cannot be read.
 //
 // The returned Config always carries a Policy saying which of the three
@@ -220,8 +220,8 @@ var errNoRepoRoot = errors.New("config: a repository root is required to resolve
 // configuration.
 //
 // "Not found" is separated from every other failure because it is the ordinary
-// and benign case — the pull request that ADDS the config file, or moves another
-// file onto its path — and reporting that as "no version of it could be read:
+// and benign case, the pull request that ADDS the config file, or moves another
+// file onto its path, and reporting that as "no version of it could be read:
 // vcs: not found" describes a normal event in the vocabulary of an
 // infrastructure fault. The decision is identical either way, and deliberately
 // so; only the sentence a contributor reads differs.
@@ -242,7 +242,7 @@ func defaultsPolicy(modified, reason string) (*Config, error) {
 	cfg, err := defaultConfig()
 	if err != nil {
 		// Defaults name no model, so a repository that names its own only
-		// inside .nitpick.yaml has nothing left to run on — which is most of
+		// inside .nitpick.yaml has nothing left to run on, which is most of
 		// them, in the pull request that adds that file. Failing loudly here is
 		// the point: the only way to carry on would be to review under policy
 		// the change wrote for its own review. The caller publishes this
@@ -279,7 +279,7 @@ func (c *Config) SelfModified(repoRoot string, changed []string) bool {
 // configuration came from, or would have come from had it been there.
 //
 // ok is false when no file is involved at all and when the file lies outside
-// repoRoot — the two cases in which no change under review can reach it, so
+// repoRoot, the two cases in which no change under review can reach it, so
 // nothing it says can ever be the change's own. Callers that describe policy to
 // an operator need to tell those apart from an in-repo config, and printing an
 // absolute path from a CI runner's workspace tells a reader nothing.
@@ -313,7 +313,7 @@ func (c *Config) selfModified(repoRoot string, changed []string) (string, bool) 
 				continue
 			}
 			// The candidate rather than the diff's spelling: the base revision
-			// has to be read at the name this configuration actually resolves
+			// has to be read at the name this configuration resolves
 			// to, not at whatever case or alias the change chose to write.
 			return candidate, true
 		}
@@ -333,8 +333,8 @@ func (c *Config) configPaths(repoRoot string) []string {
 	}
 
 	// Source is empty when no file was read, and a change that DELETES the
-	// config file — or renames it away, or replaces it with a dangling symlink
-	// — produces exactly that checkout. Skipping it there would let a change
+	// config file, or renames it away, or replaces it with a dangling symlink
+	//, produces exactly that checkout. Skipping it there would let a change
 	// swap the repository's accepted policy for built-in defaults by removal
 	// rather than by edit, with nothing reported: the weakest policy available,
 	// chosen by the change, silently.
@@ -349,7 +349,7 @@ func (c *Config) configPaths(repoRoot string) []string {
 	var out []string
 	add := func(p string) {
 		// Source is a filesystem path and diff paths are repository-relative,
-		// so comparing the two as they stand never matches — the check would
+		// so comparing the two as they stand never matches. The check would
 		// report "not self-modified" for every change ever made, leaving the
 		// hole open while looking closed.
 		rel, ok := repoRelative(repoRoot, p)
@@ -364,7 +364,7 @@ func (c *Config) configPaths(repoRoot string) []string {
 	// os.ReadFile follows symlinks. A committed `.nitpick.yaml -> ci/nitpick.yaml`
 	// therefore means the bytes governing the review live in ci/nitpick.yaml, and
 	// a change editing the target names the TARGET in its diff and never the
-	// link — so matching the link's own name alone let that change supply the
+	// link, so matching the link's own name alone let that change supply the
 	// entire policy while the run reported nothing unusual.
 	if resolved, err := filepath.EvalSymlinks(source); err == nil {
 		add(resolved)
@@ -378,8 +378,8 @@ func (c *Config) configPaths(repoRoot string) []string {
 // lies outside root.
 //
 // Directories are resolved through symlinks before comparing. A checkout
-// reached through a symlinked parent — /tmp on macOS, /home on several CI
-// images — spells the same file two different ways, and filepath.Rel then
+// reached through a symlinked parent, /tmp on macOS, /home on several CI
+// images, spells the same file two different ways, and filepath.Rel then
 // reports an in-repo config as being OUTSIDE the repository, which is the
 // answer that trusts it. The final component is deliberately left alone: the
 // name in the diff is the name of the file the change edits.

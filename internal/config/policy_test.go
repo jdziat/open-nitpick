@@ -136,8 +136,8 @@ func TestConfigOutsideTheRepositoryIsNeverSelfModified(t *testing.T) {
 // TestDeletingTheConfigIsStillTheChangesOwn covers the substitution that leaves
 // no file behind. A checkout whose .nitpick.yaml the change removed loads as
 // built-in defaults with nothing to compare against, so the change had chosen
-// its own policy — the weakest one available, with fail_on none and the default
-// ignore list restored — and the run reported nothing unusual. `git mv` away
+// its own policy, the weakest one available, with fail_on none and the default
+// ignore list restored, and the run reported nothing unusual. `git mv` away
 // from the path and a dangling symlink produce exactly the same checkout.
 func TestDeletingTheConfigIsStillTheChangesOwn(t *testing.T) {
 	t.Setenv(EnvProvider, "openai")
@@ -181,7 +181,7 @@ func TestDeletingTheConfigIsStillTheChangesOwn(t *testing.T) {
 
 // TestASymlinkedConfigIsMatchedByItsTarget: os.ReadFile follows symlinks, so a
 // committed `.nitpick.yaml -> ci/nitpick.yaml` means the bytes that govern the
-// review live in ci/nitpick.yaml — and a change editing the target names the
+// review live in ci/nitpick.yaml, and a change editing the target names the
 // TARGET in its diff. Matching only the link's own name let a two-step attack
 // (one benign "move the config under ci/" pull request, then one that edits the
 // target) supply the entire policy with nothing reported.
@@ -649,7 +649,7 @@ func TestBasePolicySkipsTheForgeForAnOrdinaryChange(t *testing.T) {
 // TestBasePolicyPrefersTheBaseRevisionItWasGiven: the engine has already
 // fetched the pull request when it resolves policy, and on GitHub asking again
 // is a second unbounded API call that can answer with a different commit if the
-// pull request was synced in between — the diff and the policy would then come
+// pull request was synced in between, the diff and the policy would then come
 // from two different reads of it.
 func TestBasePolicyPrefersTheBaseRevisionItWasGiven(t *testing.T) {
 	// The second half falls through to the provider, which cannot serve a file
@@ -678,7 +678,7 @@ func TestBasePolicyPrefersTheBaseRevisionItWasGiven(t *testing.T) {
 		t.Errorf("Policy.Ref = %q, want the caller's base revision", got.Policy.Ref)
 	}
 
-	// A pull request that names no SHA — every local review — must still fall
+	// A pull request that names no SHA, every local review, must still fall
 	// through to the provider rather than resolve to nothing.
 	if _, _, err := (&BasePolicy{RepoRoot: root, Loaded: cfg, Provider: provider}).ResolvePolicy(
 		context.Background(), vcs.Ref{}, &vcs.PullRequest{BaseRef: "main"}, []string{FileName}); err != nil {
@@ -691,8 +691,8 @@ func TestBasePolicyPrefersTheBaseRevisionItWasGiven(t *testing.T) {
 }
 
 // TestBasePolicyRefusesAnEmptyRepositoryRoot covers the guard that could not be
-// reached. ResolvePolicy fails closed without a root — every absolute config
-// path looks outside the repository, and outside means trusted — but detection
+// reached. ResolvePolicy fails closed without a root, every absolute config
+// path looks outside the repository, and outside means trusted, but detection
 // has to run first, and SelfModified with an empty root resolves it to the
 // process working directory, finds the config outside THAT, and answers "not
 // modified": the fail-open answer, from the exported seam every caller wires.

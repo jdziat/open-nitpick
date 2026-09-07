@@ -35,8 +35,8 @@ func TestGitHubRequiresToken(t *testing.T) {
 }
 
 // TestGitHubRequestsAreBounded: the review's only context comes from
-// signal.NotifyContext and carries no deadline, so with http.DefaultClient — no
-// timeout at all — a connection the far side accepts and never answers hangs the
+// signal.NotifyContext and carries no deadline, so with http.DefaultClient, no
+// timeout at all, a connection the far side accepts and never answers hangs the
 // run forever, with nothing logged after "parsed diff" and no way to tell it
 // apart from a slow model.
 func TestGitHubRequestsAreBounded(t *testing.T) {
@@ -336,7 +336,7 @@ func TestRefString(t *testing.T) {
 // rejecting every review.
 //
 // GitHub documents body as required for COMMENT and REQUEST_CHANGES events, so
-// omitting it 422s the whole payload — inline comments included.
+// omitting it 422s the whole payload, inline comments included.
 func TestPublishAlwaysSendsBody(t *testing.T) {
 	var captured capturedReview
 

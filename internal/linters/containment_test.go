@@ -3,8 +3,8 @@ package linters
 // Analyzer configuration is policy, and a change may not supply the policy it is
 // reviewed under.
 //
-// EVERY TEST HERE THAT CAN DRIVE THE REAL BINARY DOES. An argv assertion — "the
-// runner passes --no-config" — is worth nothing on its own: it passes against a
+// EVERY TEST HERE THAT CAN DRIVE THE REAL BINARY DOES. An argv assertion, "the
+// runner passes --no-config", is worth nothing on its own: it passes against a
 // flag the tool ignores, renamed between versions, or never had. So the shape is
 // always the same: build a repository whose own configuration would silence,
 // fabricate, enable or execute something, run the analyzer over it through the
@@ -14,8 +14,8 @@ package linters
 // Where the binary is absent the test skips rather than degrading to an argv
 // check, because a green argv assertion would be a worse signal than an honest
 // skip. The stub-driven tests below are the ones whose property is genuinely
-// about this package — refusing to run, refusing a config inside the repository,
-// refusing a report that never arrived — and those need no analyzer at all.
+// about this package, refusing to run, refusing a config inside the repository,
+// refusing a report that never arrived, and those need no analyzer at all.
 
 import (
 	"context"
@@ -184,8 +184,8 @@ func TestGolangciLintIgnoresAConfigFromTheTreeUnderReview(t *testing.T) {
 // FABRICATION case, which is worse than silencing because it is not an absence.
 //
 // forbidigo's `msg` is printed verbatim as the finding text, so a config file in
-// the tree could author the words of a DETERMINISTIC finding — the evidence the
-// reviewing model is told it can trust — and address them to that model.
+// the tree could author the words of a DETERMINISTIC finding, the evidence the
+// reviewing model is told it can trust, and address them to that model.
 // Verified against golangci-lint 2.8.0.
 func TestGolangciLintDoesNotPublishFindingTextFromTheTreeUnderReview(t *testing.T) {
 	requireTool(t, "golangci-lint")
@@ -304,8 +304,8 @@ severity:
 //
 // A pull request needed to add ONE FILE that is not source and not
 // configuration. golangci-lint 2.8.0 then exits 7 while printing a perfectly
-// well-formed report — {"Issues":[],"Report":{"Error":"typechecking error: ..."}}
-// — and every layer agreed it was clean: runCommand tolerates a non-zero exit
+// well-formed report, {"Issues":[],"Report":{"Error":"typechecking error: ..."}}
+// , and every layer agreed it was clean: runCommand tolerates a non-zero exit
 // when stdout is non-empty, decodeJSON is satisfied by a payload, and zero
 // Issues is zero findings. Strict mode caught nothing either, because there was
 // no error to catch.
@@ -315,7 +315,7 @@ severity:
 func TestGolangciLintDoesNotReadAFailedAnalysisAsCleanCode(t *testing.T) {
 	requireTool(t, "golangci-lint")
 
-	// The same repository, unmodified, must produce a finding — otherwise the
+	// The same repository, unmodified, must produce a finding, otherwise the
 	// attack below is indistinguishable from a test that never worked.
 	baseline := goRepo(t)
 	found, err := (&golangciLint{}).Run(context.Background(), baseline, []string{"app.go"})
@@ -343,7 +343,7 @@ func TestGolangciLintDoesNotReadAFailedAnalysisAsCleanCode(t *testing.T) {
 			// constraint to empty the whole directory. A constraint on the
 			// changed file with an unconstrained sibling beside it loads fine
 			// and reports nothing about the changed file, which is a different
-			// failure with a different answer — see
+			// failure with a different answer, see
 			// TestAChangedFileTheBuildExcludesIsNamed.
 			name: "a build constraint excluding every file in the directory",
 			apply: func(t *testing.T, repo string) {
@@ -394,13 +394,13 @@ func TestGolangciLintDoesNotReadAFailedAnalysisAsCleanCode(t *testing.T) {
 // The two guards above key on Report.Error and on a non-zero exit. A package
 // that does not COMPILE sets NEITHER: golangci-lint 2.8.0 exits 0, leaves
 // Report.Error empty, and reports the failure as an ordinary Issue whose
-// FromLinter is "typecheck" — anchored to line 1 of the alphabetically first
+// FromLinter is "typecheck", anchored to line 1 of the alphabetically first
 // file in the package, not to the file that failed.
 //
 // So the whole run is dropped by normalize under the default only_changed_lines,
 // and this is asserted through the SET rather than the runner, because the
 // runner alone would have shown a finding. Measured before the fix: zero
-// published findings, a nil error, and status "ran: isolated" — byte-identical
+// published findings, a nil error, and status "ran: isolated", byte-identical
 // to the clean run below, in strict mode as well as auto.
 //
 // The trigger here is a _test.go, because that is the version `go build ./...`
@@ -467,7 +467,7 @@ func TestGolangciLintDoesNotReadCodeThatDidNotCompileAsCleanCode(t *testing.T) {
 			t.Errorf("status = %+v: a change silenced the Go analyzer and the review still "+
 				"reports it as having run", st)
 		}
-		// The reason has to name the file that actually failed. Pos names
+		// The reason has to name the file that failed. Pos names
 		// app.go, which compiled fine; only Text carries app_test.go.
 		if !strings.Contains(st.State, "app_test.go") {
 			t.Errorf("status = %q, want it to name the file that failed to compile", st.State)
@@ -489,9 +489,9 @@ func TestGolangciLintDoesNotReadCodeThatDidNotCompileAsCleanCode(t *testing.T) {
 // symptom: a report CONTAINING a typecheck issue is not a complete analysis,
 // whatever else is in it.
 //
-// 2.8.0 never mixes the two — when typecheck fires it suppresses every other
+// 2.8.0 never mixes the two, when typecheck fires it suppresses every other
 // linter's issues, measured on a package with both a compile error and a
-// misspelling — so the real binary cannot produce this and a stub does. Without
+// misspelling, so the real binary cannot produce this and a stub does. Without
 // it the guard could be narrowed to "typecheck was the only issue" and every
 // test above would still pass, which would make a future version that reports
 // both silently publish the half that ran as if it were the whole.
@@ -518,7 +518,7 @@ func TestGolangciLintRefusesAPartialAnalysis(t *testing.T) {
 // --issues-exit-code 0 is what makes the exit status readable: with findings
 // unable to set it, a non-zero exit says something other than a finding went
 // wrong. A stub is used because no real analyzer can be asked to produce this on
-// command — a clean report from a process that then reported failure — and the
+// command, a clean report from a process that then reported failure, and the
 // property under test belongs to this package, not to golangci-lint.
 func TestGolangciLintRefusesAReportFromAProcessThatFailed(t *testing.T) {
 	s := newStubs(t)
@@ -538,7 +538,7 @@ func TestGolangciLintRefusesAReportFromAProcessThatFailed(t *testing.T) {
 // attack, it was the default state.
 //
 // Detection required go.mod AT THE CHECKOUT ROOT, so a repository with
-// backend/go.mod was never linted by this arm — for any change, with nothing in
+// backend/go.mod was never linted by this arm, for any change, with nothing in
 // any diff to show it, and a status line blaming a missing binary. golangci-lint
 // also has to be invoked from inside the module: from the root the same target
 // exits 5 with an empty report.
@@ -624,7 +624,7 @@ func TestBinaryContainmentIsAnchoredToTheCheckoutNotTheModule(t *testing.T) {
 // TestDetectReportsWhyRatherThanGuessing pins the reason each runner gives.
 //
 // What it replaces reported "its binary is not on PATH, or this repository has
-// none of the files it looks for" for every cause it did not recognize — a guess
+// none of the files it looks for" for every cause it did not recognize, a guess
 // between two possibilities, printed where the real cause was already known and
 // discarded. For a monorepo neither half of that guess was even true.
 func TestDetectReportsWhyRatherThanGuessing(t *testing.T) {
@@ -688,8 +688,8 @@ func TestDetectReportsWhyRatherThanGuessing(t *testing.T) {
 // TestSemgrepDoesNotReadAFailedScanAsCleanCode is the same defect as
 // golangci-lint's, in the same file, one analyzer over.
 //
-// semgrep reports a rule set it cannot parse inside the results envelope —
-// {"results":[],"errors":[...]} with exit 2 — so reading only `results` gave an
+// semgrep reports a rule set it cannot parse inside the results envelope,
+// {"results":[],"errors":[...]} with exit 2, so reading only `results` gave an
 // operator whose rules never compiled a clean bill of health.
 func TestSemgrepDoesNotReadAFailedScanAsCleanCode(t *testing.T) {
 	requireTool(t, "semgrep")
@@ -747,7 +747,7 @@ func TestRuffIgnoresAConfigFromTheTreeUnderReview(t *testing.T) {
 // that is not a config file at all.
 //
 // Verified against ruff 0.16.1: with RUFF_OUTPUT_FILE set, a run with real
-// findings wrote them to that file and printed zero bytes on stdout — which is
+// findings wrote them to that file and printed zero bytes on stdout, which is
 // the shape of every silent zero this change exists to end.
 func TestRuffIgnoresAnOutputRedirectInTheEnvironment(t *testing.T) {
 	requireTool(t, "ruff")
@@ -774,8 +774,8 @@ func TestRuffIgnoresAnOutputRedirectInTheEnvironment(t *testing.T) {
 // TestESLintDoesNotRunWithoutAnOperatorConfig is the containment for the arm
 // that cannot be isolated.
 //
-// eslint has no usable no-config mode — --no-config-lookup leaves zero rules
-// configured and therefore zero findings, forever — so it is off, and SAID to be
+// eslint has no usable no-config mode, --no-config-lookup leaves zero rules
+// configured and therefore zero findings, forever, so it is off, and SAID to be
 // off, rather than quietly reporting nothing. The stub exists so that this tests
 // the configuration gate and not a missing binary.
 func TestESLintDoesNotRunWithoutAnOperatorConfig(t *testing.T) {
@@ -886,7 +886,7 @@ func TestSemgrepIsNotEnabledByAFileTheChangeAdds(t *testing.T) {
 // The invocation this replaces was `--config auto --metrics off`, which semgrep
 // refuses outright: "Cannot create auto config when metrics are off", exit 2,
 // empty stdout. That runner had therefore never produced a finding, and nothing
-// said so — the precise failure this file exists to prevent, already shipped.
+// said so, the precise failure this file exists to prevent, already shipped.
 func TestSemgrepRunsUnderAnOperatorRuleSet(t *testing.T) {
 	requireTool(t, "semgrep")
 
@@ -1016,7 +1016,7 @@ func TestARefusedConfigStopsTheAnalyzer(t *testing.T) {
 //
 // runCommand errors only when stdout is empty AND the exit was non-zero, and
 // decodeJSON used to return nil for output with no JSON in it. So exit 0 with no
-// payload was "zero findings, no error" — indistinguishable from clean code, and
+// payload was "zero findings, no error", indistinguishable from clean code, and
 // exactly the state `semgrep --config auto --metrics off` had been shipping in.
 func TestAnAnalyzerThatExitsZeroWithoutReportingIsAnError(t *testing.T) {
 	s := newStubs(t)
@@ -1136,8 +1136,8 @@ func TestStatusesRecordHowEachAnalyzerWasConfigured(t *testing.T) {
 // Anything the old code did not recognize as "not configured" was replaced with
 // "its binary is not on PATH, or this repository has none of the files it looks
 // for". Here the binary is on PATH and the file it looks for is present, so both
-// halves of that sentence are false and the true reason — an operator config
-// that resolves inside the repository — had been discarded.
+// halves of that sentence are false and the true reason, an operator config
+// that resolves inside the repository, had been discarded.
 func TestTheRecordedReasonIsTheRunnersOwn(t *testing.T) {
 	s := newStubs(t)
 	s.install(t, "golangci-lint", `{"Issues":[]}`)
@@ -1171,10 +1171,10 @@ func TestTheRecordedReasonIsTheRunnersOwn(t *testing.T) {
 // separating the two absences.
 //
 // strict means "an enabled analyzer that could not run is an error from this
-// package" — published on the pull request as `did not run`, not an exit status;
+// package", published on the pull request as `did not run`, not an exit status;
 // review.fail_on decides that, from the findings that were published. An
-// analyzer with no files of its kind in the change did not fail to run — it had
-// nothing to do — and treating that as an error makes strict unusable in every
+// analyzer with no files of its kind in the change did not fail to run, it had
+// nothing to do, and treating that as an error makes strict unusable in every
 // repository that is not polyglot, which is most of them.
 func TestStrictModeDoesNotFailOverAnAnalyzerWithNothingToRead(t *testing.T) {
 	s := newStubs(t)
@@ -1199,8 +1199,8 @@ func TestStrictModeDoesNotFailOverAnAnalyzerWithNothingToRead(t *testing.T) {
 
 // TestStrictModeWorksWithTheShippedDefaults.
 //
-// THE BUG: config.DefaultLinters listed all four analyzers, and two of them —
-// eslint and semgrep — refuse to run without an operator configuration outside
+// THE BUG: config.DefaultLinters listed all four analyzers, and two of them,
+// eslint and semgrep, refuse to run without an operator configuration outside
 // the repository, which the defaults cannot supply. So `mode: strict` and
 // nothing else failed EVERY review, on "linter semgrep is enabled but not
 // available: not configured", in every repository. Strict means "an analyzer I
@@ -1251,7 +1251,7 @@ func TestStatusesAreOrderedByName(t *testing.T) {
 }
 
 // TestRunnersTerminateTheirFlagsBeforeTheFileList drives each runner and reads
-// the argv its binary actually received.
+// the argv its binary received.
 //
 // It replaces a test that grepped runners.go for literal strings, which broke
 // the moment an argument moved and never proved the arguments reached anything.

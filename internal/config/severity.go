@@ -45,7 +45,7 @@ func (s Severity) Rank() int {
 // AtLeast reports whether s is at least as severe as threshold.
 //
 // SeverityNone is a threshold, never a finding's severity. Its rank sits above
-// every real level so that `fail_on: none` matches nothing — but that means a
+// every real level so that `fail_on: none` matches nothing, but that means a
 // finding claiming severity "none" would otherwise outrank critical and trip
 // every gate. Models do return unexpected severities, so the receiver is
 // checked explicitly rather than trusted to be a real level.
@@ -56,7 +56,7 @@ func (s Severity) AtLeast(threshold Severity) bool {
 	return s.Rank() >= threshold.Rank()
 }
 
-// IsFinding reports whether s is a severity a finding may actually carry.
+// IsFinding reports whether s is a severity a finding may carry.
 func (s Severity) IsFinding() bool {
 	n := s.normalized()
 	return n != SeverityNone && n.Valid()

@@ -27,9 +27,9 @@ import (
 // golangci-lint, ruff, eslint and semgrep are hand-written because each one
 // turned out to have a channel through which the tree under review could
 // silence or forge its report, and closing those took code specific to the
-// tool (see runners.go). The tools here are simpler in that respect — most
+// tool (see runners.go). The tools here are simpler in that respect, most
 // take a config path on the command line and read nothing else from the
-// working directory — so what each needs is a description: which files it
+// working directory, so what each needs is a description: which files it
 // reads, how it is invoked with its configuration held outside the tree, and
 // how its report is read back. That description is a toolSpec, and one
 // runner type (catalogTool) executes all of them.
@@ -43,9 +43,9 @@ import (
 //     outside the repository, or from a file this package ships and writes
 //     outside the repository; a tool with neither useful default nor
 //     operator config does not run and says so;
-//   - a tool that EXECUTES the tree's own code to analyze it — cargo clippy
+//   - a tool that EXECUTES the tree's own code to analyze it, cargo clippy
 //     runs build scripts and proc macros, phpstan loads the project's
-//     autoloader — is refused unless the operator names it in
+//     autoloader, is refused unless the operator names it in
 //     linters.trusted, because no configuration outside the tree makes that
 //     safe on a pull request from a stranger.
 //

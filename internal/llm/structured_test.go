@@ -120,7 +120,7 @@ func TestExtractSchemaPathHappy(t *testing.T) {
 	if fake.callCount() != 1 {
 		t.Errorf("calls = %d, want 1 (no fallback in schema mode)", fake.callCount())
 	}
-	// The schema path must actually request a json_schema response format.
+	// The schema path must request a json_schema response format.
 	if rf := fake.call(0).opts.ResponseFormat; rf == nil || rf.Type != llms.ResponseFormatJSONSchema {
 		t.Errorf("schema mode should set a json_schema response format, got %+v", rf)
 	}

@@ -19,7 +19,7 @@ import (
 // the truth on a developer machine that has the others exported.
 //
 // LLM_BASE_URL is in the list because config.LoadFile calls applyEnv AFTER
-// sanitize, and applyEnv fills Models.Default.BaseURL whenever it is empty —
+// sanitize, and applyEnv fills Models.Default.BaseURL whenever it is empty,
 // which is exactly the post-sanitize state of the shipped config. Without this,
 // TestDefaultConfigSurvivesSanitize passed or failed according to the
 // developer's shell rather than according to the code.
@@ -189,7 +189,7 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 }
 
 // TestDefaultConfigSurvivesSanitize is the property the whole provider exists
-// for, asserted against the file this repository actually ships.
+// for, asserted against the file this repository ships.
 //
 // sanitize() strips base_url and api_key_env from an untrusted config, so a
 // default built on those keys would work only for whoever exported
@@ -199,7 +199,7 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 //
 // What it does NOT assert: that the endpoint is unreachable by any means. An
 // operator who exports LLM_BASE_URL still redirects it, because applyEnv fills
-// an empty BaseURL from the environment. That is deliberate — the environment
+// an empty BaseURL from the environment. That is deliberate, the environment
 // belongs to whoever runs the tool, and the untrusted input this guards against
 // is the config FILE, which a pull request can rewrite. clearModelEnv is what
 // keeps the distinction from turning into a flaky assertion.

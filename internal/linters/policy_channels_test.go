@@ -9,7 +9,7 @@ package linters
 //  1. golangci-lint's own defaults, which --no-config left in charge. A
 //     generated-file header on line 1 skipped the file; max-same-issues and
 //     uniq-by-line dropped findings without saying so.
-//  2. Go line directives, which rewrite the position of everything after them —
+//  2. Go line directives, which rewrite the position of everything after them,
 //     so findings are reported at a path that is not in the diff, or worse, at
 //     one that is and did not earn them. Refused; the detector is go/scanner
 //     rather than a pattern, because a pattern missed two spellings.
@@ -27,7 +27,7 @@ package linters
 //     below the toolchain analyzing it, which switches off every check gated on
 //     a later version.
 //  4. In-source suppression. golangci-lint has no flag that disables its own
-//     //nolint, and a //nolint is not per-line — attached to the package clause
+//     //nolint, and a //nolint is not per-line, attached to the package clause
 //     it covers the whole file. Counted, because it cannot be prevented.
 //  5. Analyzer message text, which quotes the tree. That one is not closed; see
 //     TestAnAnalyzerFindingCanCarryTextTheChangeWrote and the README.
@@ -155,7 +155,7 @@ func goSource(firstLine string, bodies ...string) string {
 // contain one at column 1. positionsRewritten scans the package under analysis,
 // and a test that plants a working directive in its own source would make
 // open-nitpick refuse to analyze internal/linters the next time anybody edits
-// it — a detector that breaks the review of its own package gets deleted.
+// it, a detector that breaks the review of its own package gets deleted.
 func lineDirective(target string, line int) string {
 	return "//" + "line " + target + ":" + strconv.Itoa(line)
 }
@@ -169,8 +169,8 @@ func lineDirective(target string, line int) string {
 //
 // golangci-lint 2.8.0's linters.exclusions.generated defaults to "lax", which
 // skips a file whose first line matches the Go generated-code convention. With
-// --no-config that default is in force and cannot be changed — there is no
-// command-line flag for it — so the run produced zero findings, exit 0, an empty
+// --no-config that default is in force and cannot be changed. There is no
+// command-line flag for it, so the run produced zero findings, exit 0, an empty
 // Report.Error and the status "ran(isolated)": byte-identical to a clean review,
 // in strict mode as well as auto.
 //
@@ -216,7 +216,7 @@ func TestAGeneratedFileHeaderDoesNotSilenceTheFileUnderReview(t *testing.T) {
 // Shipping our own defaults is only different from the tree supplying policy
 // while the file is outside the tree. So the same containment check an
 // operator's config faces is applied to ours, and when it cannot be satisfied
-// the analyzer does not run — it does not quietly fall back to the defaults the
+// the analyzer does not run. It does not quietly fall back to the defaults the
 // config exists to replace, which would restore the silencing at the moment
 // nobody is watching.
 func TestOpenNitpickAnalyzerConfigIsNeverWrittenIntoTheRepository(t *testing.T) {
@@ -263,7 +263,7 @@ func TestOpenNitpickAnalyzerConfigIsNeverWrittenIntoTheRepository(t *testing.T) 
 
 // TestAnOperatorConfigStillProducesPublishableFindings is the regression for a
 // silencing this project shipped itself, and it goes through Set so that
-// normalize — where the findings died — is in the path.
+// normalize, where the findings died, is in the path.
 //
 // golangci-lint 2.8.0's run.relative-path-mode defaults to `cfg`: paths relative
 // to the CONFIG FILE's directory. An operator config outside the repository is
@@ -386,7 +386,7 @@ func TestGolangciLintReportsEveryFindingOnALine(t *testing.T) {
 //     break, at lines the attacker chose, and this bot posts them under its own
 //     name. That is worse than losing them.
 //
-// Neither can be undone from the report, so the report is refused whole — the
+// Neither can be undone from the report, so the report is refused whole, the
 // same answer this package already gives to Report.Error and to a package that
 // did not compile. The failure has to be visible: silence with a reason, never
 // silence.
@@ -410,14 +410,14 @@ func TestALineDirectiveMakesTheGoAnalyzerRefuse(t *testing.T) {
 		// end: a full report at forged positions, err nil, roster "ran".
 		//
 		// CRLF, because go/scanner strips the trailing \r from a // comment
-		// BEFORE reading it as a directive — deliberately, to match the
-		// compiler on files written on Windows — while the pattern that used
+		// BEFORE reading it as a directive, deliberately, to match the
+		// compiler on files written on Windows, while the pattern that used
 		// to live here anchored on `$`, which in Go's regexp matches only
 		// before \n. git stores CRLF verbatim, so no .gitattributes is needed.
 		{name: "CRLF line endings", directive: lineDirective("zz_generated.go", 1), write: crlf},
 		// A `*` in the block form's filename. A block comment ends at the
 		// FIRST `*/`, so this is one complete directive naming a file called
-		// z*z.go — and the old pattern spelled the filename `[^*]*` to stop
+		// z*z.go, and the old pattern spelled the filename `[^*]*` to stop
 		// itself running past the terminator.
 		{name: "a * in the block form's filename", directive: "/*" + "line z*z.go:1*/"},
 	}
@@ -495,7 +495,7 @@ func TestSourceThatMerelyMentionsALineDirectiveIsAnalyzed(t *testing.T) {
 // positionsRewritten reads the source of the package under analysis, and the
 // files describing the attack are in this repository. If any of them contains a
 // working directive, open-nitpick refuses to review changes to its own analyzer
-// package — which is both a bug and the kind that only shows up in production.
+// package, which is both a bug and the kind that only shows up in production.
 func TestThisPackageIsAnalyzable(t *testing.T) {
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -521,8 +521,8 @@ func TestThisPackageIsAnalyzable(t *testing.T) {
 // TestDiscardedAnalyzerFindingsAreCountedAndNamed closes the sink itself.
 //
 // Three bare `continue` statements dropped analyzer findings with no counter, no
-// log and no status. The drops are correct — a comment cannot be published on a
-// line the forge will not accept — and the accounting was not: nothing anywhere
+// log and no status. The drops are correct, a comment cannot be published on a
+// line the forge will not accept, and the accounting was not: nothing anywhere
 // recorded that a finding had been reported and removed, which is how both the
 // line-directive attack and our own path-mode defect stayed invisible.
 //
@@ -647,8 +647,8 @@ func TestAnAnalyzerFindingCanCarryTextTheChangeWrote(t *testing.T) {
 //
 // The detector used to be a regular expression approximating Go's line-directive
 // grammar, which is another way of saying it was a list of the spellings
-// somebody thought of. Two the toolchain accepts were missing — CRLF endings and
-// a `*` inside the block form's filename — and each of them was a complete
+// somebody thought of. Two the toolchain accepts were missing, CRLF endings and
+// a `*` inside the block form's filename, and each of them was a complete
 // bypass: a full report at forged positions with the analyzer recorded as having
 // run. Asking go/scanner instead makes the accepted set the grammar's.
 //
@@ -704,14 +704,14 @@ func TestTheDirectiveDetectorIsTheGrammarAndNotAPattern(t *testing.T) {
 // golangci-lint reports when a build constraint empties a directory. Put one
 // unconstrained sibling next to the changed file and the package loads
 // perfectly while the changed file is never read: zero findings, exit 0, nil
-// error, roster "ran" — byte-identical to a clean Go review, in strict mode too.
+// error, roster "ran", byte-identical to a clean Go review, in strict mode too.
 //
 // The `_windows.go` shape is the sharp one and it carries no comment: it is an
 // ordinary platform-specific pull request, the code is live on another GOOS, and
 // `go build ./...` and the tests stay green on the CI GOOS.
 //
 // The answer is a named gap rather than a refusal because the report is not
-// corrupt — it is right about the files it covered — and because a Linux runner
+// corrupt. It is right about the files it covered, and because a Linux runner
 // reviewing foo_windows.go is a normal Tuesday. Delete the MatchFile check and
 // every subtest here goes red.
 func TestAChangedFileTheBuildExcludesIsNamed(t *testing.T) {
@@ -786,7 +786,7 @@ func TestAFileTheBuildIncludesIsNotReportedAsUncovered(t *testing.T) {
 // than an exotic one: CGO_ENABLED=0 is the default in most Go CI images.
 //
 // A file importing "C" with cgo off is dropped from the package by the go tool
-// while an ordinary sibling keeps the package loading — the same shape as
+// while an ordinary sibling keeps the package loading, the same shape as
 // //go:build windows, reached without writing a constraint at all. Measured
 // against golangci-lint 2.8.0: the errcheck violation in that file is reported
 // with cgo on and silent with it off, exit 0 and roster "ran" either way.
@@ -799,7 +799,7 @@ func TestAFileTheBuildIncludesIsNotReportedAsUncovered(t *testing.T) {
 // THE THIRD ROW IS THE ONE THAT MOVED THE DETECTOR OFF build.Default. cmd/go
 // resolves CGO_ENABLED from the environment and then from the go env config
 // file; go/build reads only os.Getenv and never that file, so `go env -w
-// CGO_ENABLED=0` — how a builder image is ordinarily configured — silenced the
+// CGO_ENABLED=0`, how a builder image is ordinarily configured, silenced the
 // file while build.Default.CgoEnabled stayed true and the coverage list stayed
 // empty. Nothing about the row is exotic: the process environment carries no
 // CGO_ENABLED at all, which is the normal state of a machine.
@@ -838,7 +838,7 @@ func TestACgoFileIsUnreadWhenCgoIsOffAndIsNamed(t *testing.T) {
 			// build.Default is deliberately NOT moved. It snapshots CGO_ENABLED at
 			// go/build's package init, long before any test runs, so a detector
 			// that consulted it would answer "cgo is on" in both of the off rows
-			// below — which is what this row exists to catch.
+			// below, which is what this row exists to catch.
 			if tc.viaGoEnvFile {
 				if !build.Default.CgoEnabled {
 					t.Skip("this test binary started with cgo off, so build.Default already agrees with the " +
@@ -892,13 +892,13 @@ func TestACgoFileIsUnreadWhenCgoIsOffAndIsNamed(t *testing.T) {
 // TestAChangedGoFileOutsideEveryModuleIsNamed is the gap that needs a monorepo,
 // which is the exact shape goTargets was written for.
 //
-// goTargets drops a changed .go file with no go.mod at or above it, correctly —
+// goTargets drops a changed .go file with no go.mod at or above it, correctly,
 // there is no module to run golangci-lint in. Detect turns that into a published
 // reason only when EVERY changed Go file lands there; the README's
 // "did not run: no go.mod at or above the changed Go files" describes the
 // all-or-nothing case. With backend/go.mod present, the partial case published
 // the backend finding, recorded the analyzer as having run, and said nothing
-// whatever about the file nobody analyzed — one bare continue, the same shape
+// whatever about the file nobody analyzed, one bare continue, the same shape
 // Set.normalize was fixed for.
 func TestAChangedGoFileOutsideEveryModuleIsNamed(t *testing.T) {
 	requireTool(t, "golangci-lint")
@@ -950,7 +950,7 @@ func TestAChangedGoFileOutsideEveryModuleIsNamed(t *testing.T) {
 // handed anything, and `**/vendor/**` and `**/testdata/**` are shipped defaults.
 // Measured: an identical errcheck violation in app.go and vendor/token.go
 // published only app.go's, with the roster saying the analyzer ran and an empty
-// coverage list — a changed Go file with a real violation that nothing looked
+// coverage list, a changed Go file with a real violation that nothing looked
 // for and nothing mentioned. Vendored code is compiled into the binary, so
 // "nobody reviews vendor" is a statement about review effort and not about
 // whether the code runs.
@@ -979,7 +979,7 @@ func TestAChangedGoFileTheIgnoreListWithheldIsNamed(t *testing.T) {
 		{name: "protobuf, beside a file that was analyzed", path: "token.pb.go", wantUncovered: false},
 	}
 
-	// Every row above keeps app.go, so every row runs the analyzer — which is
+	// Every row above keeps app.go, so every row runs the analyzer, which is
 	// why they all passed while the commonest shape of this bug did not work.
 	// See TestAChangedGoFileIsNamedWhenTheIgnoreListWithheldThemAll.
 
@@ -1042,7 +1042,7 @@ func TestAChangedGoFileTheIgnoreListWithheldIsNamed(t *testing.T) {
 // Measured before the fix, `go.mod` + `vendor/example.com/dep/dep.go` carrying a
 // real unchecked error: `findings=0 statuses=[{golangci-lint skipped "the change
 // contains no files it analyzes"}] uncovered=[]`. Rendered, the whole published
-// body was that one line, and it was false — the change contained a Go file with
+// body was that one line, and it was false, the change contained a Go file with
 // a violation. nothingReviewedNotice cannot fire either, because go.mod is a
 // batch, so nothing anywhere said a Go file went unread.
 //
@@ -1150,15 +1150,15 @@ func hasPath(found []review.Finding, path string) bool {
 // "ran", empty discard list, empty coverage list.
 //
 // It is named rather than fixed because it cannot be fixed from the
-// configuration this project owns — `run.go` does not restore the check, and
+// configuration this project owns, `run.go` does not restore the check, and
 // neither does `staticcheck.checks: ["all"]`, which demonstrably starts
 // staticcheck (ST1000 appears) without starting this. The module's declared
 // language version wins, and go.mod is the tree under review.
 //
 // THE TABLE IS A GRADIENT AND THAT IS THE POINT. Each deprecation appears only
 // once the declared version reaches the release that issued it, so the rows
-// below measure three of them at once — io/ioutil (1.19), reflect.PtrTo (1.22)
-// and cipher.NewCFBEncrypter (1.24) — and the `go 1.21` row is the attack a
+// below measure three of them at once, io/ioutil (1.19), reflect.PtrTo (1.22)
+// and cipher.NewCFBEncrypter (1.24), and the `go 1.21` row is the attack a
 // constant floor of 1.21 used to let through: two real deprecations silenced, one
 // reported, and before this an empty coverage list. See belowAnalyzedLanguage.
 func TestAModuleUnderAnOldGoDirectiveIsNamed(t *testing.T) {
@@ -1180,7 +1180,7 @@ func TestAModuleUnderAnOldGoDirectiveIsNamed(t *testing.T) {
 	)
 
 	// The toolchain that loads the packages is the ceiling, so the row that must
-	// report NO gap is written from the toolchain rather than from a literal —
+	// report NO gap is written from the toolchain rather than from a literal,
 	// otherwise this test would start failing on the next Go release for a
 	// reason that has nothing to do with what it measures.
 	if version.Lang(runtime.Version()) == "" {
@@ -1307,7 +1307,7 @@ func TestTheLanguageVersionComparisonIsTheToolchainsOwnOrdering(t *testing.T) {
 		{name: "triple digits", declared: "1.100", ceiling: "go1.25", below: false},
 		// Unreadable, either side: say nothing rather than guess. An unreadable
 		// go.mod does not load either, and an unreadable ceiling is a development
-		// toolchain — naming every module in the checkout over that would be a
+		// toolchain, naming every module in the checkout over that would be a
 		// wall of gaps invented out of an unanswered question.
 		{name: "declared unreadable", declared: "banana", ceiling: "go1.25", below: false},
 		{name: "declared empty", declared: "", ceiling: "go1.25", below: false},
@@ -1375,7 +1375,7 @@ func TestTheGoDirectiveIsReadFromGoModTheWayTheGoToolReadsIt(t *testing.T) {
 		// module's directive, and this used to read it as one: the first row
 		// returned ("1.99", 4) with the real directive on line 7 never reached.
 		// The comment justifying that said `go` is a reserved module path so no
-		// require line can begin with it — true of what the LOADER accepts, and
+		// require line can begin with it, true of what the LOADER accepts, and
 		// this runs over a file the change wrote, before anything has loaded it.
 		{
 			name:     "a go line inside a require block is not the directive",
@@ -1409,7 +1409,7 @@ func TestTheGoDirectiveIsReadFromGoModTheWayTheGoToolReadsIt(t *testing.T) {
 	}
 
 	// Unbalanced parentheses say nothing rather than pick a reading. Such a
-	// go.mod does not load, and the review says so in the loader's own words —
+	// go.mod does not load, and the review says so in the loader's own words,
 	// but which reading was meant is exactly the question this must not answer
 	// by guessing, since the answer becomes the number the ceiling compares.
 	unbalanced := writeFile(t, t.TempDir(), "go.mod", "module probe\n\n)\ngo 1.25\n")
@@ -1428,7 +1428,7 @@ func TestTheGoDirectiveIsReadFromGoModTheWayTheGoToolReadsIt(t *testing.T) {
 // file with two pre-existing errcheck violations to zero findings, on lines the
 // change never touched, with the roster saying the analyzer ran. golangci-lint
 // offers no flag that disables its own nolint, so this can be counted and not
-// prevented — which is exactly why it has to be counted.
+// prevented, which is exactly why it has to be counted.
 func TestASuppressionThisChangeAddedIsNamed(t *testing.T) {
 	requireTool(t, "golangci-lint")
 
@@ -1509,7 +1509,7 @@ func TestASuppressionTheChangeDidNotAddIsNotReported(t *testing.T) {
 //
 // Every row was measured against golangci-lint 2.8.0 by running it over a file
 // with one errcheck violation and the comment at column 1 above the package
-// clause; `suppresses` records what the binary actually did. Under-reporting
+// clause; `suppresses` records what the binary did. Under-reporting
 // leaves the attack open, and over-reporting puts "suppressed by a directive
 // this change added" on a pull request about a comment that suppresses nothing.
 //
@@ -1526,7 +1526,7 @@ func TestASuppressionTheChangeDidNotAddIsNotReported(t *testing.T) {
 // THE `suppresses` COLUMN WAS NEVER ASSERTED ON, which made this the one place
 // in this file that did not drive the tool it documents. The column said "what
 // golangci-lint 2.8.0 does with it" and nothing here ran golangci-lint, so the
-// table could only ever confirm the belief it was written from — and the whole
+// table could only ever confirm the belief it was written from, and the whole
 // point of the column is to catch the row where that belief is wrong. It is a
 // measurement now: each row runs the binary over a file whose only violation is
 // an unchecked error, and asks whether the comment made it disappear.
@@ -1611,7 +1611,7 @@ func TestTheSuppressionDetectorMatchesGolangciLintsOwnRule(t *testing.T) {
 // file.
 //
 // It goes through the runner rather than shelling out directly so that the
-// measurement is taken under the configuration open-nitpick actually ships —
+// measurement is taken under the configuration open-nitpick ships,
 // a comment that suppresses nothing under stock defaults but everything under
 // ours would be a fact about a run nobody has.
 func suppressedByGolangciLint(t *testing.T, comment string) bool {
@@ -1632,7 +1632,7 @@ func suppressedByGolangciLint(t *testing.T, comment string) bool {
 // shapes that would make it answer with the wrong variable.
 //
 // Both are real `go env` output. A development toolchain prints a GOVERSION
-// with spaces in it, and a variable with no value prints an empty line — either
+// with spaces in it, and a variable with no value prints an empty line, either
 // one slides the answers along under a whitespace split, at which point the cgo
 // question is answered with a Go version and a file importing "C" goes unnamed.
 func TestTheGoEnvironmentIsReadOneLinePerVariable(t *testing.T) {

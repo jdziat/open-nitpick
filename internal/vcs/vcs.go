@@ -28,7 +28,7 @@ var ErrForbidden = errors.New("vcs: the token may not publish here")
 //
 // It is not a failure of the run. A caller that needed the base revision in
 // order to avoid trusting the change under review falls back to something the
-// change also did not write — built-in defaults — rather than carrying on with
+// change also did not write, built-in defaults, rather than carrying on with
 // the change's own version.
 var ErrNoBaseRevision = errors.New("vcs: base revision unavailable")
 
@@ -251,8 +251,8 @@ type PriorReviewer interface {
 // changed between an earlier revision of the change and its current head.
 type IncrementalDiffer interface {
 	// ChangedSince returns the paths that differ between since and the ref's
-	// current head. ok is false when the question cannot be answered — since
-	// is no longer reachable from the head, as after a force push — in which
+	// current head. ok is false when the question cannot be answered, since
+	// is no longer reachable from the head, as after a force push, in which
 	// case the whole change has to be reviewed again.
 	ChangedSince(ctx context.Context, ref Ref, since string) (paths []string, ok bool, err error)
 }
@@ -293,8 +293,8 @@ type Provider interface {
 // therefore did not author.
 //
 // It is deliberately separate from Provider. A wrapper or a test double that
-// has no way to answer must be *unable* to answer — its caller then falls back
-// to defaults and says so — where a method on Provider would oblige every
+// has no way to answer must be *unable* to answer, its caller then falls back
+// to defaults and says so, where a method on Provider would oblige every
 // implementation to return something, and the plausible-looking something is
 // the head under review.
 type BaseResolver interface {

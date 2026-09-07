@@ -52,7 +52,7 @@ const DefaultBotMarker = "<!-- open-nitpick -->"
 //
 // github.NewClient(nil) uses http.DefaultClient, which has no timeout at all,
 // and the only context in play comes from signal.NotifyContext with no deadline
-// — so a connection the far side accepts and never answers hangs the review
+// , so a connection the far side accepts and never answers hangs the review
 // forever with nothing logged after "parsed diff". It is generous because one
 // of these calls streams a file body; the point is that there is a ceiling, not
 // where it sits.
@@ -248,7 +248,7 @@ func (g *GitHub) ListDir(ctx context.Context, ref Ref, dir string) ([]string, er
 //
 // GitHub rejects oversized review payloads, and a pull request buried under a
 // hundred bot comments is unreviewable anyway. Findings are sorted most severe
-// first, so truncation drops the least important ones — and says so.
+// first, so truncation drops the least important ones, and says so.
 const maxCommentsPerReview = 40
 
 // PublishReview submits the review.
@@ -316,7 +316,7 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	}
 
 	// GitHub documents body as required for COMMENT and REQUEST_CHANGES, so an
-	// omitted body rejects the whole review — which is exactly what happened
+	// omitted body rejects the whole review, which is exactly what happened
 	// with review.summary disabled.
 	if strings.TrimSpace(body) == "" {
 		body = defaultReviewBody(len(comments), g.Bot)
@@ -376,7 +376,7 @@ func isForbidden(err error) bool {
 //
 // Both come from the forge rather than from state kept anywhere else, because
 // a GitHub Actions job has nowhere else. A comment a human deleted is gone from
-// the answer, which is the right reading — deleting the bot's comment is how a
+// the answer, which is the right reading, deleting the bot's comment is how a
 // reviewer asks for it not to be there, not for it to be re-posted.
 func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error) {
 	if err := validateRef(ref); err != nil {
@@ -532,8 +532,8 @@ func defaultReviewBody(comments int, marker string) string {
 
 // maxSummaryBytes keeps the fallback body inside GitHub's limit.
 //
-// The original body may itself be why the review was rejected — a PR deleting
-// thousands of files produces an enormous skipped-files section — so resending
+// The original body may itself be why the review was rejected, a PR deleting
+// thousands of files produces an enormous skipped-files section, so resending
 // it verbatim would fail identically and lose the review entirely.
 const maxSummaryBytes = 60000
 

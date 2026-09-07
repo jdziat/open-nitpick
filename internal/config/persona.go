@@ -8,7 +8,7 @@ import (
 // Persona controls how the reviewer talks and how much it chooses to say.
 //
 // These are separated from Review deliberately. Everything in Review changes
-// WHAT gets reported — budgets, gates, which files. Everything here changes
+// WHAT gets reported, budgets, gates, which files. Everything here changes
 // how the same finding is WORDED and whether marginal observations are worth
 // raising at all. Teams disagree strongly about the second, and the disagreement
 // is about taste rather than correctness, so it belongs in configuration rather
@@ -36,7 +36,7 @@ type Persona struct {
 	// comments are read by the author, and "you" reads as blame to some people.
 	Address Address `yaml:"address"`
 
-	// Praise permits acknowledging genuinely good work. Off by default because
+	// Praise permits acknowledging good work. Off by default because
 	// a bot that compliments everything trains readers to skim.
 	Praise *bool `yaml:"praise"`
 
@@ -97,7 +97,7 @@ const (
 //
 // This is the single most contested setting in a review tool. It selects which
 // CLASSES of finding get published, where min_severity selects how serious they
-// must be — different questions, applied independently.
+// must be, different questions, applied independently.
 //
 // It is a post-hoc filter, not a change to the prompt. Every review is
 // generated at one fixed scope and narrowed afterwards, which keeps levels
@@ -120,7 +120,7 @@ const (
 	NitpickNormal NitpickLevel = "normal"
 
 	// NitpickPedantic additionally permits naming, documentation, idiom, and
-	// consistency observations — the things every other level forbids.
+	// consistency observations, the things every other level forbids.
 	NitpickPedantic NitpickLevel = "pedantic"
 )
 
