@@ -68,6 +68,16 @@ func parseSpend(body string) (float64, bool) {
 	return v, true
 }
 
+// FingerprintOf reads the finding identifier out of a published comment, or
+// returns "" when the comment carries none.
+//
+// Exported because a caller acting on a comment needs the same identity the
+// review gave it, and the marker's shape lives here.
+func FingerprintOf(body string) string {
+	fp, _, _ := parseFingerprint(body)
+	return fp
+}
+
 // parseFingerprint reads a comment's fingerprint marker back.
 func parseFingerprint(body string) (fingerprint, class string, ok bool) {
 	m := fingerprintPattern.FindStringSubmatch(body)

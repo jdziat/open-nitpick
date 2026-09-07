@@ -435,3 +435,25 @@ models:
 		}
 	}
 }
+
+// The fix model has no fallback to the reviewer. Every measurement here scores
+// a reviewer on recall and noise, neither of which says whether a model can
+// produce a change that compiles, so reaching for models.default would ship an
+// unmeasured capability under a measured model's name.
+func TestTheFixModelDoesNotFallBackToTheReviewer(t *testing.T) {
+	m := Models{Default: ModelSpec{Provider: "openai", Model: "gpt-4o"}}
+
+	if _, ok := m.ResolveFix(); ok {
+		t.Error("a config naming no models.fix resolved one")
+	}
+
+	// A named one still inherits the provider, the way every other override does.
+	m.Fix = &ModelSpec{Model: "an-editing-model"}
+	spec, ok := m.ResolveFix()
+	if !ok {
+		t.Fatal("a named models.fix did not resolve")
+	}
+	if spec.Provider != "openai" || spec.Model != "an-editing-model" {
+		t.Errorf("spec = %s/%s", spec.Provider, spec.Model)
+	}
+}

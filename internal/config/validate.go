@@ -54,6 +54,12 @@ func (m Models) validate() []error {
 	if m.Validate != nil {
 		errs = append(errs, prefixAll("models.validate", m.Validate.validate(false))...)
 	}
+	if m.Fix != nil {
+		errs = append(errs, prefixAll("models.fix", m.Fix.validate(false))...)
+		if strings.TrimSpace(m.Fix.Model) == "" {
+			errs = append(errs, errors.New("models.fix: model is required"))
+		}
+	}
 	if m.Router != nil {
 		errs = append(errs, prefixAll("models.router", m.Router.validate(false))...)
 	}
@@ -185,6 +191,7 @@ func (r Review) validate() []error {
 	var errs []error
 
 	errs = append(errs, r.Budget.validate()...)
+	errs = append(errs, r.Respond.Fix.validate()...)
 	errs = append(errs, r.Respond.validate()...)
 	errs = append(errs, r.validateSummaryStyle()...)
 

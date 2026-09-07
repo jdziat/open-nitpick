@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -49,6 +50,70 @@ type Respond struct {
 	// It bounds the case the association list does not: a collaborator, or an
 	// automation acting as one, in a loop.
 	MaxPerPullRequest int `yaml:"max_per_pull_request"`
+
+	// Fix bounds who may ask for a finding to be APPLIED, which is a write to
+	// the repository rather than an answer in a thread.
+	Fix FixRespond `yaml:"fix"`
+}
+
+// FixRespond bounds who may make the reviewer change code.
+//
+// Separate from Respond because an association answers "may this person spend
+// my credit" well and "may this person write to my repository" poorly:
+// COLLABORATOR covers anyone invited at all. The permission check in the fix
+// path is the real gate and this is its cheap half.
+type FixRespond struct {
+	// From lists the associations allowed to ask. Empty means
+	// DefaultRespondFrom, the same set answers use.
+	From []Association `yaml:"from"`
+}
+
+// Allows reports whether an association may ask for a fix.
+//
+// "none" is refused here even when it is written down, which is the one place
+// this differs from Respond. An operator may reasonably decide that anyone can
+// spend their model credit on an answer. Nobody decides that anyone can write
+// to their repository, so a config saying so is a mistake rather than a
+// choice, and it is refused at validation as well.
+func (f FixRespond) Allows(assoc string) bool {
+	got := Association(strings.ToLower(strings.TrimSpace(assoc)))
+	if got == "" || got == AssocNone {
+		return false
+	}
+	for _, want := range f.EffectiveFrom() {
+		// Case-folded, because validation folds too. Comparing raw would
+		// accept `from: [OWNER]` at load and then refuse every owner at run,
+		// which is a config that is wrong only when someone uses it.
+		if Association(strings.ToLower(strings.TrimSpace(string(want)))) == got {
+			return true
+		}
+	}
+	return false
+}
+
+// EffectiveFrom resolves the default.
+func (f FixRespond) EffectiveFrom() []Association {
+	if len(f.From) == 0 {
+		return DefaultRespondFrom
+	}
+	return f.From
+}
+
+// validate checks the fix block.
+func (f FixRespond) validate() []error {
+	var errs []error
+
+	for _, a := range f.From {
+		switch Association(strings.ToLower(strings.TrimSpace(string(a)))) {
+		case AssocOwner, AssocMember, AssocCollaborator, AssocContributor, AssocFirstTimer:
+		case AssocNone:
+			errs = append(errs, errors.New(
+				"review.respond.fix.from may not contain \"none\": that would let anyone write to the repository"))
+		default:
+			errs = append(errs, fmt.Errorf("review.respond.fix.from: %q is not an association", a))
+		}
+	}
+	return errs
 }
 
 // Allows reports whether an association may command the reviewer.
