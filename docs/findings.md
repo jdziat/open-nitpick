@@ -1514,10 +1514,17 @@ it was built for.** Six of six planted defects were found either way. A corpus
 where both arms score 1.00 has no room to show that grounding helps or harms
 detection, and the one unmatched finding that disappeared is a single event.
 
-On the walkthrough the arms do separate. The headline 0.22 against 0.34 is
-flattered by the two clean fixtures, where the ungrounded arm now writes
-nothing and scores zero. On the four fixtures where both arms write, it is 0.22
-against 0.32.
+On the walkthrough the arms do separate. The right comparison is the four
+fixtures where both arms write, 0.22 against 0.32, because the two clean
+fixtures have no ungrounded walkthrough to score.
+
+An earlier version of this paragraph said the headline 0.22 against 0.34 was
+flattered by those two empty walkthroughs. That was wrong about the
+arithmetic. The aggregate pools matched and total word counts, and an empty
+summary returns zero for both, so it contributes to neither the numerator nor
+the denominator and cannot move the pooled rate. The four-fixture figure is
+the honest one because it compares the same fixtures, not because it removes a
+depressing zero.
 
 **What the metric cannot do.** It counts vocabulary overlap, so it cannot tell
 paraphrase from invention. Reading the words it flagged as absent from the
