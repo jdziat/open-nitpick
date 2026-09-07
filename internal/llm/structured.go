@@ -423,6 +423,8 @@ func decodeLenient[T any](content string) (T, error) {
 	}
 
 	// Strict first: well-behaved output costs nothing extra.
+	trimmed = unwrapSingleElement[T](trimmed)
+
 	var value T
 	if err := json.Unmarshal([]byte(trimmed), &value); err == nil {
 		if err := requirePopulated(trimmed, value); err != nil {
@@ -456,12 +458,14 @@ func decodeLenient[T any](content string) (T, error) {
 
 	var lastErr error
 	for i := len(candidates) - 1; i >= 0; i-- {
+		text := unwrapSingleElement[T](candidates[i])
+
 		var candidateValue T
-		if err := json.Unmarshal([]byte(candidates[i]), &candidateValue); err != nil {
+		if err := json.Unmarshal([]byte(text), &candidateValue); err != nil {
 			lastErr = err
 			continue
 		}
-		if err := requirePopulated(candidates[i], candidateValue); err != nil {
+		if err := requirePopulated(text, candidateValue); err != nil {
 			lastErr = err
 			continue
 		}
@@ -615,6 +619,32 @@ func escapeControlChars(s string) string {
 // is routinely preceded by a brace pair that is not the answer: prose
 // mentioning `map[string]struct{}`, a leading `Analysis: {}`, or an echo of the
 // requested schema. The caller picks the one that fits the target shape.
+// unwrapSingleElement returns the one element of a single-element JSON array,
+// when the value being decoded into is not itself a slice.
+//
+// Some OpenRouter upstreams wrap a schema-constrained object in an array, and
+// they are the ones carrying the largest context, so routing prefers them for
+// the batches a lost review costs most on. See issue #46.
+//
+// A slice caller is left alone: for them the array IS the answer.
+func unwrapSingleElement[T any](text string) string {
+	var zero T
+	switch reflect.ValueOf(&zero).Elem().Kind() {
+	case reflect.Slice, reflect.Array, reflect.Interface:
+		return text
+	}
+
+	if !strings.HasPrefix(strings.TrimSpace(text), "[") {
+		return text
+	}
+
+	var elems []json.RawMessage
+	if err := json.Unmarshal([]byte(text), &elems); err != nil || len(elems) != 1 {
+		return text
+	}
+	return string(elems[0])
+}
+
 func extractJSONCandidates(s string) []string {
 	s = stripCodeFence(s)
 

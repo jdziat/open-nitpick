@@ -535,3 +535,71 @@ func TestDecodeLenientEscapesControlCharactersInsideStrings(t *testing.T) {
 		t.Errorf("escapeControlChars altered valid JSON: %q", s)
 	}
 }
+
+// Some OpenRouter upstreams wrap a schema-constrained object in an array.
+// Alibaba and Novita both do it, and both are the providers carrying the
+// model's full context, so default routing prefers them for exactly the large
+// batches a lost review costs most on. See issue #46.
+func TestASingleElementArrayIsUnwrappedForAnObjectSchema(t *testing.T) {
+	type findings struct {
+		Findings []map[string]any `json:"findings"`
+	}
+
+	for name, body := range map[string]string{
+		"plain object":       `{"findings":[{"title":"x"}]}`,
+		"wrapped object":     `[{"findings":[{"title":"x"}]}]`,
+		"wrapped with space": "  [ {\"findings\":[{\"title\":\"x\"}]} ]  ",
+		"wrapped in a fence": "```json\n[{\"findings\":[{\"title\":\"x\"}]}]\n```",
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := decodeLenient[findings](body)
+			if err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if len(got.Findings) != 1 {
+				t.Errorf("findings = %v", got.Findings)
+			}
+		})
+	}
+}
+
+// An array with more than one element is not a wrapper, and unwrapping it
+// would pick one answer out of several and call it the whole reply.
+func TestOnlyASingleElementArrayIsUnwrapped(t *testing.T) {
+	type findings struct {
+		Findings []map[string]any `json:"findings"`
+	}
+
+	if _, err := decodeLenient[findings](`[{"findings":[]},{"findings":[]}]`); err == nil {
+		t.Error("a two-element array was read as a wrapper")
+	}
+}
+
+// A caller decoding into a slice keeps its array. For them the array IS the
+// answer, and unwrapping would discard the shape they asked for.
+//
+// Asserted on the helper rather than through decodeLenient, which requires a
+// JSON object at the top level and rejects a bare array before the shape is
+// ever considered. That guard predates this change and is not what this test
+// is about.
+func TestASliceCallerKeepsItsArray(t *testing.T) {
+	type item struct {
+		Name string `json:"name"`
+	}
+	const body = `[{"name":"only"}]`
+
+	if got := unwrapSingleElement[[]item](body); got != body {
+		t.Errorf("a slice caller's array was unwrapped to %q", got)
+	}
+	if got := unwrapSingleElement[any](body); got != body {
+		t.Errorf("an any caller's array was unwrapped to %q", got)
+	}
+
+	// The object caller is the one it is for.
+	type object struct {
+		Name string `json:"name"`
+	}
+	if got := unwrapSingleElement[object](body); got != `{"name":"only"}` {
+		t.Errorf("unwrap for an object schema = %q", got)
+	}
+}

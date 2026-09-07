@@ -345,11 +345,20 @@ func (c *Client) CallOptions() []llms.CallOption {
 		opts = append(opts, llms.WithTemperature(*c.Spec.Temperature))
 	}
 	if len(c.Spec.Providers) > 0 {
-		// OpenRouter's provider routing: order alone only prioritises, and
-		// the router falls back past the list unless told not to, so a pin
-		// is order plus allow_fallbacks false.
+		// OpenRouter's provider routing. "only" restricts the candidate set;
+		// "order" ranks whatever set the other filters leave, which is not the
+		// same thing and was the bug. With order plus allow_fallbacks false,
+		// a request whose ranked providers were filtered out for any other
+		// reason ends with nothing left, and OpenRouter answers "No endpoints
+		// found" rather than using the pin. The routing funnel showed the
+		// fallback filter taking eleven endpoints to zero for a pin whose
+		// providers all served the model. See issue #46.
+		//
+		// allow_fallbacks stays false: "only" bounds which providers may be
+		// chosen, and this is what stops the router serving the request from
+		// outside that list when none of them is available.
 		opts = append(opts, llms.WithExtraBodyParam("provider", map[string]any{
-			"order":           append([]string(nil), c.Spec.Providers...),
+			"only":            append([]string(nil), c.Spec.Providers...),
 			"allow_fallbacks": false,
 		}))
 	}
