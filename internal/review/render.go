@@ -46,6 +46,13 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 		Head:     report.Head,
 	}
 
+	// What this run was priced at, recorded with the review so a later run
+	// under a pull-request ceiling can subtract it. After is the estimate for
+	// what is being sent, and equals Before whenever nothing was trimmed.
+	if report.Budget != nil {
+		review.Spend = report.Budget.After.Dollars
+	}
+
 	for _, f := range report.Findings {
 		file := files.Find(f.Path)
 		if file == nil {
@@ -934,6 +941,16 @@ func budgetNote(report *Report) string {
 	if fit.Forced {
 		fmt.Fprintf(&b, ">\n> `review.budget.min_files` kept files the ceiling does not "+
 			"pay for, so this run is expected to exceed it.\n")
+	}
+
+	// Under pull_request scope the ceiling quoted above is what is LEFT, and a
+	// reader comparing it against the max_spend in their config would find two
+	// different numbers with no explanation between them.
+	if fit.Prior > 0 {
+		fmt.Fprintf(&b, ">\n> Earlier runs on this pull request were recorded at an estimated "+
+			"$%.2f, which `review.budget.scope: pull_request` subtracts, so the ceiling "+
+			"quoted here is what remained rather than the whole of "+
+			"`review.budget.max_spend`.\n", fit.Prior)
 	}
 
 	return b.String()

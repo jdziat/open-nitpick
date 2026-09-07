@@ -370,6 +370,17 @@ review:
     min_files: 0           # review this many top files even if they do not fit
 ```
 
+**`scope: pull_request` counts every run on the branch together**, so twenty
+pushes cost what one review costs, where `scope: run` lets each push spend the
+whole ceiling. The running total is read off the pull request itself: each
+review this tool publishes carries the estimate it ran at in a hidden marker,
+and a later run sums them and subtracts. That read is made whether or not
+`review.incremental` is on, and every way of failing to get an answer bounds the
+run as if it were the first and says so in the log. A pull request whose earlier
+runs had no ceiling recorded nothing, so a ceiling added part way through starts
+from zero. When earlier spend has reduced what is left, the review says which
+number it is quoting.
+
 **Rates are yours to supply.** A price is a claim about what a vendor charges
 you, on your account, at your tier. The dated table in `internal/evals` is
 evidence for a measurement, not a promise about anyone's bill, so a ceiling is

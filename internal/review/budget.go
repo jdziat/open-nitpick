@@ -95,8 +95,14 @@ type Fit struct {
 	// Before is the estimate for the whole plan, After for the trimmed one.
 	Before, After Estimate
 
-	// Ceiling is what After had to come in under.
+	// Ceiling is what After had to come in under. Under pull_request scope it
+	// is review.budget.max_spend minus Prior, not max_spend itself, so a
+	// report quoting it has to say which of the two it is quoting.
 	Ceiling float64
+
+	// Prior is what earlier runs on this pull request were recorded as
+	// spending, and zero under run scope or on a first run.
+	Prior float64
 
 	// Forced is set when MinFiles kept files the ceiling did not pay for. The
 	// run then exceeds the ceiling deliberately, and says so.

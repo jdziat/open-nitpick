@@ -18,7 +18,7 @@ import (
 func (e *Engine) applyBudget(
 	ctx context.Context,
 	ref vcs.Ref,
-	pr *vcs.PullRequest,
+	prior *vcs.PriorReview,
 	plan *bundle.Plan,
 	files diff.Files,
 	fetch bundle.ContentFetcher,
@@ -30,7 +30,7 @@ func (e *Engine) applyBudget(
 
 	remaining := b.MaxSpend
 	if b.EffectiveScope() == config.BudgetScopePullRequest {
-		spent := e.priorSpend(ctx, ref, pr)
+		spent := e.priorSpend(ctx, ref, prior)
 		remaining -= spent
 		if spent > 0 {
 			e.log().Info("prior spend on this pull request counts against the ceiling",
@@ -43,6 +43,7 @@ func (e *Engine) applyBudget(
 
 	ranked := Rank(files)
 	keep, fit := FitToBudget(e.Config, plan, ranked, remaining)
+	fit.Prior = b.MaxSpend - remaining
 
 	if !fit.Trimmed() {
 		e.log().Info("within the spending ceiling",
@@ -109,14 +110,42 @@ func budgetSkips(dropped []string) []bundle.Skip {
 	return out
 }
 
-// priorSpend reads what earlier runs on this pull request already spent.
+// priorSpend totals what earlier runs on this pull request recorded spending.
 //
-// Not yet implemented: pull_request scope needs a spend total persisted where a
-// later run can read it, and the summary comment is where that will live. Until
-// it does, this returns zero and the scope behaves as run scope, which is
-// reported rather than assumed.
-func (e *Engine) priorSpend(_ context.Context, _ vcs.Ref, _ *vcs.PullRequest) float64 {
-	e.log().Warn("review.budget.scope is pull_request, but prior spend is not yet " +
-		"recorded, so this run is bounded as if it were the first")
-	return 0
+// The total comes off the pull request itself, from the marker each review body
+// carries, because a CI job keeps nothing between runs and the pull request is
+// the one place both ends of the question can reach.
+//
+// The read is made whether or not review.incremental is on. Incremental
+// reviewing and a pull-request ceiling ask the forge the same question for
+// different reasons, and a ceiling that silently became per-run because an
+// unrelated setting was off would be the quiet failure this package exists to
+// avoid. Every way of not getting an answer returns zero and says so: a ceiling
+// bounded as if this were the first run is the wrong answer, and one nobody was
+// told about is worse.
+func (e *Engine) priorSpend(ctx context.Context, ref vcs.Ref, prior *vcs.PriorReview) float64 {
+	if prior == nil {
+		reader, ok := e.Provider.(vcs.PriorReviewer)
+		if !ok {
+			e.log().Warn("review.budget.scope is pull_request and this provider cannot read " +
+				"earlier reviews, so this run is bounded as if it were the first")
+			return 0
+		}
+		read, err := reader.PriorReview(ctx, ref)
+		if err != nil {
+			e.log().Warn("review.budget.scope is pull_request and earlier reviews could not be "+
+				"read, so this run is bounded as if it were the first", "error", err)
+			return 0
+		}
+		prior = read
+	}
+
+	if prior == nil || prior.Spend <= 0 {
+		// Nothing recorded is the ordinary first run, and it is also a pull
+		// request whose earlier runs had no ceiling and therefore priced
+		// nothing. The two are indistinguishable here, so the report says what
+		// was found rather than what it means.
+		return 0
+	}
+	return prior.Spend
 }
