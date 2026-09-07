@@ -58,6 +58,21 @@ type Config struct {
 	// silently ignored setting is very hard to diagnose.
 	Dropped []string `yaml:"-"`
 
+	// User is the user-level configuration file this one was overlaid onto,
+	// empty when none applied. See internal/config/user.go.
+	User string `yaml:"-"`
+
+	// UserKeys are the settings the user-level file supplied, as dotted paths,
+	// and UserOverridden are those of them the repository's own file then
+	// replaced.
+	//
+	// Both are reported for the same reason Dropped is. A user-level file is
+	// read from outside the checkout, so a value arriving from one is the
+	// hardest kind to account for when a review does something unexpected, and
+	// "which of my settings did this repository overrule" has no other answer.
+	UserKeys       []string `yaml:"-"`
+	UserOverridden []string `yaml:"-"`
+
 	// Policy records which configuration decided this review's behavior, and
 	// why it is not simply the file named by Source. Like Dropped, callers
 	// should surface it: a maintainer whose newly added ignore rule did nothing
@@ -615,13 +630,25 @@ func LoadFile(path string) (*Config, error) {
 func loadBytes(data []byte, source string) (*Config, error) {
 	cfg := Defaults()
 
-	if err := cfg.merge(data); err != nil {
-		return nil, fmt.Errorf("parse config %s: %w", source, err)
+	userPath, userData, err := userDocument(nil)
+	if err != nil {
+		return nil, err
 	}
 
-	// Strip endpoint and credential keys before anything reads them. This runs
-	// before applyEnv so the environment can still supply what the file may not.
-	cfg.Dropped = cfg.sanitize(nil)
+	// The user-level file goes on first and the repository's over it, with the
+	// keys the repository may not supply deleted from its document before the
+	// merge rather than scrubbed from the struct after. See internal/config/user.go:
+	// scrubbing afterwards would clear the user's own endpoint along with the
+	// repository's, because by then nothing records which file supplied it.
+	//
+	// This runs before applyEnv so the environment can still supply what
+	// neither file said.
+	dropped, userKeys, overridden, err := cfg.overlay(userData, data, trustEndpointKeys(nil))
+	if err != nil {
+		return nil, fmt.Errorf("parse config %s: %w", source, err)
+	}
+	cfg.Dropped = dropped
+	cfg.User, cfg.UserKeys, cfg.UserOverridden = userPath, userKeys, overridden
 
 	cfg.applyEnv(nil)
 	cfg.Persona = cfg.Persona.Resolve()
@@ -642,6 +669,23 @@ func loadBytes(data []byte, source string) (*Config, error) {
 // applied: what governs a review when no config file supplies anything.
 func defaultConfig() (*Config, error) {
 	cfg := Defaults()
+
+	// The user-level file applies here too, and that is deliberate. It lives
+	// outside every checkout, so no change under review can reach it: the
+	// reason the repository's own file is withheld does not touch it, and an
+	// operator whose endpoint is configured once should not lose it because a
+	// pull request edited a file somewhere else.
+	userPath, userData, err := userDocument(nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(userData) > 0 {
+		if err := cfg.merge(userData); err != nil {
+			return nil, fmt.Errorf("parse user config %s: %w", userPath, err)
+		}
+		node, _ := documentNode(userData)
+		cfg.User, cfg.UserKeys = userPath, keyPaths(node)
+	}
 
 	cfg.applyEnv(nil)
 	cfg.Persona = cfg.Persona.Resolve()

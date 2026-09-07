@@ -281,6 +281,9 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	if marker := headMarker(review.Head); marker != "" {
 		body += "\n" + marker
 	}
+	if marker := spendMarker(review.Spend); marker != "" {
+		body += "\n" + marker
+	}
 
 	drafts := make([]*github.DraftReviewComment, 0, len(comments))
 	for _, c := range comments {
@@ -318,6 +321,9 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	if strings.TrimSpace(body) == "" {
 		body = defaultReviewBody(len(comments), g.Bot)
 		if marker := headMarker(review.Head); marker != "" {
+			body += "\n" + marker
+		}
+		if marker := spendMarker(review.Spend); marker != "" {
 			body += "\n" + marker
 		}
 	}
@@ -394,6 +400,13 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 			if !strings.Contains(body, g.Bot) {
 				continue
 			}
+			// Spend is totalled over every run, so it is read before the
+			// head check: the newest run owns Head, but each earlier one
+			// still owns what it spent.
+			if spent, ok := parseSpend(body); ok {
+				out.Spend += spent
+			}
+
 			head, ok := parseHead(body)
 			if !ok || r.GetID() < latestID {
 				continue

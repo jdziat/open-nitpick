@@ -148,6 +148,13 @@ type Review struct {
 	// it records it with the review, which is how the next run on the same
 	// pull request knows what has already been reviewed.
 	Head string
+
+	// Spend is what this review was estimated to cost, in US dollars, and is
+	// recorded with it for the same reason Head is: a ceiling that covers a
+	// whole pull request has to know what earlier runs already spent. Zero
+	// means nothing was priced, which is the case whenever no ceiling is
+	// configured.
+	Spend float64
 }
 
 // DirLister is implemented by providers that can name the entries of a
@@ -173,6 +180,17 @@ type PriorReview struct {
 	// Comments are the inline comments earlier runs published and that this
 	// tool can recognise as its own.
 	Comments []PriorComment
+
+	// Spend totals what every earlier run recorded spending on this pull
+	// request, in US dollars. It is a sum rather than the latest value: the
+	// question a pull-request ceiling asks is what the branch has cost so far,
+	// and each push answers for itself.
+	//
+	// Runs that published no spend contribute nothing, so a pull request first
+	// reviewed without a ceiling starts a later ceiling from zero. That is the
+	// safe direction only for coverage, not for the bill, and the run reports
+	// the total it found so the gap is visible rather than assumed.
+	Spend float64
 }
 
 // PriorComment is one inline comment an earlier run published.

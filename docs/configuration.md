@@ -3,6 +3,35 @@
 Everything is optional: with no config file at all, `LLM_PROVIDER` and
 `LLM_MODEL` are enough to run. `.nitpick.yaml` at the repository root:
 
+`nitpick init` writes one of these for you, commented, with the analyzers this
+checkout's languages call for. The reference below is what to reach for when
+changing a key it left at its default. `nitpick explain-config` prints what any
+of it resolves to without spending a token.
+
+## Two files
+
+Settings you want in every checkout go in a user-level file, which each
+repository's own `.nitpick.yaml` then overlays:
+
+```
+$XDG_CONFIG_HOME/nitpick/config.yaml     # or ~/.config/nitpick/config.yaml
+```
+
+Precedence runs built-in defaults, then that file, then the repository's, then
+the environment for what neither said, then flags. It takes the same keys in the
+same shape.
+
+It is also the only file trusted with `base_url`, `api_key_env`, `extra`,
+`allow_private_endpoint` and `persona.custom`, and it needs no
+`NITPICK_TRUST_CONFIG_ENDPOINTS` to use them: you wrote it, and it sits outside
+every checkout where no pull request can reach it. A repository that names any
+of those keys still has them dropped, and `nitpick explain-config` names both
+the file and what it supplied. See [Trust model](trust-model.md).
+
+It is **not read on a runner**, where `CI` or `GITHUB_ACTIONS` is set, because
+nobody there wrote it. `NITPICK_USER_CONFIG=/path/to/config.yaml` names one
+anyway, wherever you set it; `NITPICK_NO_USER_CONFIG=1` switches it off.
+
 ```yaml
 models:
   default:
@@ -340,6 +369,17 @@ review:
     overhead: 1.0          # scale the estimate to cover triage and validation
     min_files: 0           # review this many top files even if they do not fit
 ```
+
+**`scope: pull_request` counts every run on the branch together**, so twenty
+pushes cost what one review costs, where `scope: run` lets each push spend the
+whole ceiling. The running total is read off the pull request itself: each
+review this tool publishes carries the estimate it ran at in a hidden marker,
+and a later run sums them and subtracts. That read is made whether or not
+`review.incremental` is on, and every way of failing to get an answer bounds the
+run as if it were the first and says so in the log. A pull request whose earlier
+runs had no ceiling recorded nothing, so a ceiling added part way through starts
+from zero. When earlier spend has reduced what is left, the review says which
+number it is quoting.
 
 **Rates are yours to supply.** A price is a claim about what a vendor charges
 you, on your account, at your tier. The dated table in `internal/evals` is

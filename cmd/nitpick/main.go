@@ -55,6 +55,8 @@ func run() int {
 		err = runRespond(ctx, os.Args[2:])
 	case "mcp":
 		err = runMCP(ctx, os.Args[2:])
+	case "init":
+		err = runInit(os.Args[2:], os.Stdout)
 	case "explain-config":
 		err = runExplainConfig(os.Args[2:])
 	case "linters":
@@ -108,6 +110,7 @@ Usage:
   nitpick respond [flags]          Answer an @nitpick comment on a pull request (review again, resolve, or a question)
   nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
   nitpick mcp install <client>     Register that server with an agent client (claude-code, cursor, opencode, codex, ...)
+  nitpick init [flags]             Write a .nitpick.yaml for this repository
   nitpick explain-config [flags]   Show the resolved configuration and prompts
   nitpick providers                List available model providers
   nitpick linters                  List the deterministic analyzers and how each is configured

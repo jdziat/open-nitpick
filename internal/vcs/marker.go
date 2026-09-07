@@ -3,6 +3,7 @@ package vcs
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -31,10 +32,38 @@ func headMarker(sha string) string {
 	return fmt.Sprintf("<!-- open-nitpick head:%s -->", sha)
 }
 
+// spendMarker records what a review was estimated to cost, so a ceiling
+// covering a whole pull request can subtract it on the next push. A CI job
+// keeps nothing between runs; the pull request is where the total lives.
+//
+// Nothing is written below a cent's worth of nothing: a marker reading zero
+// cannot be told from one left by a run whose estimate failed, and the next
+// run would subtract a number nobody computed.
+func spendMarker(dollars float64) string {
+	if dollars <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("<!-- open-nitpick spend:%.6f -->", dollars)
+}
+
 var (
 	fingerprintPattern = regexp.MustCompile(`<!-- open-nitpick fp:([0-9a-f]+) class:([a-z_-]*) -->`)
 	headPattern        = regexp.MustCompile(`<!-- open-nitpick head:([0-9a-fA-F]+) -->`)
+	spendPattern       = regexp.MustCompile(`<!-- open-nitpick spend:([0-9]+\.?[0-9]*) -->`)
 )
+
+// parseSpend reads a review body's spend marker back.
+func parseSpend(body string) (float64, bool) {
+	m := spendPattern.FindStringSubmatch(body)
+	if m == nil {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(m[1], 64)
+	if err != nil || v <= 0 {
+		return 0, false
+	}
+	return v, true
+}
 
 // parseFingerprint reads a comment's fingerprint marker back.
 func parseFingerprint(body string) (fingerprint, class string, ok bool) {
