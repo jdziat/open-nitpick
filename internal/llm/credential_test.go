@@ -178,6 +178,11 @@ func TestACredentialCommandThatPrintsNothingIsAnError(t *testing.T) {
 // The command is argv and is run without a shell, so nothing in a config file
 // is interpreted as a program by an expansion.
 func TestTheCredentialCommandIsNotRunThroughAShell(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// echo is a cmd.exe builtin with no echo.exe on PATH, so exec fails
+		// and the test would report the failure rather than the behaviour.
+		t.Skip("this test runs echo, which is not a program on Windows")
+	}
 	marker := filepath.Join(t.TempDir(), "written-by-the-shell")
 	spec := config.ModelSpec{
 		Provider:          "synthetic",
