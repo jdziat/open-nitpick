@@ -119,11 +119,17 @@ of 41 planted defects against 30, with 1 noise finding against 5. On the
 held-out fixture corpus it located 10 of 13 against 4, and 8 of 8 against 4 of 8
 within the incumbent's own reporting range.
 
-The cost side is the open question and it moved the wrong way: re-running the
-same 44 pull requests under the remediated `v1` took detection to 36 of 41 and
-noise findings from 1 to 17. [docs/findings.md](docs/findings.md) sets out what
-has been measured, what it does not support, and the eighteen instrument bugs
-found along the way.
+Noise is the open question, and it moved the wrong way: re-running the same 44
+pull requests under the remediated `v1` took detection to 36 of 41 and noise
+findings from 1 to 17. Three more plants for sixteen more noise findings is not
+a trade this project has argued is worth making, and it is why the headline
+above stops at detection. [docs/findings.md](docs/findings.md) sets out what has
+been measured, what it does not support, and the eighteen instrument bugs found
+along the way.
+
+Cost is measured, in [docs/comparison.md](docs/comparison.md): under a cent per
+diff and about six cents for a 24-file pull request on the cheapest
+configuration measured.
 
 GitHub and a local checkout are the only forges. There is no GitLab provider.
 Reviews default to advisory, so nothing blocks a merge until you set `fail_on`.
