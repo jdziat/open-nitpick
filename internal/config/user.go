@@ -148,10 +148,12 @@ func (c *Config) overlay(user, repo []byte, trusted bool) (dropped, userKeys, ov
 		return nil, nil, nil, fmt.Errorf("parse user config: %w", err)
 	}
 	repoNode, err := documentNode(repo)
-	if err != nil {
-		// Left to merge to report, so the message names the repository's file
-		// and matches what a single-file load has always said.
-		repoNode = nil
+	if err != nil && !trusted {
+		// Refused rather than merged. Leaving it to merge would hand the
+		// untrusted document to the decoder with nothing pruned from it, and a
+		// document this parser rejects that the decoder still accepts would
+		// carry every key this function exists to remove.
+		return nil, nil, nil, fmt.Errorf("parse config: %w", err)
 	}
 
 	if len(user) > 0 {

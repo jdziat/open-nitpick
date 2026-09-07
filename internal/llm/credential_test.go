@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -37,18 +38,11 @@ func printer(t *testing.T, stdout, stderr string, exit int) []string {
 	}
 	path := filepath.Join(t.TempDir(), "cred.sh")
 	body := "#!/bin/sh\nprintf '%s\\n' \"" + stdout + "\"\nprintf '%s' \"" + stderr + "\" >&2\nexit " +
-		strings.TrimSpace(itoa(exit)) + "\n"
+		strconv.Itoa(exit) + "\n"
 	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return []string{path}
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	return string(rune('0' + n))
 }
 
 func resolve(t *testing.T, spec config.ModelSpec, env map[string]string) (string, bool, error) {

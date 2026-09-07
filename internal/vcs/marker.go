@@ -49,7 +49,10 @@ func spendMarker(dollars float64) string {
 var (
 	fingerprintPattern = regexp.MustCompile(`<!-- open-nitpick fp:([0-9a-f]+) class:([a-z_-]*) -->`)
 	headPattern        = regexp.MustCompile(`<!-- open-nitpick head:([0-9a-fA-F]+) -->`)
-	spendPattern       = regexp.MustCompile(`<!-- open-nitpick spend:([0-9]+\.?[0-9]*) -->`)
+	// Six decimal places, because that is what spendMarker writes. A looser
+	// pattern would read a hand-written "spend:1" out of a body somebody else
+	// authored and subtract a dollar nobody spent.
+	spendPattern = regexp.MustCompile(`<!-- open-nitpick spend:([0-9]+\.[0-9]{6}) -->`)
 )
 
 // parseSpend reads a review body's spend marker back.

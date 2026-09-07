@@ -149,7 +149,7 @@ func runRespond(ctx context.Context, args []string) error {
 		return gh.React(ctx, ref, ev.CommentID, ev.Inline, "+1")
 
 	default:
-		client, err := llm.Build(cfg.Models.ResolveModel(config.RoleReview))
+		client, err := llm.BuildContext(ctx, cfg.Models.ResolveModel(config.RoleReview))
 		if err != nil {
 			return err
 		}

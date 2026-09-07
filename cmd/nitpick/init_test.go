@@ -262,3 +262,28 @@ func read(t *testing.T, path string) string {
 	}
 	return string(data)
 }
+
+// The generated file is renamed into place, so a run that fails validation
+// leaves what was there before and leaves nothing behind.
+func TestAFailedGenerationLeavesTheDirectoryAsItWas(t *testing.T) {
+	root := initRepo(t, "main.go", "go.mod")
+	runInitIn(t, "-repo", root, "-provider", "openai", "-model", "gpt-4o")
+
+	before := read(t, filepath.Join(root, config.FileName))
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".nitpick.yaml.") {
+			t.Errorf("a temporary file was left behind: %s", e.Name())
+		}
+	}
+
+	// A second run under -force rewrites it, and the content is the same
+	// because the inputs are: the rename replaced rather than appended.
+	runInitIn(t, "-repo", root, "-provider", "openai", "-model", "gpt-4o", "-force")
+	if after := read(t, filepath.Join(root, config.FileName)); after != before {
+		t.Error("rewriting the file with the same inputs produced different content")
+	}
+}

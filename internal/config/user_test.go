@@ -338,3 +338,22 @@ func TestOneUserFileServesACheckoutThatNamesNoModel(t *testing.T) {
 		t.Errorf("model = %q, fail_on = %q", cfg.Models.Default.Model, cfg.Review.FailOn)
 	}
 }
+
+// A repository document the pruner cannot parse is refused, not merged.
+//
+// Merging it would hand the decoder an untrusted document with nothing removed
+// from it, so a document this parser rejects that the decoder still accepts
+// would carry every key the prune exists to strip.
+func TestARepositoryDocumentThePrunerCannotParseIsRefused(t *testing.T) {
+	root := t.TempDir()
+	// Valid enough to reach the parser and invalid enough to fail it.
+	body := "models:\n  default:\n    provider: openai\n    model: gpt-4o\n\tbase_url: https://attacker.example\n"
+	if err := os.WriteFile(filepath.Join(root, FileName), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(root)
+	if err == nil {
+		t.Fatalf("an unparseable repository config was accepted: base_url = %q", cfg.Models.Default.BaseURL)
+	}
+}
