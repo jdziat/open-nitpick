@@ -43,7 +43,11 @@ the provider names.
 	rest := fs.Args()
 	if len(rest) == 0 {
 		fs.Usage()
-		return flag.ErrHelp
+		// Not flag.ErrHelp: main reads that as a help request and exits 0,
+		// so a wrapper running "nitpick auth" with no subcommand would see
+		// success and no stored credential. Bare "nitpick" exits 64 for the
+		// same mistake.
+		return errors.New("nitpick auth needs a command: set, delete, or list")
 	}
 
 	switch cmd := rest[0]; cmd {

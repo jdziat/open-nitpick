@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"errors"
+	"flag"
 	"strings"
 	"testing"
 
@@ -113,5 +115,24 @@ func TestAuthListNamesProvidersAndNotSecrets(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "secret_value") {
 		t.Errorf("list printed the credential: %s", out.String())
+	}
+}
+
+// Bare "nitpick auth" is a usage error, not a help request.
+//
+// main maps flag.ErrHelp to exit 0, so returning it here would let a wrapper
+// running "nitpick auth" with no subcommand see success and no stored
+// credential. Bare "nitpick" exits 64 for the same mistake.
+func TestBareAuthIsAUsageErrorRatherThanHelp(t *testing.T) {
+	var out bytes.Buffer
+	err := runAuth(nil, nil, &out)
+	if err == nil {
+		t.Fatal("bare auth reported success")
+	}
+	if errors.Is(err, flag.ErrHelp) {
+		t.Error("bare auth returned flag.ErrHelp, which main exits 0 on")
+	}
+	if !strings.Contains(err.Error(), "set") {
+		t.Errorf("the error does not name the commands: %v", err)
 	}
 }

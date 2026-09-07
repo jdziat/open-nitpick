@@ -270,3 +270,36 @@ func TestACredentialCommandThatFloodsIsBounded(t *testing.T) {
 		}
 	})
 }
+
+// A named keystore entry is bounded like the default one. A locked keyring
+// waits on an unlock prompt with no timeout of its own, and a review that
+// hangs before its first request is the same outcome either way.
+func TestANamedKeystoreEntryIsBoundedToo(t *testing.T) {
+	prev := keyringGet
+	t.Cleanup(func() { keyringGet = prev })
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	keyringGet = func(string, string) (string, error) {
+		<-release // never answers within the test
+		return "", nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := resolveCredential(ctx,
+			config.ModelSpec{Provider: "synthetic", APIKeyKeyring: "vault/synthetic"}, nil)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("a keystore that never answered was read as a success")
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("a named keystore lookup was waited on rather than bounded")
+	}
+}

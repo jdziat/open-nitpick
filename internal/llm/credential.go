@@ -78,14 +78,14 @@ func resolveCredential(ctx context.Context, spec config.ModelSpec, getenv func(s
 			strings.Contains(account, "/") {
 			return "", false, fmt.Errorf("api_key_keyring %q is not \"service/account\"", spec.APIKeyKeyring)
 		}
-		key, err := keyringGet(service, account)
+		key, err := keystoreLookup(ctx, service, account)
 		if err != nil {
 			return "", false, fmt.Errorf("read %s from the keystore: %w", spec.APIKeyKeyring, err)
 		}
-		if strings.TrimSpace(key) == "" {
+		if key == "" {
 			return "", false, fmt.Errorf("the keystore entry %s is empty", spec.APIKeyKeyring)
 		}
-		return strings.TrimSpace(key), true, nil
+		return key, true, nil
 	}
 
 	if spec.APIKeyEnv != "" {
@@ -119,12 +119,14 @@ func resolveCredential(ctx context.Context, spec config.ModelSpec, getenv func(s
 // stall a review before its first request.
 const keystoreTimeout = 5 * time.Second
 
-// defaultKeystoreLookup reads the default entry, giving up quickly.
+// keystoreLookup reads one entry, giving up when the keystore does not answer.
 //
-// Every failure is a miss: no keystore, no session bus, a locked keyring, or
-// one that did not answer in time. The environment is still to be tried, and
-// this lookup was not asked for.
-func defaultKeystoreLookup(ctx context.Context, provider string) (string, bool) {
+// The bound applies to a named entry as much as to the default one. A locked
+// keyring waits on a D-Bus unlock prompt with no timeout of its own, and a
+// review that hangs before its first request is the same outcome whether the
+// operator named the entry or not. What differs is what the caller does with
+// the failure, so this reports it and lets them decide.
+func keystoreLookup(ctx context.Context, service, account string) (string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -139,20 +141,32 @@ func defaultKeystoreLookup(ctx context.Context, provider string) (string, bool) 
 	// behind on a hung keyring can finish and exit rather than block forever.
 	done := make(chan answer, 1)
 	go func() {
-		key, err := keyringGet(KeyringService, provider)
+		key, err := keyringGet(service, account)
 		done <- answer{key, err}
 	}()
 
 	select {
 	case got := <-done:
 		if got.err != nil {
-			return "", false
+			return "", got.err
 		}
-		key := strings.TrimSpace(got.key)
-		return key, key != ""
+		return strings.TrimSpace(got.key), nil
 	case <-ctx.Done():
+		return "", fmt.Errorf("the keystore did not answer within %s", keystoreTimeout)
+	}
+}
+
+// defaultKeystoreLookup reads the default entry.
+//
+// Every failure is a miss: no keystore, no session bus, a locked keyring, or
+// one that did not answer in time. The environment is still to be tried, and
+// this lookup was not asked for.
+func defaultKeystoreLookup(ctx context.Context, provider string) (string, bool) {
+	key, err := keystoreLookup(ctx, KeyringService, provider)
+	if err != nil {
 		return "", false
 	}
+	return key, key != ""
 }
 
 // runCredentialCommand runs the command and takes its output as the key.
