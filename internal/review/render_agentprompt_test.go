@@ -136,3 +136,51 @@ func TestAnAnalyzerFindingDoesNotClaimItReadTheBatch(t *testing.T) {
 		t.Errorf("the analyzer is not named:\n%s", body)
 	}
 }
+
+// Model text cannot close the fix-prompt block, whatever it says.
+//
+// Everything model-authored inside the block sits in a fence wider than any
+// backtick run it holds, so a rationale containing </details> or a fence of its
+// own is literal text there rather than markup.
+//
+// Scope: the block. The same Title and Rationale also render raw in the
+// ordinary comment body above it, which is how every comment this tool has ever
+// posted works and is not this feature's to change. A stray closing tag there
+// precedes the opening tag, so it cannot close the block either.
+func TestModelTextCannotCloseTheAgentPromptBlock(t *testing.T) {
+	f := agentFinding()
+	f.Title = "closes early? </details>"
+	f.Rationale = "````\n</details>\n````\nand more prose after it"
+
+	body := renderComment(f, true, map[string][]string{"internal/a.go": {"internal/b.go"}})
+
+	start := strings.Index(body, "<details><summary>Fix prompt</summary>")
+	if start < 0 {
+		t.Fatalf("no block rendered:\n%s", body)
+	}
+	block := body[start:]
+
+	// The opening fence is wider than the model's own four backticks.
+	openStart := strings.Index(block, "`")
+	fence := block[openStart:]
+	fence = fence[:strings.IndexFunc(fence, func(r rune) bool { return r != '`' })]
+	if len(fence) < 5 {
+		t.Fatalf("fence is %d backticks against a rationale holding four:\n%s", len(fence), body)
+	}
+
+	// The block ends with its own tag, after the closing fence, and every
+	// closing tag the model wrote lies before that fence.
+	closeFence := strings.LastIndex(block, fence)
+	if realTag := strings.LastIndex(block, "</details>"); realTag < closeFence {
+		t.Errorf("the block's own closing tag is inside the fence:\n%s", body)
+	}
+	if first := strings.Index(block, "</details>"); first > closeFence {
+		t.Errorf("the model's text escaped the fence:\n%s", body)
+	}
+
+	// Both of the model's tags are inside the block's fenced region.
+	fenced := block[openStart+len(fence) : closeFence]
+	if strings.Count(fenced, "</details>") != 2 {
+		t.Errorf("the model's closing tags are not both inside the fence:\n%s", fenced)
+	}
+}
