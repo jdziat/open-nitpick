@@ -8,16 +8,24 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
-func TestProvidersPinIsOrderWithoutFallbacks(t *testing.T) {
+// The pin restricts the candidate set rather than ranking it.
+//
+// "order" ranks whatever the other filters leave, so a pin sent that way with
+// allow_fallbacks false can end with nothing left and answer "No endpoints
+// found" for providers that all serve the model. See issue #46.
+func TestProvidersPinRestrictsRatherThanRanks(t *testing.T) {
 	c := &Client{Spec: config.ModelSpec{Provider: "openrouter", Model: "google/gemma-4-31b-it", Providers: []string{"deepinfra/turbo"}}}
 	applied := llms.ApplyOptions(c.CallOptions()...)
 	routing, ok := applied.ExtraBody["provider"].(map[string]any)
 	if !ok {
 		t.Fatalf("no provider routing in the body: %+v", applied.ExtraBody)
 	}
-	order, _ := routing["order"].([]string)
-	if len(order) != 1 || order[0] != "deepinfra/turbo" {
-		t.Errorf("order = %v", order)
+	only, _ := routing["only"].([]string)
+	if len(only) != 1 || only[0] != "deepinfra/turbo" {
+		t.Errorf("only = %v", only)
+	}
+	if _, ranked := routing["order"]; ranked {
+		t.Error("the pin was sent as order, which ranks a set rather than restricting it")
 	}
 	if fb, _ := routing["allow_fallbacks"].(bool); fb {
 		t.Error("a pin with fallbacks allowed is a preference, not a pin")
