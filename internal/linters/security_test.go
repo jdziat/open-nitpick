@@ -119,8 +119,8 @@ func TestSafePathsDropsFlagLikePaths(t *testing.T) {
 	}
 }
 
-// The end-of-options property moved to TestRunnersTerminateTheirFlagsBeforeThe
-// FileList in containment_test.go. What used to be here grepped runners.go for
-// literal argument strings, which broke whenever an argument moved and never
-// showed that any of it reached a process. The replacement drives each runner
-// and reads the argv its binary received.
+// The end-of-options property is asserted by
+// TestRunnersTerminateTheirFlagsBeforeTheFileList in containment_test.go. It
+// drives each runner and reads the argv its binary received, where grepping
+// runners.go for literal argument strings breaks whenever an argument moves
+// and never shows that any of it reached a process.

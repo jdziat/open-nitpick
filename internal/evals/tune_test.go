@@ -419,10 +419,10 @@ func reportVariants(t *testing.T, results []scored, panel JudgePanel) {
 	// SEVERITY VOCABULARY block below is the description that replaces it. See
 	// NoCrossToolSeverityScore.
 	//
-	// Every count column is a PER-SAMPLE RATE, and N and FAIL are printed
-	// beside them. They used to be raw sums next to PRECISION, SIGNAL and GRADE
-	// which are means, the defect 595b0d4 fixed for the judged-model table and
-	// which had been reintroduced here for three more columns. The denominator
+	// Every count column is a per-sample rate, and N and FAIL are printed
+	// beside them. Raw sums next to PRECISION, SIGNAL and GRADE, which are
+	// means, is the defect 595b0d4 fixed for the judged-model table, and it
+	// reaches three more columns here. The denominator
 	// is not constant across rows: on the voice axis each variant runs its own
 	// reviews, and one failed review silently gives that row a total over fewer
 	// samples than its neighbours. `failures` was counted and then read by
@@ -808,8 +808,8 @@ func reportJudgedModels(
 	b.WriteString("\nJUDGED MODEL RANKING\n")
 	// J-INFL and J-UNDER are printed together, and never one without the other.
 	//
-	// Only INFLATED used to be shown, so severity error was visible in one
-	// direction and invisible in the other. Counting over-claiming while
+	// Showing only INFLATED makes severity error visible in one direction and
+	// invisible in the other. Counting over-claiming while
 	// ignoring under-claiming hands a free win to whichever reviewer is quieter
 	// about severity, which is the opposite of the judgement a reader wants to
 	// make.
@@ -857,10 +857,10 @@ func reportJudgedModels(
 		// ones scores higher, and without those columns the artifact is
 		// invisible and reads as model quality.
 		//
-		// FAIL is the row's LOST-REVIEW count and not the length of its notes
-		// list, which is what it used to be: notes are appended for a clean-change
-		// finding, a suspect judge output and a dump error as well, none of which
-		// is a lost review and all of which fold normally. The notes themselves
+		// FAIL is the row's lost-review count rather than the length of its
+		// notes list: notes are appended for a clean-change finding, a suspect
+		// judge output and a dump error as well, none of which is a lost review
+		// and all of which fold normally. The notes themselves
 		// are printed under the table.
 		b.WriteString(JudgedModelRow(r.model, r.cross, r.agg.Lost()))
 	}
@@ -1198,9 +1198,8 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 
 		// A cached review the parser can no longer read is a different problem
 		// from one never collected, and re-collecting hides it. It is reported
-		// as an ERROR because the alternative, what this used to do, was to
-		// serve the previous parser's reading of those bytes into the table with
-		// no marker at all.
+		// as an error because the alternative serves the previous parser's
+		// reading of those bytes into the table with no marker at all.
 		if stale, why := StaleIncumbentCache(crCacheDir, f); stale {
 			t.Errorf("%s: a cached Incumbent review exists and matches the fixture, but this parser "+
 				"can no longer read it (%v). The parser and the evidence have diverged; fix the parser "+
@@ -1262,8 +1261,8 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		agg.Attempted(fx.Name)
 		// Two adapters folded into one row: the row is on no single scale, so
 		// its severity cells are withheld rather than attributed to whichever
-		// declaration arrived first. This check used to be written out here and
-		// nowhere else, which is why the other judged path did not have it.
+		// declaration arrived first. Written out at one call site rather than on
+		// the aggregate, the other judged path goes without it.
 		agg.DeclareScale(scale)
 		if err != nil {
 			notes[name] = append(notes[name], fmt.Sprintf("%s: %v", fx.Name, err))
@@ -1344,7 +1343,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 			// exists.
 			//
 			// Prefer the cache: collection is rate-limited and resumable, so a
-			// previously collected review is both cheaper and more complete.
+			// review already on disk is both cheaper and more complete.
 			if cached, ok := CachedIncumbent(crCacheDir, fx); ok {
 				record(IncumbentModel, IncumbentSeverityScale, fx, 1, cached, nil)
 				return

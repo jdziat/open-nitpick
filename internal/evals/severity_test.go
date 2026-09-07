@@ -232,8 +232,8 @@ func TestIncumbentCriticalScoresAccurateOnACriticalPlant(t *testing.T) {
 	}
 }
 
-// TestIncumbentInfoOnACriticalPlantIsStillUnderstated is the mirror, and it is
-// the half that makes the fix above worth anything.
+// TestIncumbentInfoOnACriticalPlantIsStillUnderstated is the mirror, and the
+// half that makes the case above worth anything.
 //
 // Recording severities faithfully must not turn the understatement column off.
 // A reviewer that rates a planted critical as `info` has under-rated
@@ -449,8 +449,8 @@ func TestForeignSeverityWordsAreTranslatedOnPurpose(t *testing.T) {
 // TestCreditedFindingIsTheLoudestClaimNotThePrintOrder pins that a published
 // verdict does not turn on the order a reviewer printed its comments in.
 //
-// THE BUG: the credited comment used to be the one whose severity sat NEAREST
-// the plant, with an exact tie broken by band distance and then by report order.
+// Crediting the comment whose severity sits nearest the plant, with an exact
+// tie broken by band distance and then by report order, does not.
 // Around a planted warning, an `error` and an `info` are both exactly one level
 // away and one band away, so nothing but report order was left: [error, info]
 // scored INFLATED and [info, error] scored UNDERSTATED on the same review, while
@@ -616,8 +616,8 @@ func TestMergedCommentIsGradedAgainstEveryDefectItCovers(t *testing.T) {
 		// Carries the worse of the two plants: right about the traversal,
 		// over-claiming the leak. Merging is not free in either direction.
 		{"critical", 1, 1, 0},
-		// The case that used to read as flawless: the 1-step understatement of
-		// the critical plant is now visible.
+		// The case a per-comment reading calls flawless: the 1-step
+		// understatement of the critical plant has to stay visible.
 		{"error", 1, 0, 1},
 		{"info", 0, 0, 2},
 	} {
@@ -743,8 +743,8 @@ func TestAggregateKeepsBothSeverityOpinions(t *testing.T) {
 
 	// The vocabulary description is carried too. It is the only thing printed
 	// under the head-to-head about severity across vocabularies, so an Aggregate
-	// that drops it leaves that table with nothing at all where a withdrawn
-	// column used to be.
+	// that drops it leaves that table with nothing where the withdrawn column
+	// stood.
 	err := SeverityWord{Said: "error", Recorded: config.SeverityError}
 	if got := a.SevUsage[config.SeverityCritical][err]; got != 1 {
 		t.Errorf("usage[critical][error] = %d, want 1: the aggregate must carry what the reviewer "+
@@ -1362,8 +1362,8 @@ func TestCaseIsDecidedInOnePlaceAcrossTheVocabularyBlock(t *testing.T) {
 		t.Errorf("the reviewer's own capitalization must survive to the page:\n%s", block)
 	}
 
-	// And a real translation still has to be announced, or the fix above is just
-	// a caption that never says anything.
+	// And a real translation still has to be announced, or the case above is a
+	// caption that never says anything.
 	usage.Add(config.SeverityError, SeverityWord{Said: "major", Recorded: config.SeverityWarning})
 	block = SeverityVocabularyBlock([]VocabularyRow{{Name: "some/model", Usage: usage}})
 	if !strings.Contains(block, `"major" read as warning`) {
@@ -1468,11 +1468,12 @@ func TestOurOwnTranslationsAreNotPublishedAsOurContendersWords(t *testing.T) {
 // TestTheDumpDoesNotPublishOurTranslationAsTheReviewersWord carries the same
 // rule into the artifact every published number is re-derived from.
 //
-// THE BUG: the dump wrote the translated level under a bare "severity" key
-// beside "model":"incumbent/cli", and review.Finding.RawSeverity carries
-// `json:"-"`, so the reviewer's own word could not reach this file at all. The
-// substitution the tables had been fixed for survived one layer down, in exactly
-// the file a reader opens when they doubt the tables.
+// Writing the translated level under a bare "severity" key beside
+// "model":"incumbent/cli" puts our word where the reviewer's belongs, and
+// review.Finding.RawSeverity carries `json:"-"`, so the reviewer's own word
+// cannot reach this file on its own. The substitution the tables were fixed for
+// then reappears one layer down, in the file a reader opens when they doubt
+// the tables.
 func TestTheDumpDoesNotPublishOurTranslationAsTheReviewersWord(t *testing.T) {
 	fx := severityFixture()
 	d := fx.Defects[0]
@@ -1849,11 +1850,10 @@ func numberWord(n int) string {
 	return strconv.Itoa(n)
 }
 
-// TestAnUndeclaredScaleIsWithheld pins the three states of SeverityScale, and
-// the one that did not exist before it.
+// TestAnUndeclaredScaleIsWithheld pins the three states of SeverityScale.
 //
-// The withdrawal used to be an identity check. A row was published at our
-// resolution unless its model string was IncumbentModel, so "undeclared" was
+// An identity check has only two. Publishing a row at our resolution unless its
+// model string is IncumbentModel leaves "undeclared" as
 // not a state a row could be in: a contender nobody had thought about got the
 // full five-level comparison by default, purely by not being the one reviewer
 // the check named. Now the default is withheld and somebody has to say what
@@ -2275,8 +2275,8 @@ func TestSeverityCountsAreWithdrawnForAForeignVocabulary(t *testing.T) {
 	}
 }
 
-// TestTheVocabularyPreambleIsDerivedFromTheRows pins the sentence that used to be
-// remembered.
+// TestTheVocabularyPreambleIsDerivedFromTheRows pins a sentence that is
+// otherwise kept in step by memory.
 //
 // The block carried a hand-written claim about which words a particular reviewer
 // prints, "incumbent prints 'critical' and 'major'", inside the block whose
@@ -3513,9 +3513,9 @@ func TestEveryHeaderPrintsAWholeMetric(t *testing.T) {
 // withdrawn B-ACC column shipped with the whole suite green, and deleting only
 // that comment sentence made both bypass scans fire.
 //
-// Blanking the comments did not fix it, and that is the lesson this function is
-// left here to carry. It closed the one spelling of the bypass that had been
-// found and left the family open: a comment is not the only prose in a Go file,
+// Blanking the comments does not fix it, and that is the lesson this function
+// is left here to carry. It closes the one spelling of the bypass that was
+// found and leaves the family open: a comment is not the only prose in a Go file,
 // and a STRING LITERAL is not a comment. This package is full of long prose
 // constants, NoCrossToolSeverityScore, SeverityColumnLegend, CostReadingLegend,
 // and a sentence inside any of them registered a header just as effectively:
@@ -3906,9 +3906,9 @@ func isRegisterCall(e ast.Expr) (*ast.CallExpr, bool) {
 // reflect over, the whole failure being guarded is a string the registry never
 // saw.
 //
-// Only REGISTRATIONS GO RUNS UNCONDITIONALLY COUNT: a package-level declaration
-// or a statement in an init() body. THE BUG this FIXES is the one the AST rewrite
-// introduced while closing the prose disguises. The old `var X =
+// Only registrations Go runs unconditionally count: a package-level declaration
+// or a statement in an init() body. This is the hole the AST rewrite opened
+// while closing the prose disguises. A `var X =
 // registerTableHeader(...)` shape had a property nobody wrote down, the
 // compiler guarantees it EXECUTES, and moving the scan to "any call expression
 // anywhere" dropped it. Every column guard (TestNoTableOffersACrossToolSeverityScore,
@@ -4460,10 +4460,10 @@ func TestEverySeverityCellIsWithdrawnForAForeignVocabulary(t *testing.T) {
 		Severity: SeverityScore{Accurate: 4, Inflated: 1, Understated: 2},
 	}
 
-	// UNDECLARED IS TESTED BESIDE FOREIGN, and it is the state that did not exist
-	// while the gate was a name check. A contender added without a declaration
-	// used to be published at our resolution by default, because it was not
-	// spelled IncumbentModel; now it is withheld by default and someone has to
+	// Undeclared is tested beside foreign, and it is the state a name-check gate
+	// does not have. Under one, a contender added without a declaration
+	// publishes at our resolution by default for not being spelled
+	// IncumbentModel; here it is withheld by default and someone has to
 	// say what scale it is on. See SeverityScale.
 	withheld := map[SeverityScale]CorpusTally{}
 	for _, scale := range []SeverityScale{IncumbentSeverityScale, UndeclaredSeverityScale} {
@@ -4894,10 +4894,10 @@ func TestNoReportFormatsSeverityCountersDirectly(t *testing.T) {
 // matches the flattened spelling too, and matches SevAccurate's own declaration
 // in score.go, so an unqualified scan reports the definitions as violations.
 //
-// WHAT IS and IS not A COUNTER IS DECIDED BY THE VERDICT VOCABULARY PLUS THE
-// TYPE, and neither half is sufficient alone. It was once "every Sev* field
-// except SevUsage", a name-shaped rule with a hand-written exception, which
-// fired on SevPlantedLevels the day that field existed. Narrowing that to "Sev*
+// What counts as a counter is decided by the verdict vocabulary plus the type,
+// neither half sufficing alone. "Every Sev* field except SevUsage" is a
+// name-shaped rule with a hand-written exception, and it fires on
+// SevPlantedLevels the day that field exists. Narrowing that to "Sev*
 // and an int" fixed the map case and re-broke the same way on Aggregate, whose
 // SevPlanted is an int and is a DENOMINATOR: how many defects the corpus planted
 // is a fact about the fixtures that a report is supposed to print. A counter
@@ -5161,12 +5161,12 @@ func TestTheCounterScanCoversEveryShapeAReportRendersFrom(t *testing.T) {
 //     single level of ours is right for every plant it lands on and neither
 //     candidate mapping is a description of the word.
 //
-// THE SECOND BULLET USED TO SAY SOMETHING STRONGER and FALSE: that every plant a
-// 'major' is credited on is planted ABOVE warning, so no observation here
-// distinguishes the two mappings. Measured, half of them land AT warning, and
-// the corpus distinguishes the mappings sharply, the full-resolution triple
-// moves 6/4/4 to 5/8/1 when the constant is swapped, which is this test's own
-// first bullet. The body below had already asserted the opposite
+// The stronger claim, that every plant a 'major' is credited on is planted
+// above warning so no observation here distinguishes the two mappings, is
+// false. Measured, half of them land at warning, and the corpus distinguishes
+// the mappings sharply: the full-resolution triple moves 6/4/4 to 5/8/1 when
+// the constant is swapped, which is this test's own first bullet. The body
+// below asserts the opposite
 // ("warning is the PLURALITY landing"), so the comment and the code it
 // introduces disagreed about the evidence. What survives is the conclusion, on
 // better grounds: the reason to publish no cross-tool score is that the word
@@ -5239,12 +5239,12 @@ func TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered(t *testing.T) {
 			"parameter is pinned down", shipped.Accurate, shipped.Inflated, shipped.Understated)
 	}
 
-	// THE REVISIT this TEST USED TO DEMAND, DONE.
+	// The revisit this test once demanded, carried out.
 	//
-	// It previously errored the moment a 'major' landed on a plant of warning,
-	// because until the corpus grew none ever had and the mapping was therefore
-	// a guess with nothing to check it against. Evidence now exists, so the
-	// question changes from "is this arbitrary" to "what does the evidence say".
+	// Erroring the moment a 'major' landed on a plant of warning made sense
+	// while none ever had and the mapping was a guess with nothing to check it
+	// against. Evidence exists now, so the question changes from "is this
+	// arbitrary" to "what does the evidence say".
 	//
 	// It says the word straddles. Across both corpora 'major' is credited on
 	// plants of critical, error and warning, and 'critical' is credited on

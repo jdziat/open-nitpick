@@ -207,8 +207,8 @@ func TestARetainedRunIsNamedForTheCorpusItSpent(t *testing.T) {
 
 // TestAPartialDumpIsRefusedAsARejudgeInput.
 //
-// Re-judging a file a battery is still filling measures whatever had been
-// flushed. The guard against it compared NITPICK_EVAL_DUMP with the re-judge
+// Re-judging a file a battery is still filling measures whatever reached disk
+// first. Guarding it by comparing NITPICK_EVAL_DUMP with the re-judge
 // input, which covers the operator who exported both, and covers nothing once a
 // battery resolves its own path, because then NITPICK_EVAL_DUMP is empty and the
 // comparison reads "" and skips. Dump.Close renames a retained run out of its

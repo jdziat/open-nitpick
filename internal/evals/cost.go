@@ -712,8 +712,8 @@ func parsePrice(raw rawPrice) (Price, error) {
 			return Price{}, fmt.Errorf("tier %d has min_prompt_tokens %d: a threshold at or below zero restates the base rate rather than overriding it", i, mpt)
 		}
 		if mpt <= previous {
-			// rateAt walks the slice in order, stopping at the first threshold
-			// over the prompt, so it cannot recover from an unsorted list.
+			// Selection walks the tiers in order and stops at the first
+			// threshold over the prompt, with no way back from a bad order.
 			return Price{}, fmt.Errorf("tier %d has min_prompt_tokens %d, which does not exceed the %d before it: tiers are selected by walking them in order, so an unsorted list bills a large prompt at a small prompt's rate", i, mpt, previous)
 		}
 		previous = mpt
