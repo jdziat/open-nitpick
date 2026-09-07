@@ -593,6 +593,22 @@ What that says:
   glm route. A match on the change's file count, rather than the batch's,
   is the missing feature.
 
+**What a real pull request costs (2026-09-07).** Every fixture above is
+about one batch, so its `$/review` is cost per diff and not per pull
+request. Commit `e84dee6` in this repository, 24 files and 1416 insertions,
+packs into 4 batches; reviewed whole, one run each, related context on:
+
+| config | cost | $/batch | calls | findings | time |
+|---|---|---|---|---|---|
+| ensemble-cheap | $0.0631 | $0.0158 | 9 | 5 | 5m28s |
+| routed | $0.1480 | $0.0370 | 9 | 3 | 3m3s |
+| qwen3.8-27b alone | $0.2357 | $0.0589 | 5 | 0 | 6m5s |
+
+Cost tracks batches rather than files, and the price ordering is the one
+the corpora show. The findings column is one run on a merged change, so
+read it as what each configuration said, not as recall. Reproduce it with
+`NITPICK_BIGPR_BASE` and `NITPICK_BIGPR_HEAD` on `TestBigPRCost`.
+
 **Recommendation (revised 2026-09-07).** For a repository that wants one
 cheap configuration: `ensemble-cheap`. It is below `routed` on price per
 review and price per located defect on all three corpora, and below qwen
