@@ -266,7 +266,7 @@ func TestEmptyPRContextIsOmitted(t *testing.T) {
 }
 
 // renderComment2 renders with emoji enabled, matching the default persona.
-func renderComment2(f Finding) string { return renderComment(f, true) }
+func renderComment2(f Finding) string { return renderComment(f, true, nil) }
 
 // The class enum offers slop only when the switch is on: a model is not
 // invited to label a finding with a class the operator did not ask for.

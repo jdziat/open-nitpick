@@ -208,7 +208,7 @@ func TestLinterAttributionSurvivesTriage(t *testing.T) {
 	}
 
 	// And the reader must see it.
-	body := renderComment(got, true)
+	body := renderComment(got, true, nil)
 	if !strings.Contains(body, "flagged by golangci-lint(gosec)") {
 		t.Errorf("published comment must attribute the analyzer:\n%s", body)
 	}
@@ -343,7 +343,7 @@ func TestModelFindingAttributionIsNotDoubled(t *testing.T) {
 		t.Fatalf("findings = %d", len(report.Findings))
 	}
 
-	body := renderComment(report.Findings[0], true)
+	body := renderComment(report.Findings[0], true, nil)
 	if strings.Count(body, "flagged by") > 1 {
 		t.Errorf("attribution should appear once:\n%s", body)
 	}

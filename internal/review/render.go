@@ -3,6 +3,7 @@ package review
 import (
 	"fmt"
 	"html"
+	"sort"
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
@@ -36,8 +37,15 @@ func label(s config.Severity, emoji bool) string {
 // Render turns a report into a publishable review.
 func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 	emoji := true
+	agent := false
 	if cfg != nil {
 		emoji = cfg.Persona.EmojiEnabled()
+		agent = cfg.Review.AgentPrompt
+	}
+
+	var agentPrompt map[string][]string
+	if agent {
+		agentPrompt = batchMates(report.Plan)
 	}
 
 	review := vcs.Review{
@@ -70,7 +78,7 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 			Path:        f.Path,
 			Line:        f.Line,
 			Side:        side,
-			Body:        renderComment(f, emoji),
+			Body:        renderComment(f, emoji, agentPrompt),
 			Fingerprint: Fingerprint(f),
 			Class:       f.Class,
 		}
@@ -86,8 +94,92 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 	return review
 }
 
-// renderComment formats one finding as a review comment.
-func renderComment(f Finding, emoji bool) string {
+// batchMates maps each reviewed path to the files that shared its batch.
+//
+// That set is what the reviewer had in front of it when it wrote the finding,
+// so it is the blast radius an agent would otherwise re-derive. Taken from the
+// plan rather than recomputed, because the plan is what was sent.
+func batchMates(plan *bundle.Plan) map[string][]string {
+	if plan == nil {
+		return nil
+	}
+
+	out := map[string][]string{}
+	for _, batch := range plan.Batches {
+		paths := batch.Paths()
+		for _, p := range paths {
+			mates := make([]string, 0, len(paths)-1)
+			for _, other := range paths {
+				if other != p {
+					mates = append(mates, other)
+				}
+			}
+			sort.Strings(mates)
+			out[p] = mates
+		}
+	}
+	return out
+}
+
+// agentPromptBlock is what a coding agent needs to act on a finding, folded
+// so a human reader scrolls past it.
+//
+// Assembled from fields the engine already holds. Nothing here is generated,
+// so the block cannot assert anything the review did not establish. That is
+// also its limit: it does not say what would make the fix wrong, because
+// nothing in a finding records that, and inventing it would be the kind of
+// unmeasured claim this project refuses everywhere else.
+func agentPromptBlock(f Finding, read map[string][]string) string {
+	var inner strings.Builder
+
+	fmt.Fprintf(&inner, "anchor:    %s\n", span(f.Path, f.Line, f.EndLine))
+	for _, also := range f.AlsoAt {
+		fmt.Fprintf(&inner, "also:      %s\n", span(f.Path, also.Line, also.EndLine))
+	}
+	if f.Class != "" {
+		fmt.Fprintf(&inner, "class:     %s\n", f.Class)
+	}
+	fmt.Fprintf(&inner, "severity:  %s\n", f.Sev())
+	if src := strings.TrimSpace(f.Source); src != "" {
+		fmt.Fprintf(&inner, "found by:  %s\n", src)
+	}
+
+	// Only for a finding a model wrote. An analyzer read one file and knows
+	// nothing of the batch, so naming its mates here would assert reading that
+	// did not happen, which is the claim this block promises not to make.
+	if mates := read[f.Path]; len(mates) > 0 && !f.FromAnalyzer {
+		fmt.Fprintf(&inner, "also read: %s\n", strings.Join(mates, ", "))
+	}
+
+	fmt.Fprintf(&inner, "\n%s\n", strings.TrimSpace(f.Title))
+	if r := strings.TrimSpace(f.Rationale); r != "" {
+		fmt.Fprintf(&inner, "\n%s\n", r)
+	}
+
+	// The fence is widened past anything the content holds. Title and
+	// Rationale are model-authored and can quote the diff under review, so a
+	// triple backtick in either would close a fixed fence early and spill the
+	// rest, the closing tag included, as rendered markdown in a comment posted
+	// under this tool's name.
+	body := inner.String()
+	fence := fenceFor(body)
+
+	return fmt.Sprintf("\n<details><summary>Fix prompt</summary>\n\n%s\n%s%s\n\n</details>\n",
+		fence, body, fence)
+}
+
+// span renders a path and the lines a finding covers.
+func span(path string, line, end int) string {
+	if end > line {
+		return fmt.Sprintf("%s:%d-%d", path, line, end)
+	}
+	return fmt.Sprintf("%s:%d", path, line)
+}
+
+// renderComment formats one finding as a review comment. read names the files
+// the reviewer had in front of it for each path's batch, or is nil when no
+// agent prompt was asked for.
+func renderComment(f Finding, emoji bool, read map[string][]string) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "**%s", label(f.Sev(), emoji))
@@ -124,6 +216,13 @@ func renderComment(f Finding, emoji bool) string {
 			fence := fenceFor(s)
 			fmt.Fprintf(&b, "%s\n%s\n%s\n", fence, s, fence)
 		}
+	}
+
+	// Last, and folded. A finding whose suggestion GitHub can apply in one
+	// click still gets one: the block says where else the finding reaches and
+	// what the reviewer read, which the suggestion does not.
+	if read != nil {
+		b.WriteString(agentPromptBlock(f, read))
 	}
 
 	return b.String()
