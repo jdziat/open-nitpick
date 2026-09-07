@@ -175,15 +175,24 @@ func TestCadenceReadsSourceComments(t *testing.T) {
 		t.Errorf("dense comments were not flagged: %s", rules(got))
 	}
 
-	// Code is not prose. A file of struct fields carries colons and commas
-	// that are syntax, and counting them would score a file by its shape.
-	var code strings.Builder
-	code.WriteString("package a\n\ntype T struct {\n")
-	for i := 0; i < 60; i++ {
-		code.WriteString("\tA, B, and C map[string]int `json:\"a,b,and_c\"`\n")
+	// commentLines must return comment text and nothing else. Code lines carry
+	// colons and commas that are syntax, and cadence would score them.
+	//
+	// Call commentLines directly. Asserting through Scan would pass whether or
+	// not the filter works: cadence skips indented lines, and a file this short
+	// is under its 40-line floor, so Scan returns zero either way.
+	code := []string{
+		"package a",
+		"var A, B, and C = 1, 2, 3",
+		"type T struct{ X, Y, and Z int }",
+		"// the only comment: it carries the voice",
+		"func f() { m := map[string]int{\"a\": 1, \"b\": 2}; _ = m }",
 	}
-	code.WriteString("}\n")
-	if got := Scan("b.go", code.String()); len(got) != 0 {
-		t.Errorf("code lines were counted: %+v", got)
+	lines := commentLines(code, "//")
+	if len(lines) != 1 {
+		t.Fatalf("commentLines returned %d line(s), want the one comment: %q", len(lines), lines)
+	}
+	if !strings.Contains(lines[0], "carries the voice") {
+		t.Errorf("commentLines returned %q, want the comment body", lines[0])
 	}
 }
