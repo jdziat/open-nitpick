@@ -175,15 +175,87 @@ func TestCadenceReadsSourceComments(t *testing.T) {
 		t.Errorf("dense comments were not flagged: %s", rules(got))
 	}
 
-	// Code is not prose. A file of struct fields carries colons and commas
-	// that are syntax, and counting them would score a file by its shape.
-	var code strings.Builder
-	code.WriteString("package a\n\ntype T struct {\n")
-	for i := 0; i < 60; i++ {
-		code.WriteString("\tA, B, and C map[string]int `json:\"a,b,and_c\"`\n")
+	// commentLines must return comment text and nothing else. Code lines carry
+	// colons and commas that are syntax, and cadence would score them.
+	//
+	// Call commentLines directly. Asserting through Scan would pass whether or
+	// not the filter works: cadence skips indented lines, and a file this short
+	// is under its 40-line floor, so Scan returns zero either way.
+	code := []string{
+		"package a",
+		"var A, B, and C = 1, 2, 3",
+		"type T struct{ X, Y, and Z int }",
+		"// the only comment: it carries the voice",
+		"func f() { m := map[string]int{\"a\": 1, \"b\": 2}; _ = m }",
 	}
-	code.WriteString("}\n")
-	if got := Scan("b.go", code.String()); len(got) != 0 {
-		t.Errorf("code lines were counted: %+v", got)
+	lines := commentLines(code, "//")
+	if len(lines) != 1 {
+		t.Fatalf("commentLines returned %d line(s), want the one comment: %q", len(lines), lines)
+	}
+	if !strings.Contains(lines[0], "carries the voice") {
+		t.Errorf("commentLines returned %q, want the comment body", lines[0])
+	}
+}
+
+// A raw string literal holds other people's text. This package's own tests
+// embed fixtures whose doc comments start with the Go comment marker.
+func TestRawStringLiteralsAreNotScanned(t *testing.T) {
+	src := "package a\n\n" +
+		"var fixture = `\n" +
+		"/** toCents takes DOLLARS — and it MUST NOT round. */\n" +
+		"fun toCents(d: Double): Long = 0\n" +
+		"`\n\n" +
+		"// A real comment with an em dash — this one counts.\n" +
+		"func f() {}\n"
+
+	got := Scan("a.go", src)
+	if len(got) != 1 {
+		t.Fatalf("tells = %+v, want only the real comment's em dash", got)
+	}
+	if got[0].Line != 8 {
+		t.Errorf("flagged line %d, want 8: the fixture's own text was scanned", got[0].Line)
+	}
+}
+
+// Shouting is a closed list of ordinary words, not a shape. A name in capitals
+// is a name.
+func TestShoutingIsWordsNotShape(t *testing.T) {
+	for _, line := range []string{
+		"// The cap bounds what is READ, not what is SENT.\n",
+		"// IT MUST BE RENDERED, and this paragraph said it was not.\n",
+		"// how much of the file it is NOT being shown\n",
+	} {
+		if got := Scan("a.go", line); !strings.Contains(rules(got), "shouting-emphasis") {
+			t.Errorf("not flagged: %q -> %s", line, rules(got))
+		}
+	}
+
+	for _, line := range []string{
+		"// a README that explains what the place is\n",
+		"// exceeded review.MAX_FILES on the TOML PATH\n",
+		"// parses SARIF from the HTTP endpoint, see GHSA and CVE ids\n",
+	} {
+		if got := Scan("a.go", line); strings.Contains(rules(got), "shouting-emphasis") {
+			t.Errorf("a name was flagged: %q -> %+v", line, got)
+		}
+	}
+}
+
+// A comment that narrates its own history is a commit message that outlived
+// its commit.
+func TestChangelogCommentsAreFound(t *testing.T) {
+	for _, line := range []string{
+		"// That check used to live here, and rejecting a file was wrong.\n",
+		"// THE BUG THIS FIXES: it was taken inside ScoreSeverity.\n",
+		"// The note here outlived the fix by two changes.\n",
+		"// It was previously refused its content outright.\n",
+	} {
+		if got := Scan("a.go", line); !strings.Contains(rules(got), "changelog-comment") {
+			t.Errorf("not flagged: %q -> %s", line, rules(got))
+		}
+	}
+
+	if got := Scan("a.go", "// fetchContent reads a file's contents at the reviewed revision.\n"); len(got) != 0 {
+		t.Errorf("an ordinary doc comment was flagged: %+v", got)
 	}
 }
