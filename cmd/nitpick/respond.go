@@ -151,6 +151,13 @@ func runRespond(ctx context.Context, args []string) error {
 	case converse.KindFix:
 		return runFix(ctx, gh, cfg, ref, ev, converse.FixesAll(text), log)
 
+	case converse.KindImprove:
+		if err := runImprove(ctx, gh, cfg, ref, ev, log); err != nil {
+			_ = gh.React(ctx, ref, ev.CommentID, ev.Inline, "confused")
+			return err
+		}
+		return nil
+
 	default:
 		client, err := llm.BuildContext(ctx, cfg.Models.ResolveModel(config.RoleReview))
 		if err != nil {

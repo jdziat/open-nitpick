@@ -121,6 +121,14 @@ const (
 	// KindFix asks for the finding to be applied, as a branch and a pull
 	// request. See FixesAll for the "fix all" variant.
 	KindFix Kind = "fix"
+	// KindImprove asks for the wider pass: the classes the generation scope
+	// deliberately does not produce, run once for this pull request.
+	//
+	// It changes nothing about what a push produces. config.GenerationLevel
+	// is normal because asking one pass for defects and style together
+	// measured worse at both, so the wider scope is reachable only by asking
+	// for it, and only here.
+	KindImprove Kind = "improve"
 )
 
 // Command reads the mention out of a comment: the kind, and for a question
@@ -149,6 +157,8 @@ func Command(body, mention string) (Kind, string, bool) {
 		return KindResolve, rest, true
 	case "fix", "apply":
 		return KindFix, rest, true
+	case "improve", "polish":
+		return KindImprove, rest, true
 	}
 	return KindAsk, rest, true
 }
