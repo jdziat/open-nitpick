@@ -160,3 +160,30 @@ func TestCadenceIgnoresInlineCode(t *testing.T) {
 		t.Errorf("inline code was counted: %+v", got)
 	}
 }
+
+// The rule was prose-only, so a struct-field comment built out of parallel
+// clauses was invisible. This is the shape a reader picks out of a diff first.
+func TestCadenceReadsSourceComments(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("package a\n\n")
+	for i := 0; i < 60; i++ {
+		b.WriteString("// The width is chosen per file: it has to be recorded.\n")
+		b.WriteString("// A reader who cannot tell one, another, and a third apart is lost.\n")
+		b.WriteString("var x int\n\n")
+	}
+	if got := Scan("a.go", b.String()); !strings.Contains(rules(got), "prose-cadence") {
+		t.Errorf("dense comments were not flagged: %s", rules(got))
+	}
+
+	// Code is not prose. A file of struct fields carries colons and commas
+	// that are syntax, and counting them would score a file by its shape.
+	var code strings.Builder
+	code.WriteString("package a\n\ntype T struct {\n")
+	for i := 0; i < 60; i++ {
+		code.WriteString("\tA, B, and C map[string]int `json:\"a,b,and_c\"`\n")
+	}
+	code.WriteString("}\n")
+	if got := Scan("b.go", code.String()); len(got) != 0 {
+		t.Errorf("code lines were counted: %+v", got)
+	}
+}
