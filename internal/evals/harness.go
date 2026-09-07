@@ -732,11 +732,16 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	client.LLM = recorder
 
 	// A composite run builds its own roles from the route file and meters
-	// every client it reaches for, by model, so the row's cost is the sum
-	// of each model's usage at that model's own rate.
+	// every client it reaches for, so the row's cost is the sum of each
+	// model's usage at that model's own rate.
+	//
+	// 2026-09-07: the map is keyed by client, not by model id. Two roles can
+	// resolve to one model and still be two clients, and a model-keyed map
+	// let the second one's meter replace the first's. Roles.Each dedupes on
+	// the pointer, so the pointer is the identity the meters share too.
 	var (
 		roles  = &llm.Roles{Review: client, Triage: client}
-		meters = map[string]*Meter{}
+		meters = map[*llm.Client]*Meter{}
 		mmu    sync.Mutex
 	)
 	if model.Composite() {
@@ -749,8 +754,10 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		meterInto := func(c *llm.Client) {
 			mmu.Lock()
 			defer mmu.Unlock()
-			m := MeterClient(c)
-			meters[c.Spec.Model] = m
+			if _, ok := meters[c]; ok {
+				return
+			}
+			meters[c] = MeterClient(c)
 		}
 		built.Each(meterInto)
 		inner := built.Build
@@ -799,24 +806,45 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	// that spend would make an unreliable model look cheap.
 	out.Usage = meter.Usage()
 	if model.Composite() {
-		out.UsageByModel = map[string]TokenUsage{}
-		var all TokenUsage
 		mmu.Lock()
-		for name, m := range meters {
-			u := m.Usage()
-			out.UsageByModel[name] = u
-			all.PerCall = append(all.PerCall, u.PerCall...)
-			all.Unreported += u.Unreported
-			all.Failed += u.Failed
-		}
+		out.Usage, out.UsageByModel = sumMeters(meters)
 		mmu.Unlock()
-		out.Usage = all
 	}
 
 	out.Err = err
 	out.Duration = time.Since(started)
 
 	return out
+}
+
+// sumMeters folds a composite run's per-client meters into one total and a
+// per-model breakdown.
+//
+// 2026-09-07: the input is keyed by client because two clients can carry one
+// model id, and the breakdown merges those rather than letting the last one
+// win. BuildRoles gives Validate its own client resolved from `default`
+// whenever a route file names no validate model, which is ensemble-cheap,
+// routed and qwen-glm under testdata/routes, so review and validate collide
+// on the key that prices them. Keyed by model, the reviewer's spend was the
+// half that lost, and validation is off in these runs, so the survivor had
+// recorded nothing at all.
+func sumMeters(meters map[*llm.Client]*Meter) (TokenUsage, map[string]TokenUsage) {
+	var all TokenUsage
+	byModel := map[string]TokenUsage{}
+	for c, m := range meters {
+		u := m.Usage()
+
+		row := byModel[c.Spec.Model]
+		row.PerCall = append(row.PerCall, u.PerCall...)
+		row.Unreported += u.Unreported
+		row.Failed += u.Failed
+		byModel[c.Spec.Model] = row
+
+		all.PerCall = append(all.PerCall, u.PerCall...)
+		all.Unreported += u.Unreported
+		all.Failed += u.Failed
+	}
+	return all, byModel
 }
 
 // routeFile is the shape of a route file: the config's models block.
