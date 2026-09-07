@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0](https://github.com/jdziat/open-nitpick/compare/v1.4.0...v1.5.0) (2026-09-07)
+
+
+### Features
+
+* **budget:** a spending ceiling that reviews the top files under it ([#15](https://github.com/jdziat/open-nitpick/issues/15)) ([7d8d318](https://github.com/jdziat/open-nitpick/commit/7d8d318831a996b2228d02738bf2269deee79265))
+* **spend:** only the repository people can make the reviewer spend ([#16](https://github.com/jdziat/open-nitpick/issues/16)) ([aefb97c](https://github.com/jdziat/open-nitpick/commit/aefb97c2b9a48070e6cc875f07fad76530d7cae6))
+
+
+### Fixes
+
+* **launch:** pin the composite action and close the doc gaps ([#10](https://github.com/jdziat/open-nitpick/issues/10)) ([74aaf71](https://github.com/jdziat/open-nitpick/commit/74aaf71e9772170399f6cc9f71ac2177659cb55c))
+
 ## [1.4.0](https://github.com/jdziat/open-nitpick/compare/v1.3.0...v1.4.0) (2026-09-06)
 
 
