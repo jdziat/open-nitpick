@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.10.0](https://github.com/jdziat/open-nitpick/compare/v1.9.0...v1.10.0) (2026-09-07)
+
+
+### Features
+
+* **converse:** [@open-nitpick](https://github.com/open-nitpick) improve, the wider pass on request ([#68](https://github.com/jdziat/open-nitpick/issues/68)) ([08e44bc](https://github.com/jdziat/open-nitpick/commit/08e44bcefdfcb8cf61dfa2b392df5dfafcbe933f)), closes [#54](https://github.com/jdziat/open-nitpick/issues/54)
+
+
+### Fixes
+
+* **cli:** explain-config names the handle that ships ([#70](https://github.com/jdziat/open-nitpick/issues/70)) ([3ca56e1](https://github.com/jdziat/open-nitpick/commit/3ca56e11343ef733ed8fcc35120d8674b21e011d))
+* **vcs:** say so in the thread when a fix cannot be written ([#66](https://github.com/jdziat/open-nitpick/issues/66)) ([7e9adce](https://github.com/jdziat/open-nitpick/commit/7e9adce83d99888acc21d058fb35a0ab3fc2285f))
+
+
+### Documentation
+
+* the 44-PR regression is noise, and Status links out ([#60](https://github.com/jdziat/open-nitpick/issues/60)) ([7d5e920](https://github.com/jdziat/open-nitpick/commit/7d5e920abf36b5b6730213a587bbefa99d664631))
+
 ## [1.9.0](https://github.com/jdziat/open-nitpick/compare/v1.8.0...v1.9.0) (2026-09-07)
 
 
