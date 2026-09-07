@@ -558,9 +558,8 @@ type Linters struct {
 func (l Linters) AutoDetects() bool { return l.AutoDetect == nil || *l.AutoDetect }
 
 // CapSeverity reduces an analyzer-reported severity to the ceiling this
-// repository lets a deterministic tool claim.
-//
-// It is policy applied after parsing: what the analyzer said is a fact to
+// repository lets a deterministic tool claim. It is policy applied after
+// parsing: what the analyzer said is a fact to
 // record, what this repository acts on is a decision. Mapping "CRITICAL" onto
 // error at parse time folds the two, taking the choice from every operator and
 // leaving `fail_on: critical` gating on nothing. An unset or unrecognized
