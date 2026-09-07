@@ -62,7 +62,7 @@ func (c *relatedCollector) rustModuleFile(root string, segments []string) string
 // rustUseTargets reads every `use` in the file and returns, for each binding
 // it introduces from inside the crate, the file that should define it.
 func (c *relatedCollector) rustUseTargets(e *Entry, root string) map[string]string {
-	targets := map[string]string{} // local name -> file
+	targets := map[string]string{} // local name to file
 	dir := path.Dir(e.File.Path)
 	if dir == "." {
 		dir = ""
@@ -291,7 +291,7 @@ func (c *relatedCollector) rubyWants(e *Entry) []want {
 
 	// Ruby has no import list: whatever a required file defines at top
 	// level is in scope. The names worth attaching are the constants and
-	// methods the change actually uses, so each required file's top-level
+	// methods the change uses, so each required file's top-level
 	// definitions are read and matched against the added lines.
 	for _, file := range files {
 		content, ok := c.read(file)

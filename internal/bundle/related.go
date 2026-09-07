@@ -24,7 +24,7 @@ import (
 // The prompt tells the model not to speculate about code it was not shown,
 // and a review that obeys that rule stays quiet about every defect whose
 // nature turns on what a called function does. Attaching the callee is the
-// cheapest way to show it. It is bounded three ways: to definitions actually
+// cheapest way to show it. It is bounded three ways: to definitions
 // named on a changed line, so an import list is not an invitation to dump a
 // package; to a token budget of its own, so it cannot crowd out the file
 // under review; and to what the repository's own files define, so nothing

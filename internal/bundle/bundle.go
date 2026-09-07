@@ -38,10 +38,6 @@ type Entry struct {
 
 	// ContextLines is how many lines of surrounding code the window kept on
 	// each side of every change, meaningful only when Truncated.
-	//
-	// The width is chosen per file against the budget, so it has to be
-	// recorded. Render puts it in the prompt, which tells the model how much
-	// of the file it is not being shown.
 	ContextLines int
 
 	// Instructions are the configured path-scoped prompts that apply here.
@@ -205,9 +201,9 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 	}
 
 	// Selection and content run in one pass so that review.max_files counts files
-	// that were actually reviewed. Selecting first meant a generated file (only
-	// recognisable once its content had been read), spent a slot and then dropped
-	// out of the review, and a reviewable file behind it was refused for a limit
+	// that were reviewed. Selecting first meant a generated file, recognisable
+	// only once its content had been read, spent a slot and then dropped out of
+	// the review, and a reviewable file behind it was refused for a limit
 	// nothing reviewed had reached. Six files at max_files=3, the first three
 	// generated, reviewed nothing and reported success.
 	entries := make([]Entry, 0, len(files))
@@ -339,7 +335,7 @@ func skipReason(cfg *config.Config, f *diff.File) (string, bool) {
 // understood: it is compared against the file's own bytes, both for the whole
 // file and for the bytes a window retains of it. budget bounds what is SENT and
 // is compared against the rendered entry, line numbering and headings included,
-// because that is the text the provider actually receives. Neither is allowed
+// because that is the text the provider receives. Neither is allowed
 // to answer "no content at all" while a narrower window would have satisfied
 // it. The held prompt fragment needs no separate cap: it is the thing budget
 // measures.

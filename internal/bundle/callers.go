@@ -23,7 +23,7 @@ import (
 // the first lines of each caller is the cheapest way to show it.
 //
 // It is bounded the same three ways as related context: to symbols the diff
-// actually redefined, so a whitespace-only change attaches nothing; to the
+// redefined, so a whitespace-only change attaches nothing; to the
 // shared related-context budget and per-file cap; and to files the
 // repository's own tree holds. It is also bounded in a fourth way that
 // related context is not: finding callers means reading files that were not

@@ -221,7 +221,7 @@ func buildCorpus(t *testing.T, specs []fileSpec) (diff.Files, ContentFetcher) {
 
 // packCase is one measurement: a set of files and the limits to pack them
 // under. Zero limits mean the shipped defaults, which is the configuration
-// whose behaviour actually matters.
+// whose behaviour matters.
 type packCase struct {
 	Name  string
 	Specs []fileSpec
@@ -698,13 +698,9 @@ func TestBatchNeverExceedsMaxFilesPerRequest(t *testing.T) {
 func TestOversizedEntryGetsItsOwnBatch(t *testing.T) {
 	// Chosen so exactly one entry cannot be made to fit: the 4x20-line diff
 	// alone costs ~1800 tokens and fitEntry cannot trim a diff, while a
-	// 20-line file costs ~500 and two of them share a request comfortably.
-	//
-	// The previous budget of 120 put ALL THREE entries over it, so every batch
-	// was a single over-budget entry no matter what the packer did and the
-	// assertion below could not fail: a batch() mutated to flush before every
-	// append (one file per batch, packing abandoned entirely), passed this test
-	// unchanged.
+	// 20-line file costs ~500 and two of them share a request comfortably. A
+	// budget that puts every entry over it makes the assertion below
+	// unfalsifiable.
 	const budget = 1500
 
 	// Two packable files on each side, so the case distinguishes "isolates the

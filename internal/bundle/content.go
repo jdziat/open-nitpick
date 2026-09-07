@@ -40,21 +40,11 @@ func isGenerated(content string) bool {
 	return false
 }
 
-// minContextLines is the narrowest window worth attaching. It is a floor
-// rather than a smaller number because of what the prompt already holds: the
-// diff in the same entry carries the differ's own context (three lines each
-// side, git's default), so a window at or below that width shows the model
-// nothing it has not already been sent, under a heading claiming to be the
-// surrounding file. Four is one line past it, which is thin but is code the
-// diff did not carry, and the elision markers still account for every line
-// between.
+// minContextLines is the narrowest window worth attaching.
 //
-// The floor used to be 12, picked against an imagined alternative: a sliver
-// that reads like file context and is not. The measured alternative was worse.
-// A file edited every 25 lines has no width at or above 12 that elides
-// anything, so the search ran out of rungs and threw away ALL of its context
-// while 93% of the request budget went unspent, and at width 8 the same file
-// fit with 68% of its lines attached. A thin window beats no window.
+// Four is one line wider than git's default diff context, so a window at this
+// width still shows the model code the diff did not carry. Anything narrower
+// repeats the diff under a heading claiming to be the surrounding file.
 const minContextLines = 4
 
 // windowBisectSteps is how many times the width search bisects between the
@@ -263,7 +253,7 @@ func (w windower) spans(contextLines int) [][2]int {
 // could reject every window of it, and raising a cap the file already
 // satisfied was what restored its context.
 //
-// The bool reports whether anything was actually elided. When it is false the
+// The bool reports whether anything was elided. When it is false the
 // content comes back untouched and unnumbered: Render numbers whole files
 // itself and would otherwise number them twice. Returning the numbered build
 // alongside a false was a bug waiting for a caller (every citation into it

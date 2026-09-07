@@ -190,7 +190,7 @@ func sourceBytes(t *testing.T, windowed string) int {
 // the content the model receives is a defect the model cannot see, and an unseen
 // defect is reported as no defect.
 func TestWindowNeverDropsAChangedLine(t *testing.T) {
-	// Most of the assertion lives behind "the window actually elided
+	// Most of the assertion lives behind "the window elided
 	// something", so a generator that stopped producing eliding shapes would
 	// turn this test green while testing nothing.
 	var checked, kept int
@@ -340,7 +340,7 @@ func abs(n int) int {
 // TestChangedLinesSurviveWhateverWidthTheBudgetPicks carries the invariant
 // through fitEntry. window() choosing correctly is worthless if the width
 // search, the byte cap, or a later edit to Render can still lose a changed line
-// from what actually ships.
+// from what ships.
 //
 // Swept over file sizes as well as limits, because the width is now chosen per
 // file: a size that lands between two of the search's steps is exactly where a
@@ -772,7 +772,7 @@ func TestDenselyEditedFileKeepsContextItsBudgetCanPayFor(t *testing.T) {
 			entry := plan.Batches[0].Entries[0]
 			if !entry.HasContent() {
 				// Dropping every line is honest only when the narrowest window
-				// worth attaching genuinely did not fit. Asserted by building
+				// worth attaching did not fit. Asserted by building
 				// that window here: if it would have fit, the search gave up
 				// with the budget still able to pay for it, which is the dead
 				// zone this test is named after.
