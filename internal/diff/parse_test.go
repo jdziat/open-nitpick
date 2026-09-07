@@ -403,7 +403,7 @@ func TestPositionLookup(t *testing.T) {
 func TestSideAndAnchorLine(t *testing.T) {
 	// line+side is the supported anchor; position is closing down. Deletions
 	// must anchor to the old file on LEFT, everything else to the new file on
-	// RIGHT, or comments land on unrelated code.
+	// Right, or comments land on unrelated code.
 	files, _ := Parse([]byte(modifiedDiff))
 	lines := files[0].Hunks[0].Lines
 

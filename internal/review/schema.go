@@ -11,7 +11,7 @@ import (
 // The findings schema is hand-authored rather than derived from the Result
 // struct by reflection.
 //
-// The SDK's SchemaFrom marks EVERY exported field as required, with no way to
+// The SDK's SchemaFrom marks every exported field as required, with no way to
 // opt out short of `json:"-"`. Applied to Finding that makes `suggestion`
 // mandatory on every finding, while the review prompt tells the model
 // suggestion is optional and should only be supplied when it can give exact

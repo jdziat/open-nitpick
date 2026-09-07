@@ -52,7 +52,7 @@ func TestLinterCapSeverityReducesOnlyAbove(t *testing.T) {
 // TestAnUnusableLinterCeilingCapsNothing pins the direction the fallback leans.
 //
 // Severity("").Rank() is the unknown floor, which is info's, so a ceiling
-// comparison written without this guard would silently reduce EVERY analyzer
+// comparison written without this guard would silently reduce every analyzer
 // finding to info for any Config assembled in code rather than loaded from
 // disk. Silent severity loss is the failure this whole change exists to end, so
 // an unusable ceiling caps nothing and Validate refuses to let one reach a run.

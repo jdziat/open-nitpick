@@ -140,7 +140,7 @@ func (p *Pages) Show(w http.ResponseWriter, r *http.Request) {
 }
 
 // tsDurationUnitsThroughBarrelFixture: the contract is behind a tsconfig
-// path alias AND a barrel. parseDuration is documented to return
+// path alias and a barrel. parseDuration is documented to return
 // milliseconds; the change hands the result to a function that takes seconds.
 func tsDurationUnitsThroughBarrelFixture() Fixture {
 	return Fixture{

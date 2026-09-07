@@ -694,7 +694,7 @@ func TestBasePolicyPrefersTheBaseRevisionItWasGiven(t *testing.T) {
 // reached. ResolvePolicy fails closed without a root, every absolute config
 // path looks outside the repository, and outside means trusted, but detection
 // has to run first, and SelfModified with an empty root resolves it to the
-// process working directory, finds the config outside THAT, and answers "not
+// process working directory, finds the config outside that, and answers "not
 // modified": the fail-open answer, from the exported seam every caller wires.
 func TestBasePolicyRefusesAnEmptyRepositoryRoot(t *testing.T) {
 	_, cfg := loadAt(t, FileName, hostileConfig)

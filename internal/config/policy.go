@@ -23,7 +23,7 @@ import (
 // column 0 under "Repository instructions for this path:", the position the
 // model is told to trust.
 //
-// sanitize() answers a narrower question and stays: a config the change did NOT
+// sanitize() answers a narrower question and stays: a config the change did not
 // touch can still name an endpoint or a credential variable. But scrubbing is
 // per key, so its list grows with every knob a feature adds and the next knob
 // gets missed the same way instructions[] was. This file is the invariant
@@ -155,7 +155,7 @@ type PolicyRequest struct {
 //
 // cfg is configuration as loaded from the checkout. When the change under
 // review does not modify the file it came from, cfg is authoritative and comes
-// back with nothing but its Policy stated. When the change DOES modify that
+// back with nothing but its Policy stated. When the change does modify that
 // file, the file describes policy its author wrote for their own review, so it
 // is set aside in favor of the version at the base revision, and of built-in
 // defaults when that cannot be read.

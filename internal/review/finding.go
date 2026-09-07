@@ -54,7 +54,7 @@ type Finding struct {
 	// Severity is one of nit, info, warning, error, critical.
 	Severity string `json:"severity"`
 
-	// SeverityTranslated records that Severity above is THIS PROJECT'S word
+	// SeverityTranslated records that Severity above is this PROJECT'S word
 	// rather than the reporter's own, because an adapter mapped a foreign
 	// vocabulary onto our five levels, because the reporter published no severity
 	// at all and we assigned one, or because the reporter published a word we did
@@ -67,7 +67,7 @@ type Finding struct {
 	// RawSeverity is the state of both. Reporting the second as the first is what
 	// quotes a reviewer as having said a word we chose for it.
 	//
-	// Whoever sets Severity to something the reporter did not write MUST set this,
+	// Whoever sets Severity to something the reporter did not write must set this,
 	// and the invariant is that RawSeverity is never populated without it.
 	SeverityTranslated bool `json:"-"`
 
@@ -82,7 +82,7 @@ type Finding struct {
 	// original is destroyed at parse time and every downstream report describes
 	// the reviewer using words the reviewer never used.
 	//
-	// That is not hypothetical, and it happened on BOTH sides. internal/evals
+	// That is not hypothetical, and it happened on both sides. internal/evals
 	// published a block captioned "what each contender called the defects it
 	// located" that read "critical x4, warning x3" for a reviewer which had
 	// printed "critical" and "major", our translation, presented as their

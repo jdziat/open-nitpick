@@ -38,8 +38,8 @@ func TestWindowedFilesAreDisclosed(t *testing.T) {
 	if !strings.Contains(summary, "Reviewed with reduced file context") {
 		t.Errorf("the windowed section must carry the heading bundle.Plan.Windowed's doc cites:\n%s", summary)
 	}
-	// The wording has to distinguish it from both neighbours: this file WAS
-	// reviewed, and it DID carry file context, just not all of it.
+	// The wording has to distinguish it from both neighbours: this file was
+	// reviewed, and it did carry file context, just not all of it.
 	if strings.Contains(summary, "Files not reviewed") {
 		t.Errorf("a reviewed file must not be listed as unreviewed:\n%s", summary)
 	}

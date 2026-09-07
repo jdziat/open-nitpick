@@ -93,7 +93,7 @@ type route struct {
 // decisiveRoutes are phrases that name a domain regardless of the class the
 // finding was filed under.
 //
-// They run BEFORE the class because the class is model-authored and routinely
+// They run before the class because the class is model-authored and routinely
 // wrong: a data race filed as correctness is the common case, and the expert
 // who can refute it is the one who thinks in happens-before edges.
 //

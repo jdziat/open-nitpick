@@ -21,7 +21,7 @@ package evals
 // replaced in the same change. fixtures_info.go, fixtures_nit.go and
 // timezone-boundary's own comment in fixtures.go carry the full arguments.
 //
-// WHY TWO GUARDS AND NOT ONE. The two halves of that defect are not detectable
+// WHY TWO GUARDS and not ONE. The two halves of that defect are not detectable
 // the same way.
 //
 //   - The MEASUREMENT half is literal. "accepted input" is a kotlin-widened-input
@@ -31,7 +31,7 @@ package evals
 //     title, rationale or category contains a keyword as a substring, so that
 //     costs full recall for a comment that noticed nothing. That half is
 //     mechanical, and TestNoPlantedKeywordAppearsInTheShippedPrompt runs it.
-//     Restoring the pre-fix `info` rung makes it report BOTH "accepted input"
+//     Restoring the pre-fix `info` rung makes it report both "accepted input"
 //     and "for one helper"; an earlier version of this comment claimed no
 //     keyword was involved, and the file's own fail-first evidence refutes it.
 //   - The USER-FACING half is semantic and no scan reaches it. The collision
@@ -45,7 +45,7 @@ package evals
 //     tripwire for that half: it forces a human to look, and it decides nothing
 //     itself.
 //
-// NOT BEHIND `//go:build eval`, AND THAT IS THE POINT OF IT. These tests sat
+// Not BEHIND `//go:build eval`, and that IS THE POINT OF IT. These tests sat
 // behind that tag when they were written, which made "the build goes red" false:
 // the project gate runs `go test ./...` untagged, CI runs `go test -race ./...`,
 // and every Makefile eval target is `-run`-filtered to a named paid battery, so
@@ -91,11 +91,11 @@ import (
 // contract collides with exactly one keyword in the corpus, timezone-boundary's
 // "utc" inside "the worst imaginable outcome".
 //
-// THE 14 PER-DOMAIN PROMPTS IN templates/experts ARE OUT, and that is a
+// THE 14 PER-DOMAIN PROMPTS IN templates/experts are OUT, and that is a
 // decision with a cost rather than an oversight. Three measurements, in the
 // order that decided it:
 //
-//   - A KEYWORD SCAN WOULD NOT HAVE CAUGHT THE ONE REAL DEFECT FOUND THERE.
+//   - A KEYWORD SCAN WOULD not HAVE CAUGHT THE ONE real DEFECT FOUND THERE.
 //     api.md's `info` rung read "a change the author should accept knowingly:
 //     widened input, a new optional field, a default that moved within its
 //     documented range", review.md's defect exactly, a list of categories with
@@ -118,11 +118,11 @@ import (
 //     republishes the reviewer's own Finding on confirm, and on a revision it
 //     changes the severity fields and nothing a keyword is read from.
 //
-// THE UNCOVERED DIRECTION IS SUPPRESSION, AND IT IS RECALL RATHER THAN
+// THE UNCOVERED DIRECTION IS SUPPRESSION, and IT IS RECALL RATHER THAN
 // SEVERITY. An earlier version of this comment said an expert prompt could only
 // "push a confirm or a re-rating toward the level a plant wants, which is a
 // severity-channel problem". That is wrong about the code: on `refuted`
-// applyOutcomes appends to overruled and appends NOTHING to kept, so the
+// applyOutcomes appends to overruled and appends nothing to kept, so the
 // finding is deleted rather than re-rated, the reasoned-refutation case in
 // internal/review/validate_test.go asserts kept is empty, and is named by file
 // rather than by identifier because this package's citation lint resolves only
@@ -130,11 +130,11 @@ import (
 // plant's mechanism therefore costs the whole finding. The demonstrated attack
 // is one line added to durability.md's refutation list, "the statement is a
 // one-time backfill whose author meant it to touch every row", which carries
-// data-loss-migration's keyword verbatim AND tells the expert to refute the
+// data-loss-migration's keyword verbatim and tells the expert to refute the
 // corpus's only critical data-loss plant. Run against this tree: the guard stays
 // green, as it is documented to.
 //
-// LATENT TODAY, WHICH IS WHY IT IS A DISCLOSURE AND NOT A HOLE LEFT OPEN.
+// LATENT TODAY, WHICH IS WHY IT IS A DISCLOSURE and not A HOLE LEFT OPEN.
 // config.Defaults() sets Validation{Enabled: false} and no eval path turns it
 // on, so no expert prompt reaches a model in any measurement this corpus
 // reports. The day validation ships on by default this paragraph is the thing
@@ -207,7 +207,7 @@ func shippedPromptTexts(t *testing.T) map[string]string {
 // run of whitespace collapsed to one space, and markdown's emphasis markers
 // dropped.
 //
-// BOTH HALVES ARE REPAIRS OF A MEASURED MISS, and they are the same miss twice
+// Both HALVES are REPAIRS OF A MEASURED MISS, and they are the same miss twice
 // , markdown lets a phrase be written in more than one way and a byte-exact
 // scan measures the writing rather than the phrase.
 //

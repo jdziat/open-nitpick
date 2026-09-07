@@ -302,7 +302,7 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 // is a nit" is easier than "refute it".
 //
 // When the revised level is missing or unrecognized the original also stands:
-// the expert said the defect is REAL, and a malformed second field is no reason
+// the expert said the defect is real, and a malformed second field is no reason
 // to discard that.
 func (v *Validator) revise(f Finding, expert prompt.Expert, result validationResult) (config.Severity, string) {
 	reason := strings.TrimSpace(result.Reason)
@@ -354,7 +354,7 @@ const (
 //
 // The asymmetry in it is the entire design. The review prompt's bar is "report
 // a finding only when you can name a concrete consequence"; this is its exact
-// mirror, refute only when you can name why the claim is WRONG. Uncertainty is
+// mirror, refute only when you can name why the claim is wrong. Uncertainty is
 // not refutation.
 //
 // A validator that drops whatever it merely doubts converts a precision gain

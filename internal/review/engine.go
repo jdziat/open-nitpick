@@ -102,7 +102,7 @@ type LinterDiscardReporter interface {
 // reported.
 //
 // "Before triage" is what that used to say, and it stopped being true when the
-// anchor pass that runs AFTER triage started reporting its own drops. The
+// anchor pass that runs after triage started reporting its own drops. The
 // distinction survives the correction (these were not weighed and rejected,
 // they were never weighed), but the list now spans the whole pipeline rather
 // than its first stage.
@@ -194,7 +194,7 @@ type LinterUncoveredReporter interface {
 // Every route in UncoveredReason was measured against golangci-lint 2.8.0 and
 // every one of them left the roster reporting a clean Go review.
 //
-// NOT EVERY ROUTE MEANS THE FILE WENT UNREAD, and the wording here has to hold
+// Not every ROUTE MEANS THE FILE WENT UNREAD, and the wording here has to hold
 // for all of them. It said "reported nothing about ... because the tree arranged
 // for it not to look" while every entry was a file nobody read. Two entries have
 // since arrived that the sentence is false of: UncoveredLanguageVersion, where
@@ -319,7 +319,7 @@ type LinterStatus struct {
 // LinterOutcome is what happened to one analyzer.
 //
 // The three are separate because two of them look identical in a report and
-// are not the same fact. An analyzer that was ENABLED AND APPLICABLE and did
+// are not the same fact. An analyzer that was ENABLED and APPLICABLE and did
 // not run is a hole in the review; one that had nothing of its kind to read
 // (ruff in a Go-only change) is a non-event. Collapsing them is what made a
 // status block worth skipping: three lines of "did not run" on every pull
@@ -377,7 +377,7 @@ type Report struct {
 	// configuration instead of through a failure.
 	Budget *Fit
 
-	// Incomplete lists files whose review batch failed. These files were NOT
+	// Incomplete lists files whose review batch failed. These files were not
 	// reviewed, so the absence of findings for them means nothing. Reporting
 	// them is a correctness requirement: a partially-failed review that prints
 	// "no issues found" is indistinguishable from a clean one.
@@ -520,7 +520,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA}
 	defer func() { report.Routes = e.routeDecisions }()
 
-	// What an earlier run left on the pull request, read AFTER the policy is
+	// What an earlier run left on the pull request, read after the policy is
 	// settled because review.incremental is policy. A provider that cannot answer
 	// (the local one, every test double that does not opt in) leaves prior nil
 	// and the whole change is reviewed, which is also what happens on a first
@@ -595,7 +595,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 			// because a linter misbehaved would be a bad trade.
 			e.log().Warn("linters failed", "error", err)
 		}
-		// Read AFTER Run and regardless of its error: the statuses are how the
+		// Read after Run and regardless of its error: the statuses are how the
 		// analyzers were configured and which of them did not run, which is
 		// most worth publishing exactly when something went wrong.
 		if reporter, ok := runner.(LinterStatusReporter); ok {
@@ -652,7 +652,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	discarded = append(discarded, dropped...)
 
 	// Assembled here rather than where the analyzer set was read, BECAUSE READING
-	// IT THERE WAS THE BUG. Report.Discarded was frozen before the first
+	// IT THERE was THE BUG. Report.Discarded was frozen before the first
 	// filterAnchors call, and filterAnchors is a second sink for exactly the same
 	// kind of finding: with linters.only_changed_lines off, an analyzer finding
 	// on a diff CONTEXT line passes normalize's remaining gate (the diff carries
@@ -1281,13 +1281,13 @@ func (e *Engine) restoreSeverityProvenance(f *Finding, before map[string]Finding
 }
 
 // filterAnchors drops findings that cannot be placed, snaps near-misses onto a
-// real changed line, AND RETURNS THE ANALYZER FINDINGS IT DROPPED.
+// real changed line, and RETURNS THE ANALYZER FINDINGS IT DROPPED.
 //
 // Models routinely anchor a finding a line or two off. Discarding those loses
 // genuine issues; snapping them recovers the comment while keeping the
 // guarantee that every published comment lands on a line in the diff.
 //
-// THE SECOND RETURN VALUE IS THE FIX FOR THE SAME DEFECT THIS PROJECT ALREADY
+// THE SECOND RETURN VALUE IS THE FIX FOR THE same DEFECT this PROJECT ALREADY
 // FIXED ONE FUNCTION UPSTREAM. Set.normalize's bare `continue` statements were
 // replaced with counted, named discards; this function kept two of its own,
 // and it runs immediately after, so a finding that survived normalize and died
@@ -1308,7 +1308,7 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) ([]Finding,
 	out := make([]Finding, 0, len(findings))
 	var dropped []LinterDiscard
 
-	// The reason has to describe what happened to THIS finding, and
+	// The reason has to describe what happened to this finding, and
 	// the two cases here are different facts. A line the diff carries as
 	// context is a line this change did not touch; a line the diff does not
 	// carry at all cannot be commented on by anyone.
@@ -1441,7 +1441,7 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 	// THE BUG IT FIXES: SeverityTranslated and RawSeverity are `json:"-"`, so
 	// they arrive from triage's decode zeroed. recordSeverity below could not
 	// restore them either, because renderForTriage shows triage `[%s]` of
-	// f.Severity (THIS PROJECT'S word, already normalized), so a triage model
+	// f.Severity (this PROJECT'S word, already normalized), so a triage model
 	// that echoes what it was shown normalizes to itself and the call returns
 	// early. Every finding that survived triage was therefore published claiming
 	// nobody had translated it, and internal/evals' severityAsSaid reads that as
@@ -1521,7 +1521,7 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 
 	// Every finding triage was given is accounted for: published (possibly merged
 	// or reworded, same file, within a few lines), merged into a finding that was
-	// published, or restored. THE BUG THIS CLOSES, twice over. Three of eight
+	// published, or restored. THE BUG this CLOSES, twice over. Three of eight
 	// misses on the benchmark repository were findings the reviewer made and
 	// triage threw away as "an info-level nit" or "a harmless redundancy". The
 	// first repair let triage drop with a stated reason, and it then dropped a
@@ -1589,7 +1589,7 @@ func triageAccountedFor(f Finding, kept []Finding) bool {
 // deterministic analyzer reported.
 //
 // THE BUG IT FIXES: the ceiling was applied once, in linters' normalize, which
-// runs BEFORE triage and before the expert pass. Both of those may raise a
+// runs before triage and before the expert pass. Both of those may raise a
 // severity (triage.md instructs the model to "raise anything whose blast
 // radius is larger than the original reviewer could see", and Validator.revise
 // runs in both directions on purpose), and neither reapplied the ceiling. So
@@ -1810,7 +1810,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 
 // reviewPrompt builds the system prompt for the analysis pass.
 //
-// Note what is NOT here: the pull request's title and body. Those are authored
+// Note what is not here: the pull request's title and body. Those are authored
 // by whoever opened the pull request, so they belong in the user message as
 // untrusted data, not in the system prompt where the repository's own
 // instructions live.

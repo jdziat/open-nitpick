@@ -21,7 +21,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // plausible conditions."
 //
 // The property that decides this level, and the one every plant here is built
-// around: NOTHING IS YET WRONG ON A NORMAL PATH. Each change below serves every
+// around: Nothing IS YET wrong ON A NORMAL PATH. Each change below serves every
 // request correctly today. The failure needs a condition that is plausible
 // without being guaranteed, a cancelled context, a burst of traffic, a second
 // user on the host, an attacker who can time a response. That is the whole
@@ -35,7 +35,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // to get wrong. `info` is "a defensible concern the author should consciously
 // accept or reject": a design choice with a cost the author may knowingly
 // accept and no failing input to point at. Every plant here names a mechanism
-// AND a failing input, so none of them is a matter of taste the author may
+// And a failing input, so none of them is a matter of taste the author may
 // decline.
 //
 // That argument deliberately does not quote the ladder's current info examples,
@@ -47,11 +47,11 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // to prompt prose goes stale every time the prompt is edited, and the property
 // this paragraph needs is a property of the LEVEL.
 //
-// TWO CLASSES, AND WHY NOT MORE. Every plant here is `security` or `resource`.
+// TWO CLASSES, and WHY not MORE. Every plant here is `security` or `resource`.
 // That is not because warnings only occur there, the natural home for several
 // warning-shaped defects, the anchor's own "retrying a non-idempotent request"
 // among them, is `correctness`, but because
-// TestSeverityIsConsistentWithinADefectClass requires a SeverityNote from EVERY
+// TestSeverityIsConsistentWithinADefectClass requires a SeverityNote from every
 // member of a class that carries more than one severity, and correctness,
 // concurrency, contract and data-loss are each planted in fixtures.go at a
 // single level with no notes at all. A warning planted in correctness turns
@@ -61,10 +61,10 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // into anyone else's file. The cost is real and is recorded here rather than
 // hidden: this level is now dominated by two classes, and a reviewer that
 // learned "resource implies warning" would score better than it deserves.
-// Closing that needs a correctness-class warning AND notes on the three
+// Closing that needs a correctness-class warning and notes on the three
 // correctness plants, in one change that owns both files.
 //
-// THIS FUNCTION IS NOT A CORPUS and nothing runs it as one. The five below are
+// This FUNCTION IS not A CORPUS and nothing runs it as one. The five below are
 // split across Fixtures() and HeldOutFixtures(), which name each of them
 // directly; what this returns is the record of what was AUTHORED at this level,
 // and TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus is what makes the two
@@ -84,7 +84,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // max_files_per_request of 6 that is two batches, dispatched under the shipped
 // concurrency of 4, whose findings are merged before triage, a path no fixture
 // has ever taken. Be precise about the rest: the two files that carry the
-// defect are deliberately in the SAME batch (git orders the diff by path, and
+// defect are deliberately in the same batch (git orders the diff by path, and
 // cache.ts and search.ts are the first and sixth entries), because a defect
 // split across batches would be one no reviewer could see, and a plant nothing
 // can find scores as a prompt weakness forever. Cross-batch DEDUP is reached
@@ -120,7 +120,7 @@ func warningFixtures() []Fixture {
 // ordinary PR filler, deliberately dull, and they are what pushes the change
 // past the six-file batch ceiling.
 //
-// BOTH CALLERS NAMESPACE THEIR KEYS ("plan:" and "q:") and they must keep
+// Both CALLERS NAMESPACE THEIR KEYS ("plan:" and "q:") and they must keep
 // doing so. The first draft of this fixture had search.ts call remember(q)
 // with the raw query, which shares one process-global Map with plans.ts's
 // "plan:" + tier, so searching the literal text "plan:free" returned the
@@ -135,7 +135,7 @@ func warningFixtures() []Fixture {
 // remaining defect purely about CARDINALITY, which is what it was always
 // supposed to be about.
 //
-// THE FALSE POSITIVE THIS INVITES is the staleness objection: a table that is
+// THE FALSE POSITIVE this INVITES is the staleness objection: a table that is
 // never refreshed serves a document's old title forever. It is a real remark
 // about a different consequence, and a reviewer that makes only it has not
 // noticed that the process dies. The second is a rate-limit objection, which
@@ -283,7 +283,7 @@ export interface Plan {
 			// unbounded number of searches") would have collected full recall
 			// for noticing nothing about the table.
 			//
-			// The bare stem "grow" WAS here and had to go. It is a substring of
+			// The bare stem "grow" was here and had to go. It is a substring of
 			// "grow stale", which is ordinary English for the staleness
 			// objection this fixture names as the false positive it invites,
 			// so the one stem undid the care taken to exclude "unbounded",
@@ -326,7 +326,7 @@ export interface Plan {
 // process, holding the goroutine, the connection Lookup is using, and whatever
 // its result references. A one-character fix, make(chan result, 1), removes it.
 //
-// THE FALSE POSITIVE THIS INVITES is the design objection: "Directory.Lookup
+// THE FALSE POSITIVE this INVITES is the design objection: "Directory.Lookup
 // should take a context so the work can be cancelled". It is a fair
 // remark and it is not this defect. It is about the upstream interface, and a
 // reviewer making only it has not noticed that this goroutine never exits even
@@ -435,7 +435,7 @@ func ResolveContext(ctx context.Context, d Directory, name string) (string, erro
 // signature a caller got right, and a caller that can measure that recovers a
 // valid signature one hex digit at a time rather than searching 2^256.
 //
-// THE FALSE POSITIVE THIS INVITES is the module-level secret: SECRET is read at
+// THE FALSE POSITIVE this INVITES is the module-level secret: SECRET is read at
 // import, so a missing WEBHOOK_SECRET raises KeyError at import time rather
 // than at first use. That is a real remark and a different one. The second is
 // replay: verify says nothing about a timestamp, so a captured request can be
@@ -517,7 +517,7 @@ def verify(body: bytes, provided: str) -> bool:
 //
 // It is also the corpus's first C# file.
 //
-// THE FALSE POSITIVE THIS INVITES is the timeout objection: a reviewer that
+// THE FALSE POSITIVE this INVITES is the timeout objection: a reviewer that
 // sees a bare new HttpClient often asks for an explicit timeout, and here that
 // is close to wrong. The default is 100 seconds and the change did not alter
 // it. The second is disposal ("EnsureSuccessStatusCode throws, so the response
@@ -582,10 +582,10 @@ public sealed class Notifier
 		Defects: []Defect{{
 			Path: "src/Notifier.cs",
 			Line: 17, // the per-call new HttpClient
-			// The bare token "port" WAS here and had to go. mentionsAny matches
+			// The bare token "port" was here and had to go. mentionsAny matches
 			// case-insensitive SUBSTRINGS, and "port" is inside "important",
 			// "support" and "reports", three words a reviewer reaches for
-			// without having noticed anything. It credited BOTH false positives
+			// without having noticed anything. It credited both false positives
 			// this fixture names: "it is important to set an explicit timeout"
 			// and "if the webhook reports a non-2xx status". This is the same
 			// failure Defect.Keywords already records fixing once, where
@@ -626,7 +626,7 @@ public sealed class Notifier
 //
 // It is also the corpus's first shell file.
 //
-// THE FALSE POSITIVE THIS INVITES is cleanup: "nothing removes the file; add a
+// THE FALSE POSITIVE this INVITES is cleanup: "nothing removes the file; add a
 // trap". True, weaker, and about a different line's worth of consequence. The
 // second is collision, two runs of the script clobbering each other, which is
 // a real hazard from the same fixed path but a different mechanism, and the
@@ -668,8 +668,8 @@ jq -r '.tag_name' "$OUT"
 			// The path, not the redirect: choosing the name is the defect and
 			// OUT=$(mktemp) is the single-line replacement. The redirect one
 			// line below is inside the scorer's tolerance either way.
-			// "mktemp" WAS here and had to go. It is the fix, and it is the fix
-			// for the WRONG finding too: "nothing removes the file, use
+			// "mktemp" was here and had to go. It is the fix, and it is the fix
+			// for the wrong finding too: "nothing removes the file, use
 			// OUT=$(mktemp) and trap rm EXIT" is the cleanup objection this
 			// fixture names as the false positive it invites, and it arrives
 			// carrying the word. The collision argument below was written about

@@ -127,8 +127,8 @@ func nitpickScope(level config.NitpickLevel) string {
 			// internal/evals/promptcollision_test.go, which is now the guard
 			// against a prompt example naming what the corpus plants.
 			//
-			// THE CHANGE BOUGHT NOTHING MEASURABLE AND IS KEPT ONLY BECAUSE THE OLD
-			// EXAMPLE WAS WRONG. Measured, kimi-k3, three runs over each of the five
+			// THE CHANGE BOUGHT nothing MEASURABLE and IS KEPT only BECAUSE THE OLD
+			// EXAMPLE was wrong. Measured, kimi-k3, three runs over each of the five
 			// info fixtures, before and after: 3 of 15 both times, every hit the
 			// security plant, and the three maintainability plants 0 of 9 under both
 			// wordings. The prediction was that the mis-anchored example suppressed
@@ -136,7 +136,7 @@ func nitpickScope(level config.NitpickLevel) string {
 			// then the one maintainability plant the severity ladder did not name. It
 			// did not move.
 			//
-			// THAT CONTROL NO LONGER EXISTS, and the number above was taken while it
+			// That CONTROL NO LONGER EXISTS, and the number above was taken while it
 			// did. review.md's ladder has since been rewritten and now names none of
 			// the three maintainability plants, so nothing separates
 			// go-package-singleton from its two neighbours any more. Re-running the

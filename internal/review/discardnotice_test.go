@@ -97,7 +97,7 @@ func TestForgedPathsAreNamedIndividually(t *testing.T) {
 		t.Errorf("a path that is not in this checkout was counted but not named:\n%s", published)
 	}
 
-	// And the ordinary ones are NOT listed one by one, or the block is unusable
+	// And the ordinary ones are not listed one by one, or the block is unusable
 	// on the pull requests where it matters most.
 	if strings.Contains(published, "sibling.go:4") {
 		t.Errorf("routine policy drops are listed per finding; the block will be collapsed and "+
@@ -130,7 +130,7 @@ func TestTheDiscardNoticeSurvivesSummariesBeingOff(t *testing.T) {
 //
 // A newline would break out of the bullet and leave the rest of the block
 // reading as though it described something else, and raw HTML in a comment
-// posted under this bot's name renders. Markdown is NOT neutralized here (see
+// posted under this bot's name renders. Markdown is not neutralized here (see
 // inline), which is why these two are wrapped in code spans and why the README
 // records that residual rather than implying otherwise.
 func TestADiscardedPathCannotLeaveItsBullet(t *testing.T) {
@@ -168,7 +168,7 @@ const anchorDiff = "diff --git a/app.go b/app.go\n--- a/app.go\n+++ b/app.go\n@@
 //
 // Set.normalize's bare `continue` statements were replaced with counted, named
 // discards. filterAnchors kept two of its own and runs immediately afterwards,
-// and Report.Discarded was read BEFORE it, so a finding that survived
+// and Report.Discarded was read before it, so a finding that survived
 // normalization and died here was invisible in exactly the way the first fix
 // was about, and the published headline said zero about a run that had dropped
 // one.
@@ -203,7 +203,7 @@ func TestAnAnalyzerFindingDroppedByAnchoringIsCounted(t *testing.T) {
 	if len(dropped) != 1 {
 		t.Fatalf("an analyzer finding was dropped and not recorded: %+v", dropped)
 	}
-	// The reason has to be the one that is true of THIS finding. The diff
+	// The reason has to be the one that is true of this finding. The diff
 	// carries the line, so "the diff does not carry it" would be a wrong
 	// explanation published on a pull request.
 	if dropped[0].Reason != DiscardUnchangedLine {

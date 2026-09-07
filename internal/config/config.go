@@ -204,7 +204,7 @@ type Route struct {
 type RouteMatch struct {
 	// Languages the batch's files are in, by the extension map in the
 	// bundle package ("go", "python", "typescript", ...). The batch matches
-	// when ANY of its files is in one of them.
+	// when any of its files is in one of them.
 	Languages []string `yaml:"languages"`
 
 	// Kinds the router assigned the batch. The batch matches when it has any
@@ -217,7 +217,7 @@ type RouteMatch struct {
 	MaxFiles int `yaml:"max_files"`
 }
 
-// The kinds a router may assign. They name what a change DOES, which is what
+// The kinds a router may assign. They name what a change does, which is what
 // the eval corpora vary and what the measured strengths differ on: the
 // multi-file corpus is contract changes, the tuning corpus is largely
 // security and logic, the info corpus is judgement calls.

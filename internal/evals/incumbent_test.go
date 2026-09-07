@@ -95,7 +95,7 @@ func TestParseRealSample(t *testing.T) {
 	// crSeverity demoted every Incumbent critical so its coarser vocabulary
 	// would not read as inflation; the effect was that no Incumbent review
 	// could score accurate on a plant we planted critical, and a headline
-	// number was published on it. The vocabulary mismatch is NOT handled by
+	// number was published on it. The vocabulary mismatch is not handled by
 	// correcting it anywhere, the attempt to handle it at comparison time was
 	// withdrawn too, see NoCrossToolSeverityScore. It is described rather than
 	// scored, and the parser records what the reviewer said.
@@ -781,7 +781,7 @@ func TestCacheIsRejectedWhenItMeasuredSomethingElse(t *testing.T) {
 // recover text already on disk.
 //
 // The last subtests pin the corollary the first version of this got wrong: when
-// the retained text does NOT parse, the entry is refused rather than quietly
+// the retained text does not parse, the entry is refused rather than quietly
 // served from the stored reading.
 func TestCachedReviewIsServedFromRawNotFromTheStoredParse(t *testing.T) {
 	fx := Fixtures()[0]
@@ -854,7 +854,7 @@ func TestCachedReviewIsServedFromRawNotFromTheStoredParse(t *testing.T) {
 	// drifts under a measurement.
 	//
 	// The absent-review worry it was answering is real and is handled where it
-	// belongs: callers list what has no usable cache BEFORE they run, and a
+	// belongs: callers list what has no usable cache before they run, and a
 	// contender judged on nothing is failed rather than ranked.
 	t.Run("unparseable raw is refused, and says why", func(t *testing.T) {
 		dir := t.TempDir()

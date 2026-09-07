@@ -22,7 +22,7 @@ var generatedMarkers = []string{
 
 // generatedScanLines bounds how far into a file the marker is looked for.
 // Conventions put it at the top; scanning the whole file would let an ordinary
-// comment mentioning "DO NOT EDIT" suppress a real review.
+// comment mentioning "DO not EDIT" suppress a real review.
 const generatedScanLines = 8
 
 // isGenerated reports whether content looks machine-generated.

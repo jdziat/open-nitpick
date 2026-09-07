@@ -253,7 +253,7 @@ func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
 // under mutation, six of ten additions were unguarded, which is why the rule is
 // a list here rather than a sentence.
 //
-// IT IS NOT A CORPUS-WIDE INVARIANT AND CANNOT BE ONE TODAY. Measured over
+// IT IS not A CORPUS-WIDE INVARIANT and CANNOT BE ONE TODAY. Measured over
 // AllFixtures, 345 of the corpus's 358 keywords are the sole creditor of no
 // probe: the probe table was written to catch false credit, so it holds a
 // handful of sentences per fixture and most keywords are synonyms no sentence
@@ -479,7 +479,7 @@ func declaredProbes() map[string]fixtureProbes {
 				// fixture's keywords because they credited prose about another
 				// file entirely. Removing a keyword can silently cost recall --
 				// that happened once and nothing caught it -- so each natural
-				// phrasing of the REAL detection is pinned here.
+				// phrasing of the real detection is pinned here.
 				"says the error is unchecked without using the removed words",
 				review.Finding{Path: "fetch.go", Line: 10, Severity: "error", Category: "correctness",
 					Title:     "The error return is unchecked",
@@ -992,7 +992,7 @@ func declaredProbes() map[string]fixtureProbes {
 						Rationale: "When the project exists but the viewer is not a member the body is {error: forbidden}, which does not match the envelope used elsewhere."}},
 				// The error-body remark in the words that make this plant's
 				// vocabulary problem visible. "same response" was a keyword, and
-				// this sentence is the SAME WORDS as the finding with the
+				// this sentence is the same WORDS as the finding with the
 				// assertion reversed: the detection says the two denials are
 				// distinguishable, this asks that they be made the same. Nothing
 				// in either sentence separates them but intent.
@@ -1048,7 +1048,7 @@ func declaredProbes() map[string]fixtureProbes {
 						Rationale: "Adding a package-level default fixes the answer for the whole binary; keep returning a *Set and let callers hold it."}},
 			},
 			miss: []probe{
-				// "package-level" was a keyword AND is in the change's own added
+				// "package-level" was a keyword and is in the change's own added
 				// doc comment three lines from the plant, so this nit, which
 				// noticed nothing and asks for prose, scored full recall by
 				// quoting the diff back at it.
@@ -1238,7 +1238,7 @@ func creditedByAnyDefect(f Fixture, finding review.Finding) bool {
 // `close`, and the same class had recurred three times, always found by reading
 // lists. Reading lists finds what the reader imagines.
 //
-// TWO FACTS ABOUT mentionsAny SHAPE ALL OF IT, and getting them wrong produces a
+// TWO FACTS ABOUT mentionsAny SHAPE all OF IT, and getting them wrong produces a
 // generator that runs thousands of probes and cannot fail:
 //
 //   - IT IS strings.Contains OVER ONE HAYSTACK (title+rationale+category). So
@@ -1249,7 +1249,7 @@ func creditedByAnyDefect(f Fixture, finding review.Finding) bool {
 //     ATTRIBUTE a credit (explainCredit), not to generate new ones. And a recall
 //     probe built by padding Why with "please fix" is credited by construction,
 //     which is why whyPhrasings only ever shortens.
-//   - THE CAUSE OF A CREDIT IS ALWAYS A SUBSTRING. So the minimal fragment that
+//   - THE CAUSE OF A CREDIT IS always A SUBSTRING. So the minimal fragment that
 //     still credits names the defective keyword exactly, and a fragment that is a
 //     single ordinary word says the keyword is generic enough to be typed by a
 //     reviewer who noticed nothing. That is the step the humans were doing by
@@ -1357,7 +1357,7 @@ func firedKeywords(haystack string, d Defect) []string {
 // always a substring, sentences are tried before words, and a one-word answer is
 // itself the verdict that the keyword is too generic to carry alone.
 //
-// The category is deliberately NOT shrunk. When a finding is credited through
+// The category is deliberately not shrunk. When a finding is credited through
 // mentionsAny reading Category, no fragment of the prose explains it, and saying
 // so is more useful than returning the whole sentence with no keyword named.
 //
@@ -1557,11 +1557,11 @@ const inertProse = "A remark on this change. It refers to %s and asserts nothing
 //
 // Three sources, all checked in, all from generatedSources:
 //
-//   - EVERY OTHER FIXTURE'S HIT PROBES. These are sentences already asserted to
+//   - every OTHER FIXTURE'S HIT PROBES. These are sentences already asserted to
 //     be correct detections of something else, so their status at this anchor is
 //     unambiguous.
-//   - EVERY OTHER FIXTURE'S DECLARED OBJECTIONS. Its miss probes: prose the
-//     corpus already says reports NOTHING, even in the fixture it was written
+//   - every OTHER FIXTURE'S DECLARED OBJECTIONS. Its miss probes: prose the
+//     corpus already says reports nothing, even in the fixture it was written
 //     about. This source was not being read, and every leak this change reports
 //     came from it. The loop was drawing only on sentences that were correct
 //     somewhere, which is the half of the material least likely to collide.
@@ -1569,7 +1569,7 @@ const inertProse = "A remark on this change. It refers to %s and asserts nothing
 //     is the half authored probes cannot supply: every hit probe in this file was
 //     written by someone who knew which keywords existed.
 //
-// SPLITTING THOSE SENTENCES INTO SENTENCES WOULD ADD NOTHING and is deliberately
+// SPLITTING THOSE SENTENCES INTO SENTENCES WOULD ADD nothing and is deliberately
 // not done. mentionsAny is strings.Contains over one haystack, so a fragment
 // credits only if the text containing it credits: a fragment probe cannot fail
 // where the whole-text probe passed. Fragments are used where they do pay, by
@@ -1587,7 +1587,7 @@ const inertProse = "A remark on this change. It refers to %s and asserts nothing
 // is the reachability half generated the same way, and
 // TestNoBareWordFromAnotherFixtureCreditsAPlant is the attribution.
 //
-// WHAT ITS SILENCE DOES NOT MEAN, and the first version of this comment got
+// WHAT ITS SILENCE does not MEAN, and the first version of this comment got
 // this wrong in a way worth keeping. It read the loop's output, every overlap
 // lands in a fixture file this change does not own, none in fixtures_info.go,
 // as evidence that the info keyword lists were clean. The loop CANNOT reach
@@ -1599,7 +1599,7 @@ const inertProse = "A remark on this change. It refers to %s and asserts nothing
 // by them at the time. Reachability is what the declared miss probes measure.
 // This loop measures overlap. Neither reads on the other's behalf.
 //
-// TRIPLING THE SOURCE SET DID NOT CHANGE THAT, which is the same lesson arriving
+// TRIPLING THE SOURCE SET did not CHANGE that, which is the same lesson arriving
 // twice. Adding every fixture's declared objections took the sources from 63 to
 // 142 and found thirteen new overlaps, and not one of them TARGETS an info plant
 // , the info fixtures appear only as sources, where kotlin's visibility objection
@@ -1617,7 +1617,7 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 	// fires, which nothing did until a mutation showed an entry staying
 	// green while the stem it names stopped being the cause.
 	//
-	// THE KEY CARRIES THE PLANT AND THE KIND because target|source|title
+	// THE KEY CARRIES THE PLANT and THE KIND because target|source|title
 	// identified neither. multi-defect plants its path traversal and its
 	// descriptor leak at handler.go:19 and its raced counter at handler.go:25,
 	// so one location-free key absorbed credits on THREE different defects:
@@ -1646,7 +1646,7 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 		// interpreted context. `injection` and `concatenat` name that mechanism
 		// and all three plants have it, so a sentence about one names the next.
 		//
-		// The first two are the SAME opening sentence from two sources, the
+		// The first two are the same opening sentence from two sources, the
 		// shipped cache and the hit probe someone wrote afterwards, which one
 		// title-keyed entry used to cover. They are listed separately because a
 		// reword of either has to be re-derived on its own.
@@ -1771,7 +1771,7 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 				key := overlapKey(f.Name, i, d, s)
 				if reason, known := knownOverlaps[key]; known {
 					seen[key] = true
-					// Against the WHOLE credit, not the minimal fragment.
+					// Against the whole credit, not the minimal fragment.
 					// explainCredit shrinks to one cause on purpose, so a
 					// sentence firing `injection`, `sql injection` and
 					// `parameteri` reduces to the shortest of them, and holding
@@ -1802,7 +1802,7 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 // declared false positives ONTO its own plant.
 //
 // This is the reachability question the cross-fixture loop cannot ask. A probe
-// declared under `miss` is a sentence a reviewer really might write about THIS
+// declared under `miss` is a sentence a reviewer really might write about this
 // change. That is why it was written, and the corpus says it reports nothing.
 // TestKeywordsAdmitOnlyRealDetections already runs it, but at the anchor its
 // author chose, so an objection can pass on DISTANCE while the keyword list would
@@ -1882,7 +1882,7 @@ func TestAFixturesOwnObjectionsAreNotCreditedAtItsPlants(t *testing.T) {
 // either credited or it is not, and if it is, the word and the keyword are both
 // named in the failure. No sentence has to exist for the word to be tried.
 //
-// THE VOCABULARY IS MEASURED, NOT JUDGED, which makes the verdict checkable
+// THE VOCABULARY IS MEASURED, not JUDGED, which makes the verdict checkable
 // instead of a matter of taste. A word counts as generic for a plant when this
 // repository already uses it about a DIFFERENT fixture, in prose written about
 // that fixture, in that fixture's own Why, or in its source text. So `sk-live`
@@ -1897,7 +1897,7 @@ func TestAFixturesOwnObjectionsAreNotCreditedAtItsPlants(t *testing.T) {
 // and predicate and thirteen credit a plant; twelve of the thirteen are words
 // the corpus never uses, so this loop cannot try them. `race` sits inside trace,
 // embrace, grace, brace, terrace and bracelet; `dst` inside midst and amidst;
-// `idor` inside corridor. Through the REAL scorer that is a variable-rename nit
+// `idor` inside corridor. Through the real scorer that is a variable-rename nit
 // , "corridor is a confusing name for this local; call it path", taking FULL
 // recall on removed-guard's critical authorization plant, at zero cost in
 // precision.
@@ -2107,7 +2107,7 @@ func checkVocabularyReachesBeyondSentences(t *testing.T, vocab map[string]map[st
 // IT IS AUTHORED, which is the method every generator in this file exists to get
 // away from, and it finds what its author thought of and nothing else. Worse,
 // the honest account of how it was built is that a handful of these words were
-// chosen AFTER a run showed which keywords were short enough to hide inside one
+// chosen after a run showed which keywords were short enough to hide inside one
 // , trace, midst and corridor are answers, not questions. The rest is filler,
 // and the filler found two things the targeted words did not: `secret` inside
 // "secretly", and `exhaust` inside "exhaustive", ordinary prose about test
@@ -2156,7 +2156,7 @@ func ordinaryEnglishWords() []string {
 // A credit here is not "these two fixtures share vocabulary". It is a keyword
 // firing on a sentence that says nothing about code at all.
 //
-// THE SIX ARE RECORDED, NOT CLOSED, on the same argument the recall gaps are:
+// THE SIX are RECORDED, not CLOSED, on the same argument the recall gaps are:
 // changing a keyword changes which cached Incumbent findings match a plant, and
 // those matches feed figures pinned as evidence elsewhere in this package. A
 // change that narrows `idor` has to re-derive them in the same commit.

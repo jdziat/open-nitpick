@@ -564,7 +564,7 @@ func TestGroupDumpRefusesTwoJudgementsOfOneFinding(t *testing.T) {
 // corpus as it stands NOW. Edit a fixture's Head between collecting the dump
 // and re-judging it, and the new judge reads a different change than the one
 // the recorded verdicts were made about, which is exactly the "the findings
-// AND the judge both moved" confound this path exists to eliminate, restored
+// And the judge both moved" confound this path exists to eliminate, restored
 // silently. The fixture NAME surviving is not evidence its source did.
 func TestGroupDumpRefusesAnEditedFixture(t *testing.T) {
 	first, _ := dumpFixtureNames(t)
@@ -672,7 +672,7 @@ func TestRejudgeReportCountsBothJudgesByTheSameRule(t *testing.T) {
 		t.Fatalf("group: %v", err)
 	}
 
-	// The SAME judgement, handed back as the new judge's answer.
+	// The same judgement, handed back as the new judge's answer.
 	outcomes := []RejudgeOutcome{{Group: groups[0], Result: &JudgeResult{Verdicts: raw}}}
 	report := RejudgeReport("openai/base", "openai/new", outcomes, warnings)
 

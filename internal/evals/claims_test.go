@@ -2,7 +2,7 @@ package evals
 
 // Comments that assert behaviour, and the rule that they have to name a test.
 //
-// THE DEFECT THIS EXISTS TO STOP, which is this package's most productive one by
+// THE DEFECT this EXISTS TO STOP, which is this package's most productive one by
 // a wide margin. Seven rounds of review, and the highest-yield move against this
 // tree every single time has been to read a comment and then run it: a banded
 // score whose comment claimed it could see a bug it could not; a vocabulary
@@ -54,7 +54,7 @@ import (
 // fires and quiet are the pattern's own test. A regexp that has been widened
 // into a catch-all, or narrowed into something that matches nothing, is a scan
 // that reports zero violations and looks exactly like a clean tree, so every
-// pattern has to be shown matching the idiom it names and NOT matching the plain
+// pattern has to be shown matching the idiom it names and not matching the plain
 // statement of the same fact. TestClaimTriggersMatchTheIdiomsTheyName runs both
 // halves.
 type claimTrigger struct {
@@ -164,7 +164,7 @@ type claimShape struct {
 	name     string
 	sentence string
 	// claim is what behaviouralClaim must answer. The false rows are the
-	// coverage this scan does NOT have, stated where the build can check it:
+	// coverage this scan does not have, stated where the build can check it:
 	// widen the rule and a false row starts reporting a claim, and the test
 	// fails until this table, the disclosure itself, is corrected.
 	claim bool

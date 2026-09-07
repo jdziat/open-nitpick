@@ -216,7 +216,7 @@ func TestAnUndefinedJudgedFigureIsNotZero(t *testing.T) {
 	}
 }
 
-// judgedFigure matches the grammar of a rendered figure and NOTHING ELSE. A
+// judgedFigure matches the grammar of a rendered figure and nothing ELSE. A
 // bare "3.66" must not match it: that is the failure being tested for.
 var judgedFigure = regexp.MustCompile(`^(n/a|-?\d+\.\d\d([+-]\d+\.\d\d|\+\?))$`)
 
@@ -229,7 +229,7 @@ var judgedFigure = regexp.MustCompile(`^(n/a|-?\d+\.\d\d([+-]\d+\.\d\d|\+\?))$`)
 var signedDelta = regexp.MustCompile(`-?\d+\.\d\d[+-]\d+\.\d\d`)
 
 // filteredCorpus is judgedCorpus after a nitpick level has dropped everything
-// below its threshold: the SAME fixtures, a SHORTER list for one of them.
+// below its threshold: the same fixtures, a SHORTER list for one of them.
 //
 // This is the exact shape of the demonstrated defect. The persona axis judged
 // the whole corpus once with the primary judge and handed the second judge each
@@ -246,7 +246,7 @@ func filteredCorpus() []shownList {
 // TestADeltaFromTwoStimuliCannotRenderAsAConfidenceInterval reconstructs the
 // mismatch and watches every published row refuse it.
 //
-// THE DEFECT THIS PINS, reproduced by rendering rather than by reading: on the
+// THE DEFECT this PINS, reproduced by rendering rather than by reading: on the
 // default `make tune` axis the primary judge scored the whole corpus and the
 // second scored each level's FILTERED list, so GRADE, SIGNAL, TONE and MISSED
 // published a difference between two different questions under a legend saying
@@ -257,7 +257,7 @@ func filteredCorpus() []shownList {
 //
 // The assertion is on the RENDER, not on a flag, because the flag is not what a
 // reader sees. Every judged cell of both published tables must come back either
-// undefined or marked NOT COMPARABLE, and no cell anywhere may carry a signed
+// undefined or marked not COMPARABLE, and no cell anywhere may carry a signed
 // numeric delta.
 func TestADeltaFromTwoStimuliCannotRenderAsAConfidenceInterval(t *testing.T) {
 	mismatched := CrossJudged{
@@ -447,7 +447,7 @@ func TestAnUnrecordedStimulusMatchesNothing(t *testing.T) {
 	}
 
 	// And the OTHER shape of unrecorded, which an empty trace does not reach:
-	// a judgement that WAS folded in, over a stimulus whose fingerprint could
+	// a judgement that was folded in, over a stimulus whose fingerprint could
 	// not be computed. The trace then has the right length and blank entries,
 	// so a comparison that only checked lengths and equality would find two
 	// blanks equal and publish a delta. This is the state JudgedOver returns
@@ -819,7 +819,7 @@ func TestSecondJudgeFromEnvResolvesTheVettedDefault(t *testing.T) {
 
 // TestEveryJudgedTargetCanBeGivenASecondJudge.
 //
-// THIS MAKEFILE HAS SHIPPED A PAID FLAG THAT DID NOTHING TWICE: AXIS was
+// This MAKEFILE HAS SHIPPED A PAID FLAG that did nothing TWICE: AXIS was
 // exported and read by nothing, so `make tune AXIS=voice` silently measured the
 // other axis, and RUNS was not forwarded at all, so the SPREAD column measured
 // fixture difficulty while reading as run-to-run variance. A second judge that
@@ -969,8 +969,8 @@ func (r *recordingJudge) Judge(
 // TestCorroborationJudgesTheRecordedFindingsAndRunsNoReview.
 //
 // The second judge is affordable only because it re-judges. This checks the two
-// properties that makes it worth anything: it is shown the SAME findings, and it
-// is shown them in the SAME positions, a verdict identifies its finding by
+// properties that makes it worth anything: it is shown the same findings, and it
+// is shown them in the same positions, a verdict identifies its finding by
 // position, so a reordered list would produce a full set of plausible, wrong
 // pairings that look exactly like two judges disagreeing.
 func TestCorroborationJudgesTheRecordedFindingsAndRunsNoReview(t *testing.T) {
@@ -1046,8 +1046,8 @@ func TestCorroborationJudgesTheRecordedFindingsAndRunsNoReview(t *testing.T) {
 
 // TestCorroborationIsFiledUnderTheKeyTheReportsAskFor.
 //
-// THE BUG THIS PINS, found by rendering the persona table rather than by reading
-// the code: Corroborate files each aggregate under contenderLabel, model AND
+// THE BUG this PINS, found by rendering the persona table rather than by reading
+// the code: Corroborate files each aggregate under contenderLabel, model and
 // variant, while the persona tables identify their rows by variant alone. Ask
 // for "nitpick=off" when the aggregate is under "z-ai/glm-5.2 [nitpick=off]" and
 // Pair returns an uncorroborated figure. The second judge is called, billed, and
@@ -1079,7 +1079,7 @@ func TestCorroborationIsFiledUnderTheKeyTheReportsAskFor(t *testing.T) {
 
 	panel := JudgePanel{Primary: DefaultJudgeModel, Second: SecondJudgeModel, SecondAggregates: aggregates}
 
-	// The primary is built over the SAME list the samples above recorded, so
+	// The primary is built over the same list the samples above recorded, so
 	// this test measures the keying and only the keying. Pairing a primary that
 	// declared some other stimulus would fail here for the right reason and the
 	// wrong one at once, and a test that can fail two ways reports neither.
@@ -1424,7 +1424,7 @@ func sampleAggregate(seed int) Aggregate { return sampleAggregateOver(seed, judg
 // The tests carry it because a cross-judge delta is only a confidence interval
 // when both sides were built over the same lists, so an aggregate that does not
 // say what it was shown cannot be paired with one that does. Two aggregates
-// built from the SAME lists disagree; two built from different ones do not
+// built from the same lists disagree; two built from different ones do not
 // disagree at all, and the difference between those two sentences is what
 // JudgedFigure now has a fourth state for.
 type shownList struct {
@@ -1482,7 +1482,7 @@ func sampleAggregateOver(seed int, shown []shownList) Aggregate {
 	a.DeclareScale(OurSeverityScale)
 
 	// Grades and signal move with the seed too, so two of these disagree in
-	// EVERY judged column and not only in the counted ones. Holding them equal
+	// Every judged column and not only in the counted ones. Holding them equal
 	// would let a renderer that paired an aggregate with itself pass the GRADE,
 	// SPREAD and SIGNAL cells.
 	ladder := gradeLadder(seed)
@@ -1496,7 +1496,7 @@ func sampleAggregateOver(seed int, shown []shownList) Aggregate {
 	return a
 }
 
-// gradeLadder returns two grades whose mean AND whose spread both move with the
+// gradeLadder returns two grades whose mean and whose spread both move with the
 // seed, so a corroborated GRADE and SPREAD cell have something to disagree about.
 //
 // One end is pinned and the other climbs an ASCENDING ladder, which makes both

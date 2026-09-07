@@ -34,7 +34,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // were not: their level now rests on "minor and optional", which is the clause
 // the sentence only ever illustrated.
 //
-// TWO THINGS ARE UNMEASURED HERE AND ARE NOT CLAIMED. No battery was run at
+// TWO THINGS are UNMEASURED HERE and are not CLAIMED. No battery was run at
 // this rung under either wording, so nothing here says what the old sentence
 // did to nit recall. Its measurable half was also weaker than the info pair's:
 // the info line contained two crediting keywords verbatim ("accepted input",
@@ -48,7 +48,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // normally means:
 //
 //   - Style is not generated. config.GenerationLevel is NitpickNormal, whose
-//     scope tells the reviewer "Do NOT report: naming preferences, documentation
+//     scope tells the reviewer "Do not report: naming preferences, documentation
 //     wording, formatting, import order". A naming or doc-comment nit planted
 //     here would be a plant the reviewer is instructed not to report, and a
 //     corpus that penalizes obedience measures nothing. So every plant below is
@@ -70,13 +70,13 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // both the defect is invisible from either file alone: the call site looks
 // prudent, and only the callee's contract, changed by the same pull request,
 // so it is in the diff, shows that it is buying nothing. That is the property
-// worth having. Be precise about what it does NOT buy: two files fit in one
+// worth having. Be precise about what it does not buy: two files fit in one
 // batch under the default MaxFilesPerRequest of 6, so these exercise
 // cross-file REASONING inside a single request and leave the 6-file cap, the
 // 4-way concurrency and cross-batch triage dedup as untested as they were. That
 // gap is now closed elsewhere: ts-unbounded-memo-key, authored at warning,
 // changes seven files and is the first fixture in the corpus to assemble into
-// two batches. Cross-batch DEDUP is reached but runs trivially, and it is NOT
+// two batches. Cross-batch DEDUP is reached but runs trivially, and it is not
 // owed by either file: it cannot be authored. bundle.batch appends each entry
 // to exactly one Batch, so no path is ever in two batches, and review.dedupe
 // keys on path:line:title, two batches therefore cannot collide by
@@ -85,7 +85,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // fixture can force. Recording this so the next reader does not spend an
 // afternoon trying to write the fixture that closes it.
 //
-// THIS FUNCTION IS NOT A CORPUS and nothing runs it as one. The five below are
+// This FUNCTION IS not A CORPUS and nothing runs it as one. The five below are
 // split across Fixtures() and HeldOutFixtures(), which name each of them
 // directly; what this returns is the record of what was AUTHORED at this level,
 // and TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus is what makes the two
@@ -313,7 +313,7 @@ export function listMembers(members: Member[]): Member[] {
   return [...members].sort(byDisplayName);
 }
 `,
-			// rosterHeading is filler, and it is deliberately AFTER the plant so
+			// rosterHeading is filler, and it is deliberately after the plant so
 			// the defect stays on line 6. It is here because the file was 12
 			// lines long and the plant sits at line 6, which put every line of
 			// it within noiseTolerance of the plant: a reviewer commenting on
@@ -585,7 +585,7 @@ func TestSlug(t *testing.T) {
 		Defects: []Defect{{
 			Path: "slug/slug_test.go",
 			Line: 16, // the case that repeats line 12
-			// The bare stems "duplicate", "duplicates" and "repeats" WERE here
+			// The bare stems "duplicate", "duplicates" and "repeats" were here
 			// and had to go. They admitted precisely the reviewer "identical
 			// to" carries its preposition to exclude: five of the six cases
 			// expect "hello-world", so "five of the six cases duplicate the
@@ -697,7 +697,7 @@ public final class Labels {
 			Path: "src/main/java/com/example/report/Labels.java",
 			Line: 26, // the copy taken of a list that never escaped
 			// "unnecessary copy", "redundant copy", "needless copy" and "no need
-			// to copy" WERE here and had to go, and their presence contradicted
+			// to copy" were here and had to go, and their presence contradicted
 			// this defect's own comment two paragraphs up: the keywords are
 			// supposed to be built on reachability rather than on "copy", which
 			// the change itself supplies. They credited the second false

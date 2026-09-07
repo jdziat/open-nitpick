@@ -262,7 +262,7 @@ func TestAPartialDumpIsRefusedAsARejudgeInput(t *testing.T) {
 // requires re-running, and every re-run is another look at a set that is
 // supposed to be looked at once.
 //
-// IT COVERS EVERY BATTERY THAT PRINTS THE JUDGED TABLE, not the head-to-head
+// IT COVERS every BATTERY that PRINTS THE JUDGED TABLE, not the head-to-head
 // alone, and that is the correction rather than a generalisation for its own
 // sake. Retention was fixed on the benchmark and TestJudgeModels was described
 // as a tuning axis over a re-reviewable corpus, which it is not. It prints the
@@ -327,7 +327,7 @@ func TestEveryJudgedBatteryRetainsItsFindingsWithoutBeingAsked(t *testing.T) {
 }
 
 // batteriesCalling returns the tune_test.go top-level functions that call a
-// named function, so a guard can be keyed on what a battery DOES rather than on
+// named function, so a guard can be keyed on what a battery does rather than on
 // a list somebody has to remember to extend.
 func batteriesCalling(t *testing.T, name string) map[string]bool {
 	t.Helper()
@@ -504,7 +504,7 @@ func calledAt(n ast.Node, recv, method string) []token.Pos {
 
 // TestEveryPaidReviewIsRetainedWhateverTheJudgeSays.
 //
-// RETENTION WAS GATED ON THE JUDGE. A review whose judge call failed returned
+// RETENTION was GATED ON THE JUDGE. A review whose judge call failed returned
 // before dump.Record, so its findings, already paid for, a model call on our
 // side and a rate-limited free-tier `incumbent review` on the incumbent's,
 // were discarded. RECALL, NOISE, ANCHOR and L/DEF need no judge, which is the entire
@@ -516,7 +516,7 @@ func calledAt(n ast.Node, recv, method string) []token.Pos {
 // demand.
 //
 // THE PROPERTY, and it is narrower than "every return records": a review that
-// reached the judge is written down whatever the judge answers. Returns BEFORE
+// reached the judge is written down whatever the judge answers. Returns before
 // the judge call are exempt and must be. Those are the paths where the review
 // itself failed and there is no finding list, and Dump.Record writes a
 // `silent: true` line for an empty one, which would record "this reviewer said

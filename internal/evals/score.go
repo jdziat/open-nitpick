@@ -87,7 +87,7 @@ func ScoreRun(r RunResult, f Fixture) Score {
 	}
 
 	// The census is a fact about the FIXTURE, so it is taken before anything
-	// that can return early. THE BUG THIS FIXES: it was taken inside
+	// that can return early. THE BUG this FIXES: it was taken inside
 	// ScoreSeverity, which the two returns below skip, so a run that failed
 	// contributed its plants to Total and nothing to the per-level census. Over
 	// AllFixtures with every third run failing, TallyScores reported a census
@@ -120,7 +120,7 @@ func ScoreRun(r RunResult, f Fixture) Score {
 				len(r.Report.Incomplete), strings.Join(r.Report.Incomplete, ", ")))
 	}
 
-	// EVERY DETECTION READING COMES FROM ScoreDetection, including the located
+	// Every DETECTION READING COMES FROM ScoreDetection, including the located
 	// set this function used to compute for itself. Two reasons, and the second
 	// is the one that matters: the judged batteries hold a finding list and never
 	// build a RunResult for the incumbent, so they must read these off the same
@@ -149,7 +149,7 @@ func ScoreRun(r RunResult, f Fixture) Score {
 // (fixture, findings) pair for both contenders, Incumbent is shelled out to and
 // has no RunResult at all, so for those tables NOISE and ANCHOR were not
 // discarded, they were never computed. Splitting the computation out is what lets
-// the head-to-head fill the columns from the SAME functions the ground-truth
+// the head-to-head fill the columns from the same functions the ground-truth
 // battery fills them from. Rule 6c-i in docs/measurement.md records the cost of
 // the alternative: hand-written Detections literals declared Noise 40 and
 // WidestAnchor 900 for behaviours the real scorer answered 0 and 1 for.
@@ -180,7 +180,7 @@ type DetectionScore struct {
 	// while claiming the defects it LOCATED, the same per-defect union
 	// WidestAnchor takes the MAXIMUM of, summed instead.
 	//
-	// THE MAXIMUM AND THE SUM CATCH DIFFERENT REVIEWERS AND NEITHER SUBSUMES THE
+	// THE MAXIMUM and THE SUM CATCH DIFFERENT REVIEWERS and NEITHER SUBSUMES THE
 	// OTHER. A max is what sees one blob among precise findings, which is what
 	// CorpusTally.WidestAnchor was added for and remains right about. A max is
 	// also blind to UNIFORM vagueness: a reviewer line-precise on 28 plants with
@@ -222,7 +222,7 @@ func ScoreDetection(f Fixture, findings []review.Finding) DetectionScore {
 	// seventeen regions from seventeen comments claiming one line each about the
 	// same defect, and for a reader those are the same seventeen lines. Both are
 	// taken because neither subsumes the other, a wide finding on a fixture that
-	// plants NOTHING belongs to no defect and would vanish from the second.
+	// plants nothing belongs to no defect and would vanish from the second.
 	claimed := defectAnchoredLines(findings, f.Defects)
 
 	for i, d := range f.Defects {
@@ -292,7 +292,7 @@ const (
 // WITHDRAWN. It was not a mis-tuned constant, it was the wrong instrument, and
 // two measurements say so rather than two opinions:
 //
-//   - IT IS MAXIMISED BY A REVIEWER THAT ALSO CHOOSES WHAT TO REPORT. This
+//   - IT IS MAXIMISED BY A REVIEWER that ALSO CHOOSES WHAT TO REPORT. This
 //     corpus plants 29 defects over 30 fixtures and bands them 12 blocking, 6
 //     medium, 11 low. Reconstructed over AllFixtures, the strategy that stays
 //     silent unless the defect is ALREADY blocking and then calls it critical
@@ -303,7 +303,7 @@ const (
 //     to mention would, if anyone optimised it, produce exactly the review bot
 //     this project exists not to be.
 //
-//     TWO FIGURES THIS COMMENT USED TO QUOTE HAVE BEEN CORRECTED, and the second
+//     TWO FIGURES this COMMENT USED TO QUOTE HAVE BEEN CORRECTED, and the second
 //     correction weakens half the argument rather than strengthening it, which
 //     is why it is written down. It first said "always critical and always error
 //     both scored a perfect 10 of 10", scoring those strategies over the plants
@@ -319,7 +319,7 @@ const (
 //     TestTheSeverityFiguresTheseCommentsQuoteStillReproduce reads every one of
 //     those numbers back out of the corpus.
 //
-//   - IT IS BLIND TO THE DEFECT IT WAS WRITTEN FOR. The parser bug behind the
+//   - IT IS BLIND TO THE DEFECT IT was WRITTEN FOR. The parser bug behind the
 //     PREVIOUS retraction (crSeverity demoting Incumbent's "critical" to our
 //     "error") does not move it at all: buggy parser 10/0/4, fixed parser
 //     10/0/4. At our full resolution the same bug moves the incumbent's triple
@@ -388,7 +388,7 @@ const NoCrossToolSeverityScore = "NO CROSS-TOOL SEVERITY ACCURACY IS OFFERED, BY
 // findings at our resolution and withdraw only its "major" ones, publishing a
 // fraction of the retracted comparison.
 //
-// NOR FROM THE TRANSLATION FLAG. internal/linters marks EVERY analyzer finding
+// NOR FROM THE TRANSLATION FLAG. internal/linters marks every analyzer finding
 // translated, and review.Engine marks a model's finding translated when it
 // writes "Critical" with a capital C, so the flag answers "was one word
 // rewritten", a fact about a finding, where the question is "what scale did
@@ -475,13 +475,13 @@ type SeverityWord struct {
 //
 // The unit is (planted level x the word the reviewer printed), counted, with the
 // planted total beside it. It is deliberately not reducible: on the shipped
-// cache incumbent/cli's "critical" is credited on plants of critical AND error,
-// and its "major" on plants of critical, error AND warning, so no single-valued
+// cache incumbent/cli's "critical" is credited on plants of critical and error,
+// and its "major" on plants of critical, error and warning, so no single-valued
 // mapping of either word is right for every plant it lands on and no reduction
 // of both sides to a common resolution is right either. What a reader gets is
 // what was observed; what they do with it is theirs.
 //
-// TWO INSTRUMENTS PROPOSED IN PLACE OF THAT WERE REJECTED ON MEASUREMENT, and
+// TWO INSTRUMENTS PROPOSED IN PLACE OF that were REJECTED ON MEASUREMENT, and
 // the measurements are recorded so the next proposal starts from them.
 //
 //   - AN INTERVAL, credit a foreign word against the hull of the planted levels
@@ -501,7 +501,7 @@ type SeverityWord struct {
 //     a threshold, not a permutation.
 //
 // A reader comparing two vocabularies gets to see, for example, that one
-// reviewer answered "critical" to plants of critical AND to plants of error
+// reviewer answered "critical" to plants of critical and to plants of error
 // while another split them, and gets to decide for themselves what that is
 // worth, which is exactly the judgement a single accuracy figure was making
 // silently on their behalf and getting wrong.
@@ -542,8 +542,8 @@ func (u SeverityUsage) Add(planted config.Severity, said SeverityWord) {
 //
 // Summing it gives the planted total the coverage cell divides by, Score.Total
 // on one run, Aggregate.SevPlanted on a judged row, so the description and the
-// coverage cell are read against the same number. THAT SENTENCE USED TO BE FALSE
-// FOR ANY RUN THAT PRODUCED NO REPORT: the census was taken inside
+// coverage cell are read against the same number. That SENTENCE USED TO BE FALSE
+// FOR any RUN that PRODUCED NO REPORT: the census was taken inside
 // ScoreSeverity, which ScoreRun skips when a provider errors, so a failed run
 // added its plants to the total and nothing to the census. It is now taken from
 // the fixture before ScoreRun can return early, which is the only place both
@@ -630,7 +630,7 @@ const UndeclaredPlantedTotal = "PLANTED TOTAL NOT DECLARED"
 // whether or not anything was located there, with the planted count as its
 // denominator.
 //
-// THE BUG THIS FIXES: levels nobody located were omitted, on the reasoning that
+// THE BUG this FIXES: levels nobody located were omitted, on the reasoning that
 // a miss is RECALL's job. Measured, that made the worst strategy's page the
 // cleanest one. The reviewer that reports only the plants we rate critical and
 // calls them critical rendered
@@ -653,7 +653,7 @@ func (u SeverityUsage) Lines(planted PlantedLevels) []string {
 	var out []string
 
 	// The union, so a level the corpus plants survives a reviewer that never
-	// reached it AND a word that landed on a level the census does not carry
+	// reached it and a word that landed on a level the census does not carry
 	// survives a caller that handed over the wrong census. Neither is silently
 	// dropped, because dropping either is how a denominator stops matching its
 	// numerator without anyone seeing it.
@@ -801,7 +801,7 @@ type SeverityCall struct {
 // It exists because severity correctness used to be an LLM opinion and nothing
 // else: every fixture Defect declares WantSeverity and nothing outside
 // fixtures.go read it. That opinion is measurably blind in one direction, the
-// judge reported Incumbent understating NOTHING, on a corpus whose own ground
+// judge reported Incumbent understating nothing, on a corpus whose own ground
 // truth says it understated defects it had located. A prompt tuned to reduce
 // inflation against a scorer that cannot see under-claiming optimizes toward
 // saying less and calls it progress.
@@ -941,7 +941,7 @@ func ScoreSeverity(f Fixture, findings []review.Finding) SeverityScore {
 // severityVerdict compares an assigned severity against the planted one at our
 // full five-level resolution.
 //
-// Both sides are put through Normalize before they are ranked. THE BUG THIS
+// Both sides are put through Normalize before they are ranked. THE BUG this
 // FIXES: Rank places "none" ABOVE critical, so that `fail_on: none` matches
 // nothing, which meant a finding somehow carrying "none", the word for the
 // ABSENCE of a severity, compared as the most severe value there is and scored
@@ -979,7 +979,7 @@ func severityVerdict(got, want config.Severity) string {
 // grades a reviewer on the effect its review has rather than on its most
 // flattering sentence.
 //
-// IT REPLACES A NEAREST-TO-THE-PLANT RULE THAT PAID FOR HEDGING, which is the
+// IT REPLACES A NEAREST-TO-THE-PLANT RULE that PAID FOR HEDGING, which is the
 // bug. Crediting the closest severity extended a "benefit of the doubt" that
 // only a multi-comment reviewer could collect: on a planted error, one comment
 // saying "warning" scored UNDERSTATED, and adding a second comment saying
@@ -1024,7 +1024,7 @@ func severityVerdict(got, want config.Severity) string {
 // a destroyed word beat a kept one. severityAsSaid returns an empty Said for a
 // finding something translated without keeping the original, and "" sorts before
 // every real spelling, so on a defect matched by one finding carrying
-// RawSeverity "Error" and one carrying none, BOTH report orders published
+// RawSeverity "Error" and one carrying none, both report orders published
 // `(word not recorded) x1 [we read as error]` while the reviewer's word sat in
 // the finding list beside it. That is not hypothetical: internal/linters
 // produces findings in exactly that shape, translated, with no raw word,
@@ -1041,7 +1041,7 @@ func severityVerdict(got, want config.Severity) string {
 // would have chosen which of the reviewer's spellings got published. The tie-break
 // has to be on the thing that reaches the page.
 //
-// The benefit of the doubt deliberately does NOT extend across plants, which is
+// The benefit of the doubt deliberately does not extend across plants, which is
 // what the earlier per-finding form did. multi-defect plants a critical
 // traversal and an error descriptor leak on the same line; letting one finding
 // choose which plant it was graded against made every severity from error to
@@ -1238,7 +1238,7 @@ func coverInto(claimed map[int]bool, f review.Finding) {
 // stops the pair being two answers to "how many lines is this review pointing
 // at" that an edit to either can part.
 //
-// THE BUG IT FIXES, and it is the SAME BUG anchoredLines fixed, spelled as a
+// THE BUG IT FIXES, and it is the same BUG anchoredLines fixed, spelled as a
 // count of findings instead of a count of regions. anchoredLines made a finding
 // pay for the lines it claims; per FINDING, so a reviewer that emits one comment
 // on every line within the noise tolerance of each plant scored WidestAnchor 1,
@@ -1253,17 +1253,17 @@ func coverInto(claimed map[int]bool, f review.Finding) {
 // findings rather than across regions.
 //
 // The asymmetry that decided anchoredLines decides this too, at one remove:
-// matches() and explainsAny() are satisfied by ANY finding in the review, so
+// matches() and explainsAny() are satisfied by any finding in the review, so
 // every extra comment can only ever help a reviewer match and never cost it.
 // Charging per finding leaves that free; charging for the union of what they all
 // claimed makes seventeen one-line comments cost exactly what one seventeen-line
 // gesture costs, which is what they are worth to a reader.
 //
-// NEAR-AND-NAMING rather than every finding in the file: explainsAny is already
+// NEAR-and-NAMING rather than every finding in the file: explainsAny is already
 // the package's answer to "is this comment about that defect", and reusing it
 // keeps ANCHOR from charging a reviewer for unrelated work elsewhere in the file.
 //
-// IT COSTS THE INCUMBENT NOTHING. Over the shipped Incumbent corpus the maximum
+// IT COSTS THE INCUMBENT nothing. Over the shipped Incumbent corpus the maximum
 // is 13 either way, the multi-defect review, unchanged, and no fixture's value
 // rises. Recorded because a scoring change that only ever moves numbers our way
 // is one nobody should believe, and this one was measured against the competitor
@@ -1295,14 +1295,14 @@ func defectAnchoredLines(findings []review.Finding, defects []Defect) []int {
 // the detection credit, counting it as a false positive as well punishes one
 // near-miss twice, which is the failure explainsAny was written to avoid.
 //
-// THE PREVIOUS VALUE WAS 2 * anchorTolerance, JUSTIFIED BY A CLAIM THAT WAS
-// FALSE. The comment here said "THE VALUE IS A CHOICE AND THIS CORPUS CANNOT
+// THE PREVIOUS VALUE was 2 * anchorTolerance, JUSTIFIED BY A CLAIM that was
+// FALSE. The comment here said "THE VALUE IS A CHOICE and this CORPUS CANNOT
 // CHECK IT", and that reasoning was wrong twice over. It was inert, 0, 1, 2, 4,
 // 8, 12 and 20 all left the entire suite green, including 0, at which explainsAny
 // becomes STRICTER than matches and the double penalty this comment spends its
 // first paragraph rejecting comes back. And the corpus can check it, by a
 // question nobody had asked: on how many planted fixtures is a spammer charged
-// NOTHING because the whole file fits inside the radius? At 8 the answer was two
+// Nothing because the whole file fits inside the radius? At 8 the answer was two
 // of twelve, contract-break and data-loss-migration were 15 and 13 lines, so
 // "the comment is near the defect it names" reduced there to "the file is
 // shorter than 17 lines", and the column measured nothing at all on them.
@@ -1313,7 +1313,7 @@ func defectAnchoredLines(findings []review.Finding, defects []Defect) []int {
 //   - STRICTLY GREATER THAN anchorTolerance, or explainsAny and matches ask the
 //     same question and a near-miss is punished twice, once by losing the
 //     detection and again by being counted as invented.
-//   - SMALL ENOUGH THAT NO PLANTED FIXTURE IS ENTIRELY INSIDE IT, or the column
+//   - SMALL ENOUGH that NO PLANTED FIXTURE IS ENTIRELY INSIDE IT, or the column
 //     is vacuous on that fixture and a spammer there is free.
 //
 // The largest rather than the smallest, because the trade this constant exists
@@ -1321,7 +1321,7 @@ func defectAnchoredLines(findings []review.Finding, defects []Defect) []int {
 // noise is the accepted error, and every line of slack is a near-miss not
 // punished twice.
 //
-// IT COSTS THE INCUMBENT NOTHING, which is why the bound could be chosen on its
+// IT COSTS THE INCUMBENT nothing, which is why the bound could be chosen on its
 // merits. Over the shipped Incumbent corpus the noise count is 3 at 4, 5, 6, 8
 // and 12 alike: every finding there that names a plant's keywords sits at
 // distance ZERO from it, so there is no observed misanchoring for this number to
@@ -1331,7 +1331,7 @@ func defectAnchoredLines(findings []review.Finding, defects []Defect) []int {
 const noiseTolerance = 6
 
 // explainsAny reports whether a finding describes any planted defect: it names
-// the defect AND sits near it.
+// the defect and sits near it.
 //
 // THE BUG IT FIXES: it ignored line position entirely, so a finding was credited
 // against every plant in its file whose keywords its text happened to contain.
@@ -1340,7 +1340,7 @@ const noiseTolerance = 6
 // perfectly calibrated reviewer gets, while pointing at nothing. A column whose
 // best value is reachable by saying nothing useful is not a column.
 //
-// WHICH ERROR THIS TRADES. The rule now has two ways to be wrong and both are
+// WHICH ERROR this TRADES. The rule now has two ways to be wrong and both are
 // real:
 //
 //   - FALSE NOISE. A correct finding anchored more than noiseTolerance from its
@@ -1360,7 +1360,7 @@ const noiseTolerance = 6
 // RECALL, whereas the strategy the old rule admitted was invisible by
 // construction.
 //
-// A finding must name and be near THE SAME defect. Matching one plant's keywords
+// A finding must name and be near THE same defect. Matching one plant's keywords
 // while sitting beside a different plant is not an explanation of either.
 func explainsAny(f review.Finding, defects []Defect) bool {
 	for _, d := range defects {
@@ -1385,7 +1385,7 @@ func mentionsAny(f review.Finding, keywords []string) bool {
 	return false
 }
 
-// checkInvariants verifies properties the tooling must guarantee for ANY model.
+// checkInvariants verifies properties the tooling must guarantee for any model.
 //
 // These are the fixes from the security and correctness pass, restated as
 // assertions against real output. A violation here is an open-nitpick bug: no
@@ -1782,7 +1782,7 @@ type CorpusTally struct {
 	// claimed, counting all of its regions together. See anchoredLines.
 	//
 	// It is part of the detection metric rather than a diagnostic because
-	// without it RECALL and NOISE are BOTH maximised by one finding per file
+	// without it RECALL and NOISE are both maximised by one finding per file
 	// covering the whole file, titled with every keyword in it: anchorDistance
 	// is zero anywhere inside a span, so such a blob is credited with every
 	// plant in the file and is noise for none. It scored RECALL 1.000 NOISE 0,
@@ -1792,13 +1792,13 @@ type CorpusTally struct {
 	// for exactly that trade and was reported only in a t.Logf, so no published
 	// column could see it.
 	//
-	// The version of that strategy this column could NOT see was the same blob
+	// The version of that strategy this column could not see was the same blob
 	// spelled as a list of one-line regions instead of one span. It measured the
 	// widest single region, so 38 scattered lines read as 1 and the guard passed
 	// on the behaviour it was added to catch. anchoredLines is why it now reads
 	// 36.
 	//
-	// THE MAX AND THE SUM ARE BOTH PUBLISHED, and the argument for the max used
+	// THE MAX and THE SUM are both PUBLISHED, and the argument for the max used
 	// to be written one-sidedly: "one blob anywhere in the corpus is the
 	// behaviour being caught, and a mean over precise findings hides it." That
 	// half is true and is why this field exists. The converse is equally true and
@@ -1884,7 +1884,7 @@ type PublishedMetric struct {
 	// the denominator, and the judged tables spread the same triple over
 	// O-ACC/O-INFL/O-UNDER with O-COV as the denominator.
 	//
-	// THE BUG THIS SHAPE FIXES: the type's whole justification is that a single
+	// THE BUG this SHAPE FIXES: the type's whole justification is that a single
 	// column cannot be asked "what maximises this?" honestly, O-INFL alone is
 	// maximised by silence, and nothing enforced the grouping at the table
 	// level. Deleting O-ACC and O-UNDER from VariantTableHeader, leaving O-INFL
@@ -1897,7 +1897,7 @@ type PublishedMetric struct {
 	// maxes it out is a counterexample to exactly this sentence.
 	Doc string
 
-	// Score returns the metric's components ORIENTED SO THAT HIGHER IS BETTER,
+	// Score returns the metric's components ORIENTED SO that HIGHER IS BETTER,
 	// so "maxed out" is componentwise >= without each caller re-deriving which
 	// way each column points. ok is false when the corpus gives the metric
 	// nothing to measure, which is the answer silence must get, rather than a
@@ -1924,7 +1924,7 @@ func (m PublishedMetric) Columns() []string {
 func (m PublishedMetric) Label() string { return strings.Join(m.Columns(), "/") }
 
 // Maxes reports whether a reviewer's tally is at least as good as a reference
-// tally on EVERY component of the metric.
+// tally on every component of the metric.
 //
 // The reference is a reviewer that is correct, so this answers "did
 // this strategy do as well as being right?", which is the question the withdrawn
@@ -1973,7 +1973,7 @@ func PublishedMetrics() []PublishedMetric {
 				// per sample, because that is how the tables print it and
 				// because a corpus of more fixtures would otherwise look noisier.
 				//
-				// The anchor width is negated for the same reason and NOT
+				// The anchor width is negated for the same reason and not
 				// divided: it is a worst case, not a rate. See
 				// CorpusTally.WidestAnchor for the strategy it exists to catch.
 				//
@@ -2036,9 +2036,9 @@ func PublishedMetrics() []PublishedMetric {
 	}
 }
 
-// PublishedDescription is a model-free artifact a report publishes that is NOT a
+// PublishedDescription is a model-free artifact a report publishes that is not a
 // score. "What maximises this?" has no answer for a page of text, so the question
-// asked here is the one that does: CAN A REVIEWER NOBODY WOULD SHIP PRODUCE THE
+// asked here is the one that does: CAN A REVIEWER nobody WOULD SHIP PRODUCE THE
 // DESCRIPTION A CALIBRATED ONE PRODUCES?
 //
 // It is registered for the same reason PublishedMetric is. The severity
@@ -2105,16 +2105,16 @@ func PublishedDescriptions() []PublishedDescription {
 // keys from PublishedMetrics rather than from a list here: a column of the
 // objective-severity metric that is not also part of a vocabulary-free metric
 // must have a renderer, and every renderer must answer n/a for a row whose scale
-// is not ours AND for a row that declared none. Adding a third rendering
+// is not ours and for a row that declared none. Adding a third rendering
 // therefore fails until it is gated, which is what "self-enforcing" has to mean
 // after a hand-maintained list shipped the banded column.
 //
-// THE ROW'S DECLARED SCALE IS WHAT THE RENDERERS READ, not the contender's name.
+// THE ROW'S DECLARED SCALE IS WHAT THE RENDERERS read, not the contender's name.
 // These took a model string and compared it against IncumbentModel, so the
 // withdrawal was an identity check standing in for a fact about a vocabulary;
 // see SeverityScale.
 //
-// The renderers call the SAME functions the tables call. That is the load-bearing
+// The renderers call the same functions the tables call. That is the load-bearing
 // property and also the limit: this proves the gate is in the renderer, not that
 // a table used the renderer. TestEveryHeaderPrintsAWholeMetric ties a header to
 // its metric, and TestNoReportFormatsSeverityCountersDirectly ties the tables to
@@ -2268,7 +2268,7 @@ var (
 // PublishedCostReadings) and classifying them from this file would assert things
 // about accounting it does not compute, hence tableUnscored.
 //
-// THIS COMMENT USED TO NAME AN OPEN GAP THAT HAD ALREADY BEEN CLOSED: it said
+// This COMMENT USED TO NAME AN OPEN GAP that HAD ALREADY BEEN CLOSED: it said
 // CostTableHeader printed RECALL with no NOISE column beside it and handed that
 // to the cost track. The cost track closed it, the header carries RECALL, NOISE
 // and ANCHOR, and PublishedCostReadings scores all three, while this file went
@@ -2284,7 +2284,7 @@ var (
 // rules exist to stop. It is checked by hand at the declaration site, and a
 // declaration site is not a mechanism.
 //
-// ONE SUCH GAP IS OPEN NOW AND IS DISCLOSED RATHER THAN CLOSED. The detection
+// ONE SUCH GAP IS OPEN NOW and IS DISCLOSED RATHER THAN CLOSED. The detection
 // metric gained a fourth column, L/DEF, and the cost table carries RECALL, NOISE
 // and ANCHOR without it. Under tableScored that would fail the whole-metric
 // guard; under this kind nothing asks. The cost columns are the cost track's own
@@ -2308,7 +2308,7 @@ var (
 // every column in them is a registered score, an LLM judge's opinion, or an
 // identifier, and every metric they touch must be printed complete.
 //
-// It is NOT every header this package prints, see AllTableHeaders, and read its
+// It is not every header this package prints, see AllTableHeaders, and read its
 // comment before assuming a guard that runs over these has seen them all.
 func ScoreTableHeaders() []string {
 	return tableHeaders(tableScored)

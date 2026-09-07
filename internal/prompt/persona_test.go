@@ -108,7 +108,7 @@ func TestVoiceAxesAreIndependent(t *testing.T) {
 // would get different reviews of the same code while believing they had only
 // picked a different register.
 //
-// An earlier version of this test compared only the text BEFORE the voice
+// An earlier version of this test compared only the text before the voice
 // section, a region no voice axis can write to. It passed with
 // "Only report a finding if it is critical" injected into a voice branch, i.e.
 // it tested a different, trivially-true property. It now inspects exactly the

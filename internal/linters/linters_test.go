@@ -462,7 +462,7 @@ func TestDecodeJSONIgnoresSurroundingNoise(t *testing.T) {
 // therefore not an error. None of the four analyzers behaves that way:
 // golangci-lint prints {"Issues":[]}, ruff and eslint print [], semgrep prints
 // its envelope. So the only things reaching that branch were failures, and
-// combined with runCommand, which errors only when stdout is empty AND the exit
+// combined with runCommand, which errors only when stdout is empty and the exit
 // was non-zero, an analyzer that exited 0 printing nothing was indistinguishable
 // from clean code. `semgrep --config auto --metrics off` had been shipping in
 // exactly that state.

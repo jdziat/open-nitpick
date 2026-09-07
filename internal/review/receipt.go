@@ -19,7 +19,7 @@ import (
 // report the run already produced: no model is asked, so there is nothing to
 // hallucinate and nothing to guard.
 //
-// It deliberately does NOT restate the coverage notices. Those are rendered
+// It deliberately does not restate the coverage notices. Those are rendered
 // separately and carry the detail: which files were skipped, which analyzers
 // did not run, which batches failed. The receipt is the top line a reader sees
 // before deciding whether to open any of it.

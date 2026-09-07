@@ -45,7 +45,7 @@ var shippedPrices []byte
 //
 // The per-call granularity is not bookkeeping neatness, it is what makes a
 // tiered price computable at all. OpenRouter bills 11 of the 20 models in the
-// shipped table at a rate chosen by the size of THAT REQUEST's prompt, and a
+// shipped table at a rate chosen by the size of that REQUEST's prompt, and a
 // sum of calls cannot answer "how big was the prompt", an aggregate of 60,000
 // prompt tokens is one call over the qwen 32,000 step or thirty calls under it,
 // at rates 3.3x apart. The previous version of this file recorded base rates
@@ -398,7 +398,7 @@ type Routing struct {
 	Dearest  string
 
 	// Low and High are the extremes across every endpoint, with each endpoint's
-	// own cache fallback applied BEFORE the extremum is taken, so they bound
+	// own cache fallback applied before the extremum is taken, so they bound
 	// what could be billed rather than what happens to be published.
 	//
 	// They are base rates. An endpoint's own prompt-size overrides are not
@@ -444,7 +444,7 @@ type Price struct {
 	// and it exists to make a row REFUSE rather than approximate.
 	//
 	// The two anthropic entries publish it at 1.6x their five-minute rate. A
-	// usage report says how many cache-creation tokens were written and NOT
+	// usage report says how many cache-creation tokens were written and not
 	// which TTL they were written at, so on a model publishing both, a call that
 	// wrote any is not priceable from this table. The amount is one of two
 	// numbers 1.6x apart and nothing here can say which. Billing it at the
@@ -678,7 +678,7 @@ func parsePrice(raw rawPrice) (Price, error) {
 			"and an entry that cannot say which one is the confusion that produced a whole round of cost numbers")
 	}
 
-	// An entry has to price BOTH sides or it is not an entry. A half-written one
+	// An entry has to price both sides or it is not an entry. A half-written one
 	// is worse than a missing one: missing reports unknown, half-written reports
 	// a confident dollar figure with one rate silently at zero, and output is
 	// 4-6x input across this table, so the half that goes missing costs the
@@ -1042,7 +1042,7 @@ func (p *PriceTable) Price(model string) (Price, bool) {
 	return price, ok
 }
 
-// Cost is a USD amount that may be UNKNOWN or merely NOT COMPARABLE, and knows
+// Cost is a USD amount that may be UNKNOWN or merely not COMPARABLE, and knows
 // which and why.
 //
 // A float64 cannot hold "we do not know", and every unset one in Go renders as
@@ -1074,7 +1074,7 @@ type Cost struct {
 	// behind it had moved on. Staleness is a property of the number, so it
 	// travels with the number.
 	//
-	// It is deliberately NOT a downgrade of Known or Comparable: the arithmetic
+	// It is deliberately not a downgrade of Known or Comparable: the arithmetic
 	// is right and the rows are still each other's peers. It is a disclosure.
 	Stale       bool
 	StaleReason string
@@ -1437,7 +1437,7 @@ func (l *CostLedger) rowsAt(in map[string]*modelSpend, now time.Time) []CostRow 
 // reached on each of them.
 //
 // The set is a set, not a count. Keyed on the count, which is what this was,
-// two models that each completed two of four fixtures AND FAILED DIFFERENT ONES
+// two models that each completed two of four fixtures and FAILED DIFFERENT ONES
 // both report Covered=2 against a peer coverage of 2, both pass as comparable,
 // and their $/DEFECT figures describe disjoint corpora. That is the same "priced
 // on an easier subset" error the coverage check was added to catch, wearing a
@@ -1579,13 +1579,13 @@ type CostRow struct {
 	Covered      int
 	PeerCoverage int
 
-	// Missing names the fixtures in that reference corpus this row was NOT
+	// Missing names the fixtures in that reference corpus this row was not
 	// priced on, and is what comparability turns on. The count alone
 	// cannot see two rows priced on equal numbers of DIFFERENT fixtures; see
 	// CostLedger.referenceCorpus.
 	Missing []string
 
-	// Shallow names the fixtures this row WAS priced on but fewer times than its
+	// Shallow names the fixtures this row was priced on but fewer times than its
 	// most thorough peer. It is the second half of the same defence and it is the
 	// half that stops the reading being maxed out: a row priced on every fixture
 	// at least once passes Missing, and a reviewer whose empty runs report no
@@ -1644,7 +1644,7 @@ func (r CostRow) PriceAgeDays() (int, bool) {
 //
 // Zero coverage is not comparable because it is not a result at all; otherwise
 // the test is that the row covers the whole reference corpus, fixture by fixture
-// rather than by count, AND to the depth its peers reached on each.
+// rather than by count, and to the depth its peers reached on each.
 func (r CostRow) Comparable() bool {
 	return r.Covered > 0 && len(r.Missing) == 0 && len(r.Shallow) == 0
 }
@@ -1858,16 +1858,16 @@ type CostReading struct {
 	// maxes it out is a counterexample to exactly this sentence.
 	Doc string
 
-	// Score returns the components ORIENTED SO THAT HIGHER IS BETTER, so
+	// Score returns the components ORIENTED SO that HIGHER IS BETTER, so
 	// "maxed out" is componentwise >= without each caller re-deriving which way
 	// a dollar amount points. ok is false when the row gives the reading nothing
-	// to measure, including when the row is NOT COMPARABLE, which is the whole
+	// to measure, including when the row is not COMPARABLE, which is the whole
 	// defence against the strategy that quits on the expensive fixtures.
 	Score func(CostRow) (components []float64, ok bool)
 }
 
 // Maxes reports whether a strategy's row is at least as good as a reference row
-// on EVERY component.
+// on every component.
 //
 // The reference is a reviewer that works, so this answers "did this
 // strategy do as well as being useful?". A TIE counts as maxing it out: a
@@ -1955,7 +1955,7 @@ func PublishedCostReadings() []CostReading {
 				// Negated so that higher is better in every position: cheaper is
 				// better, more of the corpus found is better, less invented is
 				// better, and a narrower worst-case span is better. The anchor
-				// is NOT divided by anything. It is a worst case, following the
+				// is not divided by anything. It is a worst case, following the
 				// detection metric, which is what makes it survive a strategy
 				// that files one wide span among many narrow ones.
 				return []float64{
@@ -2064,7 +2064,7 @@ func (l *CostLedger) ComparabilityNotes() []string {
 	return notes
 }
 
-// OrderingNotes names the pairs of rows a reader must NOT order on $/DEFECT
+// OrderingNotes names the pairs of rows a reader must not order on $/DEFECT
 // because their routing bands overlap, which
 // TestTwoAmountsWithOverlappingBandsAreNotOrderable checks on two rows built to
 // overlap.

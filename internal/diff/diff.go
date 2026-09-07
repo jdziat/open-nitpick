@@ -90,7 +90,7 @@ type Line struct {
 }
 
 // Side identifies which side of a split diff a line belongs to, matching
-// GitHub's LEFT/RIGHT review-comment parameter.
+// GitHub's LEFT/right review-comment parameter.
 type Side string
 
 // Diff sides. Deletions live on the left; additions and unchanged lines on the

@@ -18,7 +18,7 @@ import (
 // its endpoint, so a test claiming "only OPENROUTER_API_KEY is set" is telling
 // the truth on a developer machine that has the others exported.
 //
-// LLM_BASE_URL is in the list because config.LoadFile calls applyEnv AFTER
+// LLM_BASE_URL is in the list because config.LoadFile calls applyEnv after
 // sanitize, and applyEnv fills Models.Default.BaseURL whenever it is empty,
 // which is exactly the post-sanitize state of the shipped config. Without this,
 // TestDefaultConfigSurvivesSanitize passed or failed according to the
@@ -197,7 +197,7 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 // neither: nothing is dropped, and both roles build with only OPENROUTER_API_KEY
 // in the environment.
 //
-// What it does NOT assert: that the endpoint is unreachable by any means. An
+// What it does not assert: that the endpoint is unreachable by any means. An
 // operator who exports LLM_BASE_URL still redirects it, because applyEnv fills
 // an empty BaseURL from the environment. That is deliberate, the environment
 // belongs to whoever runs the tool, and the untrusted input this guards against

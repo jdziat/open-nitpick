@@ -63,7 +63,7 @@ func incumbentRemote() string {
 // crEscape matches the terminal escapes Incumbent writes into its output: OSC
 // sequences (ESC ] ... BEL or ST) and CSI sequences (ESC [ ... final byte).
 //
-// The OSC-8 hyperlink wrapping the location is the one that MUST go: its URI
+// The OSC-8 hyperlink wrapping the location is the one that must go: its URI
 // ends in "<abs-tmp-dir>/store.go:10", so leaving it in yields the absolute
 // scratch path as the finding's file and the link target's line instead of the
 // range. The captured sample carries no CSI colour codes, but escapes clearly
@@ -86,7 +86,7 @@ var crAnchor = regexp.MustCompile(`^\s*(?:→|->)\s*(.*)$`)
 var crLocation = regexp.MustCompile(`^(.*):(\d+)(?:-(\d+))?$`)
 
 // crAlsoApplies matches Incumbent's secondary-location line, which names
-// further regions the SAME finding covers rather than a new finding.
+// further regions the same finding covers rather than a new finding.
 //
 // It is not decoration. On the SQL-injection fixture the primary anchor was the
 // import block (its proposed fix deletes the fmt import) and this line was the
@@ -120,7 +120,7 @@ var crDeclaredCount = regexp.MustCompile(`(?m)^\s*(\d+)\s+findings?\b`)
 // standing in for a fact about its vocabulary, and it would have kept holding
 // for exactly one reviewer however many others were added. See SeverityScale.
 //
-// SPELLING IS NOT SCALE, and this reviewer is the counterexample: it prints
+// SPELLING IS not SCALE, and this reviewer is the counterexample: it prints
 // "critical", identical to ours, and the shipped cache credits that one word on
 // 2 plants of critical and 4 of error. A gate that compared the printed word
 // against our five levels would have scored those findings at our resolution
@@ -154,9 +154,9 @@ const IncumbentSeverityScale = ForeignSeverityScale
 //     It is recorded at warning, the weakest anchor in review.md that still
 //     asserts a defect ("likely a bug, or a genuine hazard under plausible
 //     conditions"), because a foreign token we cannot resolve should not be
-//     handed the benefit of the doubt. THAT IS A GUESS, AND THE CORPUS CANNOT
+//     handed the benefit of the doubt. That IS A GUESS, and THE CORPUS CANNOT
 //     SETTLE IT: across the shipped cache "major" is credited on plants of
-//     critical, error AND warning, so it straddles three of our levels and no
+//     critical, error and warning, so it straddles three of our levels and no
 //     single value is right for every plant it lands on. Recording it at error
 //     instead, with Incumbent's bytes unchanged, moves the full-resolution
 //     triple from 6/4/4 to 5/8/1. (The swing was published first as "0.62 to
@@ -189,7 +189,7 @@ func crSeverity(s string) config.Severity {
 	case "nit", "nitpick":
 		return config.SeverityNit
 	default:
-		// An unrecognized word is degraded the SAME way an unrecognized word
+		// An unrecognized word is degraded the same way an unrecognized word
 		// from one of our own models is, by the same function.
 		//
 		// THE BUG: this arm returned warning, while a finding of ours carrying
@@ -199,7 +199,7 @@ func crSeverity(s string) config.Severity {
 		// the incumbent by the scorer, in a comparison whose entire purpose is to
 		// be like-for-like.
 		//
-		// The claim here is about THIS ARM and no wider. The arms above are
+		// The claim here is about this ARM and no wider. The arms above are
 		// asymmetric on purpose and the asymmetry is live: "major", "warn" and
 		// "nitpick" are translated here and would Normalize to info if one of
 		// our models emitted them, so the same word is worth a different level
@@ -264,7 +264,7 @@ func crCategoryClass(category string) (config.Class, bool) {
 //
 // The comparison is deliberately like-for-like: the same fixture repository,
 // the same uncommitted working-tree change, and the same judge afterwards. What
-// is NOT equalized is the reviewer's own prompt and model. That is the thing
+// is not equalized is the reviewer's own prompt and model. That is the thing
 // being compared.
 //
 // --agent is deliberately absent. That mode emits codegen INSTRUCTIONS for an
@@ -273,7 +273,7 @@ func crCategoryClass(category string) (config.Class, bool) {
 // fixed instruction to the agent. Scoring review quality against it compared
 // the wrong artifact. The default mode is the actual review.
 // The raw return is the review as printed, escapes stripped, and is returned on
-// EVERY path including the failures. A review that did not parse is precisely
+// Every path including the failures. A review that did not parse is precisely
 // the one whose text someone needs to read.
 func RunIncumbent(ctx context.Context, dir string, timeout time.Duration) ([]review.Finding, string, error) {
 	if timeout <= 0 {
@@ -531,7 +531,7 @@ func parseCRFinding(lines []string, start int, severity, category string) (revie
 
 // crParseLocation splits "store.go:10-12" into a path and an anchor line.
 //
-// BOTH ends of a range are kept. Taking only the first number was wrong twice
+// Both ends of a range are kept. Taking only the first number was wrong twice
 // over: "the credential is on lines 11-12" identifies a defect on line 12, and
 // the discarded end is not decoration -- Incumbent anchored the same defect at
 // 7 on one run and at 11-12 on the next, so scoring the start alone converted
@@ -735,7 +735,7 @@ func freeTierError() error {
 //	free CLI allowance, even if you're signed in.
 //
 // Each is specific enough that review prose cannot produce it by accident,
-// note that the ordinary footer advertising "free promotional credits" must NOT
+// note that the ordinary footer advertising "free promotional credits" must not
 // trip this.
 var crFreeTierMarkers = []string{
 	"free cli allowance",
@@ -950,7 +950,7 @@ func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
 // , `f.Source == IncumbentModel`, and the comment here justified that by
 // claiming crSeverity was "the only place in the tree that rewrites a reviewer's
 // severity vocabulary" and that "everything else writes its own severity and is
-// quoted verbatim". BOTH HALVES WERE FALSE, and the second one is the defect.
+// quoted verbatim". Both HALVES were FALSE, and the second one is the defect.
 // review.Engine rewrites every model's severity through Normalize, and
 // linters.mapSeverity collapses four analyzers' vocabularies onto three levels;
 // neither recorded anything, so this function answered "nothing was translated"
@@ -1039,7 +1039,7 @@ func CollectIncumbent(
 			continue
 		}
 
-		// A cached review this parser can no longer read is NOT re-collected.
+		// A cached review this parser can no longer read is not re-collected.
 		// Overwriting it would replace the bytes that expose the divergence with
 		// bytes that happen to parse, spending a rate-limited allowance to
 		// destroy the only evidence of a parser bug. The remedy is to read the

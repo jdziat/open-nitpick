@@ -817,7 +817,7 @@ const AnswerMarker = "<!-- nitpick:answer -->"
 // pull request, conversation comments and inline ones alike.
 //
 // It is how a per-pull-request answer cap is enforced without persisting a
-// counter anywhere: the answers already posted ARE the record of how many
+// counter anywhere: the answers already posted are the record of how many
 // times it has answered, and they survive a re-run, a new runner, and a
 // cleared cache.
 func (g *GitHub) CountAnswers(ctx context.Context, ref Ref) (int, error) {

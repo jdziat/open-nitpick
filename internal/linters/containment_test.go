@@ -3,7 +3,7 @@ package linters
 // Analyzer configuration is policy, and a change may not supply the policy it is
 // reviewed under.
 //
-// EVERY TEST HERE THAT CAN DRIVE THE REAL BINARY DOES. An argv assertion, "the
+// Every TEST HERE that CAN DRIVE THE real BINARY does. An argv assertion, "the
 // runner passes --no-config", is worth nothing on its own: it passes against a
 // flag the tool ignores, renamed between versions, or never had. So the shape is
 // always the same: build a repository whose own configuration would silence,
@@ -68,7 +68,7 @@ func hasRule(found []Finding, rule string) bool {
 
 // stubs installs fake analyzer binaries on PATH.
 //
-// They exist for the properties that are about THIS package rather than about an
+// They exist for the properties that are about this package rather than about an
 // analyzer: that a runner refuses to execute at all, and that a process which
 // exits 0 without reporting is not read as zero findings. A stub cannot stand in
 // for a containment flag, and is never used as one here.
@@ -255,7 +255,7 @@ func TestGolangciLintDoesNotRunAToolchainNamedByTheTreeUnderReview(t *testing.T)
 }
 
 // TestGolangciLintUsesAnOperatorConfigFromOutsideTheRepository proves the opt-in
-// works and that it is the ONLY configuration read: the tree's own file, which
+// works and that it is the only configuration read: the tree's own file, which
 // would silence everything, is present throughout.
 func TestGolangciLintUsesAnOperatorConfigFromOutsideTheRepository(t *testing.T) {
 	requireTool(t, "golangci-lint")
@@ -285,7 +285,7 @@ severity:
 		t.Fatalf("the operator's ruleset did not apply; findings = %+v", found)
 	}
 
-	// The severity proves the operator's file was READ rather than merely
+	// The severity proves the operator's file was read rather than merely
 	// tolerated: golangci-lint publishes no severity at all with no config.
 	for _, f := range found {
 		if f.Rule == "errcheck" && f.Severity != config.SeverityCritical {
@@ -338,7 +338,7 @@ func TestGolangciLintDoesNotReadAFailedAnalysisAsCleanCode(t *testing.T) {
 			want: "go.work",
 		},
 		{
-			// The name says EVERY file, and the precision matters: this is
+			// The name says every file, and the precision matters: this is
 			// golangci-lint failing to load a package, which needs the
 			// constraint to empty the whole directory. A constraint on the
 			// changed file with an unconstrained sibling beside it loads fine
@@ -1014,7 +1014,7 @@ func TestARefusedConfigStopsTheAnalyzer(t *testing.T) {
 // A, and it is what stops this whole change from replacing one silent hole with
 // another.
 //
-// runCommand errors only when stdout is empty AND the exit was non-zero, and
+// runCommand errors only when stdout is empty and the exit was non-zero, and
 // decodeJSON used to return nil for output with no JSON in it. So exit 0 with no
 // payload was "zero findings, no error", indistinguishable from clean code, and
 // exactly the state `semgrep --config auto --metrics off` had been shipping in.
@@ -1072,7 +1072,7 @@ const mixedDiff = goDiff + `diff --git a/app.js b/app.js
 // be only a slog.Warn in a CI log.
 //
 // The outcome is checked alongside the words, because the two absences here are
-// NOT the same fact and a reader who cannot separate them stops reading the
+// Not the same fact and a reader who cannot separate them stops reading the
 // block: eslint was applicable to this change and nobody configured it, while
 // ruff had no Python to look at and has not gone missing at all.
 func TestStatusesRecordHowEachAnalyzerWasConfigured(t *testing.T) {
@@ -1096,8 +1096,8 @@ func TestStatusesRecordHowEachAnalyzerWasConfigured(t *testing.T) {
 		statuses[st.Linter] = st
 	}
 
-	// The state has to say BOTH halves. "Isolated" alone was true and it hid the
-	// half that mattered: the run was isolated from the tree AND left to
+	// The state has to say both halves. "Isolated" alone was true and it hid the
+	// half that mattered: the run was isolated from the tree and left to
 	// golangci-lint's stock defaults, one of which let a `// Code generated`
 	// line in the diff switch the analyzer off for that file. A reader deciding
 	// whether to trust an empty Go report needs to know whose rules produced it.
@@ -1202,7 +1202,7 @@ func TestStrictModeDoesNotFailOverAnAnalyzerWithNothingToRead(t *testing.T) {
 // THE BUG: config.DefaultLinters listed all four analyzers, and two of them,
 // eslint and semgrep, refuse to run without an operator configuration outside
 // the repository, which the defaults cannot supply. So `mode: strict` and
-// nothing else failed EVERY review, on "linter semgrep is enabled but not
+// nothing else failed every review, on "linter semgrep is enabled but not
 // available: not configured", in every repository. Strict means "an analyzer I
 // asked for did not run"; the default list is not an operator asking.
 //

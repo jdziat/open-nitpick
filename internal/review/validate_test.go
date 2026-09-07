@@ -492,7 +492,7 @@ func scriptValidation(t *testing.T, finding Finding, verdict string) *scriptedLL
 }
 
 // TestRefutedFindingsAreReportedNotVanished is the end-to-end guarantee: an
-// overruled finding is withheld from the pull request AND recorded, with who
+// overruled finding is withheld from the pull request and recorded, with who
 // overruled it and why. A finding that disappeared would be a bug that
 // looks like quality.
 func TestRefutedFindingsAreReportedNotVanished(t *testing.T) {

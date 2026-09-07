@@ -15,7 +15,7 @@ import (
 // different judge, and prints the two rankings side by side.
 //
 // It runs no review. Every finding it submits came out of the dump named by
-// NITPICK_EVAL_REJUDGE_DUMP, in the position it was recorded in, so the ONLY
+// NITPICK_EVAL_REJUDGE_DUMP, in the position it was recorded in, so the only
 // difference between the recorded verdicts and the new ones is which model was
 // asked. That is the point: the published ranking rests on an OpenAI judge
 // scoring three OpenAI contenders, and re-running the reviews under a different
@@ -24,7 +24,7 @@ import (
 //
 //	make rejudge REJUDGE=/tmp/findings.jsonl JUDGE=anthropic/claude-opus-5
 //
-// Pointing it at the SAME judge id is not a mistake, it is the other
+// Pointing it at the same judge id is not a mistake, it is the other
 // measurement: identical input judged twice by one model is that model's own
 // variance, which is the noise floor any vendor comparison has to clear.
 func TestRejudgeDump(t *testing.T) {

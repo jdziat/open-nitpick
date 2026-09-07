@@ -251,7 +251,7 @@ type Options struct {
 	// buildClient constructs the model client. It is unexported and nil in
 	// every real run, where llm.Build is used.
 	//
-	// It exists so a test can drive the WHOLE harness from a scripted model.
+	// It exists so a test can drive the whole harness from a scripted model.
 	// Without a seam here the only way to prove that reported usage reaches
 	// RunResult is to spend money at a real provider, and an assertion nobody
 	// can afford to run is not a guard, which matters for exactly this field's
@@ -304,7 +304,7 @@ func LoadDotEnv(path string) error {
 // is the tuning corpus and the thing being named is usually the held-out one.
 // NITPICK_EVAL_FIXTURES used to keep whatever it could resolve and ignore the
 // rest: a single mistyped name in the six-name line the Makefile documents
-// silently measured five of six, and a typo in the ONLY name ran all eight
+// silently measured five of six, and a typo in the only name ran all eight
 // tuning fixtures with no warning anywhere. Neither table names its corpus, so
 // the result was indistinguishable from the held-out run it claimed to be,
 // a silent failure that returns exactly the wrong answer to the one question
@@ -349,7 +349,7 @@ func OptionsFromEnv() (Options, error) {
 	}
 
 	if raw := strings.TrimSpace(os.Getenv(EnvFixtures)); raw != "" {
-		// Resolved against BOTH corpora, not against the default list: naming a
+		// Resolved against both corpora, not against the default list: naming a
 		// held-out fixture has to select it, or the held-out set could only be
 		// run by editing code. Naming nothing still yields Fixtures() alone, so
 		// no tuning run picks up the held-out corpus by accident, spending it
@@ -671,11 +671,11 @@ func Run(ctx context.Context, model Model, f Fixture, runIndex int, opts Options
 func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, opts Options, persona config.Persona) RunResult {
 	started := time.Now()
 
-	// The declaration is made BEFORE anything that can fail, because it depends
+	// The declaration is made before anything that can fail, because it depends
 	// on nothing that can. ourSeverityScale reads the configuration and the
 	// configuration is fully determined by evalConfig; a temp directory that
 	// cannot be made says nothing about which vocabulary this adapter publishes
-	// on. THE BUG THIS FIXES: it was assigned after the MkdirTemp and buildRepo
+	// on. THE BUG this FIXES: it was assigned after the MkdirTemp and buildRepo
 	// returns, so a run that died there carried no declaration, and the two
 	// halves of one infrastructure failure then published DIFFERENT severity
 	// cells. Folded with a good run, a failure carrying the declaration renders
@@ -769,7 +769,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	engine := &review.Engine{
 		Config: cfg,
 
-		// One model in BOTH roles, which is a deliberate limit on what the
+		// One model in both roles, which is a deliberate limit on what the
 		// matrix measures: it ranks reviewers, and giving each contender a
 		// different triager would confound the two. The shipped .nitpick.yaml
 		// splits the roles, so no number produced here is a measurement of the

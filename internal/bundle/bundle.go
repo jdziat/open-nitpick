@@ -80,7 +80,7 @@ type Plan struct {
 	// to one that found nothing wrong.
 	Skipped []Skip
 
-	// Degraded records files that WERE reviewed, but from the diff alone with
+	// Degraded records files that were reviewed, but from the diff alone with
 	// no file content at all, and why.
 	//
 	// These are kept apart from Skipped because the two mean opposite things to a
@@ -97,7 +97,7 @@ type Plan struct {
 	// Skipped: a windowed file was reviewed WITH file context, just not all of
 	// it, and reporting it as diff-only would understate the review.
 	//
-	// IT MUST BE RENDERED, and this paragraph used to say it was not. A file over
+	// IT must BE RENDERED, and this paragraph used to say it was not. A file over
 	// review.max_file_bytes was previously refused its content outright and
 	// landed in Degraded, which internal/review/render.go prints under "Reviewed
 	// from the diff only". Such a file now gets a window and lands here instead
@@ -253,8 +253,8 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 
 		// Both limits are enforced in one place so that whichever binds, the
 		// answer is a narrower window rather than no content: the byte cap
-		// bounds what is HELD, the token budget bounds what is SENT, and
-		// neither is allowed to decide what is UNDERSTOOD on its own.
+		// bounds what is held, the token budget bounds what is sent, and
+		// neither is allowed to decide what is understood on its own.
 		if reason := fitEntry(&entry, cfg.Review.TokenBudgetPerRequest, cfg.Review.MaxFileBytes, estimator); reason != "" {
 			if entry.Truncated {
 				plan.Windowed = append(plan.Windowed, Skip{Path: f.Path, Reason: reason})
@@ -286,10 +286,10 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 // fetchContent reads a file's contents. The returned reason is non-empty when
 // no content could be attached at all.
 //
-// It deliberately does NOT apply review.max_file_bytes. That check used to live
+// It deliberately does not apply review.max_file_bytes. That check used to live
 // here, and rejecting a file before windowing was ever considered meant a
 // 255 KiB file got a full window while a 257 KiB one got nothing: a cap written
-// to bound how much is READ had ended up deciding how much is UNDERSTOOD. The
+// to bound how much is read had ended up deciding how much is understood. The
 // cap is enforced in fitEntry instead, where it can pick a narrower window
 // rather than throw the file's context away. Only encoding is decided here,
 // because content that is not text cannot be windowed into text.
@@ -333,7 +333,7 @@ func skipReason(cfg *config.Config, f *diff.File) (string, bool) {
 // Two limits bind, for different reasons, and each is measured in the unit it
 // names. maxBytes is review.max_file_bytes and bounds how much FILE is
 // understood: it is compared against the file's own bytes, both for the whole
-// file and for the bytes a window retains of it. budget bounds what is SENT and
+// file and for the bytes a window retains of it. budget bounds what is sent and
 // is compared against the rendered entry, line numbering and headings included,
 // because that is the text the provider receives. Neither is allowed
 // to answer "no content at all" while a narrower window would have satisfied
@@ -468,7 +468,7 @@ func fitEntry(e *Entry, budget, maxBytes int, estimator *llms.TokenEstimator) st
 // provider rejects is a visible, diagnosable failure instead.
 //
 // Which of the two limits binds is decided entirely by file size, because
-// fitEntry has already sized every entry against the WHOLE request budget on
+// fitEntry has already sized every entry against the whole request budget on
 // its own. Measured by TestPackingTable at the shipped 60k budget and 6 files
 // per request, by the row names it prints: "6 tiny" (20-line files) fills a
 // request to 4.9% of budget and "6 small (200L)" to 36.1%, both split only by
@@ -550,7 +550,7 @@ func Render(e Entry) string {
 	if e.HasContent() {
 		if e.Truncated {
 			// The width is stated because it tells the model how much of the
-			// file it is NOT seeing. Without it, a window reads like a whole
+			// file it is not seeing. Without it, a window reads like a whole
 			// file, and "this helper is never called" is a confident finding
 			// drawn from the part that happened to be elided.
 			//

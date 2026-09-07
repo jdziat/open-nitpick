@@ -152,7 +152,7 @@ func TestAssembleDegradesWhenContentUnavailable(t *testing.T) {
 	if len(plan.Degraded) != 1 || plan.Degraded[0].Reason != ReasonUnavailable {
 		t.Errorf("degraded = %+v, want the unavailable reason recorded", plan.Degraded)
 	}
-	// The file WAS reviewed, so it must not also appear as skipped: the
+	// The file was reviewed, so it must not also appear as skipped: the
 	// renderer lists Skipped under "Files not reviewed".
 	if len(plan.Skipped) != 0 {
 		t.Errorf("skipped = %+v, want empty for a file that was reviewed", plan.Skipped)
@@ -200,7 +200,7 @@ func TestGeneratedFilesDoNotSpendTheFileLimit(t *testing.T) {
 	// only recognisable once its content has been read, and counting it against
 	// the limit before that refused reviewable files behind it for a limit
 	// nothing reviewed had reached: six files at max_files=3 whose first three
-	// were generated reviewed NOTHING, and reported success.
+	// were generated reviewed nothing, and reported success.
 	cfg := baseConfig()
 	cfg.Review.MaxFiles = 3
 
@@ -276,7 +276,7 @@ func TestAssembleSkipsNonUTF8(t *testing.T) {
 
 func TestMaxFileBytesWindowsRatherThanStrips(t *testing.T) {
 	// The bug this pins: max_file_bytes decided whether content was attached AT
-	// ALL, so a file one byte over the cap was reviewed from its diff while a
+	// All, so a file one byte over the cap was reviewed from its diff while a
 	// file one byte under it got a full window. The cap bounds what a run
 	// holds; it must not decide how much of a file is understood.
 	cfg := baseConfig()

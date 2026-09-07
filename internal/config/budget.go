@@ -8,7 +8,7 @@ import (
 
 // Budget bounds what one review may spend.
 //
-// The ceiling changes what the run DOES rather than stopping it partway: a
+// The ceiling changes what the run does rather than stopping it partway: a
 // review that died at ninety cents would publish a partial result that reads
 // like a complete one, which is the failure this package spends most of its
 // effort preventing. Over the ceiling, files are ranked by how much review

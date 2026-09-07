@@ -837,7 +837,7 @@ func phpstanSpec() toolSpec {
 	return toolSpec{
 		name: "phpstan", languages: "PHP",
 		exts: []string{".php"},
-		// operatorOnly AND trusted: phpstan needs a configuration naming the
+		// operatorOnly and trusted: phpstan needs a configuration naming the
 		// project's autoloader, and running it loads that autoloader.
 		isolation: operatorOnly, trusted: true,
 		args: func(inv invocation) []string {

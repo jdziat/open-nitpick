@@ -17,7 +17,7 @@ import (
 // A change may not supply the policy it is reviewed under. open-nitpick
 // reviews pull requests, and a pull request can edit the .nitpick.yaml it is
 // reviewed under, so when the change modifies that file, the file in the
-// change is not authoritative for THIS review and policy comes from a revision
+// change is not authoritative for this review and policy comes from a revision
 // the change cannot write.
 //
 // This is deliberately one seam rather than a growing list of scrubbed keys.

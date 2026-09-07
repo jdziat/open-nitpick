@@ -468,7 +468,7 @@ func allExpertPrompts(t *testing.T) []expertPrompt {
 // expert both delete the finding.
 //
 // Every case here is a real defect whose text happens to use another domain's
-// words. The assertion is on the expert NOT reached; which of the remaining
+// words. The assertion is on the expert not reached; which of the remaining
 // experts takes it matters less than that it is not the one whose scale would
 // rate it away.
 func TestIncidentalVocabularyDoesNotCaptureAFinding(t *testing.T) {

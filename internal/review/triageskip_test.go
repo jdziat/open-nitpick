@@ -51,7 +51,7 @@ func TestCleanReviewDoesNotCallTriage(t *testing.T) {
 	}
 }
 
-// TestCleanReviewStillPublishesItsNotices guards what skipping triage must NOT
+// TestCleanReviewStillPublishesItsNotices guards what skipping triage must not
 // take with it. The notices are rendered from the report, not from the triage
 // pass, and they are the reason silence is readable: a run whose analyzer never
 // executed has to say so, or "no findings" reads as a clean bill of health.

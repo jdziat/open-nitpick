@@ -65,7 +65,7 @@ type DumpRecord struct {
 	// fails on it rather than inserting a blank finding at 0.
 	Index int `json:"index"`
 
-	// Silent marks a review that reported NOTHING.
+	// Silent marks a review that reported nothing.
 	//
 	// Such a review used to write no lines at all, which made it indomitably
 	// ambiguous: a contender that stayed correctly silent on a clean fixture
@@ -87,7 +87,7 @@ type DumpRecord struct {
 	Findings int `json:"findings,omitempty"`
 
 	// Verdicts is how many verdicts the judge returned for the whole sample,
-	// which is NOT recoverable from the lines themselves.
+	// which is not recoverable from the lines themselves.
 	//
 	// This file attaches at most one verdict per finding position, so a judge
 	// that answered index 0 twice, or answered an index that has no finding,
@@ -112,11 +112,11 @@ type DumpRecord struct {
 
 	// AlsoAt are the further regions the finding claimed.
 	//
-	// IT IS RECORDED FOR THE SCORER, NOT FOR THE JUDGE, and it was omitted for
+	// IT IS RECORDED FOR THE SCORER, not FOR THE JUDGE, and it was omitted for
 	// exactly that reason: judgeRequest shows one location per finding, so a
 	// secondary span changes nothing about the prompt a re-judge rebuilds. What
 	// it does change is every detection number. anchorDistance takes the minimum
-	// over the primary span AND every region here, and coverInto unions them, so
+	// over the primary span and every region here, and coverInto unions them, so
 	// ANCHOR and NOISE are both computed from this field, and Incumbent is the
 	// reviewer that fills it, from its "Also applies to" lines.
 	//
@@ -139,7 +139,7 @@ type DumpRecord struct {
 	// loss would be invisible in most of the file and decisive in the rest.
 	AlsoAt []review.LineSpan `json:"also_at,omitempty"`
 
-	// Severity is the level THIS PROJECT recorded the finding at. It is not
+	// Severity is the level this PROJECT recorded the finding at. It is not
 	// necessarily a word the reviewer used, and the two fields below say which.
 	//
 	// THE BUG: it was written under a bare "severity" key beside
@@ -301,7 +301,7 @@ const runDumpDir = ".eval-runs"
 // RECALL, NOISE, ANCHOR and L/DEF are pure functions of (findings, fixture) and
 // need no judge and no network to recompute.
 //
-// THE RECORDING IS NOT GATED ON THE JUDGE, and saying so is load-bearing rather
+// THE RECORDING IS not GATED ON THE JUDGE, and saying so is load-bearing rather
 // than decorative: the arithmetic needing no judge is worth nothing if the write
 // happens after a judge call that can fail. It did, and a review whose judge call
 // errored was discarded, findings already paid for, and on the incumbent's side
@@ -309,14 +309,14 @@ const runDumpDir = ".eval-runs"
 // cache. TestEveryPaidReviewIsRetainedWhateverTheJudgeSays holds the write above
 // every return that follows the judge.
 //
-// It does NOT change OpenDump. That function's nil-on-unset contract is shared
+// It does not change OpenDump. That function's nil-on-unset contract is shared
 // by the remaining callers and pinned by TestDumpDisabledCostsNothing, and the
 // nil no-op is what lets every call site drop a record unconditionally; a
 // default resolved inside it would also leave EnvDump empty, which is what the
 // re-judge path's collision check used to be the whole of. Batteries that want
 // retention ask for it here.
 //
-// WHICH BATTERIES THOSE ARE IS DERIVED, NOT LISTED, and the earlier version of
+// WHICH BATTERIES THOSE are IS DERIVED, not LISTED, and the earlier version of
 // this sentence is why. It said the tuning axes still used OpenDump deliberately
 // because "their corpus can be reviewed again", true of TestTunePersona, the
 // one battery that remains on OpenDump, and false of TestJudgeModels, which

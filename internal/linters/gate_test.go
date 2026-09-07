@@ -274,7 +274,7 @@ func TestFailOnCriticalGatesOnAnAnalyzerCritical(t *testing.T) {
 // belongs to the operator, so it is configuration.
 //
 // THE BUG: moving the reduction to policy time put it in linters' normalize,
-// which runs BEFORE triage. Triage is told to raise severities and the expert
+// which runs before triage. Triage is told to raise severities and the expert
 // pass revises in both directions, and neither reapplied the ceiling, so an
 // operator who wrote max_severity: warning had capped what triage was SHOWN and
 // nothing else, and a re-rated semgrep finding still failed a critical gate. The

@@ -214,7 +214,7 @@ func (s *Set) Statuses() []review.LinterStatus {
 // counter, no log, no status. That single line was the sink for the line
 // directive attack, golangci-lint reports real findings at a forged path, and
 // they arrive here as "a path not in the diff", and it was also where the
-// opt-in analyzer config lost EVERY finding, because an operator config outside
+// opt-in analyzer config lost every finding, because an operator config outside
 // the repository made golangci-lint print paths relative to that config's
 // directory.
 //
@@ -224,7 +224,7 @@ func (s *Set) Statuses() []review.LinterStatus {
 // from a review that ran less than you think is indistinguishable from silence
 // from clean code.
 //
-// This is NOT the whole published list. review.Engine's anchor filter runs after
+// This is not the whole published list. review.Engine's anchor filter runs after
 // normalize and drops analyzer findings of its own. It was found doing so
 // silently, downstream of this fix and with the same three symptoms, so the
 // engine merges its drops into the same block. See review.SortDiscards.
@@ -440,7 +440,7 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 }
 
 // normalize converts analyzer findings into review findings, dropping those
-// that cannot be anchored to the change AND RECORDING EVERY ONE IT DROPS.
+// that cannot be anchored to the change and RECORDING every ONE IT DROPS.
 //
 // What was here was three bare `continue` statements. They are the correct
 // behaviour, a comment cannot be published on a line the forge will not accept
@@ -496,7 +496,7 @@ func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 		// something critical while the published comment says warning would be
 		// this project disagreeing with itself in one report.
 		//
-		// It is NOT true that no model is ever shown a declined level: this
+		// It is not true that no model is ever shown a declined level: this
 		// comment said so and was false. The expert validation pass reads
 		// Finding.Severity in validationRequest, downstream of this and of
 		// triage, so with a ceiling of warning and a triage that raises to
@@ -511,7 +511,7 @@ func (s *Set) normalize(found []Finding, files diff.Files) []review.Finding {
 		// Engine.capAnalyzerFindings.
 		severity = s.cfg.Linters.CapSeverity(severity)
 
-		// EVERY analyzer finding's severity is this project's word, including
+		// Every analyzer finding's severity is this project's word, including
 		// the ones whose spelling happens to match ours. A shared spelling is not
 		// a shared scale: semgrep's ERROR is a rule author's judgement inside
 		// semgrep's own four-level vocabulary, where it is a synonym for HIGH,
@@ -609,7 +609,7 @@ func (s *Set) uncover(gaps []review.LinterUncovered) {
 }
 
 // reasonForUnknownPath decides which of the two "not in the diff" answers a
-// path deserves, and IT IS THE ONE DECISION HERE THAT IS NOT BOOKKEEPING.
+// path deserves, and IT IS THE ONE DECISION HERE that IS not BOOKKEEPING.
 //
 // A path that is not in the change is ordinary. Go is analyzed a package at a
 // time, so golangci-lint routinely reports on a sibling file the change never
@@ -622,7 +622,7 @@ func (s *Set) uncover(gaps []review.LinterUncovered) {
 // , so this is the visible half of a thing whose invisible half puts this bot's
 // name on an accusation about somebody else's line.
 //
-// WHAT IS DONE WITH IT, AND WHY THAT AND NOT MORE. It is recorded under its own
+// WHAT IS DONE WITH IT, and WHY that and not MORE. It is recorded under its own
 // reason and published, rather than being turned into a finding of its own or
 // used to fail the analyzer from here. Two reasons. Publishing it as a finding
 // would mean anchoring it, and the only honest anchor is the file carrying the
@@ -838,7 +838,7 @@ func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 // run" is the analyzer's own convention, so the code is returned and the runner
 // that knows reads it. golangci-lint is invoked with --issues-exit-code 0 and
 // semgrep documents 0 and 1 as success, and both of them report a failed
-// analysis with a non-zero exit AND a well-formed report on stdout, which used
+// analysis with a non-zero exit and a well-formed report on stdout, which used
 // to arrive here as success and decode to zero findings.
 //
 // An exit of ZERO with no output is caught downstream by decodeJSON, which

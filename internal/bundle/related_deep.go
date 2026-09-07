@@ -269,7 +269,7 @@ func (c *relatedCollector) pyDefiningFile(file, name string) string {
 // --- Go: methods on imported types --------------------------------------------
 
 // goMethodWants returns, for a type T of package pkg that the change uses, the
-// methods called on ANY receiver in the added lines that pkg defines on T. The
+// methods called on any receiver in the added lines that pkg defines on T. The
 // receiver's static type is not known here, so a method is attached on the
 // strength of its name alone, which over-attaches only when two types in scope
 // share a method name, and under-attaches never.

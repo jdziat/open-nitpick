@@ -127,7 +127,7 @@ type Comment struct {
 	Class string
 }
 
-// Diff sides for a review comment, matching GitHub's LEFT/RIGHT parameter.
+// Diff sides for a review comment, matching GitHub's LEFT/right parameter.
 const (
 	SideLeft  = "LEFT"
 	SideRight = "RIGHT"

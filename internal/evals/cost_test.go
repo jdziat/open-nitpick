@@ -841,7 +841,7 @@ func TestPromptSizeCountsTheCachedSubset(t *testing.T) {
 //
 // THE BUG the presence test fixes: the whole llms.Usage was compared against its
 // zero value, and TotalTokens is copied through verbatim from any OpenAI-shaped
-// endpoint. A provider reporting ONLY a total therefore passed as a complete
+// endpoint. A provider reporting only a total therefore passed as a complete
 // report, contributed no priced tokens, and rendered as $0.000000 across every
 // cost column, known, unfootnoted, and the cheapest row in the table.
 func TestACallReportingNoUsageIsNotPricedAsZero(t *testing.T) {
@@ -1274,7 +1274,7 @@ func TestAPublishedFreeCacheRateIsNotTheInputFallback(t *testing.T) {
 // a charge this table cannot represent.
 //
 // The two anthropic entries publish a 1-hour cache TTL at 1.6x the 5-minute
-// rate. A usage report says how many cache-creation tokens were written and NOT
+// rate. A usage report says how many cache-creation tokens were written and not
 // which TTL they were written at, so the amount is one of two numbers 1.6x apart
 // and nothing here can say which. It was billed silently at the 5-minute rate,
 // the cheaper of the two, which is the flattering direction.
@@ -1446,7 +1446,7 @@ func TestTwoAmountsWithOverlappingBandsAreNotOrderable(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 // costFixture is one fixture of the battery the strategies below are run over:
-// a REAL fixture, plus what reviewing it costs to send.
+// a real fixture, plus what reviewing it costs to send.
 //
 // It was a synthetic tuple, a name, a planted count and a prompt size, and the
 // strategies returned hand-written Detections beside it. That made this whole
@@ -1516,7 +1516,7 @@ const costRunsPerFixture = 2
 
 // costPrices is the rate table the degenerate-strategy rows are priced against.
 //
-// THIS COMMENT USED TO CLAIM it "prices the two models every strategy is run
+// This COMMENT USED TO CLAIM it "prices the two models every strategy is run
 // as", and that was FALSE when it was written. The "a model nobody priced"
 // strategy sets costStrategy.model to test/unpriced precisely so that it is
 // absent from here, being unpriced IS that row's behaviour, and it is the one
@@ -1554,7 +1554,7 @@ type costStrategy struct {
 	// while still having happened.
 	run func(f costFixture, run int) (findings []review.Finding, usage CallUsage, reported bool)
 
-	// maxes declares, for EVERY published cost reading by name, whether this
+	// maxes declares, for every published cost reading by name, whether this
 	// strategy is expected to score at least as well as the calibrated reviewer.
 	// Every cell must be filled: publishing a new cost column means answering,
 	// for each of these, "can this behaviour score as well as being useful?"
@@ -1666,7 +1666,7 @@ func degenerateCostStrategies() []costStrategy {
 				return findings, CallUsage{Prompt: f.prompt, Completion: spamTokens * len(findings)}, true
 			},
 			maxes: map[string]bool{"cost effectiveness": false},
-			// NOISE AND ANCHOR, and the second name is here because this guard
+			// NOISE and ANCHOR, and the second name is here because this guard
 			// put it here. The row declared NOISE alone, and once ANCHOR began
 			// counting the union of every finding claiming ONE defect, the
 			// guesses this strategy scatters through the file started landing in
@@ -1771,7 +1771,7 @@ func ledgerFor(t *testing.T, s costStrategy) (strategy, reference CostRow) {
 	return ledger.Row(model), ledger.Row("test/reference")
 }
 
-// observeCostRun scores one published review and books it, along the SAME path a
+// observeCostRun scores one published review and books it, along the same path a
 // real run takes: findings into ScoreRun, the Score into ObserveScore.
 //
 // Going through ObserveScore rather than calling Observe with assembled
@@ -1823,7 +1823,7 @@ func costScoreOf(c CostReading, r CostRow) string {
 
 // TestNoDegenerateCostStrategyCanMaxOutAPublishedCostReading asks of every cost
 // number these reports publish the question nobody asked of the severity column
-// that was withdrawn: WHAT MAXIMISES THIS?
+// that was withdrawn: WHAT MAXIMISES this?
 //
 // Cost has an ugly answer available to it that severity does not. A reviewer
 // that fails most runs and succeeds cheaply on the easy ones is priced only on
@@ -1948,7 +1948,7 @@ func withoutColumns(c CostReading, drop []string) CostReading {
 // publishing five columns instead of one, and until this test they were
 // comments. Removing the named columns must let the strategy through; if it does
 // not, either the column is not doing the work the comment claims or the
-// strategy does not embody the behaviour it describes, and BOTH are things this
+// strategy does not embody the behaviour it describes, and both are things this
 // table is supposed to know about itself.
 //
 // It found one on the way in. The line-by-line spammer was written spending MORE

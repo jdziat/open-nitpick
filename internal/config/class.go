@@ -51,7 +51,7 @@ const (
 
 	// ClassUnknown is where an unrecognized class lands.
 	//
-	// It is published at EVERY level on purpose. severity.go makes the same
+	// It is published at every level on purpose. severity.go makes the same
 	// call for the same reason: an unexpected vocabulary should produce a
 	// visible, non-gating finding rather than silently vanishing. Routing
 	// unknowns to a filtered class instead would turn "the model wrote a word

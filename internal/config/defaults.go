@@ -34,12 +34,12 @@ var DefaultIgnore = []string{
 // DefaultLinters lists the runners enabled out of the box. Only those with
 // something to read in the change are executed.
 //
-// eslint and semgrep are NOT here, and their absence is the whole point: both
+// eslint and semgrep are not here, and their absence is the whole point: both
 // refuse to run without an operator configuration outside the repository,
 // eslint because its config is JavaScript it would execute, semgrep because it
 // has no default rule set, so neither can ever run under the shipped defaults.
 //
-// THE BUG THAT CAUSED: with all four listed, `mode: strict` failed EVERY review
+// THE BUG that CAUSED: with all four listed, `mode: strict` failed every review
 // out of the box, on "linter semgrep is enabled but not available: not
 // configured". Strict means "an analyzer I asked for did not run", and nobody
 // asked for these two. The default list did. Listing an analyzer that cannot
@@ -68,7 +68,7 @@ func Defaults() *Config {
 				StructuredOutput: StructuredAuto,
 
 				// The timeout is generous on purpose, and max_tokens is
-				// deliberately NOT set. A reasoning model spends its thinking
+				// deliberately not set. A reasoning model spends its thinking
 				// inside max_tokens on most providers and inside the wall
 				// clock on all of them, and the two-minute, 8k-token defaults
 				// this used to ship lost one review in five on glm-5.3-flash:

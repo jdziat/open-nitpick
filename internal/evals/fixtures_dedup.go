@@ -6,10 +6,10 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // property no other fixture has: the same defect is reportable from more than
 // one batch, so the merge that runs before triage has something to merge.
 //
-// WHAT WAS WRONG. ts-unbounded-memo-key made this project's first multi-batch
+// WHAT was wrong. ts-unbounded-memo-key made this project's first multi-batch
 // review happen at all, seven files at the shipped max_files_per_request of 6
 // , but it was authored to keep the plant and the files needed to see it in the
-// SAME batch, because a defect split across requests is one no reviewer can
+// Same batch, because a defect split across requests is one no reviewer can
 // find and a plant nothing can find scores as a prompt weakness forever. That
 // is the right call for a scored plant, and its cost is that the second batch
 // has nothing to say: only one batch ever reports the defect, so dedupe(),
@@ -19,7 +19,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // measurement or any test. fixtures_warning.go says so in its own words: "a
 // fixture that makes it do so is still owed". This is that fixture.
 //
-// WHY BOTH BATCHES REPORT IT. The defect is one bug with two faces, and each
+// WHY both BATCHES REPORT IT. The defect is one bug with two faces, and each
 // batch holds a complete, independently reportable face of it:
 //
 //   - platform/retry/retry.go:16 (batch 2) is the CAUSE. Replayable used to
@@ -40,14 +40,14 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // it. Here, splitting it across batches DUPLICATES it. That inversion is the
 // whole fixture.
 //
-// WHY BOTH NAME THE SAME LINE. The two reports collapse only if they land on
+// WHY both NAME THE same LINE. The two reports collapse only if they land on
 // the same path and line, because Finding.Key is path, line and normalized
 // title. review.md tells a reviewer to "anchor to the line where the problem
 // is, not where its effect surfaces", and for this defect that line is
 // retry.go:16, the predicate that declares a POST replayable. The effect side
 // reaches the same line from the other end: charge.go's own import names the
 // helper, the helper is part of this same change, and filterAnchors validates a
-// finding's path against the WHOLE change rather than against the batch that
+// finding's path against the whole change rather than against the batch that
 // produced it, which is what lets a finding from batch 1 anchor there at all.
 //
 // THE RESIDUAL, STATED RATHER THAN HIDDEN: review.md also says "path must
@@ -82,7 +82,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // in a file this change does not own. SeverityNote below is written for that
 // day; it changes nothing today.
 //
-// IT WAS RUN. Both states were extracted to a temp module and built, vetted,
+// IT was RUN. Both states were extracted to a temp module and built, vetted,
 // gofmt-ed and executed under `go test`. Head reproduces the plant, a gateway
 // that applies a capture and then reports a timeout receives the same capture
 // body twice for one order, and base does not, because base refuses to replay
@@ -98,7 +98,7 @@ func dedupFixtures() []Fixture {
 // crossBatchReplayFixture widens a retry helper's "safe to repeat" predicate
 // and, in the same change, sends a payment capture through it.
 //
-// THE BATCH SPLIT IS LOAD-BEARING AND IT IS ALPHABETICAL. git orders a diff by
+// THE BATCH SPLIT IS LOAD-BEARING and IT IS ALPHABETICAL. git orders a diff by
 // path, bundle.batch fills a request with up to max_files_per_request entries in
 // that order, and exactly six of the eight changed paths sort before platform/:
 // three under billing/, three under internal/. So batch 1 is billing/charge.go
@@ -115,7 +115,7 @@ func dedupFixtures() []Fixture {
 // were enough to falsify the same claim about ts-unbounded-memo-key while
 // `go test ./...` printed ok.
 //
-// THE FILLER IS NOT PADDING AND IT IS NOT DECORATION. Six files carry no
+// THE FILLER IS not PADDING and IT IS not DECORATION. Six files carry no
 // defect, five holding batch-1 slots and version.go riding along in batch 2,
 // and every one of them is a change a reviewer should wave through: a method
 // that reports whether a customer left an address, a total over entries the
@@ -126,7 +126,7 @@ func dedupFixtures() []Fixture {
 // bundle for having nothing to comment on, which would shrink the change back
 // to one batch.
 //
-// WHAT THE FIXTURE IS CAREFUL NOT TO INVITE. The head's predicate excludes
+// WHAT THE FIXTURE IS CAREFUL not TO INVITE. The head's predicate excludes
 // PATCH and admits GET, HEAD, PUT and DELETE, all four of which are
 // idempotent, so there is exactly one thing wrong with it: POST. An earlier
 // draft excluded DELETE instead, which is idempotent, and that hands a reviewer
