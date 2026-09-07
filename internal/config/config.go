@@ -108,8 +108,8 @@ type ModelSpec struct {
 	// loopback or private address.
 	//
 	// It is off by default and must be opted into deliberately. open-nitpick
-	// runs in CI against pull requests, and a pull request can edit
-	// .nitpick.yaml, so an endpoint pointing at an internal address turns the
+	// runs in CI against pull requests, and a pull request can edit.
+	// nitpick.yaml, so an endpoint pointing at an internal address turns the
 	// reviewer into an SSRF vector. The ollama and llamacpp providers already
 	// allow loopback themselves, so the ordinary local-model path does not
 	// need this.
@@ -485,8 +485,8 @@ type Linters struct {
 	// tree under review, on the reasoning that the tree is written by the change
 	// being reviewed. Analyzer configuration is the same object: it is policy,
 	// and a change may not supply the policy it is reviewed under, the
-	// invariant internal/config/basepolicy.go enforces for .nitpick.yaml. A
-	// .golangci.yml carrying `linters: {default: none}` switches off the entire
+	// invariant internal/config/basepolicy.go enforces for .nitpick.yaml. A.
+	// golangci.yml carrying `linters: {default: none}` switches off the entire
 	// deterministic half of its own review; a ruff `select = []` in
 	// pyproject.toml does the same for Python; adding an eslint.config.js is
 	// arbitrary JavaScript that eslint loads and EXECUTES with the review's

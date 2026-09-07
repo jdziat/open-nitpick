@@ -71,7 +71,7 @@ const (
 	//
 	// The default suits a one-file fixture. It is not enough for a multi-file
 	// one: collecting the seven-file ts-unbounded-memo-key against the incumbent
-	// CLI exceeded four minutes and was refused -- correctly, since a truncated
+	// CLI exceeded four minutes and was refused, correctly, since a truncated
 	// review must never be cached, but the run then had no way to ask for more
 	// time without editing this file. A corpus that now contains fixtures of very
 	// different sizes needs the bound to be settable per run.

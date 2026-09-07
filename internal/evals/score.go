@@ -1677,8 +1677,8 @@ const (
 	// whole-metric guards.
 	tableScored tableKind = iota
 
-	// tableUnscored is a table whose columns are readings another track defines
-	//, cost accounting, judge-swap agreement. Choosing it is a CLAIM: that this
+	// tableUnscored is a table whose columns are readings another track defines,
+	// cost accounting, judge-swap agreement. Choosing it is a CLAIM: that this
 	// file cannot classify those columns without asserting things it does not
 	// compute. They are still subject to every guard that runs over all headers,
 	// which is what the cross-tool severity withdrawal needs.

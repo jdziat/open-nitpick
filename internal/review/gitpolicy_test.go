@@ -152,8 +152,8 @@ func TestTheAttackAgainstARealCheckout(t *testing.T) {
 
 	// (b) the instruction the change planted never speaks in its own voice.
 	//
-	// The text is still in the prompt, and has to be: the change edits
-	// .nitpick.yaml, so those lines are part of the diff under review and a
+	// The text is still in the prompt, and has to be: the change edits.
+	// nitpick.yaml, so those lines are part of the diff under review and a
 	// reviewer that could not see them would be useless. What matters is WHERE
 	// it appears. Quoted inside a fenced diff every line carries a `+` and its
 	// indentation; the attack is the same bytes at column 0, under "Repository

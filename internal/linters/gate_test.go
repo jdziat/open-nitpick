@@ -66,7 +66,8 @@ type scriptedTriage struct {
 	rendered []string
 }
 
-// triageLine matches renderForTriage's "1. [severity] path:line, title".
+// triageLine matches renderForTriage's numbered line: an index, the severity in
+// brackets, the location, an em dash, then the title.
 var triageLine = regexp.MustCompile(`(?m)^\d+\. \[([^\]]+)\] ([^:\n]+):(\d+) — (.+)$`)
 
 func (e *scriptedTriage) GenerateContent(_ context.Context, msgs []llms.Message, _ ...llms.CallOption) (*llms.Response, error) {

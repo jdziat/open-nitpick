@@ -1008,8 +1008,8 @@ func TestFingerprintDistinguishesWhatTheReviewerSaw(t *testing.T) {
 // TestReparseCachedRaw re-derives every cached review from its retained raw
 // text and rewrites the cache in place.
 //
-// This is what retaining raw bought. Both anchor fixes -- keeping the end of a
-// span, and reading the "Also applies to" line -- changed how a review parses,
+// This is what retaining raw bought. Both anchor fixes (keeping the end of a
+// span, and reading the "Also applies to" line) changed how a review parses,
 // and every cached entry predates them. Without the raw text the only way to
 // apply a parser fix to an existing corpus is to buy the reviews again, which
 // is how a benchmark ends up quietly scored under two different parsers.

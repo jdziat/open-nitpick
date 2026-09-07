@@ -304,8 +304,8 @@ severity:
 //
 // A pull request needed to add ONE FILE that is not source and not
 // configuration. golangci-lint 2.8.0 then exits 7 while printing a perfectly
-// well-formed report, {"Issues":[],"Report":{"Error":"typechecking error: ..."}}
-// , and every layer agreed it was clean: runCommand tolerates a non-zero exit
+// well-formed report, {"Issues":[],"Report":{"Error":"typechecking error: ..."}},
+// and every layer agreed it was clean: runCommand tolerates a non-zero exit
 // when stdout is non-empty, decodeJSON is satisfied by a payload, and zero
 // Issues is zero findings. Strict mode caught nothing either, because there was
 // no error to catch.

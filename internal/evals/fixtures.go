@@ -839,7 +839,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 				Line: 19,
 				Keywords: []string{
 					// "arbitrary" alone was here and was credited to a finding about
-					// another fixture's unbounded cache -- "remove this cache for
+					// another fixture's unbounded cache, "remove this cache for
 					// arbitrary queries". The adjective is common; what is specific
 					// is WHAT is arbitrary, so it now has to carry its noun.
 					"path traversal", "traversal", "sanitiz", "../", "untrusted",
@@ -861,8 +861,8 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 				Keywords: []string{
 					// "concurrent" was here and was credited to a finding about
 					// another fixture's package-level default. What is left names
-					// the mechanism -- a race, the mutex this struct already
-					// carries, the counter itself -- rather than the topic.
+					// the mechanism (a race, the mutex this struct already
+					// carries, the counter itself) rather than the topic.
 					"race", "data race", "mutex", "unsynchron", "atomic", "h.count",
 				},
 				Class:        config.ClassConcurrency,
@@ -875,7 +875,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 				Keywords: []string{
 					// "close", "defer" and bare "leak" were here. Every one is a
 					// word an ordinary Go review types about any deferred close
-					// anywhere -- including a nil-deref finding in another fixture
+					// anywhere, including a nil-deref finding in another fixture
 					// that says "the deferred Close still runs". What survives
 					// names the descriptor that is lost, not the mechanism that
 					// would have released it.
@@ -1019,7 +1019,7 @@ func Fetch(url string) (int, error) {
 			Line: 10, // resp, _ := http.Get(url)
 			Keywords: []string{
 				// "nil", "panic" and "dereference" were here and were credited to
-				// a finding about another fixture's exported *Set -- prose that
+				// a finding about another fixture's exported *Set: prose that
 				// noticed nothing in this file. A keyword must be a phrase only a
 				// reviewer that saw this discarded error would write, so what is
 				// left names the error, the variable it leaves nil, or the

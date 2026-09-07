@@ -3,8 +3,8 @@
 //
 // Provider construction goes through the SDK's by-name registry, so every
 // provider the SDK supports, including local ollama and llama.cpp servers and
-// any OpenAI-compatible gateway reached via base_url, is usable from
-// .nitpick.yaml without changes here.
+// any OpenAI-compatible gateway reached via base_url, is usable from.
+// nitpick.yaml without changes here.
 package llm
 
 import (

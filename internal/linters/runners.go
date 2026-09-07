@@ -34,15 +34,15 @@ import (
 //     `linters: {default: none}` switches off the entire deterministic half of
 //     its own review, and the run reports success. `[tool.ruff.lint] select =
 //     []` in pyproject.toml does the same for Python.
-//  2. Enablement. A semgrep Detect requiring only that .semgrep.yml or
-//     .semgrepignore exist lets a pull request that adds one turn semgrep on,
+// 2. Enablement. A semgrep Detect requiring only that .semgrep.yml or
+// .semgrepignore exist lets a pull request that adds one turn semgrep on,
 //     with rules the pull request wrote, in the run reviewing it.
 //  3. Code execution. eslint.config.js is JavaScript that eslint loads and
 //     runs, so a pull request adding one runs arbitrary code in CI with
 //     GITHUB_TOKEN and the model API key in the environment.
 //
-// A fourth is worse than silencing because it is not an absence: fabrication.
-// golangci-lint's forbidigo takes a `msg` from the config file and prints it
+// A fourth is worse than silencing because it is not an absence: fabrication
+// .golangci-lint's forbidigo takes a `msg` from the config file and prints it
 // verbatim as the finding text, so a change can author the words of a
 // deterministic finding that reaches the reviewing model as evidence.
 //
@@ -667,8 +667,8 @@ func goEnvironment(ctx context.Context, repoRoot string) goBuildContext {
 //
 // `go env` prints each named variable on its own line, in the order asked for.
 // This splits by LINE rather than by field, which is not a stylistic choice:
-// GOVERSION carries spaces on a development toolchain ("devel go1.26-abc123
-// ..."), and a variable with no value prints an EMPTY line, so a whitespace
+// GOVERSION carries spaces on a development toolchain ("devel go1.26-abc123.
+// .."), and a variable with no value prints an EMPTY line, so a whitespace
 // split would slide the second answer into the first one's place and report the
 // Go version as the cgo setting.
 func parseGoEnv(out []byte) (goBuildContext, bool) {
@@ -744,8 +744,8 @@ func parseGoEnv(out []byte) (goBuildContext, bool) {
 // that was not covered.
 //
 // SUPPRESSION IS THE OTHER HALF, and it is here because it is the same fact
-// about the same run: the analyzer read the file and was told to say nothing.
-// golangci-lint has no flag that disables its own //nolint, so this cannot be
+// about the same run: the analyzer read the file and was told to say nothing
+// .golangci-lint has no flag that disables its own //nolint, so this cannot be
 // prevented from outside the tree the way a config file can. It can only be
 // counted. What made it worth counting is the SCOPE. A //nolint is not per-line:
 // golangci-lint expands it to the declaration it is attached to, and attached to
@@ -1025,8 +1025,8 @@ func moduleLanguageVersion(modFile string) (declared string, line int, ok bool) 
 // goNolintLines returns the lines carrying a golangci-lint nolint directive.
 //
 // It lexes rather than matching lines, so that a string literal or prose QUOTING
-// `//nolint`, which this repository's own tests, README and this comment all do
-// , is not published as a suppression somebody added.
+// `//nolint`, which this repository's own tests, README and this comment all do,
+// is not published as a suppression somebody added.
 //
 // The acceptance rule is measured against golangci-lint 2.8.0 rather than
 // guessed, because guessing here fails in the direction that puts a wrong

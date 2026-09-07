@@ -9,8 +9,8 @@ package evals
 // limit neither of them can cover.
 //
 // WHAT HAPPENED. review.md illustrated `info` with "Widening an exported type's
-// accepted input is info. Adding a dependency for one helper function is info."
-//, kotlin-widened-input and rust-crate-for-one-call stated almost verbatim,
+// accepted input is info. Adding a dependency for one helper function is info.",
+// kotlin-widened-input and rust-crate-for-one-call stated almost verbatim,
 // three lines above "These examples ... are deliberately drawn from defect
 // classes you are unlikely to meet in this change; do not go looking for them."
 // The prompt named two planted defects and then told the reviewer to ignore
@@ -171,8 +171,8 @@ func asRendered(s string) string {
 // nothing to an asterisk. Measured byteExact=false, wsCollapse=false,
 // asRendered=true on all four. (The sentence here used to read "pass a
 // byte-exact scan and the whitespace-collapsing one and fail both", which
-// contradicts itself and is wrong either way it is read.) A marker wrapping a WHOLE keyword
-// , "`data loss`", is not among them on purpose: it is found by every version
+// contradicts itself and is wrong either way it is read.) A marker wrapping a WHOLE keyword,
+// "`data loss`", is not among them on purpose: it is found by every version
 // of this function, so it would sit here proving nothing.
 func TestThePromptScanSeesThroughEmphasis(t *testing.T) {
 	for _, c := range []struct{ keyword, prompt string }{

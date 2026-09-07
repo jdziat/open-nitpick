@@ -332,8 +332,8 @@ func (c *Config) configPaths(repoRoot string) []string {
 	}
 
 	// Source is empty when no file was read, and a change that DELETES the
-	// config file, or renames it away, or replaces it with a dangling symlink
-	//, produces exactly that checkout. Skipping it there would let a change
+	// config file, or renames it away, or replaces it with a dangling symlink,
+	// produces exactly that checkout. Skipping it there would let a change
 	// swap the repository's accepted policy for built-in defaults by removal
 	// rather than by edit, with nothing reported: the weakest policy available,
 	// chosen by the change, silently.

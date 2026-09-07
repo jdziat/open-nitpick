@@ -475,8 +475,8 @@ type Aggregate struct {
 	// DetAnchoredLines is the same per-defect measurement summed instead of
 	// maxed, over the defects these reviews located, and it is published as L/DEF
 	// beside the max because neither fold subsumes the other: a max hides uniform
-	// vagueness exactly as a mean hides one blob. Its denominator is SevGraded()
-	//, the located-defect count RECALL is also divided by, rather than a second
+	// vagueness exactly as a mean hides one blob. Its denominator is SevGraded(),
+	// the located-defect count RECALL is also divided by, rather than a second
 	// counter folded here, because two integers for "how many defects this
 	// contender found" are two answers free to drift.
 	// TestRecallAndCoverageAreOneReadingOfOneCorpus pins them as one.
@@ -530,7 +530,7 @@ type Aggregate struct {
 	// Comparability is about COVERAGE, not sample count. Judging one contender
 	// once per fixture and another three times over the same fixtures leaves
 	// both with identical coverage and very different len(Grades), and a guard
-	// that reads the length calls that incomparable -- which it is not, and
+	// that reads the length calls that incomparable, which it is not, and
 	// which fires as a false alarm the moment RUNS is raised on one side.
 	//
 	// That REASONING IS CORRECT FOR THE COLUMNS IT was WRITTEN FOR and IS not
@@ -938,8 +938,8 @@ func (a Aggregate) DetectionCells() (recall, noise, anchor, spread string) {
 	// the one where the cells describe a smaller corpus rather than a thinner
 	// sample of the same one. Splitting ShortFixtures out of a single list is
 	// what made this two conditions, and asking only the first here would have
-	// left a row that folded nothing for a fixture printing four unmarked cells
-	//, quieter than the defect the split was fixing.
+	// left a row that folded nothing for a fixture printing four unmarked cells,
+	// quieter than the defect the split was fixing.
 	mark := ""
 	if len(a.ShortFixtures()) > 0 || len(a.UnmeasuredFixtures()) > 0 {
 		mark = shortSampleMark
@@ -1139,11 +1139,11 @@ func SeverityVocabularyBlock(rows []VocabularyRow) string {
 // translated and the ruff runner records no word, so a row of ruff findings
 // produced it.
 //
-// CASE IS DECIDED IN ONE PLACE. The note compared with == while SeverityUsage
-// .Lines suppresses the "[we read as X]" marker with EqualFold, so a model
+// CASE IS DECIDED IN ONE PLACE. The note compared with == while SeverityUsage.
+// Lines suppresses the "[we read as X]" marker with EqualFold, so a model
 // printing "Critical" was announced as a translated word above a row that quoted
-// it unmarked. Lines' rule is the right one and its reason is written out there
-// , a difference of case is not a difference of vocabulary, so this now asks
+// it unmarked. Lines' rule is the right one and its reason is written out there,
+// a difference of case is not a difference of vocabulary, so this now asks
 // the same question rather than a second, differently-spelled one.
 func translatedWordsNote(rows []VocabularyRow) string {
 	readings := map[string]map[string]bool{}
@@ -1376,8 +1376,8 @@ type JudgedFigure struct {
 
 	// crossStimulus marks a figure two judges scored FROM DIFFERENT FINDING
 	// LISTS. It is mutually exclusive with corroborated by construction,
-	// NotComparable is the only thing that sets it, and it never sets the other
-	//, because a figure that reported itself as both would be one branch away
+	// NotComparable is the only thing that sets it, and it never sets the other,
+	// because a figure that reported itself as both would be one branch away
 	// from rendering a delta again.
 	//
 	// When it is set, second is left at zero and never read. Storing the other
@@ -2111,8 +2111,8 @@ func JudgedModelRow(model string, c CrossJudged, failed int) string {
 
 	// Read off c.Primary for the reason the O-* cells are: Corroborate folds only
 	// Saw and Add into the second judge's aggregate, so a detection counter on
-	// c.Second is zero by construction. These four carry no delta and need none
-	//, ScoreDetection consults no judge, which CrossJudgeLegend states beside
+	// c.Second is zero by construction. These four carry no delta and need none,
+	// ScoreDetection consults no judge, which CrossJudgeLegend states beside
 	// the same admission for O-*.
 	recall, noise, anchor, spread := c.Primary.DetectionCells()
 

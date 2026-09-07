@@ -543,8 +543,8 @@ func TestAssembleHonorsContextCancellation(t *testing.T) {
 func TestWindowSurvivesChangedLinesPastEndOfFile(t *testing.T) {
 	// Raised as an "error" by open-nitpick reviewing its own history: that a
 	// changed line number beyond the file's length would write past the end of
-	// the keep slice. It cannot -- hi is clamped to len(lines), so the fill
-	// loop does not run when lo exceeds it -- but the mismatch it assumes is
+	// the keep slice. It cannot: hi is clamped to len(lines), so the fill
+	// loop does not run when lo exceeds it. But the mismatch it assumes is
 	// real. ChangedLines yields new-file numbers while content may be fetched
 	// at a different revision, so this pins the property rather than trusting
 	// the clamp to survive a future edit.

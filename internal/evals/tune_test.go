@@ -938,8 +938,8 @@ func reportJudgedModels(
 		}
 
 		// A row that was judged and never had its detection folded prints n/a in
-		// RECALL, NOISE, ANCHOR and L/DEF, the columns the ship decision is read off
-		//, and an n/a is otherwise the honest rendering of "no review here". The
+		// RECALL, NOISE, ANCHOR and L/DEF, the columns the ship decision is read off,
+		// and an n/a is otherwise the honest rendering of "no review here". The
 		// two spellings of a blank are indistinguishable to a reader, so the one
 		// that means "a caller forgot to wire this" is failed rather than
 		// printed. This function is shared by two batteries and both fold; a
@@ -982,8 +982,8 @@ func reportJudgedModels(
 		// RECALL and NOISE are rates over each side's own counts, so one review
 		// per fixture and three answer the same question and the counts are
 		// printed. ANCHOR is a MAXIMUM, and a maximum over more draws is weakly
-		// larger, our side draws runs x fixtures where the cache draws fixtures
-		//, so with RUNS above 1 the column is biased AGAINST us. That is the
+		// larger, our side draws runs x fixtures where the cache draws fixtures,
+		// so with RUNS above 1 the column is biased AGAINST us. That is the
 		// conservative direction for a "no wider than theirs" reading, and it is
 		// a bias rather than a comparability, which is why it is written down
 		// instead of left for a reader to derive.

@@ -428,8 +428,8 @@ func TestPrefixRule(t *testing.T) {
 }
 
 func TestDecodeJSONIgnoresSurroundingNoise(t *testing.T) {
-	// Analyzers wrap their JSON in human-readable output on both sides.
-	// golangci-lint in particular appends a "1 issues:" summary after it, which
+	// Analyzers wrap their JSON in human-readable output on both sides
+	// .golangci-lint in particular appends a "1 issues:" summary after it, which
 	// a prefix trim alone does not handle.
 	cases := []struct {
 		name string

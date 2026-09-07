@@ -809,8 +809,8 @@ func overruledNotes(report *Report) string {
 			// purpose: this line explains why a finding is absent, and quoting a
 			// level the reader never saw published would make the explanation
 			// harder to follow, not easier. What must not happen is the reverse
-			// -- a ceiling of warning rendering "re-rated this from critical" as
-			// though critical had been published -- so the level printed here is
+			// (a ceiling of warning rendering "re-rated this from critical" as
+			// though critical had been published), so the level printed here is
 			// the one that WAS published for this finding.
 			fmt.Fprintf(&b, "  - %s re-rated this from %s to %s, below this repository's minimum severity: %s\n",
 				inline(r.Expert), r.Finding.Sev(), r.Revised, inline(r.Reason))

@@ -618,8 +618,8 @@ func writeConfig(t *testing.T, body string) (root string, cfg *config.Config) {
 
 	// Built-in defaults name no model, and the change's own file is the one thing
 	// that may not supply one. So the fallback has nothing to run on unless the
-	// environment does. This is the shape a repository whose only model lives in
-	// .nitpick.yaml has to be run in.
+	// environment does. This is the shape a repository whose only model lives in.
+	// nitpick.yaml has to be run in.
 	t.Setenv(config.EnvProvider, "openai")
 	t.Setenv(config.EnvModel, "gpt-4o")
 

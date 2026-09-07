@@ -1131,8 +1131,8 @@ func TestSeverityVocabularyRendersEveryCallItWasGiven(t *testing.T) {
 
 	// A word we did not translate carries no marker. Otherwise every line of
 	// every one of our own models would end in an annotation, and the one place
-	// the annotation MATTERS, a foreign word with no counterpart among our five
-	//, would be invisible in the noise.
+	// the annotation MATTERS, a foreign word with no counterpart among our five,
+	// would be invisible in the noise.
 	if strings.Contains(block, "critical x2 [we read as") {
 		t.Errorf("an untranslated word is annotated as though it had been translated:\n%s", block)
 	}
@@ -5099,7 +5099,7 @@ func TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered(t *testing.T) {
 	// plants of critical, error and warning, and 'critical' is credited on
 	// plants of critical and error. Neither vendor word corresponds to one of
 	// ours, which is the same conclusion that withdrew the cross-tool severity
-	// score -- now held up by measurement rather than by the absence of it.
+	// score, now held up by measurement rather than by the absence of it.
 	//
 	// Within that, warning is the PLURALITY landing for 'major', so the shipped
 	// mapping is the best single answer available. Recording that is not a

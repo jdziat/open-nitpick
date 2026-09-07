@@ -471,7 +471,7 @@ func parseCRFinding(lines []string, start int, severity, category string) (revie
 //
 // Both ends of a range are kept. Taking only the first number was wrong twice
 // over: "the credential is on lines 11-12" identifies a defect on line 12, and
-// the discarded end is not decoration -- Incumbent anchored the same defect at
+// the discarded end is not decoration: Incumbent anchored the same defect at
 // 7 on one run and at 11-12 on the next, so scoring the start alone converted
 // the reviewer's own variance into a flipped hit-or-miss. See anchorDistance.
 //

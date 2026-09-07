@@ -260,8 +260,8 @@ export function rosterHeading(teamName: string, count: number): string {
 // no cross-file component: everything needed is on one line. sorted() builds a
 // full copy of the list and orders all of it; min() with the same key walks it
 // once and allocates nothing. The two agree on ties as well as on the answer,
-// sorted() is stable, so [0] is the first minimum, which is what min() returns
-// , so this is a pure cost with no behavioral difference to weigh.
+// sorted() is stable, so [0] is the first minimum, which is what min() returns,
+// so this is a pure cost with no behavioral difference to weigh.
 //
 // The false positive it invites is the empty-list objection: sorted(...)[0]
 // raising IndexError is a real bug in the general case, and a reviewer that

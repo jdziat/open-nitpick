@@ -135,8 +135,8 @@ func (l *Local) BaseRevision(ctx context.Context, ref Ref) (string, error) {
 // mergeBase resolves the fork point, matching the three-dot range Diff uses.
 //
 // Unrelated histories and shallow clones have no merge base. The named base is
-// still a revision this change did not author, the property a caller is after
-// , so it is used rather than failing the resolution outright.
+// still a revision this change did not author, the property a caller is after,
+// so it is used rather than failing the resolution outright.
 func (l *Local) mergeBase(ctx context.Context, base, head string) (string, error) {
 	out, err := l.git(ctx, "merge-base", base, head)
 	if err != nil {

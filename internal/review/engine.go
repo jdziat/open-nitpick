@@ -40,8 +40,8 @@ type Engine struct {
 	//
 	// It is a constructor for the same reason Linters is, and the omission was
 	// worse: models.* names the model that reads the diff, its temperature, its
-	// token ceiling and its timeout, so roles built from the change's own
-	// .nitpick.yaml meant a change could still choose the model that reviewed it
+	// token ceiling and its timeout, so roles built from the change's own.
+	// nitpick.yaml meant a change could still choose the model that reviewed it
 	// (a one-billion-parameter model returns an empty findings list and the run
 	// looks clean), while the published notice said its configuration had not
 	// been applied. Optional; a caller that wires Roles by hand instead cannot
@@ -1883,9 +1883,9 @@ func renderForTriage(pr *vcs.PullRequest, findings []Finding) string {
 	fmt.Fprintf(&b, "%d findings were reported across separate batches:\n\n", len(findings))
 	for i, f := range findings {
 		// The title is flattened onto one line. An analyzer message can contain
-		// newlines -- a semgrep rule whose `message:` is a YAML block scalar
+		// newlines. A semgrep rule whose `message:` is a YAML block scalar
 		// arrives as "shell=True passes the string to /bin/sh.\nUse a list
-		// argument instead.\n", measured against semgrep 1.172.0 -- and an
+		// argument instead.\n", measured against semgrep 1.172.0, and an
 		// unflattened one breaks the numbered list the triage model answers
 		// against, so its reply cannot be matched back through Finding.Key().
 		// The finding then arrives at the gate with no Source and no

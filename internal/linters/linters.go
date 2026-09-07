@@ -421,8 +421,8 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 // that cannot be anchored to the change and RECORDING every ONE IT DROPS.
 //
 // What was here was three bare `continue` statements. They are the correct
-// behaviour, a comment cannot be published on a line the forge will not accept
-// , and they were the wrong accounting: an analyzer finding entered this
+// behaviour, a comment cannot be published on a line the forge will not accept,
+// and they were the wrong accounting: an analyzer finding entered this
 // function and nothing anywhere said it had left. Two live defects hid in that
 // gap, one of them an attack (a line directive forging the reported path) and
 // one of them our own (an operator's config making every path unresolvable), and

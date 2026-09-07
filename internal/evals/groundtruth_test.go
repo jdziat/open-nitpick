@@ -459,7 +459,7 @@ func declaredProbes() map[string]fixtureProbes {
 				// "nil", "panic" and "dereference" were removed from this
 				// fixture's keywords because they credited prose about another
 				// file entirely. Removing a keyword can silently cost recall --
-				// that happened once and nothing caught it -- so each natural
+				// that happened once and nothing caught it, so each natural
 				// phrasing of the real detection is pinned here.
 				"says the error is unchecked without using the removed words",
 				review.Finding{Path: "fetch.go", Line: 10, Severity: "error", Category: "correctness",
@@ -1582,8 +1582,8 @@ const inertProse = "A remark on this change. It refers to %s and asserts nothing
 //
 // TRIPLING THE SOURCE SET did not CHANGE that, which is the same lesson arriving
 // twice. Adding every fixture's declared objections took the sources from 63 to
-// 142 and found thirteen new overlaps, and not one of them TARGETS an info plant
-// , the info fixtures appear only as sources, where kotlin's visibility objection
+// 142 and found thirteen new overlaps, and not one of them TARGETS an info plant,
+// the info fixtures appear only as sources, where kotlin's visibility objection
 // reaches contract-break's `consumer`. More material does not make a loop reach
 // where its exclusion rule forbids.
 //
@@ -1878,8 +1878,8 @@ func TestAFixturesOwnObjectionsAreNotCreditedAtItsPlants(t *testing.T) {
 // and predicate and thirteen credit a plant; twelve of the thirteen are words
 // the corpus never uses, so this loop cannot try them. `race` sits inside trace,
 // embrace, grace, brace, terrace and bracelet; `dst` inside midst and amidst;
-// `idor` inside corridor. Through the real scorer that is a variable-rename nit
-// , "corridor is a confusing name for this local; call it path", taking FULL
+// `idor` inside corridor. Through the real scorer that is a variable-rename nit,
+// "corridor is a confusing name for this local; call it path", taking FULL
 // recall on removed-guard's critical authorization plant, at zero cost in
 // precision.
 //
@@ -2088,8 +2088,8 @@ func checkVocabularyReachesBeyondSentences(t *testing.T, vocab map[string]map[st
 // IT IS AUTHORED, which is the method every generator in this file exists to get
 // away from, and it finds what its author thought of and nothing else. Worse,
 // the honest account of how it was built is that a handful of these words were
-// chosen after a run showed which keywords were short enough to hide inside one
-// , trace, midst and corridor are answers, not questions. The rest is filler,
+// chosen after a run showed which keywords were short enough to hide inside one,
+// trace, midst and corridor are answers, not questions. The rest is filler,
 // and the filler found two things the targeted words did not: `secret` inside
 // "secretly", and `exhaust` inside "exhaustive", ordinary prose about test
 // coverage taking full credit for a socket-exhaustion plant.
@@ -3839,8 +3839,8 @@ func TestIncumbentSeverityIsRecordedNotRewritten(t *testing.T) {
 
 	// The words crSeverity translates rather than degrades, enumerated.
 	//
-	// crSeverity's default arm is symmetric with our own models by construction
-	//, it calls the same Normalize, and the guard for that only ever tested
+	// crSeverity's default arm is symmetric with our own models by construction,
+	// it calls the same Normalize, and the guard for that only ever tested
 	// words that REACH the default. These three do not: they are foreign tokens
 	// given bespoke arms, so the identical word is worth a different level
 	// depending on which contender emitted it, and "major" carries more than
@@ -4109,8 +4109,8 @@ func TestHeldOutCorpusStaysHeldOut(t *testing.T) {
 // TestHeldOutFixturesAreSelectableByName proves the corpus can be run.
 //
 // Both halves matter and they pull in opposite directions: naming a held-out
-// fixture must select it, otherwise the set can only be spent by editing code
-// , and naming nothing must not, or a tuning loop consumes the held-out corpus
+// fixture must select it, otherwise the set can only be spent by editing code,
+// and naming nothing must not, or a tuning loop consumes the held-out corpus
 // on its first iteration and no one finds out.
 func TestHeldOutFixturesAreSelectableByName(t *testing.T) {
 	// OptionsFromEnv reads the whole environment, so the sibling variables are
