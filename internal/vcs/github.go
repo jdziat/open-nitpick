@@ -48,14 +48,12 @@ type GitHubOptions struct {
 // DefaultBotMarker identifies comments this tool published.
 const DefaultBotMarker = "<!-- open-nitpick -->"
 
-// requestTimeout bounds a single API call.
-//
-// github.NewClient(nil) uses http.DefaultClient, which has no timeout at all,
-// and the only context in play comes from signal.NotifyContext with no deadline
-// , so a connection the far side accepts and never answers hangs the review
-// forever with nothing logged after "parsed diff". It is generous because one
-// of these calls streams a file body; the point is that there is a ceiling, not
-// where it sits.
+// requestTimeout bounds a single API call. github.NewClient(nil) uses
+// http.DefaultClient, which has no timeout, and signal.NotifyContext supplies
+// no deadline, so without this a connection the far side accepts and never
+// answers hangs the review with nothing logged after "parsed diff". It is
+// generous because one of these calls streams a file body; what matters is
+// that a ceiling exists, not where it sits.
 const requestTimeout = 2 * time.Minute
 
 // NewGitHub builds a GitHub provider.
@@ -804,13 +802,10 @@ func (g *GitHub) ThreadComments(ctx context.Context, ref Ref, rootID int64) ([]T
 }
 
 // AnswerMarker distinguishes an answer to a mention from every other comment
-// the reviewer posts.
-//
-// The general bot marker cannot serve here. It is on published findings and on
-// the summary too, so counting it would let a review that posted five findings
+// the reviewer posts. The general bot marker sits on findings and on the
+// summary too, so counting it would let a review that posted five findings
 // exhaust a five-answer cap and refuse the first question anybody asked. The
-// cap is about how often the reviewer is TALKED TO, and only these comments
-// are that.
+// cap bounds how often the reviewer is addressed, and only these comments are.
 const AnswerMarker = "<!-- nitpick:answer -->"
 
 // CountAnswers counts the replies the reviewer has posted to mentions on a

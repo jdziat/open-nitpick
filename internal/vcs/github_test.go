@@ -67,7 +67,7 @@ func TestGitHubValidatesRef(t *testing.T) {
 func TestGitHubPullRequest(t *testing.T) {
 	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/repos/o/r/commits/abc123") {
-			// The head commit's message, read for a skip marker.
+			// Read for a skip marker before anything else is fetched.
 			_ = json.NewEncoder(w).Encode(map[string]any{"sha": "abc123", "commit": map[string]any{"message": "Add retry\n\n[skip review]"}})
 			return
 		}

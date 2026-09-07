@@ -114,9 +114,9 @@ func (l *Local) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 // BaseRevision resolves the revision the ref's diff was computed against.
 //
 // Every case below mirrors a case in Diff, and that correspondence is the whole
-// point: a caller reading a file "as it was before this change" has to read it
-// at the same revision the diff subtracted, or the two disagree about what the
-// change did.
+// point: a caller reading a file as it stood ahead of the change has to read
+// it at the same revision the diff subtracted, or the two disagree about what
+// the change did.
 func (l *Local) BaseRevision(ctx context.Context, ref Ref) (string, error) {
 	switch {
 	case ref.Head == Worktree && ref.Base == "":
@@ -146,14 +146,15 @@ func (l *Local) mergeBase(ctx context.Context, base, head string) (string, error
 }
 
 // FileContent reads a file at the ref's head. For a working-tree review the
-// file is read from disk, so uncommitted edits are reviewed as they actually
-// are rather than as they were last committed.
+// file is read from disk, so uncommitted edits are reviewed as they stand
+// rather than as they were last committed.
 //
 // Working-tree reads are confined to the repository. The reviewed branch is
 // frequently untrusted, `gh pr checkout` on an outside contributor's PR is the
 // documented workflow, and its diff decides which paths get read and sent to
 // the model. Without containment, a committed symlink such as
-// `notes.md -> ~/.ssh/id_rsa` would put a private key in the prompt.
+// `notes.md` pointing at `~/.ssh/id_rsa` would put a private key in the
+// prompt.
 func (l *Local) FileContent(ctx context.Context, ref Ref, path string) ([]byte, error) {
 	if ref.Head == Worktree {
 		return l.readContained(path)

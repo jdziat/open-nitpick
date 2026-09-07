@@ -115,28 +115,15 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 
 // generateTyped is llms.GenerateTyped with stall retries.
 //
-// A stall is the HTTP client's own timeout firing while the body was still
-// being read: the request left, the provider accepted it, and the answer never
-// finished arriving. From this side two things look exactly like that, and
-// the eval battery met both on gemma-4-31b in the same run:
-//
-//   - an upstream hung behind the router. The same request sent again is
-//     routed afresh and answers; 15 of 26 stalls in one battery did.
-//   - the model generating past any sensible length on this input, at this
-//     temperature. Sent again unchanged it loops again; 11 of 26 did.
-//
-// So the first retry is sent with an output cap when the caller set none. A
-// hung upstream answers under the cap; a runaway generation comes back cut,
-// with finish_reason=length or a JSON body that ends mid-value, and that is
-// the signal to change the one thing that decides the loop: the retry after a
-// truncation samples at a small temperature instead of zero. A review that
-// took that path is no longer reproducible by re-running it, and the log line
-// says so; the alternative was a review that did not exist.
-//
-// The budget is max_retries (default 3), the same number the SDK spends on
-// 429s and 5xx: both are transient failures that happen to cost a full
-// timeout to detect. Only while the caller's own context is live: a cancelled
-// review is not a stalled request.
+// A stall is the HTTP client's timeout firing mid-body: the request left, the
+// provider accepted it, the answer never finished. Two causes look identical
+// from here, both met on gemma-4-31b in one eval battery: an upstream hung
+// behind the router, which a fresh route answers (15 of 26), and a generation
+// running past any sensible length, which loops again unchanged (11 of 26). So
+// the first retry carries an output cap when the caller set none. A hung
+// upstream answers under it; a runaway comes back cut, and that truncation is
+// the signal to sample at a small temperature rather than zero, which the log
+// records because such a review will not reproduce. Budget is max_retries.
 func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (T, *llms.Response, error) {
 	for attempt := 0; ; attempt++ {
 		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
@@ -278,18 +265,14 @@ func hasMaxTokens(opts []llms.CallOption) bool {
 var errSchemaNotEnforced = errors.New("provider did not enforce the response schema")
 
 // requireSchemaEnforced rejects a schema-path response that decoded cleanly and
-// carries nothing.
-//
-// The bug: the schema path returned llms.GenerateTyped's value whenever its
-// error was nil, and GenerateTyped decodes with a bare json.Unmarshal. `{}`,
-// `null` and any unrelated object all decode into a struct as its zero value
-// with no error, so a batch that produced nothing was recorded as SUCCEEDED, it
-// never reached Report.Incomplete, and the run exited 0 calling the pull request
-// clean. decodeLenient has rejected exactly those three shapes on the JSON path
-// from the start; only the schema path was unguarded. Routing through a provider
-// that forwards response_format to whichever upstream it picked, and does not
-// require that upstream to honor it, is what made an unenforced schema response
-// reachable in the shipped configuration rather than theoretical.
+// carries nothing. GenerateTyped decodes with a bare json.Unmarshal, so `{}`,
+// `null` and any unrelated object reach a struct as its zero value with no
+// error; without this guard a batch that produced nothing is recorded as
+// succeeded, never reaches Report.Incomplete, and the run exits 0 calling the
+// pull request clean. decodeLenient rejects those three shapes on the JSON
+// path. A router that forwards response_format to whichever upstream it picked
+// without requiring that upstream to honor it is what makes an unenforced
+// schema response reachable in a shipped configuration.
 func requireSchemaEnforced[T any](resp *llms.Response, value T) error {
 	if resp == nil {
 		return fmt.Errorf("%w: empty response", errSchemaNotEnforced)

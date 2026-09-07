@@ -112,7 +112,7 @@ type Comment struct {
 	// lines, SideLeft for deletions.
 	Side string
 
-	// Body is markdown.
+	// Body is the comment text, rendered as markdown by the provider.
 	Body string
 
 	// Fingerprint identifies the finding this comment reports independently
@@ -138,7 +138,7 @@ type Review struct {
 	// Summary is the top-level walkthrough comment. It may be empty.
 	Summary string
 
-	// Comments are inline comments.
+	// Comments are anchored to a line of the diff.
 	Comments []Comment
 
 	// Event selects how the review is submitted.
@@ -281,22 +281,19 @@ type Provider interface {
 	// returns ErrNotFound when the file does not exist there.
 	FileContent(ctx context.Context, ref Ref, path string) ([]byte, error)
 
-	// PublishReview delivers the review.
+	// PublishReview posts the summary and every comment as one submission.
 	PublishReview(ctx context.Context, ref Ref, review Review) error
 
 	// Name identifies the provider for logs and errors.
 	Name() string
 }
 
-// BaseResolver names the revision a ref's change is measured against: the state
-// of the repository that already existed, and that the change under review
-// therefore did not author.
-//
-// It is deliberately separate from Provider. A wrapper or a test double that
-// has no way to answer must be *unable* to answer, its caller then falls back
-// to defaults and says so, where a method on Provider would oblige every
-// implementation to return something, and the plausible-looking something is
-// the head under review.
+// BaseResolver names the revision a ref's change is measured against: the
+// repository state the change under review did not author. It is separate from
+// Provider so that an implementation with no way to answer is unable to answer
+// and its caller falls back to defaults and says so, where a Provider method
+// would oblige every implementation to return something, and the
+// plausible-looking something is the head under review.
 type BaseResolver interface {
 	BaseRevision(ctx context.Context, ref Ref) (string, error)
 }
