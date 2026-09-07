@@ -11,10 +11,13 @@ import (
 // Attempts is how many times Do tries before giving up.
 const Attempts = 3
 
+// baseDelay is the pause before the second attempt; it grows per attempt.
+const baseDelay = 50 * time.Millisecond
+
 // Do calls f until it succeeds or the attempts run out.
 //
-// It retries immediately on failure, with no pause between attempts, so a
-// service that is refusing because it is overloaded is asked again at once.
+// It backs off between attempts so an overloaded dependency gets room to
+// recover, and it stops early if the caller cancels the context.
 func Do(ctx context.Context, f func(context.Context) error) error {
 	var last error
 	for i := 0; i < Attempts; i++ {
@@ -22,6 +25,16 @@ func Do(ctx context.Context, f func(context.Context) error) error {
 			return nil
 		} else {
 			last = err
+		}
+		if i+1 == Attempts {
+			break
+		}
+		timer := time.NewTimer(baseDelay * time.Duration(i+1))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
 		}
 	}
 	if last == nil {
