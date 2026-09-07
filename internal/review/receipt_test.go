@@ -110,3 +110,30 @@ func TestAnEmptyChangeProducesNoReceipt(t *testing.T) {
 		t.Errorf("receipt(nil) = %q", got)
 	}
 }
+
+// A failed style pass puts a marker in Incomplete that is not a path, so
+// counting it would report a file nobody can open.
+func TestTheStyleMarkerIsNotCountedAsAFile(t *testing.T) {
+	report := &Report{
+		Files:      diff.Files{{Path: "a.go"}, {Path: "b.go"}},
+		Plan:       planOfFiles(2),
+		Incomplete: []string{stylePassMarker},
+	}
+
+	got := receipt(report)
+	if strings.Contains(got, "could not be reviewed") {
+		t.Errorf("the style marker was counted as a file:\n%s", got)
+	}
+	if !strings.Contains(got, "style pass failed") {
+		t.Errorf("a failed style pass went unreported:\n%s", got)
+	}
+
+	report.Incomplete = []string{"b.go", stylePassMarker}
+	got = receipt(report)
+	if !strings.Contains(got, "1 file could not be reviewed") {
+		t.Errorf("want one file counted, not two:\n%s", got)
+	}
+	if !strings.Contains(got, "style pass failed") {
+		t.Errorf("both facts must appear:\n%s", got)
+	}
+}

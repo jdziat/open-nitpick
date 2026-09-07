@@ -575,7 +575,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		if err != nil {
 			e.log().Warn("style pass failed; the review is complete for defects "+
 				"but style findings are missing", "error", err)
-			report.Incomplete = append(report.Incomplete, "(style pass)")
+			report.Incomplete = append(report.Incomplete, stylePassMarker)
 		}
 		findings = append(findings, style...)
 	}
