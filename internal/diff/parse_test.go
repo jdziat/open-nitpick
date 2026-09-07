@@ -148,8 +148,8 @@ func TestPositionsContinueAcrossHunks(t *testing.T) {
 	if last.Position != 4 {
 		t.Errorf("last position of hunk 1 = %d, want 4", last.Position)
 	}
-	// Position 5 goes to the *second* header, an ordinary diff line, which puts
-	// the opening of hunk 2 at 6.
+	// Position 5 goes to the *second* header, an ordinary diff line, so the
+	// next hunk opens at 6.
 	first := f.Hunks[1].Lines[0]
 	if first.Position != 6 {
 		t.Errorf("first position of hunk 2 = %d, want 6 (the second header consumes a position)", first.Position)

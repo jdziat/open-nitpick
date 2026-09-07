@@ -454,18 +454,15 @@ func TestDecodeJSONIgnoresSurroundingNoise(t *testing.T) {
 	}
 }
 
-// TestDecodeJSONRequiresAPayload pins the assertion that an analyzer actually
-// reported.
+// TestDecodeJSONRequiresAPayload pins the assertion that an analyzer reported
+// something.
 //
-// THE BUG IT REPLACES: this test used to assert the opposite, that output with
-// no JSON in it is "the analyzer found nothing and said so in prose", and
-// therefore not an error. None of the four analyzers behaves that way:
-// golangci-lint prints {"Issues":[]}, ruff and eslint print [], semgrep prints
-// its envelope. So the only things reaching that branch were failures, and
-// combined with runCommand, which errors only when stdout is empty and the exit
-// was non-zero, an analyzer that exited 0 printing nothing was indistinguishable
-// from clean code. `semgrep --config auto --metrics off` had been shipping in
-// exactly that state.
+// Treating output with no JSON in it as "the analyzer found nothing and said
+// so in prose" is wrong for all four: golangci-lint prints {"Issues":[]}, ruff
+// and eslint print [], semgrep prints its envelope. Only failures reach that
+// branch, and with runCommand erring only when stdout is empty and the exit
+// non-zero, an analyzer exiting 0 printing nothing reads as clean code. That
+// is the state `semgrep --config auto --metrics off` produces.
 func TestDecodeJSONRequiresAPayload(t *testing.T) {
 	var parsed golangciOutput
 

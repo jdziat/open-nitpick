@@ -67,11 +67,10 @@ func goProbe(t *testing.T, source string) (string, diff.Files) {
 // not the thing under test: the language version of the toolchain that will
 // analyze it.
 //
-// A LITERAL HERE WOULD PUT A COVERAGE GAP IN every FIXTURE the day the toolchain
+// A literal here puts a coverage gap in every fixture the day the toolchain
 // moves past it. golangciLint.Uncovered names a module declaring less than the
-// toolchain analyzing it, so `go 1.24` on a go1.25 machine makes tests about
-// build constraints and suppressions fail over the one line they do not care
-// about.
+// toolchain analyzing it, so `go 1.24` on a go1.25 machine fails tests about
+// build constraints and suppressions over the one line they do not care about.
 func currentGoDirective() string {
 	if lang := version.Lang(runtime.Version()); lang != "" {
 		return strings.TrimPrefix(lang, "go")
@@ -520,11 +519,12 @@ func TestThisPackageIsAnalyzable(t *testing.T) {
 
 // TestDiscardedAnalyzerFindingsAreCountedAndNamed closes the sink itself.
 //
-// Three bare `continue` statements dropped analyzer findings with no counter, no
-// log and no status. The drops are correct, a comment cannot be published on a
-// line the forge will not accept, and the accounting was not: nothing anywhere
-// recorded that a finding had been reported and removed, which is how both the
-// line-directive attack and our own path-mode defect stayed invisible.
+// Three bare `continue` statements drop analyzer findings with no counter, no
+// log and no status. The drops are correct, since a comment cannot be
+// published on a line the forge will not accept, and the accounting is what is
+// missing: nothing records that a finding was reported and removed, which is
+// how the line-directive attack and this tool's own path-mode defect both stay
+// invisible.
 //
 // The reasons are asserted separately because the report separates them, and
 // because the separation is the decision: two of them are publication policy
@@ -645,12 +645,12 @@ func TestAnAnalyzerFindingCanCarryTextTheChangeWrote(t *testing.T) {
 // TestTheDirectiveDetectorIsTheGrammarAndNotAPattern is the mutation guard for
 // the refusal, in both directions.
 //
-// The detector used to be a regular expression approximating Go's line-directive
-// grammar, which is another way of saying it was a list of the spellings
-// somebody thought of. Two the toolchain accepts were missing, CRLF endings and
-// a `*` inside the block form's filename, and each of them was a complete
-// bypass: a full report at forged positions with the analyzer recorded as having
-// run. Asking go/scanner instead makes the accepted set the grammar's.
+// A regular expression approximating Go's line-directive grammar is a list of
+// the spellings somebody thought of. Two the toolchain accepts go missing that
+// way, CRLF endings and a `*` inside the block form's filename, and each is a
+// complete bypass: a full report at forged positions with the analyzer
+// recorded as having run. Asking go/scanner makes the accepted set the
+// grammar's.
 //
 // The negatives matter as much as the positives and are the reason this is a
 // table rather than two asserts. A detector that refuses files it should not is
@@ -1033,11 +1033,11 @@ func TestAChangedGoFileTheIgnoreListWithheldIsNamed(t *testing.T) {
 // TestAChangedGoFileIsNamedWhenTheIgnoreListWithheldThemAll is the half of the
 // ignore-list route the first fix left open, and it is the ordinary half.
 //
-// The coverage question used to be asked only of an analyzer that RAN. Detect is
-// handed reviewablePaths' output, so when review.ignore withholds every changed
-// Go file and some non-Go file survives, golangci-lint is offered nothing it
-// reads, returns errNoTargets, and the arm that records the skip used to
-// `continue` without ever asking what went uncovered.
+// Asking the coverage question only of an analyzer that ran leaves this open.
+// Detect is handed reviewablePaths' output, so when review.ignore withholds
+// every changed Go file and some non-Go file survives, golangci-lint is offered
+// nothing it reads and returns errNoTargets, and the arm recording that skip
+// has to ask what went uncovered rather than `continue`.
 //
 // Measured before the fix, `go.mod` + `vendor/example.com/dep/dep.go` carrying a
 // real unchecked error: `findings=0 statuses=[{golangci-lint skipped "the change
@@ -1371,12 +1371,12 @@ func TestTheGoDirectiveIsReadFromGoModTheWayTheGoToolReadsIt(t *testing.T) {
 		// only one that can be in force.
 		{name: "repeated", src: "module probe\n\ngo 1.24\ngo 1.15\n", declared: "1.24", line: 3},
 
-		// A `go` line inside a parenthesized block is a block entry, not the
-		// module's directive, and this used to read it as one: the first row
-		// returned ("1.99", 4) with the real directive on line 7 never reached.
-		// The comment justifying that said `go` is a reserved module path so no
-		// require line can begin with it, true of what the LOADER accepts, and
-		// this runs over a file the change wrote, before anything has loaded it.
+		// A `go` line inside a parenthesized block is a block entry rather than
+		// the module's directive. Reading it as one returns ("1.99", 4) and
+		// never reaches the real directive on line 7. The tempting argument,
+		// that `go` is a reserved module path so no require line can begin with
+		// it, holds for what the loader accepts, and this runs over a file the
+		// change wrote before anything has loaded it.
 		{
 			name:     "a go line inside a require block is not the directive",
 			src:      "module probe\n\nrequire (\n\tgo 1.99\n)\n\ngo 1.25\n",

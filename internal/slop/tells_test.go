@@ -109,8 +109,8 @@ func TestTheAntithesisShapeIsFound(t *testing.T) {
 		}
 	}
 
-	// A plain negation is not the shape. The tell is the pivot into a
-	// restatement, not the word "not".
+	// A plain negation is not the shape. What the rule looks for is the pivot
+	// into a restatement.
 	if got := Scan("x.md", "The linters are not run from the repository.\n"); len(got) != 0 {
 		t.Errorf("a plain negation was flagged: %+v", got)
 	}
@@ -241,8 +241,8 @@ func TestShoutingIsWordsNotShape(t *testing.T) {
 	}
 }
 
-// A comment that narrates its own history is a commit message that outlived
-// its commit.
+// A comment that narrates its own history is a commit message living past the
+// commit that carried it.
 func TestChangelogCommentsAreFound(t *testing.T) {
 	for _, line := range []string{
 		"// That check used to live here, and rejecting a file was wrong.\n",

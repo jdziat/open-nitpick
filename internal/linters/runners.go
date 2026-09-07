@@ -25,70 +25,66 @@ import (
 	"github.com/jdziat/open-nitpick/internal/review"
 )
 
-// ANALYZER CONFIGURATION IS POLICY, and POLICY COMES FROM OUTSIDE THE CHANGE.
+// Analyzer configuration is policy, and policy comes from outside the change.
 //
-// Every analyzer here used to be invoked in the tree under review with no
-// no-config flag, so each read its configuration from that tree. Three things
-// followed, in increasing severity:
+// An analyzer invoked in the tree under review with no no-config flag reads its
+// configuration from that tree. Three things follow, in increasing severity:
 //
-//  1. SILENCING. A pull request adding a .golangci.yml with
-//     `linters: {default: none}` switched off the entire deterministic half of
-//     its own review, and the run reported success. `[tool.ruff.lint] select =
-//     []` in pyproject.toml did the same for Python.
-//  2. ENABLEMENT. semgrep's Detect required only that .semgrep.yml or
-//     .semgrepignore EXIST, so a pull request that ADDED one turned semgrep on,
+//  1. Silencing. A pull request adding a .golangci.yml with
+//     `linters: {default: none}` switches off the entire deterministic half of
+//     its own review, and the run reports success. `[tool.ruff.lint] select =
+//     []` in pyproject.toml does the same for Python.
+//  2. Enablement. A semgrep Detect requiring only that .semgrep.yml or
+//     .semgrepignore exist lets a pull request that adds one turn semgrep on,
 //     with rules the pull request wrote, in the run reviewing it.
-//  3. CODE EXECUTION. eslint.config.js is JavaScript that eslint loads and
-//     EXECUTES. A pull request adding one ran arbitrary code in CI with
+//  3. Code execution. eslint.config.js is JavaScript that eslint loads and
+//     runs, so a pull request adding one runs arbitrary code in CI with
 //     GITHUB_TOKEN and the model API key in the environment.
 //
-// And a fourth that is worse than silencing, because it is not an absence:
-// FABRICATION. golangci-lint's forbidigo takes a `msg` from the config file and
-// prints it verbatim as the finding text, so a change could author the words of
-// a deterministic finding that reaches the reviewing model as evidence.
+// A fourth is worse than silencing because it is not an absence: fabrication.
+// golangci-lint's forbidigo takes a `msg` from the config file and prints it
+// verbatim as the finding text, so a change can author the words of a
+// deterministic finding that reaches the reviewing model as evidence.
 //
-// resolveBinary already refused an analyzer BINARY that resolves inside the
-// repository, on exactly this reasoning, while the same process handed that
-// binary a CONFIG FILE the pull request wrote. The rule is now the same for
-// both: a change may not supply the policy it is reviewed under, which is the
-// invariant internal/config enforces for .nitpick.yaml.
+// resolveBinary refuses an analyzer binary that resolves inside the repository
+// on this reasoning, and the rule is the same for the config file it is handed:
+// a change may not supply the policy it is reviewed under, the invariant
+// internal/config enforces for .nitpick.yaml.
 //
 // What that does not close is in-source suppression. `//nolint`, `# noqa`,
-// `# nosemgrep` and `eslint-disable` are comments in the code, not
-// configuration, and golangci-lint has no flag to disable its own. THE SCOPE OF
-// That was UNDERSTATED BY A whole FILE, here and in the README: a //nolint is not
-// per-line. golangci-lint expands it to the declaration it is attached to, and
-// attached to the package clause it covers the entire file, so a one-line diff
-// adding `//nolint:all` above `package p` takes a file with pre-existing
-// violations to zero findings, on lines the change never touched. It cannot be
-// prevented from outside the tree, so it is counted and published instead; see
-// golangciLint.Uncovered.
+// `# nosemgrep` and `eslint-disable` are comments in the code rather than
+// configuration, and golangci-lint has no flag to disable its own. Its scope is
+// a whole file, not a line: golangci-lint expands a //nolint to the declaration
+// it is attached to, and attached to the package clause it covers everything,
+// so a one-line diff adding `//nolint:all` above `package p` takes a file with
+// pre-existing violations to zero findings on lines the change never touched.
+// It cannot be prevented from outside the tree, so it is counted and published
+// instead; see golangciLint.Uncovered.
 //
-// And CONFIGURATION IS not THE only WAY THE TREE CAN SILENCE AN ANALYZER. A
-// change that breaks the package LOAD silences golangci-lint just as completely
-//, go.work naming other modules, a build constraint excluding every file in the
-// directory, and that route does not go through a config file at all. Those
-// runs used to be read as clean, because golangci-lint reports the failure in
-// the same JSON envelope it reports issues in, and this file parsed the envelope
-// while throwing the failure away. See golangciLint.findings.
+// Configuration is not the only way the tree can silence an analyzer. A change
+// that breaks the package load silences golangci-lint as completely, through
+// go.work naming other modules or a build constraint excluding every file in
+// the directory, and that route touches no config file. Such a run reads as
+// clean unless the failure is pulled out of the JSON envelope golangci-lint
+// reports issues in. See golangciLint.findings.
 //
-// A LOAD FAILURE IS THE LOUD SHAPE OF that, and THERE IS A QUIET ONE. The
-// constraint has to empty the whole DIRECTORY to fail the load; put one
-// unconstrained sibling beside the changed file and the package loads perfectly
-// while the changed file is never read. `//go:build windows`, `//go:build
-// ignore` and a plain rename to app_windows.go all reached zero findings, exit
-// 0, a nil error and the roster line "ran". Nothing there is a failure to
-// report, so it is reported as a coverage gap; see golangciLint.Uncovered.
+// A load failure is the loud shape of that, and there is a quiet one. The
+// constraint has to empty the whole directory to fail the load; put one
+// unconstrained sibling beside the changed file and the package loads while the
+// changed file is never read. `//go:build windows`, `//go:build ignore` and a
+// plain rename to app_windows.go each reach zero findings, exit 0, a nil error
+// and the roster line "ran". Nothing there is a failure to report, so it is
+// reported as a coverage gap; see golangciLint.Uncovered.
 //
-// POLICY IS not A LIST OF FILENAMES, and DRAWING THE BOUNDARY AROUND CONFIG
-// FILES LEFT THE PROPERTY OPEN. Policy is anything in the tree that decides what
-// the review reports, and --no-config closed one channel while opening another:
-// it removed the attacker's configuration and OUR ability to set defaults in the
-// same stroke, leaving golangci-lint's own defaults in charge, and those
-// defaults read the tree. Measured against golangci-lint 2.8.0:
+// Policy is not a list of filenames, and drawing the boundary around config
+// files leaves the property open. Policy is anything in the tree that decides
+// what the review reports, and --no-config closes one channel while opening
+// another: it removes the attacker's configuration and this tool's own defaults
+// in the same stroke, leaving golangci-lint's defaults in charge, and those
+// read the tree. Measured against golangci-lint 2.8.0:
 //
-//   - `// Code generated by protoc-gen-go. DO not EDIT.` on line 1 of the file
-//     under review skips that file entirely, because linters.exclusions.generated
+//   - the standard `Code generated ... do not edit` header on line 1 of the
+//     file under review skips it entirely, because linters.exclusions.generated
 //     defaults to "lax". Zero findings, exit 0, empty Report.Error, status
 //     "ran(isolated)", byte-identical to a clean run, in strict mode too.
 //   - max-same-issues defaults to 3 and max-issues-per-linter to 50, so a package
@@ -100,16 +96,16 @@ import (
 //
 // None of that needs a config file, and only the first has a config-file switch
 // (`linters.exclusions.generated: disable`, with no command-line equivalent in
-// 2.8.0). So open-nitpick ships its own config, materialized OUTSIDE the tree
-// under review, and passes the rest as flags that bind an operator's config too.
-// See golangciLint.Run and golangci.yml.
+// 2.8.0). So open-nitpick ships its own config, materialized outside the tree
+// under review, and passes the rest as flags that bind an operator's config
+// too. See golangciLint.Run and golangci.yml.
 //
-// THE POSITIONS are PART OF THE REPORT, and THE TREE CAN REWRITE THOSE AS WELL.
+// The positions are part of the report, and the tree can rewrite those as well.
 // A Go line directive above the offending function makes golangci-lint report
-// real findings at a forged path, see positionsRewritten and goDirectiveLine.
-// The detector for that used to be a regular expression, and an approximation of
-// a grammar is a list of the spellings somebody thought of: CRLF line endings and
-// a `*` in the block form's filename both walked past it.
+// real findings at a forged path; see positionsRewritten and goDirectiveLine.
+// The detector reads the grammar rather than approximating it with a regular
+// expression, which is a list of the spellings somebody thought of: CRLF line
+// endings and a `*` in the block form's filename both walk past one.
 
 // analyzerConfig is one analyzer's operator-supplied configuration, resolved
 // and checked for containment once, at construction.
@@ -311,14 +307,12 @@ func (g *golangciLint) Detect(_ context.Context, repoRoot string, files []string
 	return nil
 }
 
-// State says which configuration golangci-lint read.
-//
-// The isolated case no longer says only "isolated". It was true and incomplete:
-// the run was isolated from the tree, and it was also running under
-// golangci-lint's stock defaults, which is how a `// Code generated` line in the
-// diff switched the analyzer off for that file. A reader has to be able to tell
-// "nothing configured this" from "open-nitpick configured this", because the two
-// report different things about the same code.
+// State says which configuration golangci-lint read. The isolated case names
+// the config as well: "isolated" alone is true and incomplete, since a run
+// isolated from the tree with no config of ours runs under golangci-lint's
+// stock defaults, which is how a `// Code generated` line in the diff switches
+// the analyzer off for that file. A reader has to tell "nothing configured
+// this" from "open-nitpick configured this".
 func (g *golangciLint) State() string {
 	return g.cfg.state("isolated: open-nitpick's own analyzer config")
 }
@@ -445,53 +439,49 @@ func (g *golangciLint) Run(ctx context.Context, repoRoot string, files []string)
 // severity is decided from the analyzer's real output, and a test that
 // hand-builds the Finding has already made the decision under test.
 //
-// golangci-lint's Severity is not a vocabulary at all. It is whatever text is
-// written in the config file's `severity` block. Under the default that file can
-// only be one the OPERATOR supplied out of tree, so calling it the operator's
-// text is now true; it used to be false on any fork pull request, where the
-// person writing it was the contributor being reviewed. With no config at all
-// golangci-lint publishes no severity, so every finding here arrives as warning
-// via mapSeverity's default branch.
+// golangci-lint's Severity is not a vocabulary. It is whatever text is written
+// in the config file's `severity` block, and under the default that file can
+// only be one the operator supplied out of tree, which is what makes calling it
+// the operator's text true: read from the tree it would be the contributor's
+// on any fork pull request. With no config at all golangci-lint publishes no
+// severity, so every finding here arrives as warning via mapSeverity's default.
 //
-// THE BUG, and IT was BEING EXPLOITED BY A ONE-FILE DIFF: a report that PARSED
-// was read as a report of an analysis that HAPPENED. Adding a go.work that does
+// A report that parsed must not be read as an analysis that happened, and a
+// one-file diff is enough to exploit the difference. Adding a go.work that does
 // not list the module makes golangci-lint 2.8.0 exit 7 while printing
 // {"Issues":[],"Report":{"Error":"typechecking error: directory pkg is contained
 // in a module that is not one of the workspace modules listed in go.work..."}}.
-// runCommand tolerates a non-zero exit whenever stdout is non-empty (analyzers
-// exit non-zero on findings), decodeJSON was satisfied because a payload
-// arrived, and zero Issues read as clean code, so a pull request switched off
-// the entire deterministic half of its own Go review by ADDING ONE FILE, and the
-// run reported success in strict mode as well as auto. `//go:build ignore` on
-// the changed file reproduces it exactly. There is nothing to salvage from such
-// a run: 2.8.0 abandons the whole invocation, so a second, healthy package in
-// the same run reports nothing either, measured, not assumed.
+// runCommand tolerates a non-zero exit whenever stdout is non-empty, since
+// analyzers exit non-zero on findings, decodeJSON is satisfied by the payload,
+// and zero Issues reads as clean code, so a pull request switches off the
+// entire deterministic half of its own Go review by adding one file and the run
+// reports success in strict mode as well as auto. `//go:build ignore` on the
+// changed file reproduces it. There is nothing to salvage: 2.8.0 abandons the
+// whole invocation, so a second, healthy package reports nothing either.
 //
-// And THE THIRD SHAPE, WHICH THE FIRST TWO both MISS and WHICH IS THE ONE A
-// CHANGE REACHES WITHOUT TRYING: a package that does not COMPILE. golangci-lint
-// 2.8.0 reports that as an ordinary Issue with FromLinter "typecheck", exits
-// ZERO, and leaves Report.Error EMPTY, so neither check above fires. Measured,
-// on a change that adds one file:
+// The third shape is the one a change reaches without trying, and the first two
+// miss it: a package that does not compile. golangci-lint 2.8.0 reports that as
+// an ordinary Issue with FromLinter "typecheck", exits zero, and leaves
+// Report.Error empty, so neither check above fires. Measured, on a change that
+// adds one file:
 //
 //	Issues: [{FromLinter: "typecheck",
 //	          Text: ": # probe/pkg\npkg/b.go:4:9: undefined: undefinedSymbol",
 //	          Pos: {Filename: "pkg/a.go", Line: 1}}]
 //
 // Three things make that a silencing rather than a finding. The analysis is
-// ABANDONED, not degraded: a second, healthy package in the same invocation
-// reported nothing either, so one broken package deletes every other package's
-// results. The issue is anchored to line 1 of the alphabetically FIRST file in
-// the package rather than to the file that failed, so with the default
-// only_changed_lines it is dropped by normalize and nothing is published at
-// all. And `go build ./...` STAYS GREEN when the offending file is a _test.go,
-// so the change looks healthy to everything except the review it silenced.
-// End to end that was zero findings, a nil error, and status "ran: isolated",
-// byte-identical to a clean review, in strict mode as well as auto.
+// abandoned rather than degraded, so one broken package deletes every other
+// package's results in the same invocation. The issue anchors to line 1 of the
+// alphabetically first file in the package rather than the file that failed, so
+// the default only_changed_lines has normalize drop it and nothing is published
+// at all. And `go build ./...` stays green when the offending file is a
+// _test.go, so the change looks healthy to everything except the review it
+// silenced. End to end that is zero findings, a nil error and status "ran:
+// isolated", byte-identical to a clean review, in strict mode as well as auto.
 //
-// So a typecheck issue is read as what it is: not a lint result, but
-// golangci-lint reporting through the issue channel that it could not analyze
-// the code. Its Text carries the real file and line, which Report.Error would
-// not have given us, so that is what the status line quotes.
+// So a typecheck issue is read as golangci-lint reporting through the issue
+// channel that it could not analyze the code. Its Text carries the real file
+// and line, which Report.Error would not give, so the status line quotes that.
 func (g *golangciLint) findings(out []byte, exit int) ([]Finding, error) {
 	var parsed golangciOutput
 	if err := decodeJSON(out, &parsed); err != nil {
@@ -536,27 +526,25 @@ func (g *golangciLint) findings(out []byte, exit int) ([]Finding, error) {
 // golangciReportArgs are the flags that decide how much of golangci-lint's
 // report reaches this process, and how its positions are spelled.
 //
-// They are FLAGS rather than lines in golangci.yml so that they bind an
-// operator's linters.golangci_config as well as ours. That is deliberately
-// overriding the operator, and the justification is that none of the four
-// chooses which rules run: they decide how much of the analyzer's own output
-// survives to be gated, and this project's rule is that a finding produced and
-// then discarded may not vanish silently. Every one of these was measured
-// against golangci-lint 2.8.0.
+// They are flags rather than lines in golangci.yml so that they bind an
+// operator's linters.golangci_config as well as ours. Overriding the operator
+// is deliberate: none of the four chooses which rules run, they decide how much
+// of the analyzer's own output survives to be gated, and a finding produced and
+// then discarded may not vanish silently. Each was measured against
+// golangci-lint 2.8.0.
 //
-//   - --path-mode abs. THE OPT-IN PATH was PUBLISHING nothing, and this is the
-//     fix. run.relative-path-mode defaults to `cfg`, paths relative to the
-//     CONFIG FILE's directory, so an operator config outside the repository
-//     made every issue arrive as "../repo/app.go". files.Find missed all of
-//     them and Set.normalize dropped the lot without a word: the operator who
-//     configured their own rules to get their review back got an analyzer that
-//     ran, reported, and published zero findings. Absolute paths cannot be
-//     re-based by anything, and repoPath already relativizes them.
+//   - --path-mode abs. run.relative-path-mode defaults to `cfg`, paths relative
+//     to the config file's directory, so an operator config outside the
+//     repository makes every issue arrive as "../repo/app.go". files.Find
+//     misses all of them and Set.normalize drops the lot without a word, so the
+//     operator who configured their own rules to get their review back gets an
+//     analyzer that ran, reported and published nothing. Absolute paths cannot
+//     be re-based, and repoPath already relativizes them.
 //   - --max-same-issues 0 and --max-issues-per-linter 0. The defaults are 3 and
 //     50, and the truncation is invisible: eight identical errcheck violations
-//     arrive as three, with nothing in the JSON saying five were cut. A change
-//     can therefore push a real finding out of the report with decoys.
-//   - --uniq-by-line=false. The default keeps ONE issue per line. A
+//     arrive as three, with nothing in the JSON saying five were cut, so a
+//     change can push a real finding out of the report with decoys.
+//   - --uniq-by-line=false. The default keeps one issue per line. A
 //     two-statement function reported four issues with it off and two with it
 //     on; the pair that disappeared were staticcheck's, hidden behind an
 //     ineffassign on the same line.
@@ -594,16 +582,16 @@ var golangciReportArgs = []string{
 //     `*/`, so `/*line z*z.go:1*/` is one complete directive naming a file
 //     called z*z.go.
 //
-// go/scanner is not a longer list of spellings, it is the grammar: `//line ` at
-// the start of a line or `/*line ` anywhere, per go/scanner's own `prefix`. It
-// is also stricter in the direction that matters for false refusals. A trailing
-// space (`//line z.go:1 `) is not a directive and the old pattern refused the
-// file for it; `//line` inside a string literal is not a comment at all and the
-// old pattern could not tell.
+// go/scanner supplies the grammar: `//line ` at the start of a line or
+// `/*line ` anywhere, per its own `prefix`. It is also stricter in the
+// direction that matters for false refusals. A trailing space in
+// `//line z.go:1 ` makes it no directive, and a pattern refuses the file for
+// it; `//line` inside a string literal is no comment at all, and a pattern
+// cannot tell.
 //
-// It reports a directive only where the position it produces DIFFERS from the
-// natural one, because a refusal has to be earned. `//line probe.go:4` on line 3
-// of probe.go renumbers nothing, and neither does a directive with no token
+// It reports a directive only where the position it produces differs from the
+// natural one, because a refusal has to be earned. `//line probe.go:4` on line
+// 3 of probe.go renumbers nothing, and neither does a directive with no token
 // after it.
 func goDirectiveLine(name string, src []byte) int {
 	fset := token.NewFileSet()
@@ -643,17 +631,18 @@ func goDirectiveLine(name string, src []byte) int {
 // scanning the packages that are about to be analyzed, and returns "" when it
 // can.
 //
-// THE ATTACK, reproduced against golangci-lint 2.8.0 and go1.25.5. One line
+// The attack, reproduced against golangci-lint 2.8.0 and go1.25.5, is one line
 // above the offending function:
 //
 //	//line zz_generated.go:1
 //
 // golangci-lint reports both findings, correctly, at pkg/zz_generated.go, a
-// file that does not exist. Every "did the analyzer produce issues" check passes.
-// They then die in Set.normalize, because the path is not in the diff. Point the
-// directive at a real file the change also touched and it is worse than
-// silencing: the findings land ON that FILE, at lines the reviewer chose, and
-// this bot posts them under its own name against code the change did not write.
+// file that does not exist. Every "did the analyzer produce issues" check
+// passes, and they then die in Set.normalize because the path is not in the
+// diff. Point the directive at a real file the change also touched and it is
+// worse than silencing: the findings land on that file, at lines the attacker
+// chose, and this bot posts them under its own name against code the change
+// did not write.
 //
 // There is nothing to salvage. A line directive rewrites the file and the line
 // of every position after it, golangci-lint's JSON carries only the rewritten
@@ -663,24 +652,24 @@ func goDirectiveLine(name string, src []byte) int {
 // exit, and the run says "did not run" with a reason instead of publishing a
 // quieter or a relocated review.
 //
-// WHAT A REFUSAL IS WORTH, stated because it is easy to overrate. It makes the
-// silencing VISIBLE; it does not prevent it. A change that wants no Go analysis
-// can still have none, and mode: strict does not close that either, strict
-// makes this an error from Set.Run, which review.Engine logs and publishes as
-// "did not run", and the run's exit status is decided by review.fail_on against
-// the findings that were published. Visible is the property on offer here.
+// A refusal is worth less than it looks. It makes the silencing visible
+// without preventing it: a change that wants no Go analysis can still have
+// none, and mode: strict does not close that either, since strict makes this an
+// error from Set.Run that review.Engine logs and publishes as "did not run",
+// and review.fail_on decides the exit status against what was published.
+// Visible is the property on offer.
 //
 // It scans every .go file in the analyzed directories rather than only the
 // changed ones, because a directive anywhere in the package can move a finding
-// ONTO the changed file, and because that is the set golangci-lint actually
-// parsed. Legitimately generated code carrying directives, goyacc and cgo
-// output committed to the tree, trips it, and the cost of that is a named
-// refusal rather than a silent one.
+// onto the changed file, and because that is the set golangci-lint parsed.
+// Legitimately generated code carrying directives, goyacc and cgo output
+// committed to the tree, trips it, at the cost of a named refusal rather than a
+// silent one.
 //
-// It quotes WHERE the directive is and not WHAT it says. The filename inside a
-// directive is written by the change, this reason is published on the pull
-// request, and published reasons escape HTML but not markdown; a file and line
-// locates it exactly without giving the change a second place to render a link.
+// It quotes where the directive is rather than what it says. The filename
+// inside a directive is written by the change, this reason is published on the
+// pull request, and published reasons escape HTML but not markdown; a file and
+// line locates it without giving the change a second place to render a link.
 func positionsRewritten(repoRoot string, targets []goTarget) string {
 	for _, t := range targets {
 		for _, d := range t.Dirs {
@@ -728,11 +717,9 @@ func positionsRewritten(repoRoot string, targets []goTarget) string {
 //
 // It is separate from Runner for the reason stateful is: a test double must not
 // be forced to have an opinion about build constraints, and only the Go runner
-// has anything to say here today.
-//
-// It is asked only of a runner that ran. An analyzer that was skipped or failed
-// already says so in the roster, and adding "and by the way it did not read this
-// file" underneath is noise about a thing the reader has already been told.
+// has anything to say here today. It is asked only of a runner that ran, since
+// a skipped or failed analyzer says so in the roster and a coverage note
+// underneath repeats what the reader was told.
 type covering interface {
 	Uncovered(ctx context.Context, repoRoot string, files []string, diffs diff.Files) []review.LinterUncovered
 }
@@ -764,16 +751,15 @@ type goBuildContext struct {
 // under.
 //
 // One invocation per review, in the environment the analyzer child is given,
-// GOTOOLCHAIN=local included, so this reports the toolchain that will actually
-// load the packages rather than one go.mod could ask to be downloaded. `go env`
-// reads configuration and builds nothing, so it does not execute the tree the
-// way `go list` would.
+// GOTOOLCHAIN=local included, so this reports the toolchain that will load the
+// packages rather than one go.mod could ask to be downloaded. `go env` reads
+// configuration and builds nothing, so it does not execute the tree the way
+// `go list` would.
 //
-// A FAILURE FALLS BACK TO this PROCESS'S OWN VIEW, which is what the two
-// callers used unconditionally before. That path is close to unreachable in a
-// run that gets this far: golangci-lint's package loader shells out to the same
-// go tool, so a missing or broken one has already produced a report findings()
-// refuses, and Uncovered is asked only of an analyzer that ran without error.
+// A failure falls back to this process's own view, a path close to unreachable
+// in a run that gets this far: golangci-lint's package loader shells out to the
+// same go tool, so a missing or broken one has already produced a report
+// findings() refuses, and Uncovered is asked only of an analyzer that ran.
 func goEnvironment(ctx context.Context, repoRoot string) goBuildContext {
 	fallback := goBuildContext{
 		CgoEnabled: build.Default.CgoEnabled,
@@ -826,44 +812,45 @@ func parseGoEnv(out []byte) (goBuildContext, bool) {
 // review never offered it, the suppression directives this change added, and the
 // modules whose declared language version narrowed the ruleset.
 //
-// THE ATTACK IT CLOSES, reproduced against golangci-lint 2.8.0. The package-load
-// failures findings() catches are the LOUD shape of a tree silencing the Go
-// analyzer: they need the constraint to empty the whole directory, because
-// "build constraints exclude all Go files" is a failure of the package, not of a
-// file. Add ONE unconstrained sibling and the package loads perfectly while the
-// changed file is never analyzed at all. Three spellings, all measured with a
-// sibling present and one errcheck violation on twenty added lines:
+// The attack it closes, reproduced against golangci-lint 2.8.0: the
+// package-load failures findings() catches are the loud shape of a tree
+// silencing the Go analyzer, needing the constraint to empty the whole
+// directory, because "build constraints exclude all Go files" fails the package
+// rather than a file. Add one unconstrained sibling and the package loads while
+// the changed file is never analyzed. Three spellings, all measured with a
+// sibling present and one errcheck violation on twenty added lines, reach zero
+// findings, exit 0 and the roster line "ran":
 //
-//	//go:build windows       → zero findings, exit 0, roster says "ran"
-//	//go:build ignore        → the same
-//	rename app.go → app_windows.go, no comment at all → the same
+//	//go:build windows
+//	//go:build ignore
+//	a rename of app.go to app_windows.go, with no comment at all
 //
-// The last one is the sharp one, because it needs no directive and reads as an
-// ordinary platform-specific pull request: the code is live on another GOOS,
+// The last is the sharp one, needing no directive and reading as an ordinary
+// platform-specific pull request: the code is live on another GOOS,
 // `go build ./...` and the tests stay green on the CI GOOS, and the file gets
-// zero deterministic analysis while the roster reports a clean Go review.
+// no deterministic analysis while the roster reports a clean Go review.
 //
-// THE ANSWER IS A NAMED GAP, not A REFUSAL, and the difference is deliberate.
+// The answer is a named gap rather than a refusal, and that is deliberate.
 // The report is not corrupt. It is accurate about the files it covered, so
-// refusing it would throw away real findings about the rest of the change, and a
-// pull request touching foo_windows.go on a Linux runner is a normal thing to
-// do. What was missing is that nothing said the file went unread. It is
-// go/build's own matcher rather than a constraint parser of ours, for the reason
-// goDirectiveLine is go/scanner: the name-suffix rule (_windows.go) and the
-// //go:build grammar are the toolchain's, and an approximation of them is a list
-// of the cases somebody thought of.
+// refusing it throws away real findings about the rest of the change, and a
+// pull request touching foo_windows.go on a Linux runner is ordinary. What is
+// needed is for something to say the file went unread. It uses go/build's own
+// matcher rather than a constraint parser of ours, for the reason
+// goDirectiveLine uses go/scanner: the name-suffix rule and the //go:build
+// grammar are the toolchain's, and an approximation of them is a list of the
+// cases somebody thought of.
 //
-// GOOS/GOARCH come from this process, which golangci-lint inherits and is given
-// no build tags on top of, so MatchFile answers the constraint question the run
-// depends on. It could not answer the cgo one: with cgo off the go tool drops a
-// file importing "C" from the package and MatchFile still matches it, because
-// MatchFile reads build constraints and filename suffixes and never the import
-// list. That was disclosed as a residual and disclosure is not the reader of a
-// review seeing it, so it is detected here; see cgoExcluded. Whether cgo is off
-// is asked of the go tool rather than of this process, see goEnvironment.
+// GOOS/GOARCH come from this process, which golangci-lint inherits with no
+// build tags on top, so MatchFile answers the constraint question the run
+// depends on. It cannot answer the cgo one: with cgo off the go tool drops a
+// file importing "C" from the package and MatchFile still matches it, reading
+// build constraints and filename suffixes but never the import list. A
+// disclosed residual is not the reader of a review seeing it, so it is detected
+// here; see cgoExcluded. Whether cgo is off is asked of the go tool rather than
+// this process, see goEnvironment.
 //
-// A CHANGED FILE WITH NO MODULE ABOVE IT IS THE THIRD SHAPE, and it was the
-// quietest of the three because nothing in this file was even asked about it.
+// A changed file with no module above it is the third shape, and the quietest,
+// because nothing in this file was asked about it.
 // goTargets drops such a file, correctly. There is no module to run
 // golangci-lint in, and Detect turns that into a published reason only when NO
 // changed Go file has a module. In a monorepo with backend/go.mod, a change
@@ -1149,32 +1136,30 @@ const goAssumedLanguageVersion = "1.16"
 // wins over anything the analyzer is configured with, and we may not edit go.mod
 // to raise it: it is the tree under review.
 //
-// This USED TO BE A CONSTANT FLOOR OF 1.21 and THE FLOOR was THE BUG. The
-// argument for it was volume, every Go release deprecates something, so
-// "below the newest" is true of nearly every module, and a notice that fires on
-// ordinary code is one reviewers learn to collapse. What it bought was
-// silence at the modal directive. Measured, one file using reflect.PtrTo
-// (deprecated in 1.22) and cipher.NewCFBEncrypter (deprecated in 1.24), sweeping
-// the directive: `go 1.22` publishes the first, `go 1.24` publishes both, and
-// `go 1.21` and `go 1.21.4` publish NEITHER while the coverage list stays empty
-// , the review byte-identical to a clean one. Run as an attack it is a diff that
-// edits go.mod from `go 1.25` to `go 1.21` and adds the file; go 1.21 to 1.23 are
-// the ordinary directives in live repositories, so the floor was silent in the
-// common case, and its entire disclosed cost was a paragraph like this one, which
-// nobody reading a pull request ever sees.
+// A constant floor of 1.21 is the wrong shape here. The argument for one is
+// volume: every Go release deprecates something, so "below the newest" is true
+// of nearly every module, and a notice firing on ordinary code is one reviewers
+// learn to collapse. What it buys is silence at the modal directive. Measured
+// on one file using reflect.PtrTo (deprecated in 1.22) and
+// cipher.NewCFBEncrypter (deprecated in 1.24), sweeping the directive: `go
+// 1.22` publishes the first, `go 1.24` publishes both, and `go 1.21` and `go
+// 1.21.4` publish neither while the coverage list stays empty, the review
+// byte-identical to a clean one. As an attack it is a diff editing go.mod from
+// `go 1.25` to `go 1.21` and adding the file, and go 1.21 to 1.23 are the
+// ordinary directives in live repositories, so a floor is silent in the common
+// case at a cost disclosed only in a paragraph like this one.
 //
-// THE CLAIM that BOUNDED IT was FALSE, and it is worth saying which one, because
-// it is the sentence that made the floor look safe: "the compiler gates language
-// FEATURES on this same directive, so lowering it below what the code uses does
-// not go quiet, it fails". True at `go 1.15`, generics there produce `type
-// parameter requires go1.18 or later`, which findings() turns into "the code did
-// not compile". It is nothing at the floor: at `go 1.21` every language feature
-// through 1.21 compiles, generics included, and every deprecation issued since is
-// off. A bound that only holds far below the threshold does not bound the
-// threshold.
+// The sentence that makes a floor look safe is false: "the compiler gates
+// language features on this same directive, so lowering it below what the code
+// uses fails rather than going quiet". True at `go 1.15`, where generics
+// produce `type parameter requires go1.18 or later` and findings() turns that
+// into "the code did not compile". Nothing at the floor: at `go 1.21` every
+// language feature through 1.21 compiles, generics included, and every
+// deprecation issued since is off. A bound that holds only far below the
+// threshold does not bound the threshold.
 //
-// WHAT THE CEILING GIVES UP, in the other direction, because a false coverage gap
-// is as much a defect as a missed one. The gate staticcheck applies is its own
+// The ceiling gives something up in the other direction, and a false coverage
+// gap is as much a defect as a missed one. The gate staticcheck applies is its
 // table of deprecations, not the toolchain's standard library, so a module
 // declaring one release behind a toolchain whose deprecations the analyzer does
 // not yet know about is named for a reduction that is currently empty. That is
@@ -1373,15 +1358,14 @@ type goTarget struct {
 // no module to run in, and inventing one gets "no go files to analyze" with an
 // empty report.
 //
-// THE SENTENCE that USED TO BE HERE SAID DETECT REPORTS that CASE, and Detect
-// only reports it when every changed Go file lands in it, the whole-analyzer
-// reason "no go.mod at or above the changed Go files". A monorepo makes the
-// partial case ordinary, and the partial case is the dangerous one: with
-// backend/go.mod present, a change touching backend/app.go and tools/evil.go
-// analyzed the first, published its finding, and said nothing at all about the
-// second. That is the same bare-continue shape Set.normalize was fixed for, one
-// directory over, and the answer is the same one. The file is named in
-// golangciLint.Uncovered rather than merely dropped.
+// Detect does not cover that case on its own. It reports only when every
+// changed Go file lands in it, under the whole-analyzer reason "no go.mod at or
+// above the changed Go files". A monorepo makes the partial case ordinary, and
+// the partial case is the dangerous one: with backend/go.mod present, a change
+// touching backend/app.go and tools/evil.go analyzes the first, publishes its
+// finding, and says nothing about the second. That is the bare-continue shape
+// Set.normalize was fixed for, one directory over, and the answer is the same.
+// The file is named in golangciLint.Uncovered rather than dropped.
 func goTargets(repoRoot string, files []string) []goTarget {
 	byModule := map[string][]string{}
 	var order []string
@@ -1625,7 +1609,7 @@ func (e *eslint) State() string { return e.cfg.state(eslintUnconfigured) }
 const eslintUnconfigured = "not configured; set linters.eslint_config to a config outside the repository"
 
 // eslintExts are the extensions eslint is given. A change containing none of
-// them is not a degraded eslint run, it is a change with no JavaScript in it.
+// them is a change with no JavaScript in it, rather than a degraded run.
 var eslintExts = []string{".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
 
 // eslintFile is one file's results in eslint's JSON output.
@@ -1698,22 +1682,22 @@ func (s *semgrep) Name() string { return "semgrep" }
 
 // Detect requires an operator-supplied config and reads nothing from the tree.
 //
-// THE BUG IT REPLACES: this used to return true when .semgrep.yml, .semgrep.yaml,
-// .semgrepignore or .semgrep merely EXISTED in the head tree, so a pull request
-// that added one switched semgrep on, with rules the pull request wrote, in
-// the run reviewing it. That is enablement rather than silencing, and no
-// severity ceiling or ignore list touches it. Keying on operator configuration
-// instead means no file in the tree decides whether an analyzer runs.
+// Returning true because .semgrep.yml, .semgrep.yaml, .semgrepignore or
+// .semgrep exists in the head tree lets a pull request that adds one switch
+// semgrep on, with rules the pull request wrote, in the run reviewing it. That
+// is enablement rather than silencing, and no severity ceiling or ignore list
+// touches it. Keying on operator configuration means no file in the tree
+// decides whether an analyzer runs.
 //
-// .semgrepignore needed no flag: explicit file targets bypass it, verified
+// .semgrepignore needs no flag: explicit file targets bypass it, verified
 // against semgrep 1.172.0 with the target file listed in .semgrepignore. It was
-// only ever a detection trigger here, and the trigger is what is gone.
+// only ever a detection trigger here.
 func (s *semgrep) Detect(_ context.Context, _ string, files []string) error {
 	if s.cfg.Err != nil {
 		return s.cfg.Err
 	}
-	// semgrep is multi-language and takes whatever it is given, so any changed
-	// file is a target for it.
+	// semgrep is multi-language and takes whatever it is given, so an empty
+	// list is the only case with nothing to analyze.
 	if len(files) == 0 {
 		return errNoTargets
 	}

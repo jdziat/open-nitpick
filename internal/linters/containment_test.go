@@ -13,8 +13,8 @@ package linters
 //
 // Where the binary is absent the test skips rather than degrading to an argv
 // check, because a green argv assertion would be a worse signal than an honest
-// skip. The stub-driven tests below are the ones whose property is genuinely
-// about this package, refusing to run, refusing a config inside the repository,
+// skip. The stub-driven tests below are the ones whose property belongs to
+// this package: refusing to run, refusing a config inside the repository,
 // refusing a report that never arrived, and those need no analyzer at all.
 
 import (
@@ -583,15 +583,15 @@ func F() {
 	}
 }
 
-// TestBinaryContainmentIsAnchoredToTheCheckoutNotTheModule is the hazard that
-// came WITH per-module invocation.
+// TestBinaryContainmentIsAnchoredToTheCheckoutNotTheModule is the hazard
+// per-module invocation brings with it.
 //
-// The containment root used to be the process's working directory, which was
-// always the checkout root. Running golangci-lint inside the module that owns
-// the changed package made those two different things, and keyed on the working
-// directory a binary the pull request added at <repo>/tools would be refused
-// while linting a root module and accepted while linting a nested one. The whole
-// checkout is what the change wrote, so the whole checkout is what is refused.
+// Anchoring containment to the process's working directory is the same as the
+// checkout root until golangci-lint runs inside the module that owns the
+// changed package. Keyed on the working directory, a binary the pull request
+// added at <repo>/tools is refused while linting a root module and accepted
+// while linting a nested one. The whole checkout is what the change wrote, so
+// the whole checkout is what is refused.
 func TestBinaryContainmentIsAnchoredToTheCheckoutNotTheModule(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("PATH semantics differ on windows")
@@ -1014,10 +1014,10 @@ func TestARefusedConfigStopsTheAnalyzer(t *testing.T) {
 // A, and it is what stops this whole change from replacing one silent hole with
 // another.
 //
-// runCommand errors only when stdout is empty and the exit was non-zero, and
-// decodeJSON used to return nil for output with no JSON in it. So exit 0 with no
-// payload was "zero findings, no error", indistinguishable from clean code, and
-// exactly the state `semgrep --config auto --metrics off` had been shipping in.
+// runCommand errors only when stdout is empty and the exit was non-zero, so a
+// decodeJSON returning nil for output with no JSON in it makes exit 0 with no
+// payload read as "zero findings, no error", indistinguishable from clean
+// code. That is the state `semgrep --config auto --metrics off` produces.
 func TestAnAnalyzerThatExitsZeroWithoutReportingIsAnError(t *testing.T) {
 	s := newStubs(t)
 	s.install(t, "golangci-lint", "")
@@ -1130,14 +1130,14 @@ func TestStatusesRecordHowEachAnalyzerWasConfigured(t *testing.T) {
 	}
 }
 
-// TestTheRecordedReasonIsTheRunnersOwn covers the OTHER half of the guess: the
-// runner knows why, and Set.Run used to overwrite it.
+// TestTheRecordedReasonIsTheRunnersOwn covers the other half of the guess: the
+// runner knows why, and Set.Run must not overwrite it.
 //
-// Anything the old code did not recognize as "not configured" was replaced with
-// "its binary is not on PATH, or this repository has none of the files it looks
-// for". Here the binary is on PATH and the file it looks for is present, so both
-// halves of that sentence are false and the true reason, an operator config
-// that resolves inside the repository, had been discarded.
+// Replacing anything unrecognized as "not configured" with "its binary is not
+// on PATH, or this repository has none of the files it looks for" is wrong
+// here on both halves: the binary is on PATH and the file it looks for is
+// present, and the true reason is an operator config resolving inside the
+// repository.
 func TestTheRecordedReasonIsTheRunnersOwn(t *testing.T) {
 	s := newStubs(t)
 	s.install(t, "golangci-lint", `{"Issues":[]}`)

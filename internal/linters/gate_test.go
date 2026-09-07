@@ -47,24 +47,14 @@ const semgrepCritical = `{"results":[{"check_id":"go.lang.security.audit.dangero
 	`"extra":{"message":"Command built from user input","severity":"CRITICAL"}}]}`
 
 // scriptedTriage is a triage model with two modes, and choosing the wrong one
-// makes a test decorative.
-//
-// With rerate empty it ECHOES: it reads each severity back out of the rendered
-// prompt rather than being handed one, so the analyzer's level stays
-// load-bearing all the way to the gate. A scripted `"severity":"critical"` would
-// publish a critical no matter what mapSeverity did.
-//
-// With rerate set it RE-RATES every finding to that level, ignoring what it was
-// shown. That is not an exotic model: prompt/templates/triage.md rule 3 tells
-// the triage pass to "raise anything whose blast radius is larger than the
-// original reviewer could see", and Validator.revise moves severities in both
-// directions on purpose. Any claim that a policy caps what a run ACTS on has to
-// be asserted against this mode. The echoing mode can only ever return the
-// level the policy already produced, so it would confirm the claim whether the
-// policy reached the gate or not.
-//
-// retitle rewords every finding, which changes review.Finding.Key() and is how
-// a test reaches the one case the ceiling cannot describe.
+// makes a test decorative. With rerate empty it echoes, reading each severity
+// out of the rendered prompt, so the analyzer's level stays load-bearing to
+// the gate. With rerate set it re-rates every finding to that level, the
+// ordinary case, since triage.md rule 3 tells the pass to raise anything whose
+// blast radius is larger than the original reviewer could see. A claim that a
+// policy caps what a run acts on has to be asserted against the second mode.
+// retitle rewords findings, changing review.Finding.Key(), the one case the
+// ceiling cannot describe.
 type scriptedTriage struct {
 	mu sync.Mutex
 

@@ -58,12 +58,11 @@ type Runner interface {
 	// files, and nil when it will. errNoTargets means the change contains
 	// nothing it reads, which is not a degradation.
 	//
-	// IT RETURNS THE REASON RATHER THAN A BOOL because the caller was inventing
-	// one. A false used to be reported to the operator as "its binary is not on
-	// PATH, or this repository has none of the files it looks for", a guess
-	// between two causes, printed where the real cause (a config refused, a
-	// module the old detection could not see, no Python in a Go change) was
-	// already known here and thrown away.
+	// It returns the reason rather than a bool so the caller does not invent
+	// one. A bool reaches the operator as "its binary is not on PATH, or this
+	// repository has none of the files it looks for", a guess between two
+	// causes, where the real cause is known here: a config refused, a module
+	// the detection could not see, no Python in a Go change.
 	Detect(ctx context.Context, repoRoot string, files []string) error
 
 	// Run analyzes the given repository-relative files.
@@ -77,24 +76,13 @@ func isAutoDetected(r Runner) bool {
 	return ok && t.detected
 }
 
-// errNoTargets is Detect's answer when nothing this analyzer reads survived the
-// review's file selection.
-//
-// It is a distinct answer from "it could not run" because the two are different
-// facts about the review and only one of them is a degradation: ruff sitting out
-// a Go-only change is not a Python review that went missing, and reporting it as
-// one both fails strict mode for nothing and teaches a reader to skip the block
-// where real absences are announced.
-//
-// It says "was selected for review" and not "the change contains" because the
-// two come apart, and the wording that claimed the stronger one was measured
-// false. Detect is handed reviewablePaths' output, review.ignore already
-// applied, so a `go mod vendor` bump touching go.mod and vendor/dep/dep.go
-// arrives as a one-element list holding go.mod, and the sentence "the change
-// contains no files it analyzes" was published over a change containing a Go
-// file with a real violation. The selection is the honest subject: this analyzer
-// was offered nothing it reads. Which files were withheld, and whether that
-// mattered, is the coverage list's job, see Set.Run's errNoTargets arm.
+// errNoTargets is Detect's answer when nothing this analyzer reads survived
+// the review's file selection. Only "it could not run" is a degradation: ruff
+// sitting out a Go-only change is not a Python review that went missing. It
+// says "was selected for review" rather than "the change contains", the
+// stronger claim having measured false, since Detect is handed
+// reviewablePaths' output with review.ignore applied and a `go mod vendor`
+// bump arrives as a one-element list holding go.mod.
 var errNoTargets = errors.New("no files it analyzes were selected for review")
 
 // notOnPath is the reason an analyzer whose binary is missing did not run.
@@ -210,24 +198,17 @@ func (s *Set) Statuses() []review.LinterStatus {
 // Discarded reports the findings an analyzer produced that this review did not
 // publish, and why. It is populated by Run and empty before it.
 //
-// It exists because Set.normalize used to drop them with a bare `continue`: no
-// counter, no log, no status. That single line was the sink for the line
-// directive attack, golangci-lint reports real findings at a forged path, and
-// they arrive here as "a path not in the diff", and it was also where the
-// opt-in analyzer config lost every finding, because an operator config outside
-// the repository made golangci-lint print paths relative to that config's
-// directory.
+// A bare `continue` in Set.normalize is the sink for two failures that look
+// like nothing. The line-directive attack lands here, golangci-lint reporting
+// real findings at a forged path that arrives as "a path not in the diff", and
+// so does an operator config outside the repository, which makes golangci-lint
+// print paths relative to that directory and loses every finding. A discarded
+// finding is counted and published for the reason Plan.Skipped is: silence
+// from a review that ran less than you think reads like clean code.
 //
-// Neither of those looked like anything. A finding the reviewer produced and
-// this tool discarded is the class this project keeps shipping, so it is counted
-// and published for the same reason Plan.Skipped and Plan.Degraded are: silence
-// from a review that ran less than you think is indistinguishable from silence
-// from clean code.
-//
-// This is not the whole published list. review.Engine's anchor filter runs after
-// normalize and drops analyzer findings of its own. It was found doing so
-// silently, downstream of this fix and with the same three symptoms, so the
-// engine merges its drops into the same block. See review.SortDiscards.
+// This is not the whole list. review.Engine's anchor filter runs after
+// normalize and drops analyzer findings of its own, so the engine merges those
+// into this block. See review.SortDiscards.
 func (s *Set) Discarded() []review.LinterDiscard {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -392,16 +373,13 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 
 			found, err := r.Run(runCtx, s.repoRoot, paths)
 
-			// Asked whether or not the analyzer found anything, because an
-			// analyzer with nothing to say about a file it never read is
-			// exactly the state this answers. Not asked when it FAILED: an
-			// analyzer recorded as failed has told the reader more than a
-			// coverage note would, and every file would be uncovered anyway.
+			// Asked whether or not the analyzer found anything, since an
+			// analyzer silent about a file it never read is the state this
+			// answers. Not asked when it failed, where the recorded failure
+			// says more than a coverage note and every file is uncovered.
 			//
-			// Outside the lock below, because it reads files: the mutex
-			// serializes the result tails of every analyzer in the run, and
-			// holding it across file I/O would make each analyzer wait on the
-			// last one's directory reads.
+			// Outside the lock below, because it reads files and the mutex
+			// serializes every analyzer's result tail.
 			var gaps []review.LinterUncovered
 			if err == nil {
 				gaps = s.coverage(ctx, r, paths, files)
@@ -609,32 +587,23 @@ func (s *Set) uncover(gaps []review.LinterUncovered) {
 }
 
 // reasonForUnknownPath decides which of the two "not in the diff" answers a
-// path deserves, and IT IS THE ONE DECISION HERE that IS not BOOKKEEPING.
+// path deserves, the one decision here that is not bookkeeping.
 //
-// A path that is not in the change is ordinary. Go is analyzed a package at a
-// time, so golangci-lint routinely reports on a sibling file the change never
-// touched, and dropping those is what only_changed_lines is for.
+// A path outside the change is ordinary. Go is analyzed a package at a time, so
+// golangci-lint routinely reports on a sibling file the change never touched,
+// and dropping those is what only_changed_lines is for.
 //
-// A path that is not in the CHECKOUT is not ordinary and is not a lint result at
-// all: the analyzer was made to describe a file that does not exist. The only
-// way to reach it from a Go tree is a line directive, and the same directive
-// pointed at a real file relocates a finding onto code the change did not write
-// , so this is the visible half of a thing whose invisible half puts this bot's
+// A path outside the checkout is not a lint result: the analyzer was made to
+// describe a file that does not exist. A line directive is the only way there
+// from a Go tree, and aimed at a real file the same directive puts this bot's
 // name on an accusation about somebody else's line.
 //
-// WHAT IS DONE WITH IT, and WHY that and not MORE. It is recorded under its own
-// reason and published, rather than being turned into a finding of its own or
-// used to fail the analyzer from here. Two reasons. Publishing it as a finding
-// would mean anchoring it, and the only honest anchor is the file carrying the
-// directive, which this function cannot see: it holds a forged path and nothing
-// else. And failing the analyzer at this point would be late and partial,
-// Set.Run has already recorded the analyzer as having run, and the SILENCING
-// variant of the attack produces no findings for this function to inspect at
-// all. The analyzer has to refuse before it reports, which is where the refusal
-// now is; see positionsRewritten. This is the backstop that names it if one
-// arrives anyway, from an analyzer with no such check, or along a path nobody
-// has thought of yet, and a named, published count is the minimum that makes
-// such a run distinguishable from a clean one.
+// It is recorded under its own reason and published rather than made into a
+// finding or used to fail the analyzer. Anchoring such a finding needs the
+// file carrying the directive, which this function cannot see, and failing the
+// analyzer here is late: Set.Run has recorded it as having run, and the
+// silencing variant produces no findings to inspect. The analyzer refuses
+// before it reports, in positionsRewritten.
 func (s *Set) reasonForUnknownPath(reported string) review.DiscardReason {
 	if reported == "" {
 		return review.DiscardPathNotInCheckout
@@ -735,13 +704,12 @@ func prefixRule(linter, rule string) string {
 }
 
 // available reports whether an analyzer binary can be safely executed.
-//
 // Resolution is PATH-only and the result must not live inside the repository
-// being reviewed. A pull request can add `node_modules/.bin/eslint` (git
-// preserves the executable bit), and running it would execute attacker-supplied
+// under review: a pull request can add `node_modules/.bin/eslint`, git
+// preserving the executable bit, and running it executes attacker-supplied
 // code with GITHUB_TOKEN and the model API key in the environment, while
-// `**/node_modules/**` is in the default ignore list, so the malicious file
-// would never even appear in the posted review.
+// `**/node_modules/**` in the default ignore list keeps that file out of the
+// posted review entirely.
 func available(name string) bool {
 	_, err := resolveBinary(name, "")
 	return err == nil

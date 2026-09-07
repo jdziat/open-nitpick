@@ -115,7 +115,8 @@ type toolSpec struct {
 	// perFile invokes the tool once per target rather than once with all.
 	perFile bool
 
-	// reportOnStderr reads the report from stderr (cppcheck).
+	// reportOnStderr is set for a tool that writes its findings to stderr,
+	// which cppcheck does.
 	reportOnStderr bool
 
 	// args builds the command line.
