@@ -1240,12 +1240,12 @@ func TestAModuleUnderAnOldGoDirectiveIsNamed(t *testing.T) {
 				t.Fatalf("Run: %v", err)
 			}
 			for _, want := range tc.want {
-				if !reportsAbout(published, want) {
+				if !reportsDeprecation(published, want) {
 					t.Fatalf("findings = %+v, want one about %q under %q", published, want, tc.directive)
 				}
 			}
 			for _, notWant := range tc.notWant {
-				if reportsAbout(published, notWant) {
+				if reportsDeprecation(published, notWant) {
 					t.Fatalf("findings = %+v, want nothing about %q under %q: the fixture no longer "+
 						"measures the gate it was built for", published, notWant, tc.directive)
 				}
@@ -1268,9 +1268,21 @@ func TestAModuleUnderAnOldGoDirectiveIsNamed(t *testing.T) {
 	}
 }
 
-// reportsAbout reports whether any finding's text mentions the symbol.
-func reportsAbout(found []review.Finding, symbol string) bool {
+// reportsDeprecation reports whether staticcheck raised a deprecation about the
+// symbol. What the gate switches off is staticcheck's deprecation table, so
+// that is what the assertion has to name.
+//
+// Matching any finding that mentions the symbol is not the same question, and
+// the difference is reachable: govet's inline analyzer prints "cannot inline
+// call to reflect.PtrTo (declared using go1.26.8) into a file using go1.21"
+// over the same fixture, which satisfies a mention test while the deprecation
+// it stands in for is absent. An absence asserted by substring over every
+// finding is answered by whichever analyzer happens to name the symbol next.
+func reportsDeprecation(found []review.Finding, symbol string) bool {
 	for _, f := range found {
+		if !strings.Contains(f.Source, "staticcheck") {
+			continue
+		}
 		if strings.Contains(f.Title, symbol) || strings.Contains(f.Rationale, symbol) {
 			return true
 		}
