@@ -64,7 +64,8 @@ jobs:
 
 `@open-nitpick review` reviews the whole change again, not the increment.
 `@open-nitpick resolve` on an inline thread resolves it with a reply naming who
-asked. Anything else is a question, answered in the same thread by the
+asked. `@open-nitpick improve` runs the wider pass, below. Anything else is a
+question, answered in the same thread by the
 review model with the diff, the lines around the thread, and the thread
 so far as its context; forge-authored text is fenced as untrusted, so a
 comment cannot instruct the model. The comment gets an eyes reaction when

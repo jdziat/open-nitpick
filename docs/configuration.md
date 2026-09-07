@@ -67,6 +67,26 @@ claim beside a measured one.
 The block appears on every finding, including one carrying a suggestion GitHub
 can apply: the suggestion says what to type, not where else the finding reaches.
 
+## The wider pass
+
+`@open-nitpick improve` reviews the change again for naming, documentation,
+structure, idiom and slop: the classes an ordinary review does not ask for.
+On an inline thread it covers that file; on the conversation, the whole change.
+
+It answers with one comment listing what it found, not a thread per finding,
+and nothing it says has to be resolved or blocks a merge. Findings the pull
+request already carries are dropped, so it does not repeat the review.
+
+Reviews are generated at the `normal` scope whatever `persona.nitpick` says,
+because asking one pass for defects and style together measured worse at both:
+more findings, lower precision, more missed defects. Style therefore comes from
+a second pass, which this command runs on request. Nothing about it changes
+what a push produces, and it does not read or write `persona.nitpick`.
+
+It is the widest call pattern here, a second generation pass over every batch,
+so `review.budget.max_spend` bounds it the way it bounds any review, and
+`review.respond.max_per_pull_request` counts its answer.
+
 ## Applying a finding
 
 `@open-nitpick fix` on a review thread applies that finding; `@open-nitpick fix

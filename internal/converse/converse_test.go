@@ -41,6 +41,12 @@ func TestCommandReadsTheMention(t *testing.T) {
 		{"please @Open-NitPick re-review this", KindReview, "re-review this", true},
 		{"@open-nitpick resolve", KindResolve, "resolve", true},
 		{"@open-nitpick: fixed in the last push", KindResolve, "fixed in the last push", true},
+		{"@open-nitpick improve", KindImprove, "improve", true},
+		{"@open-nitpick polish this file please", KindImprove, "polish this file please", true},
+		// "improvement" is a noun in a sentence, not the command. The switch
+		// matches whole words for the same reason "fix" and "fixed" are
+		// different commands.
+		{"@open-nitpick improvements welcome", KindAsk, "improvements welcome", true},
 		{"@open-nitpick why does this matter?", KindAsk, "why does this matter?", true},
 		{"@open-nitpick", "", "", false},
 		{"no mention here", "", "", false},
