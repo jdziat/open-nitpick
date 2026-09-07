@@ -251,7 +251,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	b.WriteString(budgetNote(report))
 
 	if cfg == nil || cfg.Review.Summary {
-		b.WriteString(walkthrough(report))
+		b.WriteString(walkthrough(report, cfg))
 	}
 
 	if notes := overruledNotes(report); notes != "" {
@@ -718,10 +718,15 @@ func blockquote(s string) string {
 }
 
 // walkthrough is the narration review.summary controls.
-func walkthrough(report *Report) string {
+func walkthrough(report *Report, cfg *config.Config) string {
 	var b strings.Builder
 
-	if s := strings.TrimSpace(report.Summary); s != "" {
+	// The receipt is counted from the report; the prose was written by a model
+	// that never saw the change. Which one appears is review.summary_style,
+	// and the receipt is the default.
+	if cfg != nil && cfg.Review.EffectiveSummaryStyle() == config.SummaryReceipt {
+		b.WriteString(receipt(report))
+	} else if s := strings.TrimSpace(report.Summary); s != "" {
 		b.WriteString(s)
 		b.WriteString("\n")
 	}

@@ -114,3 +114,37 @@ func (r Respond) validate() []error {
 
 	return errs
 }
+
+// SummaryStyle chooses how a review's walkthrough is produced.
+type SummaryStyle string
+
+// The two styles.
+const (
+	// SummaryReceipt counts what the run did and prints that. No model is
+	// asked, so nothing in it can be invented. It is the default because the
+	// alternative is a description of code the writer never saw.
+	SummaryReceipt SummaryStyle = "receipt"
+
+	// SummaryProse keeps the generated walkthrough. Available for a team that
+	// wants prose and accepts that it is written from the findings list rather
+	// than from the change; see docs/findings.md.
+	SummaryProse SummaryStyle = "prose"
+)
+
+// EffectiveSummaryStyle resolves the default.
+func (r Review) EffectiveSummaryStyle() SummaryStyle {
+	if r.SummaryStyle == "" {
+		return SummaryReceipt
+	}
+	return r.SummaryStyle
+}
+
+// validateSummaryStyle checks the style names one of the two.
+func (r Review) validateSummaryStyle() []error {
+	switch r.EffectiveSummaryStyle() {
+	case SummaryReceipt, SummaryProse:
+		return nil
+	}
+	return []error{fmt.Errorf("review.summary_style %q is not %s or %s",
+		r.SummaryStyle, SummaryReceipt, SummaryProse)}
+}

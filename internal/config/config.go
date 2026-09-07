@@ -392,6 +392,10 @@ type Review struct {
 	// the window each changed file itself gets.
 	RelatedContextTokens int `yaml:"related_context_tokens"`
 
+	// SummaryStyle chooses how the walkthrough at the top of a review is
+	// produced. See internal/review/receipt.go.
+	SummaryStyle SummaryStyle `yaml:"summary_style"`
+
 	// TriageNoNewClaims restores the reviewer's own words over anything triage
 	// rewrote, so triage may select, drop, group and re-anchor findings but may
 	// not author them. See internal/review/noclaims.go.

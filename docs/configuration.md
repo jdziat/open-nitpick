@@ -251,6 +251,35 @@ at the price of dropping the questions cancelled while pending.
 shipped workflow, which skips them: reviewing one would need the model key
 present in a run whose code the contributor controls.
 
+## The walkthrough at the top of a review
+
+```yaml
+review:
+  summary_style: receipt   # receipt | prose
+```
+
+**`receipt`**, the default, is counted from the run. It states how many changed
+files were read out of how many there were, the findings by severity, which
+analyzers ran, and how many files could not be reviewed. No model is asked, so
+nothing in it can be invented, and two runs over the same change print the same
+line.
+
+It says "Nothing found in what was read" rather than that the change is clean,
+because those are different claims and the coverage notices below it carry the
+difference.
+
+**`prose`** keeps the generated walkthrough. The triage model writes it, and it
+is not shown the change: it sees the findings list and the pull request title.
+Measured over six fixtures, most of the content words in what it wrote do not
+appear in the diff it describes. See
+[Findings](findings.md#should-triage-see-the-change).
+
+Under `receipt` the triage prompt does not ask for a walkthrough at all, so the
+output tokens are not spent on an answer nothing prints.
+
+`review.summary: false` still suppresses the walkthrough entirely, whichever
+style is set.
+
 ## What triage may and may not do
 
 Triage merges duplicates across batches, drops findings the reviewer could not

@@ -97,6 +97,16 @@ type Options struct {
 	// Run is a per-invocation instruction, typically a CLI flag.
 	Run string
 
+	// Walkthrough appends the triage template's Summary section, which asks the
+	// model for a walkthrough of the change.
+	//
+	// It is opt-in because the model is not shown the change, so what it writes
+	// there is a description of the findings list. Under the default
+	// review.summary_style the walkthrough is counted from the report instead,
+	// and asking for prose nobody prints would spend output tokens on an
+	// answer that is thrown away.
+	Walkthrough bool
+
 	// PersonaText is rendered voice-and-scope guidance, inserted after the base
 	// prompt so it can narrow scope, and before repository instructions so a
 	// repository can still override it.
@@ -131,6 +141,14 @@ func Build(name string, opts Options) (Prompt, error) {
 	rendered, err := render(name, base, opts.Data)
 	if err != nil {
 		return Prompt{}, err
+	}
+
+	if opts.Walkthrough && name == NameTriage {
+		extra, err := templates.ReadFile("templates/triage_summary.md")
+		if err != nil {
+			return Prompt{}, fmt.Errorf("prompt %q summary: %w", name, err)
+		}
+		rendered = strings.TrimRight(rendered, "\n") + "\n\n" + string(extra)
 	}
 
 	p := Prompt{Layers: []Layer{{Name: LayerBase, Text: rendered}}}

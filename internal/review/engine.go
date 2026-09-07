@@ -1874,6 +1874,10 @@ func (e *Engine) reviewPromptFor(client *llm.Client) (string, error) {
 func (e *Engine) triagePrompt() (string, error) {
 	p, err := prompt.Build(prompt.NameTriage, prompt.Options{
 		PersonaText: prompt.Persona(e.Config.Persona),
+		// Only when a walkthrough will actually be published. Under the
+		// receipt style it is counted from the report, so asking for prose
+		// here would buy an answer that is discarded.
+		Walkthrough: e.Config.Review.EffectiveSummaryStyle() == config.SummaryProse,
 	})
 	if err != nil {
 		return "", err
