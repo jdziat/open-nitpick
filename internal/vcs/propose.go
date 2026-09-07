@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"path"
 	"regexp"
 	"strings"
@@ -142,7 +143,7 @@ func (g *GitHub) ProposeChange(ctx context.Context, ref Ref, p Proposal) (*Propo
 
 	tree, _, err := g.client.Git.CreateTree(ctx, ref.Owner, ref.Repo, base.GetTree().GetSHA(), entries)
 	if err != nil {
-		return nil, fmt.Errorf("github: create tree: %w", err)
+		return nil, writeErr("create tree", err)
 	}
 
 	// Nothing changed. Caught here rather than at the pull request, which
@@ -158,7 +159,7 @@ func (g *GitHub) ProposeChange(ctx context.Context, ref Ref, p Proposal) (*Propo
 		Parents: []*github.Commit{{SHA: github.Ptr(p.Base)}},
 	}, nil)
 	if err != nil {
-		return nil, fmt.Errorf("github: create commit: %w", err)
+		return nil, writeErr("create commit", err)
 	}
 
 	// CreateRef and never UpdateRef. A ref that exists is the same request
@@ -173,7 +174,7 @@ func (g *GitHub) ProposeChange(ctx context.Context, ref Ref, p Proposal) (*Propo
 		if strings.Contains(strings.ToLower(err.Error()), "already exists") {
 			return nil, fmt.Errorf("github: %w: %s", ErrRefExists, p.Branch)
 		}
-		return nil, fmt.Errorf("github: create %s: %w", fullRef, err)
+		return nil, writeErr("create "+fullRef, err)
 	}
 
 	// The last chance to notice a push that landed while this was being built.
@@ -217,7 +218,7 @@ func (g *GitHub) ProposeChange(ctx context.Context, ref Ref, p Proposal) (*Propo
 			return nil, fmt.Errorf("github: open the pull request: %w, and %s could not be removed: %w",
 				err, p.Branch, delErr)
 		}
-		return nil, fmt.Errorf("github: open the pull request: %w", err)
+		return nil, writeErr("open the pull request", err)
 	}
 
 	return &ProposedChange{
@@ -280,11 +281,26 @@ func treeEntries(p Proposal, modes map[string]string) ([]*github.TreeEntry, erro
 	return out, nil
 }
 
+// writeErr labels a failed write, marking one the forge refused outright.
+//
+// 403 covers SSO enforcement as well as a missing permission, so the caller
+// names the likely cause rather than asserting one, and the original error is
+// wrapped alongside. Rate limits never reach here: go-github gives them types
+// of their own.
+func writeErr(op string, err error) error {
+	var resp *github.ErrorResponse
+	if errors.As(err, &resp) && resp.Response != nil && resp.Response.StatusCode == http.StatusForbidden {
+		return fmt.Errorf("github: %s: %w: %w", op, ErrNoWriteAccess, err)
+	}
+	return fmt.Errorf("github: %s: %w", op, err)
+}
+
 // treeModes maps every path in a revision's tree to its file mode.
 //
 // One recursive read rather than one call per edit. A truncated tree is
 // refused rather than half-used: a missing path would otherwise read as "this
 // file is new", which is the one case a proposal must not accept.
+
 func (g *GitHub) treeModes(ctx context.Context, ref Ref, treeSHA string) (map[string]string, error) {
 	tree, _, err := g.client.Git.GetTree(ctx, ref.Owner, ref.Repo, treeSHA, true)
 	if err != nil {
