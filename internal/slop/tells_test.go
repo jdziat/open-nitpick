@@ -151,3 +151,12 @@ func TestCadenceIgnoresCodeTablesAndHeadings(t *testing.T) {
 		t.Errorf("non-prose lines were counted: %+v", got)
 	}
 }
+
+// A config key written in backticks is a value, not a cadence. Counting it
+// would score a reference page by how many options it documents.
+func TestCadenceIgnoresInlineCode(t *testing.T) {
+	line := "Set `a, b, and c` to configure it.\n"
+	if got := Scan("ref.md", strings.Repeat(line, 60)); len(got) != 0 {
+		t.Errorf("inline code was counted: %+v", got)
+	}
+}

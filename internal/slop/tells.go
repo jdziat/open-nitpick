@@ -157,6 +157,10 @@ func cadence(p string, lines []string) []Tell {
 			continue
 		}
 		prose++
+		// Outside inline code, the same as every per-line rule. A config key
+		// written `a, b, and c` is a value, not a cadence, and counting it
+		// would score a reference page by how many options it documents.
+		t = stripInlineCode(t)
 		hits += len(cadenceTriplet.FindAllString(t, -1))
 		hits += len(cadenceColon.FindAllString(t, -1))
 		hits += len(cadenceTail.FindAllString(t, -1))
