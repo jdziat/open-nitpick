@@ -678,6 +678,17 @@ func CatalogNames() []string {
 type CatalogEntry struct {
 	Name, Languages, Configuration string
 	Default, Auto, Trusted         bool
+
+	// NeedsConfig marks a tool that does nothing until an operator points it
+	// at a configuration outside the repository. `nitpick init` writes these
+	// commented out: naming one in linters.enabled without the config it
+	// needs buys a roster line that reports "not configured" forever.
+	NeedsConfig bool
+
+	// Exts, Names and Prefixes are the inputs the tool reads: file
+	// extensions, exact basenames, and basename prefixes. Suggest matches a
+	// checkout against them.
+	Exts, Names, Prefixes []string
 }
 
 // Catalog describes every tool, for `nitpick linters` and the README.
@@ -699,7 +710,12 @@ func Catalog() []CatalogEntry {
 		default:
 			conf = "linters.configs." + s.name + " required"
 		}
-		out = append(out, CatalogEntry{Name: s.name, Languages: s.languages, Configuration: conf, Default: defaults[s.name], Auto: s.auto, Trusted: s.trusted})
+		out = append(out, CatalogEntry{
+			Name: s.name, Languages: s.languages, Configuration: conf,
+			Default: defaults[s.name], Auto: s.auto, Trusted: s.trusted,
+			NeedsConfig: s.isolation == operatorOnly,
+			Exts:        s.exts, Names: s.names, Prefixes: s.prefixes,
+		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out

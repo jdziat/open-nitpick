@@ -678,13 +678,7 @@ func runLinters() error {
 	fmt.Println("  opt-in   runs only when named, and configured or trusted as the last column says")
 	fmt.Println()
 	fmt.Printf("  %-18s %-8s %-52s %s\n", "name", "runs", "covers", "configuration")
-	fixed := []linters.CatalogEntry{
-		{Name: "golangci-lint", Languages: "Go", Configuration: "open-nitpick's own config; linters.golangci_config overrides", Default: true},
-		{Name: "ruff", Languages: "Python", Configuration: "--isolated; linters.ruff_config overrides", Default: true},
-		{Name: "eslint", Languages: "JavaScript, TypeScript (via an operator config)", Configuration: "linters.eslint_config required"},
-		{Name: "semgrep", Languages: "any (rules of your choosing)", Configuration: "linters.semgrep_config required"},
-	}
-	for _, e := range append(fixed, linters.Catalog()...) {
+	for _, e := range append(linters.Builtins(), linters.Catalog()...) {
 		def := "opt-in"
 		switch {
 		case e.Default:
