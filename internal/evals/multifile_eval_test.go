@@ -19,8 +19,8 @@ import (
 // corpus: every model in the battery, with and without related context,
 // against every incumbent that has a cached or collectable review.
 //
-// It prints deterministic columns only — RECALL, NOISE, ANCHOR, and the
-// per-band located counts — because Rule 1 says those are the primary
+// It prints deterministic columns only, RECALL, NOISE, ANCHOR, and the
+// per-band located counts, because Rule 1 says those are the primary
 // evidence and because the question this corpus asks (does reading the callee
 // find the defect?) is answered by a keyword on a line, not by a grade.
 //
@@ -116,7 +116,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 
 	// Incumbents first, from cache where there is one. A missing cache is
 	// collected live when the CLI is available, and reported as absent when
-	// it is not — never scored as a clean review.
+	// it is not, never scored as a clean review.
 	type incumbent struct {
 		name      string
 		cacheDir  string

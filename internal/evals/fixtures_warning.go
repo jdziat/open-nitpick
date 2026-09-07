@@ -17,13 +17,13 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // every request, and the number beside it now says warning. Nothing here was
 // moved. Every defect below is newly authored, and each is one a senior
 // reviewer would rate warning on its own terms against the anchor the model is
-// actually given: "`warning` — likely a bug, or a genuine hazard under
+// given: "`warning`, likely a bug, or a genuine hazard under
 // plausible conditions."
 //
 // The property that decides this level, and the one every plant here is built
 // around: NOTHING IS YET WRONG ON A NORMAL PATH. Each change below serves every
 // request correctly today. The failure needs a condition that is plausible
-// without being guaranteed — a cancelled context, a burst of traffic, a second
+// without being guaranteed, a cancelled context, a burst of traffic, a second
 // user on the host, an attacker who can time a response. That is the whole
 // distance to `error`, "a real bug that produces incorrect behavior on a
 // reachable path", and the corpus already states it in multi-defect's own note:
@@ -36,11 +36,11 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // accept or reject": a design choice with a cost the author may knowingly
 // accept and no failing input to point at. Every plant here names a mechanism
 // AND a failing input, so none of them is a matter of taste the author may
-// simply decline.
+// decline.
 //
 // That argument deliberately does not quote the ladder's current info examples,
 // which is a repair rather than a style choice. This comment used to name them
-// — "widening an exported type, adding a dependency" — and those two sentences
+// , "widening an exported type, adding a dependency", and those two sentences
 // were deleted from review.md for naming two plants; the quotation outlived
 // them because it sat in an em-dash aside rather than in double quotes, where
 // the sweep that fixed every other stale reference was looking. A comment keyed
@@ -48,9 +48,9 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // this paragraph needs is a property of the LEVEL.
 //
 // TWO CLASSES, AND WHY NOT MORE. Every plant here is `security` or `resource`.
-// That is not because warnings only occur there — the natural home for several
+// That is not because warnings only occur there, the natural home for several
 // warning-shaped defects, the anchor's own "retrying a non-idempotent request"
-// among them, is `correctness` — but because
+// among them, is `correctness`, but because
 // TestSeverityIsConsistentWithinADefectClass requires a SeverityNote from EVERY
 // member of a class that carries more than one severity, and correctness,
 // concurrency, contract and data-loss are each planted in fixtures.go at a
@@ -69,7 +69,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // directly; what this returns is the record of what was AUTHORED at this level,
 // and TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus is what makes the two
 // facts agree. Without it a fixture can be written, reviewed, merged and never
-// wired into anything — passing every test in the tree while measuring nothing,
+// wired into anything, passing every test in the tree while measuring nothing,
 // which is the quietest way this corpus has to lose a plant.
 //
 // LANGUAGES. Eleven of the fifteen fixtures before these were Go, two Python,
@@ -82,7 +82,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // the 4-way concurrency and cross-batch triage have never been measured at all.
 // ts-unbounded-memo-key changes SEVEN files. At the shipped
 // max_files_per_request of 6 that is two batches, dispatched under the shipped
-// concurrency of 4, whose findings are merged before triage — a path no fixture
+// concurrency of 4, whose findings are merged before triage, a path no fixture
 // has ever taken. Be precise about the rest: the two files that carry the
 // defect are deliberately in the SAME batch (git orders the diff by path, and
 // cache.ts and search.ts are the first and sixth entries), because a defect
@@ -104,8 +104,8 @@ func warningFixtures() []Fixture {
 // text, across two files.
 //
 // This is the shape the corpus has never had: the defect is invisible from
-// either file alone. src/search.ts reads as ordinary caching — a repeated
-// search is answered from a table — and src/cache.ts reads as an ordinary memo
+// either file alone. src/search.ts reads as ordinary caching, a repeated
+// search is answered from a table, and src/cache.ts reads as an ordinary memo
 // helper that says what it is, "a table of things that do not change", and
 // states its one requirement: keys must come from a set the caller can
 // enumerate. Neither is wrong. The defect is the pair: search.ts keys the table
@@ -123,7 +123,7 @@ func warningFixtures() []Fixture {
 // BOTH CALLERS NAMESPACE THEIR KEYS ("plan:" and "q:") and they must keep
 // doing so. The first draft of this fixture had search.ts call remember(q)
 // with the raw query, which shares one process-global Map with plans.ts's
-// "plan:" + tier — so searching the literal text "plan:free" returned the
+// "plan:" + tier, so searching the literal text "plan:free" returned the
 // cached Plan and `hits.slice` threw, and searching first made
 // planLimits("team").seats undefined. Both were reproduced by running the head
 // files under node. That was a SECOND, unplanted, user-reachable defect in a
@@ -131,7 +131,7 @@ func warningFixtures() []Fixture {
 // the unbounded table: a reviewer reporting the collision was charged a false
 // positive, and if it used the word "key" it was credited with the memory
 // plant it had never mentioned. Disjoint prefixes remove it and cost the plant
-// nothing — "q:" + q is exactly as unenumerable as q — and they make the
+// nothing, "q:" + q is exactly as unenumerable as q, and they make the
 // remaining defect purely about CARDINALITY, which is what it was always
 // supposed to be about.
 //
@@ -141,8 +141,8 @@ func warningFixtures() []Fixture {
 // noticed that the process dies. The second is a rate-limit objection, which
 // reaches for "unbounded" about the REQUEST rate. Both are why the keywords are
 // about memory and growth and about what the key space IS, and why "unbounded",
-// "cache", "key" and "held for the lifetime" — that last phrase being cache.ts's
-// own words — are not among them.
+// "cache", "key" and "held for the lifetime", that last phrase being cache.ts's
+// own words, are not among them.
 func tsUnboundedMemoKeyFixture() Fixture {
 	return Fixture{
 		Name: "ts-unbounded-memo-key",
@@ -285,7 +285,7 @@ export interface Plan {
 			//
 			// The bare stem "grow" WAS here and had to go. It is a substring of
 			// "grow stale", which is ordinary English for the staleness
-			// objection this fixture names as the false positive it invites —
+			// objection this fixture names as the false positive it invites,
 			// so the one stem undid the care taken to exclude "unbounded",
 			// "cache", "key" and "held for the lifetime". The phrases that
 			// replace it say what grows, which is the whole distinction between
@@ -323,12 +323,12 @@ export interface Plan {
 // respect but one: done is unbuffered. On the normal path the select takes the
 // receive and the goroutine finishes. When ctx is done first, ResolveContext
 // returns, nothing ever receives, and the send blocks for the life of the
-// process — holding the goroutine, the connection Lookup is using, and whatever
+// process, holding the goroutine, the connection Lookup is using, and whatever
 // its result references. A one-character fix, make(chan result, 1), removes it.
 //
 // THE FALSE POSITIVE THIS INVITES is the design objection: "Directory.Lookup
-// should take a context so the work can actually be cancelled". It is a fair
-// remark and it is not this defect — it is about the upstream interface, and a
+// should take a context so the work can be cancelled". It is a fair
+// remark and it is not this defect. It is about the upstream interface, and a
 // reviewer making only it has not noticed that this goroutine never exits even
 // after Lookup returns. The keywords therefore never mention context,
 // cancellation or the interface: every one of them is a word only a reviewer
@@ -440,7 +440,7 @@ func ResolveContext(ctx context.Context, d Directory, name string) (string, erro
 // than at first use. That is a real remark and a different one. The second is
 // replay: verify says nothing about a timestamp, so a captured request can be
 // sent again. Neither reaches for a word about TIME TAKEN, which is what every
-// keyword here is about, and "compare_digest" — the fix — appears nowhere in
+// keyword here is about, and "compare_digest", the fix, appears nowhere in
 // the change, so it cannot be typed by anyone who has not identified the
 // defect. Bare "compare" is excluded on purpose: it would credit the wholly
 // different objection that hex digests should be compared case-insensitively.
@@ -507,8 +507,8 @@ def verify(body: bytes, provided: str) -> bool:
 
 // csharpClientPerRequestFixture constructs and disposes an HttpClient per call.
 //
-// The change is a plausible refactor with a plausible reason — the field goes
-// away, the class becomes stateless — and everything else about it is right:
+// The change is a plausible refactor with a plausible reason. The field goes
+// away, the class becomes stateless, and everything else about it is right:
 // the method awaits before the using scopes close, so nothing is disposed out
 // from under the request, and the response is disposed too. What it costs is
 // invisible until there is traffic. Each HttpClient brings its own handler and
@@ -519,7 +519,7 @@ def verify(body: bytes, provided: str) -> bool:
 //
 // THE FALSE POSITIVE THIS INVITES is the timeout objection: a reviewer that
 // sees a bare new HttpClient often asks for an explicit timeout, and here that
-// is close to wrong — the default is 100 seconds and the change did not alter
+// is close to wrong. The default is 100 seconds and the change did not alter
 // it. The second is disposal ("EnsureSuccessStatusCode throws, so the response
 // is leaked"), which the using already handles. Neither reaches for a word
 // about SOCKETS or REUSE, which is what the keywords require, and none of those
@@ -584,7 +584,7 @@ public sealed class Notifier
 			Line: 17, // the per-call new HttpClient
 			// The bare token "port" WAS here and had to go. mentionsAny matches
 			// case-insensitive SUBSTRINGS, and "port" is inside "important",
-			// "support" and "reports" — three words a reviewer reaches for
+			// "support" and "reports", three words a reviewer reaches for
 			// without having noticed anything. It credited BOTH false positives
 			// this fixture names: "it is important to set an explicit timeout"
 			// and "if the webhook reports a non-2xx status". This is the same
@@ -615,7 +615,7 @@ public sealed class Notifier
 
 // bashFixedTempPathFixture writes a fetched payload to a fixed path in /tmp.
 //
-// The script needs the response twice, so it stops piping and saves a copy —
+// The script needs the response twice, so it stops piping and saves a copy,
 // the right instinct, spent on a path any other account on the host can create
 // first. A pre-created symlink at that path turns the redirect into a write to
 // whatever it points at, under this script's identity; a pre-created regular
@@ -628,7 +628,7 @@ public sealed class Notifier
 //
 // THE FALSE POSITIVE THIS INVITES is cleanup: "nothing removes the file; add a
 // trap". True, weaker, and about a different line's worth of consequence. The
-// second is collision — two runs of the script clobbering each other — which is
+// second is collision, two runs of the script clobbering each other, which is
 // a real hazard from the same fixed path but a different mechanism, and the
 // keywords admit it only when it arrives with the fix ("mktemp") or the
 // attacker ("another user", "symlink") attached. That boundary is deliberate:

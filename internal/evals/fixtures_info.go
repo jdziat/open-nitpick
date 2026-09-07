@@ -5,7 +5,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // infoFixtures are the corpus's info-level plants.
 //
 // Measured over AllFixtures() before these were written, the corpus planted 4
-// critical, 8 error, 6 warning, 0 info and 6 nit — 24 plants across 25
+// critical, 8 error, 6 warning, 0 info and 6 nit, 24 plants across 25
 // fixtures, which is one more fixture than this sentence used to claim. Every
 // other level had been given at least two plants and an argument; info had
 // none, so no claim about it was falsifiable. A reviewer that never emits the
@@ -20,7 +20,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // severity is defined by a failure: something returns the wrong answer, leaks,
 // deadlocks or breaches. Authoring one is a matter of choosing the failure and
 // then choosing how much has to go right for it not to happen. Info has no
-// failure. The shipped anchor is "`info` — a defensible concern the author
+// failure. The shipped anchor is "`info`, a defensible concern the author
 // should consciously accept or reject", and what a published example of it has
 // to do is name a cost WITHOUT naming an input that breaks.
 //
@@ -30,14 +30,14 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // is a property of the LEVEL. It went stale twice already. The version before
 // this one quoted an example reading "so a rise in failures reads as a fall in
 // traffic" and asserted in the same sentence that the ladder's examples "name no
-// input that breaks" — the quotation names the input, a failure, and the wrong
+// input that breaks", the quotation names the input, a failure, and the wrong
 // output, traffic reading as falling. Both the example and the claim about it
 // were wrong, and the claim was refuted by the text it quoted.
 //
 // THE AUTHORING TEST, which is what survives when the quotations are removed and
 // is the reason both of those examples were replaced: ask whether the AUTHOR
 // COULD BE WRONG. If the author could be wrong, the finding is at least a
-// warning. The usual move — take a defect and turn the dial down — therefore
+// warning. The usual move, take a defect and turn the dial down, therefore
 // does not produce an info finding at all; it produces a warning whose
 // consequence has been made small. Info is the level where reasonable engineers
 // split, and where the reviewable fact is that the author should have DECIDED
@@ -49,7 +49,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // either: one earlier version was "a subcommand configured on the command line
 // where the tool's other subcommands read a config file", which named no cost at
 // all, failed review.md's own bar ("report a finding only when you can name a
-// concrete consequence"), and was besides a consistency observation —
+// concrete consequence"), and was besides a consistency observation,
 // config.ClassStyle, which allowedClasses drops below pedantic, so a reader of
 // the default configuration could never have seen the finding it illustrated.
 //
@@ -57,17 +57,17 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // REPLACED, which is why two SeverityNotes below argue from a clause rather
 // than from an example. review.md illustrated `info` with "Widening an exported
 // type's accepted input is info. Adding a dependency for one helper function is
-// info." — kotlin-widened-input and rust-crate-for-one-call stated almost
-// verbatim — three lines above "These examples ... are deliberately drawn from
+// info.", kotlin-widened-input and rust-crate-for-one-call stated almost
+// verbatim, three lines above "These examples ... are deliberately drawn from
 // defect classes you are unlikely to meet in this change; do not go looking for
 // them." So the prompt named two planted defects and then told the reviewer to
 // ignore them. Measured, kimi-k3, two independent three-run batteries: both
 // fixtures 0 of 3 every time, usually with an empty findings list.
 //
 // THE FIX WAS ON THE PROMPT AND NOT ON THESE PLANTS, and the reason is not the
-// corpus. Every other rung illustrates with a SCENARIO — "Writing a decrypted
+// corpus. Every other rung illustrates with a SCENARIO, "Writing a decrypted
 // secret to a log that ships off-host", "A check-then-act on a file that
-// another process can replace between the two steps" — while those two were
+// another process can replace between the two steps", while those two were
 // CATEGORIES, and the anti-anchoring sentence's claim of rarity was therefore
 // false of them for any reader: widening an exported signature and adding a
 // dependency for one helper are among the most ordinary things a reviewer
@@ -78,7 +78,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 //
 // Every plant below was tested against that question before it was written:
 // name the case FOR the change, in one sentence, and refuse to plant it unless
-// that sentence is one a senior engineer would actually say. Those sentences
+// that sentence is one a senior engineer would say. Those sentences
 // are in each fixture's doc comment, alongside the case against. A plant whose
 // "for" side is a straw man is a warning with the dial turned down, and the
 // previous round's gate audited for exactly that.
@@ -95,7 +95,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // what it will cost concretely". So the shipped prompt contains a genuine
 // tension, and until now nothing in the corpus could see it. If every model
 // misses all five of these while scoring well elsewhere, that is evidence about
-// review.md's bar and not about the models — and it is the first evidence this
+// review.md's bar and not about the models, and it is the first evidence this
 // tree has ever had either way. Every plant below therefore states a CONCRETE
 // COST, because that clause is the only door into the level and a plant that
 // does not fit through it measures nothing.
@@ -105,20 +105,20 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // from EVERY member of a class that carries more than one severity.
 // correctness, concurrency, contract and data-loss are each planted in
 // fixtures.go at a single level with no notes at all, so an info plant in any
-// of them turns green plants red in a file this change does not own —
+// of them turns green plants red in a file this change does not own,
 // correctness alone would need notes on three. That is a real cost and it lands
 // on the most natural home for two of these: widening an exported type's
 // accepted input is contract-flavoured, and it is planted here as
-// `maintainability` instead. The declared class is honest on its own terms —
+// `maintainability` instead. The declared class is honest on its own terms,
 // ClassContract is "a change that breaks existing callers", and nothing below
-// breaks a caller, which is precisely why these are info and not error — but a
+// breaks a caller, which is precisely why these are info and not error, but a
 // reader should know the taxonomy was not the only pressure. Closing that needs
 // notes on contract-break, in a change that owns fixtures.go.
 //
 // LANGUAGES. Rust, Kotlin, Ruby and PHP are all new to the corpus; one plant is
-// Go. Before these, fourteen of twenty-five fixtures were Go — counted rather
+// Go. Before these, fourteen of twenty-five fixtures were Go, counted rather
 // than remembered, and the previous count in this sentence, sixteen of
-// twenty-four, was wrong in both figures — so a prompt tuned on this corpus
+// twenty-four, was wrong in both figures, so a prompt tuned on this corpus
 // could be Go-shaped without anyone noticing.
 //
 // THIS FUNCTION IS NOT A CORPUS and nothing runs it as one. The five below are
@@ -126,7 +126,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // directly; what this returns is the record of what was AUTHORED at this level,
 // and TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus is what makes the two
 // facts agree. Without it a fixture can be written, reviewed, merged and never
-// wired into anything — passing every test in the tree while measuring nothing,
+// wired into anything, passing every test in the tree while measuring nothing,
 // which is the quietest way this corpus has to lose a plant.
 //
 // THAT IS EXACTLY WHAT HAPPENED TO THESE FIVE, and the paragraph above was true
@@ -135,9 +135,9 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // touched one: unchecked lines, unprobed keywords, unpinned severity, in a diff
 // where a plant that measures nothing looks exactly like a plant that does.
 // Three defects survived that silence and were found by running the fixtures
-// rather than reading them — a Kotlin head that broke every named-argument
+// rather than reading them, a Kotlin head that broke every named-argument
 // caller, a Rust crate cargo would not build, and a keyword the change's own doc
-// comment supplied — and each is written up in the fixture it belongs to.
+// comment supplied, and each is written up in the fixture it belongs to.
 //
 // The guard could not have caught it either: it knew the names warningFixtures
 // and nitFixtures and was written as a list, so a set added after it was blind
@@ -151,7 +151,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // discovered a fourth time. Every other level in this corpus is defined by a
 // failure, and a failure brings its own nouns: nil, injection, WHERE clause,
 // symlink, socket. A reviewer that has found the defect uses them and one that
-// has not cannot. Info has no failure, so the vocabulary is shared — at this
+// has not cannot. Info has no failure, so the vocabulary is shared, at this
 // level the finding and the objection are frequently the SAME WORDS ABOUT THE
 // SAME LINE, differing in what the reviewer is asserting.
 //
@@ -164,7 +164,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 //     is strings.Contains, so any keyword crediting the first credits the second:
 //     no word list separates them, whatever it contains.
 //     TestTheInfoRecallThisInstrumentCannotBuy carries the proof and pins the
-//     price — the corpus denies both, so a terse reviewer proposing exactly this
+//     price, the corpus denies both, so a terse reviewer proposing exactly this
 //     plant's fix is scored a miss.
 //   - ruby-default-page-size is REACHABLE BUT FRAGILE. "Other consumers now
 //     receive 100 rows" is the finding and "other consumers can still receive
@@ -173,8 +173,8 @@ import "github.com/jdziat/open-nitpick/internal/config"
 //     one that names grammar is a rule about how a sentence is built rather than
 //     about what it says. "other caller" and "other consumer" were removed
 //     rather than qualified for that reason. The number is the seam that DOES
-//     work — the cap is 200 and the new default is 100, so "rows by default"
-//     separates them on subject matter — and it only reaches the sentences that
+//     work. The cap is 200 and the new default is 100, so "rows by default"
+//     separates them on subject matter, and it only reaches the sentences that
 //     quote the size. The fix stated as a location, "set it at the call site
 //     instead", stays uncredited: every phrase reaching it is one a reviewer
 //     types about any line in any file.
@@ -182,8 +182,8 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // WHAT THIS MEANS FOR THE NUMBER. Info recall on these two plants is a LOWER
 // BOUND and not a measurement: correct terse findings are uncredited by
 // construction, and no keyword edit changes that. The three options that would
-// — a required conjunction, a veto phrase, or judging detection at info against
-// Defect.Why with the model judge — are all changes to Defect and matches(),
+// , a required conjunction, a veto phrase, or judging detection at info against
+// Defect.Why with the model judge, are all changes to Defect and matches(),
 // argued in that test. None was made here: this round's scope was the keyword
 // damage, and a scorer change to close a measurement gap belongs in a change
 // that owns the scorer and can probe it in both directions.
@@ -199,9 +199,9 @@ func infoFixtures() []Fixture {
 
 // rustCrateForOneCallFixture adds a crate to format one string.
 //
-// This was the anchor's own second example — the ladder read "adding a
+// This was the anchor's own second example. The ladder read "adding a
 // dependency for one helper function is info" until that illustration was
-// replaced, for the reason in this file's header — planted in the language
+// replaced, for the reason in this file's header, planted in the language
 // where a manifest change is most visible. The change is small and entirely
 // reasonable: the nightly report printed durations as a seconds count, someone
 // on the rota misread 150 as minutes, and the fix spells them "2m 30s".
@@ -211,7 +211,7 @@ func infoFixtures() []Fixture {
 // breaks correctly, which is exactly the kind of tedious code a team should not
 // be writing itself. THE CASE AGAINST: it is one call site, the output this
 // report needs is a few lines of arithmetic, and a dependency is not a local
-// cost — it is in every build, every lockfile bump and whatever audit the team
+// cost. It is in every build, every lockfile bump and whatever audit the team
 // runs, forever. Both sentences are ones a senior engineer says. Neither is
 // wrong, and the reviewable fact is that the author should have weighed them.
 //
@@ -222,7 +222,7 @@ func infoFixtures() []Fixture {
 // THE FALSE POSITIVE THIS INVITES is the version-specification objection:
 // `humantime = "2"` accepts any 2.x, so a reviewer reaches for pinning, an exact
 // version, or a lockfile. That is a real remark about supply-chain hygiene and
-// it accepts the dependency, which is the opposite of this finding — so
+// it accepts the dependency, which is the opposite of this finding, so
 // "version", "pin", "semver" and "supply chain" are all absent, and so is the
 // bare word "dependency", which both objections type in their first sentence.
 // The second is the output-format remark: humantime prints sub-second
@@ -234,7 +234,7 @@ func infoFixtures() []Fixture {
 // IT DID NOT BUILD, and that is worth recording because this is the one fixture
 // in either corpus whose plant is IN the manifest. Cargo.toml and src/report.rs
 // were its only files, so cargo refused the manifest before compiling anything:
-// "no targets specified in the manifest — either src/lib.rs, src/main.rs, a
+// "no targets specified in the manifest, either src/lib.rs, src/main.rs, a
 // [lib] section, or [[bin]] section must be present". A manifest that does not
 // build is not a manifest a reviewer is reading, and the finding this fixture
 // scores is a judgement about a manifest. src/lib.rs supplies the missing
@@ -288,7 +288,7 @@ pub fn render(jobs: &[Job]) -> String {
 			// noiseTolerance of the plant. A comment-on-every-line spammer is
 			// then charged no noise at all, which
 			// TestTheNoiseToleranceIsPinnedByTheCorpus calls vacuous and fails
-			// on, correctly — the NOISE column measures nothing on a fixture
+			// on, correctly, the NOISE column measures nothing on a fixture
 			// smaller than its own radius.
 			"Cargo.toml": `[package]
 name = "report"
@@ -330,8 +330,8 @@ pub fn render(jobs: &[Job]) -> String {
 		Extra: map[string]string{
 			// The crate root, and the reason this fixture builds at all. It is
 			// byte-identical in both states and nothing about the plant needs it
-			// to be READABLE — the decision is the manifest line, and the call
-			// site it pays for is already in the diff — so it belongs here
+			// to be READABLE. The decision is the manifest line, and the call
+			// site it pays for is already in the diff, so it belongs here
 			// rather than in Base and Head, and Extra's own doc is the rule:
 			// unchanged files never reach the model, and buildRepo writes them
 			// so the repository looks like a project. What it buys here is that
@@ -347,8 +347,8 @@ pub fn render(jobs: &[Job]) -> String {
 			// be typed by a reviewer that has accepted the dependency and is
 			// asking for a tighter version, which is the objection this change
 			// most invites. "a few lines" and "hand-rolled" were considered and
-			// dropped: both appear in the APPROVING sentence too — "this
-			// replaces a few lines of hand-rolled formatting" — and the corpus
+			// dropped: both appear in the APPROVING sentence too, "this
+			// replaces a few lines of hand-rolled formatting", and the corpus
 			// has already paid full recall once for admitting a phrase that a
 			// finding agreeing with the change would use.
 			Keywords: []string{
@@ -363,7 +363,7 @@ pub fn render(jobs: &[Job]) -> String {
 			// maintainability is the accurate box and the scope clause that
 			// admits it is the one this plant is built to fit: "You may report a
 			// maintainability problem only when you can name what it will cost
-			// concretely". The cost is named — a crate in every build and every
+			// concretely". The cost is named, a crate in every build and every
 			// audit for one call.
 			Class:        config.ClassMaintainability,
 			WantSeverity: config.SeverityInfo,
@@ -386,7 +386,7 @@ pub fn render(jobs: &[Job]) -> String {
 // kotlinWidenedInputFixture lifts an exported function off the type it was
 // written for.
 //
-// The anchor's own first example until that illustration was replaced — the
+// The anchor's own first example until that illustration was replaced, the
 // ladder read "widening an exported type's accepted input is info", which is
 // this plant, for the reason in this file's header. The reason it is planted in
 // Kotlin rather than Go is that Kotlin's non-null types make the widening carry
@@ -410,22 +410,22 @@ pub fn render(jobs: &[Job]) -> String {
 // lost are second names for day, signups and cancellations, so a reviewer asks
 // for one set or the other. That is a naming observation, the generation scope
 // excludes naming, and its fix leaves the widened signature exactly where it
-// is — so "alias", "duplicate", "two names" and "rename" are all absent.
+// is, so "alias", "duplicate", "two names" and "rename" are all absent.
 //
 // THE SECOND IS THE VISIBILITY REMARK ("make Summarizable internal"), which
 // accepts the abstraction and argues about who may SEE it. This comment used to
 // claim it was "admitted only through phrases that also name the widening", and
 // that was false: "public api", "public surface" and "surface area" were all
 // keywords, and all three match a remark that has noticed nothing about the
-// parameter — "this adds public API surface area; internal would keep the public
+// parameter, "this adds public API surface area; internal would keep the public
 // surface smaller" scored full recall, and survived only by an accident of
 // anchor distance. The three are gone.
 //
 // What is left admits that remark only when it reaches for the widening or for
 // the one-implementation argument, and that is deliberate rather than a residual
 // leak: a reviewer that writes "there is only one implementation" has made this
-// plant's case whatever fix it goes on to propose. The pure form — the one that
-// argues visibility and nothing else — is the probe in
+// plant's case whatever fix it goes on to propose. The pure form, the one that
+// argues visibility and nothing else, is the probe in
 // TestKeywordsAdmitOnlyRealDetections, and it is run through matches() rather
 // than described. "interface" stays absent for its own reason: it is the
 // change's own most typed token.
@@ -435,9 +435,9 @@ pub fn render(jobs: &[Job]) -> String {
 // which is not a change Kotlin lets a caller ignore: named arguments are part of
 // the signature, so `summarize(report = r)` compiled against Base and failed
 // against Head with "no parameter with name 'report' found" under kotlinc
-// 2.0.21. That falsified two sentences of the SeverityNote below verbatim —
+// 2.0.21. That falsified two sentences of the SeverityNote below verbatim,
 // "every caller that compiled before compiles now", and "this breaks none, which
-// is exactly why it is not an error" — and it made the fixture plant a contract
+// is exactly why it is not an error", and it made the fixture plant a contract
 // break at info. The rename bought nothing, so the name stays: the widening is
 // now the only change. Both states were recompiled with that named caller and
 // run, and both print "2026-08-04: +12 / -3".
@@ -524,7 +524,7 @@ fun summarize(report: Summarizable): String =
 			// The line this list draws, stated so the next editor does not move
 			// it by accident: a remark arguing only about who may SEE the type
 			// is not credited; one that reaches for the widening, or for the
-			// fact that nothing yet needs it, is — and is credited on purpose,
+			// fact that nothing yet needs it, is, and is credited on purpose,
 			// whatever fix it goes on to propose.
 			//
 			// "open set" CAME OUT, and it is the last casualty of the round that
@@ -547,7 +547,7 @@ fun summarize(report: Summarizable): String =
 			//
 			//   - "summarize's parameter" credited "Summarizable is public with
 			//     no consumer outside this module; mark it internal.
-			//     summarize's parameter can stay as it is." — the pure
+			//     summarize's parameter can stay as it is.", the pure
 			//     visibility objection, mentioning the parameter only to say it
 			//     is FINE, scored full recall.
 			//   - "wider than anything" credited "the public surface here is
@@ -603,10 +603,10 @@ fun summarize(report: Summarizable): String =
 // with a reason stated for that caller and none offered for the rest. It is
 // Ruby, which is new to the corpus, and the change is four characters wide.
 //
-// THE CASE FOR IT: defaults exist to serve the caller that actually makes the
+// THE CASE FOR IT: defaults exist to serve the caller that makes the
 // requests, the web client is that caller, and a default the busiest consumer
 // has to override is a default that is wrong. THE CASE AGAINST: every OTHER
-// consumer — the mobile client, the RSS job, the moderation queue — now
+// consumer, the mobile client, the RSS job, the moderation queue, now
 // receives and serializes four times the rows it did yesterday without asking
 // for them or being mentioned in the change, and the alternative is one keyword
 // argument at the one call site that wanted it. Reasonable engineers split on
@@ -614,7 +614,7 @@ fun summarize(report: Summarizable): String =
 //
 // NOTHING HERE IS A DEFECT AND THAT IS DELIBERATE. The cap still applies, the
 // clamp is unchanged, the offset arithmetic is unchanged, and 100 rows is not a
-// size anything falls over at — the moment it were, this would be a warning
+// size anything falls over at. The moment it were, this would be a warning
 // about a named failure rather than an info about a decision.
 //
 // THE FALSE POSITIVE THIS INVITES is the offset-pagination remark: deep pages
@@ -626,7 +626,7 @@ fun summarize(report: Summarizable): String =
 // which is what every keyword here requires. The bare stem "default" is absent
 // for a mechanical reason: keywords match case-insensitive substrings, and
 // DEFAULT_PER_PAGE is the changed line's own identifier, so any finding quoting
-// it — including both objections above — would have scored as a detection.
+// it, including both objections above, would have scored as a detection.
 //
 // THE CAP OBJECTION WAS CREDITED ANYWAY, which is what running it rather than
 // reasoning about it found: "a client can still pass per_page: 200 and get 200
@@ -704,7 +704,7 @@ end
 			// FIVE MORE CAME OUT, each for the same reason and each measured
 			// through matches() rather than argued about. "pass per_page" and
 			// "passing per_page" credited the cap objection this fixture's own
-			// comment says it excludes — "a client can still pass per_page: 200"
+			// comment says it excludes, "a client can still pass per_page: 200"
 			// is how that objection writes itself, and it accepts the new
 			// default entirely. "payload" and "rows per request" credited any
 			// generic remark about size, including the same one. "at the call
@@ -718,8 +718,8 @@ end
 			// They also open the cap objection: "every caller can still request
 			// up to MAX_PER_PAGE" is a finding that has noticed nothing and was
 			// credited in full. The rule this list settles on is that a keyword
-			// NAMING CALLERS must name them NEGATIVELY — the ones that do not
-			// pass per_page, did not ask, and were not mentioned — because those
+			// NAMING CALLERS must name them NEGATIVELY. The ones that do not
+			// pass per_page, did not ask, and were not mentioned, because those
 			// are the only callers this plant is about, and no objection that
 			// accepts the new default has a reason to mention them. Singular
 			// stems are used where they match both numbers.
@@ -727,15 +727,15 @@ end
 			// The rule covers the caller keywords and NOT the whole list, which
 			// this sentence used to imply: "four times", "quadruple", "opt in"
 			// and "rows by default" name the change's magnitude rather than any
-			// caller, and they are held to the other bar instead — no objection
+			// caller, and they are held to the other bar instead, no objection
 			// this fixture excludes reaches them, which is a probe rather than a
 			// claim.
 			//
 			// "other caller" and "other consumer" DID NOT SURVIVE THAT RULE, and
 			// they are the reason it is written here rather than assumed. Neither
 			// names a caller negatively: the cap objection reaches both without
-			// noticing anything — "other consumers can still request up to
-			// MAX_PER_PAGE, so the cap is the real ceiling here" — which is the
+			// noticing anything, "other consumers can still request up to
+			// MAX_PER_PAGE, so the cap is the real ceiling here", which is the
 			// same finding "every caller" was removed for admitting, one word
 			// narrower. It is in the miss probes.
 			//
@@ -761,15 +761,15 @@ end
 			// it argued, is not. Containment runs the other way. mentionsAny is
 			// strings.Contains, "the call site" is a SUBSTRING of "at the call
 			// site", so the replacement credited everything the removal denied
-			// and more — "this allocation happens at the call site, which is
+			// and more, "this allocation happens at the call site, which is
 			// fine" scored full recall on this plant.
 			//
 			// Both are gone and NOTHING REPLACES THEM. The alternative stated as
 			// "set it at the call site instead" is therefore uncredited, and
 			// TestTheInfoRecallThisInstrumentCannotBuy runs that sentence and
 			// records the price rather than leaving it to this paragraph. The
-			// one candidate that reached it without naming a call site — "what
-			// everyone gets" — credits no probe in this package's table, and was
+			// one candidate that reached it without naming a call site, "what
+			// everyone gets", credits no probe in this package's table, and was
 			// still rejected: it names the population POSITIVELY, which is what
 			// "every caller" came out for, and one ordinary cap objection
 			// reaches it ("the clamp is what everyone gets in the end, so
@@ -811,14 +811,14 @@ end
 // The change ADDS the membership check: before it, any signed-in viewer could
 // read any project, and after it they cannot. That is the shape worth having at
 // this level, because it makes the fixture unmistakably not a defect with the
-// dial turned down — the change is a security improvement, and the only thing
+// dial turned down. The change is a security improvement, and the only thing
 // left to review is which of two correct denials it should send.
 //
 // THE CASE FOR 403: it is what the status code means, it tells a legitimate
 // user who has landed on a colleague's link that they need access rather than
 // that they mistyped, and support can tell the two apart. THE CASE FOR 404: a
-// 403 confirms to anyone holding an id — from a shared link, a log line, a
-// referrer, a support ticket — that a project with that id exists and that they
+// 403 confirms to anyone holding an id, from a shared link, a log line, a
+// referrer, a support ticket, that a project with that id exists and that they
 // are not on it, and hiding that costs nothing but debuggability. Serious
 // products ship both: most APIs answer 403, and GitHub answers 404 for a
 // private repository. That is the strongest available evidence that this is a
@@ -829,8 +829,8 @@ end
 // and one that has not read the docblock asks who $viewerId is. Both are
 // hallucinations about a check that is in the diff, so "authorization", "access
 // control", "idor" and "permission" are all absent. The second is the
-// error-body remark — the two responses carry different bodies, so a reviewer
-// may ask for a shared error shape — which is a consistency observation whose
+// error-body remark, the two responses carry different bodies, so a reviewer
+// may ask for a shared error shape, which is a consistency observation whose
 // fix leaves the disclosure exactly where it is.
 //
 // THIS FIXTURE CREDITED BOTH OF THEM, and it took running them through
@@ -839,7 +839,7 @@ end
 // "an attacker can enumerate project ids" is how that finding writes itself, and
 // enumeration is the attack that FOLLOWS this disclosure rather than a sign the
 // disclosure was noticed. "exists" is a bare English verb and credited "No test
-// exists for the non-member path" — a remark about coverage, scored as a
+// exists for the non-member path", a remark about coverage, scored as a
 // security detection. "hide" and "hides" credited the error-body remark, which
 // asks the 403 body to "hide internal details". All four are gone and the
 // probes are in TestKeywordsAdmitOnlyRealDetections. What is left either names
@@ -849,7 +849,7 @@ end
 // IT WAS RUN, under php 8.3, against stub Response, Project and
 // ProjectRepository classes with one project the viewer is a member of, one it
 // is not, and one that does not exist. Base answers 200, 200, 404: any
-// signed-in viewer reads any project. Head answers 200, 403, 404 — which is
+// signed-in viewer reads any project. Head answers 200, 403, 404, which is
 // both the security improvement the change is for and, in the last two rows,
 // the disclosure this plant is about, since the pair of denials is exactly what
 // tells a caller holding an id which of the two it is holding.
@@ -925,8 +925,8 @@ final class ProjectController
 			// "exists" is absent for the same reason and was not, which cost
 			// this plant a false detection on every finding containing an
 			// ordinary English verb. It survives only in the two forms that
-			// require the sentence to be ABOUT the disclosure — "whether the
-			// project exists" and "that the project exists" — because a reviewer
+			// require the sentence to be ABOUT the disclosure, "whether the
+			// project exists" and "that the project exists", because a reviewer
 			// merely describing the branch writes "when the project exists but
 			// the viewer is not a member", and that is not a finding. "enumerat",
 			// "hide" and "hides" came out with it; the doc comment above says
@@ -937,7 +937,7 @@ final class ProjectController
 			// error-body objection says they SHOULD return the same envelope.
 			// Both sentences are about two responses being the same, both are
 			// ordinary English, and they differ by what the reviewer is
-			// ASSERTING rather than by any word either one uses — "both denials
+			// ASSERTING rather than by any word either one uses, "both denials
 			// should return the same response envelope" was credited in full.
 			// "indistinguishable" survives on the narrower ground that asking
 			// for the denials to be indistinguishable IS this plant's fix, so a
@@ -949,8 +949,8 @@ final class ProjectController
 			// WORK, which was found by restoring it alone and re-running every
 			// probe on this fixture: not one verdict changed. It was removed on
 			// a reading of the sentence rather than on a run, in the round whose
-			// whole thesis is that prose is not executable. The removal stands —
-			// it is the same failure as "same response" one word over — but it
+			// whole thesis is that prose is not executable. The removal stands,
+			// it is the same failure as "same response" one word over, but it
 			// is now CHARGED: the error-body objection appears below in the
 			// wording that uses it, so putting the keyword back fails
 			// TestKeywordsAdmitOnlyRealDetections instead of passing silently.
@@ -964,8 +964,8 @@ final class ProjectController
 			// it still requires the sentence to name what the caller learns
 			// about EXISTENCE.
 			//
-			// The looser pair tried first — "now learns" and "learns the
-			// project" — was withdrawn for failing exactly the rule the comment
+			// The looser pair tried first, "now learns" and "learns the
+			// project", was withdrawn for failing exactly the rule the comment
 			// claimed for it. Run through matches(), "now learns" credited an
 			// N+1 remark ("the second now learns nothing the first did not
 			// already have") and "learns the project" credited an input
@@ -1003,8 +1003,8 @@ final class ProjectController
 // package-level default plus thin wrappers, so a caller can ask one question
 // without being handed a *Set first.
 //
-// THE CASE FOR IT: this is what the standard library does — http.DefaultClient,
-// log.Default, flag.CommandLine — and threading a value through four layers so
+// THE CASE FOR IT: this is what the standard library does, http.DefaultClient,
+// log.Default, flag.CommandLine, and threading a value through four layers so
 // one leaf can ask "is this flag on" is a real cost paid by everything in
 // between. THE CASE AGAINST: the answer is now fixed at process start from the
 // environment, so a test that wants a different set has to reach into the
@@ -1027,7 +1027,7 @@ final class ProjectController
 // change's own comment contains "thread a *Set through every layer", so it is a
 // word a reviewer can type by quoting.
 //
-// "package-level" WAS NOT ABSENT, and the same comment contains it too — the
+// "package-level" WAS NOT ABSENT, and the same comment contains it too, the
 // exact failure the sentence above describes, in the same fixture, one clause
 // later. See the note on Keywords. Both objections above are now probes in
 // TestKeywordsAdmitOnlyRealDetections, and so is the docs nit that found it.
@@ -1118,9 +1118,9 @@ func Enabled(name string) bool { return Default.Enabled(name) }
 			// THE BARE STEMS "package-level" AND "package level" ARE GONE, and
 			// they are the reason this list needed rereading: the change's own
 			// added doc comment says "the package-level helpers read", three
-			// lines from the plant, so a docs nit that quoted it — "the comment
+			// lines from the plant, so a docs nit that quoted it, "the comment
 			// says Default is the Set the package-level helpers read; say which
-			// variable a caller should set" — was scored as having found the
+			// variable a caller should set", was scored as having found the
 			// plant. A keyword the diff supplies is a keyword the reviewer did
 			// not have to earn. The compounds that replace them cannot be
 			// reached by quoting: each one names the standing cost rather than
@@ -1131,7 +1131,7 @@ func Enabled(name string) bool { return Default.Enabled(name) }
 			// the answer for the whole binary; keep returning a *Set and let
 			// callers hold it" is this finding stated plainly, and it came back
 			// MISSED: every compound above names the PATTERN, and a reviewer who
-			// has read the diff names the SCOPE — the binary — because the scope
+			// has read the diff names the SCOPE, the binary, because the scope
 			// is what the added line changes. "answer for the whole" closes it
 			// and requires the sentence to say what is fixed for that scope.
 			//
@@ -1144,7 +1144,7 @@ func Enabled(name string) bool { return Default.Enabled(name) }
 			//     fixture's doc comment already excludes, wearing the scope
 			//     word: "a typo in FEATURES turns a flag off for the whole
 			//     binary with no error". Naming the ANSWER is what separates the
-			//     finding from it — the objection is about which flags are in
+			//     finding from it. The objection is about which flags are in
 			//     the set, not about there being one set.
 			//   - "one binary" is ten characters and a substring. "The package
 			//     function Enabled and the method Enabled differ by one binary
@@ -1160,7 +1160,7 @@ func Enabled(name string) bool { return Default.Enabled(name) }
 			// anything, so the rule for ADDING one to this corpus is now checked
 			// rather than stated: TestKeywordsAdmitOnlyRealDetections carries a
 			// soleCreditors list, and a keyword on it must be the ONLY keyword
-			// crediting some hit probe — deleting it then fails a test — while
+			// crediting some hit probe, deleting it then fails a test, while
 			// the miss probes keep charging it in the other direction. 345 of
 			// the corpus's 358 keywords predate that list and nothing enforces
 			// it for them; the list is what a keyword added from here on has to

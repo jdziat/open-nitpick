@@ -26,25 +26,25 @@ import (
 // DefaultJudgeModel stands in for a senior human reviewer.
 //
 // The judge must be stronger than anything under test, because its job is to
-// say whether a finding is worth a colleague's attention — a question keyword
+// say whether a finding is worth a colleague's attention, a question keyword
 // matching cannot answer. Keyword scoring tells you a bug was found; only a
 // judgement call tells you the review was worth reading.
 //
 // DEFAULTJUDGEMODEL SHARES A VENDOR WITH CONTENDERS IT SCORES, and that is not
 // a defect this constant can fix on its own. DefaultModels carries three OpenAI
-// entries — gpt-5.6-luna, gpt-5.4, and THIS MODEL. The judge is not merely from
+// entries, gpt-5.6-luna, gpt-5.4, and THIS MODEL. The judge is not merely from
 // the same vendor as three contenders; it is one of them, grading its own
 // output. LLM-as-judge self-preference is a documented effect and every judged
 // column inherits whatever preference it carries.
 //
 // The exact list is not written down here, because a list in a comment is wrong
-// the first time somebody edits the battery — the brief that commissioned the
+// the first time somebody edits the battery, the brief that commissioned the
 // second judge named three OpenAI contenders that are not in DefaultModels at
 // all, and named three CLEAN vendors that are. VendorConflicts computes it.
 //
 // Swapping this constant for a clean vendor would move the conflict rather than
 // measure it: the new judge would have its own preferences and nothing would say
-// how much either one moved the table. SecondJudgeModel is the answer instead —
+// how much either one moved the table. SecondJudgeModel is the answer instead,
 // the same findings scored twice, with the disagreement published beside every
 // judged figure. VendorConflicts is what refuses to let the conflict go
 // unstated, and it is computed from DefaultModels rather than described here,
@@ -54,7 +54,7 @@ const DefaultJudgeModel = "openai/gpt-5.6-terra"
 // SecondJudgeModel corroborates the primary judge from a vendor NO contender
 // shares.
 //
-// x-ai has no entry in DefaultModels — checked against the live OpenRouter
+// x-ai has no entry in DefaultModels, checked against the live OpenRouter
 // catalog (GET /api/v1/models) on 2026-08-04, which listed 338 models across 8
 // contender vendors and 49 others. TestTheSecondJudgeSharesNoVendorWithAny
 // Contender recomputes that from the battery on every run, so adding an x-ai
@@ -64,7 +64,7 @@ const DefaultJudgeModel = "openai/gpt-5.6-terra"
 // grok-4.5 specifically, on three requirements the judge has:
 //
 //   - STRONGER THAN THE FIELD. DefaultJudgeModel's doc comment states the
-//     requirement and it is not negotiable — the judge decides whether a finding
+//     requirement and it is not negotiable, the judge decides whether a finding
 //     was worth a colleague's attention. grok-4.5 is x-ai's flagship ("frontier
 //     performance on coding, knowledge work, and STEM"), and ~x-ai/grok-latest
 //     redirects to it. The clean vendors that are NOT this are all weaker: the
@@ -77,7 +77,7 @@ const DefaultJudgeModel = "openai/gpt-5.6-terra"
 //     response_format and structured_outputs.
 //   - ENOUGH CONTEXT FOR judgeRequest. It renders every file of the fixture at
 //     Head AND at Base, plus the persona and every finding. grok-4.5 carries
-//     500k tokens, against 1.05M for the primary judge — comfortably above the
+//     500k tokens, against 1.05M for the primary judge, comfortably above the
 //     largest fixture, and the multi-file corpus is the axis to re-check this on.
 //
 // It is also, unlike the primary judge, a model that accepts `temperature`. The
@@ -127,7 +127,7 @@ type Verdict struct {
 	// Real reports whether the finding describes a genuine problem in the code.
 	Real bool `json:"real"`
 
-	// WorthRaising reports whether a senior reviewer would actually leave this
+	// WorthRaising reports whether a senior reviewer would leave this
 	// comment. A finding can be technically true and still not worth the
 	// reader's time, which is the distinction that separates a useful reviewer
 	// from an exhausting one.
@@ -140,12 +140,12 @@ type Verdict struct {
 	ToneVerdict string `json:"tone_verdict"`
 
 	// ClassCorrect reports whether the finding's class matches what the problem
-	// actually is.
+	// is.
 	//
 	// Class drives which findings a repository publishes, so a mislabelled one
 	// is silently filtered away at the stricter levels. Without this field the
 	// harness cannot tell "the filter worked" from "the model mislabelled it
-	// and a real defect vanished" — they produce the identical observation of a
+	// and a real defect vanished", they produce the identical observation of a
 	// lower finding count.
 	ClassCorrect bool `json:"class_correct"`
 
@@ -405,7 +405,7 @@ func numbered(content string) string {
 // The identity is DERIVED FROM THE FINDINGS, not declared by the caller. A
 // boolean saying "these matched" is the kind of convention this package has
 // watched fail twice; a fingerprint cannot be wrong about what it covers, and
-// it self-corrects — two nitpick levels that filter to the same list produce
+// it self-corrects, two nitpick levels that filter to the same list produce
 // the same fingerprint and are corroborable, which is true of them rather than
 // assumed.
 //
@@ -420,7 +420,7 @@ type Stimulus struct {
 	n int
 
 	// print is the fingerprint. EMPTY MEANS UNRECORDED, and an unrecorded
-	// stimulus matches NOTHING — not even another unrecorded one. That is the
+	// stimulus matches NOTHING, not even another unrecorded one. That is the
 	// safe direction: a judgement folded in without stating what produced it
 	// costs a delta, where the alternative would let two unstated stimuli
 	// compare equal and publish exactly the fake confidence interval this type
@@ -455,7 +455,7 @@ func (s Stimulus) Recorded() bool { return s.print != "" }
 // judges have seen the same stimulus only when they have seen the same
 // fixtures with the same findings in each. Comparing a single rolled-up hash
 // would work as well, but the multiset also makes the LENGTHS visible, which is
-// how a second judge that failed on two fixtures is caught — its aggregate
+// how a second judge that failed on two fixtures is caught, its aggregate
 // covers six samples where the primary's covers eight, and the difference
 // between two rates over different sample sets is not a disagreement.
 type stimulusTrace struct {
@@ -474,8 +474,8 @@ func (t *stimulusTrace) record(s Stimulus) { t.prints = append(t.prints, s.print
 // the whole comparison rather than being skipped.
 //
 // Sorted before comparing because the two sides are assembled in different
-// orders — the primary from a goroutine pool, the second from Rejudge's ordered
-// pass — and order of assembly is not a difference in stimulus.
+// orders, the primary from a goroutine pool, the second from Rejudge's ordered
+// pass, and order of assembly is not a difference in stimulus.
 func (t stimulusTrace) matches(o stimulusTrace) bool {
 	if len(t.prints) == 0 || len(t.prints) != len(o.prints) {
 		return false
@@ -510,7 +510,7 @@ type Aggregate struct {
 	// judge scored Incumbent as understating nothing on a corpus whose ground
 	// truth says it understated defects it had located. Replacing the judge's
 	// columns with these would hide that disagreement, and the disagreement is
-	// itself the result — one of the two instruments is wrong about this corpus
+	// itself the result, one of the two instruments is wrong about this corpus
 	// and a reader has to be able to see which.
 	//
 	// They are counted per LOCATED DEFECT while Inflated and Understated are
@@ -521,7 +521,7 @@ type Aggregate struct {
 	SevInflated    int
 	SevUnderstated int
 
-	// SevPlanted is how many defects the fixtures behind those counts planted —
+	// SevPlanted is how many defects the fixtures behind those counts planted,
 	// the denominator printed as O-COV.
 	//
 	// It is carried because the triple above is graded only over what the
@@ -535,7 +535,7 @@ type Aggregate struct {
 	// invented findings, the widest span claimed about any one thing, and the
 	// number of reviews both were folded over.
 	//
-	// They are model-free and judge-free — ScoreDetection consults neither — and
+	// They are model-free and judge-free, ScoreDetection consults neither, and
 	// they carry their OWN review count rather than dividing by len(Grades).
 	//
 	// The two agree on the common path and are not the same quantity. Both folds
@@ -564,7 +564,7 @@ type Aggregate struct {
 	// maxed, over the defects these reviews located, and it is published as L/DEF
 	// beside the max because neither fold subsumes the other: a max hides uniform
 	// vagueness exactly as a mean hides one blob. Its denominator is SevGraded()
-	// — the located-defect count RECALL is also divided by — rather than a second
+	//, the located-defect count RECALL is also divided by, rather than a second
 	// counter folded here, because two integers for "how many defects this
 	// contender found" are two answers free to drift.
 	// TestRecallAndCoverageAreOneReadingOfOneCorpus pins them as one.
@@ -625,7 +625,7 @@ type Aggregate struct {
 	// SUFFICIENT FOR A PER-REVIEW RATE. GRADE is a mean over judged samples and
 	// coverage is the right question for it. RECALL, NOISE and L/DEF are folded
 	// over the reviews that SURVIVED, and losing runs of a fixture that other
-	// runs still cover leaves this set — and therefore Coverage() — unchanged
+	// runs still cover leaves this set, and therefore Coverage(), unchanged
 	// while reweighting the fixture mix every one of those rates is a mean over.
 	// The depth counters below are what sees that; Coverage() is deliberately
 	// left as the set count so the guard this comment governs is untouched.
@@ -637,7 +637,7 @@ type Aggregate struct {
 	// The gap is not a smaller sample, it is a NON-RANDOM smaller sample: a run
 	// drops out because its review errored or its judge call failed, and nothing
 	// here can rule out that those correlate with what the review said. The
-	// direction is one-sided — the incumbent is served at depth one per fixture,
+	// direction is one-sided. The incumbent is served at depth one per fixture,
 	// so any loss on its side removes the fixture and moves Coverage, while our
 	// side at RUNS>1 loses depth without losing coverage. Only the challenger can
 	// be silently flattered, which is why the shortfall marks the cells rather
@@ -748,11 +748,11 @@ func (a Aggregate) Lost() int {
 // Empty when the battery never called Attempted: a row that does not state what
 // it tried cannot be short of it, and inferring a shortfall from silence would
 // mark every row of a battery that has not been wired up. That is a real blind
-// spot rather than a safe default — TestEveryJudgedBatteryStatesWhatItAttempted
+// spot rather than a safe default, TestEveryJudgedBatteryStatesWhatItAttempted
 // is what stops a battery staying in it.
 // A fixture folded ZERO times is not short, it is absent, and it is returned by
-// UnmeasuredFixtures instead. The split is the cost ledger's — see CostRow's
-// Missing beside its Shallow — and this function was extracted from that one
+// UnmeasuredFixtures instead. The split is the cost ledger's, see CostRow's
+// Missing beside its Shallow, and this function was extracted from that one
 // without it, which made ShallowSampleWarning open "covers every fixture" over a
 // row that covered nothing of the fixture it then named "(0 of 1)". Reproduced
 // at Coverage() 3 of 5. A not-comparable row reading as merely thin is the wrong
@@ -775,7 +775,7 @@ func (a Aggregate) ShortFixtures() []ShortFixture {
 // short on a fixture measured that fixture and measured it thinly, so its
 // figures describe the whole corpus at uneven depth. A row that folded nothing
 // for a fixture did not measure that fixture at all, so its figures describe a
-// SMALLER CORPUS — and on this corpus the fixtures that fail are not a random
+// SMALLER CORPUS, and on this corpus the fixtures that fail are not a random
 // subset, since a review that errored or a judge call that failed correlates
 // with the reviews that were hard.
 func (a Aggregate) UnmeasuredFixtures() []string {
@@ -818,7 +818,7 @@ func (a Aggregate) CoverageShortfall(model string) string {
 //
 // One character, for the reason the cost table's "*" is one character: a table
 // cell is width-formatted and a marker that widens the column moves every number
-// beside it. It is the same character as the cost table's, deliberately — it
+// beside it. It is the same character as the cost table's, deliberately, it
 // means the same thing in both places, and a second symbol for one condition is
 // how two tables come to disagree about one loss.
 const shortSampleMark = "*"
@@ -867,8 +867,8 @@ func (a *Aggregate) Add(r *JudgeResult, shown Stimulus) []string {
 //
 // It is the pair verdictProblems + countVerdicts, kept together because that is
 // what Add wants and separating them at every call site would let the two drift
-// apart. Callers that must apply them to DIFFERENT lists — the re-judge report
-// validates what the judge returned and counts what the dump could carry — use
+// apart. Callers that must apply them to DIFFERENT lists, the re-judge report
+// validates what the judge returned and counts what the dump could carry, use
 // the two directly.
 //
 // The counting lives here rather than in each caller so that a number derived
@@ -891,8 +891,8 @@ func (a *Aggregate) AddVerdicts(verdicts []Verdict, expected int) []string {
 // The two are split because the re-judge report has to do them to DIFFERENT
 // lists: it counts a list reduced to one verdict per finding position, so that
 // both judges are counted by one rule, but the complaint belongs to the list
-// the judge actually returned. Validating the reduced list instead would report
-// nothing at all — the reduction is what removed the duplicate and the
+// the judge returned. Validating the reduced list instead would report
+// nothing at all. The reduction is what removed the duplicate and the
 // out-of-range index, so the judge's malformed answer would be silently
 // laundered into a well-formed one.
 func verdictProblems(verdicts []Verdict, expected int) []string {
@@ -985,14 +985,14 @@ func (a *Aggregate) AddSeverity(f Fixture, s SeverityScore) {
 // site and for the same reason: the report divides the count columns on a row by
 // one sample count, and folding detection over a different set of reviews would
 // put NOISE over a larger denominator than every column beside it. That choice
-// costs a review whose judge call failed — its findings are scored by nothing,
-// for two columns that need no judge — and the loss is reported rather than
+// costs a review whose judge call failed. Its findings are scored by nothing,
+// for two columns that need no judge, and the loss is reported rather than
 // hidden, as the review count in DetectionCounts and as a note on the row.
 //
 // It takes only the score, where AddSeverity also takes the fixture: O-COV needs
 // a plant census and these three columns do not, since a review that located
 // nothing still invented what it invented and still anchored where it anchored.
-// RECALL's denominator comes from AddSeverity's census — see locatedShare, which
+// RECALL's denominator comes from AddSeverity's census, see locatedShare, which
 // is the one expression RECALL and O-COV are both rendered from.
 func (a *Aggregate) AddDetection(d DetectionScore) {
 	a.DetReviews++
@@ -1038,7 +1038,7 @@ func (a Aggregate) SevGraded() int {
 //
 // The two cells sit three columns apart in one table and mean the same thing, so
 // they are computed once. ScoreSeverity grades a defect exactly when some
-// finding matches() it — the same predicate ScoreRun counts a detection with —
+// finding matches() it, the same predicate ScoreRun counts a detection with,
 // so SevGraded IS the located-defect count, and two expressions for it would be
 // two answers free to drift apart under an edit to either.
 // TestRecallAndCoverageAreOneReadingOfOneCorpus pins the identity against the
@@ -1067,7 +1067,7 @@ func (a Aggregate) locatedShare() (float64, bool) {
 // THE TEST THAT PINS THIS IS TestTheDetectionColumnsAreFilledForAForeignVocabulary,
 // and naming the right one took a mutation to establish. This comment used to
 // cite TestEverySeverityCellIsWithdrawnForAForeignVocabulary as deriving the
-// exemption from PublishedMetrics — that test iterates the SEVERITY metric's
+// exemption from PublishedMetrics, that test iterates the SEVERITY metric's
 // columns, and NOISE and ANCHOR are columns of neither rendering of it, so it
 // never examines them. Gating this whole function on the severity vocabulary
 // leaves it green. It does still cover RECALL, which is a column of both
@@ -1084,7 +1084,7 @@ func (a Aggregate) locatedShare() (float64, bool) {
 // reviews that arrived. What it says is that those reviews are not the ones the
 // row set out to measure, and the ones missing are a subset it did not choose at
 // random. All four are marked rather than only the two rates, because all four
-// are folded over the survivors — a MAXIMUM over fewer draws is weakly SMALLER,
+// are folded over the survivors, a MAXIMUM over fewer draws is weakly SMALLER,
 // which is the flattering direction for ANCHOR, not the safe one.
 // Aggregate.CoverageShortfall is the footnote the marker points at.
 func (a Aggregate) DetectionCells() (recall, noise, anchor, spread string) {
@@ -1093,7 +1093,7 @@ func (a Aggregate) DetectionCells() (recall, noise, anchor, spread string) {
 	// sample of the same one. Splitting ShortFixtures out of a single list is
 	// what made this two conditions, and asking only the first here would have
 	// left a row that folded NOTHING for a fixture printing four unmarked cells
-	// — quieter than the defect the split was fixing.
+	//, quieter than the defect the split was fixing.
 	mark := ""
 	if len(a.ShortFixtures()) > 0 || len(a.UnmeasuredFixtures()) > 0 {
 		mark = shortSampleMark
@@ -1106,7 +1106,7 @@ func (a Aggregate) DetectionCells() (recall, noise, anchor, spread string) {
 	}
 
 	// A row no review was folded into has no noise RATE and no widest anchor,
-	// and 0 in either is the BEST value in its column — the reading a reviewer
+	// and 0 in either is the BEST value in its column, the reading a reviewer
 	// that said nothing would earn. n/a is what distinguishes the two.
 	noise, anchor = "n/a", "n/a"
 	if a.DetReviews > 0 {
@@ -1117,7 +1117,7 @@ func (a Aggregate) DetectionCells() (recall, noise, anchor, spread string) {
 	// L/DEF is undefined for a row that LOCATED nothing, which is a stricter
 	// condition than the two above and is the whole reason it is spelled
 	// separately. Its numerator only accumulates over located defects, so a
-	// reviewer that found none renders 0/0 — and 0.00 is the best value the
+	// reviewer that found none renders 0/0, and 0.00 is the best value the
 	// column can take, so printing it would put silence at the top of a third
 	// column. The metric's own component is 0 there and says why: a component is
 	// read beside RECALL by construction and a cell is read alone.
@@ -1174,8 +1174,8 @@ func (a Aggregate) DetectionCounts() string {
 // than being recognized by name.
 //
 // O-COV IS BLANKED HERE AND PRINTED BY ObjectiveSeverityCounts, and the two are
-// not asserting opposite rules about one quantity. What O-COV measures — how
-// many planted defects the reviewer LOCATED — is a detection fact in nobody's
+// not asserting opposite rules about one quantity. What O-COV measures, how
+// many planted defects the reviewer LOCATED, is a detection fact in nobody's
 // severity vocabulary, so it survives the gate as a NUMBER. What it does not
 // survive is this position: a CELL in a sorted ranking, on a row whose other
 // three severity cells read n/a, where a filled fourth invites reading the row
@@ -1221,9 +1221,9 @@ func (a Aggregate) ObjectiveSeverityCells(samples int) (infl, under, acc, cov st
 // sorted ranking beside three cells reading n/a, which reads as a partial score.
 // This line is prose under the table, it is not ranked, and it restates a
 // detection fact the RECALL cell publishes on the same row. That sentence used
-// to point at a column this table did not have — RECALL was absent from the
+// to point at a column this table did not have, RECALL was absent from the
 // judged header while two doc comments cited it as the place a reader could
-// already see the number — and the fix was to print the column rather than to
+// already see the number, and the fix was to print the column rather than to
 // delete the justification. Aggregate.ObjectiveSeverityCells says the same thing
 // from the other side, so the two stop appearing to disagree about one quantity.
 func (a Aggregate) ObjectiveSeverityCounts(model string) string {
@@ -1268,7 +1268,7 @@ type VocabularyRow struct {
 	Name  string
 	Usage SeverityUsage
 
-	// Planted is what the corpus behind this row planted at each level — the
+	// Planted is what the corpus behind this row planted at each level, the
 	// denominator every line is read against.
 	//
 	// A row that omits it renders UndeclaredPlantedTotal rather than a bare
@@ -1309,8 +1309,8 @@ type VocabularyRow struct {
 //   - HEDGING. A reviewer answering all five severities renders exactly as one
 //     answering only the loudest: reportingFinding credits the loudest claim,
 //     and measured, "one comment per severity, on every plant" produces the same
-//     page as "always critical". That is defensible — fail_on gates on the worst
-//     thing said — and it is still a thing this page cannot show.
+//     page as "always critical". That is defensible, fail_on gates on the worst
+//     thing said, and it is still a thing this page cannot show.
 //   - PER-REVIEW STRUCTURE. The table is pooled over the corpus. Of the 12
 //     cached reviews that locate anything, exactly one locates defects at two or
 //     more distinct planted levels, and no line here says so.
@@ -1358,8 +1358,8 @@ func SeverityVocabularyBlock(rows []VocabularyRow) string {
 // translate, and what it read each of them as.
 //
 // It is derived rather than written down. The sentence it replaces was a
-// hand-maintained claim about which words a particular reviewer prints —
-// "incumbent prints 'critical' and 'major'" — sitting inside the block whose
+// hand-maintained claim about which words a particular reviewer prints,
+// "incumbent prints 'critical' and 'major'", sitting inside the block whose
 // entire thesis is that a reviewer's vocabulary must be quoted rather than
 // restated from memory. It was the same failure in miniature, and it was already
 // drifting: it named one reviewer while the engine had begun translating our own
@@ -1376,7 +1376,7 @@ func SeverityVocabularyBlock(rows []VocabularyRow) string {
 // it were nothing to report, so a block in which every word had been destroyed
 // printed "NO WORD IN THIS BLOCK WAS TRANSLATED ... each line quotes its
 // reviewer directly" directly above rows reading "(word not recorded) x1 [we
-// read as warning]" — the preamble asserting the exact opposite of every line
+// read as warning]", the preamble asserting the exact opposite of every line
 // under it, in the one published block whose entire purpose is to keep our
 // substitutions distinguishable from a reviewer's own words. It is reachable
 // with no cache at all: linters.normalize marks every analyzer finding
@@ -1387,7 +1387,7 @@ func SeverityVocabularyBlock(rows []VocabularyRow) string {
 // .Lines suppresses the "[we read as X]" marker with EqualFold, so a model
 // printing "Critical" was announced as a translated word above a row that quoted
 // it unmarked. Lines' rule is the right one and its reason is written out there
-// — a difference of case is not a difference of vocabulary — so this now asks
+// , a difference of case is not a difference of vocabulary, so this now asks
 // the same question rather than a second, differently-spelled one.
 func translatedWordsNote(rows []VocabularyRow) string {
 	readings := map[string]map[string]bool{}
@@ -1449,7 +1449,7 @@ func translatedWordsNote(rows []VocabularyRow) string {
 		"severity score is offered." + lostNote + "\n"
 }
 
-// Precision is the share of findings a senior reviewer would actually raise.
+// Precision is the share of findings a senior reviewer would raise.
 //
 // This, not recall, is what determines whether a review bot survives contact
 // with a team: a bot that finds everything and says twenty things nobody needed
@@ -1532,14 +1532,14 @@ func (a Aggregate) MeanGrade() float64 {
 //
 // The samples are one per (fixture, run), so this is TOTAL dispersion: fixture
 // difficulty and run-to-run variance together, not separated. That is the right
-// quantity for the only question the table is asked — is this GRADE gap worth
-// anything — because a mean over eight fixtures moves for either reason and the
+// quantity for the only question the table is asked, is this GRADE gap worth
+// anything, because a mean over eight fixtures moves for either reason and the
 // reader cannot act on the difference.
 //
 // It exists because this harness measured its own noise and the noise won: the
 // run-to-run spread on a single model reached 0.49 while the whole distance
 // from the best-ranked model to the twelfth was 0.28. A table of mean grades
-// with no dispersion column invites the one reading it cannot support — that
+// with no dispersion column invites the one reading it cannot support, that
 // the order of the rows means something.
 //
 // Reported rather than turned into a confidence interval on purpose: eight
@@ -1565,7 +1565,7 @@ func (a Aggregate) GradeSpread() float64 {
 // Everything below exists because a single number from a single judge is what
 // this harness has been publishing and it is not defensible. The judge shares a
 // vendor with three contenders it scores, and separately, the same cached
-// findings scored 3.66, 3.90, 3.95 and 3.98 across four runs at temperature 0 —
+// findings scored 3.66, 3.90, 3.95 and 3.98 across four runs at temperature 0,
 // so a published GRADE carries both an untested preference and an unquantified
 // instability, and nothing on the row said either.
 //
@@ -1579,7 +1579,7 @@ func (a Aggregate) GradeSpread() float64 {
 //
 // Derived, never listed. The brief that commissioned the second judge named
 // "openai, anthropic, z-ai, moonshotai and qwen" as the contender vendors and
-// concluded that google, deepseek and minimax were therefore clean — while
+// concluded that google, deepseek and minimax were therefore clean, while
 // DefaultModels carries google/gemini-3.5-flash, google/gemini-3.1-pro-preview,
 // deepseek/deepseek-v4-pro and minimax/minimax-m2.7. A judge picked from that
 // list would have re-created the exact conflict it was chosen to remove, and
@@ -1625,13 +1625,13 @@ func VendorConflicts(judge string) []string {
 //
 // It is one value and not two columns, and that is the entire design. This
 // package has twice shipped a metric published without the thing that gives it
-// meaning — a severity triple with no coverage denominator, and a cross-tool
-// band with no vocabulary caveat — and both times the missing half existed,
+// meaning, a severity triple with no coverage denominator, and a cross-tool
+// band with no vocabulary caveat, and both times the missing half existed,
 // correct, in a neighbouring function that the table did not call. A convention
 // that says "always print the delta beside it" is exactly the convention that
 // failed twice. So the delta is not beside the figure; it is INSIDE it, the
 // fields are unexported, and the type implements fmt.Formatter so that EVERY
-// verb — %v, %s, %f, %.2f — renders the pair. There is no formatting route to
+// verb, %v, %s, %f, %.2f, renders the pair. There is no formatting route to
 // the bare number, from this package or any other.
 //
 // The four states it can be in are deliberately four, not two:
@@ -1645,7 +1645,7 @@ func VendorConflicts(judge string) []string {
 //	            difference between them is not a disagreement, so there is no
 //	            delta to publish and the second judge's figure is not carried
 //	            out of this type at all. See Stimulus.
-//	n/a         undefined — no findings, no graded sample. There is no figure
+//	n/a         undefined, no findings, no graded sample. There is no figure
 //	            to disagree about, and printing 0.00 here is the bug
 //	            Aggregate.Precision's doc comment already records shipping.
 //
@@ -1677,9 +1677,9 @@ type JudgedFigure struct {
 	corroborated bool
 
 	// crossStimulus marks a figure two judges scored FROM DIFFERENT FINDING
-	// LISTS. It is mutually exclusive with corroborated by construction —
+	// LISTS. It is mutually exclusive with corroborated by construction,
 	// NotComparable is the only thing that sets it, and it never sets the other
-	// — because a figure that reported itself as both would be one branch away
+	//, because a figure that reported itself as both would be one branch away
 	// from rendering a delta again.
 	//
 	// When it is set, second is left at zero and never read. Storing the other
@@ -1741,7 +1741,7 @@ func (f JudgedFigure) String() string {
 	case !f.defined:
 		return "n/a"
 	case f.crossStimulus:
-		// "+NC" — NOT COMPARABLE. Two judges answered, about different finding
+		// "+NC", NOT COMPARABLE. Two judges answered, about different finding
 		// lists, so there is no disagreement to size. Spelled without digits
 		// for the same reason "+?" is: nothing downstream can average it, and
 		// nobody can quote it as a small delta.
@@ -1759,7 +1759,7 @@ func (f JudgedFigure) String() string {
 // Format implements fmt.Formatter, and it IGNORES THE VERB ON PURPOSE.
 //
 // This is the lock. A judged figure reaches a report through fmt, and honouring
-// %f or %.2f would hand back the bare primary — the exact half-value the type
+// %f or %.2f would hand back the bare primary, the exact half-value the type
 // exists to prevent, obtainable by a format string nobody would look twice at.
 // Every verb therefore renders the same token. Width and the '-' flag ARE
 // honoured, because a table cell has to be padded and refusing that would push
@@ -1786,15 +1786,15 @@ func (f JudgedFigure) Format(s fmt.State, verb rune) {
 // Defined reports whether there is a figure at all.
 //
 // It returns a BOOL and not the number. Ranking needs to know that a contender
-// with no judged finding sorts last — silence is not a perfect score — and that
+// with no judged finding sorts last, silence is not a perfect score, and that
 // question can be answered without letting the value escape.
 func (f JudgedFigure) Defined() bool { return f.defined }
 
 // Corroborated reports whether a second judge scored THE SAME QUESTION.
 //
 // A cross-stimulus figure answers false. Callers use this to decide whether a
-// derived comparison is available at all — the re-judge table's rank MOVE, the
-// model ranking's second-judge order — and every one of those comparisons is
+// derived comparison is available at all, the re-judge table's rank MOVE, the
+// model ranking's second-judge order, and every one of those comparisons is
 // exactly as invalid across two stimuli as it is with one judge.
 func (f JudgedFigure) Corroborated() bool { return f.corroborated }
 
@@ -1841,7 +1841,7 @@ func (f JudgedFigure) Compare(o JudgedFigure) int {
 // signed delta between them.
 //
 // It is the ONE table whose subject is the two judges themselves, so showing
-// both absolute values there is the point rather than a leak — a reader
+// both absolute values there is the point rather than a leak, a reader
 // comparing PREC-A against the published number needs the number, not a
 // difference. Three values from one call, matching
 // Aggregate.ObjectiveSeverityCells, because that is what stops a row rendering
@@ -1857,7 +1857,7 @@ func (f JudgedFigure) SplitCells() (primary, second, delta string) {
 	}
 	// A cross-stimulus figure yields the primary and NOTHING ELSE. This is the
 	// one table that prints both absolute values, and printing them here would
-	// invite exactly the subtraction the figure exists to refuse — two numbers
+	// invite exactly the subtraction the figure exists to refuse, two numbers
 	// side by side in a table whose subject is the two judges read as a
 	// difference whatever the third cell says.
 	if f.crossStimulus {
@@ -1880,7 +1880,7 @@ func (f JudgedFigure) SplitCells() (primary, second, delta string) {
 // result. TestNoReportFormatsAJudgedFigureDirectly is what keeps them out.
 //
 // The accessors are named with a Figure suffix and NOT after the Aggregate
-// fields they derive from — GradeFigure, not Grade — so that a source scan for
+// fields they derive from, GradeFigure, not Grade, so that a source scan for
 // the Aggregate spellings cannot be confused by a same-named method on this
 // type. The guard has no type information; the naming is what makes it exact.
 type CrossJudged struct {
@@ -1900,10 +1900,10 @@ type CrossJudged struct {
 }
 
 // primarySamples and secondSamples are the denominators each side's rates
-// divide by: how many samples that judge actually graded.
+// divide by: how many samples that judge graded.
 //
-// They are separate because they CAN differ — a second judge that errored on
-// two fixtures graded fewer — and dividing both sides by one number would
+// They are separate because they CAN differ, a second judge that errored on
+// two fixtures graded fewer, and dividing both sides by one number would
 // publish a delta between a rate and something that is not one. Where they
 // differ, SamplesCell prints both.
 func (c CrossJudged) primarySamples() int { return len(c.Primary.Grades) }
@@ -1916,14 +1916,14 @@ func (c CrossJudged) secondSamples() int  { return len(c.Second.Grades) }
 // the VALUE: each accessor returns NaN where it has nothing to report, and
 // Corroborated collapses a NaN second to an uncorroborated figure. Gating on a
 // sample count here instead would have been wrong for the re-judge path, which
-// carries verdicts and no grades at all — every figure would have declared
+// carries verdicts and no grades at all, every figure would have declared
 // itself uncorroborated in the one report whose entire subject is two judges.
 func (c CrossJudged) figure(of func(Aggregate) float64) JudgedFigure {
 	if !c.HaveSecond {
 		return SingleJudged(of(c.Primary))
 	}
-	// THE STIMULUS GATE, and it is here — at the one function every accessor
-	// goes through — rather than at each accessor, so that a figure added later
+	// THE STIMULUS GATE, and it is here, at the one function every accessor
+	// goes through, rather than at each accessor, so that a figure added later
 	// inherits it without anyone remembering to. A column that reached
 	// Corroborated directly would be a column publishing a confidence interval
 	// on a comparison nobody made, which is the defect this whole mechanism
@@ -1968,7 +1968,7 @@ func (c CrossJudged) GradeFigure() JudgedFigure {
 	return c.figure(func(a Aggregate) float64 {
 		if len(a.Grades) == 0 {
 			// Undefined, not 0.00. A contender whose every review failed has no
-			// grade, and 0.00 reads as "graded, and terrible" — the state the
+			// grade, and 0.00 reads as "graded, and terrible", the state the
 			// benchmark reaches whenever the incumbent's every invocation errors.
 			return math.NaN()
 		}
@@ -2064,8 +2064,8 @@ func (c CrossJudged) ToneOffFigure() JudgedFigure {
 
 // MissedFigure is defects the judge would have raised and the review did not.
 //
-// This is the column the re-judge path has never been able to measure — the
-// dump records no missed list — and it is also the column whose instability
+// This is the column the re-judge path has never been able to measure, the
+// dump records no missed list, and it is also the column whose instability
 // motivated that path: the same cached findings were scored 2 missed on one run
 // and 5 on the next. Judging live with two judges is the first thing here that
 // puts a number on it.
@@ -2077,8 +2077,8 @@ func (c CrossJudged) MissedFigure() JudgedFigure {
 //
 // One number when they agree, "8/6" when the second judge graded fewer. A
 // second judge that failed on two fixtures produces deltas computed from rates
-// over different denominators, and that is legitimate — each rate is correct
-// over its own sample — but it is not the same measurement, and a reader
+// over different denominators, and that is legitimate, each rate is correct
+// over its own sample, but it is not the same measurement, and a reader
 // comparing a delta against a spread has to be able to see it.
 func (c CrossJudged) SamplesCell() string {
 	n := c.primarySamples()
@@ -2091,9 +2091,9 @@ func (c CrossJudged) SamplesCell() string {
 // VerdictCells renders how many verdicts each judge was COUNTED for.
 //
 // Two cells from one call, for the same reason SplitCells returns three: the
-// two counts differing is itself a result — a judge that answered nine of
+// two counts differing is itself a result, a judge that answered nine of
 // twelve findings has a precision over a different population than one that
-// answered all twelve — and a row that printed one of them would be claiming a
+// answered all twelve, and a row that printed one of them would be claiming a
 // shared denominator it does not have.
 func (c CrossJudged) VerdictCells() (primary, second string) {
 	if !c.HaveSecond {
@@ -2106,8 +2106,8 @@ func (c CrossJudged) VerdictCells() (primary, second string) {
 // judges.
 //
 // It lives here rather than at the table for the same reason the figures do.
-// The counts are the resolution behind the rates — PREC 0.74 and PREC 0.67 read
-// as a difference until you are told they are 17/23 and 2/3 — and a report that
+// The counts are the resolution behind the rates, PREC 0.74 and PREC 0.67 read
+// as a difference until you are told they are 17/23 and 2/3, and a report that
 // formatted them itself would be a report holding the raw judged counters,
 // which is the state this type exists to keep it out of.
 func (c CrossJudged) Denominators(label string) string {
@@ -2183,8 +2183,8 @@ func (p JudgePanel) Pair(contender string, primary Aggregate) CrossJudged {
 // Unpaired returns the contenders the second judge scored that no row claimed.
 //
 // A second aggregate nobody looked up is the SILENT form of a keying bug, and
-// this path has one available: Corroborate keys by contenderLabel — model and
-// variant together — while the persona tables identify their rows by variant
+// this path has one available: Corroborate keys by contenderLabel, model and
+// variant together, while the persona tables identify their rows by variant
 // alone. Ask for "nitpick=off" when the aggregate is filed under
 // "z-ai/glm-5.2 [nitpick=off]" and Pair returns an uncorroborated figure, so the
 // judging is paid for, the answers exist, and every cell still prints "+?". The
@@ -2213,7 +2213,7 @@ func (p JudgePanel) Unpaired(claimed []string) []string {
 //
 // The single-judge case is the one this has to get right. It is the state every
 // run before this one was in, it is the state a run falls back to when
-// NITPICK_EVAL_JUDGE2 is unset, and a table that simply omitted the deltas
+// NITPICK_EVAL_JUDGE2 is unset, and a table that omitted the deltas
 // there would be indistinguishable from the tables this work was commissioned
 // to replace. So it prints, loudly, and names the command that fixes it.
 func (p JudgePanel) Banner() string {
@@ -2245,8 +2245,8 @@ func (p JudgePanel) Banner() string {
 //
 // The widest rendering is a two-decimal value with a two-decimal signed delta.
 // Eleven characters covers a rate that has gone into double digits against a
-// delta of the same size — "15.00-15.00", which a FIND column reaches the first
-// time a contender files fifteen findings a sample — and twelve leaves the
+// delta of the same size, "15.00-15.00", which a FIND column reaches the first
+// time a contender files fifteen findings a sample, and twelve leaves the
 // column from touching its neighbour. It is a constant rather than a measured
 // maximum because the header has to be built before any figure exists.
 const judgedCellWidth = 12
@@ -2254,8 +2254,8 @@ const judgedCellWidth = 12
 // CorroboratedColumns are the columns whose value comes from a judge and must
 // therefore be printed as a JudgedFigure.
 //
-// It is JudgeOpinionColumns — the package's own register of what an LLM judge
-// supplies — plus the two counts that are TALLIED FROM VERDICTS. FIND and
+// It is JudgeOpinionColumns, the package's own register of what an LLM judge
+// supplies, plus the two counts that are TALLIED FROM VERDICTS. FIND and
 // FINDINGS are classed descriptive because no reviewer is better for a larger
 // one, and that classification is right about what they mean and wrong about
 // where they come from: Aggregate.countVerdicts increments Findings once per
@@ -2281,14 +2281,14 @@ type tableColumn struct {
 //
 // Columns are separated by runs of TWO OR MORE spaces, matching the rule the
 // package's own header guards use, because a single space occurs inside a column
-// name — "SEV A/I/U" is one column of SummaryTableHeader — and splitting on it
+// name, "SEV A/I/U" is one column of SummaryTableHeader, and splitting on it
 // shatters the header rather than reading it.
 //
 // The width of every column but the last is the distance to the next column's
 // start, minus the one space that separates them; the last column is unbounded
 // and reports the width of its own name. Reading the widths OUT of the header,
 // rather than keeping a format string in step with it by hand, is what makes a
-// row that cannot drift out of line with the header above it — a defect the
+// row that cannot drift out of line with the header above it, a defect the
 // judged tables have shipped once already.
 func tableColumns(header string) []tableColumn {
 	var (
@@ -2333,7 +2333,7 @@ func tableColumns(header string) []tableColumn {
 // after it out of line, which is the failure mode this package has already
 // shipped once and describes as silent. Widening is done by DERIVING a new
 // header from the declared one, so the two carry identical columns in identical
-// order by construction — a hand-written second header is the maintained list
+// order by construction, a hand-written second header is the maintained list
 // that this package's own registry comment calls the way a bad column ships.
 func WidenJudgedColumns(header string) string {
 	judged := map[string]bool{}
@@ -2407,7 +2407,7 @@ func TableRow(header string, cells []string) string {
 //
 // It is registered as a SCORED table, like the header it derives from, so every
 // column guard in this package runs over it too: same column names, same order,
-// wider cells. Deriving it is what guarantees that — a second hand-written
+// wider cells. Deriving it is what guarantees that, a second hand-written
 // header is how a column gets added to one table and not the other.
 var CrossJudgedModelTableHeader = registerTableHeader(tableScored,
 	WidenJudgedColumns(JudgedModelTableHeader))
@@ -2424,7 +2424,7 @@ var CrossJudgedVariantTableHeader = registerTableHeader(tableScored,
 // keeping the headers here: the reports are rendered from files behind the
 // `eval` build tag, and a guard that only compiles under that tag cannot run in
 // `go test ./...`. Putting the row here means the default build can render one
-// and assert that every judged cell carries its disagreement — which is the
+// and assert that every judged cell carries its disagreement, which is the
 // claim, and which was previously unassertable without spending money.
 //
 // It takes a CrossJudged and not an Aggregate. That is the structural half: this
@@ -2433,7 +2433,7 @@ var CrossJudgedVariantTableHeader = registerTableHeader(tableScored,
 // every verb.
 //
 // The objective severity cells are computed here rather than passed in, so the
-// gated renderer is always the one that produces them — a table that formatted
+// gated renderer is always the one that produces them, a table that formatted
 // SevAccurate itself is the defect TestNoReportFormatsSeverityCountersDirectly
 // exists for, found the hard way.
 func JudgedModelRow(model string, c CrossJudged, failed int) string {
@@ -2442,7 +2442,7 @@ func JudgedModelRow(model string, c CrossJudged, failed int) string {
 	// Read off c.Primary for the reason the O-* cells are: Corroborate folds only
 	// Saw and Add into the second judge's aggregate, so a detection counter on
 	// c.Second is zero by construction. These four carry no delta and need none
-	// — ScoreDetection consults no judge — which CrossJudgeLegend states beside
+	//, ScoreDetection consults no judge, which CrossJudgeLegend states beside
 	// the same admission for O-*.
 	recall, noise, anchor, spread := c.Primary.DetectionCells()
 

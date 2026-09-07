@@ -9,8 +9,8 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // change USES a contract that lives in an unchanged file, and related context
 // attaches that contract so the reviewer can read it. This corpus measures
 // the other direction. A change alters what a function returns, raises, or
-// promises, its own file is self-consistent afterwards — the doc comment is
-// updated, nothing in the diff contradicts itself — and the defect exists only
+// promises, its own file is self-consistent afterwards. The doc comment is
+// updated, nothing in the diff contradicts itself, and the defect exists only
 // because an untouched file still calls it the old way.
 //
 // No reviewer shown the diff alone can find these. The diff is a plausible,
@@ -25,11 +25,11 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // TestCallersCorpusIsWellFormed holds the inverted rule: the changed file is
 // imported by a file that is byte-identical in Base and Head, and every plant
 // sits on a line the change added IN THE CONTRACT FILE, because that is the
-// line a reviewer comments on — "this breaks web/users.go" belongs on the
+// line a reviewer comments on, "this breaks web/users.go" belongs on the
 // line that breaks it.
 //
 // Keywords credit only a finding that has SEEN the caller: its file, its
-// function, or a detail that exists nowhere else — the body length the upload
+// function, or a detail that exists nowhere else, the body length the upload
 // handler compares against, the page of 500 the exporter asks for. Nothing
 // about consequences. Three floor runs showed why: a reviewer that reasons
 // well from the diff alone writes "callers passing this to setTimeout now run
@@ -195,7 +195,7 @@ func (u *Users) Lookup(id string) (string, error) {
 // the same files, the same caller, the same motivation, and the change wraps
 // the sentinel with %w so errors.Is still matches. Any finding here is noise,
 // and "this may break callers that compare the error" is the finding a
-// reviewer who did not read the caller — or did not read the %w — writes.
+// reviewer who did not read the caller, or did not read the %w, writes.
 func goCleanWrappedSentinelFixture() Fixture {
 	return Fixture{
 		Name: "go-clean-wrapped-sentinel",

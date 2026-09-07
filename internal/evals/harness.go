@@ -97,7 +97,7 @@ func DefaultModels() []Model {
 	return []Model{
 		// Current generation. An earlier survey of this catalog printed only the
 		// four cheapest models per provider, which systematically surfaced the
-		// oldest and hid these — gpt-5.6-luna is CHEAPER than half the models
+		// oldest and hid these, gpt-5.6-luna is CHEAPER than half the models
 		// that got tested instead.
 		{ID: "openai/gpt-5.6-luna", Kind: "frontier"},
 		{ID: "openai/gpt-5.6-terra", Kind: "frontier"},
@@ -126,13 +126,13 @@ func DefaultModels() []Model {
 		{ID: "qwen/qwen3-coder-plus", Kind: "coding"},
 
 		// Dropped after the previous battery, with the reason:
-		//   mistralai/mistral-medium-3.1 — judged last (2.74), 7 inflated of 11
-		//   kwaipilot/kat-coder-pro-v2   — precision 0.78, 5 inflated
-		//   moonshotai/kimi-k3           — 74s and $3.00 for a mid-tier grade
-		//   anthropic/claude-sonnet-5    — superseded by sonnet-4.6 / opus-5
-		//   google/gemini-2.5-flash      — superseded by the gemini-3.x line
-		//   openai/gpt-5-mini, gpt-oss-120b — superseded by the 5.6 line
-		//   ~deepseek/deepseek-v4-flash-latest — superseded by v4-pro
+		//   mistralai/mistral-medium-3.1, judged last (2.74), 7 inflated of 11
+		//   kwaipilot/kat-coder-pro-v2, precision 0.78, 5 inflated
+		//   moonshotai/kimi-k3, 74s and $3.00 for a mid-tier grade
+		//   anthropic/claude-sonnet-5, superseded by sonnet-4.6 / opus-5
+		//   google/gemini-2.5-flash, superseded by the gemini-3.x line
+		//   openai/gpt-5-mini, gpt-oss-120b, superseded by the 5.6 line
+		//   ~deepseek/deepseek-v4-flash-latest, superseded by v4-pro
 	}
 }
 
@@ -141,7 +141,7 @@ type Model struct {
 	ID string
 
 	// Kind records why the model is in the matrix, so a report says what a
-	// failure actually implies.
+	// failure implies.
 	Kind string
 
 	// Provider is the shipped provider the model is reached through, empty
@@ -228,7 +228,7 @@ type Options struct {
 	CaptureDir string
 
 	// Prices is the rate table this run reports cost against, resolved ONCE at
-	// setup so a battery cannot be priced against two different tables — and so
+	// setup so a battery cannot be priced against two different tables, and so
 	// that a bad NITPICK_EVAL_PRICES is a setup error rather than a discovery
 	// made ninety minutes and a real invoice later, at the moment the report is
 	// formatted. Resolving it here also fixes the rates for the whole run: a
@@ -254,7 +254,7 @@ type Options struct {
 	// It exists so a test can drive the WHOLE harness from a scripted model.
 	// Without a seam here the only way to prove that reported usage reaches
 	// RunResult is to spend money at a real provider, and an assertion nobody
-	// can afford to run is not a guard — which matters for exactly this field's
+	// can afford to run is not a guard, which matters for exactly this field's
 	// neighbours, since a cost column silently reading zero looks identical to
 	// a cheap model.
 	buildClient func(config.ModelSpec) (*llm.Client, error)
@@ -306,7 +306,7 @@ func LoadDotEnv(path string) error {
 // rest: a single mistyped name in the six-name line the Makefile documents
 // silently measured five of six, and a typo in the ONLY name ran all eight
 // tuning fixtures with no warning anywhere. Neither table names its corpus, so
-// the result was indistinguishable from the held-out run it claimed to be —
+// the result was indistinguishable from the held-out run it claimed to be,
 // a silent failure that returns exactly the wrong answer to the one question
 // the held-out set exists to answer.
 func OptionsFromEnv() (Options, error) {
@@ -352,7 +352,7 @@ func OptionsFromEnv() (Options, error) {
 		// Resolved against BOTH corpora, not against the default list: naming a
 		// held-out fixture has to select it, or the held-out set could only be
 		// run by editing code. Naming nothing still yields Fixtures() alone, so
-		// no tuning run picks up the held-out corpus by accident — spending it
+		// no tuning run picks up the held-out corpus by accident, spending it
 		// takes saying its name, spelled correctly.
 		known := map[string]Fixture{}
 		for _, f := range EveryFixture() {
@@ -407,7 +407,7 @@ func OptionsFromEnv() (Options, error) {
 	opts.CaptureDir = strings.TrimSpace(os.Getenv(EnvCapture))
 
 	// Before the run, not at report time. Prices() rejects an unreadable or
-	// undated override rather than falling back to the shipped table — the right
+	// undated override rather than falling back to the shipped table, the right
 	// behaviour, but only if it happens while the operator is still watching.
 	prices, err := Prices()
 	if err != nil {
@@ -423,7 +423,7 @@ func OptionsFromEnv() (Options, error) {
 // Exported so a report can LABEL the corpus it measured. A held-out table and a
 // tuning table were textually identical, which meant the one number the
 // held-out set exists to produce could not be told apart from a training score
-// after the fact — not by a reader, and not by whoever kept the artifact.
+// after the fact, not by a reader, and not by whoever kept the artifact.
 func HeldOut(fixture string) bool {
 	for _, f := range HeldOutFixtures() {
 		if f.Name == fixture {
@@ -532,7 +532,7 @@ func buildRepo(dir string, f Fixture) error {
 
 	// Incumbent matches a review to an organization through the repository's
 	// git remote. With none it warns that "this review will use the free CLI
-	// allowance, even if you're signed in" — so every fixture review was billed
+	// allowance, even if you're signed in", so every fixture review was billed
 	// to that allowance regardless of account tier, which is what exhausted it
 	// mid-collection and turned an earlier benchmark into a measurement of the
 	// allowance rather than of the reviewer. Nothing is ever pushed; the remote
@@ -634,7 +634,7 @@ type RunResult struct {
 	Responses []string
 
 	// Usage is what the provider REPORTED this review spent, summed over every
-	// call the run made — review, triage, any repair round-trip. It is the
+	// call the run made, review, triage, any repair round-trip. It is the
 	// measurement a cost figure is allowed to rest on; see TokenUsage for why
 	// the estimate internal/bundle already computes is not.
 	//
@@ -649,7 +649,7 @@ type RunResult struct {
 	//
 	// IT IS SET EVEN WHEN Err IS, and that is not tidiness. commonScale
 	// withdraws a row whose runs disagree, so a failed run carrying no
-	// declaration drags an otherwise-declared row to n/a — meaning a provider
+	// declaration drags an otherwise-declared row to n/a, meaning a provider
 	// error would decide which severity cell a reader is shown. The declaration
 	// is a fact about the adapter, not about whether this particular attempt
 	// reached a provider.
@@ -676,7 +676,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	// configuration is fully determined by evalConfig; a temp directory that
 	// cannot be made says nothing about which vocabulary this adapter publishes
 	// on. THE BUG THIS FIXES: it was assigned after the MkdirTemp and buildRepo
-	// returns, so a run that died there carried no declaration — and the two
+	// returns, so a run that died there carried no declaration, and the two
 	// halves of one infrastructure failure then published DIFFERENT severity
 	// cells. Folded with a good run, a failure carrying the declaration renders
 	// SEV as the good run's own triple; a failure carrying none withdraws the
@@ -725,7 +725,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	// the shipped path. The price is one call per logical request rather than
 	// one per attempt: a retried request contributes only the attempt that
 	// succeeded, and the attempts a provider may have billed for before it are
-	// invisible. Understated, never overstated — see TokenUsage.Failed.
+	// invisible. Understated, never overstated, see TokenUsage.Failed.
 	meter := MeterClient(client)
 
 	recorder := &recordingLLM{inner: client.LLM}
@@ -773,7 +773,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		// matrix measures: it ranks reviewers, and giving each contender a
 		// different triager would confound the two. The shipped .nitpick.yaml
 		// splits the roles, so no number produced here is a measurement of the
-		// shipped pairing — in particular a model annotated in DefaultModels as
+		// shipped pairing, in particular a model annotated in DefaultModels as
 		// good value was ranked as a REVIEWER and has never been measured
 		// triaging another model's findings.
 		Roles:    roles,
@@ -904,7 +904,7 @@ func evalConfig(model Model) *config.Config {
 		// it resolves OPENROUTER_API_KEY then LLM_API_KEY exactly as a real
 		// review does. Naming base_url + api_key_env here made `make eval` fail
 		// for anyone who only exported LLM_API_KEY, while `nitpick review`
-		// succeeded for them — a difference between the harness and the thing
+		// succeeded for them, a difference between the harness and the thing
 		// it measures.
 		Provider:  model.provider(),
 		Model:     model.modelName(),
@@ -965,7 +965,7 @@ func evalConfig(model Model) *config.Config {
 		cfg.Review.Slop = true
 	}
 
-	// Report everything the model says so precision can actually be measured.
+	// Report everything the model says so precision can be measured.
 	cfg.Review.MinSeverity = config.SeverityNit
 	cfg.Review.FailOn = config.SeverityNone
 
@@ -979,7 +979,7 @@ func evalConfig(model Model) *config.Config {
 // question it asks is the one that can make the assertion false. review.Engine
 // writes our five levels for a model's own findings, but a report is the union
 // of the model's findings and the analyzers', and internal/linters' mapSeverity
-// folds HIGH onto our error and MEDIUM onto warning — a translation between
+// folds HIGH onto our error and MEDIUM onto warning, a translation between
 // vocabularies, which is the exact shape of the first retraction this package
 // made. Its codomain now covers all five of our levels, so a report could carry
 // an analyzer's word and our word spelled identically, and that makes the risk

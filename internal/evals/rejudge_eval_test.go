@@ -71,7 +71,7 @@ func TestRejudgeDump(t *testing.T) {
 	}
 
 	// The persona is not recorded in the dump, so the default is the only
-	// honest choice — and it is the correct one for every dump the model
+	// honest choice, and it is the correct one for every dump the model
 	// benchmark and the Incumbent benchmark produce, both of which hold the
 	// persona at DefaultPersona. RejudgeReport says so when a variant appears.
 	outcomes := Rejudge(context.Background(), judge, config.DefaultPersona(), groups, evalConcurrency)

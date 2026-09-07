@@ -2,15 +2,15 @@ package evals
 
 // Guards against one defect: the shipped prompt naming what the corpus plants.
 //
-// Two of them do the guarding — a mechanical keyword scan and a tripwire over
-// the severity ladder — and the rest of the file is their supporting evidence:
+// Two of them do the guarding, a mechanical keyword scan and a tripwire over
+// the severity ladder, and the rest of the file is their supporting evidence:
 // one test pinning the normalization the scan depends on, one pinning the
 // sentence the tripwire's second question refers to, and one demonstrating the
 // limit neither of them can cover.
 //
 // WHAT HAPPENED. review.md illustrated `info` with "Widening an exported type's
 // accepted input is info. Adding a dependency for one helper function is info."
-// — kotlin-widened-input and rust-crate-for-one-call stated almost verbatim —
+//, kotlin-widened-input and rust-crate-for-one-call stated almost verbatim,
 // three lines above "These examples ... are deliberately drawn from defect
 // classes you are unlikely to meet in this change; do not go looking for them."
 // The prompt named two planted defects and then told the reviewer to ignore
@@ -40,7 +40,7 @@ package evals
 //     exported signature is among the most ordinary things a reviewer meets, so
 //     "you are unlikely to meet this" was false and the prompt was suppressing
 //     a legitimate finding. An illustration can do that while sharing no
-//     keyword at all — api.md's `info` rung did, and scores zero hits against
+//     keyword at all, api.md's `info` rung did, and scores zero hits against
 //     the whole corpus. TestTheSeverityLadderIllustrationsArePinned is a
 //     tripwire for that half: it forces a human to look, and it decides nothing
 //     itself.
@@ -51,14 +51,14 @@ package evals
 // and every Makefile eval target is `-run`-filtered to a named paid battery, so
 // no command anybody runs reached them. Demonstrated before the tag came off:
 // replacing review.md's `nit` rung with "*Widening an exported type's accepted
-// input is a nit.*" — one edit that both moves a pinned illustration and plants
-// a kotlin-widened-input keyword verbatim — passed `go test ./internal/evals/
+// input is a nit.*", one edit that both moves a pinned illustration and plants
+// a kotlin-widened-input keyword verbatim, passed `go test ./internal/evals/
 // -count=1`, which is exactly what the gate runs for this package. It fails now.
 //
 // Nothing here needs more than the embedded templates and the in-process
-// fixtures, which is why every guard of that kind in this package —
+// fixtures, which is why every guard of that kind in this package,
 // groundtruth, claims, severity, crossjudge, incumbent, cost, rejudge,
-// fixtures_dedup — is untagged too. One offline test does still carry the tag,
+// fixtures_dedup, is untagged too. One offline test does still carry the tag,
 // score_span_test.go, and it is the same mistake at a smaller scale rather than
 // a counter-example.
 
@@ -79,7 +79,7 @@ import (
 //
 // It is built from the real embedded templates and the real persona renderers
 // rather than from a copy pasted into this file, because a copy is a second
-// source of truth that goes stale silently — which is the failure mode this
+// source of truth that goes stale silently, which is the failure mode this
 // whole file exists to catch, one level up.
 //
 // THE VALIDATION SURFACE IS HALF COVERED, on purpose, and the line runs between
@@ -98,15 +98,15 @@ import (
 //   - A KEYWORD SCAN WOULD NOT HAVE CAUGHT THE ONE REAL DEFECT FOUND THERE.
 //     api.md's `info` rung read "a change the author should accept knowingly:
 //     widened input, a new optional field, a default that moved within its
-//     documented range" — review.md's defect exactly, a list of categories with
-//     two plants in it — and it was found by hand and rewritten in the same
+//     documented range", review.md's defect exactly, a list of categories with
+//     two plants in it, and it was found by hand and rewritten in the same
 //     change. Measured: that sentence, scanned with asRendered against every
 //     keyword in AllFixtures() and dedupFixtures(), produces ZERO hits.
 //     "widened input" is not on kotlin-widened-input's list, and no phrasing of
 //     the moved default is on ruby-default-page-size's.
 //   - IT WOULD FIRE 100 TIMES ON THE PRODUCT. Measured across the 14 files: 100
 //     collisions, 61 distinct fixture/keyword pairs, every file between 2 and
-//     12. Nearly all are a domain checklist naming its domain — sql.md says
+//     12. Nearly all are a domain checklist naming its domain, sql.md says
 //     "injection", authz.md says "authoriz", crypto.md says "constant time",
 //     secrets.md says "credential". Each would need a promptKeywordException
 //     with an argued `why`, and then the next paragraph anyone writes in
@@ -123,13 +123,13 @@ import (
 // "push a confirm or a re-rating toward the level a plant wants, which is a
 // severity-channel problem". That is wrong about the code: on `refuted`
 // applyOutcomes appends to overruled and appends NOTHING to kept, so the
-// finding is deleted rather than re-rated — the reasoned-refutation case in
+// finding is deleted rather than re-rated, the reasoned-refutation case in
 // internal/review/validate_test.go asserts kept is empty, and is named by file
 // rather than by identifier because this package's citation lint resolves only
 // tests it declares. A sentence in an expert's refutation list that describes a
 // plant's mechanism therefore costs the whole finding. The demonstrated attack
-// is one line added to durability.md's refutation list — "the statement is a
-// one-time backfill whose author meant it to touch every row" — which carries
+// is one line added to durability.md's refutation list, "the statement is a
+// one-time backfill whose author meant it to touch every row", which carries
 // data-loss-migration's keyword verbatim AND tells the expert to refute the
 // corpus's only critical data-loss plant. Run against this tree: the guard stays
 // green, as it is documented to.
@@ -138,7 +138,7 @@ import (
 // config.Defaults() sets Validation{Enabled: false} and no eval path turns it
 // on, so no expert prompt reaches a model in any measurement this corpus
 // reports. The day validation ships on by default this paragraph is the thing
-// to re-read, and what it needs is not a bigger scan — it is a reader of the 14
+// to re-read, and what it needs is not a bigger scan. It is a reader of the 14
 // prompts asking whether any refutation reason describes something planted,
 // which is question 2 of the ladder tripwire asked about a different file.
 func shippedPromptTexts(t *testing.T) map[string]string {
@@ -157,7 +157,7 @@ func shippedPromptTexts(t *testing.T) map[string]string {
 	// The validation contract is here and the 14 per-domain expert prompts are
 	// not, and the line between them is that this text is SHARED: every expert
 	// call carries it whatever the finding was about, so a plant's vocabulary in
-	// it is not a domain naming its domain. It costs one exception to scan —
+	// it is not a domain naming its domain. It costs one exception to scan,
 	// measured, the whole contract collides with exactly one keyword, and it is
 	// the "utc"-inside-"outcome" accident already disclosed three times below.
 	out["validation-contract"] = review.ValidationContract()
@@ -203,12 +203,12 @@ func shippedPromptTexts(t *testing.T) map[string]string {
 	return out
 }
 
-// asRendered reduces prompt text to what a reader of it actually reads: every
+// asRendered reduces prompt text to what a reader of it reads: every
 // run of whitespace collapsed to one space, and markdown's emphasis markers
 // dropped.
 //
 // BOTH HALVES ARE REPAIRS OF A MEASURED MISS, and they are the same miss twice
-// — markdown lets a phrase be written in more than one way and a byte-exact
+// , markdown lets a phrase be written in more than one way and a byte-exact
 // scan measures the writing rather than the phrase.
 //
 //   - WRAPPING. The templates hard-wrap at about 76 columns. Of the two
@@ -222,7 +222,7 @@ func shippedPromptTexts(t *testing.T) map[string]string {
 //     **state** that outlives a single call..." added to review.md this test
 //     passed, and with the two `**` pairs removed and nothing else changed it
 //     failed on go-package-singleton's keyword. review.md already uses `**` in
-//     six places, so no adversarial intent is needed — a maintainer emphasising
+//     six places, so no adversarial intent is needed, a maintainer emphasising
 //     a word is enough. TestThePromptScanSeesThroughEmphasis is the
 //     permanent form of that experiment.
 //
@@ -244,7 +244,7 @@ func asRendered(s string) string {
 // TestThePromptScanSeesThroughEmphasis pins the normalization the scan depends
 // on, at the exact granularity a maintainer's edit changes.
 //
-// It is here because the scan's other half — "is this keyword in this text" —
+// It is here because the scan's other half, "is this keyword in this text",
 // is one strings.Contains and cannot be got wrong; every miss this file has had
 // was a normalization gap, first the line wrap and then the emphasis markers.
 //
@@ -256,7 +256,7 @@ func asRendered(s string) string {
 // asRendered=true on all four. (The sentence here used to read "pass a
 // byte-exact scan and the whitespace-collapsing one and fail both", which
 // contradicts itself and is wrong either way it is read.) A marker wrapping a WHOLE keyword
-// — "`data loss`" — is not among them on purpose: it is found by every version
+// , "`data loss`", is not among them on purpose: it is found by every version
 // of this function, so it would sit here proving nothing.
 func TestThePromptScanSeesThroughEmphasis(t *testing.T) {
 	for _, c := range []struct{ keyword, prompt string }{
@@ -277,7 +277,7 @@ func TestThePromptScanSeesThroughEmphasis(t *testing.T) {
 	// The transform must not invent a match either: a guard that fires on
 	// ordinary correct text is deleted by the first maintainer it lies to.
 	// Both cases below separate DROPPING a marker from replacing it with a
-	// space, which is the plausible wrong version of this function — under
+	// space, which is the plausible wrong version of this function, under
 	// replacement "page_size" reads as "page size" and this test goes red on a
 	// prompt that never said it.
 	if got := asRendered("**word**s"); got != "words" {
@@ -299,7 +299,7 @@ func TestThePromptScanSeesThroughEmphasis(t *testing.T) {
 // the same each time: a prompt ILLUSTRATION is replaceable, so an illustration
 // that names a plant gets replaced; a DEFINITION, a scope list, or an ordinary
 // English word is the right word for its job, and changing it to dodge a
-// substring would be tuning the prompt to this corpus — which is the thing the
+// substring would be tuning the prompt to this corpus, which is the thing the
 // prompt must never be tuned to, and which would also teach a real reviewer
 // nothing.
 //
@@ -333,14 +333,14 @@ type promptKeywordException struct {
 	// to the prompt. None of them is news about the corpus: a bare adverb
 	// reaching a fourth file tells a reader nothing they did not know from the
 	// first three, and the build break trains the next editor to delete the
-	// entry — or worse, to reword correct English to dodge a substring, which
+	// entry, or worse, to reword correct English to dodge a substring, which
 	// is precisely the tuning this file exists to prevent.
 	//
 	// It stays EXACT for multi-word phrases like "existing caller", where a new
 	// occurrence really is a new argument somebody has to make.
 	//
-	// ARGUED PER ENTRY RATHER THAN COMPUTED. The tempting metric — a keyword
-	// that appears in N of the 14 expert prompts is ordinary by construction —
+	// ARGUED PER ENTRY RATHER THAN COMPUTED. The tempting metric, a keyword
+	// that appears in N of the 14 expert prompts is ordinary by construction,
 	// was measured and rejected: it scores "race", "injection", "secret" and
 	// "sanitiz" as ordinary, and those are exactly the keywords a concurrency or
 	// security plant SHOULD use, so the rule would end by demanding good
@@ -349,8 +349,8 @@ type promptKeywordException struct {
 	//
 	// What this gives up, stated rather than smoothed: for an ordinary keyword
 	// this test no longer reports that the leak reached one more surface. The
-	// timezone entry's own note — that "utc" is absent from exactly one scope
-	// branch, so the nitpick level is quietly a scoring knob — is the kind of
+	// timezone entry's own note. That "utc" is absent from exactly one scope
+	// branch, so the nitpick level is quietly a scoring knob, is the kind of
 	// observation that is now made by hand or not at all.
 	ordinary bool
 
@@ -359,7 +359,7 @@ type promptKeywordException struct {
 
 // allowedPromptKeywords is the disclosed residual, in full.
 //
-// A stale entry fails as loudly as a missing one — see checkPromptExceptions —
+// A stale entry fails as loudly as a missing one, see checkPromptExceptions,
 // so this list can only shrink by deletion, never rot into a green claim about
 // text nobody kept.
 func allowedPromptKeywords() []promptKeywordException {
@@ -465,8 +465,8 @@ func allowedPromptKeywords() []promptKeywordException {
 //
 // "Fix the PROMPT, not the fixture" used to lead unconditionally, and for a
 // one-word keyword that is the wrong instruction. Measured on this corpus: a
-// definitional expansion of persona.go's scope list — "resource handling (a
-// file descriptor, a connection, memory)" — fires ten times on `memory` and
+// definitional expansion of persona.go's scope list, "resource handling (a
+// file descriptor, a connection, memory)", fires ten times on `memory` and
 // `file descriptor`, and a one-word precision swap in review.md, "a path that
 // loses an error" to "discards an error", fires on `discard`. Rewording correct
 // English to dodge a bare noun teaches a reviewer nothing, which is the test
@@ -504,7 +504,7 @@ func collisionAdvice(keyword string) string {
 //
 // A keyword in the prompt is a phrase the reviewer can produce by quoting its
 // own instructions, and matches() will credit the plant for it without the
-// reviewer having read the code — so this is the same defect Defect.Keywords
+// reviewer having read the code, so this is the same defect Defect.Keywords
 // warns about ("a keyword must not be a token a reviewer would type merely by
 // QUOTING the change") with the change replaced by the prompt.
 //
@@ -565,7 +565,7 @@ func TestNoPlantedKeywordAppearsInTheShippedPrompt(t *testing.T) {
 // Without it the list would only ever grow, and a residual nobody can reproduce
 // reads to the next editor as a reason not to look.
 //
-// Every listed source is checked in both kinds of entry — that is the half that
+// Every listed source is checked in both kinds of entry. That is the half that
 // stops rot. Only the UNLISTED direction differs, and only for keywords marked
 // ordinary; see promptKeywordException.ordinary for the false positives that
 // bought that distinction.
@@ -623,7 +623,7 @@ func missingFrom(want, got []string) []string {
 //
 // IT IS A TRIPWIRE AND NOTHING MORE. It cannot tell whether a new example names
 // something the corpus plants, and it cannot tell whether "you are unlikely to
-// meet this in this change" is true of one — both are judgements about meaning,
+// meet this in this change" is true of one, both are judgements about meaning,
 // and the second is not about the corpus at all. What it does is make an edit
 // to these sentences impossible to land silently: the build goes red, and a
 // human has to re-affirm the questions in the failure message. It buys
@@ -634,8 +634,8 @@ func missingFrom(want, got []string) []string {
 // NEEDED, which is a narrower claim than the one this comment used to make.
 // Restoring the pre-fix `info` rung and running
 // TestNoPlantedKeywordAppearsInTheShippedPrompt reports "accepted input" and
-// "for one helper" — both literal keywords — so the scan was not blind to it;
-// there was simply no scan. What no scan reaches is an illustration that
+// "for one helper", both literal keywords, so the scan was not blind to it;
+// there was no scan. What no scan reaches is an illustration that
 // describes a plant in words the fixture does not list, and question 2, which
 // is a judgement about ordinary reviewing and would matter with no corpus in
 // the repository at all.
@@ -644,7 +644,7 @@ func missingFrom(want, got []string) []string {
 // property cannot be computed, so the list IS the assertion.
 // The pinned text is each rung's WHOLE bullet, not its illustration alone. See
 // ladderBullets for the two edits that landed green while only the italic was
-// pinned — both of them the collision this guard exists to catch.
+// pinned, both of them the collision this guard exists to catch.
 var ladderIllustrations = map[string]ladderIllustration{
 	"critical": {class: config.ClassSecurity, text: "data loss, a security breach, or a " +
 		"guaranteed production failure. *Writing a decrypted secret to a log that ships " +
@@ -662,9 +662,9 @@ var ladderIllustrations = map[string]ladderIllustration{
 	// services ARE correlated through" and "…so a rise in failures READS AS a
 	// fall in traffic": the first asserts a live consumer and then rates
 	// breaking it info, and the second asserts the dashboard misreports during
-	// an outage. Under this package's own authoring rule — fixtures_info.go, "it
+	// an outage. Under this package's own authoring rule, fixtures_info.go, "it
 	// is discovered by asking whether the AUTHOR COULD BE WRONG. If the author
-	// could be wrong, the finding is at least a warning" — the author of the
+	// could be wrong, the finding is at least a warning", the author of the
 	// second one is wrong, so it was illustrating `info` with a warning. The
 	// second was also structurally the `error` rung's own example two lines up:
 	// an artifact omitting a dimension it depends on and therefore answering
@@ -682,12 +682,12 @@ var ladderIllustrations = map[string]ladderIllustration{
 // ladderIllustration is one pinned severity example and the class a finding of
 // that shape would carry.
 //
-// THE CLASS IS A HUMAN JUDGEMENT, NOT A MEASUREMENT — no model was asked. It is
+// THE CLASS IS A HUMAN JUDGEMENT, NOT A MEASUREMENT, no model was asked. It is
 // pinned because of what it is checked against: config.GenerationLevel.
 // Publishes. review.md's ladder is rendered into the STYLE pass as well as the
 // defect pass (internal/review/engine.go's analyzeStyle builds prompt.NameReview
 // with StylePass as its persona layer), and an illustration whose honest class
-// is `style` lands in three contradictions at once — the style pass is told to
+// is `style` lands in three contradictions at once. The style pass is told to
 // report ONLY naming, documentation, structure, idiom and consistency, told by
 // the ladder that this one is `info`, told by StylePass to mark every finding
 // `nit`, and told three lines below the ladder not to go looking for it. At the
@@ -695,7 +695,7 @@ var ladderIllustrations = map[string]ladderIllustration{
 // below pedantic, so the same finding is filtered away before a reader sees it.
 //
 // The rung that forced this pin illustrated `info` with a subcommand configured
-// unlike its siblings — a consistency observation, the one class the ladder
+// unlike its siblings, a consistency observation, the one class the ladder
 // must not illustrate with, and the only one of the nine illustrations that
 // named a difference and no cost.
 type ladderIllustration struct {
@@ -713,21 +713,21 @@ var ladderBulletStart = regexp.MustCompile("(?m)^- `(critical|error|warning|info
 // illustrations, and anything written after them.
 //
 // PINNING ONLY THE ITALIC LET THE ORIGINAL BUG BACK IN. What was here matched
-// "- `level` — [^*]*\*([^*]+)\*" and pinned the captured italic. `[^*]*` cannot
-// cross an asterisk, so everything before the first italic — the whole
-// definition half — was skipped without being compared, and nothing looked
+// "- `level`, [^*]*\*([^*]+)\*" and pinned the captured italic. `[^*]*` cannot
+// cross an asterisk, so everything before the first italic, the whole
+// definition half, was skipped without being compared, and nothing looked
 // after the italic at all. Both halves of that were measured green against the
 // previous guard:
 //
 //	appended after the italic:
-//	  - `info` — … is info.* Loosening what an exported function will take is
+//	  - `info`, … is info.* Loosening what an exported function will take is
 //	    info too, as is pulling in a package for one call.
 //	written into the definition half:
-//	  - `info` — a defensible concern …, such as loosening an exported signature
+//	  - `info`, a defensible concern …, such as loosening an exported signature
 //	    or taking on a package for one call.
 //
-// Each of those is the bug this whole guard was built for — the prompt naming a
-// defect the corpus plants — reintroduced with the tripwire silent. The second
+// Each of those is the bug this whole guard was built for, the prompt naming a
+// defect the corpus plants, reintroduced with the tripwire silent. The second
 // is not hypothetical: the other real collision this work found, in
 // experts/api.md, was written in exactly that plain-prose position.
 //
@@ -762,7 +762,7 @@ func ladderBullets(window string) map[string]string {
 // it green after. review.md already uses `**` in six places, two of them inside
 // the severity section, so that edit is ordinary rather than adversarial.
 //
-// Bold INSIDE an illustration is not silently absorbed — the markers stay in
+// Bold INSIDE an illustration is not silently absorbed, the markers stay in
 // the captured text, so the pin fires and a human reads the message. That is
 // the right side to err on: an emphasis marker inside a pinned sentence is an
 // edit to the sentence.
@@ -827,19 +827,19 @@ func italicSpans(text string) []string {
 //     go-hardcoded-secret whose scenario differs; allowedPromptKeywords records
 //     it. Direction: inflates.
 //   - `warning` keeps "Retrying a non-idempotent request", which IS
-//     cross-batch-replay's plant word for word — that fixture is in neither
+//     cross-batch-replay's plant word for word. That fixture is in neither
 //     scored corpus today, and its own file says wiring it in needs work this
 //     rung has to be part of. Direction: inflates, unscored today.
 //   - `nit` fails question 2 by the same argument that removed the example
 //     before it. "A test that asserts on an error's exact wording rather than
 //     its type" is an ordinary review finding, and ordinariness was the stated
 //     reason "an unnecessary intermediate copy" had to go. Direction:
-//     SUPPRESSES — for a real user it is one common, legitimate finding placed
+//     SUPPRESSES, for a real user it is one common, legitimate finding placed
 //     under "do not go looking for them". For this corpus the effect is
 //     unmeasured and probably nil: the only `tests`-class plant is
 //     duplicate-test-case-nit, a repeated case rather than an assertion on
 //     wording. It is left rather than replaced because every candidate for that
-//     rung has the same problem — a nit that is NOT ordinary is not a nit — and
+//     rung has the same problem. A nit that is NOT ordinary is not a nit, and
 //     because moving it again without a measurement would be churn. What would
 //     close it is the held-out battery this build already owes, not a better
 //     sentence.
@@ -847,8 +847,8 @@ func italicSpans(text string) []string {
 // The `info` rung's first example is a fourth, weaker one: "Dropping the
 // request id from a log line that two services are correlated through" asserts
 // an existing consumer and then rates removing what it reads as info, where
-// this corpus's contract-break — a field an existing consumer reads, silently
-// gone — is `error`. The distinction is real (a log consumer is an operator,
+// this corpus's contract-break, a field an existing consumer reads, silently
+// gone, is `error`. The distinction is real (a log consumer is an operator,
 // not code returning a wrong answer) and the sentence does not spell it out.
 // Unmeasured; direction, if any, is toward under-rating a genuine contract
 // break.
@@ -860,7 +860,7 @@ func TestTheSeverityLadderIllustrationsArePinned(t *testing.T) {
 
 	// The window ends at the anti-anchoring sentence rather than at the section
 	// break, because "these examples" is what that sentence governs. An italic
-	// added BELOW it — in the calibration rules — is therefore unpinned, which is
+	// added BELOW it, in the calibration rules, is therefore unpinned, which is
 	// a real gap and a small one: text outside the sentence's reach is not an
 	// example the reviewer is told not to go looking for. Widening the window
 	// would pin the calibration prose too, and an editor emphasising a word there
@@ -876,7 +876,7 @@ func TestTheSeverityLadderIllustrationsArePinned(t *testing.T) {
 	got := ladderBullets(text[start:end])
 
 	// Counted as well as compared, because comparing bullets cannot see an
-	// italic that belongs to no bullet — one added to the section's intro line,
+	// italic that belongs to no bullet, one added to the section's intro line,
 	// or below the last rung but above the anti-anchoring sentence. Those
 	// positions are inside what "these examples" governs, so an illustration
 	// written there is exactly as unre-affirmed as one inside a rung.
@@ -959,7 +959,7 @@ func TestTheSeverityLadderIllustrationsArePinned(t *testing.T) {
 // rather than merely redundant, and deleting it would turn every failure
 // message above into advice about a rule that no longer exists. It is also the
 // thing a future editor is most likely to reach for when an illustration is
-// found to name a plant — and removing it, rather than the example, would
+// found to name a plant, and removing it, rather than the example, would
 // inflate this corpus by exactly the mechanism it guards against.
 func TestTheLadderStillCarriesItsAntiAnchoringSentence(t *testing.T) {
 	p, err := prompt.Build(prompt.NameReview, prompt.Options{})
@@ -985,8 +985,8 @@ func TestTheLadderStillCarriesItsAntiAnchoringSentence(t *testing.T) {
 // THE LIMIT IS THE TECHNIQUE'S, NOT THIS TEST'S. Credit is a substring test, so
 // the score is a function of the nouns the reviewer reaches for. The two
 // findings below say the same true thing about the same line and only one is
-// credited. A prompt sentence can therefore raise or lower the odds of a noun —
-// "ask who is allowed to do this" against "ask what the caller owns" — and move
+// credited. A prompt sentence can therefore raise or lower the odds of a noun,
+// "ask who is allowed to do this" against "ask what the caller owns", and move
 // the measured score while containing no keyword at all, which is the whole
 // space TestNoPlantedKeywordAppearsInTheShippedPrompt cannot see.
 //
@@ -995,7 +995,7 @@ func TestTheLadderStillCarriesItsAntiAnchoringSentence(t *testing.T) {
 // scoring a correct detection of a `critical` plant at zero. Nothing here
 // distinguishes a sentence that teaches the level better from one that steers
 // this corpus, and a tripwire over all of review.md would fire on every
-// legitimate edit and be deleted inside a month — the same false-positive rule
+// legitimate edit and be deleted inside a month, the same false-positive rule
 // this file has already had to apply twice. What closes it is the pre-registered
 // held-out battery this build already names as its open item: freeze the corpus,
 // change one sentence, measure.

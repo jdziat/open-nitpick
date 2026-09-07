@@ -7,15 +7,15 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // one batch, so the merge that runs before triage has something to merge.
 //
 // WHAT WAS WRONG. ts-unbounded-memo-key made this project's first multi-batch
-// review happen at all — seven files at the shipped max_files_per_request of 6
-// — but it was authored to keep the plant and the files needed to see it in the
+// review happen at all, seven files at the shipped max_files_per_request of 6
+// , but it was authored to keep the plant and the files needed to see it in the
 // SAME batch, because a defect split across requests is one no reviewer can
 // find and a plant nothing can find scores as a prompt weakness forever. That
 // is the right call for a scored plant, and its cost is that the second batch
 // has nothing to say: only one batch ever reports the defect, so dedupe(),
 // which triage() runs over the combined findings, has never had two reports of
-// one defect to collapse. The engine's cross-batch merge — README calls it a
-// headline capability — has therefore never merged anything under any
+// one defect to collapse. The engine's cross-batch merge, README calls it a
+// headline capability, has therefore never merged anything under any
 // measurement or any test. fixtures_warning.go says so in its own words: "a
 // fixture that makes it do so is still owed". This is that fixture.
 //
@@ -44,7 +44,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // the same path and line, because Finding.Key is path, line and normalized
 // title. review.md tells a reviewer to "anchor to the line where the problem
 // is, not where its effect surfaces", and for this defect that line is
-// retry.go:16 — the predicate that declares a POST replayable. The effect side
+// retry.go:16, the predicate that declares a POST replayable. The effect side
 // reaches the same line from the other end: charge.go's own import names the
 // helper, the helper is part of this same change, and filterAnchors validates a
 // finding's path against the WHOLE change rather than against the batch that
@@ -52,7 +52,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 //
 // THE RESIDUAL, STATED RATHER THAN HIDDEN: review.md also says "path must
 // exactly match one of the file paths given below", and a reviewer that obeys
-// that literally anchors in its own batch — charge.go:20 from batch 1,
+// that literally anchors in its own batch, charge.go:20 from batch 1,
 // retry.go:16 from batch 2. Those are two keys, and dedupe cannot collapse
 // them; only the triage model can. TestOneDefectAnchoredTwiceIsNotDeduped pins
 // that boundary so nobody reads the test above as a claim the engine merges
@@ -62,7 +62,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // DELIBERATELY IN NEITHER CORPUS, and this is the one thing about this file
 // that has to be read before it is copied. Fixtures() and HeldOutFixtures() do
 // not name it, so AllFixtures() does not contain it and NO ground-truth test in
-// groundtruth_test.go touches it — which is precisely the failure
+// groundtruth_test.go touches it, which is precisely the failure
 // TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus exists to catch for
 // warningFixtures and nitFixtures. It is not an oversight here and the checks
 // are not skipped: fixtures_dedup_test.go re-derives this fixture's line
@@ -83,9 +83,9 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // day; it changes nothing today.
 //
 // IT WAS RUN. Both states were extracted to a temp module and built, vetted,
-// gofmt-ed and executed under `go test`. Head reproduces the plant — a gateway
+// gofmt-ed and executed under `go test`. Head reproduces the plant, a gateway
 // that applies a capture and then reports a timeout receives the same capture
-// body twice for one order — and base does not, because base refuses to replay
+// body twice for one order, and base does not, because base refuses to replay
 // a POST at all. The filler files are exercised by the same run rather than
 // eyeballed, which is what would have caught the second, unplanted,
 // user-reachable defect ts-unbounded-memo-key shipped with: a Ledger that
@@ -108,7 +108,7 @@ func dedupFixtures() []Fixture {
 // retry.go in the first request, both halves arrive together, one reviewer sees
 // the whole defect and reports it once, and the fixture silently stops testing
 // anything while every test here still compiles. Adding one is survivable but
-// not free — the split moves, and whichever filler lands beside retry.go is the
+// not free, the split moves, and whichever filler lands beside retry.go is the
 // file a reviewer of batch 2 has to ignore. TestTheDedupFixtureSplitsTheDefect
 // reads the split back out of bundle.Assemble rather than trusting this
 // paragraph, for the reason the corpus already learned once: two one-line edits
@@ -116,21 +116,21 @@ func dedupFixtures() []Fixture {
 // `go test ./...` printed ok.
 //
 // THE FILLER IS NOT PADDING AND IT IS NOT DECORATION. Six files carry no
-// defect — five holding batch-1 slots and version.go riding along in batch 2 —
+// defect, five holding batch-1 slots and version.go riding along in batch 2,
 // and every one of them is a change a reviewer should wave through: a method
 // that reports whether a customer left an address, a total over entries the
 // ledger was already copying out defensively, a fixed clock for tests, a level
 // comparison, a prefix trim, a version bump. A filler file with
 // a defect in it would be a false positive charged to every reviewer that
 // reported it, and a filler file with no added lines at all would be dropped by
-// bundle for having nothing to comment on — which would shrink the change back
+// bundle for having nothing to comment on, which would shrink the change back
 // to one batch.
 //
 // WHAT THE FIXTURE IS CAREFUL NOT TO INVITE. The head's predicate excludes
-// PATCH and admits GET, HEAD, PUT and DELETE, all four of which genuinely are
+// PATCH and admits GET, HEAD, PUT and DELETE, all four of which are
 // idempotent, so there is exactly one thing wrong with it: POST. An earlier
 // draft excluded DELETE instead, which is idempotent, and that hands a reviewer
-// a second true remark — "your exclusion is backwards" — in a fixture whose
+// a second true remark, "your exclusion is backwards", in a fixture whose
 // whole premise is that there is one defect to report twice. Do itself is
 // byte-identical in both states for the same reason: a retry loop that is new
 // code invites remarks about backoff and jitter, and the corpus already plants
@@ -511,7 +511,7 @@ func String() string { return "pay/" + Number + "+" + Commit }
 			// capture is sent once and succeeds once until an attempt fails
 			// after the gateway has already applied it. WARNING rather than
 			// info because the mechanism and the failing input are both
-			// nameable, which is not something an author may simply decline.
+			// nameable, which is not something an author may decline.
 			SeverityNote: "warning, not error: every capture is correct until an " +
 				"attempt fails after the gateway applied it, which is a plausible " +
 				"condition rather than a guaranteed one",

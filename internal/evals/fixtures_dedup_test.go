@@ -117,7 +117,7 @@ func (b *batchLLM) counts() (reviews, triages int, prompt string) {
 
 // triageListing matches one entry of renderForTriage's numbered list:
 //
-//  1. [warning] platform/retry/retry.go:16 — A POST is replayable
+//  1. [warning] platform/retry/retry.go:16. A POST is replayable
 var triageListing = regexp.MustCompile(`(?m)^\d+\. \[([a-z]+)\] (\S+):(\d+) — (.*)$`)
 
 // echoTriage answers a triage prompt with exactly the findings it lists.
@@ -224,9 +224,9 @@ func assemble(t *testing.T, f Fixture) (*bundle.Plan, map[string]int) {
 //
 // The fixture's entire value is that its two halves land in DIFFERENT requests:
 // that is what gives dedupe two reports of one defect to merge. It is the exact
-// inverse of the invariant the tuning corpus needs — ts-unbounded-memo-key must
+// inverse of the invariant the tuning corpus needs, ts-unbounded-memo-key must
 // keep its halves TOGETHER, because there the defect is invisible from either
-// file alone — and it turns on the same fragile fact, alphabetical position at
+// file alone, and it turns on the same fragile fact, alphabetical position at
 // a six-file boundary. One added path sorting before platform/ re-splits the
 // change and this fixture quietly stops testing anything, which is precisely
 // how two one-line edits were once enough to falsify the corpus's other
@@ -272,7 +272,7 @@ func TestTheDedupFixtureSplitsTheDefect(t *testing.T) {
 func TestTheDedupFixturePlantIsWhereItSaysItIs(t *testing.T) {
 	requireGit(t)
 
-	// What each anchor must actually contain, read out of Head rather than
+	// What each anchor must contain, read out of Head rather than
 	// asserted about it. The cause is the widened predicate; the effect is the
 	// capture handed to the retry helper as a POST.
 	want := map[string]string{
@@ -338,8 +338,8 @@ func TestTheDedupFixturePlantIsWhereItSaysItIs(t *testing.T) {
 // and one comment on the pull request.
 //
 // The fixture is what makes the input honest. Its defect has a face in each
-// batch — the predicate that declares a POST replayable, and the capture handed
-// to the retry helper — and review.md tells a reviewer to "anchor to the line
+// batch, the predicate that declares a POST replayable, and the capture handed
+// to the retry helper, and review.md tells a reviewer to "anchor to the line
 // where the problem is, not where its effect surfaces", which names the
 // predicate from either side. A duplicate the model would not naturally produce
 // would test nothing.
@@ -442,7 +442,7 @@ func TestOneDefectAnchoredTwiceIsNotDeduped(t *testing.T) {
 			// dedupe and not about what a script chose to echo.
 			failTriage: true,
 			byFile: map[string]string{
-				// Each batch anchors in the file it was actually given.
+				// Each batch anchors in the file it was given.
 				effectPath: finding(effectPath, effectLine, "A capture is retried, so it can be applied twice"),
 				causePath:  finding(causePath, causeLine, "A POST is replayable, so a capture can be applied twice"),
 			},
@@ -467,9 +467,9 @@ func TestOneDefectAnchoredTwiceIsNotDeduped(t *testing.T) {
 // corpus has to lose a plant and the reason
 // TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus exists. That test
 // enumerates warningFixtures and nitFixtures by name, so it cannot see this
-// file at all. The omission here is deliberate — a fixture whose point is that
+// file at all. The omission here is deliberate, a fixture whose point is that
 // one defect is reported twice would be scored as one detection and one false
-// positive — and stating it as an assertion is what stops the next reader
+// positive, and stating it as an assertion is what stops the next reader
 // wiring it in for tidiness and moving a published noise number.
 func TestTheDedupFixtureIsNotInEitherScoredCorpus(t *testing.T) {
 	scored := map[string]string{}

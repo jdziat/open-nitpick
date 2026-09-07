@@ -33,7 +33,7 @@ const EnvDump = "NITPICK_EVAL_DUMP"
 //
 // A sample whose reviewer said nothing writes one Silent line, not zero lines.
 // Misses still live in the judge's `missed` list and in Score.Detected rather
-// than here — what the marker records is that the sample was RUN, which is the
+// than here, what the marker records is that the sample was RUN, which is the
 // one thing a reader cannot infer from an absence.
 type DumpRecord struct {
 	Model   string `json:"model"`
@@ -44,7 +44,7 @@ type DumpRecord struct {
 	//
 	// The dump is written to a path the operator chooses and every experiment
 	// reuses those paths, so a held-out run can land in the file the tuner has
-	// been iterating against — carrying defect_why, which is the planted
+	// been iterating against, carrying defect_why, which is the planted
 	// defect's own prose. Nothing else in the record distinguishes the two, and
 	// "read the dump, edit the prompt" is the documented workflow, so the
 	// distinction has to be in the data rather than in the filename.
@@ -71,7 +71,7 @@ type DumpRecord struct {
 	// ambiguous: a contender that stayed correctly silent on a clean fixture
 	// and a contender that was never given that fixture are the same absence.
 	// GroupDump had to guess the matrix back from the records present, and
-	// guessed wrong in both directions — it invented groups for corpora a
+	// guessed wrong in both directions, it invented groups for corpora a
 	// contender never reviewed, and lost whole runs a contender was silent
 	// through. One marker line ends the guessing.
 	Silent bool `json:"silent,omitempty"`
@@ -79,8 +79,8 @@ type DumpRecord struct {
 	// Findings is how many findings the judged list held, so a reconstruction
 	// can tell a COMPLETE list from a truncated one.
 	//
-	// Without it a dump whose last line was lost — a killed run, a `head -n`,
-	// a filter — rebuilds SHORT and silently, because the length was inferred
+	// Without it a dump whose last line was lost, a killed run, a `head -n`,
+	// a filter, rebuilds SHORT and silently, because the length was inferred
 	// from the largest index present. A hole in the middle was refused and a
 	// hole at the end was not, which is the worse of the two: the re-judged
 	// review is shorter than the one the recorded verdicts were made against.
@@ -96,12 +96,12 @@ type DumpRecord struct {
 	// reporting the loss as the ORIGINAL judge having said too little.
 	Verdicts int `json:"verdicts,omitempty"`
 
-	// FixtureHash pins the source the reviewer actually read.
+	// FixtureHash pins the source the reviewer read.
 	//
 	// A dump names its fixture and nothing else, and the fixtures are Go source
 	// that gets edited. Re-judging resolves the name against the CURRENT
 	// corpus, so an edit to a fixture's Head between the benchmark and the
-	// re-judge changes the prompt as well as the judge — reintroducing, through
+	// re-judge changes the prompt as well as the judge, reintroducing, through
 	// the corpus, the exact confound re-judging exists to remove. The name
 	// surviving is not evidence the change did.
 	FixtureHash string `json:"fixture_hash,omitempty"`
@@ -117,7 +117,7 @@ type DumpRecord struct {
 	// secondary span changes nothing about the prompt a re-judge rebuilds. What
 	// it does change is every detection number. anchorDistance takes the minimum
 	// over the primary span AND every region here, and coverInto unions them, so
-	// ANCHOR and NOISE are both computed from this field — and Incumbent is the
+	// ANCHOR and NOISE are both computed from this field, and Incumbent is the
 	// reviewer that fills it, from its "Also applies to" lines.
 	//
 	// Without it a dump is not a sufficient record of a run: ANCHOR replays
@@ -127,8 +127,8 @@ type DumpRecord struct {
 	// TestASecondarySpanSurvivesTheDump scores a round trip rather than
 	// inspecting the field, since the field matters only for what it changes.
 	//
-	// open-nitpick's own reviews leave it empty — review.Finding.AlsoAt says the
-	// schema does not offer it — so this is omitempty on every one of our
+	// open-nitpick's own reviews leave it empty, review.Finding.AlsoAt says the
+	// schema does not offer it, so this is omitempty on every one of our
 	// records. The incumbent is the only reviewer here whose records can carry
 	// it, and "can" is the accurate word: it is filled only where a review
 	// printed an "Also applies to" line, which most of them do not. An earlier
@@ -146,7 +146,7 @@ type DumpRecord struct {
 	// "model":"incumbent/cli", so the artifact every downstream reading is
 	// re-derived from published our translation of a foreign vocabulary as the
 	// reviewer's own severity. review.Finding.RawSeverity carries `json:"-"`, so
-	// the word the reviewer actually printed could not reach this file at all —
+	// the word the reviewer printed could not reach this file at all,
 	// the substitution the tables had been fixed for survived one layer down, in
 	// the file a reader goes to when they doubt the tables.
 	Severity string `json:"severity"`
@@ -157,7 +157,7 @@ type DumpRecord struct {
 	// source for one fact.
 	//
 	// Absent WITH SeverityTranslated true is the third state and it is a real
-	// one: something rewrote the severity and the original is not recoverable —
+	// one: something rewrote the severity and the original is not recoverable,
 	// a Incumbent cache entry collected before the raw review was retained, or
 	// an analyzer that published no severity at all. A reader must be able to
 	// tell that from "the reviewer said this", which is why the flag is written
@@ -183,13 +183,13 @@ type DumpRecord struct {
 	Suggestion string `json:"suggestion,omitempty"`
 
 	// Verdict is the judge's assessment, absent when the judge returned none
-	// for this index. Absent is not "the judge approved it" — a judge that
+	// for this index. Absent is not "the judge approved it", a judge that
 	// returns the wrong number of verdicts is already reported as suspect, and
 	// a reader of this file must be able to tell the two apart.
 	Verdict *Verdict `json:"verdict,omitempty"`
 
 	// Matched reports whether this finding is the one CREDITED with reporting a
-	// planted defect — the same finding recall counted and the same one the
+	// planted defect, the same finding recall counted and the same one the
 	// severity columns graded. The fields below are populated only when it did:
 	// nothing planted says what an unmatched finding's severity should have
 	// been.
@@ -203,8 +203,8 @@ type DumpRecord struct {
 	Matched      bool   `json:"matched"`
 	WantSeverity string `json:"want_severity,omitempty"`
 
-	// SeverityDelta is the objective verdict — accurate, inflated or
-	// understated — against WantSeverity, comparing EXACT levels. Precomputed so
+	// SeverityDelta is the objective verdict, accurate, inflated or
+	// understated, against WantSeverity, comparing EXACT levels. Precomputed so
 	// a reader does not reimplement the severity ordering to recover it.
 	//
 	// A second, banded verdict used to be written beside it as band_delta, for
@@ -230,15 +230,15 @@ type DumpSample struct {
 	Findings []review.Finding
 
 	// Judged assesses exactly these findings, so Verdict.Index is a position in
-	// Findings — and "assesses" means the judge was SHOWN this list, not merely
+	// Findings, and "assesses" means the judge was SHOWN this list, not merely
 	// that the verdicts have been renumbered to fit it.
 	//
 	// The file cannot carry the difference, and a reader of it has no way to
 	// check: a producer that judged some larger list and filtered the verdicts
 	// down would look identical here, and every figure a re-judge derived from
-	// it would compare two questions. The persona path was that producer — it
+	// it would compare two questions. The persona path was that producer, it
 	// judged a shared corpus once and recorded each nitpick level's filtered
-	// list beside those verdicts — and it no longer is; runLevels judges each
+	// list beside those verdicts, and it no longer is; runLevels judges each
 	// distinct filtered list. Any new producer owes the same.
 	Judged *JudgeResult
 }
@@ -284,7 +284,7 @@ func NewDump(path string) (*Dump, error) {
 // runDumpDir is where a run's own dump lands when the operator named no path.
 //
 // It sits beside the package rather than under testdata: testdata holds
-// collected evidence that is committed and read back — the Incumbent cache —
+// collected evidence that is committed and read back, the Incumbent cache,
 // and a run artifact written on every invocation does not belong in it.
 const runDumpDir = ".eval-runs"
 
@@ -295,7 +295,7 @@ const runDumpDir = ".eval-runs"
 // the Rule 14 evidence ran with EnvDump unset, so OpenDump returned nil, every
 // Record call was a no-op, and the finding lists sat in memory for the whole of
 // a paid run and were written nowhere. Two of Rule 14's four conditions then
-// needed a re-run to evaluate — against a corpus whose own label says it is
+// needed a re-run to evaluate, against a corpus whose own label says it is
 // spent once. Retention is not a diagnostic convenience here; it is what makes
 // the next held-out spend the last one required for a model-free column, because
 // RECALL, NOISE, ANCHOR and L/DEF are pure functions of (findings, fixture) and
@@ -304,7 +304,7 @@ const runDumpDir = ".eval-runs"
 // THE RECORDING IS NOT GATED ON THE JUDGE, and saying so is load-bearing rather
 // than decorative: the arithmetic needing no judge is worth nothing if the write
 // happens after a judge call that can fail. It did, and a review whose judge call
-// errored was discarded — findings already paid for, and on the incumbent's side
+// errored was discarded, findings already paid for, and on the incumbent's side
 // drawn from a rate-limited allowance the benchmark's live path does not even
 // cache. TestEveryPaidReviewIsRetainedWhateverTheJudgeSays holds the write above
 // every return that follows the judge.
@@ -318,7 +318,7 @@ const runDumpDir = ".eval-runs"
 //
 // WHICH BATTERIES THOSE ARE IS DERIVED, NOT LISTED, and the earlier version of
 // this sentence is why. It said the tuning axes still used OpenDump deliberately
-// because "their corpus can be reviewed again" — true of TestTunePersona, the
+// because "their corpus can be reviewed again", true of TestTunePersona, the
 // one battery that remains on OpenDump, and false of TestJudgeModels, which
 // prints the same judged table the head-to-head does and which
 // `make judge-models FIXTURES=$(HELD_OUT)` points at the spent-once corpus. A
@@ -386,7 +386,7 @@ const dumpPartialSuffix = ".partial"
 // reason its own comment gives, so a fixed default name would let the second
 // held-out benchmark destroy the first one's evidence with no warning and no
 // test failure. The corpus token is here because held-out and tuning runs are
-// the distinction the Makefile's truncation warning is actually about, and the
+// the distinction the Makefile's truncation warning is about, and the
 // timestamp and pid are what make two runs land on two files.
 //
 // Uniqueness by name is not relied on alone: openRunDumpAt creates the file
@@ -501,7 +501,7 @@ func (d *Dump) Record(s DumpSample) error {
 	defer d.mu.Unlock()
 
 	// A review that said nothing writes ONE line rather than none. Silence is a
-	// result — it is the correct answer on a clean fixture — and recording it as
+	// result. It is the correct answer on a clean fixture, and recording it as
 	// an absence made it indistinguishable from a sample that was never run.
 	if len(s.Findings) == 0 {
 		rec := sample
@@ -569,7 +569,7 @@ func (d *Dump) Record(s DumpSample) error {
 //
 // The rename is the completeness marker. A dump is written by a battery that
 // takes tens of minutes and is read by `make rejudge`, and the only guard
-// against reading one mid-write compares two environment variables — which a
+// against reading one mid-write compares two environment variables, which a
 // path this file resolved for itself does not set. Renaming on Close moves that
 // guarantee into the file name, where a reader can check it. See
 // RejudgeInputProblem.
@@ -578,8 +578,8 @@ func (d *Dump) Record(s DumpSample) error {
 // insufficient at the moment it runs. Between that check and this one sits a
 // battery that takes tens of minutes, and os.Rename is silent: a run that landed
 // on this name in the meantime would be replaced with no error and no trace. The
-// window is not reachable from anything in this package — that is why the
-// refusal below is a latent guard rather than an observed bug — but the argument
+// window is not reachable from anything in this package. That is why the
+// refusal below is a latent guard rather than an observed bug, but the argument
 // for the open-time check ("the file it would land on may be the only copy of a
 // held-out run") does not weaken while the run is going.
 // TestAFinishedRunIsNotRenamedOverAnother covers it.

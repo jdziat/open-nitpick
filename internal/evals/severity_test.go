@@ -68,7 +68,7 @@ func severityFixture() Fixture {
 // It is a hand-built pair rather than a Incumbent finding now. Incumbent's
 // review of go-hardcoded-secret says "critical"; the "error" was crSeverity
 // rewriting it, which is the bug the parser fix removed. The pair is still worth
-// pinning because any reviewer can genuinely make that call — it just is not one
+// pinning because any reviewer can make that call. It just is not one
 // the parser manufactures any more.
 func TestSeverityIsScoredAgainstPlantedGroundTruth(t *testing.T) {
 	findings := []review.Finding{
@@ -134,7 +134,7 @@ func TestSeverityIsScoredAgainstPlantedGroundTruth(t *testing.T) {
 	// The same sample as a vocabulary description, which is what a reader
 	// comparing two reviewers gets instead of a cross-tool accuracy figure.
 	// Every planted level this review located has to appear with the word the
-	// review actually used, or the description is not a record of anything.
+	// review used, or the description is not a record of anything.
 	usage := got.Usage()
 	for _, tc := range []struct {
 		planted config.Severity
@@ -195,7 +195,7 @@ func criticalPlant() Fixture {
 // crSeverity used to map "critical" onto our "error", so a Incumbent review
 // that rated a defect exactly as the corpus plants it was recorded as having
 // UNDERSTATED it. Four fixtures plant critical, and the demotion made all four
-// unwinnable however the finding was worded — its raw output for
+// unwinnable however the finding was worded, its raw output for
 // go-sql-injection literally reads "critical [Security & Privacy]", which is
 // the same call our own models make. A published headline was computed on the
 // resulting number and had to be retracted.
@@ -236,7 +236,7 @@ func TestIncumbentCriticalScoresAccurateOnACriticalPlant(t *testing.T) {
 // the half that makes the fix above worth anything.
 //
 // Recording severities faithfully must not turn the understatement column off.
-// A reviewer that rates a planted critical as `info` has genuinely under-rated
+// A reviewer that rates a planted critical as `info` has under-rated
 // it, and the column has to say so, or the measurement the tuning is aimed at
 // has been quietly disabled in the name of fairness.
 func TestIncumbentInfoOnACriticalPlantIsStillUnderstated(t *testing.T) {
@@ -268,9 +268,9 @@ func TestIncumbentInfoOnACriticalPlantIsStillUnderstated(t *testing.T) {
 //     config.Severity.Normalize and lands at INFO. The same literal token was
 //     therefore worth a whole level more when the incumbent emitted it, in a
 //     comparison whose entire point is to be like-for-like.
-//   - severityVerdict ranked "none" — the word for the ABSENCE of a severity,
+//   - severityVerdict ranked "none", the word for the ABSENCE of a severity,
 //     which config.Severity.Rank deliberately places ABOVE critical so that
-//     `fail_on: none` matches nothing — as the most severe value there is, and
+//     `fail_on: none` matches nothing, as the most severe value there is, and
 //     so scored it INFLATED against a planted critical. The withdrawn banded
 //     verdict normalized first and answered UNDERSTATED for the identical input.
 //     Two verdicts printed on one row disagreed about direction and only one of
@@ -306,7 +306,7 @@ func TestUnusableSeverityIsDegradedIdenticallyForEveryContender(t *testing.T) {
 	}
 
 	// "none" is the specific value the two verdicts disagreed about. It must be
-	// treated as the absence of a claim — which lands at info — in every
+	// treated as the absence of a claim, which lands at info, in every
 	// direction, not as the most severe claim possible.
 	for _, tc := range []struct {
 		got, planted config.Severity
@@ -380,7 +380,7 @@ func crSeverityCases(t *testing.T) []string {
 //
 // crSeverity translates a foreign vocabulary. "major" and "warn" become warning
 // and "nitpick" becomes nit, where those same tokens on one of our own findings
-// would go through config.Severity.Normalize and land at info — so the identical
+// would go through config.Severity.Normalize and land at info, so the identical
 // word is worth a different level depending on who said it. The asymmetry is
 // deliberate and it is load-bearing: "major" carries more than half the
 // incumbent's severity words in the shipped cache, and degrading it to info
@@ -388,8 +388,8 @@ func crSeverityCases(t *testing.T) []string {
 // point is to be like-for-like.
 //
 // THE REASON THIS TEST EXISTS AT ALL is that the comment beside crSeverity has
-// been citing it by name — "pins the enumerated set, so a fourth translation
-// cannot be added silently" — while nothing of the sort was ever written. A
+// been citing it by name, "pins the enumerated set, so a fourth translation
+// cannot be added silently", while nothing of the sort was ever written. A
 // citation reads as proof the claim beside it is checked, so that sentence was
 // worse than saying nothing: it told every reader to stop looking. The guard is
 // arriving late rather than the promise being withdrawn, because the promise is
@@ -402,8 +402,8 @@ func TestForeignSeverityWordsAreTranslatedOnPurpose(t *testing.T) {
 	}
 
 	// A word is TRANSLATED when the enumeration moves it somewhere Normalize
-	// would not have. Words the two paths agree on — "critical", "error",
-	// "minor" — cost nothing and need no argument: they are recorded, not
+	// would not have. Words the two paths agree on, "critical", "error",
+	// "minor", cost nothing and need no argument: they are recorded, not
 	// re-decided.
 	translated := map[string]config.Severity{}
 	for _, word := range words {
@@ -457,7 +457,7 @@ func TestForeignSeverityWordsAreTranslatedOnPurpose(t *testing.T) {
 // the function's own doc comment claimed print order could not matter.
 //
 // The credited comment is now the most severe matching one, which is the
-// severity the review actually HAS — `fail_on` gates on the worst thing said.
+// severity the review HAS, `fail_on` gates on the worst thing said.
 // Max is commutative, so this is a property rather than a promise.
 func TestCreditedFindingIsTheLoudestClaimNotThePrintOrder(t *testing.T) {
 	f := Fixture{
@@ -498,12 +498,12 @@ func TestCreditedFindingIsTheLoudestClaimNotThePrintOrder(t *testing.T) {
 }
 
 // TestSeverityIsNotImprovedByHedging is the other half, and the one the tie-break
-// was actually costing.
+// was costing.
 //
 // THE BUG: crediting the comment NEAREST the plant meant a reviewer could buy a
 // better verdict by adding a second comment at a different severity. On a planted
 // error, one comment saying "warning" scored UNDERSTATED; adding a second saying
-// "critical" — a strictly worse review, two different claims about one defect —
+// "critical", a strictly worse review, two different claims about one defect,
 // scored ACCURATE in either print order, because the band tie-break preferred the
 // in-band comment. Only a multi-comment reviewer could collect, and Incumbent
 // emits one matching finding per plant on this corpus, so the benefit fell
@@ -568,7 +568,7 @@ func TestSeverityIsNotImprovedByHedging(t *testing.T) {
 //
 // A finding that describes a planted defect but points somewhere else is not
 // counted as detecting it, so grading its severity against that defect would
-// credit a reviewer for the severity of a bug it did not actually locate.
+// credit a reviewer for the severity of a bug it did not locate.
 func TestSeverityIgnoresFindingsAnchoredTooFarAway(t *testing.T) {
 	findings := []review.Finding{
 		{Path: "a.go", Line: 10 + anchorTolerance + 1, Severity: "nit", Title: "hardcoded secret"},
@@ -642,7 +642,7 @@ func TestMergedCommentIsGradedAgainstEveryDefectItCovers(t *testing.T) {
 //
 // A reviewer that rates both defects correctly in two comments must score two
 // accurate calls. Without this, grading per defect could be satisfied by always
-// picking the first matching finding — which would mark the leak inflated here
+// picking the first matching finding, which would mark the leak inflated here
 // purely because the traversal comment came first in the list.
 func TestSeparateCommentsAreEachGradedOnTheirOwnPlant(t *testing.T) {
 	got := ScoreSeverity(overlappingFixture(), []review.Finding{
@@ -660,7 +660,7 @@ func TestSeparateCommentsAreEachGradedOnTheirOwnPlant(t *testing.T) {
 //
 // Grading per finding counted one planted defect once per comment that happened
 // to match it, so a reviewer restating a correct call four ways earned four
-// times the accuracy of one that said it once — and a comment about an entirely
+// times the accuracy of one that said it once, and a comment about an entirely
 // different bug that tripped a keyword was graded against the plant's severity
 // as though it had reported it.
 func TestSeverityIsGradedPerDefectNotPerFinding(t *testing.T) {
@@ -861,7 +861,7 @@ func TestDumpWritesWhatItClaims(t *testing.T) {
 //
 // The dump used to write a band_delta beside every severity_delta, for the
 // cross-tool columns that are withdrawn. Removing the columns and leaving the
-// field would have left the number in the file — and a field in a JSONL dump is
+// field would have left the number in the file, and a field in a JSONL dump is
 // a number somebody will group by, without the legend that would have told them
 // it is maximised by rating everything critical.
 func TestDumpCarriesNoWithdrawnBandedVerdict(t *testing.T) {
@@ -921,7 +921,7 @@ func TestDumpDisabledCostsNothing(t *testing.T) {
 	}
 }
 
-// TestOpenDumpHonoursTheEnvironment proves the env var is actually read; a
+// TestOpenDumpHonoursTheEnvironment proves the env var is read; a
 // diagnostic that silently writes nowhere is worse than none.
 func TestOpenDumpHonoursTheEnvironment(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "dump.jsonl")
@@ -984,7 +984,7 @@ func readDump(t *testing.T, path string) []DumpRecord {
 // It used to write none, which made silence indistinguishable from a sample
 // that was never run: a reader had to guess the (contender, fixture, run)
 // matrix back from the records present, and the guess was wrong in both
-// directions — it invented samples for corpora a contender never reviewed, and
+// directions, it invented samples for corpora a contender never reviewed, and
 // lost whole runs a contender was silent through. Silence on a clean fixture is
 // the CORRECT answer, so it is the one result the file must not omit.
 func TestDumpRecordsSilenceAsAResult(t *testing.T) {
@@ -1035,8 +1035,8 @@ func TestDumpRecordsSilenceAsAResult(t *testing.T) {
 //
 // Summarize used to fold in a band triple and had no test of its own: deleting
 // those three lines left the whole suite green. The replacement is exposed the
-// same way — printTable reads Summary.SevUsage and prints nothing at all if it is
-// empty — so it gets the test the band triple never had. A description that
+// same way, printTable reads Summary.SevUsage and prints nothing at all if it is
+// empty, so it gets the test the band triple never had. A description that
 // silently arrives empty is indistinguishable from a reviewer that located
 // nothing, which is the one reading it must never produce.
 func TestSummarizeCarriesTheSeverityVocabulary(t *testing.T) {
@@ -1105,7 +1105,7 @@ func TestSeverityVocabularyRendersEveryCallItWasGiven(t *testing.T) {
 	// The census the rows are read against, stated separately from the usage
 	// because the two are counted over different things: a level appears here
 	// whether or not any finding reached it. The warning row is the one that
-	// matters — nothing located there, and the corpus planted two.
+	// matters, nothing located there, and the corpus planted two.
 	planted := PlantedLevels{
 		config.SeverityCritical: 1,
 		config.SeverityError:    4,
@@ -1131,8 +1131,8 @@ func TestSeverityVocabularyRendersEveryCallItWasGiven(t *testing.T) {
 
 	// A word we did not translate carries no marker. Otherwise every line of
 	// every one of our own models would end in an annotation, and the one place
-	// the annotation MATTERS — a foreign word with no counterpart among our five
-	// — would be invisible in the noise.
+	// the annotation MATTERS, a foreign word with no counterpart among our five
+	//, would be invisible in the noise.
 	if strings.Contains(block, "critical x2 [we read as") {
 		t.Errorf("an untranslated word is annotated as though it had been translated:\n%s", block)
 	}
@@ -1155,7 +1155,7 @@ func TestSeverityVocabularyRendersEveryCallItWasGiven(t *testing.T) {
 // of its word, under a caption saying it was the reviewer's. Incumbent prints
 // "critical" and "major" and printed neither "error" nor "warning" anywhere in
 // the shipped cache, yet the block read "planted error (7 located): critical x4,
-// warning x3" — and swapping crSeverity's free "major" constant, with the cached
+// warning x3", and swapping crSeverity's free "major" constant, with the cached
 // bytes byte-for-byte unchanged, re-rendered the identical line as "critical x4,
 // error x3". A description offered BECAUSE a score could not be justified, which
 // is itself a function of the free parameter the withdrawal rested on, is the
@@ -1169,7 +1169,7 @@ func TestSeverityVocabularyRendersEveryCallItWasGiven(t *testing.T) {
 // never printed.
 func TestPublishedVocabularyIsQuotedFromTheRetainedReview(t *testing.T) {
 	// The evidence, read without going through the scorer: the severity token on
-	// every finding header the CLI actually wrote.
+	// every finding header the CLI wrote.
 	printed := map[string]bool{}
 	usage := SeverityUsage{}
 	cached := 0
@@ -1230,7 +1230,7 @@ func TestPublishedVocabularyIsQuotedFromTheRetainedReview(t *testing.T) {
 	}
 
 	// And the same claim about the RENDERED page, because the data being right is
-	// not the same as the page being right — the substitution lived in the
+	// not the same as the page being right, the substitution lived in the
 	// renderer's key, not in the scorer.
 	block := SeverityVocabularyBlock([]VocabularyRow{{Name: IncumbentModel, Usage: usage}})
 	if !strings.Contains(block, "major x") {
@@ -1255,13 +1255,13 @@ func sortedWords(set map[string]bool) []string {
 }
 
 // TestAnUnrecoverableWordIsReportedNotSubstituted covers the one case where the
-// reviewer's word genuinely cannot be quoted.
+// reviewer's word cannot be quoted.
 //
 // A Incumbent cache entry collected before the raw review was retained replays
 // a previous parser's findings, and the word that parser read is gone. The
 // choice there is between saying so and printing our own reading as though the
 // reviewer had said it, and the second is the defect this whole block was
-// rewritten to remove — silently, and on exactly the entries whose evidence is
+// rewritten to remove, silently, and on exactly the entries whose evidence is
 // missing, which is where a reader is least able to check.
 func TestAnUnrecoverableWordIsReportedNotSubstituted(t *testing.T) {
 	f := Fixture{
@@ -1320,7 +1320,7 @@ func TestAnUnrecoverableWordIsReportedNotSubstituted(t *testing.T) {
 	// THE PREAMBLE HAS TO AGREE WITH THE ROWS IT INTRODUCES. This test asserted
 	// only on the body and was green while the note above it read "NO WORD IN
 	// THIS BLOCK WAS TRANSLATED: every contender above printed a word this
-	// project already uses, so each line quotes its reviewer directly" — sitting
+	// project already uses, so each line quotes its reviewer directly", sitting
 	// directly on top of "(word not recorded) x1 [we read as warning]", which is
 	// the exact opposite claim, in the one published block whose purpose is to
 	// keep our readings distinguishable from a reviewer's words. A caption that
@@ -1340,8 +1340,8 @@ func TestAnUnrecoverableWordIsReportedNotSubstituted(t *testing.T) {
 // must answer "was this word translated?" the same way.
 //
 // THE BUG: SeverityUsage.Lines suppresses the "[we read as X]" marker with
-// EqualFold — its comment gives the reason, that a difference of case is not a
-// difference of vocabulary and flagging it would bury the ones that are — while
+// EqualFold. Its comment gives the reason, that a difference of case is not a
+// difference of vocabulary and flagging it would bury the ones that are, while
 // translatedWordsNote compared with ==. A model printing "Critical" was
 // therefore ANNOUNCED as a translated word by the caption and QUOTED unmarked by
 // the row underneath, so the block disagreed with itself about a word a reader
@@ -1374,8 +1374,8 @@ func TestCaseIsDecidedInOnePlaceAcrossTheVocabularyBlock(t *testing.T) {
 // TestOurOwnTranslationsAreNotPublishedAsOurContendersWords is the other half of
 // the substitution the vocabulary block exists to prevent.
 //
-// THE BUG: severityWasTranslated answered from the finding's SOURCE — it was
-// true only for Incumbent — so it said "nothing was translated" for every model
+// THE BUG: severityWasTranslated answered from the finding's SOURCE, it was
+// true only for Incumbent, so it said "nothing was translated" for every model
 // this project ships. review.Engine rewrites a model's severity through
 // Normalize, so a model that wrote "P1" was published at info and QUOTED as
 // having said "info", a word it never used. The incumbent's side had already
@@ -1418,7 +1418,7 @@ func TestOurOwnTranslationsAreNotPublishedAsOurContendersWords(t *testing.T) {
 
 	// The mirror. A model that writes a level we already use has not been
 	// translated, and marking it as though it had would make every finding in the
-	// tree unquotable — the failure in the opposite direction, and the reason the
+	// tree unquotable, the failure in the opposite direction, and the reason the
 	// fact is recorded rather than assumed.
 	verbatim := ours
 	verbatim.Severity = string(d.WantSeverity)
@@ -1470,7 +1470,7 @@ func TestOurOwnTranslationsAreNotPublishedAsOurContendersWords(t *testing.T) {
 //
 // THE BUG: the dump wrote the translated level under a bare "severity" key
 // beside "model":"incumbent/cli", and review.Finding.RawSeverity carries
-// `json:"-"` — so the reviewer's own word could not reach this file at all. The
+// `json:"-"`, so the reviewer's own word could not reach this file at all. The
 // substitution the tables had been fixed for survived one layer down, in exactly
 // the file a reader opens when they doubt the tables.
 func TestTheDumpDoesNotPublishOurTranslationAsTheReviewersWord(t *testing.T) {
@@ -1566,7 +1566,7 @@ func TestTheResolutionIsStatedAndDerived(t *testing.T) {
 
 	// THE QUOTIENT IS THE ONLY NUMBER A READER ACTS ON, AND NOTHING READ IT.
 	// This test asserted the "%d planted defect(s)" phrase, a fixed sentence,
-	// and that the note moves for a smaller corpus — so multiplying the
+	// and that the note moves for a smaller corpus, so multiplying the
 	// denominator by seven published "steps of 1/98 = 0.010" with the whole
 	// suite green. A derived note whose derivation is unchecked is a hardcoded
 	// sentence with extra steps.
@@ -1576,7 +1576,7 @@ func TestTheResolutionIsStatedAndDerived(t *testing.T) {
 
 	// And the per-fixture floor, which is the one that matches a printed CELL.
 	// The note used to give the corpus-wide step alone while sitting under a
-	// table whose RECALL is per (model, fixture) — eleven of these fixtures
+	// table whose RECALL is per (model, fixture), eleven of these fixtures
 	// plant exactly one defect, so the cell it was describing moves in steps of
 	// 1.000, fourteen times coarser than the number printed beside it.
 	coarsest := 0
@@ -1628,8 +1628,8 @@ func TestTheResolutionIsStatedAndDerived(t *testing.T) {
 // Repeated because that is what a randomized order requires: one call proves
 // nothing, and the failure it is looking for appears in a minority of runs.
 func TestTheVocabularyBlockIsAFunctionOfTheWordsNotOfMapOrder(t *testing.T) {
-	// Three foreign words on ONE level of ours — the case the comment calls
-	// normal — so the tie-break is the only thing deciding their order.
+	// Three foreign words on ONE level of ours, the case the comment calls
+	// normal, so the tie-break is the only thing deciding their order.
 	// None of these three is a substring of one of our five level names: the
 	// rendered line also carries "[we read as warning]" after every word, and a
 	// probe word like "warn" would match inside THAT rather than inside the
@@ -1654,8 +1654,8 @@ func TestTheVocabularyBlockIsAFunctionOfTheWordsNotOfMapOrder(t *testing.T) {
 		}
 	}
 
-	// The order must also be the DOCUMENTED one — most severe level first, then
-	// the reviewer's spelling — or "stable" is satisfied by any arbitrary rule.
+	// The order must also be the DOCUMENTED one, most severe level first, then
+	// the reviewer's spelling, or "stable" is satisfied by any arbitrary rule.
 	sorted := slices.Clone(words)
 	sort.Strings(sorted)
 	at := -1
@@ -1676,7 +1676,7 @@ func TestTheVocabularyBlockIsAFunctionOfTheWordsNotOfMapOrder(t *testing.T) {
 // set that nothing pinned.
 //
 // THE BUG: noiseTolerance survived every mutation across its whole plausible
-// range — 0, 1, 2, 4, 8, 12 and 20 all left the suite green, and only an absurd
+// range, 0, 1, 2, 4, 8, 12 and 20 all left the suite green, and only an absurd
 // 100000 tripped anything. Its own comment disclosed that the Incumbent corpus
 // could not distinguish 4 from 8 from 12, and drew from that the conclusion that
 // the value could not be checked at all. It could. The incumbent is insensitive
@@ -1762,7 +1762,7 @@ func explainsWithin(f review.Finding, defects []Defect, tol int) bool {
 // per line of the file and the largest Head file in AllFixtures is 38 lines, so
 // the measured maximum is 38; boilerplateGridReview files one finding per line,
 // so the only three-plant fixture yields 36 comments, not 22. The arguments were
-// right and the evidence quoted for them was invented — which is the defect
+// right and the evidence quoted for them was invented, which is the defect
 // these same files retract twice over ("a retraction argued from an
 // unreproducible measurement is the same defect one level up") and the one
 // docs/measurement.md's own checklist asks about: is every word of it something
@@ -1798,7 +1798,7 @@ func TestTheFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	}
 
 	// Read verbatim, comments included: the claim under test IS a comment, so
-	// packageSources — which blanks them — is the wrong reader here.
+	// packageSources, which blanks them, is the wrong reader here.
 	quoted := map[string][]string{
 		"score.go": {
 			"A finding naming %d separate one-line regions scored 1",
@@ -1852,8 +1852,8 @@ func numberWord(n int) string {
 // TestAnUndeclaredScaleIsWithheld pins the three states of SeverityScale, and
 // the one that did not exist before it.
 //
-// The withdrawal used to be an identity check — a row was published at our
-// resolution unless its model string was IncumbentModel — so "undeclared" was
+// The withdrawal used to be an identity check. A row was published at our
+// resolution unless its model string was IncumbentModel, so "undeclared" was
 // not a state a row could be in: a contender nobody had thought about got the
 // full five-level comparison by default, purely by not being the one reviewer
 // the check named. Now the default is withheld and somebody has to say what
@@ -1955,7 +1955,7 @@ func TestASummaryOfMixedScalesIsWithheld(t *testing.T) {
 // THE BUG IT PINS. Lines omitted the levels nobody located, on the reasoning
 // that a miss is RECALL's job. Measured, that made the worst strategy's page the
 // cleanest one: "report only the plants we rate critical, and call them
-// critical" rendered a single line — planted critical (4 located): critical x4 —
+// critical" rendered a single line, planted critical (4 located): critical x4,
 // which is a proper SUBSTRING of a calibrated reviewer's whole block, on the
 // same row whose O-COV cell is blank. Absence was invisible. Restoring the
 // omit-empty rule fails here, and so does handing the block no census: a count
@@ -1963,20 +1963,20 @@ func TestASummaryOfMixedScalesIsWithheld(t *testing.T) {
 //
 // THE SECOND BUG IT PINS, and the reason every case below runs twice. The first
 // version of this test built its runs as RunResult{Report: ...}, which is a run
-// that always succeeded — so it could only ever ask whether the RENDERER omits a
+// that always succeeded, so it could only ever ask whether the RENDERER omits a
 // level, never whether the census reached the renderer. It did not: ScoreRun
 // returns before ScoreSeverity when a provider errors, so a failed run
 // contributed its plants to the planted TOTAL and nothing to the per-level
 // census. Every third run failing over AllFixtures produced a census summing to
-// 17 against a total of 29 and a page with no "nothing located" line on it — the
+// 17 against a total of 29 and a page with no "nothing located" line on it, the
 // same invisible absence, reached by an ordinary provider error instead of by a
 // reviewer strategy. deliveries() is what makes a failed run one of the cases.
 //
 // THE THIRD BUG IT PINS, and the reason every case runs once per row SHAPE. Both
 // halves above fold a CorpusTally, and the judged reports do not: they render
 // the block from an Aggregate. That shape was never folded here, so the line
-// that supplies its denominators could be deleted with this test — and the whole
-// default suite — green. vocabularyRowFolds carries the measurement.
+// that supplies its denominators could be deleted with this test, and the whole
+// default suite, green. vocabularyRowFolds carries the measurement.
 func TestEveryPlantedLevelAppearsWithItsDenominator(t *testing.T) {
 	corpus := AllFixtures()
 
@@ -2126,7 +2126,7 @@ func TestEveryPlantedLevelAppearsWithItsDenominator(t *testing.T) {
 // TestTheVocabularyBlockStatesWhatItCannotSay keeps the limits on the page.
 //
 // Every one of them is something a reader would otherwise supply for themselves
-// from a page of counts — that the reviewer under-claims, that a hedging
+// from a page of counts, that the reviewer under-claims, that a hedging
 // reviewer is visible, that these are per-review figures, that one block beats
 // another. A limitation recorded only in the source is a limitation nobody
 // outside the source knows about, and this block is what a reader is handed IN
@@ -2187,7 +2187,7 @@ func TestTheVocabularyBlockStatesWhatItCannotSay(t *testing.T) {
 	// The printed list must not name a reviewer's word. The preamble beside it
 	// is DERIVED from the rows and says which words THIS block translated, so a
 	// fixed sentence quoting one would be the hand-maintained claim that was
-	// already removed from this block once — and would make a block containing
+	// already removed from this block once, and would make a block containing
 	// no such word announce it. See TestTheVocabularyPreambleIsDerivedFromTheRows.
 	for _, word := range []string{"major", "minor", "incumbent"} {
 		if strings.Contains(strings.ToLower(VocabularyBlockLimits), word) {
@@ -2203,7 +2203,7 @@ func TestTheVocabularyBlockStatesWhatItCannotSay(t *testing.T) {
 // review.Engine writes our five levels for a model's own findings, but a report
 // is the union of the model's findings and the analyzers', and
 // internal/linters' mapSeverity folds HIGH/ERROR/CRITICAL onto our error and
-// MEDIUM onto warning — a codomain excluding critical and nit, which is the
+// MEDIUM onto warning, a codomain excluding critical and nit, which is the
 // exact shape of the first retraction this package made. Those findings are
 // absent from the eval today only because evalConfig turns linters off. A
 // declaration that ASSERTED our scale would have published them at our
@@ -2279,7 +2279,7 @@ func TestSeverityCountsAreWithdrawnForAForeignVocabulary(t *testing.T) {
 // remembered.
 //
 // The block carried a hand-written claim about which words a particular reviewer
-// prints — "incumbent prints 'critical' and 'major'" — inside the block whose
+// prints, "incumbent prints 'critical' and 'major'", inside the block whose
 // entire thesis is that a reviewer's vocabulary must be quoted rather than
 // restated. It was the same failure in miniature, and it was already stale: the
 // engine had begun translating our own models' words too, and the sentence still
@@ -2318,11 +2318,11 @@ func TestTheVocabularyPreambleIsDerivedFromTheRows(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// WHAT MAXIMISES THIS? — the question nobody asked of the withdrawn cross-tool
+// WHAT MAXIMISES THIS?, the question nobody asked of the withdrawn cross-tool
 // severity column, asked here of every model-free number the reports publish.
 // ---------------------------------------------------------------------------
 
-// calibratedReview is the reviewer that is actually correct: one comment per
+// calibratedReview is the reviewer that is correct: one comment per
 // planted defect, on its line, naming it, at the level the corpus plants it at.
 //
 // It is the reference every degenerate strategy is measured against. A published
@@ -2342,7 +2342,7 @@ func calibratedReview(f Fixture) []review.Finding {
 }
 
 // oneCommentPerPlant locates every defect correctly and stamps ONE severity word
-// on all of them — the reviewer the withdrawn banded column scored as perfect.
+// on all of them, the reviewer the withdrawn banded column scored as perfect.
 func oneCommentPerPlant(sev config.Severity) func(Fixture) []review.Finding {
 	return func(f Fixture) []review.Finding {
 		out := calibratedReview(f)
@@ -2412,8 +2412,8 @@ func keywordsPerFile(f Fixture) (map[string][]string, []string) {
 // scatteredAnchorReview is a line-precise reviewer that ALSO gestures at the
 // whole file, one line at a time.
 //
-// Every finding is the calibrated reviewer's — right defect, right line, right
-// severity, right words — with one extra region per line of the file attached to
+// Every finding is the calibrated reviewer's, right defect, right line, right
+// severity, right words, with one extra region per line of the file attached to
 // it. That costs it nothing anywhere: anchorDistance takes the MIN over regions,
 // so the primary anchor still lands on the plant, and it is noise for nothing.
 // Under the widest-single-region rule it also cost nothing in ANCHOR, because
@@ -2421,8 +2421,8 @@ func keywordsPerFile(f Fixture) (map[string][]string, []string) {
 // reviewer on EVERY column of the detection metric while pointing at the whole
 // file. anchoredLines is what tells them apart.
 //
-// This is not an invented shape. crParseAlsoApplies produces exactly it —
-// "Also applies to: 3, 7, 12, ..." — so the escape was one Incumbent review
+// This is not an invented shape. crParseAlsoApplies produces exactly it,
+// "Also applies to: 3, 7, 12, ...", so the escape was one Incumbent review
 // away from being live, not a thought experiment about a reviewer nobody has.
 func scatteredAnchorReview(f Fixture) []review.Finding {
 	_, lines := fixturePaths(f)
@@ -2447,7 +2447,7 @@ func scatteredAnchorReview(f Fixture) []review.Finding {
 // credited and NONE was noise: NOISE 0, the same value a perfectly calibrated
 // reviewer scores, for a review that has identified nothing at all.
 //
-// Its anchors are single lines, so ANCHOR cannot see it — this is the strategy
+// Its anchors are single lines, so ANCHOR cannot see it. This is the strategy
 // that survives the anchor column and the one that makes NOISE load-bearing.
 func boilerplateGridReview(f Fixture) []review.Finding {
 	keywords, order := keywordsPerFile(f)
@@ -2471,13 +2471,13 @@ func boilerplateGridReview(f Fixture) []review.Finding {
 // every planted defect it files one comment on every line within noiseTolerance
 // of it, each titled with that defect's own keywords and rated at its level.
 //
-// It is the boilerplate grid with one thing changed — it does not stray outside
-// the radius — and that one change made it invisible to everything. Every
+// It is the boilerplate grid with one thing changed. It does not stray outside
+// the radius, and that one change made it invisible to everything. Every
 // comment names a defect and sits near it, so NOISE counts none of them. Every
 // anchor is a single line, so ANCHOR (per FINDING) read 1. It reports every
 // severity correctly, so the severity metric is entitled to say so. Run through
 // ScoreRun over AllFixtures it filed 196 findings against a calibrated
-// reviewer's 14 — 182 of them on lines holding no defect — and returned
+// reviewer's 14, 182 of them on lines holding no defect, and returned
 // detection and objective severity BYTE-IDENTICAL to the calibrated reference,
 // with Maxes true on both.
 //
@@ -2520,14 +2520,14 @@ func radiusSpamReview(f Fixture) []review.Finding {
 // AllFixtures, while `defects` grows only when a plant is added. Ten fixtures
 // authored to fix the severity skew added far more lines than plants, and at a
 // spacing of 3 the guesser tipped over into costing 3036 against the explainer's
-// 2880 — so it was caught by $/DEFECT, stopped demonstrating that NOISE is
+// 2880, so it was caught by $/DEFECT, stopped demonstrating that NOISE is
 // load-bearing, and TestEachCostStrategyIsCaughtByTheColumnItClaims failed
 // exactly as it is designed to. At 5 it is 2040 against 2880.
 //
 // The value is a band rather than a point: 4 also clears it, by 17% rather than
 // 29%. 5 is chosen for the headroom, because the margin is consumed by every
 // fixture anyone adds and a guard that has to be re-derived on each one teaches
-// people to adjust the constant instead of reading it. That test is the guard —
+// people to adjust the constant instead of reading it. That test is the guard,
 // this comment is not, and a change here that breaks the inequality fails there.
 const terseGuessSpacing = 5
 
@@ -2538,7 +2538,7 @@ const terseGuessSpacing = 5
 //
 // It is the honest cheap-and-noisy strategy, and it replaced one that was not.
 // The row it stands in for was a line-by-line spammer justified as "forty
-// one-line findings are FEWER output tokens than three explained ones" — a claim
+// one-line findings are FEWER output tokens than three explained ones", a claim
 // that only held because the row declared its own token count. Run over the real
 // corpus with output billed per finding, a comment on every line of a 20-line
 // file with one defect costs MORE than explaining that one defect, so $/DEFECT
@@ -2546,7 +2546,7 @@ const terseGuessSpacing = 5
 // is the failure TestEachCostStrategyIsCaughtByTheColumnItClaims exists to
 // report, and it reported it.
 //
-// What is genuinely cheap is refusing to explain. Every comment here is a title
+// What is cheap is refusing to explain. Every comment here is a title
 // and nothing else, so it buys the same recall for a fraction of the output, and
 // the only thing separating it from a useful reviewer is that most of what it
 // filed is invented.
@@ -2599,7 +2599,7 @@ type degenerateReviewer struct {
 	//
 	// Every cell must be filled. That is the structural part: publishing a new
 	// metric or description means answering, for each of these reviewers, "can
-	// this behaviour pass for being right?" — and one where the answer is yes
+	// this behaviour pass for being right?", and one where the answer is yes
 	// does not measure what its name claims.
 	maxes map[string]bool
 }
@@ -2664,7 +2664,7 @@ func degenerateReviewers() []degenerateReviewer {
 				}
 				return out
 			},
-			// It misses the quieter plants, so detection catches it — but only
+			// It misses the quieter plants, so detection catches it, but only
 			// because detection is scored over what was PLANTED rather than over
 			// what the reviewer chose to mention. A severity metric is scored over
 			// what it located, which is the loophole this strategy walks through.
@@ -2742,7 +2742,7 @@ func degenerateReviewers() []degenerateReviewer {
 				"anchorDistance took the MIN over the same list, so each region could only ever help " +
 				"it. ANCHOR is what tells them apart, and only once it counts DISTINCT LINES",
 			review: scatteredAnchorReview,
-			// Severity is untouched — it is the calibrated reviewer's — so the
+			// Severity is untouched. It is the calibrated reviewer's, so the
 			// severity metric is entitled to say so, and detection is left as the
 			// only thing that can catch it. That is the point of the row: it
 			// isolates ANCHOR instead of being caught three ways over.
@@ -2774,7 +2774,7 @@ func degenerateReviewers() []degenerateReviewer {
 				"seventeen lines to read",
 			review: radiusSpamReview,
 			// Severity is the calibrated reviewer's, so that metric is right to
-			// say so and detection is left as the only thing that can catch it —
+			// say so and detection is left as the only thing that can catch it,
 			// the same isolation the scattered-anchor row is built for.
 			maxes: map[string]bool{"detection": false, "objective severity": true, "severity vocabulary": true},
 		},
@@ -2793,8 +2793,8 @@ func degenerateReviewers() []degenerateReviewer {
 				"that reviewer's single worst finding as a budget for all of its own. L/DEF is the " +
 				"fold that charges it: lines pointed at per defect found",
 			review: hedgedTo(hedgeSpan),
-			// Severity is the calibrated reviewer's — same words on the same
-			// plants — so that metric and the vocabulary block are entitled to
+			// Severity is the calibrated reviewer's, same words on the same
+			// plants, so that metric and the vocabulary block are entitled to
 			// say so, and detection is left as the only thing that can catch it.
 			maxes: map[string]bool{"detection": false, "objective severity": true, "severity vocabulary": true},
 		},
@@ -2814,7 +2814,7 @@ func degenerateReviewers() []degenerateReviewer {
 			// It maxes both, declared rather than omitted. Score.Matched breaks
 			// at the first match per defect, explainsAny makes every duplicate
 			// non-noise, and reportingFinding's max over matching findings is
-			// idempotent across identical copies — so duplication is invisible
+			// idempotent across identical copies, so duplication is invisible
 			// to every model-free column by construction. Leaving the row out
 			// would have left the question unasked rather than answered; the
 			// judge's PRECISION is where verbosity is meant to be paid for.
@@ -2849,8 +2849,8 @@ func degenerateReviewers() []degenerateReviewer {
 			review: func(f Fixture) []review.Finding {
 				return append(calibratedReview(f), oneCommentPerLine(f)...)
 			},
-			// Its severity behaviour is NOT degenerate — it rates the defects it
-			// names correctly — so the severity metric is entitled to say so.
+			// Its severity behaviour is NOT degenerate, it rates the defects it
+			// names correctly, so the severity metric is entitled to say so.
 			// Detection is the one it must not win, and noise is what stops it.
 			maxes: map[string]bool{"detection": false, "objective severity": true, "severity vocabulary": true},
 		},
@@ -2888,7 +2888,7 @@ func tallyOver(corpus []Fixture, reviewer func(Fixture) []review.Finding) Corpus
 // axis from what the reviewer said.
 //
 // It exists because every model-free guard in this file used to build its runs
-// as RunResult{Report: ...} — a run that always succeeded. That is the shape
+// as RunResult{Report: ...}, a run that always succeeded. That is the shape
 // nobody was thinking about, and a whole class of bug lives in it: ScoreRun has
 // two early returns for a run with no report, so anything derived from the
 // FIXTURE rather than from the findings can be silently skipped on exactly the
@@ -2969,20 +2969,20 @@ func deliveries() []delivery {
 //
 // The failure this exists to prevent was not a bad constant. A banded cross-tool
 // severity accuracy figure was published, and 12 of the 29 plants sit in the
-// blocking band: a reviewer that picks WHAT to report — stay silent unless the
-// defect is already blocking, then call it critical — banded a perfect 12/0/0
+// blocking band: a reviewer that picks WHAT to report, stay silent unless the
+// defect is already blocking, then call it critical, banded a perfect 12/0/0
 // over those 12, an exact tie with a calibrated reviewer's 29/0/0. The column
 // was maximised by the worst production behaviour there is, and nothing in the
 // tree asked. A metric that rewards stamping "critical" on everything a reviewer
 // bothers to mention would, if anyone optimised against it, produce exactly the
 // review bot this project exists not to be.
 //
-// (TWO FIGURES IN THIS COMMENT HAVE BEEN CORRECTED. It said "a PERFECT record —
+// (TWO FIGURES IN THIS COMMENT HAVE BEEN CORRECTED. It said "a PERFECT record,
 // 10 of 10", which scored the degenerate strategy over the plants the INCUMBENT
 // located rather than over what it reports; finding that is what added the
 // selective-reporting row below. It then said the two stampers banded 12
 // accurate and 2 inflated of 14 against the incumbent's 6 of 10, which was true
-// of a fourteen-plant corpus and is not true of this one — on the corpus in this
+// of a fourteen-plant corpus and is not true of this one, on the corpus in this
 // tree they band 12/17/0 of 29 and no longer tie. The stamper half of the
 // argument is withdrawn; the selective half reproduces and is what the sentence
 // above now rests on. TestTheSeverityFiguresTheseCommentsQuoteStillReproduce
@@ -3010,7 +3010,7 @@ func TestNoDegenerateReviewerCanMaxOutAPublishedMetric(t *testing.T) {
 
 	reference := tallyOver(corpus, calibratedReview)
 
-	// The reference has to be a reviewer this corpus can actually reward, or
+	// The reference has to be a reviewer this corpus can reward, or
 	// "no strategy beats it" is satisfied by it being unbeatable-because-broken.
 	if reference.Matched != reference.Planted {
 		t.Fatalf("the calibrated reviewer detected %d of %d planted defects. It names each defect "+
@@ -3094,7 +3094,7 @@ func TestNoDegenerateReviewerCanMaxOutAPublishedMetric(t *testing.T) {
 
 	// Every metric must be falsifiable by SOMETHING here, or the crossing above
 	// is decoration: a metric no degenerate strategy is expected to fail is one
-	// this table never actually tests.
+	// this table never tests.
 	for _, m := range metrics {
 		falsifiable := false
 		for _, d := range degenerateReviewers() {
@@ -3180,13 +3180,13 @@ func TestOneCommentPerLineNamesNoPlantedDefect(t *testing.T) {
 //
 // A reviewer that says nothing inflates nothing and understates nothing. Printed
 // as 0.00 those two columns are the best score on the table, which is how
-// silence becomes the global optimum of a tuning objective — the exact failure
+// silence becomes the global optimum of a tuning objective, the exact failure
 // Aggregate.Precision's doc comment records having shipped once, where a variant
 // with no findings sorted to the top AND switched off the suite's only assertion.
 // TestSilenceIsNotStable pins the second return value of Summary.Stable.
 //
 // STABLE is printed "yes" or "NO [3 5 4]" and a reader takes yes as better. Five
-// runs of silence used to return true — the column's BEST value went to a
+// runs of silence used to return true, the column's BEST value went to a
 // reviewer that said nothing, while a wobbly but correct reviewer got NO. Being
 // classified descriptive is what kept it out of the degenerate-reviewer table,
 // so nothing asked what maximised it.
@@ -3234,7 +3234,7 @@ func TestSilenceIsNotStable(t *testing.T) {
 //
 // It said ties were between findings carrying the SAME severity, so order
 // decided only which comment a diagnostic NAMED. Ties are on NORMALIZED rank,
-// and the credited finding's RAW spelling is what SeverityUsage records — which
+// and the credited finding's RAW spelling is what SeverityUsage records, which
 // is published, as the description that replaced the withdrawn cross-tool score.
 // Two findings spelled "info" and "P1" both normalize to info and tie, so the
 // same review published two different vocabulary blocks depending on the order
@@ -3280,7 +3280,7 @@ func TestTheCreditedSpellingDoesNotDependOnReportOrder(t *testing.T) {
 	// "warn" and "warning" all onto warning, so any two of them tie on rank AND
 	// on the level recorded. Deciding the tie on our word would compare a string
 	// that is equal by construction, leaving report order to choose which of the
-	// reviewer's spellings reached the page — the same defect this test was
+	// reviewer's spellings reached the page, the same defect this test was
 	// written for, reachable again the moment the reviewer's own word became the
 	// thing published.
 	foreign := func(word string) review.Finding {
@@ -3308,7 +3308,7 @@ func TestTheCreditedSpellingDoesNotDependOnReportOrder(t *testing.T) {
 // severityAsSaid returns an EMPTY Said for a finding something translated
 // without keeping the original, and the block renders that as UnrecordedWord.
 // The tie-break compared spellings lexicographically, and "" sorts before every
-// real word — so a defect matched by one finding carrying RawSeverity "Error"
+// real word, so a defect matched by one finding carrying RawSeverity "Error"
 // and one carrying none published `(word not recorded)` in BOTH report orders,
 // with the reviewer's word sitting in the finding list beside it. Order
 // independence held; it held on the wrong answer, which is why the test above
@@ -3317,7 +3317,7 @@ func TestTheCreditedSpellingDoesNotDependOnReportOrder(t *testing.T) {
 // The shape is not contrived. internal/linters marks every analyzer finding
 // translated and gives it no raw word, so a run with linters on is a run where
 // half the findings are the empty side of this tie. ourSeverityScale withdraws
-// the SCORE in that configuration, and the DESCRIPTION is published regardless —
+// the SCORE in that configuration, and the DESCRIPTION is published regardless,
 // so the gap phrase was reachable in exactly the configuration the withdrawal
 // was written for.
 func TestADestroyedWordDoesNotOutrankAKeptOne(t *testing.T) {
@@ -3404,7 +3404,7 @@ func TestSilenceScoresUndefinedNotPerfect(t *testing.T) {
 //
 // The degenerate table can only ask "what maximises this?" of metrics it knows
 // about. The withdrawn banded columns were added to two table headers and a
-// legend, and nothing anywhere required them to be declared — which is why the
+// legend, and nothing anywhere required them to be declared, which is why the
 // question was never asked of them. Every column in every published header must
 // now be either a registered metric, an LLM judge's opinion, or an identifier,
 // and adding a score means adding it to PublishedMetrics, which puts it in front
@@ -3439,8 +3439,8 @@ func TestEveryPublishedColumnIsRegistered(t *testing.T) {
 // declared column is not enough, it has to be printed with the columns it is
 // only meaningful beside.
 //
-// PublishedMetric is a GROUP for a stated reason — "O-INFL alone is maximised by
-// silence and is only a score BESIDE O-UNDER and O-ACC" — and nothing enforced
+// PublishedMetric is a GROUP for a stated reason, "O-INFL alone is maximised by
+// silence and is only a score BESIDE O-UNDER and O-ACC", and nothing enforced
 // it. Deleting O-ACC and O-UNDER from VariantTableHeader, leaving O-INFL
 // published by itself, passed the whole package including the guard named after
 // this failure. A metric may be rendered more than one way (one cell holding
@@ -3497,11 +3497,11 @@ func TestEveryHeaderPrintsAWholeMetric(t *testing.T) {
 // Test files are read because the eval reports are RENDERED from test files
 // behind the `eval` build tag. A source scan that skipped them could not see the
 // two tables the head-to-head is printed in, so a header declared beside its own
-// renderer — the obvious place to put one — was invisible to the guard that
+// renderer, the obvious place to put one, was invisible to the guard that
 // exists to notice new tables.
 //
 // THE BUG COMMENTS CAUSED: the scans over this text were regexps, and
-// registeredHeaderNames matched `registerTableHeader(kind, X)` ANYWHERE in it —
+// registeredHeaderNames matched `registerTableHeader(kind, X)` ANYWHERE in it,
 // including inside a doc comment. So a file could declare
 //
 //	// Registered by reference from score.go: registerTableHeader(tableUnscored, BandedTableHeader).
@@ -3517,7 +3517,7 @@ func TestEveryHeaderPrintsAWholeMetric(t *testing.T) {
 // left here to carry. It closed the one spelling of the bypass that had been
 // found and left the family open: a comment is not the only prose in a Go file,
 // and a STRING LITERAL is not a comment. This package is full of long prose
-// constants — NoCrossToolSeverityScore, SeverityColumnLegend, CostReadingLegend —
+// constants, NoCrossToolSeverityScore, SeverityColumnLegend, CostReadingLegend,
 // and a sentence inside any of them registered a header just as effectively:
 //
 //	const legend = "Registered from score.go by registerTableHeader(tableUnscored, BandedTableHeader)."
@@ -3528,8 +3528,8 @@ func TestEveryHeaderPrintsAWholeMetric(t *testing.T) {
 // the package with go/ast and look at call expressions, which neither a comment
 // nor a string can be. See registeredHeaderNames.
 //
-// What is left for this function is the scans that are genuinely textual —
-// "does any report print this identifier" — where blanking comments is still the
+// What is left for this function is the scans that are textual,
+// "does any report print this identifier", where blanking comments is still the
 // right precaution and the remaining error direction is safe.
 func packageSources(t *testing.T) map[string]string {
 	t.Helper()
@@ -3603,7 +3603,7 @@ func blankComments(t *testing.T, name string, src []byte) string {
 // THE BUG, TWICE. ReportTableHeaders returned three headers while claiming to be
 // "every published table header"; CostTableHeader and the two rejudge tables
 // were not in it, so appending `B-ACC` to CostTableHeader passed both the
-// registration guard and the cross-tool severity guard — the withdrawn
+// registration guard and the cross-tool severity guard, the withdrawn
 // instrument could be reinstated in a table the mechanism did not know existed.
 // The fix for that was to append the missing three to the list and add a SECOND
 // hand-maintained list, a name-to-value map, so a test could check the first.
@@ -3614,7 +3614,7 @@ func blankComments(t *testing.T, name string, src []byte) string {
 // Registration is now the declaration: registerTableHeader returns its argument,
 // so `var X = registerTableHeader(kind, "...")` cannot be written without
 // registering, and AllTableHeaders is derived rather than typed out. What is left
-// for a source scan is bypass, and there are two shapes of it — declaring a
+// for a source scan is bypass, and there are two shapes of it, declaring a
 // header string without the registrar, and building a table out of something
 // that was never declared as a header at all.
 func TestEveryTableHeaderInThePackageIsRegistered(t *testing.T) {
@@ -3642,7 +3642,7 @@ func TestEveryTableHeaderInThePackageIsRegistered(t *testing.T) {
 
 	// The second shape: a table whose header was never declared as one. Every
 	// report here underlines its header with a rule as wide as the header, which
-	// is the syntactic signature of "this is a table" — so the thing being
+	// is the syntactic signature of "this is a table", so the thing being
 	// measured has to be a registered header, or a parameter carrying one.
 	for name, file := range files {
 		for _, ident := range tableUnderlines(file) {
@@ -3659,7 +3659,7 @@ func TestEveryTableHeaderInThePackageIsRegistered(t *testing.T) {
 	}
 
 	// The third shape, and the reason there is a third: the two rules above are
-	// both about how somebody WROTE the table — what they named the constant,
+	// both about how somebody WROTE the table, what they named the constant,
 	// whether they ruled it. Miss both and a banded column ships green, which was
 	// reproduced here with a `const costBanner` and no rule under it. This one
 	// reads the VALUE: anything shaped like a row of column headings is a header,
@@ -3681,8 +3681,8 @@ func TestEveryTableHeaderInThePackageIsRegistered(t *testing.T) {
 //
 // Every bypass the header registry has shipped had the same shape: the scan read
 // text, and text includes writing that only LOOKS like code. It was found twice.
-// First in a doc comment — `// Registered by reference: registerTableHeader(...)`
-// beside an unregistered const — which shipped the withdrawn B-ACC column with
+// First in a doc comment, `// Registered by reference: registerTableHeader(...)`
+// beside an unregistered const, which shipped the withdrawn B-ACC column with
 // the suite green. Comments were then blanked, and the identical bypass moved
 // into a string literal, which is not a comment: this package declares several
 // long prose constants and a sentence in any of them registered a header just as
@@ -3750,7 +3750,7 @@ func init() { _ = registerTableHeader(tableUnscored, ByReferenceHeader) }
 // opened while it was closing the prose ones.
 //
 // Every column guard reads the RUNTIME registry through AllTableHeaders, and the
-// source scan was changed to accept a registerTableHeader call ANYWHERE — so a
+// source scan was changed to accept a registerTableHeader call ANYWHERE, so a
 // call inside an ordinary function body satisfied the scan while the registry
 // stayed empty. The withdrawn banded columns shipped from a perfectly reachable
 // renderer with build, vet, the full suite and golangci-lint all green;
@@ -3798,7 +3798,7 @@ func init() { _ = registerTableHeader(tableScored, InsideInitHeader) }
 // TestAHeaderIsRecognizedByItsValueNotItsName closes the other half of the same
 // family: a table nobody named or ruled like one.
 //
-// The two coverage rules were both heuristics about how a table was WRITTEN —
+// The two coverage rules were both heuristics about how a table was WRITTEN,
 // an identifier ending in "header", a strings.Repeat rule under it. Missing both
 // is not exotic; `const costBanner = "..."` printed without a dash rule is an
 // ordinary way to write a table, and it shipped B-ACC/B-INFL/B-UNDER past all
@@ -3845,7 +3845,7 @@ const dumpNote = "written to %s"
 // Test files are parsed because the eval reports are RENDERED from test files
 // behind the `eval` build tag. A scan that skipped them could not see the two
 // tables the head-to-head is printed in, so a header declared beside its own
-// renderer — the obvious place to put one — was invisible to the guard that
+// renderer, the obvious place to put one, was invisible to the guard that
 // exists to notice new tables. ParseComments is off: the comments are exactly
 // what these scans must not be able to read.
 func packageAST(t *testing.T) map[string]*ast.File {
@@ -3896,21 +3896,21 @@ func isRegisterCall(e ast.Expr) (*ast.CallExpr, bool) {
 // distinction is the whole point: a call expression is something the program
 // DOES, and neither a comment nor a string literal can be one. The previous
 // version was a regexp over source text, so `registerTableHeader(kind, X)`
-// written in prose satisfied it — first inside a doc comment, and after comments
+// written in prose satisfied it, first inside a doc comment, and after comments
 // were blanked, inside any of this package's several long prose constants. Both
 // spellings shipped a withdrawn banded column with every guard green. Excluding
 // comments and then excluding strings is a list of the disguises that have been
 // noticed; parsing is the answer that does not need one.
 //
 // Names rather than values, because a header nobody registered has no value to
-// reflect over — the whole failure being guarded is a string the registry never
+// reflect over, the whole failure being guarded is a string the registry never
 // saw.
 //
 // ONLY REGISTRATIONS GO RUNS UNCONDITIONALLY COUNT: a package-level declaration
 // or a statement in an init() body. THE BUG THIS FIXES is the one the AST rewrite
 // introduced while closing the prose disguises. The old `var X =
-// registerTableHeader(...)` shape had a property nobody wrote down — the
-// compiler guarantees it EXECUTES — and moving the scan to "any call expression
+// registerTableHeader(...)` shape had a property nobody wrote down, the
+// compiler guarantees it EXECUTES, and moving the scan to "any call expression
 // anywhere" dropped it. Every column guard (TestNoTableOffersACrossToolSeverityScore,
 // TestEveryPublishedColumnIsRegistered, TestEveryHeaderPrintsAWholeMetric) reads
 // the RUNTIME registry through AllTableHeaders, so a registration written inside
@@ -3918,11 +3918,11 @@ func isRegisterCall(e ast.Expr) (*ast.CallExpr, bool) {
 // empty: a file declaring the withdrawn banded header and printing it from a
 // perfectly reachable renderer shipped with build, vet, the whole suite and the
 // linter green, reproduced on this tree. A dead function would at least have
-// been caught by `unused`; a reachable renderer whose registration simply never
+// been caught by `unused`; a reachable renderer whose registration never
 // ran was caught by nothing.
 //
 // The rule is not "the call must be at the top" for tidiness. It is that this
-// scan's answer — "the registry knows about this header" — is only true of calls
+// scan's answer, "the registry knows about this header", is only true of calls
 // the language promises to make.
 func registeredHeaderNames(files map[string]*ast.File) map[string]bool {
 	out := map[string]bool{}
@@ -3932,7 +3932,7 @@ func registeredHeaderNames(files map[string]*ast.File) map[string]bool {
 			if _, ok := isRegisterCall(v); !ok || i >= len(names) {
 				continue
 			}
-			// `X = registerTableHeader(kind, "...")` — the declaration IS the
+			// `X = registerTableHeader(kind, "...")`. The declaration IS the
 			// registration, which is the shape a header declared in this package
 			// takes.
 			if id, ok := names[i].(*ast.Ident); ok && id.Name != "_" {
@@ -3955,7 +3955,7 @@ func registeredHeaderNames(files map[string]*ast.File) map[string]bool {
 				record(node.Lhs, node.Rhs)
 
 			case *ast.CallExpr:
-				// `_ = registerTableHeader(kind, X)` — a header declared in
+				// `_ = registerTableHeader(kind, X)`, a header declared in
 				// another track's file, registered without editing it. Only the
 				// SECOND argument is the header; recording every identifier
 				// argument would also record the table KIND, and a registry that
@@ -3993,8 +3993,8 @@ func registeredHeaderNames(files map[string]*ast.File) map[string]bool {
 }
 
 // columnRun splits a header on the whitespace between its columns. Two spaces,
-// because a single one occurs INSIDE a column name — "SEV A/I/U" is one column
-// of SummaryTableHeader — and splitting on it would shatter the header rather
+// because a single one occurs INSIDE a column name, "SEV A/I/U" is one column
+// of SummaryTableHeader, and splitting on it would shatter the header rather
 // than read it.
 var columnRun = regexp.MustCompile(`\s{2,}`)
 
@@ -4004,9 +4004,9 @@ var columnRun = regexp.MustCompile(`\s{2,}`)
 // THE BUG IT FIXES: headerDeclarations asks whether an identifier ends in
 // "header" and tableUnderlines asks whether a table is ruled with
 // strings.Repeat("-", len(X)). Those were the only two ways a table entered the
-// guard, and they are both heuristics about how somebody wrote it. Fail both —
+// guard, and they are both heuristics about how somebody wrote it. Fail both,
 // name the constant `costBanner` and print no rule under it, which is an
-// entirely ordinary way to write a table — and the withdrawn banded columns
+// entirely ordinary way to write a table, and the withdrawn banded columns
 // shipped with the whole suite green. Reproduced on this tree with
 // `const costBanner = "MODEL   RECALL  B-ACC  B-INFL  B-UNDER"` and a renderer
 // writing it: B-ACC/B-INFL/B-UNDER published, AllTableHeaders never told, and
@@ -4019,8 +4019,8 @@ var columnRun = regexp.MustCompile(`\s{2,}`)
 // disguised from it without ceasing to look like a header on the page.
 //
 // It is deliberately narrow. Over this package it selects exactly the three
-// registered scored headers and nothing else — no legend, no prose constant, no
-// format string — so a hit is a table and there are no exemptions to maintain.
+// registered scored headers and nothing else, no legend, no prose constant, no
+// format string, so a hit is a table and there are no exemptions to maintain.
 // A header that falls outside it (lowercase columns, single-space separation) is
 // still caught by the two rules above if it is named or ruled like one; the
 // three rules are independent nets, which is the point of adding a third rather
@@ -4055,7 +4055,7 @@ func headerShapedStrings(file *ast.File) []string {
 
 // constantString evaluates the string expressions a header is written as: a
 // literal, a concatenation of them, or a registrar call (which returns its
-// argument). Anything else — a Sprintf, a function result — is not something
+// argument). Anything else, a Sprintf, a function result, is not something
 // this scan can read, and reports so rather than guessing.
 func constantString(e ast.Expr) (string, bool) {
 	switch v := e.(type) {
@@ -4162,7 +4162,7 @@ func buildsHeaderString(e ast.Expr) bool {
 }
 
 // tableUnderlines returns the identifier of every `strings.Repeat("-", len(X))`
-// in a file — the rule a report writes under a table header, as wide as the
+// in a file, the rule a report writes under a table header, as wide as the
 // header, which is the syntactic signature of "this is a table".
 //
 // Matched structurally rather than by a regexp assembled from an escaped
@@ -4220,7 +4220,7 @@ func rendersATable(file *ast.File) bool { return len(tableUnderlines(file)) > 0 
 // The helper is looked for in the file that draws the underline, not across the
 // package: `registerTableHeader(kind tableKind, header string)` also takes a
 // parameter named header, and searching every file made the answer depend on map
-// iteration order — the guard passed or failed at random.
+// iteration order, the guard passed or failed at random.
 func forwardsRegisteredHeaders(files map[string]*ast.File, file, ident string, registered map[string]bool) bool {
 	for _, decl := range files[file].Decls {
 		fn, ok := decl.(*ast.FuncDecl)
@@ -4260,7 +4260,7 @@ func hasStringParam(fn *ast.FuncDecl, name string) bool {
 // The declaration can no longer be mistaken for a call site. The regexp version
 // needed an optional `func` prefix in its pattern to avoid reading
 // `func draw(b *strings.Builder, header string)` as a call whose arguments were
-// "b *strings.Builder" and "header string" — neither of which is a registered
+// "b *strings.Builder" and "header string", neither of which is a registered
 // header, so a helper looked unsafe merely for existing. An ast.CallExpr is not
 // an ast.FuncDecl and the question does not arise.
 func callersPassRegisteredHeaders(files map[string]*ast.File, fn string, registered map[string]bool) bool {
@@ -4295,7 +4295,7 @@ func callersPassRegisteredHeaders(files map[string]*ast.File, fn string, registe
 // source scan cannot see.
 //
 // The scan proves nothing bypassed the registrar. This proves the registry is
-// what the guards actually read: ScoreTableHeaders and AllTableHeaders are
+// what the guards read: ScoreTableHeaders and AllTableHeaders are
 // derived from it rather than listed beside it, which is what stopped them
 // drifting apart the last two times.
 func TestTheHeaderRegistryIsTheOnlySourceOfHeaders(t *testing.T) {
@@ -4345,7 +4345,7 @@ func TestNoTableOffersACrossToolSeverityScore(t *testing.T) {
 	// table with every guard green.
 	// The spellings a banded severity column can take: anything mentioning a
 	// band, or B- carrying one of the severity triple's suffixes. A bare "B-"
-	// prefix is too wide — the agreement table's B-ONLY counts findings only
+	// prefix is too wide, the agreement table's B-ONLY counts findings only
 	// judge B raised and has nothing to do with severity, and matching it would
 	// have made this guard fire on an unrelated table, which is how a guard
 	// gets loosened until it catches nothing.
@@ -4418,7 +4418,7 @@ func TestNoTableOffersACrossToolSeverityScore(t *testing.T) {
 // folds the same reading into a single SEV a/i/u cell and formatted the counters
 // inline, ungated. "Rows that do not publish our five levels print n/a" therefore
 // held because the battery printing that table happens to run no foreign
-// reviewer — a property of a caller, not of the withdrawal.
+// reviewer, a property of a caller, not of the withdrawal.
 //
 // The required set is DERIVED, not listed here: every column of the
 // objective-severity metric that no vocabulary-free metric also publishes needs a
@@ -4454,7 +4454,7 @@ func TestEverySeverityCellIsWithdrawnForAForeignVocabulary(t *testing.T) {
 	}
 
 	// A tally with a reading in every component, so a renderer that has been
-	// gated and one that has simply been emptied are distinguishable.
+	// gated and one that has been emptied are distinguishable.
 	tally := CorpusTally{
 		Samples: 4, Matched: 7, Planted: 14,
 		Severity: SeverityScore{Accurate: 4, Inflated: 1, Understated: 2},
@@ -4516,15 +4516,15 @@ func TestEverySeverityCellIsWithdrawnForAForeignVocabulary(t *testing.T) {
 // The declaration depends only on the configuration, and the configuration is
 // fully determined before RunWithPersona does anything that can fail. It was
 // nonetheless assigned after the temp-directory and fixture-build returns, so a
-// run that died in either carried none — and commonScale withdraws a row whose
+// run that died in either carried none, and commonScale withdraws a row whose
 // runs disagree. Folded with a good run, a failure carrying the declaration
 // leaves the row on our scale; a failure carrying none takes the row to n/a.
 // One class of infrastructure failure, two different published cells, decided by
 // which side of one line the provider happened to break on.
 //
 // The fold is exercised rather than the harness, because RunWithPersona reaches
-// a provider and this suite does not. What is asserted is the CONSEQUENCE — that
-// a failed run's declaration decides a published cell — plus the source fact
+// a provider and this suite does not. What is asserted is the CONSEQUENCE, that
+// a failed run's declaration decides a published cell, plus the source fact
 // that the assignment precedes the returns.
 func TestAFailedRunStillDeclaresItsScale(t *testing.T) {
 	fx := severityFixture()
@@ -4583,7 +4583,7 @@ func TestAFailedRunStillDeclaresItsScale(t *testing.T) {
 // disagreement check by hand; the other constructed `&Aggregate{Scale:
 // result.Scale}` on whichever goroutine reached the map first and never looked
 // again. That is the rule commonScale refuses on the un-judged path, live on the
-// judged one, in a shape no test covered — a row folding two adapters was
+// judged one, in a shape no test covered, a row folding two adapters was
 // published at whichever resolution won the race.
 func TestARowWithdrawsWhenItsAdaptersDisagree(t *testing.T) {
 	fold := func(scales ...SeverityScale) SeverityScale {
@@ -4688,7 +4688,7 @@ func TestNoAggregateLiteralSetsItsOwnScale(t *testing.T) {
 // renderer.
 //
 // That scan looks for a counter named in a file that draws a table. judge.go
-// draws none — it is where the gated renderers live, and it names the counters
+// draws none. It is where the gated renderers live, and it names the counters
 // legitimately, in the branch that publishes them. So the withdrawn branch of
 // ObjectiveSeverityCounts is a blind spot on both guards at once, and it is the
 // most attractive place in the tree to put a cross-tool figure: it is the prose
@@ -4701,8 +4701,8 @@ func TestNoAggregateLiteralSetsItsOwnScale(t *testing.T) {
 // graded and not on HOW they were graded. Two aggregates are rendered whose
 // verdicts are distributed differently and whose SevGraded is identical, and the
 // withdrawn output must be byte-identical between them. SevGraded survives the
-// withdrawal on its own argument — how many planted defects a reviewer LOCATED
-// is a detection fact in nobody's severity vocabulary — so holding it constant
+// withdrawal on its own argument, how many planted defects a reviewer LOCATED
+// is a detection fact in nobody's severity vocabulary, so holding it constant
 // is what isolates the part that does not.
 //
 // Every verdict-naming int on Aggregate is varied, not just today's three, so a
@@ -4710,7 +4710,7 @@ func TestNoAggregateLiteralSetsItsOwnScale(t *testing.T) {
 // branch is required to DIFFER between the same two aggregates, or the whole
 // test would pass on a renderer that prints nothing at all.
 func TestAWithdrawnRowsProseDoesNotLeakASeverityVerdict(t *testing.T) {
-	// spread and lump grade the same number of defects — three — and disagree
+	// spread and lump grade the same number of defects, three, and disagree
 	// about every verdict. Fields beyond the core triple are varied too, at a
 	// value SevGraded does not sum, so a new counter changes the output without
 	// changing the quantity that is allowed to reach the page.
@@ -4804,13 +4804,13 @@ func namesAVerdict(field string) bool {
 // SevAccurate/SevInflated/SevUnderstated inline, so the withdrawal was in a
 // function that cell never called.
 //
-// The set of report files is derived rather than listed — a file that underlines
-// a table is a report renderer — so a new report is covered on the day it is
+// The set of report files is derived rather than listed, a file that underlines
+// a table is a report renderer, so a new report is covered on the day it is
 // written rather than on the day someone remembers this test exists.
 //
 // THE COUNTER NAMES ARE DERIVED TOO, and that is the second half of the same
 // bug. This scan used to hold the literal list {SevAccurate, SevInflated,
-// SevUnderstated} — the field names on Summary and Aggregate — while the
+// SevUnderstated}, the field names on Summary and Aggregate, while the
 // counters are ALSO reachable as CorpusTally.Severity.Accurate/.Inflated/
 // .Understated, which is a different spelling of the same three integers. A
 // report doing
@@ -4818,9 +4818,9 @@ func namesAVerdict(field string) bool {
 //	fmt.Fprintf(&b, "%-21s %d/%d/%d\n", model,
 //	    t.Severity.Accurate, t.Severity.Inflated, t.Severity.Understated)
 //
-// rendered `incumbent/cli  4/1/2` — the withdrawn full-resolution cross-tool
+// rendered `incumbent/cli  4/1/2`, the withdrawn full-resolution cross-tool
 // severity triple, on the foreign row, where the gated renderer returns "n/a"
-// for the identical tally — and the whole suite stayed green. A list of what to
+// for the identical tally, and the whole suite stayed green. A list of what to
 // guard guards what was on the list; reflecting over the types the counters live
 // on covers spellings nobody thought of.
 //
@@ -4836,8 +4836,8 @@ func namesAVerdict(field string) bool {
 //   - THE INSIDE OF THE GATED RENDERER. This scan skips judge.go, which draws no
 //     table and is where ObjectiveSeverityCells and ObjectiveSeverityCounts
 //     legitimately name the counters. Appending a banded triple to the WITHDRAWN
-//     branch of ObjectiveSeverityCounts — the prose line under the table for the
-//     row whose four O-* cells read n/a — is therefore invisible here.
+//     branch of ObjectiveSeverityCounts, the prose line under the table for the
+//     row whose four O-* cells read n/a, is therefore invisible here.
 //     TestAWithdrawnRowsProseDoesNotLeakASeverityVerdict is that position.
 func TestNoReportFormatsSeverityCountersDirectly(t *testing.T) {
 	counters := severityCounterSpellings()
@@ -4877,9 +4877,9 @@ func TestNoReportFormatsSeverityCountersDirectly(t *testing.T) {
 // severity counters, from the types that hold them.
 //
 // EVERY SHAPE A REPORT READS IS REFLECTED OVER, and the omission was the bug.
-// This walked Summary and CorpusTally only. Aggregate — the type judge.go
+// This walked Summary and CorpusTally only. Aggregate, the type judge.go
 // records the withdrawn B-INFL/B-UNDER/B-ACC triple as having lived on, and the
-// one whose four O-* cells read n/a for the incumbent — was never walked, so its
+// one whose four O-* cells read n/a for the incumbent, was never walked, so its
 // counters were covered purely because Summary happens to spell them
 // identically. Adding `SevBandedAccurate int` to Aggregate and printing it from
 // ObjectiveSeverityCounts's WITHDRAWN branch put the retracted cross-tool figure
@@ -4896,13 +4896,13 @@ func TestNoReportFormatsSeverityCountersDirectly(t *testing.T) {
 //
 // WHAT IS AND IS NOT A COUNTER IS DECIDED BY THE VERDICT VOCABULARY PLUS THE
 // TYPE, and neither half is sufficient alone. It was once "every Sev* field
-// except SevUsage" — a name-shaped rule with a hand-written exception — which
+// except SevUsage", a name-shaped rule with a hand-written exception, which
 // fired on SevPlantedLevels the day that field existed. Narrowing that to "Sev*
 // and an int" fixed the map case and re-broke the same way on Aggregate, whose
 // SevPlanted is an int and is a DENOMINATOR: how many defects the corpus planted
 // is a fact about the fixtures that a report is supposed to print. A counter
 // counts VERDICTS, so the names are derived from the verdict constants
-// themselves — SevAccurate, SevInflated, SevUnderstated — which means a counter
+// themselves, SevAccurate, SevInflated, SevUnderstated, which means a counter
 // added at a new resolution (SevBandedAccurate, a nested BandedUnderstated) is
 // caught by the word it must contain to be one, while a census, a usage map or
 // the per-finding Calls slice is not.
@@ -4957,16 +4957,16 @@ type vocabularyRowFold struct {
 // vocabularyRowFolds is every way a published row reaches SeverityVocabularyBlock.
 //
 // THE BUG THIS PINS. The census that makes a level with nothing located visible
-// was checked on CorpusTally and on Summary, and Aggregate — the shape BOTH
+// was checked on CorpusTally and on Summary, and Aggregate, the shape BOTH
 // judged reports render the block from, including the head-to-head against the
-// incumbent — was never folded. Deleting `a.SevPlantedLevels.Add(f)` from
+// incumbent, was never folded. Deleting `a.SevPlantedLevels.Add(f)` from
 // Aggregate.AddSeverity, the one line that supplies those denominators on that
 // path, left the entire default suite green. Under that deletion the most
 // selective strategy's judged page collapses back to one line reading
-// "planted critical (4 located, PLANTED TOTAL NOT DECLARED): critical x4" —
+// "planted critical (4 located, PLANTED TOTAL NOT DECLARED): critical x4",
 // a proper substring of a calibrated reviewer's page, which is precisely the
 // absence-is-invisible failure the census exists to close, restored on the only
-// path a reader actually reads.
+// path a reader reads.
 //
 // It is the same omission twice: the counter scan walked two of these three
 // shapes for two rounds for the same reason, that Summary and Aggregate agree on
@@ -5077,7 +5077,7 @@ func counterSpellingsOver(shapes []reflect.Type) []string {
 //
 // It carries one of each thing the rule has to tell apart: a counter at today's
 // resolution, a counter at the coarser one the withdrawn B-ACC came back as, a
-// nested triple, and three quantities that are NOT verdicts — the corpus census,
+// nested triple, and three quantities that are NOT verdicts, the corpus census,
 // its per-level split, and a detection count.
 type syntheticRow struct {
 	SevAccurate       int
@@ -5148,8 +5148,8 @@ func TestTheCounterScanCoversEveryShapeAReportRendersFrom(t *testing.T) {
 // TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered is the third measurement
 // behind the retraction, and the one that is easiest to argue with.
 //
-// crSeverity records Incumbent's "major" — a word with no counterpart among our
-// five — at warning. That is a guess. This test re-parses the SHIPPED reviews
+// crSeverity records Incumbent's "major", a word with no counterpart among our
+// five, at warning. That is a guess. This test re-parses the SHIPPED reviews
 // with the guess changed to error, byte-for-byte identical input otherwise, and
 // shows two things:
 //
@@ -5164,7 +5164,7 @@ func TestTheCounterScanCoversEveryShapeAReportRendersFrom(t *testing.T) {
 // THE SECOND BULLET USED TO SAY SOMETHING STRONGER AND FALSE: that every plant a
 // 'major' is credited on is planted ABOVE warning, so no observation here
 // distinguishes the two mappings. Measured, half of them land AT warning, and
-// the corpus distinguishes the mappings sharply — the full-resolution triple
+// the corpus distinguishes the mappings sharply, the full-resolution triple
 // moves 6/4/4 to 5/8/1 when the constant is swapped, which is this test's own
 // first bullet. The body below had already asserted the opposite
 // ("warning is the PLURALITY landing"), so the comment and the code it
@@ -5184,8 +5184,8 @@ func TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered(t *testing.T) {
 		majors           int
 	)
 
-	// Every cached review, tuning and held-out alike. This tunes nothing — it
-	// demonstrates that a constant in OUR parser is unconstrained by the corpus —
+	// Every cached review, tuning and held-out alike. This tunes nothing, it
+	// demonstrates that a constant in OUR parser is unconstrained by the corpus,
 	// so the held-out set is not being spent, and the more observations the claim
 	// rests on the harder it is to argue with.
 	for _, f := range AllFixtures() {
@@ -5201,7 +5201,7 @@ func TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered(t *testing.T) {
 			t.Fatalf("%s: the shipped review no longer parses: %v", f.Name, err)
 		}
 		// The ONLY change: the word this parser maps by guesswork. Everything
-		// else about the review — its findings, anchors, prose — is identical.
+		// else about the review, its findings, anchors, prose, is identical.
 		asError, err := parseIncumbent([]byte(strings.ReplaceAll(c.Raw, "major [", "error [")))
 		if err != nil {
 			t.Fatalf("%s: substituting the severity word broke the parse: %v", f.Name, err)
@@ -5291,7 +5291,7 @@ func TestMajorIsAFreeParameterSoNoCrossToolScoreIsOffered(t *testing.T) {
 // function of crSeverity's free "major" constant. Its first version printed the
 // level that constant translated each foreign word TO, so the replacement was a
 // function of the same constant, presented as an observation. The words are now
-// quoted from the retained review; this asserts the consequence — that changing
+// quoted from the retained review; this asserts the consequence, that changing
 // the constant, with the cached bytes untouched, changes only the part of the
 // page LABELLED AS OURS.
 //
@@ -5388,7 +5388,7 @@ func TestTheDescriptionDoesNotMoveWhenOurConstantDoes(t *testing.T) {
 // anchors.
 //
 // THE BANDED VERDICT IS RECONSTRUCTED HERE, inside this function, and nowhere
-// else. It is the instrument that was deleted, so no report may compute it — but
+// else. It is the instrument that was deleted, so no report may compute it, but
 // a retraction whose own evidence cannot be recomputed is the defect this
 // package has now corrected three times, and quoting a banded figure that
 // nothing can check is exactly that. A closure is the narrowest scope Go
@@ -5460,7 +5460,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	//
 	// Read through readCRCache and re-parsed rather than through
 	// CachedIncumbent, because three of these readings need the RAW bytes
-	// altered — the free constant moved, and the parser bug reintroduced — and
+	// altered, the free constant moved, and the parser bug reintroduced, and
 	// all four have to come from the same entries or they are not comparable.
 	var (
 		crLocated                                  = map[config.Severity]int{}
@@ -5527,7 +5527,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	// on SeverityUsage rejects it with a number, and a rejection argued from a
 	// figure nothing recomputes is the defect this package keeps correcting.
 	// Each raw word is credited against the HULL of the planted levels it is
-	// observed on — fitted over the very observations it is then scored against,
+	// observed on, fitted over the very observations it is then scored against,
 	// which is why a perfect score is the definition of the fit rather than a
 	// result.
 	interval := func(mutate func([]review.Finding)) (accurate, not int) {
@@ -5632,8 +5632,8 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	locating, multiLevel := 0, 0
 
 	// The per-level split of what 'major' lands on. It is measured here because
-	// the sentence that used to describe it — "every plant a 'major' is credited
-	// on is planted ABOVE warning" — was false and unchecked, in the same file
+	// the sentence that used to describe it, "every plant a 'major' is credited
+	// on is planted ABOVE warning", was false and unchecked, in the same file
 	// as this test and 75 lines above a body asserting the opposite.
 	majorSpread := map[config.Severity]int{}
 
@@ -5723,7 +5723,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 			fmt.Sprintf("banded a perfect %s over those %d", render(selectiveBanded), selectiveGraded),
 
 			// The straddle, per level. This claim exists because the sentence it
-			// replaces — that every plant a 'major' lands on is above warning —
+			// replaces, that every plant a 'major' lands on is above warning,
 			// was false, sat in this file, and was not among the figures
 			// anything read back out of the corpus.
 			fmt.Sprintf("credited on %d plants, landing %d critical, %d error and %d warning",
@@ -5749,7 +5749,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	// A "SEE X" BESIDE A PINNED FIGURE HAS TO NAME THE GUARD THAT PINS IT.
 	//
 	// Two paragraphs of NoCrossToolSeverityScore cited
-	// TestTheFiguresTheseCommentsQuoteStillReproduce — a real test, one word
+	// TestTheFiguresTheseCommentsQuoteStillReproduce, a real test, one word
 	// different from this one, which reads anchor-width and grid figures and
 	// whose claim list contains no severity figure at all. Changing "bands
 	// 10/0/4 over them" to "bands 11/0/4" left the cited guard green and turned
@@ -5758,7 +5758,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	// covered, which is how the banded column stayed on the page for as long as
 	// it did.
 	//
-	// The unit is the COMMENT GROUP — one contiguous run of comment lines — and
+	// The unit is the COMMENT GROUP, one contiguous run of comment lines, and
 	// the rule admits no "but it also cites the right one somewhere" exemption.
 	// Both attempts at something narrower failed on a real case: naming the
 	// wrong guard is excused per-group by a correct citation elsewhere in the
@@ -5768,7 +5768,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	//
 	// Guard names are derived from the package, so renaming either keeps this
 	// honest. If a paragraph ever needs to discuss the other guard for a good
-	// reason, the answer is to split the paragraph — a "see X" is a promise
+	// reason, the answer is to split the paragraph. A "see X" is a promise
 	// about the sentences around it.
 	const self = "TestTheSeverityFiguresTheseCommentsQuoteStillReproduce"
 	guards := figurePinningGuards(t)
@@ -5804,7 +5804,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	}
 
 	// The two published constants carry the same numbers and are checked as
-	// VALUES, because they are what a reader of a report actually meets.
+	// VALUES, because they are what a reader of a report meets.
 	for _, want := range []string{
 		fmt.Sprintf("%d plants over %d fixtures, banded %d blocking, %d medium, %d low",
 			plants, len(corpus), bands[2], bands[1], bands[0]),
@@ -5823,7 +5823,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	}
 
 	// The degenerate table's own prose is a VALUE, not a comment, and it is
-	// printed in this test's failure messages — so it is checked against the
+	// printed in this test's failure messages, so it is checked against the
 	// table rather than against the file.
 	for _, d := range degenerateReviewers() {
 		if d.name != critOnlyName {
@@ -5859,8 +5859,8 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	// It is checked here rather than left to a reader because the paragraph it
 	// sits in is a RETRACTION, and the previous retraction in that same spot was
 	// itself argued from figures that did not reproduce. The straddle line is
-	// checked for the narrower reason that its predecessor — that the corpus
-	// could not check the word's placement at all — was an overstatement of what
+	// checked for the narrower reason that its predecessor, that the corpus
+	// could not check the word's placement at all, was an overstatement of what
 	// nothing here measured.
 	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "findings.md"))
 	if err != nil {
@@ -5888,9 +5888,9 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	// docs/findings.md and never opened docs/measurement.md. Changing "stampers
 	// band 12/17/0 of 29" to 13/17/0, "it bands 10/0/4 over them" to 11/0/4 and
 	// "buggy 10/0/4, fixed 10/0/4" to 9/0/4 left the whole default suite green.
-	// It is the same defect the citation rule above was written for — a "see X"
-	// naming a guard that does not check the sentence — one level out, in the
-	// document a reader is actually handed, and stated there as a positive
+	// It is the same defect the citation rule above was written for, a "see X"
+	// naming a guard that does not check the sentence, one level out, in the
+	// document a reader is handed, and stated there as a positive
 	// guarantee rather than a pointer.
 	calibratedFull := sum(corpus, func(f Fixture) triple { return fullOver(f, calibratedReview(f)) })
 	for _, want := range []string{
@@ -5935,7 +5935,7 @@ func commentProse(t *testing.T, name string) string {
 //
 // The same reasoning as commentProse. A figure in these documents is a sentence,
 // and the author's line wrapping and their choice to write `critical` or
-// **12/0/0** are formatting — a guard that goes red when a paragraph is re-flowed
+// **12/0/0** are formatting. A guard that goes red when a paragraph is re-flowed
 // or a word is emphasised is a guard that earns exemptions until it guards
 // nothing.
 func docProse(t *testing.T, path string) string {
@@ -5950,7 +5950,7 @@ func docProse(t *testing.T, path string) string {
 }
 
 // commentGroups is a source file's comments as one collapsed string PER
-// CONTIGUOUS RUN of comment lines — a doc comment, a block above a case, a
+// CONTIGUOUS RUN of comment lines, a doc comment, a block above a case, a
 // trailing note.
 //
 // The group is the unit a claim and its "see X" share. Checking a citation

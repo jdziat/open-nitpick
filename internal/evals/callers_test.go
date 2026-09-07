@@ -19,7 +19,7 @@ import (
 // It holds the INVERSE of TestMultiFileCorpusIsWellFormed's structural rule.
 // There, the contract file is unchanged and a changed file imports it. Here,
 // the changed file IS the contract, and a file that is byte-identical in Base
-// and Head imports it — the caller the change breaks. A fixture that satisfied
+// and Head imports it, the caller the change breaks. A fixture that satisfied
 // the multi-file rule instead would be a multi-file fixture filed in the wrong
 // corpus, and would measure the direction related context already covers.
 //

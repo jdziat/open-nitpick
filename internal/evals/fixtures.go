@@ -1,8 +1,8 @@
 // Package evals runs open-nitpick against real models and scores the result.
 //
 // Unit tests prove the tooling behaves correctly given a scripted model. They
-// cannot tell you whether the PROMPTS work — whether a real model, handed a
-// real diff, actually finds the bug, anchors it to the right line, and stays
+// cannot tell you whether the PROMPTS work, whether a real model, handed a
+// real diff, finds the bug, anchors it to the right line, and stays
 // quiet about code that is fine. That is what this package measures.
 //
 // It is deliberately not part of `go test ./...`: it costs money and needs
@@ -28,7 +28,7 @@ type Defect struct {
 	// had noticed nothing: "created_at" is the line the diff removes, "foreach"
 	// and "await" are the changed line itself, "owner" survives untouched in
 	// the head, "location" sits in an unchanged doc comment, and "subprocess"
-	// is both an import and the word the correct FIX uses — it credited a
+	// is both an import and the word the correct FIX uses, it credited a
 	// comment about tar's exit status with finding a command injection.
 	// TestKeywordsAdmitOnlyRealDetections holds the line with the actual
 	// findings rather than with a list of words.
@@ -39,9 +39,9 @@ type Defect struct {
 	// It exists so severity consistency can be checked mechanically: two plants
 	// of the same class must agree about WantSeverity or say why they do not.
 	// The security class is why. It holds five plants across two levels, and
-	// which level each one gets turns on a distinction — whether the untrusted
+	// which level each one gets turns on a distinction, whether the untrusted
 	// source is IN the diff or only in Defect.Why, which the reviewer never
-	// sees — that no reader would reconstruct from the severities alone.
+	// sees. That no reader would reconstruct from the severities alone.
 	// Unwritten, that distinction is indistinguishable from drift, and a plant
 	// can then be moved in whichever direction the week's numbers want.
 	//
@@ -57,15 +57,15 @@ type Defect struct {
 	// is the guard that does not depend on it.
 	Class config.Class
 
-	// WantSeverity is the severity a correct reviewer should assign — a TARGET,
+	// WantSeverity is the severity a correct reviewer should assign, a TARGET,
 	// not a floor. Rating a defect above it counts as inflation and below it as
 	// understatement (see severityVerdict), because over-claiming is one of the
 	// two failures the severity columns exist to tune away and "at least the
 	// floor" cannot see it. Author fixtures to the level a senior reviewer would
-	// actually pick, not to the lowest defensible one.
+	// pick, not to the lowest defensible one.
 	//
 	// Author it against the anchors in internal/prompt/templates/review.md,
-	// which is the definition the model is actually given. A plant that
+	// which is the definition the model is given. A plant that
 	// disagrees with the published anchor does not measure the reviewer; it
 	// penalises the reviewer for obeying its instructions.
 	WantSeverity config.Severity
@@ -78,7 +78,7 @@ type Defect struct {
 	//
 	// It must NAME the level it is defending, in words. A note that only
 	// explains a defect goes stale the moment the level moves and then reads as
-	// a justification for a number it never justified — which is worse than no
+	// a justification for a number it never justified, which is worse than no
 	// note, because the next editor trusts it. Naming the level makes the test
 	// able to catch that, and it is the only part of a note a test can check.
 	SeverityNote string
@@ -99,14 +99,14 @@ type Fixture struct {
 	Head map[string]string
 
 	// Defects are what a competent reviewer must find. An empty list means the
-	// change is genuinely fine and any finding is a false positive.
+	// change is fine and any finding is a false positive.
 	Defects []Defect
 
 	// Extra files exist in both states and are never changed.
 	//
 	// THEY DO NOT REACH THE MODEL. This field used to claim it gave "the model
 	// surrounding context without appearing in the diff", and nine files across
-	// seven fixtures were authored on that reading — a tsconfig.json here, a
+	// seven fixtures were authored on that reading, a tsconfig.json here, a
 	// pyproject.toml there, an Alerts.csproj to say the project is net8.0.
 	// bundle.Assemble builds its plan by iterating the files the DIFF names and
 	// fetching content for those; a file that is byte-identical in both states
@@ -115,7 +115,7 @@ type Fixture struct {
 	// reach the plan zero times, and the assembly test in groundtruth_test.go
 	// now fails if that ever silently changes.
 	//
-	// What they DO is make the repository realistic — buildRepo writes them, so
+	// What they DO is make the repository realistic, buildRepo writes them, so
 	// `git diff` sees a tree that looks like a project rather than one loose
 	// source file, and a fixture in a language with a manifest is not a fixture
 	// whose manifest is missing. That is worth keeping. It is not context, and
@@ -148,8 +148,8 @@ func (f Fixture) Clean() bool { return len(f.Defects) == 0 }
 //     not occur, and the one warning in the tree sat in the set nobody may look
 //     at until the end.
 //   - A SECURITY warning (python-timing-unsafe-hmac). Every security plant here
-//     was error or critical, so "security implies at least error" — a rule a
-//     reviewer can learn and be rewarded for — could not be falsified on the
+//     was error or critical, so "security implies at least error", a rule a
+//     reviewer can learn and be rewarded for, could not be falsified on the
 //     corpus that shapes the prompt.
 //   - MULTI-FILE and MULTI-BATCH review. ts-unbounded-memo-key changes seven
 //     files, which at the shipped max_files_per_request of 6 is the first
@@ -199,7 +199,7 @@ func Fixtures() []Fixture {
 //
 // It is deliberately unreachable from Fixtures() and from the default run, so
 // nothing picks it up by accident. Selecting it takes naming a fixture in
-// NITPICK_EVAL_FIXTURES — an explicit act by whoever is measuring.
+// NITPICK_EVAL_FIXTURES, an explicit act by whoever is measuring.
 //
 // The defect classes here are chosen to be ones the tuning corpus does NOT
 // contain, because a held-out set drawn from the same distribution measures
@@ -219,15 +219,15 @@ func Fixtures() []Fixture {
 //
 // That last one is about the instrument rather than the defect class. Without
 // it every plant here is error or critical, and a prompt that learned to answer
-// "at least error" to everything — the exact failure the O-INFL column exists
-// to catch — cannot be caught by the corpus that is supposed to check whether
+// "at least error" to everything, the exact failure the O-INFL column exists
+// to catch, cannot be caught by the corpus that is supposed to check whether
 // the tuning generalized. TestHeldOutCorpusCanFalsifyInflation pins it.
 //
 // THE SECOND HALF OF THE SEVERITY REBALANCE lands here, and the split was made
 // on one question: what would a prompt tuned on Fixtures() have to GENERALIZE
 // to, rather than what is left over. Held-out fixtures chosen as leftovers make
 // the set thin and the generalization claim weak, which is the state this list
-// was in — seven fixtures, six plants, one of them below error.
+// was in, seven fixtures, six plants, one of them below error.
 //
 //   - csharp-client-per-request  C#, a language NEITHER corpus contained
 //   - bash-fixed-temp-path       shell, likewise, and a security warning
@@ -250,15 +250,15 @@ func Fixtures() []Fixture {
 // `tests` is here for a related but WEAKER reason than this comment first
 // claimed, and the difference matters. It said the class is one "NitpickNormal's
 // scope includes", which is not true of this plant: that scope asks for "missing
-// tests where new branching logic is genuinely risky", and duplicate-test-case-nit
-// is the opposite — a REDUNDANT case, in a change whose slug.go is byte-identical
+// tests where new branching logic is risky", and duplicate-test-case-nit
+// is the opposite, a REDUNDANT case, in a change whose slug.go is byte-identical
 // between base and head, so there is no new branching logic for a missing-test
 // finding to attach to. A reviewer reading the tests clause literally stays
 // silent and is scored a miss, which is the "a corpus that penalizes obedience
 // measures nothing" trap fixtures_nit.go uses to rule out style nits.
 //
 // It stays because it is still reachable, through the maintainability clause of
-// the same scope — a duplicated case has a concrete cost a reviewer can name.
+// the same scope. A duplicated case has a concrete cost a reviewer can name.
 // So it measures how far the prompt generalizes past the examples it was given,
 // which is worth measuring; it does NOT measure coverage of an instructed
 // class, and no claim resting on that reading should be made from it.
@@ -266,7 +266,7 @@ func Fixtures() []Fixture {
 // WHAT DELIBERATELY DID NOT COME HERE: ts-unbounded-memo-key, the only fixture
 // that assembles into more than one batch. Batching is a property of the
 // assembly and prompt this project keeps changing, and a one-shot corpus cannot
-// answer whether a change to it helped — the first measurement would also be
+// answer whether a change to it helped. The first measurement would also be
 // the last. It is in Fixtures() so it can be measured repeatedly, and this list
 // therefore still tests no multi-batch behaviour at all.
 func HeldOutFixtures() []Fixture {
@@ -287,7 +287,7 @@ func HeldOutFixtures() []Fixture {
 
 		// The two info plants that are spent once. Rust and Ruby are languages
 		// NEITHER corpus contained, so a prompt tuned on Fixtures() has to reach
-		// the level in a language it was never shown — the same argument the C#,
+		// the level in a language it was never shown, the same argument the C#,
 		// shell and Java plants above are here for. The Makefile's HELD_OUT line
 		// names both; TestTheMakefileSpendsTheWholeHeldOutCorpus pins that.
 		rustCrateForOneCallFixture(),
@@ -298,7 +298,7 @@ func HeldOutFixtures() []Fixture {
 // AllFixtures is every fixture in both corpora.
 //
 // It exists so the NITPICK_EVAL_FIXTURES filter can name a held-out fixture
-// without Fixtures() — the default run, and therefore every tuning loop —
+// without Fixtures(), the default run, and therefore every tuning loop,
 // changing what it returns. Ground-truth tests iterate this: a corpus that is
 // not validated is worse than no corpus, and "held out" is not an excuse to
 // skip the check that caught four wrong line numbers in the first eight.
@@ -311,8 +311,8 @@ func AllFixtures() []Fixture {
 //
 // The multi-file corpus is deliberately NOT in AllFixtures. The ground-truth
 // suite that iterates AllFixtures carries hand-maintained registries for every
-// plant — anchor assertions, hit and miss probes, severity pins, and
-// cross-fixture prose sweeps — and the multi-file corpus is validated by its
+// plant, anchor assertions, hit and miss probes, severity pins, and
+// cross-fixture prose sweeps, and the multi-file corpus is validated by its
 // own, narrower test (TestMultiFileCorpusIsWellFormed) instead. That is a
 // weaker guarantee, and a claim about that corpus should be read with it in
 // mind: its keywords have not been swept against every other fixture's
@@ -330,8 +330,8 @@ func EveryFixture() []Fixture {
 // Nothing in the tuning corpus tests the contract class, and this is the shape
 // that matters: the compiler is happy, the tests are happy, and every deployed
 // consumer of the endpoint silently starts reading a zero value. The added
-// UpdatedAt field supplies the motivation a real pull request would carry —
-// "make the tags consistent" — which is exactly the reasoning a reviewer has to
+// UpdatedAt field supplies the motivation a real pull request would carry,
+// "make the tags consistent", which is exactly the reasoning a reviewer has to
 // refuse.
 func contractBreakFixture() Fixture {
 	return Fixture{
@@ -383,7 +383,7 @@ func Events() []Event { return nil }
 			Keywords: []string{"breaking", "backward", "compatib", "wire format", "existing client", "consumer", "api contract", "decode a zero", "already deployed"},
 			Class:    config.ClassContract,
 			// error, not critical. The demonstrated consequence is a zero
-			// timestamp — "incorrect behavior on a reachable path" — not data
+			// timestamp, "incorrect behavior on a reachable path", not data
 			// loss, not a breach, and not a failure that is guaranteed:
 			// consumers keep serving, wrongly. Calibration rule 2 takes the
 			// lower level. It is the only plant of its class, so no note is
@@ -399,7 +399,7 @@ func Events() []Event { return nil }
 // dataLossMigrationFixture ships an UPDATE with no WHERE clause.
 //
 // The corpus has no data-loss fixture and no SQL file. The comment states the
-// intent — legacy rows, the ones with a NULL plan — and the statement below it
+// intent, legacy rows, the ones with a NULL plan, and the statement below it
 // rewrites every row in the table, downgrading paying accounts. It is
 // irreversible: the old values are gone once the transaction commits.
 func dataLossMigrationFixture() Fixture {
@@ -504,7 +504,7 @@ export async function saveAll(items: Item[], save: Save): Promise<void> {
 			//
 			// "foreach", "await" and "promise" were on this list and are the
 			// three most-typed tokens of the changed lines, so "prefer for...of
-			// for readability" — and even "fine as written" — scored as
+			// for readability", and even "fine as written", scored as
 			// detection while the unbounded-concurrency objection the comment
 			// above rejects walked straight back in through "promise".
 			Keywords: []string{
@@ -530,7 +530,7 @@ export async function saveAll(items: Item[], save: Save): Promise<void> {
 // This is the fixture for the bug a careless reviewer waves through, because
 // the line reads exactly like what it claims to do. Truncate rounds down since
 // the zero time, which is UTC, so for any t carrying a non-UTC location the
-// result is UTC midnight — mid-afternoon or the previous evening locally, and
+// result is UTC midnight, mid-afternoon or the previous evening locally, and
 // every daily aggregate built on it covers the wrong window.
 func timezoneBoundaryFixture() Fixture {
 	return Fixture{
@@ -573,7 +573,7 @@ func StartOfDay(t time.Time) time.Time {
 			//
 			// Nor "location", for the same reason it looked safe: the word is
 			// already in the file's own unchanged doc comment, so "say which
-			// location the result carries" — a documentation nit — matched.
+			// location the result carries", a documentation nit, matched.
 			Keywords: []string{"utc", "timezone", "time zone", "local midnight", "dst", "daylight", "zone offset", "wrong day"},
 			Class:    config.ClassCorrectness,
 			// error under "a real bug that produces incorrect behavior on a
@@ -583,8 +583,8 @@ func StartOfDay(t time.Time) time.Time {
 			// THE ERROR ANCHOR USED TO ILLUSTRATE WITH THIS DEFECT'S CLASS, and
 			// the illustration was replaced rather than this plant. review.md
 			// read "Comparing timestamps from two different timezones is an
-			// error" — which this fixture's earlier comment called "this defect
-			// exactly" — three lines above "do not go looking for them", and the
+			// error", which this fixture's earlier comment called "this defect
+			// exactly", three lines above "do not go looking for them", and the
 			// keyword `timezone` sat verbatim in that sentence. That is the same
 			// shape as the info pair fixtures_info.go's header describes, on a
 			// HELD-OUT plant, where a contaminated number cannot be re-run
@@ -599,10 +599,10 @@ func StartOfDay(t time.Time) time.Time {
 // cleanSQLAllowlistFixture builds a query with Sprintf and is correct.
 //
 // This is the most valuable fixture in the set, because precision is where the
-// benchmark loses. It pattern-matches the corpus's own SQL-injection fixture —
-// fmt.Sprintf, a query string, a caller-supplied argument — but the sort key is
+// benchmark loses. It pattern-matches the corpus's own SQL-injection fixture,
+// fmt.Sprintf, a query string, a caller-supplied argument, but the sort key is
 // resolved through a map whose values are all source literals, and the only
-// caller-controlled value is passed as a parameter. ORDER BY genuinely cannot
+// caller-controlled value is passed as a parameter. ORDER BY cannot
 // take a placeholder, so there is no safer shape to move to.
 //
 // The correct review is silence. Any injection finding here is a false
@@ -672,7 +672,7 @@ func (s *Store) ListUsersBy(sortKey string, limit int) (*sql.Rows, error) {
 // lines are innocuous and the defect is what the change removed: any
 // authenticated caller can now delete any project. The doc comment carries the
 // plausible-sounding justification a real pull request would, and it is true as
-// far as it goes — the extra read WAS latency — which is what makes the review
+// far as it goes. The extra read WAS latency, which is what makes the review
 // a judgement rather than a lookup.
 //
 // That rewritten doc comment is also load-bearing, not decoration. The deleted
@@ -790,8 +790,8 @@ func (s *Service) DeleteProject(ctx context.Context, callerID, projectID string)
 // Every other plant in this corpus is error or critical, which leaves the
 // severity measurement one-sided: understatement is observable everywhere and
 // inflation almost nowhere. This one is a genuine defect that a senior reviewer
-// raises at WARNING and not above — five immediate retries turn one client's
-// blip into five times the load on a service that is already failing — so a
+// raises at WARNING and not above, five immediate retries turn one client's
+// blip into five times the load on a service that is already failing, so a
 // reviewer that answers "error" to everything is visibly wrong here, on the
 // corpus that decides whether the tuning generalized.
 //
@@ -844,7 +844,7 @@ def fetch(url):
 				"backoff", "back off", "back-off", "sleep", "jitter",
 				"thundering herd", "hammer", "delay between", "no delay", "without waiting",
 			},
-			// Classed by what is consumed — a struggling dependency's capacity.
+			// Classed by what is consumed, a struggling dependency's capacity.
 			// The closed set has no "resilience", so this is the nearest box
 			// rather than a snug one.
 			Class:        config.ClassResource,
@@ -987,7 +987,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 // the capacity passed to make() is one short, so the final append reallocates.
 //
 // That distinction is the point. A reviewer that "finds an off-by-one in the
-// loop" is hallucinating, and must not score as a hit — which is why the
+// loop" is hallucinating, and must not score as a hit, which is why the
 // keywords below name the allocation, never the bound.
 func subtleLogicFixture() Fixture {
 	return Fixture{
@@ -1115,7 +1115,7 @@ func Fetch(url string) (int, error) {
 			Class: config.ClassCorrectness,
 			// error, not critical: the panic needs http.Get to fail first, so
 			// it is not the "guaranteed production failure" the critical anchor
-			// describes, and calibration rule 2 — when torn, take the lower —
+			// describes, and calibration rule 2, when torn, take the lower,
 			// settles what is left. A crash is not automatically critical here.
 			WantSeverity: config.SeverityError,
 			Why:          "http.Get's error is discarded; on failure resp is nil and the deferred Close panics",
@@ -1265,9 +1265,9 @@ def archive(name):
 			Line: 12, // the os.system call
 			// Not "os.system" or "subprocess": the first is the line being
 			// quoted and the second is both an import and the word the correct
-			// FIX uses, so Incumbent's "Propagate archive failures" — a
+			// FIX uses, so Incumbent's "Propagate archive failures", a
 			// comment about tar's ignored exit status, recommending
-			// subprocess.run(check=True) — was credited with finding the
+			// subprocess.run(check=True), was credited with finding the
 			// command injection and then graded for its severity.
 			Keywords:     []string{"command injection", "injection", "shell", "untrusted", "sanitiz", "arbitrary command", "metacharacter"},
 			Class:        config.ClassSecurity,

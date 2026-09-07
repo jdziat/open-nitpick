@@ -24,8 +24,8 @@ import (
 // The cost block had NO test coverage at all when this file was written, which
 // is the reason it reads as it does: every test here pins a decision that was
 // already made in cost.go and that nothing could have stopped being reversed.
-// Two rounds of cost numbers were withdrawn for errors — a dropped tier ladder,
-// then a per-endpoint rate read as a per-model one — and both were the kind a
+// Two rounds of cost numbers were withdrawn for errors, a dropped tier ladder,
+// then a per-endpoint rate read as a per-model one, and both were the kind a
 // test catches and a reading does not.
 
 // mustPrices parses a price table or fails, for the many tests below that vary
@@ -97,9 +97,9 @@ type vendorEndpoint struct {
 // It SHIFTS THE DECIMAL POINT rather than multiplying, which is what makes every
 // check below exact. Multiplying by 1e6 in float64 does not round-trip:
 // 0.00000003 * 1e6 is 0.030000000000000002, which is not the 0.03 pricing.yaml
-// records, so a comparison written that way needs a tolerance — and a tolerance
+// records, so a comparison written that way needs a tolerance, and a tolerance
 // wide enough to absorb that is a tolerance nobody can justify against the 1.015x
-// errors this table has actually shipped. Shifting first means the comparison is
+// errors this table has shipped. Shifting first means the comparison is
 // plain equality and there is no threshold to argue about.
 //
 // An exponent is refused rather than handled: the vendor publishes plain
@@ -418,16 +418,16 @@ func TestShippedPricesMatchTheCapturedVendorResponse(t *testing.T) {
 // regression.
 //
 // THE BUG: `cheapest` and `dearest` were derived from an endpoint's POSITION in
-// the vendor's array, on a claim written into both file headers as load-bearing —
+// the vendor's array, on a claim written into both file headers as load-bearing,
 // that `/api/v1/models/…/endpoints` returns them cheapest first. It does not. The
 // array is unsorted by price for 8 of the 20 models, in every case because a
 // half-price `/flex` service tier is listed after the standard one. So eight
 // entries named a cheapest endpoint costing exactly 2.00x the min_input recorded
-// three lines below it, and never one below — one-directional, on the eight
+// three lines below it, and never one below, one-directional, on the eight
 // first-party endpoints, which is the axis this table is read along.
 //
-// Nothing caught it because every NUMBER was right. The label is advice — "pin
-// the cheapest and the band collapses" — and it pointed at twice the floor.
+// Nothing caught it because every NUMBER was right. The label is advice, "pin
+// the cheapest and the band collapses", and it pointed at twice the floor.
 func TestRoutingLabelsNameAnEndpointAtTheExtremeTheyClaim(t *testing.T) {
 	receipt := readReceipt(t)
 
@@ -462,8 +462,8 @@ func TestRoutingLabelsNameAnEndpointAtTheExtremeTheyClaim(t *testing.T) {
 				continue
 			}
 
-			// Equality, not "within the band". Ties at an extreme are normal —
-			// six of claude-opus-5's seven endpoints share its floor — so any
+			// Equality, not "within the band". Ties at an extreme are normal,
+			// six of claude-opus-5's seven endpoints share its floor, so any
 			// endpoint AT the extreme is a correct label and one merely near it
 			// is not.
 			if got.Input != c.want {
@@ -611,7 +611,7 @@ func TestPricesRejectsAnEntryItCannotUse(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 // meterStub answers with a fixed usage and content, so a test can make the two
-// disagree — which is the only way to tell a measurement from an estimate.
+// disagree, which is the only way to tell a measurement from an estimate.
 // The call count is atomic because the concurrency test below drives this stub
 // from eight goroutines, and an unsynchronised counter here would report a race
 // in the test's own bookkeeping and bury the one it is looking for.
@@ -629,8 +629,8 @@ func (m *meterStub) GenerateContent(context.Context, []llms.Message, ...llms.Cal
 	}
 
 	// A fresh Response each time. Handing out one shared value would let a
-	// caller that mutates Usage — which is exactly what wrapping the meter in
-	// an estimator does — change what every other call reported.
+	// caller that mutates Usage, which is exactly what wrapping the meter in
+	// an estimator does, change what every other call reported.
 	return &llms.Response{Content: m.content, Usage: m.usage}, nil
 }
 
@@ -660,7 +660,7 @@ func meter(t *testing.T, stub *meterStub) TokenUsage {
 //
 // The temptation is real and one import away. The SDK ships
 // EstimateUsageFromMessages and UsageOrEstimate, and internal/bundle already
-// estimates tokens — correctly, because being wrong there costs a repacked
+// estimates tokens, correctly, because being wrong there costs a repacked
 // batch. Being wrong here produces a dollar amount somebody buys a model on.
 //
 // The test makes the two answers differ by two orders of magnitude: a 100,000
@@ -706,7 +706,7 @@ func TestUsageIsMeasuredAndNotEstimated(t *testing.T) {
 //
 // llms.UsageOrEstimate returns the provider's numbers UNCHANGED whenever they
 // are present, so a meter wrapped in it passes every test that supplies a usage
-// and silently invents one for every call that does not — turning the Unreported
+// and silently invents one for every call that does not, turning the Unreported
 // count, which exists precisely to keep that state visible, into a plausible
 // number nobody can distinguish from a measurement. One import, no failing test
 // except this one.
@@ -746,7 +746,7 @@ func TestNothingInThisPackageEstimatesUsage(t *testing.T) {
 // TestMeteringIsSafeUnderConcurrentCalls pins the lock.
 //
 // The battery runs models concurrently against one client, so an unsynchronised
-// meter would not merely race — it would drop calls, and a dropped call is a
+// meter would not merely race. It would drop calls, and a dropped call is a
 // silently cheaper row rather than a crash.
 func TestMeteringIsSafeUnderConcurrentCalls(t *testing.T) {
 	client := &llm.Client{LLM: &meterStub{usage: llms.Usage{PromptTokens: 10, CompletionTokens: 1}}}
@@ -778,7 +778,7 @@ func TestMeteringIsSafeUnderConcurrentCalls(t *testing.T) {
 
 // TestUsageReturnedByTheMeterIsACopy pins the aliasing.
 //
-// Usage returns a slice, and a caller that keeps it — every ledger does — would
+// Usage returns a slice, and a caller that keeps it, every ledger does, would
 // otherwise observe later calls appending to it, so a row's cost would depend on
 // when it was rendered.
 func TestUsageReturnedByTheMeterIsACopy(t *testing.T) {
@@ -803,7 +803,7 @@ func TestUsageReturnedByTheMeterIsACopy(t *testing.T) {
 //
 // The SDK normalizes ReasoningTokens as a SUBSET of CompletionTokens, and every
 // model in the shipped table that publishes an internal_reasoning rate publishes
-// it EQUAL to its completion rate — so reasoning is already billed correctly
+// it EQUAL to its completion rate, so reasoning is already billed correctly
 // inside completion, and adding a term for it would charge twice.
 func TestReasoningIsNotBilledOnTopOfCompletion(t *testing.T) {
 	c := CallUsage{Prompt: 100, Completion: 60, Reasoning: 50}
@@ -825,7 +825,7 @@ func TestReasoningIsNotBilledOnTopOfCompletion(t *testing.T) {
 // PromptTokens EXCLUDES the cached subset by the SDK's normalization, so a call
 // with 30,000 fresh and 30,000 cached prompt tokens sent a 60,000-token prompt
 // and reports Prompt as 30,000. Selecting a tier on that would apply the
-// sub-32,000 rate to a 60,000-token prompt — a discount nobody offered.
+// sub-32,000 rate to a 60,000-token prompt, a discount nobody offered.
 func TestPromptSizeCountsTheCachedSubset(t *testing.T) {
 	c := CallUsage{Prompt: 30_000, CacheRead: 25_000, CacheWrite: 5_000, Completion: 400}
 
@@ -843,7 +843,7 @@ func TestPromptSizeCountsTheCachedSubset(t *testing.T) {
 // zero value, and TotalTokens is copied through verbatim from any OpenAI-shaped
 // endpoint. A provider reporting ONLY a total therefore passed as a complete
 // report, contributed no priced tokens, and rendered as $0.000000 across every
-// cost column — known, unfootnoted, and the cheapest row in the table.
+// cost column, known, unfootnoted, and the cheapest row in the table.
 func TestACallReportingNoUsageIsNotPricedAsZero(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -874,8 +874,8 @@ func TestACallReportingNoUsageIsNotPricedAsZero(t *testing.T) {
 
 // TestAFailedCallIsABlindSpotNotAZero pins the other half of the same rule.
 //
-// A failed call may still have been billed — a provider that generates a
-// response and fails to deliver it charges for the generation — and that is not
+// A failed call may still have been billed, a provider that generates a
+// response and fails to deliver it charges for the generation, and that is not
 // visible from a response. It is counted, never filled in, and never used to
 // discard the run: in StructuredAuto a provider that rejects json_schema
 // produces a capability error and the client retries in JSON mode, so voiding
@@ -899,7 +899,7 @@ func TestAFailedCallIsABlindSpotNotAZero(t *testing.T) {
 // TestTheCostLegendStatesTheBlindSpots keeps the disclosure attached to the
 // numbers.
 //
-// Neither blind spot is countable — a billed-but-undelivered response leaves no
+// Neither blind spot is countable. A billed-but-undelivered response leaves no
 // trace, and the meter sits outside the SDK's retry loop by design, so a request
 // that succeeded on its second attempt contributes only the second attempt's
 // tokens. Both run the same way, and a reader can only know that if the table
@@ -914,7 +914,7 @@ func TestTheCostLegendStatesTheBlindSpots(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Unknown, undefined and stale — the three things a float64 cannot say.
+// Unknown, undefined and stale, the three things a float64 cannot say.
 // -----------------------------------------------------------------------------
 
 // costLedger builds a one-model ledger over a table with a single priced entry.
@@ -927,7 +927,7 @@ func costLedger(t *testing.T, model string, captured string) *CostLedger {
 // type exists for.
 //
 // A float64 cannot hold "we do not know", and every unset one in Go renders as
-// $0.00 — the single wrong answer a reader acts on without checking, because
+// $0.00, the single wrong answer a reader acts on without checking, because
 // free is a reason to pick a model.
 func TestAModelWithNoPriceEntryReportsUnknownAndNotZero(t *testing.T) {
 	ledger := costLedger(t, "test/unpriced", "2026-08-01")
@@ -964,7 +964,7 @@ func TestAModelWithNoPriceEntryReportsUnknownAndNotZero(t *testing.T) {
 // TestPerDefectIsUndefinedAndNotInfiniteAtZeroDetections pins the division.
 //
 // Zero detections is a division by zero, not an infinite cost and not a free
-// lunch. Both wrong answers are reachable in one line — Go yields +Inf, and a
+// lunch. Both wrong answers are reachable in one line, Go yields +Inf, and a
 // guard returning 0 reads as the best row in the table.
 func TestPerDefectIsUndefinedAndNotInfiniteAtZeroDetections(t *testing.T) {
 	ledger := costLedger(t, "test/priced", "2026-08-01")
@@ -994,8 +994,8 @@ func TestPerDefectIsUndefinedAndNotInfiniteAtZeroDetections(t *testing.T) {
 // TestStalenessIsSurfacedOnTheAmountItself pins where the disclosure lives.
 //
 // THE BUG: the age was surfaced only by the table's own AGE column, so anything
-// that formatted a row's $/DEFECT into a summary — the obvious next use of the
-// type — carried a dollar figure with no indication that the rate behind it had
+// that formatted a row's $/DEFECT into a summary, the obvious next use of the
+// type, carried a dollar figure with no indication that the rate behind it had
 // moved on. Staleness is a property of the number, so it travels with the
 // number.
 func TestStalenessIsSurfacedOnTheAmountItself(t *testing.T) {
@@ -1061,7 +1061,7 @@ func TestACaptureDateInTheFutureIsReportedNotSwallowed(t *testing.T) {
 // is.
 //
 // Reporting the newest, or a file-level date, lets one refreshed entry describe
-// every other one as fresh — which is the failure the per-model dates exist to
+// every other one as fresh, which is the failure the per-model dates exist to
 // prevent, so summarizing them away here would put it straight back.
 func TestProvenanceReportsTheOldestEntryNotTheNewest(t *testing.T) {
 	now := time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC)
@@ -1111,7 +1111,7 @@ func TestAgeIsWholeCalendarDays(t *testing.T) {
 //
 // Nobody running open-nitpick pays for a judge. Folding its tokens into a
 // contender's cost would overstate what the tool costs by whatever the judge
-// happens to charge — currently more than the input rate of more than half the
+// happens to charge, currently more than the input rate of more than half the
 // battery.
 func TestJudgeSpendIsNotAContenderCost(t *testing.T) {
 	ledger := NewCostLedger(mustPrices(t, "models:\n"+
@@ -1165,7 +1165,7 @@ func TestJudgeSpendIsNotAContenderCost(t *testing.T) {
 // THE BUG this shape fixes: an earlier version recorded base rates only, with a
 // comment asserting that every review was billed one tier up and was therefore
 // understated by up to 3.3x. Nobody had measured a prompt. A sum of calls cannot
-// answer "how big was the prompt" — 60,000 aggregate prompt tokens is one call
+// answer "how big was the prompt", 60,000 aggregate prompt tokens is one call
 // over a 32,000 step or thirty calls under it, at rates 3.3x apart.
 func TestATierIsChosenPerCallAndNotFromAnAggregate(t *testing.T) {
 	table := mustPrices(t, "models:\n"+priceEntry("test/tiered", "2026-08-01", 1, 10,
@@ -1181,7 +1181,7 @@ func TestATierIsChosenPerCallAndNotFromAnAggregate(t *testing.T) {
 	//
 	// The expectation is accumulated call by call rather than computed from the
 	// totals, because that is how the amount is built and float64 addition is
-	// not associative — writing (60_000*1 + 3_000*10)/1e6 here fails by 4e-17,
+	// not associative, writing (60_000*1 + 3_000*10)/1e6 here fails by 4e-17,
 	// which is a fact about arithmetic and not about tiers.
 	var many TokenUsage
 	wantMany := 0.0
@@ -1244,7 +1244,7 @@ func TestTiersReportWhereTheCallsActuallyLanded(t *testing.T) {
 // float64 cannot tell apart.
 //
 // An OMITTED cache rate means "this provider bills those tokens at input", which
-// is what such a provider actually charges. A PUBLISHED 0.0 means free caching,
+// is what such a provider charges. A PUBLISHED 0.0 means free caching,
 // which some providers do publish. The escape hatch the file header documents
 // did not exist: an operator who wrote `cache_read: 0.0` to record a free tier
 // was billed at the input rate, silently.
@@ -1276,7 +1276,7 @@ func TestAPublishedFreeCacheRateIsNotTheInputFallback(t *testing.T) {
 // The two anthropic entries publish a 1-hour cache TTL at 1.6x the 5-minute
 // rate. A usage report says how many cache-creation tokens were written and NOT
 // which TTL they were written at, so the amount is one of two numbers 1.6x apart
-// and nothing here can say which. It was billed silently at the 5-minute rate —
+// and nothing here can say which. It was billed silently at the 5-minute rate,
 // the cheaper of the two, which is the flattering direction.
 //
 // Nothing in open-nitpick enables prompt caching today, which is exactly why
@@ -1385,7 +1385,7 @@ func TestABandIsRefusedAboveTheBaseTier(t *testing.T) {
 //
 // A footnote saying "this amount is one point in a 3.9x band" leaves the reader
 // to intersect two intervals across a wide table, and the habit the whole cost
-// block is fighting is that they will not — they will sort the column.
+// block is fighting is that they will not. They will sort the column.
 func TestTwoAmountsWithOverlappingBandsAreNotOrderable(t *testing.T) {
 	entry := func(model string, input, output, lo, hi float64) string {
 		return fmt.Sprintf(`  %q:
@@ -1448,7 +1448,7 @@ func TestTwoAmountsWithOverlappingBandsAreNotOrderable(t *testing.T) {
 // costFixture is one fixture of the battery the strategies below are run over:
 // a REAL fixture, plus what reviewing it costs to send.
 //
-// It was a synthetic tuple — a name, a planted count and a prompt size — and the
+// It was a synthetic tuple, a name, a planted count and a prompt size, and the
 // strategies returned hand-written Detections beside it. That made this whole
 // block a test of CostRow's arithmetic over numbers a person typed, and the two
 // numbers most often typed were FALSE for the behaviours their own rows named:
@@ -1468,9 +1468,9 @@ type costFixture struct {
 
 	// prompt is what one review of this fixture sends, standing in for the
 	// bundle the harness really builds. Only the RATIO between fixtures is under
-	// test here — the cheapest cost per defect is bought by completing the cheap
+	// test here. The cheapest cost per defect is bought by completing the cheap
 	// fixtures and dying on the dear ones, and a corpus where every fixture costs
-	// the same cannot express that strategy at all — so it is derived from the
+	// the same cannot express that strategy at all, so it is derived from the
 	// fixture's own bytes rather than declared, and stays honest as the corpus
 	// grows.
 	prompt int
@@ -1511,7 +1511,7 @@ func dearFixture(f costFixture) bool {
 }
 
 // costRunsPerFixture is more than one so that a row can be short on DEPTH
-// without being short on coverage — the gap a set-based check could not see.
+// without being short on coverage, the gap a set-based check could not see.
 const costRunsPerFixture = 2
 
 // costPrices is the rate table the degenerate-strategy rows are priced against.
@@ -1519,7 +1519,7 @@ const costRunsPerFixture = 2
 // THIS COMMENT USED TO CLAIM it "prices the two models every strategy is run
 // as", and that was FALSE when it was written. The "a model nobody priced"
 // strategy sets costStrategy.model to test/unpriced precisely so that it is
-// absent from here — being unpriced IS that row's behaviour, and it is the one
+// absent from here, being unpriced IS that row's behaviour, and it is the one
 // strategy in the table whose whole argument depends on a missing entry. Read as
 // a guarantee of complete coverage, the old sentence said no such row could
 // exist, in a file where one does. Two of the three ids the strategies run as
@@ -1562,14 +1562,14 @@ type costStrategy struct {
 
 	// caughtBy names the columns that are JOINTLY necessary to catch this
 	// strategy: remove all of them and it maxes the reading out. Empty means the
-	// row is not scored at all — because it is not comparable to its peers, or
+	// row is not scored at all, because it is not comparable to its peers, or
 	// because its cost is unknown, or because its per-defect ratio is undefined.
 	//
 	// It exists because the `why` prose above claims things like "NOISE is what
 	// sees it", and a claim in a comment is not a test. Without it a strategy
 	// caught three ways over teaches nothing about any of them, and a column
 	// nothing depends on can be deleted with every guard in this file still
-	// passing — which is how the withdrawn severity columns lived as long as
+	// passing, which is how the withdrawn severity columns lived as long as
 	// they did.
 	caughtBy []string
 }
@@ -1594,8 +1594,8 @@ func calibratedCostRun(f costFixture, _ int) ([]review.Finding, CallUsage, bool)
 // The gap between them is the whole content of the line-spammer row: a comment
 // carrying a reason is many times the output of a comment carrying none, which
 // is why saying everything is cheaper than saying three useful things. Ten to
-// one is conservative — a real rationale runs longer than ten times a one-line
-// nit — and the row is only claiming the sign of the difference.
+// one is conservative. A real rationale runs longer than ten times a one-line
+// nit, and the row is only claiming the sign of the difference.
 const (
 	explainedTokens = 120
 	spamTokens      = 12
@@ -1673,7 +1673,7 @@ func degenerateCostStrategies() []costStrategy {
 			// that union: its ANCHOR is 7 against a calibrated 1, and the
 			// subset check below reports that either column alone now catches it.
 			// Left as NOISE, the declaration would have claimed NOISE was
-			// load-bearing here when it no longer solely is — which is the
+			// load-bearing here when it no longer solely is, which is the
 			// stale-declaration failure the whole table exists to make visible.
 			caughtBy: []string{"NOISE", "ANCHOR"},
 		},
@@ -1779,7 +1779,7 @@ func ledgerFor(t *testing.T, s costStrategy) (strategy, reference CostRow) {
 // noise and anchor counts in this file the scorer's answer rather than a
 // person's, and it is what gives ObserveScore a caller reachable from
 // `go test ./...`: it had none, no test, and three separate mutations of it left
-// the suite green — an inert function that the cost table's whole premise rested
+// the suite green, an inert function that the cost table's whole premise rested
 // on.
 func observeCostRun(l *CostLedger, model string, f costFixture, run int,
 	publish func(costFixture, int) ([]review.Finding, CallUsage, bool)) {
@@ -1827,8 +1827,8 @@ func costScoreOf(c CostReading, r CostRow) string {
 //
 // Cost has an ugly answer available to it that severity does not. A reviewer
 // that fails most runs and succeeds cheaply on the easy ones is priced only on
-// the runs it survived, and its $/DEFECT — real dollars, real detections, a
-// correct division — describes an easier corpus than the row beneath it. Every
+// the runs it survived, and its $/DEFECT, real dollars, real detections, a
+// correct division, describes an easier corpus than the row beneath it. Every
 // term of the ratio is right and the ranking is wrong.
 //
 // Each cell below is DECLARED. A reading a degenerate strategy can score as well
@@ -1840,7 +1840,7 @@ func TestNoDegenerateCostStrategyCanMaxOutAPublishedCostReading(t *testing.T) {
 		t.Fatal("no cost reading is registered, so this test proves nothing about the cost table")
 	}
 
-	// The reference has to be a reviewer this corpus can actually reward, or
+	// The reference has to be a reviewer this corpus can reward, or
 	// "no strategy beats it" is satisfied by it being unbeatable-because-broken.
 	_, reference := ledgerFor(t, costStrategy{name: "control", run: calibratedCostRun})
 	if !reference.Comparable() {
@@ -1943,7 +1943,7 @@ func withoutColumns(c CostReading, drop []string) CostReading {
 // TestEachCostStrategyIsCaughtByTheColumnItClaims turns the prose in the
 // degenerate table into assertions.
 //
-// Every strategy above says which column sees it — "NOISE is what sees it",
+// Every strategy above says which column sees it, "NOISE is what sees it",
 // "only ANCHOR tells them apart". Those are the sentences that justify
 // publishing five columns instead of one, and until this test they were
 // comments. Removing the named columns must let the strategy through; if it does
@@ -1953,7 +1953,7 @@ func withoutColumns(c CostReading, drop []string) CostReading {
 //
 // It found one on the way in. The line-by-line spammer was written spending MORE
 // output tokens than a calibrated reviewer, so it was caught by $/DEFECT and
-// NOISE could have been deleted without any guard noticing — the strategy did
+// NOISE could have been deleted without any guard noticing. The strategy did
 // not embody its own justification.
 func TestEachCostStrategyIsCaughtByTheColumnItClaims(t *testing.T) {
 	for _, c := range PublishedCostReadings() {
@@ -1970,7 +1970,7 @@ func TestEachCostStrategyIsCaughtByTheColumnItClaims(t *testing.T) {
 				// Not caught by any column: the reading refuses to score the row
 				// at all, because it is not comparable to its peers or its cost
 				// is unknown or its ratio is undefined. That is a stronger
-				// defence than a low score — an incomparable row's dollars are
+				// defence than a low score, an incomparable row's dollars are
 				// CORRECT, so any number it produced would still sort.
 				if _, ok := c.Score(got); ok {
 					t.Errorf("%q declares that no column catches it, so the reading must refuse to "+
@@ -2025,7 +2025,7 @@ func TestEachCostStrategyIsCaughtByTheColumnItClaims(t *testing.T) {
 // strategies rest on.
 //
 // An incomparable row's dollars are CORRECT. What is wrong is the corpus they
-// describe, so the defence cannot be a smaller score — it has to be a refusal to
+// describe, so the defence cannot be a smaller score. It has to be a refusal to
 // score, or a reader sorting the column still gets an ordering out of it.
 func TestIncomparableRowsAreNotScoredAtAll(t *testing.T) {
 	for _, name := range []string{
@@ -2089,7 +2089,7 @@ func TestCostReadingsTreatATieAsAFailure(t *testing.T) {
 // score.go registers CostTableHeader as a table whose columns another track
 // classifies, so the guard that runs over the SCORED headers deliberately does
 // not read it. That leaves the cost columns declared nowhere unless this test
-// exists — which is precisely the hole the withdrawn banded columns went
+// exists, which is precisely the hole the withdrawn banded columns went
 // through: added to a header and a legend, with nothing anywhere asking what
 // maximised them.
 func TestEveryCostColumnIsRegistered(t *testing.T) {
@@ -2165,8 +2165,8 @@ func columnStarts(line string) []int {
 // up, by OFFSET rather than by count.
 //
 // A header column with no cell under it is a caveat a reader never sees, and the
-// widths here are hand-maintained in two places — the header string and a printf
-// format — with nothing tying them together.
+// widths here are hand-maintained in two places, the header string and a printf
+// format, with nothing tying them together.
 //
 // THE BUG this offset check exists for: RECALL was formatted eight wide and its
 // cell is "14/14 1.00", which is ten characters, so every column to its right
