@@ -90,8 +90,8 @@ defaults in charge, and those read the tree. Measured against golangci-lint
   strict` as well as `auto`. There is no command-line flag for it; `disable` can
   only be said in a config file.
 - `max-same-issues` defaults to 3 and `max-issues-per-linter` to 50. Eight
-  identical `errcheck` violations arrived as three, and nothing in the JSON said
-  five had been cut.
+  identical `errcheck` violations arrive as three, with nothing in the JSON
+  naming the five it dropped.
 - `uniq-by-line` defaults to true, so one issue survives per line. A
   two-statement function reported four issues with it off and two with it on.
 
@@ -137,9 +137,9 @@ does not substitute what it loads.
 semgrep is off for a different reason: it has no default rule set, so with no
 `--config` it analyzes nothing. Point `semgrep_config` at a rule file outside the
 repository, or at a registry reference (`p/...`, `r/...`), a fetch you asked for
-by name. It previously ran with `--config auto`, which semgrep refuses whenever
-metrics are off; that invocation had never produced a single finding, and nothing
-said so.
+by name. `--config auto` is not an alternative: semgrep refuses it whenever
+metrics are off, and that invocation produces no findings while saying nothing
+about why.
 
 Every review says what every analyzer did: `ran` under `isolated:
 open-nitpick's own analyzer config` or `operator config <path>`, `did not run:
@@ -162,9 +162,9 @@ applicable but did not run an *error from the analyzer set*, which is logged and
 published on the pull request as `did not run: <reason>`. It does **not** change
 the run's exit status: that is decided by `review.fail_on` against the findings
 that were published, and an analyzer which produced no findings because it never
-ran contributes nothing to it. This file used to say strict "fails the review",
-which is what a reader would take to mean the job goes red. If you need a missing
-analyzer to break the build, gate on the roster yourself for now.
+ran contributes nothing to it. Read "strict fails the review" as the job going
+red and you will be wrong. If you need a missing analyzer to break the build,
+gate on the roster yourself for now.
 
 **And every review says how many analyzer findings it discarded**, in a second
 collapsed block beside the roster. An analyzer reports on whole packages while a
@@ -175,8 +175,8 @@ per-finding list of them is a wall of text nobody opens twice.
 
 The fourth reason is counted *and* named individually, because it is not policy:
 a finding reported **for a path that is not in this checkout**. Nothing in a
-healthy tree produces one. It used to be dropped by a bare `continue` (no
-counter, no log, no status), and that single line absorbed two real defects. One
+healthy tree produces one. A bare `continue` here (no counter, no log, no
+status) is one line that absorbs two real defects. One
 was ours: with `golangci_config` set, golangci-lint's `relative-path-mode`
 defaults to the *config file's* directory, so every finding arrived as
 `../repo/app.go` and the opt-in path published nothing at all while reporting

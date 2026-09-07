@@ -140,10 +140,10 @@ this very rule records as insufficient. The surviving triple is *more* sensitive
 to the free `major` constant than the banded one it replaced: re-parsing the
 identical cached bytes with `major` at `error` moves it from 6/4/4 to 5/8/1.
 Those cells now print `n/a` for any row that has not **declared** our five
-levels: a three-state scale carried on the row, zero value undeclared. The gate
-used to be `model != IncumbentModel`, a reporter's identity standing in for a
-fact about its vocabulary, so a contender added without anyone thinking about it
-was published at our resolution by default.
+levels: a three-state scale carried on the row, zero value undeclared. Gating
+on `model != IncumbentModel` instead puts a reporter's identity in place of a
+fact about its vocabulary, and publishes a contender added without anyone
+thinking about it at our resolution by default.
 
 **Rule 6b: a description published in place of a score must be a quotation.**
 The vocabulary block was not one, and this is the third correction in the same
@@ -216,10 +216,10 @@ reviewers. Those five sentences are in the block itself rather than in this file
 because a limitation only the source records is a limitation only its author
 knows about.
 
-**Rule 6b-i: the same rule applies to our own side, and did not.** The fix above
-was made for the incumbent and reintroduced for every contender this project
-ships. `severityWasTranslated` answered from the finding's **source** (it was
-true only for Incumbent) while `review.Engine` rewrites every model's severity
+**Rule 6b-i: the same rule applies to our own side.** A fix made for the
+incumbent alone is reintroduced for every contender this project ships.
+Answering `severityWasTranslated` from the finding's **source** makes it true
+only for Incumbent, while `review.Engine` rewrites every model's severity
 through `Normalize` and `linters.mapSeverity` collapses four analyzers'
 vocabularies onto three of our levels. So the block answered "nothing was
 translated" for all of our rows and quoted each model as having printed the word
@@ -306,11 +306,11 @@ than six lines from its defect is counted as invented) in exchange for closing
 is; false signal is unbounded and makes it look better, and this package has
 twice retracted an instrument that flattered.
 
-This page previously said **"this corpus cannot check the constant"**, and that
-was wrong in both halves. The constant was *inert*: 0, 1, 2, 4, 8, 12 and 20 all
-left the entire suite green, including 0, at which `explainsAny` becomes stricter
-than `matches` and the double penalty the paragraph above rejects comes straight
-back. And the corpus *can* check it, by a question nobody had asked: on how many
+**"This corpus cannot check the constant"** is wrong in both halves. The
+constant was *inert*: 0, 1, 2, 4, 8, 12 and 20 all left the entire suite green,
+including 0, at which `explainsAny` becomes stricter than `matches` and the
+double penalty the paragraph above rejects comes straight back. And the corpus
+*can* check it, by a question nobody had asked: on how many
 planted fixtures is a spammer charged **nothing** because the whole file fits
 inside the radius? At 8 the answer was two of twelve, and on those two the rule
 was not "the comment is near the defect it names" but "the file is shorter than
@@ -469,7 +469,7 @@ argument has to survive the reader knowing the expectation existed.
 
 ### The decision
 
-Ship v1 if ALL of these hold on the fixtures BOTH reviewers covered:
+Ship v1 if every one of these holds on the fixtures both reviewers covered:
 
 1. **Locate count.** Plants we located ≥ plants Incumbent located.
 2. **Margin ≥ 2 plants.** One plant is the smallest difference this corpus can
@@ -480,7 +480,7 @@ Ship v1 if ALL of these hold on the fixtures BOTH reviewers covered:
    that sees it.
 4. **Anchors.** Our worst-case anchored span is no wider than Incumbent's. A
    finding naming a whole file is credited with every plant inside it and is
-   noise for none; ANCHOR is the only column that sees THAT.
+   noise for none, and ANCHOR is the only column that sees the width.
 
 Any one failing means do not ship, and the report says which.
 
@@ -509,8 +509,8 @@ the conservative direction for that condition and is stated on the row rather th
 left to be derived.
 
 **The cells are not restricted to the intersection the preamble names.** "On the
-fixtures BOTH reviewers covered" is the rule's own scope clause, and all four
-detection cells are folded over each contender's OWN reviews. Two rows of unequal
+fixtures both reviewers covered" is the rule's own scope clause, and all four
+detection cells are folded over each contender's own reviews. Two rows of unequal
 COV therefore divide by two different populations, with nothing on the cells
 saying so: the coverage note under the table is about GRADE, and the counts in
 the DENOMINATORS block are what a reader has to compare by hand. Applying
@@ -560,7 +560,7 @@ rather than edited into the rule.**
 - **No cost ranking across routing bands.** Amounts marked `~` sit inside a band
   and may be ordered only if the bands are disjoint.
 
-### What a passing result does NOT establish
+### What a passing result leaves open
 
 That the corpus is a fair sample of real pull requests. It is 29 plants chosen by
 this project, and four of its five `info` plants are reported by NEITHER reviewer
@@ -574,18 +574,18 @@ Rule 14 was applied once, to the held-out battery, and could not yield a verdict
 condition 3 failed for a reason that turned out to be a defect in the condition,
 and condition 4 named a column the run did not print. Both are amended here.
 
-**Amended AFTER seeing which conditions failed, which is the thing Rule 14 was
+**Amended after seeing which conditions failed, which is the thing Rule 14 was
 written to prevent.** That is why each amendment states its direction. One
 loosens the bar and one tightens it, and only the second is safe on its face; the
 first has to be argued.
 
-### Condition 3, LOOSENED: precision plus an absolute floor
+### Condition 3, loosened: precision plus an absolute floor
 
 Was: our invented findings per review ≤ 1.5× Incumbent's.
-Now: our judged precision ≥ Incumbent's − 0.10 absolute, AND our `NOISE`
+Now: our judged precision ≥ Incumbent's − 0.10 absolute, and our `NOISE`
 ≤ 0.30 invented findings per review.
 
-The old form fired on VOLUME AT EQUAL PRECISION. Measured held-out: precision
+The old form fired on volume at equal precision. Measured held-out: precision
 0.80 against 0.83 (inside a single-judge figure whose cross-judge disagreement
 was never measured) while findings per review were 0.88 against 0.43 and located
 defects 0.68 against 0.31. Recall rose 2.2× on volume up 2.0×, so the extra
@@ -607,17 +607,17 @@ rather than to state a standard. 0.30 binds: it passes now and a 20% noise
 regression breaks it. A reader who thinks that is too generous should move it;
 what may not happen is moving it again after the next number.
 
-`NOISE` means the column (findings matching no plant) and NOT the judge's
+`NOISE` means the column (findings matching no plant) rather than the judge's
 "worth raising" figure. The two gave 0.25 and 0.175 on the same run, and leaving
 which one unstated is how a condition gets evaluated twice and reported once.
 
-### Condition 4, TIGHTENED: the worst case was a budget
+### Condition 4, tightened: the worst case was a budget
 
 Was: our worst-case anchored span no wider than Incumbent's.
 Now: additionally, our `L/DEF` ≤ Incumbent's.
 
 A worst case alone is a ceiling every finding may spend. If the incumbent's worst
-anchor is 13 lines, the old condition let EVERY one of our findings be 13 lines
+anchor is 13 lines, the old condition let every one of our findings be 13 lines
 wide and still pass, while a finding naming a whole region is credited with
 every plant inside it and is noise for none. That is Rule 6d: the column is
 topped by a reviewer nobody would ship. L/DEF (lines claimed per located defect)
