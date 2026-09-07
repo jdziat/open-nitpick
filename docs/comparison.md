@@ -561,7 +561,7 @@ them.
 What that says:
 
 - **The routed configuration buys quiet, not cheapness.** On the
-  2026-09-07 re-run it costs $0.0136 – $0.0152 per review against
+  2026-09-07 re-run it costs $0.0096 – $0.0152 per review against
   ensemble-cheap's $0.0075 – $0.0086, and more per located defect on all
   three corpora ($0.0153 – $0.0187 against $0.0087 – $0.0120). Its case
   is the noise column, not the cost column. The claim that the qwen triage
