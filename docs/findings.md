@@ -27,7 +27,7 @@ reporting range, `critical` through `warning`, **8 of 8 against 4 of 8**. Single
 run against single run, so the run-count asymmetry does not flatter us: 9 of 11
 against 4.
 
-**The cost side moved the wrong way.** Re-running the same 44 pull requests
+**Noise moved the wrong way.** Re-running the same 44 pull requests
 under the remediated `v1` (2026-09-04) took detection to 36 of 41 and noise
 findings from 1 to 17, over 53 inline comments. Detection improved by three
 plants and noise by sixteen findings, which is not a trade this project has

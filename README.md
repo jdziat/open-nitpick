@@ -113,17 +113,12 @@ scores byte-identical input anywhere from 3.66 to 3.98.
 
 Early. Everything described above is built and runs.
 
-On review quality there are now two counted comparisons against a hosted
-incumbent, neither judged by a model. Over 44 real pull requests it located 33
-of 41 planted defects against 30, with 1 noise finding against 5. On the
-held-out fixture corpus it located 10 of 13 against 4, and 8 of 8 against 4 of 8
-within the incumbent's own reporting range.
-
-The cost side is the open question and it moved the wrong way: re-running the
-same 44 pull requests under the remediated `v1` took detection to 36 of 41 and
-noise findings from 1 to 17. [docs/findings.md](docs/findings.md) sets out what
-has been measured, what it does not support, and the eighteen instrument bugs
-found along the way.
+It out-detects a hosted incumbent on both counted comparisons, 33 of 41 planted
+defects against 30 over 44 real pull requests, and noise is the open question:
+a later run took detection to 36 of 41 and noise findings from 1 to 17.
+[docs/findings.md](docs/findings.md) has both comparisons, what they do not
+support, and the eighteen instrument bugs found along the way.
+[docs/comparison.md](docs/comparison.md) has the costs, under a cent per diff.
 
 GitHub and a local checkout are the only forges. There is no GitLab provider.
 Reviews default to advisory, so nothing blocks a merge until you set `fail_on`.
