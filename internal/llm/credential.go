@@ -70,8 +70,12 @@ func resolveCredential(ctx context.Context, spec config.ModelSpec, getenv func(s
 	}
 
 	if spec.APIKeyKeyring != "" {
+		// The same rule the validator applies, restated rather than assumed.
+		// A spec that reached here without going through Validate would
+		// otherwise be looked up under an account the operator did not write.
 		service, account, ok := strings.Cut(spec.APIKeyKeyring, "/")
-		if !ok {
+		if !ok || strings.TrimSpace(service) == "" || strings.TrimSpace(account) == "" ||
+			strings.Contains(account, "/") {
 			return "", false, fmt.Errorf("api_key_keyring %q is not \"service/account\"", spec.APIKeyKeyring)
 		}
 		key, err := keyringGet(service, account)

@@ -204,8 +204,8 @@ func TestACredentialCommandThatFloodsIsBounded(t *testing.T) {
 	}
 	dir := t.TempDir()
 	script := filepath.Join(dir, "flood.sh")
-	// yes(1) never stops on its own, so reaching the assertion at all proves
-	// the read was bounded and the process was not waited on forever.
+	// yes(1) never stops on its own, so returning at all proves the read was
+	// bounded and the process was not waited on forever.
 	body := "#!/bin/sh\nprintf 'thekey\\n'\nexec yes padding\n"
 	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
@@ -214,25 +214,35 @@ func TestACredentialCommandThatFloodsIsBounded(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	done := make(chan struct{})
-	var key string
-	var err error
+	type result struct {
+		key string
+		err error
+	}
+	// The result travels on a channel rather than through captured variables,
+	// so nothing is written by one goroutine while another reads it, and
+	// nothing touches t after this function has returned.
+	done := make(chan result, 1)
 	go func() {
-		defer close(done)
-		key, _, err = resolveCredential(ctx,
+		key, _, err := resolveCredential(ctx,
 			config.ModelSpec{Provider: "synthetic", CredentialCommand: []string{script}}, nil)
+		done <- result{key, err}
 	}()
 
+	var got result
 	select {
-	case <-done:
+	case got = <-done:
 	case <-time.After(30 * time.Second):
 		t.Fatal("a flooding credential command was not bounded")
 	}
 
-	// The command is killed by the context rather than exiting cleanly, so an
-	// error here is expected; what matters is that it returned and that the
-	// first line was not lost in the flood.
-	if err == nil && key != "thekey" {
-		t.Errorf("key = %q", key)
+	// The command is killed by the context rather than exiting, so an error is
+	// expected. The key is asserted either way: the claim is that the first
+	// line survives the flood, and an assertion that only runs when there is
+	// no error does not test that.
+	if got.err == nil && got.key != "thekey" {
+		t.Errorf("key = %q, want the first line kept", got.key)
+	}
+	if got.err != nil && got.key != "" {
+		t.Errorf("key = %q alongside an error; a failed command must yield nothing", got.key)
 	}
 }
