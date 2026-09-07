@@ -452,8 +452,8 @@ type Linters struct {
 	// deterministic analyzer is published and gated at, whatever the analyzer
 	// called it. It defaults to critical, which reduces nothing.
 	//
-	// It is the operator's answer to a question that used to be answered by a
-	// constant. The sharpest case is not a security scanner: golangci-lint's
+	// It is the operator's answer to a question a constant cannot answer. The
+	// sharpest case is golangci-lint rather than a security scanner: its
 	// severity is arbitrary text an operator wrote in .golangci.yml, applied by
 	// `severity.default` to every issue it reports including typecheck compile
 	// errors, so one line there can make lll or misspell speak at the same
@@ -560,18 +560,14 @@ func (l Linters) AutoDetects() bool { return l.AutoDetect == nil || *l.AutoDetec
 // CapSeverity reduces an analyzer-reported severity to the ceiling this
 // repository lets a deterministic tool claim.
 //
-// It is POLICY, applied after parsing, and the split is the point. What the
-// analyzer said is a fact to record; what this repository will act on is a
-// decision. mapSeverity used to make the second decision by destroying the first
-// , folding "CRITICAL" onto error, which took the choice away from every
-// operator at once and left `fail_on: critical` gating on nothing, since no
-// analyzer finding could reach the level it names.
-//
-// An unset or unrecognized ceiling caps nothing. Config.Validate rejects both
-// before a review runs, so the only way to arrive here with one is a Config
-// assembled in code; the alternative reading of an empty ceiling is Rank()'s
-// unknown floor, which would silently reduce every analyzer finding to info,
-// the same class of invisible severity loss this exists to end.
+// It is policy applied after parsing: what the analyzer said is a fact to
+// record, what this repository acts on is a decision. Mapping "CRITICAL" onto
+// error at parse time folds the two, taking the choice from every operator and
+// leaving `fail_on: critical` gating on nothing. An unset or unrecognized
+// ceiling caps nothing; Config.Validate rejects both, so the only way here
+// with one is a Config assembled in code. Reading an empty ceiling as Rank()'s
+// unknown floor would reduce every analyzer finding to info, the severity loss
+// this exists to end.
 func (l Linters) CapSeverity(s Severity) Severity {
 	ceiling := l.MaxSeverity.normalized()
 	if !ceiling.IsFinding() {

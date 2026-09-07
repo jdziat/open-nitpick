@@ -284,13 +284,12 @@ func checkAnalyzerConfigPath(key, path string) error {
 }
 
 // SemgrepRegistryRef reports whether a semgrep config value names a registry
-// rule set rather than a local file.
-//
-// Exported so that internal/linters, which decides containment, and this
-// package, which decides validity, cannot drift on what counts as a path. A
-// value that is not a registry reference has to be an absolute path outside the
-// repository, and getting that wrong in one place only would let `rules/x.yml`
-// pass validation and then be read out of the tree under review.
+// rule set rather than a local file. Exported so internal/linters, which
+// decides containment, and this package, which decides validity, cannot drift
+// on what counts as a path: anything that is not a registry reference has to
+// be an absolute path outside the repository, and getting that wrong in one
+// place alone lets `rules/x.yml` pass validation and then be read out of the
+// tree under review.
 func SemgrepRegistryRef(ref string) bool {
 	ref = strings.TrimSpace(ref)
 	return strings.HasPrefix(ref, "p/") || strings.HasPrefix(ref, "r/")

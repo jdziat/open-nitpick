@@ -180,11 +180,11 @@ func TestDeletingTheConfigIsStillTheChangesOwn(t *testing.T) {
 }
 
 // TestASymlinkedConfigIsMatchedByItsTarget: os.ReadFile follows symlinks, so a
-// committed `.nitpick.yaml -> ci/nitpick.yaml` means the bytes that govern the
-// review live in ci/nitpick.yaml, and a change editing the target names the
-// TARGET in its diff. Matching only the link's own name let a two-step attack
-// (one benign "move the config under ci/" pull request, then one that edits the
-// target) supply the entire policy with nothing reported.
+// committed `.nitpick.yaml` pointing at `ci/nitpick.yaml` puts the bytes that
+// govern the review in ci/nitpick.yaml, and a change editing the target names
+// only the target in its diff. Matching the link's own name alone lets a
+// two-step attack (one benign "move the config under ci/" pull request, then
+// one that edits the target) supply the entire policy with nothing reported.
 func TestASymlinkedConfigIsMatchedByItsTarget(t *testing.T) {
 	root := t.TempDir()
 

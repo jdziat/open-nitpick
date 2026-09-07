@@ -278,11 +278,10 @@ func (c *Config) SelfModified(repoRoot string, changed []string) bool {
 // RepoRelative returns the repository-relative path of the file this
 // configuration came from, or would have come from had it been there.
 //
-// ok is false when no file is involved at all and when the file lies outside
-// repoRoot, the two cases in which no change under review can reach it, so
-// nothing it says can ever be the change's own. Callers that describe policy to
-// an operator need to tell those apart from an in-repo config, and printing an
-// absolute path from a CI runner's workspace tells a reader nothing.
+// ok is false when no file is involved and when the file lies outside
+// repoRoot, the two cases no change under review can reach. Callers describing
+// policy to an operator have to tell those from an in-repo config, and an
+// absolute path out of a CI runner's workspace tells a reader nothing.
 func (c *Config) RepoRelative(repoRoot string) (string, bool) {
 	paths := c.configPaths(repoRoot)
 	if len(paths) == 0 {
@@ -361,11 +360,11 @@ func (c *Config) configPaths(repoRoot string) []string {
 
 	add(source)
 
-	// os.ReadFile follows symlinks. A committed `.nitpick.yaml -> ci/nitpick.yaml`
-	// therefore means the bytes governing the review live in ci/nitpick.yaml, and
-	// a change editing the target names the TARGET in its diff and never the
-	// link, so matching the link's own name alone let that change supply the
-	// entire policy while the run reported nothing unusual.
+	// os.ReadFile follows symlinks, so a committed `.nitpick.yaml` pointing at
+	// `ci/nitpick.yaml` puts the bytes governing the review in ci/nitpick.yaml.
+	// A change editing the target names only the target in its diff, never the
+	// link, so matching the link's own name alone lets that change supply the
+	// entire policy while the run reports nothing unusual.
 	if resolved, err := filepath.EvalSymlinks(source); err == nil {
 		add(resolved)
 	}

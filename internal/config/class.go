@@ -2,33 +2,22 @@ package config
 
 import "strings"
 
-// Class is what kind of problem a finding describes.
-//
-// It exists so that nitpick level can be applied as a FILTER over a single
-// review corpus rather than as a change to what the model is asked to look for.
-// That matters for two measured reasons:
-//
-//   - Generating at a wider scope degrades the defect hunt. Across four eval
-//     runs, asking the model to also consider style consistently produced the
-//     worst results, more findings, lower precision, and more missed real
-//     defects, because attention spent on naming is attention not spent on
-//     the race condition.
-//   - Scope-as-generation makes levels incomparable. Changing the level changed
-//     the prompt, so any measured difference confounded scope with model
-//     variance. One corpus plus deterministic filters can be evaluated offline
-//     at zero cost.
-//
-// Free-text categories cannot support that, so this is a closed set the schema
-// enforces.
+// Class is what kind of problem a finding describes. It exists so nitpick
+// level is a filter over one review corpus rather than a change to what the
+// model is asked to look for: generating at a wider scope degraded the defect
+// hunt across four eval runs, and changing the prompt per level confounded
+// scope with model variance. One corpus plus deterministic filters evaluates
+// offline at zero cost, and free-text categories cannot support that, so this
+// is a closed set the schema enforces.
 type Class string
 
 // Finding classes, ordered roughly by how universally teams want them.
 const (
 	// ClassCorrectness is logic that produces a wrong result.
 	ClassCorrectness Class = "correctness"
-	// ClassConcurrency is races, deadlocks, and missing synchronization.
+	// ClassConcurrency is races, deadlocks and missing synchronization.
 	ClassConcurrency Class = "concurrency"
-	// ClassSecurity is injection, authorization, secrets, and traversal.
+	// ClassSecurity is injection, authorization, secrets and traversal.
 	ClassSecurity Class = "security"
 	// ClassResource is leaks and unbounded growth.
 	ClassResource Class = "resource"
@@ -40,7 +29,7 @@ const (
 	ClassTests Class = "tests"
 	// ClassMaintainability is a structural cost that can be named concretely.
 	ClassMaintainability Class = "maintainability"
-	// ClassStyle is naming, documentation, idiom, and consistency.
+	// ClassStyle is naming, documentation, idiom and consistency.
 	ClassStyle Class = "style"
 	// ClassSlop is generated-looking code that costs a reader: a comment that
 	// restates its line, a check against a condition the types exclude, an
@@ -55,8 +44,8 @@ const (
 	// call for the same reason: an unexpected vocabulary should produce a
 	// visible, non-gating finding rather than silently vanishing. Routing
 	// unknowns to a filtered class instead would turn "the model wrote a word
-	// we did not expect" into "a real defect disappeared", which is the exact
-	// failure this codebase is built to avoid.
+	// we did not expect" into "a real defect disappeared", the exact failure
+	// this codebase is built to avoid.
 	ClassUnknown Class = "unknown"
 )
 
@@ -93,9 +82,9 @@ var defectClasses = []Class{
 
 // allowedClasses maps a nitpick level to the classes it publishes.
 //
-// The levels are nested, which is what makes post-hoc filtering sound: each
-// level is a superset of the one before it, so narrowing never needs a finding
-// that was not generated.
+// The levels are nested, and that nesting is what makes post-hoc filtering
+// sound. Each level is a superset of the one before it, so narrowing never
+// needs a finding that was not generated.
 var allowedClasses = map[NitpickLevel]map[Class]bool{
 	NitpickOff:     classSet(defectClasses...),
 	NitpickMinimal: classSet(append(append([]Class{}, defectClasses...), ClassContract)...),
@@ -176,8 +165,8 @@ func (level NitpickLevel) Publishes(c Class) bool {
 
 	// Normalize defensively. An unrecognized or empty class reaching here would
 	// otherwise match nothing and silently drop the finding, turning a missing
-	// field into a disappeared defect, which is the failure mode this whole
-	// codebase is built to avoid.
+	// field into a disappeared defect, the failure mode this whole codebase is
+	// built to avoid.
 	normalized, _ := c.Normalize()
 	return allowed[normalized]
 }

@@ -89,20 +89,16 @@ type Address string
 const (
 	// AddressImpersonal describes the code.
 	AddressImpersonal Address = "impersonal"
-	// AddressAuthor speaks to the author directly.
+	// AddressAuthor writes in the second person.
 	AddressAuthor Address = "author"
 )
 
-// NitpickLevel sets how far past outright defects the reviewer ranges.
-//
-// This is the single most contested setting in a review tool. It selects which
-// CLASSES of finding get published, where min_severity selects how serious they
-// must be, different questions, applied independently.
-//
-// It is a post-hoc filter, not a change to the prompt. Every review is
-// generated at one fixed scope and narrowed afterwards, which keeps levels
-// comparable (a difference between two levels is the filter, not model
-// variance) and stops a wider setting from diluting the defect hunt. See
+// NitpickLevel sets how far past outright defects the reviewer ranges. It
+// selects which classes of finding get published, where min_severity selects
+// how serious they must be, and the two apply independently. It is a post-hoc
+// filter: every review is generated at one fixed scope and narrowed
+// afterwards, so a difference between two levels is the filter rather than
+// model variance, and a wider setting cannot dilute the defect hunt. See
 // config.GenerationLevel.
 type NitpickLevel string
 

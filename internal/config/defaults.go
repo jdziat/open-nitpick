@@ -3,7 +3,7 @@ package config
 import "time"
 
 // DefaultIgnore excludes paths where review comments are noise: vendored and
-// generated code, lockfiles, and fixtures. A repository can replace this list
+// generated code, lockfiles and fixtures. A repository can replace this list
 // wholesale via review.ignore.
 var DefaultIgnore = []string{
 	"**/vendor/**",
@@ -39,20 +39,19 @@ var DefaultIgnore = []string{
 // eslint because its config is JavaScript it would execute, semgrep because it
 // has no default rule set, so neither can ever run under the shipped defaults.
 //
-// THE BUG that CAUSED: with all four listed, `mode: strict` failed every review
-// out of the box, on "linter semgrep is enabled but not available: not
-// configured". Strict means "an analyzer I asked for did not run", and nobody
-// asked for these two. The default list did. Listing an analyzer that cannot
-// run also spent a line of the published roster, on every pull request forever,
-// saying nothing; that is how a reader learns to skip the block where a real
-// absence is announced.
+// Listing all four fails every review under `mode: strict` out of the box, on
+// "linter semgrep is enabled but not available: not configured". Strict means
+// "an analyzer I asked for did not run", and nobody asked for these two; the
+// default list did. An analyzer that cannot run also spends a line of the
+// published roster on every pull request saying nothing. That is how a reader
+// learns to skip the block where a real absence is announced.
 //
 // Naming either in linters.enabled still works and still means it: strict then
 // does catch an operator who enabled one without configuring it.
 var DefaultLinters = []string{"golangci-lint", "ruff"}
 
 // The catalog analyzers (internal/linters) are not listed here because they
-// are not ENABLED by default: they are auto-detected. Naming one in
+// are auto-detected rather than enabled by default. Naming one in
 // linters.enabled makes it a promise strict mode checks; leaving it to
 // linters.auto_detect runs it when it is installed and skips it when it is
 // not.
@@ -70,13 +69,13 @@ func Defaults() *Config {
 				// The timeout is generous on purpose, and max_tokens is
 				// deliberately not set. A reasoning model spends its thinking
 				// inside max_tokens on most providers and inside the wall
-				// clock on all of them, and the two-minute, 8k-token defaults
-				// this used to ship lost one review in five on glm-5.3-flash:
-				// the schema-path answer came back truncated to prose, and
+				// clock on all of them. Two-minute, 8k-token defaults lose one
+				// review in five on glm-5.3-flash: the schema-path answer
+				// comes back truncated to prose, and
 				// the JSON fallback then died on the HTTP timeout while the
 				// model was still generating. Unset, an OpenAI-compatible
 				// request carries no max_tokens and the model's own output
-				// maximum applies, which is the only number that is not a
+				// maximum applies, the only number here that is not a
 				// guess. The one provider whose SDK path substitutes a small
 				// constant for "unset" is handled in llm.Client.CallOptions.
 				Timeout: 10 * time.Minute,
@@ -126,7 +125,7 @@ func Defaults() *Config {
 		Persona: DefaultPersona(),
 		// Stated rather than left to the zero value, because "off" here is a
 		// decision with a reason: the pass is unmeasured and its risk is to
-		// recall. See Validation.Enabled.
+		// recall. Validation.Enabled carries the rest of it.
 		Validation: Validation{Enabled: false},
 		Linters: Linters{
 			Enabled:          append([]string(nil), DefaultLinters...),

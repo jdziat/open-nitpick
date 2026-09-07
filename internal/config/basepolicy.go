@@ -13,7 +13,7 @@ import (
 // It is the only part of this defense that needs a forge, and it is separate
 // for that reason: detection and resolution are pure and exercised without a
 // repository, while this supplies the two things only a provider can answer,
-// which revision counts as "before this change", and what a file contained
+// which revision the change is measured against, and what a file contained
 // there.
 type BasePolicy struct {
 	// RepoRoot is the checkout that diff paths are relative to.
