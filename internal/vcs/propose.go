@@ -210,6 +210,13 @@ func (g *GitHub) ProposeChange(ctx context.Context, ref Ref, p Proposal) (*Propo
 		MaintainerCanModify: github.Ptr(true),
 	})
 	if err != nil {
+		// The branch goes too. Left behind it is a ref with nothing to link
+		// to, and the next identical ask reports it as an earlier proposal
+		// that does not exist.
+		if _, delErr := g.client.Git.DeleteRef(ctx, ref.Owner, ref.Repo, fullRef); delErr != nil {
+			return nil, fmt.Errorf("github: open the pull request: %w, and %s could not be removed: %w",
+				err, p.Branch, delErr)
+		}
 		return nil, fmt.Errorf("github: open the pull request: %w", err)
 	}
 

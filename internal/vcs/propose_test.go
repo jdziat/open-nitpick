@@ -30,6 +30,7 @@ type proposeFake struct {
 	treeEntries []map[string]any
 
 	failSecondRead bool
+	failCreatePR   bool
 	treeBody       map[string]any
 }
 
@@ -103,6 +104,11 @@ func (f *proposeFake) handler(t *testing.T) http.HandlerFunc {
 			f.deleted = p
 
 		case r.Method == http.MethodPost && strings.HasSuffix(p, "/pulls"):
+			if f.failCreatePR {
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				_ = json.NewEncoder(w).Encode(map[string]any{"message": "refused"})
+				return
+			}
 			_ = json.NewDecoder(r.Body).Decode(&f.prBody)
 			_ = json.NewEncoder(w).Encode(map[string]any{"number": 99, "html_url": "https://example/99"})
 
@@ -392,5 +398,19 @@ func TestProposeChangeTreatsAFailedRereadAsMoved(t *testing.T) {
 	}
 	if f.deleted == "" {
 		t.Error("the branch was left behind")
+	}
+}
+
+// A pull request that could not be opened takes its branch with it. Left
+// behind, the ref has nothing to link to, and the next identical ask reports
+// it as an earlier proposal that does not exist.
+func TestProposeChangeUnwindsWhenThePullRequestIsRefused(t *testing.T) {
+	f := &proposeFake{head: "head01", headRepo: "o/r", baseRepo: "o/r", failCreatePR: true}
+
+	if _, err := propose(t, f, goodProposal()); err == nil {
+		t.Fatal("a refused pull request reported success")
+	}
+	if f.deleted == "" {
+		t.Error("the branch was left behind with no pull request")
 	}
 }
