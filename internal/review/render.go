@@ -49,7 +49,7 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 	}
 
 	review := vcs.Review{
-		Event:    vcs.EventComment,
+		Event:    reviewEvent(report, cfg),
 		Comments: make([]vcs.Comment, 0, len(report.Findings)),
 		Head:     report.Head,
 	}

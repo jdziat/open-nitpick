@@ -1,0 +1,97 @@
+package review
+
+import (
+	"testing"
+
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/vcs"
+)
+
+// approving returns a config with review.approve on and the analyzer gate as
+// given, so each case below states only what it is about.
+func approving(requireAnalyzers bool) *config.Config {
+	cfg := config.Defaults()
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.RequireAnalyzers = requireAnalyzers
+	return cfg
+}
+
+// TestApprovalIsOffUntilItIsAskedFor pins the default, which is the whole
+// reason this is a setting rather than a behaviour. A repository upgrading
+// into this feature must not start approving its own pull requests.
+func TestApprovalIsOffUntilItIsAskedFor(t *testing.T) {
+	cfg := config.Defaults()
+	if cfg.Review.Approve.Enabled {
+		t.Fatal("review.approve.enabled defaults to true; upgrading would start approving")
+	}
+	if cfg.Review.Approve.RequireAnalyzers {
+		t.Error("review.approve.require_analyzers defaults to true; the documented default is a clean review alone")
+	}
+	if got := reviewEvent(&Report{}, cfg); got != vcs.EventComment {
+		t.Errorf("event on a clean review with approval off = %q, want %q", got, vcs.EventComment)
+	}
+}
+
+// TestACleanReviewIsApproved is the case the setting exists for.
+func TestACleanReviewIsApproved(t *testing.T) {
+	if got := reviewEvent(&Report{}, approving(false)); got != vcs.EventApprove {
+		t.Errorf("event = %q, want %q", got, vcs.EventApprove)
+	}
+}
+
+// TestAFindingHoldsTheReviewAtAComment covers the obvious half.
+func TestAFindingHoldsTheReviewAtAComment(t *testing.T) {
+	r := &Report{Findings: []Finding{{Path: "a.go", Line: 1, Title: "boom"}}}
+	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
+		t.Errorf("event with one finding = %q, want %q", got, vcs.EventComment)
+	}
+}
+
+// TestAPartlyFailedRunIsNotApproved is the case that makes this safe.
+//
+// A batch that failed published no findings for its files, so "no findings"
+// and "nothing was read" are the same value here. Report.Incomplete is the
+// only thing that tells them apart, and an approval that skips it converts a
+// broken run into a green check.
+func TestAPartlyFailedRunIsNotApproved(t *testing.T) {
+	r := &Report{Incomplete: []string{"unreviewed.go"}}
+	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
+		t.Errorf("event on an incomplete run = %q, want %q: an unreviewed file is not a clean one", got, vcs.EventComment)
+	}
+}
+
+// TestTheAnalyzerGateIsOptInAndBinds covers both directions of
+// require_analyzers, since a gate that never fires and a gate that always
+// fires are equally useless and look the same from one case.
+func TestTheAnalyzerGateIsOptInAndBinds(t *testing.T) {
+	skipped := &Report{Linters: []LinterStatus{{Linter: "golangci-lint", Outcome: LinterSkipped}}}
+	if got := reviewEvent(skipped, approving(false)); got != vcs.EventApprove {
+		t.Errorf("a skipped analyzer blocked approval with the gate off: %q", got)
+	}
+	if got := reviewEvent(skipped, approving(true)); got != vcs.EventComment {
+		t.Errorf("a skipped analyzer passed the gate: %q, want %q", got, vcs.EventComment)
+	}
+
+	ran := &Report{Linters: []LinterStatus{{Linter: "golangci-lint", Outcome: LinterRan}}}
+	if got := reviewEvent(ran, approving(true)); got != vcs.EventApprove {
+		t.Errorf("an analyzer that ran failed the gate: %q, want %q", got, vcs.EventApprove)
+	}
+}
+
+// TestACoverageGapFailsTheAnalyzerGate is the half a status line cannot show.
+//
+// golangciLint.Uncovered records a file a build constraint excluded or a
+// suppression the change added, on a run whose status is "ran". Approving on
+// the status alone would call that code checked.
+func TestACoverageGapFailsTheAnalyzerGate(t *testing.T) {
+	r := &Report{
+		Linters:   []LinterStatus{{Linter: "golangci-lint", Outcome: LinterRan}},
+		Uncovered: []LinterUncovered{{Linter: "golangci-lint", Path: "app_windows.go"}},
+	}
+	if got := reviewEvent(r, approving(true)); got != vcs.EventComment {
+		t.Errorf("event with an uncovered file = %q, want %q", got, vcs.EventComment)
+	}
+	if got := reviewEvent(r, approving(false)); got != vcs.EventApprove {
+		t.Errorf("the coverage list blocked approval with the gate off: %q", got)
+	}
+}

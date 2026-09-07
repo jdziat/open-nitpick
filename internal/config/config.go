@@ -479,12 +479,43 @@ type Review struct {
 	// not author them. See internal/review/noclaims.go.
 	TriageNoNewClaims bool `yaml:"triage_no_new_claims"`
 
+	// Approve lets a review that found nothing be submitted as an approval
+	// rather than a comment. See Approve.
+	Approve Approve `yaml:"approve"`
+
 	// Respond bounds who may make the reviewer spend money by mentioning it.
 	// See spend.go.
 	Respond Respond `yaml:"respond"`
 
 	// Budget bounds what one review may spend. Off by default; see budget.go.
 	Budget Budget `yaml:"budget"`
+}
+
+// Approve decides whether a review that found nothing is submitted as an
+// approval instead of a comment.
+//
+// Off by default. A reviewer that can approve is one whose approval a branch
+// rule may come to require, and turning that on for somebody is their decision
+// rather than this tool's.
+//
+// A GitHub App cannot approve a pull request it opened itself, so a fix branch
+// this tool published is never approved by it whatever this says.
+type Approve struct {
+	// Enabled submits APPROVE when the review published no findings and
+	// reviewed every file it planned to. Report.Complete() is the second half
+	// and is not optional: approving a run whose batches partly failed is the
+	// silence this package exists to refuse, wearing a green check.
+	Enabled bool `yaml:"enabled"`
+
+	// RequireAnalyzers additionally demands that every enabled analyzer ran
+	// and covered the change, so an approval means the deterministic half
+	// happened rather than that it was absent.
+	//
+	// Off by default: the model finding nothing is what a clean review
+	// reports, and an operator who wants the analyzers counted says so. With
+	// it on, an analyzer recorded as skipped or failed, or any entry in the
+	// coverage list, holds the review at a comment.
+	RequireAnalyzers bool `yaml:"require_analyzers"`
 }
 
 // Instruction is a path-scoped prompt addition. Every instruction whose Path

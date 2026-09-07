@@ -751,6 +751,42 @@ answer, which is capped at 120 words.
 uses to talk to the reviewer; see the CI page for the workflow that
 answers it.
 
+## Approving a clean review
+
+`review.approve.enabled` (default off) submits the review as an approval
+rather than a comment when it published no findings. Off by default because a
+reviewer that can approve is one whose approval a branch rule may come to
+require, and that is the repository's decision rather than this tool's.
+
+```yaml
+review:
+  approve:
+    enabled: true
+    require_analyzers: false   # the default
+```
+
+Two conditions always hold, whatever else is configured:
+
+- **No findings were published.** A finding filtered out by
+  `review.min_severity` or the nitpick level is not a finding for this
+  purpose, since it was not published.
+- **Every planned file was reviewed.** A run whose batches partly failed
+  published no findings for the files it never read, and reading that as
+  clean is how an approval comes to mean less than nothing. The files are
+  listed under "Reviewed from the diff only" and its neighbours.
+
+`review.approve.require_analyzers` (default off) adds a third: every enabled
+analyzer ran, and none of them reported a coverage gap. Off by default because
+the model finding nothing is what a clean review reports; an operator who
+wants the deterministic half counted says so. With it on, an analyzer that was
+skipped or failed holds the review at a comment, and so does a file
+`golangci-lint` read without checking, such as one a build constraint excluded
+or one the change suppressed.
+
+The GitHub App or token needs Pull requests write, which posting reviews
+already needs. A GitHub App cannot approve a pull request it opened itself, so
+a fix branch this tool published is never approved by it.
+
 ## Resolving superseded comments
 
 `review.resolve_superseded` (default on) lets an incremental run close its
