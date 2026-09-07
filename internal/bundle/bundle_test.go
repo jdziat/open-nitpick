@@ -314,11 +314,11 @@ func TestMaxFileBytesWindowsRatherThanStrips(t *testing.T) {
 		t.Fatalf("content should be marked as a window of known width, got truncated=%v context=%d",
 			entry.Truncated, entry.ContextLines)
 	}
-	// The cap still binds, or it would not be a cap — and it binds on the
-	// file's own bytes, the same quantity it was compared against to reject the
-	// whole file. Held against the NUMBERED text instead, the two call sites
-	// measured different things and a window came out larger than the file it
-	// was cut from.
+	// The cap still binds, or it would not be a cap, and it binds on the file's
+	// own bytes, the same quantity it was compared against to reject the whole
+	// file. Held against the NUMBERED text instead, the two call sites measured
+	// different things and a window came out larger than the file it was cut
+	// from.
 	if got := sourceBytes(t, entry.Content); got > cfg.Review.MaxFileBytes {
 		t.Errorf("the window retains %d bytes of the file, over the %d-byte cap", got, cfg.Review.MaxFileBytes)
 	}
@@ -337,9 +337,8 @@ func TestMaxFileBytesWindowsRatherThanStrips(t *testing.T) {
 
 func TestMaxFileBytesFallsBackToDiffOnlyWhenNoWindowFits(t *testing.T) {
 	// A cap too small for even one line of context: there is no honest window
-	// left, so the file drops to diff-only — and that must be recorded, since a
-	// contentless entry is otherwise indistinguishable from a fully attached
-	// one.
+	// left, so the file drops to diff-only. And that must be recorded, since a
+	// contentless entry is otherwise indistinguishable from a fully attached one.
 	cfg := baseConfig()
 	cfg.Review.MaxFileBytes = 10
 

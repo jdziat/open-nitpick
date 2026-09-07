@@ -40,19 +40,20 @@ func isGenerated(content string) bool {
 	return false
 }
 
-// minContextLines is the narrowest window worth attaching. It is a floor rather
-// than a smaller number because of what the prompt already holds: the diff in
-// the same entry carries the differ's own context — three lines each side,
-// git's default — so a window at or below that width shows the model nothing it
-// has not already been sent, under a heading claiming to be the surrounding
-// file. Four is one line past it, which is thin but is code the diff did not
-// carry, and the elision markers still account for every line between.
+// minContextLines is the narrowest window worth attaching. It is a floor
+// rather than a smaller number because of what the prompt already holds: the
+// diff in the same entry carries the differ's own context (three lines each
+// side, git's default), so a window at or below that width shows the model
+// nothing it has not already been sent, under a heading claiming to be the
+// surrounding file. Four is one line past it, which is thin but is code the
+// diff did not carry, and the elision markers still account for every line
+// between.
 //
 // The floor used to be 12, picked against an imagined alternative: a sliver
 // that reads like file context and is not. The measured alternative was worse.
 // A file edited every 25 lines has no width at or above 12 that elides
 // anything, so the search ran out of rungs and threw away ALL of its context
-// while 93% of the request budget went unspent — and at width 8 the same file
+// while 93% of the request budget went unspent, and at width 8 the same file
 // fit with 68% of its lines attached. A thin window beats no window.
 const minContextLines = 4
 
@@ -77,8 +78,8 @@ const elisionMarker = "        … unchanged lines omitted …\n"
 // line on every trial.
 type windower struct {
 	// content is the file as read, returned unchanged whenever a width elides
-	// nothing — Render numbers whole files itself and would otherwise number
-	// them twice.
+	// nothing, Render numbers whole files itself and would otherwise number them
+	// twice.
 	content string
 
 	lines []string
@@ -104,10 +105,10 @@ func newWindower(content string, f *diff.File) windower {
 // anchorLines returns the new-file lines a window must be built around: every
 // added line, plus the new-file position each removal used to occupy.
 //
-// diff.ChangedLines yields added lines only, and correctly so — a review
-// comment cannot be anchored to a line that no longer exists. A window is not a
-// comment. Code deleted between two surviving lines is exactly where breakage
-// shows, and a window built only on additions elides the site of a
+// diff.ChangedLines yields added lines only, and correctly so, a review
+// comment cannot be anchored to a line that no longer exists. A window is not
+// a comment. Code deleted between two surviving lines is exactly where
+// breakage shows, and a window built only on additions elides the site of a
 // pure-deletion hunk while Render's heading tells the model it is being shown
 // the regions around every edit. That made the heading a precise false claim
 // rather than a vague one, in the one direction that costs findings: a removed
@@ -145,14 +146,14 @@ func anchorLines(f *diff.File) []int {
 
 // ceiling is the widest width at which this file still elides anything. Above
 // it every line lies within the width of some anchor, so the "window" is the
-// whole file — which the caller only reaches after establishing the whole file
+// whole file, which the caller only reaches after establishing the whole file
 // does not fit. A negative result means no width elides anything, so no window
 // is worth rendering at all.
 //
 // It is derived from the file's own edit geometry because a fixed ceiling
 // cannot spend headroom. With one pinned at 200, a 20,000-line file with a
 // single edit got the same 401-line window at every budget from 5,000 to
-// 235,507 tokens — 98% of the largest of those requests left unspent — and then
+// 235,507 tokens (98% of the largest of those requests left unspent), and then
 // the whole file one token later. It also removes the opposite cliff: there is
 // no longer a width that elides nothing, so the search cannot run out of rungs
 // while the file is still too big.
@@ -160,7 +161,7 @@ func anchorLines(f *diff.File) []int {
 // It bisects rather than solving for the widest gap. The closed form has to
 // reason about anchors pointing past the end of the content, whose spans are
 // truncated or empty, and got the degenerate cases wrong in the direction that
-// costs context — Go truncates -1/2 toward zero, so a file with every line
+// costs context, Go truncates -1/2 toward zero, so a file with every line
 // changed reported a ceiling of 0 and the search wasted a render on it.
 func (w windower) ceiling() int {
 	if len(w.lines) == 0 || len(w.anchors) == 0 {
@@ -248,8 +249,8 @@ func (w windower) spans(contextLines int) [][2]int {
 //
 // Every anchor that exists in content is kept, at every width including zero.
 // That is the invariant the review depends on: a changed line missing from the
-// content is a defect the model cannot see, and an unseen defect is reported as
-// no defect — a silent zero indistinguishable from a clean file.
+// content is a defect the model cannot see, and an unseen defect is reported
+// as no defect, a silent zero indistinguishable from a clean file.
 //
 // The text it returns is already line-numbered, since the elision markers
 // occupy no line number of their own.
@@ -257,16 +258,16 @@ func (w windower) spans(contextLines int) [][2]int {
 // srcBytes is how much of the file the window retained, in the file's own
 // bytes. It is what review.max_file_bytes is compared against, so that the cap
 // means the same thing for a window as it does for a whole file. Measuring the
-// numbered text against it instead made a window routinely larger than the file
-// it came from — 3.5x on short lines — so a cap that admitted a file whole
-// could reject every window of it, and raising a cap the file already satisfied
-// was what restored its context.
+// numbered text against it instead made a window routinely larger than the
+// file it came from (3.5x on short lines), so a cap that admitted a file whole
+// could reject every window of it, and raising a cap the file already
+// satisfied was what restored its context.
 //
 // The bool reports whether anything was actually elided. When it is false the
 // content comes back untouched and unnumbered: Render numbers whole files
 // itself and would otherwise number them twice. Returning the numbered build
-// alongside a false was a bug waiting for a caller — every citation into it
-// would have been ambiguous — and only the caller discarding that text kept it
+// alongside a false was a bug waiting for a caller (every citation into it
+// would have been ambiguous), and only the caller discarding that text kept it
 // from happening.
 func (w windower) render(contextLines int) (text string, srcBytes int, elided bool) {
 	// Nothing kept and everything kept both mean "this width did not reduce the

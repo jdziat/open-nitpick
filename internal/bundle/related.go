@@ -31,12 +31,12 @@ import (
 // under node_modules or a module cache is ever read.
 //
 // Three languages are resolved. Each has a hand-written reader rather than a
-// parser, because the question is narrow — where is NAME defined, and what do
-// its first lines say — and a reader that gets that wrong attaches the wrong
+// parser, because the question is narrow (where is NAME defined, and what do
+// its first lines say), and a reader that gets that wrong attaches the wrong
 // snippet, which costs nothing worse than a model reading one definition it
-// did not need. What it must never do is read a file outside the checkout,
-// and every path here is resolved relative to the repository root and handed
-// to the same fetcher the diff's own files come through.
+// did not need. What it must never do is read a file outside the checkout, and
+// every path here is resolved relative to the repository root and handed to
+// the same fetcher the diff's own files come through.
 
 // Related is one definition attached from a file the change did not touch.
 type Related struct {
@@ -66,8 +66,8 @@ type Related struct {
 
 // DirLister names the entries of a directory at the reviewed revision, with a
 // trailing slash on subdirectories. Nil means directories cannot be listed,
-// which rules out Go — a package is a directory — and makes the other two
-// probe for files by name instead.
+// which rules out Go (a package is a directory), and makes the other two probe
+// for files by name instead.
 type DirLister func(ctx context.Context, dir string) ([]string, error)
 
 // maxDefinitionLines caps one attached definition. Past this a snippet is cut

@@ -157,8 +157,8 @@ func seq(lo, hi int) []int {
 	return out
 }
 
-// testWidths spans the regime the width search walks — it doubles from
-// minContextLines to a ceiling derived per file — plus the degenerate widths a
+// testWidths spans the regime the width search walks (it doubles from
+// minContextLines to a ceiling derived per file), plus the degenerate widths a
 // future caller could pass. Zero is included deliberately: even a window with
 // no context at all must still carry the changed lines themselves.
 func testWidths() []int {
@@ -201,9 +201,9 @@ func TestWindowNeverDropsAChangedLine(t *testing.T) {
 
 			lines := splitLines(s.content)
 			if !elided {
-				// Nothing was elided, so the whole file is the answer and it
-				// must come back untouched — Render numbers unelided content
-				// itself and would otherwise number it twice.
+				// Nothing was elided, so the whole file is the answer and it must come
+				// back untouched, Render numbers unelided content itself and would
+				// otherwise number it twice.
 				if got != s.content {
 					t.Fatalf("%s width %d: nothing elided but content changed:\n%q", s.name, width, got)
 				}
@@ -238,7 +238,7 @@ func TestWindowNeverDropsAChangedLine(t *testing.T) {
 
 // TestWindowEmitsExactlyTheLinesWithinTheWidth pins what a window IS. Without
 // it, "never drops a changed line" is satisfied by returning the whole file,
-// and the width would stop meaning anything — which is what makes widening the
+// and the width would stop meaning anything. Which is what makes widening the
 // window to fill the budget a real gain rather than a relabelling.
 func TestWindowEmitsExactlyTheLinesWithinTheWidth(t *testing.T) {
 	for _, s := range generatedShapes(t) {
@@ -411,9 +411,9 @@ func TestChangedLinesSurviveWhateverWidthTheBudgetPicks(t *testing.T) {
 				checked++
 
 				if !entry.Truncated {
-					// A whole file is numbered by Render, not by the window,
-					// so the invariant is that every changed line is present at
-					// all — which it is by construction. Nothing to parse.
+					// A whole file is numbered by Render, not by the window, so the invariant
+					// is that every changed line is present at all. Which it is by
+					// construction. Nothing to parse.
 					continue
 				}
 				windowed++
@@ -461,10 +461,10 @@ func oneEditFile(n, at int) (diff.Files, ContentFetcher) {
 
 // TestWiderBudgetBuysWiderContext pins the point of sizing the window against
 // the budget. Headroom left unspent is context the reviewer could have had and
-// did not, and the failure this rules out is a plateau: with the ceiling pinned
-// at 200 lines, every budget from 5,000 to 235,507 tokens bought the same
-// 401-line window — 98% of the largest of those requests unused — and the next
-// token bought the whole 20,000-line file.
+// did not, and the failure this rules out is a plateau: with the ceiling
+// pinned at 200 lines, every budget from 5,000 to 235,507 tokens bought the
+// same 401-line window (98% of the largest of those requests unused), and the
+// next token bought the whole 20,000-line file.
 func TestWiderBudgetBuysWiderContext(t *testing.T) {
 	files, fetch := oneEditFile(6000, 3000)
 
@@ -618,11 +618,11 @@ func TestWindowCeilingIsTheWidestThatElides(t *testing.T) {
 // TestOversizedFileIsNotCostedBeforeItIsRejected pins the one property here
 // whose failure is an outage rather than a bad review. review.max_file_bytes
 // can force a window on its own, so a file over it has a whole-file cost that
-// will never be used — and computing it anyway meant rendering, numbering and
-// token-scanning the entire file first, at a size nothing bounds. Measured on a
-// 22.8 MB file: 243 MiB of allocation and 800,676 mallocs to produce a 29 KiB
-// window, against 21.7 MiB when the cap was checked first. An OOM here takes
-// the whole run down, which is the largest silent zero available.
+// will never be used, and computing it anyway meant rendering, numbering and
+// token-scanning the entire file first, at a size nothing bounds. Measured on
+// a 22.8 MB file: 243 MiB of allocation and 800,676 mallocs to produce a 29
+// KiB window, against 21.7 MiB when the cap was checked first. An OOM here
+// takes the whole run down, which is the largest silent zero available.
 //
 // Asserted as a multiple of the file rather than an absolute, so it measures
 // the shape of the work and not the machine. Windowing a file it intends to
@@ -750,11 +750,11 @@ func denselyEdited(n, stride int) (diff.Files, ContentFetcher) {
 }
 
 // TestDenselyEditedFileKeepsContextItsBudgetCanPayFor pins the dead zone shut.
-// A file whose edits sit closer together than twice the narrowest width used to
-// lose ALL of its context — every rung covered the whole file, the search fell
-// through, and the request went out with 93% of its budget unspent and no file
-// attached. Losing the file entirely is the worst answer available, and it was
-// reached while the budget could have paid for most of it.
+// A file whose edits sit closer together than twice the narrowest width used
+// to lose ALL of its context, every rung covered the whole file, the search
+// fell through, and the request went out with 93% of its budget unspent and no
+// file attached. Losing the file entirely is the worst answer available, and
+// it was reached while the budget could have paid for most of it.
 func TestDenselyEditedFileKeepsContextItsBudgetCanPayFor(t *testing.T) {
 	for _, stride := range []int{1, 5, 13, 25, 26, 40} {
 		t.Run(fmt.Sprintf("stride=%d", stride), func(t *testing.T) {
@@ -859,11 +859,11 @@ func TestACapTheWholeFileSatisfiesNeverRejectsItsWindow(t *testing.T) {
 	}
 }
 
-// TestWindowReasonNamesTheLimitAnOperatorMustRaise pins what the reason strings
-// are for. Naming "too large" without saying too large for WHAT sends a reader
-// to the wrong knob, and the reason used to name the byte cap whenever the file
-// was over it — even when the byte cap had nothing to do with how wide the
-// window ended up, so raising it changed nothing at all.
+// TestWindowReasonNamesTheLimitAnOperatorMustRaise pins what the reason
+// strings are for. Naming "too large" without saying too large for WHAT sends
+// a reader to the wrong knob, and the reason used to name the byte cap
+// whenever the file was over it, even when the byte cap had nothing to do with
+// how wide the window ended up, so raising it changed nothing at all.
 func TestWindowReasonNamesTheLimitAnOperatorMustRaise(t *testing.T) {
 	files, fetch := oneEditFile(6000, 3000)
 
@@ -919,11 +919,11 @@ func TestWindowReasonNamesTheLimitAnOperatorMustRaise(t *testing.T) {
 	}
 }
 
-// TestWindowFloorStaysClearOfTheDiffsOwnContext guards the one judgement in the
-// width search that mechanism cannot check. The diff in the same prompt already
-// carries the differ's context lines — three each side is git's default — so a
-// window at or below that width shows the model nothing new under a heading
-// claiming to be the surrounding file.
+// TestWindowFloorStaysClearOfTheDiffsOwnContext guards the one judgement in
+// the width search that mechanism cannot check. The diff in the same prompt
+// already carries the differ's context lines (three each side is git's
+// default), so a window at or below that width shows the model nothing new
+// under a heading claiming to be the surrounding file.
 func TestWindowFloorStaysClearOfTheDiffsOwnContext(t *testing.T) {
 	const differContext = 3
 
