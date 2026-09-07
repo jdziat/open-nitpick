@@ -117,6 +117,22 @@ func (s ModelSpec) validate(required bool) []error {
 			}
 		}
 	}
+	for i, arg := range s.CredentialCommand {
+		if strings.TrimSpace(arg) == "" {
+			errs = append(errs, fmt.Errorf("credential_command[%d] is empty", i))
+		}
+	}
+	if s.APIKeyKeyring != "" {
+		// Both halves have to be there. One slash is not enough: "/account"
+		// and "service/" each carry exactly one and name nothing the keystore
+		// can look up.
+		service, account, ok := strings.Cut(s.APIKeyKeyring, "/")
+		if !ok || strings.TrimSpace(service) == "" || strings.TrimSpace(account) == "" ||
+			strings.Contains(account, "/") {
+			errs = append(errs, fmt.Errorf("api_key_keyring %q must be \"service/account\"", s.APIKeyKeyring))
+		}
+	}
+
 	if s.Timeout < 0 {
 		errs = append(errs, fmt.Errorf("timeout must not be negative, got %s", s.Timeout))
 	}

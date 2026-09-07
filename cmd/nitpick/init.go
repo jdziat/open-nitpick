@@ -79,7 +79,12 @@ Flags:
 	if err != nil {
 		return fmt.Errorf("read %s: %w", root, err)
 	}
-	matched := linters.Suggest(files)
+
+	// The file being written is not evidence about the repository. Counting it
+	// makes init report a different analyzer roster on a second run than on a
+	// first, because the config it just wrote is itself a YAML file that
+	// yamllint reads.
+	matched := linters.Suggest(without(files, config.FileName))
 
 	chosen := resolveModel(provider, model, os.Getenv)
 	body := renderConfig(chosen, matched)
@@ -390,26 +395,77 @@ func writeVerified(path, body string, c chosenModel) error {
 	}
 
 	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".nitpick.yaml.*")
+
+	// The file that gets validated and the file that gets kept are the same
+	// bytes whenever a model is known, so the kept one is written first and
+	// renamed into place after it passes. A rename is atomic: an interruption
+	// leaves the old file or the new one, never half of either, which a second
+	// os.WriteFile to the destination could not promise.
+	keep, err := writeTemp(dir, body)
 	if err != nil {
 		return err
 	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }()
+	// Cleared once the rename has taken it, because the deferred remove names a
+	// path that a successful rename has already consumed. On Unix removing it
+	// fails harmlessly; on Windows the source can survive a rename, and the
+	// remove would delete the config just written.
+	defer func() {
+		if keep != "" {
+			_ = os.Remove(keep)
+		}
+	}()
 
-	if _, err := tmp.WriteString(check); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
+	validated := keep
+	if check != body {
+		// No model was named, so the kept file's models block is commented out
+		// and a copy carrying one is what the loader is given.
+		if validated, err = writeTemp(dir, check); err != nil {
+			return err
+		}
+		defer func() { _ = os.Remove(validated) }()
 	}
 
-	if _, err := config.LoadFile(tmpName); err != nil {
+	if _, err := config.LoadFile(validated); err != nil {
 		return fmt.Errorf("the generated config did not load, so nothing was written: %w", err)
 	}
 
-	return os.WriteFile(path, []byte(body), 0o644)
+	if err := os.Chmod(keep, 0o644); err != nil {
+		return err
+	}
+	if err := os.Rename(keep, path); err != nil {
+		return err
+	}
+	keep = ""
+	return nil
+}
+
+// without returns the paths that are not the named repository-relative file.
+func without(files []string, name string) []string {
+	out := make([]string, 0, len(files))
+	for _, f := range files {
+		if f != name {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// writeTemp writes body to a new file beside dir and returns its path.
+func writeTemp(dir, body string) (string, error) {
+	f, err := os.CreateTemp(dir, ".nitpick.yaml.*")
+	if err != nil {
+		return "", err
+	}
+	if _, err := f.WriteString(body); err != nil {
+		_ = f.Close()
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	return f.Name(), nil
 }
 
 // report says what the file was built from, so the choices it made are

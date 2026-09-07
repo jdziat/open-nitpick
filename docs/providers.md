@@ -1,5 +1,172 @@
 # Providers and models
 
+Every provider below is registered in the SDK and usable as
+`models.default.provider`. `nitpick providers` prints the same list from the
+binary you are running, which is the answer to trust if this page has drifted.
+
+## Every provider at a glance
+
+The credential variable is what the provider reads when nothing else supplies a
+key. `LLM_API_KEY` is a fallback for every provider that lists one, and the
+keystore comes before both; see [Credentials](#credentials).
+
+| Provider | Credential variable | `base_url` | Notes |
+|---|---|---|---|
+| `anthropic` | `ANTHROPIC_API_KEY` | compiled in | Claude, native API rather than an OpenAI-compatible shim |
+| `azure` | `AZURE_OPENAI_API_KEY` or `AZURE_OPENAI_KEY` | **required** | `model` is the deployment name, not a model id |
+| `cerebras` | `CEREBRAS_API_KEY` | `https://api.cerebras.ai/v1` | |
+| `deepseek` | `DEEPSEEK_API_KEY` | `https://api.deepseek.com/v1` | |
+| `featherless` | `FEATHERLESS_API_KEY` | `https://api.featherless.ai/v1` | |
+| `fireworks` | `FIREWORKS_API_KEY` | `https://api.fireworks.ai/inference/v1` | |
+| `gemini` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | compiled in | native API |
+| `groq` | `GROQ_API_KEY` | `https://api.groq.com/openai/v1` | |
+| `llamacpp` | `LLAMA_CPP_API_KEY` | `http://localhost:8080` | local; loopback allowed without `allow_private_endpoint` |
+| `mistral` | `MISTRAL_API_KEY` | `https://api.mistral.ai/v1` | |
+| `ollama` | `OLLAMA_API_KEY` | `http://localhost:11434/v1` | local; key usually unset |
+| `openai` | `OPENAI_API_KEY` | `https://api.openai.com/v1` | |
+| `openrouter` | `OPENROUTER_API_KEY` | `https://openrouter.ai/api/v1` | a router; see [Pinning a router](#pinning-a-router-to-one-upstream) |
+| `perplexity` | `PERPLEXITY_API_KEY` or `PPLX_API_KEY` | `https://api.perplexity.ai` | |
+| `runpod` | `RUNPOD_API_KEY` | derived | needs `extra.endpoint_id` |
+| `synthetic` | `SYNTHETIC_API_KEY` | `https://api.synthetic.new/openai/v1` | flat subscription; see below |
+| `togetherai` | `TOGETHER_API_KEY` | `https://api.together.xyz/v1` | |
+| `zai` | `ZAI_API_KEY` | `https://api.z.ai/api/coding/paas/v4` | `extra.coding` selects the Coding API |
+
+Model ids are the vendor's own and are not listed here: they change faster than
+this page can. Take them from the provider's catalogue.
+
+## A worked example for each
+
+Every block below is a complete `.nitpick.yaml`. Each names only `provider` and
+`model`, because everything else in this file has a working default, and the
+credential comes from the keystore or the variable in the table above.
+
+```yaml
+# anthropic
+models: {default: {provider: anthropic, model: claude-sonnet-4-5}}
+```
+
+```yaml
+# openai
+models: {default: {provider: openai, model: gpt-5}}
+```
+
+```yaml
+# gemini
+models: {default: {provider: gemini, model: gemini-2.5-pro}}
+```
+
+```yaml
+# mistral
+models: {default: {provider: mistral, model: mistral-large-latest}}
+```
+
+```yaml
+# deepseek
+models: {default: {provider: deepseek, model: deepseek-chat}}
+```
+
+```yaml
+# groq, cerebras, fireworks, togetherai, featherless, perplexity:
+# same shape, one line each
+models: {default: {provider: groq, model: llama-3.3-70b-versatile}}
+```
+
+Three providers need more than a name.
+
+**Azure** addresses a deployment you created, so `model` is the deployment
+name and `base_url` is your resource endpoint. Neither has a default that could
+be right.
+
+```yaml
+models:
+  default:
+    provider: azure
+    model: my-gpt5-deployment      # the deployment, not a model id
+    base_url: https://my-resource.openai.azure.com
+    api_key_env: AZURE_OPENAI_API_KEY
+```
+
+**RunPod** serves each deployment under its own endpoint id, which the base URL
+is built from, so it is required and passed through `extra`.
+
+```yaml
+models:
+  default:
+    provider: runpod
+    model: meta-llama/Llama-3.3-70B-Instruct
+    extra:
+      endpoint_id: abc123xyz
+```
+
+**Z.AI** has a separate Coding API endpoint, selected with `extra.coding`.
+
+```yaml
+models:
+  default:
+    provider: zai
+    model: glm-4.6
+    extra:
+      coding: "true"
+```
+
+`base_url`, `api_key_env`, `extra` and `allow_private_endpoint` are withheld
+from a repository's own `.nitpick.yaml` unless
+`NITPICK_TRUST_CONFIG_ENDPOINTS=1` is set. Put them in the user-level config
+instead, which no pull request can edit. See
+[Trust model](trust-model.md) and [Configuration](configuration.md#two-files).
+
+## Credentials
+
+The keystore is consulted first and needs no configuration. Store a key once:
+
+```bash
+nitpick auth set synthetic      # reads the key from standard input
+nitpick auth list               # which providers have one, never what it is
+nitpick auth delete synthetic
+```
+
+That writes to the operating system's keystore (Keychain on macOS, Credential
+Manager on Windows, Secret Service on Linux) under the service `open-nitpick`
+and the provider's name, which is where a review looks with nothing configured.
+The credential is read from standard input rather than an argument so it
+reaches neither the shell's history nor the process table.
+
+Resolution order, explicit sources before implicit ones:
+
+1. `credential_command`, a program whose standard output is the key
+2. `api_key_keyring`, a named keystore secret as `service/account`
+3. `api_key_env`, a named environment variable
+4. the keystore under the default name above
+5. nothing, leaving the provider to read its own variable from the table
+
+A source you named failing is an error, because writing down where your key
+lives says you do not want the environment used instead. A miss on step 4 falls
+through in silence, so a machine with no keystore, or a Linux session with no
+D-Bus, behaves as it always did.
+
+For a secret manager the keystore cannot reach, name a command. It is a command
+and its arguments rather than a shell line, so nothing in the file is expanded
+by a shell:
+
+```yaml
+# ~/.config/nitpick/config.yaml, never a repository's .nitpick.yaml
+models:
+  default:
+    provider: anthropic
+    model: claude-sonnet-4-5
+    credential_command: ["op", "read", "op://Private/anthropic/credential"]
+```
+
+```yaml
+    credential_command:
+      ["aws", "secretsmanager", "get-secret-value",
+       "--secret-id", "nitpick/anthropic", "--query", "SecretString", "--output", "text"]
+```
+
+`credential_command` and `api_key_keyring` are withheld from a repository's own
+config for the reason `api_key_env` is: one chooses which stored secret is read,
+the other runs a program in the job holding your credentials.
+
 ## Synthetic (recommended)
 
 [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR) hosts open-weight

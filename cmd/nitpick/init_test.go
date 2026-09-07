@@ -262,3 +262,32 @@ func read(t *testing.T, path string) string {
 	}
 	return string(data)
 }
+
+// The generated file is renamed into place, so nothing is left beside it and a
+// second run with the same inputs writes the same file.
+//
+// This does not exercise a validation failure. The generator has no input that
+// produces a config the loader rejects, so there is nothing to inject from out
+// here; what a failure would leave behind is covered by the rename itself.
+func TestInitLeavesNoTemporaryFileAndIsIdempotent(t *testing.T) {
+	root := initRepo(t, "main.go", "go.mod")
+	runInitIn(t, "-repo", root, "-provider", "openai", "-model", "gpt-4o")
+
+	before := read(t, filepath.Join(root, config.FileName))
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".nitpick.yaml.") {
+			t.Errorf("a temporary file was left behind: %s", e.Name())
+		}
+	}
+
+	// A second run under -force rewrites it, and the content is the same
+	// because the inputs are: the rename replaced rather than appended.
+	runInitIn(t, "-repo", root, "-provider", "openai", "-model", "gpt-4o", "-force")
+	if after := read(t, filepath.Join(root, config.FileName)); after != before {
+		t.Error("rewriting the file with the same inputs produced different content")
+	}
+}

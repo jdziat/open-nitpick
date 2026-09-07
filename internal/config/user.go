@@ -149,9 +149,13 @@ func (c *Config) overlay(user, repo []byte, trusted bool) (dropped, userKeys, ov
 	}
 	repoNode, err := documentNode(repo)
 	if err != nil {
-		// Left to merge to report, so the message names the repository's file
-		// and matches what a single-file load has always said.
-		repoNode = nil
+		// Refused rather than merged, whether or not the file is trusted.
+		// Untrusted, merging would hand the decoder a document with nothing
+		// pruned from it, so one this parser rejects and the decoder accepts
+		// would carry every key the prune exists to remove. Trusted, the
+		// decoder is about to reject the same bytes anyway, and reporting it
+		// here says which parse failed.
+		return nil, nil, nil, fmt.Errorf("parse config: %w", err)
 	}
 
 	if len(user) > 0 {

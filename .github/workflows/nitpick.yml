@@ -59,6 +59,19 @@ jobs:
           app-id: ${{ env.NITPICK_APP_ID }}
           private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
 
+      # Without these the review's deterministic half is absent: the reviewer
+      # reports "golangci-lint is not on PATH" and posts model findings alone,
+      # on every pull request, which reads the same as an analyzer that ran and
+      # found nothing. The toolchain comes from go.mod and the analyzer from
+      # tools/go.mod, the pair ci.yml uses, because a golangci-lint built with
+      # an older Go refuses a go.mod that targets a newer one.
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+      - name: Install golangci-lint
+        working-directory: tools
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+
       - uses: ./
         with:
           github-token: ${{ steps.app.outputs.token || github.token }}

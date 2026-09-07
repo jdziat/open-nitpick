@@ -29,8 +29,10 @@ func (e *Engine) applyBudget(
 	}
 
 	remaining := b.MaxSpend
+	var priorSpent float64
 	if b.EffectiveScope() == config.BudgetScopePullRequest {
 		spent := e.priorSpend(ctx, ref, prior)
+		priorSpent = spent
 		remaining -= spent
 		if spent > 0 {
 			e.log().Info("prior spend on this pull request counts against the ceiling",
@@ -43,7 +45,7 @@ func (e *Engine) applyBudget(
 
 	ranked := Rank(files)
 	keep, fit := FitToBudget(e.Config, plan, ranked, remaining)
-	fit.Prior = b.MaxSpend - remaining
+	fit.Prior = priorSpent
 
 	if !fit.Trimmed() {
 		e.log().Info("within the spending ceiling",

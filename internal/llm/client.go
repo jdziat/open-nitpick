@@ -8,6 +8,7 @@
 package llm
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -64,7 +65,18 @@ func (c *Client) String() string { return c.Spec.Provider + "/" + c.Spec.Model }
 
 // Build constructs a client from a model spec. Unknown providers and missing
 // credentials fail here, before any request is made.
+//
+// It resolves the credential under a background context, so a credential_command
+// is bounded by its own timeout rather than by the caller's cancellation. Use
+// BuildContext from a path that has a context: on Ctrl-C, a secret manager
+// waiting on a fingerprint should stop with the run.
 func Build(spec config.ModelSpec) (*Client, error) {
+	return BuildContext(context.Background(), spec)
+}
+
+// BuildContext is Build under a caller's context, which bounds the credential
+// command it may have to run.
+func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 	if err := validateProvider(spec.Provider); err != nil {
 		return nil, err
 	}
@@ -83,10 +95,14 @@ func Build(spec config.ModelSpec) (*Client, error) {
 		// documents allow_private_endpoint as granting both.
 		AllowHTTP: spec.AllowPrivateEndpoint,
 	}
-	if key, ok := spec.APIKey(nil); ok {
+	// Credential resolution: the keystore and a secret manager before the
+	// environment, and the SDK's own conventional variable only when none of
+	// them said anything. See credential.go for the order and why.
+	switch key, ok, err := resolveCredential(ctx, spec, nil); {
+	case err != nil:
+		return nil, fmt.Errorf("model %s/%s: %w", spec.Provider, spec.Model, err)
+	case ok:
 		cfg.APIKey = key
-	} else if spec.APIKeyEnv != "" {
-		return nil, fmt.Errorf("model %s/%s: %s is empty", spec.Provider, spec.Model, spec.APIKeyEnv)
 	}
 
 	client, err := llms.New(spec.Provider, cfg)

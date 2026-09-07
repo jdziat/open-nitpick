@@ -26,9 +26,9 @@ because it could not be run here.
 | Static analyzers | ~50 tools, auto-selected | 33 tools, auto-detected when installed, every one isolated from the tree; see [analyzers.md](analyzers.md) |
 | Repository context | indexes the repository | attaches the definitions a changed line uses: Go (types and methods), TypeScript (aliases, barrels), Python (package re-exports), Ruby (Rails autoload), Rust, Java, Kotlin, C/C++; and the untouched callers of what a change redefines, with the constants they pass: Go, Python, TypeScript |
 | Disclosure | summary and walkthrough | every file not reviewed, every analyzer that did not run, every finding an analyzer produced and the review discarded, every part of the change an analyzer did not cover, every finding a domain expert overruled |
-| Chat, `@mention` commands | yes | no |
+| Chat, `@mention` commands | yes | yes; `@nitpick review` reviews again, `@nitpick resolve` closes a thread, anything else is a question answered in it. Bounded by `review.respond.from`, which defaults to owner, member and collaborator, and by `max_per_pull_request` |
 | Learnings from human feedback | yes | no |
-| Multi-line committable suggestions | yes | single-line suggestions only; multi-line fixes are described |
+| Multi-line committable suggestions | yes | yes, up to 40 lines within one hunk, and only when the lines it would replace match the diff; a range that fails either check is published as a described change rather than a wrong one-click apply |
 | Sequence diagrams, docstring generation, issue creation | yes | no |
 | Measurement | vendor benchmark | a corpus, a judge-free harness, and a findings document that records its own mistakes |
 

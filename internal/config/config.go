@@ -95,6 +95,21 @@ type ModelSpec struct {
 	// empty the SDK provider resolves its own conventional variable.
 	APIKeyEnv string `yaml:"api_key_env"`
 
+	// APIKeyKeyring names a secret in the operating system's keystore as
+	// "service/account", for example "open-nitpick/synthetic". Empty still
+	// consults the keystore under a default name; see internal/llm/credential.go.
+	APIKeyKeyring string `yaml:"api_key_keyring"`
+
+	// CredentialCommand is a command whose standard output is the credential,
+	// for a secret manager the keystore cannot reach: 1Password, AWS Secrets
+	// Manager, Vault.
+	//
+	// It is a command and its arguments, not a shell line, and it is run
+	// without a shell. A string split on spaces would make quoting decide
+	// whether an argument containing one is an argument or two, and a shell
+	// would make every character in this field a program.
+	CredentialCommand []string `yaml:"credential_command"`
+
 	Temperature *float64      `yaml:"temperature"`
 	MaxTokens   int           `yaml:"max_tokens"`
 	Timeout     time.Duration `yaml:"timeout"`
@@ -767,8 +782,15 @@ func (base ModelSpec) overlay(over ModelSpec) ModelSpec {
 	if over.BaseURL != "" {
 		out.BaseURL = over.BaseURL
 	}
-	if over.APIKeyEnv != "" {
+	// The three credential sources move as a group. They are alternatives
+	// rather than layers, so an override that names any one of them replaces
+	// all three: a role that says its key is in a keystore entry must not
+	// inherit the default's credential_command and have it win, which is what
+	// copying them independently produced.
+	if over.APIKeyEnv != "" || over.APIKeyKeyring != "" || len(over.CredentialCommand) > 0 {
 		out.APIKeyEnv = over.APIKeyEnv
+		out.APIKeyKeyring = over.APIKeyKeyring
+		out.CredentialCommand = append([]string(nil), over.CredentialCommand...)
 	}
 	if over.Temperature != nil {
 		out.Temperature = over.Temperature

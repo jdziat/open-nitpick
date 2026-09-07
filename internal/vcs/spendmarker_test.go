@@ -38,3 +38,24 @@ func TestNothingPricedWritesNoSpendMarker(t *testing.T) {
 		t.Error("a zero marker was read as a spend to subtract")
 	}
 }
+
+// The pattern reads back only what spendMarker writes. A review body is text
+// somebody else may have authored, and a looser pattern would take a
+// hand-written "spend:1" as a dollar already spent and shrink the next run's
+// ceiling by it.
+func TestOnlyTheFormThisToolWritesIsReadAsSpend(t *testing.T) {
+	for _, body := range []string{
+		"<!-- open-nitpick spend:1 -->",
+		"<!-- open-nitpick spend:99 -->",
+		"<!-- open-nitpick spend:1.5 -->",
+		"<!-- open-nitpick spend:.500000 -->",
+	} {
+		if v, ok := parseSpend(body); ok {
+			t.Errorf("parseSpend(%q) = %v, want it refused", body, v)
+		}
+	}
+
+	if v, ok := parseSpend(spendMarker(1)); !ok || v != 1 {
+		t.Errorf("the marker this tool writes did not read back: %v, %v", v, ok)
+	}
+}
