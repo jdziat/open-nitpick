@@ -1483,6 +1483,13 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		}
 	}
 
+	// The no-new-claims contract, when it is on: every published finding
+	// carries the words the reviewer wrote, not triage's restatement of them.
+	byOrigin := origins{}
+	if e.Config.Review.TriageNoNewClaims {
+		byOrigin = originsOf(findings)
+	}
+
 	kept := make([]Finding, 0, len(result.Findings))
 	for _, f := range result.Findings {
 		if !f.Valid() {
@@ -1492,6 +1499,21 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 			e.log().Warn("triage invented a finding for an unreported path; dropping",
 				"path", f.Path, "title", f.Title)
 			continue
+		}
+		if e.Config.Review.TriageNoNewClaims {
+			origin, ok := byOrigin.find(f.Path, f.Line)
+			if !ok {
+				// A reported path, a line no reviewer reported at, and words
+				// triage wrote. That is a new claim, which is the thing the
+				// path check was always assumed to be catching and never did.
+				e.log().Warn("triage made a claim at a line no reviewer reported; dropping",
+					"at", describe(f), "title", f.Title)
+				continue
+			}
+			if changed := restore(&f, origin); len(changed) > 0 {
+				e.log().Debug("restored the reviewer's words over triage's",
+					"at", describe(f), "fields", changed)
+			}
 		}
 		e.recordSeverity(&f)
 		e.restoreSeverityProvenance(&f, severityBefore)

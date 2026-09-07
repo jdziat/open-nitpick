@@ -392,6 +392,11 @@ type Review struct {
 	// the window each changed file itself gets.
 	RelatedContextTokens int `yaml:"related_context_tokens"`
 
+	// TriageNoNewClaims restores the reviewer's own words over anything triage
+	// rewrote, so triage may select, drop, group and re-anchor findings but may
+	// not author them. See internal/review/noclaims.go.
+	TriageNoNewClaims bool `yaml:"triage_no_new_claims"`
+
 	// GroundTriage attaches the change itself to the triage prompt.
 	//
 	// Triage is asked for "a short walkthrough of the change" and is shown the
