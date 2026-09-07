@@ -79,13 +79,18 @@ models:
     model: an-editing-model   # provider inherited from models.default
 
 review:
-  budget:
-    max_fix_spend: 0.50       # priced with the same rates as max_spend
   respond:
     fix:
       from: [owner, member]   # defaults to owner, member, collaborator
-      max_per_pull_request: 5
 ```
+
+!!! warning "A fix pass has no spending ceiling"
+
+    `review.budget.max_spend` bounds a review by dropping the lowest-ranked
+    files from a packed plan. A fix pass has neither a plan nor a ranking, so
+    it cannot share that machinery, and no ceiling of its own exists yet. What
+    bounds a fix today is who may ask for one: the association list, and the
+    write permission the forge is asked for directly.
 
 There is no default fix model, deliberately. Every measurement in this
 repository scores a reviewer on recall and noise, and neither says whether a
@@ -109,7 +114,10 @@ Four refusals, and they are separate on purpose:
 - The asker needs write or admin permission, which the forge is asked for
   directly. `COLLABORATOR` covers read-level access, so an association is the
   cheap half of this gate rather than the gate.
-- A pull request from a fork is refused, in the workflow and again at the write.
+- A pull request from a fork is refused before the model call, and again at the
+  write. Not in the workflow condition: an `issue_comment` payload carries no
+  head repository, so the condition cannot see whether the pull request is a
+  fork's.
 - Only paths the pull request already changes may be written, and `.github`,
   `.nitpick.yaml` and `.git` are refused whatever the diff says.
 

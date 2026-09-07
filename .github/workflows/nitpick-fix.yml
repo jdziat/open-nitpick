@@ -1,10 +1,10 @@
 # open-nitpick applying a finding on @open-nitpick fix.
 #
-# A separate file from nitpick-respond.yml rather than another job in it, and
-# the separation is the point: this is the only workflow here that carries
-# contents: write. One typo in the condition below costs write access to the
-# repository, where the same typo in the respond workflow costs a wasted
-# answer, so the two do not share a condition to get wrong.
+# A separate file from nitpick-respond.yml rather than another job in
+# it, and the separation is the point: this is the only workflow here
+# that carries contents: write. One typo in the condition below costs
+# write access, where the same typo in the respond workflow costs a
+# wasted answer, so the two do not share a condition to get wrong.
 name: Fix
 
 on:
@@ -18,27 +18,26 @@ permissions:
   pull-requests: write
 
 concurrency:
-  # Per pull request. Two fix asks in a minute derive the same branch name, and
-  # the second would otherwise race the first to create it.
+  # Per pull request. Two fix asks in a minute derive the same branch
+  # name, and the second would otherwise race the first to create it.
   group: nitpick-fix-${{ github.event.issue.number || github.event.pull_request.number }}
 
 jobs:
   fix:
     runs-on: ubuntu-latest
-    # Four conditions. The comment asks for a fix, the event is on a pull
-    # request, the author is one the forge calls a writer, and the pull request
-    # is not from a fork.
+    # Three conditions: the comment asks for a fix, the event is on a
+    # pull request, and the author is one the forge calls a writer.
     #
-    # The fork test is the one this workflow adds over the respond workflow.
-    # A fix reads the head's code and writes a branch here, so a fork's pull
-    # request would put code from outside this repository on a branch inside
-    # it, under this tool's name. `nitpick respond` refuses the same thing
-    # itself, and vcs.ProposeChange refuses it again at the write; this is the
-    # cheap half that stops the runner from starting.
+    # There is no fork test here, and that is a limit rather than a
+    # choice. An issue_comment payload carries no head repository, so
+    # this condition cannot see whether the pull request is a fork's.
+    # The refusal happens twice in code instead: `nitpick respond`
+    # refuses before the model call, and vcs.ProposeChange refuses
+    # again at the write.
     #
-    # The association test is not the write gate. GitHub's COLLABORATOR covers
-    # anyone invited to the repository, read access included, so the binary
-    # asks the forge for the asker's actual permission before it writes.
+    # The association test is not the write gate either. GitHub's
+    # COLLABORATOR covers anyone invited at all, read access included,
+    # so the binary asks the forge for the asker's real permission.
     if: >-
       contains(github.event.comment.body, '@open-nitpick fix') &&
       (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request != null) &&
@@ -56,10 +55,10 @@ jobs:
 
       # The App token, and no fallback to github.token.
       #
-      # A pull request opened with the default token raises no workflow, so the
-      # fix would arrive with no checks at all while its body says the checks
-      # are the verification. That is a promise nothing keeps, and refusing to
-      # run is better than making it.
+      # A pull request opened with the default token raises no
+      # workflow, so the fix would arrive with no checks at all while
+      # its body says the checks are the verification. That is a
+      # promise nothing keeps, and refusing is better than making it.
       - name: Token for the review app
         id: app
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0

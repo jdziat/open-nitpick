@@ -57,6 +57,14 @@ func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref
 		return err
 	}
 
+	// Before the model call, not only at the write. ProposeChange refuses a
+	// fork too, but by then the credit is spent reading code from outside
+	// this repository.
+	if pr.HeadRepo == "" || pr.BaseRepo == "" || pr.HeadRepo != pr.BaseRepo {
+		return reply(ctx, gh, ref, ev, fmt.Sprintf(
+			"@%s I do not apply findings on a pull request from a fork.", ev.Author))
+	}
+
 	findings, err := gatherFindings(ctx, gh, ref, ev, all)
 	if err != nil {
 		return err
@@ -162,7 +170,14 @@ func gatherFindings(ctx context.Context, gh *vcs.GitHub, ref vcs.Ref, ev *conver
 		if !strings.Contains(c.Body, gh.Bot) {
 			continue
 		}
-		return []fix.Finding{{Path: ev.Path, Line: ev.Line, Body: c.Body}}, nil
+		// The fingerprint comes from the comment, not from nothing. Without
+		// it the branch is named after the pull request alone, so a second
+		// fix on the same pull request collides with the first and is
+		// reported as one already open.
+		return []fix.Finding{{
+			Path: ev.Path, Line: ev.Line, Body: c.Body,
+			Fingerprint: vcs.FingerprintOf(c.Body),
+		}}, nil
 	}
 	return nil, nil
 }

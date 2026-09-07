@@ -457,18 +457,3 @@ func TestTheFixModelDoesNotFallBackToTheReviewer(t *testing.T) {
 		t.Errorf("spec = %s/%s", spec.Provider, spec.Model)
 	}
 }
-
-// A ceiling with no rates cannot bind, and the failure would be silent.
-func TestTheFixCeilingNeedsRates(t *testing.T) {
-	cfg := Defaults()
-	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
-	cfg.Review.Budget.MaxFixSpend = 0.50
-
-	err := cfg.Validate()
-	if err == nil {
-		t.Fatal("a fix ceiling with no prices was accepted")
-	}
-	if !strings.Contains(err.Error(), "max_fix_spend") {
-		t.Errorf("the refusal does not name the key: %v", err)
-	}
-}

@@ -58,23 +58,14 @@ type Respond struct {
 
 // FixRespond bounds who may make the reviewer change code.
 //
-// Separate from Respond because the two gates guard different things. An
-// association is a reasonable answer to "may this person spend my model
-// credit"; it is a weak answer to "may this person have code written into my
-// repository", since the forge's COLLABORATOR covers anyone invited at all,
-// read level included. The permission check in the fix path is the real
-// invariant and this is the cheap half of it.
+// Separate from Respond because an association answers "may this person spend
+// my credit" well and "may this person write to my repository" poorly:
+// COLLABORATOR covers anyone invited at all. The permission check in the fix
+// path is the real gate and this is its cheap half.
 type FixRespond struct {
 	// From lists the associations allowed to ask. Empty means
 	// DefaultRespondFrom, the same set answers use.
 	From []Association `yaml:"from"`
-
-	// MaxPerPullRequest caps how many fix passes one pull request may trigger.
-	// Zero, the default, is no cap.
-	//
-	// It is not the answer cap. One "fix all" is a single answer and a model
-	// call per finding, so a count of answers bounds nothing here.
-	MaxPerPullRequest int `yaml:"max_per_pull_request"`
 }
 
 // Allows reports whether an association may ask for a fix.
@@ -90,7 +81,10 @@ func (f FixRespond) Allows(assoc string) bool {
 		return false
 	}
 	for _, want := range f.EffectiveFrom() {
-		if want == got {
+		// Case-folded, because validation folds too. Comparing raw would
+		// accept `from: [OWNER]` at load and then refuse every owner at run,
+		// which is a config that is wrong only when someone uses it.
+		if Association(strings.ToLower(strings.TrimSpace(string(want)))) == got {
 			return true
 		}
 	}
@@ -118,9 +112,6 @@ func (f FixRespond) validate() []error {
 		default:
 			errs = append(errs, fmt.Errorf("review.respond.fix.from: %q is not an association", a))
 		}
-	}
-	if f.MaxPerPullRequest < 0 {
-		errs = append(errs, errors.New("review.respond.fix.max_per_pull_request cannot be negative"))
 	}
 	return errs
 }
