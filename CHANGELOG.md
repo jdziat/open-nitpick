@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.0](https://github.com/jdziat/open-nitpick/compare/v1.6.0...v1.7.0) (2026-09-07)
+
+
+### Features
+
+* **slop:** capitals doing a sentence's work, and comments that narrate ([#30](https://github.com/jdziat/open-nitpick/issues/30)) ([5c9f2b7](https://github.com/jdziat/open-nitpick/commit/5c9f2b7d5c694cedb079c2c455f99ade956e0e56))
+* **slop:** the cadence rule reads source comments too ([#28](https://github.com/jdziat/open-nitpick/issues/28)) ([ea0ee1d](https://github.com/jdziat/open-nitpick/commit/ea0ee1da8b55a4fdac2bc52dd095e37024d8b695))
+
 ## [1.6.0](https://github.com/jdziat/open-nitpick/compare/v1.5.1...v1.6.0) (2026-09-07)
 
 
