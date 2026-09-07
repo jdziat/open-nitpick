@@ -97,15 +97,11 @@ type LinterDiscardReporter interface {
 // It is a separate list from Report.Overruled because the two describe
 // different events. An overruled finding was judged: a domain expert read it
 // and said no, and the reader can weigh that. A discarded one was never judged
-// at all (it was removed by ANCHORING, because no comment could be attached to
-// the line it named), and until this existed nothing recorded that it had been
-// reported.
+// at all: it was removed by anchoring, because no comment could be attached to
+// the line it named. This list is the only record that it was reported.
 //
-// "Before triage" is what that used to say, and it stopped being true when the
-// anchor pass that runs after triage started reporting its own drops. The
-// distinction survives the correction (these were not weighed and rejected,
-// they were never weighed), but the list now spans the whole pipeline rather
-// than its first stage.
+// 2026-09-07: the list spans the whole pipeline, not only the stage before
+// triage. The anchor pass runs after triage and reports its own drops.
 //
 // Path is the path THE ANALYZER PRINTED, not a path this tool resolved. For the
 // reason that separates DiscardNotInChange from DiscardPathNotInCheckout, that
@@ -1190,9 +1186,9 @@ func (e *Engine) normalizeClass(f Finding) string {
 // would outrank critical and trip every gate, and "P1" would silently become
 // info with nothing to explain the surprise.
 //
-// THE BUG IT FIXES: this used to return only the normalized level, so a model
-// that said "P1" or "Critical" had its word destroyed here and nothing
-// recorded that a substitution had happened. internal/evals then published a
+// 2026-09-07: both the normalized level and the model's own word are returned.
+// Returning only the level destroyed the model's word with nothing recording
+// that a substitution had happened. internal/evals then published a
 // block captioned as each contender's own severity vocabulary, and answered it
 // from "was this finding produced by the Incumbent adapter?", so every model
 // this project ships was reported as having printed the word we had just
