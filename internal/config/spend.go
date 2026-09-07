@@ -28,7 +28,7 @@ const (
 // comment event runs in the BASE repository holding the repository's model
 // credential, whoever wrote the comment. On a public repository an open list
 // means every account on the forge can spend the maintainer's money, one
-// "@nitpick explain this" at a time, and nothing about a per-answer size cap
+// "@open-nitpick explain this" at a time, and nothing about a per-answer size cap
 // bounds a total whose multiplier is the number of strangers.
 //
 // CONTRIBUTOR is deliberately absent. It means "has a merged commit", which is

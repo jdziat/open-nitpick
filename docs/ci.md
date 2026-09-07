@@ -37,7 +37,7 @@ jobs:
 ```
 
 **Talking to it.** A comment on the pull request that starts with
-`@nitpick` is answered by a second workflow on `issue_comment` and
+`@open-nitpick` is answered by a second workflow on `issue_comment` and
 `pull_request_review_comment` events, running the Action with
 `command: respond`:
 
@@ -49,7 +49,7 @@ on:
 permissions: {contents: read, pull-requests: write, issues: write}
 jobs:
   respond:
-    if: contains(github.event.comment.body, '@nitpick')
+    if: contains(github.event.comment.body, '@open-nitpick')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,8 +62,8 @@ jobs:
           api-key: ${{ secrets.SYNTHETIC_API_KEY }}
 ```
 
-`@nitpick review` reviews the whole change again, not the increment.
-`@nitpick resolve` on an inline thread resolves it with a reply naming who
+`@open-nitpick review` reviews the whole change again, not the increment.
+`@open-nitpick resolve` on an inline thread resolves it with a reply naming who
 asked. Anything else is a question, answered in the same thread by the
 review model with the diff, the lines around the thread, and the thread
 so far as its context; forge-authored text is fenced as untrusted, so a

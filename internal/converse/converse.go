@@ -1,4 +1,4 @@
-// Package converse is the @nitpick conversation: a comment on a pull request
+// Package converse is the @open-nitpick conversation: a comment on a pull request
 // that mentions the reviewer is read as a command (review again, resolve this
 // thread) or as a question the model answers in the same thread, with the
 // change and the thread as its context.
