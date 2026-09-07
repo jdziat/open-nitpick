@@ -87,7 +87,7 @@ Flags:
 	if err := writeVerified(path, body, chosen); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "wrote %s\n", path)
+	_, _ = fmt.Fprintf(out, "wrote %s\n", path)
 	report(out, chosen, matched)
 
 	if workflow {
@@ -101,7 +101,7 @@ Flags:
 		if err := os.WriteFile(wf, []byte(renderWorkflow(chosen)), 0o644); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "wrote %s (pinned to %s)\n", wf, majorTag(version))
+		_, _ = fmt.Fprintf(out, "wrote %s (pinned to %s)\n", wf, majorTag(version))
 	}
 
 	return nil
@@ -217,7 +217,7 @@ func scanRepo(root string) ([]string, error) {
 // renderConfig builds the file.
 func renderConfig(c chosenModel, matched []linters.CatalogEntry) string {
 	var b strings.Builder
-	p := func(format string, a ...any) { fmt.Fprintf(&b, format, a...) }
+	p := func(format string, a ...any) { _, _ = fmt.Fprintf(&b, format, a...) }
 
 	p(`# open-nitpick configuration. Written by "nitpick init".
 #
@@ -315,7 +315,7 @@ persona:
 // as a comment, which tells a reader it covers their code without promising
 // their CI runner has it installed.
 func renderLinterRoster(b *strings.Builder, matched []linters.CatalogEntry) {
-	p := func(format string, a ...any) { fmt.Fprintf(b, format, a...) }
+	p := func(format string, a ...any) { _, _ = fmt.Fprintf(b, format, a...) }
 
 	var named, auto, blocked []linters.CatalogEntry
 	for _, e := range matched {
@@ -417,24 +417,24 @@ func writeVerified(path, body string, c chosenModel) error {
 func report(out io.Writer, c chosenModel, matched []linters.CatalogEntry) {
 	switch {
 	case c.Known() && c.FromEnv:
-		fmt.Fprintf(out, "  model:     %s/%s (from the environment)\n", c.Provider, c.Model)
+		_, _ = fmt.Fprintf(out, "  model:     %s/%s (from the environment)\n", c.Provider, c.Model)
 	case c.Known():
-		fmt.Fprintf(out, "  model:     %s/%s\n", c.Provider, c.Model)
+		_, _ = fmt.Fprintf(out, "  model:     %s/%s\n", c.Provider, c.Model)
 	default:
-		fmt.Fprintf(out, "  model:     none. Set models.default in the file, or export %s and %s.\n",
+		_, _ = fmt.Fprintf(out, "  model:     none. Set models.default in the file, or export %s and %s.\n",
 			config.EnvProvider, config.EnvModel)
 	}
 
 	if len(matched) == 0 {
-		fmt.Fprintln(out, "  analyzers: none matched this checkout")
+		_, _ = fmt.Fprintln(out, "  analyzers: none matched this checkout")
 		return
 	}
 	names := make([]string, 0, len(matched))
 	for _, e := range matched {
 		names = append(names, e.Name)
 	}
-	fmt.Fprintf(out, "  analyzers: %s\n", strings.Join(names, ", "))
-	fmt.Fprintln(out, "\nRun \"nitpick explain-config\" to see what this resolves to.")
+	_, _ = fmt.Fprintf(out, "  analyzers: %s\n", strings.Join(names, ", "))
+	_, _ = fmt.Fprintln(out, "\nRun \"nitpick explain-config\" to see what this resolves to.")
 }
 
 // renderWorkflow writes the Action workflow from docs/ci.md, pinned to this
