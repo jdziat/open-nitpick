@@ -128,7 +128,27 @@ func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref
 	case errors.Is(err, vcs.ErrHeadMoved):
 		return reply(ctx, gh, ref, ev, fmt.Sprintf(
 			"@%s this pull request moved while I was writing, so I stopped rather than revert the push. Ask again.", ev.Author))
+	case errors.Is(err, vcs.ErrNoWriteAccess):
+		// Named because it is the one failure whose fix is a setting rather
+		// than a retry, and because the run log says only 403.
+		if rerr := reply(ctx, gh, ref, ev, fmt.Sprintf(
+			"@%s I am not allowed to write here, so nothing was created. The workflow asks for `contents: write`; the credential it was handed does not have it.",
+			ev.Author)); rerr != nil {
+			return errors.Join(err, rerr)
+		}
+		return err
 	case err != nil:
+		// Every other failure says so in the thread as well. Without this the
+		// asker sees nothing: the run goes red on a page they were not
+		// watching, and the conversation they asked in stays silent, which
+		// reads the same as a fix still being written.
+		//
+		// The error is returned afterwards regardless, so the check still
+		// fails. Saying it twice is the point.
+		if rerr := reply(ctx, gh, ref, ev, fmt.Sprintf(
+			"@%s I could not write the change: %v", ev.Author, err)); rerr != nil {
+			return errors.Join(err, rerr)
+		}
 		return err
 	case change == nil:
 		return reply(ctx, gh, ref, ev, fmt.Sprintf("@%s I did not change anything.", ev.Author))

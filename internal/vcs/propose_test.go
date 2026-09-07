@@ -31,6 +31,7 @@ type proposeFake struct {
 
 	failSecondRead bool
 	failCreatePR   bool
+	forbidWrites   bool
 	treeBody       map[string]any
 }
 
@@ -70,6 +71,10 @@ func (f *proposeFake) handler(t *testing.T) http.HandlerFunc {
 
 		case strings.Contains(p, "/git/commits/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"sha": f.head, "tree": map[string]any{"sha": "tree-base"}})
+
+		case f.forbidWrites && r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]any{"message": "Resource not accessible by integration"})
 
 		case r.Method == http.MethodPost && strings.HasSuffix(p, "/git/trees"):
 			_ = json.NewDecoder(r.Body).Decode(&f.treeBody)
@@ -412,5 +417,36 @@ func TestProposeChangeUnwindsWhenThePullRequestIsRefused(t *testing.T) {
 	}
 	if f.deleted == "" {
 		t.Error("the branch was left behind with no pull request")
+	}
+}
+
+// A forge that refuses the write is reported as a missing permission rather
+// than as a bare status, because the two lead somewhere different: one is a
+// setting to change, the other is a request to repeat.
+//
+// The branch must not exist afterwards either. A 403 on the first write means
+// nothing was created, and a test that only checked the error would pass just
+// as well if the code created the ref and then failed.
+func TestProposeChangeNamesARefusedCredential(t *testing.T) {
+	f := &proposeFake{head: "head01", headRepo: "o/r", baseRepo: "o/r", forbidWrites: true}
+	change, err := propose(t, f, goodProposal())
+	if !errors.Is(err, ErrNoWriteAccess) {
+		t.Fatalf("error = %v, want ErrNoWriteAccess", err)
+	}
+	if change != nil {
+		t.Errorf("change = %+v, want nil", change)
+	}
+	if f.created != "" {
+		t.Errorf("created ref %q after a refused write", f.created)
+	}
+}
+
+// A write that fails for any other reason keeps its own error. Mapping every
+// failure to a permission problem would send the reader to the App settings
+// for an outage.
+func TestProposeChangeDoesNotCallEveryFailureAPermission(t *testing.T) {
+	f := &proposeFake{head: "head01", headRepo: "o/r", baseRepo: "o/r", failCreatePR: true}
+	if _, err := propose(t, f, goodProposal()); errors.Is(err, ErrNoWriteAccess) {
+		t.Fatalf("a 422 was reported as ErrNoWriteAccess: %v", err)
 	}
 }

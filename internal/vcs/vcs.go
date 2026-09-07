@@ -52,6 +52,13 @@ var ErrRefExists = errors.New("vcs: the branch already exists")
 // review does not touch.
 var ErrOutsideChange = errors.New("vcs: the path is not part of this change")
 
+// ErrNoWriteAccess reports that the forge refused a write this code had
+// already decided was allowed.
+//
+// Separate from ErrForbidden, which covers the refusals made here: a fork, a
+// protected path, an underived branch name.
+var ErrNoWriteAccess = errors.New("vcs: the credential may not write to this repository")
+
 // Ref identifies what to review.
 type Ref struct {
 	// Owner and Repo identify the repository on a forge. Both are empty for
