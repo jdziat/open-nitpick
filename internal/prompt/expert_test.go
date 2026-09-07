@@ -294,8 +294,8 @@ func TestEveryExpertPromptUsesTheReviewerSeverityScale(t *testing.T) {
 					t.Errorf("prompt uses %q, which is not a severity this schema accepts", f)
 				}
 			}
-			// The calibration rules from review.md, which are what actually
-			// hold severity down.
+			// The calibration rules from review.md, which are what holds
+			// severity down.
 			if !strings.Contains(e.prose, "not the worst one") {
 				t.Error("prompt must tell the expert to rate the demonstrated consequence")
 			}
@@ -606,8 +606,8 @@ func TestDomainVocabularyStillRoutes(t *testing.T) {
 // cannot see.
 //
 // That test checks a signal against its own normalized spelling, so "sha256"
-// passes, while signalText collapses punctuation, and the way anyone actually
-// writes it, SHA-256, arrives as two tokens. The route is then live in the
+// passes, while signalText collapses punctuation, so the ordinary spelling,
+// SHA-256, arrives as two tokens. The route is then live in the
 // table and dead in practice, which is the silent degradation the table's tests
 // exist to prevent.
 func TestSignalsMatchHowThePrimitivesAreWritten(t *testing.T) {

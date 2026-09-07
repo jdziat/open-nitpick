@@ -83,10 +83,10 @@ type Plan struct {
 	// Degraded records files that were reviewed, but from the diff alone with
 	// no file content at all, and why.
 	//
-	// These are kept apart from Skipped because the two mean opposite things to a
-	// reader. Both once shared this list, so a file whose content fetch failed
-	// was reviewed diff-only and then listed under "Files not reviewed",
-	// understating the review in exactly the way Skipped exists to prevent it
+	// These are kept apart from Skipped because the two mean opposite things to
+	// a reader: Skipped means no review happened, Degraded means one happened
+	// without file content. Merging them lists a reviewed file under "Files not
+	// reviewed", understating the review in the way Skipped exists to keep it
 	// from being overstated.
 	Degraded []Skip
 
@@ -94,25 +94,15 @@ type Plan struct {
 	// rather than whole, and how wide that window was.
 	//
 	// Separate from Degraded for the same reason Degraded is separate from
-	// Skipped: a windowed file was reviewed WITH file context, just not all of
+	// Skipped: a windowed file was reviewed with file context, just not all of
 	// it, and reporting it as diff-only would understate the review.
 	//
-	// IT must BE RENDERED, and this paragraph used to say it was not. A file over
-	// review.max_file_bytes was previously refused its content outright and
-	// landed in Degraded, which internal/review/render.go prints under "Reviewed
-	// from the diff only". Such a file now gets a window and lands here instead
-	// (a better review), so for as long as nothing printed this list, a reader
-	// who had been told something was told nothing, even where most of the file
-	// had been elided. Better context must not be paid for with worse disclosure.
-	//
-	// render.go closed that: renderSummary prints this list under "Reviewed
+	// This list has to be rendered. renderSummary prints it under "Reviewed
 	// with reduced file context", a heading kept distinct from both neighbours
-	// because a reader who concludes "not reviewed" re-reviews the file by hand
-	// and one who concludes "fully reviewed" trusts an absence of findings in
-	// the part that was elided. TestWindowedFilesAreDisclosed is the guard. The
-	// note here outlived the fix by two changes, which is its own small lesson:
-	// a comment naming an open regression is read as a task, and this one sent
-	// the next reader to implement something that already existed.
+	// because a reader who concludes "not reviewed" re-reviews the file by
+	// hand, and one who concludes "fully reviewed" trusts an absence of
+	// findings in the part that was elided. TestWindowedFilesAreDisclosed is
+	// the guard.
 	Windowed []Skip
 
 	// RelatedFiles names the files the change does not touch that related context
@@ -200,12 +190,12 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 		related.callers = cfg.Review.RelatedContextCallers
 	}
 
-	// Selection and content run in one pass so that review.max_files counts files
-	// that were reviewed. Selecting first meant a generated file, recognisable
-	// only once its content had been read, spent a slot and then dropped out of
-	// the review, and a reviewable file behind it was refused for a limit
-	// nothing reviewed had reached. Six files at max_files=3, the first three
-	// generated, reviewed nothing and reported success.
+	// Selection and content run in one pass so that review.max_files counts
+	// files that were reviewed. A generated file is recognisable only once its
+	// content is read, so selecting first spends a slot on one that then drops
+	// out of the review, and refuses a reviewable file behind it for a limit
+	// nothing reviewed has reached: six files at max_files=3 with the first
+	// three generated review nothing and report success.
 	entries := make([]Entry, 0, len(files))
 	for _, f := range files {
 		if err := ctx.Err(); err != nil {
@@ -286,13 +276,12 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 // fetchContent reads a file's contents. The returned reason is non-empty when
 // no content could be attached at all.
 //
-// It deliberately does not apply review.max_file_bytes. That check used to live
-// here, and rejecting a file before windowing was ever considered meant a
-// 255 KiB file got a full window while a 257 KiB one got nothing: a cap written
-// to bound how much is read had ended up deciding how much is understood. The
-// cap is enforced in fitEntry instead, where it can pick a narrower window
-// rather than throw the file's context away. Only encoding is decided here,
-// because content that is not text cannot be windowed into text.
+// It deliberately does not apply review.max_file_bytes. Rejecting a file
+// before windowing is considered gives a 255 KiB file a full window and a
+// 257 KiB one nothing, turning a cap on how much is read into a cap on how
+// much is understood. fitEntry enforces it instead, where it can pick a
+// narrower window rather than throw the file's context away. Only encoding is
+// decided here, because content that is not text cannot be windowed into text.
 func fetchContent(ctx context.Context, fetch ContentFetcher, f *diff.File) (content, reason string) {
 	data, err := fetch(ctx, f.Path)
 	switch {
@@ -477,9 +466,9 @@ func fitEntry(e *Entry, budget, maxBytes int, estimator *llms.TokenEstimator) st
 // deliberate half (fewer files per request means more attention each), but the
 // consequence is that max_files_per_request is a ceiling large files cannot
 // reach and the budget is a limit small ones cannot approach. Re-measure there
-// before retuning either, and take the numbers from the row that is named: the
-// 4.9% figure was once attributed to "six small files", which names a
-// different row that measures 36.1%.
+// before retuning either, and take each number from the row that is named:
+// 4.9% belongs to "6 tiny", and "6 small (200L)" is the row that measures
+// 36.1%.
 func batch(entries []Entry, maxFiles, budget int) []Batch {
 	var (
 		batches []Batch

@@ -38,7 +38,7 @@ type Expert struct {
 	// this" rather than watching a finding vanish.
 	Name string
 
-	// System is the expert's system prompt.
+	// System is what the model is given before the diff.
 	System string
 }
 
@@ -100,9 +100,9 @@ type route struct {
 // The cost of letting text override the class is bounded only because every
 // expert is told, in the shared validation contract, that being the wrong
 // specialist refutes nothing and re-rates nothing. Without that clause a
-// misroute is not a less informed opinion, it is a deletion: each prompt's
-// refutation list is a set of domain-membership tests, and "this is not a
-// credential" is a named reason. So a signal belongs here only if it names a
+// misroute is a deletion: each prompt's refutation list is a set of
+// domain-membership tests, and "this is not a credential" is a named reason.
+// So a signal belongs here only if it names a
 // domain rather than merely appearing in findings about one.
 //
 // Order is the routing rule, not decoration: the narrowest vocabulary comes

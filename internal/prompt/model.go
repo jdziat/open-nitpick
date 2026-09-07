@@ -54,8 +54,9 @@ func ModelGuidance(model string) string {
 	case FamilyQwen:
 		// Measured on the tuning, multi-file and info corpora with related
 		// context on, two runs each, against the same prompt without this
-		// layer: recall 0.72 → 0.81, 0.92 → 0.96 and 0.60 → 0.65, noise equal
-		// or lower on every corpus. See docs/comparison.md.
+		// layer: recall rises from 0.72 to 0.81, from 0.92 to 0.96 and from
+		// 0.60 to 0.65, with noise equal or lower on every corpus. See
+		// docs/comparison.md.
 		return "## Notes for this reviewer\n\n" +
 			"- Read every hunk of the diff and decide about each before reading the definitions " +
 			"section that may follow it. Those definitions resolve names the diff uses; they do not " +
@@ -64,9 +65,9 @@ func ModelGuidance(model string) string {
 			"- A small change with one hunk gets the same reading as a large one. The first file in " +
 			"the batch is not the only file in the batch.\n"
 	case FamilyGLM, FamilyDeepSeek:
-		// GLM had a note here and it was measured against its absence on the
-		// same three corpora: no recall change, and noise moved both ways
-		// (0.12 → 0.00 on info, 0.19 → 0.30 on multi-file). A layer that
+		// A note for GLM was measured against its absence on the same three
+		// corpora: no recall change, and noise moved both ways, from 0.12 to
+		// 0.00 on info and from 0.19 to 0.30 on multi-file. A layer that
 		// cannot show its contribution does not ship. DeepSeek's habit looks
 		// like Qwen's in the sweep, but its note was never measured, and an
 		// unmeasured note is the same thing.
