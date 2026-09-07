@@ -44,9 +44,22 @@ type reviewFlags struct {
 }
 
 func runReview(ctx context.Context, args []string) error {
-	var f reviewFlags
+	return reviewWithScope(ctx, "review", args, nil)
+}
 
-	fs := flag.NewFlagSet("review", flag.ContinueOnError)
+// reviewWithScope is runReview with an optional widening applied to the
+// configuration after it is loaded.
+//
+// One code path rather than two: `nitpick improve` differs from `nitpick
+// review` in the scope it generates at and nothing else, so a second
+// implementation would be two things to keep in step. scope is nil for
+// review.
+func reviewWithScope(ctx context.Context, name string, args []string, scope func(*config.Config)) error {
+	var f reviewFlags
+	var level string
+	var slop bool
+
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.StringVar(&f.repo, "repo", ".", "repository root")
 	fs.StringVar(&f.configPath, "config", "", "path to .nitpick.yaml (default: <repo>/.nitpick.yaml)")
 	fs.StringVar(&f.base, "base", "", "base revision (default: review uncommitted changes)")
@@ -63,8 +76,20 @@ func runReview(ctx context.Context, args []string) error {
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
 	fs.StringVar(&f.logFormat, "log-format", "text", "log format: text or json")
 
+	// improve only. review generates at config.GenerationLevel whatever the
+	// configured level says, so a level flag there would name something the
+	// command cannot honour.
+	if scope != nil {
+		fs.StringVar(&level, "level", string(config.NitpickPedantic), "how wide to generate: minimal, normal, pedantic")
+		fs.BoolVar(&slop, "slop", true, "include the slop class")
+	}
+
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: nitpick review [flags]\n\nReviews the working tree by default.\n\nFlags:")
+		if scope != nil {
+			fmt.Fprintln(os.Stderr, "Usage: nitpick improve [flags]\n\nThe wider pass: the classes a normal review filters out. Reviews the working tree by default.\n\nFlags:")
+		} else {
+			fmt.Fprintln(os.Stderr, "Usage: nitpick review [flags]\n\nReviews the working tree by default.\n\nFlags:")
+		}
 		fs.PrintDefaults()
 	}
 
@@ -78,6 +103,16 @@ func runReview(ctx context.Context, args []string) error {
 	// nothing, which is how -fail-on went missing in CI.
 	if fs.NArg() > 0 {
 		return fmt.Errorf("unexpected argument %q (flags must precede positional arguments)", fs.Arg(0))
+	}
+
+	// Before the config is read, so a mistyped flag is answered as a mistyped
+	// flag rather than as whatever the configuration happens to be missing.
+	if scope != nil {
+		switch config.NitpickLevel(level) {
+		case config.NitpickMinimal, config.NitpickNormal, config.NitpickPedantic:
+		default:
+			return fmt.Errorf("invalid -level %q (minimal, normal, pedantic)", level)
+		}
 	}
 
 	repo, err := filepath.Abs(f.repo)
@@ -99,6 +134,11 @@ func runReview(ctx context.Context, args []string) error {
 	}
 	if f.full {
 		cfg.Review.Incremental = false
+	}
+	if scope != nil {
+		scope(cfg)
+		cfg.Persona.Nitpick = config.NitpickLevel(level)
+		cfg.Review.Slop = slop
 	}
 
 	log := newLogger(f.verbose, f.logFormat)

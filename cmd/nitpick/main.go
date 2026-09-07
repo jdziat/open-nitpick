@@ -49,6 +49,8 @@ func run() int {
 		err = runFullReview(ctx, os.Args[2:])
 	case "repo-score":
 		err = runRepoScore(ctx, os.Args[2:])
+	case "improve":
+		err = runImproveCLI(ctx, os.Args[2:])
 	case "slop":
 		err = runSlop(ctx, os.Args[2:])
 	case "respond":
@@ -108,6 +110,7 @@ Usage:
                                    Review the whole tree, or the paths given, with a remediation plan
   nitpick repo-score [flags] [path...]
                                    The same, plus slop, bug and security findings per thousand lines, by language
+  nitpick improve [flags]          The wider pass: the classes a normal review filters out
   nitpick slop [flags] [path...]   AI slop only: the tells without a model, the model's slop rules, a score, and fixes
   nitpick respond [flags]          Answer an @open-nitpick comment on a pull request (review again, resolve, or a question)
   nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
