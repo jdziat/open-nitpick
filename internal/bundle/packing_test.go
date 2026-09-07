@@ -72,7 +72,7 @@ type fileSpec struct {
 func (s fileSpec) bytes() int { return s.Lines * synthLineBytes }
 
 // hunkStarts resolves where this spec's hunks begin, and rejects any layout
-// whose hunks would overlap — overlapping hunks would make the requested hunk
+// whose hunks would overlap, overlapping hunks would make the requested hunk
 // count a lie and quietly change what the window keeps.
 func (s fileSpec) hunkStarts(t *testing.T) []int {
 	t.Helper()
@@ -221,7 +221,7 @@ func buildCorpus(t *testing.T, specs []fileSpec) (diff.Files, ContentFetcher) {
 
 // packCase is one measurement: a set of files and the limits to pack them
 // under. Zero limits mean the shipped defaults, which is the configuration
-// whose behaviour actually matters.
+// whose behaviour matters.
 type packCase struct {
 	Name  string
 	Specs []fileSpec
@@ -489,7 +489,7 @@ func TestPackingTable(t *testing.T) {
 // describes. The previous version interpolated live numbers into fixed prose,
 // which is how it came to print that a 60-hunk file "cannot fit a window, so
 // ALL of its content is discarded" and that "nothing in the Plan records that
-// drop" — four lines under a row showing that same file windowed, truncated and
+// drop", four lines under a row showing that same file windowed, truncated and
 // recorded. Numbers that move under prose that does not are worse than no
 // notes: this table exists to be read by someone deciding packing policy.
 func packingNotes(t *testing.T, measured map[string]*Plan) string {
@@ -546,9 +546,8 @@ func packingNotes(t *testing.T, measured map[string]*Plan) string {
 				i, len(b.Entries), perRequest)
 		}
 	}
-	// Claim 3: both shapes of the same file keep a window, and the widths
-	// differ — which is the whole reason sizing cannot be a function of file
-	// size alone.
+	// Claim 3: both shapes of the same file keep a window, and the widths differ.
+	// Which is the whole reason sizing cannot be a function of file size alone.
 	for name, e := range map[string]Entry{"3 hunks at the top": clustered, "60 hunks throughout": scattered} {
 		if !e.Truncated || !e.HasContent() {
 			t.Errorf("%s: truncated=%v content=%d, want a window: the note below reports the width it settled on",
@@ -651,7 +650,7 @@ func fingerprint(p *Plan) string {
 }
 
 // TestPackingIsDeterministic pins reproducibility. An unstable packer makes
-// every downstream measurement — eval scores, token cost, latency — noise,
+// every downstream measurement (eval scores, token cost, latency), noise,
 // because two runs of the same pull request would send different requests.
 func TestPackingIsDeterministic(t *testing.T) {
 	for _, c := range packCases() {
@@ -699,13 +698,9 @@ func TestBatchNeverExceedsMaxFilesPerRequest(t *testing.T) {
 func TestOversizedEntryGetsItsOwnBatch(t *testing.T) {
 	// Chosen so exactly one entry cannot be made to fit: the 4x20-line diff
 	// alone costs ~1800 tokens and fitEntry cannot trim a diff, while a
-	// 20-line file costs ~500 and two of them share a request comfortably.
-	//
-	// The previous budget of 120 put ALL THREE entries over it, so every batch
-	// was a single over-budget entry no matter what the packer did and the
-	// assertion below could not fail: a batch() mutated to flush before every
-	// append — one file per batch, packing abandoned entirely — passed this
-	// test unchanged.
+	// 20-line file costs ~500 and two of them share a request comfortably. A
+	// budget that puts every entry over it makes the assertion below
+	// unfalsifiable.
 	const budget = 1500
 
 	// Two packable files on each side, so the case distinguishes "isolates the
@@ -881,7 +876,7 @@ func TestBatchWithUnsetLimitsStillPacksEveryEntry(t *testing.T) {
 
 // TestPackerFillsEachBatchUntilALimitBinds pins that no batch is closed early.
 // A batch flushed while both limits still had room is a request paid for and
-// half used, and — since concurrency is bounded — a slot another batch could
+// half used, and (since concurrency is bounded), a slot another batch could
 // have had. Stated against the limits rather than against measured sizes, so
 // it keeps its teeth when the sizing policy changes.
 func TestPackerFillsEachBatchUntilALimitBinds(t *testing.T) {
@@ -909,8 +904,8 @@ func TestPackerFillsEachBatchUntilALimitBinds(t *testing.T) {
 }
 
 // TestSmallFilesReachTheFileCeiling pins that MaxFilesPerRequest is reachable
-// at all. It is the only limit that ever splits a change made of small files —
-// six of them use a twentieth of the budget — so if the ceiling stopped
+// at all. It is the only limit that ever splits a change made of small files
+// (six of them use a twentieth of the budget), so if the ceiling stopped
 // binding, batching would silently become one request for the whole run.
 func TestSmallFilesReachTheFileCeiling(t *testing.T) {
 	cfg, six := measure(t, packCase{Name: "6 tiny", Specs: repeatSpec(tinyFile, 6)})

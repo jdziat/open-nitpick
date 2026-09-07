@@ -16,8 +16,8 @@ import (
 //   - Python: a package whose __init__.py re-exports a name from a submodule.
 //   - Go: a method called on a value of an imported type, whose doc comment is
 //     the contract, where the type's struct declaration says nothing.
-//   - Ruby: a Rails constant that no require names, found by Zeitwerk's rule —
-//     `Billing::Refund` lives at app/*/billing/refund.rb.
+//   - Ruby: a Rails constant that no require names, found by Zeitwerk's rule,
+//     where `Billing::Refund` lives at app/*/billing/refund.rb.
 //
 // Each follows at most two hops, and each fails closed: a name that cannot be
 // traced is context not attached.
@@ -268,11 +268,11 @@ func (c *relatedCollector) pyDefiningFile(file, name string) string {
 
 // --- Go: methods on imported types --------------------------------------------
 
-// goMethodWants returns, for a type T of package pkg that the change uses,
-// the methods called on ANY receiver in the added lines that pkg defines on
-// T. The receiver's static type is not known here, so a method is attached
-// on the strength of its name alone — which over-attaches only when two
-// types in scope share a method name, and under-attaches never.
+// goMethodWants returns, for a type T of package pkg that the change uses, the
+// methods called on ANY receiver in the added lines that pkg defines on T. The
+// receiver's static type is not known here, so a method is attached on the
+// strength of its name alone, which over-attaches only when two types in scope
+// share a method name, and under-attaches never.
 func (c *relatedCollector) goMethodWants(added string, goFiles []string, typeName string) []want {
 	called := map[string]int{}
 	for _, m := range regexp.MustCompile(`\.([A-Z]\w*)\s*\(`).FindAllStringSubmatch(added, -1) {

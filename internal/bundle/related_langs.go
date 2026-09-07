@@ -11,10 +11,10 @@ import (
 // same terms as the three in related.go: a changed line names a binding an
 // import brought in, the import is followed to a file in the repository, and
 // the definition is read out with its doc comment. Each resolver is written
-// against the language's ordinary layout — Cargo's src/, Ruby's
-// require_relative, Maven's src/main/java, C's quoted includes — and gives
-// up quietly on anything else: a definition not found is context not
-// attached, never a wrong file attached.
+// against the language's ordinary layout (Cargo's src/, Ruby's
+// require_relative, Maven's src/main/java, C's quoted includes), and gives up
+// quietly on anything else: a definition not found is context not attached,
+// never a wrong file attached.
 
 // --- Rust ----------------------------------------------------------------------
 
@@ -62,7 +62,7 @@ func (c *relatedCollector) rustModuleFile(root string, segments []string) string
 // rustUseTargets reads every `use` in the file and returns, for each binding
 // it introduces from inside the crate, the file that should define it.
 func (c *relatedCollector) rustUseTargets(e *Entry, root string) map[string]string {
-	targets := map[string]string{} // local name -> file
+	targets := map[string]string{} // local name to file
 	dir := path.Dir(e.File.Path)
 	if dir == "." {
 		dir = ""
@@ -291,7 +291,7 @@ func (c *relatedCollector) rubyWants(e *Entry) []want {
 
 	// Ruby has no import list: whatever a required file defines at top
 	// level is in scope. The names worth attaching are the constants and
-	// methods the change actually uses, so each required file's top-level
+	// methods the change uses, so each required file's top-level
 	// definitions are read and matched against the added lines.
 	for _, file := range files {
 		content, ok := c.read(file)
@@ -411,9 +411,9 @@ func (c *relatedCollector) jvmWants(e *Entry, ext string) []want {
 		wants = append(wants, want{file: file, name: name, uses: n, extract: jvmDefinitionFor(added)})
 	}
 
-	// inPackage finds the file under pkgDir that declares name: the file
-	// named after it, or — Kotlin puts top-level declarations in any file —
-	// whichever sibling with the extension declares it.
+	// inPackage finds the file under pkgDir that declares name: the file named
+	// after it, or (Kotlin puts top-level declarations in any file), whichever
+	// sibling with the extension declares it.
 	inPackage := func(pkgDir, name string) string {
 		if named := path.Join(pkgDir, name+ext); c.exists(named) {
 			return named
@@ -493,9 +493,9 @@ func capitalisedIdents(text string) []string {
 	return out
 }
 
-// jvmDefinitionFor extracts a class: its declaration with the doc comment,
-// and — because a whole class is usually too long — the members the change
-// names, each with its own doc comment.
+// jvmDefinitionFor extracts a class: its declaration with the doc comment, and
+// (because a whole class is usually too long), the members the change names,
+// each with its own doc comment.
 func jvmDefinitionFor(added string) func(content, name string) (Related, bool) {
 	return func(content, name string) (Related, bool) {
 		lines := splitLines(content)

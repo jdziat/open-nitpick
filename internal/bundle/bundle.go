@@ -38,10 +38,6 @@ type Entry struct {
 
 	// ContextLines is how many lines of surrounding code the window kept on
 	// each side of every change, meaningful only when Truncated.
-	//
-	// The width is chosen per file against the budget, so it has to be
-	// recorded. Render puts it in the prompt, which tells the model how much
-	// of the file it is not being shown.
 	ContextLines int
 
 	// Instructions are the configured path-scoped prompts that apply here.
@@ -87,11 +83,11 @@ type Plan struct {
 	// Degraded records files that WERE reviewed, but from the diff alone with
 	// no file content at all, and why.
 	//
-	// These are kept apart from Skipped because the two mean opposite things
-	// to a reader. Both once shared this list, so a file whose content fetch
-	// failed was reviewed diff-only and then listed under "Files not
-	// reviewed" — understating the review in exactly the way Skipped exists
-	// to prevent it from being overstated.
+	// These are kept apart from Skipped because the two mean opposite things to a
+	// reader. Both once shared this list, so a file whose content fetch failed
+	// was reviewed diff-only and then listed under "Files not reviewed",
+	// understating the review in exactly the way Skipped exists to prevent it
+	// from being overstated.
 	Degraded []Skip
 
 	// Windowed records files reviewed with a window around their changes
@@ -101,14 +97,13 @@ type Plan struct {
 	// Skipped: a windowed file was reviewed WITH file context, just not all of
 	// it, and reporting it as diff-only would understate the review.
 	//
-	// IT MUST BE RENDERED, and this paragraph used to say it was not. A file
-	// over review.max_file_bytes was previously refused its content outright
-	// and landed in Degraded, which internal/review/render.go prints under
-	// "Reviewed from the diff only". Such a file now gets a window and lands
-	// here instead — a better review — so for as long as nothing printed this
-	// list, a reader who had been told something was told nothing, even where
-	// most of the file had been elided. Better context must not be paid for
-	// with worse disclosure.
+	// IT MUST BE RENDERED, and this paragraph used to say it was not. A file over
+	// review.max_file_bytes was previously refused its content outright and
+	// landed in Degraded, which internal/review/render.go prints under "Reviewed
+	// from the diff only". Such a file now gets a window and lands here instead
+	// (a better review), so for as long as nothing printed this list, a reader
+	// who had been told something was told nothing, even where most of the file
+	// had been elided. Better context must not be paid for with worse disclosure.
 	//
 	// render.go closed that: renderSummary prints this list under "Reviewed
 	// with reduced file context", a heading kept distinct from both neighbours
@@ -120,10 +115,10 @@ type Plan struct {
 	// the next reader to implement something that already existed.
 	Windowed []Skip
 
-	// RelatedFiles names the files the change does not touch that related
-	// context was read from, and RelatedDefinitions counts what was attached.
-	// Disclosed so a reader knows the model saw more than the diff and its
-	// files — and which files, since a finding may lean on one.
+	// RelatedFiles names the files the change does not touch that related context
+	// was read from, and RelatedDefinitions counts what was attached. Disclosed
+	// so a reader knows the model saw more than the diff and its files, and which
+	// files, since a finding may lean on one.
 	RelatedFiles       []string
 	RelatedDefinitions int
 
@@ -205,13 +200,12 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 		related.callers = cfg.Review.RelatedContextCallers
 	}
 
-	// Selection and content run in one pass so that review.max_files counts
-	// files that were actually reviewed. Selecting first meant a generated file
-	// — only recognisable once its content had been read — spent a slot and
-	// then dropped out of the review, and a reviewable file behind it was
-	// refused for a limit nothing reviewed had reached. Six files at
-	// max_files=3, the first three generated, reviewed nothing and reported
-	// success.
+	// Selection and content run in one pass so that review.max_files counts files
+	// that were reviewed. Selecting first meant a generated file, recognisable
+	// only once its content had been read, spent a slot and then dropped out of
+	// the review, and a reviewable file behind it was refused for a limit
+	// nothing reviewed had reached. Six files at max_files=3, the first three
+	// generated, reviewed nothing and reported success.
 	entries := make([]Entry, 0, len(files))
 	for _, f := range files {
 		if err := ctx.Err(); err != nil {
@@ -237,8 +231,8 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 			content, skip := fetchContent(ctx, fetch, f)
 			switch {
 			case skip != "":
-				// Not fatal: review the diff without the full file. Recorded
-				// as degraded, not skipped — this file is still reviewed.
+				// Not fatal: review the diff without the full file. Recorded as degraded,
+				// not skipped. This file is still reviewed.
 				plan.Degraded = append(plan.Degraded, Skip{Path: f.Path, Reason: skip})
 
 			case cfg.Review.SkipGenerated && isGenerated(content):
@@ -269,9 +263,8 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 			}
 		}
 
-		// After fitEntry, so the file's own window is decided first and the
-		// related context takes only what the request has left — never the
-		// other way round.
+		// After fitEntry, so the file's own window is decided first and the related
+		// context takes only what the request has left, never the other way round.
 		if related != nil {
 			budget := min(cfg.Review.RelatedContextTokens, cfg.Review.TokenBudgetPerRequest-entry.Tokens)
 			entry.Tokens += related.collect(&entry, budget, estimator)
@@ -342,7 +335,7 @@ func skipReason(cfg *config.Config, f *diff.File) (string, bool) {
 // understood: it is compared against the file's own bytes, both for the whole
 // file and for the bytes a window retains of it. budget bounds what is SENT and
 // is compared against the rendered entry, line numbering and headings included,
-// because that is the text the provider actually receives. Neither is allowed
+// because that is the text the provider receives. Neither is allowed
 // to answer "no content at all" while a narrower window would have satisfied
 // it. The held prompt fragment needs no separate cap: it is the thing budget
 // measures.
@@ -378,12 +371,12 @@ func fitEntry(e *Entry, budget, maxBytes int, estimator *llms.TokenEstimator) st
 
 	win := newWindower(e.Content, e.File)
 
-	// probe reports whether a width fits, and records which limit turned it
-	// down. The last refusal is the narrowest one, so bound ends up naming the
-	// knob that stopped the window from being wider — not merely the one that
-	// rejected the whole file. Naming the wrong one sends an operator to a
-	// setting they can raise without anything changing, which the reason
-	// strings exist to prevent.
+	// probe reports whether a width fits, and records which limit turned it down.
+	// The last refusal is the narrowest one, so bound ends up naming the knob
+	// that stopped the window from being wider, not merely the one that rejected
+	// the whole file. Naming the wrong one sends an operator to a setting they
+	// can raise without anything changing, which the reason strings exist to
+	// prevent.
 	probe := func(width int) (text string, tokens int, ok bool) {
 		text, srcBytes, elided := win.render(width)
 		if !elided {
@@ -407,9 +400,9 @@ func fitEntry(e *Entry, budget, maxBytes int, estimator *llms.TokenEstimator) st
 
 	// Widen from the floor rather than narrow from the ceiling. Both find the
 	// same width, but this way every render is at most twice the size of the
-	// window that ends up shipping, where starting at the ceiling means
-	// rendering something close to the whole file first — the cost the byte cap
-	// was just moved above to avoid.
+	// window that ends up shipping, where starting at the ceiling means rendering
+	// something close to the whole file first, the cost the byte cap was just
+	// moved above to avoid.
 	var (
 		fit    int
 		over   int
@@ -455,12 +448,12 @@ func fitEntry(e *Entry, budget, maxBytes int, estimator *llms.TokenEstimator) st
 		return windowedReason(bound, fit)
 	}
 
-	// Not even the narrowest useful window fits. Drop file context and review
-	// the diff alone rather than send a request the provider will reject — a
-	// rejected request loses every file in its batch, so an over-budget send is
-	// worse than a thinner review. Recorded, because an entry that reads as
-	// fully attached while carrying nothing is the same silent zero the
-	// Degraded list exists to prevent.
+	// Not even the narrowest useful window fits. Drop file context and review the
+	// diff alone rather than send a request the provider will reject, a rejected
+	// request loses every file in its batch, so an over-budget send is worse than
+	// a thinner review. Recorded, because an entry that reads as fully attached
+	// while carrying nothing is the same silent zero the Degraded list exists to
+	// prevent.
 	e.Content = ""
 	e.Truncated = false
 	e.ContextLines = 0
@@ -481,12 +474,12 @@ func fitEntry(e *Entry, budget, maxBytes int, estimator *llms.TokenEstimator) st
 // request to 4.9% of budget and "6 small (200L)" to 36.1%, both split only by
 // the file ceiling, while "6 big (2000L)" costs 33,116 tokens a file and takes
 // a request each without ever reaching that ceiling. Packing by count is the
-// deliberate half — fewer files per request means more attention each — but the
+// deliberate half (fewer files per request means more attention each), but the
 // consequence is that max_files_per_request is a ceiling large files cannot
 // reach and the budget is a limit small ones cannot approach. Re-measure there
 // before retuning either, and take the numbers from the row that is named: the
-// 4.9% figure was once attributed to "six small files", which names a different
-// row that measures 36.1%.
+// 4.9% figure was once attributed to "six small files", which names a
+// different row that measures 36.1%.
 func batch(entries []Entry, maxFiles, budget int) []Batch {
 	var (
 		batches []Batch
