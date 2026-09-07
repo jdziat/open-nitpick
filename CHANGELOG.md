@@ -6,6 +6,14 @@
 ### Features
 
 * **converse:** [@open-nitpick](https://github.com/open-nitpick) improve, the wider pass on request ([#68](https://github.com/jdziat/open-nitpick/issues/68)) ([08e44bc](https://github.com/jdziat/open-nitpick/commit/08e44bcefdfcb8cf61dfa2b392df5dfafcbe933f)), closes [#54](https://github.com/jdziat/open-nitpick/issues/54)
+* **config:** `models.fix`, the model that edits code on a fix command ([#61](https://github.com/jdziat/open-nitpick/issues/61)) ([1ab8ce5](https://github.com/jdziat/open-nitpick/commit/1ab8ce55cb9c254f9e2b955312883fb0441bf087))
+
+    There is no default and there should not be: every measurement in
+    docs/findings.md scores a reviewer on recall and noise, and neither says
+    whether a model can produce a change that compiles. **Without
+    `models.fix`, `@open-nitpick fix` refuses**, and `nitpick
+    explain-config` names the model or says none is set. A fix it writes
+    stays unverified until the checks on the pull request it opens have run.
 
 
 ### Fixes
