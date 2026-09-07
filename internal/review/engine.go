@@ -629,7 +629,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// class and their line, and still pass the operator's ceiling and gate.
 	findings, advisories := holdAdvisories(dedupe(findings))
 
-	summary, findings, withheldByTriage, err := e.triage(ctx, pr, findings)
+	summary, findings, withheldByTriage, err := e.triage(ctx, pr, findings, e.grounding(raw))
 	if err != nil {
 		return nil, err
 	}
@@ -1373,12 +1373,27 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) ([]Finding,
 	return out, dropped
 }
 
+// grounding returns the change to attach to the triage prompt, or "" when
+// review.ground_triage is off.
+//
+// The whole diff, not the bundled plan: the plan is packed for the REVIEW
+// model's token budget, with windows and dropped content, and a walkthrough
+// written over a windowed view describes the parts that survived packing. The
+// triage model is the cheap one and the diff is the smallest complete
+// statement of what changed.
+func (e *Engine) grounding(raw []byte) string {
+	if !e.Config.Review.GroundTriage {
+		return ""
+	}
+	return string(raw)
+}
+
 // triage merges and filters findings with the cheap model, and writes the
 // walkthrough.
 //
 // When triage fails the run continues with locally deduped findings: a
 // duplicated review is worth more than no review.
-func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Finding) (string, []Finding, []Overruled, error) {
+func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Finding, change string) (string, []Finding, []Overruled, error) {
 	findings = dedupe(findings)
 	e.log().Info("triaging", "findings", len(findings), "model", e.Roles.Triage.String())
 
@@ -1399,7 +1414,11 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 	// what review.summary=false already did. The notices are the part that
 	// matters here: they are what makes silence mean something, and they are
 	// rendered from the report, not from this pass.
-	if len(findings) == 0 {
+	//
+	// review.ground_triage is the exception, and the only one: with the diff
+	// attached the model HAS been shown the change, so a walkthrough on a clean
+	// review is a description rather than an invention.
+	if len(findings) == 0 && !e.Config.Review.GroundTriage {
 		return "", nil, nil, nil
 	}
 
@@ -1410,7 +1429,7 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 
 	msgs := []llms.Message{
 		{Role: llms.RoleSystem, Content: base},
-		{Role: llms.RoleUser, Content: renderForTriage(pr, findings)},
+		{Role: llms.RoleUser, Content: renderForTriage(pr, findings, change)},
 	}
 
 	schema, err := schemaOption(triageSchemaName, func() (json.RawMessage, error) { return triageSchema(offeredClasses(e.Config.Review.Slop)) })
@@ -1891,11 +1910,19 @@ func pullRequestContext(pr *vcs.PullRequest) string {
 func oneLineTitle(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 // renderForTriage formats findings for the triage model.
-func renderForTriage(pr *vcs.PullRequest, findings []Finding) string {
+func renderForTriage(pr *vcs.PullRequest, findings []Finding, change string) string {
 	var b strings.Builder
 
 	if pr != nil && pr.Title != "" {
 		fmt.Fprintf(&b, "Change under review: %s\n\n", pr.Title)
+	}
+
+	// The diff, when review.ground_triage is on. Without it this message names
+	// the change only through the findings that happen to mention it, and the
+	// walkthrough the template asks for is written about something the model
+	// was never shown.
+	if change != "" {
+		fmt.Fprintf(&b, "The change under review:\n\n```diff\n%s\n```\n\n", change)
 	}
 
 	if len(findings) == 0 {
