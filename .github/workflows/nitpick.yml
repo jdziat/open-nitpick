@@ -23,7 +23,19 @@ jobs:
     runs-on: ubuntu-latest
     # Reviews of forked pull requests would need a token this workflow does not
     # safely have, and the model API key must never be exposed to fork code.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    #
+    # Dependabot is excluded for a different reason: GitHub withholds the
+    # repository's secrets from a pull_request run whose actor is
+    # dependabot[bot], keeping them in a separate Dependabot store, so the
+    # reviewer starts with no model credential and exits 2 with "API key is
+    # required". That is a red check on every dependency bump, saying nothing
+    # about the bump. Skipping is the honest answer rather than making a
+    # missing key exit 0, which would hide a real misconfiguration everywhere
+    # else. A SHA bump with the tag in the comment beside it is verified by
+    # reading the two, not by a model.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
     env:
       # A step's if cannot read the secrets context; it can read env.
       NITPICK_APP_ID: ${{ secrets.NITPICK_APP_ID }}
