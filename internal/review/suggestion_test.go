@@ -15,7 +15,7 @@ import (
 //
 // The SDK's reflective schema builder marks every struct field required, with
 // no opt-out. Applied to Finding that made `suggestion` mandatory, so a model
-// with no fix to offer had to invent one — and the invention got rendered as an
+// with no fix to offer had to invent one, and the invention got rendered as an
 // applicable block. The schema is hand-authored precisely to prevent this.
 func TestSuggestionIsNotSchemaRequired(t *testing.T) {
 	for name, build := range map[string]func() ([]byte, error){
@@ -89,7 +89,7 @@ func TestSeverityIsAClosedEnumInTheSchema(t *testing.T) {
 // TestSnappedFindingDropsSuggestion is the regression test for the corruption
 // observed in a live run: the model anchored a suggestion at line 13, the
 // anchor was relocated to line 15, and the suggestion was published against
-// line 15 — replacing unrelated code on one click.
+// line 15, replacing unrelated code on one click.
 func TestSnappedFindingDropsSuggestion(t *testing.T) {
 	files, err := parseDiff(engineDiff)
 	if err != nil {
@@ -141,7 +141,7 @@ func TestUnrelocatedFindingKeepsSuggestion(t *testing.T) {
 
 func TestMultiLineSuggestionIsNotApplicable(t *testing.T) {
 	// GitHub replaces only the anchored line. Offering a 4-line block as
-	// applicable leaves the original following lines in place — the observed
+	// applicable leaves the original following lines in place. The observed
 	// result is a duplicated if-block and an unbalanced brace.
 	body := renderComment2(Finding{
 		Severity: "error", Title: "x",
@@ -221,7 +221,7 @@ func baseCfg() *config.Config {
 //
 // PR text used to be passed as the "Repository instructions" layer, which is
 // rendered through text/template with missingkey=error. A description
-// containing {{ .Values.image.tag }} — routine in a Helm chart PR — therefore
+// containing {{ .Values.image.tag }} (routine in a Helm chart PR), therefore
 // failed the run with exit 2.
 func TestPRBodyIsNotTemplated(t *testing.T) {
 	got := pullRequestContext(&vcs.PullRequest{

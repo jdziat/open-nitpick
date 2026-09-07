@@ -34,7 +34,7 @@ type scriptedLLM struct {
 	err error
 
 	// seen records every prompt sent, so a test can assert on what the model
-	// was actually TOLD. Asserting only on what came back would pass against a
+	// was TOLD. Asserting only on what came back would pass against a
 	// prompt still carrying an injection the model happened to ignore.
 	seen []string
 
@@ -222,13 +222,14 @@ func TestReviewEndToEnd(t *testing.T) {
 // TestRewritingAModelsSeverityRecordsTheModelsWord pins the provenance half of
 // severity normalization.
 //
-// THE BUG: normalizeSeverity returned only the level and threw the model's word
-// away. internal/evals then published a block captioned as each contender's own
-// severity vocabulary, and answered "was this translated?" from the finding's
-// SOURCE — so every model this project ships was reported as having printed the
-// word we had just written over it. The same defect had been found and fixed for
-// the incumbent, where a lost word at least prints "(word not recorded)"; here
-// the substitute was quoted silently as the model's own.
+// THE BUG: normalizeSeverity returned only the level and threw the model's
+// word away. internal/evals then published a block captioned as each
+// contender's own severity vocabulary, and answered "was this translated?"
+// from the finding's SOURCE, so every model this project ships was reported as
+// having printed the word we had just written over it. The same defect had
+// been found and fixed for the incumbent, where a lost word at least prints
+// "(word not recorded)"; here the substitute was quoted silently as the
+// model's own.
 //
 // Both directions are asserted, and the second is the one that keeps the fix
 // honest: a model writing a level we already use has NOT been translated, and
@@ -318,12 +319,12 @@ func TestAnExpertRerateClearsTheEarlierTranslation(t *testing.T) {
 // kind of reporter, and clearing the pair for both was a bug.
 //
 // A model's raw word is its own RATING, so an expert re-rating makes it stale.
-// An analyzer's raw word is what the tool PRINTED, and semgrep does not retract
-// CRITICAL because an expert disagreed about impact. The finding is still
-// published as "flagged by semgrep(...)" with a level that is ours rather than
-// semgrep's, so zeroing the pair here made the report assert semgrep's own word
-// for it was "warning" — the substitution these two fields exist to prevent, on
-// the one class of finding that names a third party.
+// An analyzer's raw word is what the tool PRINTED, and semgrep does not
+// retract CRITICAL because an expert disagreed about impact. The finding is
+// still published as "flagged by semgrep(...)" with a level that is ours
+// rather than semgrep's, so zeroing the pair here made the report assert
+// semgrep's own word for it was "warning", the substitution these two fields
+// exist to prevent, on the one class of finding that names a third party.
 func TestAnExpertRerateKeepsAnAnalyzersWord(t *testing.T) {
 	f := Finding{
 		Path: "app.go", Line: 4, Class: string(config.ClassSecurity),
@@ -565,9 +566,9 @@ Binary files a/huge.bin and b/huge.bin differ
 func TestDegradedFilesAreNotReportedAsUnreviewed(t *testing.T) {
 	// Found by running open-nitpick on its own history. A file whose content
 	// fetch fails is reviewed from the diff alone, but was recorded in
-	// Plan.Skipped — which the summary prints under "Files not reviewed".
-	// Claiming a reviewed file was not reviewed is the same class of error as
-	// hiding a skipped one, just in the opposite direction.
+	// Plan.Skipped, which the summary prints under "Files not reviewed". Claiming
+	// a reviewed file was not reviewed is the same class of error as hiding a
+	// skipped one, just in the opposite direction.
 	report := &Report{
 		Summary: "Walkthrough.",
 		Plan: &bundle.Plan{

@@ -14,11 +14,12 @@ import (
 //
 // The triage user message is the numbered findings list plus, when the forge
 // supplies one, the pull request title. It never carries the diff. With an
-// empty list the model is asked to write a walkthrough of a change it was never
-// shown, and it answers with an invented one — on a fine-tuned gemma-4-E4B,
-// confidently describing a retry wrapper around an HTTP client for a fixture
-// whose change was a SQL migration. This test fails the moment the guard goes
-// back to consulting review.summary, which is what made that call reachable.
+// empty list the model is asked to write a walkthrough of a change it was
+// never shown, and it answers with an invented one, on a fine-tuned
+// gemma-4-E4B, confidently describing a retry wrapper around an HTTP client
+// for a fixture whose change was a SQL migration. This test fails the moment
+// the guard goes back to consulting review.summary, which is what made that
+// call reachable.
 func TestCleanReviewDoesNotCallTriage(t *testing.T) {
 	model := &scriptedLLM{fallback: `{"findings":[]}`}
 	provider := &stubProvider{diff: engineDiff}

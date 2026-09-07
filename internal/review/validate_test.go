@@ -80,9 +80,9 @@ func newValidator(model *scriptedLLM, policy config.Validation) *Validator {
 //
 // An expert that refutes but cannot say why has expressed doubt, not
 // knowledge, and doubt does not delete a finding. Treating it as a refutation
-// would convert this pass from a precision gain into a silent recall loss —
-// and the loss is invisible, because nobody reviews the comments that were
-// never posted.
+// would convert this pass from a precision gain into a silent recall loss. And
+// the loss is invisible, because nobody reviews the comments that were never
+// posted.
 func TestRefutationWithoutAReasonKeepsTheFinding(t *testing.T) {
 	for name, response := range map[string]string{
 		"empty reason":     `{"verdict":"refuted","reason":""}`,
@@ -144,7 +144,7 @@ func TestSeverityVerdictRevisesRatherThanDrops(t *testing.T) {
 
 	// The move is reported even though the finding survived it. Whether the new
 	// level is low enough to delete the finding is the gate's decision, and the
-	// validator does not know the gate — so it states what it did rather than
+	// validator does not know the gate, so it states what it did rather than
 	// deciding for itself that nobody needs to be told.
 	if len(overruled) != 1 {
 		t.Fatalf("overruled = %+v, want the re-rating recorded", overruled)
@@ -198,8 +198,8 @@ func TestSeverityVerdictWithoutAReasonKeepsTheOriginal(t *testing.T) {
 // real; a malformed second field is no reason to discard that.
 //
 // All three cases run through Normalize's ok=false: it reports true only for a
-// level a finding may carry, so "none" — the sentinel that outranks critical
-// and would trip every gate — is rejected there rather than by a second guard.
+// level a finding may carry, so "none" (the sentinel that outranks critical
+// and would trip every gate) is rejected there rather than by a second guard.
 // It is listed separately because it is the value with teeth.
 func TestSeverityVerdictWithoutAUsableLevelKeepsTheOriginal(t *testing.T) {
 	for name, response := range map[string]string{
@@ -428,7 +428,7 @@ func TestValidationRequestFencesUntrustedText(t *testing.T) {
 // contains.
 //
 // The code block is bundle.Render's output, and Render prints .nitpick.yaml's
-// per-path instructions at column 0 — a file the pull request under review is
+// per-path instructions at column 0, a file the pull request under review is
 // free to edit. A change that closes the fence, writes a paragraph in this
 // harness's voice, and reopens it would have its own sentence published as the
 // reason an expert withheld a real finding.
@@ -493,7 +493,7 @@ func scriptValidation(t *testing.T, finding Finding, verdict string) *scriptedLL
 
 // TestRefutedFindingsAreReportedNotVanished is the end-to-end guarantee: an
 // overruled finding is withheld from the pull request AND recorded, with who
-// overruled it and why. A finding that simply disappeared would be a bug that
+// overruled it and why. A finding that disappeared would be a bug that
 // looks like quality.
 func TestRefutedFindingsAreReportedNotVanished(t *testing.T) {
 	const reason = "the interpolated value is a package constant, so it is not attacker controlled"
@@ -636,9 +636,9 @@ func TestGatedOutRefutationsAreNotReported(t *testing.T) {
 		t.Fatalf("Review: %v", err)
 	}
 
-	// Three calls: review, triage, and the expert. Asserting it stops this
-	// test passing for the wrong reason — an empty Overruled list proves nothing
-	// if validation never ran.
+	// Three calls: review, triage, and the expert. Asserting it stops this test
+	// passing for the wrong reason, an empty Overruled list proves nothing if
+	// validation never ran.
 	if model.callCount() != 3 {
 		t.Fatalf("model calls = %d, want 3: the finding must actually have been validated", model.callCount())
 	}
@@ -673,11 +673,11 @@ func TestRefutedNotesFlattenModelText(t *testing.T) {
 // TestOverruledNotesCannotLeaveTheirSection is the containment the flattening
 // test above does not cover.
 //
-// The reason is model-authored, and the model wrote it after reading a diff the
-// author of the change controls. The list is rendered inside a <details>
+// The reason is model-authored, and the model wrote it after reading a diff
+// the author of the change controls. The list is rendered inside a <details>
 // element, so a `</details>` in that text closes the collapsed block and puts
 // everything after it at top level of a comment published under this bot's own
-// name — where GitHub renders an image and a link, and a reader has every
+// name, where GitHub renders an image and a link, and a reader has every
 // reason to trust both.
 func TestOverruledNotesCannotLeaveTheirSection(t *testing.T) {
 	report := &Report{Overruled: []Overruled{{
@@ -704,7 +704,7 @@ func TestOverruledNotesCannotLeaveTheirSection(t *testing.T) {
 // channel.
 //
 // Validation runs before the publication gate so that a severity verdict can
-// move a finding across it — which means a downgrade past review.min_severity
+// move a finding across it. Which means a downgrade past review.min_severity
 // deletes the finding as completely as a refutation does, while the expert has
 // AGREED the defect is real. Left unrecorded it is absent from the findings,
 // absent from the withheld list, and absent from the comment: the exact shape
@@ -791,9 +791,9 @@ func TestRevisionThatStaysPublishedIsNotReportedAsWithheld(t *testing.T) {
 // "nothing is dropped silently".
 //
 // review.summary asks for less narration. It is not permission to delete a
-// finding without saying so — and with the withheld list suppressed alongside
-// the walkthrough, publish() finds an empty review and posts nothing at all, so
-// a run whose only finding an expert overruled is indistinguishable from a
+// finding without saying so, and with the withheld list suppressed alongside
+// the walkthrough, publish() finds an empty review and posts nothing at all,
+// so a run whose only finding an expert overruled is indistinguishable from a
 // clean one.
 func TestWithheldFindingsSurviveSummariesBeingOff(t *testing.T) {
 	const reason = "the value is a package constant"
@@ -879,7 +879,7 @@ func TestCancellationKeepsEveryFinding(t *testing.T) {
 }
 
 // TestExpertSystemCarriesBothThePersonaAndTheContract pins the message an
-// expert is actually judging under.
+// expert is judging under.
 //
 // The specialist prompts carry the domain knowledge and the severity anchors;
 // the verdict vocabulary, the reason-is-mandatory rule and the do-not-refute-
@@ -924,7 +924,7 @@ func TestExpertSystemCarriesBothThePersonaAndTheContract(t *testing.T) {
 // The SDK's reflective builder marks every field required, which would make
 // `revised_severity` mandatory on every verdict. A model forced to fill it for
 // a finding whose severity is already right invents a level, and revise() then
-// applies it — silent severity churn on findings nobody disputed. The scripted
+// applies it, silent severity churn on findings nobody disputed. The scripted
 // tests cannot catch this: the fake model does not enforce the schema, so only
 // an assertion on the marshalled `required` array will.
 func TestRevisedSeverityIsNotSchemaRequired(t *testing.T) {
@@ -952,9 +952,9 @@ func TestRevisedSeverityIsNotSchemaRequired(t *testing.T) {
 		t.Error("revised_severity is missing from the schema entirely")
 	}
 	// reason is required on every verdict: it is the one field that makes a
-	// verdict auditable in the log, and the engine's own check that a
-	// refutation carries one is not a substitute — JSON-mode providers do not
-	// enforce required either.
+	// verdict auditable in the log, and the engine's own check that a refutation
+	// carries one is not a substitute, JSON-mode providers do not enforce
+	// required either.
 	if !slices.Contains(schema.Required, "reason") || !slices.Contains(schema.Required, "verdict") {
 		t.Errorf("required = %v, want both verdict and reason", schema.Required)
 	}
@@ -988,7 +988,7 @@ func TestPullRequestTextCannotForgeItsFence(t *testing.T) {
 // An empty or invented class is exactly where a model's unexpected vocabulary
 // lands, and this repository has already lost findings to one: a class it did
 // not recognize filtered them away. Such a finding must still be judged, by a
-// named expert with a real prompt — never skipped, and never dropped for a
+// named expert with a real prompt, never skipped, and never dropped for a
 // defect in its metadata.
 func TestUnroutableClassStillReachesAnExpert(t *testing.T) {
 	for _, class := range []string{"", "   ", "nonsense-class", "SEVERE"} {

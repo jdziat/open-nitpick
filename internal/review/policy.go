@@ -14,11 +14,11 @@ import (
 
 // PolicyResolver decides which configuration a review runs under.
 //
-// A change may not supply the policy it is reviewed under. open-nitpick reviews
-// pull requests, and a pull request can edit the .nitpick.yaml it is reviewed
-// under — so when the change modifies that file, the file in the change is not
-// authoritative for THIS review and policy comes from a revision the change
-// cannot write.
+// A change may not supply the policy it is reviewed under. open-nitpick
+// reviews pull requests, and a pull request can edit the .nitpick.yaml it is
+// reviewed under, so when the change modifies that file, the file in the
+// change is not authoritative for THIS review and policy comes from a revision
+// the change cannot write.
 //
 // This is deliberately one seam rather than a growing list of scrubbed keys.
 // config.sanitize withholds base_url, api_key_env, extra, allow_private_endpoint
@@ -41,7 +41,7 @@ type PolicyResolver interface {
 	ResolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, changed []string) (cfg *config.Config, modified bool, err error)
 }
 
-// Policy records which configuration a review actually ran under.
+// Policy records which configuration a review ran under.
 type Policy struct {
 	// Config is the configuration the run used. It is the engine's own unless
 	// Replaced, and never nil in a report the engine produced.
@@ -62,10 +62,11 @@ type Policy struct {
 // summary prints.
 //
 // A substituted policy is described by config itself, because it knows things
-// this package cannot reconstruct: which revision the accepted version was read
-// at, and — when even that failed — why nothing but built-in defaults was left.
-// "Defaults" alone would leave a maintainer unable to tell a base revision that
-// genuinely carried no configuration from one that could not be read.
+// this package cannot reconstruct: which revision the accepted version was
+// read at, and (when even that failed), why nothing but built-in defaults was
+// left. "Defaults" alone would leave a maintainer unable to tell a base
+// revision that carried no configuration from one that could not be
+// read.
 func (p Policy) Source() string {
 	if p.Config == nil {
 		return "built-in defaults"
@@ -84,7 +85,7 @@ func (p Policy) Source() string {
 //
 // Failure is fatal on purpose. A resolver that errors has not told us whether
 // the change edits the policy, and continuing under the change's own
-// configuration on a maybe is the outcome this exists to prevent — a run that
+// configuration on a maybe is the outcome this exists to prevent, a run that
 // reports success having read nothing is worse than a run that fails.
 func (e *Engine) resolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, files diff.Files) (Policy, error) {
 	current := Policy{Config: e.Config}
@@ -131,9 +132,9 @@ func (e *Engine) resolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.PullReq
 // printing on a pull request.
 //
 // The resolver's own answer is preferred because it is the only one that is
-// right: it is the repository-relative path the resolver MATCHED, so it names a
-// config below the root in full and survives the change that adds or deletes
-// the file. The fallbacks are for a resolver that does not record one —
+// right: it is the repository-relative path the resolver MATCHED, so it names
+// a config below the root in full and survives the change that adds or deletes
+// the file. The fallbacks are for a resolver that does not record one,
 // loaded.Source is absolute, so in CI it carries the runner's workspace path,
 // and its basename reports tools/ci/.nitpick.yaml as `.nitpick.yaml`, a path
 // that does not exist in the repository.

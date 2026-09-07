@@ -26,11 +26,11 @@ type Finding struct {
 	// always produce: the prompt's contract is to anchor AT the defect, and the
 	// hand-authored schema does not offer a model this field.
 	//
-	// It exists for reviewers that report a region instead. Scoring one of
-	// those by the start of its span alone is simply wrong — "the credential is
-	// on lines 11-12" has identified a defect on line 12 — and the error is not
-	// even stable: the same reviewer anchored the same defect at 7 on one run
-	// and 11-12 on the next, which start-only scoring turns from a reviewer's
+	// It exists for reviewers that report a region instead. Scoring one of those
+	// by the start of its span alone is wrong ("the credential is on lines
+	// 11-12" has identified a defect on line 12), and the error is not even
+	// stable: the same reviewer anchored the same defect at 7 on one run and
+	// 11-12 on the next, which start-only scoring turns from a reviewer's
 	// variance into a flipped benchmark result.
 	EndLine int `json:"end_line,omitempty"`
 
@@ -40,13 +40,12 @@ type Finding struct {
 	// a repeated pattern once, or a triage pass that merged duplicates across
 	// batches, both produce a single finding with more than one location.
 	//
-	// Ignoring them misreads the reviewer. Incumbent reported the SQL
-	// injection fixture as "store.go:3-6" — the import block, because its
-	// proposed fix deletes the fmt import — and then "Also applies to: 15-18",
-	// which is where the interpolation actually is. Reading only the primary
-	// anchor scores that as missing a defect it explicitly located, and a
-	// benchmark that reports a competitor missing something it found is worse
-	// than one that does not run.
+	// Ignoring them misreads the reviewer. Incumbent reported the SQL injection
+	// fixture as "store.go:3-6" (the import block, because its proposed fix
+	// deletes the fmt import), and then "Also applies to: 15-18", which is where
+	// the interpolation is. Reading only the primary anchor scores that
+	// as missing a defect it explicitly located, and a benchmark that reports a
+	// competitor missing something it found is worse than one that does not run.
 	//
 	// open-nitpick's own reviews leave this empty: the schema does not offer it
 	// and one finding gets one anchor.
@@ -56,7 +55,7 @@ type Finding struct {
 	Severity string `json:"severity"`
 
 	// SeverityTranslated records that Severity above is THIS PROJECT'S word
-	// rather than the reporter's own — because an adapter mapped a foreign
+	// rather than the reporter's own, because an adapter mapped a foreign
 	// vocabulary onto our five levels, because the reporter published no severity
 	// at all and we assigned one, or because the reporter published a word we did
 	// not recognize and normalized away.
@@ -86,7 +85,7 @@ type Finding struct {
 	// That is not hypothetical, and it happened on BOTH sides. internal/evals
 	// published a block captioned "what each contender called the defects it
 	// located" that read "critical x4, warning x3" for a reviewer which had
-	// printed "critical" and "major" — our translation, presented as their
+	// printed "critical" and "major", our translation, presented as their
 	// vocabulary, and a function of a constant we are free to change. That was
 	// fixed for the incumbent and reintroduced for our own contenders: the review
 	// engine rewrites a model's severity and used to set nothing here, and the
@@ -97,7 +96,7 @@ type Finding struct {
 	//
 	// It is not serialized: a finding read back from JSON has lost the word, and
 	// claiming otherwise would put the same substitution back one layer down.
-	// SeverityTranslated is not serialized either, for the same reason — a
+	// SeverityTranslated is not serialized either, for the same reason, a
 	// consumer that recovered the flag without the word would be told a word
 	// exists and shown ours.
 	RawSeverity string `json:"-"`
@@ -132,8 +131,8 @@ type Finding struct {
 	FixValidated bool `json:"-"`
 
 	// Source names where the finding came from: a linter's rule id, or the
-	// reviewing model. It is not part of the model-facing schema — the model
-	// does not get to claim provenance — but it IS shown to the reader.
+	// reviewing model. It is not part of the model-facing schema (the model does
+	// not get to claim provenance), but it IS shown to the reader.
 	//
 	// "flagged by golangci-lint(gosec), triaged by claude" is the sentence this
 	// tool exists to be able to write. A deterministic analyzer found it, a
@@ -205,7 +204,7 @@ type Result struct {
 	// Dropped is triage's account of what it did not publish, by list
 	// number, each with a reason. Every finding triage was given is either
 	// published, listed here, or restored by the engine: a finding that
-	// simply vanishes is a bug that looks like quality.
+	// vanishes is a bug that looks like quality.
 	Dropped []Drop `json:"dropped,omitempty"`
 }
 

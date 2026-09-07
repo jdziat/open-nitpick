@@ -10,12 +10,12 @@ import (
 // TestWindowedFilesAreDisclosed is the regression test for a disclosure that
 // went missing while the context handling got better.
 //
-// A file too large for its full content used to be refused outright, landing in
-// Plan.Degraded, which the summary prints. Windowing it instead is an
-// improvement — a window beats a bare diff — but it moved the file onto
+// A file too large for its full content used to be refused outright, landing
+// in Plan.Degraded, which the summary prints. Windowing it instead is an
+// improvement (a window beats a bare diff), but it moved the file onto
 // Plan.Windowed, which nothing rendered. The reader went from being told "this
-// was reviewed from the diff alone" to being told nothing, on a file where most
-// of the content had been elided.
+// was reviewed from the diff alone" to being told nothing, on a file where
+// most of the content had been elided.
 func TestWindowedFilesAreDisclosed(t *testing.T) {
 	report := &Report{
 		Summary: "Walkthrough.",

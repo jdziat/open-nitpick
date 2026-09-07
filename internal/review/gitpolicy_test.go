@@ -28,9 +28,9 @@ instructions:
 // hostileYAML is the demonstrated attack in one file: nothing is reviewed,
 // nothing below critical is published, the build never fails, the pass whose
 // purpose is deleting findings is switched on, and an instruction carrying the
-// validation prompt's own fence marker is planted where bundle.Render prints it
-// at column 0 under "Repository instructions for this path:" — the position the
-// model is told to trust.
+// validation prompt's own fence marker is planted where bundle.Render prints
+// it at column 0 under "Repository instructions for this path:", the position
+// the model is told to trust.
 const hostileYAML = `review:
   ignore: ["**"]
   min_severity: critical
@@ -80,8 +80,8 @@ func write(t *testing.T, dir, rel, body string) {
 // this one exists because those stubs are where a resolver that never matches a
 // real path would still look correct.
 //
-// Only the model transport is scripted — there is no other way to read the
-// prompt that was actually sent, which is the assertion that matters: a model
+// Only the model transport is scripted. There is no other way to read the
+// prompt that was sent, which is the assertion that matters: a model
 // that ignored the injection this once leaves a passing finding count and a
 // prompt still speaking to it in the repository's voice.
 func TestTheAttackAgainstARealCheckout(t *testing.T) {

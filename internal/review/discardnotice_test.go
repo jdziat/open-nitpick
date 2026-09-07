@@ -83,8 +83,8 @@ func TestTheDiscardHeadlineIsVisibleWithoutExpandingIt(t *testing.T) {
 
 // TestForgedPathsAreNamedIndividually is the one exception to counting.
 //
-// A count of the policy drops is enough — they are routinely in the dozens and a
-// per-finding wall of text teaches a reader to collapse the block forever. A
+// A count of the policy drops is enough. They are routinely in the dozens and
+// a per-finding wall of text teaches a reader to collapse the block forever. A
 // path that is not in the checkout is different in kind: nothing in a healthy
 // tree reports one, and a count alone leaves nobody able to go and look.
 func TestForgedPathsAreNamedIndividually(t *testing.T) {
@@ -109,7 +109,7 @@ func TestForgedPathsAreNamedIndividually(t *testing.T) {
 // policy notice and the analyzer roster.
 //
 // review.summary asks for less narration. It is not permission to stop saying
-// that a deterministic analyzer produced findings this review discarded — with
+// that a deterministic analyzer produced findings this review discarded, with
 // it off and this suppressed, such a run publishes nothing at all and reads as
 // clean.
 func TestTheDiscardNoticeSurvivesSummariesBeingOff(t *testing.T) {
@@ -130,8 +130,8 @@ func TestTheDiscardNoticeSurvivesSummariesBeingOff(t *testing.T) {
 //
 // A newline would break out of the bullet and leave the rest of the block
 // reading as though it described something else, and raw HTML in a comment
-// posted under this bot's name renders. Markdown is NOT neutralized here — see
-// inline — which is why these two are wrapped in code spans and why the README
+// posted under this bot's name renders. Markdown is NOT neutralized here (see
+// inline), which is why these two are wrapped in code spans and why the README
 // records that residual rather than implying otherwise.
 func TestADiscardedPathCannotLeaveItsBullet(t *testing.T) {
 	report := &Report{Plan: &bundle.Plan{}, Discarded: []LinterDiscard{{
@@ -158,8 +158,8 @@ func TestADiscardedPathCannotLeaveItsBullet(t *testing.T) {
 //
 // The distance is the fixture. filterAnchors snaps a finding onto the nearest
 // ADDED line within three lines, so a finding on the first context line is
-// outside snapping range — which is the only way to reach the drop branch with a
-// line the diff genuinely carries.
+// outside snapping range. Which is the only way to reach the drop branch with
+// a line the diff carries.
 const anchorDiff = "diff --git a/app.go b/app.go\n--- a/app.go\n+++ b/app.go\n@@ -1,7 +1,8 @@\n" +
 	" one\n two\n three\n four\n five\n six\n seven\n+added\n"
 
@@ -168,9 +168,10 @@ const anchorDiff = "diff --git a/app.go b/app.go\n--- a/app.go\n+++ b/app.go\n@@
 //
 // Set.normalize's bare `continue` statements were replaced with counted, named
 // discards. filterAnchors kept two of its own and runs immediately afterwards,
-// and Report.Discarded was read BEFORE it — so a finding that survived
-// normalization and died here was invisible in exactly the way the first fix was
-// about, and the published headline said zero about a run that had dropped one.
+// and Report.Discarded was read BEFORE it, so a finding that survived
+// normalization and died here was invisible in exactly the way the first fix
+// was about, and the published headline said zero about a run that had dropped
+// one.
 //
 // Reaching it needs linters.only_changed_lines off: with the default on,
 // normalize drops a context-line finding first and counts it there. The defect
@@ -182,8 +183,8 @@ func TestAnAnalyzerFindingDroppedByAnchoringIsCounted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A line the diff carries as CONTEXT. Position resolves — which is why
-	// normalize passes it through — and it is not a changed line, which is why
+	// A line the diff carries as CONTEXT. Position resolves (which is why
+	// normalize passes it through), and it is not a changed line, which is why
 	// this function drops it.
 	if _, ok := files.Find("app.go").Position(1); !ok {
 		t.Fatal("the fixture no longer carries line 1 as context; it would be dropped upstream")
@@ -218,10 +219,10 @@ func TestAnAnalyzerFindingDroppedByAnchoringIsCounted(t *testing.T) {
 // thing.
 //
 // A model that anchors a finding two lines off is a model guessing, and it
-// happens constantly — that is why this function snaps in the first place.
-// LinterDiscard says "a deterministic analyzer reported this and the review threw
-// it away"; filling it with model output would make the headline a count of
-// something else and drown the case it exists to surface.
+// happens constantly. That is why this function snaps in the first place.
+// LinterDiscard says "a deterministic analyzer reported this and the review
+// threw it away"; filling it with model output would make the headline a count
+// of something else and drown the case it exists to surface.
 func TestAModelFindingDroppedByAnchoringIsNotCounted(t *testing.T) {
 	files, err := parseDiff(anchorDiff)
 	if err != nil {
@@ -249,9 +250,9 @@ func TestAModelFindingDroppedByAnchoringIsNotCounted(t *testing.T) {
 //
 // The third is here because it is the one that does not describe a file of the
 // change at all. It anchors to the module's go.mod, which the change need not
-// have touched, and it is the one entry that means REDUCED coverage rather than
-// absent coverage — so a renderer that assumed every entry names an unread file
-// of the diff is wrong about it.
+// have touched, and it is the one entry that means REDUCED coverage rather
+// than absent coverage, so a renderer that assumed every entry names an unread
+// file of the diff is wrong about it.
 func uncovered() []LinterUncovered {
 	return []LinterUncovered{
 		{Linter: "golangci-lint", Path: "app_windows.go", Reason: UncoveredBuildExcluded},
@@ -263,12 +264,12 @@ func uncovered() []LinterUncovered {
 // TestTheUncoveredPartsOfAChangeArePublished is the disclosure half of the
 // third channel.
 //
-// "golangci-lint — ran" is true and is read as "the Go analyzer looked at this
+// "golangci-lint, ran" is true and is read as "the Go analyzer looked at this
 // change". A build constraint on the changed file with one ordinary sibling
-// beside it, or a //nolint on the package clause, both leave that line true and
-// the change unread — with zero findings and a nil error, which is what a clean
-// review looks like. Counting it inside the process is worth nothing: the reader
-// who needs it is the one reading the pull request.
+// beside it, or a //nolint on the package clause, both leave that line true
+// and the change unread, with zero findings and a nil error, which is what a
+// clean review looks like. Counting it inside the process is worth nothing:
+// the reader who needs it is the one reading the pull request.
 func TestTheUncoveredPartsOfAChangeArePublished(t *testing.T) {
 	report := &Report{Plan: &bundle.Plan{}, Uncovered: uncovered()}
 
@@ -295,7 +296,7 @@ func TestTheUncoveredPartsOfAChangeArePublished(t *testing.T) {
 // TestTheUncoveredHeadlineIsVisibleWithoutExpandingIt, and counts files.
 //
 // The ledger lives in a <details> and a forge renders the <summary> whether or
-// not anyone opens it. It counts FILES because that is the fact — one file with
+// not anyone opens it. It counts FILES because that is the fact, one file with
 // three added suppressions is one file nothing was said about, and "3" would
 // overstate it.
 func TestTheUncoveredHeadlineIsVisibleWithoutExpandingIt(t *testing.T) {
@@ -327,8 +328,8 @@ func TestTheUncoveredHeadlineIsVisibleWithoutExpandingIt(t *testing.T) {
 // the analyzer roster and the discard block.
 //
 // review.summary asks for less narration. It is not permission to stop saying
-// that part of the change was never analyzed — which is precisely the state that
-// otherwise publishes nothing at all and reads as clean.
+// that part of the change was never analyzed. Which is precisely the state
+// that otherwise publishes nothing at all and reads as clean.
 func TestTheUncoveredNoticeSurvivesSummariesBeingOff(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Review.Summary = false
@@ -386,14 +387,14 @@ func (unanchorableLinter) Run(context.Context, diff.Files) ([]Finding, error) {
 func (unanchorableLinter) Discarded() []LinterDiscard { return nil }
 
 // TestTheEngineMergesItsOwnAnchorDropsIntoTheDiscardLedger is the WIRING half,
-// and it is the half the defect actually lived in.
+// and it is the half the defect lived in.
 //
 // filterAnchors returning its drops is worth nothing if Report.Discarded is
-// assembled before it runs — which is exactly what was there: the field was
+// assembled before it runs. Which is exactly what was there: the field was
 // filled from the analyzer set at the point the set was read, two statements
 // above the first anchor pass. A unit test of filterAnchors alone stays green
-// through that, so this drives Engine.Review end to end and reads the published
-// comment.
+// through that, so this drives Engine.Review end to end and reads the
+// published comment.
 func TestTheEngineMergesItsOwnAnchorDropsIntoTheDiscardLedger(t *testing.T) {
 	empty := mustJSON(t, Result{Summary: "Nothing to report."})
 
@@ -433,7 +434,7 @@ func TestTheEngineMergesItsOwnAnchorDropsIntoTheDiscardLedger(t *testing.T) {
 }
 
 // uncoveringLinter reports no findings at all and one part of the change it
-// never read — the exact shape a build-excluded file produces.
+// never read, the exact shape a build-excluded file produces.
 type uncoveringLinter struct{}
 
 func (uncoveringLinter) Run(context.Context, diff.Files) ([]Finding, error) { return nil, nil }
@@ -450,8 +451,8 @@ func (uncoveringLinter) Uncovered() []LinterUncovered {
 // always-empty field renders as a run with nothing to say.
 //
 // It goes through Engine.Review rather than Render so that the optional
-// interface, the assignment and the renderer are all on the path — which is
-// where the equivalent defect for discards actually lived.
+// interface, the assignment and the renderer are all on the path. Which is
+// where the equivalent defect for discards lived.
 func TestTheEngineCarriesUncoveredPartsThroughToThePullRequest(t *testing.T) {
 	empty := mustJSON(t, Result{Summary: "Nothing to report."})
 
@@ -485,12 +486,12 @@ func TestTheEngineCarriesUncoveredPartsThroughToThePullRequest(t *testing.T) {
 // hundreds of entries for ONE reason, and a body the forge rejects is worse than
 // a shorter list.
 //
-// `go mod vendor` adds a directory of Go files that review.ignore withholds from
-// every analyzer, and a port adds a directory of _windows.go. GitHub caps a
-// review body at 65536 bytes — summaryFallback exists because a pull request
-// deleting thousands of files already produced an enormous skipped-files section
-// — so an unbounded list here would trade the coverage notice for the whole
-// review.
+// `go mod vendor` adds a directory of Go files that review.ignore withholds
+// from every analyzer, and a port adds a directory of _windows.go. GitHub caps
+// a review body at 65536 bytes (summaryFallback exists because a pull request
+// deleting thousands of files already produced an enormous skipped-files
+// section), so an unbounded list here would trade the coverage notice for the
+// whole review.
 //
 // The bound is per reason so that a bulk route cannot push the others off the
 // end, and the headline still counts every file: the total a reader sees is
@@ -536,10 +537,11 @@ func TestTheUncoveredListIsBoundedPerReason(t *testing.T) {
 // there is, and it used to be the cleanest-looking one.
 //
 // When every changed file is set aside there are no batches to send, so the
-// engine returns before any model or analyzer is asked anything and the summary
-// renders empty — at which point the forge publishes its own default body,
-// "open-nitpick found nothing to comment on", for a change nothing read. One
-// file under vendor/ reaches it, and vendored code is compiled into the binary.
+// engine returns before any model or analyzer is asked anything and the
+// summary renders empty, at which point the forge publishes its own default
+// body, "open-nitpick found nothing to comment on", for a change nothing read.
+// One file under vendor/ reaches it, and vendored code is compiled into the
+// binary.
 func TestAChangeNothingReviewedSaysSoRatherThanReadingClean(t *testing.T) {
 	report := &Report{Plan: &bundle.Plan{Skipped: []bundle.Skip{
 		{Path: "vendor/example.com/evil/evil.go", Reason: bundle.ReasonIgnored},
@@ -569,7 +571,7 @@ func TestAChangeNothingReviewedSaysSoRatherThanReadingClean(t *testing.T) {
 // TestAReviewThatRanSaysNothingAboutHavingReviewedNothing is the other
 // direction: the notice above must not appear on an ordinary review.
 //
-// A false "nothing was reviewed" is worse than the silence it replaced — it
+// A false "nothing was reviewed" is worse than the silence it replaced, it
 // tells a reader to discount findings that were produced by a real review.
 func TestAReviewThatRanSaysNothingAboutHavingReviewedNothing(t *testing.T) {
 	report := &Report{Plan: &bundle.Plan{
