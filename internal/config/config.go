@@ -428,6 +428,18 @@ type Review struct {
 	// exists so the layer's contribution can be measured on its own.
 	ModelNotes *bool `yaml:"model_notes"`
 
+	// AgentPrompt adds a collapsed block under each published finding holding
+	// what a coding agent needs to act on it: the anchor, every secondary
+	// span, the class, the rationale as the reviewer wrote it, and the files
+	// the reviewer read for that batch.
+	//
+	// It is assembled from fields the engine already holds rather than
+	// generated, so it costs no model call and cannot assert anything the
+	// review did not establish. The findings it helps most are the ones a
+	// one-line suggestion cannot express, which are the ones a reader
+	// otherwise translates into a change by hand.
+	AgentPrompt bool `yaml:"agent_prompt"`
+
 	// Slop asks the model for, and publishes, findings in the slop class:
 	// generated-looking code that costs a reader, defined rule by rule in
 	// the prompt layer prompt.SlopGuidance. Off by default in a review; a

@@ -32,6 +32,41 @@ It is **not read on a runner**, where `CI` or `GITHUB_ACTIONS` is set, because
 nobody there wrote it. `NITPICK_USER_CONFIG=/path/to/config.yaml` names one
 anyway, wherever you set it; `NITPICK_NO_USER_CONFIG=1` switches it off.
 
+## Findings a coding agent can act on
+
+`review.agent_prompt: true` folds a block under each published finding holding
+what an agent needs and a reader does not:
+
+```yaml
+review:
+  agent_prompt: true
+```
+
+```
+anchor:    internal/a.go:42-58
+also:      internal/a.go:19
+class:     correctness
+severity:  warning
+found by:  openrouter/qwen/qwen3.8-27b
+also read: internal/b.go, internal/c.go
+
+Guard removed that a caller depends on
+
+b.go calls this with a nil map on the error path.
+```
+
+It is assembled from what the engine already holds, so it costs no model call,
+reproduces from the same review, and cannot assert anything the review did not
+establish. `also read` is the rest of the batch, which is what the reviewer had
+in front of it when it wrote the finding.
+
+That is also its limit. It does not say what would make the fix wrong, because
+nothing in a finding records that, and generating it would put an unmeasured
+claim beside a measured one.
+
+The block appears on every finding, including one carrying a suggestion GitHub
+can apply: the suggestion says what to type, not where else the finding reaches.
+
 ## When a model cannot answer
 
 `fallback` escalates to a different model rather than retrying the same one:
