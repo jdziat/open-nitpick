@@ -7,7 +7,7 @@ the pull request it happened on (the walkthrough this tool posted, the
 inline comments, and the analyzer roster) and each workstream below names
 the miss it answers, what the evidence says caused it, the change, how the
 change is measured before it ships, and what a pass looks like. The rules in
-[measurement.md](measurement.md) apply throughout.
+[Measurement](measurement.md) apply throughout.
 
 ## What the misses are
 

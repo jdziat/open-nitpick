@@ -180,3 +180,12 @@ func (level NitpickLevel) Publishes(c Class) bool {
 func (level NitpickLevel) NeedsStylePass() bool {
 	return level == NitpickPedantic
 }
+
+// ClassesValues reports what validation.classes accepts, for the generated
+// reference.
+//
+// It exists because the generator reads a field's type to find a closed set,
+// and this field is a []Class rather than a Class, so the type it saw was a
+// slice and it printed the sentence without the ten names the loader rejects a
+// bad value with.
+func (v Validation) ClassesValues() []string { return ClassNames() }

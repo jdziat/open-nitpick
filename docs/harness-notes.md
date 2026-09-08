@@ -248,11 +248,12 @@ things instead of three explained ones" is a claim about output tokens that
 has to be expressible or the NOISE column has nothing to be load-bearing
 against.
 
-## explainedTokens is what one EXPLAINED finding costs to write
+## explainedTokens
 
 `internal/evals/cost_test.go`
 
-The gap between them is the whole content of the line-spammer row: a comment
+explainedTokens is what one EXPLAINED finding costs to write, and spamTokens
+what one empty one costs. The gap between them is the whole content of the line-spammer row: a comment
 carrying a reason is many times the output of a comment carrying none, which
 is why saying everything is cheaper than saying three useful things. Ten to
 one is conservative. A real rationale runs longer than ten times a one-line
@@ -2850,11 +2851,11 @@ remaining thing a compiler cannot, that no declaration bypasses the
 registrar, and that no table is built from a string that was never declared as
 a header at all.
 
-## The headers of every table the eval reports print
+## tableScored headers
 
 `internal/evals/score.go`
 
-They live in NON-TEST code, away from the code that prints them, for one
+The headers of every table the eval reports print. They live in NON-TEST code, away from the code that prints them, for one
 reason: the reports are rendered from files behind the `eval` build tag, and a
 guard that only compiles under that tag cannot run in `go test ./...`. Keeping
 the headers here lets TestEveryPublishedColumnIsRegistered read them in the
@@ -2869,11 +2870,12 @@ anywhere asking what maximised them.
 They are vars rather than consts because a const cannot call the registrar,
 and an unregistered header is a table every guard here is blind to.
 
-## The cost and judge-swap tables, registered from here rather than beside their own declarations
+## tableUnscored headers
 
 `internal/evals/score.go`
 
-Their columns are readings those tracks define (CostReadingLegend,
+The cost and judge-swap tables are registered from here rather than beside
+their own declarations. Their columns are readings those tracks define (CostReadingLegend,
 PublishedCostReadings) and classifying them from this file would assert things
 about accounting it does not compute, hence tableUnscored.
 

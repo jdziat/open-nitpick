@@ -4,7 +4,7 @@ What has to hold before a number out of `internal/evals` is worth acting on.
 
 These are not style preferences. Every rule below was written because the harness
 produced a confident wrong number and something downstream believed it. The
-provenance is in [findings.md](findings.md); this file is the checklist.
+provenance is in [Findings](findings.md); this file is the checklist.
 
 ## The two kinds of column, and why it matters
 
@@ -648,7 +648,7 @@ cross-fixture keyword sweeps in `groundtruth_test.go` run over it; its own test
 checks anchors, self-credit, and that no keyword is a token of the change, and
 nothing more. A number from it is a measurement of this corpus by this
 instrument, and the sentence that reports it should say so. Its first spend is
-recorded in [findings.md](findings.md#related-context-on-the-multi-file-corpus).
+recorded in [Findings](findings.md#related-context-on-the-multi-file-corpus).
 
 
 

@@ -53,10 +53,23 @@ theme:
 # as one token: `review.fail_on` in the key reference did not answer a search
 # for `fail_on`, and `models.routes[].match.max_files` did not answer one for
 # `max_files`, while the same keys written bare on the prose pages did. That is
-# a matching problem and not a ranking one, and a document boost does not reach
-# it: 2, 5, 20 and 100 on the reference page returned the same pages in the same
-# order, none of them it, because it was never in the result set. Splitting on
-# the dot as well puts it first for `max_files` and second for `fail_on`.
+# a matching problem and not a ranking one, and splitting on the dot as well is
+# what solves it: it puts the reference into the result set for both.
+#
+# Where it lands in that set is a second question, and it is not answered here.
+# A boost of 2 was set and measured, twice, and both measurements expired: a
+# figure about search rank is a fact about one build, and every heading added
+# anywhere on the site changes it. The second expiry was this branch giving the
+# reference a heading per key, which rewrites its index entirely. No boost is
+# set now. A claim about ranking that nobody can reproduce is worth less than
+# the silence, and the separator above is the part that carried the weight:
+# without it the reference was not in the result set at any boost.
+#
+# The heading per key also answers what the boost could not. Material draws a
+# result's excerpt from the text around the match, and while the page was six
+# tables the text before `review.fail_on` was `review.concurrency`'s
+# description, so that is what the excerpt showed. Each key is its own search
+# document now.
 plugins:
   - search:
       separator: '[\s\-.]+'

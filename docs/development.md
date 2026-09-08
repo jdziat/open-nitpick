@@ -1,5 +1,9 @@
 # Development
 
+Working on the tool itself: the tests, which need no network or credentials, the
+commit and release conventions CI enforces, and the eval harness that measures a
+prompt or analyzer change against real models before it ships.
+
 ```bash
 go test ./...        # no network or credentials required
 go test -race ./...
@@ -35,7 +39,7 @@ The `v1` tag follows every `v1.x.y` release, which is what the Action's
 with related context off and on, against `z-ai/glm-5.3-flash`, about a
 thirtieth of the default reviewer's price per review. It is the model to
 iterate against, and the triage model this repository's own config uses;
-[docs/findings.md](findings.md) records how it compares as a reviewer.
+[Findings](findings.md) records how it compares as a reviewer.
 `QUICK=<openrouter id>` swaps it.
 
 ## Evaluating the prompts against real models

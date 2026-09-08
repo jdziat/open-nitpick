@@ -374,7 +374,7 @@ caller passes comes along with it. The walk is up to 150 file fetches a
 review on top of the changed files, and when that ceiling stops it short the
 summary says so, so a file with no callers attached is not read as a file
 with no callers. Measured on its own corpus in
-[docs/findings.md](findings.md#callers-2026-09-05): a cheap model went
+[Findings](findings.md#callers-2026-09-05): a cheap model went
 from finding none of the planted contract breaks to seven of eight.
 
 It is bounded by `review.related_context_tokens` per batch, spent only from
@@ -390,7 +390,7 @@ sweep was measured with them on; that direction ships on. The caller walk
 reads up to 150 files the change never named and sends excerpts to the model,
 which is a different consent boundary from "review my diff", so it ships off
 and the measured gain (0/8 to 7/8 on its corpus, noise down on the multi-file
-corpus, in [docs/findings.md](findings.md#callers-2026-09-05)) is for
+corpus, in [Findings](findings.md#callers-2026-09-05)) is for
 the operator to weigh against that. Context is not free either way: the same
 definitions that let a model confirm a defect give it more to be confidently
 wrong about.
@@ -479,7 +479,7 @@ The text lives in `internal/prompt/model.go`, never widens what a model is
 asked to look for, and shows up in `nitpick explain-config` as the `model`
 layer so it can be read without spending tokens. `review.model_notes: false`
 removes it. The measurements are in
-[docs/comparison.md](comparison.md#tuning-for-glm-53-flash-and-qwen38-27b-2026-09-04).
+[Against Incumbent](comparison.md#tuning-for-glm-53-flash-and-qwen38-27b-2026-09-04).
 
 ## Who may make it spend
 

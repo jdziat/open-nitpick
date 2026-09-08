@@ -1,5 +1,10 @@
 # GitHub Actions and other CI
 
+Running the reviewer on a runner rather than from a terminal: the Action and
+the workflow it goes in, the inputs and permissions it needs, what an
+incremental review is, what a fork changes, and the same review as a plain CLI
+call in any other CI. [Usage](usage.md) is the same tool locally.
+
 ## GitHub Actions
 
 ```yaml

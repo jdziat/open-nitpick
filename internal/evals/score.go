@@ -1707,7 +1707,7 @@ func registerTableHeader(kind tableKind, header string) string {
 
 // The headers of every table the eval reports print.
 //
-// The note behind it is in docs/harness-notes.md#the-headers-of-every-table-the-eval-reports-print.
+// The note behind it is in docs/harness-notes.md#tablescored-headers.
 var (
 	// SummaryTableHeader is the ground-truth battery's table: no judge, no
 	// foreign reviewer, one row per model and fixture.
@@ -1732,8 +1732,7 @@ var (
 // The cost and judge-swap tables, registered from here rather than beside
 // their own declarations.
 //
-// The note behind it is in
-// docs/harness-notes.md#the-cost-and-judge-swap-tables-registered-from-here-rather-than-beside-their-own-declarations.
+// The note behind it is in docs/harness-notes.md#tableunscored-headers.
 var (
 	_ = registerTableHeader(tableUnscored, CostTableHeader)
 	_ = registerTableHeader(tableUnscored, precisionHeader)

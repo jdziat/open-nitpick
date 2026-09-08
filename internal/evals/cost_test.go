@@ -1563,7 +1563,7 @@ func calibratedCostRun(f costFixture, _ int) ([]review.Finding, CallUsage, bool)
 // explainedTokens is what one EXPLAINED finding costs to write, and spamTokens
 // what one empty one costs.
 //
-// The note behind it is in docs/harness-notes.md#explainedtokens-is-what-one-explained-finding-costs-to-write.
+// The note behind it is in docs/harness-notes.md#explainedtokens.
 const (
 	explainedTokens = 120
 	spamTokens      = 12

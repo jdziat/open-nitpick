@@ -1,0 +1,18 @@
+{#-
+  The mark is inlined once for the header logo and once for the drawer logo, so
+  the gradient inside it carried the same id twice on all 19 pages: two
+  elements with id="np-brand" and two fill="url(#np-brand)" references, which is
+  invalid HTML on the whole site and renders today only because both references
+  resolve to the first gradient in document order. Each instance gets its own id
+  instead. np_logo is a list set at the top level of main.html; Jinja includes
+  share the caller's context and a list is mutable, so appending here is what
+  makes the second render differ from the first.
+-#}
+{% if config.theme.logo %}
+  <img src="{{ config.theme.logo | url }}" alt="logo">
+{% else %}
+  {%- set icon = config.theme.icon.logo or "material/library" -%}
+  {%- set mark %}{% include ".icons/" ~ icon ~ ".svg" %}{% endset -%}
+  {%- set _ = np_logo.append(1) -%}
+  {{ mark | replace("np-brand", "np-brand-" ~ (np_logo | length)) }}
+{% endif %}

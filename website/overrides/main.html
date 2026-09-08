@@ -2,6 +2,14 @@
 
 {% set home_title = "open-nitpick: self-hosted, model-agnostic pull request review" %}
 
+{#-
+  A per-render counter for partials/logo.html, which is included twice and until
+  now emitted the same gradient id both times. A list rather than a number
+  because Jinja gives an include the caller's context but not a way to assign
+  back into it, and a list can be appended to.
+-#}
+{% set np_logo = [] %}
+
 {% block htmltitle %}
   {% if page.is_homepage %}
     <title>{{ home_title }}</title>

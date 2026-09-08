@@ -49,12 +49,15 @@ patch-level floor, so 1.25.4 refuses.
 `init` is optional: with those two variables set, a review runs with no config
 file at all. What it buys is a file that names the model, the analyzers this
 checkout's languages call for, and the dozen settings most worth changing,
-each at its shipped default and commented. It is a starting point, not the
-whole surface: [the configuration reference](docs/configuration-reference.md)
-lists every key the loader accepts. Because every value written is already the
-one in force, deleting a key changes nothing. It refuses to overwrite an
-existing file without `-force`, and `-workflow` writes the Actions workflow
-beside it.
+commented. It is a starting point, not the whole surface: [the configuration
+reference](docs/configuration-reference.md) lists every key the loader accepts.
+Every value written is already the one in force except two, so deleting a key
+changes nothing: the model, which no default supplies, and `linters.enabled`,
+which is matched to this checkout rather than copied from the default. A
+Go-only tree is written `[golangci-lint]` and a Python-only one `[ruff]`, where
+the shipped default is both, and under `mode: strict` that list is the one
+whose absence fails a run. It refuses to overwrite an existing file without
+`-force`, and `-workflow` writes the Actions workflow beside it.
 
 The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR),
 which serves open-weight models on a flat subscription. Their pricing page read
@@ -110,15 +113,15 @@ with a prompt you cannot read. This one is built the other way round.
 This project makes empirical claims about review quality, so how those numbers are
 produced is part of the product.
 
-- [docs/measurement.md](docs/measurement.md): the fifteen rules a number out of
+- [Measurement](docs/measurement.md): the fifteen rules a number out of
   the eval harness has to satisfy before it is worth acting on. Each rule was
   written after the harness produced a confident wrong number that something
   believed.
-- [docs/comparison.md](docs/comparison.md): capabilities and measured results
-  against Incumbent, by language, with what each iteration changed.
-- [docs/remediation.md](docs/remediation.md): every miss on the benchmark
+- [Against Incumbent](docs/comparison.md): capabilities and measured results
+  by language, with what each iteration changed.
+- [Remediation](docs/remediation.md): every miss on the benchmark
   repository, its cause read from the pull request, and the plan.
-- [docs/findings.md](docs/findings.md): every measurement taken and what it
+- [Findings](docs/findings.md): every measurement taken and what it
   supports. It also tables the instrument bugs found so far. Some of those bugs
   flattered one side of a comparison, and one put a claim on this page that had
   to be retracted.
@@ -135,9 +138,9 @@ It out-detects a hosted incumbent on both counted corpora: 33 of 41 planted
 defects against 30 of 41 across 44 real pull requests, and 10 of 13 against
 4 of 13 on the held-out fixtures. Noise is the open question: a later run took
 detection to 36 of 41 and noise findings from 1 to 17.
-[docs/findings.md](docs/findings.md) has both comparisons, what they do not
+[Findings](docs/findings.md) has both comparisons, what they do not
 support, and the twenty instrument bugs found along the way.
-[docs/comparison.md](docs/comparison.md) has the costs: about two cents a
+[Against Incumbent](docs/comparison.md) has the costs: about two cents a
 review on the default reviewer, under a fifth of a cent on the cheap one.
 
 GitHub and a local checkout are the only forges. There is no GitLab provider.

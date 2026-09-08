@@ -33,23 +33,31 @@ func runConfigRef(args []string, stdout io.Writer) error {
 		return err
 	}
 
-	docs, err := docgen.ReadDocs(*src)
+	docs, values, err := docgen.ReadDocs(*src)
 	if err != nil {
 		return err
 	}
-	fields := docgen.Walk(config.Defaults(), docs)
+	fields := docgen.Walk(config.Defaults(), docs, values)
 
-	// One table per top-level key, under a heading of its name. As one table it
-	// was 191 rows under a single h1: no table of contents, no anchor to point
-	// an issue at, and one search document of 32,000 characters whose only
-	// answer to a key name was the top of the page.
+	// One entry per key, under a heading of its own name.
+	//
+	// Six four-column tables were tried and replaced. A table is the obvious
+	// shape for a reference and it was the wrong one here: 199 keys carried 7
+	// anchors between them, so no key could be linked or searched to; the
+	// widest column was the one a reader came for, and below 1366px it went off
+	// the right edge behind a horizontal scrollbar that sat thousands of pixels
+	// down the page; and on paper the key column took 44% of the width and left
+	// the sentence 29 characters a line.
+	//
+	// A heading per key costs a long table of contents. That is what an index
+	// is, and it is the affordance a 199-key reference exists to provide.
 	var b strings.Builder
 	b.WriteString(header)
 	group := ""
 	for _, f := range fields {
 		if g := topLevel(f.Path); g != group {
 			group = g
-			fmt.Fprintf(&b, "\n## %s\n\n| Key | Type | Default | What it does |\n|---|---|---|---|\n", group)
+			fmt.Fprintf(&b, "\n## %s\n", group)
 		}
 		def := f.Default
 		if def == "" {
@@ -59,7 +67,7 @@ func runConfigRef(args []string, stdout io.Writer) error {
 		if doc == "" {
 			doc = "Undocumented. A key with no sentence here has none in the source either."
 		}
-		fmt.Fprintf(&b, "| `%s` | %s | `%s` | %s |\n", f.Path, f.Type, def, cell(doc))
+		fmt.Fprintf(&b, "\n### `%s`\n\n%s, default `%s`.\n%s\n", f.Path, f.Type, def, doc)
 	}
 	b.WriteString(footer)
 

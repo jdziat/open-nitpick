@@ -103,14 +103,41 @@ func TestInitLeavesEnabledEmptyWhenNoDefaultAnalyzerApplies(t *testing.T) {
 // An analyzer that runs itself belongs in a comment, not in enabled. Putting
 // it in enabled would make its absence an error under mode: strict, which is a
 // promise about the operator's runner that init has no standing to make.
+//
+// The fixture carries a .md file and a lockfile as well as a Dockerfile and a
+// workflow because hadolint and actionlint alone cannot fail this: both are
+// `auto: true`, so a roster that bucketed every unblocked analyzer as
+// auto-detected passed while writing markdownlint and osv-scanner under the
+// same comment. Those two run only when named, and osv-scanner is the
+// dependency-vulnerability scanner, so the file was telling an operator their
+// lockfiles were being scanned when nothing scanned them.
 func TestInitCommentsTheAutoDetectedAnalyzersRatherThanEnablingThem(t *testing.T) {
-	root := initRepo(t, "main.go", "go.mod", "Dockerfile", ".github/workflows/ci.yml")
+	root := initRepo(t, "main.go", "go.mod", "Dockerfile", ".github/workflows/ci.yml",
+		"NOTES.md", "package-lock.json")
 	runInitIn(t, "-repo", root, "-provider", "openai", "-model", "gpt-4o")
 
 	body := read(t, filepath.Join(root, config.FileName))
-	for _, name := range []string{"hadolint", "actionlint"} {
+	for _, name := range []string{"hadolint", "actionlint", "markdownlint", "osv-scanner"} {
 		if !strings.Contains(body, "#   "+name) {
 			t.Errorf("%s was matched by this checkout but is not named in the file:\n%s", name, body)
+		}
+	}
+
+	// The two rosters are the claim under test: one says these run without an
+	// entry, the other says these run only with one. Which block a name is in
+	// is the whole of what init tells an operator about whether it runs.
+	auto, optIn := rosters(t, body)
+	for _, name := range []string{"hadolint", "actionlint"} {
+		if !strings.Contains(auto, name) {
+			t.Errorf("%s is auto-detected but is not in the auto roster:\n%s", name, body)
+		}
+	}
+	for _, name := range []string{"markdownlint", "osv-scanner"} {
+		if strings.Contains(auto, name) {
+			t.Errorf("%s runs only when named, and the file says it runs on its own:\n%s", name, body)
+		}
+		if !strings.Contains(optIn, name) {
+			t.Errorf("%s is not in the roster of analyzers that run only when named:\n%s", name, body)
 		}
 	}
 
@@ -123,6 +150,25 @@ func TestInitCommentsTheAutoDetectedAnalyzersRatherThanEnablingThem(t *testing.T
 			t.Errorf("%s was enabled; auto-detected analyzers must stay comments", got)
 		}
 	}
+}
+
+// rosters splits the two commented analyzer blocks out of a generated file,
+// keyed on the sentence each block opens with rather than on position, so a
+// third block added between them does not silently move a name.
+func rosters(t *testing.T, body string) (auto, optIn string) {
+	t.Helper()
+	cut := func(open string) string {
+		i := strings.Index(body, open)
+		if i < 0 {
+			t.Fatalf("the file has no roster opening %q:\n%s", open, body)
+		}
+		rest := body[i+len(open):]
+		if j := strings.Index(rest, "\n\n"); j >= 0 {
+			return rest[:j]
+		}
+		return rest
+	}
+	return cut("These run on their own when installed"), cut("each runs only when it is named")
 }
 
 // An analyzer that needs an operator's configuration, or an operator's word

@@ -655,9 +655,12 @@ type Linters struct {
 	// its own isolation flag, or not at all; `nitpick linters` says which.
 	Configs map[string]string `yaml:"configs"`
 
-	// AutoDetect runs every catalog analyzer that is installed, isolated from
-	// the tree, and executes nothing from it, whenever the change contains
-	// files it reads, without each being named in Enabled. One that is not
+	// AutoDetect runs the catalog analyzers marked auto, each installed,
+	// isolated from the tree, and executing nothing from it, whenever the
+	// change contains files it reads and without being named in Enabled;
+	// `nitpick linters` says which those are. It is not every catalog
+	// analyzer: the ones marked opt-in there are reached by naming and by
+	// nothing else, so this key never turns them on. One that is not
 	// installed is skipped, silently in auto mode and in strict mode alike:
 	// strict is a promise about the analyzers an operator NAMED, and naming
 	// one here is how to make its absence fail the run. Defaults to on.

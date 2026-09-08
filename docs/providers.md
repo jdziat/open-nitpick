@@ -216,13 +216,13 @@ for reviewing fewer pull requests.
 
 What the measurements say, in full: Kimi-K3 with related context ties the
 shipped default, `anthropic/claude-sonnet-4.6`, on recall on both tuned
-corpora ([docs/findings.md](findings.md#kimi-k3-and-the-second-half-of-the-multi-file-corpus)),
+corpora ([Findings](findings.md#kimi-k3-and-the-second-half-of-the-multi-file-corpus)),
 and was marked down there on one column only, price per review, which is why
 it is absent from the twelve-model price table below. A flat subscription
 does not charge that column. GLM-5.3-Flash is the triage and iteration model
 this repository's own configuration uses, and with Kimi-K3 as the expert pass
 over it, noise on the tuning corpus halved at the same recall
-([docs/findings.md](findings.md#callers-2026-09-05)). Neither of those is
+([Findings](findings.md#callers-2026-09-05)). Neither of those is
 a claim that Kimi-K3 is the best reviewer measured; `qwen/qwen3.8-27b` and
 `openai/gpt-5.6-luna` are, per dollar on metered pricing, and the table says
 so.
@@ -306,7 +306,7 @@ receives the code. See [Trust model](trust-model.md#trust-model).
 Twelve models were run through the shipped pipeline on all three eval corpora
 (tuning, multi-file, info; 38 planted defects) with related context on. The
 full table, per-corpus numbers and caveats are in
-[docs/comparison.md](comparison.md#twelve-models-three-corpora-the-costperformance-sweep-2026-09-04);
+[Against Incumbent](comparison.md#twelve-models-three-corpora-the-costperformance-sweep-2026-09-04);
 this is the short version. Recall is planted defects located; `$/review` is
 the provider-reported spend per pull request on those corpora. Most rows are
 a single run, so gaps under about 0.10 are inside the noise.
@@ -329,12 +329,12 @@ Incumbent's on-demand price on the same corpora is $0.25 to $0.36 a review.
 Every row was measured with `review.related_context: true`, on 2026-09-04,
 which is now the default, and without the caller walk, which is not. The
 multi-file corpus rerun with the walk on
-([docs/findings.md](findings.md#callers-2026-09-05)) cost no more per
+([Findings](findings.md#callers-2026-09-05)) cost no more per
 review than before, but the sweep itself has not been repeated.
 
 The default stays sonnet-4.6 because the sweep ran on the corpora the prompt
 was tuned against; a candidate replaces it only by beating it on the held-out
-corpus under the rule in [docs/measurement.md](measurement.md).
+corpus under the rule in [Measurement](measurement.md).
 `qwen/qwen3.8-27b` and `openai/gpt-5.6-luna` are the two worth that spend.
 
 ## Routing batches to different models, and ensembles
@@ -387,7 +387,7 @@ the model starts unpinned unless it sets `providers` itself. The report
 records where each batch went (`Report.Routes`), and `nitpick explain-config`
 shows the prompt each reviewer gets, including its model-family layer. The
 measured configurations are in `internal/evals/testdata/routes/` and their
-numbers in [docs/comparison.md](comparison.md).
+numbers in [Against Incumbent](comparison.md).
 
 ## Pinning a router to one upstream
 
@@ -431,7 +431,7 @@ review that took that path is no longer reproducible by re-running it, and
 its log says so. Every retry and its outcome is one log line, so a review
 that took forty minutes says why. This was built on gemma-4-31b through
 OpenRouter, which lost one review in five without it and none with it; the
-numbers are in [docs/comparison.md](comparison.md).
+numbers are in [Against Incumbent](comparison.md).
 
 A provider can also refuse the shape of the answer rather than the request.
 `structured_output: auto` asks for a JSON-Schema response format, drops to

@@ -3,7 +3,7 @@
 What has been measured, and what it does and does not support.
 
 Numbers here are dated and provisional. Read
-[measurement.md](measurement.md) first: several of the results below were
+[Measurement](measurement.md) first: several of the results below were
 produced by an instrument that was itself wrong, and the corrections matter more
 than the original figures.
 
@@ -14,7 +14,7 @@ question, and the change that improved detection made noise worse.** That is
 the whole of what is supportable, and the two halves have to be read together.
 
 Counted, no judge, on real pull requests (2026-09-03, 44 pull requests on
-`jdziat/nitpick-bench`, [remediation.md](remediation.md)):
+`jdziat/nitpick-bench`, [Remediation](remediation.md)):
 
 | | open-nitpick | Incumbent |
 |---|---|---|
@@ -320,7 +320,7 @@ severity and therefore could not see this floor at all. They are superseded.
 
 ## Judge instability
 
-Documented in [measurement.md](measurement.md#the-two-kinds-of-column-and-why-it-matters):
+Documented in [Measurement](measurement.md#the-two-kinds-of-column-and-why-it-matters):
 four runs over byte-identical cached findings gave grades from 3.66 to 3.98 and
 `MISSED` from 0.12 to 0.62, at `Temperature: 0`.
 
