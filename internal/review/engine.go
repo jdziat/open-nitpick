@@ -413,6 +413,16 @@ type Report struct {
 	// changed since the earlier review and the finding did not recur.
 	Superseded []vcs.PriorComment
 
+	// PriorComments is how many comments earlier runs left on this pull
+	// request that this tool recognises as its own, before this run resolved
+	// any of them.
+	//
+	// Carried because AlreadyReported cannot answer the question on its own: a
+	// narrowed run that never re-read a file never re-produces the finding
+	// whose thread is still open there, so it withholds nothing and looks
+	// clean. Subtracting Superseded leaves what is still standing.
+	PriorComments int
+
 	// Incremental records that this run reviewed only the files changed since
 	// an earlier run, and which. Nil when the whole change was reviewed.
 	Incremental *Incremental
@@ -681,6 +691,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// After the gate, so what is counted as "already posted" is what would
 	// otherwise have been posted, and nothing below min_severity is.
 	findings, report.AlreadyReported = withholdAlreadyReported(findings, prior)
+	if prior != nil {
+		report.PriorComments = len(prior.Comments)
+	}
 	report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported)
 
 	// Triage's drops are disclosed exactly as an expert's refutations are:
@@ -1767,7 +1780,11 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	e.log().Info("publishing", "findings", len(report.Findings), "provider", e.Provider.Name())
 	review := Render(report, files, e.Config)
 
-	if len(review.Comments) == 0 && review.Summary == "" {
+	// An empty body is not nothing when the review carries a disposition. A
+	// clean run under review.approve with review.summary off renders no
+	// comments and no summary, and returning here would drop the approval and
+	// log "nothing to publish" over a review that had something to say.
+	if len(review.Comments) == 0 && review.Summary == "" && review.Event == vcs.EventComment {
 		e.log().Info("nothing to publish")
 		return nil
 	}
