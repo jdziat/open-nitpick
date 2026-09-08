@@ -19,11 +19,16 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 		return vcs.EventComment
 	}
 
-	// An incremental run withholds a finding an earlier run already posted, so
-	// it leaves Findings empty while the comment thread it made is still open
-	// on the pull request. Approving beside a standing finding describes a
-	// review nobody performed.
-	if len(report.AlreadyReported) > 0 {
+	// An earlier run's comment threads outlive the run that made them, and a
+	// narrowed run never re-produces a finding on a file it did not re-read,
+	// so Findings and AlreadyReported are both empty while a thread stands
+	// open. Approving there describes a review nobody performed.
+	//
+	// Superseded is what this run closed. Anything left is counted as
+	// standing, including a thread a person resolved by hand, which this tool
+	// cannot see: that refuses an approval it might have earned, and the
+	// direction to be wrong in is the one that publishes a comment.
+	if len(report.AlreadyReported) > 0 || report.PriorComments > len(report.Superseded) {
 		return vcs.EventComment
 	}
 

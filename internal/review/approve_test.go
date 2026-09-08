@@ -1,6 +1,7 @@
 package review
 
 import (
+	"context"
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
@@ -108,22 +109,90 @@ func TestAStandingFindingIsNotApproved(t *testing.T) {
 	}
 }
 
-// TestAnApprovalWithNoBodyIsStillPublished pins the reason publish() cannot
-// return early on an empty render any more.
+// TestAStandingThreadIsNotApproved covers the case AlreadyReported cannot see.
 //
-// A clean run with review.summary off produces no comments and no summary. The
-// disposition is the whole message, and dropping it logs "nothing to publish"
-// over a review that had something to say.
+// A narrowed run does not re-read every file, so it never re-produces the
+// finding whose thread is still open on one it skipped: Findings and
+// AlreadyReported are both empty and the pull request still carries a comment.
+// PriorComments is what makes that visible.
+func TestAStandingThreadIsNotApproved(t *testing.T) {
+	r := &Report{PriorComments: 1}
+	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
+		t.Errorf("event beside a standing thread = %q, want %q", got, vcs.EventComment)
+	}
+
+	// The same run once it has closed that thread.
+	r.Superseded = []vcs.PriorComment{{ID: 1, Path: "a.go"}}
+	if got := reviewEvent(r, approving(false)); got != vcs.EventApprove {
+		t.Errorf("event after superseding every prior comment = %q, want %q", got, vcs.EventApprove)
+	}
+}
+
+// TestAnApprovalWithNoBodyIsStillPublished pins the guard in Engine.publish,
+// through Engine.publish.
+//
+// A clean run with review.summary off renders no comments and no summary, so
+// the early return on an empty body would drop the approval and log "nothing
+// to publish". Asserting on Render alone would leave that revertible with
+// every test still green, which is what the first version of this test did.
 func TestAnApprovalWithNoBodyIsStillPublished(t *testing.T) {
 	cfg := approving(false)
 	cfg.Review.Summary = false
 
-	review := Render(&Report{}, nil, cfg)
-	if review.Event != vcs.EventApprove {
-		t.Fatalf("event = %q, want %q", review.Event, vcs.EventApprove)
+	rec := &capturingProvider{}
+	e := &Engine{Config: cfg, Provider: rec}
+	if err := e.publish(t.Context(), vcs.Ref{}, &Report{}, nil); err != nil {
+		t.Fatalf("publish: %v", err)
 	}
-	if len(review.Comments) != 0 || review.Summary != "" {
+
+	if rec.published == nil {
+		t.Fatal("publish() returned without calling PublishReview: the approval was dropped")
+	}
+	if rec.published.Event != vcs.EventApprove {
+		t.Errorf("event = %q, want %q", rec.published.Event, vcs.EventApprove)
+	}
+	if len(rec.published.Comments) != 0 || rec.published.Summary != "" {
 		t.Fatalf("this case is only interesting when the body is empty: %d comments, summary %q",
-			len(review.Comments), review.Summary)
+			len(rec.published.Comments), rec.published.Summary)
 	}
+}
+
+// TestACleanCommentReviewWithNoBodyIsStillDropped is the other direction: the
+// early return has to keep working for everything that is not a disposition.
+func TestACleanCommentReviewWithNoBodyIsStillDropped(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Review.Summary = false
+
+	rec := &capturingProvider{}
+	e := &Engine{Config: cfg, Provider: rec}
+	if err := e.publish(t.Context(), vcs.Ref{}, &Report{}, nil); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	if rec.published != nil {
+		t.Errorf("an empty comment review was published as %+v", rec.published)
+	}
+}
+
+// capturingProvider is a Provider that records the review it was handed and
+// answers everything else with a zero value. Only PublishReview is exercised
+// here; the rest exists to satisfy the interface.
+type capturingProvider struct {
+	published *vcs.Review
+}
+
+func (c *capturingProvider) Name() string { return "capturing" }
+
+func (c *capturingProvider) PullRequest(context.Context, vcs.Ref) (*vcs.PullRequest, error) {
+	return &vcs.PullRequest{}, nil
+}
+
+func (c *capturingProvider) Diff(context.Context, vcs.Ref) ([]byte, error) { return nil, nil }
+
+func (c *capturingProvider) FileContent(context.Context, vcs.Ref, string) ([]byte, error) {
+	return nil, vcs.ErrNotFound
+}
+
+func (c *capturingProvider) PublishReview(_ context.Context, _ vcs.Ref, r vcs.Review) error {
+	c.published = &r
+	return nil
 }
