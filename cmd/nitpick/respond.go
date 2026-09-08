@@ -163,6 +163,7 @@ func runRespond(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
+		client.SetLogger(log)
 		pr, err := gh.PullRequest(ctx, ref)
 		if err != nil {
 			return err

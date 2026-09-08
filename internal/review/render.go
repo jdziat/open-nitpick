@@ -830,7 +830,8 @@ func walkthrough(report *Report, cfg *config.Config) string {
 	// The receipt is counted from the report; the prose was written by a model
 	// that never saw the change. Which one appears is review.summary_style,
 	// and the receipt is the default.
-	if cfg != nil && cfg.Review.EffectiveSummaryStyle() == config.SummaryReceipt {
+	usedReceipt := cfg != nil && cfg.Review.EffectiveSummaryStyle() == config.SummaryReceipt
+	if usedReceipt {
 		b.WriteString(receipt(report))
 	} else if s := strings.TrimSpace(report.Summary); s != "" {
 		b.WriteString(s)
@@ -855,12 +856,17 @@ func walkthrough(report *Report, cfg *config.Config) string {
 		}
 	}
 
-	// A stage that did not run is its own news. Every file can be read and the
-	// review still be worth less than it looks: findings published without
-	// triage were never deduplicated or ranked, and a reader who is not told
-	// that reasonably assumes they were.
-	for _, st := range report.Stages {
-		fmt.Fprintf(&b, "\n> **%s**\n", inline(stageSentence(st)))
+	// A stage that did not run is its own news: findings published without
+	// triage were never deduplicated or ranked, and a reader not told that
+	// assumes they were.
+	//
+	// Only when the receipt is not the summary. The receipt says this already,
+	// and the two are alternatives rather than a pair, so rendering both put
+	// the sentence on the page twice.
+	if !usedReceipt {
+		for _, st := range report.Stages {
+			fmt.Fprintf(&b, "\n> **%s**\n", inline(stageSentence(st)))
+		}
 	}
 
 	// Surfacing skips is a correctness matter, not a nicety: a review that

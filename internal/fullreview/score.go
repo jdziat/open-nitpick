@@ -166,7 +166,16 @@ func (c Scorecard) String() string {
 	}
 	fmt.Fprintf(&b, "  slop per thousand lines is %s the threshold of %.1f.\n", verdict, SlopThreshold)
 	if c.Incomplete() {
-		b.WriteString("  INCOMPLETE: the rates above are over the files a model answered for, not the tree.\n")
+		// Two different kinds of incomplete. A failed batch or a missing
+		// analyzer takes files out of the denominators, and the header says
+		// so. A failed stage does not: every file was read and scored, and
+		// saying otherwise would be the same overstatement in the other
+		// direction.
+		if len(c.Unreviewed) > 0 || len(c.AnalyzersFailed) > 0 {
+			b.WriteString("  INCOMPLETE: the rates above are over the files a model answered for, not the tree.\n")
+		} else {
+			b.WriteString("  INCOMPLETE: every file was scored, and a required stage did not run.\n")
+		}
 		if len(c.Unreviewed) > 0 {
 			fmt.Fprintf(&b, "  %d file(s) whose batch failed are in no denominator: %s\n", len(c.Unreviewed), strings.Join(c.Unreviewed, ", "))
 		}

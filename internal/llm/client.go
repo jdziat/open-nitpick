@@ -299,6 +299,13 @@ func (c *Client) setLog(l *slog.Logger) {
 	}
 }
 
+// SetLogger points this client, its fallback and their retry observers at l.
+//
+// Exported because not every client comes from Roles: fix and respond build
+// one directly, and assigning the Log field alone leaves the SDK's retries
+// writing nowhere, which is the silence this observer exists to end.
+func (c *Client) SetLogger(l *slog.Logger) { c.setLog(l) }
+
 // logger is Log, or a discarding logger.
 func (c *Client) logger() *slog.Logger {
 	if c != nil && c.Log != nil {

@@ -192,3 +192,19 @@ func TestTheReceiptIsQuietWhenNothingWasSkipped(t *testing.T) {
 		}
 	}
 }
+
+// The receipt and the walkthrough's own stage block are alternatives, not a
+// pair. Rendering both put the sentence on the page twice.
+func TestADegradedRunSaysItOnce(t *testing.T) {
+	report := &Report{
+		Files:  diff.Files{{Path: "a.go"}},
+		Plan:   planOfFiles(1),
+		Stages: []StageStatus{{Stage: "triage", Reason: "rate-limited"}},
+	}
+	cfg := config.Defaults()
+
+	got := walkthrough(report, cfg)
+	if n := strings.Count(got, "Triage failed"); n != 1 {
+		t.Errorf("the stage sentence appears %d times, want 1:\n%s", n, got)
+	}
+}
