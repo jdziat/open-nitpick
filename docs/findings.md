@@ -3,7 +3,7 @@
 What has been measured, and what it does and does not support.
 
 Numbers here are dated and provisional. Read
-[measurement.md](measurement.md) first: several of the results below were
+[Measurement](measurement.md) first: several of the results below were
 produced by an instrument that was itself wrong, and the corrections matter more
 than the original figures.
 
@@ -14,7 +14,7 @@ question, and the change that improved detection made noise worse.** That is
 the whole of what is supportable, and the two halves have to be read together.
 
 Counted, no judge, on real pull requests (2026-09-03, 44 pull requests on
-`jdziat/nitpick-bench`, [remediation.md](remediation.md)):
+`jdziat/nitpick-bench`, [Remediation](remediation.md)):
 
 | | open-nitpick | Incumbent |
 |---|---|---|
@@ -63,8 +63,8 @@ from the tree. Our own side is a live measurement and does not.
 
 ## What the instrument got wrong
 
-Eighteen measurement bugs have been found, listed below. Six of them scored
-against Incumbent and six flattered whichever behaviour this project would
+Twenty measurement bugs have been found, listed below. Six of them scored
+against Incumbent and seven flattered whichever behaviour this project would
 rather see (silence, selective reporting, or the author's own argument), which
 is why this section exists at all: none were bugs in open-nitpick, and every one
 would have produced a confident wrong number.
@@ -72,7 +72,10 @@ would have produced a confident wrong number.
 The count is the number of rows in the table, so it moves when the table does.
 It said "nine" against fourteen rows for two rounds, which is the same failure
 these documents keep recording one size down: a figure restated rather than
-recomputed.
+recomputed. It came back one size smaller: two bugs found later were numbered
+in the prose of their own dated sections, "the tenth" and "the eleventh"
+against a table that already had eighteen rows. Both are rows now, and a bug
+found from here on gets a row rather than an ordinal.
 
 | bug | effect | direction |
 |---|---|---|
@@ -94,6 +97,8 @@ recomputed.
 | the withdrawal applied to one of the metric's two renderings | `O-*` was gated on vocabulary and the `SEV a/i/u` cell was formatted inline, so "a foreign row prints `n/a`" held only because that table had no foreign row | latent |
 | `STABLE` returned `yes` for five silent runs | the column's best value went to a reviewer that never spoke; a wobbly correct one got `NO` | favoured silence |
 | the retraction's own figures (`10 of 10`, `0.62 → 0.88`, `O-ACC 0.63`) | none reproduced; each overstated the case it was making | favoured the author |
+| two unplanted defects shipped in the tuning corpus | a 0600 to 0666 file mode and an error string written to an HTTP response were scored as noise against every model that reported them | against whichever reviewer read the code |
+| the grounding instrument counted tokens the template forbids the walkthrough to name | numerator and denominator were both zero, so six walkthroughs from two arms all scored a perfect 1.00 | favoured the arm that wrote less |
 
 ### The correction that mattered most
 
@@ -202,7 +207,7 @@ Rule 6.
 ## v1 head-to-head
 
 Both sides measured on the same 30-fixture corpus, `glm-5.2` and `kimi-k3` at two
-runs each. The deciding numbers come from the HELD-OUT corpus, which the prompt was
+runs each. The deciding numbers come from the held-out corpus, which the prompt was
 never tuned against.
 
 ### Detection: counted, no judge
@@ -268,7 +273,7 @@ ruby-default-page-size, and the shipped severity ladder illustrated `info` with
 "Adding a dependency for one helper function is info" three lines above "do not
 go looking for them": the prompt named one of the two plants and then told the
 reviewer to ignore it. That illustration has since been replaced and the figure
-above has NOT been re-measured under the new wording, so this row is stale in a
+above has not been re-measured under the new wording, so this row is stale in a
 known direction for our column only. The incumbent's column is unaffected: it
 never reads our prompt.
 
@@ -315,7 +320,7 @@ severity and therefore could not see this floor at all. They are superseded.
 
 ## Judge instability
 
-Documented in [measurement.md](measurement.md#the-two-kinds-of-column-and-why-it-matters):
+Documented in [Measurement](measurement.md#the-two-kinds-of-column-and-why-it-matters):
 four runs over byte-identical cached findings gave grades from 3.66 to 3.98 and
 `MISSED` from 0.12 to 0.62, at `Temperature: 0`.
 
@@ -713,7 +718,7 @@ Two batteries, kimi-k3, 3 runs each, against the shipped Incumbent cache.
 | nit | 5/9 | 0/3 |
 | **located** | **38/48 = 0.79** | **10/16 = 0.62** |
 
-THE TWO SPLITS TELL DIFFERENT STORIES AND THE DIFFERENCE IS THE POINT. On the
+The two splits tell different stories, and the difference is the point. On the
 tuning corpus the blocking bands are a dead heat (10 of 10 each on
 critical+error+warning), and the whole margin is info and nit, where Incumbent
 locates nothing and may not publish at all. Quoting the tuning total alone would
@@ -731,7 +736,7 @@ it counts: critical 1.00 against 0.50, warning 1.00 against 0.33, error tied.
 
 Rule 14 says any one failing means do not ship. **Do not ship v1 yet.**
 
-WHY CONDITION 3 FAILS, AND WHAT IT DOES AND DOES NOT SAY. Judged precision is
+Why condition 3 fails, and what it does and does not say. Judged precision is
 0.80 for us and 0.83 for Incumbent, within a hair, and well inside a
 single-judge figure whose cross-judge disagreement was never measured. What
 differs is VOLUME: 0.88 findings per review against 0.43. At near-equal
@@ -748,7 +753,7 @@ pre-registration exists to prevent.
     TUNING corpus Incumbent's judged precision was 13/13, so 1.5x0 = 0 and any
     noise at all fails. A threshold that a perfect-precision incumbent makes
     unsatisfiable is not a threshold. It needs an absolute floor.
-  - Condition 4 named a column the benchmark DID NOT PRINT AT THE TIME. ANCHOR
+  - Condition 4 named a column the benchmark did not print at the time. ANCHOR
     appeared in the prompt-battery cost table and not in the head-to-head, so a
     condition could not be evaluated by the run it governs. **The instrument has
     since been repaired and this row is history, not current state:** the
@@ -771,10 +776,10 @@ All three were written or read by an author who had already seen a favourable
 narrow result, which is disclosed in Rule 14 and is the reason to read them
 sceptically rather than to trust that they were merely unlucky.
 
-### What is NOT claimed
+### What this does not claim
 
 No cross-tool severity accuracy: incumbent/cli's O-* columns are withdrawn by
-construction, its one `critical` spanning our critical AND error. GRADE is 3.77
+construction, its one `critical` spanning both our critical and our error. GRADE is 3.77
 against 3.14 with spreads of 2.30 and 4.30, a gap far inside either spread, so
 it is not a ranking. Every judged figure is one model's opinion with its
 cross-judge disagreement unmeasured, printed `+?`. Our side lost 2 runs of 42 to
@@ -810,7 +815,7 @@ By band, and this is where the incumbent's shape shows:
 Perfect on critical, error and warning; the incumbent locates 4 of 8 across those
 three. Both locate nothing at `info`.
 
-### THE HELD-OUT CORPUS WAS SPENT TWICE AND THIS IS THE SECOND LOOK
+### The held-out corpus was spent twice, and this is the second look
 
 It is meant to be spent once. The first spend could not evaluate the rule (two
 of four conditions had no column), so the instrument was fixed and it was spent
@@ -834,7 +839,7 @@ The drift is itself worth recording: 0.68 to 0.74 is about two defects on a
 corpus whose smallest expressible difference is one. Run-to-run variance at
 temperature 0 is real here and is not a rounding effect.
 
-### What this does NOT establish
+### What this does not establish
 
 - **Condition 3 was loosened after it failed.** Rule 14a states the direction and
   the reasoning; the timing is what pre-registration exists to distrust.
@@ -843,7 +848,7 @@ temperature 0 is real here and is not a rounding effect.
   singleton, is a pattern the standard library ships), so that band measures
   something below every tested reviewer's threshold rather than a gap.
 - **No cross-tool severity accuracy.** incumbent/cli's O-* cells are withdrawn by
-  construction; its one `critical` spans our critical AND error.
+  construction; its one `critical` spans both our critical and our error.
 - **GRADE is not a ranking.** 3.91 against 3.12 with spreads of 2.00 and 4.30.
   Single judge, cross-judge disagreement unmeasured, printed `+?`.
 - **The incumbent's raw text is not retained on this path**, only parsed findings,
@@ -881,8 +886,9 @@ Read the run dumps first; most of the noise was ours.
 
 - **Two unplanted defects shipped in the corpus** and were scored as noise
   against every model that found them (a 0600 to 0666 file mode, an error
-  string written to an HTTP response). Fixed at the fixture. This is the
-  tenth instrument bug, and the first found by three models agreeing.
+  string written to an HTTP response). Fixed at the fixture. It is in the
+  table above, and the first instrument bug there found by three models
+  agreeing.
 - **Two base-prompt rules cut noise for every model measured**, the default
   included: a consequence must be reachable with what was shown, and an
   untouched helper is judged by its contract. Multi-file noise: glm 0.64 to
@@ -1568,8 +1574,8 @@ and file names, scored both arms a perfect 1.00 over six walkthroughs, and the
 reason was that it found zero tokens: the same template forbids naming files
 ("no bullet lists of files, no statistics, no restating the diff"). An
 instrument that returns a perfect score because its numerator and denominator
-are both zero is the eleventh instrument bug here, and the second to flatter
-the arm that produced less.
+are both zero is in the table above, with the others there that rewarded the
+arm which produced less.
 
 **Not measured: cost.** Grounding sends the whole diff to the triage model on
 every review. The tokens were never counted, and `review.budget`'s `overhead`

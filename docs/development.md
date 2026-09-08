@@ -1,5 +1,9 @@
 # Development
 
+Working on the tool itself: the tests, which need no network or credentials, the
+commit and release conventions CI enforces, and the eval harness that measures a
+prompt or analyzer change against real models before it ships.
+
 ```bash
 go test ./...        # no network or credentials required
 go test -race ./...
@@ -7,6 +11,8 @@ make quick           # measure a prompt or analyzer change for a few cents (see 
 ```
 
 ## Commits and releases
+
+<a id="releases"></a>
 
 Commit subjects follow [Conventional Commits](https://www.conventionalcommits.org/):
 `feat(scope): what changed`, `fix: …`, `docs: …`, `evals: …`, `prompt: …`.
@@ -18,10 +24,10 @@ asset with Sigstore keyless signing, so a download is checkable against this
 repository's workflow identity and nothing else:
 
 ```bash
-cosign verify-blob --bundle nitpick_v1.4.0_linux_amd64.sigstore.json \
+cosign verify-blob --bundle nitpick_v1.11.0_linux_amd64.sigstore.json \
   --certificate-identity-regexp '^https://github.com/jdziat/open-nitpick/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  nitpick_v1.4.0_linux_amd64
+  nitpick_v1.11.0_linux_amd64
 ```
 
 The `v1` tag follows every `v1.x.y` release, which is what the Action's
@@ -33,7 +39,7 @@ The `v1` tag follows every `v1.x.y` release, which is what the Action's
 with related context off and on, against `z-ai/glm-5.3-flash`, about a
 thirtieth of the default reviewer's price per review. It is the model to
 iterate against, and the triage model this repository's own config uses;
-[docs/findings.md](findings.md) records how it compares as a reviewer.
+[Findings](findings.md) records how it compares as a reviewer.
 `QUICK=<openrouter id>` swaps it.
 
 ## Evaluating the prompts against real models

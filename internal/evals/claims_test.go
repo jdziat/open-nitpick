@@ -51,7 +51,7 @@ import (
 
 // claimTrigger is one idiom that turns a sentence into a guarantee.
 //
-// The note behind it is in docs/measurement.md#claimtrigger.
+// The note behind it is in docs/harness-notes.md#claimtrigger.
 type claimTrigger struct {
 	name    string
 	pattern *regexp.Regexp
@@ -128,12 +128,12 @@ var claimTriggers = []claimTrigger{
 
 // claimReason opens a clause that ARGUES rather than asserts.
 //
-// The note behind it is in docs/measurement.md#claimreason.
+// The note behind it is in docs/harness-notes.md#claimreason.
 var claimReason = regexp.MustCompile(`(?i)(\bbecause\b|\bso\b|\bsince\b|\bwhich\b|\bwhere\b|\bwhen\b|\bwhile\b|\bunless\b|\bif\b|\bbut\b|\band\b|\bor\b|\brather than\b|,|;|:|\(|—)`)
 
 // claimHistory marks a sentence as a record of what HAPPENED.
 //
-// The note behind it is in docs/measurement.md#claimhistory.
+// The note behind it is in docs/harness-notes.md#claimhistory.
 var claimHistory = regexp.MustCompile(`(?i)\b(was|were|had|have been|has been|used to|did|would|could|might|previously|originally|historically|no longer|until|before|once)\b`)
 
 // claimTestRef is how a comment cites a test. Go's own convention: the test's
@@ -329,7 +329,7 @@ func glued(text string) string { return strings.ReplaceAll(text, "\n", "") }
 // codeShaped reports whether a word is spelled the way code is spelled rather
 // than the way English is.
 //
-// The note behind it is in docs/measurement.md#codeshaped.
+// The note behind it is in docs/harness-notes.md#codeshaped.
 func codeShaped(word string) bool {
 	for i, r := range word {
 		if i > 0 && r >= 'A' && r <= 'Z' {

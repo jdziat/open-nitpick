@@ -53,16 +53,42 @@ cover:
 # pages, and website/ for what only the site has (landing page, styling).
 # Staged into .website/ so every relative link in the repository resolves on
 # the site unchanged. Needs mkdocs-material (pip install mkdocs-material).
-.PHONY: docs docs-serve
-docs:
+.PHONY: docs docs-serve docs-reference
+# The configuration reference is generated from the configuration, so a key
+# the loader accepts and the docs never mention cannot survive a build.
+docs-reference:
+	go run ./cmd/nitpick config-reference -o docs/configuration-reference.md
+
+docs: docs-reference
 	rm -rf .website && mkdir -p .website/docs
 	cp website/index.md .website/index.md
-	cp -r website/assets .website/assets
+	# Rejected logo concepts are not documentation and were reachable in
+	# production until this line. logo.jpg joined them: 94 KB of the published
+	# site that no page, template or stylesheet names.
+	cp -r website/assets .website/assets && rm -rf .website/assets/logo-candidates .website/assets/logo.jpg
 	printf -- '---\ntitle: Guide\n---\n' > .website/guide.md
-	sed -E '1s/^# open-nitpick$$/# Guide/; /^Documentation: <https:\/\/jdziat\.github\.io/d; /^The same documents are published at/d' README.md >> .website/guide.md
+	# The heading is on line 3, under the centred logo, so the address this
+	# substitution used to carry never matched and the Guide's h1 was the site's
+	# own name, two inches under the header that already says it. README.md has
+	# exactly one line reading `# open-nitpick`.
+	# The logo and the three badges are deleted with it. A 112px centred mark
+	# 150px below the header's own mark and wordmark, over a left-aligned h1,
+	# over three shields, is README furniture: it makes the second page a
+	# four-minute reader reaches read as a rehosted README, and the License
+	# badge is the third statement of what the footer already carries as
+	# "Apache-2.0". README.md on GitHub keeps all four lines.
+	sed -E 's/^# open-nitpick$$/# Guide/; /^<p align="center"><img src="website\/assets\/logo\.svg"/d; /^\[!\[/d; /^Documentation: <https:\/\/jdziat\.github\.io/d; /^The same documents are published at/d' README.md >> .website/guide.md
 	cp docs/*.md .website/docs/
-	for f in .website/docs/*.md; do sed -E 's#\]\(\.\./(internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
-	sed -E 's#\]\((internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g; s#src="website/assets/#src="../assets/#g' .website/guide.md > .website/guide.md.tmp && mv .website/guide.md.tmp .website/guide.md
+	cp docs/configuration-reference.md .website/docs/configuration-reference.md
+	# SECURITY.md sits at the repository root, so its links are docs/-relative;
+	# staged beside the pages it points at, that prefix has to go.
+	sed -E 's#\]\(docs/#](#g' SECURITY.md > .website/docs/security.md
+	# ../README.md resolves for someone reading docs/ in the repository and
+	# names no file on the site, where the same document is staged as guide.md.
+	# Written the other way round it is the repository copy that breaks, and
+	# these pages are read in both places.
+	for f in .website/docs/*.md; do sed -E -e 's#\]\(\.\./(internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' -e 's#\]\(\.\./README\.md#](../guide.md#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
+	sed -E 's#\]\((internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' .website/guide.md > .website/guide.md.tmp && mv .website/guide.md.tmp .website/guide.md
 	mkdocs build
 
 docs-serve: docs

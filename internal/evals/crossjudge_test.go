@@ -1421,7 +1421,7 @@ func sampleAggregate(seed int) Aggregate { return sampleAggregateOver(seed, judg
 // shownList is one judged sample: a fixture, and the findings the judge was
 // shown for it.
 //
-// The note behind it is in docs/measurement.md#shownlist.
+// The note behind it is in docs/harness-notes.md#shownlist.
 type shownList struct {
 	fixture  string
 	findings []review.Finding
@@ -1496,7 +1496,7 @@ func sampleAggregateOver(seed int, shown []shownList) Aggregate {
 // seed, so a corroborated GRADE and SPREAD cell have something to disagree
 // about.
 //
-// The note behind it is in docs/measurement.md#gradeladder.
+// The note behind it is in docs/harness-notes.md#gradeladder.
 func gradeLadder(seed int) []string {
 	ladder := []string{"D", "C", "C+", "B-", "B", "B+", "A-", "A"}
 	return []string{ladder[0], ladder[seed%len(ladder)]}

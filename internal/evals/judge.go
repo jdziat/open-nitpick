@@ -25,13 +25,13 @@ import (
 
 // DefaultJudgeModel stands in for a senior human reviewer.
 //
-// The note behind it is in docs/measurement.md#defaultjudgemodel.
+// The note behind it is in docs/harness-notes.md#defaultjudgemodel.
 const DefaultJudgeModel = "openai/gpt-5.6-terra"
 
 // SecondJudgeModel corroborates the primary judge from a vendor NO contender
 // shares.
 //
-// The note behind it is in docs/measurement.md#secondjudgemodel.
+// The note behind it is in docs/harness-notes.md#secondjudgemodel.
 const SecondJudgeModel = "x-ai/grok-4.5"
 
 // EnvJudgeModel overrides the judge.
@@ -49,7 +49,7 @@ const EnvSecondJudge = "NITPICK_EVAL_JUDGE2"
 // SecondJudgeFromEnv resolves the corroborating judge, returning "" when there
 // is none.
 //
-// The note behind it is in docs/measurement.md#secondjudgefromenv.
+// The note behind it is in docs/harness-notes.md#secondjudgefromenv.
 func SecondJudgeFromEnv() string {
 	raw := strings.TrimSpace(os.Getenv(EnvSecondJudge))
 	if raw == "default" {
@@ -331,7 +331,7 @@ func numbered(content string) string {
 
 // Stimulus is the finding list a judge was SHOWN, as an identity.
 //
-// The note behind it is in docs/measurement.md#stimulus.
+// The note behind it is in docs/harness-notes.md#stimulus.
 type Stimulus struct {
 	// n is how many findings were shown, and is the number of verdicts a
 	// judge owes back.
@@ -369,7 +369,7 @@ func (s Stimulus) Recorded() bool { return s.print != "" }
 // stimulusTrace is every stimulus behind one Aggregate, one per judgement
 // folded in.
 //
-// The note behind it is in docs/measurement.md#stimulustrace.
+// The note behind it is in docs/harness-notes.md#stimulustrace.
 type stimulusTrace struct {
 	prints []string
 }
@@ -635,7 +635,7 @@ func (a Aggregate) Attempts() int {
 // the
 // FAIL cell prints.
 //
-// The note behind it is in docs/measurement.md#lost.
+// The note behind it is in docs/harness-notes.md#lost.
 func (a Aggregate) Lost() int {
 	lost := 0
 	for fixture, tried := range a.attempted {
@@ -649,7 +649,7 @@ func (a Aggregate) Lost() int {
 // ShortFixtures names the fixtures this row attempted more reviews of than it
 // folded, with both counts, in fixture-name order.
 //
-// The note behind it is in docs/measurement.md#shortfixtures.
+// The note behind it is in docs/harness-notes.md#shortfixtures.
 func (a Aggregate) ShortFixtures() []ShortFixture {
 	var out []ShortFixture
 	for fixture, tried := range a.attempted {
@@ -758,7 +758,7 @@ func (a *Aggregate) Add(r *JudgeResult, shown Stimulus) []string {
 // review-level fields, and returns the same suspicions Add reports about the
 // verdict list.
 //
-// The note behind it is in docs/measurement.md#addverdicts.
+// The note behind it is in docs/harness-notes.md#addverdicts.
 func (a *Aggregate) AddVerdicts(verdicts []Verdict, expected int) []string {
 	problems := verdictProblems(verdicts, expected)
 	a.countVerdicts(verdicts)
@@ -861,7 +861,7 @@ func (a *Aggregate) AddSeverity(f Fixture, s SeverityScore) {
 
 // AddDetection folds one review's detection reading in.
 //
-// The note behind it is in docs/measurement.md#adddetection.
+// The note behind it is in docs/harness-notes.md#adddetection.
 func (a *Aggregate) AddDetection(d DetectionScore) {
 	a.DetReviews++
 	a.DetNoise += d.Noise()
@@ -872,7 +872,7 @@ func (a *Aggregate) AddDetection(d DetectionScore) {
 // DeclareScale folds one result's declared severity vocabulary into this row,
 // withdrawing the row when two results disagree.
 //
-// The note behind it is in docs/measurement.md#declarescale.
+// The note behind it is in docs/harness-notes.md#declarescale.
 func (a *Aggregate) DeclareScale(s SeverityScale) {
 	if !a.scaleDeclared {
 		a.Scale, a.scaleDeclared = s, true
@@ -891,7 +891,7 @@ func (a Aggregate) SevGraded() int {
 // locatedShare is the share of planted defects this contender LOCATED, and the
 // single expression both RECALL and O-COV are rendered from.
 //
-// The note behind it is in docs/measurement.md#locatedshare.
+// The note behind it is in docs/harness-notes.md#locatedshare.
 func (a Aggregate) locatedShare() (float64, bool) {
 	if a.SevPlanted == 0 {
 		return 0, false
@@ -979,7 +979,7 @@ func (a Aggregate) DetectionCells() (recall, noise, anchor, spread string) {
 // for
 // the DENOMINATORS block under the table.
 //
-// The note behind it is in docs/measurement.md#detectioncounts.
+// The note behind it is in docs/harness-notes.md#detectioncounts.
 func (a Aggregate) DetectionCounts() string {
 	if a.DetReviews == 0 {
 		return fmt.Sprintf("RECALL %d/%d defects | NOISE, ANCHOR and L/DEF undefined: no review was "+
@@ -999,7 +999,7 @@ func (a Aggregate) DetectionCounts() string {
 // ObjectiveSeverityCells renders this contender's O-INFL/O-UNDER/O-ACC/O-COV,
 // per sample for the first three and as a share of planted defects for O-COV.
 //
-// The note behind it is in docs/measurement.md#objectiveseveritycells.
+// The note behind it is in docs/harness-notes.md#objectiveseveritycells.
 func (a Aggregate) ObjectiveSeverityCells(samples int) (infl, under, acc, cov string) {
 	if !a.Scale.PublishesOurLevels() {
 		return "n/a", "n/a", "n/a", "n/a"
@@ -1022,7 +1022,7 @@ func (a Aggregate) ObjectiveSeverityCells(samples int) (infl, under, acc, cov st
 // O-INFL/O-UNDER/O-ACC/O-COV,
 // so a reader can see what resolution those four rates have.
 //
-// The note behind it is in docs/measurement.md#objectiveseveritycounts.
+// The note behind it is in docs/harness-notes.md#objectiveseveritycounts.
 func (a Aggregate) ObjectiveSeverityCounts(model string) string {
 	located := fmt.Sprintf("%d located of %d planted", a.SevGraded(), a.SevPlanted)
 
@@ -1078,7 +1078,7 @@ type VocabularyRow struct {
 // SeverityVocabularyBlock renders what each contender CALLED the defects it
 // located, against the level each was planted at.
 //
-// The note behind it is in docs/measurement.md#severityvocabularyblock.
+// The note behind it is in docs/harness-notes.md#severityvocabularyblock.
 func SeverityVocabularyBlock(rows []VocabularyRow) string {
 	var b strings.Builder
 
@@ -1207,7 +1207,7 @@ func translatedWordsNote(rows []VocabularyRow) string {
 
 // Precision is the share of findings a senior reviewer would raise.
 //
-// The note behind it is in docs/measurement.md#precision.
+// The note behind it is in docs/harness-notes.md#precision.
 func (a Aggregate) Precision() float64 {
 	if a.Findings == 0 {
 		return math.NaN()
@@ -1277,7 +1277,7 @@ func (a Aggregate) MeanGrade() float64 {
 
 // GradeSpread is the range of the graded samples, worst to best.
 //
-// The note behind it is in docs/measurement.md#gradespread.
+// The note behind it is in docs/harness-notes.md#gradespread.
 func (a Aggregate) GradeSpread() float64 {
 	if len(a.Grades) < 2 {
 		return 0
@@ -1356,7 +1356,7 @@ func VendorConflicts(judge string) []string {
 // JudgedFigure is a number an LLM judge produced, BOUND TO the disagreement
 // between the judges who produced it.
 //
-// The note behind it is in docs/measurement.md#judgedfigure.
+// The note behind it is in docs/harness-notes.md#judgedfigure.
 type JudgedFigure struct {
 	// primary is the first judge's value, second the corroborating judge's.
 	// Unexported so that no caller outside this package can format either one
@@ -1418,7 +1418,7 @@ func Corroborated(primary, second float64) JudgedFigure {
 
 // NotComparable builds a figure both judges scored, from different stimuli.
 //
-// The note behind it is in docs/measurement.md#notcomparable.
+// The note behind it is in docs/harness-notes.md#notcomparable.
 func NotComparable(primary float64) JudgedFigure {
 	if math.IsNaN(primary) {
 		return JudgedFigure{}
@@ -1629,7 +1629,7 @@ func (c CrossJudged) figure(of func(Aggregate) float64) JudgedFigure {
 // same
 // question.
 //
-// The note behind it is in docs/measurement.md#samestimulus.
+// The note behind it is in docs/harness-notes.md#samestimulus.
 func (c CrossJudged) SameStimulus() bool {
 	return c.HaveSecond && c.Primary.SameStimulusAs(c.Second)
 }
@@ -1926,13 +1926,13 @@ func (p JudgePanel) Banner() string {
 // judgedCellWidth is how wide a table cell must be to hold a corroborated
 // figure.
 //
-// The note behind it is in docs/measurement.md#judgedcellwidth.
+// The note behind it is in docs/harness-notes.md#judgedcellwidth.
 const judgedCellWidth = 12
 
 // CorroboratedColumns are the columns whose value comes from a judge and must
 // therefore be printed as a JudgedFigure.
 //
-// The note behind it is in docs/measurement.md#corroboratedcolumns.
+// The note behind it is in docs/harness-notes.md#corroboratedcolumns.
 func CorroboratedColumns() []string {
 	out := append([]string(nil), JudgeOpinionColumns()...)
 	out = append(out, "FIND", "FINDINGS")

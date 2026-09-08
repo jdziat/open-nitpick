@@ -24,6 +24,12 @@ import (
 // every value written is already the one in force, deleting a key changes
 // nothing and the file can be trimmed to taste without a surprise.
 //
+// linters.enabled is the exception, and the header says so. It is derived from
+// the languages the checkout contains rather than copied from the default: a
+// Go-only tree is written [golangci-lint] and a Python-only one [ruff], where
+// the shipped default is both. Deleting it is the one deletion that changes a
+// run, under mode: strict, where it is the list whose absence fails one.
+//
 // The generated file is verified before it lands: it is written to a temporary
 // file, loaded through the same config.LoadFile a review uses, and only then
 // renamed into place. A generator that emitted a file the loader rejects would
@@ -226,8 +232,10 @@ func renderConfig(c chosenModel, matched []linters.CatalogEntry) string {
 
 	p(`# open-nitpick configuration. Written by "nitpick init".
 #
-# Every value here is already the shipped default, except the model, so
-# deleting a key changes nothing and this file can be trimmed to taste. Run
+# Every value here is already the shipped default, except the model and
+# linters.enabled, so deleting a key changes nothing and this file can be
+# trimmed to taste. linters.enabled is matched to this checkout's files, and
+# under "mode: strict" it is the list whose absence fails a run. Run
 # "nitpick explain-config" to print what it resolves to without spending a
 # token.
 
@@ -319,16 +327,28 @@ persona:
 // that ship enabled are named; everything the catalog auto-detects is listed
 // as a comment, which tells a reader it covers their code without promising
 // their CI runner has it installed.
+//
+// The optIn bucket exists because there is a fourth case and it used to fall
+// into auto. Five catalog analyzers carry no `auto:` in their spec, so
+// autoDetected() never returns them, and two of those five, markdownlint and
+// osv-scanner, need neither a configuration nor trust and so were not blocked
+// either. A checkout with a .md file and a lockfile had both written under the
+// comment that says they run on their own: the file told an operator their
+// dependencies were being scanned for vulnerabilities when nothing was
+// scanning them, while `nitpick linters` and docs/analyzers.md said the
+// opposite. The switch tests what runs it, not what stops it.
 func renderLinterRoster(b *strings.Builder, matched []linters.CatalogEntry) {
 	p := func(format string, a ...any) { _, _ = fmt.Fprintf(b, format, a...) }
 
-	var named, auto, blocked []linters.CatalogEntry
+	var named, auto, optIn, blocked []linters.CatalogEntry
 	for _, e := range matched {
 		switch {
 		case e.NeedsConfig || e.Trusted:
 			blocked = append(blocked, e)
 		case e.Default:
 			named = append(named, e)
+		case !e.Auto:
+			optIn = append(optIn, e)
 		default:
 			auto = append(auto, e)
 		}
@@ -355,6 +375,18 @@ func renderLinterRoster(b *strings.Builder, matched []linters.CatalogEntry) {
   # mode: strict.
 `)
 		for _, e := range auto {
+			p("  #   %-14s %s\n", e.Name, e.Languages)
+		}
+	}
+
+	if len(optIn) > 0 {
+		p(`
+  # Also matched here, and each runs only when it is named. Auto-detection
+  # does not reach these, so leaving one a comment means it never runs. Move
+  # it into enabled above to turn it on, and its absence then fails a run
+  # under mode: strict.
+`)
+		for _, e := range optIn {
 			p("  #   %-14s %s\n", e.Name, e.Languages)
 		}
 	}
@@ -490,6 +522,11 @@ func report(out io.Writer, c chosenModel, matched []linters.CatalogEntry) {
 		names = append(names, e.Name)
 	}
 	_, _ = fmt.Fprintf(out, "  analyzers: %s\n", strings.Join(names, ", "))
+	// The list is what matched, and matching is not running: some of these are
+	// enabled, some are auto-detected, and some run only once they are named or
+	// configured. Under the bare label the line read as a roster of what the
+	// review would run, which for the last group it is not.
+	_, _ = fmt.Fprintln(out, "             matched this checkout. The file says which of them run as written.")
 	_, _ = fmt.Fprintln(out, "\nRun \"nitpick explain-config\" to see what this resolves to.")
 }
 

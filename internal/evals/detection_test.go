@@ -690,7 +690,10 @@ func TestNoShippedDocumentSaysAPrintedColumnIsMissing(t *testing.T) {
 	}
 	sort.Strings(cols)
 
-	for _, doc := range []string{"findings.md", "measurement.md"} {
+	// harness-notes.md carries the prose that used to be the second half of
+	// measurement.md, and a claim about a column nobody prints is as wrong
+	// there as it was there.
+	for _, doc := range []string{"findings.md", "measurement.md", "harness-notes.md"} {
 		prose := docProse(t, filepath.Join("..", "..", "docs", doc))
 		for _, col := range cols {
 			for _, claim := range []string{

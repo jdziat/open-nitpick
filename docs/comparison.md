@@ -1,12 +1,16 @@
 # open-nitpick against Incumbent
 
-> [!NOTE]
-> "Incumbent" is the hosted reviewer these tables measure against. What matters for reading the numbers is the methodology, not which product it is: the corpora are this project's own, the runs are dated, and every instrument bug found so far is in [findings.md](findings.md).
+!!! note "What Incumbent names in these tables"
+
+    "Incumbent" is the hosted reviewer these tables measure against. What
+    matters for reading the numbers is the methodology, not which product it
+    is: the corpora are this project's own, the runs are dated, and every
+    instrument bug found so far is in [Findings](findings.md).
 
 A capability comparison and a measured one, kept apart because they are
 different kinds of claim. The capability table is what each product does; the
 measured tables are what each did on this project's corpora, with every rule
-in [measurement.md](measurement.md) applying: above all that the corpora are
+in [Measurement](measurement.md) applying: above all that the corpora are
 this project's own, that the incumbent's side is its CLI in plain-text mode
 on a free allowance rather than the hosted product with a learned codebase,
 and that Contender, a second hosted reviewer, is not in the tables
@@ -17,13 +21,13 @@ because it could not be run here.
 | capability | Incumbent | open-nitpick |
 |---|---|---|
 | Runs where | hosted; self-hosted on an enterprise plan | anywhere: GitHub Action, any CI, a laptop, offline against a checkout |
-| Model | theirs, undisclosed | any of 17 providers, any OpenRouter model, any OpenAI-compatible endpoint, local models; different models per role |
+| Model | theirs, undisclosed | any of 18 providers, any OpenRouter model, any OpenAI-compatible endpoint, local models; different models per role |
 | Prompt | not visible | prompts are files in the repository; `nitpick explain-config` prints the exact prompt |
 | Pricing | per seat | none; you pay the model provider |
 | Trust model | reads `.incumbent.yaml` and analyzer configs from the branch under review | a change may not supply the policy it is reviewed under: policy from the base revision, analyzer configs never from the tree, endpoint keys stripped from untrusted config |
 | Forges | GitHub, GitLab, Bitbucket, Azure DevOps | GitHub, local |
 | Incremental review on push | yes | yes; fingerprints withhold findings already posted, files unchanged since the last review are not re-read, force push falls back to full |
-| Static analyzers | ~50 tools, auto-selected | 33 tools, auto-detected when installed, every one isolated from the tree; see [analyzers.md](analyzers.md) |
+| Static analyzers | ~50 tools, auto-selected | 33 tools, auto-detected when installed, every one isolated from the tree; see [Analyzers](analyzers.md) |
 | Repository context | indexes the repository | attaches the definitions a changed line uses: Go (types and methods), TypeScript (aliases, barrels), Python (package re-exports), Ruby (Rails autoload), Rust, Java, Kotlin, C/C++; and the untouched callers of what a change redefines, with the constants they pass: Go, Python, TypeScript |
 | Disclosure | summary and walkthrough | every file not reviewed, every analyzer that did not run, every finding an analyzer produced and the review discarded, every part of the change an analyzer did not cover, every finding a domain expert overruled |
 | Chat, `@mention` commands | yes | yes; `@open-nitpick review` reviews again, `@open-nitpick resolve` closes a thread, anything else is a question answered in it. Bounded by `review.respond.from`, which defaults to owner, member and collaborator, and by `max_per_pull_request` |
@@ -219,7 +223,7 @@ this reviewer.
 
 ### After the remediation plan (2026-09-04)
 
-See [remediation.md](remediation.md) for the plan and what each step
+See [Remediation](remediation.md) for the plan and what each step
 measured. On the benchmark repository, re-laid-out so nothing tells either
 reviewer it is reading a fixture, the shipped Action moved from 33 to 36 of
 41 plants, recovering four of the eight misses; the four still missed are

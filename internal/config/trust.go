@@ -105,7 +105,12 @@ func pruneUntrusted(root *yaml.Node) []string {
 	}
 
 	if models := mapValue(root, "models"); models != nil {
-		for _, role := range []string{"default", "review", "triage", "validate", "router"} {
+		// fix writes code and opens a pull request from it, which makes it the
+		// role a repository would most want to point at an endpoint of its own.
+		// It was absent from this list for a release: models.fix.base_url and
+		// models.fix.credential_command survived the prune and reached
+		// validation while the same keys under models.default were deleted.
+		for _, role := range []string{"default", "review", "triage", "validate", "router", "fix"} {
 			scrub("models."+role, mapValue(models, role))
 		}
 		for i, route := range sequence(mapValue(models, "routes")) {

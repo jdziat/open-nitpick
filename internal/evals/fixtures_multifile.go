@@ -5,7 +5,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // MultiFileFixtures is the multi-file corpus: changes whose defect is only
 // visible by reading a file the change does not touch.
 //
-// The note behind it is in docs/measurement.md#multifilefixtures.
+// The note behind it is in docs/harness-notes.md#multifilefixtures.
 func MultiFileFixtures() []Fixture {
 	fixtures := []Fixture{
 		goQueryWithoutDeadlineFixture(),

@@ -144,3 +144,31 @@ func TestMCPInstallPrintDoesNotWriteAndRefusesUnknownClients(t *testing.T) {
 		t.Errorf("clients = %v", got)
 	}
 }
+
+// TestMCPInstallTakesFlagsOnEitherSideOfTheClient holds the command to the
+// usage line it prints, "<client> [flags]". Go's flag package stops at the
+// first non-flag argument, so `mcp install codex -user` counted two
+// positionals and was refused with the -user it had just been given listed in
+// the usage it printed. docs/usage.md documents that order on the first
+// command a day-one operator copies.
+func TestMCPInstallTakesFlagsOnEitherSideOfTheClient(t *testing.T) {
+	for _, args := range [][]string{
+		{"claude-desktop", "-user", "-print"},
+		{"-user", "-print", "claude-desktop"},
+		{"-user", "claude-desktop", "-print"},
+	} {
+		var out bytes.Buffer
+		if err := runMCPInstall(args, &out); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		if !strings.Contains(out.String(), "claude_desktop_config.json") {
+			t.Errorf("%v printed %q", args, out.String())
+		}
+	}
+
+	// Two client names is still one too many, whichever side the flags sit on.
+	var out bytes.Buffer
+	if err := runMCPInstall([]string{"codex", "-user", "claude-desktop"}, &out); err == nil {
+		t.Error("two client names were accepted")
+	}
+}

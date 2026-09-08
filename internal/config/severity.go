@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -31,6 +32,37 @@ var severityRank = map[Severity]int{
 	SeverityCritical: 5,
 	SeverityNone:     99,
 }
+
+// FindingSeverities are the levels a finding can carry, least severe first.
+//
+// SeverityNone is a threshold rather than a level, so the two keys that gate on
+// a level a finding carries reject it: validate refuses `review.min_severity:
+// none`, which would discard every finding, and `linters.max_severity: none`,
+// which asks for a ceiling below the floor. The generated reference lists the
+// values a key accepts from its type's constants, and Severity declares six
+// where those two take five, so they answer with this list instead. It is
+// derived from severityRank and sorted by it, so a level added there is offered
+// here without anyone remembering to.
+func FindingSeverities() []string {
+	out := make([]string, 0, len(severityRank))
+	for s := range severityRank {
+		if s != SeverityNone {
+			out = append(out, string(s))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return severityRank[Severity(out[i])] < severityRank[Severity(out[j])]
+	})
+	return out
+}
+
+// MinSeverityValues reports what review.min_severity accepts, for the generated
+// reference. See FindingSeverities.
+func (r Review) MinSeverityValues() []string { return FindingSeverities() }
+
+// MaxSeverityValues reports what linters.max_severity accepts, for the
+// generated reference. See FindingSeverities.
+func (l Linters) MaxSeverityValues() []string { return FindingSeverities() }
 
 // Rank returns the severity's ordinal. Unknown severities rank as SeverityInfo
 // so that an unexpected value from a model degrades to a non-gating finding

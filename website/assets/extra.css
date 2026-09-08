@@ -20,12 +20,46 @@
   --md-code-font: "JetBrains Mono";
   --md-primary-fg-color: #0f766e;
   --md-primary-fg-color--dark: #115e59;
-  --md-accent-fg-color: #0f766e;
+  /* Darker than primary, so an inline link changes on hover. Material paints
+     links with primary and their hover with accent; equal values make every
+     link on the site inert under the cursor. */
+  --md-accent-fg-color: #0d5f59;
   --md-accent-fg-color--transparent: rgba(15, 118, 110, 0.1);
   --np-ink: #0b1220;
   --np-muted: #526070;
   --np-card: #ffffff;
-  --np-line: rgba(11, 18, 32, 0.12);
+  --np-page: #fbfcfd;   /* applied to the page below, so white cards lift off it */
+  --np-line: rgba(11, 18, 32, 0.16);
+  /* The two admonition hues, decided here rather than left to Material. See
+     the rules further down for the measurement that set these values. */
+  --np-note: var(--md-primary-fg-color);
+  --np-note-tint: rgba(15, 118, 110, 0.1);
+  --np-warn: #b45309;
+  --np-warn-tint: rgba(180, 83, 9, 0.1);
+}
+/* Material declares its palette twice, `:root,[data-md-color-scheme=default]`,
+   and the second half lands on <body>. A value set on :root alone is shadowed
+   for everything inside the body, so anything this sheet overrides by
+   Material's own name has to be set on the scheme selector rather than on
+   :root: the seven below are the ones Material declares there.
+   `--md-code-bg-color` carries the inline chip, which is every configuration
+   key on this site; Material's #f5f5f5 is a 1.06:1 step on a white page and
+   reads as no chip at all. The footer trio is Material's white-on-a-coloured-
+   footer set, and this footer is the page colour, so .md-copyright, its link
+   and .md-social__link resolve to white on white. */
+[data-md-color-scheme="default"] {
+  /* Clicking a search result lands on the page with every hit wrapped in a
+     <mark>, which is how most readers arrive here; the reference page carries
+     27 of them for one query. Material's default is #ffff0080, a pure yellow at
+     half opacity and the only saturated yellow on a teal and neutral site, and
+     its slate default is #4287ff4d, from the same blue this sheet already took
+     out of the admonitions. Deriving both from the primary at an alpha strong
+     enough to find by eye keeps the last theme default off the page. Measured
+     on the 27 marks /docs/measurement/?h=severity carries: the light tint
+     composites to rgb(194, 220, 219) on the page and holds the body text at
+     11.80:1, the slate one to rgb(23, 70, 70) at 6.15:1. */
+  --md-typeset-mark-color: rgba(15, 118, 110, 0.24);
+  --md-code-bg-color: #f6f8fa;
   --md-footer-bg-color: var(--md-default-bg-color);
   --md-footer-bg-color--dark: var(--md-default-bg-color);
   --md-footer-fg-color: var(--np-ink);
@@ -33,11 +67,17 @@
   --md-footer-fg-color--lighter: var(--np-muted);
 }
 [data-md-color-scheme="slate"] {
+  --md-typeset-mark-color: rgba(45, 212, 191, 0.26);
+  --md-footer-bg-color: var(--md-default-bg-color);
+  --md-footer-bg-color--dark: var(--md-default-bg-color);
+  --md-footer-fg-color: var(--np-ink);
+  --md-footer-fg-color--light: var(--np-muted);
+  --md-footer-fg-color--lighter: var(--np-muted);
   --md-primary-fg-color: #2dd4bf;
   --md-primary-fg-color--dark: #5eead4;
   --md-primary-bg-color: #0b1220;
   --md-primary-bg-color--light: rgba(11, 18, 32, 0.7);
-  --md-accent-fg-color: #2dd4bf;
+  --md-accent-fg-color: #5eead4;
   --md-accent-fg-color--transparent: rgba(45, 212, 191, 0.12);
   --md-accent-bg-color: #0b1220;
   --md-default-bg-color: #0f141c;
@@ -45,7 +85,12 @@
   --np-ink: #e6edf3;
   --np-muted: #9aa8b5;
   --np-card: #1b2230;
+  --np-page: var(--md-default-bg-color);
   --np-line: rgba(230, 237, 243, 0.12);
+  --np-note: var(--md-primary-fg-color);
+  --np-note-tint: rgba(45, 212, 191, 0.12);
+  --np-warn: #f59e0b;
+  --np-warn-tint: rgba(245, 158, 11, 0.12);
 }
 
 /* Chrome: header, tabs and footer take the page background and keep colour
@@ -53,6 +98,11 @@
 .md-header, .md-tabs, .md-footer, .md-footer-meta {
   background-color: var(--md-default-bg-color);
   color: var(--np-ink);
+}
+/* Flat until the page scrolls. Material adds md-header--shadow on scroll to
+   say content is passing underneath, and an unscoped reset here would win
+   permanently against a header the same colour as the page. */
+.md-header:not(.md-header--shadow), .md-tabs, .md-footer, .md-footer-meta {
   box-shadow: none;
 }
 .md-header { border-bottom: 1px solid var(--np-line); }
@@ -65,9 +115,347 @@
 .md-tabs__link--active { color: var(--md-primary-fg-color); }
 .md-search__form { background-color: rgba(127, 127, 127, 0.12); border-radius: 0.4rem; }
 .md-search__input { color: var(--np-ink); }
-.md-search__input::placeholder, .md-search__icon { color: var(--np-muted); }
-[data-md-toggle="search"]:checked ~ .md-header .md-search__form { background-color: var(--np-card); }
+/* Material's own `.md-search__input + .md-search__icon` is 0,2,0 and the
+   `.md-search__icon` written here was 0,1,0, so this declaration lost and the
+   magnifier resolved to --md-primary-bg-color instead: white on the
+   rgb(240,240,240) the field composites to in light, 1.14:1, and #0b1220 on
+   rgb(28,33,40) in dark, 1.16:1. The one shape that says the field is a search
+   field painted nothing, and the rule written to colour it was arithmetic with
+   no effect. Matching Material's specificity is what makes the value land.
+   The open field is Material's own `[data-md-toggle=search]:checked` rule at
+   0,5,0 and is left to it; that one resolves to a colour that is visible. */
+.md-search__input::placeholder,
+.md-search__input + .md-search__icon,
+.md-search__input ~ .md-search__icon { color: var(--np-muted); }
+/* Material fills the open field with the page colour, assuming a coloured
+   header to sit against. This header is the page colour, so the border is
+   what makes it a field. */
+[data-md-toggle="search"]:checked ~ .md-header .md-search__form {
+  background-color: var(--np-card);
+  border: 1px solid var(--md-primary-fg-color);
+}
+body, .md-main { background-color: var(--np-page); }
 .md-grid { max-width: 72rem; }
+
+/* Material paints a link in the accent and leaves it otherwise identical to
+   the text around it, which is hue alone: 2.94:1 in light and 1.02:1 in dark
+   against body copy. A reader with achromatopsia, or anyone reading a
+   greyscale print, cannot find the links. WCAG 1.4.1 wants 3:1 or a second
+   cue, so running prose carries the underline at rest. Buttons and cards have
+   their own shape and are reset below. */
+.md-typeset p a,
+.md-typeset li a,
+.md-typeset td a {
+  text-decoration: underline;
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.15em;
+}
+.md-typeset .md-button,
+.md-typeset .np-card a { text-decoration: none; }
+/* Material's only hover rule is a colour swap, and the two teals are 1.26:1
+   apart: a change at the edge of perception on the site's whole navigation
+   model. Thickening the rule is the affordance; the colour is the nicety. */
+.md-typeset a:hover,
+.md-typeset a:focus {
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.15em;
+}
+/* An inline code chip cannot be carried by fill on a white page: #f5f5f5 is
+   1.09:1 against it and every darker grey that still reads as a chip is under
+   1.2:1. A border is a shape cue and reads where a fill does not. */
+.md-typeset code {
+  border: 1px solid var(--np-line);
+  border-radius: 0.2rem;
+  padding: 0.05em 0.3em;
+}
+/* Material sets box-decoration-break: clone, so the border above closes around
+   every line fragment of a chip that wraps: the `review.ignore` default is one
+   value that painted 19 boxes on the reference page, and a reader scanning the
+   Default column counts values by their boxes. `slice` leaves one shape, opened
+   at each break. Material also sets word-break: break-word, which in the narrow
+   cells of a table breaks inside a token rather than at a separator:
+   `https://api.mistral.ai/v1` broke after the `v` and `https://api.groq.com/
+   openai/v1` in the middle of `openai`, eleven endpoints in that column in all,
+   each cut at a character that means nothing. Table cells break at the
+   spaces and separators instead, and keep break-word as the last resort for a
+   token wider than its cell. */
+.md-typeset code {
+  -webkit-box-decoration-break: slice;
+  box-decoration-break: slice;
+}
+.md-typeset table:not([class]) code { word-break: normal; overflow-wrap: break-word; }
+.md-typeset pre code, .md-typeset .highlight code { border: 0; padding: 0; }
+/* Material paints the copy button at --md-default-fg-color--lightest until
+   the block is hovered, and lightest is rgba(0,0,0,0.07) in light and
+   rgba(226,228,233,0.12) in dark: over the fill those blocks composite to,
+   rgb(249,250,251) and rgb(28,32,42), that is 1.17:1 and 1.38:1, a ghost
+   outline on all 79 code blocks. WCAG 1.4.11 asks 3:1 of the visual
+   information that identifies a control, and Material only reaches 4.54:1 /
+   4.96:1 once a pointer is on the block, so the affordance for the thing this
+   site is most often opened to copy, the install command, paints nothing
+   until the reader is already there and nothing at all on touch. It was also
+   the last interactive element left at a stock Material colour in a sheet
+   that decides the header, the tabs, the field, the chips, the links, the
+   tables and the admonitions.
+
+   The muted token measures 6.15:1 and 6.71:1 on those fills. The second
+   selector carries it through Material's block-hover rule, which is 0,2,0 and
+   would otherwise DROP the button to 4.54:1 as the pointer approaches it; the
+   two :not() exclusions leave Material's own hover and focus rules to win, so
+   the button still goes to the accent under the pointer, 7.18:1 and 11.03:1,
+   and keyboard focus still resolves to the accent beside its ring. */
+.md-code__button,
+.md-typeset :hover > * > .md-code__button:not(:hover):not(.focus-visible) {
+  color: var(--np-muted);
+}
+
+/* The five admonitions on the site, one note and four warnings on
+   /docs/comparison/ and /docs/configuration/, were the only blue and the only
+   orange on it: Material's #448aff and #ff9100, identical in both schemes,
+   where every other coloured element derives from the primary. They were the
+   one decision this sheet had not made. Measured against the page they sit on,
+   Material's orange bar is 2.20:1 in light, under the 3:1 WCAG 1.4.11 asks of a
+   graphical object that carries meaning; its blue is 3.23:1 there and carries
+   no meaning the rest of the site uses. The note takes the primary, which is
+   the site's one accent and is already per-scheme. The warning keeps a separate
+   hue, because a warning that reads as the same colour as everything else has
+   lost the thing it is for, and takes an amber picked to clear 3:1 on both
+   pages: 4.89:1 on #fbfcfd and 8.60:1 on #0f141c. Material writes each hue into
+   five rules, so each is overridden five times. */
+.md-typeset .admonition.note,
+.md-typeset details.note { border-color: var(--np-note); }
+.md-typeset .admonition.note:focus-within,
+.md-typeset details.note:focus-within { box-shadow: 0 0 0 0.2rem var(--np-note-tint); }
+.md-typeset .note > .admonition-title,
+.md-typeset .note > summary { background-color: var(--np-note-tint); }
+.md-typeset .note > .admonition-title::before,
+.md-typeset .note > summary::before { background-color: var(--np-note); }
+.md-typeset .note > .admonition-title::after,
+.md-typeset .note > summary::after { color: var(--np-note); }
+.md-typeset .admonition.warning,
+.md-typeset details.warning { border-color: var(--np-warn); }
+.md-typeset .admonition.warning:focus-within,
+.md-typeset details.warning:focus-within { box-shadow: 0 0 0 0.2rem var(--np-warn-tint); }
+.md-typeset .warning > .admonition-title,
+.md-typeset .warning > summary { background-color: var(--np-warn-tint); }
+.md-typeset .warning > .admonition-title::before,
+.md-typeset .warning > summary::before { background-color: var(--np-warn); }
+.md-typeset .warning > .admonition-title::after,
+.md-typeset .warning > summary::after { color: var(--np-warn); }
+
+/* The first tab stop on every page. Material draws its ring in the accent
+   against the skip chip rather than the page, which is 2.33:1 in light and
+   1.25:1 in dark; the inner white edge is what makes it visible in both. */
+.md-skip:focus, .md-skip:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--md-accent-fg-color);
+}
+
+/* The palette toggle is a tab stop that paints nothing in dark. Material rings
+   the label adjacent to the focused input (`.md-option.focus-visible + label`),
+   and the tab stop is always the first radio, `#__palette_0`; in slate the
+   label next to it is the display:none one and the sun icon on screen belongs
+   to the other input. Space at that stop switches the site to light, so the
+   control is operable and invisible. Ring whichever label is displayed. */
+.md-header__option:has(.md-option.focus-visible) label:not([hidden]),
+.md-header__option:has(.md-option:focus-visible) label:not([hidden]) {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+  border-radius: 0.2rem;
+}
+
+/* Chrome makes a scroll container a tab stop of its own, and the search
+   results wrap is one. At 1440 the stop after the search field is
+   .md-search__scrollwrap as a 688x0 box with [data-md-toggle=search] unchecked:
+   it holds nothing, the only ring is the UA default on a zero-height box, and a
+   560x110 crop of the header is byte-identical before and after it takes focus.
+   It has results to scroll only while search is open, so it is a tab stop only
+   then. Closing already sets max-height to 0 with no transition, so nothing
+   visible is cut short by hiding it at the same moment. */
+[data-md-toggle="search"]:not(:checked) ~ .md-header .md-search__scrollwrap {
+  visibility: hidden;
+}
+
+/* A page with no headings reserves a 242px rail and an empty landmark that
+   announces a table of contents holding nothing. `visibility: hidden` takes the
+   landmark out of the accessibility tree and leaves its 242px in flow;
+   `display: none` also took the space, and the article re-centred into it, so
+   clicking from any Guide page to "How a review runs" moved the column centre
+   from 720 to 841 at 1440 and left the 404 off-centre against a blank rail. */
+.md-sidebar--secondary:not(:has(.md-nav__list)) { visibility: hidden; }
+
+/* The column the article actually gets: the grid, less whichever rails
+   Material has put in flow at this width. The secondary rail appears at 60em
+   and the primary at 76.25em, both 12.1rem, and both are the breakpoints
+   Material's own sheet uses. Everything below measures against this rather
+   than against the viewport, because the viewport is what the earlier
+   constants measured and the rails are what made them wrong. */
+:root { --np-rails: 0rem; --np-column: calc(min(100vw, 72rem) - var(--np-rails)); }
+@media screen and (min-width: 60em) { :root { --np-rails: 12.1rem; } }
+@media screen and (min-width: 76.25em) { :root { --np-rails: 24.2rem; } }
+
+/* About 74 characters, and the arithmetic is in px because rem is not 16px
+   here: Material sets html to 125%, so 1rem is 20px and .md-typeset is 16px.
+   28rem is 560px, and body copy on this site measures 7.36-7.72px per
+   character (canvas measureText over the first 400 characters of five
+   paragraphs on the trust-model page), which is 73 to 76 characters.
+   The first attempt capped at 46rem, which never applied: the two 12.1rem
+   rails and the margins leave 45.4rem of a 72rem grid, so the cap sat above the
+   width it was meant to cut. The second capped at 36rem and did apply, but
+   36rem is 720px, which measures 93 to 96 characters: above the 45-75 range
+   and above the 80 WCAG 1.4.8 asks for. Evidence gets the width back below,
+   rather than the prose keeping it.
+   The cap is also the gutter. `margin-inline: auto` replaces Material's
+   `margin: 0 .8rem 1.2rem`, and neither .md-content nor .md-main carries
+   horizontal padding of its own, so a bare cap left every phone reading body
+   text flush to both edges of the glass. Capping at the column as well leaves
+   the auto margins something to divide. */
+.md-content__inner { max-width: min(28rem, var(--np-column) - 1.6rem); margin-inline: auto; }
+/* The landing page hides both rails and its cards are laid out across the
+   whole grid, so it keeps the width and takes the gutter only. --np-column
+   subtracts rails this page does not have, which is why it is not used here. */
+.md-content__inner:has(.np-hero) { max-width: min(100%, 100vw - 1.6rem); margin-inline: auto; }
+/* Material centres the measure until 76.25em and then pins it 1.2rem from the
+   rail, at a specificity of (0,5,0) that a bare .md-content__inner cannot
+   reach; logical and physical margins cascade as one property, so matching
+   the selector is what it takes. Left-pinned, the symmetric pull-out below
+   spends a gutter that is all on the other side and lands under the rail. */
+[dir] .md-sidebar--primary:not([hidden]) ~ .md-content > .md-content__inner,
+[dir] .md-sidebar--secondary:not([hidden]) ~ .md-content > .md-content__inner {
+  margin-inline: auto;
+}
+
+/* Tables and code are the reason the page is wide. They break the measure on
+   purpose, centred on it, and stop at the column the rails leave.
+   Material puts both classes on one element, `<article class="md-content__inner
+   md-typeset">`, so a descendant step between them matches nothing and only the
+   scrollwrap branch was ever live: the child combinator is what reaches code.
+   The target is the column rather than a constant, because 45.4rem is the room
+   a 72rem grid has left over and no narrower viewport has it. Measured at
+   45.4rem, a table hung 102px off the left of a 960px window with
+   html{overflow-x:hidden} clipping rather than scrolling it, and 70px under the
+   navigation rail at 1440. The clamp at 0 is for the other end, where the
+   column is narrower than the measure and the pull-out would become an indent
+   of up to 224px on a 320px screen. */
+.md-content__inner:not(:has(.np-hero)) .md-typeset__scrollwrap,
+.md-content__inner:not(:has(.np-hero)) > .highlight,
+.md-content__inner:not(:has(.np-hero)) > table:not([class]) {
+  width: max(100%, min(45.4rem, var(--np-column) - 1.6rem));
+  margin-inline: min(0px, calc((100% - min(45.4rem, var(--np-column) - 1.6rem)) / 2));
+}
+
+/* The band above is a constant width, and Material's wrapper is an inline-block
+   that shrink-wraps the table and sits at its left edge, so a table that needs
+   none of the extra width is still dragged 158px left of the prose it belongs
+   to. 33 of the 67 tables on the site do this at 1440: the four-row table on
+   the measurement page is 302px in a 908px band, with the sentence above it and
+   the sentence below it both starting 158px to its right. Centring the wrapper
+   puts a narrow table on the same centreline the prose is centred on, and
+   changes nothing for a table that fills the band: `fit-content` stops at the
+   band, `margin-inline: auto` is over-constrained past it and resolves to zero,
+   so a table wider than the band still starts at the left and still scrolls.
+   At 390 the band is the column and only one table of 67 has 60px to spare, so
+   this is a desktop and tablet change. */
+/* Centring by constraining the wrapper was tried with `width: fit-content;
+   max-width: 100%` and stays removed. It did centre a narrow table, and it also
+   stopped the wrapper ever exceeding the scrollwrap, so the scrollwrap never
+   became the scroll container and Material's own `overflow-x: auto` on the
+   table took the job. The table then clipped its own text at its right edge
+   with its right border still drawn: 60 of 67 tables and 1643 of 2323 body
+   cells sheared at 320px, 51 and 1397 at 390, 7 and 214 as high as 1280, all of
+   it invisible at the 1440 the rule was written at. A table that reads as
+   complete while missing five columns is the one failure this project cannot
+   ship.
+   Centring the inline-block in the flow costs none of that, because it leaves
+   the wrapper's width alone: the wrapper still exceeds the scrollwrap when the
+   table is wide, so the scrollwrap is still the scroll container and Material's
+   overflow never takes the job. Swept as-is against patched over 67 tables and
+   2588 cells on all 19 pages at 1440, 390 and 320: 0 sheared cells either way,
+   and 0 tables whose left edge ends up outside the scrollwrap at scrollLeft 0,
+   which is the other way centring an overflowing box goes wrong. At 1440 the
+   four-row table on the measurement page moves from x=266 to x=553 and is then
+   centred on the 560px measure at 440+280=720, and the widest dead margin
+   beside a narrow table falls from 674px to 337px. `text-align` is restored on
+   the table itself so only the box moves and no cell is recentred. */
+.md-typeset__scrollwrap { text-align: center; }
+.md-typeset__scrollwrap > .md-typeset__table {
+  display: inline-block;
+  max-width: none;
+  text-align: left;
+}
+
+/* Below 76.25em the drawer is off-canvas and Material leaves every link in it
+   in the tab order. Walking the tab order at 390x844 on /docs/usage/ gives 59
+   stops, 28 of them at x=-242 or zero-size with the toggle unchecked, and a
+   full-viewport screenshot taken while the "Home" link is focused is
+   byte-identical to the unfocused page: 26 consecutive stops that paint
+   nothing, WCAG 2.4.7 and 2.4.3.
+   `visibility: hidden` was tried here and removed. It does take those stops out
+   of the tab order, and it takes the whole primary navigation with them: the
+   only other way in is `<label class="md-header__button" for="__drawer">`,
+   which carries no tabindex, and `#__drawer` itself is `display: none`, so
+   neither is focusable. The same walk then ran 32 stops at 390x844 with 0 of
+   the 28 links among them, and 35 and 34 stops with the same 0 at 1024x768 and
+   1219x800. That is WCAG 2.1.1 bought with 2.4.7.
+   Sliding the drawer in on `:focus-within` pays neither. The links stay in the
+   tab order and the first Tab that reaches one brings the panel with it: 27, 21
+   and 21 navigation stops at those three sizes, against 0 with the rule above.
+   Tabbing past the last link slides it back, and the transform and the shadow
+   are the ones Material's own `:checked` rule uses, so opening the drawer by
+   Tab and opening it by pointer land in the same place.
+   The rule below then takes the panels that paint nothing back out, leaving 15
+   navigation stops at 390x844 and 15 at each of the other two, every one of
+   them painted; the walk's only remaining unpainted stop anywhere is the 0x0
+   palette radio in the header. The count is under the 27 above because a
+   closed section's children are no longer focusable, not because a reachable
+   link was lost: an open section is a `position: absolute` panel that covers
+   the level above it, so the tabs under it are focusable and painted over, and
+   a closed section's children sit off-canvas at `opacity: 0`. What opens each
+   is a `<label>` with no tabindex, so the label is reachable by pointer and not
+   by Tab; closing that gap is a template change, not a stylesheet one. */
+@media screen and (max-width: 76.234375em) {
+  [data-md-toggle="drawer"]:not(:checked) ~ .md-container .md-sidebar--primary:focus-within {
+    box-shadow: var(--md-shadow-z3);
+    transform: translateX(12.1rem);
+  }
+  /* A closed section's children sit at opacity 0 over the list that is visible,
+     so a Tab landing in one slid a blank panel across 62% of a phone screen.
+     Taking them out of the tab order until their section is open leaves every
+     stop painted, and the section's own label opens it.
+     The page's own table of contents is the same panel and was missed by the
+     first version of this rule, which asked for [data-md-level]: the drawer's
+     .md-nav--secondary carries no such attribute, so six Tab stops at 390x844
+     were still landing on links at opacity 0 inside the viewport. It is opened
+     by the label for #__toc, which is the same argument the rest of the rule
+     rests on, and the :checked line below already covers it because that nav is
+     a sibling of the toggle. */
+  [data-md-toggle="drawer"]:not(:checked) ~ .md-container
+    .md-nav--primary .md-nav[data-md-level]:not([style*="visible"]),
+  [data-md-toggle="drawer"]:not(:checked) ~ .md-container
+    .md-nav--primary .md-nav--secondary:not([style*="visible"]) {
+    visibility: hidden;
+  }
+  [data-md-toggle="drawer"]:not(:checked) ~ .md-container
+    .md-nav--primary .md-nav__toggle:checked ~ .md-nav {
+    visibility: visible;
+  }
+}
+
+/* Material lifts the active section's label to the top of the left rail and
+   masks the links scrolling under it with --md-default-bg-color, plus a
+   0 0 .4rem .4rem shadow of the same colour. That token is #ffffff and the
+   page is --np-page #fbfcfd, so in light the mask painted a 210px white band
+   at 1.02:1 on the off-white page and read as a smudge behind the heading.
+   Dark is unaffected because --np-page is --md-default-bg-color there. The
+   mask has to be the colour of what it masks, and setting --np-page to
+   --md-default-bg-color instead would take the step the white cards lift off. */
+.md-nav--lifted > .md-nav__list > .md-nav__item--active > .md-nav__link,
+.md-nav--secondary .md-nav__title {
+  background: var(--np-page);
+  box-shadow: 0 0 0.4rem 0.4rem var(--np-page);
+}
 
 /* The mobile drawer takes the page background like the header does. */
 .md-nav--primary .md-nav__title, .md-nav__source { background-color: var(--md-default-bg-color); color: var(--np-ink); }
@@ -93,9 +481,62 @@
 /* Type */
 .md-typeset { line-height: 1.65; }
 .md-typeset h1 { font-weight: 700; letter-spacing: -0.02em; color: var(--np-ink); }
-.md-typeset h2 { font-weight: 600; margin-top: 2.2em; color: var(--np-ink); }
-.md-typeset h3 { font-weight: 600; }
+/* h2 and h3 are 25px and 20px in Material. Five pixels at one weight is not a
+   level, and the reference pages carry a hundred of each. */
+.md-typeset h2 {
+  font-weight: 700;
+  margin-top: 2.2em;
+  color: var(--np-ink);
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid var(--np-line);
+}
+.md-typeset h3 {
+  font-weight: 600;
+  font-size: 1.05em;
+  letter-spacing: -0.005em;
+  color: var(--np-ink);
+}
 .md-typeset table:not([class]) { font-size: 0.72rem; }
+/* The key is what a reference is scanned by, and it was the one column that
+   could not be read: at 149px, 197 of the reference's 199 key cells broke
+   mid-identifier, `models.defau` / `lt.allow_pri` / `vate_endpoin` / `t`. A
+   chip that will not break is what sets the column's minimum width; the
+   scrollwrap Material already wraps the table in is what pays for it when the
+   row no longer fits. */
+.md-typeset table:not([class]) td:first-child code {
+  white-space: nowrap;
+}
+/* Past the width where the whole row fits, an unbreakable key is what pushes
+   the description off the page, so below that the key breaks and the row stays
+   whole. A key broken after a dot is still read as one; a description with its
+   last five words missing is not. */
+@media screen and (max-width: 85.375em) {
+  .md-typeset table:not([class]) td:first-child code { white-space: normal; }
+}
+/* The Type column held 224px of the reference's 876 while the sentence saying
+   what a key does held 181, because ten rows read `same keys as
+   models.routes[].ensemble[]` and that path is one unbreakable 26-character
+   token. Letting it break takes Type to 109px and the description to 276, and
+   takes the models table's horizontal overflow from 19px to 0 at 1440 and from
+   34px to 0 at 1920, where 111 of its 560 cells had been sheared at the table's
+   right edge. Its height falls from 24,292px to 16,450px with it, which matters
+   because the scroller Material puts that overflow on is the table itself: a
+   scrollbar 24,292px down the page is a scrollbar nobody sees, so clipped text
+   reads as lost rather than scrollable. Below 1024 the row still does not fit
+   and the shortfall only narrows, 177px to 53px at 1024, because the Key column
+   is pinned at 388px by the rule above. Sweeping all 67 tables on the site at
+   1440 found this one overflowing before the rule and none after. */
+.md-typeset table:not([class]) td:nth-child(2) { overflow-wrap: anywhere; }
+/* Reference tables run to ten rows of decimals, and something has to hold the
+   row the eye is on.
+   A sticky header row was tried here and removed. Material gives the table its
+   own overflow:auto and wraps it in a scrollwrap, so position:sticky resolves
+   against the table itself, which never scrolls vertically: the rule produced
+   no pixels on any page. Releasing those two overflows would bring it back and
+   would take horizontal scrolling from the eight-column tables with it. */
+.md-typeset table:not([class]) tbody tr:hover {
+  background: var(--md-accent-fg-color--transparent);
+}
 
 /* Landing page */
 .np-hero { padding: 2.5rem 0 1rem; }
@@ -105,7 +546,43 @@
 .np-actions { margin-bottom: 1.6rem; }
 .np-actions p { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0; }
 .np-actions .md-button { margin: 0; padding-block: 0.75em; }
-.np-prose { max-width: 44rem; }
+.np-prose { max-width: 40rem; }
+/* The measure above is the width the install block needs, not the width running
+   prose reads at. Measured by walking a Range over every character and grouping
+   the client rects by line top, the "How a review runs" list ran 97 to 101
+   characters a line at 1440 and held at 101 to 104 at 1920 and 2560, and the
+   two .np-fine paragraphs ran 114 to 149. The article the same reader clicks
+   into next peaks at 80. Only the running prose is capped: the hero lede is
+   already 74 to 76, the cards 45 to 55, and the code block is the reason
+   .np-prose is 40rem in the first place. The h2 is capped with them because its
+   rule is the block's own edge, and left at 40rem it ran 240px past the longest
+   line under it. .np-fine is 14.4px against the body's 16px, so it takes a
+   narrower box to land in the same character count. */
+.np-prose > h2,
+.np-prose > p,
+.np-prose > ol,
+.np-prose > ul { max-width: 28rem; }
+/* The cap alone does not align the list with the rule above it. Material gives
+   a list `[dir=ltr] .md-typeset ol{margin-left:.625em}` at 0,2,1, which the cap
+   does not cancel, so the "How a review runs" h2 ran x=16 to x=576 and the list
+   under it x=26 to x=586: the section rule that is meant to be the block's edge
+   overhung at one end and fell short at the other. The indent moves into the
+   padding, where the markers still sit inside the same box. */
+[dir="ltr"] .md-typeset .np-prose > ol,
+[dir="ltr"] .md-typeset .np-prose > ul {
+  margin-left: 0;
+  padding-left: 1.2em;
+}
+.np-prose > p.np-fine,
+.np-hero > p.np-fine { max-width: 26rem; }
+/* The install snippet is what the page is for, and its longest line is 881px
+   against the 800px measure above: the curl command was cut after
+   `nitpick_${v}_${os}_` with `${arch}` off screen and 600px of empty page
+   beside it at 1440. The copy button still yielded the whole line, so this
+   misled the eye rather than breaking the paste. The block takes the same
+   45.4rem the article pull-out takes, and the viewport clamp keeps it inside
+   the page where the column is narrower than that. */
+.np-prose > .highlight { width: max(100%, min(45.4rem, 100vw - 1.6rem)); }
 .np-fine { color: var(--np-muted); font-size: 0.72rem; }
 
 .np-stat { display: flex; gap: 2.5rem; flex-wrap: wrap; margin: 0 0 0.4rem; }
@@ -127,6 +604,7 @@
 }
 .np-card {
   position: relative;
+  z-index: 0;
   background: var(--np-card);
   border: 1px solid var(--np-line);
   border-radius: 0.4rem;
@@ -136,16 +614,140 @@
 .np-card:hover, .np-card:focus-within { border-color: var(--md-primary-fg-color); }
 /* The ring means keyboard: it follows the link's focus-visible, not a click.
    Where :has() is unsupported the border colour from :focus-within remains. */
-.np-card a:focus-visible { outline: none; }
+@supports selector(:has(*)) {
+  .np-card a:focus-visible { outline: none; }
+}
 .np-card:has(a:focus-visible) { outline: 2px solid var(--md-primary-fg-color); outline-offset: 2px; }
 .np-card .np-card-title { margin: 0 0 0.4rem; font-size: 0.95rem; font-weight: 600; color: var(--np-ink); }
 .np-card p { margin: 0; color: var(--np-muted); }
 .np-card a { font-weight: 600; }
-/* The whole card is the target: the one link in it stretches over it. */
-.np-card a::after { content: ""; position: absolute; inset: 0; }
+/* The whole card is the target: the one link in it stretches over it.
+   Nothing between the card and the anchor may be positioned, because an
+   absolutely positioned pseudo-element resolves against its nearest positioned
+   ancestor. `position: relative` on the anchor, and on the paragraphs around
+   it, made the overlay cover the link's own inline box while `.np-card:hover`
+   went on lighting the whole card: six cards on the landing page offering a
+   click that did nothing. z-index on the card makes it the stacking context
+   the overlay sits in. */
+.np-card a::after { content: ""; position: absolute; inset: 0; z-index: 0; }
+/* Text under the overlay cannot be selected, and the thing on these cards
+   someone copies is the command, so the chip carrying it comes back over. */
+.np-card code { position: relative; z-index: 1; }
 
 @media (max-width: 44rem) {
   .np-hero h1 { font-size: 1.8rem; }
   .np-hero p.np-lede { font-size: 0.95rem; }
 }
 
+
+/* Print.
+   Operators print references, and until this block a reader in dark mode got
+   1.23:1 body text on white paper, tables as solid near-black rectangles, a
+   920px column on 794px of A4, and every link reduced to dead ink. The
+   scrollwrap that lets an eight-column table scroll on screen silently clips
+   it on paper, which is the one failure this project cannot ship: a table
+   missing columns with nothing saying so. */
+@media print {
+  /* The default scheme is named as well as slate, for the reason the palette
+     block at the top of this sheet gives: Material declares the light values a
+     second time on [data-md-color-scheme=default], which lands on <body>, and a
+     token set on :root alone is shadowed for everything inside it. Under
+     media=print the two lines below that Material also declares there,
+     --md-typeset-table-color and --md-code-fg-color, kept Material's values in
+     the light scheme however this block set them on the root. */
+  :root,
+  [data-md-color-scheme="default"],
+  [data-md-color-scheme="slate"] {
+    /* Every token below is reset to a light value, and the paper was still not
+       one. Slate's `color-scheme: dark` sits inside @media screen and main.css
+       declares `[data-md-color-scheme=default]{color-scheme:light}` on the body
+       rather than the root, so under media=print the computed color-scheme on
+       the root element is `normal` and the UA paints the canvas from the OS
+       preference. Rendered to A4 with 1cm margins and background graphics on,
+       under prefers-color-scheme: dark, page 1 of both schemes came back with
+       its corner and mid-left margin at rgb(18,18,18); with this line both are
+       rgb(255,255,255). It is the page margins, so only a reader who turned
+       background graphics on sees it, and that is the same reader this block's
+       code and table fills were written for. */
+    color-scheme: light;
+    --md-default-bg-color: #fff;
+    --md-default-fg-color: rgba(0, 0, 0, 0.87);
+    --md-default-fg-color--light: rgba(0, 0, 0, 0.62);
+    --md-code-bg-color: #f6f8fa;
+    --md-code-fg-color: #24292f;
+    --np-ink: #0b1220;
+    --np-muted: #3d4b5a;
+    --np-card: #fff;
+    --np-page: #fff;
+    --np-line: rgba(11, 18, 32, 0.28);
+    /* The slate values for these are picked for a dark page: the dark amber is
+       2.09:1 on white paper against 4.89:1 for the light one, so the warning
+       bar has to be reset here with the rest. --np-note resolves through
+       --md-primary-fg-color, which this block already sets, and needs no line
+       of its own; its tint carries a literal and does. */
+    --np-note-tint: rgba(15, 118, 110, 0.1);
+    --np-warn: #b45309;
+    --np-warn-tint: rgba(180, 83, 9, 0.1);
+    /* Material resolves --md-typeset-a-color from --md-primary-fg-color in a
+       rule that is not media-scoped, and the slate override above is not
+       either, so a reader in dark mode printed every link at 1.86:1 on white.
+       The light teal is 5.47:1 there. */
+    --md-primary-fg-color: #0f766e;
+    --md-primary-fg-color--dark: #115e59;
+    --md-accent-fg-color: #0d5f59;
+    /* Slate's table colour lives inside @media screen, so in print the value
+       that survives is main.css's #0000001f, which composites to #e0e0e0 on
+       white: a 1.32:1 row rule under the 199-row reference. Material's table
+       borders read this variable and not --np-line, so the print value has to
+       be set here by name. This one is 2.24:1, and it is 2.24:1 in both
+       schemes only because of the default-scheme selector above; set on the
+       root alone it reached the dark path and left the light one, the one most
+       readers print in, on Material's 1.32:1. */
+    --md-typeset-table-color: rgba(0, 0, 0, 0.32);
+  }
+  .md-grid,
+  .md-content__inner,
+  .md-content__inner:has(.np-hero),
+  [dir] .md-sidebar--primary:not([hidden]) ~ .md-content > .md-content__inner,
+  [dir] .md-sidebar--secondary:not([hidden]) ~ .md-content > .md-content__inner,
+  .md-content__inner:not(:has(.np-hero)) .md-typeset__scrollwrap,
+  .md-content__inner:not(:has(.np-hero)) > .highlight,
+  .md-content__inner:not(:has(.np-hero)) > table:not([class]) {
+    max-width: none;
+    width: auto;
+    margin-inline: 0;
+  }
+  .md-typeset__scrollwrap,
+  .md-typeset table:not([class]),
+  .md-typeset__table table { overflow: visible; }
+  /* An inline-block box cannot begin part-way down a page, so each table is
+     atomic on paper and `break-after: avoid` on the h2 above then drags the
+     heading onto the next sheet with it. Material sets that display on the
+     wrapper and already resets it to block under print; the rule that survives
+     the reset is this sheet's own, the one that centres a narrow table by
+     centring the box rather than constraining it. That one is
+     `.md-typeset__scrollwrap > .md-typeset__table`, 0,2,0 and not
+     media-scoped, so it beat both print declarations and the wrapper stayed
+     inline-block on paper. Printed to A4 with 1cm margins and background
+     graphics on, the 199-key reference came back at 30 pages with pages 2, 4
+     and 25 carrying only "linters", "models" and "review" and page 23 carrying
+     nothing at all. Overriding at the same specificity gives 29 pages and no
+     near-empty one; all 199 keys are in the text of both, so it was page waste
+     and not clipping. Centring goes with it, and costs nothing here: the rules
+     above already give the table the full measure on paper. */
+  .md-typeset__scrollwrap > .md-typeset__table { display: block; }
+  .md-typeset table:not([class]) { font-size: 0.6rem; width: 100%; }
+  .md-typeset thead { display: table-header-group; }
+  .md-typeset tr,
+  .md-typeset .admonition,
+  .md-typeset .highlight,
+  .np-card { break-inside: avoid; }
+  .md-typeset h2, .md-typeset h3 { break-after: avoid; }
+  /* A printed page about a tool you install from URLs should carry them. */
+  .md-typeset a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    color: #555;
+    word-break: break-all;
+  }
+}

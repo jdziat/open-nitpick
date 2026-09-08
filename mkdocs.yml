@@ -3,7 +3,7 @@ site_description: Self-hosted, model-agnostic pull request review.
 site_url: https://jdziat.github.io/open-nitpick/
 repo_url: https://github.com/jdziat/open-nitpick
 repo_name: jdziat/open-nitpick
-edit_uri: ""
+edit_uri: blob/main/
 
 # The docs directory is staged by `make docs`: README.md becomes guide.md and
 # docs/*.md are copied under docs/, so every relative link in the repository
@@ -18,14 +18,15 @@ theme:
   language: en
   icon:
     logo: np/mark
+    repo: fontawesome/brands/github
   favicon: assets/favicon.svg
   features:
     - navigation.tabs
     - navigation.sections
     - navigation.top
     - navigation.footer
+    - content.action.view
     - toc.follow
-    - toc.integrate
     - content.code.copy
     - search.suggest
     - search.highlight
@@ -47,6 +48,36 @@ theme:
   # Fonts are loaded from extra.css so the 500 and 600 weights exist; the
   # theme's own loader fetches only 300, 400 and 700.
   font: false
+
+# The default separator is `[\s\-]+`, which leaves a dotted configuration path
+# as one token: `review.fail_on` in the key reference did not answer a search
+# for `fail_on`, and `models.routes[].match.max_files` did not answer one for
+# `max_files`, while the same keys written bare on the prose pages did. That is
+# a matching problem and not a ranking one, and splitting on the dot as well is
+# what solves it: it puts the reference into the result set for both.
+#
+# Where it lands in that set is a second question, and it is not answered here.
+# A boost of 2 was set and measured, twice, and both measurements expired: a
+# figure about search rank is a fact about one build, and every heading added
+# anywhere on the site changes it. The second expiry was this branch giving the
+# reference a heading per key, which rewrites its index entirely. No boost is
+# set now. A claim about ranking that nobody can reproduce is worth less than
+# the silence, and the separator above is the part that carried the weight:
+# without it the reference was not in the result set at any boost.
+#
+# The heading per key also answers what the boost could not. Material draws a
+# result's excerpt from the text around the match, and while the page was six
+# tables the text before `review.fail_on` was `review.concurrency`'s
+# description, so that is what the excerpt showed. Each key is its own search
+# document now.
+plugins:
+  - search:
+      separator: '[\s\-.]+'
+
+# edit_uri is resolved against the staged path, and three pages are staged under
+# a name they do not have in the repository.
+hooks:
+  - website/hooks/page_sources.py
 
 extra_css:
   - assets/extra.css
@@ -73,9 +104,11 @@ nav:
       - Usage: docs/usage.md
       - GitHub Actions and other CI: docs/ci.md
       - Configuration: docs/configuration.md
+      - Configuration reference: docs/configuration-reference.md
       - Analyzers: docs/analyzers.md
       - Providers and models: docs/providers.md
       - Trust model: docs/trust-model.md
+      - Security policy: docs/security.md
       - How a review runs: docs/how-a-review-runs.md
       - Development: docs/development.md
   - Measurement:
@@ -83,6 +116,13 @@ nav:
       - Findings: docs/findings.md
       - Against Incumbent: docs/comparison.md
       - Remediation: docs/remediation.md
+  # Commentary on the harness and the analyzer runners, one section per
+  # declaration. It is worth keeping and it is not what a reader opens the
+  # rules page for, so it has a tab of its own rather than 3,300 lines of
+  # someone else's package inside one.
+  - Internals:
+      - Notes from the harness: docs/harness-notes.md
+      - Notes from the runners: docs/runner-notes.md
 
 extra:
   generator: false

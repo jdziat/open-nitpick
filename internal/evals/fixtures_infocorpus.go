@@ -5,7 +5,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // InfoFixtures is the fourth corpus: ten `info` plants and two clean
 // controls at the same level of subtlety.
 //
-// The note behind it is in docs/measurement.md#infofixtures.
+// The note behind it is in docs/harness-notes.md#infofixtures.
 func InfoFixtures() []Fixture {
 	return []Fixture{
 		infoGoTimeoutHalved(),

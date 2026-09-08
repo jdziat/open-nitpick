@@ -4,9 +4,11 @@ Everything is optional: with no config file at all, `LLM_PROVIDER` and
 `LLM_MODEL` are enough to run. `.nitpick.yaml` at the repository root:
 
 `nitpick init` writes one of these for you, commented, with the analyzers this
-checkout's languages call for. The reference below is what to reach for when
-changing a key it left at its default. `nitpick explain-config` prints what any
-of it resolves to without spending a token.
+checkout's languages call for. This page argues the settings worth changing;
+[Configuration reference](configuration-reference.md) lists every key the
+loader accepts, with its type and its shipped default, generated from the
+binary. `nitpick explain-config` prints what any of it resolves to without
+spending a token.
 
 ## Two files
 
@@ -22,11 +24,12 @@ the environment for what neither said, then flags. It takes the same keys in the
 same shape.
 
 It is also the only file trusted with `base_url`, `api_key_env`, `extra`,
-`allow_private_endpoint` and `persona.custom`, and it needs no
-`NITPICK_TRUST_CONFIG_ENDPOINTS` to use them: you wrote it, and it sits outside
-every checkout where no pull request can reach it. A repository that names any
-of those keys still has them dropped, and `nitpick explain-config` names both
-the file and what it supplied. See [Trust model](trust-model.md).
+`allow_private_endpoint`, `api_key_keyring`, `credential_command` and
+`persona.custom`, and it needs no `NITPICK_TRUST_CONFIG_ENDPOINTS` to use
+them: you wrote it, and it sits outside every checkout where no pull request
+can reach it. A repository that names any of those keys still has them
+dropped, for every model role, and `nitpick explain-config` names both the
+file and what it supplied. See [Trust model](trust-model.md).
 
 It is **not read on a runner**, where `CI` or `GITHUB_ACTIONS` is set, because
 nobody there wrote it. `NITPICK_USER_CONFIG=/path/to/config.yaml` names one
@@ -371,7 +374,7 @@ caller passes comes along with it. The walk is up to 150 file fetches a
 review on top of the changed files, and when that ceiling stops it short the
 summary says so, so a file with no callers attached is not read as a file
 with no callers. Measured on its own corpus in
-[docs/findings.md](findings.md#callers-2026-09-05): a cheap model went
+[Findings](findings.md#callers-2026-09-05): a cheap model went
 from finding none of the planted contract breaks to seven of eight.
 
 It is bounded by `review.related_context_tokens` per batch, spent only from
@@ -387,7 +390,7 @@ sweep was measured with them on; that direction ships on. The caller walk
 reads up to 150 files the change never named and sends excerpts to the model,
 which is a different consent boundary from "review my diff", so it ships off
 and the measured gain (0/8 to 7/8 on its corpus, noise down on the multi-file
-corpus, in [docs/findings.md](findings.md#callers-2026-09-05)) is for
+corpus, in [Findings](findings.md#callers-2026-09-05)) is for
 the operator to weigh against that. Context is not free either way: the same
 definitions that let a model confirm a defect give it more to be confidently
 wrong about.
@@ -425,7 +428,9 @@ persona:
     enumerated axes above are always honored, because they are bounded and
     validated. See [Trust model](trust-model.md).
 
-**`nitpick`** is the setting people argue about. It selects which
+### `nitpick`
+
+is the setting people argue about. It selects which
 *classes* of finding get published, where `min_severity` selects how serious
 they must be: independent questions, applied independently.
 
@@ -474,7 +479,7 @@ The text lives in `internal/prompt/model.go`, never widens what a model is
 asked to look for, and shows up in `nitpick explain-config` as the `model`
 layer so it can be read without spending tokens. `review.model_notes: false`
 removes it. The measurements are in
-[docs/comparison.md](comparison.md#tuning-for-glm-53-flash-and-qwen38-27b-2026-09-04).
+[Against Incumbent](comparison.md#tuning-for-glm-53-flash-and-qwen38-27b-2026-09-04).
 
 ## Who may make it spend
 
@@ -502,7 +507,9 @@ model call, and the run says who was refused and what the allowed set is. No
 reaction is deliberate: acknowledging a mention tells someone probing that
 something is listening.
 
-**`max_per_pull_request`** bounds the case the list does not, a person or an
+### `max_per_pull_request`
+
+bounds the case the list does not, a person or an
 automation inside the set in a loop. The count comes from the answers already
 posted on the pull request, so it survives a re-run and needs nothing
 persisted. Answers carry their own marker, so published findings and the
@@ -510,7 +517,9 @@ summary do not count against it: a review that posted five findings would
 otherwise exhaust a cap of five and refuse the first question anybody asked. Where the count cannot be read, the run says the cap is not being
 enforced rather than answering as though it were.
 
-**The workflow should gate too.** `nitpick respond` refuses these comments
+### The workflow should gate too
+
+`nitpick respond` refuses these comments
 itself, but only after a runner has started and the repository is checked out.
 The shipped `.github/workflows/nitpick-respond.yml` tests
 `github.event.comment.author_association` in its `if:`, so a stranger's comment
@@ -518,7 +527,9 @@ costs nothing at all. It also groups concurrency per pull request rather than
 per comment: a burst of twenty comments then costs two runs instead of twenty,
 at the price of dropping the questions cancelled while pending.
 
-**Forked pull requests** are a separate matter and are already handled by the
+### Forked pull requests
+
+are a separate matter and are already handled by the
 shipped workflow, which skips them: reviewing one would need the model key
 present in a run whose code the contributor controls.
 
@@ -546,11 +557,13 @@ It says "Nothing found in what was read" rather than that the change is clean,
 because those are different claims and the coverage notices below it carry the
 difference.
 
-**`prose`** keeps the generated walkthrough. The triage model writes it, and it
+### `prose`
+
+keeps the generated walkthrough. The triage model writes it, and it
 is not shown the change: it sees the findings list and the pull request title.
 Measured over six fixtures, most of the content words in what it wrote do not
 appear in the diff it describes. See
-[Findings](findings.md#should-triage-see-the-change).
+[Findings](findings.md#should-triage-see-the-change-2026-09-07).
 
 Under `receipt` the triage prompt does not ask for a walkthrough at all, so the
 output tokens are not spent on an answer nothing prints.
@@ -570,7 +583,9 @@ question tracked in [Findings](findings.md).
 **A finding for a path nobody reported is dropped**, always, with a line in the
 log. That guard has been there from the start.
 
-**`review.triage_no_new_claims`** closes the gap the path check leaves. A
+### `review.triage_no_new_claims`
+
+closes the gap the path check leaves. A
 finding whose path *was* reported can still come back with a rewritten title
 and rationale, published under the original reporter's name, because the
 attribution is restored a few lines later. Turn this on and the reviewer's own
@@ -623,13 +638,17 @@ runs had no ceiling recorded nothing, so a ceiling added part way through starts
 from zero. When earlier spend has reduced what is left, the review says which
 number it is quoting.
 
-**Rates are yours to supply.** A price is a claim about what a vendor charges
+### Rates are yours to supply
+
+A price is a claim about what a vendor charges
 you, on your account, at your tier. The dated table in `internal/evals` is
 evidence for a measurement, not a promise about anyone's bill, so a ceiling is
 computed only from rates you wrote down. A `max_spend` without them is a
 configuration error rather than a ceiling that silently never binds.
 
-**What gets reviewed.** When the whole diff costs more than the ceiling, files
+### What gets reviewed
+
+When the whole diff costs more than the ceiling, files
 are ranked and the highest-ranked are reviewed until the money runs out. The
 ranking is computed from the diff with no model call, and it is a priority
 rather than a prediction of where the bug is:
@@ -645,7 +664,9 @@ rather than a prediction of where the bug is:
 | A test | Halves it. Worth reviewing, worth reviewing after the code it covers. |
 | Prose or data | Halves it. Markdown, YAML, JSON, lockfiles. |
 
-**The estimate errs high.** Output size is not knowable before the model
+### The estimate errs high
+
+Output size is not knowable before the model
 writes, so `completion_ratio` assumes an answer a quarter the size of the
 prompt, roughly four times what a clean review produces. Over-estimating
 reviews fewer files than it could have and says so; under-estimating spends
@@ -655,7 +676,9 @@ route carries its own ensemble the estimate uses the largest set a batch could
 land in, since which batch takes which route is not known until the router has
 run.
 
-**What the pull request says.** A trimmed review states the ceiling, both
+### What the pull request says
+
+A trimmed review states the ceiling, both
 estimates, and how many files it did not read, with the coverage notices rather
 than inside the walkthrough, so turning `review.summary` off does not turn a
 trimmed review into a silent one. Every dropped file also appears under *Files
@@ -663,7 +686,9 @@ not reviewed* with the ceiling as its reason. Analyzers are unaffected: they run
 over the whole change, so an analyzer finding on a dropped file is still real,
 and only the model's silence there means nothing.
 
-**`min_files`** reviews that many of the top-ranked files even when the ceiling
+### `min_files`
+
+reviews that many of the top-ranked files even when the ceiling
 does not pay for them, and the run reports that it expects to exceed the
 ceiling. Left at zero, a diff whose cheapest file is over the ceiling is
 reviewed not at all, and says so.
@@ -680,7 +705,9 @@ reviewed not at all, and says so.
 One model for everything is the default. Two optional mechanisms change that,
 and both overlay `models.default`, so each entry names only what differs.
 
-**Routes** pick the reviewing model for a batch. The first route whose match
+### Routes
+
+pick the reviewing model for a batch. The first route whose match
 holds wins, and a batch no route matches goes to the review model.
 
 ```yaml
@@ -708,7 +735,9 @@ change does. Naming a kind without configuring `models.router` is a
 configuration error, and routes that match only on languages or file counts
 never call it.
 
-**Ensembles** add reviewers rather than replacing one. Every model listed
+### Ensembles
+
+add reviewers rather than replacing one. Every model listed
 reviews every batch, the findings are pooled, and triage merges and reranks
 them, so a defect two models report independently becomes one finding whose
 agreement is a reason to trust its level.

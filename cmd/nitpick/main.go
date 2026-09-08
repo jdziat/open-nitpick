@@ -67,6 +67,8 @@ func run() int {
 		err = runLinters()
 	case "providers":
 		err = runProviders()
+	case "config-reference":
+		err = runConfigRef(os.Args[2:], os.Stdout)
 	case "version", "--version", "-v":
 		fmt.Println("nitpick", version)
 		return exitOK
@@ -120,6 +122,7 @@ Usage:
   nitpick explain-config [flags]   Show the resolved configuration and prompts
   nitpick providers                List available model providers
   nitpick linters                  List the deterministic analyzers and how each is configured
+  nitpick config-reference         Print every configuration key, its type and its default
   nitpick version                  Print the version
 
 Run "nitpick <command> -h" for a command's flags.

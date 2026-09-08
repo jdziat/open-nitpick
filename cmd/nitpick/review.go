@@ -585,6 +585,19 @@ func runExplainConfig(args []string) error {
 	fs.StringVar(&configPath, "config", "", "path to .nitpick.yaml")
 	fs.StringVar(&forPath, "path", "", "show the instructions that apply to this file path")
 
+	// Every other flagged subcommand writes its own header, and this one is the
+	// command the documentation points at hardest: the landing page, the quick
+	// start and docs/usage.md all send a first-time operator here to see what a
+	// review would send before paying for one. Left to Go's default it was the
+	// one command in the set that printed no sentence about itself.
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage: nitpick explain-config [flags]\n\n"+
+			"Prints the resolved configuration, the model each role will use, and the review prompt\n"+
+			"exactly as it will be sent. -path adds the instructions that apply to one file.\n"+
+			"No model is called, so this costs nothing.\n\nFlags:")
+		fs.PrintDefaults()
+	}
+
 	if err := fs.Parse(args); err != nil {
 		return err
 	}

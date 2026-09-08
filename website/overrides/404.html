@@ -1,0 +1,53 @@
+{% extends "main.html" %}
+
+{#-
+  main.html special-cases the homepage and falls through to the theme for
+  everything else, and the theme builds its title and its cards from page,
+  which mkdocs does not give a theme template. Without these the tab, the
+  history entry and the bookmark all read "open-nitpick", and a dead link
+  pasted into a chat client unfurled as the project's front page with no
+  address on it. Both names are read by main.html, which is where the cards
+  are written.
+-#}
+{% set page_title_override = "Not found - " ~ config.site_name %}
+{% set page_url_override = config.site_url ~ "404.html" %}
+
+{% block htmltitle %}<title>{{ page_title_override }}</title>{% endblock %}
+
+{#-
+  base.html gates the bypass-blocks link on page.toc, and mkdocs gives a theme
+  template no page, so this was the one page on the site with no skip link:
+  `grep -c md-skip` returns 1 on every built page and returned 0 on 404.html.
+  A keyboard reader who followed a dead link had to tab the header controls with
+  nothing to get past them. The skip div in base.html is not inside a block, so
+  the link is emitted at the top of the header block instead, which is the first
+  focusable element in the body either way. .md-skip is position: fixed and
+  carries no JS, so it behaves here as it does on every other page.
+-#}
+{% block header %}
+  <a href="#not-found" class="md-skip">{{ lang.t("action.skip") }}</a>
+  {{ super() }}
+{% endblock %}
+
+{#-
+  The theme's 404 is one heading and nothing else. This site's argument is that
+  everything is written down, so the page a lost reader lands on says where the
+  writing is.
+-#}
+{% block content %}
+  <h1 id="not-found">Not found</h1>
+  <p>
+    This page does not exist at this address. The documentation moved here from
+    the repository, so a link written against the old layout can miss.
+  </p>
+  <ul>
+    <li><a href="{{ 'guide/' | url }}">Guide</a>: what open-nitpick is and how to run it.</li>
+    <li><a href="{{ 'docs/configuration-reference/' | url }}">Configuration reference</a>: every key <code>.nitpick.yaml</code> accepts.</li>
+    <li><a href="{{ config.repo_url }}">The repository</a>: the source, the releases, and the issue tracker.</li>
+  </ul>
+  <p>
+    Search, at the top of this page, reads every page except the two under
+    Internals, which are commentary on declarations and are linked from the
+    declarations they document.
+  </p>
+{% endblock %}

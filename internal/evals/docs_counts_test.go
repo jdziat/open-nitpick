@@ -10,9 +10,14 @@ import (
 
 // The instrument-bug count in docs/findings.md once said "nine" against
 // fourteen rows for two rounds, and the document records that as its own
-// failure: a figure restated rather than recomputed. The count now appears
-// in two places, the findings prose and the site's landing page, so this
-// test recomputes it from the table and holds both to it.
+// failure: a figure restated rather than recomputed. The count appears in
+// three places, the findings prose, the site's landing page and README.md,
+// so this test recomputes it from the table and holds all three to it.
+//
+// README.md was the third and was outside the guard, which asserted a
+// completeness it did not have: no test in this repository read README prose
+// at all, so the one restatement a reader meets first was the one nothing
+// checked.
 func TestInstrumentBugCountIsTheTableRowCount(t *testing.T) {
 	findings, err := os.ReadFile("../../docs/findings.md")
 	if err != nil {
@@ -71,5 +76,20 @@ func TestInstrumentBugCountIsTheTableRowCount(t *testing.T) {
 	}
 	if m[1] != strconv.Itoa(rows) {
 		t.Errorf("website/index.md says %s instrument bugs; the table has %d rows", m[1], rows)
+	}
+
+	readme, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Skip("README.md not present")
+	}
+	// The README spells the figure out, in the sentence that sends a reader to
+	// findings.md. Matching the phrase rather than the word is what makes a
+	// stale number fail here instead of a missing sentence passing quietly.
+	r := regexp.MustCompile(`the ([a-z-]+) instrument bugs found along the way`).FindStringSubmatch(string(readme))
+	if r == nil {
+		t.Fatal("README.md no longer states the instrument-bug count; drop this check or restore the sentence")
+	}
+	if !strings.EqualFold(r[1], word) {
+		t.Errorf("README.md says %q instrument bugs; the table has %d rows", r[1], rows)
 	}
 }

@@ -1448,7 +1448,7 @@ func TestTwoAmountsWithOverlappingBandsAreNotOrderable(t *testing.T) {
 // costFixture is one fixture of the battery the strategies below are run over:
 // a real fixture, plus what reviewing it costs to send.
 //
-// The note behind it is in docs/measurement.md#costfixture.
+// The note behind it is in docs/harness-notes.md#costfixture.
 type costFixture struct {
 	Fixture
 
@@ -1503,7 +1503,7 @@ const costRunsPerFixture = 2
 // costPrices is the rate table the degenerate-strategy rows are priced
 // against.
 //
-// The note behind it is in docs/measurement.md#costprices.
+// The note behind it is in docs/harness-notes.md#costprices.
 func costPrices(t *testing.T) *PriceTable {
 	t.Helper()
 	return mustPrices(t, "models:\n"+
@@ -1554,7 +1554,7 @@ type costStrategy struct {
 // worth
 // publishing only if being useful beats being degenerate on it.
 //
-// The note behind it is in docs/measurement.md#calibratedcostrun.
+// The note behind it is in docs/harness-notes.md#calibratedcostrun.
 func calibratedCostRun(f costFixture, _ int) ([]review.Finding, CallUsage, bool) {
 	findings := calibratedReview(f.Fixture)
 	return findings, CallUsage{Prompt: f.prompt, Completion: explainedTokens * len(findings)}, true
@@ -1563,7 +1563,7 @@ func calibratedCostRun(f costFixture, _ int) ([]review.Finding, CallUsage, bool)
 // explainedTokens is what one EXPLAINED finding costs to write, and spamTokens
 // what one empty one costs.
 //
-// The note behind it is in docs/measurement.md#explainedtokens-is-what-one-explained-finding-costs-to-write.
+// The note behind it is in docs/harness-notes.md#explainedtokens.
 const (
 	explainedTokens = 120
 	spamTokens      = 12
@@ -1743,7 +1743,7 @@ func ledgerFor(t *testing.T, s costStrategy) (strategy, reference CostRow) {
 // a
 // real run takes: findings into ScoreRun, the Score into ObserveScore.
 //
-// The note behind it is in docs/measurement.md#observecostrun.
+// The note behind it is in docs/harness-notes.md#observecostrun.
 func observeCostRun(l *CostLedger, model string, f costFixture, run int,
 	publish func(costFixture, int) ([]review.Finding, CallUsage, bool)) {
 	findings, usage, reported := publish(f, run)

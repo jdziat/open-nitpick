@@ -1,5 +1,16 @@
 # Usage
 
+Running the reviewer from a terminal: over uncommitted changes, over a branch,
+over a whole repository, from an agent session over MCP, and over prose alone.
+[GitHub Actions and other CI](ci.md) is the same tool on a runner.
+
+Start anywhere in it. `nitpick init` comes first here because a repository is
+usually set up once, but it is optional: a review runs with no config file at
+all as long as `LLM_PROVIDER` and `LLM_MODEL` are set, and every command below
+works that way. All of them assume `nitpick` is on your PATH; the
+[Quick start](../README.md#quick-start) has the one-line install, and
+[Providers and models](providers.md) covers what to set those two variables to.
+
 ## Starting a repository off
 
 ```bash
@@ -9,23 +20,37 @@ nitpick init -workflow                  # also .github/workflows/nitpick.yml
 nitpick init -force                     # overwrite an existing file
 ```
 
-The file it writes is the shipped defaults, spelled out and commented, plus the
-one thing a default cannot supply: a model, taken from `-provider` and `-model`
-or from `LLM_PROVIDER` and `LLM_MODEL`. Because every value written is already
-the one in force, deleting a key changes nothing and the file can be trimmed to
-taste.
+The file it writes names the model, the analyzers this checkout calls for, and
+the settings most worth changing first: the gate, the severity floor, the three
+budget bounds, the ignore list, the persona axes, and the analyzer mode. Every
+value written is already the one in force except two, so deleting a key changes
+nothing and the file can be trimmed to taste. It is not the whole surface:
+[Configuration reference](configuration-reference.md) lists every key the
+loader accepts.
 
-The analyzers are the part hardest to get right by hand. `init` matches this
+The two exceptions are the model, which no default supplies and which comes
+from `-provider` and `-model` or from `LLM_PROVIDER` and `LLM_MODEL`, and
+`linters.enabled`, which is matched to this checkout rather than copied from
+the default. A Go-only tree is written `[golangci-lint]` and a Python-only one
+`[ruff]`, where the shipped default is both, and under `mode: strict` that list
+is the one whose absence fails a run.
+
+The analyzers are the part hardest to get right by hand, and
+[Analyzers](analyzers.md) is the catalog they come from. `init` matches this
 checkout against the same targets a review detects on, names the ones that ship
-enabled in `linters.enabled`, and lists the rest as comments: those the catalog
-runs on its own when installed, and those that need a configuration from outside
-the repository or your word that their code may run. Nothing is enabled that
+enabled in `linters.enabled`, and lists the rest as comments under three
+headings: those the catalog runs on its own when installed, those that run only
+once you name them, and those that need a configuration from outside the
+repository or your word that their code may run. Nothing is enabled that
 would fail a run under `mode: strict` on a runner that lacks it.
 
-Nothing is written until the generated file has been loaded and validated, so a
-first command cannot leave a repository with a config the reviewer rejects. With
-no model named anywhere the `models` block is written commented out and `init`
-says which two variables would fill it.
+Nothing is written until the generated file has been parsed, so a first command
+cannot leave a repository with a file the loader cannot read. That is a weaker
+guarantee than it sounds and the difference is worth stating: with no model
+named anywhere the `models` block is written commented out, and a configuration
+naming no model is one `nitpick review` and `nitpick explain-config` both
+refuse with `models.default: model is required`. `init` says as much on the
+line reporting `model: none`, and the file it wrote is not yet runnable.
 
 ## Locally
 

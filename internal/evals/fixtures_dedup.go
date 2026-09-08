@@ -7,7 +7,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // property no other fixture has: the same defect is reportable from more than
 // one batch, so the merge that runs before triage has something to merge.
 //
-// The note behind it is in docs/measurement.md#dedupfixtures.
+// The note behind it is in docs/harness-notes.md#dedupfixtures.
 func dedupFixtures() []Fixture {
 	return []Fixture{crossBatchReplayFixture()}
 }
@@ -15,7 +15,7 @@ func dedupFixtures() []Fixture {
 // crossBatchReplayFixture widens a retry helper's "safe to repeat" predicate
 // and, in the same change, sends a payment capture through it.
 //
-// The note behind it is in docs/measurement.md#crossbatchreplayfixture.
+// The note behind it is in docs/harness-notes.md#crossbatchreplayfixture.
 func crossBatchReplayFixture() Fixture {
 	return Fixture{
 		Name: "cross-batch-replay",

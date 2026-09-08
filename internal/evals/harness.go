@@ -1003,7 +1003,7 @@ func evalConfig(model Model) *config.Config {
 // ourSeverityScale declares the severity vocabulary a run under this
 // configuration publishes on.
 //
-// The note behind it is in docs/measurement.md#ourseverityscale.
+// The note behind it is in docs/harness-notes.md#ourseverityscale.
 func ourSeverityScale(cfg *config.Config) SeverityScale {
 	if cfg == nil || cfg.Linters.Mode != config.LinterOff {
 		return UndeclaredSeverityScale

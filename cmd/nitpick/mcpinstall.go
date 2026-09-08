@@ -151,16 +151,30 @@ func runMCPInstall(args []string, stdout io.Writer) error {
 		fmt.Fprintln(os.Stderr, "\nFlags:")
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
-		return err
+	// The usage line above is "<client> [flags]", and the documentation and
+	// every example in it put the client first. Go's flag package stops at the
+	// first non-flag argument, so `mcp install codex -user` parsed as two
+	// positionals and was refused, with the -user it had just been handed
+	// listed in the usage it printed. Parsing what follows each positional
+	// makes the documented order the one that runs.
+	var clients []string
+	for rest := args; ; {
+		if err := fs.Parse(rest); err != nil {
+			return err
+		}
+		if fs.NArg() == 0 {
+			break
+		}
+		clients = append(clients, fs.Arg(0))
+		rest = fs.Args()[1:]
 	}
-	if fs.NArg() != 1 {
+	if len(clients) != 1 {
 		fs.Usage()
 		return errors.New("one client name is required")
 	}
-	client, ok := findClient(fs.Arg(0))
+	client, ok := findClient(clients[0])
 	if !ok {
-		return fmt.Errorf("unknown client %q; run nitpick mcp install -h for the list", fs.Arg(0))
+		return fmt.Errorf("unknown client %q; run nitpick mcp install -h for the list", clients[0])
 	}
 
 	// A project file is shared through version control, so it names the

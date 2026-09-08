@@ -84,8 +84,14 @@ type Config struct {
 // the SDK's provider registry, so any provider the SDK supports is usable here
 // without changes to open-nitpick.
 type ModelSpec struct {
+	// Provider names the vendor or gateway the call goes to. "nitpick
+	// providers" prints the list.
 	Provider string `yaml:"provider"`
-	Model    string `yaml:"model"`
+
+	// Model is the model id as that provider spells it, which is not a name
+	// this project validates: an id the vendor does not serve fails at the
+	// call, not at load.
+	Model string `yaml:"model"`
 
 	// BaseURL points at an alternate endpoint. This is what makes local models
 	// (ollama, llama.cpp) and OpenAI-compatible gateways usable.
@@ -110,13 +116,24 @@ type ModelSpec struct {
 	// would make every character in this field a program.
 	CredentialCommand []string `yaml:"credential_command"`
 
-	Temperature *float64      `yaml:"temperature"`
-	MaxTokens   int           `yaml:"max_tokens"`
-	Timeout     time.Duration `yaml:"timeout"`
+	// Temperature is passed through unchanged. Unset leaves the role's default,
+	// which is 0 for every role here: a review that varies between runs on the
+	// same diff is one nobody can hold to a measurement.
+	Temperature *float64 `yaml:"temperature"`
+
+	// MaxTokens caps the response. Zero lets the provider decide, which is the
+	// shipped behaviour, and a cap too low truncates a finding rather than
+	// dropping it.
+	MaxTokens int `yaml:"max_tokens"`
+
+	// Timeout bounds one call, retries excluded.
+	Timeout time.Duration `yaml:"timeout"`
 
 	// StructuredOutput selects how findings are constrained to the schema:
 	// "auto" (default) prefers a JSON-Schema response format and falls back to
-	// JSON mode, "schema" forces the schema path, "json" forces JSON mode.
+	// JSON mode and then to prompt-carried text, "schema" forces the schema
+	// path, "json" forces JSON mode, "text" forces the text path, where the
+	// schema rides in the prompt and the reply is parsed leniently.
 	StructuredOutput StructuredMode `yaml:"structured_output"`
 
 	// AllowPrivateEndpoint permits base_url to use plain HTTP or resolve to a
@@ -251,9 +268,10 @@ type RouteMatch struct {
 	// of them. Naming a kind requires Models.Router.
 	Kinds []string `yaml:"kinds"`
 
-	// MinFiles and MaxFiles bound how many files the batch holds. Zero is
-	// unset.
+	// MinFiles bounds how few files the batch may hold. Zero is unset.
 	MinFiles int `yaml:"min_files"`
+
+	// MaxFiles bounds how many files the batch may hold. Zero is unset.
 	MaxFiles int `yaml:"max_files"`
 }
 
@@ -522,7 +540,12 @@ type Approve struct {
 // glob matches a file is appended to that file's review prompt, so instructions
 // compose rather than override one another.
 type Instruction struct {
-	Path   string `yaml:"path"`
+	// Path is a glob matched against each changed file's repository-relative
+	// path, in the doublestar dialect, so "**/*.go" reaches every directory.
+	Path string `yaml:"path"`
+
+	// Prompt is appended to the review prompt for a matching file. It is
+	// repository text and is fenced as untrusted before the model reads it.
 	Prompt string `yaml:"prompt"`
 }
 
@@ -632,9 +655,12 @@ type Linters struct {
 	// its own isolation flag, or not at all; `nitpick linters` says which.
 	Configs map[string]string `yaml:"configs"`
 
-	// AutoDetect runs every catalog analyzer that is installed, isolated from
-	// the tree, and executes nothing from it, whenever the change contains
-	// files it reads, without each being named in Enabled. One that is not
+	// AutoDetect runs the catalog analyzers marked auto, each installed,
+	// isolated from the tree, and executing nothing from it, whenever the
+	// change contains files it reads and without being named in Enabled;
+	// `nitpick linters` says which those are. It is not every catalog
+	// analyzer: the ones marked opt-in there are reached by naming and by
+	// nothing else, so this key never turns them on. One that is not
 	// installed is skipped, silently in auto mode and in strict mode alike:
 	// strict is a promise about the analyzers an operator NAMED, and naming
 	// one here is how to make its absence fail the run. Defaults to on.
