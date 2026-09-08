@@ -39,7 +39,7 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 		return vcs.EventComment
 	}
 
-	if cfg.Review.Approve.RequireAnalyzers && !analyzersCovered(report) {
+	if cfg.Review.Approve.RequireAnalyzers && !analyzersCovered(report, cfg) {
 		return vcs.EventComment
 	}
 	return vcs.EventApprove
@@ -52,7 +52,15 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 // one that ran over less of the change than "ran" implies: golangciLint.Uncovered
 // records a file a build constraint excluded or a suppression the change added,
 // and an approval that ignores those says the code was checked when it was not.
-func analyzersCovered(report *Report) bool {
+func analyzersCovered(report *Report, cfg *config.Config) bool {
+	// An empty roster satisfies "every analyzer ran" vacuously, and that is
+	// how the setting forbidding an unchecked approval comes to permit one:
+	// -no-linters leaves Linters nil, and so does any run that never built an
+	// analyzer set. A configuration that enables analyzers and a report that
+	// names none did not run them.
+	if len(report.Linters) == 0 && cfg.Linters.Mode != config.LinterOff {
+		return false
+	}
 	if len(report.Uncovered) > 0 {
 		return false
 	}

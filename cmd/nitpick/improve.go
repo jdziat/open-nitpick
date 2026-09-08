@@ -50,6 +50,12 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs
 	icfg.Review.MinSeverity = config.SeverityNit
 	icfg.Review.ResolveSuperseded = false
 
+	// This pass answers with one comment and no disposition. reviewEvent reads
+	// the operator's config and fires for every publish, so leaving
+	// review.approve on here would post an approval beside that comment on a
+	// change clean at pedantic scope, a verdict this command has never given.
+	icfg.Review.Approve.Enabled = false
+
 	roles, err := llm.BuildRoles(&icfg)
 	if err != nil {
 		return err

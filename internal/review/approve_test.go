@@ -196,3 +196,23 @@ func (c *capturingProvider) PublishReview(_ context.Context, _ vcs.Ref, r vcs.Re
 	c.published = &r
 	return nil
 }
+
+// TestAnEmptyRosterFailsTheAnalyzerGate closes the vacuous reading.
+//
+// "Every enabled analyzer ran" is satisfied by a report naming none, which is
+// what -no-linters produces and what any run that built no analyzer set
+// produces. The one setting that exists to forbid an unchecked approval would
+// otherwise permit exactly that.
+func TestAnEmptyRosterFailsTheAnalyzerGate(t *testing.T) {
+	cfg := approving(true)
+	if got := reviewEvent(&Report{}, cfg); got != vcs.EventComment {
+		t.Errorf("event with no analyzers on the roster = %q, want %q", got, vcs.EventComment)
+	}
+
+	// An operator who turned the analyzers off asked for a review without
+	// them, so the gate has nothing to hold out for.
+	cfg.Linters.Mode = config.LinterOff
+	if got := reviewEvent(&Report{}, cfg); got != vcs.EventApprove {
+		t.Errorf("event with linters.mode off = %q, want %q", got, vcs.EventApprove)
+	}
+}
