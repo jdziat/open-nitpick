@@ -497,6 +497,40 @@ func TestTriageFailureStillPublishesFindings(t *testing.T) {
 	if len(report.Findings) != 1 {
 		t.Errorf("findings = %+v, want the review findings to survive", report.Findings)
 	}
+
+	// The half that was missing. Surviving the failure is right; reporting the
+	// pipeline finished is what made a dead triage read as a clean review.
+	if report.PipelineComplete() {
+		t.Error("PipelineComplete() = true after triage failed")
+	}
+	if !report.Complete() {
+		t.Error("Complete() = false; triage failing is not a file going unread")
+	}
+	if got := report.FailedStages(); len(got) != 1 || got[0] != "triage" {
+		t.Errorf("FailedStages() = %v, want [triage]", got)
+	}
+	// The reason is this code's own word, not the model's answer, because it
+	// reaches a pull request comment.
+	if r := report.Stages[0].Reason; r == "" || strings.Contains(r, "not json") {
+		t.Errorf("Stages[0].Reason = %q, want a sanitized kind", r)
+	}
+}
+
+// A clean review never calls triage at all, so there is no stage to fail. If
+// the skip started reporting one, every clean review would exit 2.
+func TestACleanReviewRecordsNoStageFailure(t *testing.T) {
+	model := &scriptedLLM{byPrompt: map[string]string{
+		"Review the following changes": mustJSON(t, Result{Findings: nil}),
+	}}
+	engine := newEngine(t, model, &stubProvider{diff: engineDiff}, nil)
+
+	report, err := engine.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if !report.PipelineComplete() {
+		t.Errorf("PipelineComplete() = false on a clean review; stages = %+v", report.Stages)
+	}
 }
 
 func TestAllBatchesFailingIsAnError(t *testing.T) {

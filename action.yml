@@ -129,6 +129,22 @@ outputs:
     description: Findings withheld because an earlier review already posted them.
     value: ${{ steps.review.outputs.withheld }}
 
+  complete:
+    description: >-
+      Whether every planned file was reviewed and every required stage ran.
+      False sets result to "error" and exits 2 whatever fail-on says: a run
+      whose triage died published findings nothing ranked, and reporting that
+      as clean is the one output this tool must not produce.
+    value: ${{ steps.review.outputs.complete }}
+
+  failed_stages:
+    description: >-
+      Comma-separated names of the required stages that did not complete, empty
+      when none did. Reading it apart from complete tells a reviewer that could
+      not start (no stages, nil report) from one whose triage failed after the
+      files were read.
+    value: ${{ steps.review.outputs.failed_stages }}
+
 runs:
   using: composite
   steps:

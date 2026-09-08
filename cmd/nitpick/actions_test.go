@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,5 +72,51 @@ func TestResultForFollowsTheGate(t *testing.T) {
 	}
 	if resultFor(nil, config.SeverityNone) != resultError {
 		t.Error("no report is an error")
+	}
+}
+
+// The classification the issue was filed for. A report with findings below the
+// gate and a stage that never ran is not clean, whatever fail-on says: the
+// question fail-on answers is what to do about the code, and no part of this
+// run measured the code.
+func TestResultForRefusesToCallADegradedRunClean(t *testing.T) {
+	degraded := &review.Report{
+		Findings: []review.Finding{{Path: "a.go", Line: 1, Severity: "info", Title: "minor"}},
+		Stages:   []review.StageStatus{{Stage: "triage", Reason: "rate-limited"}},
+	}
+	if got := resultFor(degraded, config.SeverityError); got != resultError {
+		t.Errorf("resultFor on a degraded run = %q, want %q", got, resultError)
+	}
+
+	// And the control: the same findings with every stage run are clean, so
+	// the branch above is answering completeness and not severity.
+	clean := &review.Report{Findings: degraded.Findings}
+	if got := resultFor(clean, config.SeverityError); got != resultClean {
+		t.Errorf("resultFor on a complete run = %q, want %q", got, resultClean)
+	}
+}
+
+// The exit contract, which is what automation reads. A degraded run exits 2
+// rather than 1: exit 1 says the change has problems at or above the gate, and
+// a run that never reached the gate has measured nothing to say that about.
+func TestExitForSeparatesFindingsFromNotFinishing(t *testing.T) {
+	for _, tc := range []struct {
+		result actionResult
+		want   error
+	}{
+		{resultClean, nil},
+		{resultSkipped, nil},
+		{resultFindings, errFindings},
+		{resultError, errIncomplete},
+	} {
+		if got := exitFor(tc.result); !errors.Is(got, tc.want) {
+			t.Errorf("exitFor(%q) = %v, want %v", tc.result, got, tc.want)
+		}
+	}
+
+	// errors.Is(nil, nil) is true, so the table above would pass with every
+	// arm returning nil. This is the assertion that makes it a test.
+	if exitFor(resultError) == nil {
+		t.Error("a degraded run returned no error, so the process would exit 0")
 	}
 }

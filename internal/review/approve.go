@@ -33,9 +33,10 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 	}
 
 	// A run whose batches partly failed published no findings for the files it
-	// never read, which is the shape Report.Incomplete exists to name. Reading
-	// that as clean is how an approval comes to mean less than nothing.
-	if !report.Complete() {
+	// never read, and a run whose triage died published findings nothing
+	// ranked. Reading either as clean is how an approval comes to mean less
+	// than nothing.
+	if !report.PipelineComplete() {
 		return vcs.EventComment
 	}
 

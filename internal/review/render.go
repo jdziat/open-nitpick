@@ -353,6 +353,10 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// what was reviewed is a fact about coverage, and review.summary turning
 	// the walkthrough off must not turn it into a silent trim.
 	b.WriteString(budgetNote(report))
+	// Same rule, same reason. A stage that did not run is a fact about what
+	// the findings below have been through, and review.summary is a setting
+	// about prose.
+	b.WriteString(stageNotice(report))
 	b.WriteString(EscalationNotice(report))
 
 	if cfg == nil || cfg.Review.Summary {
@@ -1051,5 +1055,22 @@ func budgetNote(report *Report) string {
 			"`review.budget.max_spend`.\n", fit.Prior)
 	}
 
+	return b.String()
+}
+
+// stageNotice reports a required stage that did not complete.
+//
+// Ungated, beside budgetNote and for its reason: review.summary chooses
+// whether a model's prose is published, and a reader who turned that off has
+// not asked to stop being told the findings were never ranked.
+func stageNotice(report *Report) string {
+	if len(report.Stages) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n> **This review did not complete.**\n>\n")
+	for _, st := range report.Stages {
+		fmt.Fprintf(&b, "> - %s\n", inline(stageSentence(st)))
+	}
 	return b.String()
 }

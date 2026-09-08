@@ -111,30 +111,51 @@ func TestAnEmptyChangeProducesNoReceipt(t *testing.T) {
 	}
 }
 
-// A failed style pass puts a marker in Incomplete that is not a path, so
-// counting it would report a file nobody can open.
-func TestTheStyleMarkerIsNotCountedAsAFile(t *testing.T) {
+// A failed stage is not a file, and the count of files a reader is given must
+// not include one.
+func TestAFailedStageIsNotCountedAsAFile(t *testing.T) {
 	report := &Report{
-		Files:      diff.Files{{Path: "a.go"}, {Path: "b.go"}},
-		Plan:       planOfFiles(2),
-		Incomplete: []string{stylePassMarker},
+		Files:  diff.Files{{Path: "a.go"}, {Path: "b.go"}},
+		Plan:   planOfFiles(2),
+		Stages: []StageStatus{{Stage: "style", Reason: "rate-limited"}},
 	}
 
 	got := receipt(report)
 	if strings.Contains(got, "could not be reviewed") {
-		t.Errorf("the style marker was counted as a file:\n%s", got)
+		t.Errorf("a stage was counted as a file:\n%s", got)
 	}
-	if !strings.Contains(got, "style pass failed") {
+	if !strings.Contains(stageNotice(report), "style pass failed") {
 		t.Errorf("a failed style pass went unreported:\n%s", got)
 	}
 
-	report.Incomplete = []string{"b.go", stylePassMarker}
+	report.Incomplete = []string{"b.go"}
 	got = receipt(report)
 	if !strings.Contains(got, "1 file could not be reviewed") {
 		t.Errorf("want one file counted, not two:\n%s", got)
 	}
-	if !strings.Contains(got, "style pass failed") {
+	if !strings.Contains(stageNotice(report), "style pass failed") {
 		t.Errorf("both facts must appear:\n%s", got)
+	}
+}
+
+// Triage is the stage the issue was filed for: a review whose findings were
+// published without ever being deduplicated, ranked or summarized, and said so
+// nowhere.
+func TestAFailedTriageSaysWhatWasLost(t *testing.T) {
+	report := &Report{
+		Files:  diff.Files{{Path: "a.go"}},
+		Plan:   planOfFiles(1),
+		Stages: []StageStatus{{Stage: "triage", Reason: "rate-limited"}},
+	}
+
+	got := stageNotice(report)
+	for _, want := range []string{"Triage failed", "rate-limited", "deduplicated"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the notice does not say %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(receipt(report), "could not be reviewed") {
+		t.Errorf("triage failing is not a file failing:\n%s", receipt(report))
 	}
 }
 
@@ -168,6 +189,30 @@ func TestTheReceiptIsQuietWhenNothingWasSkipped(t *testing.T) {
 	for _, forbidden := range []string{"nothing to review", "could not be read"} {
 		if strings.Contains(got, forbidden) {
 			t.Errorf("receipt mentions %q with no skips:\n%s", forbidden, got)
+		}
+	}
+}
+
+// One renderer, said once, and said whether or not the walkthrough runs.
+//
+// review.summary chooses whether a model's prose is published. A reader who
+// turned it off has not asked to stop being told that the findings in front of
+// them were never ranked, which is the same rule budgetNote is held to.
+func TestADegradedRunSaysItOnceUnderEverySummarySetting(t *testing.T) {
+	report := &Report{
+		Files:  diff.Files{{Path: "a.go"}},
+		Plan:   planOfFiles(1),
+		Stages: []StageStatus{{Stage: "triage", Reason: "rate-limited"}},
+	}
+
+	for _, summary := range []bool{true, false} {
+		cfg := config.Defaults()
+		cfg.Review.Summary = summary
+
+		got := Render(report, report.Files, cfg).Summary
+		if n := strings.Count(got, "Triage failed"); n != 1 {
+			t.Errorf("summary=%t: the stage sentence appears %d times, want 1:\n%s",
+				summary, n, got)
 		}
 	}
 }

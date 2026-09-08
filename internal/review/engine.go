@@ -380,6 +380,16 @@ type Report struct {
 	// "no issues found" is indistinguishable from a clean one.
 	Incomplete []string
 
+	// Stages names a required stage that did not complete, in the order the
+	// run met them.
+	//
+	// A stage failure is not a file failure. The files were read and the
+	// findings are real; what is missing is work done over them, so counting a
+	// dead triage as an unreviewed file would understate coverage and misname
+	// what broke. Kept apart from Incomplete for that reason: a reader given a
+	// list of paths should be able to open every one of them.
+	Stages []StageStatus
+
 	// Policy records the configuration this review ran under, and whether that
 	// is the change's own. Callers gate on it rather than on the configuration
 	// they loaded: a change that edits .nitpick.yaml had its configuration set
@@ -446,8 +456,40 @@ type Incremental struct {
 	Unchanged []string
 }
 
+// StageStatus records a required stage that did not complete.
+type StageStatus struct {
+	// Stage is the stage's name as a reader knows it: "triage", "style".
+	Stage string
+
+	// Reason is a short kind, not the provider's answer. What a model or a
+	// gateway returns on failure is untrusted text bound for a pull request
+	// comment, and a status line is the wrong place to learn that.
+	Reason string
+}
+
 // Complete reports whether every planned file was reviewed.
+//
+// File coverage only. A run whose triage died read every file it planned to,
+// and evals and the tree scorecard both phrase this one as a count of files.
 func (r *Report) Complete() bool { return len(r.Incomplete) == 0 }
+
+// PipelineComplete reports whether every planned file was reviewed and every
+// required stage ran.
+//
+// This is the question a caller is asking before it calls a run clean.
+// Complete alone answers a narrower one, and answering the narrow question
+// when the broad one was meant is how a failed triage reached exit 0.
+func (r *Report) PipelineComplete() bool { return r.Complete() && len(r.Stages) == 0 }
+
+// FailedStages names the stages that did not complete, for an output that
+// carries one line.
+func (r *Report) FailedStages() []string {
+	out := make([]string, 0, len(r.Stages))
+	for _, s := range r.Stages {
+		out = append(out, s.Stage)
+	}
+	return out
+}
 
 // Failed reports whether the run should exit non-zero under the configured
 // gate.
@@ -583,7 +625,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		if err != nil {
 			e.log().Warn("style pass failed; the review is complete for defects "+
 				"but style findings are missing", "error", err)
-			report.Incomplete = append(report.Incomplete, stylePassMarker)
+			report.Stages = append(report.Stages, StageStatus{Stage: "style", Reason: errorKind(err)})
 		}
 		findings = append(findings, style...)
 	}
@@ -638,7 +680,13 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings, advisories := holdAdvisories(dedupe(findings))
 
 	summary, findings, withheldByTriage, err := e.triage(ctx, pr, findings)
-	if err != nil {
+	switch {
+	case errors.Is(err, errStageDegraded):
+		// Usable output behind a failed stage. The findings publish and the
+		// report says the stage did not run, which is what stops a caller
+		// downstream from reading this as a clean review.
+		report.Stages = append(report.Stages, StageStatus{Stage: "triage", Reason: errorKind(err)})
+	case err != nil:
 		return nil, err
 	}
 	// The summary was written over what triage saw, which the advisories
@@ -1426,8 +1474,12 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		if ctx.Err() != nil {
 			return "", nil, nil, err
 		}
-		e.log().Warn("triage failed; publishing deduplicated findings", "error", err)
-		return "", findings, nil, nil
+		// The findings are kept: losing a whole review because the summarizer
+		// failed would be a bad trade. The error is kept too, which is the
+		// part that was missing. Returning nil here told Review the pipeline
+		// finished, and Review had no way to know better.
+		e.log().Warn("triage failed; publishing findings that were never triaged", "error", err)
+		return "", findings, nil, fmt.Errorf("%w: triage: %w", errStageDegraded, err)
 	}
 
 	// Triage may reword and merge, but must not invent findings for files that

@@ -98,6 +98,9 @@ func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref
 	if err != nil {
 		return err
 	}
+	// A client built outside Roles gets no logger otherwise, and a fix that
+	// spent two minutes being rate limited would say only that it was slow.
+	client.SetLogger(log)
 
 	req := fix.Request{Findings: findings, Files: files}
 	res, err := fix.Apply(ctx, client, req)

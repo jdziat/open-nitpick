@@ -71,15 +71,11 @@ func receipt(report *Report) string {
 		parts = append(parts, fmt.Sprintf("Analyzers: %s.", strings.Join(analyzers, ", ")))
 	}
 
-	// Incomplete carries one entry that is not a file. A failed style pass
-	// appends the marker "(style pass)" so the notice can say the defect review
-	// is complete and the style findings are missing, and counting it as a file
-	// would report a file nobody can open.
-	if n := incompleteFiles(report); n > 0 {
+	// Files only. A failed stage is reported by stageNotice, which renders
+	// whether or not the walkthrough does, and saying it in both put the
+	// sentence on the page twice.
+	if n := len(report.Incomplete); n > 0 {
 		parts = append(parts, fmt.Sprintf("%s could not be reviewed.", plural(n, "file")))
-	}
-	if stylePassFailed(report) {
-		parts = append(parts, "The style pass failed, so style findings are missing.")
 	}
 
 	return strings.Join(parts, " ") + "\n"
@@ -106,29 +102,19 @@ func plural(n int, noun string) string {
 	return fmt.Sprintf("%d %ss", n, noun)
 }
 
-// stylePassMarker is the entry Engine.Review adds to Report.Incomplete when the
-// style pass fails. It is a marker, not a path.
-const stylePassMarker = "(style pass)"
-
-// incompleteFiles counts the entries of Report.Incomplete that name a file.
-func incompleteFiles(report *Report) int {
-	n := 0
-	for _, p := range report.Incomplete {
-		if p != stylePassMarker {
-			n++
-		}
+// stageSentence says what a failed stage cost the reader, in that stage's own
+// terms. A stage nobody has written a sentence for still gets one, because a
+// stage that fails silently is the defect this whole path exists to close.
+func stageSentence(st StageStatus) string {
+	switch st.Stage {
+	case "triage":
+		return fmt.Sprintf("Triage failed (%s), so these findings were not "+
+			"deduplicated, ranked or summarized.", st.Reason)
+	case "style":
+		return fmt.Sprintf("The style pass failed (%s), so style findings are missing.", st.Reason)
+	default:
+		return fmt.Sprintf("The %s stage failed (%s).", st.Stage, st.Reason)
 	}
-	return n
-}
-
-// stylePassFailed reports whether the marker is present.
-func stylePassFailed(report *Report) bool {
-	for _, p := range report.Incomplete {
-		if p == stylePassMarker {
-			return true
-		}
-	}
-	return false
 }
 
 // unreadable names the skip reasons that mean the reviewer wanted the file and

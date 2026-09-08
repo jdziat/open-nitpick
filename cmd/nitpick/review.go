@@ -236,10 +236,25 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	actions.setOutputs(result, report)
 	actions.writeSummary(result, report, &rendered, ref, note)
 
-	if result == resultFindings {
+	return exitFor(result)
+}
+
+// exitFor turns a classification into the error the process exits on.
+//
+// A function rather than a switch inline, because the mapping is the contract
+// every command shares and the only part of it a test can reach without a
+// forge, a model and a diff. Called after the outputs are written, never
+// instead: the findings a degraded run did produce are worth reading, and what
+// must not happen is the run reporting itself finished.
+func exitFor(result actionResult) error {
+	switch result {
+	case resultFindings:
 		return errFindings
+	case resultError:
+		return errIncomplete
+	default:
+		return nil
 	}
-	return nil
 }
 
 // skipReason says why a pull request is not reviewed, or "" when it is:

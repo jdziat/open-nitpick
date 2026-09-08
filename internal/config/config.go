@@ -151,7 +151,15 @@ type ModelSpec struct {
 	// runpod's endpoint_id) straight through to the SDK.
 	Extra map[string]string `yaml:"extra"`
 
-	// MaxRetries bounds SDK-level retries for transient failures.
+	// MaxRetries bounds two loops, not one, and they multiply.
+	//
+	// It is the SDK's retry count for a transient failure (a 429, a 5xx, a
+	// dropped connection) and also the local stall loop's budget for a request
+	// that returns nothing. One structured call can take several attempts
+	// through the schema, JSON and repair paths, so the ceiling on provider
+	// requests for a single extraction is the product of the three, not the
+	// largest of them. Raising this past its default of 3 raises that ceiling
+	// faster than it looks.
 	MaxRetries *int `yaml:"max_retries"`
 
 	// Fallback is the model a role escalates to when this one cannot answer:
