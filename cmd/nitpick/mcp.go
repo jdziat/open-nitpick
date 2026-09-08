@@ -147,6 +147,11 @@ type ReviewOut struct {
 	Policy    string         `json:"policy,omitempty" jsonschema:"set when the change's own configuration was set aside, and why"`
 	FailOn    string         `json:"fail_on" jsonschema:"the configured gate"`
 	Failed    bool           `json:"failed" jsonschema:"whether a finding reached the gate"`
+	// An agent reading this over a socket has no exit code and no log, so the
+	// tree tools' Unreviewed has a counterpart here. Without it a review whose
+	// triage died is indistinguishable from one that had nothing to say.
+	Complete     bool     `json:"complete" jsonschema:"whether every planned file was reviewed and every required stage ran"`
+	FailedStages []string `json:"failed_stages,omitempty" jsonschema:"required stages that did not complete"`
 }
 
 // TreeOut is what the tree tools return: the review, the grouped
@@ -341,7 +346,14 @@ func (t *mcpTools) explainConfig(_ context.Context, _ *mcp.CallToolRequest, in E
 
 // reviewOut converts a report.
 func reviewOut(report *review.Report, failOn config.Severity) ReviewOut {
-	out := ReviewOut{Summary: report.Summary, Files: report.Plan.Files(), FailOn: string(failOn), Failed: report.Failed(failOn)}
+	out := ReviewOut{
+		Summary:      report.Summary,
+		Files:        report.Plan.Files(),
+		FailOn:       string(failOn),
+		Failed:       report.Failed(failOn),
+		Complete:     report.PipelineComplete(),
+		FailedStages: report.FailedStages(),
+	}
 	for _, f := range report.Findings {
 		out.Findings = append(out.Findings, Finding{
 			Path: f.Path, Line: f.Line, Severity: f.Severity, Class: f.Class, Category: f.Category,

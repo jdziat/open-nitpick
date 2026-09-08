@@ -236,8 +236,14 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	actions.setOutputs(result, report)
 	actions.writeSummary(result, report, &rendered, ref, note)
 
-	if result == resultFindings {
+	switch result {
+	case resultFindings:
 		return errFindings
+	case resultError:
+		// After publishing, not instead of it. The findings a degraded run did
+		// produce are worth reading; what must not happen is the run reporting
+		// itself finished.
+		return errIncomplete
 	}
 	return nil
 }

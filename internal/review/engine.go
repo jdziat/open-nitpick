@@ -681,7 +681,13 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings, advisories := holdAdvisories(dedupe(findings))
 
 	summary, findings, withheldByTriage, err := e.triage(ctx, pr, findings)
-	if err != nil {
+	switch {
+	case errors.Is(err, errStageDegraded):
+		// Usable output behind a failed stage. The findings publish and the
+		// report says the stage did not run, which is what stops a caller
+		// downstream from reading this as a clean review.
+		report.Stages = append(report.Stages, StageStatus{Stage: "triage", Reason: errorKind(err)})
+	case err != nil:
 		return nil, err
 	}
 	// The summary was written over what triage saw, which the advisories
@@ -1469,8 +1475,12 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		if ctx.Err() != nil {
 			return "", nil, nil, err
 		}
-		e.log().Warn("triage failed; publishing deduplicated findings", "error", err)
-		return "", findings, nil, nil
+		// The findings are kept: losing a whole review because the summarizer
+		// failed would be a bad trade. The error is kept too, which is the
+		// part that was missing. Returning nil here told Review the pipeline
+		// finished, and Review had no way to know better.
+		e.log().Warn("triage failed; publishing findings that were never triaged", "error", err)
+		return "", findings, nil, fmt.Errorf("%w: triage: %w", errStageDegraded, err)
 	}
 
 	// Triage may reword and merge, but must not invent findings for files that

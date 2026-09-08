@@ -103,6 +103,13 @@ func run() int {
 // errFindings signals that the review succeeded but found gating issues.
 var errFindings = errors.New("findings at or above the configured threshold")
 
+// errIncomplete ends a run that produced output but did not finish.
+//
+// It exits 2 rather than 1 because it is not a statement about the code: the
+// gate was never reached, and a caller that reads exit 1 as "the change has
+// problems" would be told something nobody measured.
+var errIncomplete = errors.New("the review did not complete; see the stages it reports")
+
 func usage() {
 	fmt.Fprint(os.Stderr, `nitpick: self-hosted, model-agnostic pull request review
 

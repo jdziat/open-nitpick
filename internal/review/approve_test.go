@@ -216,3 +216,13 @@ func TestAnEmptyRosterFailsTheAnalyzerGate(t *testing.T) {
 		t.Errorf("event with linters.mode off = %q, want %q", got, vcs.EventApprove)
 	}
 }
+
+// A run whose triage died published findings nothing ranked or deduplicated.
+// Approving on that is worse than approving on an unread file, because the
+// findings are there and look complete.
+func TestADegradedRunIsNotApproved(t *testing.T) {
+	r := &Report{Stages: []StageStatus{{Stage: "triage", Reason: "rate-limited"}}}
+	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
+		t.Errorf("event = %q, want %q on a degraded run", got, vcs.EventComment)
+	}
+}

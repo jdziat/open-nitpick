@@ -86,6 +86,7 @@ type SlopResult struct {
 	ModelSlopPerKLOC float64   `json:"model_slop_per_kloc,omitempty" jsonschema:"weighted by severity, per thousand lines reviewed"`
 	ModelRan         bool      `json:"model_ran"`
 	Unreviewed       []string  `json:"unreviewed,omitempty"`
+	FailedStages     []string  `json:"failed_stages,omitempty" jsonschema:"required stages that did not complete; the files were still read"`
 	Skipped          []string  `json:"skipped,omitempty"`
 	Recommendations  []string  `json:"recommendations"`
 	ScoreNote        string    `json:"score_note,omitempty"`
@@ -163,6 +164,10 @@ func slopScore(ctx context.Context, f *reviewFlags, paths []string, budget int, 
 			for _, a := range card.AnalyzersFailed {
 				parts = append(parts, "analyzer did not run: "+a)
 			}
+			for _, st := range card.StagesFailed {
+				parts = append(parts, "stage did not complete: "+st)
+			}
+			out.FailedStages = card.StagesFailed
 			out.ScoreNote = "INCOMPLETE: " + strings.Join(parts, "; ")
 		}
 	}

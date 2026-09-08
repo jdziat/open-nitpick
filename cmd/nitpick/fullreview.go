@@ -76,6 +76,13 @@ func runTreeReview(ctx context.Context, name string, args []string, score bool) 
 	if score {
 		fmt.Print(fullreview.Score(report, tree).String())
 	}
+
+	// After the output, not instead of it. full-review and repo-score returned
+	// nil unconditionally, so a tree review whose triage died exited 0 and read
+	// as a finished score.
+	if !report.PipelineComplete() {
+		return errIncomplete
+	}
 	return nil
 }
 

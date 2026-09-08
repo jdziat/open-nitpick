@@ -9,6 +9,15 @@ import (
 // Stage failures: a required stage that did not complete, and the sanitized
 // kind that is safe to publish.
 
+// errStageDegraded marks a stage failure that leaves usable output behind.
+//
+// It travels as a wrapped error rather than a widened return, so a caller that
+// forgets to look at it still sees an error rather than a nil, and the one
+// caller that does look at it says so in a named branch. The failure this
+// closes went the other way: triage returned nil, and every reader downstream
+// was right to believe it.
+var errStageDegraded = errors.New("review: a required stage did not complete")
+
 // errorKind reduces an error to a word that can be published.
 //
 // A stage's reason reaches a pull request comment and the Action's outputs,

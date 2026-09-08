@@ -72,10 +72,17 @@ type Scorecard struct {
 	// AnalyzersFailed names the analyzers that did not run, since a
 	// security rate with the security analyzers missing is a lower bound.
 	AnalyzersFailed []string
+	// StagesFailed names the required stages that did not complete. Unlike the
+	// two above it removes nothing from a denominator: every file was read and
+	// scored, and what is missing is the work over them.
+	StagesFailed []string
 }
 
-// Incomplete reports whether any batch failed or any analyzer did not run.
-func (c Scorecard) Incomplete() bool { return len(c.Unreviewed) > 0 || len(c.AnalyzersFailed) > 0 }
+// Incomplete reports whether any batch failed, any analyzer did not run, or
+// any required stage failed.
+func (c Scorecard) Incomplete() bool {
+	return len(c.Unreviewed) > 0 || len(c.AnalyzersFailed) > 0 || len(c.StagesFailed) > 0
+}
 
 // Score computes the scorecard from a whole-tree review and the tree it read.
 func Score(report *review.Report, tree *vcs.Tree) Scorecard {
@@ -127,6 +134,7 @@ func Score(report *review.Report, tree *vcs.Tree) Scorecard {
 	card.Total.Language = "all"
 	card.Unreviewed = failed
 	card.AnalyzersFailed = FailedAnalyzers(report)
+	card.StagesFailed = report.FailedStages()
 	sort.Slice(card.Languages, func(i, j int) bool {
 		if card.Languages[i].Lines != card.Languages[j].Lines {
 			return card.Languages[i].Lines > card.Languages[j].Lines
@@ -165,6 +173,10 @@ func (c Scorecard) String() string {
 		for _, a := range c.AnalyzersFailed {
 			fmt.Fprintf(&b, "  analyzer did not run, so its findings are missing from the numerators: %s\n", a)
 		}
+		for _, st := range c.StagesFailed {
+			fmt.Fprintf(&b, "  stage did not complete, so the findings below it were never %s: %s\n",
+				lostTo(st), st)
+		}
 	}
 	return b.String()
 }
@@ -200,5 +212,18 @@ func languageOf(p string) string {
 		return "config/docs"
 	default:
 		return "other"
+	}
+}
+
+// lostTo names what a failed stage would have done, so the card says what is
+// missing rather than that something is.
+func lostTo(stage string) string {
+	switch stage {
+	case "triage":
+		return "deduplicated or ranked"
+	case "style":
+		return "gathered"
+	default:
+		return "completed"
 	}
 }

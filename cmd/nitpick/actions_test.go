@@ -73,3 +73,24 @@ func TestResultForFollowsTheGate(t *testing.T) {
 		t.Error("no report is an error")
 	}
 }
+
+// The classification the issue was filed for. A report with findings below the
+// gate and a stage that never ran is not clean, whatever fail-on says: the
+// question fail-on answers is what to do about the code, and no part of this
+// run measured the code.
+func TestResultForRefusesToCallADegradedRunClean(t *testing.T) {
+	degraded := &review.Report{
+		Findings: []review.Finding{{Path: "a.go", Line: 1, Severity: "info", Title: "minor"}},
+		Stages:   []review.StageStatus{{Stage: "triage", Reason: "rate-limited"}},
+	}
+	if got := resultFor(degraded, config.SeverityError); got != resultError {
+		t.Errorf("resultFor on a degraded run = %q, want %q", got, resultError)
+	}
+
+	// And the control: the same findings with every stage run are clean, so
+	// the branch above is answering completeness and not severity.
+	clean := &review.Report{Findings: degraded.Findings}
+	if got := resultFor(clean, config.SeverityError); got != resultClean {
+		t.Errorf("resultFor on a complete run = %q, want %q", got, resultClean)
+	}
+}
