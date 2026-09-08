@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.11.0](https://github.com/jdziat/open-nitpick/compare/v1.10.0...v1.11.0) (2026-09-08)
+
+
+### Features
+
+* **cli:** nitpick improve, the local half of the wider pass ([#72](https://github.com/jdziat/open-nitpick/issues/72)) ([f23cc93](https://github.com/jdziat/open-nitpick/commit/f23cc93f4b76f8ecbf3504eca20b725e9b064aed))
+* **review:** approve a clean review, when asked to ([#71](https://github.com/jdziat/open-nitpick/issues/71)) ([b168540](https://github.com/jdziat/open-nitpick/commit/b168540771e2438bee96844ba7c3fb1360c94f6b))
+
 ## [1.10.0](https://github.com/jdziat/open-nitpick/compare/v1.9.0...v1.10.0) (2026-09-07)
 
 
