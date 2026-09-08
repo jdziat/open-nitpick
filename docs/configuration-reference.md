@@ -7,10 +7,10 @@ argued for rather than listed; this page is the index.
 Regenerate with `nitpick config-reference -o docs/configuration-reference.md`,
 which `make docs` runs and CI checks. That check diffs this file against
 what the generator produces now, so a key the generator reaches cannot drift
-from its row. It says nothing about a key the generator never walks to, and
+from its entry. It says nothing about a key the generator never walks to, and
 nothing fails when it stops short. One field it cannot walk into is
 `fallback`, a model block inside a model block: walking it does not
-terminate, so it is emitted as a `same keys as …` row naming the block
+terminate, so it is emitted as a `same keys as …` entry naming the block
 whose keys it repeats.
 
 `[]` marks a list whose entries carry the keys beneath it,
@@ -21,8 +21,8 @@ same as off: the prose page says which.
 
 Every model block overlays `models.default`. A role, a route or an
 ensemble entry sets only what differs, and a key it leaves out is served by the
-default's value, so that is what the Default column carries for those rows
-rather than the zero of the field's type.
+default's value, so that is the default those entries report rather than the
+zero of the field's type.
 
 Endpoint and credential keys (`base_url`, `api_key_env`, `extra`,
 `allow_private_endpoint`, `api_key_keyring`, `credential_command`) are

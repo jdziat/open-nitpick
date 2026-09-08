@@ -102,8 +102,10 @@ models: {default: {provider: llamacpp, model: local}}
 
 The model ids above are examples, not recommendations, and none of them has
 been measured as a reviewer here. Catalogues change faster than this file, and
-every one of these providers is OpenAI-compatible, so `GET /v1/models` against
-the endpoint in the table above is the current answer. The `fireworks` and
+every provider in this section reaches an OpenAI-compatible endpoint, so
+`GET /v1/models` against the base URL in the table above is the current answer.
+`anthropic` and `gemini` are native APIs rather than compatible ones and answer
+their own model-list endpoints instead. The `fireworks` and
 `togetherai` ids come from the SDK's own tables; `cerebras` and `perplexity`
 were read from the vendors' documentation on 2026-09-07.
 

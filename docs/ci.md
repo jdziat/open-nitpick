@@ -141,7 +141,7 @@ than the repository root.
 
 | input | default | what it does |
 |---|---|---|
-| `github-token` | `${{ github.token }}` | reads the pull request and publishes the review. Needs `pull-requests: write`. On a pull request from a fork it is read-only, and the review goes to the job summary and the log instead |
+| `github-token` | `${{ github.token }}` | reads the pull request and publishes the review. Needs `pull-requests: write`. On a pull request from a fork it is read-only, so nothing is posted; see [Forks](#forks) for what a fork run does and does not do |
 | `config` | `.nitpick.yaml` | path to the configuration file, relative to the workspace |
 | `provider` | from the config file | overrides `models.default.provider`; `nitpick providers` prints the list |
 | `model` | from the config file | overrides `models.default.model` |
