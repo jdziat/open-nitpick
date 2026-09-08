@@ -87,6 +87,25 @@ It is the widest call pattern here, a second generation pass over every batch,
 so `review.budget.max_spend` bounds it the way it bounds any review, and
 `review.respond.max_per_pull_request` counts its answer.
 
+`nitpick improve` runs the same pass locally, on a checkout this tool does not
+post to:
+
+```
+nitpick improve                    # the working tree
+nitpick improve -base main         # a branch against its base
+nitpick improve -level normal      # narrower than the default pedantic
+nitpick improve -slop=false        # without the slop class
+```
+
+`-level` and `-slop` exist only on `improve`. `nitpick review` generates at
+`config.GenerationLevel` whatever the configured level says, so naming a level
+there would promise something that command cannot honour.
+
+`improve` prints and does not publish, so `-pr`, `-owner` and `-repo-name` are
+refused. The comment form answers with one comment listing what it found;
+letting the CLI take `-pr` would post each finding as its own inline thread
+instead, which is a different command under the same name.
+
 ## Applying a finding
 
 `@open-nitpick fix` on a review thread applies that finding; `@open-nitpick fix

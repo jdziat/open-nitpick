@@ -42,12 +42,7 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs
 	// the shallow copy is sound, and the caller's config is what the next
 	// ordinary review will use.
 	icfg := *cfg
-	icfg.Persona.Nitpick = config.NitpickPedantic
-	icfg.Review.Slop = true
-	// The floor, not the configured one: most of what this pass finds is a
-	// nit, and a repository publishing at warning would otherwise get silence
-	// back from a command it typed on purpose.
-	icfg.Review.MinSeverity = config.SeverityNit
+	applyImproveScope(&icfg)
 	icfg.Review.ResolveSuperseded = false
 
 	// This pass answers with one comment and no disposition. reviewEvent reads
@@ -211,3 +206,27 @@ func (h *heldReview) PublishReview(_ context.Context, _ vcs.Ref, r vcs.Review) e
 }
 
 func (h *heldReview) Name() string { return h.inner.Name() + " (held)" }
+
+// applyImproveScope widens a configuration to the pass improve asks for.
+//
+// Shared by the comment command above and `nitpick improve`, so the two
+// cannot drift into meaning different things. The CLI overrides the level and
+// the slop switch afterwards from its flags; everything here is what both
+// forms agree on.
+func applyImproveScope(cfg *config.Config) {
+	cfg.Persona.Nitpick = config.NitpickPedantic
+	cfg.Review.Slop = true
+
+	// The floor, not the configured one: most of what this pass finds is a
+	// nit, and a repository publishing at warning would otherwise get silence
+	// back from a command it typed on purpose.
+	cfg.Review.MinSeverity = config.SeverityNit
+}
+
+// runImproveCLI is the local form: the same pass on a checkout this tool does
+// not post to. internal/evals drives the engine directly, so a pass reachable
+// only by commenting on a pull request could not be scored against the corpus
+// that argues for it existing separately.
+func runImproveCLI(ctx context.Context, args []string) error {
+	return reviewWithScope(ctx, "improve", args, applyImproveScope)
+}
