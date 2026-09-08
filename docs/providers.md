@@ -433,6 +433,15 @@ that took forty minutes says why. This was built on gemma-4-31b through
 OpenRouter, which lost one review in five without it and none with it; the
 numbers are in [docs/comparison.md](comparison.md).
 
+A provider can also refuse the shape of the answer rather than the request.
+`structured_output: auto` asks for a JSON-Schema response format, drops to
+JSON mode when the provider rejects that, and drops once more to carrying the
+schema in the prompt and parsing the reply leniently; OpenRouter's DeepInfra
+turbo endpoints land on that last path. Each downgrade is remembered for the
+rest of the run, so it costs one request rather than one per batch. Naming the
+path outright with `structured_output: schema`, `json` or `text` skips the
+discovery for an endpoint whose answer you already know.
+
 ## Other OpenAI-compatible gateways (vLLM, LiteLLM)
 
 Any other OpenAI-compatible endpoint works through the `openai` provider:

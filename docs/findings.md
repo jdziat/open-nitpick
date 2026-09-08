@@ -63,8 +63,8 @@ from the tree. Our own side is a live measurement and does not.
 
 ## What the instrument got wrong
 
-Eighteen measurement bugs have been found, listed below. Six of them scored
-against Incumbent and six flattered whichever behaviour this project would
+Twenty measurement bugs have been found, listed below. Six of them scored
+against Incumbent and seven flattered whichever behaviour this project would
 rather see (silence, selective reporting, or the author's own argument), which
 is why this section exists at all: none were bugs in open-nitpick, and every one
 would have produced a confident wrong number.
@@ -72,7 +72,10 @@ would have produced a confident wrong number.
 The count is the number of rows in the table, so it moves when the table does.
 It said "nine" against fourteen rows for two rounds, which is the same failure
 these documents keep recording one size down: a figure restated rather than
-recomputed.
+recomputed. It came back one size smaller: two bugs found later were numbered
+in the prose of their own dated sections, "the tenth" and "the eleventh"
+against a table that already had eighteen rows. Both are rows now, and a bug
+found from here on gets a row rather than an ordinal.
 
 | bug | effect | direction |
 |---|---|---|
@@ -94,6 +97,8 @@ recomputed.
 | the withdrawal applied to one of the metric's two renderings | `O-*` was gated on vocabulary and the `SEV a/i/u` cell was formatted inline, so "a foreign row prints `n/a`" held only because that table had no foreign row | latent |
 | `STABLE` returned `yes` for five silent runs | the column's best value went to a reviewer that never spoke; a wobbly correct one got `NO` | favoured silence |
 | the retraction's own figures (`10 of 10`, `0.62 → 0.88`, `O-ACC 0.63`) | none reproduced; each overstated the case it was making | favoured the author |
+| two unplanted defects shipped in the tuning corpus | a 0600 to 0666 file mode and an error string written to an HTTP response were scored as noise against every model that reported them | against whichever reviewer read the code |
+| the grounding instrument counted tokens the template forbids the walkthrough to name | numerator and denominator were both zero, so six walkthroughs from two arms all scored a perfect 1.00 | favoured the arm that wrote less |
 
 ### The correction that mattered most
 
@@ -881,8 +886,9 @@ Read the run dumps first; most of the noise was ours.
 
 - **Two unplanted defects shipped in the corpus** and were scored as noise
   against every model that found them (a 0600 to 0666 file mode, an error
-  string written to an HTTP response). Fixed at the fixture. This is the
-  tenth instrument bug, and the first found by three models agreeing.
+  string written to an HTTP response). Fixed at the fixture. It is in the
+  table above, and the first instrument bug there found by three models
+  agreeing.
 - **Two base-prompt rules cut noise for every model measured**, the default
   included: a consequence must be reachable with what was shown, and an
   untouched helper is judged by its contract. Multi-file noise: glm 0.64 to
@@ -1568,8 +1574,8 @@ and file names, scored both arms a perfect 1.00 over six walkthroughs, and the
 reason was that it found zero tokens: the same template forbids naming files
 ("no bullet lists of files, no statistics, no restating the diff"). An
 instrument that returns a perfect score because its numerator and denominator
-are both zero is the eleventh instrument bug here, and the second to flatter
-the arm that produced less.
+are both zero is in the table above, with the others there that rewarded the
+arm which produced less.
 
 **Not measured: cost.** Grounding sends the whole diff to the triage model on
 every review. The tokens were never counted, and `review.budget`'s `overhead`

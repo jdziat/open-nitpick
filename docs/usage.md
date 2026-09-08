@@ -9,11 +9,14 @@ nitpick init -workflow                  # also .github/workflows/nitpick.yml
 nitpick init -force                     # overwrite an existing file
 ```
 
-The file it writes is the shipped defaults, spelled out and commented, plus the
-one thing a default cannot supply: a model, taken from `-provider` and `-model`
-or from `LLM_PROVIDER` and `LLM_MODEL`. Because every value written is already
-the one in force, deleting a key changes nothing and the file can be trimmed to
-taste.
+The file it writes names the model, the analyzers this checkout calls for, and
+the settings most worth changing first: the gate, the severity floor, the three
+budget bounds, the ignore list, the persona axes, and the analyzer mode. Each
+is written at its shipped default and commented, so deleting a key changes
+nothing and the file can be trimmed to taste. It is not the whole surface:
+[Configuration reference](configuration-reference.md) lists every key the
+loader accepts. The model is the one thing a default cannot supply, and comes
+from `-provider` and `-model` or from `LLM_PROVIDER` and `LLM_MODEL`.
 
 The analyzers are the part hardest to get right by hand. `init` matches this
 checkout against the same targets a review detects on, names the ones that ship

@@ -1,0 +1,20 @@
+{% extends "main.html" %}
+
+{#-
+  The theme's 404 is one heading and nothing else. This site's argument is that
+  everything is written down, so the page a lost reader lands on says where the
+  writing is.
+-#}
+{% block content %}
+  <h1>Not found</h1>
+  <p>
+    This page does not exist at this address. The documentation moved here from
+    the repository, so a link written against the old layout can miss.
+  </p>
+  <ul>
+    <li><a href="{{ 'guide/' | url }}">Guide</a>: what open-nitpick is and how to run it.</li>
+    <li><a href="{{ 'docs/configuration-reference/' | url }}">Configuration reference</a>: every key <code>.nitpick.yaml</code> accepts.</li>
+    <li><a href="{{ config.repo_url }}">The repository</a>: the source, the releases, and the issue tracker.</li>
+  </ul>
+  <p>Search, at the top of this page, reads every page on the site.</p>
+{% endblock %}

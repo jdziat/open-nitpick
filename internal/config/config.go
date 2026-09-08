@@ -131,7 +131,9 @@ type ModelSpec struct {
 
 	// StructuredOutput selects how findings are constrained to the schema:
 	// "auto" (default) prefers a JSON-Schema response format and falls back to
-	// JSON mode, "schema" forces the schema path, "json" forces JSON mode.
+	// JSON mode and then to prompt-carried text, "schema" forces the schema
+	// path, "json" forces JSON mode, "text" forces the text path, where the
+	// schema rides in the prompt and the reply is parsed leniently.
 	StructuredOutput StructuredMode `yaml:"structured_output"`
 
 	// AllowPrivateEndpoint permits base_url to use plain HTTP or resolve to a

@@ -25,8 +25,9 @@ in your repository that you can read and edit.
 ## Quick start
 
 ```bash
-# A signed binary for your platform. Releases carry linux, darwin and windows
-# on amd64 and arm64, each with a Sigstore bundle and a checksums file.
+# A signed binary for your platform. Releases carry linux and darwin on amd64
+# and arm64, plus windows on amd64, each with a Sigstore bundle and a
+# checksums file.
 v=$(gh release view --repo jdziat/open-nitpick --json tagName -q .tagName)
 os=$(uname -s | tr 'A-Z' 'a-z'); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
 curl -fsSLo nitpick "https://github.com/jdziat/open-nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
@@ -42,15 +43,18 @@ nitpick review          # reviews your uncommitted changes
 Verifying that download is one command and
 [Development](docs/development.md#releases) has it. Building from source
 instead is `go install github.com/jdziat/open-nitpick/cmd/nitpick@latest`,
-which needs Go 1.25.5 or newer: the toolchain line in `go.mod` is a patch-level
-floor, so 1.25.4 refuses.
+which needs Go 1.25.5 or newer: the `go` directive in `go.mod` is a
+patch-level floor, so 1.25.4 refuses.
 
 `init` is optional: with those two variables set, a review runs with no config
-file at all. What it buys is a file that names the model and the analyzers this
-checkout's languages call for, with every other key written out at its shipped
-default and commented, so the settings worth changing are in front of you rather
-than in the documentation. It refuses to overwrite an existing file without
-`-force`, and `-workflow` writes the Actions workflow beside it.
+file at all. What it buys is a file that names the model, the analyzers this
+checkout's languages call for, and the dozen settings most worth changing,
+each at its shipped default and commented. It is a starting point, not the
+whole surface: [the configuration reference](docs/configuration-reference.md)
+lists every key the loader accepts. Because every value written is already the
+one in force, deleting a key changes nothing. It refuses to overwrite an
+existing file without `-force`, and `-workflow` writes the Actions workflow
+beside it.
 
 The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR),
 which serves open-weight models on a flat subscription. Their pricing page read
@@ -94,6 +98,7 @@ with a prompt you cannot read. This one is built the other way round.
 | [Usage](docs/usage.md) | reviewing a change or a whole repository, the remediation plan and score, the slop class, and the MCP server for agent sessions |
 | [GitHub Actions and other CI](docs/ci.md) | the Action, its inputs and permissions, incremental review, forks, and running the CLI in any other CI |
 | [Configuration](docs/configuration.md) | `.nitpick.yaml`: models per role, budget, related context, personality and instructions, model-family notes, severities |
+| [Configuration reference](docs/configuration-reference.md) | every key the loader accepts, with its type and shipped default, generated from the binary |
 | [Analyzers](docs/analyzers.md) | the 33 deterministic tools, how they are detected, isolated and fed to the model as evidence, and what strict mode means |
 | [Providers and models](docs/providers.md) | Synthetic, OpenRouter, choosing a model by price, routing and ensembles, pinning an upstream, stalls, other gateways, local models |
 | [Trust model](docs/trust-model.md) | what a pull request can and cannot change about its own review, and why |
@@ -130,7 +135,7 @@ It out-detects a hosted incumbent on both counted comparisons, 33 of 41 planted
 defects against 30 over 44 real pull requests, and noise is the open question:
 a later run took detection to 36 of 41 and noise findings from 1 to 17.
 [docs/findings.md](docs/findings.md) has both comparisons, what they do not
-support, and the eighteen instrument bugs found along the way.
+support, and the twenty instrument bugs found along the way.
 [docs/comparison.md](docs/comparison.md) has the costs: about two cents a
 review on the default reviewer, under a fifth of a cent on the cheap one.
 

@@ -286,7 +286,7 @@ const (
 // NoCrossToolSeverityScore is printed wherever a reader might go looking for a
 // cross-tool severity accuracy figure.
 //
-// The note behind it is in docs/measurement.md#nocrosstoolseverityscore.
+// The note behind it is in docs/harness-notes.md#nocrosstoolseverityscore.
 const NoCrossToolSeverityScore = "NO CROSS-TOOL SEVERITY ACCURACY IS OFFERED, BY CONSTRUCTION. " +
 	"Our five levels and " + IncumbentModel + "'s ~three are different RESOLUTIONS, and every " +
 	"reduction that makes them comparable is maximised by a reviewer that also picks what to mention: " +
@@ -306,7 +306,7 @@ const NoCrossToolSeverityScore = "NO CROSS-TOOL SEVERITY ACCURACY IS OFFERED, BY
 // SeverityScale is DECLARED by whatever adapter produced a row's findings, and
 // it is not derivable from them.
 //
-// The note behind it is in docs/measurement.md#severityscale.
+// The note behind it is in docs/harness-notes.md#severityscale.
 type SeverityScale string
 
 const (
@@ -366,7 +366,7 @@ type SeverityWord struct {
 // SeverityUsage tabulates which severity words a reviewer printed for
 // the defects it located, against the level each defect was planted at.
 //
-// The note behind it is in docs/measurement.md#severityusage.
+// The note behind it is in docs/harness-notes.md#severityusage.
 type SeverityUsage map[config.Severity]map[SeverityWord]int
 
 // Add records one graded defect.
@@ -383,7 +383,7 @@ func (u SeverityUsage) Add(planted config.Severity, said SeverityWord) {
 // level, the DENOMINATOR of the contingency table, and the half of it that has
 // nothing to do with what the reviewer said.
 //
-// The note behind it is in docs/measurement.md#plantedlevels.
+// The note behind it is in docs/harness-notes.md#plantedlevels.
 type PlantedLevels map[config.Severity]int
 
 // Add counts one fixture's plants.
@@ -630,7 +630,7 @@ type SeverityCall struct {
 
 // SeverityScore compares assigned severities against the planted ones.
 //
-// The note behind it is in docs/measurement.md#severityscore.
+// The note behind it is in docs/harness-notes.md#severityscore.
 type SeverityScore struct {
 	Accurate    int
 	Inflated    int
@@ -670,7 +670,7 @@ func (s SeverityScore) Usage() SeverityUsage {
 // this
 // package recorded it at.
 //
-// The note behind it is in docs/measurement.md#severityassaid.
+// The note behind it is in docs/harness-notes.md#severityassaid.
 func severityAsSaid(f review.Finding) SeverityWord {
 	w := SeverityWord{Said: f.RawSeverity, Recorded: f.Sev()}
 	if w.Said == "" && !severityWasTranslated(f) {
@@ -739,7 +739,7 @@ func ScoreSeverity(f Fixture, findings []review.Finding) SeverityScore {
 // severityVerdict compares an assigned severity against the planted one at our
 // full five-level resolution.
 //
-// The note behind it is in docs/measurement.md#severityverdict.
+// The note behind it is in docs/harness-notes.md#severityverdict.
 func severityVerdict(got, want config.Severity) string {
 	g, _ := got.Normalize()
 	w, _ := want.Normalize()
@@ -757,7 +757,7 @@ func severityVerdict(got, want config.Severity) string {
 // reportingFinding picks which of a review's findings is credited with
 // reporting a defect, returning its index.
 //
-// The note behind it is in docs/measurement.md#reportingfinding.
+// The note behind it is in docs/harness-notes.md#reportingfinding.
 func reportingFinding(findings []review.Finding, d Defect) (int, bool) {
 	var (
 		best  int
@@ -826,7 +826,7 @@ func matches(f review.Finding, d Defect) bool {
 // anchorDistance is how far a finding's anchor sits from a line, measured from
 // the NEAREST point of a multi-line anchor rather than its start.
 //
-// The note behind it is in docs/measurement.md#anchordistance.
+// The note behind it is in docs/harness-notes.md#anchordistance.
 func anchorDistance(f review.Finding, line int) int {
 	best := spanDistance(review.LineSpan{Line: f.Line, EndLine: f.EndLine}, line)
 
@@ -863,7 +863,7 @@ func spanDistance(s review.LineSpan, line int) int {
 // region
 // in AlsoAt as one set. One for the ordinary single-line anchor.
 //
-// The note behind it is in docs/measurement.md#anchoredlines.
+// The note behind it is in docs/harness-notes.md#anchoredlines.
 func anchoredLines(f review.Finding) int {
 	claimed := map[int]bool{}
 	coverInto(claimed, f)
@@ -894,7 +894,7 @@ func coverInto(claimed map[int]bool, f review.Finding) {
 // It
 // returns one count per defect, in the order they are planted.
 //
-// The note behind it is in docs/measurement.md#defectanchoredlines.
+// The note behind it is in docs/harness-notes.md#defectanchoredlines.
 func defectAnchoredLines(findings []review.Finding, defects []Defect) []int {
 	out := make([]int, len(defects))
 
@@ -915,13 +915,13 @@ func defectAnchoredLines(findings []review.Finding, defects []Defect) []int {
 // noiseTolerance is how far from a planted defect a finding may sit and still
 // count as being ABOUT it rather than as invented.
 //
-// The note behind it is in docs/measurement.md#noisetolerance.
+// The note behind it is in docs/harness-notes.md#noisetolerance.
 const noiseTolerance = 6
 
 // explainsAny reports whether a finding describes any planted defect: it names
 // the defect and sits near it.
 //
-// The note behind it is in docs/measurement.md#explainsany.
+// The note behind it is in docs/harness-notes.md#explainsany.
 func explainsAny(f review.Finding, defects []Defect) bool {
 	for _, d := range defects {
 		if f.Path != d.Path || !mentionsAny(f, d.Keywords) {
@@ -1112,7 +1112,7 @@ func (s Summary) Spread() (float64, bool) {
 // Stable reports whether every run produced the same number of findings, and
 // whether that question has an answer for this row.
 //
-// The note behind it is in docs/measurement.md#stable.
+// The note behind it is in docs/harness-notes.md#stable.
 func (s Summary) Stable() (stable, defined bool) {
 	if len(s.FindingCounts) < 2 {
 		return true, false
@@ -1140,7 +1140,7 @@ func (s Summary) Recall() float64 {
 
 // RateLegend is printed under every table that carries a rate.
 //
-// The note behind it is in docs/measurement.md#ratelegend.
+// The note behind it is in docs/harness-notes.md#ratelegend.
 const RateLegend = "EVERY RATE HERE IS A QUOTIENT OF TWO SMALL INTEGERS, AND THE COUNTS ARE PRINTED " +
 	"BESIDE IT FOR THAT REASON. A rate measured over d observations moves only in steps of 1/d, so " +
 	"two rows differing by less than 1/d are not distinguishable by it — the decimals are arithmetic, " +
@@ -1218,7 +1218,7 @@ func CorpusResolution(fixtures []Fixture) string {
 
 // SeverityCell renders this row's SEV a/i/u cell.
 //
-// The note behind it is in docs/measurement.md#severitycell.
+// The note behind it is in docs/harness-notes.md#severitycell.
 func (s Summary) SeverityCell() string {
 	if !s.Scale.PublishesOurLevels() {
 		return "n/a"
@@ -1570,7 +1570,7 @@ func PublishedMetrics() []PublishedMetric {
 // THE
 // DESCRIPTION A CALIBRATED ONE PRODUCES?
 //
-// The note behind it is in docs/measurement.md#publisheddescription.
+// The note behind it is in docs/harness-notes.md#publisheddescription.
 type PublishedDescription struct {
 	// Name is how the artifact is referred to in a failure message and in the
 	// degenerate table's declarations.
@@ -1612,7 +1612,7 @@ func PublishedDescriptions() []PublishedDescription {
 // SeverityCells maps every published column that states a severity reading in
 // OUR five levels to the function that renders it.
 //
-// The note behind it is in docs/measurement.md#severitycells.
+// The note behind it is in docs/harness-notes.md#severitycells.
 func SeverityCells() map[string]func(t CorpusTally) string {
 	objective := func(pick int) func(CorpusTally) string {
 		return func(t CorpusTally) string {
@@ -1689,7 +1689,7 @@ const (
 // by
 // declaration.
 //
-// The note behind it is in docs/measurement.md#registeredtableheaders.
+// The note behind it is in docs/harness-notes.md#registeredtableheaders.
 var registeredTableHeaders []struct {
 	kind   tableKind
 	header string
@@ -1707,7 +1707,7 @@ func registerTableHeader(kind tableKind, header string) string {
 
 // The headers of every table the eval reports print.
 //
-// The note behind it is in docs/measurement.md#the-headers-of-every-table-the-eval-reports-print.
+// The note behind it is in docs/harness-notes.md#the-headers-of-every-table-the-eval-reports-print.
 var (
 	// SummaryTableHeader is the ground-truth battery's table: no judge, no
 	// foreign reviewer, one row per model and fixture.
@@ -1733,7 +1733,7 @@ var (
 // their
 // own declarations.
 //
-// The note behind it is in docs/measurement.md#the-cost-and-judge-swap-tables-registered-from-here-rather.
+// The note behind it is in docs/harness-notes.md#the-cost-and-judge-swap-tables-registered-from-here-rather.
 var (
 	_ = registerTableHeader(tableUnscored, CostTableHeader)
 	_ = registerTableHeader(tableUnscored, precisionHeader)
@@ -1788,7 +1788,7 @@ func JudgeOpinionColumns() []string {
 // it.
 // They are not scores: no reviewer is better for having a larger N.
 //
-// The note behind it is in docs/measurement.md#descriptivecolumns.
+// The note behind it is in docs/harness-notes.md#descriptivecolumns.
 func DescriptiveColumns() []string {
 	return []string{
 		"MODEL", "FIXTURE", "VARIANT", "RUNS", "N", "COV", "FAIL", "FAILED",

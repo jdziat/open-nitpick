@@ -14,8 +14,8 @@ import (
 // preventing. Over the ceiling, files are ranked by how much review
 // attention they warrant and the plan keeps as many as fit.
 type Budget struct {
-	// MaxSpend is the ceiling in US dollars. Zero, the default, is no ceiling
-	// and no estimation.
+	// MaxSpend is the ceiling in US dollars, and zero, the default, is no
+	// ceiling and no estimation.
 	MaxSpend float64 `yaml:"max_spend"`
 
 	// Scope says what the ceiling covers.

@@ -63,7 +63,7 @@ func incumbentRemote() string {
 // crEscape matches the terminal escapes Incumbent writes into its output: OSC
 // sequences (ESC ] ... BEL or ST) and CSI sequences (ESC [ ... final byte).
 //
-// The note behind it is in docs/measurement.md#crescape.
+// The note behind it is in docs/harness-notes.md#crescape.
 var crEscape = regexp.MustCompile("\x1b\\][^\x07\x1b]*(?:\x07|\x1b\\\\)|\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
 // crFindingHeader matches a block's first line: "  critical [Security & Privacy]".
@@ -108,12 +108,12 @@ var crDeclaredCount = regexp.MustCompile(`(?m)^\s*(\d+)\s+findings?\b`)
 // IncumbentSeverityScale is this adapter's DECLARATION that the reviewer it
 // parses does not publish our five levels.
 //
-// The note behind it is in docs/measurement.md#incumbentseverityscale.
+// The note behind it is in docs/harness-notes.md#incumbentseverityscale.
 const IncumbentSeverityScale = ForeignSeverityScale
 
 // crSeverity records the severity Incumbent assigned, in our vocabulary.
 //
-// The note behind it is in docs/measurement.md#crseverity.
+// The note behind it is in docs/harness-notes.md#crseverity.
 func crSeverity(s string) config.Severity {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "critical":
@@ -668,7 +668,7 @@ func freeTierError() error {
 
 // crFreeTierMarkers are the distinguishing phrases of the warning:
 //
-// The note behind it is in docs/measurement.md#crfreetiermarkers.
+// The note behind it is in docs/harness-notes.md#crfreetiermarkers.
 var crFreeTierMarkers = []string{
 	"free cli allowance",
 	"couldn't find a git remote",
@@ -878,7 +878,7 @@ func CachedIncumbent(cacheDir string, f Fixture) ([]review.Finding, bool) {
 // severityWasTranslated reports whether a finding's Severity is this project's
 // word rather than the reporter's own.
 //
-// The note behind it is in docs/measurement.md#severitywastranslated.
+// The note behind it is in docs/harness-notes.md#severitywastranslated.
 func severityWasTranslated(f review.Finding) bool {
 	return f.SeverityTranslated
 }

@@ -32,9 +32,18 @@ func runConfigRef(args []string, stdout io.Writer) error {
 	}
 	fields := docgen.Walk(config.Defaults(), docs)
 
+	// One table per top-level key, under a heading of its name. As one table it
+	// was 191 rows under a single h1: no table of contents, no anchor to point
+	// an issue at, and one search document of 32,000 characters whose only
+	// answer to a key name was the top of the page.
 	var b strings.Builder
 	b.WriteString(header)
+	group := ""
 	for _, f := range fields {
+		if g := topLevel(f.Path); g != group {
+			group = g
+			fmt.Fprintf(&b, "\n## %s\n\n| Key | Type | Default | What it does |\n|---|---|---|---|\n", group)
+		}
 		def := f.Default
 		if def == "" {
 			def = "none"
@@ -54,6 +63,14 @@ func runConfigRef(args []string, stdout io.Writer) error {
 	return os.WriteFile(*out, []byte(b.String()), 0o644)
 }
 
+// topLevel is the key a path hangs from: the section it is listed under.
+func topLevel(path string) string {
+	if i := strings.IndexAny(path, ".["); i >= 0 {
+		return path[:i]
+	}
+	return path
+}
+
 // cell keeps a table cell from ending the row it is in.
 func cell(s string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(s, "|", `\|`), "\n", " ")
@@ -66,21 +83,28 @@ binary was built with. [Configuration](configuration.md) is the same settings
 argued for rather than listed; this page is the index.
 
 Regenerate with ` + "`nitpick config-reference -o docs/configuration-reference.md`" + `,
-which ` + "`make docs`" + ` runs and CI checks. A key that reaches the loader
-without a row here fails that check, so the two cannot drift apart quietly.
+which ` + "`make docs`" + ` runs and CI checks. That check diffs this file against
+what the generator produces now, so a key the generator reaches cannot drift
+from its row. It says nothing about a key the generator never walks to: one
+self-referential field kept ` + "`fallback`" + ` and the eighteen keys under it off
+this page entirely, and nothing failed.
 
-` + "`[]`" + ` marks a list whose entries carry the keys beneath it, and
-` + "`<name>`" + ` a map whose keys you choose. A default of ` + "`none`" + ` means the
-key is unset until you set it, which is not always the same as off: the prose
-page says which.
+` + "`[]`" + ` marks a list whose entries carry the keys beneath it,
+` + "`<name>`" + ` a map whose keys you choose, and ` + "`same keys as …`" + ` a block
+that repeats the keys listed under the path it names. A default of
+` + "`none`" + ` means the key is unset until you set it, which is not always the
+same as off: the prose page says which.
+
+Every model block overlays ` + "`models.default`" + `. A role, a route or an
+ensemble entry sets only what differs, and a key it leaves out is served by the
+default's value, so that is what the Default column carries for those rows
+rather than the zero of the field's type.
 
 Endpoint and credential keys (` + "`base_url`, `api_key_env`, `extra`," + `
 ` + "`allow_private_endpoint`, `api_key_keyring`, `credential_command`" + `) are
 withheld from a repository's own file unless ` + "`NITPICK_TRUST_CONFIG_ENDPOINTS=1`" + `
-is set. See [Trust model](trust-model.md).
-
-| Key | Type | Default | What it does |
-|---|---|---|---|
+is set, for every role. So is ` + "`persona.custom`" + `. See
+[Trust model](trust-model.md).
 `
 
 const footer = `

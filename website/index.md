@@ -18,10 +18,10 @@ hide:
 
 <div class="np-stat" markdown>
 <div markdown><strong>5</strong><span>corpora, four re-runnable</span></div>
-<div markdown><strong>18</strong><span>instrument bugs recorded</span></div>
+<div markdown><strong>20</strong><span>instrument bugs recorded</span></div>
 <div markdown><strong>1</strong><span>published claim retracted</span></div>
 </div>
-<p class="np-fine">Counts as of 2026-09-05, from <a href="docs/findings/">the findings</a>.</p>
+<p class="np-fine">Corpora and the retraction as of 2026-09-05. The instrument-bug count is the number of rows in <a href="docs/findings/">the findings</a> table, and a test holds this figure to it.</p>
 
 </div>
 
@@ -67,7 +67,7 @@ A change cannot supply the policy it is reviewed under. Policy is read from the 
 
 <div class="np-card" markdown>
 <p class="np-card-title">Linters as evidence, not noise</p>
-golangci-lint, ruff, eslint, semgrep and 29 more, detected automatically and run in isolation from the tree. Their output goes to the model for triage instead of into the pull request. [Analyzers →](docs/analyzers.md)
+Thirty-three, configured from outside the tree they read. golangci-lint and ruff ship enabled, twenty-four more run whenever they are installed, and eslint, semgrep and five others wait until you name them. Their output goes to the model for triage instead of into the pull request. [Analyzers →](docs/analyzers.md)
 </div>
 
 <div class="np-card" markdown>

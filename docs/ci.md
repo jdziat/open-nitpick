@@ -127,6 +127,30 @@ secret posts with the job token as before. The token the step mints
 lasts an hour and is scoped to the installation, so the workflow's
 `permissions` block still governs only the default token.
 
+### Inputs
+
+Every input the Action takes, with its default. The examples above set the
+ones most runs need; the rest are here because reading `action.yml` should not
+be the way to find out that the configuration file can live somewhere other
+than the repository root.
+
+| input | default | what it does |
+|---|---|---|
+| `github-token` | `${{ github.token }}` | reads the pull request and publishes the review. Needs `pull-requests: write`. On a pull request from a fork it is read-only, and the review goes to the job summary and the log instead |
+| `config` | `.nitpick.yaml` | path to the configuration file, relative to the workspace |
+| `provider` | from the config file | overrides `models.default.provider`; `nitpick providers` prints the list |
+| `model` | from the config file | overrides `models.default.model` |
+| `api-key` | none | the provider's key. Pass a secret, never a literal. Ignored where the provider reads its own conventional variable |
+| `fail-on` | from `review.fail_on` | lowest severity that fails the job: `nit`, `info`, `warning`, `error`, `critical`, or `none` |
+| `instruction` | none | one extra instruction, applied to this run only |
+| `pr-number` | the triggering pull request | set it on `workflow_dispatch` and `issue_comment` runs |
+| `dry-run` | `false` | print the review to the log and the job summary instead of publishing it |
+| `skip-drafts` | `false` | do nothing on a draft pull request |
+| `version` | `latest` | a release tag such as `v1.0.0`, or `latest`. See the paragraph below for what happens when no release matches |
+| `analyzers` | empty | catalog names to install on the runner before the review, comma separated, or `auto` for the ones the change's languages call for. Empty installs nothing and the review runs whatever the runner already has |
+| `command` | `review` | `review` reviews the pull request; `respond` answers a comment that mentioned the reviewer |
+| `args` | none | flags passed verbatim to `nitpick review`, for anything with no input of its own |
+
 ### What a run does
 
 The release binary for the runner is downloaded and its

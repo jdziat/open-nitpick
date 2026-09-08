@@ -49,6 +49,11 @@ theme:
   # theme's own loader fetches only 300, 400 and 700.
   font: false
 
+# edit_uri is resolved against the staged path, and three pages are staged under
+# a name they do not have in the repository.
+hooks:
+  - website/hooks/page_sources.py
+
 extra_css:
   - assets/extra.css
 
@@ -86,6 +91,13 @@ nav:
       - Findings: docs/findings.md
       - Against Incumbent: docs/comparison.md
       - Remediation: docs/remediation.md
+  # Commentary on the harness and the analyzer runners, one section per
+  # declaration. It is worth keeping and it is not what a reader opens the
+  # rules page for, so it has a tab of its own rather than 3,300 lines of
+  # someone else's package inside one.
+  - Internals:
+      - Notes from the harness: docs/harness-notes.md
+      - Notes from the runners: docs/runner-notes.md
 
 extra:
   generator: false

@@ -1800,7 +1800,7 @@ func TestTheFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 
 	// Read verbatim, comments included: the claim under test IS a comment, so
 	// packageSources, which blanks them, is the wrong reader here.
-	measurement := filepath.Join("..", "..", "docs", "measurement.md")
+	measurement := measurementDocs
 	quoted := map[string][]string{
 		measurement: {
 			"A finding naming %d separate one-line regions scored 1",
@@ -1832,11 +1832,43 @@ func TestTheFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	}
 }
 
+// measurementDocs names the pair of pages the harness's notes are published
+// across, rather than one file.
+//
+// docs/measurement.md is nav-linked as Rules and was 83% commentary on
+// internal/evals, so the notes moved to docs/harness-notes.md and about half
+// of the sentences below went with them. A figure has to reproduce wherever a
+// reader finds it, and tracking which of the two pages each sentence landed on
+// would be a second thing to keep right, so the guard reads both.
+const measurementDocs = "docs/measurement.md and docs/harness-notes.md"
+
+// sourcePaths resolves a claim group's key to the files behind it, so a key
+// naming two documents is read as two.
+func sourcePaths(key string) []string {
+	if key == measurementDocs {
+		return []string{
+			filepath.Join("..", "..", "docs", "measurement.md"),
+			filepath.Join("..", "..", "docs", "harness-notes.md"),
+		}
+	}
+	return []string{key}
+}
+
+// measurementProse is the prose of both pages, joined.
+func measurementProse(t *testing.T) string {
+	t.Helper()
+	return docProse(t, filepath.Join("..", "..", "docs", "measurement.md")) + "\n\n" +
+		docProse(t, filepath.Join("..", "..", "docs", "harness-notes.md"))
+}
+
 // quotedProse reads a claim's home, whether that is a Go file's comments or a
 // shipped document. A note that outgrew its declaration moved to docs/ and the
 // figure in it still has to reproduce, so the reader follows it there.
 func quotedProse(t *testing.T, path string) string {
 	t.Helper()
+	if path == measurementDocs {
+		return measurementProse(t)
+	}
 	if strings.HasSuffix(path, ".md") {
 		return docProse(t, path)
 	}
@@ -1848,6 +1880,9 @@ func quotedProse(t *testing.T, path string) string {
 // figure back at the reader.
 func verbatim(t *testing.T, path string) string {
 	t.Helper()
+	if path == measurementDocs {
+		return measurementProse(t)
+	}
 	if strings.HasSuffix(path, ".md") {
 		return docProse(t, path)
 	}
@@ -2434,7 +2469,7 @@ func keywordsPerFile(f Fixture) (map[string][]string, []string) {
 // scatteredAnchorReview is a line-precise reviewer that ALSO gestures at the
 // whole file, one line at a time.
 //
-// The note behind it is in docs/measurement.md#scatteredanchorreview.
+// The note behind it is in docs/harness-notes.md#scatteredanchorreview.
 func scatteredAnchorReview(f Fixture) []review.Finding {
 	_, lines := fixturePaths(f)
 
@@ -2522,7 +2557,7 @@ func radiusSpamReview(f Fixture) []review.Finding {
 // is
 // the whole content of the cost strategy it serves.
 //
-// The note behind it is in docs/measurement.md#terseguessspacing.
+// The note behind it is in docs/harness-notes.md#terseguessspacing.
 const terseGuessSpacing = 5
 
 // terseGuessReview publishes a title and nothing else for every finding it
@@ -2531,7 +2566,7 @@ const terseGuessSpacing = 5
 // and scatters one-line guesses through the rest of the file, each repeating
 // that file's own vocabulary.
 //
-// The note behind it is in docs/measurement.md#terseguessreview.
+// The note behind it is in docs/harness-notes.md#terseguessreview.
 func terseGuessReview(f Fixture) []review.Finding {
 	paths, lines := fixturePaths(f)
 	keywords, _ := keywordsPerFile(f)
@@ -3469,7 +3504,7 @@ func TestEveryHeaderPrintsAWholeMetric(t *testing.T) {
 // packageSources returns every Go file in this package, test files included,
 // keyed by name, WITH COMMENTS BLANKED OUT.
 //
-// The note behind it is in docs/measurement.md#packagesources.
+// The note behind it is in docs/harness-notes.md#packagesources.
 func packageSources(t *testing.T) map[string]string {
 	t.Helper()
 
@@ -3688,7 +3723,7 @@ func init() { _ = registerTableHeader(tableUnscored, ByReferenceHeader) }
 // TestARegistrationThatNeverRunsDoesNotCount closes the hole the AST rewrite
 // opened while it was closing the prose ones.
 //
-// The note behind it is in docs/measurement.md#testaregistrationthatneverrunsdoesnotcount.
+// The note behind it is in docs/harness-notes.md#testaregistrationthatneverrunsdoesnotcount.
 func TestARegistrationThatNeverRunsDoesNotCount(t *testing.T) {
 	const src = `package evals
 
@@ -4142,7 +4177,7 @@ func rendersATable(file *ast.File) bool { return len(tableUnderlines(file)) > 0 
 // forwardsRegisteredHeaders reports whether an identifier is a helper's string
 // parameter that every caller passes a registered header to.
 //
-// The note behind it is in docs/measurement.md#forwardsregisteredheaders.
+// The note behind it is in docs/harness-notes.md#forwardsregisteredheaders.
 func forwardsRegisteredHeaders(files map[string]*ast.File, file, ident string, registered map[string]bool) bool {
 	for _, decl := range files[file].Decls {
 		fn, ok := decl.(*ast.FuncDecl)
@@ -4721,7 +4756,7 @@ func namesAVerdict(field string) bool {
 // TestNoReportFormatsSeverityCountersDirectly ties the tables to the gated
 // renderers.
 //
-// The note behind it is in docs/measurement.md#testnoreportformatsseveritycountersdirectly.
+// The note behind it is in docs/harness-notes.md#testnoreportformatsseveritycountersdirectly.
 func TestNoReportFormatsSeverityCountersDirectly(t *testing.T) {
 	counters := severityCounterSpellings()
 	if len(counters) < 6 {
@@ -4759,12 +4794,12 @@ func TestNoReportFormatsSeverityCountersDirectly(t *testing.T) {
 // severityCounterSpellings derives every way a report could name one of the
 // severity counters, from the types that hold them.
 //
-// The note behind it is in docs/measurement.md#severitycounterspellings.
+// The note behind it is in docs/harness-notes.md#severitycounterspellings.
 func severityCounterSpellings() []string { return counterSpellingsOver(reportRowShapes()) }
 
 // reportRowShapes is every type a published row is rendered from.
 //
-// The note behind it is in docs/measurement.md#reportrowshapes.
+// The note behind it is in docs/harness-notes.md#reportrowshapes.
 func reportRowShapes() []reflect.Type {
 	return []reflect.Type{
 		reflect.TypeOf(Summary{}),
@@ -5536,10 +5571,10 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	// Checked against the prose a reader reads rather than the bytes gofmt
 	// produced: a claim that fails only because a line was rewrapped is a false
 	// alarm, and a guard that cries wolf gets exemptions until it guards nothing.
-	docPath := filepath.Join("..", "..", "docs", "measurement.md")
+	docPath := measurementDocs
 	quoted := map[string][]string{
-		// The notes carrying these figures live in the measurement document;
-		// the declarations they were attached to point at it.
+		// The notes carrying these figures live in the measurement documents;
+		// the declarations they were attached to point at them.
 		docPath: {
 			fmt.Sprintf("plants %d defects over %d fixtures and bands them %d blocking, %d medium, %d low",
 				plants, len(corpus), bands[2], bands[1], bands[0]),
@@ -5596,7 +5631,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 
 	// A "SEE X" BESIDE A PINNED FIGURE HAS TO NAME THE GUARD that PINS IT.
 	//
-	// The note behind it is in docs/measurement.md#self.
+	// The note behind it is in docs/harness-notes.md#self.
 	const self = "TestTheSeverityFiguresTheseCommentsQuoteStillReproduce"
 	guards := figurePinningGuards(t)
 	if !slices.Contains(guards, self) {
@@ -5605,27 +5640,28 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 	}
 
 	for file, claims := range quoted {
-		path := strings.SplitN(file, "?", 2)[0]
-		for _, group := range commentGroups(t, path) {
-			var quotes []string
-			for _, claim := range claims {
-				if strings.Contains(group, claim) {
-					quotes = append(quotes, claim)
+		for _, path := range sourcePaths(strings.SplitN(file, "?", 2)[0]) {
+			for _, group := range commentGroups(t, path) {
+				var quotes []string
+				for _, claim := range claims {
+					if strings.Contains(group, claim) {
+						quotes = append(quotes, claim)
+					}
 				}
-			}
-			if len(quotes) == 0 {
-				continue
-			}
-
-			for _, g := range guards {
-				if g == self || !strings.Contains(group, g) {
+				if len(quotes) == 0 {
 					continue
 				}
-				t.Errorf("%s: a paragraph quoting %v cites %s, which does not read those figures. "+
-					"The guard that does is %s. A 'see X' pointing at a test that passes when the "+
-					"sentence is wrong is worse than no citation — it tells the next reader the "+
-					"number is covered, which is how the banded column kept its place on the page",
-					path, quotes, g, self)
+
+				for _, g := range guards {
+					if g == self || !strings.Contains(group, g) {
+						continue
+					}
+					t.Errorf("%s: a paragraph quoting %v cites %s, which does not read those figures. "+
+						"The guard that does is %s. A 'see X' pointing at a test that passes when the "+
+						"sentence is wrong is worse than no citation — it tells the next reader the "+
+						"number is covered, which is how the banded column kept its place on the page",
+						path, quotes, g, self)
+				}
 			}
 		}
 	}
@@ -5747,7 +5783,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 // commentProse is a source file's COMMENTS as continuous prose: the leading
 // slashes stripped and every run of whitespace collapsed to one space.
 //
-// The note behind it is in docs/measurement.md#commentprose.
+// The note behind it is in docs/harness-notes.md#commentprose.
 func commentProse(t *testing.T, name string) string {
 	t.Helper()
 	return strings.Join(commentGroups(t, name), " \x00 ")

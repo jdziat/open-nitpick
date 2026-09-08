@@ -28,7 +28,7 @@ import (
 // clean file, lists the known advisory when osv-scanner is installed, and puts
 // the secret first in the remediation plan.
 //
-// The note behind it is in docs/measurement.md#advisoryid.
+// The note behind it is in docs/harness-notes.md#advisoryid.
 var advisoryID = regexp.MustCompile(`(?m)^\s+osv-scanner\((GHSA-|CVE-|GO-20)[^)]*\)\s+go\.mod:\d+ `)
 
 func TestFullReviewFixture(t *testing.T) {

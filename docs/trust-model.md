@@ -4,18 +4,34 @@
 in CI against pull requests, and a pull request can edit any file in the repo,
 including `.nitpick.yaml`. Three consequences:
 
-### Endpoint and credential keys are ignored in a repository file
+## Endpoint and credential keys are ignored in a repository file
 
-`base_url`, `api_key_env`, `extra`, and `allow_private_endpoint` are ignored
-by default when read from the reviewed repository. Otherwise a contributor
-could point the reviewer at an endpoint they control and name the environment
-variable to send as the bearer token, exfiltrating `GITHUB_TOKEN` or your
-model key in one line of YAML. Set `NITPICK_TRUST_CONFIG_ENDPOINTS=1` to allow
-them, only where you control the file. Ignored keys are logged, never silent.
+Six keys are ignored by default when read from the reviewed repository:
+`base_url`, `api_key_env`, `extra`, `allow_private_endpoint`,
+`api_key_keyring` and `credential_command`. They are dropped for every model
+role, `fix` included. `persona.custom` is dropped with them for a different
+reason: it is free text that lands in the system prompt, the highest-trust
+position a string reaches here, so a change that could supply it could tell
+the reviewer to return an empty findings list for the directory it edits. The
+enumerated persona axes stay, being bounded, validated and printed by
+`nitpick explain-config`.
+
+The first four decide where a request goes and which environment variable
+rides along as the bearer token: without them a contributor could point the
+reviewer at an endpoint they control and exfiltrate `GITHUB_TOKEN` or your
+model key in one line of YAML. `api_key_keyring` chooses which stored secret
+is read. `credential_command` is a program this process runs to fetch one, in
+the job holding both those credentials, so a repository trusted with it would
+have arbitrary command execution and not merely a redirected request; it is
+the most dangerous key on the list and the reason the list is not four names
+long.
+
+Set `NITPICK_TRUST_CONFIG_ENDPOINTS=1` to allow them, only where you control
+the file. Ignored keys are logged, never silent.
 Providers whose endpoint is compiled in (`openrouter`, `anthropic`, `ollama`,
 and the rest) are unaffected, which is why the shipped default names one
 rather than a `base_url`.
-### A user-level file may supply those keys
+## A user-level file may supply those keys
 
 A user-level file may supply exactly those keys, and needs no variable to
 do it. `$XDG_CONFIG_HOME/nitpick/config.yaml`, or
@@ -33,7 +49,7 @@ or `GITHUB_ACTIONS`): there is nobody there who wrote it. Name one with
 `NITPICK_USER_CONFIG` to opt a runner in deliberately, or switch it off
 anywhere with `NITPICK_NO_USER_CONFIG=1`. `nitpick explain-config` names the
 file, the settings it supplied, and the ones this repository overruled.
-### provider and model are not stripped, and that is the residual risk
+## provider and model are not stripped, and that is the residual risk
 
 `provider` and `model` are *not* stripped, and that is the residual risk.
 A pull request editing its own `.nitpick.yaml` cannot change the endpoint or
@@ -46,7 +62,7 @@ the whole-file bodies `review.include_full_files` sends. Neither is specific
 to `openrouter`; naming a router as the default is what makes the reachable
 set a whole catalogue rather than one vendor's. Review `.nitpick.yaml` changes
 on their own merits, exactly as you would a change to a CI workflow.
-### Who may make the reviewer spend
+## Who may make the reviewer spend
 
 A stranger's comment must not be able to spend your model credit. A
 comment event runs in the BASE repository with the base repository's secrets,
@@ -60,7 +76,7 @@ the default set on purpose: it is permanent, and one merged typo fix would
 otherwise buy unlimited calls. See
 [Configuration](configuration.md#who-may-make-it-spend).
 
-### A change that edits .nitpick.yaml is not reviewed under its own edit
+## A change that edits .nitpick.yaml is not reviewed under its own edit
 
 A change that edits `.nitpick.yaml` is not reviewed under its own edit.
 The keys above bound what a config file may say; this bounds *which* config
@@ -80,12 +96,12 @@ revision is not an error; policy falls back to defaults and the run says so.
 Running locally, where you wrote the file, there is no pull request and the
 checkout's config is used as written.
 
-### api_key_env may never name a forge credential
+## api_key_env may never name a forge credential
 
 `api_key_env` may never name a forge credential (`GITHUB_TOKEN` and
 friends), even in a trusted config. A model provider has no business receiving
 it, and the likeliest reason to ask is exfiltration.
-### Analyzers run only from PATH
+## Analyzers run only from PATH
 
 Linters run only from `PATH`, never from the repository, and neither does
 their configuration. A pull request can add an executable
@@ -97,7 +113,7 @@ pull request cannot switch its own analyzers off *through configuration*, and
 it cannot switch semgrep on with rules it wrote. It also closes one specific
 fabrication: golangci-lint's `forbidigo` prints a `msg` from the config file
 verbatim, so a config in the tree could author a finding's words outright.
-### A change can author the text a reviewing model reads
+## A change can author the text a reviewing model reads
 
 A change CAN still author the text of a finding that reaches the reviewing
 model, and this file used to claim otherwise. The claim was that keeping
@@ -125,7 +141,7 @@ produce findings nobody could act on. Treat analyzer text as what it is:
 attacker-influenced data with a trustworthy *source* attribution and untrusted
 *content*, exactly as this tool treats the pull request description, which is
 fenced as untrusted in the prompt. Analyzer findings are not fenced today.
-### Line directives rewrite analyzer positions
+## Line directives rewrite analyzer positions
 
 A Go line directive rewrites the positions in an analyzer's report, and this
 is why a discarded finding is now counted. One line above the offending
@@ -168,7 +184,7 @@ positions with the roster saying the analyzer ran. The detector now asks
 `go/scanner`, which is the grammar rather than a list of spellings, and is
 stricter in the other direction too: `//line z.go:1 ` with a trailing space is
 not a directive and the old pattern refused the package for it.
-### Configuration is not the only way the tree silences an analyzer
+## Configuration is not the only way the tree silences an analyzer
 
 Configuration is not the only way the tree can silence an analyzer. A
 change that breaks golangci-lint's package load (`go.work` omitting the
@@ -192,7 +208,7 @@ nothing whatever about the second file. One finding and an empty coverage list
 reads as a change that was analyzed in full and was clean everywhere except
 that one line. Each such file is now named on the pull request under *Analyzed
 less than it ran over*.
-### A load failure is loud; the quiet failure needs a second check
+## A load failure is loud; the quiet failure needs a second check
 
 A load failure is the loud shape of that; the quiet one needs one extra
 file. A constraint has to empty the whole *directory* to fail the load. Put
@@ -212,7 +228,7 @@ the pull request under *Analyzed less than it ran over*, so `ran` can no longer
 be read as "the analyzer looked at this change". Exclusion is decided by
 `go/build`'s own matcher under the process's `GOOS`/`GOARCH`, which is the one
 golangci-lint inherits.
-### cgo is the same gap through a door the matcher cannot see
+## cgo is the same gap through a door the matcher cannot see
 
 cgo is the same gap through a door that matcher cannot see, and it is the
 common case rather than an exotic one. `CGO_ENABLED=0` is the default in most
@@ -236,7 +252,7 @@ image without exporting anything. Measured with `CGO_ENABLED` absent from the
 environment: the key in that file took the child to `CGO_ENABLED=0`, the
 finding vanished, `go/build` still said cgo was on, and the coverage list was
 empty, the same silence, through the config file instead of the variable.
-### The go directive in go.mod is policy the change can edit
+## The go directive in go.mod is policy the change can edit
 
 `go.mod`'s `go` directive is policy, and it is one line the change can
 edit. Measured against golangci-lint 2.8.0: with `go 1.24` in `go.mod` the
@@ -292,7 +308,7 @@ something was rejected. That number can only be a constant measured against
 one analyzer release, and once the table moves past it the error turns into
 silence. Silence is what this whole list exists to prevent, and it is why the
 `go 1.21` floor above was removed.
-### Your own ignore list is a silencing channel
+## Your own ignore list is a silencing channel
 
 Your own ignore list is a silencing channel, and it is the one that is not
 the change's doing. Changed paths matching `review.ignore` are dropped before
@@ -316,7 +332,7 @@ files it analyzes"*, over a change containing a Go file with a real unchecked
 error. An analyzer that is handed nothing is now asked what it did not cover
 just as one that ran is, and the line it prints says *no files it analyzes were
 **selected for review***, which is the fact it has.
-### Code that does not compile silences the same way
+## Code that does not compile silences the same way
 
 Code that does not compile is the same silencing, and needs no attack at
 all. Go is analyzed a package at a time, so one file that does not build
@@ -331,7 +347,7 @@ quoting the file that failed rather than the one it was anchored to.
 Note the corollary: an ordinary work-in-progress pull request that does not
 compile gets **no Go analyzer findings at all**, and the roster says so rather
 than implying the code was clean.
-### Published reasons escape HTML, not markdown
+## Published reasons escape HTML, not markdown
 
 Published reasons escape HTML, not markdown. An analyzer's failure reason
 is quoted on the pull request, and it quotes the tree: a Go compile error
@@ -343,7 +359,7 @@ this is a phishing surface in a trusted comment, not an injection into the
 review itself. The same is true of every other untrusted string this tool
 renders, including the substituted-policy notice and the forged paths named in
 the discard block, which are by construction chosen by the change.
-### Containment covers symlinks, not hard links
+## Containment covers symlinks, not hard links
 
 Containment covers symlinks, not hard links. An analyzer config path is
 refused if it resolves inside the repository, following symlinks on both sides.
@@ -352,7 +368,7 @@ accepted, because nothing short of walking the whole tree comparing inodes can
 see one. git stores no hard links, so a pull request cannot create this;
 reaching it requires write access outside the repository, which is already a
 larger problem.
-### What this does not close: in-source suppression
+## What this does not close: in-source suppression
 
 What that does not close: in-source suppression, and it is not per-line.
 A pull request can suppress a deterministic finding with `//nolint`, `# noqa`,
@@ -390,8 +406,11 @@ Findings are constrained to a schema. By default (`structured_output: auto`)
 open-nitpick requests a JSON-Schema response format and, if the provider
 *rejects* it, falls back to JSON mode with lenient parsing and one bounded
 repair attempt, remembering that downgrade so it is paid for once per run
-rather than once per request. Force either path with `structured_output: schema`
-or `json`.
+rather than once per request. A provider that rejects JSON mode as well leaves
+one path below that: no `response_format` at all, the schema carried in the
+prompt and the reply parsed leniently, which is where OpenRouter's DeepInfra
+turbo endpoints land. Force any of the three with `structured_output: schema`,
+`json` or `text`.
 
 A provider that *accepts* the schema and then ignores it is handled separately.
 The response is rejected and the same request is retried on the JSON path, but

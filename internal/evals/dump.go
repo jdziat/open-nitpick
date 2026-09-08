@@ -290,7 +290,7 @@ const runDumpDir = ".eval-runs"
 // OpenRunDump opens the dump a battery writes its own findings to, whether or
 // not anybody asked for one.
 //
-// The note behind it is in docs/measurement.md#openrundump.
+// The note behind it is in docs/harness-notes.md#openrundump.
 func OpenRunDump(battery string, fixtures []Fixture) (*Dump, string, error) {
 	return openRunDumpAt(runDumpDir, battery, fixtures, time.Now().UTC(), os.Getpid())
 }

@@ -63,8 +63,9 @@ docs: docs-reference
 	rm -rf .website && mkdir -p .website/docs
 	cp website/index.md .website/index.md
 	# Rejected logo concepts are not documentation and were reachable in
-	# production until this line.
-	cp -r website/assets .website/assets && rm -rf .website/assets/logo-candidates
+	# production until this line. logo.jpg joined them: 94 KB of the published
+	# site that no page, template or stylesheet names.
+	cp -r website/assets .website/assets && rm -rf .website/assets/logo-candidates .website/assets/logo.jpg
 	printf -- '---\ntitle: Guide\n---\n' > .website/guide.md
 	sed -E '1s/^# open-nitpick$$/# Guide/; /^Documentation: <https:\/\/jdziat\.github\.io/d; /^The same documents are published at/d' README.md >> .website/guide.md
 	cp docs/*.md .website/docs/

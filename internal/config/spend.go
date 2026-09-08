@@ -45,7 +45,7 @@ type Respond struct {
 
 	// MaxPerPullRequest caps how many comments the reviewer answers on one
 	// pull request, counting its own replies as the record of how many it has
-	// answered. Zero, the default, is no cap.
+	// answered, and zero, the default, is no cap at all.
 	//
 	// It bounds the case the association list does not: a collaborator, or an
 	// automation acting as one, in a loop.

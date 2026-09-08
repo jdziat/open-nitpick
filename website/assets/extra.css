@@ -27,13 +27,22 @@
   --md-accent-fg-color--transparent: rgba(15, 118, 110, 0.1);
   --np-ink: #0b1220;
   --np-muted: #526070;
-  /* Slate sets its own; without this light mode inherits Material's #f5f5f5
-     chip on a white page, which is a 1.06:1 step and reads as no chip at all.
-     Every configuration key on this site is inline code. */
-  --md-code-bg-color: #f6f8fa;
   --np-card: #ffffff;
   --np-page: #fbfcfd;   /* applied to the page below, so white cards lift off it */
   --np-line: rgba(11, 18, 32, 0.16);
+}
+/* Material declares its palette twice, `:root,[data-md-color-scheme=default]`,
+   and the second half lands on <body>. A value set on :root alone is shadowed
+   for everything inside the body, so anything this sheet overrides by
+   Material's own name has to be set on the scheme selector rather than on
+   :root: the six below are the ones Material declares there.
+   `--md-code-bg-color` carries the inline chip, which is every configuration
+   key on this site; Material's #f5f5f5 is a 1.06:1 step on a white page and
+   reads as no chip at all. The footer trio is Material's white-on-a-coloured-
+   footer set, and this footer is the page colour, so .md-copyright, its link
+   and .md-social__link resolve to white on white. */
+[data-md-color-scheme="default"] {
+  --md-code-bg-color: #f6f8fa;
   --md-footer-bg-color: var(--md-default-bg-color);
   --md-footer-bg-color--dark: var(--md-default-bg-color);
   --md-footer-fg-color: var(--np-ink);
@@ -41,6 +50,11 @@
   --md-footer-fg-color--lighter: var(--np-muted);
 }
 [data-md-color-scheme="slate"] {
+  --md-footer-bg-color: var(--md-default-bg-color);
+  --md-footer-bg-color--dark: var(--md-default-bg-color);
+  --md-footer-fg-color: var(--np-ink);
+  --md-footer-fg-color--light: var(--np-muted);
+  --md-footer-fg-color--lighter: var(--np-muted);
   --md-primary-fg-color: #2dd4bf;
   --md-primary-fg-color--dark: #5eead4;
   --md-primary-bg-color: #0b1220;
@@ -90,9 +104,24 @@
 body, .md-main { background-color: var(--np-page); }
 .md-grid { max-width: 72rem; }
 
+/* Material paints a link in the accent and leaves it otherwise identical to
+   the text around it, which is hue alone: 2.94:1 in light and 1.02:1 in dark
+   against body copy. A reader with achromatopsia, or anyone reading a
+   greyscale print, cannot find the links. WCAG 1.4.1 wants 3:1 or a second
+   cue, so running prose carries the underline at rest. Buttons and cards have
+   their own shape and are reset below. */
+.md-typeset p a,
+.md-typeset li a,
+.md-typeset td a {
+  text-decoration: underline;
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.15em;
+}
+.md-typeset .md-button,
+.md-typeset .np-card a { text-decoration: none; }
 /* Material's only hover rule is a colour swap, and the two teals are 1.26:1
    apart: a change at the edge of perception on the site's whole navigation
-   model. The underline is the affordance; the colour is the nicety. */
+   model. Thickening the rule is the affordance; the colour is the nicety. */
 .md-typeset a:hover,
 .md-typeset a:focus {
   text-decoration: underline;
@@ -121,20 +150,58 @@ body, .md-main { background-color: var(--np-page); }
 /* A page with no headings reserves a 242px rail and an empty landmark that
    announces a table of contents holding nothing. */
 .md-sidebar--secondary:not(:has(.md-nav__list)) { display: none; }
+
+/* The column the article actually gets: the grid, less whichever rails
+   Material has put in flow at this width. The secondary rail appears at 60em
+   and the primary at 76.25em, both 12.1rem, and both are the breakpoints
+   Material's own sheet uses. Everything below measures against this rather
+   than against the viewport, because the viewport is what the earlier
+   constants measured and the rails are what made them wrong. */
+:root { --np-rails: 0rem; --np-column: calc(min(100vw, 72rem) - var(--np-rails)); }
+@media screen and (min-width: 60em) { :root { --np-rails: 12.1rem; } }
+@media screen and (min-width: 76.25em) { :root { --np-rails: 24.2rem; } }
+
 /* About 72 characters. The first attempt capped at 46rem, which never applied:
    the two 12.1rem rails and the margins leave 45.4rem of a 72rem grid, so the
    cap sat above the width it was meant to cut. Evidence gets the width back
-   below, rather than the prose keeping it. */
-.md-content__inner { max-width: 36rem; margin-inline: auto; }
-.md-content__inner:has(.np-hero) { max-width: none; margin-inline: 0; }
+   below, rather than the prose keeping it.
+   The cap is also the gutter. `margin-inline: auto` replaces Material's
+   `margin: 0 .8rem 1.2rem`, and neither .md-content nor .md-main carries
+   horizontal padding of its own, so a bare cap left every phone reading body
+   text flush to both edges of the glass. Capping at the column as well leaves
+   the auto margins something to divide. */
+.md-content__inner { max-width: min(36rem, var(--np-column) - 1.6rem); margin-inline: auto; }
+/* The landing page hides both rails and its cards are laid out across the
+   whole grid, so it keeps the width and takes the gutter only. --np-column
+   subtracts rails this page does not have, which is why it is not used here. */
+.md-content__inner:has(.np-hero) { max-width: min(100%, 100vw - 1.6rem); margin-inline: auto; }
+/* Material centres the measure until 76.25em and then pins it 1.2rem from the
+   rail, at a specificity of (0,5,0) that a bare .md-content__inner cannot
+   reach; logical and physical margins cascade as one property, so matching
+   the selector is what it takes. Left-pinned, the symmetric pull-out below
+   spends a gutter that is all on the other side and lands under the rail. */
+[dir] .md-sidebar--primary:not([hidden]) ~ .md-content > .md-content__inner,
+[dir] .md-sidebar--secondary:not([hidden]) ~ .md-content > .md-content__inner {
+  margin-inline: auto;
+}
 
 /* Tables and code are the reason the page is wide. They break the measure on
-   purpose, centred on it, and stop at the column the rails leave. */
+   purpose, centred on it, and stop at the column the rails leave.
+   Material puts both classes on one element, `<article class="md-content__inner
+   md-typeset">`, so a descendant step between them matches nothing and only the
+   scrollwrap branch was ever live: the child combinator is what reaches code.
+   The target is the column rather than a constant, because 45.4rem is the room
+   a 72rem grid has left over and no narrower viewport has it. Measured at
+   45.4rem, a table hung 102px off the left of a 960px window with
+   html{overflow-x:hidden} clipping rather than scrolling it, and 70px under the
+   navigation rail at 1440. The clamp at 0 is for the other end, where the
+   column is narrower than the measure and the pull-out would become an indent
+   of up to 224px on a 320px screen. */
 .md-content__inner:not(:has(.np-hero)) .md-typeset__scrollwrap,
-.md-content__inner:not(:has(.np-hero)) .md-typeset > .highlight,
-.md-content__inner:not(:has(.np-hero)) .md-typeset > table:not([class]) {
-  width: min(45.4rem, 100vw - 2.4rem);
-  margin-inline: calc((36rem - min(45.4rem, 100vw - 2.4rem)) / 2);
+.md-content__inner:not(:has(.np-hero)) > .highlight,
+.md-content__inner:not(:has(.np-hero)) > table:not([class]) {
+  width: max(100%, min(45.4rem, var(--np-column) - 1.6rem));
+  margin-inline: min(0px, calc((100% - min(45.4rem, var(--np-column) - 1.6rem)) / 2));
 }
 
 /* The mobile drawer takes the page background like the header does. */
@@ -177,6 +244,13 @@ body, .md-main { background-color: var(--np-page); }
   color: var(--np-ink);
 }
 .md-typeset table:not([class]) { font-size: 0.72rem; }
+/* The key is what a reference is scanned by, and it was the one column that
+   could not be read: at 149px, 197 of the reference's 199 key cells broke
+   mid-identifier, `models.defau` / `lt.allow_pri` / `vate_endpoin` / `t`. A
+   chip that will not break is what sets the column's minimum width; the
+   scrollwrap Material already wraps the table in is what pays for it when the
+   row no longer fits. */
+.md-typeset table:not([class]) td:first-child code { white-space: nowrap; }
 /* Reference tables run to ten rows of decimals, and something has to hold the
    row the eye is on.
    A sticky header row was tried here and removed. Material gives the table its
@@ -218,6 +292,7 @@ body, .md-main { background-color: var(--np-page); }
 }
 .np-card {
   position: relative;
+  z-index: 0;
   background: var(--np-card);
   border: 1px solid var(--np-line);
   border-radius: 0.4rem;
@@ -234,13 +309,18 @@ body, .md-main { background-color: var(--np-page); }
 .np-card .np-card-title { margin: 0 0 0.4rem; font-size: 0.95rem; font-weight: 600; color: var(--np-ink); }
 .np-card p { margin: 0; color: var(--np-muted); }
 .np-card a { font-weight: 600; }
-/* The whole card is the target: the one link in it stretches over it. */
-/* The overlay makes the whole card clickable and would make none of it
-   selectable, so it sits under the text rather than over it. A card naming a
-   command is a card someone copies from. */
+/* The whole card is the target: the one link in it stretches over it.
+   Nothing between the card and the anchor may be positioned, because an
+   absolutely positioned pseudo-element resolves against its nearest positioned
+   ancestor. `position: relative` on the anchor, and on the paragraphs around
+   it, made the overlay cover the link's own inline box while `.np-card:hover`
+   went on lighting the whole card: six cards on the landing page offering a
+   click that did nothing. z-index on the card makes it the stacking context
+   the overlay sits in. */
 .np-card a::after { content: ""; position: absolute; inset: 0; z-index: 0; }
-.np-card > * { position: relative; z-index: 1; }
-.np-card a { position: relative; z-index: 2; }
+/* Text under the overlay cannot be selected, and the thing on these cards
+   someone copies is the command, so the chip carrying it comes back over. */
+.np-card code { position: relative; z-index: 1; }
 
 @media (max-width: 44rem) {
   .np-hero h1 { font-size: 1.8rem; }
@@ -268,12 +348,28 @@ body, .md-main { background-color: var(--np-page); }
     --np-card: #fff;
     --np-page: #fff;
     --np-line: rgba(11, 18, 32, 0.28);
+    /* Material resolves --md-typeset-a-color from --md-primary-fg-color in a
+       rule that is not media-scoped, and the slate override above is not
+       either, so a reader in dark mode printed every link at 1.86:1 on white.
+       The light teal is 5.47:1 there. */
+    --md-primary-fg-color: #0f766e;
+    --md-primary-fg-color--dark: #115e59;
+    --md-accent-fg-color: #0d5f59;
+    /* Slate's table colour lives inside @media screen, so in print the value
+       that survives is main.css's #0000001f, which composites to #e0e0e0 on
+       white: a 1.32:1 row rule under the 199-row reference. Material's table
+       borders read this variable and not --np-line, so the print value has to
+       be set here by name. This one is 2.24:1. */
+    --md-typeset-table-color: rgba(0, 0, 0, 0.32);
   }
   .md-grid,
   .md-content__inner,
+  .md-content__inner:has(.np-hero),
+  [dir] .md-sidebar--primary:not([hidden]) ~ .md-content > .md-content__inner,
+  [dir] .md-sidebar--secondary:not([hidden]) ~ .md-content > .md-content__inner,
   .md-content__inner:not(:has(.np-hero)) .md-typeset__scrollwrap,
-  .md-content__inner:not(:has(.np-hero)) .md-typeset > .highlight,
-  .md-content__inner:not(:has(.np-hero)) .md-typeset > table:not([class]) {
+  .md-content__inner:not(:has(.np-hero)) > .highlight,
+  .md-content__inner:not(:has(.np-hero)) > table:not([class]) {
     max-width: none;
     width: auto;
     margin-inline: 0;

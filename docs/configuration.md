@@ -4,9 +4,11 @@ Everything is optional: with no config file at all, `LLM_PROVIDER` and
 `LLM_MODEL` are enough to run. `.nitpick.yaml` at the repository root:
 
 `nitpick init` writes one of these for you, commented, with the analyzers this
-checkout's languages call for. The reference below is what to reach for when
-changing a key it left at its default. `nitpick explain-config` prints what any
-of it resolves to without spending a token.
+checkout's languages call for. This page argues the settings worth changing;
+[Configuration reference](configuration-reference.md) lists every key the
+loader accepts, with its type and its shipped default, generated from the
+binary. `nitpick explain-config` prints what any of it resolves to without
+spending a token.
 
 ## Two files
 
@@ -22,11 +24,12 @@ the environment for what neither said, then flags. It takes the same keys in the
 same shape.
 
 It is also the only file trusted with `base_url`, `api_key_env`, `extra`,
-`allow_private_endpoint` and `persona.custom`, and it needs no
-`NITPICK_TRUST_CONFIG_ENDPOINTS` to use them: you wrote it, and it sits outside
-every checkout where no pull request can reach it. A repository that names any
-of those keys still has them dropped, and `nitpick explain-config` names both
-the file and what it supplied. See [Trust model](trust-model.md).
+`allow_private_endpoint`, `api_key_keyring`, `credential_command` and
+`persona.custom`, and it needs no `NITPICK_TRUST_CONFIG_ENDPOINTS` to use
+them: you wrote it, and it sits outside every checkout where no pull request
+can reach it. A repository that names any of those keys still has them
+dropped, for every model role, and `nitpick explain-config` names both the
+file and what it supplied. See [Trust model](trust-model.md).
 
 It is **not read on a runner**, where `CI` or `GITHUB_ACTIONS` is set, because
 nobody there wrote it. `NITPICK_USER_CONFIG=/path/to/config.yaml` names one

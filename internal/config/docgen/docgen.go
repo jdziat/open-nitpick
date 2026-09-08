@@ -113,12 +113,21 @@ func firstSentence(doc string) string {
 // empty everywhere describes a configuration nobody ships.
 func Walk(cfg any, docs Docs) []Field {
 	var out []Field
-	walk(reflect.ValueOf(cfg), "", docs, &out, map[reflect.Type]bool{})
+	walk(reflect.ValueOf(cfg), "", docs, &out, map[reflect.Type]bool{}, map[reflect.Type]reflect.Value{})
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
 	return out
 }
 
-func walk(v reflect.Value, prefix string, docs Docs, out *[]Field, seen map[reflect.Type]bool) {
+// walk emits one Field per yaml key under v.
+//
+// inherit carries the block a sibling named `default` holds, keyed by its
+// type. A block of that type which sets nothing is not off: ModelSpec.overlay
+// fills each unset field from it, and every resolver in internal/config
+// (ResolveModel, ResolveRoute, ResolveEnsemble, ResolveFix, ResolveRouter)
+// goes through it. Printing the struct zero instead gave models.review a
+// timeout of 0s where the run uses 10m and a structured_output of none where
+// it uses auto, across eight roles.
+func walk(v reflect.Value, prefix string, docs Docs, out *[]Field, seen map[reflect.Type]bool, inherit map[reflect.Type]reflect.Value) {
 	for v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			v = reflect.New(v.Type().Elem())
@@ -138,6 +147,21 @@ func walk(v reflect.Value, prefix string, docs Docs, out *[]Field, seen map[refl
 	defer delete(seen, t)
 
 	for i := 0; i < t.NumField(); i++ {
+		name, _, _ := strings.Cut(t.Field(i).Tag.Get("yaml"), ",")
+		if name != "default" {
+			continue
+		}
+		d := deref(v.Field(i))
+		if d.Kind() != reflect.Struct || isLeaf(d.Type()) {
+			continue
+		}
+		if _, ok := inherit[d.Type()]; !ok {
+			inherit[d.Type()] = d
+			defer delete(inherit, d.Type())
+		}
+	}
+
+	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		tag := f.Tag.Get("yaml")
 		name, _, _ := strings.Cut(tag, ",")
@@ -151,25 +175,77 @@ func walk(v reflect.Value, prefix string, docs Docs, out *[]Field, seen map[refl
 		fv := v.Field(i)
 
 		if inner := deref(fv); inner.Kind() == reflect.Struct && !isLeaf(inner.Type()) {
-			walk(inner, path, docs, out, seen)
+			// A field whose type is one of its own ancestors: models.<role>.fallback
+			// is a ModelSpec inside a ModelSpec. Walking it does not terminate, and
+			// the guard above used to return here having emitted nothing, so the key
+			// and the eighteen under it were absent from a page whose footer says
+			// anything not listed is not a key. One row, pointing at the block whose
+			// keys it repeats.
+			if seen[inner.Type()] {
+				*out = append(*out, Field{
+					Path: path,
+					Type: "same keys as " + prefix,
+					Doc:  docs[t.Name()+"."+f.Name],
+				})
+				continue
+			}
+			walk(inner, path, docs, out, seen, inherit)
 			continue
 		}
 		if fv.Kind() == reflect.Slice && fv.Type().Elem().Kind() == reflect.Struct {
-			walk(reflect.New(fv.Type().Elem()).Elem(), path+"[]", docs, out, seen)
+			walk(reflect.New(fv.Type().Elem()).Elem(), path+"[]", docs, out, seen, inherit)
 			continue
 		}
 		if fv.Kind() == reflect.Map && fv.Type().Elem().Kind() == reflect.Struct {
-			walk(reflect.New(fv.Type().Elem()).Elem(), path+".<name>", docs, out, seen)
+			walk(reflect.New(fv.Type().Elem()).Elem(), path+".<name>", docs, out, seen, inherit)
 			continue
 		}
 
+		def := format(fv)
+		// An unset field takes the sibling `default` block's value, so that is
+		// the default this key has. Inside the default block itself the two
+		// values are the same one and this changes nothing.
+		if base, ok := inherit[t]; ok && fv.IsZero() {
+			def = format(base.Field(i))
+		}
+		if resolved, ok := resolvedDefault(v, f.Name); ok {
+			def = resolved
+		}
 		*out = append(*out, Field{
 			Path:    path,
 			Type:    yamlType(f.Type),
-			Default: format(fv),
+			Default: def,
 			Doc:     docs[t.Name()+"."+f.Name],
 		})
 	}
+}
+
+// resolvedDefault returns what a resolver method on the parent type gives for
+// this field, and false when the type has none.
+//
+// Several defaults are not in the struct. A *bool that means on when unset, a
+// list whose empty value stands for a package-level default, a ratio the
+// budget substitutes where it is read: reflection over the field alone finds
+// the zero value and the reference printed `none` for two settings that ship
+// on and `0` for two that ship at 0.25 and 1. A reference that says a switch
+// is off when it is on is worse than no reference. The resolver is where the
+// shipped value lives, so the reference asks it, by the three shapes this
+// package spells one in.
+func resolvedDefault(parent reflect.Value, field string) (string, bool) {
+	for _, name := range []string{"Effective" + field, field + "On", field + "s"} {
+		m := parent.MethodByName(name)
+		if !m.IsValid() {
+			continue
+		}
+		// A resolver takes nothing and answers with one value. Allows(assoc)
+		// and Matches(languages, kinds, files) are the same shape of name and
+		// are not resolvers.
+		if mt := m.Type(); mt.NumIn() != 0 || mt.NumOut() != 1 {
+			continue
+		}
+		return format(m.Call(nil)[0]), true
+	}
+	return "", false
 }
 
 func deref(v reflect.Value) reflect.Value {
