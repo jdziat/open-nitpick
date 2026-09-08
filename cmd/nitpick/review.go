@@ -114,15 +114,8 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 			return fmt.Errorf("invalid -level %q (minimal, normal, pedantic)", level)
 		}
 
-		// improve does not publish. The comment form answers with one comment
-		// listing what it found, and this path would post each pedantic nit
-		// as its own inline thread instead, which is a different command
-		// wearing the same name. Refusing is the whole of the difference: the
-		// pass itself is identical, and `@open-nitpick improve` is how it
-		// reaches a pull request.
-		if f.pr > 0 || f.owner != "" || f.repoName != "" {
-			return fmt.Errorf("improve does not post to a pull request: it prints locally, " +
-				"and \"@open-nitpick improve\" is how the same pass reaches a pull request")
+		if err := refusePublishing(&f, vcs.Ref{}); err != nil {
+			return err
 		}
 	}
 
@@ -179,6 +172,15 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	provider, ref, err := selectProvider(&f, repo)
 	if err != nil {
 		return err
+	}
+	// Again, because the flags are not the only way a pull request arrives.
+	// selectProvider falls back to vcs.RefFromEnv, so improve run with no
+	// flags inside a pull-request Actions job would otherwise pass the check
+	// above and publish through the GitHub provider.
+	if scope != nil {
+		if err := refusePublishing(&f, ref); err != nil {
+			return err
+		}
 	}
 	log.Info("reviewing", "provider", provider.Name(), "ref", ref.String())
 
@@ -805,4 +807,18 @@ func cmp(value, fallback config.StructuredMode) config.StructuredMode {
 		return fallback
 	}
 	return value
+}
+
+// refusePublishing is improve's one difference from review. This path would
+// post each pedantic finding as its own inline thread where the comment form
+// answers with one comment, which is a different command under the same name.
+//
+// Called twice, with the flags before any work and with the resolved ref
+// after, because vcs.RefFromEnv supplies a pull request that no flag names.
+func refusePublishing(f *reviewFlags, ref vcs.Ref) error {
+	if f.pr <= 0 && f.owner == "" && f.repoName == "" && ref.Number <= 0 {
+		return nil
+	}
+	return errors.New("improve does not post to a pull request: it prints locally, " +
+		`and "@open-nitpick improve" is how the same pass reaches one`)
 }

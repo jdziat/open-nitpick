@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // TestImproveScopeWidensWhatAReviewGenerates pins what the two forms of the
@@ -84,11 +85,30 @@ func TestImproveRefusesToPostToAPullRequest(t *testing.T) {
 	}
 }
 
-// TestReviewStillPostsToAPullRequest is the other direction: the refusal is
-// improve's, and adding it must not take -pr away from review.
-func TestReviewStillPostsToAPullRequest(t *testing.T) {
-	err := runReview(t.Context(), []string{"-pr", "7", "-repo", t.TempDir()})
-	if err != nil && strings.Contains(err.Error(), "does not post") {
-		t.Fatalf("review inherited improve's refusal: %v", err)
+// TestTheRefusalCoversAPullRequestNoFlagNamed is the half the flag check
+// misses.
+//
+// selectProvider falls back to vcs.RefFromEnv, so improve run with no flags
+// inside a pull-request Actions job resolves a pull request and would publish
+// through the GitHub provider. Driving the command to prove that would make
+// live calls, so the check is a function and this asserts on it.
+func TestTheRefusalCoversAPullRequestNoFlagNamed(t *testing.T) {
+	if err := refusePublishing(&reviewFlags{}, vcs.Ref{}); err != nil {
+		t.Errorf("a local run was refused: %v", err)
+	}
+
+	cases := map[string]struct {
+		f   reviewFlags
+		ref vcs.Ref
+	}{
+		"-pr":                  {f: reviewFlags{pr: 7}},
+		"-owner":               {f: reviewFlags{owner: "jdziat"}},
+		"-repo-name":           {f: reviewFlags{repoName: "open-nitpick"}},
+		"from the environment": {ref: vcs.Ref{Number: 7}},
+	}
+	for name, tc := range cases {
+		if err := refusePublishing(&tc.f, tc.ref); err == nil {
+			t.Errorf("%s was accepted", name)
+		}
 	}
 }
