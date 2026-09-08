@@ -855,6 +855,14 @@ func walkthrough(report *Report, cfg *config.Config) string {
 		}
 	}
 
+	// A stage that did not run is its own news. Every file can be read and the
+	// review still be worth less than it looks: findings published without
+	// triage were never deduplicated or ranked, and a reader who is not told
+	// that reasonably assumes they were.
+	for _, st := range report.Stages {
+		fmt.Fprintf(&b, "\n> **%s**\n", inline(stageSentence(st)))
+	}
+
 	// Surfacing skips is a correctness matter, not a nicety: a review that
 	// quietly ignored most of the diff otherwise looks like a clean bill of
 	// health.

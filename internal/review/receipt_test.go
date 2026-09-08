@@ -111,30 +111,51 @@ func TestAnEmptyChangeProducesNoReceipt(t *testing.T) {
 	}
 }
 
-// A failed style pass puts a marker in Incomplete that is not a path, so
-// counting it would report a file nobody can open.
-func TestTheStyleMarkerIsNotCountedAsAFile(t *testing.T) {
+// A failed stage is not a file. It used to be recorded as one, and the count a
+// reader saw was one higher than the files that existed.
+func TestAFailedStageIsNotCountedAsAFile(t *testing.T) {
 	report := &Report{
-		Files:      diff.Files{{Path: "a.go"}, {Path: "b.go"}},
-		Plan:       planOfFiles(2),
-		Incomplete: []string{stylePassMarker},
+		Files:  diff.Files{{Path: "a.go"}, {Path: "b.go"}},
+		Plan:   planOfFiles(2),
+		Stages: []StageStatus{{Stage: "style", Reason: "rate-limited"}},
 	}
 
 	got := receipt(report)
 	if strings.Contains(got, "could not be reviewed") {
-		t.Errorf("the style marker was counted as a file:\n%s", got)
+		t.Errorf("a stage was counted as a file:\n%s", got)
 	}
 	if !strings.Contains(got, "style pass failed") {
 		t.Errorf("a failed style pass went unreported:\n%s", got)
 	}
 
-	report.Incomplete = []string{"b.go", stylePassMarker}
+	report.Incomplete = []string{"b.go"}
 	got = receipt(report)
 	if !strings.Contains(got, "1 file could not be reviewed") {
 		t.Errorf("want one file counted, not two:\n%s", got)
 	}
 	if !strings.Contains(got, "style pass failed") {
 		t.Errorf("both facts must appear:\n%s", got)
+	}
+}
+
+// Triage is the stage the issue was filed for: a review whose findings were
+// published without ever being deduplicated, ranked or summarized, and said so
+// nowhere.
+func TestAFailedTriageSaysWhatWasLost(t *testing.T) {
+	report := &Report{
+		Files:  diff.Files{{Path: "a.go"}},
+		Plan:   planOfFiles(1),
+		Stages: []StageStatus{{Stage: "triage", Reason: "rate-limited"}},
+	}
+
+	got := receipt(report)
+	for _, want := range []string{"Triage failed", "rate-limited", "deduplicated"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("receipt does not say %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "could not be reviewed") {
+		t.Errorf("triage failing is not a file failing:\n%s", got)
 	}
 }
 
