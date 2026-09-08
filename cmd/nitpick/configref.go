@@ -86,11 +86,6 @@ func topLevel(path string) string {
 	return path
 }
 
-// cell keeps a table cell from ending the row it is in.
-func cell(s string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(s, "|", `\|`), "\n", " ")
-}
-
 const header = `# Configuration reference
 
 Every key ` + "`.nitpick.yaml`" + ` accepts, generated from the configuration the
