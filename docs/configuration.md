@@ -101,6 +101,11 @@ nitpick improve -slop=false        # without the slop class
 `config.GenerationLevel` whatever the configured level says, so naming a level
 there would promise something that command cannot honour.
 
+`improve` prints and does not publish, so `-pr`, `-owner` and `-repo-name` are
+refused. The comment form answers with one comment listing what it found;
+letting the CLI take `-pr` would post each finding as its own inline thread
+instead, which is a different command under the same name.
+
 ## Applying a finding
 
 `@open-nitpick fix` on a review thread applies that finding; `@open-nitpick fix

@@ -113,6 +113,17 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		default:
 			return fmt.Errorf("invalid -level %q (minimal, normal, pedantic)", level)
 		}
+
+		// improve does not publish. The comment form answers with one comment
+		// listing what it found, and this path would post each pedantic nit
+		// as its own inline thread instead, which is a different command
+		// wearing the same name. Refusing is the whole of the difference: the
+		// pass itself is identical, and `@open-nitpick improve` is how it
+		// reaches a pull request.
+		if f.pr > 0 || f.owner != "" || f.repoName != "" {
+			return fmt.Errorf("improve does not post to a pull request: it prints locally, " +
+				"and \"@open-nitpick improve\" is how the same pass reaches a pull request")
+		}
 	}
 
 	repo, err := filepath.Abs(f.repo)

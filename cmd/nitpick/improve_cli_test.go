@@ -59,3 +59,36 @@ func TestImproveRejectsALevelItCannotGenerate(t *testing.T) {
 		t.Errorf("the error does not name the value: %v", err)
 	}
 }
+
+// TestImproveRefusesToPostToAPullRequest pins the difference between the two
+// forms of the command.
+//
+// reviewWithScope carries review's flags, so -pr would select the GitHub
+// provider and publish each pedantic finding as its own inline thread. The
+// comment form answers with one comment instead, and a pass that posts forty
+// nit threads under a name documented as local is a different command.
+func TestImproveRefusesToPostToAPullRequest(t *testing.T) {
+	for _, args := range [][]string{
+		{"-pr", "7"},
+		{"-owner", "jdziat"},
+		{"-repo-name", "open-nitpick"},
+	} {
+		err := runImproveCLI(t.Context(), args)
+		if err == nil {
+			t.Errorf("improve %v was accepted", args)
+			continue
+		}
+		if !strings.Contains(err.Error(), "does not post") {
+			t.Errorf("improve %v failed for another reason: %v", args, err)
+		}
+	}
+}
+
+// TestReviewStillPostsToAPullRequest is the other direction: the refusal is
+// improve's, and adding it must not take -pr away from review.
+func TestReviewStillPostsToAPullRequest(t *testing.T) {
+	err := runReview(t.Context(), []string{"-pr", "7", "-repo", t.TempDir()})
+	if err != nil && strings.Contains(err.Error(), "does not post") {
+		t.Fatalf("review inherited improve's refusal: %v", err)
+	}
+}
