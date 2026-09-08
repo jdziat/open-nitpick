@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.1](https://github.com/jdziat/open-nitpick/compare/v1.11.0...v1.11.1) (2026-09-08)
+
+
+### Documentation
+
+* generate the configuration reference, and fix what the site got wrong ([#75](https://github.com/jdziat/open-nitpick/issues/75)) ([cf7a41f](https://github.com/jdziat/open-nitpick/commit/cf7a41f6b4d16b74312f5c5a70fb09fecd12ec42))
+
 ## [1.11.0](https://github.com/jdziat/open-nitpick/compare/v1.10.0...v1.11.0) (2026-09-08)
 
 
