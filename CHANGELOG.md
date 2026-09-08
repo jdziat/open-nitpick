@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.2](https://github.com/jdziat/open-nitpick/compare/v1.11.1...v1.11.2) (2026-09-08)
+
+
+### Fixes
+
+* **review:** a failed stage stops reporting the run as clean ([#78](https://github.com/jdziat/open-nitpick/issues/78)) ([5d442e0](https://github.com/jdziat/open-nitpick/commit/5d442e0751c1aa9ba7c1352c590681b0c70475a6))
+
 ## [1.11.1](https://github.com/jdziat/open-nitpick/compare/v1.11.0...v1.11.1) (2026-09-08)
 
 
