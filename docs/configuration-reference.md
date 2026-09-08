@@ -144,7 +144,7 @@ Fallback is the model a role escalates to when this one cannot answer: a request
 ### `models.default.max_retries`
 
 integer, default `none`.
-MaxRetries bounds SDK-level retries for transient failures.
+MaxRetries bounds two loops, not one, and they multiply.
 
 ### `models.default.max_tokens`
 
@@ -219,7 +219,7 @@ Fallback is the model a role escalates to when this one cannot answer: a request
 ### `models.ensemble[].max_retries`
 
 integer, default `none`.
-MaxRetries bounds SDK-level retries for transient failures.
+MaxRetries bounds two loops, not one, and they multiply.
 
 ### `models.ensemble[].max_tokens`
 
@@ -294,7 +294,7 @@ Fallback is the model a role escalates to when this one cannot answer: a request
 ### `models.fix.max_retries`
 
 integer, default `none`.
-MaxRetries bounds SDK-level retries for transient failures.
+MaxRetries bounds two loops, not one, and they multiply.
 
 ### `models.fix.max_tokens`
 
@@ -369,7 +369,7 @@ Fallback is the model a role escalates to when this one cannot answer: a request
 ### `models.review.max_retries`
 
 integer, default `none`.
-MaxRetries bounds SDK-level retries for transient failures.
+MaxRetries bounds two loops, not one, and they multiply.
 
 ### `models.review.max_tokens`
 
@@ -444,7 +444,7 @@ Fallback is the model a role escalates to when this one cannot answer: a request
 ### `models.router.max_retries`
 
 integer, default `none`.
-MaxRetries bounds SDK-level retries for transient failures.
+MaxRetries bounds two loops, not one, and they multiply.
 
 ### `models.router.max_tokens`
 
@@ -519,7 +519,7 @@ Fallback is the model a role escalates to when this one cannot answer: a request
 ### `models.routes[].ensemble[].max_retries`
 
 integer, default `none`.
-MaxRetries bounds SDK-level retries for transient failures.
+MaxRetries bounds two loops, not one, and they multiply.
 
 ### `models.routes[].ensemble[].max_tokens`
 
@@ -619,7 +619,7 @@ Fallback is the model a role escalates to when this one cannot answer: a request
 ### `models.routes[].review.max_retries`
 
 integer, default `none`.
-MaxRetries bounds SDK-level retries for transient failures.
+MaxRetries bounds two loops, not one, and they multiply.
 
 ### `models.routes[].review.max_tokens`
 
@@ -694,7 +694,7 @@ Fallback is the model a role escalates to when this one cannot answer: a request
 ### `models.triage.max_retries`
 
 integer, default `none`.
-MaxRetries bounds SDK-level retries for transient failures.
+MaxRetries bounds two loops, not one, and they multiply.
 
 ### `models.triage.max_tokens`
 
@@ -769,7 +769,7 @@ Fallback is the model a role escalates to when this one cannot answer: a request
 ### `models.validate.max_retries`
 
 integer, default `none`.
-MaxRetries bounds SDK-level retries for transient failures.
+MaxRetries bounds two loops, not one, and they multiply.
 
 ### `models.validate.max_tokens`
 

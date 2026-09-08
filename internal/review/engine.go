@@ -386,9 +386,8 @@ type Report struct {
 	// A stage failure is not a file failure. The files were read and the
 	// findings are real; what is missing is work done over them, so counting a
 	// dead triage as an unreviewed file would understate coverage and misname
-	// what broke. The style pass used to be recorded as a file for want of
-	// anywhere else to put it, and the walkthrough duly listed "(style pass)"
-	// among the paths.
+	// what broke. Kept apart from Incomplete for that reason: a reader given a
+	// list of paths should be able to open every one of them.
 	Stages []StageStatus
 
 	// Policy records the configuration this review ran under, and whether that

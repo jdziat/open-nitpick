@@ -431,7 +431,21 @@ answers under the cap. A runaway generation comes back cut, and the next
 attempt samples at temperature 0.3 instead of zero to break the loop; a
 review that took that path is no longer reproducible by re-running it, and
 its log says so. Every retry and its outcome is one log line, so a review
-that took forty minutes says why. This was built on gemma-4-31b through
+that took forty minutes says why.
+
+A refusal is a different loop, and until recently a silent one. A 429 or a 5xx
+is retried by the SDK, up to `max_retries` times again, with exponential
+backoff; that loop reported nothing, so a request rate limited three times and
+then answered looked in the log like one answered at once. It now writes a line
+per retry naming the attempt, the status, the delay and the provider's
+`Retry-After` when it sent one. That header is honoured as a floor and capped
+at 30 seconds, so a provider asking for longer is asked again early, and the
+line says so when it happens.
+
+Because both loops read `max_retries`, they multiply. A structured call can
+also take several passes through the schema, JSON and repair paths, so the
+requests one extraction can make is the product of the three rather than the
+largest. The default of 3 is not a small number in that arithmetic. This was built on gemma-4-31b through
 OpenRouter, which lost one review in five without it and none with it; the
 numbers are in [Against Incumbent](comparison.md).
 

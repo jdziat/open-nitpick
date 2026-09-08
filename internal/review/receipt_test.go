@@ -111,8 +111,8 @@ func TestAnEmptyChangeProducesNoReceipt(t *testing.T) {
 	}
 }
 
-// A failed stage is not a file. It used to be recorded as one, and the count a
-// reader saw was one higher than the files that existed.
+// A failed stage is not a file, and the count of files a reader is given must
+// not include one.
 func TestAFailedStageIsNotCountedAsAFile(t *testing.T) {
 	report := &Report{
 		Files:  diff.Files{{Path: "a.go"}, {Path: "b.go"}},

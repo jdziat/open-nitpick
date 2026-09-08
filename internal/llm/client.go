@@ -56,6 +56,10 @@ type Client struct {
 	// fallback is the client a caller escalates to when this one cannot
 	// answer. Nil when the spec names none. See ShouldEscalate.
 	fallback *Client
+
+	// retries receives the SDK's retry callback. Nil on a client built for a
+	// test, which bypasses the resilience wrapper entirely.
+	retries *retryLog
 }
 
 // Provider returns the configured provider name.
@@ -128,14 +132,20 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 	if spec.MaxRetries != nil {
 		maxRetries = *spec.MaxRetries
 	}
-	resilient := resilience.NewResilientClient(client, resilience.WithMaxRetries(maxRetries))
+	// The retry observer is built here because the resilient client needs it
+	// and the Client needs the resilient client, so the logger cannot be known
+	// yet. It arrives later through setLog.
+	rl := &retryLog{model: spec.Provider + "/" + spec.Model}
+	resilient := resilience.NewResilientClient(client,
+		resilience.WithMaxRetries(maxRetries),
+		resilience.WithOnRetry(rl.observe))
 
 	mode := spec.StructuredOutput
 	if mode == "" {
 		mode = config.StructuredAuto
 	}
 
-	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries, fallback: fallback}, nil
+	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries, fallback: fallback, retries: rl}, nil
 }
 
 // NewClientForTest wraps an arbitrary SDK client, bypassing provider
@@ -285,6 +295,7 @@ func (r *Roles) WithLogger(l *slog.Logger) *Roles {
 func (c *Client) setLog(l *slog.Logger) {
 	for ; c != nil; c = c.fallback {
 		c.Log = l
+		c.retries.set(l)
 	}
 }
 
