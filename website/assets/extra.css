@@ -136,6 +136,22 @@ body, .md-main { background-color: var(--np-page); }
   border-radius: 0.2rem;
   padding: 0.05em 0.3em;
 }
+/* Material sets box-decoration-break: clone, so the border above closes around
+   every line fragment of a chip that wraps: the `review.ignore` default is one
+   value that painted 19 boxes on the reference page, and a reader scanning the
+   Default column counts values by their boxes. `slice` leaves one shape, opened
+   at each break. Material also sets word-break: break-word, which in the narrow
+   cells of a table breaks inside a token rather than at a separator:
+   `https://api.mistral.ai/v1` broke after the `v` and `https://api.groq.com/
+   openai/v1` in the middle of `openai`, eleven endpoints in that column in all,
+   each cut at a character that means nothing. Table cells break at the
+   spaces and separators instead, and keep break-word as the last resort for a
+   token wider than its cell. */
+.md-typeset code {
+  -webkit-box-decoration-break: slice;
+  box-decoration-break: slice;
+}
+.md-typeset table:not([class]) code { word-break: normal; overflow-wrap: break-word; }
 .md-typeset pre code, .md-typeset .highlight code { border: 0; padding: 0; }
 
 /* The first tab stop on every page. Material draws its ring in the accent
@@ -147,9 +163,38 @@ body, .md-main { background-color: var(--np-page); }
   box-shadow: 0 0 0 4px var(--md-accent-fg-color);
 }
 
+/* The palette toggle is a tab stop that paints nothing in dark. Material rings
+   the label adjacent to the focused input (`.md-option.focus-visible + label`),
+   and the tab stop is always the first radio, `#__palette_0`; in slate the
+   label next to it is the display:none one and the sun icon on screen belongs
+   to the other input. Space at that stop switches the site to light, so the
+   control is operable and invisible. Ring whichever label is displayed. */
+.md-header__option:has(.md-option.focus-visible) label:not([hidden]),
+.md-header__option:has(.md-option:focus-visible) label:not([hidden]) {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+  border-radius: 0.2rem;
+}
+
+/* Chrome makes a scroll container a tab stop of its own, and the search
+   results wrap is one. At 1440 the stop after the search field is
+   .md-search__scrollwrap as a 688x0 box with [data-md-toggle=search] unchecked:
+   it holds nothing, the only ring is the UA default on a zero-height box, and a
+   560x110 crop of the header is byte-identical before and after it takes focus.
+   It has results to scroll only while search is open, so it is a tab stop only
+   then. Closing already sets max-height to 0 with no transition, so nothing
+   visible is cut short by hiding it at the same moment. */
+[data-md-toggle="search"]:not(:checked) ~ .md-header .md-search__scrollwrap {
+  visibility: hidden;
+}
+
 /* A page with no headings reserves a 242px rail and an empty landmark that
-   announces a table of contents holding nothing. */
-.md-sidebar--secondary:not(:has(.md-nav__list)) { display: none; }
+   announces a table of contents holding nothing. `visibility: hidden` takes the
+   landmark out of the accessibility tree and leaves its 242px in flow;
+   `display: none` also took the space, and the article re-centred into it, so
+   clicking from any Guide page to "How a review runs" moved the column centre
+   from 720 to 841 at 1440 and left the 404 off-centre against a blank rail. */
+.md-sidebar--secondary:not(:has(.md-nav__list)) { visibility: hidden; }
 
 /* The column the article actually gets: the grid, less whichever rails
    Material has put in flow at this width. The secondary rail appears at 60em
@@ -161,16 +206,23 @@ body, .md-main { background-color: var(--np-page); }
 @media screen and (min-width: 60em) { :root { --np-rails: 12.1rem; } }
 @media screen and (min-width: 76.25em) { :root { --np-rails: 24.2rem; } }
 
-/* About 72 characters. The first attempt capped at 46rem, which never applied:
-   the two 12.1rem rails and the margins leave 45.4rem of a 72rem grid, so the
-   cap sat above the width it was meant to cut. Evidence gets the width back
-   below, rather than the prose keeping it.
+/* About 74 characters, and the arithmetic is in px because rem is not 16px
+   here: Material sets html to 125%, so 1rem is 20px and .md-typeset is 16px.
+   28rem is 560px, and body copy on this site measures 7.36-7.72px per
+   character (canvas measureText over the first 400 characters of five
+   paragraphs on the trust-model page), which is 73 to 76 characters.
+   The first attempt capped at 46rem, which never applied: the two 12.1rem
+   rails and the margins leave 45.4rem of a 72rem grid, so the cap sat above the
+   width it was meant to cut. The second capped at 36rem and did apply, but
+   36rem is 720px, which measures 93 to 96 characters: above the 45-75 range
+   and above the 80 WCAG 1.4.8 asks for. Evidence gets the width back below,
+   rather than the prose keeping it.
    The cap is also the gutter. `margin-inline: auto` replaces Material's
    `margin: 0 .8rem 1.2rem`, and neither .md-content nor .md-main carries
    horizontal padding of its own, so a bare cap left every phone reading body
    text flush to both edges of the glass. Capping at the column as well leaves
    the auto margins something to divide. */
-.md-content__inner { max-width: min(36rem, var(--np-column) - 1.6rem); margin-inline: auto; }
+.md-content__inner { max-width: min(28rem, var(--np-column) - 1.6rem); margin-inline: auto; }
 /* The landing page hides both rails and its cards are laid out across the
    whole grid, so it keeps the width and takes the gutter only. --np-column
    subtracts rails this page does not have, which is why it is not used here. */
@@ -202,6 +254,79 @@ body, .md-main { background-color: var(--np-page); }
 .md-content__inner:not(:has(.np-hero)) > table:not([class]) {
   width: max(100%, min(45.4rem, var(--np-column) - 1.6rem));
   margin-inline: min(0px, calc((100% - min(45.4rem, var(--np-column) - 1.6rem)) / 2));
+}
+
+/* The band above is a constant width, and Material's wrapper is an inline-block
+   that shrink-wraps the table and sits at its left edge, so a table that needs
+   none of the extra width is still dragged 158px left of the prose it belongs
+   to. 33 of the 67 tables on the site do this at 1440: the four-row table on
+   the measurement page is 302px in a 908px band, with the sentence above it and
+   the sentence below it both starting 158px to its right. Centring the wrapper
+   puts a narrow table on the same centreline the prose is centred on, and
+   changes nothing for a table that fills the band: `fit-content` stops at the
+   band, `margin-inline: auto` is over-constrained past it and resolves to zero,
+   so a table wider than the band still starts at the left and still scrolls.
+   At 390 the band is the column and only one table of 67 has 60px to spare, so
+   this is a desktop and tablet change. */
+/* Centring was tried here with `width: fit-content; max-width: 100%` and is
+   removed. It did centre a narrow table, and it also stopped the wrapper ever
+   exceeding the scrollwrap, so the scrollwrap never became the scroll container
+   and Material's own `overflow-x: auto` on the table took the job. The table
+   then clipped its own text at its right edge with its right border still
+   drawn: 60 of 67 tables and 1643 of 2323 body cells sheared at 320px, 51 and
+   1397 at 390, 7 and 214 as high as 1280, all of it invisible at the 1440 the
+   rule was written at. A table that reads as complete while missing five
+   columns is the one failure this project cannot ship, and a narrow table
+   sitting left of its prose is a smaller cost than that. */
+.md-typeset__scrollwrap > .md-typeset__table {
+  display: inline-block;
+  max-width: none;
+}
+
+/* Below 76.25em the drawer is off-canvas and Material leaves every link in it
+   in the tab order. Walking the tab order at 390x844 on /docs/usage/ gives 59
+   stops, 28 of them at x=-242 or zero-size with the toggle unchecked, and a
+   full-viewport screenshot taken while the "Home" link is focused is
+   byte-identical to the unfocused page: 26 consecutive stops that paint
+   nothing, WCAG 2.4.7 and 2.4.3.
+   `visibility: hidden` was tried here and removed. It does take those stops out
+   of the tab order, and it takes the whole primary navigation with them: the
+   only other way in is `<label class="md-header__button" for="__drawer">`,
+   which carries no tabindex, and `#__drawer` itself is `display: none`, so
+   neither is focusable. The same walk then ran 32 stops at 390x844 with 0 of
+   the 28 links among them, and 35 and 34 stops with the same 0 at 1024x768 and
+   1219x800. That is WCAG 2.1.1 bought with 2.4.7.
+   Sliding the drawer in on `:focus-within` pays neither. The links stay in the
+   tab order and the first Tab that reaches one brings the panel with it: 27, 21
+   and 21 navigation stops at those three sizes, against 0 with the rule above.
+   Tabbing past the last link slides it back, and the transform and the shadow
+   are the ones Material's own `:checked` rule uses, so opening the drawer by
+   Tab and opening it by pointer land in the same place.
+   12 of the 27 stops at 390x844 now paint, and 13 of 21 at the other two.
+   The rest are Material's own mobile drawer, unchanged by this sheet: an open
+   section is a `position: absolute` panel that covers the level above it, so
+   the tabs under it are focusable and painted over, and a closed section's
+   children sit off-canvas at `opacity: 0`. Hiding either takes links out of the
+   tab order that nothing else can reach, because the labels that open a section
+   are `<label>` elements with no tabindex. Closing that gap is a template
+   change, not a stylesheet one. */
+@media screen and (max-width: 76.234375em) {
+  [data-md-toggle="drawer"]:not(:checked) ~ .md-container .md-sidebar--primary:focus-within {
+    box-shadow: var(--md-shadow-z3);
+    transform: translateX(12.1rem);
+  }
+  /* A closed section's children sit at opacity 0 over the list that is visible,
+     so a Tab landing in one slid a blank panel across 62% of a phone screen.
+     Taking them out of the tab order until their section is open leaves every
+     stop painted, and the section's own label opens it. */
+  [data-md-toggle="drawer"]:not(:checked) ~ .md-container
+    .md-nav--primary .md-nav[data-md-level]:not([style*="visible"]) {
+    visibility: hidden;
+  }
+  [data-md-toggle="drawer"]:not(:checked) ~ .md-container
+    .md-nav--primary .md-nav__toggle:checked ~ .md-nav {
+    visibility: visible;
+  }
 }
 
 /* The mobile drawer takes the page background like the header does. */
@@ -250,7 +375,30 @@ body, .md-main { background-color: var(--np-page); }
    chip that will not break is what sets the column's minimum width; the
    scrollwrap Material already wraps the table in is what pays for it when the
    row no longer fits. */
-.md-typeset table:not([class]) td:first-child code { white-space: nowrap; }
+.md-typeset table:not([class]) td:first-child code {
+  white-space: nowrap;
+}
+/* Past the width where the whole row fits, an unbreakable key is what pushes
+   the description off the page, so below that the key breaks and the row stays
+   whole. A key broken after a dot is still read as one; a description with its
+   last five words missing is not. */
+@media screen and (max-width: 85.375em) {
+  .md-typeset table:not([class]) td:first-child code { white-space: normal; }
+}
+/* The Type column held 224px of the reference's 876 while the sentence saying
+   what a key does held 181, because ten rows read `same keys as
+   models.routes[].ensemble[]` and that path is one unbreakable 26-character
+   token. Letting it break takes Type to 109px and the description to 276, and
+   takes the models table's horizontal overflow from 19px to 0 at 1440 and from
+   34px to 0 at 1920, where 111 of its 560 cells had been sheared at the table's
+   right edge. Its height falls from 24,292px to 16,450px with it, which matters
+   because the scroller Material puts that overflow on is the table itself: a
+   scrollbar 24,292px down the page is a scrollbar nobody sees, so clipped text
+   reads as lost rather than scrollable. Below 1024 the row still does not fit
+   and the shortfall only narrows, 177px to 53px at 1024, because the Key column
+   is pinned at 388px by the rule above. Sweeping all 67 tables on the site at
+   1440 found this one overflowing before the rule and none after. */
+.md-typeset table:not([class]) td:nth-child(2) { overflow-wrap: anywhere; }
 /* Reference tables run to ten rows of decimals, and something has to hold the
    row the eye is on.
    A sticky header row was tried here and removed. Material gives the table its
@@ -271,6 +419,31 @@ body, .md-main { background-color: var(--np-page); }
 .np-actions p { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0; }
 .np-actions .md-button { margin: 0; padding-block: 0.75em; }
 .np-prose { max-width: 40rem; }
+/* The measure above is the width the install block needs, not the width running
+   prose reads at. Measured by walking a Range over every character and grouping
+   the client rects by line top, the "How a review runs" list ran 97 to 101
+   characters a line at 1440 and held at 101 to 104 at 1920 and 2560, and the
+   two .np-fine paragraphs ran 114 to 149. The article the same reader clicks
+   into next peaks at 80. Only the running prose is capped: the hero lede is
+   already 74 to 76, the cards 45 to 55, and the code block is the reason
+   .np-prose is 40rem in the first place. The h2 is capped with them because its
+   rule is the block's own edge, and left at 40rem it ran 240px past the longest
+   line under it. .np-fine is 14.4px against the body's 16px, so it takes a
+   narrower box to land in the same character count. */
+.np-prose > h2,
+.np-prose > p,
+.np-prose > ol,
+.np-prose > ul { max-width: 28rem; }
+.np-prose > p.np-fine,
+.np-hero > p.np-fine { max-width: 26rem; }
+/* The install snippet is what the page is for, and its longest line is 881px
+   against the 800px measure above: the curl command was cut after
+   `nitpick_${v}_${os}_` with `${arch}` off screen and 600px of empty page
+   beside it at 1440. The copy button still yielded the whole line, so this
+   misled the eye rather than breaking the paste. The block takes the same
+   45.4rem the article pull-out takes, and the viewport clamp keeps it inside
+   the page where the column is narrower than that. */
+.np-prose > .highlight { width: max(100%, min(45.4rem, 100vw - 1.6rem)); }
 .np-fine { color: var(--np-muted); font-size: 0.72rem; }
 
 .np-stat { display: flex; gap: 2.5rem; flex-wrap: wrap; margin: 0 0 0.4rem; }

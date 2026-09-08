@@ -22,6 +22,13 @@ func runConfigRef(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("config-reference", flag.ContinueOnError)
 	src := fs.String("src", "internal/config", "the package the documentation is read from")
 	out := fs.String("o", "", "write here instead of standard output")
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage: nitpick config-reference [flags]\n\n"+
+			"Writes every key .nitpick.yaml accepts, with its type, its shipped default and one\n"+
+			"sentence about it, read from the source of the package -src names. It reads that\n"+
+			"package from disk, so it runs from a checkout.\n\nFlags:")
+		fs.PrintDefaults()
+	}
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -85,9 +92,11 @@ argued for rather than listed; this page is the index.
 Regenerate with ` + "`nitpick config-reference -o docs/configuration-reference.md`" + `,
 which ` + "`make docs`" + ` runs and CI checks. That check diffs this file against
 what the generator produces now, so a key the generator reaches cannot drift
-from its row. It says nothing about a key the generator never walks to: one
-self-referential field kept ` + "`fallback`" + ` and the eighteen keys under it off
-this page entirely, and nothing failed.
+from its row. It says nothing about a key the generator never walks to, and
+nothing fails when it stops short. One field it cannot walk into is
+` + "`fallback`" + `, a model block inside a model block: walking it does not
+terminate, so it is emitted as a ` + "`same keys as …`" + ` row naming the block
+whose keys it repeats.
 
 ` + "`[]`" + ` marks a list whose entries carry the keys beneath it,
 ` + "`<name>`" + ` a map whose keys you choose, and ` + "`same keys as …`" + ` a block

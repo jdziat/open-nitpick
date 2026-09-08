@@ -1,7 +1,11 @@
 # open-nitpick against Incumbent
 
-> [!NOTE]
-> "Incumbent" is the hosted reviewer these tables measure against. What matters for reading the numbers is the methodology, not which product it is: the corpora are this project's own, the runs are dated, and every instrument bug found so far is in [findings.md](findings.md).
+!!! note "What Incumbent names in these tables"
+
+    "Incumbent" is the hosted reviewer these tables measure against. What
+    matters for reading the numbers is the methodology, not which product it
+    is: the corpora are this project's own, the runs are dated, and every
+    instrument bug found so far is in [findings.md](findings.md).
 
 A capability comparison and a measured one, kept apart because they are
 different kinds of claim. The capability table is what each product does; the

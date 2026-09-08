@@ -67,13 +67,23 @@ docs: docs-reference
 	# site that no page, template or stylesheet names.
 	cp -r website/assets .website/assets && rm -rf .website/assets/logo-candidates .website/assets/logo.jpg
 	printf -- '---\ntitle: Guide\n---\n' > .website/guide.md
-	sed -E '1s/^# open-nitpick$$/# Guide/; /^Documentation: <https:\/\/jdziat\.github\.io/d; /^The same documents are published at/d' README.md >> .website/guide.md
+	# The heading is on line 3, under the centred logo, so the address this
+	# substitution used to carry never matched and the Guide's h1 was the site's
+	# own name, two inches under the header that already says it. README.md has
+	# exactly one line reading `# open-nitpick`.
+	# The logo and the three badges are deleted with it. A 112px centred mark
+	# 150px below the header's own mark and wordmark, over a left-aligned h1,
+	# over three shields, is README furniture: it makes the second page a
+	# four-minute reader reaches read as a rehosted README, and the License
+	# badge is the third statement of what the footer already carries as
+	# "Apache-2.0". README.md on GitHub keeps all four lines.
+	sed -E 's/^# open-nitpick$$/# Guide/; /^<p align="center"><img src="website\/assets\/logo\.svg"/d; /^\[!\[/d; /^Documentation: <https:\/\/jdziat\.github\.io/d; /^The same documents are published at/d' README.md >> .website/guide.md
 	cp docs/*.md .website/docs/
 	# SECURITY.md sits at the repository root, so its links are docs/-relative;
 	# staged beside the pages it points at, that prefix has to go.
 	sed -E 's#\]\(docs/#](#g' SECURITY.md > .website/docs/security.md
 	for f in .website/docs/*.md; do sed -E 's#\]\(\.\./(internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
-	sed -E 's#\]\((internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g; s#src="website/assets/#src="../assets/#g' .website/guide.md > .website/guide.md.tmp && mv .website/guide.md.tmp .website/guide.md
+	sed -E 's#\]\((internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' .website/guide.md > .website/guide.md.tmp && mv .website/guide.md.tmp .website/guide.md
 	mkdocs build
 
 docs-serve: docs

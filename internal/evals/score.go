@@ -1730,10 +1730,10 @@ var (
 )
 
 // The cost and judge-swap tables, registered from here rather than beside
-// their
-// own declarations.
+// their own declarations.
 //
-// The note behind it is in docs/harness-notes.md#the-cost-and-judge-swap-tables-registered-from-here-rather.
+// The note behind it is in
+// docs/harness-notes.md#the-cost-and-judge-swap-tables-registered-from-here-rather-than-beside-their-own-declarations.
 var (
 	_ = registerTableHeader(tableUnscored, CostTableHeader)
 	_ = registerTableHeader(tableUnscored, precisionHeader)

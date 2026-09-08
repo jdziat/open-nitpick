@@ -11,7 +11,16 @@
 {% endblock %}
 
 {% block extrahead %}
-  {% set page_title = page.title if page.title and not page.is_homepage else home_title %}
+  {#-
+    mkdocs renders 404.html as a theme template, with no page: page.title is
+    then Undefined and page.canonical_url renders as the empty string, so the
+    cards for a dead link claimed to be the front page and carried no address.
+    A template with no page of its own sets these two at its top level and the
+    assignment reaches here; every real page leaves both unset and falls
+    through to its own title and canonical URL.
+  -#}
+  {% set page_title = page_title_override | default(page.title if page.title and not page.is_homepage else home_title) %}
+  {% set page_url = page_url_override | default(page.canonical_url) %}
   {% set description = page.meta.description if page.meta and page.meta.description else config.site_description %}
   <link rel="preload" href="{{ 'assets/fonts/Inter-var.woff2' | url }}" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="{{ 'assets/fonts/JetBrainsMono-var.woff2' | url }}" as="font" type="font/woff2" crossorigin>
@@ -19,7 +28,7 @@
   <meta property="og:site_name" content="{{ config.site_name }}">
   <meta property="og:title" content="{{ page_title }}">
   <meta property="og:description" content="{{ description }}">
-  <meta property="og:url" content="{{ page.canonical_url }}">
+  <meta property="og:url" content="{{ page_url }}">
   <meta property="og:image" content="{{ config.site_url }}assets/social.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">

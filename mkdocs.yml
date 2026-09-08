@@ -49,6 +49,18 @@ theme:
   # theme's own loader fetches only 300, 400 and 700.
   font: false
 
+# The default separator is `[\s\-]+`, which leaves a dotted configuration path
+# as one token: `review.fail_on` in the key reference did not answer a search
+# for `fail_on`, and `models.routes[].match.max_files` did not answer one for
+# `max_files`, while the same keys written bare on the prose pages did. That is
+# a matching problem and not a ranking one, and a document boost does not reach
+# it: 2, 5, 20 and 100 on the reference page returned the same pages in the same
+# order, none of them it, because it was never in the result set. Splitting on
+# the dot as well puts it first for `max_files` and second for `fail_on`.
+plugins:
+  - search:
+      separator: '[\s\-.]+'
+
 # edit_uri is resolved against the staged path, and three pages are staged under
 # a name they do not have in the repository.
 hooks:

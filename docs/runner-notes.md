@@ -1,3 +1,19 @@
+---
+# The harness and runner notes are 209,313 of the 589,395 characters of the
+# published search index, 35.5%, and they are commentary on Go declarations, so
+# they repeat operator vocabulary at length without answering an operator's
+# question. A document boost was tried here and removed. At 0.3 it moved the
+# runner notes off the first screen and left the harness notes at rank 1 for
+# "severity", a 562px result block that is 29.2% of the rendered list, and 27.8%
+# for "fail_on", because the word runs the length of the page. Weighting a page
+# that is not an answer only changes how far down the wrong answer sits, so
+# these two leave the answer set instead. Nothing is hidden: both stay in the
+# nav under Internals and stay linked from every declaration that points at
+# them. Measured 2026-09-07 against the built index.
+search:
+  exclude: true
+---
+
 # Notes from the runners
 
 Every note below was a doc comment in `internal/linters/runners.go`. Each records

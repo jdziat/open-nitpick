@@ -1,7 +1,7 @@
 # How a review runs
 
 ```
-diff → select and batch files → review each batch → triage → render → publish
+diff → select and batch files → review each batch → triage → anchor → render → publish
 ```
 
 - **Select** drops ignored, binary, deleted, and generated files. A review that

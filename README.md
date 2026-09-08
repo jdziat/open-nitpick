@@ -131,9 +131,10 @@ scores byte-identical input anywhere from 3.66 to 3.98.
 
 Early. Everything described above is built and runs.
 
-It out-detects a hosted incumbent on both counted comparisons, 33 of 41 planted
-defects against 30 over 44 real pull requests, and noise is the open question:
-a later run took detection to 36 of 41 and noise findings from 1 to 17.
+It out-detects a hosted incumbent on both counted corpora: 33 of 41 planted
+defects against 30 of 41 across 44 real pull requests, and 10 of 13 against
+4 of 13 on the held-out fixtures. Noise is the open question: a later run took
+detection to 36 of 41 and noise findings from 1 to 17.
 [docs/findings.md](docs/findings.md) has both comparisons, what they do not
 support, and the twenty instrument bugs found along the way.
 [docs/comparison.md](docs/comparison.md) has the costs: about two cents a
