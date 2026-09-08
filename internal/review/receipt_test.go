@@ -124,7 +124,7 @@ func TestAFailedStageIsNotCountedAsAFile(t *testing.T) {
 	if strings.Contains(got, "could not be reviewed") {
 		t.Errorf("a stage was counted as a file:\n%s", got)
 	}
-	if !strings.Contains(got, "style pass failed") {
+	if !strings.Contains(stageNotice(report), "style pass failed") {
 		t.Errorf("a failed style pass went unreported:\n%s", got)
 	}
 
@@ -133,7 +133,7 @@ func TestAFailedStageIsNotCountedAsAFile(t *testing.T) {
 	if !strings.Contains(got, "1 file could not be reviewed") {
 		t.Errorf("want one file counted, not two:\n%s", got)
 	}
-	if !strings.Contains(got, "style pass failed") {
+	if !strings.Contains(stageNotice(report), "style pass failed") {
 		t.Errorf("both facts must appear:\n%s", got)
 	}
 }
@@ -148,14 +148,14 @@ func TestAFailedTriageSaysWhatWasLost(t *testing.T) {
 		Stages: []StageStatus{{Stage: "triage", Reason: "rate-limited"}},
 	}
 
-	got := receipt(report)
+	got := stageNotice(report)
 	for _, want := range []string{"Triage failed", "rate-limited", "deduplicated"} {
 		if !strings.Contains(got, want) {
-			t.Errorf("receipt does not say %q:\n%s", want, got)
+			t.Errorf("the notice does not say %q:\n%s", want, got)
 		}
 	}
-	if strings.Contains(got, "could not be reviewed") {
-		t.Errorf("triage failing is not a file failing:\n%s", got)
+	if strings.Contains(receipt(report), "could not be reviewed") {
+		t.Errorf("triage failing is not a file failing:\n%s", receipt(report))
 	}
 }
 
@@ -193,18 +193,26 @@ func TestTheReceiptIsQuietWhenNothingWasSkipped(t *testing.T) {
 	}
 }
 
-// The receipt and the walkthrough's own stage block are alternatives, not a
-// pair. Rendering both put the sentence on the page twice.
-func TestADegradedRunSaysItOnce(t *testing.T) {
+// One renderer, said once, and said whether or not the walkthrough runs.
+//
+// review.summary chooses whether a model's prose is published. A reader who
+// turned it off has not asked to stop being told that the findings in front of
+// them were never ranked, which is the same rule budgetNote is held to.
+func TestADegradedRunSaysItOnceUnderEverySummarySetting(t *testing.T) {
 	report := &Report{
 		Files:  diff.Files{{Path: "a.go"}},
 		Plan:   planOfFiles(1),
 		Stages: []StageStatus{{Stage: "triage", Reason: "rate-limited"}},
 	}
-	cfg := config.Defaults()
 
-	got := walkthrough(report, cfg)
-	if n := strings.Count(got, "Triage failed"); n != 1 {
-		t.Errorf("the stage sentence appears %d times, want 1:\n%s", n, got)
+	for _, summary := range []bool{true, false} {
+		cfg := config.Defaults()
+		cfg.Review.Summary = summary
+
+		got := Render(report, report.Files, cfg).Summary
+		if n := strings.Count(got, "Triage failed"); n != 1 {
+			t.Errorf("summary=%t: the stage sentence appears %d times, want 1:\n%s",
+				summary, n, got)
+		}
 	}
 }

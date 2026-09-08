@@ -71,13 +71,11 @@ func receipt(report *Report) string {
 		parts = append(parts, fmt.Sprintf("Analyzers: %s.", strings.Join(analyzers, ", ")))
 	}
 
-	// Incomplete is files, Stages is work over them, and the receipt says both
-	// rather than folding one into the other.
+	// Files only. A failed stage is reported by stageNotice, which renders
+	// whether or not the walkthrough does, and saying it in both put the
+	// sentence on the page twice.
 	if n := len(report.Incomplete); n > 0 {
 		parts = append(parts, fmt.Sprintf("%s could not be reviewed.", plural(n, "file")))
-	}
-	for _, st := range report.Stages {
-		parts = append(parts, stageSentence(st))
 	}
 
 	return strings.Join(parts, " ") + "\n"

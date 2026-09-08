@@ -353,6 +353,10 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// what was reviewed is a fact about coverage, and review.summary turning
 	// the walkthrough off must not turn it into a silent trim.
 	b.WriteString(budgetNote(report))
+	// Same rule, same reason. A stage that did not run is a fact about what
+	// the findings below have been through, and review.summary is a setting
+	// about prose.
+	b.WriteString(stageNotice(report))
 	b.WriteString(EscalationNotice(report))
 
 	if cfg == nil || cfg.Review.Summary {
@@ -830,8 +834,7 @@ func walkthrough(report *Report, cfg *config.Config) string {
 	// The receipt is counted from the report; the prose was written by a model
 	// that never saw the change. Which one appears is review.summary_style,
 	// and the receipt is the default.
-	usedReceipt := cfg != nil && cfg.Review.EffectiveSummaryStyle() == config.SummaryReceipt
-	if usedReceipt {
+	if cfg != nil && cfg.Review.EffectiveSummaryStyle() == config.SummaryReceipt {
 		b.WriteString(receipt(report))
 	} else if s := strings.TrimSpace(report.Summary); s != "" {
 		b.WriteString(s)
@@ -853,19 +856,6 @@ func walkthrough(report *Report, cfg *config.Config) string {
 			// carry a path taken from the diff, and a name containing a newline
 			// breaks out of the bullet and continues at top level.
 			fmt.Fprintf(&b, "> - `%s`\n", inline(path))
-		}
-	}
-
-	// A stage that did not run is its own news: findings published without
-	// triage were never deduplicated or ranked, and a reader not told that
-	// assumes they were.
-	//
-	// Only when the receipt is not the summary. The receipt says this already,
-	// and the two are alternatives rather than a pair, so rendering both put
-	// the sentence on the page twice.
-	if !usedReceipt {
-		for _, st := range report.Stages {
-			fmt.Fprintf(&b, "\n> **%s**\n", inline(stageSentence(st)))
 		}
 	}
 
@@ -1065,5 +1055,22 @@ func budgetNote(report *Report) string {
 			"`review.budget.max_spend`.\n", fit.Prior)
 	}
 
+	return b.String()
+}
+
+// stageNotice reports a required stage that did not complete.
+//
+// Ungated, beside budgetNote and for its reason: review.summary chooses
+// whether a model's prose is published, and a reader who turned that off has
+// not asked to stop being told the findings were never ranked.
+func stageNotice(report *Report) string {
+	if len(report.Stages) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n> **This review did not complete.**\n>\n")
+	for _, st := range report.Stages {
+		fmt.Fprintf(&b, "> - %s\n", inline(stageSentence(st)))
+	}
 	return b.String()
 }
