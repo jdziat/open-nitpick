@@ -22,10 +22,13 @@ runs on its own when installed, and those that need a configuration from outside
 the repository or your word that their code may run. Nothing is enabled that
 would fail a run under `mode: strict` on a runner that lacks it.
 
-Nothing is written until the generated file has been loaded and validated, so a
-first command cannot leave a repository with a config the reviewer rejects. With
-no model named anywhere the `models` block is written commented out and `init`
-says which two variables would fill it.
+Nothing is written until the generated file has been parsed, so a first command
+cannot leave a repository with a file the loader cannot read. That is a weaker
+guarantee than it sounds and the difference is worth stating: with no model
+named anywhere the `models` block is written commented out, and a configuration
+naming no model is one `nitpick review` and `nitpick explain-config` both
+refuse with `models.default: model is required`. `init` says as much on the
+line reporting `model: none`, and the file it wrote is not yet runnable.
 
 ## Locally
 

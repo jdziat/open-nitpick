@@ -53,14 +53,24 @@ cover:
 # pages, and website/ for what only the site has (landing page, styling).
 # Staged into .website/ so every relative link in the repository resolves on
 # the site unchanged. Needs mkdocs-material (pip install mkdocs-material).
-.PHONY: docs docs-serve
-docs:
+.PHONY: docs docs-serve docs-reference
+# The configuration reference is generated from the configuration, so a key
+# the loader accepts and the docs never mention cannot survive a build.
+docs-reference:
+	go run ./cmd/nitpick config-reference -o docs/configuration-reference.md
+
+docs: docs-reference
 	rm -rf .website && mkdir -p .website/docs
 	cp website/index.md .website/index.md
-	cp -r website/assets .website/assets
+	# Rejected logo concepts are not documentation and were reachable in
+	# production until this line.
+	cp -r website/assets .website/assets && rm -rf .website/assets/logo-candidates
 	printf -- '---\ntitle: Guide\n---\n' > .website/guide.md
 	sed -E '1s/^# open-nitpick$$/# Guide/; /^Documentation: <https:\/\/jdziat\.github\.io/d; /^The same documents are published at/d' README.md >> .website/guide.md
 	cp docs/*.md .website/docs/
+	# SECURITY.md sits at the repository root, so its links are docs/-relative;
+	# staged beside the pages it points at, that prefix has to go.
+	sed -E 's#\]\(docs/#](#g' SECURITY.md > .website/docs/security.md
 	for f in .website/docs/*.md; do sed -E 's#\]\(\.\./(internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
 	sed -E 's#\]\((internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g; s#src="website/assets/#src="../assets/#g' .website/guide.md > .website/guide.md.tmp && mv .website/guide.md.tmp .website/guide.md
 	mkdocs build

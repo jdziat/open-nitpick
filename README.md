@@ -4,11 +4,13 @@
 
 [![CI](https://github.com/jdziat/open-nitpick/actions/workflows/ci.yml/badge.svg)](https://github.com/jdziat/open-nitpick/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/jdziat/open-nitpick)](https://github.com/jdziat/open-nitpick/releases)
-[![Go Reference](https://pkg.go.dev/badge/github.com/jdziat/open-nitpick.svg)](https://pkg.go.dev/github.com/jdziat/open-nitpick)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/jdziat/open-nitpick/blob/main/LICENSE)
-[![Recommended route: Synthetic](https://img.shields.io/badge/recommended_route-Synthetic-7c3aed)](https://synthetic.new/?referral=KBc4DHaHWcig6zR)
 
 Self-hosted, model-agnostic pull request review.
+
+Referral link: [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR) is
+the route this project recommends and the link pays the author referral credit.
+[Below](#quick-start) says what that is worth and what the plain link is.
 
 Documentation: <https://jdziat.github.io/open-nitpick/>
 
@@ -23,7 +25,12 @@ in your repository that you can read and edit.
 ## Quick start
 
 ```bash
-go install github.com/jdziat/open-nitpick/cmd/nitpick@latest
+# A signed binary for your platform. Releases carry linux, darwin and windows
+# on amd64 and arm64, each with a Sigstore bundle and a checksums file.
+v=$(gh release view --repo jdziat/open-nitpick --json tagName -q .tagName)
+os=$(uname -s | tr 'A-Z' 'a-z'); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+curl -fsSLo nitpick "https://github.com/jdziat/open-nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
+chmod +x nitpick && sudo mv nitpick /usr/local/bin/
 
 export LLM_PROVIDER=synthetic LLM_MODEL=hf:moonshotai/Kimi-K3
 export SYNTHETIC_API_KEY=syn_...
@@ -31,6 +38,12 @@ export SYNTHETIC_API_KEY=syn_...
 nitpick init            # writes .nitpick.yaml for this repository
 nitpick review          # reviews your uncommitted changes
 ```
+
+Verifying that download is one command and
+[Development](docs/development.md#releases) has it. Building from source
+instead is `go install github.com/jdziat/open-nitpick/cmd/nitpick@latest`,
+which needs Go 1.25.5 or newer: the toolchain line in `go.mod` is a patch-level
+floor, so 1.25.4 refuses.
 
 `init` is optional: with those two variables set, a review runs with no config
 file at all. What it buys is a file that names the model and the analyzers this
@@ -118,7 +131,8 @@ defects against 30 over 44 real pull requests, and noise is the open question:
 a later run took detection to 36 of 41 and noise findings from 1 to 17.
 [docs/findings.md](docs/findings.md) has both comparisons, what they do not
 support, and the eighteen instrument bugs found along the way.
-[docs/comparison.md](docs/comparison.md) has the costs, under a cent per diff.
+[docs/comparison.md](docs/comparison.md) has the costs: about two cents a
+review on the default reviewer, under a fifth of a cent on the cheap one.
 
 GitHub and a local checkout are the only forges. There is no GitLab provider.
 Reviews default to advisory, so nothing blocks a merge until you set `fail_on`.

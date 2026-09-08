@@ -20,12 +20,20 @@
   --md-code-font: "JetBrains Mono";
   --md-primary-fg-color: #0f766e;
   --md-primary-fg-color--dark: #115e59;
-  --md-accent-fg-color: #0f766e;
+  /* Darker than primary, so an inline link changes on hover. Material paints
+     links with primary and their hover with accent; equal values make every
+     link on the site inert under the cursor. */
+  --md-accent-fg-color: #0d5f59;
   --md-accent-fg-color--transparent: rgba(15, 118, 110, 0.1);
   --np-ink: #0b1220;
   --np-muted: #526070;
+  /* Slate sets its own; without this light mode inherits Material's #f5f5f5
+     chip on a white page, which is a 1.06:1 step and reads as no chip at all.
+     Every configuration key on this site is inline code. */
+  --md-code-bg-color: #f6f8fa;
   --np-card: #ffffff;
-  --np-line: rgba(11, 18, 32, 0.12);
+  --np-page: #fbfcfd;   /* applied to the page below, so white cards lift off it */
+  --np-line: rgba(11, 18, 32, 0.16);
   --md-footer-bg-color: var(--md-default-bg-color);
   --md-footer-bg-color--dark: var(--md-default-bg-color);
   --md-footer-fg-color: var(--np-ink);
@@ -37,7 +45,7 @@
   --md-primary-fg-color--dark: #5eead4;
   --md-primary-bg-color: #0b1220;
   --md-primary-bg-color--light: rgba(11, 18, 32, 0.7);
-  --md-accent-fg-color: #2dd4bf;
+  --md-accent-fg-color: #5eead4;
   --md-accent-fg-color--transparent: rgba(45, 212, 191, 0.12);
   --md-accent-bg-color: #0b1220;
   --md-default-bg-color: #0f141c;
@@ -45,6 +53,7 @@
   --np-ink: #e6edf3;
   --np-muted: #9aa8b5;
   --np-card: #1b2230;
+  --np-page: var(--md-default-bg-color);
   --np-line: rgba(230, 237, 243, 0.12);
 }
 
@@ -53,6 +62,11 @@
 .md-header, .md-tabs, .md-footer, .md-footer-meta {
   background-color: var(--md-default-bg-color);
   color: var(--np-ink);
+}
+/* Flat until the page scrolls. Material adds md-header--shadow on scroll to
+   say content is passing underneath, and an unscoped reset here would win
+   permanently against a header the same colour as the page. */
+.md-header:not(.md-header--shadow), .md-tabs, .md-footer, .md-footer-meta {
   box-shadow: none;
 }
 .md-header { border-bottom: 1px solid var(--np-line); }
@@ -66,8 +80,62 @@
 .md-search__form { background-color: rgba(127, 127, 127, 0.12); border-radius: 0.4rem; }
 .md-search__input { color: var(--np-ink); }
 .md-search__input::placeholder, .md-search__icon { color: var(--np-muted); }
-[data-md-toggle="search"]:checked ~ .md-header .md-search__form { background-color: var(--np-card); }
+/* Material fills the open field with the page colour, assuming a coloured
+   header to sit against. This header is the page colour, so the border is
+   what makes it a field. */
+[data-md-toggle="search"]:checked ~ .md-header .md-search__form {
+  background-color: var(--np-card);
+  border: 1px solid var(--md-primary-fg-color);
+}
+body, .md-main { background-color: var(--np-page); }
 .md-grid { max-width: 72rem; }
+
+/* Material's only hover rule is a colour swap, and the two teals are 1.26:1
+   apart: a change at the edge of perception on the site's whole navigation
+   model. The underline is the affordance; the colour is the nicety. */
+.md-typeset a:hover,
+.md-typeset a:focus {
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.15em;
+}
+/* An inline code chip cannot be carried by fill on a white page: #f5f5f5 is
+   1.09:1 against it and every darker grey that still reads as a chip is under
+   1.2:1. A border is a shape cue and reads where a fill does not. */
+.md-typeset code {
+  border: 1px solid var(--np-line);
+  border-radius: 0.2rem;
+  padding: 0.05em 0.3em;
+}
+.md-typeset pre code, .md-typeset .highlight code { border: 0; padding: 0; }
+
+/* The first tab stop on every page. Material draws its ring in the accent
+   against the skip chip rather than the page, which is 2.33:1 in light and
+   1.25:1 in dark; the inner white edge is what makes it visible in both. */
+.md-skip:focus, .md-skip:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--md-accent-fg-color);
+}
+
+/* A page with no headings reserves a 242px rail and an empty landmark that
+   announces a table of contents holding nothing. */
+.md-sidebar--secondary:not(:has(.md-nav__list)) { display: none; }
+/* About 72 characters. The first attempt capped at 46rem, which never applied:
+   the two 12.1rem rails and the margins leave 45.4rem of a 72rem grid, so the
+   cap sat above the width it was meant to cut. Evidence gets the width back
+   below, rather than the prose keeping it. */
+.md-content__inner { max-width: 36rem; margin-inline: auto; }
+.md-content__inner:has(.np-hero) { max-width: none; margin-inline: 0; }
+
+/* Tables and code are the reason the page is wide. They break the measure on
+   purpose, centred on it, and stop at the column the rails leave. */
+.md-content__inner:not(:has(.np-hero)) .md-typeset__scrollwrap,
+.md-content__inner:not(:has(.np-hero)) .md-typeset > .highlight,
+.md-content__inner:not(:has(.np-hero)) .md-typeset > table:not([class]) {
+  width: min(45.4rem, 100vw - 2.4rem);
+  margin-inline: calc((36rem - min(45.4rem, 100vw - 2.4rem)) / 2);
+}
 
 /* The mobile drawer takes the page background like the header does. */
 .md-nav--primary .md-nav__title, .md-nav__source { background-color: var(--md-default-bg-color); color: var(--np-ink); }
@@ -93,9 +161,32 @@
 /* Type */
 .md-typeset { line-height: 1.65; }
 .md-typeset h1 { font-weight: 700; letter-spacing: -0.02em; color: var(--np-ink); }
-.md-typeset h2 { font-weight: 600; margin-top: 2.2em; color: var(--np-ink); }
-.md-typeset h3 { font-weight: 600; }
+/* h2 and h3 are 25px and 20px in Material. Five pixels at one weight is not a
+   level, and the reference pages carry a hundred of each. */
+.md-typeset h2 {
+  font-weight: 700;
+  margin-top: 2.2em;
+  color: var(--np-ink);
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid var(--np-line);
+}
+.md-typeset h3 {
+  font-weight: 600;
+  font-size: 1.05em;
+  letter-spacing: -0.005em;
+  color: var(--np-ink);
+}
 .md-typeset table:not([class]) { font-size: 0.72rem; }
+/* Reference tables run to ten rows of decimals, and something has to hold the
+   row the eye is on.
+   A sticky header row was tried here and removed. Material gives the table its
+   own overflow:auto and wraps it in a scrollwrap, so position:sticky resolves
+   against the table itself, which never scrolls vertically: the rule produced
+   no pixels on any page. Releasing those two overflows would bring it back and
+   would take horizontal scrolling from the eight-column tables with it. */
+.md-typeset table:not([class]) tbody tr:hover {
+  background: var(--md-accent-fg-color--transparent);
+}
 
 /* Landing page */
 .np-hero { padding: 2.5rem 0 1rem; }
@@ -105,7 +196,7 @@
 .np-actions { margin-bottom: 1.6rem; }
 .np-actions p { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0; }
 .np-actions .md-button { margin: 0; padding-block: 0.75em; }
-.np-prose { max-width: 44rem; }
+.np-prose { max-width: 40rem; }
 .np-fine { color: var(--np-muted); font-size: 0.72rem; }
 
 .np-stat { display: flex; gap: 2.5rem; flex-wrap: wrap; margin: 0 0 0.4rem; }
@@ -136,16 +227,72 @@
 .np-card:hover, .np-card:focus-within { border-color: var(--md-primary-fg-color); }
 /* The ring means keyboard: it follows the link's focus-visible, not a click.
    Where :has() is unsupported the border colour from :focus-within remains. */
-.np-card a:focus-visible { outline: none; }
+@supports selector(:has(*)) {
+  .np-card a:focus-visible { outline: none; }
+}
 .np-card:has(a:focus-visible) { outline: 2px solid var(--md-primary-fg-color); outline-offset: 2px; }
 .np-card .np-card-title { margin: 0 0 0.4rem; font-size: 0.95rem; font-weight: 600; color: var(--np-ink); }
 .np-card p { margin: 0; color: var(--np-muted); }
 .np-card a { font-weight: 600; }
 /* The whole card is the target: the one link in it stretches over it. */
-.np-card a::after { content: ""; position: absolute; inset: 0; }
+/* The overlay makes the whole card clickable and would make none of it
+   selectable, so it sits under the text rather than over it. A card naming a
+   command is a card someone copies from. */
+.np-card a::after { content: ""; position: absolute; inset: 0; z-index: 0; }
+.np-card > * { position: relative; z-index: 1; }
+.np-card a { position: relative; z-index: 2; }
 
 @media (max-width: 44rem) {
   .np-hero h1 { font-size: 1.8rem; }
   .np-hero p.np-lede { font-size: 0.95rem; }
 }
 
+
+/* Print.
+   Operators print references, and until this block a reader in dark mode got
+   1.23:1 body text on white paper, tables as solid near-black rectangles, a
+   920px column on 794px of A4, and every link reduced to dead ink. The
+   scrollwrap that lets an eight-column table scroll on screen silently clips
+   it on paper, which is the one failure this project cannot ship: a table
+   missing columns with nothing saying so. */
+@media print {
+  :root,
+  [data-md-color-scheme="slate"] {
+    --md-default-bg-color: #fff;
+    --md-default-fg-color: rgba(0, 0, 0, 0.87);
+    --md-default-fg-color--light: rgba(0, 0, 0, 0.62);
+    --md-code-bg-color: #f6f8fa;
+    --md-code-fg-color: #24292f;
+    --np-ink: #0b1220;
+    --np-muted: #3d4b5a;
+    --np-card: #fff;
+    --np-page: #fff;
+    --np-line: rgba(11, 18, 32, 0.28);
+  }
+  .md-grid,
+  .md-content__inner,
+  .md-content__inner:not(:has(.np-hero)) .md-typeset__scrollwrap,
+  .md-content__inner:not(:has(.np-hero)) .md-typeset > .highlight,
+  .md-content__inner:not(:has(.np-hero)) .md-typeset > table:not([class]) {
+    max-width: none;
+    width: auto;
+    margin-inline: 0;
+  }
+  .md-typeset__scrollwrap,
+  .md-typeset table:not([class]),
+  .md-typeset__table table { overflow: visible; }
+  .md-typeset table:not([class]) { font-size: 0.6rem; width: 100%; }
+  .md-typeset thead { display: table-header-group; }
+  .md-typeset tr,
+  .md-typeset .admonition,
+  .md-typeset .highlight,
+  .np-card { break-inside: avoid; }
+  .md-typeset h2, .md-typeset h3 { break-after: avoid; }
+  /* A printed page about a tool you install from URLs should carry them. */
+  .md-typeset a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    color: #555;
+    word-break: break-all;
+  }
+}

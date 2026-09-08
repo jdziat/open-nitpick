@@ -123,7 +123,7 @@ defined but the bar above it reads as a gate that `info` cannot pass.
   is not displaced by the first being more interesting.
 
 **Measure.** Tuning corpus with `make quick` for the `info` band and noise;
-then held-out is NOT re-spent: this is exactly the prompt change Rule 14
+then held-out is not re-spent: this is exactly the prompt change Rule 14
 was written for, and the held-out corpus has been spent twice already. A
 third corpus of `info` plants is authored first (see workstream 6) and the
 change is measured on that.

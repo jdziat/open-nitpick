@@ -2985,7 +2985,7 @@ the measurements are recorded so the next proposal starts from them.
 - AN INTERVAL, credit a foreign word against the hull of the planted levels
 it is observed on, is fitted to the observations it is then scored
 against, so a perfect score is the definition of the fit. Over the shipped
-cache the incumbent scores 14 accurate / 0 not, and 14/0 BOTH with the
+cache the incumbent scores 14 accurate / 0 not, and 14/0 again with the
 crSeverity bug that demoted "critical" and without it, where the
 point-valued reading moves 6/4/4 to 8/0/6. It is blind to the bug that
 caused the first retraction.

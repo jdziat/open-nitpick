@@ -67,6 +67,8 @@ func run() int {
 		err = runLinters()
 	case "providers":
 		err = runProviders()
+	case "config-reference":
+		err = runConfigRef(os.Args[2:], os.Stdout)
 	case "version", "--version", "-v":
 		fmt.Println("nitpick", version)
 		return exitOK

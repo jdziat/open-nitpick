@@ -66,10 +66,46 @@ models: {default: {provider: deepseek, model: deepseek-chat}}
 ```
 
 ```yaml
-# groq, cerebras, fireworks, togetherai, featherless, perplexity:
-# same shape, one line each
+# groq
 models: {default: {provider: groq, model: llama-3.3-70b-versatile}}
 ```
+
+```yaml
+# cerebras
+models: {default: {provider: cerebras, model: llama-3.3-70b}}
+```
+
+```yaml
+# fireworks
+models: {default: {provider: fireworks, model: accounts/fireworks/models/llama-v3p1-70b-instruct}}
+```
+
+```yaml
+# togetherai
+models: {default: {provider: togetherai, model: meta-llama/Llama-3.3-70B-Instruct-Turbo}}
+```
+
+```yaml
+# perplexity
+models: {default: {provider: perplexity, model: sonar-pro}}
+```
+
+```yaml
+# featherless: any model on featherless.ai, addressed by its Hugging Face path
+models: {default: {provider: featherless, model: meta-llama/Meta-Llama-3.1-70B-Instruct}}
+```
+
+```yaml
+# llamacpp: whatever the server was started with, so the name is yours
+models: {default: {provider: llamacpp, model: local}}
+```
+
+The model ids above are examples, not recommendations, and none of them has
+been measured as a reviewer here. Catalogues change faster than this file, and
+every one of these providers is OpenAI-compatible, so `GET /v1/models` against
+the endpoint in the table above is the current answer. The `fireworks` and
+`togetherai` ids come from the SDK's own tables; `cerebras` and `perplexity`
+were read from the vendors' documentation on 2026-09-07.
 
 Three providers need more than a name.
 

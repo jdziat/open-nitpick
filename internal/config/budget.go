@@ -53,7 +53,12 @@ type Budget struct {
 
 // BudgetPrices are per-million-token rates.
 type BudgetPrices struct {
-	Input  float64 `yaml:"input"`
+	// Input is dollars per million prompt tokens, as you supply it. Nothing
+	// here knows a vendor's price list, so an estimate is only as current as
+	// this number.
+	Input float64 `yaml:"input"`
+
+	// Output is dollars per million completion tokens, on the same terms.
 	Output float64 `yaml:"output"`
 }
 

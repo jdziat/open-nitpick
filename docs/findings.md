@@ -202,7 +202,7 @@ Rule 6.
 ## v1 head-to-head
 
 Both sides measured on the same 30-fixture corpus, `glm-5.2` and `kimi-k3` at two
-runs each. The deciding numbers come from the HELD-OUT corpus, which the prompt was
+runs each. The deciding numbers come from the held-out corpus, which the prompt was
 never tuned against.
 
 ### Detection: counted, no judge
@@ -268,7 +268,7 @@ ruby-default-page-size, and the shipped severity ladder illustrated `info` with
 "Adding a dependency for one helper function is info" three lines above "do not
 go looking for them": the prompt named one of the two plants and then told the
 reviewer to ignore it. That illustration has since been replaced and the figure
-above has NOT been re-measured under the new wording, so this row is stale in a
+above has not been re-measured under the new wording, so this row is stale in a
 known direction for our column only. The incumbent's column is unaffected: it
 never reads our prompt.
 
@@ -713,7 +713,7 @@ Two batteries, kimi-k3, 3 runs each, against the shipped Incumbent cache.
 | nit | 5/9 | 0/3 |
 | **located** | **38/48 = 0.79** | **10/16 = 0.62** |
 
-THE TWO SPLITS TELL DIFFERENT STORIES AND THE DIFFERENCE IS THE POINT. On the
+The two splits tell different stories, and the difference is the point. On the
 tuning corpus the blocking bands are a dead heat (10 of 10 each on
 critical+error+warning), and the whole margin is info and nit, where Incumbent
 locates nothing and may not publish at all. Quoting the tuning total alone would
@@ -731,7 +731,7 @@ it counts: critical 1.00 against 0.50, warning 1.00 against 0.33, error tied.
 
 Rule 14 says any one failing means do not ship. **Do not ship v1 yet.**
 
-WHY CONDITION 3 FAILS, AND WHAT IT DOES AND DOES NOT SAY. Judged precision is
+Why condition 3 fails, and what it does and does not say. Judged precision is
 0.80 for us and 0.83 for Incumbent, within a hair, and well inside a
 single-judge figure whose cross-judge disagreement was never measured. What
 differs is VOLUME: 0.88 findings per review against 0.43. At near-equal
@@ -748,7 +748,7 @@ pre-registration exists to prevent.
     TUNING corpus Incumbent's judged precision was 13/13, so 1.5x0 = 0 and any
     noise at all fails. A threshold that a perfect-precision incumbent makes
     unsatisfiable is not a threshold. It needs an absolute floor.
-  - Condition 4 named a column the benchmark DID NOT PRINT AT THE TIME. ANCHOR
+  - Condition 4 named a column the benchmark did not print at the time. ANCHOR
     appeared in the prompt-battery cost table and not in the head-to-head, so a
     condition could not be evaluated by the run it governs. **The instrument has
     since been repaired and this row is history, not current state:** the
@@ -771,10 +771,10 @@ All three were written or read by an author who had already seen a favourable
 narrow result, which is disclosed in Rule 14 and is the reason to read them
 sceptically rather than to trust that they were merely unlucky.
 
-### What is NOT claimed
+### What this does not claim
 
 No cross-tool severity accuracy: incumbent/cli's O-* columns are withdrawn by
-construction, its one `critical` spanning our critical AND error. GRADE is 3.77
+construction, its one `critical` spanning both our critical and our error. GRADE is 3.77
 against 3.14 with spreads of 2.30 and 4.30, a gap far inside either spread, so
 it is not a ranking. Every judged figure is one model's opinion with its
 cross-judge disagreement unmeasured, printed `+?`. Our side lost 2 runs of 42 to
@@ -810,7 +810,7 @@ By band, and this is where the incumbent's shape shows:
 Perfect on critical, error and warning; the incumbent locates 4 of 8 across those
 three. Both locate nothing at `info`.
 
-### THE HELD-OUT CORPUS WAS SPENT TWICE AND THIS IS THE SECOND LOOK
+### The held-out corpus was spent twice, and this is the second look
 
 It is meant to be spent once. The first spend could not evaluate the rule (two
 of four conditions had no column), so the instrument was fixed and it was spent
@@ -834,7 +834,7 @@ The drift is itself worth recording: 0.68 to 0.74 is about two defects on a
 corpus whose smallest expressible difference is one. Run-to-run variance at
 temperature 0 is real here and is not a rounding effect.
 
-### What this does NOT establish
+### What this does not establish
 
 - **Condition 3 was loosened after it failed.** Rule 14a states the direction and
   the reasoning; the timing is what pre-registration exists to distrust.
@@ -843,7 +843,7 @@ temperature 0 is real here and is not a rounding effect.
   singleton, is a pattern the standard library ships), so that band measures
   something below every tested reviewer's threshold rather than a gap.
 - **No cross-tool severity accuracy.** incumbent/cli's O-* cells are withdrawn by
-  construction; its one `critical` spans our critical AND error.
+  construction; its one `critical` spans both our critical and our error.
 - **GRADE is not a ranking.** 3.91 against 3.12 with spreads of 2.00 and 4.30.
   Single judge, cross-judge disagreement unmeasured, printed `+?`.
 - **The incumbent's raw text is not retained on this path**, only parsed findings,

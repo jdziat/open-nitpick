@@ -5555,7 +5555,7 @@ func TestTheSeverityFiguresTheseCommentsQuoteStillReproduce(t *testing.T) {
 			fmt.Sprintf("moves the incumbent's triple from %s to %s", render(crFull), render(crDemoted)),
 			fmt.Sprintf("B-ACC %.3f either way (%s to %s)", acc(crBanded), render(crBanded), render(crBandedSwapped)),
 			fmt.Sprintf("FULL-RESOLUTION triple from %s to %s", render(crFull), render(crSwapped)),
-			fmt.Sprintf("the incumbent scores %d accurate / %d not, and %d/%d BOTH with the",
+			fmt.Sprintf("the incumbent scores %d accurate / %d not, and %d/%d again with the",
 				fitAcc, fitNot, demotedAcc, demotedNot),
 			fmt.Sprintf("triple from %s to %s", render(crFull), render(crSwapped)),
 			fmt.Sprintf("is credited on %d plants, %d of them blocking", majorPlants, majorBlocking),

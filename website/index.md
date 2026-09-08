@@ -28,7 +28,11 @@ hide:
 <div class="np-prose" markdown>
 
 ```bash
-go install github.com/jdziat/open-nitpick/cmd/nitpick@latest
+# A signed binary, or `go install …/cmd/nitpick@latest` with Go 1.25.5.
+v=$(gh release view --repo jdziat/open-nitpick --json tagName -q .tagName)
+os=$(uname -s | tr 'A-Z' 'a-z'); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+curl -fsSLo nitpick "https://github.com/jdziat/open-nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
+chmod +x nitpick && sudo mv nitpick /usr/local/bin/
 
 export LLM_PROVIDER=synthetic
 export LLM_MODEL=hf:moonshotai/Kimi-K3

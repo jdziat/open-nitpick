@@ -17,7 +17,7 @@ because it could not be run here.
 | capability | Incumbent | open-nitpick |
 |---|---|---|
 | Runs where | hosted; self-hosted on an enterprise plan | anywhere: GitHub Action, any CI, a laptop, offline against a checkout |
-| Model | theirs, undisclosed | any of 17 providers, any OpenRouter model, any OpenAI-compatible endpoint, local models; different models per role |
+| Model | theirs, undisclosed | any of 18 providers, any OpenRouter model, any OpenAI-compatible endpoint, local models; different models per role |
 | Prompt | not visible | prompts are files in the repository; `nitpick explain-config` prints the exact prompt |
 | Pricing | per seat | none; you pay the model provider |
 | Trust model | reads `.incumbent.yaml` and analyzer configs from the branch under review | a change may not supply the policy it is reviewed under: policy from the base revision, analyzer configs never from the tree, endpoint keys stripped from untrusted config |

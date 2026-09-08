@@ -3,7 +3,7 @@ site_description: Self-hosted, model-agnostic pull request review.
 site_url: https://jdziat.github.io/open-nitpick/
 repo_url: https://github.com/jdziat/open-nitpick
 repo_name: jdziat/open-nitpick
-edit_uri: ""
+edit_uri: blob/main/
 
 # The docs directory is staged by `make docs`: README.md becomes guide.md and
 # docs/*.md are copied under docs/, so every relative link in the repository
@@ -18,14 +18,15 @@ theme:
   language: en
   icon:
     logo: np/mark
+    repo: fontawesome/brands/github
   favicon: assets/favicon.svg
   features:
     - navigation.tabs
     - navigation.sections
     - navigation.top
     - navigation.footer
+    - content.action.view
     - toc.follow
-    - toc.integrate
     - content.code.copy
     - search.suggest
     - search.highlight
@@ -73,9 +74,11 @@ nav:
       - Usage: docs/usage.md
       - GitHub Actions and other CI: docs/ci.md
       - Configuration: docs/configuration.md
+      - Configuration reference: docs/configuration-reference.md
       - Analyzers: docs/analyzers.md
       - Providers and models: docs/providers.md
       - Trust model: docs/trust-model.md
+      - Security policy: docs/security.md
       - How a review runs: docs/how-a-review-runs.md
       - Development: docs/development.md
   - Measurement:
