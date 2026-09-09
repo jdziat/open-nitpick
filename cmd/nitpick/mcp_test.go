@@ -173,8 +173,10 @@ func TestReviewTextCarriesTheCitation(t *testing.T) {
 			Expert: "resource", Reason: "the loop body returns", Cited: "go-defer-in-loop",
 		}},
 	})
-	if !strings.Contains(text, "go-defer-in-loop") {
-		t.Errorf("the citation is missing from the text result:\n%s", text)
+	// The whole line, so the id cannot run into the reason: a reader has to be
+	// able to see where the id ends.
+	if !strings.Contains(text, "(resource: the loop body returns) (citing go-defer-in-loop)") {
+		t.Errorf("the citation did not render after the reason:\n%s", text)
 	}
 
 	// And a withheld finding with no citation reads cleanly.

@@ -447,11 +447,14 @@ func reviewText(out ReviewOut) string {
 			// The citation belongs on both halves of the result. A client
 			// reading the text sees the reason a finding was removed, and the
 			// entry that reason rests on is part of it.
+			// After the reason, as printOverruled renders it. Between the
+			// expert and the reason the id and the sentence run together and a
+			// reader cannot see where the id ends.
 			cited := ""
 			if w.Cited != "" {
-				cited = fmt.Sprintf(" citing %s", w.Cited)
+				cited = fmt.Sprintf(" (citing %s)", w.Cited)
 			}
-			fmt.Fprintf(&b, "\n  %s:%d %s (%s:%s %s)", w.Path, w.Line, w.Title, w.Expert, cited, w.Reason)
+			fmt.Fprintf(&b, "\n  %s:%d %s (%s: %s)%s", w.Path, w.Line, w.Title, w.Expert, w.Reason, cited)
 		}
 		b.WriteString("\n")
 	}
