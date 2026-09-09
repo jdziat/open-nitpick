@@ -77,6 +77,15 @@ func (s *scriptedLLM) GenerateContent(_ context.Context, msgs []llms.Message, _ 
 			return &llms.Response{Content: response}, nil
 		}
 	}
+	// A fallback is written for the review pass, and the triage pass has a
+	// different shape. Answering triage with a review-shaped reply is not a
+	// no-op: every verdict names no finding, so triage is skipped entirely and
+	// a test that meant "triage is not the subject here" has quietly stopped
+	// exercising it. An empty verdict list says the same thing truthfully, and
+	// the findings restore.
+	if strings.Contains(text, "triaging findings") && !strings.Contains(s.fallback, `"number"`) {
+		return &llms.Response{Content: `{"findings":[],"summary":""}`}, nil
+	}
 	return &llms.Response{Content: s.fallback}, nil
 }
 
@@ -101,7 +110,7 @@ func (s *scriptedLLM) prompts() []string {
 }
 
 // mustJSON encodes a Result as the model would return it.
-func mustJSON(t *testing.T, r Result) string {
+func mustJSON[T Result | TriageResult](t *testing.T, r T) string {
 	t.Helper()
 
 	data, err := json.Marshal(r)
@@ -186,12 +195,12 @@ func TestReviewEndToEnd(t *testing.T) {
 		Path: "app.go", Line: 4, Severity: "error", Category: "correctness",
 		Title: "Ignored error from http.Get", Rationale: "resp may be nil, so the deferred Close panics.",
 	}}})
-	triageOut := mustJSON(t, Result{
+	triageOut := mustJSON(t, TriageResult{
 		Summary: "Adds a retry path to Get.",
-		Findings: []Finding{{
+		Verdicts: verdictsFor([]Finding{{
 			Path: "app.go", Line: 4, Severity: "error", Category: "correctness",
 			Title: "Ignored error from http.Get", Rationale: "resp may be nil, so the deferred Close panics.",
-		}},
+		}}),
 	})
 
 	model := &scriptedLLM{byPrompt: map[string]string{
@@ -390,7 +399,7 @@ func TestNearMissFindingsAreSnapped(t *testing.T) {
 	}})
 
 	model := &scriptedLLM{byPrompt: map[string]string{
-		"triaging findings":            mustJSON(t, Result{Summary: "s", Findings: []Finding{{Path: "app.go", Line: 6, Severity: "warning", Title: "Close may panic"}}}),
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor([]Finding{{Path: "app.go", Line: 6, Severity: "warning", Title: "Close may panic"}})}),
 		"Review the following changes": reviewOut,
 	}}
 	engine := newEngine(t, model, &stubProvider{diff: engineDiff}, nil)
@@ -425,37 +434,12 @@ func TestInvalidFindingsAreDiscarded(t *testing.T) {
 	}
 }
 
-func TestTriageCannotInventFindingsForOtherFiles(t *testing.T) {
-	// Triage may merge and reword, but a summarizing model must not be able to
-	// place comments on files nobody reported on.
-	reviewOut := mustJSON(t, Result{Findings: []Finding{
-		{Path: "app.go", Line: 4, Severity: "warning", Title: "Real finding"},
-	}})
-	triageOut := mustJSON(t, Result{
-		Summary: "ok",
-		Findings: []Finding{
-			{Path: "app.go", Line: 4, Severity: "warning", Title: "Real finding"},
-			{Path: "/etc/passwd", Line: 1, Severity: "critical", Title: "Invented"},
-		},
-	})
-
-	model := &scriptedLLM{byPrompt: map[string]string{
-		"triaging findings":            triageOut,
-		"Review the following changes": reviewOut,
-	}}
-	engine := newEngine(t, model, &stubProvider{diff: engineDiff}, nil)
-
-	report, err := engine.Review(context.Background(), vcs.Ref{})
-	if err != nil {
-		t.Fatalf("Review: %v", err)
-	}
-	for _, f := range report.Findings {
-		if f.Path != "app.go" {
-			t.Errorf("triage invented a finding for %q", f.Path)
-		}
-	}
-}
-
+// A triage pass could once place a comment on a file nobody reported on, by
+// returning a finding with a path of its own. TestTriageCannotInventFindingsForOtherFiles
+// guarded that. A verdict carries no path: it names a finding by its number
+// and the engine publishes its own object, so there is no longer a way to
+// express the claim the test refuted. Deleted rather than rewritten, because a
+// test of an inexpressible state asserts nothing.
 func TestMinSeverityGate(t *testing.T) {
 	out := mustJSON(t, Result{Summary: "s", Findings: []Finding{
 		{Path: "app.go", Line: 4, Severity: "nit", Title: "A nit"},

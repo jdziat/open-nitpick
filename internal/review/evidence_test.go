@@ -62,20 +62,22 @@ func TestNoHitsIsNoEvidence(t *testing.T) {
 	}
 }
 
-// Evidence survives triage, which re-decodes every finding from JSON.
+// Evidence survives triage.
 //
-// Source, Triager and the severity fields are all restored the same way and
-// for the same reason: they are json:"-", so they arrive from triage's decode
-// zeroed. A field that skipped this would be attributed at the reviewer and
-// gone by the time anything published it.
+// It used to survive by being restored after triage's reply was matched back
+// to the original by path, line and title, which broke the moment triage used
+// its permission to reword. Triage now answers by number and the reviewer's
+// own object publishes, so Evidence, Source, Triager and the severity fields
+// never make the round trip at all. This pins the outcome, which is the part
+// that has to hold whichever mechanism is underneath.
 func TestEvidenceSurvivesTriage(t *testing.T) {
 	reviewed := mustJSON(t, Result{Findings: []Finding{
 		{Path: "app.go", Line: 4, Severity: "error", Title: "Real finding"},
 	}})
-	triaged := mustJSON(t, Result{
+	triaged := mustJSON(t, TriageResult{
 		Summary: "one finding",
-		Findings: []Finding{
-			{Path: "app.go", Line: 4, Severity: "error", Title: "Real finding"},
+		Verdicts: []Verdict{
+			{Number: 1, Severity: "error", Class: "correctness", Title: "Reworded by triage"},
 		},
 	})
 

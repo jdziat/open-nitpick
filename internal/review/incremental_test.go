@@ -86,7 +86,7 @@ func TestIncrementalReviewReadsOnlyChangedFilesAndWithholdsPosted(t *testing.T) 
 		Title: "Ignored error from http.Get", Rationale: "resp may be nil, so the deferred Close panics.",
 	}
 	model := &scriptedLLM{byPrompt: map[string]string{
-		"triaging findings":            mustJSON(t, Result{Summary: "Adds a retry path.", Findings: []Finding{appFinding}}),
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "Adds a retry path.", Verdicts: verdictsFor([]Finding{appFinding})}),
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{appFinding}}),
 	}}
 	provider := &incrementalProvider{
@@ -181,7 +181,7 @@ func TestIncrementalCanBeSwitchedOff(t *testing.T) {
 func TestPublishedCommentsCarryFingerprints(t *testing.T) {
 	f := Finding{Path: "app.go", Line: 4, Severity: "error", Class: "correctness", Title: "Ignored error"}
 	model := &scriptedLLM{byPrompt: map[string]string{
-		"triaging findings":            mustJSON(t, Result{Summary: "s", Findings: []Finding{f}}),
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor([]Finding{f})}),
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{f}}),
 	}}
 	provider := &stubProvider{diff: engineDiff}
@@ -200,7 +200,7 @@ func TestPublishedCommentsCarryFingerprints(t *testing.T) {
 func TestAReviewThatCannotBePublishedIsStillReturned(t *testing.T) {
 	f := Finding{Path: "app.go", Line: 4, Severity: "error", Class: "correctness", Title: "Ignored error"}
 	model := &scriptedLLM{byPrompt: map[string]string{
-		"triaging findings":            mustJSON(t, Result{Summary: "s", Findings: []Finding{f}}),
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor([]Finding{f})}),
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{f}}),
 	}}
 	provider := &stubProvider{diff: engineDiff, err: errors.New("403 forbidden")}
@@ -227,7 +227,7 @@ func TestTriageMayNotLoseAFindingSilently(t *testing.T) {
 	// listed with the number it merges into. Line 5 is #2 after sorting.
 	listed := Finding{Path: "app.go", Line: 5, Severity: "warning", Class: "concurrency", Title: "Speculative", Rationale: "The nil response from the failed Get is closed."}
 	model := &scriptedLLM{byPrompt: map[string]string{
-		"triaging findings": mustJSON(t, Result{Summary: "s", Findings: []Finding{kept},
+		"triaging findings": mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor([]Finding{kept}),
 			Dropped: []Drop{{Number: 2, DuplicateOf: 1, Reason: "same nil response, one line down"}}}),
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{kept, lost, listed}}),
 	}}
@@ -269,7 +269,7 @@ func TestMultiLineSuggestionsAreCommittableOnlyWhenValidated(t *testing.T) {
 	same := Finding{Path: "app.go", Line: 4, Severity: "info", Class: "maintainability", Title: "Identical",
 		Suggestion: "\tresp, _ := http.Get(\"http://x\")\n\tdefer resp.Body.Close()", FixEndLine: 5}
 	model := &scriptedLLM{byPrompt: map[string]string{
-		"triaging findings":            mustJSON(t, Result{Summary: "s", Findings: []Finding{good, outside, same}}),
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor([]Finding{good, outside, same})}),
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{good, outside, same}}),
 	}}
 	provider := &stubProvider{diff: engineDiff}
@@ -329,7 +329,7 @@ func TestIncrementalRunResolvesSupersededComments(t *testing.T) {
 	elsewhere := Finding{Path: "other.go", Line: 3, Class: "style", Title: "Unread file nit"}
 	outdated := Finding{Path: "other.go", Line: 9, Class: "resource", Title: "Body not closed"}
 	model := &scriptedLLM{byPrompt: map[string]string{
-		"triaging findings":            mustJSON(t, Result{Summary: "s", Findings: []Finding{appFinding}}),
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor([]Finding{appFinding})}),
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{appFinding}}),
 	}}
 	provider := &resolvingProvider{incrementalProvider: incrementalProvider{

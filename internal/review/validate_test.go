@@ -486,7 +486,7 @@ func scriptValidation(t *testing.T, finding Finding, verdict string) *scriptedLL
 
 	return &scriptedLLM{byPrompt: map[string]string{
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{finding}}),
-		"triaging findings":            mustJSON(t, Result{Summary: "Walkthrough.", Findings: []Finding{finding}}),
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "Walkthrough.", Verdicts: verdictsFor([]Finding{finding})}),
 		validationNeedle:               verdict,
 	}}
 }

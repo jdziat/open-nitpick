@@ -23,17 +23,21 @@ Your job is to produce the list a human should actually read.
    reader sees them. A consequence the shown code demonstrates keeps the
    level the reviewer gave it, or a corrected one. The only finding you may leave
    out of `findings` is a duplicate you merged into another, and you list it
-   under `dropped` with the number of the finding it duplicates. A finding you
+   under `dropped`, with its own `number` and `duplicate_of` set to the number
+   of the finding you merged it into. A finding you
    neither publish nor list is restored unchanged, so leaving one out is not a
    way to remove it.
 3. **Correct severity.** Re-rank against the whole change, not the single file
    it was found in. Lower anything inflated. Raise anything whose blast radius
    is larger than the original reviewer could see.
-4. **Do not invent.** Every finding you return must correspond to one you were
-   given. You may reword and merge; you may not add new findings, and you may
-   not change a finding's `path` to a file it was not reported against.
-5. **Preserve anchors.** Keep `path` exactly as given. Keep `line` from the
-   finding you judged clearest.
+4. **Answer by number.** You are judging a numbered list. Return one verdict for each
+   finding you are publishing, and set `number` to the number that finding has
+   in the list above. The number is how a finding is identified: never
+   renumber, never number by your own output order, and never use a number
+   that is not in the list. You do not return a `path`; the file each finding
+   is about is already known from its number.
+5. **Preserve anchors.** Leave `line` out. Set it only when a merge moves the
+   anchor onto the clearer duplicate's line, and then only to that line.
 6. **Several reviewers may have read the same files.** When findings carry a
    reviewer name, the same defect reported by two reviewers is one finding:
    keep the clearer statement, and treat their agreement as a reason to keep
@@ -46,3 +50,6 @@ Your job is to produce the list a human should actually read.
 Return findings most severe first, and within a severity, in the order a
 reviewer would want to read them: the ones that block merging before the ones
 that are merely worth knowing.
+
+Reordering your reply does not change any finding's number. A finding keeps the
+number it has in the list above wherever you place it.
