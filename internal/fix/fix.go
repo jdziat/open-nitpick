@@ -275,23 +275,17 @@ func Proposal(r Request, res Result, pr *vcs.PullRequest, branch, body string) (
 // whose answer is written to files, which is what makes the delimiter load
 // bearing rather than decorative.
 //
-// The bodies are verbatim. Nothing else works: the model returns the complete
-// new content, so a byte this changes on the way in is a byte it can echo onto
-// disk. Defanging them put the placeholder into real source, including this
-// repository's own internal/fence, and a fixed delimiter let one body forge an
-// entry for another file the same pass is allowed to write. An unguessable
-// marker answers both, since a body cannot contain what nobody had read when
-// it was written.
-//
-// The findings are still defanged: they are prose the model reads, not content
-// it returns, so changing them costs nothing.
+// Everything inside the marker is verbatim, findings as well as bodies. The
+// model returns the complete new content and a finding carries the suggestion
+// it builds that from, so a byte changed on the way in is a byte that can
+// reach disk. See docs/trust-model.md.
 func userMessage(r Request, marker string) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "The findings to apply:\n%s\n", marker)
 	for _, f := range r.Findings {
 		fmt.Fprintf(&b, "%s:%d\n%s\n\n",
-			bundle.PromptSafe(f.Path), f.Line, fence.Defang(strings.TrimSpace(f.Body)))
+			bundle.PromptSafe(f.Path), f.Line, strings.TrimSpace(f.Body))
 	}
 	fmt.Fprintf(&b, "%s\n\n", marker)
 

@@ -193,8 +193,10 @@ rather than on the document, so the merge-key route that got past the prune
 does not apply to them: a `<<`-merged `golangci_config` lands on the struct
 field and is validated identically. That is the shape to copy.
 
-`fix` is the one prompt whose answer is written to files, so its bodies travel
-verbatim: a byte changed on the way in is a byte the model can echo onto disk,
+`fix` is the one prompt whose answer is written to files, so everything inside
+its region travels verbatim, the findings as well as the bodies: a published
+finding carries the suggestion block the model turns into content. Bodies
+first, because that is where it was found: a byte changed on the way in is a byte the model can echo onto disk,
 and defanging them put the placeholder into real source, this repository's own
 `internal/fence` among it. A fixed delimiter is no good either, since a body
 containing it forges an entry for another file the same pass may write. The
