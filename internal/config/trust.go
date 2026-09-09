@@ -316,8 +316,11 @@ func checkPruned(repo []byte, source string) error {
 		// today and would refuse it too, so this costs nothing; leaving it to
 		// the merge would make a security check depend on that staying true,
 		// and the two decoders already differ deliberately on KnownFields.
-		return worded{text: fmt.Sprintf("%s could not be read to check what it supplies: %v",
-			source, err)}
+		// Worded as the parse failure it is. Where it was caught is an
+		// implementation detail, and `fail_on: blocker` is the commonest
+		// config mistake there is: its reader should not have to get past a
+		// clause about supply-checking to reach it.
+		return worded{text: fmt.Sprintf("parse config %s: %v", source, err)}
 	}
 
 	if found := untrustedIn(reflect.ValueOf(*probe)); len(found) > 0 {

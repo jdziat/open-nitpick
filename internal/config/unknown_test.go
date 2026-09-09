@@ -79,6 +79,11 @@ func TestTheOptInDoesNotSwallowATypeError(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			root := writeConfig(t, models+body)
 			t.Setenv(EnvIgnoreUnknownKeys, "1")
+			// Trusted, so checkPruned does not run. It decodes with
+			// KnownFields off, so a type error trips it too, and it sits ahead
+			// of the merge: without this the load fails there and never
+			// reaches the classification this test is about.
+			t.Setenv(EnvTrustConfigEndpoints, "1")
 
 			if _, err := Load(root); err == nil {
 				t.Fatal("loaded; a decode this tool cannot describe must not be ignored")
@@ -91,6 +96,7 @@ func TestTheOptInDoesNotSwallowATypeError(t *testing.T) {
 	t.Run("the unknown key alone is ignored", func(t *testing.T) {
 		root := writeConfig(t, models+"review:\n  max_fils: 10\n")
 		t.Setenv(EnvIgnoreUnknownKeys, "1")
+		t.Setenv(EnvTrustConfigEndpoints, "1")
 
 		if _, err := Load(root); err != nil {
 			t.Fatalf("Load: %v", err)
