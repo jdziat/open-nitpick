@@ -237,6 +237,10 @@ func indexModel(raw []byte) (string, error) {
 
 // CheckModel refuses a query embedded by a different model than the index.
 func (ix *Index) CheckModel(model string) error {
+	if strings.TrimSpace(model) == "" {
+		return fmt.Errorf("knowledge: the index was built with %q and this run does not say what it embeds with; "+
+			"a query of the right width from the wrong model returns ordered nonsense, so name the model", ix.Model)
+	}
 	if !strings.EqualFold(strings.TrimSpace(model), strings.TrimSpace(ix.Model)) {
 		return fmt.Errorf("knowledge: the index was built with %q and this run embeds with %q; "+
 			"vectors from two models are not comparable, so regenerate the index or name the model it was built with",

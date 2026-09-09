@@ -64,7 +64,9 @@ func TestLiveKnowledgeReachesThePlants(t *testing.T) {
 			paths = append(paths, p)
 			q.WriteString(body)
 		}
-		hits, err := r.Retrieve(context.Background(), q.String(), knowledge.LanguagesOf(paths))
+		// Every class the review pass publishes: this test asks where an entry
+		// ranks for a fixture, not which pass routes it.
+		hits, err := r.Retrieve(context.Background(), q.String(), knowledge.LanguagesOf(paths), liveDefectClasses())
 		if err != nil {
 			t.Errorf("%s: Retrieve: %v", f.Name, err)
 			continue
@@ -99,4 +101,14 @@ func mustShippedIndex(t *testing.T) []byte {
 		t.Fatalf("SelectIndex(%q): %v", models[0], err)
 	}
 	return raw
+}
+
+// liveDefectClasses is every class in the taxonomy, for a retrieval test that
+// is not about routing.
+func liveDefectClasses() map[config.Class]bool {
+	out := map[config.Class]bool{}
+	for _, c := range config.Classes() {
+		out[c] = true
+	}
+	return out
 }

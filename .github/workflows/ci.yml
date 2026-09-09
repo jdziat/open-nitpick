@@ -38,6 +38,13 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # The eval battery is behind a build tag, so `go vet ./...` never
+      # compiles it and a signature change in a package it uses lands green.
+      # #85 changed knowledge.Retriever.Retrieve and left
+      # internal/evals/knowledge_live_test.go uncompilable; CI said nothing.
+      - name: Vet the eval battery
+        run: go vet -tags=eval ./...
+
       # internal/linters drives the real analyzer and skips when the binary is
       # absent, so without this the tests that measure golangci-lint's own
       # behaviour never ran here and a green CI meant silence rather than a

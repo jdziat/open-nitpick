@@ -97,6 +97,7 @@ docs-serve: docs
 .PHONY: lint
 lint:
 	go vet ./...
+	go vet -tags=eval ./...
 	@test -z "$$(gofmt -l .)" || { echo "gofmt needed:"; gofmt -l .; exit 1; }
 	@if command -v golangci-lint >/dev/null; then \
 		golangci-lint run; \
