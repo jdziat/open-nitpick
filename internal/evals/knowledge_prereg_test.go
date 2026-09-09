@@ -161,3 +161,87 @@ func TestTheSelectionMatchesWhatWasRegistered(t *testing.T) {
 		}
 	}
 }
+
+// The two halves of a fix are the same pair of commits read from opposite
+// ends: pre_fix reviews the parent, repaired reviews the fix. A row whose
+// review target does not match its arm would put the repaired code in the
+// pre-fix arm and score a clean review as a miss.
+func TestEachArmReviewsTheRightCommit(t *testing.T) {
+	s, err := LoadSelection()
+	if err != nil {
+		t.Fatalf("LoadSelection: %v", err)
+	}
+	if !s.Frozen {
+		t.Skip("the selection is not frozen")
+	}
+	for _, snap := range s.Snapshots {
+		switch snap.Arm {
+		case "pre_fix":
+			if snap.Review != snap.Parent {
+				t.Errorf("%s reviews %s, want the parent %s", snap.ID, snap.Review, snap.Parent)
+			}
+		case "repaired", "clean":
+			if snap.Review != snap.Commit {
+				t.Errorf("%s reviews %s, want the commit %s", snap.ID, snap.Review, snap.Commit)
+			}
+		default:
+			t.Errorf("%s names arm %q", snap.ID, snap.Arm)
+		}
+	}
+}
+
+// Every corpus contributes, and no one repository can carry the result. A
+// macro average over four repositories is only a macro average if all four are
+// present.
+func TestEveryCorpusContributes(t *testing.T) {
+	p, err := LoadPreRegistration()
+	if err != nil {
+		t.Fatalf("LoadPreRegistration: %v", err)
+	}
+	s, err := LoadSelection()
+	if err != nil {
+		t.Fatalf("LoadSelection: %v", err)
+	}
+	if !s.Frozen {
+		t.Skip("the selection is not frozen")
+	}
+
+	byRepo := map[string]int{}
+	for _, snap := range s.Snapshots {
+		byRepo[snap.Repo]++
+	}
+	for _, c := range p.Corpora {
+		if byRepo[c.Repo] == 0 {
+			t.Errorf("%s contributes no snapshots", c.Repo)
+		}
+	}
+	if len(byRepo) != len(p.Corpora) {
+		t.Errorf("the selection covers %d repositories, the pre-registration names %d", len(byRepo), len(p.Corpora))
+	}
+}
+
+// A pre-fix row without a defect sentence cannot be scored: nothing says what
+// finding would count as locating it.
+func TestEveryScoredRowNamesItsDefect(t *testing.T) {
+	s, err := LoadSelection()
+	if err != nil {
+		t.Fatalf("LoadSelection: %v", err)
+	}
+	if !s.Frozen {
+		t.Skip("the selection is not frozen")
+	}
+	for _, snap := range s.Snapshots {
+		if snap.Arm == "clean" {
+			if snap.Defect != "" {
+				t.Errorf("%s is a clean change and names a defect", snap.ID)
+			}
+			continue
+		}
+		if len(snap.Defect) < 40 {
+			t.Errorf("%s names no usable defect: %q", snap.ID, snap.Defect)
+		}
+		if snap.Class == "" {
+			t.Errorf("%s names no class", snap.ID)
+		}
+	}
+}

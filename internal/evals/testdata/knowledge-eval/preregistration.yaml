@@ -8,7 +8,7 @@
 
 version: 1
 frozen: "2026-09-08"
-status: registered   # registered -> selected -> run -> reported
+status: selected     # registered -> selected -> run -> reported
 
 # What is being asked. One sentence, so a reader can tell whether the tables
 # below answer it.
