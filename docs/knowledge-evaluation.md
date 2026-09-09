@@ -52,6 +52,33 @@ same repositories, with counterexamples.
 open-nitpick's own three historical bugs stay a diagnostic corpus, with the
 selection bias stated: we already know those targets.
 
+### The selection, frozen 2026-09-08
+
+100 rows in `selection.yaml`: 40 pre-fix, 40 repaired, 20 clean, 25 per
+repository. Classes across the fixes are 29 correctness, 4 contract, 3
+concurrency, 3 resource and 1 security, each counted once and reviewed twice.
+
+The rule, applied before any tuning: merged pull requests carrying each
+repository's own bug label (`kind/bug` for Prometheus, `bug` for HTTPX and
+typescript-eslint) or, where the repository labels issues rather than pull
+requests, a conventional `fix(` title (Cargo), merged before 2026-09-01, in the
+order the GitHub search API returned them, keeping the first ten per repository
+that change source and whose defect can be written from the fix and its own
+discussion. Documentation and lint-warning fixes, test-only changes, feature
+removals, a reverted refactor with its revert, and one output-polish change
+with no stated defect were excluded on that rule.
+
+A pre-fix row reviews the parent commit and its repaired twin reviews the fix,
+so both halves are the same pair of commits read from opposite ends.
+
+Two limits belong in the results rather than in a footnote. The fixes were
+adjudicated by one reader: independent here means chosen without reference to
+the knowledge corpus, which the rule enforces, and not that a second person
+checked them. And a clean change is a merged refactor with no bug label and no
+later revert, which is a proxy: nobody can show a change introduced no defect,
+so a finding on one of these is unsupported only in the sense that the
+repository's own history never recorded it.
+
 ## The thresholds
 
 Every one names the denominator it is read against, and a test checks that

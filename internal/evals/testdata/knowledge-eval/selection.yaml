@@ -1,26 +1,1206 @@
-# The frozen selection. Empty until the snapshots are adjudicated; the schema
-# and the guards ship first, deliberately, so the selection cannot be assembled
-# while retrieval is being tuned against it.
+# The frozen selection for the knowledge evaluation, issue #84.
 #
-# One row per snapshot:
+# Selection rule, applied before any retrieval tuning and recorded so the set
+# can be rebuilt: merged pull requests carrying each repository's own bug
+# label (prometheus kind/bug, httpx and typescript-eslint bug) or, where the
+# repository labels issues rather than pull requests, a conventional `fix(`
+# title (cargo), merged before 2026-09-01, in the order the GitHub search API
+# returned them, keeping the first ten per repository that change source and
+# whose defect can be written from the fix and its own discussion. Excluded on
+# that rule: documentation and lint-warning fixes, test-only changes, feature
+# removals, a reverted refactor and its revert, and one output-polish change
+# with no stated defect.
 #
-#   - id: prometheus-0001-pre
-#     repo: prometheus/prometheus
-#     commit: <sha>            # the fix
-#     parent: <sha>            # what it was fixed from
-#     arm: pre_fix             # pre_fix | repaired | clean
-#     language: go
-#     class: resource          # the review class the defect belongs to
-#     family: context-cancellation
-#     defect: >
-#       One sentence naming the defect and the observable consequence, written
-#       from the fix and its discussion, not from a review of the diff.
-#     adjudicated_by: <who>, <date>
+# Clean changes are merged refactors touching source with no bug label and no
+# subsequent revert. That is a proxy and not a proof: nobody can show a change
+# introduced no defect, and a finding on one of these is unsupported only in
+# the sense that the repository's own history never recorded it.
 #
-# A refactor commit is not evidence the old code was defective, and authorship
-# is never the label. A row whose `defect` cannot be written from the fix's own
-# discussion does not belong here.
+# Adjudicated by one reader, not two. #84 asks for independently adjudicated
+# fixes; independent here means chosen without reference to the knowledge
+# corpus, which the rule above enforces, and NOT that a second person checked
+# them. That limit belongs in the results.
 
 version: 1
-frozen: false
-snapshots: []
+frozen: true
+snapshots:
+  - id: prometheus-19557-pre
+    repo: prometheus/prometheus
+    commit: 9c8c131e849264f1dd210c89e5232dc9d1723536
+    parent: 571f1a59306ce837db4c893b8bc855f0d710319a
+    review: 571f1a59306ce837db4c893b8bc855f0d710319a
+    arm: pre_fix
+    language: go
+    class: correctness
+    family: promql-info-join
+    defect: >-
+      info() built one storage selector from every non-empty job and instance value at once, so a query mixing series that carry those labels with series that do not enriched the wrong set.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19557-fixed
+    repo: prometheus/prometheus
+    commit: 9c8c131e849264f1dd210c89e5232dc9d1723536
+    parent: 571f1a59306ce837db4c893b8bc855f0d710319a
+    review: 9c8c131e849264f1dd210c89e5232dc9d1723536
+    arm: repaired
+    language: go
+    class: correctness
+    family: promql-info-join
+    defect: >-
+      info() built one storage selector from every non-empty job and instance value at once, so a query mixing series that carry those labels with series that do not enriched the wrong set.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19470-pre
+    repo: prometheus/prometheus
+    commit: fd10b7944a52a85d227e47ebf396e0510abc1ba1
+    parent: ee1c94eb6f548967b58bdcbe6e9d9b28427b07bc
+    review: ee1c94eb6f548967b58bdcbe6e9d9b28427b07bc
+    arm: pre_fix
+    language: go
+    class: concurrency
+    family: head-gc-race
+    defect: >-
+      Head eviction could drop a series while an append to it was still in flight, losing the sample the appender was about to commit.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19470-fixed
+    repo: prometheus/prometheus
+    commit: fd10b7944a52a85d227e47ebf396e0510abc1ba1
+    parent: ee1c94eb6f548967b58bdcbe6e9d9b28427b07bc
+    review: fd10b7944a52a85d227e47ebf396e0510abc1ba1
+    arm: repaired
+    language: go
+    class: concurrency
+    family: head-gc-race
+    defect: >-
+      Head eviction could drop a series while an append to it was still in flight, losing the sample the appender was about to commit.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19413-pre
+    repo: prometheus/prometheus
+    commit: 7b61de40d34e571abb91de1f6467a7a3aedf9e32
+    parent: 216edd239d0d0a0cf2106a6d56aafd750b3de4ce
+    review: 216edd239d0d0a0cf2106a6d56aafd750b3de4ce
+    arm: pre_fix
+    language: go
+    class: correctness
+    family: promql-name-dropping
+    defect: >-
+      The info function did not implement delayed name removal, so the metric name was kept or dropped inconsistently through it.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19413-fixed
+    repo: prometheus/prometheus
+    commit: 7b61de40d34e571abb91de1f6467a7a3aedf9e32
+    parent: 216edd239d0d0a0cf2106a6d56aafd750b3de4ce
+    review: 7b61de40d34e571abb91de1f6467a7a3aedf9e32
+    arm: repaired
+    language: go
+    class: correctness
+    family: promql-name-dropping
+    defect: >-
+      The info function did not implement delayed name removal, so the metric name was kept or dropped inconsistently through it.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19387-pre
+    repo: prometheus/prometheus
+    commit: 72ec71faad58fe7ce8e147a118270e6f8a939b67
+    parent: d60b93b8adc203e47c49519b4a30b9c1dcfc92c4
+    review: d60b93b8adc203e47c49519b4a30b9c1dcfc92c4
+    arm: pre_fix
+    language: go
+    class: correctness
+    family: promql-info-join
+    defect: >-
+      info() derived the enrichment timestamp from the wrong expression for composite queries mixing @ and offset modifiers, enriching from the wrong instant.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19387-fixed
+    repo: prometheus/prometheus
+    commit: 72ec71faad58fe7ce8e147a118270e6f8a939b67
+    parent: d60b93b8adc203e47c49519b4a30b9c1dcfc92c4
+    review: 72ec71faad58fe7ce8e147a118270e6f8a939b67
+    arm: repaired
+    language: go
+    class: correctness
+    family: promql-info-join
+    defect: >-
+      info() derived the enrichment timestamp from the wrong expression for composite queries mixing @ and offset modifiers, enriching from the wrong instant.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19368-pre
+    repo: prometheus/prometheus
+    commit: dee5127070290d0152159de46d89401e831adc45
+    parent: 9606e393dc34f915af7689fe66b7936f981687e8
+    review: 9606e393dc34f915af7689fe66b7936f981687e8
+    arm: pre_fix
+    language: go
+    class: correctness
+    family: tsdb-options
+    defect: >-
+      A TSDB opened with custom options used the wrong default block reload interval, so blocks were reloaded on a schedule the operator did not configure.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19368-fixed
+    repo: prometheus/prometheus
+    commit: dee5127070290d0152159de46d89401e831adc45
+    parent: 9606e393dc34f915af7689fe66b7936f981687e8
+    review: dee5127070290d0152159de46d89401e831adc45
+    arm: repaired
+    language: go
+    class: correctness
+    family: tsdb-options
+    defect: >-
+      A TSDB opened with custom options used the wrong default block reload interval, so blocks were reloaded on a schedule the operator did not configure.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19272-pre
+    repo: prometheus/prometheus
+    commit: e4e086ce289675dac3cdb4fe59ad8c1be9f40b55
+    parent: 82a2f6bee5d71f28a7b4eac4f37bb43da8932244
+    review: 82a2f6bee5d71f28a7b4eac4f37bb43da8932244
+    arm: pre_fix
+    language: go
+    class: concurrency
+    family: head-gc-race
+    defect: >-
+      Head garbage collection could remove a series from the head index while an append was resolving it, so the appended samples were silently lost.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19272-fixed
+    repo: prometheus/prometheus
+    commit: e4e086ce289675dac3cdb4fe59ad8c1be9f40b55
+    parent: 82a2f6bee5d71f28a7b4eac4f37bb43da8932244
+    review: e4e086ce289675dac3cdb4fe59ad8c1be9f40b55
+    arm: repaired
+    language: go
+    class: concurrency
+    family: head-gc-race
+    defect: >-
+      Head garbage collection could remove a series from the head index while an append was resolving it, so the appended samples were silently lost.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19149-pre
+    repo: prometheus/prometheus
+    commit: 50ffaa38fae9248f80680f027e91637202bebd1b
+    parent: e4d0e59c87afd0ca06010a03478ad8f89981085b
+    review: e4d0e59c87afd0ca06010a03478ad8f89981085b
+    arm: pre_fix
+    language: go
+    class: correctness
+    family: scrape-lifecycle
+    defect: >-
+      Manager.Run used break on the closed discovery target-set channel, which left the select and not the loop, so the manager spun instead of stopping.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19149-fixed
+    repo: prometheus/prometheus
+    commit: 50ffaa38fae9248f80680f027e91637202bebd1b
+    parent: e4d0e59c87afd0ca06010a03478ad8f89981085b
+    review: 50ffaa38fae9248f80680f027e91637202bebd1b
+    arm: repaired
+    language: go
+    class: correctness
+    family: scrape-lifecycle
+    defect: >-
+      Manager.Run used break on the closed discovery target-set channel, which left the select and not the loop, so the manager spun instead of stopping.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19134-pre
+    repo: prometheus/prometheus
+    commit: 39359eb784397136c1aa91046915ca6c2ec93b42
+    parent: fa365c3a62f50e01f6ca68e4b09d5fdddc591a7c
+    review: fa365c3a62f50e01f6ca68e4b09d5fdddc591a7c
+    arm: pre_fix
+    language: go
+    class: correctness
+    family: tsdb-chunk-cache
+    defect: >-
+      The head-chunk cache kept an entry across head-chunk truncation and returned samples from the wrong chunk.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-19134-fixed
+    repo: prometheus/prometheus
+    commit: 39359eb784397136c1aa91046915ca6c2ec93b42
+    parent: fa365c3a62f50e01f6ca68e4b09d5fdddc591a7c
+    review: 39359eb784397136c1aa91046915ca6c2ec93b42
+    arm: repaired
+    language: go
+    class: correctness
+    family: tsdb-chunk-cache
+    defect: >-
+      The head-chunk cache kept an entry across head-chunk truncation and returned samples from the wrong chunk.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-18306-pre
+    repo: prometheus/prometheus
+    commit: 6b5c0b327a5ec706029dfebb7bd7bbd6d1611ce6
+    parent: 8b25b26a7653d9c7444f217a7f2ae9b327bda921
+    review: 8b25b26a7653d9c7444f217a7f2ae9b327bda921
+    arm: pre_fix
+    language: go
+    class: resource
+    family: tsdb-wal-replay
+    defect: >-
+      Histogram chunks were not mmapped during WAL replay, so replay held them in heap memory instead of mapping them.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-18306-fixed
+    repo: prometheus/prometheus
+    commit: 6b5c0b327a5ec706029dfebb7bd7bbd6d1611ce6
+    parent: 8b25b26a7653d9c7444f217a7f2ae9b327bda921
+    review: 6b5c0b327a5ec706029dfebb7bd7bbd6d1611ce6
+    arm: repaired
+    language: go
+    class: resource
+    family: tsdb-wal-replay
+    defect: >-
+      Histogram chunks were not mmapped during WAL replay, so replay held them in heap memory instead of mapping them.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-18151-pre
+    repo: prometheus/prometheus
+    commit: f3cbf90e1ca3f991244ee1d69948ad799d6de91f
+    parent: b8d9a9b77af5501d5920014b8478b21f0e1b16fc
+    review: b8d9a9b77af5501d5920014b8478b21f0e1b16fc
+    arm: pre_fix
+    language: go
+    class: concurrency
+    family: tsdb-locking
+    defect: >-
+      mmapHeadChunks and mmapOOOSeriesChunk unlocked on the success path only, so an early return held the lock and deadlocked the head.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-18151-fixed
+    repo: prometheus/prometheus
+    commit: f3cbf90e1ca3f991244ee1d69948ad799d6de91f
+    parent: b8d9a9b77af5501d5920014b8478b21f0e1b16fc
+    review: f3cbf90e1ca3f991244ee1d69948ad799d6de91f
+    arm: repaired
+    language: go
+    class: concurrency
+    family: tsdb-locking
+    defect: >-
+      mmapHeadChunks and mmapOOOSeriesChunk unlocked on the success path only, so an early return held the lock and deadlocked the head.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-3442-pre
+    repo: encode/httpx
+    commit: 89599a9541af14bcf906fc4ed58ccbdf403802ba
+    parent: 8ecb86f0d74ffc52d4663214fae9526bee89358d
+    review: 8ecb86f0d74ffc52d4663214fae9526bee89358d
+    arm: pre_fix
+    language: python
+    class: security
+    family: tls-verification
+    defect: >-
+      Passing verify=False together with a client certificate did not produce the intended TLS context, so the combination behaved differently from either setting alone.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-3442-fixed
+    repo: encode/httpx
+    commit: 89599a9541af14bcf906fc4ed58ccbdf403802ba
+    parent: 8ecb86f0d74ffc52d4663214fae9526bee89358d
+    review: 89599a9541af14bcf906fc4ed58ccbdf403802ba
+    arm: repaired
+    language: python
+    class: security
+    family: tls-verification
+    defect: >-
+      Passing verify=False together with a client certificate did not produce the intended TLS context, so the combination behaved differently from either setting alone.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-2701-pre
+    repo: encode/httpx
+    commit: ee432c0d3098375df258b6d5844e7569080b2369
+    parent: df5dbc05580a4c3225e70153729e2a306d67a472
+    review: df5dbc05580a4c3225e70153729e2a306d67a472
+    arm: pre_fix
+    language: python
+    class: correctness
+    family: url-encoding
+    defect: >-
+      The set of gen-delims escaped in a URL's path, query and fragment did not match the RFC, so valid characters were escaped and invalid ones were not.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-2701-fixed
+    repo: encode/httpx
+    commit: ee432c0d3098375df258b6d5844e7569080b2369
+    parent: df5dbc05580a4c3225e70153729e2a306d67a472
+    review: ee432c0d3098375df258b6d5844e7569080b2369
+    arm: repaired
+    language: python
+    class: correctness
+    family: url-encoding
+    defect: >-
+      The set of gen-delims escaped in a URL's path, query and fragment did not match the RFC, so valid characters were escaped and invalid ones were not.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-2671-pre
+    repo: encode/httpx
+    commit: 9ae170a936df39f42a6ddf8eb2c27026e20bea7e
+    parent: 15d09a3bbc20372cd87e48f17f7c9381c8220a0f
+    review: 15d09a3bbc20372cd87e48f17f7c9381c8220a0f
+    arm: pre_fix
+    language: python
+    class: correctness
+    family: url-encoding
+    defect: >-
+      Optional percent encoding was applied inconsistently, so two URLs that should compare equal did not.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-2671-fixed
+    repo: encode/httpx
+    commit: 9ae170a936df39f42a6ddf8eb2c27026e20bea7e
+    parent: 15d09a3bbc20372cd87e48f17f7c9381c8220a0f
+    review: 9ae170a936df39f42a6ddf8eb2c27026e20bea7e
+    arm: repaired
+    language: python
+    class: correctness
+    family: url-encoding
+    defect: >-
+      Optional percent encoding was applied inconsistently, so two URLs that should compare equal did not.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-2659-pre
+    repo: encode/httpx
+    commit: 15d09a3bbc20372cd87e48f17f7c9381c8220a0f
+    parent: 7d7c4f15b8784e4a550d974139acfa64193b32c2
+    review: 7d7c4f15b8784e4a550d974139acfa64193b32c2
+    arm: pre_fix
+    language: python
+    class: correctness
+    family: proxy-config
+    defect: >-
+      get_environment_proxies did not parse NO_PROXY entries for IPv4, IPv6 or localhost, so requests that should have bypassed the proxy went through it.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-2659-fixed
+    repo: encode/httpx
+    commit: 15d09a3bbc20372cd87e48f17f7c9381c8220a0f
+    parent: 7d7c4f15b8784e4a550d974139acfa64193b32c2
+    review: 15d09a3bbc20372cd87e48f17f7c9381c8220a0f
+    arm: repaired
+    language: python
+    class: correctness
+    family: proxy-config
+    defect: >-
+      get_environment_proxies did not parse NO_PROXY entries for IPv4, IPv6 or localhost, so requests that should have bypassed the proxy went through it.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-2423-pre
+    repo: encode/httpx
+    commit: 85c5898d8e48011ab7b660fe8aac58910e45c84b
+    parent: e486fbceea7a933baa4b52852681f9c6ac80ac96
+    review: e486fbceea7a933baa4b52852681f9c6ac80ac96
+    arm: pre_fix
+    language: python
+    class: correctness
+    family: line-decoding
+    defect: >-
+      LineDecoder did not split lines the way the standard library does, so text responses were split at the wrong boundaries.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-2423-fixed
+    repo: encode/httpx
+    commit: 85c5898d8e48011ab7b660fe8aac58910e45c84b
+    parent: e486fbceea7a933baa4b52852681f9c6ac80ac96
+    review: 85c5898d8e48011ab7b660fe8aac58910e45c84b
+    arm: repaired
+    language: python
+    class: correctness
+    family: line-decoding
+    defect: >-
+      LineDecoder did not split lines the way the standard library does, so text responses were split at the wrong boundaries.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-2026-pre
+    repo: encode/httpx
+    commit: 7f0d43daad60b37d07f7734a83986e9dade59bf7
+    parent: 0f1ff50a1e88ddee0c7ffe4ef1c04f0dc30cc6ab
+    review: 0f1ff50a1e88ddee0c7ffe4ef1c04f0dc30cc6ab
+    arm: pre_fix
+    language: python
+    class: resource
+    family: object-lifetime
+    defect: >-
+      __del__ performed an implicit close and emitted a warning, running teardown at an interpreter-controlled time rather than the caller's.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-2026-fixed
+    repo: encode/httpx
+    commit: 7f0d43daad60b37d07f7734a83986e9dade59bf7
+    parent: 0f1ff50a1e88ddee0c7ffe4ef1c04f0dc30cc6ab
+    review: 7f0d43daad60b37d07f7734a83986e9dade59bf7
+    arm: repaired
+    language: python
+    class: resource
+    family: object-lifetime
+    defect: >-
+      __del__ performed an implicit close and emitted a warning, running teardown at an interpreter-controlled time rather than the caller's.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-1827-pre
+    repo: encode/httpx
+    commit: 10b60d47c71e352f06c418f31095f381ea36c6b8
+    parent: 06498df528d0f6e0b0fe9c2695b56aedf03de635
+    review: 06498df528d0f6e0b0fe9c2695b56aedf03de635
+    arm: pre_fix
+    language: python
+    class: correctness
+    family: stream-iteration
+    defect: >-
+      iter_bytes on empty content yielded nothing rather than the expected single empty chunk.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-1827-fixed
+    repo: encode/httpx
+    commit: 10b60d47c71e352f06c418f31095f381ea36c6b8
+    parent: 06498df528d0f6e0b0fe9c2695b56aedf03de635
+    review: 10b60d47c71e352f06c418f31095f381ea36c6b8
+    arm: repaired
+    language: python
+    class: correctness
+    family: stream-iteration
+    defect: >-
+      iter_bytes on empty content yielded nothing rather than the expected single empty chunk.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-1613-pre
+    repo: encode/httpx
+    commit: 81f385c484f1c2f189e8e9d05b02d16240bec199
+    parent: 4fbf2751ec353b09fafe9e3b22cbe07e49a26442
+    review: 4fbf2751ec353b09fafe9e3b22cbe07e49a26442
+    arm: pre_fix
+    language: python
+    class: contract
+    family: api-surface
+    defect: >-
+      The top-level httpx.stream() helper accepted no timeout argument, so callers could not set one through it as they could through the client.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-1613-fixed
+    repo: encode/httpx
+    commit: 81f385c484f1c2f189e8e9d05b02d16240bec199
+    parent: 4fbf2751ec353b09fafe9e3b22cbe07e49a26442
+    review: 81f385c484f1c2f189e8e9d05b02d16240bec199
+    arm: repaired
+    language: python
+    class: contract
+    family: api-surface
+    defect: >-
+      The top-level httpx.stream() helper accepted no timeout argument, so callers could not set one through it as they could through the client.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-1469-pre
+    repo: encode/httpx
+    commit: 02a692aba574a8e1ea7abd6fdfbfa77258ad8e6e
+    parent: d964343fa14852bcf475a83ef9774f8c388317d7
+    review: d964343fa14852bcf475a83ef9774f8c388317d7
+    arm: pre_fix
+    language: python
+    class: correctness
+    family: wsgi-transport
+    defect: >-
+      WSGITransport did not handle default ports, so the SERVER_PORT it passed through disagreed with the request URL.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-1469-fixed
+    repo: encode/httpx
+    commit: 02a692aba574a8e1ea7abd6fdfbfa77258ad8e6e
+    parent: d964343fa14852bcf475a83ef9774f8c388317d7
+    review: 02a692aba574a8e1ea7abd6fdfbfa77258ad8e6e
+    arm: repaired
+    language: python
+    class: correctness
+    family: wsgi-transport
+    defect: >-
+      WSGITransport did not handle default ports, so the SERVER_PORT it passed through disagreed with the request URL.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-1391-pre
+    repo: encode/httpx
+    commit: 2961f267fdcd84539defeb006a07a56b94f15dba
+    parent: 0af6d9a25469718d1bf9adc64a04f79a660fc316
+    review: 0af6d9a25469718d1bf9adc64a04f79a660fc316
+    arm: pre_fix
+    language: python
+    class: correctness
+    family: wsgi-transport
+    defect: >-
+      PATH_INFO was passed to the WSGI app still URL-quoted, so applications saw an escaped path where the spec requires an unquoted one.
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-1391-fixed
+    repo: encode/httpx
+    commit: 2961f267fdcd84539defeb006a07a56b94f15dba
+    parent: 0af6d9a25469718d1bf9adc64a04f79a660fc316
+    review: 2961f267fdcd84539defeb006a07a56b94f15dba
+    arm: repaired
+    language: python
+    class: correctness
+    family: wsgi-transport
+    defect: >-
+      PATH_INFO was passed to the WSGI app still URL-quoted, so applications saw an escaped path where the spec requires an unquoted one.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17366-pre
+    repo: rust-lang/cargo
+    commit: 75d17360928f57ff2a7d2f2da1c753f5fe1926d1
+    parent: 3bb5bfd13ea9c974056b70e2dd8f6d80378e1457
+    review: 3bb5bfd13ea9c974056b70e2dd8f6d80378e1457
+    arm: pre_fix
+    language: rust
+    class: correctness
+    family: trim-paths
+    defect: >-
+      Packages at workspace-relative member paths were not given the remap prefix, so their paths were not trimmed as configured.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17366-fixed
+    repo: rust-lang/cargo
+    commit: 75d17360928f57ff2a7d2f2da1c753f5fe1926d1
+    parent: 3bb5bfd13ea9c974056b70e2dd8f6d80378e1457
+    review: 75d17360928f57ff2a7d2f2da1c753f5fe1926d1
+    arm: repaired
+    language: rust
+    class: correctness
+    family: trim-paths
+    defect: >-
+      Packages at workspace-relative member paths were not given the remap prefix, so their paths were not trimmed as configured.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17370-pre
+    repo: rust-lang/cargo
+    commit: 514c56dd7321eecbfdcf9b6479519cf4edfab906
+    parent: 0b47ab4fc947679d5af9b7e5382e05e1484e1984
+    review: 0b47ab4fc947679d5af9b7e5382e05e1484e1984
+    arm: pre_fix
+    language: rust
+    class: correctness
+    family: git-config
+    defect: >-
+      git gc failed against Cargo's bare checkouts once safe.bareRepository=explicit was enforced.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17370-fixed
+    repo: rust-lang/cargo
+    commit: 514c56dd7321eecbfdcf9b6479519cf4edfab906
+    parent: 0b47ab4fc947679d5af9b7e5382e05e1484e1984
+    review: 514c56dd7321eecbfdcf9b6479519cf4edfab906
+    arm: repaired
+    language: rust
+    class: correctness
+    family: git-config
+    defect: >-
+      git gc failed against Cargo's bare checkouts once safe.bareRepository=explicit was enforced.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17322-pre
+    repo: rust-lang/cargo
+    commit: 593ae3e482ae226d1f4533b29106f76e43649b70
+    parent: 97b3bcefc74ddf1203b21f158129e4b7df33254a
+    review: 97b3bcefc74ddf1203b21f158129e4b7df33254a
+    arm: pre_fix
+    language: rust
+    class: correctness
+    family: clean-targets
+    defect: >-
+      cargo clean --doc always removed target/doc, ignoring an explicitly requested target directory and deleting documentation it should have left.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17322-fixed
+    repo: rust-lang/cargo
+    commit: 593ae3e482ae226d1f4533b29106f76e43649b70
+    parent: 97b3bcefc74ddf1203b21f158129e4b7df33254a
+    review: 593ae3e482ae226d1f4533b29106f76e43649b70
+    arm: repaired
+    language: rust
+    class: correctness
+    family: clean-targets
+    defect: >-
+      cargo clean --doc always removed target/doc, ignoring an explicitly requested target directory and deleting documentation it should have left.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17338-pre
+    repo: rust-lang/cargo
+    commit: a07c49a989d565727725e5bb5a8038ff402006a8
+    parent: b99aa3ee16b96480b74b83cf866218e720257317
+    review: b99aa3ee16b96480b74b83cf866218e720257317
+    arm: pre_fix
+    language: rust
+    class: correctness
+    family: trim-paths
+    defect: >-
+      Sources under /cargo/deps had no fallback remap rule, so their paths survived trimming.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17338-fixed
+    repo: rust-lang/cargo
+    commit: a07c49a989d565727725e5bb5a8038ff402006a8
+    parent: b99aa3ee16b96480b74b83cf866218e720257317
+    review: a07c49a989d565727725e5bb5a8038ff402006a8
+    arm: repaired
+    language: rust
+    class: correctness
+    family: trim-paths
+    defect: >-
+      Sources under /cargo/deps had no fallback remap rule, so their paths survived trimming.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17337-pre
+    repo: rust-lang/cargo
+    commit: 94faf9175f010e171466841c77e38b47d9503ac8
+    parent: 9184583d2dc29ac1e23c6304f7281fd3941bb1bb
+    review: 9184583d2dc29ac1e23c6304f7281fd3941bb1bb
+    arm: pre_fix
+    language: rust
+    class: correctness
+    family: trim-paths
+    defect: >-
+      Under -Zroot-dir rustc runs from the root dir, so workspace remap rules computed against the old working directory produced wrong paths.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17337-fixed
+    repo: rust-lang/cargo
+    commit: 94faf9175f010e171466841c77e38b47d9503ac8
+    parent: 9184583d2dc29ac1e23c6304f7281fd3941bb1bb
+    review: 94faf9175f010e171466841c77e38b47d9503ac8
+    arm: repaired
+    language: rust
+    class: correctness
+    family: trim-paths
+    defect: >-
+      Under -Zroot-dir rustc runs from the root dir, so workspace remap rules computed against the old working directory produced wrong paths.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17373-pre
+    repo: rust-lang/cargo
+    commit: e58ed5577389b5cf597dca04bc53f4134b6444dc
+    parent: 75d17360928f57ff2a7d2f2da1c753f5fe1926d1
+    review: 75d17360928f57ff2a7d2f2da1c753f5fe1926d1
+    arm: pre_fix
+    language: rust
+    class: correctness
+    family: terminal-output
+    defect: >-
+      cargo run printed no newline before the error code, so a carriage return in the program's output overwrote it.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17373-fixed
+    repo: rust-lang/cargo
+    commit: e58ed5577389b5cf597dca04bc53f4134b6444dc
+    parent: 75d17360928f57ff2a7d2f2da1c753f5fe1926d1
+    review: e58ed5577389b5cf597dca04bc53f4134b6444dc
+    arm: repaired
+    language: rust
+    class: correctness
+    family: terminal-output
+    defect: >-
+      cargo run printed no newline before the error code, so a carriage return in the program's output overwrote it.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17304-pre
+    repo: rust-lang/cargo
+    commit: c79e8f89441b3e73d6d65d125c0c745792808c74
+    parent: 2d4a6dca5ee90408c4f4db1834a2f979b50e9615
+    review: 2d4a6dca5ee90408c4f4db1834a2f979b50e9615
+    arm: pre_fix
+    language: rust
+    class: correctness
+    family: diagnostics
+    defect: >-
+      A diagnostic with a title and no snippet rendered incorrectly.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17304-fixed
+    repo: rust-lang/cargo
+    commit: c79e8f89441b3e73d6d65d125c0c745792808c74
+    parent: 2d4a6dca5ee90408c4f4db1834a2f979b50e9615
+    review: c79e8f89441b3e73d6d65d125c0c745792808c74
+    arm: repaired
+    language: rust
+    class: correctness
+    family: diagnostics
+    defect: >-
+      A diagnostic with a title and no snippet rendered incorrectly.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17268-pre
+    repo: rust-lang/cargo
+    commit: 88e0ae88276c937e4a5614c8b2812fa9902193a3
+    parent: 983b5661b8d07839453b68358a6d5edf3221bcf8
+    review: 983b5661b8d07839453b68358a6d5edf3221bcf8
+    arm: pre_fix
+    language: rust
+    class: correctness
+    family: manifest-validation
+    defect: >-
+      An empty package.build was not validated before target construction, so Cargo panicked instead of reporting an invalid manifest.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17268-fixed
+    repo: rust-lang/cargo
+    commit: 88e0ae88276c937e4a5614c8b2812fa9902193a3
+    parent: 983b5661b8d07839453b68358a6d5edf3221bcf8
+    review: 88e0ae88276c937e4a5614c8b2812fa9902193a3
+    arm: repaired
+    language: rust
+    class: correctness
+    family: manifest-validation
+    defect: >-
+      An empty package.build was not validated before target construction, so Cargo panicked instead of reporting an invalid manifest.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17289-pre
+    repo: rust-lang/cargo
+    commit: c6dd6ae8769438e2c3a9da80905c1dcb06aea588
+    parent: 8ea62e927ca2875b7839b8c5110f3e4fdfdf58c3
+    review: 8ea62e927ca2875b7839b8c5110f3e4fdfdf58c3
+    arm: pre_fix
+    language: rust
+    class: correctness
+    family: cache-layout
+    defect: >-
+      Checkout directory names followed the user's core.abbrev, so the cache layout differed between machines with different git configuration.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17289-fixed
+    repo: rust-lang/cargo
+    commit: c6dd6ae8769438e2c3a9da80905c1dcb06aea588
+    parent: 8ea62e927ca2875b7839b8c5110f3e4fdfdf58c3
+    review: c6dd6ae8769438e2c3a9da80905c1dcb06aea588
+    arm: repaired
+    language: rust
+    class: correctness
+    family: cache-layout
+    defect: >-
+      Checkout directory names followed the user's core.abbrev, so the cache layout differed between machines with different git configuration.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-12739-pre
+    repo: typescript-eslint/typescript-eslint
+    commit: abe9011a43524ea867e249125250d0927065750e
+    parent: 79c16e784056ed9d6fea92268f036c18f46530ff
+    review: 79c16e784056ed9d6fea92268f036c18f46530ff
+    arm: pre_fix
+    language: typescript
+    class: correctness
+    family: rule-suggestions
+    defect: >-
+      no-empty-object-type offered suggestions that produced invalid interfaces and export defaults, so applying the fix broke the file.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-12739-fixed
+    repo: typescript-eslint/typescript-eslint
+    commit: abe9011a43524ea867e249125250d0927065750e
+    parent: 79c16e784056ed9d6fea92268f036c18f46530ff
+    review: abe9011a43524ea867e249125250d0927065750e
+    arm: repaired
+    language: typescript
+    class: correctness
+    family: rule-suggestions
+    defect: >-
+      no-empty-object-type offered suggestions that produced invalid interfaces and export defaults, so applying the fix broke the file.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-12727-pre
+    repo: typescript-eslint/typescript-eslint
+    commit: 513638effe9e7b78566cc153d4d809a1435153f3
+    parent: 1dba4c50f0599cc212e9d1eca9ec0f21a818f0b5
+    review: 1dba4c50f0599cc212e9d1eca9ec0f21a818f0b5
+    arm: pre_fix
+    language: typescript
+    class: correctness
+    family: rule-reporting
+    defect: >-
+      no-meaningless-void-operator did not report void applied to non-call expressions, missing the case the rule exists for.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-12727-fixed
+    repo: typescript-eslint/typescript-eslint
+    commit: 513638effe9e7b78566cc153d4d809a1435153f3
+    parent: 1dba4c50f0599cc212e9d1eca9ec0f21a818f0b5
+    review: 513638effe9e7b78566cc153d4d809a1435153f3
+    arm: repaired
+    language: typescript
+    class: correctness
+    family: rule-reporting
+    defect: >-
+      no-meaningless-void-operator did not report void applied to non-call expressions, missing the case the rule exists for.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-12608-pre
+    repo: typescript-eslint/typescript-eslint
+    commit: b51279f3706236d94f443cf8e51f25de27962890
+    parent: abe9011a43524ea867e249125250d0927065750e
+    review: abe9011a43524ea867e249125250d0927065750e
+    arm: pre_fix
+    language: typescript
+    class: correctness
+    family: config-resolution
+    defect: >-
+      The playground crashed on configs using extends.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-12608-fixed
+    repo: typescript-eslint/typescript-eslint
+    commit: b51279f3706236d94f443cf8e51f25de27962890
+    parent: abe9011a43524ea867e249125250d0927065750e
+    review: b51279f3706236d94f443cf8e51f25de27962890
+    arm: repaired
+    language: typescript
+    class: correctness
+    family: config-resolution
+    defect: >-
+      The playground crashed on configs using extends.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-11599-pre
+    repo: typescript-eslint/typescript-eslint
+    commit: 20c3d97235956d7a5ea34c3e0c0be5e56d603575
+    parent: 4fde781fdfeb38ac80256d20ac3d776479217b2d
+    review: 4fde781fdfeb38ac80256d20ac3d776479217b2d
+    arm: pre_fix
+    language: typescript
+    class: correctness
+    family: type-narrowing
+    defect: >-
+      no-unsafe-enum-comparison did not handle unions of literals, so comparisons it should have flagged passed.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-11599-fixed
+    repo: typescript-eslint/typescript-eslint
+    commit: 20c3d97235956d7a5ea34c3e0c0be5e56d603575
+    parent: 4fde781fdfeb38ac80256d20ac3d776479217b2d
+    review: 20c3d97235956d7a5ea34c3e0c0be5e56d603575
+    arm: repaired
+    language: typescript
+    class: correctness
+    family: type-narrowing
+    defect: >-
+      no-unsafe-enum-comparison did not handle unions of literals, so comparisons it should have flagged passed.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10513-pre
+    repo: typescript-eslint/typescript-eslint
+    commit: d24a82854d06089cbd2a8801f2982fd4781f3701
+    parent: b2ce15840934fb5bf1ad4b1136658be9578ab82c
+    review: b2ce15840934fb5bf1ad4b1136658be9578ab82c
+    arm: pre_fix
+    language: typescript
+    class: contract
+    family: type-exports
+    defect: >-
+      Types were not exported by name, so projects building declaration files could not name them.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10513-fixed
+    repo: typescript-eslint/typescript-eslint
+    commit: d24a82854d06089cbd2a8801f2982fd4781f3701
+    parent: b2ce15840934fb5bf1ad4b1136658be9578ab82c
+    review: d24a82854d06089cbd2a8801f2982fd4781f3701
+    arm: repaired
+    language: typescript
+    class: contract
+    family: type-exports
+    defect: >-
+      Types were not exported by name, so projects building declaration files could not name them.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10339-pre
+    repo: typescript-eslint/typescript-eslint
+    commit: f5e23e28653705fc7021d8c780f0d63656dea518
+    parent: 6ce04d548efc3fd9888ce731003e71c31e095d0e
+    review: 6ce04d548efc3fd9888ce731003e71c31e095d0e
+    arm: pre_fix
+    language: typescript
+    class: contract
+    family: rule-metadata
+    defect: >-
+      defaultOptions was missing from a rule's meta, so consumers reading meta saw no defaults.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10339-fixed
+    repo: typescript-eslint/typescript-eslint
+    commit: f5e23e28653705fc7021d8c780f0d63656dea518
+    parent: 6ce04d548efc3fd9888ce731003e71c31e095d0e
+    review: f5e23e28653705fc7021d8c780f0d63656dea518
+    arm: repaired
+    language: typescript
+    class: contract
+    family: rule-metadata
+    defect: >-
+      defaultOptions was missing from a rule's meta, so consumers reading meta saw no defaults.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10315-pre
+    repo: typescript-eslint/typescript-eslint
+    commit: 66234d0e997c28d894950afd134e031fe9264859
+    parent: daaca3b49f8bbf16eb54014b40e070713a785112
+    review: daaca3b49f8bbf16eb54014b40e070713a785112
+    arm: pre_fix
+    language: typescript
+    class: correctness
+    family: rule-reporting
+    defect: >-
+      explicit-module-boundary-types and explicit-function-return-type reported on as const satisfies expressions, which need no annotation.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10315-fixed
+    repo: typescript-eslint/typescript-eslint
+    commit: 66234d0e997c28d894950afd134e031fe9264859
+    parent: daaca3b49f8bbf16eb54014b40e070713a785112
+    review: 66234d0e997c28d894950afd134e031fe9264859
+    arm: repaired
+    language: typescript
+    class: correctness
+    family: rule-reporting
+    defect: >-
+      explicit-module-boundary-types and explicit-function-return-type reported on as const satisfies expressions, which need no annotation.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10314-pre
+    repo: typescript-eslint/typescript-eslint
+    commit: 013c5cc1a2bf2c041358ace2228fb2e577e095c2
+    parent: a7746fb15f84e10658aab5d2b6073009e2861392
+    review: a7746fb15f84e10658aab5d2b6073009e2861392
+    arm: pre_fix
+    language: typescript
+    class: correctness
+    family: type-narrowing
+    defect: >-
+      await-thenable and return-await flagged awaiting an unconstrained type parameter as unnecessary, though it may be a thenable at run time.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10314-fixed
+    repo: typescript-eslint/typescript-eslint
+    commit: 013c5cc1a2bf2c041358ace2228fb2e577e095c2
+    parent: a7746fb15f84e10658aab5d2b6073009e2861392
+    review: 013c5cc1a2bf2c041358ace2228fb2e577e095c2
+    arm: repaired
+    language: typescript
+    class: correctness
+    family: type-narrowing
+    defect: >-
+      await-thenable and return-await flagged awaiting an unconstrained type parameter as unnecessary, though it may be a thenable at run time.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10304-pre
+    repo: typescript-eslint/typescript-eslint
+    commit: 68311eedfdd6c46d333f7cc437b45b24d4ae9388
+    parent: 05617d2780f3f143d2420a2c5c5b2855b430112d
+    review: 05617d2780f3f143d2420a2c5c5b2855b430112d
+    arm: pre_fix
+    language: typescript
+    class: correctness
+    family: rule-reporting
+    defect: >-
+      promise-function-async did not account for function overloading, so overloaded declarations were judged on the wrong signature.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10304-fixed
+    repo: typescript-eslint/typescript-eslint
+    commit: 68311eedfdd6c46d333f7cc437b45b24d4ae9388
+    parent: 05617d2780f3f143d2420a2c5c5b2855b430112d
+    review: 68311eedfdd6c46d333f7cc437b45b24d4ae9388
+    arm: repaired
+    language: typescript
+    class: correctness
+    family: rule-reporting
+    defect: >-
+      promise-function-async did not account for function overloading, so overloaded declarations were judged on the wrong signature.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10258-pre
+    repo: typescript-eslint/typescript-eslint
+    commit: 0fde8f6541a56c417d05155e4737d799454ae432
+    parent: 336f0271bf4d467f7a4dab9e254a3b1873599df2
+    review: 336f0271bf4d467f7a4dab9e254a3b1873599df2
+    arm: pre_fix
+    language: typescript
+    class: contract
+    family: ast-types
+    defect: >-
+      The ImportAttribute node's parent property carried the wrong type annotation.
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-10258-fixed
+    repo: typescript-eslint/typescript-eslint
+    commit: 0fde8f6541a56c417d05155e4737d799454ae432
+    parent: 336f0271bf4d467f7a4dab9e254a3b1873599df2
+    review: 0fde8f6541a56c417d05155e4737d799454ae432
+    arm: repaired
+    language: typescript
+    class: contract
+    family: ast-types
+    defect: >-
+      The ImportAttribute node's parent property carried the wrong type annotation.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17251-pre
+    repo: rust-lang/cargo
+    commit: 630f52f9590c60e6706a543d6a6d206afcb04bed
+    parent: a7ec559a641945bdf84fb63efbd53dc0a07b64e4
+    review: a7ec559a641945bdf84fb63efbd53dc0a07b64e4
+    arm: pre_fix
+    language: rust
+    class: resource
+    family: diagnostics
+    defect: >-
+      The transitive unused-dependency traversal was unbounded, so a deep dependency graph made it walk without limit.
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17251-fixed
+    repo: rust-lang/cargo
+    commit: 630f52f9590c60e6706a543d6a6d206afcb04bed
+    parent: a7ec559a641945bdf84fb63efbd53dc0a07b64e4
+    review: 630f52f9590c60e6706a543d6a6d206afcb04bed
+    arm: repaired
+    language: rust
+    class: resource
+    family: diagnostics
+    defect: >-
+      The transitive unused-dependency traversal was unbounded, so a deep dependency graph made it walk without limit.
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-18012-clean
+    repo: prometheus/prometheus
+    commit: ea4545fc6f1c13e3316fe14c9248f07f0c18a8d0
+    parent: 39a35110d269aa8013ca6b75657fa8ebc542f9ee
+    review: ea4545fc6f1c13e3316fe14c9248f07f0c18a8d0
+    arm: clean
+    language: go
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-17977-clean
+    repo: prometheus/prometheus
+    commit: 7d40cd47e2288b4ef469973019febbc067747e38
+    parent: edb6731d9270b4b3fe21e2420628934b6aa2e58b
+    review: 7d40cd47e2288b4ef469973019febbc067747e38
+    arm: clean
+    language: go
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-18617-clean
+    repo: prometheus/prometheus
+    commit: 0919b89f56e5c6efcf51e5b17b38a9647ea69b4f
+    parent: 1e68b3b30e2b4c7c44670563b13f2c41758f741a
+    review: 0919b89f56e5c6efcf51e5b17b38a9647ea69b4f
+    arm: clean
+    language: go
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-17996-clean
+    repo: prometheus/prometheus
+    commit: 7769495a4a3e95db7f439e2bd3b729b27e59c5af
+    parent: 3c44ca757d1932e3fcca317dfc05ad66ce38ac57
+    review: 7769495a4a3e95db7f439e2bd3b729b27e59c5af
+    arm: clean
+    language: go
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: prometheus-17531-clean
+    repo: prometheus/prometheus
+    commit: 7803b9f9d75af7dc0e38727d3da5089f4ce2a423
+    parent: 69f1bc9dadb5d8bfaa4dcd35b30b8925576f51d1
+    review: 7803b9f9d75af7dc0e38727d3da5089f4ce2a423
+    arm: clean
+    language: go
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-1943-clean
+    repo: encode/httpx
+    commit: a4161062501a32ce258e9f990737d494bfe419aa
+    parent: 7d3a5347a9717169c00c73b71ba7c560e9a04443
+    review: a4161062501a32ce258e9f990737d494bfe419aa
+    arm: clean
+    language: python
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-1971-clean
+    repo: encode/httpx
+    commit: 83c81aa9b8ef0f7825df413a673e6d9300065f3a
+    parent: 82ba15b52189eacec74f2ec7dbd81f3c70a69261
+    review: 83c81aa9b8ef0f7825df413a673e6d9300065f3a
+    arm: clean
+    language: python
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-626-clean
+    repo: encode/httpx
+    commit: 869714fbf5f2a1bfda8d6f906930f49032507d7a
+    parent: 00a875db934b26868a8bb740d6bbf5ce344b1f65
+    review: 869714fbf5f2a1bfda8d6f906930f49032507d7a
+    arm: clean
+    language: python
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-625-clean
+    repo: encode/httpx
+    commit: 00a875db934b26868a8bb740d6bbf5ce344b1f65
+    parent: 66e0f4b6f8df5c744681cb8306f416f48b0a0e35
+    review: 00a875db934b26868a8bb740d6bbf5ce344b1f65
+    arm: clean
+    language: python
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: httpx-706-clean
+    repo: encode/httpx
+    commit: b0bf2a7513bdbe6877c4ff1f577bb968a8515ccf
+    parent: a9f4d018e164980c916bfd6f254307957178e45d
+    review: b0bf2a7513bdbe6877c4ff1f577bb968a8515ccf
+    arm: clean
+    language: python
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17390-clean
+    repo: rust-lang/cargo
+    commit: 261e135d1e752695f0048abb29b58fb5b650b4d5
+    parent: 7456cead3171941991b974356a2e55e8d91fa82c
+    review: 261e135d1e752695f0048abb29b58fb5b650b4d5
+    arm: clean
+    language: rust
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17305-clean
+    repo: rust-lang/cargo
+    commit: 2d4a6dca5ee90408c4f4db1834a2f979b50e9615
+    parent: cafc91b2f53f5ecd701145aeb23f879357eaa746
+    review: 2d4a6dca5ee90408c4f4db1834a2f979b50e9615
+    arm: clean
+    language: rust
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17331-clean
+    repo: rust-lang/cargo
+    commit: a5b1a05f791463d20b55accd1570415944c05b45
+    parent: 57a3f424d7a9c6afd00306a0fe70f1f05dd957c2
+    review: a5b1a05f791463d20b55accd1570415944c05b45
+    arm: clean
+    language: rust
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17222-clean
+    repo: rust-lang/cargo
+    commit: 3efb1f477e99b42974b982d939fd100303cdf7db
+    parent: db9a276da1aa9b6461537a7a7abc35778477debd
+    review: 3efb1f477e99b42974b982d939fd100303cdf7db
+    arm: clean
+    language: rust
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: cargo-17240-clean
+    repo: rust-lang/cargo
+    commit: af12f12d366f4de06e5913b9ad37edfbfaf44b7b
+    parent: e09f57a4252db7e4f83a56d25be73088316d19b4
+    review: af12f12d366f4de06e5913b9ad37edfbfaf44b7b
+    arm: clean
+    language: rust
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-11969-clean
+    repo: typescript-eslint/typescript-eslint
+    commit: a8bbe16b250ad9963ae9faa3f391275dab44bb1e
+    parent: f8d988b345b030a95af7a660332fa5261fb3e21c
+    review: a8bbe16b250ad9963ae9faa3f391275dab44bb1e
+    arm: clean
+    language: typescript
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-11927-clean
+    repo: typescript-eslint/typescript-eslint
+    commit: 29f703f1b3bfd6c490f021c741bf3d00fe96eaa6
+    parent: a8b924b3cd736068216c2036832ee4f0338c670a
+    review: 29f703f1b3bfd6c490f021c741bf3d00fe96eaa6
+    arm: clean
+    language: typescript
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-11775-clean
+    repo: typescript-eslint/typescript-eslint
+    commit: 97389331fa48fba04be134871a87bc52ce60783c
+    parent: 17601fca9e269e7250b647cab33215fd1b2b4f61
+    review: 97389331fa48fba04be134871a87bc52ce60783c
+    arm: clean
+    language: typescript
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-7657-clean
+    repo: typescript-eslint/typescript-eslint
+    commit: 9cf757a86f382dcd457f99f1cbe9d6d447364b34
+    parent: e0cb75112423b37e92fda1687c0bbc964540563d
+    review: 9cf757a86f382dcd457f99f1cbe9d6d447364b34
+    arm: clean
+    language: typescript
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08
+  - id: tseslint-5834-clean
+    repo: typescript-eslint/typescript-eslint
+    commit: 8ddcc9a767a0794b17e603a8b11af998154ad3cb
+    parent: c4e0d8678e0398f3ab85510f40ad6f97832b9e6d
+    review: 8ddcc9a767a0794b17e603a8b11af998154ad3cb
+    arm: clean
+    language: typescript
+    class: ""
+    family: refactor
+    defect: ""
+    adjudicated_by: claude, 2026-09-08

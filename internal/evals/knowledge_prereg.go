@@ -57,6 +57,7 @@ type Snapshot struct {
 	Language      string `yaml:"language"`
 	Class         string `yaml:"class"`
 	Family        string `yaml:"family"`
+	Review        string `yaml:"review"`
 	Defect        string `yaml:"defect"`
 	AdjudicatedBy string `yaml:"adjudicated_by"`
 }
