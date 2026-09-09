@@ -109,7 +109,12 @@ func scanMod(modFile string) (modFacts, bool) {
 		// After the check and not before it: `require (` opens the block on the
 		// line that names it, and the directive itself never carries a paren, so
 		// no top-level `go` is ever hidden by its own line.
-		depth += strings.Count(raw, "(") - strings.Count(raw, ")")
+		//
+		// Quoted parens do not count, because go.mod permits a quoted path and
+		// a directory named "libs (v1)" is legal on every filesystem this runs
+		// on. Counted, one leaves the depth above zero for the rest of the
+		// file, and the `go` directive after it is read as block content.
+		depth += parenDelta(raw)
 		if depth < 0 {
 			// Unbalanced. The file does not load either, and guessing which of
 			// the two readings the author meant is how a misread becomes a
@@ -236,4 +241,36 @@ func resolved(p string) string {
 		return real
 	}
 	return p
+}
+
+// parenDelta counts a line's unquoted parentheses.
+//
+// go.mod tokens may be quoted, and a quoted path can hold a parenthesis. The
+// modules reference gives interpreted strings in double quotes and raw strings
+// in backquotes, with no escape inside the latter.
+func parenDelta(line string) int {
+	var (
+		delta   int
+		quote   rune
+		escaped bool
+	)
+	for _, r := range line {
+		switch {
+		case escaped:
+			escaped = false
+		case quote == '"' && r == '\\':
+			escaped = true
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			}
+		case r == '"' || r == '`':
+			quote = r
+		case r == '(':
+			delta++
+		case r == ')':
+			delta--
+		}
+	}
+	return delta
 }

@@ -153,3 +153,31 @@ func TestAFileWithNoModuleDirectiveIsNotAModule(t *testing.T) {
 		t.Errorf("Versions = %q, want 1.21", got)
 	}
 }
+
+// A parenthesis inside a quoted path is not a block.
+//
+// go.mod permits a quoted token, and a directory named "libs (v1)" is legal.
+// Counted as a block opener it leaves the depth above zero for the rest of the
+// file, so the `go` directive after it is read as block content and a module
+// on 1.25 answers with the 1.16 assumption.
+func TestAQuotedParenIsNotABlock(t *testing.T) {
+	dir := t.TempDir()
+	// One unmatched paren inside the quotes. A balanced pair cancels itself and
+	// would pass with the naive count, proving nothing.
+	write(t, filepath.Join(dir, "go.mod"),
+		"module example.com/x\n\nreplace example.com/y => \"./libs (v1/y\"\n\ngo 1.25\n")
+
+	if got := Versions(dir)["go"]; got != "1.25" {
+		t.Errorf("Versions = %q, want 1.25: a quoted paren opened a block", got)
+	}
+
+	// A real block still counts, and a stray closer still refuses the file.
+	write(t, filepath.Join(dir, "go.mod"), "module example.com/x\n\nrequire (\n\tgo 9.99\n)\n\ngo 1.22\n")
+	if got := Versions(dir)["go"]; got != "1.22" {
+		t.Errorf("Versions = %q, want 1.22", got)
+	}
+	write(t, filepath.Join(dir, "go.mod"), "module example.com/x\n)\n\ngo 1.22\n")
+	if got := Versions(dir); got != nil {
+		t.Errorf("Versions = %v, want an abstention on an unbalanced file", got)
+	}
+}

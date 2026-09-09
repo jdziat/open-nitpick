@@ -1063,9 +1063,12 @@ func TestUnresolvedWithoutAReasonIsNotRecorded(t *testing.T) {
 			kept, overruled := v.Validate(context.Background(), []Finding{claimed}, claimedCode)
 
 			// The expert ran. Without this the whole test passes when
-			// validation is skipped or the verdict is not implemented, since
-			// both produce the same three values below. Same assertion, for
-			// the same reason, as TestGatedOutRefutationsAreNotReported.
+			// validation is skipped, since that produces the same three values
+			// below. Same assertion, for the same reason, as
+			// TestGatedOutRefutationsAreNotReported. It leaves an
+			// unimplemented verdict open, since that publishes clean here too;
+			// TestAnUnresolvedVerdictReachesTheFindingFromJSON is what pins
+			// that the branch exists.
 			if model.callCount() != 1 {
 				t.Fatalf("expert calls = %d, want 1: nothing below proves anything unless it ran",
 					model.callCount())
@@ -1117,5 +1120,36 @@ func TestAnUnresolvedReasonIsFlattenedIntoItsLine(t *testing.T) {
 	}
 	if !strings.Contains(got, "could not be resolved by expert: cannot tell") {
 		t.Errorf("the doubt was not rendered:\n%s", got)
+	}
+}
+
+// A well-formed unresolved verdict reaches the finding, decoded from JSON.
+//
+// The reason-free cases above cannot show this: an unrecognised verdict
+// publishes clean too, so deleting the branch leaves them green. This drives
+// the whole path, model response to published field, and fails when the
+// branch is gone.
+func TestAnUnresolvedVerdictReachesTheFindingFromJSON(t *testing.T) {
+	model := &scriptedLLM{
+		fallback: `{"verdict":"unresolved","reason":"the caller is not in this file"}`,
+	}
+	v := newValidator(model, config.Validation{Enabled: true})
+
+	kept, overruled := v.Validate(context.Background(), []Finding{claimed}, claimedCode)
+
+	if model.callCount() != 1 {
+		t.Fatalf("expert calls = %d, want 1", model.callCount())
+	}
+	if len(overruled) != 0 {
+		t.Fatalf("overruled = %d, want 0: unresolved removes nothing", len(overruled))
+	}
+	if len(kept) != 1 {
+		t.Fatalf("kept = %d, want 1", len(kept))
+	}
+	if kept[0].Unresolved != "the caller is not in this file" {
+		t.Errorf("Unresolved = %q, want the expert's reason", kept[0].Unresolved)
+	}
+	if kept[0].UnresolvedBy == "" {
+		t.Error("UnresolvedBy is empty, so the record does not say who was undecided")
 	}
 }
