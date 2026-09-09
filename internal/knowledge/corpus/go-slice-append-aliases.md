@@ -14,8 +14,8 @@ The classic shape is a sub-slice: `b := a[:2]` has the capacity of `a`, so
 is correct up until the day the caller's slice is created with `make([]T, n, m)`
 rather than a literal.
 
-Go 1.20's three-index `a[:2:2]` caps the capacity and makes the append copy,
-which is the fix that reads as noise until you have met this.
+The three-index `a[:2:2]`, in the language since Go 1.2, caps the capacity and
+makes the append copy. It reads as noise until you have met this.
 
 What to look for: a function that appends to a slice parameter and returns it,
 where the caller keeps using the original, and any `append` to a sub-slice of a

@@ -36,7 +36,7 @@ func knowledgeSection(hits []knowledge.Hit) string {
 	for _, h := range hits {
 		fmt.Fprintf(&b, "##### %s\n\n%s\n\nSource: %s, read %s.\n\n",
 			bundle.PromptSafe(h.Entry.Title),
-			h.Entry.Body,
+			bundle.PromptSafe(h.Entry.Body),
 			bundle.PromptSafe(h.Entry.Source),
 			h.Entry.Checked.Format("2006-01-02"))
 	}
@@ -49,8 +49,14 @@ func knowledgeSection(hits []knowledge.Hit) string {
 // to a review that worked without it, so an embedding provider that is down
 // should cost the run its extra context and not the review, and the log says
 // which happened.
-func (e *Engine) retrieveKnowledge(ctx context.Context, b bundle.Batch) []knowledge.Hit {
+func (e *Engine) retrieveKnowledge(ctx context.Context, b bundle.Batch, style bool) []knowledge.Hit {
 	if e.Knowledge == nil {
+		return nil
+	}
+	// Not for the style pass. It re-reviews the same batches with a different
+	// prompt, so retrieving again pays a second embedding call per batch to
+	// hand a style reviewer a corpus about correctness defects.
+	if style {
 		return nil
 	}
 	hits, err := e.Knowledge.ForBatch(ctx, b)

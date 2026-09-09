@@ -69,4 +69,17 @@ func TestLiveRetrievalRanksTheRightEntry(t *testing.T) {
 		t.Logf("%-26s rank=%d  top=%s (%.3f)", tc.want, rank, got[0].Entry.ID, got[0].Score)
 	}
 	t.Logf("hit@1 = %d/%d, hit@3 = %d/%d", hitsAt1, len(cases), hitsAt3, len(cases))
+
+	// A test that only logs is a test that cannot fail, and this one is the
+	// evidence behind the claim that retrieval finds the right entry. The bar
+	// is every query, because each names the one entry a person would want and
+	// the corpus holds fourteen.
+	if hitsAt3 != len(cases) {
+		t.Errorf("the right entry was outside the top 3 for %d of %d queries",
+			len(cases)-hitsAt3, len(cases))
+	}
+	if hitsAt1 < len(cases)-1 {
+		t.Errorf("the right entry ranked first for only %d of %d queries",
+			hitsAt1, len(cases))
+	}
 }

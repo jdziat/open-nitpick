@@ -1156,7 +1156,7 @@ func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bu
 				return
 			}
 
-			result, err := e.analyzeBatch(ctx, base, prContext, b)
+			result, err := e.analyzeBatch(ctx, base, prContext, b, true)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -1192,13 +1192,13 @@ func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bu
 
 // analyzeBatch reviews one batch.
 // analyzeBatch reviews a batch with the default review client.
-func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bundle.Batch) ([]Finding, error) {
-	return e.analyzeBatchWith(ctx, e.Roles.Review, base, prContext, b)
+func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bundle.Batch, style bool) ([]Finding, error) {
+	return e.analyzeBatchWith(ctx, e.Roles.Review, base, prContext, b, style)
 }
 
 // analyzeBatchWith reviews a batch with one client, under the prompt built
 // for it.
-func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base, prContext string, b bundle.Batch) ([]Finding, error) {
+func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base, prContext string, b bundle.Batch, style bool) ([]Finding, error) {
 	var body strings.Builder
 
 	if prContext != "" {
@@ -1213,7 +1213,7 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 
 	// After the diff, not before it. The change is what the model is being
 	// asked about, and reference material placed first reads as the subject.
-	if hits := e.retrieveKnowledge(ctx, b); len(hits) > 0 {
+	if hits := e.retrieveKnowledge(ctx, b, style); len(hits) > 0 {
 		body.WriteString(knowledgeSection(hits))
 		e.log().Info("knowledge retrieved", "batch", b.Paths(), "entries", ids(hits))
 	}

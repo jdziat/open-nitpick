@@ -94,7 +94,7 @@ func Sizes(paths []string) (map[string]int64, error) {
 }
 `},
 		Defects: []Defect{{
-			Path: "ingest/read.go", Line: 14,
+			Path: "ingest/read.go", Line: 16,
 			Keywords: []string{"until the function returns", "file descriptor",
 				"descriptors", "too many open files", "closed until", "defer inside",
 				"deferred close", "each iteration"},
