@@ -504,6 +504,9 @@ section including its heading and disclaimer, dropping the least relevant
 entries first, and yields no section at all rather than a heading with nothing
 under it.
 
+The evaluation that would decide whether it should ever default on is
+pre-registered in [Evaluating retrieved knowledge](knowledge-evaluation.md).
+
 It ships off. On its own corpus it took recall from 0.75 to 1.00 with noise
 falling from 0.50 to 0.33 per review
 ([Findings](findings.md#retrieved-knowledge-and-a-pre-registration-i-got-wrong-2026-09-08)),

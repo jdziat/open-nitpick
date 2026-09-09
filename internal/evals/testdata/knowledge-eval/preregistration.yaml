@@ -1,0 +1,98 @@
+# The pre-registered evaluation of retrieved knowledge, issue #84.
+#
+# Frozen before any retrieval tuning. Every threshold below states its
+# denominator, because the recorded failure this file exists to prevent was a
+# threshold the instrument could not express: docs/findings.md registered "at
+# least 3 of 12 plants" against a corpus that turned out to hold six.
+# TestThresholdsAreExpressible checks each denominator against the selection.
+
+version: 1
+frozen: "2026-09-08"
+status: registered   # registered -> selected -> run -> reported
+
+# What is being asked. One sentence, so a reader can tell whether the tables
+# below answer it.
+question: >
+  Does retrieval raise actionable finding recall on defects nobody wrote a
+  corpus entry for, without raising noise on clean changes, in repositories
+  and languages the corpus authors did not choose?
+
+corpora:
+  - repo: prometheus/prometheus
+    language: go
+    exercises: cancellation, concurrency, resource cleanup, HTTP contracts, error propagation
+  - repo: encode/httpx
+    language: python
+    exercises: async behaviour, exception handling, streaming, redirects, compatibility
+  - repo: typescript-eslint/typescript-eslint
+    language: typescript
+    exercises: parser edge cases, configuration merging, AST traversal, misleading diagnostics
+  - repo: rust-lang/cargo
+    language: rust
+    exercises: filesystem behaviour, cancellation, concurrency, resource lifetime, platform differences
+
+# Ten independently adjudicated bug fixes per repository, each contributing a
+# pre-fix and a repaired snapshot, plus five clean changes per repository.
+arms:
+  pre_fix: 40      # can it find the exact defect?
+  repaired: 40     # does it stop reporting that defect?
+  clean: 20        # does retrieved knowledge provoke unsupported findings?
+
+repeats: 2         # per arm, per retrieval setting
+
+# Real parent-to-commit diffs against a full checkout. A synthetic diff that
+# re-adds every file is a different measurement wearing this one's name.
+snapshots: parent-to-commit
+
+# Whole repositories reserved for the final holdout, named before selection so
+# a disappointing result cannot promote one of them into the tuning set.
+holdout_repos:
+  - rust-lang/cargo
+
+# Spend, in US dollars, for the whole pilot including re-runs. A run that would
+# cross it stops and says so rather than trimming the protocol.
+budget_usd: 100
+
+# Thresholds. Each names the denominator it is read against, and the
+# denominator has to match the frozen selection.
+thresholds:
+  - name: located-gain
+    metric: plants located, retrieval on minus off
+    denominator: 40          # pre_fix
+    at_least: 4              # a tenth of the arm; two is the resolution of a 2-repeat run
+    why: >
+      Two plants is the smallest difference two runs of this size can express,
+      so a two-plant lead is a tie reported as a win. Four is the smallest
+      margin that survives that reading.
+  - name: repaired-recurrence
+    metric: repaired defects reported again, retrieval on
+    denominator: 40          # repaired
+    at_most: 4
+    why: >
+      Retrieval hands the model a description of the defect that was fixed. An
+      entry that makes it report the repair as the bug is the specific harm
+      this arm exists to catch.
+  - name: clean-noise
+    metric: findings per review on clean changes, retrieval on minus off
+    denominator: 20          # clean
+    at_most: 0.25
+    why: >
+      Reference material beside a diff is a standing invitation to report the
+      reference. A quarter of a finding per review is one extra finding per
+      four clean changes.
+  - name: latency
+    metric: added seconds per review, median
+    denominator: 100         # every snapshot
+    at_most: 20
+  - name: cost
+    metric: added dollars per review
+    denominator: 100
+    at_most: 0.01
+
+# Stated before the run, so a null result is a result rather than a reason to
+# keep looking.
+publish_negative: true
+
+# review.knowledge stays off by default whatever this returns. Promotion is a
+# separate decision on this evidence.
+promotes_default: false
