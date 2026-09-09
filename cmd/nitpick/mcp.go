@@ -444,7 +444,14 @@ func reviewText(out ReviewOut) string {
 	if len(out.Withheld) > 0 {
 		fmt.Fprintf(&b, "\n%d finding(s) withheld:", len(out.Withheld))
 		for _, w := range out.Withheld {
-			fmt.Fprintf(&b, "\n  %s:%d %s (%s: %s)", w.Path, w.Line, w.Title, w.Expert, w.Reason)
+			// The citation belongs on both halves of the result. A client
+			// reading the text sees the reason a finding was removed, and the
+			// entry that reason rests on is part of it.
+			cited := ""
+			if w.Cited != "" {
+				cited = fmt.Sprintf(" citing %s", w.Cited)
+			}
+			fmt.Fprintf(&b, "\n  %s:%d %s (%s:%s %s)", w.Path, w.Line, w.Title, w.Expert, cited, w.Reason)
 		}
 		b.WriteString("\n")
 	}
