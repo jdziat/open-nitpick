@@ -17,6 +17,7 @@ import (
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
@@ -62,6 +63,12 @@ const (
 	// slop corpus needs: its plants are in a class the default never asks
 	// for. Any non-empty value other than "0" or "false" enables it.
 	EnvSlop = "NITPICK_EVAL_SLOP"
+
+	// EnvKnowledge switches review.knowledge, which is the arm of the
+	// knowledge corpus measurement. Off unless the run asks, whatever the
+	// shipped default becomes, for the reason the related-context switch is:
+	// the harness is how that default gets decided.
+	EnvKnowledge = "NITPICK_EVAL_KNOWLEDGE"
 
 	// EnvValidation switches validation (the expert pass) on for every review
 	// in the run, so its effect on recall and noise can be measured.
@@ -788,6 +795,23 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		Log:      cmpLogger(opts.Log),
 	}
 
+	// Retrieval, when the arm asks for it. A failure to build it fails the run
+	// rather than quietly reviewing without: an arm that was supposed to have
+	// retrieval and did not would be recorded as the on arm and measure the
+	// off one.
+	if cfg.Review.Knowledge {
+		k, err := review.BuildKnowledge(ctx, cfg, knowledge.IndexJSON(), cmpLogger(opts.Log))
+		switch {
+		case err != nil:
+			out.Err = fmt.Errorf("build knowledge retrieval: %w", err)
+			return out
+		case k == nil:
+			out.Err = fmt.Errorf("review.knowledge is on and no retriever was built")
+			return out
+		}
+		engine.Knowledge = k
+	}
+
 	runCtx := ctx
 	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -991,6 +1015,12 @@ func evalConfig(model Model) *config.Config {
 	case "", "0", "false", "off":
 	default:
 		cfg.Review.Slop = true
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvKnowledge))) {
+	case "", "0", "false", "off":
+		cfg.Review.Knowledge = false
+	default:
+		cfg.Review.Knowledge = true
 	}
 
 	// Report everything the model says so precision can be measured.

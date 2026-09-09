@@ -350,6 +350,11 @@ eval-fullreview:
 # The slop corpus, judge-free, with review.slop on: recall over the plants
 # and, above all, silence on the controls.
 .PHONY: eval-slop
+# The knowledge corpus, both arms. NITPICK_EVAL_KNOWLEDGE decides which.
+.PHONY: eval-knowledge
+eval-knowledge:
+	$(MAKE) benchmark-multifile FIXTURES=$(KNOWLEDGE) MODELS=$${MODELS:-z-ai/glm-5.3-flash} RUNS=$${RUNS:-2}
+
 eval-slop:
 	NITPICK_EVAL_SLOP=1 $(MAKE) benchmark-multifile FIXTURES='$(SLOP)' MODELS='$(or $(MODELS),z-ai/glm-5.3-flash)' RUNS='$(or $(RUNS),1)'
 
