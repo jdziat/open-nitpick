@@ -1645,3 +1645,20 @@ spread; this has the passes and the gap is 1.5 plants against a resolution of
 one, which is thinner than it looks.
 
 `review.knowledge` stays off by default.
+
+### The provider claim in this section was wrong
+
+The arm above embedded through OpenRouter because I recorded that synthetic,
+the provider this repository runs, could not embed. That came from the SDK's
+per-provider capability flag, which reports `Embeddings: false` for synthetic.
+Synthetic serves an embeddings endpoint: `hf:nomic-ai/nomic-embed-text-v1.5`,
+768 dimensions, included in the subscription at no additional charge.
+
+The index ships built on it now. Retrieval reaches all six plants on synthetic
+at ranks 1, 1, 1, 1, 1 and 3, against 1, 1, 1, 2, 3 and 3 on OpenRouter, so the
+recall arm above is a lower bound on what the shipped configuration does rather
+than a measurement of it. The arm has not been re-run on synthetic and the
+table is the OpenRouter one.
+
+The lesson is narrower than "the SDK was wrong": a capability flag is metadata
+about a provider, and the only check worth trusting is a request.

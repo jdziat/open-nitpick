@@ -239,9 +239,9 @@ type Models struct {
 	// embedding model is not a chat model and naming the reviewer here would
 	// fail at the first request rather than at load.
 	//
-	// Not every provider can do this. The one this repository recommends
-	// cannot, so a repository that wants retrieval names a second provider
-	// here and supplies its credential.
+	// Not every provider serves embeddings, and one that does may serve a
+	// different set of models for it than it does for chat, which is why this
+	// names a provider rather than inheriting the reviewer's.
 	Embed *ModelSpec `yaml:"embed"`
 
 	// Routes choose the reviewing model per batch. The first route whose

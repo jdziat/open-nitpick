@@ -16,9 +16,10 @@ import (
 // no roles. What it does share is provider construction and credential
 // resolution, which is why it lives here rather than in internal/knowledge.
 //
-// Not every provider can do this. The SDK reports embedding support per
-// provider and several this tool otherwise recommends do not have it, synthetic
-// among them, so a repository embedding needs a second provider and says so.
+// Not every provider can do this, and the SDK's own capability flags are not
+// the authority on which: it reports synthetic as having no embeddings, and
+// synthetic serves an embeddings endpoint. The check that counts is whether
+// the constructed client satisfies llms.Embedder, which is what happens below.
 
 // Embedder wraps an SDK client that can embed.
 type Embedder struct {
