@@ -189,7 +189,7 @@ func (e *Engine) reviewWith(ctx context.Context, r reviewers, prContext string, 
 			base, err := e.reviewPromptFor(c)
 			if err == nil {
 				var out []Finding
-				out, err = e.analyzeBatchWith(ctx, c, base, prContext, b)
+				out, err = e.analyzeBatchWith(ctx, c, base, prContext, b, false)
 
 				// A model that ran away or could not return the schema is not
 				// answered by asking it again, so the batch escalates to a
@@ -201,7 +201,7 @@ func (e *Engine) reviewWith(ctx context.Context, r reviewers, prContext string, 
 
 					blamed = fb
 					if base, err = e.reviewPromptFor(fb); err == nil {
-						out, err = e.analyzeBatchWith(ctx, fb, base, prContext, b)
+						out, err = e.analyzeBatchWith(ctx, fb, base, prContext, b, false)
 						if err == nil {
 							mu.Lock()
 							escalations = append(escalations, Escalation{

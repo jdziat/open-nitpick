@@ -49,6 +49,12 @@ type Engine struct {
 	// reviewed under half of one.
 	Models func(policy *config.Config) (*llm.Roles, error)
 
+	// Knowledge retrieves the entries a batch should be judged against. Nil
+	// when review.knowledge is off or no models.embed is configured, which is
+	// the shipped state: this is an option a repository turns on, not a
+	// default it inherits.
+	Knowledge *KnowledgeRetriever
+
 	// routeDecisions is where each batch of the last review went; copied
 	// into the Report.
 	routeDecisions []RouteDecision
@@ -1150,7 +1156,7 @@ func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bu
 				return
 			}
 
-			result, err := e.analyzeBatch(ctx, base, prContext, b)
+			result, err := e.analyzeBatch(ctx, base, prContext, b, true)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -1186,13 +1192,13 @@ func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bu
 
 // analyzeBatch reviews one batch.
 // analyzeBatch reviews a batch with the default review client.
-func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bundle.Batch) ([]Finding, error) {
-	return e.analyzeBatchWith(ctx, e.Roles.Review, base, prContext, b)
+func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bundle.Batch, style bool) ([]Finding, error) {
+	return e.analyzeBatchWith(ctx, e.Roles.Review, base, prContext, b, style)
 }
 
 // analyzeBatchWith reviews a batch with one client, under the prompt built
 // for it.
-func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base, prContext string, b bundle.Batch) ([]Finding, error) {
+func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base, prContext string, b bundle.Batch, style bool) ([]Finding, error) {
 	var body strings.Builder
 
 	if prContext != "" {
@@ -1203,6 +1209,13 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	for _, entry := range b.Entries {
 		body.WriteString(bundle.Render(entry))
 		body.WriteString("\n")
+	}
+
+	// After the diff, not before it. The change is what the model is being
+	// asked about, and reference material placed first reads as the subject.
+	if hits := e.retrieveKnowledge(ctx, b, style); len(hits) > 0 {
+		body.WriteString(knowledgeSection(hits))
+		e.log().Info("knowledge retrieved", "batch", b.Paths(), "entries", ids(hits))
 	}
 
 	msgs := []llms.Message{

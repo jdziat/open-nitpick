@@ -395,6 +395,44 @@ the operator to weigh against that. Context is not free either way: the same
 definitions that let a model confirm a defect give it more to be confidently
 wrong about.
 
+## Knowledge the model may not carry
+
+Related context above retrieves code from this repository. This retrieves prose
+from a corpus that ships with the binary: antipatterns and standard-library
+contracts a reviewing model covers unevenly, attached to a batch when the
+change resembles one.
+
+```yaml
+models:
+  embed:
+    provider: synthetic
+    model: hf:nomic-ai/nomic-embed-text-v1.5
+
+review:
+  knowledge: true
+```
+
+`models.embed` has no default and does not fall back to `models.default`: an
+embedding model is not a chat model, and overlaying one produces a
+configuration that looks complete and fails at the first request. A provider
+that serves chat may serve a different set of models for embeddings, so this
+names its own provider. Synthetic includes embeddings in the subscription at no
+additional charge, which is why the example uses it.
+
+The corpus is fourteen entries under `internal/knowledge/corpus`, each naming
+the source it came from and the day that source was read. The vectors are
+committed and regenerated with `nitpick knowledge-index`; CI diffs them, so an
+entry added without regenerating fails the build that added it rather than
+being silently unreachable. An index built by one embedding model refuses a
+query from another, because vectors from two models are not comparable.
+
+It ships off. On its own corpus it took recall from 0.75 to 1.00 with noise
+falling from 0.50 to 0.33 per review
+([Findings](findings.md#retrieved-knowledge-and-a-pre-registration-i-got-wrong-2026-09-08)),
+and that corpus is twelve fixtures written by the same author as the entries
+they retrieve, so it measures retrieval working rather than the corpus covering
+what a repository has.
+
 ## Personality and how much it nitpicks
 
 How a reviewer talks, and how far past outright defects it ranges, are matters

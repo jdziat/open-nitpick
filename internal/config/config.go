@@ -234,6 +234,16 @@ type Models struct {
 	// ship an unmeasured capability under a measured model's name.
 	Fix *ModelSpec `yaml:"fix"`
 
+	// Embed is the model that turns text into vectors for knowledge
+	// retrieval. It has no default and no fallback to Default, because an
+	// embedding model is not a chat model and naming the reviewer here would
+	// fail at the first request rather than at load.
+	//
+	// Not every provider serves embeddings, and one that does may serve a
+	// different set of models for it than it does for chat, which is why this
+	// names a provider rather than inheriting the reviewer's.
+	Embed *ModelSpec `yaml:"embed"`
+
 	// Routes choose the reviewing model per batch. The first route whose
 	// match holds wins; a batch no route matches is reviewed by the review
 	// model. Every model here overlays Default the way a role does, so a
@@ -355,6 +365,18 @@ func (m Models) ResolveEnsemble(r *Route) []ModelSpec {
 	return out
 }
 
+// ResolveEmbed returns the embedding model, and false when none is named.
+//
+// Like ResolveFix and unlike ResolveModel, it does not fall back to Default.
+// Overlaying a chat model's spec would produce a configuration that looks
+// complete and fails at the first embedding request.
+func (m Models) ResolveEmbed() (ModelSpec, bool) {
+	if m.Embed == nil {
+		return ModelSpec{}, false
+	}
+	return *m.Embed, true
+}
+
 // ResolveFix returns the model that edits code, and false when none is named.
 //
 // Unlike a role, this has no fallback to the default model. A caller with no
@@ -467,6 +489,16 @@ type Review struct {
 	// separate switch, and off unless asked for. It does nothing unless
 	// RelatedContext is on.
 	RelatedContextCallers bool `yaml:"related_context_callers"`
+
+	// Knowledge attaches entries from the shipped corpus that the change
+	// resembles: antipatterns and standard-library contracts a model may not
+	// carry. It needs models.embed, and does nothing without it.
+	//
+	// Off by default, and it should stay off until a measurement says
+	// otherwise. Reference material beside a diff is a reason for a model to
+	// report the reference, and a reviewer that invents defects out of a style
+	// guide is worse than one that misses them.
+	Knowledge bool `yaml:"knowledge"`
 
 	// ModelNotes adds the prompt layer addressed to the reviewing model's
 	// family (prompt.ModelGuidance). On unless set to false; the switch

@@ -14,6 +14,7 @@ import (
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/linters"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/prompt"
@@ -199,7 +200,19 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		}
 	}
 
-	report, err := newEngine(&f, repo, cfg, provider, log).Review(ctx, ref)
+	engine := newEngine(&f, repo, cfg, provider, log)
+
+	// Retrieval is built from the file on disk rather than the resolved
+	// policy, and deliberately: it reads models.embed, which the trust prune
+	// strips from a repository's own file, so a change cannot point the
+	// embedder at an endpoint of its own. A misconfiguration is fatal here
+	// because the operator asked for retrieval; a failure to retrieve during a
+	// review is not, and is logged instead.
+	if engine.Knowledge, err = review.BuildKnowledge(ctx, cfg, knowledge.IndexJSON(), log); err != nil {
+		return err
+	}
+
+	report, err := engine.Review(ctx, ref)
 	var note string
 	switch {
 	case err == nil:

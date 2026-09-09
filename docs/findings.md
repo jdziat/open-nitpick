@@ -1586,3 +1586,170 @@ the walkthrough is now counted from the report instead; see
 
 Rule 15 applies. One model, one run, six fixtures, and the headline number is
 a proxy the section above says cannot separate paraphrase from invention.
+
+## Retrieved knowledge, and a pre-registration I got wrong (2026-09-08)
+
+The knowledge corpus is twelve fixtures under Rule 15: six plants whose defect
+needs one specific fact, each paired with a control whose code attracts the same
+corpus entry and contains nothing wrong. `z-ai/glm-5.3-flash` through
+OpenRouter, two runs per arm, 24 reviews per arm, none lost. Judge-free.
+
+| arm | embedder | RECALL | NOISE / review | $ / review |
+|---|---|---|---|---|
+| retrieval off | none | 0.75 | 0.50 | $0.0002 |
+| retrieval on | synthetic, nomic-embed-text-v1.5 | **1.00** | **0.33** | $0.0003 |
+| retrieval on | openrouter, text-embedding-3-small | **1.00** | **0.33** | $0.0005 |
+
+The off arm builds no retriever, so it is the control for both. The two
+embedders land on the same recall and the same noise from different vector
+spaces and different dimensions, 768 against 1536, which is more than one run
+of six plants can distinguish and less than a claim that they are equivalent.
+
+Recall is located plants over plants across every review, so 0.75 is 18 of 24
+and 1.00 is 24 of 24. Per run of six plants that is 4.5 found without
+retrieval and 6 with it.
+
+**The plant that moved is the one worth naming.** `know-go-time-after-leak` was
+missed in all four reviews without retrieval and found in all four with it. It
+is the fixture whose defect is least visible from the diff alone: a
+`time.After` in a select loop looks like ordinary idle-timeout code, and the
+reason it leaks is a sentence in the standard library's documentation about
+when the timer is recovered.
+
+**Noise fell rather than rose**, 0.50 to 0.33 per review, and the six controls
+drew no plant-shaped finding in either arm. That was the outcome most at risk:
+reference material beside a diff is a standing invitation to report the
+reference, and the section's heading says three times over that none of it was
+written about the change under review.
+
+### The pre-registration does not fit the corpus, and that is my error
+
+The plan fixed the threshold before the corpus existed, at *"at least 3 of 12
+plants"*. The corpus as built has **six** plants and six controls, so the
+threshold as written cannot be evaluated: there was never a twelfth plant to
+find three of.
+
+Read proportionally, 3 of 12 is a quarter of the plants, and the observed gain
+is 1.5 of 6, which is also a quarter. So the condition is met on the reading
+that survives the arithmetic, and I am recording that it is a reading rather
+than the thing I committed to. Rule 14's preamble is about exactly this failure
+and I walked into a version of it: a threshold written before the instrument
+was built is not automatically a threshold the instrument can express.
+
+### What this does not establish
+
+Every plant has a matching corpus entry by construction. A separate check
+confirms retrieval puts that entry in the prompt for all six, at ranks 1, 1, 1,
+2, 3 and 3 of at most five kept, so the gain is retrieval working rather than
+run-to-run variance. What it is not is evidence that the corpus covers defects
+a real repository has: fourteen entries were chosen by one author, and the
+corpus was written before the fixtures that measure it.
+
+Two runs per arm on six plants also cannot separate a real 1.5-plant gain from
+a fortunate pair of runs. Rule 3 wants two passes and a gap wider than the
+spread; this has the passes and the gap is 1.5 plants against a resolution of
+one, which is thinner than it looks.
+
+`review.knowledge` stays off by default.
+
+### The provider claim in this section was wrong
+
+The arm above embedded through OpenRouter because I recorded that synthetic,
+the provider this repository runs, could not embed. That came from the SDK's
+per-provider capability flag, which reports `Embeddings: false` for synthetic.
+Synthetic serves an embeddings endpoint: `hf:nomic-ai/nomic-embed-text-v1.5`,
+768 dimensions, included in the subscription at no additional charge.
+
+The index ships built on it now, and the arm was re-run: the table above has
+both. Retrieval reaches all six plants on synthetic at ranks 1, 1, 1, 1, 1 and
+3, against 1, 1, 1, 2, 3 and 3 on OpenRouter, and the two arms score the same.
+Better ranks did not buy better recall here, which they could not: the on arm
+finds every plant, so there is nothing above it to reach.
+
+The lesson is narrower than "the SDK was wrong": a capability flag is metadata
+about a provider, and the only check worth trusting is a request.
+
+## Vectors cannot tell a finding from noise (2026-09-08)
+
+Asked whether the corpus and the embedder could classify a published finding as
+noise. Three mechanisms, three measurements, all negative, and the one number
+that looked positive was circular.
+
+The labels come from runs already recorded: a finding the keyword rule credited
+against a plant is real, one explaining no plant is noise. 291 findings across
+two corpora collected four days apart.
+
+### Similarity to the knowledge corpus
+
+| corpus the findings came from | real, mean cosine | noise, mean cosine | best single threshold | baseline |
+|---|---|---|---|---|
+| knowledge (12 fixtures) | 0.733 | 0.538 | **0.938** at cut 0.658 | 0.531 |
+| callers (6 fixtures) | 0.533 | 0.536 | 0.528 at cut 0.615 | 0.478 |
+
+The first row is the artifact. Every plant in the knowledge corpus has a
+matching entry by construction, because the entries were written first and the
+fixtures were written to need them. So "real finding" and "finding the corpus
+covers" are the same set there, and 0.938 measures that identity rather than
+any property of noise.
+
+The second row is the test that counts. On findings from a corpus the entries
+were not written for, real and noise sit 0.003 apart on a scale where a single
+fixture moves more than that, and the best threshold beats always-guessing by
+five points, which one run cannot distinguish from nothing.
+
+### Past labelled findings as the index
+
+Nearest-neighbour over 161 labelled findings from one corpus, classifying 130
+from the other:
+
+| k | accuracy |
+|---|---|
+| 1 | 0.492 |
+| 3 | 0.469 |
+| 5 | 0.485 |
+| always the majority class | **0.531** |
+
+Every k is worse than guessing. Not weakly informative, not marginal: a coin
+that always says "real" beats all three.
+
+### What this says, and what it does not
+
+An embedding of a finding's title carries what the finding is *about*, and
+being about a nil map is not evidence either way about whether this particular
+nil map is reachable. That is the thing a validator has to decide and the thing
+a vector does not encode.
+
+The measurement is on titles alone. A rationale, the diff hunk, and the
+surrounding code are all available and none was tried, so this rules out the
+cheap version rather than the idea. It also says nothing about a reranking
+model reading the finding and the code, which is a model call rather than a
+vector comparison and is what `internal/review/validate.go` already does.
+
+The retrieval feature keeps its own result: noise fell from 0.50 to 0.33 per
+review with retrieval on. That is context helping a model judge, not a vector
+judging on its own, and the difference is the whole of this section.
+
+### The model that reads the finding and the code did not do better
+
+`internal/review/validate.go` is that mechanism and already exists: an expert
+persona is shown a finding and the code it names, and overrules it with a
+stated reason. Turning it on over the same corpus, same model, two runs:
+
+| arm | RECALL | NOISE / review |
+|---|---|---|
+| retrieval on | **1.00** | 0.33 |
+| retrieval on, validation on | 0.83 | 0.29 |
+
+Recall fell from 24 of 24 plant-locations to 20 of 24. Noise fell by 0.04 per
+review on one contender and not at all on the other, against a corpus
+resolution where one plant is 0.083.
+
+So the validator paid four real findings for something smaller than this
+instrument can measure. `know-go-defer-in-loop` is the clearest case: found in
+every run without validation, overruled in one run with it.
+
+That is one corpus, one model, two runs, and validation was built for a
+different job than noise reduction on twelve fixtures. What it does say is that
+the obvious escalation from a vector to a model did not rescue the idea here,
+and the thing that did reduce noise was giving the reviewer better context in
+the first place.

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -105,12 +106,12 @@ func pruneUntrusted(root *yaml.Node) []string {
 	}
 
 	if models := mapValue(root, "models"); models != nil {
-		// fix writes code and opens a pull request from it, which makes it the
-		// role a repository would most want to point at an endpoint of its own.
-		// It was absent from this list for a release: models.fix.base_url and
-		// models.fix.credential_command survived the prune and reached
-		// validation while the same keys under models.default were deleted.
-		for _, role := range []string{"default", "review", "triage", "validate", "router", "fix"} {
+		// Read off the Models struct rather than listed. A literal here is a
+		// list someone has to remember to extend, and the one that stood here
+		// was missing models.fix for a release: its base_url and its
+		// credential_command survived the prune and reached validation while
+		// the same keys under models.default were deleted.
+		for _, role := range modelRoleKeys() {
 			scrub("models."+role, mapValue(models, role))
 		}
 		for i, route := range sequence(mapValue(models, "routes")) {
@@ -217,4 +218,29 @@ func nodeAsksForSomething(n *yaml.Node) bool {
 // there is no legitimate reason to send the forge token to a model endpoint.
 func (s ModelSpec) checkAPIKeyEnv() bool {
 	return !forbiddenAPIKeyEnv[strings.ToUpper(strings.TrimSpace(s.APIKeyEnv))]
+}
+
+// modelRoleKeys is the yaml key of every single-model slot on Models.
+//
+// Derived by reflection so a slot added to the struct is pruned without a
+// second edit. A credential key that survives this prune is one a pull request
+// can set, which is the whole of what this file prevents.
+func modelRoleKeys() []string {
+	var out []string
+	t := reflect.TypeOf(Models{})
+	spec := reflect.TypeOf(ModelSpec{})
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		ft := f.Type
+		for ft.Kind() == reflect.Pointer {
+			ft = ft.Elem()
+		}
+		if ft != spec {
+			continue
+		}
+		if name, _, _ := strings.Cut(f.Tag.Get("yaml"), ","); name != "" && name != "-" {
+			out = append(out, name)
+		}
+	}
+	return out
 }
