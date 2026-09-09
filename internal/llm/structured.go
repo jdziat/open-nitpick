@@ -139,7 +139,12 @@ func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, c
 // generateContent is GenerateContent with generateTyped's retries.
 func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (*llms.Response, error) {
 	for attempt := 0; ; attempt++ {
-		resp, err := c.LLM.GenerateContent(ctx, msgs, call...)
+		var resp *llms.Response
+		err := whileWaiting(ctx, c.Log, "model call", c.String(), waitInterval, func() error {
+			var err error
+			resp, err = c.LLM.GenerateContent(ctx, msgs, call...)
+			return err
+		})
 		if next, ok := c.retryAfter(ctx, attempt, call, resp, err); ok {
 			call = next
 			continue
