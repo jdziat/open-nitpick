@@ -300,11 +300,15 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 	// the reason to doubt it, so the verdict itself is demoted to doubt: the
 	// finding stands, and the reader is told the check did not resolve.
 	//
-	// Only the two verdicts that act on a finding. A confirmation changes
-	// nothing whatever it cites, and stamping one "could not be resolved"
-	// tells the reader the check was weaker than it was.
-	removes := verdict == verdictRefuted || verdict == verdictSeverity
-	if invented := removes && len(shown) > 0 && namesSomething(result.Cited) && cite == ""; invented {
+	// Asked at each verdict that acts on the finding rather than before the
+	// switch, because whether one acts is not known until it has been read. A
+	// re-rating to the level the finding already carries changes nothing, and
+	// stamping that "could not be resolved" tells the reader the check was
+	// weaker than it was, exactly as it would for a confirmation.
+	invented := func() bool {
+		if len(shown) == 0 || !namesSomething(result.Cited) || cite != "" {
+			return false
+		}
 		// The reason too, as both other verdicts log it. This is the path the
 		// code itself rates least reliable, so an auditor reading it later
 		// needs what the expert said and not only what it cited.
@@ -312,9 +316,10 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 			"expert", expert.Key, "path", f.Path, "title", f.Title,
 			"cited", result.Cited, "verdict", result.Verdict,
 			"reason", strings.TrimSpace(result.Reason))
-		return outcome{finding: f, expert: expertLabel(expert),
-			unresolved: "it named a reference it was not shown, so this was not resolved"}
+		return true
 	}
+	demoted := outcome{finding: f, expert: expertLabel(expert),
+		unresolved: "it named a reference it was not shown, so this was not resolved"}
 
 	switch verdict {
 	case verdictRefuted:
@@ -326,6 +331,10 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 			return keep
 		}
 
+		if invented() {
+			return demoted
+		}
+
 		v.log().Info("expert refuted a finding",
 			"expert", expert.Key, "path", f.Path, "line", f.Line, "title", f.Title, "reason", reason)
 		return outcome{finding: f, refuted: true, expert: expertLabel(expert), reason: reason, cited: cite}
@@ -334,6 +343,9 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 		revised, reason := v.revise(f, expert, result)
 		if revised == "" {
 			return keep
+		}
+		if invented() {
+			return demoted
 		}
 		return outcome{finding: f, expert: expertLabel(expert), reason: reason, revised: revised, cited: cite}
 

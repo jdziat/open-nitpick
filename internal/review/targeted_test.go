@@ -292,3 +292,34 @@ func TestOnlyAnActingVerdictIsDemotedForAnInventedCitation(t *testing.T) {
 		t.Error("a refutation resting on an invented source was not demoted")
 	}
 }
+
+// A re-rating that moves nothing is not demoted for its citation.
+//
+// revise returns an empty level when the expert names the level the finding
+// already carries, and the finding is then published untouched. That is the
+// same non-action as a confirmation, and stamping it "could not be resolved"
+// tells the reader the check was weaker than it was.
+func TestANoChangeRerateIsNotDemotedForAnInventedCitation(t *testing.T) {
+	v := newValidator(&scriptedLLM{
+		fallback: `{"verdict":"severity","reason":"this level is right","revised_severity":"` +
+			claimed.Severity + `","cited":"cwe-489-invented"}`,
+	}, config.Validation{Enabled: true, Targeted: true})
+	v.Corpus = referenceCorpus
+
+	f := claimed
+	f.Evidence = []string{"go-defer-in-loop"}
+
+	kept, overruled := v.Validate(context.Background(), []Finding{f}, claimedCode)
+	if len(overruled) != 0 {
+		t.Fatalf("overruled = %d, want 0: the level did not move", len(overruled))
+	}
+	if len(kept) != 1 {
+		t.Fatalf("kept = %d, want 1", len(kept))
+	}
+	if kept[0].Unresolved != "" {
+		t.Errorf("a re-rating that moved nothing was stamped %q", kept[0].Unresolved)
+	}
+	if kept[0].Severity != claimed.Severity {
+		t.Errorf("severity = %q, want it untouched", kept[0].Severity)
+	}
+}
