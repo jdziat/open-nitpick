@@ -299,9 +299,13 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 	// the reason to doubt it, so the verdict itself is demoted to doubt: the
 	// finding stands, and the reader is told the check did not resolve.
 	if invented := len(shown) > 0 && namesSomething(result.Cited) && cite == ""; invented {
+		// The reason too, as both other verdicts log it. This is the path the
+		// code itself rates least reliable, so an auditor reading it later
+		// needs what the expert said and not only what it cited.
 		v.log().Warn("expert cited a reference it was not shown; publishing the finding unresolved",
 			"expert", expert.Key, "path", f.Path, "title", f.Title,
-			"cited", result.Cited, "verdict", result.Verdict)
+			"cited", result.Cited, "verdict", result.Verdict,
+			"reason", strings.TrimSpace(result.Reason))
 		return outcome{finding: f, expert: expertLabel(expert),
 			unresolved: "it named a reference it was not shown, so this was not resolved"}
 	}

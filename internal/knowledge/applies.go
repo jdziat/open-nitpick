@@ -70,6 +70,15 @@ func parseApplies(id, value string) ([]Constraint, error) {
 		if !version.IsValid("go" + c.Version) {
 			return nil, fmt.Errorf("knowledge: %s: applies: %q is not a version", id, c.Version)
 		}
+		// Language versions only. holds compares with version.Lang, which
+		// truncates both sides, so "1.21.1" would be accepted here and then
+		// behave as "1.21": a constraint wider than its author wrote, with
+		// nothing said. Refused at parse instead.
+		if version.Lang("go"+c.Version) != "go"+c.Version {
+			return nil, fmt.Errorf("knowledge: %s: applies: %q names a patch release; "+
+				"clauses compare language versions, so write %q",
+				id, c.Version, strings.TrimPrefix(version.Lang("go"+c.Version), "go"))
+		}
 		out = append(out, c)
 	}
 	if len(out) == 0 {
@@ -102,9 +111,10 @@ func (e Entry) AppliesTo(versions map[string]string) bool {
 // holds compares a declared version against one clause.
 //
 // go/version, the same comparison the linter roster makes, so "1.9" is below
-// "1.23" rather than above it the way a string compare would have it. A
-// declared version this package cannot parse keeps the entry, for AppliesTo's
-// reason.
+// "1.23" rather than above it the way a string compare would have it. Both
+// sides truncate to the language version, which is why parseApplies refuses a
+// clause naming a patch release. A declared version this package cannot parse
+// keeps the entry, for AppliesTo's reason.
 func (c Constraint) holds(declared string) bool {
 	got, want := "go"+declared, "go"+c.Version
 	if !version.IsValid(got) || !version.IsValid(want) {

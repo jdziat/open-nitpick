@@ -85,6 +85,9 @@ func TestAMalformedAppliesIsRefused(t *testing.T) {
 		"one clause of two":       "go >= 1.21, go",
 		"a name nothing resolves": "golang < 1.23",
 		"a plausible typo":        "Go1 >= 1.21",
+		// Comparison truncates to the language version, so this would silently
+		// mean ">= 1.21" and be wider than its author wrote.
+		"a patch release": "go >= 1.21.1",
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := parseApplies("some-entry", value); err == nil {
