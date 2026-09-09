@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.12.0](https://github.com/jdziat/open-nitpick/compare/v1.11.2...v1.12.0) (2026-09-09)
+
+
+### Features
+
+* **knowledge:** retrieval across every command, selectable bundles, class routing and a pre-registered evaluation ([#85](https://github.com/jdziat/open-nitpick/issues/85)) ([ffcc840](https://github.com/jdziat/open-nitpick/commit/ffcc8405f767f313812659e851ef4fd9fc6cf322)), closes [#84](https://github.com/jdziat/open-nitpick/issues/84)
+* **knowledge:** retrieve what the model was not taught ([#80](https://github.com/jdziat/open-nitpick/issues/80)) ([5709a07](https://github.com/jdziat/open-nitpick/commit/5709a075bb1c83e11bf223e8d8fda85410867971))
+* **knowledge:** ship voyage-code-4 and qwen3-embedding-8b bundles ([#89](https://github.com/jdziat/open-nitpick/issues/89)) ([2bb8c9b](https://github.com/jdziat/open-nitpick/commit/2bb8c9ba5e4e4dabb326a7622d3756f938371a92))
+
+
+### Fixes
+
+* **bundle,llm:** stop sending an added file twice, and say when a call is slow ([#86](https://github.com/jdziat/open-nitpick/issues/86)) ([a5a4290](https://github.com/jdziat/open-nitpick/commit/a5a4290cf5d789b1107e1de531e95db148bfb132))
+* **knowledge:** check the embedding model at query time, not only at build ([#90](https://github.com/jdziat/open-nitpick/issues/90)) ([7bbd023](https://github.com/jdziat/open-nitpick/commit/7bbd023fe6f22e779b15cdcbfe58cf23da86f86b))
+* **review,bundle:** reasoning budget, concurrent style pass, framing-aware budget ([#87](https://github.com/jdziat/open-nitpick/issues/87)) ([0120e85](https://github.com/jdziat/open-nitpick/commit/0120e85052b55f8c08e8870084ad1c8ca9880814))
+
+
+### Measurement
+
+* **knowledge:** freeze the 100-snapshot selection ([#88](https://github.com/jdziat/open-nitpick/issues/88)) ([6dd5872](https://github.com/jdziat/open-nitpick/commit/6dd5872ab5e2f2ea92f2af2cf29c525d1dd7cb73)), closes [#84](https://github.com/jdziat/open-nitpick/issues/84)
+
 ## [1.11.2](https://github.com/jdziat/open-nitpick/compare/v1.11.1...v1.11.2) (2026-09-08)
 
 
