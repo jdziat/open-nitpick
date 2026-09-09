@@ -45,15 +45,15 @@ type Retriever struct {
 	// creates (the entry that would have caught the defect, cut for scoring
 	// 0.4) are both real, and which dominates is a measurement.
 	MinScore float64
-
-	// Versions is what the repository under review declares, keyed as an
-	// entry's `applies:` clauses name it. Nil means nothing is known, and
-	// nothing known keeps every entry.
-	Versions map[string]string
 }
 
 // Retrieve returns the entries closest to a change.
-func (r *Retriever) Retrieve(ctx context.Context, query string, langs map[string]bool, classes map[config.Class]bool) ([]Hit, error) {
+// versions is what the module owning the queried files declares, keyed as an
+// entry's `applies:` clauses name it. Per call rather than per run: a
+// repository can hold several modules on several language versions, and one
+// answer for all of them would judge a submodule's files against a version it
+// does not target. Nil keeps every entry.
+func (r *Retriever) Retrieve(ctx context.Context, query string, langs map[string]bool, classes map[config.Class]bool, versions map[string]string) ([]Hit, error) {
 	if r == nil || r.Index == nil || r.Embedder == nil {
 		return nil, nil
 	}
@@ -63,7 +63,7 @@ func (r *Retriever) Retrieve(ctx context.Context, query string, langs map[string
 	if err := r.Index.CheckModel(r.Model); err != nil {
 		return nil, err
 	}
-	pool := r.pool(langs, classes)
+	pool := r.pool(langs, classes, versions)
 	if len(pool) == 0 {
 		return nil, nil
 	}
@@ -180,10 +180,10 @@ func languageOf(p string) string {
 // are wrong rather than distant, and cosine cannot tell those from a near
 // miss. Similarity alone puts Python's mutable default beside Go's slice
 // aliasing, both being "a value shared when it looked copied".
-func (r *Retriever) pool(langs map[string]bool, classes map[config.Class]bool) []Entry {
+func (r *Retriever) pool(langs map[string]bool, classes map[config.Class]bool, versions map[string]string) []Entry {
 	out := ForLanguages(r.Entries, langs)
 	out = ForClasses(out, classes)
-	return ForVersions(out, r.Versions)
+	return ForVersions(out, versions)
 }
 
 // PoolSize is how many entries a query could have reached.
@@ -192,9 +192,9 @@ func (r *Retriever) pool(langs map[string]bool, classes map[config.Class]bool) [
 // is answerable from a run rather than by counting corpus files. On a pool at
 // or below Keep, every entry reaches the prompt and any reordering of the
 // candidates is unobservable, which is what a reranker would be buying.
-func (r *Retriever) PoolSize(langs map[string]bool, classes map[config.Class]bool) int {
+func (r *Retriever) PoolSize(langs map[string]bool, classes map[config.Class]bool, versions map[string]string) int {
 	if r == nil {
 		return 0
 	}
-	return len(r.pool(langs, classes))
+	return len(r.pool(langs, classes, versions))
 }

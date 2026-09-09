@@ -1795,3 +1795,23 @@ condition to revisit this is written here rather than left implicit: when the
 pool exceeds keep for most retrievals rather than one language in six, a
 reranker has something to do, and it can be measured against the cosine order
 as the control.
+
+## Regenerating the index is not a pure function of the corpus (2026-09-08)
+
+Editing one corpus entry and regenerating all four bundles moved two other
+entries' vectors. Measured on the diff, comparing per-entry vectors before and
+after:
+
+| entry | model | components differing | max delta | cosine |
+|---|---|---|---|---|
+| sql-rows-err-unchecked | text-embedding-3-small | 1209 of 1536 | 1.22e-4 | 0.999999228 |
+| rust-mem-forget-leak | voyage-code-4 | 598 of 1024 | 1.30e-7 | 1.000000000 |
+
+Neither entry's text changed. This is provider-side nondeterminism, and at that
+magnitude it cannot reorder retrieval: the corpus's nearest neighbours are
+separated by far more than 1e-4.
+
+Recorded because the `corpus` hash pins the text and nothing pins the vectors,
+so a bundle regenerated from an unchanged corpus is a clean diff by the test's
+standard and a changed file by git's. Nothing here needs fixing. What it rules
+out is treating a bundle diff as evidence that the corpus changed.

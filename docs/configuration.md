@@ -932,9 +932,21 @@ The reason it is not on: it narrows the question from "is this claim true of
 this code" to "is this claim true of this code given this rule", and a wrong
 retrieval makes the second easy to answer confidently and wrongly.
 
-A citation naming an entry the expert was not shown is dropped rather than
-recorded. A citation nobody can follow is worse than none, since the point of
-a finding carrying its evidence is that a reader can go and look.
+A citation naming an entry the expert was not shown does more than get
+dropped: the verdict resting on it is demoted to `unresolved`, so the finding
+publishes and the reader is told the check did not resolve. An expert naming a
+source it never saw is the strongest signal available that its refutation is
+unreliable, and this tool's rule is that doubt does not delete a finding.
+
+Every published finding lists the entries the reviewer read, as
+`reference read: <id>`, and every withheld one lists the entry its expert
+cited. The ids are the filenames under `internal/knowledge/corpus`.
+
+Like the rest of the `validation` block, `targeted` can be set by the
+repository's own `.nitpick.yaml`, which a change may edit. That is the existing
+position for `validation.enabled` too, and `enabled` is the larger lever, since
+it creates the pass rather than changing its prompt. The trust prune covers
+model endpoints and credentials; see the trust model page.
 
 The entries are shown under a `REFERENCE MATERIAL, NOT THIS CHANGE` marker, and that marker is
 defanged out of the code in the same request. The code is written by the change

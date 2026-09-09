@@ -1255,7 +1255,14 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	hits := e.retrieveKnowledge(ctx, b, style)
 	if len(hits) > 0 {
 		body.WriteString(knowledgeSection(hits))
-		e.log().Info("knowledge retrieved", "batch", b.Paths(), "entries", ids(hits))
+		// pool beside entries, at the level an operator runs at. A pool at or
+		// below Keep means every entry the cuts allowed reached the prompt, so
+		// nothing chose between them, which is the number docs/findings.md
+		// says a corpus grown past that point will report.
+		e.log().Info("knowledge retrieved",
+			"batch", b.Paths(),
+			"entries", ids(hits),
+			"pool", e.Knowledge.PoolSize(b, e.knowledgeClasses(style)))
 	}
 
 	msgs := []llms.Message{

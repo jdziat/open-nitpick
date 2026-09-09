@@ -85,9 +85,78 @@ func LanguageVersion(modFile string) (declared string, line int, ok bool) {
 // repository as a whole claims. An unreadable or absent one returns nothing,
 // which AppliesTo reads as "unknown".
 func Versions(repoRoot string) map[string]string {
+	if repoRoot == "" {
+		// Not the process working directory. Joining "" with "go.mod" names a
+		// relative path, so a caller with no checkout would judge entries
+		// against whatever module the binary happens to be run from.
+		return nil
+	}
 	declared, _, ok := LanguageVersion(filepath.Join(repoRoot, "go.mod"))
 	if !ok {
 		return nil
 	}
 	return map[string]string{"go": declared}
+}
+
+// VersionsFor reports what the module owning these paths declares.
+//
+// The module owning them, not the repository's root, because the Go language
+// version is a property of the main module and a repository can hold several.
+// A submodule on 1.21 under a root on 1.25 has the timer behaviour its own
+// go.mod declares, and judging its files against the root's answer would drop
+// an entry that applies: a confident wrong answer, which is worse than the
+// unknown this package's callers are built to keep everything on.
+//
+// Paths belonging to different modules return nothing, for the same reason. So
+// does a path that escapes repoRoot, which is not a path this repository
+// serves.
+func VersionsFor(repoRoot string, paths []string) map[string]string {
+	if repoRoot == "" || len(paths) == 0 {
+		return nil
+	}
+
+	var found string
+	for i, p := range paths {
+		mod, ok := moduleDir(repoRoot, p)
+		if !ok {
+			return nil
+		}
+		if i > 0 && mod != found {
+			return nil
+		}
+		found = mod
+	}
+	return Versions(found)
+}
+
+// moduleDir walks up from a repository-relative path to the nearest directory
+// holding a go.mod, stopping at repoRoot.
+//
+// The root itself counts, so a single-module repository answers the way it
+// always did. A path with no go.mod anywhere above it is not in a module, and
+// reporting one for it would be an invention.
+func moduleDir(repoRoot, rel string) (string, bool) {
+	root := filepath.Clean(repoRoot)
+	dir := filepath.Dir(filepath.Join(root, filepath.FromSlash(rel)))
+
+	// Refuse anything that climbed out of the repository rather than searching
+	// upward from it: a "../" in a diff path must not read a go.mod the
+	// repository does not contain.
+	if dir != root && !strings.HasPrefix(dir, root+string(filepath.Separator)) {
+		return "", false
+	}
+
+	for {
+		if _, _, ok := LanguageVersion(filepath.Join(dir, "go.mod")); ok {
+			return dir, true
+		}
+		if dir == root {
+			return "", false
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
 }

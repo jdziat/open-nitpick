@@ -134,6 +134,10 @@ type Withheld struct {
 	Title  string `json:"title"`
 	Expert string `json:"expert"`
 	Reason string `json:"reason"`
+
+	// Cited is the knowledge entry the expert said decided its verdict, empty
+	// when it named none or named one it was not shown.
+	Cited string `json:"cited,omitempty"`
 }
 
 // ReviewOut is what review returns.
@@ -369,7 +373,8 @@ func reviewOut(report *review.Report, failOn config.Severity) ReviewOut {
 		out.Analyzers = append(out.Analyzers, Analyzer{Name: s.Linter, Outcome: string(s.Outcome), State: s.State})
 	}
 	for _, o := range report.Overruled {
-		out.Withheld = append(out.Withheld, Withheld{Path: o.Finding.Path, Line: o.Finding.Line, Title: o.Finding.Title, Expert: o.Expert, Reason: o.Reason})
+		out.Withheld = append(out.Withheld, Withheld{Path: o.Finding.Path, Line: o.Finding.Line,
+			Title: o.Finding.Title, Expert: o.Expert, Reason: o.Reason, Cited: o.Cited})
 	}
 	if report.Policy.Replaced {
 		out.Policy = fmt.Sprintf("the change edits %s, so it was reviewed under %s", report.Policy.Modified, report.Policy.Source())

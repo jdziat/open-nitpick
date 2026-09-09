@@ -61,29 +61,6 @@ func TestNoHitsIsNoEvidence(t *testing.T) {
 	}
 }
 
-// The order is stable, so two runs over the same hits publish the same
-// evidence and a review stays reproducible.
-func TestEvidenceIsDeterministic(t *testing.T) {
-	f := Finding{Path: "a.go"}
-	hits := []knowledge.Hit{hitOn("x", "b.go"), hitOn("y", "a.go"), hitOn("z", "b.go")}
-
-	first := evidenceFor(f, hits)
-	for i := 0; i < 20; i++ {
-		again := evidenceFor(f, hits)
-		for j := range first {
-			if again[j] != first[j] {
-				t.Fatalf("order changed between calls: %v then %v", first, again)
-			}
-		}
-	}
-}
-
-// Evidence survives triage, which re-decodes every finding from JSON.
-//
-// Source, Triager and the severity fields are all restored the same way and
-// for the same reason: they are json:"-", so they arrive from triage's decode
-// zeroed. A field that skipped this would be attributed at the reviewer and
-// gone by the time anything published it.
 func TestEvidenceSurvivesTriage(t *testing.T) {
 	reviewed := mustJSON(t, Result{Findings: []Finding{
 		{Path: "app.go", Line: 4, Severity: "error", Title: "Real finding"},

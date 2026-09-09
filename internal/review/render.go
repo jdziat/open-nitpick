@@ -213,7 +213,20 @@ func renderComment(f Finding, emoji bool, read map[string][]string) string {
 	// whatever follows renders as live HTML in a comment posted under this
 	// tool's name. Same call every other model-authored string here makes.
 	if u := inline(strings.TrimSpace(f.Unresolved)); u != "" {
-		fmt.Fprintf(&b, "\n<sub>could not be resolved by %s</sub>\n", u)
+		fmt.Fprintf(&b, "\n<sub>could not be resolved by %s: %s</sub>\n", inline(f.UnresolvedBy), u)
+	}
+
+	// What the reviewer read, so a reader can go and look. Ids only: the
+	// entries ship in this repository under internal/knowledge/corpus, and a
+	// reader who wants the text has a filename. It is not a claim that any of
+	// them produced the finding, which is why the line says "read", see
+	// evidence.go.
+	if len(f.Evidence) > 0 {
+		read := make([]string, 0, len(f.Evidence))
+		for _, id := range f.Evidence {
+			read = append(read, "`"+inline(id)+"`")
+		}
+		fmt.Fprintf(&b, "\n<sub>reference read: %s</sub>\n", strings.Join(read, ", "))
 	}
 
 	// A GitHub suggestion block is one click to apply. Which makes it the most
@@ -930,11 +943,11 @@ func overruledNotes(report *Report) string {
 			// (a ceiling of warning rendering "re-rated this from critical" as
 			// though critical had been published), so the level printed here is
 			// the one that WAS published for this finding.
-			fmt.Fprintf(&b, "  - %s re-rated this from %s to %s, below this repository's minimum severity: %s\n",
-				inline(r.Expert), r.Finding.Sev(), r.Revised, inline(r.Reason))
+			fmt.Fprintf(&b, "  - %s re-rated this from %s to %s, below this repository's minimum severity: %s%s\n",
+				inline(r.Expert), r.Finding.Sev(), r.Revised, inline(r.Reason), citedNote(r))
 			continue
 		}
-		fmt.Fprintf(&b, "  - %s: %s\n", inline(r.Expert), inline(r.Reason))
+		fmt.Fprintf(&b, "  - %s: %s%s\n", inline(r.Expert), inline(r.Reason), citedNote(r))
 	}
 
 	return b.String()
@@ -1087,4 +1100,16 @@ func stageNotice(report *Report) string {
 		fmt.Fprintf(&b, "> - %s\n", inline(stageSentence(st)))
 	}
 	return b.String()
+}
+
+// citedNote names the reference entry an expert said decided its verdict.
+//
+// Rendered wherever a reason is, because the reason is the claim and this is
+// what it rests on. A citation naming an entry the expert was not shown never
+// reaches here: it is dropped at the verdict, see citation.
+func citedNote(r Overruled) string {
+	if r.Cited == "" {
+		return ""
+	}
+	return fmt.Sprintf(" (citing `%s`)", inline(r.Cited))
 }

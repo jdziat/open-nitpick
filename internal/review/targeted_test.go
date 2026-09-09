@@ -7,6 +7,7 @@ import (
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/knowledge"
+	"github.com/jdziat/open-nitpick/internal/prompt"
 )
 
 var referenceCorpus = map[string]knowledge.Entry{
@@ -149,5 +150,67 @@ func TestOrdinaryProseIsNotMistakenForAMarker(t *testing.T) {
 		if got := defang(forged); got != defanged {
 			t.Errorf("defang(%q) = %q, want it defanged", forged, got)
 		}
+	}
+}
+
+// A verdict resting on an invented source is demoted to doubt.
+//
+// Dropping the citation alone would publish the deletion and hide the reason
+// to doubt it. An expert that names a reference it was never shown has given
+// the strongest available signal that its refutation is unreliable, and this
+// project's rule is that doubt does not delete a finding.
+func TestAVerdictCitingAnUnshownReferenceIsDemoted(t *testing.T) {
+	v := newValidator(&scriptedLLM{
+		fallback: `{"verdict":"refuted","reason":"a rule I read says so","cited":"cwe-489-invented"}`,
+	}, config.Validation{Enabled: true, Targeted: true})
+	v.Corpus = referenceCorpus
+
+	f := claimed
+	f.Evidence = []string{"go-defer-in-loop"}
+
+	kept, overruled := v.Validate(context.Background(), []Finding{f}, claimedCode)
+	if len(overruled) != 0 {
+		t.Fatalf("overruled = %d, want 0: the refutation cited a source it was not shown", len(overruled))
+	}
+	if len(kept) != 1 {
+		t.Fatalf("kept = %d, want the finding published", len(kept))
+	}
+	if kept[0].Unresolved == "" {
+		t.Error("the finding published with no record that the check did not resolve")
+	}
+}
+
+// An expert shown nothing is not held to a citation it could not make.
+//
+// Without targeted validation no reference block exists, so a `cited` field a
+// model volunteers names nothing and must not demote every verdict it appears
+// on.
+func TestACitationWithNothingShownDoesNotDemote(t *testing.T) {
+	v := newValidator(&scriptedLLM{
+		fallback: `{"verdict":"refuted","reason":"the guard covers it","cited":"something"}`,
+	}, config.Validation{Enabled: true})
+
+	_, overruled := v.Validate(context.Background(), []Finding{claimed}, claimedCode)
+	if len(overruled) != 1 {
+		t.Fatalf("overruled = %d, want 1: nothing was shown, so nothing was invented", len(overruled))
+	}
+	if overruled[0].Cited != "" {
+		t.Errorf("Cited = %q, want empty", overruled[0].Cited)
+	}
+}
+
+// The reference contract reaches an expert only when a reference block does.
+//
+// Sent on every run it would prime every expert for material that is usually
+// absent, which lends credibility to anything in the code that resembles a
+// reference block and gets past defang.
+func TestTheReferenceContractIsSentOnlyWithAReferenceBlock(t *testing.T) {
+	expert := prompt.ExpertFor("correctness", "a title", "")
+
+	if with := expertSystem(expert, true); !strings.Contains(with, "never name an\nentry you were not shown") {
+		t.Errorf("a request carrying references was sent no instruction about them:\n%s", with)
+	}
+	if without := expertSystem(expert, false); strings.Contains(without, "reference material") {
+		t.Errorf("an expert shown nothing was primed for references:\n%s", without)
 	}
 }

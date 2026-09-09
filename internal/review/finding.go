@@ -160,8 +160,12 @@ type Finding struct {
 	// write this field could name an entry it was never shown.
 	Evidence []string `json:"-"`
 
-	// Unresolved is the doubt a domain expert stated about this finding, with
-	// the expert named, empty when nobody was undecided.
+	// Unresolved is the doubt a domain expert stated about this finding, empty
+	// when nobody was undecided. UnresolvedBy names the expert.
+	//
+	// The two are separate for Overruled's reason and one more: Scrub's chat
+	// openers and closers are anchored to the ends of the string, so a reason
+	// carrying an expert's name in front of it walks past every one of them.
 	//
 	// It never changes whether the finding publishes: an unresolved verdict
 	// keeps it exactly as a confirmation does. It changes what the reader is
@@ -169,7 +173,8 @@ type Finding struct {
 	//
 	// json:"-" for Evidence's reason. Validation runs after triage, so unlike
 	// Evidence nothing has to restore it.
-	Unresolved string `json:"-"`
+	Unresolved   string `json:"-"`
+	UnresolvedBy string `json:"-"`
 
 	// FromAnalyzer records that a deterministic analyzer reported this finding
 	// rather than a model. Source already names WHICH one, but Source is free

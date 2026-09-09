@@ -3,17 +3,15 @@ package knowledge
 import (
 	"fmt"
 	"go/version"
+	"sort"
 	"strings"
 )
 
 // Constraint is one clause of an entry's `applies:` line: a named thing, a
 // comparison, and a version to compare against.
 type Constraint struct {
-	// Name is what the version belongs to, as gomod.Versions keys it. Only
-	// "go" is answerable today, and a clause naming anything else is parsed
-	// and then never decides anything, which is deliberate: an entry may
-	// state a constraint this tool cannot yet resolve without that silently
-	// removing the entry.
+	// Name is what the version belongs to, as gomod.Versions keys it. See
+	// resolvableNames for why the set is closed.
 	Name string
 
 	// Op is one of >=, >, <, <=, ==.
@@ -21,6 +19,25 @@ type Constraint struct {
 
 	// Version is the right-hand side, as it is written in go.mod: "1.23".
 	Version string
+}
+
+// resolvableNames is every name a clause may use.
+//
+// Closed, so that widening it is the same edit as teaching the tool to answer
+// it. An open set makes a typo and a deliberate future constraint the same
+// bytes: `applies: golang < 1.23` would parse, pass the corpus test, and offer
+// its entry to every repository forever with nothing said. Silence needs
+// proving, and a constraint that never fires proves nothing.
+var resolvableNames = map[string]bool{"go": true}
+
+// resolvable names the set, sorted, for an error a corpus author can act on.
+func resolvable() []string {
+	out := make([]string, 0, len(resolvableNames))
+	for n := range resolvableNames {
+		out = append(out, n)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // parseApplies reads an `applies:` line: clauses separated by commas, all of
@@ -41,6 +58,10 @@ func parseApplies(id, value string) ([]Constraint, error) {
 			return nil, fmt.Errorf("knowledge: %s: applies: %q is not `name op version`", id, clause)
 		}
 		c := Constraint{Name: strings.ToLower(fields[0]), Op: fields[1], Version: fields[2]}
+		if !resolvableNames[c.Name] {
+			return nil, fmt.Errorf("knowledge: %s: applies: %q is not a name this tool resolves; one of %s",
+				id, c.Name, strings.Join(resolvable(), ", "))
+		}
 		switch c.Op {
 		case ">=", ">", "<", "<=", "==":
 		default:

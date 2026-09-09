@@ -204,7 +204,7 @@ func applyOutcomes(outcomes []outcome) (kept []Finding, overruled []Overruled) {
 			// Published, exactly as an unvalidated finding is. Only the record
 			// on it differs, which is the whole point of the verdict.
 			f := o.finding
-			f.Unresolved = o.expert + ": " + o.unresolved
+			f.Unresolved, f.UnresolvedBy = o.unresolved, o.expert
 			kept = append(kept, f)
 
 		default:
@@ -271,9 +271,11 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 		return keep
 	}
 
+	shown := v.cited(f)
+
 	msgs := []llms.Message{
-		{Role: llms.RoleSystem, Content: expertSystem(expert)},
-		{Role: llms.RoleUser, Content: validationRequest(f, code, v.cited(f))},
+		{Role: llms.RoleSystem, Content: expertSystem(expert, len(shown) > 0)},
+		{Role: llms.RoleUser, Content: validationRequest(f, code, shown)},
 	}
 
 	result, err := llm.Extract[validationResult](ctx, v.Client, msgs, schema)
@@ -284,6 +286,24 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 		v.log().Warn("expert validation failed; keeping the finding",
 			"expert", expert.Key, "path", f.Path, "title", f.Title, "error", err)
 		return keep
+	}
+
+	// The entries this expert was shown, so a verdict can be checked against
+	// what it was allowed to know. Recomputed rather than threaded, because
+	// cited is a pure function of the finding and the corpus.
+	cite := citation(result.Cited, shown)
+
+	// An expert that names a source it was not shown has invented one, and the
+	// verdict resting on it is the least reliable answer this pass can
+	// produce. Dropping only the citation would publish the deletion and hide
+	// the reason to doubt it, so the verdict itself is demoted to doubt: the
+	// finding stands, and the reader is told the check did not resolve.
+	if invented := len(shown) > 0 && strings.TrimSpace(result.Cited) != "" && cite == ""; invented {
+		v.log().Warn("expert cited a reference it was not shown; publishing the finding unresolved",
+			"expert", expert.Key, "path", f.Path, "title", f.Title,
+			"cited", result.Cited, "verdict", result.Verdict)
+		return outcome{finding: f, expert: expertLabel(expert),
+			unresolved: "it named a reference it was not shown, so this was not resolved"}
 	}
 
 	switch strings.ToLower(strings.TrimSpace(result.Verdict)) {
@@ -298,16 +318,14 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 
 		v.log().Info("expert refuted a finding",
 			"expert", expert.Key, "path", f.Path, "line", f.Line, "title", f.Title, "reason", reason)
-		return outcome{finding: f, refuted: true, expert: expertLabel(expert), reason: reason,
-			cited: citation(result.Cited, v.cited(f))}
+		return outcome{finding: f, refuted: true, expert: expertLabel(expert), reason: reason, cited: cite}
 
 	case verdictSeverity:
 		revised, reason := v.revise(f, expert, result)
 		if revised == "" {
 			return keep
 		}
-		return outcome{finding: f, expert: expertLabel(expert), reason: reason, revised: revised,
-			cited: citation(result.Cited, v.cited(f))}
+		return outcome{finding: f, expert: expertLabel(expert), reason: reason, revised: revised, cited: cite}
 
 	case verdictConfirmed:
 		return keep
@@ -395,7 +413,7 @@ type validationResult struct {
 // cited returns the entries a finding's evidence names, in the order the
 // finding names them, empty unless targeted validation is on.
 //
-// Only entries this run actually has. An evidence id with no entry behind it
+// Only entries this run has. An evidence id with no entry behind it
 // is dropped rather than mentioned, because a request listing an id and no
 // text asks the model to judge against something it cannot read.
 func (v *Validator) cited(f Finding) []knowledge.Entry {
@@ -492,13 +510,20 @@ and do not put it on your own domain's severity scale, because a lost write
 rated as though it were a naming choice is deleted just as surely as one you
 refuted.
 
-When reference material is shown, it is material the reviewer read, not a
-statement about this code, and one of the entries may not apply here at all.
-Judge whether it applies before it decides anything. When one does decide your
-verdict, put its bracketed id in ` + "`cited`" + `; leave that empty otherwise,
-and never name an entry you were not shown.
-
 Do not restate the code. One or two sentences.`
+
+// referenceContract is appended only when a request carries a reference block.
+//
+// Sent unconditionally it would prime every expert on every run for material
+// that is usually absent, which lends credibility to anything in the code that
+// resembles a reference block and gets past defang.
+const referenceContract = `
+
+The reference material below is what the reviewer read, not a statement about
+this code, and an entry may not apply here at all. Judge whether it applies
+before it decides anything. When one does decide your verdict, put its
+bracketed id in ` + "`cited`" + `; leave that empty otherwise, and never name an
+entry you were not shown.`
 
 // ValidationContract returns the task text every expert is given.
 //
@@ -516,12 +541,16 @@ func ValidationContract() string { return validationContract }
 // Later text is weighted most heavily, and the contract is the part that must
 // not be negotiable. The persona decides who is judging; this decides what
 // judging means.
-func expertSystem(e prompt.Expert) string {
+func expertSystem(e prompt.Expert, withReference bool) string {
+	contract := validationContract
+	if withReference {
+		contract += referenceContract
+	}
 	persona := strings.TrimSpace(e.System)
 	if persona == "" {
-		return validationContract
+		return contract
 	}
-	return persona + "\n\n" + validationContract
+	return persona + "\n\n" + contract
 }
 
 // expertLabel is the name shown to a reader, falling back to the routing key so

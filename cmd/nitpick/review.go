@@ -416,8 +416,12 @@ func printOverruled(report *review.Report) {
 				r.Finding.Sev(), r.Revised, r.Reason)
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "  %s:%d %s — %s: %s\n",
-			r.Finding.Path, r.Finding.Line, r.Finding.Title, r.Expert, r.Reason)
+		cited := ""
+		if r.Cited != "" {
+			cited = fmt.Sprintf(" (citing %s)", r.Cited)
+		}
+		fmt.Fprintf(os.Stderr, "  %s:%d %s — %s: %s%s\n",
+			r.Finding.Path, r.Finding.Line, r.Finding.Title, r.Expert, r.Reason, cited)
 	}
 }
 

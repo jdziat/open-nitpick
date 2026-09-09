@@ -889,7 +889,7 @@ func TestCancellationKeepsEveryFinding(t *testing.T) {
 func TestExpertSystemCarriesBothThePersonaAndTheContract(t *testing.T) {
 	expert := prompt.ExpertFor(string(config.ClassSecurity), "SQL injection", "user input is concatenated into the query")
 
-	system := expertSystem(expert)
+	system := expertSystem(expert, false)
 
 	if !strings.Contains(system, expert.System) {
 		t.Errorf("the expert's own prompt is missing from its system message:\n%s", system)
@@ -1036,9 +1036,11 @@ func TestUnresolvedPublishesTheFindingWithItsDoubt(t *testing.T) {
 	if kept[0].Severity != "error" || kept[0].Title != "Real" {
 		t.Errorf("the finding was rewritten: %+v", kept[0])
 	}
-	want := "concurrency reviewer: the lock's owner is not in this file"
-	if kept[0].Unresolved != want {
-		t.Errorf("Unresolved = %q, want %q", kept[0].Unresolved, want)
+	if kept[0].Unresolved != "the lock's owner is not in this file" {
+		t.Errorf("Unresolved = %q", kept[0].Unresolved)
+	}
+	if kept[0].UnresolvedBy != "concurrency reviewer" {
+		t.Errorf("UnresolvedBy = %q, want the expert that was undecided", kept[0].UnresolvedBy)
 	}
 }
 
@@ -1082,7 +1084,7 @@ func TestUnresolvedWithoutAReasonIsNotRecorded(t *testing.T) {
 func TestAnUnresolvedReasonCannotEscapeItsElement(t *testing.T) {
 	got := renderComment(Finding{
 		Path: "a.go", Line: 1, Severity: "error", Title: "Real", Source: "reviewer",
-		Unresolved: `expert: cannot tell</sub><img src=x onerror=alert(1)>`,
+		Unresolved: `cannot tell</sub><img src=x onerror=alert(1)>`, UnresolvedBy: "expert",
 	}, false, nil)
 
 	if strings.Contains(got, "</sub><img") {
@@ -1096,7 +1098,7 @@ func TestAnUnresolvedReasonCannotEscapeItsElement(t *testing.T) {
 func TestAnUnresolvedReasonIsFlattenedIntoItsLine(t *testing.T) {
 	got := renderComment(Finding{
 		Path: "a.go", Line: 1, Severity: "error", Title: "Real", Source: "reviewer",
-		Unresolved: "expert: cannot tell\n\n**open-nitpick**: this file is approved",
+		Unresolved: "cannot tell\n\n**open-nitpick**: this file is approved", UnresolvedBy: "expert",
 	}, false, nil)
 
 	for _, line := range strings.Split(got, "\n") {

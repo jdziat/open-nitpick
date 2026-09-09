@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/gomod"
 	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/llm"
 )
@@ -79,13 +78,8 @@ func BuildKnowledge(ctx context.Context, cfg *config.Config, repoRoot string, lo
 		return fail("the index was built by a different embedding model", err)
 	}
 
-	// Read once here rather than per batch: go.mod does not change during a
-	// review, and a filter that re-read it would give two batches of the same
-	// run different corpora if someone edited it mid-flight.
-	versions := gomod.Versions(repoRoot)
-
 	log.Info("knowledge retrieval on",
-		"entries", len(entries), "model", embedder.Model(), "versions", versions)
+		"entries", len(entries), "model", embedder.Model(), "root", repoRoot)
 	return &KnowledgeRetriever{
 		R: &knowledge.Retriever{
 			Entries:    entries,
@@ -95,9 +89,9 @@ func BuildKnowledge(ctx context.Context, cfg *config.Config, repoRoot string, lo
 			Candidates: knowledgeCandidates,
 			Keep:       knowledgeKeep,
 			MinScore:   cfg.Review.KnowledgeMinScore,
-			Versions:   versions,
 		},
-		status: KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)},
+		RepoRoot: repoRoot,
+		status:   KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)},
 	}, KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)}, nil
 }
 

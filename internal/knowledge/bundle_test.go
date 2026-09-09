@@ -111,19 +111,19 @@ func TestRetrievalRefusesAQueryFromAnotherModelOfTheSameWidth(t *testing.T) {
 		Model:    "google/gemini-embedding-001",
 		Keep:     5,
 	}
-	if _, err := r.Retrieve(context.Background(), "some changed lines", map[string]bool{"go": true}, everyClass()); err == nil {
+	if _, err := r.Retrieve(context.Background(), "some changed lines", map[string]bool{"go": true}, everyClass(), nil); err == nil {
 		t.Fatal("a query from another model of the same width was answered; the result would be ordered nonsense")
 	}
 
 	// And a retriever that does not say what it embeds with is refused too,
 	// rather than assumed to match.
 	r.Model = ""
-	if _, err := r.Retrieve(context.Background(), "some changed lines", map[string]bool{"go": true}, everyClass()); err == nil {
+	if _, err := r.Retrieve(context.Background(), "some changed lines", map[string]bool{"go": true}, everyClass(), nil); err == nil {
 		t.Fatal("a retriever naming no model was answered")
 	}
 
 	r.Model = ix.Model
-	if _, err := r.Retrieve(context.Background(), "some changed lines", map[string]bool{"go": true}, everyClass()); err != nil {
+	if _, err := r.Retrieve(context.Background(), "some changed lines", map[string]bool{"go": true}, everyClass(), nil); err != nil {
 		t.Fatalf("the index's own model was refused: %v", err)
 	}
 }

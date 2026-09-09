@@ -3315,3 +3315,25 @@ dropping the note that says so leaves a row whose N cell reads "8/6" with
 nothing anywhere explaining the six. Both axes report per variant, and
 Corroborate keys by contenderLabel, so the notes are translated back the same
 way the aggregates are looked up.
+
+## evidence ordering
+
+`internal/review/evidence.go`
+
+`mine` answers true in two cases, for different reasons, and neither is a claim
+about which entry produced the finding.
+
+An empty `Hit.Path` is the batch query, which retrieves once for a whole batch
+of files. That is the default (`review.knowledge_query: batch`, what shipped
+and what was measured), and under it every finding in a batch carries the same
+entries, so the ordering does nothing at all.
+
+A matching path is the per-file query. There `knowledge.Merge` has already
+deduplicated by entry id keeping the highest-scoring hit, so `Hit.Path` names
+the file that retrieved the entry most strongly rather than a file that
+retrieved it. An entry that `a.go` pulled in sorts last for an `a.go`
+finding when `b.go` scored higher on it.
+
+What the field is for is stated at `Finding.Evidence`: the reviewer read these
+entries when it wrote this finding. The ordering is a preference, not evidence
+of attribution, and no consumer treats it as more than that.

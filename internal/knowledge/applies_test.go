@@ -74,14 +74,17 @@ func TestVersionsCompareNumerically(t *testing.T) {
 //
 // The corpus is checked by a test that parses every entry, so a clause nobody
 // can evaluate is caught by whoever wrote it. Silently ignoring one would
-// offer an entry its author had bounded.
+// offer an entry its author had bounded. The name set is closed for the same
+// reason: `golang < 1.23` would otherwise parse, never fire, and say nothing.
 func TestAMalformedAppliesIsRefused(t *testing.T) {
 	for name, value := range map[string]string{
-		"no operator":       "go 1.23",
-		"unknown operator":  "go ~> 1.23",
-		"not a version":     "go >= banana",
-		"empty":             "",
-		"one clause of two": "go >= 1.21, go",
+		"no operator":             "go 1.23",
+		"unknown operator":        "go ~> 1.23",
+		"not a version":           "go >= banana",
+		"empty":                   "",
+		"one clause of two":       "go >= 1.21, go",
+		"a name nothing resolves": "golang < 1.23",
+		"a plausible typo":        "Go1 >= 1.21",
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := parseApplies("some-entry", value); err == nil {
@@ -129,10 +132,11 @@ func TestRetrieveAppliesTheVersionCut(t *testing.T) {
 		Embedder: fixedEmbedder(ix.Dimensions),
 		Model:    ix.Model,
 		Keep:     len(entries),
-		Versions: map[string]string{"go": "1.25"},
 	}
+	modern := map[string]string{"go": "1.25"}
 
-	hits, err := r.Retrieve(context.Background(), "time.After in a select loop", map[string]bool{"go": true}, everyClass())
+	hits, err := r.Retrieve(context.Background(), "time.After in a select loop",
+		map[string]bool{"go": true}, everyClass(), modern)
 	if err != nil {
 		t.Fatalf("Retrieve: %v", err)
 	}
@@ -142,8 +146,8 @@ func TestRetrieveAppliesTheVersionCut(t *testing.T) {
 		}
 	}
 
-	r.Versions = map[string]string{"go": "1.21"}
-	hits, err = r.Retrieve(context.Background(), "time.After in a select loop", map[string]bool{"go": true}, everyClass())
+	hits, err = r.Retrieve(context.Background(), "time.After in a select loop",
+		map[string]bool{"go": true}, everyClass(), map[string]string{"go": "1.21"})
 	if err != nil {
 		t.Fatalf("Retrieve: %v", err)
 	}
@@ -173,21 +177,20 @@ func TestPoolSizeReportsWhatTheCutsAllowed(t *testing.T) {
 	for lang, want := range map[string]int{
 		"go": 8, "python": 2, "typescript": 2, "javascript": 1, "rust": 1, "shell": 1,
 	} {
-		if got := r.PoolSize(map[string]bool{lang: true}, everyClass()); got != want {
+		if got := r.PoolSize(map[string]bool{lang: true}, everyClass(), nil); got != want {
 			t.Errorf("PoolSize(%s) = %d, want %d", lang, got, want)
 		}
 	}
 
 	// The version cut counts too, so the number a run logs is that run's pool
 	// rather than the corpus's size.
-	r.Versions = map[string]string{"go": "1.25"}
-	if got := r.PoolSize(map[string]bool{"go": true}, everyClass()); got != 7 {
+	if got := r.PoolSize(map[string]bool{"go": true}, everyClass(), map[string]string{"go": "1.25"}); got != 7 {
 		t.Errorf("PoolSize(go) on a 1.25 module = %d, want 7", got)
 	}
 
 	// A language the corpus says nothing about reaches nothing, generic
 	// entries included, which is what makes an empty pool an answer.
-	if got := r.PoolSize(map[string]bool{"cobol": true}, everyClass()); got != 0 {
+	if got := r.PoolSize(map[string]bool{"cobol": true}, everyClass(), nil); got != 0 {
 		t.Errorf("PoolSize(cobol) = %d, want 0", got)
 	}
 }
