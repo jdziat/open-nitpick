@@ -148,6 +148,12 @@ SLOP := go-slop-restating-comments,go-clean-why-comments,python-slop-swallowed-e
 
 CALLERS := go-error-identity-changed,go-clean-wrapped-sentinel,go-return-units-changed,python-precondition-added,python-clean-precondition-satisfied,ts-return-units-changed
 
+# Every fixture in evals.KnowledgeFixtures(): six plants whose defect needs one
+# specific fact, each paired with a control whose code attracts the same entry.
+# The pairs are the measurement: a gain on the plants alone would not separate
+# retrieval working from a reviewer reporting whatever it was shown.
+KNOWLEDGE := know-go-defer-in-loop,know-go-clean-defer-scoped,know-go-time-after-leak,know-go-clean-timer-reset,know-go-rows-err-unchecked,know-go-clean-rows-err-checked,know-py-mutable-default,know-py-clean-none-default,know-sh-pipeline-masks-failure,know-sh-clean-pipefail,know-go-nil-map-write,know-go-clean-map-made
+
 # Every fixture in evals.InfoFixtures(): the band no reviewer had located.
 INFO := info-go-timeout-halved,info-python-pin-loosened,info-ts-any-widening,info-go-context-string-key,info-java-mutable-constant,info-sql-column-unindexed,info-bash-hardcoded-region,info-python-print-diagnostics,info-ts-magic-duration,info-go-close-error-on-write,info-clean-go-named-constant,info-clean-python-logging
 

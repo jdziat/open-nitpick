@@ -3645,6 +3645,9 @@ func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 	for _, f := range SlopFixtures() {
 		multi[f.Name] = true // a fifth, planted/control pairs for the slop class
 	}
+	for _, f := range KnowledgeFixtures() {
+		multi[f.Name] = true // a sixth, pairs for retrieval from the knowledge corpus
+	}
 
 	for name, where := range authored {
 		reason, excused := exempt[name]
