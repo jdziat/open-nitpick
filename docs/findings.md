@@ -1586,3 +1586,62 @@ the walkthrough is now counted from the report instead; see
 
 Rule 15 applies. One model, one run, six fixtures, and the headline number is
 a proxy the section above says cannot separate paraphrase from invention.
+
+## Retrieved knowledge, and a pre-registration I got wrong (2026-09-08)
+
+The knowledge corpus is twelve fixtures under Rule 15: six plants whose defect
+needs one specific fact, each paired with a control whose code attracts the same
+corpus entry and contains nothing wrong. `z-ai/glm-5.3-flash` through
+OpenRouter, two runs per arm, 24 reviews per arm, none lost. Judge-free.
+
+| arm | RECALL | NOISE / review | $ / review |
+|---|---|---|---|
+| retrieval off | 0.75 | 0.50 | $0.0002 |
+| retrieval on | **1.00** | **0.33** | $0.0005 |
+
+Recall is located plants over plants across every review, so 0.75 is 18 of 24
+and 1.00 is 24 of 24. Per run of six plants that is 4.5 found without
+retrieval and 6 with it.
+
+**The plant that moved is the one worth naming.** `know-go-time-after-leak` was
+missed in all four reviews without retrieval and found in all four with it. It
+is the fixture whose defect is least visible from the diff alone: a
+`time.After` in a select loop looks like ordinary idle-timeout code, and the
+reason it leaks is a sentence in the standard library's documentation about
+when the timer is recovered.
+
+**Noise fell rather than rose**, 0.50 to 0.33 per review, and the six controls
+drew no plant-shaped finding in either arm. That was the outcome most at risk:
+reference material beside a diff is a standing invitation to report the
+reference, and the section's heading says three times over that none of it was
+written about the change under review.
+
+### The pre-registration does not fit the corpus, and that is my error
+
+The plan fixed the threshold before the corpus existed, at *"at least 3 of 12
+plants"*. The corpus as built has **six** plants and six controls, so the
+threshold as written cannot be evaluated: there was never a twelfth plant to
+find three of.
+
+Read proportionally, 3 of 12 is a quarter of the plants, and the observed gain
+is 1.5 of 6, which is also a quarter. So the condition is met on the reading
+that survives the arithmetic, and I am recording that it is a reading rather
+than the thing I committed to. Rule 14's preamble is about exactly this failure
+and I walked into a version of it: a threshold written before the instrument
+was built is not automatically a threshold the instrument can express.
+
+### What this does not establish
+
+Every plant has a matching corpus entry by construction. A separate check
+confirms retrieval puts that entry in the prompt for all six, at ranks 1, 1, 1,
+2, 3 and 3 of at most five kept, so the gain is retrieval working rather than
+run-to-run variance. What it is not is evidence that the corpus covers defects
+a real repository has: fourteen entries were chosen by one author, and the
+corpus was written before the fixtures that measure it.
+
+Two runs per arm on six plants also cannot separate a real 1.5-plant gain from
+a fortunate pair of runs. Rule 3 wants two passes and a gap wider than the
+spread; this has the passes and the gap is 1.5 plants against a resolution of
+one, which is thinner than it looks.
+
+`review.knowledge` stays off by default.

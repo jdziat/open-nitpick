@@ -353,6 +353,8 @@ eval-fullreview:
 # The knowledge corpus, both arms. NITPICK_EVAL_KNOWLEDGE decides which.
 .PHONY: eval-knowledge
 eval-knowledge:
+	NITPICK_EVAL_EMBED_PROVIDER=$${NITPICK_EVAL_EMBED_PROVIDER:-openrouter} \
+	NITPICK_EVAL_EMBED_MODEL=$${NITPICK_EVAL_EMBED_MODEL:-openai/text-embedding-3-small} \
 	$(MAKE) benchmark-multifile FIXTURES=$(KNOWLEDGE) MODELS=$${MODELS:-z-ai/glm-5.3-flash} RUNS=$${RUNS:-2}
 
 eval-slop:

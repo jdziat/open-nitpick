@@ -1,0 +1,87 @@
+//go:build eval
+
+package evals
+
+import (
+	"context"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/knowledge"
+	"github.com/jdziat/open-nitpick/internal/llm"
+)
+
+// Does retrieval put the entry a plant needs in front of the model?
+//
+// The measurement's premise. A recall gain with retrieval that never fired
+// would be run-to-run variance wearing a feature's name, and the log is not
+// evidence: the harness discards it.
+func TestLiveKnowledgeReachesThePlants(t *testing.T) {
+	if os.Getenv("NITPICK_EVAL_EMBED_PROVIDER") == "" {
+		t.Skip("set NITPICK_EVAL_EMBED_PROVIDER and NITPICK_EVAL_EMBED_MODEL")
+	}
+	entries, err := knowledge.Corpus()
+	if err != nil {
+		t.Fatalf("Corpus: %v", err)
+	}
+	ix, err := knowledge.LoadIndex(knowledge.IndexJSON(), entries)
+	if err != nil {
+		t.Fatalf("LoadIndex: %v", err)
+	}
+	embedder, err := llm.BuildEmbedder(context.Background(), config.ModelSpec{
+		Provider: os.Getenv("NITPICK_EVAL_EMBED_PROVIDER"),
+		Model:    os.Getenv("NITPICK_EVAL_EMBED_MODEL"),
+	})
+	if err != nil {
+		t.Fatalf("BuildEmbedder: %v", err)
+	}
+	r := &knowledge.Retriever{
+		Entries: entries, Index: ix, Embedder: embedder,
+		Candidates: 20, Keep: 5,
+	}
+
+	// The entry each plant needs, by fixture.
+	want := map[string]string{
+		"know-go-defer-in-loop":          "go-defer-in-loop",
+		"know-go-time-after-leak":        "go-time-after-leak",
+		"know-go-rows-err-unchecked":     "sql-rows-err-unchecked",
+		"know-py-mutable-default":        "python-mutable-default",
+		"know-sh-pipeline-masks-failure": "sh-set-e-pipeline",
+		"know-go-nil-map-write":          "go-nil-map-write",
+	}
+
+	got := 0
+	for _, f := range KnowledgeFixtures() {
+		id, ok := want[f.Name]
+		if !ok {
+			continue
+		}
+		var q strings.Builder
+		var paths []string
+		for p, body := range f.Head {
+			paths = append(paths, p)
+			q.WriteString(body)
+		}
+		hits, err := r.Retrieve(context.Background(), q.String(), knowledge.LanguagesOf(paths))
+		if err != nil {
+			t.Errorf("%s: Retrieve: %v", f.Name, err)
+			continue
+		}
+		rank := -1
+		for i, h := range hits {
+			if h.Entry.ID == id {
+				rank = i + 1
+			}
+		}
+		if rank > 0 {
+			got++
+		}
+		t.Logf("%-32s wants %-24s rank=%d of %d", f.Name, id, rank, len(hits))
+	}
+	if got != len(want) {
+		t.Errorf("the needed entry reached %d of %d plants; retrieval is not what the on arm measured",
+			got, len(want))
+	}
+}

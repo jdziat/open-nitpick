@@ -70,6 +70,11 @@ const (
 	// the harness is how that default gets decided.
 	EnvKnowledge = "NITPICK_EVAL_KNOWLEDGE"
 
+	// EnvEmbedProvider and EnvEmbedModel name the embedding model the on arm
+	// retrieves with. Held constant across contenders on purpose.
+	EnvEmbedProvider = "NITPICK_EVAL_EMBED_PROVIDER"
+	EnvEmbedModel    = "NITPICK_EVAL_EMBED_MODEL"
+
 	// EnvValidation switches validation (the expert pass) on for every review
 	// in the run, so its effect on recall and noise can be measured.
 	EnvValidation = "NITPICK_EVAL_VALIDATION"
@@ -1021,6 +1026,13 @@ func evalConfig(model Model) *config.Config {
 		cfg.Review.Knowledge = false
 	default:
 		cfg.Review.Knowledge = true
+		// The embedding model comes from the environment rather than the
+		// contender under test: the arm varies retrieval, and varying the
+		// embedder with it would confound the two.
+		cfg.Models.Embed = &config.ModelSpec{
+			Provider: strings.TrimSpace(os.Getenv(EnvEmbedProvider)),
+			Model:    strings.TrimSpace(os.Getenv(EnvEmbedModel)),
+		}
 	}
 
 	// Report everything the model says so precision can be measured.
