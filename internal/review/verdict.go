@@ -85,7 +85,7 @@ func (e *Engine) applyVerdict(f *Finding, v Verdict) {
 	// summarizer guessed.
 	if class := strings.TrimSpace(v.Class); class != "" && f.Class == "" {
 		f.Class = class
-		f.Class = string(e.normalizeClass(*f))
+		f.Class = e.normalizeClass(*f)
 	} else if class != "" && !strings.EqualFold(class, f.Class) {
 		e.log().Debug("keeping the review-pass class over triage's",
 			"path", f.Path, "triage", class, "review", f.Class)

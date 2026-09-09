@@ -9,11 +9,6 @@ import (
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
-func origin(path string, line int, title, rationale string) Finding {
-	return Finding{Path: path, Line: line, Title: title, Rationale: rationale,
-		Severity: "warning", Class: "defect"}
-}
-
 // The case the path check was assumed to catch and never did: a reported path,
 // the reviewer's line, and triage's words.
 func TestTheContractHoldsThroughAWholeReview(t *testing.T) {
