@@ -16,14 +16,16 @@ import (
 //go:embed corpus/*.md
 var corpusFS embed.FS
 
-// The committed index ships with the binary too. A review that had to fetch it
-// would need a network for a file that is already known at build time.
+// The committed indexes ship with the binary too. A review that had to fetch
+// one would need a network for a file that is already known at build time.
 //
-//go:embed index.json
-var indexJSON []byte
+// A directory rather than a single file: one index per embedding model, chosen
+// at run time by SelectIndex from what models.embed names.
+//
+//go:embed indexes/*.json
+var indexFS embed.FS
 
-// IndexJSON is the committed index, for a caller building a retriever.
-func IndexJSON() []byte { return indexJSON }
+const indexDir = "indexes"
 
 const corpusDir = "corpus"
 

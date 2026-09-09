@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/knowledge"
@@ -30,7 +31,7 @@ const (
 // The error is still returned, and callers that asked for retrieval should
 // still treat construction as fatal. A status of failed exists for the run
 // that got further than construction.
-func BuildKnowledge(ctx context.Context, cfg *config.Config, index []byte, log *slog.Logger) (*KnowledgeRetriever, KnowledgeStatus, error) {
+func BuildKnowledge(ctx context.Context, cfg *config.Config, log *slog.Logger) (*KnowledgeRetriever, KnowledgeStatus, error) {
 	if cfg == nil || !cfg.Review.Knowledge {
 		return nil, KnowledgeStatus{State: KnowledgeOff}, nil
 	}
@@ -55,14 +56,21 @@ func BuildKnowledge(ctx context.Context, cfg *config.Config, index []byte, log *
 	if len(entries) == 0 {
 		return skip("the corpus is empty")
 	}
-	ix, err := knowledge.LoadIndex(index, entries)
-	if err != nil {
-		return fail("the index could not be loaded", err)
-	}
-
+	// The embedder first, because it names the model the index has to match.
+	// Selecting an index before knowing what will query it is how a run ends
+	// up comparing one model's vectors against another's.
 	embedder, err := llm.BuildEmbedder(ctx, spec)
 	if err != nil {
 		return fail("the embedder could not be built", err)
+	}
+
+	raw, err := resolveIndex(cfg, embedder.Model())
+	if err != nil {
+		return fail("no index is available for this embedding model", err)
+	}
+	ix, err := knowledge.LoadIndex(raw, entries)
+	if err != nil {
+		return fail("the index could not be loaded", err)
 	}
 	if err := ix.CheckModel(embedder.Model()); err != nil {
 		return fail("the index was built by a different embedding model", err)
@@ -79,4 +87,18 @@ func BuildKnowledge(ctx context.Context, cfg *config.Config, index []byte, log *
 		},
 		status: KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)},
 	}, KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)}, nil
+}
+
+// resolveIndex picks the vectors this run queries: the operator's own file
+// when review.knowledge_index names one, otherwise the shipped index built by
+// the configured embedding model.
+//
+// An explicit path wins and is not second-guessed. An operator who named a
+// file wants that file, and silently falling back to a shipped index when it
+// cannot be read would answer a review from vectors they did not choose.
+func resolveIndex(cfg *config.Config, model string) ([]byte, error) {
+	if p := strings.TrimSpace(cfg.Review.KnowledgeIndex); p != "" {
+		return knowledge.LoadIndexFile(p)
+	}
+	return knowledge.SelectIndex(model)
 }

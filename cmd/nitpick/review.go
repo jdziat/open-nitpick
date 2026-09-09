@@ -14,7 +14,6 @@ import (
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/linters"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/prompt"
@@ -334,7 +333,7 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	// embedder at an endpoint of its own. A misconfiguration is fatal here
 	// because the operator asked for retrieval; a failure to retrieve during a
 	// review is not, and lands on the report instead.
-	k, status, err := review.BuildKnowledge(ctx, cfg, knowledge.IndexJSON(), log)
+	k, status, err := review.BuildKnowledge(ctx, cfg, log)
 	if err != nil {
 		return nil, fmt.Errorf("knowledge retrieval (%s): %w", status.Reason, err)
 	}

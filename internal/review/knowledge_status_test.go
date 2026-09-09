@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/knowledge"
 )
 
 func discard() *slog.Logger { return slog.New(slog.DiscardHandler) }
@@ -19,14 +18,14 @@ func TestBuildKnowledgeSaysWhichKindOfNotRunningItIs(t *testing.T) {
 	t.Setenv("SYNTHETIC_API_KEY", "syn_test")
 
 	off := &config.Config{}
-	_, status, err := BuildKnowledge(context.Background(), off, knowledge.IndexJSON(), discard())
+	_, status, err := BuildKnowledge(context.Background(), off, discard())
 	if err != nil || status.State != KnowledgeOff {
 		t.Errorf("retrieval not asked for = %q (%v), want off", status.State, err)
 	}
 
 	noEmbedder := &config.Config{}
 	noEmbedder.Review.Knowledge = true
-	_, status, err = BuildKnowledge(context.Background(), noEmbedder, knowledge.IndexJSON(), discard())
+	_, status, err = BuildKnowledge(context.Background(), noEmbedder, discard())
 	switch {
 	case err != nil:
 		t.Errorf("a missing models.embed should not be an error: %v", err)
@@ -43,7 +42,7 @@ func TestBuildKnowledgeSaysWhichKindOfNotRunningItIs(t *testing.T) {
 	mismatch := &config.Config{}
 	mismatch.Review.Knowledge = true
 	mismatch.Models.Embed = &config.ModelSpec{Provider: "synthetic", Model: "hf:not-the-indexed-model"}
-	_, status, err = BuildKnowledge(context.Background(), mismatch, knowledge.IndexJSON(), discard())
+	_, status, err = BuildKnowledge(context.Background(), mismatch, discard())
 	if err == nil {
 		t.Fatal("a mismatched embedding model built without error; the index identity check did not run")
 	}

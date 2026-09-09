@@ -421,10 +421,36 @@ additional charge, which is why the example uses it.
 
 The corpus is fourteen entries under `internal/knowledge/corpus`, each naming
 the source it came from and the day that source was read. The vectors are
-committed and regenerated with `nitpick knowledge-index`; CI diffs them, so an
-entry added without regenerating fails the build that added it rather than
-being silently unreachable. An index built by one embedding model refuses a
-query from another, because vectors from two models are not comparable.
+committed under `internal/knowledge/indexes` and regenerated with `nitpick
+knowledge-index`, one file per embedding model. A run selects the file whose
+recorded model matches `models.embed`, so switching embedder is configuration
+rather than a rebuild:
+
+```yaml
+models:
+  embed:
+    provider: openrouter
+    model: openai/text-embedding-3-small
+```
+
+Two ship: `synthetic/hf:nomic-ai/nomic-embed-text-v1.5` at 768 dimensions and
+`openrouter/openai/text-embedding-3-small` at 1536. For any other provider,
+build your own and name it:
+
+```yaml
+review:
+  knowledge_index: ./my-index.json
+```
+
+An index built by one embedding model refuses a query from another, because
+vectors from two models are not comparable, and every index records the hash of
+the corpus text it was built from. That hash is the half a file listing cannot
+check: an entry *added* without regenerating has no vector and is caught by its
+absence, and an entry *edited* without regenerating keeps its vector under the
+same id, so the counts still agree and retrieval answers from a paragraph
+nobody wrote any more. The hash covers the title and body, which is what gets
+embedded, and not the citation, so correcting a URL does not cost an embedding
+run.
 
 Every reviewing command reads it: `review`, `full-review`, `slop`, the MCP
 review tools and `improve`'s defect pass. Retrieval was wired per command until

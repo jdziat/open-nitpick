@@ -17,7 +17,6 @@ import (
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
@@ -810,7 +809,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	// retrieval and did not would be recorded as the on arm and measure the
 	// off one.
 	if cfg.Review.Knowledge {
-		k, status, err := review.BuildKnowledge(ctx, cfg, knowledge.IndexJSON(), cmpLogger(opts.Log))
+		k, status, err := review.BuildKnowledge(ctx, cfg, cmpLogger(opts.Log))
 		switch {
 		case err != nil:
 			out.Err = fmt.Errorf("build knowledge retrieval (%s): %w", status.Reason, err)

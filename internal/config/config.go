@@ -500,6 +500,16 @@ type Review struct {
 	// guide is worse than one that misses them.
 	Knowledge bool `yaml:"knowledge"`
 
+	// KnowledgeIndex names an index file to retrieve from, instead of the one
+	// this build ships for the configured embedding model.
+	//
+	// The escape hatch that keeps the embedding model configuration rather
+	// than a property of the binary: an operator whose provider is not one of
+	// the shipped ones runs `nitpick knowledge-index` and names the result
+	// here. It is checked against the corpus and the model like any other, so
+	// naming a file buys no exemption from either.
+	KnowledgeIndex string `yaml:"knowledge_index"`
+
 	// ModelNotes adds the prompt layer addressed to the reviewing model's
 	// family (prompt.ModelGuidance). On unless set to false; the switch
 	// exists so the layer's contribution can be measured on its own.

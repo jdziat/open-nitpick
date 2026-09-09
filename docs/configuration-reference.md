@@ -1005,6 +1005,11 @@ Incremental makes a run on a pull request this tool has reviewed before read onl
 boolean, default `false`.
 Knowledge attaches entries from the shipped corpus that the change resembles: antipatterns and standard-library contracts a model may not carry.
 
+### `review.knowledge_index`
+
+string, default `none`.
+KnowledgeIndex names an index file to retrieve from, instead of the one this build ships for the configured embedding model.
+
 ### `review.max_file_bytes`
 
 integer, default `262144`.

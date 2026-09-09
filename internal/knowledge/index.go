@@ -2,11 +2,14 @@ package knowledge
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
+	"time"
 )
 
 // The committed index.
@@ -39,10 +42,46 @@ type Index struct {
 	// rather than at the first comparison.
 	Dimensions int `json:"dimensions"`
 
+	// Corpus is the hash of the text that produced these vectors.
+	//
+	// The missing half of the freshness check. An entry ADDED without
+	// regenerating is caught by its absent vector; an entry EDITED without
+	// regenerating keeps a vector under the same id, so the index still
+	// covers the corpus and every vector is now a point about a paragraph
+	// nobody wrote any more. Retrieval answers, plausibly and wrongly, and
+	// nothing says so. This is what makes that a load error.
+	Corpus string `json:"corpus"`
+
+	// Entries and Built are provenance, for a results table that has to name
+	// which corpus produced a number months later.
+	Entries int    `json:"entries"`
+	Built   string `json:"built"`
+
 	// Vectors keyed by entry id rather than positional, so an entry renamed
 	// or removed is a load error naming it rather than a silent shift of every
 	// vector after it onto the wrong entry.
 	Vectors map[string][]float32 `json:"vectors"`
+}
+
+// CorpusHash is the identity of a corpus, over exactly the text that is
+// embedded.
+//
+// Title and body, which is what Entry.Text returns and what the vectors
+// describe. Source and the checked date are deliberately outside it: correcting
+// a citation does not move a vector, and an operator forced to re-embed a
+// fourteen-entry corpus to fix a URL will start skipping the check.
+func CorpusHash(entries []Entry) string {
+	sorted := append([]Entry(nil), entries...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
+
+	h := sha256.New()
+	for _, e := range sorted {
+		h.Write([]byte(e.ID))
+		h.Write([]byte{0})
+		h.Write([]byte(e.Text()))
+		h.Write([]byte{0})
+	}
+	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
 // Build embeds every entry and returns the index.
@@ -63,7 +102,13 @@ func Build(ctx context.Context, entries []Entry, model string, e Embedder) (*Ind
 		return nil, fmt.Errorf("knowledge: embedded %d of %d entries", len(vecs), len(entries))
 	}
 
-	ix := &Index{Model: model, Vectors: make(map[string][]float32, len(entries))}
+	ix := &Index{
+		Model:   model,
+		Corpus:  CorpusHash(entries),
+		Entries: len(entries),
+		Built:   time.Now().UTC().Format("2006-01-02"),
+		Vectors: make(map[string][]float32, len(entries)),
+	}
 	for i, entry := range entries {
 		if len(vecs[i]) == 0 {
 			return nil, fmt.Errorf("knowledge: %s: empty vector", entry.ID)
@@ -110,6 +155,21 @@ func LoadIndex(raw []byte, entries []Entry) (*Index, error) {
 			return nil, fmt.Errorf("knowledge: %s: %d dimensions, index says %d", e.ID, len(v), ix.Dimensions)
 		}
 	}
+
+	// After the per-entry checks, so a missing or renamed entry reports itself
+	// by name. The hash catches what those cannot: an entry whose text changed
+	// while its id and its vector stayed put, which every count above still
+	// agrees with.
+	if ix.Corpus == "" {
+		return nil, fmt.Errorf("knowledge: index records no corpus hash; " +
+			"regenerate it with `nitpick knowledge-index`")
+	}
+	if want := CorpusHash(entries); ix.Corpus != want {
+		return nil, fmt.Errorf("knowledge: the index was built from corpus %s and this one is %s; "+
+			"an entry changed after the vectors were computed, so retrieval would answer from text "+
+			"nobody wrote any more. Regenerate it with `nitpick knowledge-index`", ix.Corpus, want)
+	}
+
 	return &ix, nil
 }
 
@@ -149,6 +209,20 @@ func (ix *Index) Nearest(query []float32, entries []Entry, k int) ([]Hit, error)
 		hits = hits[:k]
 	}
 	return hits, nil
+}
+
+// indexModel reads only the model out of a raw index, for selection.
+func indexModel(raw []byte) (string, error) {
+	var head struct {
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(raw, &head); err != nil {
+		return "", fmt.Errorf("parse: %w", err)
+	}
+	if strings.TrimSpace(head.Model) == "" {
+		return "", fmt.Errorf("names no model")
+	}
+	return strings.ToLower(strings.TrimSpace(head.Model)), nil
 }
 
 // CheckModel refuses a query embedded by a different model than the index.
