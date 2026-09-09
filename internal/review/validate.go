@@ -437,18 +437,18 @@ func (v *Validator) cited(f Finding) []knowledge.Entry {
 // nobody can follow, which is worse than none: the whole reason findings carry
 // evidence is that a reader can go and look.
 func citation(said string, shown []knowledge.Entry) string {
-	// Brackets trimmed, because the entries render as "[id] Title" and both
-	// the schema and the contract ask for the bracketed id. A model that does
-	// as it was told must not fail the check: the verdict is demoted on a
-	// failure, so this would publish a correctly cited refutation as though
-	// the expert had invented its source.
-	said = strings.Trim(strings.TrimSpace(said), "[]")
-	said = strings.TrimSpace(said)
+	// Matched on the id's own characters, with punctuation and case discarded
+	// on both sides. Entries render as "[id] Title" and the schema asks for
+	// the bracketed id, so brackets are expected; backticks and quotes are
+	// what a model reaches for unasked. A failure here demotes the verdict, so
+	// a mismatch that is only punctuation would publish a correctly cited
+	// refutation as though the expert had invented its source.
+	said = idChars(said)
 	if said == "" {
 		return ""
 	}
 	for _, e := range shown {
-		if strings.EqualFold(said, e.ID) {
+		if said == idChars(e.ID) {
 			return e.ID
 		}
 	}
@@ -670,4 +670,18 @@ func (v *Validator) log() *slog.Logger {
 		return v.Log
 	}
 	return slog.New(slog.DiscardHandler)
+}
+
+// idChars reduces a string to the characters a corpus id is spelled with.
+//
+// Corpus ids are a filename's base: lower-case letters, digits and hyphens.
+// Anything else a model wrapped around one is formatting.
+func idChars(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

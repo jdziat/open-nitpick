@@ -76,8 +76,21 @@ func TestACitationThatWasNotShownIsDropped(t *testing.T) {
 	if got := citation("[go-defer-in-loop]", shown); got != "go-defer-in-loop" {
 		t.Errorf("citation = %q for the bracketed form the prompt requests", got)
 	}
-	if got := citation(" [ go-defer-in-loop ] ", shown); got != "go-defer-in-loop" {
-		t.Errorf("citation = %q, want whitespace inside the brackets tolerated", got)
+	for _, wrapped := range []string{
+		" [ go-defer-in-loop ] ",
+		"`go-defer-in-loop`",
+		`"go-defer-in-loop"`,
+		"[`go-defer-in-loop`]",
+	} {
+		if got := citation(wrapped, shown); got != "go-defer-in-loop" {
+			t.Errorf("citation(%q) = %q, want the id: punctuation is not a different entry", wrapped, got)
+		}
+	}
+
+	// Punctuation is discarded; the id is not. A different entry stays
+	// different however it is wrapped.
+	if got := citation("[go-defer-in-loops]", shown); got != "" {
+		t.Errorf("citation = %q, want empty: that is not the id that was shown", got)
 	}
 	if got := citation("cwe-489-invented", shown); got != "" {
 		t.Errorf("citation = %q, want empty: that entry was never shown", got)
