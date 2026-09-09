@@ -367,6 +367,9 @@ func (c *Client) CallOptions() []llms.CallOption {
 	if c.Spec.Temperature != nil {
 		opts = append(opts, llms.WithTemperature(*c.Spec.Temperature))
 	}
+	if r, ok := reasoningOption(c.Spec.Reasoning); ok {
+		opts = append(opts, r)
+	}
 	if len(c.Spec.Providers) > 0 {
 		// OpenRouter's provider routing. "only" restricts the candidate set;
 		// "order" ranks whatever set the other filters leave, which is not the
@@ -442,4 +445,25 @@ func providerConfig(ctx context.Context, spec config.ModelSpec) (llms.Config, er
 		cfg.APIKey = key
 	}
 	return cfg, nil
+}
+
+// reasoningOption renders a configured reasoning level as a call option.
+//
+// Unset sends nothing, so a model keeps whatever it does by default. That is
+// the shipped behaviour and the only one any number in docs/findings.md was
+// measured under: sending a level nobody asked for would change every
+// published result without changing the document that reports it.
+func reasoningOption(level config.ReasoningLevel) (llms.CallOption, bool) {
+	switch level {
+	case "":
+		return nil, false
+	case config.ReasoningOff:
+		// A portable "do not think". Providers with a boolean switch honour it
+		// verbatim; those that only take a budget see zero effort and zero
+		// tokens, which is the same request.
+		off := false
+		return llms.WithReasoning(llms.ReasoningConfig{Enabled: &off}), true
+	default:
+		return llms.WithReasoningEffort(llms.ReasoningEffort(level)), true
+	}
 }
