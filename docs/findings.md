@@ -1594,10 +1594,16 @@ needs one specific fact, each paired with a control whose code attracts the same
 corpus entry and contains nothing wrong. `z-ai/glm-5.3-flash` through
 OpenRouter, two runs per arm, 24 reviews per arm, none lost. Judge-free.
 
-| arm | RECALL | NOISE / review | $ / review |
-|---|---|---|---|
-| retrieval off | 0.75 | 0.50 | $0.0002 |
-| retrieval on | **1.00** | **0.33** | $0.0005 |
+| arm | embedder | RECALL | NOISE / review | $ / review |
+|---|---|---|---|---|
+| retrieval off | none | 0.75 | 0.50 | $0.0002 |
+| retrieval on | synthetic, nomic-embed-text-v1.5 | **1.00** | **0.33** | $0.0003 |
+| retrieval on | openrouter, text-embedding-3-small | **1.00** | **0.33** | $0.0005 |
+
+The off arm builds no retriever, so it is the control for both. The two
+embedders land on the same recall and the same noise from different vector
+spaces and different dimensions, 768 against 1536, which is more than one run
+of six plants can distinguish and less than a claim that they are equivalent.
 
 Recall is located plants over plants across every review, so 0.75 is 18 of 24
 and 1.00 is 24 of 24. Per run of six plants that is 4.5 found without
@@ -1654,11 +1660,11 @@ per-provider capability flag, which reports `Embeddings: false` for synthetic.
 Synthetic serves an embeddings endpoint: `hf:nomic-ai/nomic-embed-text-v1.5`,
 768 dimensions, included in the subscription at no additional charge.
 
-The index ships built on it now. Retrieval reaches all six plants on synthetic
-at ranks 1, 1, 1, 1, 1 and 3, against 1, 1, 1, 2, 3 and 3 on OpenRouter, so the
-recall arm above is a lower bound on what the shipped configuration does rather
-than a measurement of it. The arm has not been re-run on synthetic and the
-table is the OpenRouter one.
+The index ships built on it now, and the arm was re-run: the table above has
+both. Retrieval reaches all six plants on synthetic at ranks 1, 1, 1, 1, 1 and
+3, against 1, 1, 1, 2, 3 and 3 on OpenRouter, and the two arms score the same.
+Better ranks did not buy better recall here, which they could not: the on arm
+finds every plant, so there is nothing above it to reach.
 
 The lesson is narrower than "the SDK was wrong": a capability flag is metadata
 about a provider, and the only check worth trusting is a request.
