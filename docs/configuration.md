@@ -420,7 +420,22 @@ names its own provider. Synthetic includes embeddings in the subscription at no
 additional charge, which is why the example uses it.
 
 The corpus is fourteen entries under `internal/knowledge/corpus`, each naming
-the source it came from and the day that source was read. The vectors are
+the source it came from, the day that source was read, the languages it applies
+to and the review classes it is about. The classes route it: the defect pass
+sees correctness, concurrency, security, resource, data-loss, contract and
+tests entries, `improve`'s style pass sees style entries, maintainability goes
+to both, and slop entries arrive only when `review.slop` is on. A style rule in
+front of the defect reviewer is the same dilution the generation scope exists
+to prevent, arriving as reference material instead of as a prompt.
+
+An entry applies to the languages it names. `languages: [any]` is the only way
+to write one that crosses them, and it has to be typed: an empty list used to
+mean the same thing, which made a forgotten key and a deliberate claim about
+every language the same entry. A change whose files resolve to no known
+language still retrieves nothing, generic entries included. `versions:` and
+`frameworks:` are optional and are rendered beside the entry rather than
+filtered on, because nothing here knows the versions a change runs under and a
+filter fed a guess would silence entries on the strength of it. The vectors are
 committed under `internal/knowledge/indexes` and regenerated with `nitpick
 knowledge-index`, one file per embedding model. A run selects the file whose
 recorded model matches `models.embed`, so switching embedder is configuration

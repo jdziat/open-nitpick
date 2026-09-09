@@ -1,6 +1,7 @@
 ---
 title: A database/sql rows loop that does not check rows.Err silently truncates
 languages: [go]
+classes: [data-loss]
 source: https://pkg.go.dev/database/sql#Rows.Err
 checked: 2026-09-08
 ---

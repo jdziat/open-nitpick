@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/knowledge"
 )
@@ -34,9 +35,21 @@ func knowledgeSection(hits []knowledge.Hit) string {
 		"before reporting anything from it, and report nothing on the strength of this " +
 		"section alone.\n\n")
 	for _, h := range hits {
-		fmt.Fprintf(&b, "##### %s\n\n%s\n\nSource: %s, read %s.\n\n",
+		fmt.Fprintf(&b, "##### %s\n\n%s\n\n",
 			bundle.PromptSafe(h.Entry.Title),
-			bundle.PromptSafe(h.Entry.Body),
+			bundle.PromptSafe(h.Entry.Body))
+		// Applicability where the entry states it. Rendered rather than
+		// filtered on: nothing here knows the versions the change runs under,
+		// and a filter fed a guess would silence an entry on the strength of
+		// it. The model is already asked to judge whether an entry applies;
+		// this is the sentence it judges with.
+		if v := strings.TrimSpace(h.Entry.Versions); v != "" {
+			fmt.Fprintf(&b, "Applies to: %s.\n\n", bundle.PromptSafe(v))
+		}
+		if len(h.Entry.Frameworks) > 0 {
+			fmt.Fprintf(&b, "Frameworks: %s.\n\n", bundle.PromptSafe(strings.Join(h.Entry.Frameworks, ", ")))
+		}
+		fmt.Fprintf(&b, "Source: %s, read %s.\n\n",
 			bundle.PromptSafe(h.Entry.Source),
 			h.Entry.Checked.Format("2006-01-02"))
 	}
@@ -53,13 +66,13 @@ func (e *Engine) retrieveKnowledge(ctx context.Context, b bundle.Batch, style bo
 	if e.Knowledge == nil {
 		return nil
 	}
-	// Not for the style pass. It re-reviews the same batches with a different
-	// prompt, so retrieving again pays a second embedding call per batch to
-	// hand a style reviewer a corpus about correctness defects.
-	if style {
-		return nil
-	}
-	hits, err := e.Knowledge.ForBatch(ctx, b)
+	// The style pass used to retrieve nothing at all, because the corpus was
+	// entirely about correctness and a second embedding call per batch bought
+	// a style reviewer a set of defect rules. Now the classes decide: the
+	// style pass gets style and maintainability entries and no others, and
+	// declines only when the corpus has none, which is the corpus's answer
+	// rather than a rule in the engine.
+	hits, err := e.Knowledge.ForBatch(ctx, b, e.knowledgeClasses(style))
 	if err != nil {
 		// Still nothing rather than an error: the review worked before
 		// retrieval existed and must survive its provider. The count is what
@@ -104,7 +117,7 @@ func (k *KnowledgeRetriever) Status() KnowledgeStatus {
 // The query is the diff text rather than the whole file: a file is mostly
 // unchanged code, and embedding it retrieves entries about the parts nobody
 // touched.
-func (k *KnowledgeRetriever) ForBatch(ctx context.Context, b bundle.Batch) ([]knowledge.Hit, error) {
+func (k *KnowledgeRetriever) ForBatch(ctx context.Context, b bundle.Batch, classes map[config.Class]bool) ([]knowledge.Hit, error) {
 	if k == nil || k.R == nil {
 		return nil, nil
 	}
@@ -131,7 +144,7 @@ func (k *KnowledgeRetriever) ForBatch(ctx context.Context, b bundle.Batch) ([]kn
 		return nil, nil
 	}
 	k.counts.query()
-	hits, err := k.R.Retrieve(ctx, q.String(), knowledge.LanguagesOf(paths))
+	hits, err := k.R.Retrieve(ctx, q.String(), knowledge.LanguagesOf(paths), classes)
 	if err != nil {
 		k.counts.failure()
 		return nil, err
@@ -145,6 +158,43 @@ func ids(hits []knowledge.Hit) []string {
 	out := make([]string, 0, len(hits))
 	for _, h := range hits {
 		out = append(out, h.Entry.ID)
+	}
+	return out
+}
+
+// knowledgeClasses names the entries a pass can act on.
+//
+// The defect pass takes everything the review taxonomy calls a defect, plus
+// contract and tests. It does NOT take style: a style rule handed to the
+// defect reviewer is the dilution config.GenerationLevel exists to prevent,
+// arriving as reference material instead of as a prompt.
+//
+// Slop rides with the defect pass and only when review.slop is on, because
+// that is when slop is a class the reviewer may publish. Retrieving entries
+// for a class the filter will drop spends a slot in the prompt on a finding
+// that cannot survive.
+func (e *Engine) knowledgeClasses(style bool) map[config.Class]bool {
+	if style {
+		return map[config.Class]bool{
+			config.ClassStyle:           true,
+			config.ClassMaintainability: true,
+		}
+	}
+	out := map[config.Class]bool{
+		config.ClassCorrectness: true,
+		config.ClassConcurrency: true,
+		config.ClassSecurity:    true,
+		config.ClassResource:    true,
+		config.ClassDataLoss:    true,
+		config.ClassContract:    true,
+		config.ClassTests:       true,
+		// Maintainability is in both. It is the one class the defect pass and
+		// the style pass both publish, so an entry about it is useful to
+		// either and belongs to neither alone.
+		config.ClassMaintainability: true,
+	}
+	if e.Config != nil && e.Config.Review.Slop {
+		out[config.ClassSlop] = true
 	}
 	return out
 }

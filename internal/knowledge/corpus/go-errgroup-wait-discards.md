@@ -1,6 +1,7 @@
 ---
 title: errgroup.Group.Wait returns only the first error, so later failures are lost
 languages: [go]
+classes: [correctness]
 source: https://pkg.go.dev/golang.org/x/sync/errgroup
 checked: 2026-09-08
 ---

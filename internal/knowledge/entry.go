@@ -18,6 +18,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // Entry is one thing worth knowing, and where it came from.
@@ -33,8 +35,28 @@ type Entry struct {
 	Title string
 
 	// Languages the entry applies to, as the extensions in a diff resolve to.
-	// Empty means every language, which almost nothing should be.
+	//
+	// The literal "any" is the only way to write a rule that crosses
+	// languages, and it has to be typed: an empty list used to mean the same
+	// thing, which made a forgotten key indistinguishable from a deliberate
+	// claim about every language. See AnyLanguage.
 	Languages []string
+
+	// Classes the entry is about, from the review taxonomy.
+	//
+	// What routes it. A style rule handed to the defect pass is the dilution
+	// the generation scope exists to prevent, arriving as reference material
+	// instead of as a prompt, and a correctness rule handed to the style pass
+	// is an embedding call spent on a reviewer that cannot act on it.
+	Classes []config.Class
+
+	// Frameworks and Versions are applicability a reader and the model judge
+	// for themselves. Neither filters anything today: no caller knows the
+	// versions a change runs under, and a filter fed a guess would silence
+	// entries on the strength of it. They are rendered beside the entry so
+	// the model can decline it, which is what the prompt already asks for.
+	Frameworks []string
+	Versions   string
 
 	// Source is where the claim came from: a specification, a standard
 	// library's own documentation, a published advisory.
@@ -76,6 +98,19 @@ func parseEntry(id, raw string) (Entry, error) {
 			e.Title = value
 		case "languages":
 			e.Languages = splitList(value)
+		case "classes":
+			for _, c := range splitList(value) {
+				class, ok := config.Class(c).Normalize()
+				if !ok {
+					return Entry{}, fmt.Errorf("knowledge: %s: %q is not a review class; one of %s",
+						id, c, strings.Join(config.ClassNames(), ", "))
+				}
+				e.Classes = append(e.Classes, class)
+			}
+		case "frameworks":
+			e.Frameworks = splitList(value)
+		case "versions":
+			e.Versions = value
 		case "source":
 			e.Source = value
 		case "checked":
@@ -121,9 +156,39 @@ func (e Entry) validate() error {
 	case e.Body == "":
 		return fmt.Errorf("knowledge: %s: no body", e.ID)
 	case len(e.Languages) == 0:
-		return fmt.Errorf("knowledge: %s: no languages; an entry for every language is a claim about every language", e.ID)
+		return fmt.Errorf("knowledge: %s: no languages; write `languages: [any]` if the rule really crosses all of them", e.ID)
+	case len(e.Classes) == 0:
+		return fmt.Errorf("knowledge: %s: no classes; an entry nothing routes is an entry nothing retrieves", e.ID)
 	}
 	return nil
+}
+
+// AnyLanguage is the language list of a rule that crosses languages.
+//
+// Spelled rather than implied. An empty list meant this once, which made a
+// forgotten `languages:` key and a deliberate claim about every language the
+// same entry, and the corpus is the one place here where prose becomes
+// evidence: a claim that broad should cost someone typing it.
+const AnyLanguage = "any"
+
+// Generic reports whether the entry claims to cross languages.
+func (e Entry) Generic() bool {
+	for _, l := range e.Languages {
+		if strings.EqualFold(l, AnyLanguage) {
+			return true
+		}
+	}
+	return false
+}
+
+// InClasses reports whether the entry is about any of these classes.
+func (e Entry) InClasses(allowed map[config.Class]bool) bool {
+	for _, c := range e.Classes {
+		if allowed[c] {
+			return true
+		}
+	}
+	return false
 }
 
 // Text is what gets embedded: the title and the body, without the citation.

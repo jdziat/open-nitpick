@@ -1,6 +1,7 @@
 ---
 title: A held std Mutex guard across an await point blocks the whole executor thread
 languages: [rust]
+classes: [concurrency]
 source: https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html
 checked: 2026-09-08
 ---

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"path"
 	"strings"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // Retriever answers a change with the entries it should be judged against.
@@ -25,7 +27,7 @@ type Retriever struct {
 }
 
 // Retrieve returns the entries closest to a change.
-func (r *Retriever) Retrieve(ctx context.Context, query string, langs map[string]bool) ([]Hit, error) {
+func (r *Retriever) Retrieve(ctx context.Context, query string, langs map[string]bool, classes map[config.Class]bool) ([]Hit, error) {
 	if r == nil || r.Index == nil || r.Embedder == nil {
 		return nil, nil
 	}
@@ -34,6 +36,10 @@ func (r *Retriever) Retrieve(ctx context.Context, query string, langs map[string
 	// are "a value shared when it looked copied", and an entry from another
 	// language is a reason to invent a finding.
 	pool := ForLanguages(r.Entries, langs)
+	// Then the class cut, for the pass that is asking. Both are cuts rather
+	// than ranking signals: an entry the pass cannot act on is wrong, not
+	// distant, and cosine has no way to tell those apart.
+	pool = ForClasses(pool, classes)
 	if len(pool) == 0 {
 		return nil, nil
 	}

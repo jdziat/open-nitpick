@@ -104,3 +104,50 @@ func TestNilRetrieverIsOff(t *testing.T) {
 		t.Errorf("a nil retriever = %q, want off", got.State)
 	}
 }
+
+// The routing #84 asks for, at the layer that decides it. The style pass used
+// to retrieve nothing because the corpus was all correctness; now the classes
+// decide, and the engine must not hand a style reviewer a defect corpus or a
+// defect reviewer a style one.
+func TestPassesAskForDifferentClasses(t *testing.T) {
+	e := &Engine{Config: &config.Config{}}
+
+	defect := e.knowledgeClasses(false)
+	if !defect[config.ClassCorrectness] || !defect[config.ClassResource] {
+		t.Error("the defect pass does not ask for correctness or resource entries")
+	}
+	if defect[config.ClassStyle] {
+		t.Error("the defect pass asks for style entries; that is the dilution the generation scope prevents")
+	}
+	if defect[config.ClassSlop] {
+		t.Error("the defect pass asks for slop entries with review.slop off, so the filter would drop what they support")
+	}
+
+	style := e.knowledgeClasses(true)
+	if !style[config.ClassStyle] {
+		t.Error("the style pass does not ask for style entries")
+	}
+	for _, c := range []config.Class{config.ClassCorrectness, config.ClassSecurity, config.ClassSlop} {
+		if style[c] {
+			t.Errorf("the style pass asks for %s entries, which it cannot publish", c)
+		}
+	}
+
+	// Maintainability is the one class both publish, so an entry about it
+	// belongs to either and neither alone.
+	if !defect[config.ClassMaintainability] || !style[config.ClassMaintainability] {
+		t.Error("maintainability is not offered to both passes")
+	}
+}
+
+// Slop entries arrive exactly when slop is a class the reviewer may publish.
+func TestSlopEntriesFollowTheSlopSetting(t *testing.T) {
+	on := &Engine{Config: &config.Config{}}
+	on.Config.Review.Slop = true
+	if !on.knowledgeClasses(false)[config.ClassSlop] {
+		t.Error("review.slop is on and the defect pass does not ask for slop entries")
+	}
+	if on.knowledgeClasses(true)[config.ClassSlop] {
+		t.Error("the style pass asks for slop entries; slop rides with the pass that publishes it")
+	}
+}

@@ -1,6 +1,7 @@
 ---
 title: set -e does not fail a pipeline when a command before the last one fails
 languages: [shell, bash]
+classes: [correctness]
 source: https://www.gnu.org/software/bash/manual/bash.html#Pipelines
 checked: 2026-09-08
 ---

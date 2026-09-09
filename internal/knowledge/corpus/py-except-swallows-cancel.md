@@ -1,6 +1,7 @@
 ---
 title: In asyncio, a bare except catches CancelledError and breaks cancellation
 languages: [python]
+classes: [concurrency]
 source: https://docs.python.org/3/library/asyncio-task.html#task-cancellation
 checked: 2026-09-08
 ---
