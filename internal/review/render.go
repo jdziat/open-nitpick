@@ -228,6 +228,12 @@ func renderComment(f Finding, emoji bool, read map[string][]string) string {
 	// reader who wants the text has a filename. It is not a claim that any of
 	// them produced the finding, which is why the line says "read", see
 	// evidence.go.
+	//
+	// Every id resolves to a file, and nothing here checks that, because
+	// nothing here could be wrong about it: Evidence is json:"-" and is filled
+	// from the entries retrieval returned, which are the corpus. A model can
+	// neither write the field nor name an entry that is not in it. See
+	// TestEvidenceIsOnlyEverCorpusIDs.
 	if len(f.Evidence) > 0 {
 		read := make([]string, 0, len(f.Evidence))
 		for _, id := range f.Evidence {

@@ -131,3 +131,33 @@ func TestTiedEvidenceKeepsRetrievalOrder(t *testing.T) {
 		}
 	}
 }
+
+// Every id evidence can carry is a corpus entry.
+//
+// The rendered line hands a reader a filename, so an id naming no file would
+// send them nowhere. Nothing at the render site checks this, and nothing needs
+// to: Evidence is json:"-" so no model writes it, and evidenceFor copies ids
+// off the entries retrieval returned, which are the corpus. This pins the
+// second half, since the first is a struct tag and the third is a type.
+func TestEvidenceIsOnlyEverCorpusIDs(t *testing.T) {
+	entries, err := knowledge.Corpus()
+	if err != nil {
+		t.Fatalf("Corpus: %v", err)
+	}
+	real := map[string]bool{}
+	hits := make([]knowledge.Hit, 0, len(entries))
+	for _, e := range entries {
+		real[e.ID] = true
+		hits = append(hits, knowledge.Hit{Entry: e, Path: "a.go"})
+	}
+
+	got := evidenceFor(Finding{Path: "a.go"}, hits)
+	if len(got) == 0 {
+		t.Fatal("no evidence at all, so this proves nothing")
+	}
+	for _, id := range got {
+		if !real[id] {
+			t.Errorf("evidence names %q, which is not a corpus entry", id)
+		}
+	}
+}
