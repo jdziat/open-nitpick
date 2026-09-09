@@ -1057,10 +1057,19 @@ func TestUnresolvedWithoutAReasonIsNotRecorded(t *testing.T) {
 		"no reason at all": `{"verdict":"unresolved"}`,
 	} {
 		t.Run(name, func(t *testing.T) {
-			v := newValidator(&scriptedLLM{fallback: response}, config.Validation{Enabled: true})
+			model := &scriptedLLM{fallback: response}
+			v := newValidator(model, config.Validation{Enabled: true})
 
 			kept, overruled := v.Validate(context.Background(), []Finding{claimed}, claimedCode)
 
+			// The expert ran. Without this the whole test passes when
+			// validation is skipped or the verdict is not implemented, since
+			// both produce the same three values below. Same assertion, for
+			// the same reason, as TestGatedOutRefutationsAreNotReported.
+			if model.callCount() != 1 {
+				t.Fatalf("expert calls = %d, want 1: nothing below proves anything unless it ran",
+					model.callCount())
+			}
 			if len(kept) != 1 {
 				t.Fatalf("kept = %d, want the finding to survive", len(kept))
 			}
