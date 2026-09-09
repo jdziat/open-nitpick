@@ -588,7 +588,12 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		return e.Provider.FileContent(ctx, ref, path)
 	}
 
-	plan, err := bundle.AssembleWith(ctx, e.Config, files, fetch, bundle.ListerFrom(e.Provider, ref))
+	// The framing is measured rather than guessed: the system prompt is built
+	// before the plan and does not depend on it, so what it costs is known
+	// here. A budget that bounded only the entries let a request estimated at
+	// 24,852 tokens reach the provider at 32,653.
+	plan, err := bundle.AssembleReserving(ctx, e.Config, files, fetch,
+		bundle.ListerFrom(e.Provider, ref), bundle.Reserve{Tokens: e.framingTokens()})
 	if err != nil {
 		return nil, fmt.Errorf("assemble review: %w", err)
 	}
@@ -2144,4 +2149,21 @@ func firstPath(b bundle.Batch) string {
 		return ""
 	}
 	return b.Entries[0].File.Path
+}
+
+// framingTokens estimates what a request carries besides its entries.
+//
+// The system prompt, plus an allowance for the pull request context and the
+// response schema, which are built later and are small and roughly constant
+// beside it. An estimate that is a little high costs a smaller batch; one that
+// is low costs a request the provider refuses, so this rounds the safe way.
+func (e *Engine) framingTokens() int {
+	base, err := e.reviewPrompt()
+	if err != nil {
+		// A prompt that will not build fails later with a better message than
+		// anything this function could give. Reserve nothing and let it.
+		return 0
+	}
+	const schemaAndContext = 1500
+	return llms.DefaultTokenEstimator().EstimateTokens(base) + schemaAndContext
 }

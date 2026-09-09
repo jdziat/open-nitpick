@@ -75,6 +75,15 @@ func (b *Batch) Paths() []string {
 type Plan struct {
 	Batches []Batch
 
+	// BudgetPerBatch is the token budget a batch's entries were fitted to,
+	// after FramingReserved was taken out of review.token_budget_per_request.
+	BudgetPerBatch int
+
+	// FramingReserved is what was held back for the system prompt, the pull
+	// request context and the response schema. Disclosed because an operator
+	// who set a budget and sees smaller batches is owed the reason.
+	FramingReserved int
+
 	// Skipped records files that were excluded and why. Reporting these
 	// matters: a review that silently ignored half the diff looks identical
 	// to one that found nothing wrong.
@@ -171,11 +180,33 @@ func Assemble(ctx context.Context, cfg *config.Config, files diff.Files, fetch C
 	return AssembleWith(ctx, cfg, files, fetch, nil)
 }
 
+// Reserve holds back what a batch's budget must leave for everything the
+// engine sends alongside the entries: the system prompt, the pull request
+// context, and the response schema.
+//
+// It exists because the budget bounded the entries and nothing else, so a
+// request estimated at 24,852 tokens against a 32,000 budget reached the
+// provider at 32,653. Measured in issue #81.
+type Reserve struct {
+	// Tokens is the framing the caller will send. Zero reserves nothing, which
+	// is the old behaviour and what a caller that cannot measure its own
+	// framing gets.
+	Tokens int
+}
+
 // AssembleWith is Assemble with a directory lister, which related context
 // needs to find the file a Go package or Python module defines a name in.
 // A nil lister attaches related context for the languages that can be
 // resolved without one and none for Go.
+//
+// It reserves nothing, for a caller that does not build the prompt and cannot
+// measure its framing.
 func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fetch ContentFetcher, list DirLister) (*Plan, error) {
+	return AssembleReserving(ctx, cfg, files, fetch, list, Reserve{})
+}
+
+// AssembleReserving plans a review, leaving room for the caller's framing.
+func AssembleReserving(ctx context.Context, cfg *config.Config, files diff.Files, fetch ContentFetcher, list DirLister, reserve Reserve) (*Plan, error) {
 	if cfg == nil {
 		return nil, errors.New("bundle: nil config")
 	}
@@ -269,7 +300,14 @@ func AssembleWith(ctx context.Context, cfg *config.Config, files diff.Files, fet
 		entries = append(entries, entry)
 	}
 
-	plan.Batches = batch(entries, cfg.Review.MaxFilesPerRequest, cfg.Review.TokenBudgetPerRequest)
+	// The budget the entries actually get, after the framing that travels with
+	// them. Floored rather than allowed to go negative or to zero: a reserve
+	// larger than the budget is a misconfiguration, and answering it by
+	// batching nothing would turn a bad number into no review at all.
+	perBatch := max(1, cfg.Review.TokenBudgetPerRequest-reserve.Tokens)
+	plan.BudgetPerBatch = perBatch
+	plan.FramingReserved = reserve.Tokens
+	plan.Batches = batch(entries, cfg.Review.MaxFilesPerRequest, perBatch)
 	return plan, nil
 }
 
