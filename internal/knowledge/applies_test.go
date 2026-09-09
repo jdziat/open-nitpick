@@ -155,3 +155,39 @@ func TestRetrieveAppliesTheVersionCut(t *testing.T) {
 		t.Error("the entry was not offered to a module inside its bound either, so the cut is not the version's doing")
 	}
 }
+
+// PoolSize reports what the cuts allowed, which is what says whether Keep can
+// bind at all.
+//
+// The numbers are the corpus's, and they are the reason no reranker ships: on
+// five of six languages the pool is at or below Keep, so every entry reaches
+// the prompt and there is nothing for a second model call to reorder. See
+// docs/findings.md.
+func TestPoolSizeReportsWhatTheCutsAllowed(t *testing.T) {
+	entries, err := Corpus()
+	if err != nil {
+		t.Fatalf("Corpus: %v", err)
+	}
+	r := &Retriever{Entries: entries}
+
+	for lang, want := range map[string]int{
+		"go": 8, "python": 2, "typescript": 2, "javascript": 1, "rust": 1, "shell": 1,
+	} {
+		if got := r.PoolSize(map[string]bool{lang: true}, everyClass()); got != want {
+			t.Errorf("PoolSize(%s) = %d, want %d", lang, got, want)
+		}
+	}
+
+	// The version cut counts too, so the number a run logs is that run's pool
+	// rather than the corpus's size.
+	r.Versions = map[string]string{"go": "1.25"}
+	if got := r.PoolSize(map[string]bool{"go": true}, everyClass()); got != 7 {
+		t.Errorf("PoolSize(go) on a 1.25 module = %d, want 7", got)
+	}
+
+	// A language the corpus says nothing about reaches nothing, generic
+	// entries included, which is what makes an empty pool an answer.
+	if got := r.PoolSize(map[string]bool{"cobol": true}, everyClass()); got != 0 {
+		t.Errorf("PoolSize(cobol) = %d, want 0", got)
+	}
+}

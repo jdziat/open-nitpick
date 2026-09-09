@@ -126,8 +126,13 @@ func (e *Engine) retrieveKnowledge(ctx context.Context, b bundle.Batch, style bo
 	hits = fitKnowledge(hits, e.Config.Review.KnowledgeTokens)
 
 	if len(hits) > 0 {
+		// pool beside entries, because the two together answer whether Keep
+		// truncated anything. A pool at or below Keep means every entry the
+		// cuts allowed reached the prompt, so nothing chose between them and
+		// a reranker would have had nothing to reorder.
 		e.log().Debug("knowledge retrieved",
 			"entries", ids(hits),
+			"pool", e.Knowledge.PoolSize(b, e.knowledgeClasses(style)),
 			"scores", scores(hits),
 			"stage", stage(style),
 			"latency", time.Since(started),
@@ -208,6 +213,24 @@ func (k *KnowledgeRetriever) ForBatch(ctx context.Context, b bundle.Batch, class
 		return nil, nil
 	}
 	return k.retrieve(ctx, q.String(), knowledge.LanguagesOf(paths), classes, "")
+}
+
+// PoolSize is how many entries this batch could have reached.
+//
+// The languages a batch resolves to, which is what the per-batch query uses.
+// A per-file run asks smaller questions and so has smaller pools; this reports
+// the widest one, which is the one that says whether Keep can bind at all.
+func (k *KnowledgeRetriever) PoolSize(b bundle.Batch, classes map[config.Class]bool) int {
+	if k == nil || k.R == nil {
+		return 0
+	}
+	paths := make([]string, 0, len(b.Entries))
+	for _, e := range b.Entries {
+		if e.File != nil {
+			paths = append(paths, e.File.Path)
+		}
+	}
+	return k.R.PoolSize(knowledge.LanguagesOf(paths), classes)
 }
 
 // perFile queries once per changed file and merges the results.

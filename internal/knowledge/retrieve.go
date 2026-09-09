@@ -35,10 +35,6 @@ type Retriever struct {
 	Candidates int
 	Keep       int
 
-	// Rerank picks from the candidates. Nil keeps the top Keep by cosine,
-	// which is the control the measurement compares against.
-	Rerank func(ctx context.Context, query string, hits []Hit, keep int) ([]Hit, error)
-
 	// MinScore drops hits below a cosine, so a change resembling nothing in
 	// the corpus retrieves nothing rather than its five least distant
 	// entries.
@@ -67,20 +63,7 @@ func (r *Retriever) Retrieve(ctx context.Context, query string, langs map[string
 	if err := r.Index.CheckModel(r.Model); err != nil {
 		return nil, err
 	}
-	// The language cut first, before any vector is compared. Similarity alone
-	// puts Python's mutable default beside Go's slice aliasing, because both
-	// are "a value shared when it looked copied", and an entry from another
-	// language is a reason to invent a finding.
-	pool := ForLanguages(r.Entries, langs)
-	// Then the class cut, for the pass that is asking. Both are cuts rather
-	// than ranking signals: an entry the pass cannot act on is wrong, not
-	// distant, and cosine has no way to tell those apart.
-	pool = ForClasses(pool, classes)
-	// And the version cut, last of the three, for the same reason as the other
-	// two: an entry about Go before 1.23 shown to a repository on 1.25 is not
-	// a distant neighbour, it is a wrong one, and it arrives as reference
-	// material a reviewer is asked to trust.
-	pool = ForVersions(pool, r.Versions)
+	pool := r.pool(langs, classes)
 	if len(pool) == 0 {
 		return nil, nil
 	}
@@ -99,18 +82,7 @@ func (r *Retriever) Retrieve(ctx context.Context, query string, langs map[string
 	}
 	hits = above(hits, r.MinScore)
 
-	if r.Rerank == nil || len(hits) <= r.Keep {
-		return truncate(hits, r.Keep), nil
-	}
-
-	ranked, err := r.Rerank(ctx, query, hits, r.Keep)
-	if err != nil {
-		// A reranker that failed leaves the cosine order, which is the state
-		// this feature ships in without one. Losing the context entirely
-		// because the optional half broke would be the wrong trade.
-		return truncate(hits, r.Keep), nil
-	}
-	return truncate(above(ranked, r.MinScore), r.Keep), nil
+	return truncate(hits, r.Keep), nil
 }
 
 // above drops hits below a cosine. A zero floor keeps everything, which is
@@ -199,4 +171,30 @@ func languageOf(p string) string {
 		}
 		return ""
 	}
+}
+
+// pool is the entries a query is allowed to reach, before any vector is
+// compared.
+//
+// Three cuts rather than ranking signals, because each removes entries that
+// are wrong rather than distant, and cosine cannot tell those from a near
+// miss. Similarity alone puts Python's mutable default beside Go's slice
+// aliasing, both being "a value shared when it looked copied".
+func (r *Retriever) pool(langs map[string]bool, classes map[config.Class]bool) []Entry {
+	out := ForLanguages(r.Entries, langs)
+	out = ForClasses(out, classes)
+	return ForVersions(out, r.Versions)
+}
+
+// PoolSize is how many entries a query could have reached.
+//
+// Reported beside what was kept so the question "is Keep truncating anything"
+// is answerable from a run rather than by counting corpus files. On a pool at
+// or below Keep, every entry reaches the prompt and any reordering of the
+// candidates is unobservable, which is what a reranker would be buying.
+func (r *Retriever) PoolSize(langs map[string]bool, classes map[config.Class]bool) int {
+	if r == nil {
+		return 0
+	}
+	return len(r.pool(langs, classes))
 }

@@ -1753,3 +1753,45 @@ different job than noise reduction on twelve fixtures. What it does say is that
 the obvious escalation from a vector to a model did not rescue the idea here,
 and the thing that did reduce noise was giving the reviewer better context in
 the first place.
+
+## No reranker, on arithmetic (2026-09-08)
+
+The retrieval design left a `Rerank` hook on the retriever: a cheap chat model
+that would read the candidate titles and choose which reach the prompt. Nothing
+ever set it. Before building one, I counted what it could change.
+
+Retrieval cuts the corpus by language, then by the asking pass's classes, then
+by the versions an entry declares, and keeps the top five of what survives.
+The reranker only matters when that keep truncates, so the question is the size
+of the pool it truncates.
+
+| language | entries the cuts allow | truncated at keep = 5 |
+|---|---|---|
+| go | 8 | yes |
+| python | 2 | no |
+| typescript | 2 | no |
+| javascript | 1 | no |
+| rust | 1 | no |
+| shell | 1 | no |
+
+Source: `TestPoolSizeReportsWhatTheCutsAllowed` in
+`internal/knowledge/applies_test.go`, over the fourteen shipped entries. On a
+module declaring Go 1.23 or later the Go pool is 7, because `go-time-after-leak`
+is bounded below it.
+
+For five of the six languages truncation is the identity: every entry the cuts
+allowed reaches the prompt whatever order it is in. A reranker would spend one
+model call per batch to reorder a list that is then not cut. The one place it
+could act is Go, where it would choose which 3 of 8 entries to drop.
+
+So the hook is deleted rather than filled. An unimplemented interface implies
+somebody decided how to rank, and a reader finding it has no way to see that
+nothing is behind it.
+
+What replaces it is the number, in every run: `knowledge retrieved` now logs
+`pool` beside `entries`, so a corpus that has grown past the point where keep
+binds says so in the log rather than in somebody's memory of this table. The
+condition to revisit this is written here rather than left implicit: when the
+pool exceeds keep for most retrievals rather than one language in six, a
+reranker has something to do, and it can be measured against the cosine order
+as the control.
