@@ -142,10 +142,14 @@ func userDocument(getenv func(string) string) (path string, data []byte, err err
 // repo is pruned before it is merged, so a repository document cannot reach
 // any key the user-level file is trusted for. Ordering here is the invariant;
 // see the note at the top of this file.
-func (c *Config) overlay(user, repo []byte, trusted bool) (dropped, userKeys, overridden []string, err error) {
+// userPath and repoPath name the two documents, for a message that has to say
+// which of them carries the key it is refusing.
+func (c *Config) overlay(user, repo []byte, trusted bool, userPath, repoPath string) (dropped, userKeys, overridden, unknown []string, err error) {
+	tolerate := ignoreUnknownKeys(nil)
+
 	userNode, err := documentNode(user)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("parse user config: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("parse user config: %w", err)
 	}
 	repoNode, err := documentNode(repo)
 	if err != nil {
@@ -155,31 +159,69 @@ func (c *Config) overlay(user, repo []byte, trusted bool) (dropped, userKeys, ov
 		// would carry every key the prune exists to remove. Trusted, the
 		// decoder is about to reject the same bytes anyway, and reporting it
 		// here says which parse failed.
-		return nil, nil, nil, fmt.Errorf("parse config: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("parse config: %w", err)
 	}
 
 	if len(user) > 0 {
-		if err := c.merge(user); err != nil {
-			return nil, nil, nil, err
+		ignored, err := c.merge(user, tolerate)
+		if err != nil {
+			// Named here rather than by the caller, which knows only the
+			// repository's path and would blame that file for a line in this
+			// one.
+			if keys, only := unknownFields(err); only {
+				return nil, nil, nil, nil, unknownKeyError(userPath, keys)
+			}
+			return nil, nil, nil, nil, err
 		}
+		unknown = append(unknown, render(ignored, userPath, false)...)
 		userKeys = keyPaths(userNode)
 	}
 
+	// rendered records whether the bytes merged below are still the file on
+	// disk. Once the prune rewrites them a line number counted in the result
+	// points at the wrong line of the file: deleted keys shift what follows
+	// them, and Marshal drops the comments and blank lines besides.
+	var rendered bool
+
 	if !trusted && repoNode != nil {
-		dropped = pruneUntrusted(repoNode)
-		if repo, err = yaml.Marshal(repoNode); err != nil {
-			return nil, nil, nil, fmt.Errorf("rewrite config without the keys it may not supply: %w", err)
+		// Rewritten only when the prune changed the document. One it left
+		// alone is the file, and round-tripping it costs every unknown key its
+		// line for nothing.
+		//
+		// Changed, not reported: a key whose value asks for nothing is deleted
+		// and deliberately unreported, and reading the report as the change
+		// republishes the original bytes with that key still in it.
+		var changed bool
+		if dropped, changed = pruneUntrusted(repoNode); changed {
+			if repo, err = yaml.Marshal(repoNode); err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("rewrite config without the keys it may not supply: %w", err)
+			}
+			rendered = true
 		}
 	}
 
-	if err := c.merge(repo); err != nil {
-		return nil, nil, nil, err
+	// After the prune and before the merge, because the question is what this
+	// document supplies: once it is merged onto the user's, nothing records
+	// whose base_url survived.
+	if !trusted {
+		if err := checkPruned(repo, repoPath); err != nil {
+			return nil, nil, nil, nil, err
+		}
 	}
+
+	ignored, err := c.merge(repo, tolerate)
+	if err != nil {
+		if keys, only := unknownFields(err); only {
+			return nil, nil, nil, nil, unknownKeyError(repoPath, forget(keys, rendered))
+		}
+		return nil, nil, nil, nil, err
+	}
+	unknown = append(unknown, render(ignored, repoPath, rendered)...)
 
 	if len(userKeys) > 0 && repoNode != nil {
 		overridden = intersect(userKeys, keyPaths(repoNode))
 	}
-	return dropped, userKeys, overridden, nil
+	return dropped, userKeys, overridden, unknown, nil
 }
 
 // documentNode parses a document down to its root mapping, or nil when the
@@ -262,4 +304,38 @@ func resolveNode(n *yaml.Node) *yaml.Node {
 		n = n.Alias
 	}
 	return n
+}
+
+// render names each recorded key's document, and drops the line when it was
+// counted in one this tool rewrote.
+func render(keys []unknownKey, path string, rewritten bool) []string {
+	name := filepath.Base(strings.TrimSpace(path))
+	if name == "." || name == string(filepath.Separator) {
+		name = ""
+	}
+	out := make([]string, 0, len(keys))
+	for _, k := range forget(keys, rewritten) {
+		k.File = name
+		out = append(out, k.String())
+	}
+	return out
+}
+
+// forget drops the line number from each key when it was counted in a document
+// this tool rewrote.
+//
+// A wrong line is worse than none. The prune deletes keys before the merge, so
+// every key below a deleted one has moved, and a notice pointing a reader at a
+// line where the key is not costs them the search plus their trust in the rest
+// of the notice.
+func forget(keys []unknownKey, rewritten bool) []unknownKey {
+	if !rewritten {
+		return keys
+	}
+	out := make([]unknownKey, 0, len(keys))
+	for _, k := range keys {
+		k.Line = 0
+		out = append(out, k)
+	}
+	return out
 }

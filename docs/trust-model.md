@@ -43,7 +43,14 @@ order and only one: the keys above are deleted from the repository's document
 repository value can never be written into a position the user-level file
 owns, and the user-level value is never cleared by the scrub that keeps the
 repository out. A YAML alias is followed rather than skipped, so an anchored
-model spec is pruned wherever it is used. `api_key_env: GITHUB_TOKEN` stays
+model spec is pruned wherever it is used. That is a claim about the routes the
+prune walks, and the prune walks the document by name, so it can only remove a
+key it can see: an anchor declared under a key nitpick does not have, merged
+into a model spec, reaches the decoder having passed none of them. The
+untrusted document is therefore decoded on its own after the prune and checked
+for any of these settings, and refused when one survived. The check asks the
+question the prune exists to answer, on the settings rather than on the syntax,
+which is why a route nobody enumerated does not get past it. `api_key_env: GITHUB_TOKEN` stays
 refused in both files. The user-level file is **not read on a runner** (`CI`
 or `GITHUB_ACTIONS`): there is nobody there who wrote it. Name one with
 `NITPICK_USER_CONFIG` to opt a runner in deliberately, or switch it off

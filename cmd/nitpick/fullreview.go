@@ -103,6 +103,10 @@ func treeReview(ctx context.Context, f *reviewFlags, paths []string, budget int,
 	if len(cfg.Dropped) > 0 {
 		log.Warn("ignored endpoint settings from an untrusted config file", "keys", strings.Join(cfg.Dropped, ", "))
 	}
+	if len(cfg.Unknown) > 0 {
+		log.Warn("ignored config keys this version does not know",
+			"keys", strings.Join(cfg.Unknown, ", "), "version", version)
+	}
 
 	// A whole-tree review has already read every file, so both directions
 	// of related context are on: nothing the caller walk reads is a file

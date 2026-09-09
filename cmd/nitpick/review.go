@@ -156,6 +156,16 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 			"hint", "set "+config.EnvTrustConfigEndpoints+"=1 if you control this file")
 	}
 
+	// Keys this build does not have, ignored on the operator's word that their
+	// binary is behind their config. Worth a line whether or not they were
+	// right: if they were not, the key is a typo doing nothing.
+	if len(cfg.Unknown) > 0 {
+		log.Warn("ignored config keys this version does not know",
+			"keys", strings.Join(cfg.Unknown, ", "),
+			"version", version,
+			"hint", "unset "+config.EnvIgnoreUnknownKeys+" to make these fail the run again")
+	}
+
 	// A config file that is not there is the one outcome this command used to
 	// produce no output for at all: LoadFile treats a missing file as "use
 	// defaults", so a mistyped -config path reviewed the repository under
@@ -725,6 +735,18 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 	if len(cfg.Dropped) > 0 {
 		pl("Ignored (untrusted config; set NITPICK_TRUST_CONFIG_ENDPOINTS=1 where you control the file):")
 		for _, key := range cfg.Dropped {
+			pf("  %s\n", key)
+		}
+		b.WriteString("\n")
+	}
+
+	// The same answer for the other reason a key is not in force: this build
+	// does not have it. An operator reading "why is my setting not doing
+	// anything" gets the key, its line and the version that did not know it.
+	if len(cfg.Unknown) > 0 {
+		pf("Ignored (keys nitpick %s does not know; unset %s to make these fail the run):\n",
+			version, config.EnvIgnoreUnknownKeys)
+		for _, key := range cfg.Unknown {
 			pf("  %s\n", key)
 		}
 		b.WriteString("\n")

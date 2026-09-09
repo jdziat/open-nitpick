@@ -953,6 +953,64 @@ defanged out of the code in the same request. The code is written by the change
 author, so without that a diff opens a reference block of its own and states a
 rule in this tool's voice for the expert to refute a real finding with.
 
+## A key this nitpick does not have
+
+An unrecognised key fails the run rather than being ignored, which is right for
+a typo and has a second consequence: a `.nitpick.yaml` written for a newer
+nitpick does not degrade on an older one, it stops the review before a line of
+the diff is read. The two cases are the same bytes from in here. A build that
+has never heard of `models.fix` has never heard of `models.fx` either.
+
+So the default stays fatal and the message says what it can:
+
+```
+error: .nitpick.yaml has keys this nitpick does not know:
+
+  fix (line 34)
+
+This is nitpick v1.8.0. A key added after this version is rejected the same way
+a typo is. Set NITPICK_IGNORE_UNKNOWN_KEYS=1 to ignore them and continue.
+```
+
+Setting `NITPICK_IGNORE_UNKNOWN_KEYS=1` ignores such keys and runs. They are
+named in the log, in `nitpick explain-config`, and on the pull request, for the
+reason a dropped endpoint key is: a setting a reader believes is in force and is
+not is very hard to diagnose. The two audiences differ, which is why it is in
+both places: the operator who set the variable reads the log, and whoever wrote
+the key reads the pull request.
+
+It is an environment variable rather than a config key, one step further than
+`NITPICK_TRUST_CONFIG_ENDPOINTS`: a config file that could switch off the check
+on its own keys is the one thing this must not be.
+
+A decode that fails for any other reason stays fatal with the variable set. A
+document that mixes an unknown key with a value of the wrong type has applied
+some of itself and skipped some, and nothing here knows which, so the file is
+refused rather than reviewed under a config the tool cannot describe.
+
+The case this is for is a binary behind its config: a workflow pinned to an
+older tag, or a monorepo running two pinned versions against one file. Whoever
+sets it is asserting that. Nothing here can check the assertion, so if one of
+the keys was a typo after all, that setting is not in force and the notice is
+the only sign.
+
+An ignored key is not read as a key, which is not the same as the text under it
+being inert. YAML lets an anchor declared under one key be merged into another,
+so a key nitpick does not have can still carry a value that reaches a key it
+does have. Where that value is an endpoint or a credential setting from a file
+this tool does not trust, the load is refused rather than ignored:
+
+```
+error: .nitpick.yaml supplies base_url after the untrusted-key prune ran, which
+means the document reached them by a route the prune does not walk, such as a
+YAML anchor merged into a model spec. It was not applied.
+```
+
+The prune removes those keys by name, so it only removes what it can see. That
+check asks the question the prune exists to answer, on the settings themselves
+after the document is decoded, which is why a route nobody enumerated does not
+get past it. See [Trust model](trust-model.md).
+
 ## Severities
 
 `nit` < `info` < `warning` < `error` < `critical`. `fail_on: none` never fails
