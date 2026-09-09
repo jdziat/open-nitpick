@@ -1728,3 +1728,28 @@ vector comparison and is what `internal/review/validate.go` already does.
 The retrieval feature keeps its own result: noise fell from 0.50 to 0.33 per
 review with retrieval on. That is context helping a model judge, not a vector
 judging on its own, and the difference is the whole of this section.
+
+### The model that reads the finding and the code did not do better
+
+`internal/review/validate.go` is that mechanism and already exists: an expert
+persona is shown a finding and the code it names, and overrules it with a
+stated reason. Turning it on over the same corpus, same model, two runs:
+
+| arm | RECALL | NOISE / review |
+|---|---|---|
+| retrieval on | **1.00** | 0.33 |
+| retrieval on, validation on | 0.83 | 0.29 |
+
+Recall fell from 24 of 24 plant-locations to 20 of 24. Noise fell by 0.04 per
+review on one contender and not at all on the other, against a corpus
+resolution where one plant is 0.083.
+
+So the validator paid four real findings for something smaller than this
+instrument can measure. `know-go-defer-in-loop` is the clearest case: found in
+every run without validation, overruled in one run with it.
+
+That is one corpus, one model, two runs, and validation was built for a
+different job than noise reduction on twelve fixtures. What it does say is that
+the obvious escalation from a vector to a model did not rescue the idea here,
+and the thing that did reduce noise was giving the reviewer better context in
+the first place.
