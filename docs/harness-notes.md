@@ -3337,3 +3337,25 @@ finding when `b.go` scored higher on it.
 What the field is for is stated at `Finding.Evidence`: the reviewer read these
 entries when it wrote this finding. The ordering is a preference, not evidence
 of attribution, and no consumer treats it as more than that.
+
+## naming a citation
+
+`internal/review/validate.go`
+
+`namesSomething` gates the demotion, and the demotion is the strong step: it
+publishes a finding stamped as having had its verdict rest on a source the
+expert never saw. That is a claim about the expert, in a place a reader cannot
+check it, so it is worth making only where the expert did claim something.
+
+One token, not among the entries it was shown, is that case. A sentence is not.
+A model asked for an id and answering "no specific entry" was answering in the
+wrong form, not inventing a source, and reading it as one demotes a sound
+refutation and publishes a false line about the expert.
+
+The earlier rule tried to decide whether a string means nothing, as a list of
+nullish phrasings. Three rounds of review found a form the list was missing:
+the bracketed id the prompt itself asks for, an id spelled with spaces, and
+then ordinary prose. Whether an arbitrary sentence means nothing is not
+decidable from the string; whether it is one token is. The list survives as a
+backstop for the single words, `none` and `n/a` among them, where the shape
+test alone would say a source was claimed.

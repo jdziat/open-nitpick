@@ -255,12 +255,21 @@ func TestTheReferenceContractIsSentOnlyWithAReferenceBlock(t *testing.T) {
 // The contract asks for an empty string and gets "none" instead. Reading that
 // as an invented source demotes a sound refutation over a filler word.
 func TestAWordForNoCitationIsNotAnInventedSource(t *testing.T) {
-	for _, said := range []string{"", "  ", "none", "None", "N/A", "nil", "null", "nothing", "unknown"} {
+	for _, said := range []string{
+		"", "  ", "none", "None", "N/A", "nil", "null", "nothing", "unknown",
+		// Prose, whatever it says. An id is one word, so a sentence in this
+		// field is an answer in the wrong form rather than a claimed source,
+		// and no list of phrasings can be kept complete.
+		"no specific entry", "I did not use one", "none of the above",
+		"not applicable here", "the reference did not decide it",
+	} {
 		if namesSomething(said) {
 			t.Errorf("cited %q was read as naming an entry", said)
 		}
 	}
-	for _, said := range []string{"go-defer-in-loop", "[cwe-489-invented]", "some-rule"} {
+	// One token that is not among the entries shown is the case the demotion
+	// was written for: the expert claimed a source.
+	for _, said := range []string{"go-defer-in-loop", "[cwe-489-invented]", "some-rule", "CWE-89"} {
 		if !namesSomething(said) {
 			t.Errorf("cited %q was read as naming nothing", said)
 		}

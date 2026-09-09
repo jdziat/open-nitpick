@@ -705,18 +705,29 @@ func (v *Validator) log() *slog.Logger {
 	return slog.New(slog.DiscardHandler)
 }
 
-// nullish are the ways a model says "no citation" when asked for an id.
+// nullish are the single words a model reaches for when it means "no
+// citation", which the contract asks it to spell as an empty string.
 //
-// The contract asks for an empty string and gets these instead. Reading one as
-// an invented source would demote a sound refutation over a filler word, which
-// is the failure the demotion exists to avoid one direction of.
+// A backstop rather than the rule. The rule is in namesSomething: a list of
+// phrasings is a list somebody has to keep complete, and three rounds of
+// review found a form it was missing each time.
 var nullish = map[string]bool{
 	"": true, "none": true, "na": true, "nil": true, "null": true,
 	"nothing": true, "notapplicable": true, "empty": true, "unknown": true,
 }
 
-// namesSomething reports whether a `cited` field is an attempt at an id.
+// namesSomething reports whether a `cited` field claims to be an id.
+//
+// Only a single token counts, because an id is one word: a sentence in this
+// field is an answer in the wrong form rather than a claimed source. See
+// docs/harness-notes.md#naming-a-citation for what that gates and why the
+// alternative, deciding whether a sentence means nothing, is not decidable
+// from the string.
 func namesSomething(said string) bool {
+	said = strings.TrimSpace(said)
+	if strings.ContainsAny(said, " \t\n") {
+		return false
+	}
 	return !nullish[idChars(said)]
 }
 
