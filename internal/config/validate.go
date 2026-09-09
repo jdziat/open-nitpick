@@ -60,6 +60,16 @@ func (m Models) validate() []error {
 			errs = append(errs, errors.New("models.fix: model is required"))
 		}
 	}
+	if m.Embed != nil {
+		errs = append(errs, prefixAll("models.embed", m.Embed.validate(false))...)
+		if strings.TrimSpace(m.Embed.Model) == "" {
+			errs = append(errs, errors.New("models.embed: model is required"))
+		}
+		if strings.TrimSpace(m.Embed.Provider) == "" {
+			errs = append(errs, errors.New("models.embed: provider is required; "+
+				"an embedding model does not inherit the reviewer's provider"))
+		}
+	}
 	if m.Router != nil {
 		errs = append(errs, prefixAll("models.router", m.Router.validate(false))...)
 	}

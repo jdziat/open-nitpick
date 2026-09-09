@@ -67,6 +67,8 @@ func run() int {
 		err = runLinters()
 	case "providers":
 		err = runProviders()
+	case "knowledge-index":
+		err = runKnowledgeIndex(ctx, os.Args[2:], os.Stdout)
 	case "config-reference":
 		err = runConfigRef(os.Args[2:], os.Stdout)
 	case "version", "--version", "-v":

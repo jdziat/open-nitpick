@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -214,30 +213,4 @@ func TestPrivateAddressForms(t *testing.T) {
 			t.Errorf("%s should not require an opt-in", u)
 		}
 	}
-}
-
-// modelRoleKeys reports the yaml key of every single-model role on Models.
-//
-// Read off the struct rather than listed, which is the difference between a
-// test that holds the prune to the loader and one that holds it to whatever
-// someone remembered to type. The literal list this replaced was missing
-// models.fix for a release, and fix is the role that writes code.
-func modelRoleKeys() []string {
-	var out []string
-	t := reflect.TypeOf(Models{})
-	spec := reflect.TypeOf(ModelSpec{})
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		ft := f.Type
-		for ft.Kind() == reflect.Pointer {
-			ft = ft.Elem()
-		}
-		if ft != spec {
-			continue
-		}
-		if name, _, _ := strings.Cut(f.Tag.Get("yaml"), ","); name != "" && name != "-" {
-			out = append(out, name)
-		}
-	}
-	return out
 }

@@ -181,6 +181,81 @@ Temperature is passed through unchanged. Unset leaves the role's default, which 
 duration, default `10m0s`.
 Timeout bounds one call, retries excluded.
 
+### `models.embed.allow_private_endpoint`
+
+boolean, default `false`.
+AllowPrivateEndpoint permits base_url to use plain HTTP or resolve to a loopback or private address.
+
+### `models.embed.api_key_env`
+
+string, default `none`.
+APIKeyEnv names the environment variable holding the credential.
+
+### `models.embed.api_key_keyring`
+
+string, default `none`.
+APIKeyKeyring names a secret in the operating system's keystore as "service/account", for example "open-nitpick/synthetic". Empty still consults the keystore under a default name; see internal/llm/credential.go.
+
+### `models.embed.base_url`
+
+string, default `none`.
+BaseURL points at an alternate endpoint.
+
+### `models.embed.credential_command`
+
+list of string, default `none`.
+CredentialCommand is a command whose standard output is the credential, for a secret manager the keystore cannot reach: 1Password, AWS Secrets Manager, Vault.
+
+### `models.embed.extra`
+
+map of string, default `none`.
+Extra carries provider-specific construction parameters (for example runpod's endpoint_id) straight through to the SDK.
+
+### `models.embed.fallback`
+
+same keys as models.embed, default `none`.
+Fallback is the model a role escalates to when this one cannot answer: a request cut at the output cap because the model looped, or structured output that never parsed.
+
+### `models.embed.max_retries`
+
+integer, default `none`.
+MaxRetries bounds two loops, not one, and they multiply.
+
+### `models.embed.max_tokens`
+
+integer, default `0`.
+MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+
+### `models.embed.model`
+
+string, default `none`.
+Model is the model id as that provider spells it, which is not a name this project validates: an id the vendor does not serve fails at the call, not at load.
+
+### `models.embed.provider`
+
+string, default `none`.
+Provider names the vendor or gateway the call goes to. "nitpick providers" prints the list.
+
+### `models.embed.providers`
+
+list of string, default `none`.
+Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
+
+### `models.embed.structured_output`
+
+string, default `auto`.
+StructuredOutput selects how findings are constrained to the schema: "auto" (default) prefers a JSON-Schema response format and falls back to JSON mode and then to prompt-carried text, "schema" forces the schema path, "json" forces JSON mode, "text" forces the text path, where the schema rides in the prompt and the reply is parsed leniently.
+
+### `models.embed.temperature`
+
+number, default `0`.
+Temperature is passed through unchanged. Unset leaves the role's default, which is 0 for every role here: a review that varies between runs on the same diff is one nobody can hold to a measurement.
+
+### `models.embed.timeout`
+
+duration, default `10m0s`.
+Timeout bounds one call, retries excluded.
+
 ### `models.ensemble[].allow_private_endpoint`
 
 boolean, default `false`.

@@ -234,6 +234,16 @@ type Models struct {
 	// ship an unmeasured capability under a measured model's name.
 	Fix *ModelSpec `yaml:"fix"`
 
+	// Embed is the model that turns text into vectors for knowledge
+	// retrieval. It has no default and no fallback to Default, because an
+	// embedding model is not a chat model and naming the reviewer here would
+	// fail at the first request rather than at load.
+	//
+	// Not every provider can do this. The one this repository recommends
+	// cannot, so a repository that wants retrieval names a second provider
+	// here and supplies its credential.
+	Embed *ModelSpec `yaml:"embed"`
+
 	// Routes choose the reviewing model per batch. The first route whose
 	// match holds wins; a batch no route matches is reviewed by the review
 	// model. Every model here overlays Default the way a role does, so a
@@ -353,6 +363,18 @@ func (m Models) ResolveEnsemble(r *Route) []ModelSpec {
 		out = append(out, m.Default.overlay(s))
 	}
 	return out
+}
+
+// ResolveEmbed returns the embedding model, and false when none is named.
+//
+// Like ResolveFix and unlike ResolveModel, it does not fall back to Default.
+// Overlaying a chat model's spec would produce a configuration that looks
+// complete and fails at the first embedding request.
+func (m Models) ResolveEmbed() (ModelSpec, bool) {
+	if m.Embed == nil {
+		return ModelSpec{}, false
+	}
+	return *m.Embed, true
 }
 
 // ResolveFix returns the model that edits code, and false when none is named.

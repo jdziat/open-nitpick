@@ -89,28 +89,9 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 		return nil, err
 	}
 
-	cfg := llms.Config{
-		Model:   strings.TrimSpace(spec.Model),
-		BaseURL: strings.TrimSpace(spec.BaseURL),
-		Timeout: spec.Timeout,
-		Extra:   spec.Extra,
-
-		// Opt-in only. Providers that target localhost by design (ollama,
-		// llamacpp) enable this themselves, so leaving it off here does not
-		// break the ordinary local-model path.
-		AllowPrivateIPs: spec.AllowPrivateEndpoint,
-		// The SDK split plain-HTTP from private-IP access in v5; the config
-		// documents allow_private_endpoint as granting both.
-		AllowHTTP: spec.AllowPrivateEndpoint,
-	}
-	// Credential resolution: the keystore and a secret manager before the
-	// environment, and the SDK's own conventional variable only when none of
-	// them said anything. See credential.go for the order and why.
-	switch key, ok, err := resolveCredential(ctx, spec, nil); {
-	case err != nil:
-		return nil, fmt.Errorf("model %s/%s: %w", spec.Provider, spec.Model, err)
-	case ok:
-		cfg.APIKey = key
+	cfg, err := providerConfig(ctx, spec)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := llms.New(spec.Provider, cfg)
@@ -429,3 +410,36 @@ const anthropicUnsetMaxTokens = 32768
 
 // Timeout returns the per-request timeout, or zero when unset.
 func (c *Client) Timeout() time.Duration { return c.Spec.Timeout }
+
+// providerConfig builds the SDK config for a spec, credential and all.
+//
+// Shared with the embedding client, which needs the same endpoint rules and
+// the same credential order and none of the chat machinery around them. Split
+// out rather than duplicated: a credential order that differs between two call
+// sites is one that will differ in the wrong direction eventually.
+func providerConfig(ctx context.Context, spec config.ModelSpec) (llms.Config, error) {
+	cfg := llms.Config{
+		Model:   strings.TrimSpace(spec.Model),
+		BaseURL: strings.TrimSpace(spec.BaseURL),
+		Timeout: spec.Timeout,
+		Extra:   spec.Extra,
+
+		// Opt-in only. Providers that target localhost by design (ollama,
+		// llamacpp) enable this themselves, so leaving it off here does not
+		// break the ordinary local-model path.
+		AllowPrivateIPs: spec.AllowPrivateEndpoint,
+		// The SDK split plain-HTTP from private-IP access in v5; the config
+		// documents allow_private_endpoint as granting both.
+		AllowHTTP: spec.AllowPrivateEndpoint,
+	}
+	// Credential resolution: the keystore and a secret manager before the
+	// environment, and the SDK's own conventional variable only when none of
+	// them said anything. See credential.go for the order and why.
+	switch key, ok, err := resolveCredential(ctx, spec, nil); {
+	case err != nil:
+		return llms.Config{}, fmt.Errorf("model %s/%s: %w", spec.Provider, spec.Model, err)
+	case ok:
+		cfg.APIKey = key
+	}
+	return cfg, nil
+}
