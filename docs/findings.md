@@ -1834,8 +1834,12 @@ evidence at all. Recall and noise per review, the same pair every arm here is
 scored on.
 
 Ship condition, written before the number: targeted must not cost recall, and
-must reduce noise by more than one plant-location, which `CorpusResolution`
-puts at 0.083. Anything smaller is inside what this instrument can resolve.
+must reduce noise by more than one finding per review. Noise is counted per
+review over the corpus's twelve fixtures, so one finding is 1/12 = 0.083 and
+anything smaller is inside what this instrument can resolve. Recall is the
+coarser of the two and is not the same number: `CorpusResolution` reports its
+step as 1/6 = 0.167, one defect over the six the corpus plants, so "must not
+cost recall" means no defect lost rather than a fraction of one.
 
 Kill condition, so the holding position expires: if that measurement has not
 run by the release after the one carrying this branch, the flag, the
