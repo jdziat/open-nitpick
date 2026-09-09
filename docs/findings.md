@@ -1668,3 +1668,63 @@ finds every plant, so there is nothing above it to reach.
 
 The lesson is narrower than "the SDK was wrong": a capability flag is metadata
 about a provider, and the only check worth trusting is a request.
+
+## Vectors cannot tell a finding from noise (2026-09-08)
+
+Asked whether the corpus and the embedder could classify a published finding as
+noise. Three mechanisms, three measurements, all negative, and the one number
+that looked positive was circular.
+
+The labels come from runs already recorded: a finding the keyword rule credited
+against a plant is real, one explaining no plant is noise. 291 findings across
+two corpora collected four days apart.
+
+### Similarity to the knowledge corpus
+
+| corpus the findings came from | real, mean cosine | noise, mean cosine | best single threshold | baseline |
+|---|---|---|---|---|
+| knowledge (12 fixtures) | 0.733 | 0.538 | **0.938** at cut 0.658 | 0.531 |
+| callers (6 fixtures) | 0.533 | 0.536 | 0.528 at cut 0.615 | 0.478 |
+
+The first row is the artifact. Every plant in the knowledge corpus has a
+matching entry by construction, because the entries were written first and the
+fixtures were written to need them. So "real finding" and "finding the corpus
+covers" are the same set there, and 0.938 measures that identity rather than
+any property of noise.
+
+The second row is the test that counts. On findings from a corpus the entries
+were not written for, real and noise sit 0.003 apart on a scale where a single
+fixture moves more than that, and the best threshold beats always-guessing by
+five points, which one run cannot distinguish from nothing.
+
+### Past labelled findings as the index
+
+Nearest-neighbour over 161 labelled findings from one corpus, classifying 130
+from the other:
+
+| k | accuracy |
+|---|---|
+| 1 | 0.492 |
+| 3 | 0.469 |
+| 5 | 0.485 |
+| always the majority class | **0.531** |
+
+Every k is worse than guessing. Not weakly informative, not marginal: a coin
+that always says "real" beats all three.
+
+### What this says, and what it does not
+
+An embedding of a finding's title carries what the finding is *about*, and
+being about a nil map is not evidence either way about whether this particular
+nil map is reachable. That is the thing a validator has to decide and the thing
+a vector does not encode.
+
+The measurement is on titles alone. A rationale, the diff hunk, and the
+surrounding code are all available and none was tried, so this rules out the
+cheap version rather than the idea. It also says nothing about a reranking
+model reading the finding and the code, which is a model call rather than a
+vector comparison and is what `internal/review/validate.go` already does.
+
+The retrieval feature keeps its own result: noise fell from 0.50 to 0.33 per
+review with retrieval on. That is context helping a model judge, not a vector
+judging on its own, and the difference is the whole of this section.
