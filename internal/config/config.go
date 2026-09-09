@@ -986,6 +986,9 @@ func (base ModelSpec) overlay(over ModelSpec) ModelSpec {
 	if over.StructuredOutput != "" {
 		out.StructuredOutput = over.StructuredOutput
 	}
+	if over.Reasoning != "" {
+		out.Reasoning = over.Reasoning
+	}
 	if over.MaxRetries != nil {
 		out.MaxRetries = over.MaxRetries
 	}

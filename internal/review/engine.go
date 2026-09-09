@@ -593,7 +593,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// here. A budget that bounded only the entries let a request estimated at
 	// 24,852 tokens reach the provider at 32,653.
 	plan, err := bundle.AssembleReserving(ctx, e.Config, files, fetch,
-		bundle.ListerFrom(e.Provider, ref), bundle.Reserve{Tokens: e.framingTokens()})
+		bundle.ListerFrom(e.Provider, ref), bundle.Reserve{Tokens: e.framingTokens(pr)})
 	if err != nil {
 		return nil, fmt.Errorf("assemble review: %w", err)
 	}
@@ -2153,17 +2153,25 @@ func firstPath(b bundle.Batch) string {
 
 // framingTokens estimates what a request carries besides its entries.
 //
-// The system prompt, plus an allowance for the pull request context and the
-// response schema, which are built later and are small and roughly constant
-// beside it. An estimate that is a little high costs a smaller batch; one that
-// is low costs a request the provider refuses, so this rounds the safe way.
-func (e *Engine) framingTokens() int {
+// The system prompt and the pull request context are both measured, because
+// both are known here and neither is bounded: a body is whatever its author
+// wrote, and a flat allowance for it is a number that is right until someone
+// writes a long one.
+//
+// The schema is the remaining allowance. It is generated from a fixed set of
+// classes and varies by a little, so a constant is honest about it in a way a
+// measurement of the wrong thing would not be. An estimate that is a little
+// high costs a smaller batch; one that is low costs a request the provider
+// refuses, so this rounds the safe way.
+func (e *Engine) framingTokens(pr *vcs.PullRequest) int {
 	base, err := e.reviewPrompt()
 	if err != nil {
 		// A prompt that will not build fails later with a better message than
 		// anything this function could give. Reserve nothing and let it.
 		return 0
 	}
-	const schemaAndContext = 1500
-	return llms.DefaultTokenEstimator().EstimateTokens(base) + schemaAndContext
+	const schemaAllowance = 1200
+
+	est := llms.DefaultTokenEstimator()
+	return est.EstimateTokens(base) + est.EstimateTokens(pullRequestContext(pr)) + schemaAllowance
 }

@@ -2,6 +2,7 @@ package bundle
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
@@ -76,4 +77,51 @@ func hunked(path string) *diff.File {
 			},
 		}},
 	}
+}
+
+// The reserve bounds a single entry, not only a batch of them.
+//
+// Reserving at packing alone let one file be fitted to the whole budget and
+// then sent with the system prompt on top, which is the one-batch case issue
+// #81 measured.
+func TestTheReserveBoundsASingleEntry(t *testing.T) {
+	body := strings.Repeat("func f() { _ = 1 }\n", 400)
+	fetch := func(_ context.Context, _ string) ([]byte, error) { return []byte(body), nil }
+
+	cfg := config.Defaults()
+	cfg.Review.TokenBudgetPerRequest = 3000
+	cfg.Review.IncludeFullFiles = true
+	cfg.Review.RelatedContext = false
+
+	// Modified rather than added: an added file renders diff-only, so its
+	// content would cost nothing and the budget would never bind.
+	modified := hunked("a.go")
+	modified.Kind = diff.ChangeModified
+	files := diff.Files{modified}
+
+	plain, err := AssembleReserving(context.Background(), cfg, files, fetch, nil, Reserve{})
+	if err != nil {
+		t.Fatalf("AssembleReserving: %v", err)
+	}
+	held, err := AssembleReserving(context.Background(), cfg, files, fetch, nil, Reserve{Tokens: 2500})
+	if err != nil {
+		t.Fatalf("AssembleReserving: %v", err)
+	}
+
+	got := tokensOf(t, held)
+	if want := tokensOf(t, plain); got >= want {
+		t.Errorf("entry cost %d tokens with 2500 reserved and %d with none; "+
+			"the reserve did not reach the fitting", got, want)
+	}
+	if got > 500 {
+		t.Errorf("entry cost %d tokens against a 3000 budget with 2500 reserved", got)
+	}
+}
+
+func tokensOf(t *testing.T, p *Plan) int {
+	t.Helper()
+	if len(p.Batches) == 0 || len(p.Batches[0].Entries) == 0 {
+		t.Fatal("plan has no entry to measure")
+	}
+	return p.Batches[0].Entries[0].Tokens
 }

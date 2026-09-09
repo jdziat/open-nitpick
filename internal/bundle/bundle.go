@@ -214,6 +214,19 @@ func AssembleReserving(ctx context.Context, cfg *config.Config, files diff.Files
 	plan := &Plan{}
 	estimator := llms.DefaultTokenEstimator()
 
+	// The budget the entries actually get, after the framing that travels with
+	// them. Computed here rather than at packing, because a single file is
+	// fitted against it too: reserving only at packing let one entry fill the
+	// whole budget and then be sent with the system prompt on top, which is
+	// the one-batch case issue #81 measured.
+	//
+	// Floored rather than allowed to reach zero. A reserve larger than the
+	// budget is a misconfiguration, and answering it by reviewing nothing
+	// would turn a bad number into no review at all.
+	perBatch := max(1, cfg.Review.TokenBudgetPerRequest-reserve.Tokens)
+	plan.BudgetPerBatch = perBatch
+	plan.FramingReserved = reserve.Tokens
+
 	var related *relatedCollector
 	if cfg.Review.RelatedContext && fetch != nil {
 		related = newRelatedCollector(ctx, files, fetch, list)
@@ -276,7 +289,7 @@ func AssembleReserving(ctx context.Context, cfg *config.Config, files diff.Files
 		// answer is a narrower window rather than no content: the byte cap
 		// bounds what is held, the token budget bounds what is sent, and
 		// neither is allowed to decide what is understood on its own.
-		if reason := fitEntry(&entry, cfg.Review.TokenBudgetPerRequest, cfg.Review.MaxFileBytes, estimator); reason != "" {
+		if reason := fitEntry(&entry, perBatch, cfg.Review.MaxFileBytes, estimator); reason != "" {
 			if entry.Truncated {
 				plan.Windowed = append(plan.Windowed, Skip{Path: f.Path, Reason: reason})
 			} else {
@@ -287,7 +300,7 @@ func AssembleReserving(ctx context.Context, cfg *config.Config, files diff.Files
 		// After fitEntry, so the file's own window is decided first and the related
 		// context takes only what the request has left, never the other way round.
 		if related != nil {
-			budget := min(cfg.Review.RelatedContextTokens, cfg.Review.TokenBudgetPerRequest-entry.Tokens)
+			budget := min(cfg.Review.RelatedContextTokens, perBatch-entry.Tokens)
 			entry.Tokens += related.collect(&entry, budget, estimator)
 			for _, r := range entry.Related {
 				plan.RelatedDefinitions++
@@ -300,13 +313,6 @@ func AssembleReserving(ctx context.Context, cfg *config.Config, files diff.Files
 		entries = append(entries, entry)
 	}
 
-	// The budget the entries actually get, after the framing that travels with
-	// them. Floored rather than allowed to go negative or to zero: a reserve
-	// larger than the budget is a misconfiguration, and answering it by
-	// batching nothing would turn a bad number into no review at all.
-	perBatch := max(1, cfg.Review.TokenBudgetPerRequest-reserve.Tokens)
-	plan.BudgetPerBatch = perBatch
-	plan.FramingReserved = reserve.Tokens
 	plan.Batches = batch(entries, cfg.Review.MaxFilesPerRequest, perBatch)
 	return plan, nil
 }

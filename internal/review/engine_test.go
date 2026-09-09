@@ -822,3 +822,26 @@ func TestTheStylePassRunsBesideTheReview(t *testing.T) {
 		t.Errorf("peak in-flight calls = %d, above review.concurrency of 4", peak)
 	}
 }
+
+// A long pull request body is measured, not allowed for.
+//
+// The body is whatever its author wrote, so a flat allowance is a number that
+// is right until someone writes a long one, and the budget it protects is what
+// keeps a request inside the model's input window.
+func TestTheFramingReserveGrowsWithThePullRequestBody(t *testing.T) {
+	engine := newEngine(t, &scriptedLLM{fallback: `{"findings":[]}`}, &stubProvider{diff: engineDiff}, nil)
+
+	short := engine.framingTokens(&vcs.PullRequest{Title: "t", Body: "short"})
+	long := engine.framingTokens(&vcs.PullRequest{
+		Title: "t",
+		Body:  strings.Repeat("a paragraph of release notes nobody trimmed. ", 400),
+	})
+
+	if long <= short {
+		t.Errorf("a long body reserved %d tokens and a short one %d; the body is not being measured", long, short)
+	}
+	// And a nil pull request is not a panic: the local driver has none.
+	if engine.framingTokens(nil) <= 0 {
+		t.Error("a run with no pull request reserved nothing for its system prompt")
+	}
+}
