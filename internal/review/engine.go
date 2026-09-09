@@ -374,6 +374,15 @@ type Report struct {
 	// configuration instead of through a failure.
 	Budget *Fit
 
+	// Knowledge is what retrieval did on this run: off, active, skipped or
+	// failed, with the counts behind it.
+	//
+	// On the report rather than the log because a measurement reads reports.
+	// An arm whose embedder refused every batch produced a review without
+	// retrieval, and scoring it as the retrieval-on treatment measures the
+	// control twice.
+	Knowledge KnowledgeStatus
+
 	// Escalated records the batches a fallback model reviewed after the
 	// primary could not, so a reader can tell which findings came from which
 	// model. Silence here would put a weaker model's findings beside a
@@ -613,6 +622,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	if len(plan.Batches) == 0 {
 		e.log().Info("nothing to review")
 		report.Counts = counts(nil)
+		report.Knowledge = e.Knowledge.Status()
 		return report, e.publish(ctx, ref, report, files)
 	}
 
@@ -765,6 +775,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	report.Findings = findings
 	report.Summary = summary
 	report.Counts = counts(findings)
+	// Read after every batch, so the counts are the run's and not a snapshot
+	// taken before retrieval was asked for anything.
+	report.Knowledge = e.Knowledge.Status()
 
 	// The report is returned WITH a publish error rather than instead of it: by
 	// this point the review has happened and been paid for, and a caller that

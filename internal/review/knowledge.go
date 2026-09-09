@@ -61,6 +61,10 @@ func (e *Engine) retrieveKnowledge(ctx context.Context, b bundle.Batch, style bo
 	}
 	hits, err := e.Knowledge.ForBatch(ctx, b)
 	if err != nil {
+		// Still nothing rather than an error: the review worked before
+		// retrieval existed and must survive its provider. The count is what
+		// changed, so the report can say the arm did not run clean instead of
+		// the log saying it once into a file nobody scores.
 		e.log().Warn("knowledge retrieval failed; reviewing without it", "error", err)
 		return nil
 	}
@@ -71,6 +75,28 @@ func (e *Engine) retrieveKnowledge(ctx context.Context, b bundle.Batch, style bo
 // depend on how retrieval is configured.
 type KnowledgeRetriever struct {
 	R *knowledge.Retriever
+
+	// status is what construction settled: the model, the entry count and,
+	// when retrieval never got as far as answering, why.
+	status KnowledgeStatus
+	counts counters
+}
+
+// Status is what retrieval did, for the report.
+//
+// A nil retriever is off rather than a missing answer: the review ran, and
+// nobody asked retrieval for anything.
+func (k *KnowledgeRetriever) Status() KnowledgeStatus {
+	if k == nil {
+		return KnowledgeStatus{State: KnowledgeOff}
+	}
+	out := k.status
+	out.Queries, out.Failures = k.counts.read()
+	if out.Failures > 0 && out.State == KnowledgeActive {
+		out.State = KnowledgeFailed
+		out.Reason = "the embedder refused one or more batches"
+	}
+	return out
 }
 
 // ForBatch retrieves against a batch's diffs.
@@ -104,7 +130,13 @@ func (k *KnowledgeRetriever) ForBatch(ctx context.Context, b bundle.Batch) ([]kn
 	if q.Len() == 0 {
 		return nil, nil
 	}
-	return k.R.Retrieve(ctx, q.String(), knowledge.LanguagesOf(paths))
+	k.counts.query()
+	hits, err := k.R.Retrieve(ctx, q.String(), knowledge.LanguagesOf(paths))
+	if err != nil {
+		k.counts.failure()
+		return nil, err
+	}
+	return hits, nil
 }
 
 // ids names the retrieved entries for the log, so a review that consulted the

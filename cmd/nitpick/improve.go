@@ -9,6 +9,7 @@ import (
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/converse"
+	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
@@ -64,11 +65,25 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs
 	// wants the whole change looked at, and wants no threads touched.
 	held := &heldReview{inner: gh}
 
+	// Retrieval, on the defect pass only. The style pass declines it inside
+	// the engine: it re-reviews the same batches with a style prompt, and a
+	// corpus about correctness defects handed to a style reviewer buys a
+	// second embedding call per batch and nothing else.
+	//
+	// Fatal on a construction error, matching every other command: the
+	// operator asked for retrieval, so a broken embedder is a configuration
+	// answer rather than a review that quietly did less than it said.
+	k, status, err := review.BuildKnowledge(ctx, &icfg, knowledge.IndexJSON(), log)
+	if err != nil {
+		return fmt.Errorf("knowledge retrieval (%s): %w", status.Reason, err)
+	}
+
 	engine := &review.Engine{
-		Config:   &icfg,
-		Roles:    roles,
-		Provider: held,
-		Log:      log,
+		Config:    &icfg,
+		Roles:     roles,
+		Provider:  held,
+		Log:       log,
+		Knowledge: k,
 		// Linters stays nil. The analyzers are deterministic and the ordinary
 		// review already ran them; a second run would spend time to publish
 		// what is already on the pull request.

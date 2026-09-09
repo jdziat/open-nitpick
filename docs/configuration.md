@@ -426,6 +426,20 @@ entry added without regenerating fails the build that added it rather than
 being silently unreachable. An index built by one embedding model refuses a
 query from another, because vectors from two models are not comparable.
 
+Every reviewing command reads it: `review`, `full-review`, `slop`, the MCP
+review tools and `improve`'s defect pass. Retrieval was wired per command until
+2026-09-08 and only `review` had it, so the same setting meant different things
+depending on what you ran; a test now fails the build if a command builds a
+review engine without it.
+
+A misconfigured embedder stops the run rather than reviewing quietly without
+retrieval, because asking for it and not getting it is a question about the
+configuration. A failure once the review is under way costs that batch its
+extra context and nothing else, and the report records what retrieval did: off,
+active, skipped (something to fix, such as no `models.embed`) or failed (an
+embedder that should have worked). A measurement reads that field, so a run
+whose embedder refused its batches is never scored as the retrieval-on arm.
+
 It ships off. On its own corpus it took recall from 0.75 to 1.00 with noise
 falling from 0.50 to 0.33 per review
 ([Findings](findings.md#retrieved-knowledge-and-a-pre-registration-i-got-wrong-2026-09-08)),

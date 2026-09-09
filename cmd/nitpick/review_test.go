@@ -248,7 +248,10 @@ func TestTheReviewEngineIsWiredAgainstTheChangesOwnPolicy(t *testing.T) {
 		t.Fatalf("loadConfig: %v", err)
 	}
 
-	engine := newEngine(&reviewFlags{}, repo, cfg, vcs.NewLocal(repo, io.Discard), slog.New(slog.DiscardHandler))
+	engine, err := newEngine(context.Background(), &reviewFlags{}, repo, cfg, vcs.NewLocal(repo, io.Discard), slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatalf("newEngine: %v", err)
+	}
 
 	if engine.Policy == nil {
 		t.Fatal("no policy resolver: a change that edits .nitpick.yaml is reviewed under its own configuration")

@@ -127,7 +127,10 @@ func treeReview(ctx context.Context, f *reviewFlags, paths []string, budget int,
 	ref := vcs.Ref{Head: vcs.Worktree}
 
 	log.Info("reviewing the tree", "repo", repo, "paths", strings.Join(paths, ","), "budget", budget)
-	engine := newEngine(f, repo, cfg, tree, log)
+	engine, err := newEngine(ctx, f, repo, cfg, tree, log)
+	if err != nil {
+		return nil, nil, err
+	}
 	// A pull request may not supply the policy it is reviewed under, so the
 	// engine normally re-reads .nitpick.yaml from the base revision when the
 	// change touches it. A tree review "changes" every file, that one
