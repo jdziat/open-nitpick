@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.0.0](https://github.com/jdziat/open-nitpick/compare/v1.12.0...v2.0.0) (2026-09-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **fence:** linters.trusted and review.knowledge_index are ignored when they come from a repository's own .nitpick.yaml. Neither names a file, which is the argument the rest of the linters block relies on: linters.trusted is the only gate on the analyzers that run the tree's own code, and knowledge_index is a path this process opens. Move either to the user-level file, which on a runner is named with NITPICK_USER_CONFIG, or set NITPICK_TRUST_CONFIG_ENDPOINTS=1. Both are named in the log, in explain-config and on the pull request.
+
+### Features
+
+* **config:** an opt-in for keys a newer nitpick added ([#94](https://github.com/jdziat/open-nitpick/issues/94)) ([ffbad30](https://github.com/jdziat/open-nitpick/commit/ffbad3083bb9ae180c80a3843e69dd51ac7d8a70))
+* **review:** findings carry what the reviewer read, and version-gated entries ([#91](https://github.com/jdziat/open-nitpick/issues/91)) ([1d1b2ba](https://github.com/jdziat/open-nitpick/commit/1d1b2ba2172dd496f59dfab50b9dea210e28d3df))
+
+
+### Fixes
+
+* **fence:** one marker vocabulary, and a marker per request where it is written back ([#96](https://github.com/jdziat/open-nitpick/issues/96)) ([7c643c6](https://github.com/jdziat/open-nitpick/commit/7c643c6d475c0ae8adbf01418e70df8fa9b2ca08))
+* **review:** triage answers by number, so a finding keeps its metadata ([#97](https://github.com/jdziat/open-nitpick/issues/97)) ([74c1e9b](https://github.com/jdziat/open-nitpick/commit/74c1e9b2e338e05d6876895bcae740844e546bea))
+
 ## [1.12.0](https://github.com/jdziat/open-nitpick/compare/v1.11.2...v1.12.0) (2026-09-09)
 
 
