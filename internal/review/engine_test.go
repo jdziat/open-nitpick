@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
@@ -33,6 +34,10 @@ type scriptedLLM struct {
 	// err, when set, fails every call.
 	err error
 
+	// onCall, when set, runs for every request before the answer is chosen. It
+	// exists so a test can observe how many calls are in flight at once.
+	onCall func()
+
 	// seen records every prompt sent, so a test can assert on what the model
 	// was TOLD. Asserting only on what came back would pass against a
 	// prompt still carrying an injection the model happened to ignore.
@@ -42,6 +47,15 @@ type scriptedLLM struct {
 }
 
 func (s *scriptedLLM) GenerateContent(_ context.Context, msgs []llms.Message, _ ...llms.CallOption) (*llms.Response, error) {
+	// Outside the lock, because the lock serialises every call and a hook
+	// counting requests in flight would then always see one.
+	s.mu.Lock()
+	hook := s.onCall
+	s.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -763,5 +777,71 @@ func TestPublishedProseIsScrubbed(t *testing.T) {
 	}
 	if strings.HasPrefix(report.Summary, "Sure!") || strings.Contains(report.Summary, "actually") {
 		t.Errorf("summary = %q", report.Summary)
+	}
+}
+
+// The style pass runs beside the defect review, not after it.
+//
+// It reads the plan and not the findings, so nothing in it depended on the
+// review it used to wait for. Issue #81, cause 4: a one-batch change could not
+// use its configured concurrency because every stage was serial.
+func TestTheStylePassRunsBesideTheReview(t *testing.T) {
+	var (
+		mu       sync.Mutex
+		inFlight int
+		peak     int
+	)
+	model := &scriptedLLM{fallback: `{"findings":[]}`, onCall: func() {
+		mu.Lock()
+		inFlight++
+		if inFlight > peak {
+			peak = inFlight
+		}
+		mu.Unlock()
+		time.Sleep(20 * time.Millisecond)
+		mu.Lock()
+		inFlight--
+		mu.Unlock()
+	}}
+
+	engine := newEngine(t, model, &stubProvider{diff: engineDiff}, nil)
+	engine.Config.Persona.Nitpick = config.NitpickPedantic
+	engine.Config.Review.Concurrency = 4
+
+	if _, err := engine.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if peak < 2 {
+		t.Errorf("peak in-flight calls = %d, want the style pass overlapping the review", peak)
+	}
+	// And the shared bound holds: two semaphores would have allowed eight.
+	if peak > 4 {
+		t.Errorf("peak in-flight calls = %d, above review.concurrency of 4", peak)
+	}
+}
+
+// A long pull request body is measured, not allowed for.
+//
+// The body is whatever its author wrote, so a flat allowance is a number that
+// is right until someone writes a long one, and the budget it protects is what
+// keeps a request inside the model's input window.
+func TestTheFramingReserveGrowsWithThePullRequestBody(t *testing.T) {
+	engine := newEngine(t, &scriptedLLM{fallback: `{"findings":[]}`}, &stubProvider{diff: engineDiff}, nil)
+
+	short := engine.framingTokens(&vcs.PullRequest{Title: "t", Body: "short"})
+	long := engine.framingTokens(&vcs.PullRequest{
+		Title: "t",
+		Body:  strings.Repeat("a paragraph of release notes nobody trimmed. ", 400),
+	})
+
+	if long <= short {
+		t.Errorf("a long body reserved %d tokens and a short one %d; the body is not being measured", long, short)
+	}
+	// And a nil pull request is not a panic: the local driver has none.
+	if engine.framingTokens(nil) <= 0 {
+		t.Error("a run with no pull request reserved nothing for its system prompt")
 	}
 }

@@ -166,6 +166,11 @@ Provider names the vendor or gateway the call goes to. "nitpick providers" print
 list of string, default `none`.
 Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
 
+### `models.default.reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
 ### `models.default.structured_output`
 
 string, default `auto`.
@@ -240,6 +245,11 @@ Provider names the vendor or gateway the call goes to. "nitpick providers" print
 
 list of string, default `none`.
 Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
+
+### `models.embed.reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.embed.structured_output`
 
@@ -316,6 +326,11 @@ Provider names the vendor or gateway the call goes to. "nitpick providers" print
 list of string, default `none`.
 Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
 
+### `models.ensemble[].reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
 ### `models.ensemble[].structured_output`
 
 string, default `auto`.
@@ -390,6 +405,11 @@ Provider names the vendor or gateway the call goes to. "nitpick providers" print
 
 list of string, default `none`.
 Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
+
+### `models.fix.reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.fix.structured_output`
 
@@ -466,6 +486,11 @@ Provider names the vendor or gateway the call goes to. "nitpick providers" print
 list of string, default `none`.
 Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
 
+### `models.review.reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
 ### `models.review.structured_output`
 
 string, default `auto`.
@@ -541,6 +566,11 @@ Provider names the vendor or gateway the call goes to. "nitpick providers" print
 list of string, default `none`.
 Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
 
+### `models.router.reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
 ### `models.router.structured_output`
 
 string, default `auto`.
@@ -615,6 +645,11 @@ Provider names the vendor or gateway the call goes to. "nitpick providers" print
 
 list of string, default `none`.
 Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
+
+### `models.routes[].ensemble[].reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.routes[].ensemble[].structured_output`
 
@@ -716,6 +751,11 @@ Provider names the vendor or gateway the call goes to. "nitpick providers" print
 list of string, default `none`.
 Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
 
+### `models.routes[].review.reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
 ### `models.routes[].review.structured_output`
 
 string, default `auto`.
@@ -791,6 +831,11 @@ Provider names the vendor or gateway the call goes to. "nitpick providers" print
 list of string, default `none`.
 Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
 
+### `models.triage.reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
 ### `models.triage.structured_output`
 
 string, default `auto`.
@@ -865,6 +910,11 @@ Provider names the vendor or gateway the call goes to. "nitpick providers" print
 
 list of string, default `none`.
 Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
+
+### `models.validate.reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.validate.structured_output`
 

@@ -172,6 +172,13 @@ func (s ModelSpec) validate(required bool) []error {
 		errs = append(errs, fmt.Errorf("unknown structured_output %q (want auto, schema, or json)", s.StructuredOutput))
 	}
 
+	switch s.Reasoning {
+	case "", ReasoningMinimal, ReasoningLow, ReasoningMedium, ReasoningHigh, ReasoningOff:
+	default:
+		errs = append(errs, fmt.Errorf("unknown reasoning %q (want %s)",
+			s.Reasoning, strings.Join(ReasoningLevels(), ", ")))
+	}
+
 	if s.BaseURL != "" {
 		if !strings.Contains(s.BaseURL, "://") {
 			errs = append(errs, fmt.Errorf("base_url %q must include a scheme", s.BaseURL))

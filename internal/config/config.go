@@ -136,6 +136,21 @@ type ModelSpec struct {
 	// schema rides in the prompt and the reply is parsed leniently.
 	StructuredOutput StructuredMode `yaml:"structured_output"`
 
+	// Reasoning bounds how much a reasoning model thinks before it answers:
+	// "minimal", "low", "medium", "high", or "off" to ask for none.
+	//
+	// Unset leaves the model's own default, which is the shipped behaviour and
+	// the only setting any measurement here was taken under. A review that
+	// spent 21,423 reasoning tokens to produce 443 tokens of findings is the
+	// case this exists for, and the tradeoff is visible rather than chosen for
+	// an operator: less reasoning is faster and cheaper, and nothing here has
+	// measured what it costs in recall.
+	//
+	// Providers differ in what they can honour. One that takes a token budget
+	// gets one derived from the level, one with a boolean switch gets the
+	// switch, and one with neither ignores it.
+	Reasoning ReasoningLevel `yaml:"reasoning"`
+
 	// AllowPrivateEndpoint permits base_url to use plain HTTP or resolve to a
 	// loopback or private address.
 	//
@@ -1005,6 +1020,9 @@ func (base ModelSpec) overlay(over ModelSpec) ModelSpec {
 	if over.StructuredOutput != "" {
 		out.StructuredOutput = over.StructuredOutput
 	}
+	if over.Reasoning != "" {
+		out.Reasoning = over.Reasoning
+	}
 	if over.MaxRetries != nil {
 		out.MaxRetries = over.MaxRetries
 	}
@@ -1040,3 +1058,27 @@ func (c *Config) Ignored(path string) bool {
 	}
 	return false
 }
+
+// ReasoningLevel is how much a reasoning model is asked to think.
+type ReasoningLevel string
+
+// The levels, and the one that asks for no reasoning at all.
+const (
+	ReasoningMinimal ReasoningLevel = "minimal"
+	ReasoningLow     ReasoningLevel = "low"
+	ReasoningMedium  ReasoningLevel = "medium"
+	ReasoningHigh    ReasoningLevel = "high"
+	ReasoningOff     ReasoningLevel = "off"
+)
+
+// ReasoningLevels reports what models.*.reasoning accepts, for the generated
+// reference and the validator.
+func ReasoningLevels() []string {
+	return []string{
+		string(ReasoningMinimal), string(ReasoningLow), string(ReasoningMedium),
+		string(ReasoningHigh), string(ReasoningOff),
+	}
+}
+
+// ReasoningValues reports the same, for the generated reference.
+func (m ModelSpec) ReasoningValues() []string { return ReasoningLevels() }

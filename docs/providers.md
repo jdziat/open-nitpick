@@ -449,6 +449,26 @@ largest. The default of 3 is not a small number in that arithmetic. This was bui
 OpenRouter, which lost one review in five without it and none with it; the
 numbers are in [Against Incumbent](comparison.md).
 
+A reasoning model decides for itself how long to think, and that decision is
+most of the wall clock on a slow review. One measured run spent 21,423
+reasoning tokens producing 443 tokens of findings, 298 seconds for a request
+that answered in one attempt.
+
+```yaml
+models:
+  default:
+    provider: synthetic
+    model: hf:moonshotai/Kimi-K3
+    reasoning: low     # minimal, low, medium, high, or off
+```
+
+Unset is the shipped behaviour and the only setting anything in
+[Findings](findings.md) was measured under, so this is a knob rather than a
+recommendation: less reasoning is faster and cheaper, and nothing here has
+measured what it costs in recall. Providers honour what they can. One that
+takes a token budget gets one derived from the level, one with a thinking
+switch gets the switch, and one with neither ignores it.
+
 A provider can also refuse the shape of the answer rather than the request.
 `structured_output: auto` asks for a JSON-Schema response format, drops to
 JSON mode when the provider rejects that, and drops once more to carrying the
