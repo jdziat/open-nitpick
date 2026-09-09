@@ -70,6 +70,15 @@ func TestACitationThatWasNotShownIsDropped(t *testing.T) {
 	if got := citation("GO-DEFER-IN-LOOP", shown); got != "go-defer-in-loop" {
 		t.Errorf("citation = %q, want the id as the corpus spells it", got)
 	}
+	// The form the prompt asks for. Entries render as "[id] Title" and both the
+	// schema and the contract say to return the bracketed id, so a model doing
+	// as it was told must not be read as having invented a source.
+	if got := citation("[go-defer-in-loop]", shown); got != "go-defer-in-loop" {
+		t.Errorf("citation = %q for the bracketed form the prompt requests", got)
+	}
+	if got := citation(" [ go-defer-in-loop ] ", shown); got != "go-defer-in-loop" {
+		t.Errorf("citation = %q, want whitespace inside the brackets tolerated", got)
+	}
 	if got := citation("cwe-489-invented", shown); got != "" {
 		t.Errorf("citation = %q, want empty: that entry was never shown", got)
 	}

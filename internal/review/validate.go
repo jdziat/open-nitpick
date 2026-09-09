@@ -437,6 +437,12 @@ func (v *Validator) cited(f Finding) []knowledge.Entry {
 // nobody can follow, which is worse than none: the whole reason findings carry
 // evidence is that a reader can go and look.
 func citation(said string, shown []knowledge.Entry) string {
+	// Brackets trimmed, because the entries render as "[id] Title" and both
+	// the schema and the contract ask for the bracketed id. A model that does
+	// as it was told must not fail the check: the verdict is demoted on a
+	// failure, so this would publish a correctly cited refutation as though
+	// the expert had invented its source.
+	said = strings.Trim(strings.TrimSpace(said), "[]")
 	said = strings.TrimSpace(said)
 	if said == "" {
 		return ""
