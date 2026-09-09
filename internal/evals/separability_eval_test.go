@@ -95,7 +95,15 @@ func TestKnowledgeSimilaritySeparatesNoise(t *testing.T) {
 	var real, noise []float64
 	for i, r := range rows {
 		hits, err := ix.Nearest(vecs[i], entries, 1)
-		if err != nil || len(hits) == 0 {
+		if err != nil {
+			// Fatal, not skipped. A dimension mismatch drops every row, and
+			// the run then reports n=0, a NaN mean and a threshold computed
+			// over nothing, which reads as a measurement. Two embedders ship
+			// here at 768 and 1536 dimensions, so the mismatch is one command
+			// away.
+			t.Fatalf("Nearest: %v", err)
+		}
+		if len(hits) == 0 {
 			continue
 		}
 		if r.Matched {
