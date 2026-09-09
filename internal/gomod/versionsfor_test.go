@@ -103,3 +103,29 @@ func TestASymlinkCannotEscapeTheCheckout(t *testing.T) {
 		t.Errorf("VersionsFor through a symlink = %v, want nothing", got)
 	}
 }
+
+// A submodule whose go.mod does not parse answers nothing, not its parent's
+// version.
+//
+// LanguageVersion cannot say whether a file is absent or unreadable, so
+// without this the walk continues upward and hands the root's version to a
+// module that declares something else. Keeping every entry is the answer for a
+// module nothing is known about.
+func TestAnUnreadableSubmoduleDoesNotInheritItsParent(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "go.mod"), "module example.com/x\n\ngo 1.25\n")
+	if err := os.MkdirAll(filepath.Join(root, "sub"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	// A stray closing paren, which LanguageVersion refuses rather than guess
+	// at. The file does not load for the go tool either.
+	write(t, filepath.Join(root, "sub", "go.mod"), "module example.com/x/sub\n)\n\ngo 1.21\n")
+
+	if got := VersionsFor(root, []string{"sub/a.go"}); got != nil {
+		t.Errorf("VersionsFor = %v, want nothing rather than the root's version", got)
+	}
+	if got := VersionsFor(root, []string{"a.go"})["go"]; got != "1.25" {
+		t.Errorf("the root still answers %q, want 1.25", got)
+	}
+}

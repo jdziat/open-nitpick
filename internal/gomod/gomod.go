@@ -155,8 +155,17 @@ func moduleDir(repoRoot, rel string) (string, bool) {
 	}
 
 	for {
-		if _, _, ok := LanguageVersion(filepath.Join(dir, "go.mod")); ok {
+		mod := filepath.Join(dir, "go.mod")
+		if _, _, ok := LanguageVersion(mod); ok {
 			return dir, true
+		}
+		// A go.mod that is here and unreadable ends the search rather than
+		// handing the parent's version to this module's files. That is the
+		// confident wrong answer this package exists to avoid: a submodule
+		// whose go.mod does not parse is a module nothing is known about, and
+		// nothing known keeps every entry.
+		if _, err := os.Stat(mod); err == nil {
+			return "", false
 		}
 		if dir == root {
 			return "", false
