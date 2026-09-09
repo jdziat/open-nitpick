@@ -42,9 +42,6 @@ func whileWaiting(ctx context.Context, log *slog.Logger, stage, model string, ev
 		t := time.NewTicker(every)
 		defer t.Stop()
 
-		// A second ctx check inside the tick arm was tried and removed. The
-		// arm above returns on the first pass once the context is done, before
-		// any tick, so the extra check never ran and no test could reach it.
 		started := time.Now()
 		for {
 			select {
@@ -53,6 +50,19 @@ func whileWaiting(ctx context.Context, log *slog.Logger, stage, model string, ev
 			case <-ctx.Done():
 				return
 			case now := <-t.C:
+				// Checked again, because select picks uniformly among ready
+				// cases: a run cancelled a moment before a tick leaves both
+				// arms ready and would otherwise print one more line about a
+				// request nobody is waiting for.
+				//
+				// Deliberately untested. Without this the outer arm still wins
+				// within an iteration or two, so the difference is roughly one
+				// line either way and no test can separate them; with it the
+				// bound is exact. Kept because it is two lines and states the
+				// intent, not because a guard holds it.
+				if ctx.Err() != nil {
+					return
+				}
 				log.Info("still waiting on the model",
 					"stage", stage,
 					"model", model,
