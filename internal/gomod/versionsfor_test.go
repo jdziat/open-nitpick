@@ -129,3 +129,27 @@ func TestAnUnreadableSubmoduleDoesNotInheritItsParent(t *testing.T) {
 		t.Errorf("the root still answers %q, want 1.25", got)
 	}
 }
+
+// A go.mod with no module directive is not a module.
+//
+// LanguageVersion answers 1.16 for it, which is the go tool's assumption and
+// what the linter roster's coverage note needs. A knowledge entry bounded to a
+// version must not be judged against a number read out of a file the go tool
+// would refuse, so retrieval abstains and keeps every entry.
+func TestAFileWithNoModuleDirectiveIsNotAModule(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "go.mod"), "go 1.21\n")
+
+	if got := Versions(dir); got != nil {
+		t.Errorf("Versions = %v, want nothing", got)
+	}
+	// The measured fallback is untouched, because the linter roster reads it.
+	if _, _, ok := LanguageVersion(filepath.Join(dir, "go.mod")); !ok {
+		t.Error("LanguageVersion stopped answering; that reading is the roster's, not retrieval's")
+	}
+
+	write(t, filepath.Join(dir, "go.mod"), "module example.com/x\n\ngo 1.21\n")
+	if got := Versions(dir)["go"]; got != "1.21" {
+		t.Errorf("Versions = %q, want 1.21", got)
+	}
+}

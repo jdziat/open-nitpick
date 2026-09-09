@@ -95,7 +95,18 @@ func Versions(repoRoot string) map[string]string {
 		// against whatever module the binary happens to be run from.
 		return nil
 	}
-	declared, _, ok := LanguageVersion(filepath.Join(repoRoot, "go.mod"))
+	mod := filepath.Join(repoRoot, "go.mod")
+	// A file with no `module` directive is not a loadable module, whatever
+	// else it holds. LanguageVersion still answers for it, because the go
+	// tool's assumed version is what the linter roster's coverage note needs
+	// and that reading is measured (docs/runner-notes.md#assumedlanguage).
+	// Here the question is different: an entry bounded to a version must not
+	// be judged against a number that came from a file the go tool would
+	// refuse, so this abstains and the caller keeps every entry.
+	if !declaresModule(mod) {
+		return nil
+	}
+	declared, _, ok := LanguageVersion(mod)
 	if !ok {
 		return nil
 	}
@@ -187,4 +198,27 @@ func resolved(p string) string {
 		return real
 	}
 	return p
+}
+
+// declaresModule reports whether a go.mod carries a top-level module
+// directive, which is what makes it a module rather than a file.
+func declaresModule(modFile string) bool {
+	src, err := os.ReadFile(modFile)
+	if err != nil {
+		return false
+	}
+	depth := 0
+	for _, raw := range strings.Split(string(src), "\n") {
+		if comment := strings.Index(raw, "//"); comment >= 0 {
+			raw = raw[:comment]
+		}
+		if fields := strings.Fields(raw); depth == 0 && len(fields) >= 2 && fields[0] == "module" {
+			return true
+		}
+		depth += strings.Count(raw, "(") - strings.Count(raw, ")")
+		if depth < 0 {
+			return false
+		}
+	}
+	return false
 }
