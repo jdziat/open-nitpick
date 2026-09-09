@@ -103,10 +103,22 @@ func TestTheOptInDoesNotSwallowATypeError(t *testing.T) {
 // A config file that could switch off the check on its own keys is the one
 // thing this must not be, which is why it is not a config key.
 func TestTheOptInIsNotAConfigKey(t *testing.T) {
-	root := writeConfig(t, "ignore_unknown_keys: true\nreview:\n  max_fils: 10\n")
+	// A valid models block, so the only thing that can fail this load is the
+	// decode. Without it the fixture fails validation and the test stays green
+	// whatever the key does.
+	root := writeConfig(t, "models:\n  default: {provider: openai, model: gpt-4o}\n"+
+		"ignore_unknown_keys: true\nreview:\n  max_fils: 10\n")
 
-	if _, err := Load(root); err == nil {
+	_, err := Load(root)
+	if err == nil {
 		t.Fatal("a config file granted itself the opt-in")
+	}
+	// And it failed for the right reason: the message is the unknown-key one,
+	// naming both the key that asked and the key it was trying to permit.
+	for _, want := range []string{"ignore_unknown_keys", "max_fils", EnvIgnoreUnknownKeys} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the failure never mentions %q, so it may not be the decode:\n%s", want, err)
+		}
 	}
 }
 
