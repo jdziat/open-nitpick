@@ -616,25 +616,46 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		return report, e.publish(ctx, ref, report, files)
 	}
 
-	findings, unreviewed, escalated, err := e.analyze(ctx, pr, plan)
+	// One bound across both passes. They run together below, and two
+	// semaphores would have let a pedantic review put twice review.concurrency
+	// requests in flight against a provider that was told four.
+	sem := make(chan struct{}, max(1, e.Config.Review.Concurrency))
+
+	// Pedantic wants findings the generation scope deliberately does not
+	// produce, and a filter can only narrow. They come from a separate pass so
+	// the defect hunt is never diluted by the style hunt.
+	//
+	// Concurrent with it, because the style pass reads the plan and not the
+	// defect findings: nothing in it depends on the review it used to wait
+	// for. Triage still follows both, and always will, since it summarises
+	// what they found.
+	var (
+		style    []Finding
+		styleErr error
+		styleWG  sync.WaitGroup
+	)
+	if e.Config.Persona.Nitpick.NeedsStylePass() {
+		styleWG.Add(1)
+		go func() {
+			defer styleWG.Done()
+			style, styleErr = e.analyzeStyle(ctx, pr, plan, sem)
+		}()
+	}
+
+	findings, unreviewed, escalated, err := e.analyze(ctx, pr, plan, sem)
+	styleWG.Wait()
 	if err != nil {
 		return nil, err
 	}
 	report.Incomplete = append(report.Incomplete, unreviewed...)
 	report.Escalated = append(report.Escalated, escalated...)
 
-	// Pedantic wants findings the generation scope deliberately does not
-	// produce, and a filter can only narrow. They come from a separate pass so
-	// the defect hunt above is never diluted by the style hunt.
-	if e.Config.Persona.Nitpick.NeedsStylePass() {
-		style, err := e.analyzeStyle(ctx, pr, plan)
-		if err != nil {
-			e.log().Warn("style pass failed; the review is complete for defects "+
-				"but style findings are missing", "error", err)
-			report.Stages = append(report.Stages, StageStatus{Stage: "style", Reason: errorKind(err)})
-		}
-		findings = append(findings, style...)
+	if styleErr != nil {
+		e.log().Warn("style pass failed; the review is complete for defects "+
+			"but style findings are missing", "error", styleErr)
+		report.Stages = append(report.Stages, StageStatus{Stage: "style", Reason: errorKind(styleErr)})
 	}
+	findings = append(findings, style...)
 
 	// Collected across every stage that can drop an analyzer finding, not just
 	// the first one. See the assembly below.
@@ -996,7 +1017,7 @@ func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publis
 //
 // A batch that fails does not fail the run: partial review output is far more
 // useful than none, and the failure is logged and surfaced rather than hidden.
-func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.Plan) ([]Finding, []string, []Escalation, error) {
+func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.Plan, sem chan struct{}) ([]Finding, []string, []Escalation, error) {
 	// Built once for the default reviewer so a prompt error surfaces before
 	// any batch runs; routed reviewers build theirs on first use.
 	if _, err := e.reviewPromptFor(e.Roles.Review); err != nil {
@@ -1019,8 +1040,7 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 		unreviewed []string
 		decisions  []RouteDecision
 
-		wg  sync.WaitGroup
-		sem = make(chan struct{}, max(1, e.Config.Review.Concurrency))
+		wg sync.WaitGroup
 	)
 
 	// Progress is logged per batch, since a review of a large change is
@@ -1123,7 +1143,7 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 // is never fatal: losing style nits is a far better outcome than losing the
 // review. Findings are forced to class=style so the filter cannot be bypassed
 // by a model that ignores the instruction.
-func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bundle.Plan) ([]Finding, error) {
+func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bundle.Plan, sem chan struct{}) ([]Finding, error) {
 	p, err := prompt.Build(prompt.NameReview, prompt.Options{
 		PersonaText: prompt.StylePass(e.Config.Persona),
 		Run:         e.Instruction,
@@ -1140,7 +1160,6 @@ func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bu
 		out      []Finding
 		failures int
 		wg       sync.WaitGroup
-		sem      = make(chan struct{}, max(1, e.Config.Review.Concurrency))
 	)
 
 	for _, b := range plan.Batches {
