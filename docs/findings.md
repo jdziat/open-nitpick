@@ -1817,3 +1817,28 @@ Recorded because the `corpus` hash pins the text and nothing pins the vectors,
 so a bundle regenerated from an unchanged corpus is a clean diff by the test's
 standard and a changed file by git's. Nothing here needs fixing. What it rules
 out is treating a bundle diff as evidence that the corpus changed.
+
+## Targeted validation: what would decide it, and when (2026-09-09)
+
+`validation.targeted` ships off and unmeasured, and it is now the
+best-defended path in the validation pass: the reference marker, the
+conditional contract, `defang`, and a citation check that demotes a verdict
+naming an entry the expert was not shown. Four defences on a feature nobody
+has evidence for is a standing cost, so this records what would settle it
+rather than leaving that to whoever next reads the code.
+
+The measurement is the one this repository already runs. Two arms over the
+knowledge corpus, `validation.enabled` on in both, `validation.targeted` the
+only difference, two runs each, `review.knowledge` on so findings carry
+evidence at all. Recall and noise per review, the same pair every arm here is
+scored on.
+
+Ship condition, written before the number: targeted must not cost recall, and
+must reduce noise by more than one plant-location, which `CorpusResolution`
+puts at 0.083. Anything smaller is inside what this instrument can resolve.
+
+Kill condition, so the holding position expires: if that measurement has not
+run by the release after the one carrying this branch, the flag, the
+`referenceContract`, the reference fence and the citation check come out. The
+evidence line on a published finding stays either way, because it costs no
+model call and is checkable by a reader on every run.

@@ -213,7 +213,14 @@ func renderComment(f Finding, emoji bool, read map[string][]string) string {
 	// whatever follows renders as live HTML in a comment posted under this
 	// tool's name. Same call every other model-authored string here makes.
 	if u := inline(strings.TrimSpace(f.Unresolved)); u != "" {
-		fmt.Fprintf(&b, "\n<sub>could not be resolved by %s: %s</sub>\n", inline(f.UnresolvedBy), u)
+		// The expert's name is set beside the reason on every path that writes
+		// one, so an empty one is a caller that built the finding by hand. It
+		// still must not render "resolved by : ".
+		if by := inline(strings.TrimSpace(f.UnresolvedBy)); by != "" {
+			fmt.Fprintf(&b, "\n<sub>could not be resolved by %s: %s</sub>\n", by, u)
+		} else {
+			fmt.Fprintf(&b, "\n<sub>could not be resolved: %s</sub>\n", u)
+		}
 	}
 
 	// What the reviewer read, so a reader can go and look. Ids only: the

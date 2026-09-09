@@ -292,13 +292,19 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 	// what it was allowed to know. Recomputed rather than threaded, because
 	// cited is a pure function of the finding and the corpus.
 	cite := citation(result.Cited, shown)
+	verdict := strings.ToLower(strings.TrimSpace(result.Verdict))
 
 	// An expert that names a source it was not shown has invented one, and the
 	// verdict resting on it is the least reliable answer this pass can
 	// produce. Dropping only the citation would publish the deletion and hide
 	// the reason to doubt it, so the verdict itself is demoted to doubt: the
 	// finding stands, and the reader is told the check did not resolve.
-	if invented := len(shown) > 0 && namesSomething(result.Cited) && cite == ""; invented {
+	//
+	// Only the two verdicts that act on a finding. A confirmation changes
+	// nothing whatever it cites, and stamping one "could not be resolved"
+	// tells the reader the check was weaker than it was.
+	removes := verdict == verdictRefuted || verdict == verdictSeverity
+	if invented := removes && len(shown) > 0 && namesSomething(result.Cited) && cite == ""; invented {
 		// The reason too, as both other verdicts log it. This is the path the
 		// code itself rates least reliable, so an auditor reading it later
 		// needs what the expert said and not only what it cited.
@@ -310,7 +316,7 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 			unresolved: "it named a reference it was not shown, so this was not resolved"}
 	}
 
-	switch strings.ToLower(strings.TrimSpace(result.Verdict)) {
+	switch verdict {
 	case verdictRefuted:
 		reason := strings.TrimSpace(result.Reason)
 		if reason == "" {
@@ -702,14 +708,17 @@ func namesSomething(said string) bool {
 	return !nullish[idChars(said)]
 }
 
-// idChars reduces a string to the characters a corpus id is spelled with.
+// idChars reduces a string to the letters and digits of a corpus id.
 //
-// Corpus ids are a filename's base: lower-case letters, digits and hyphens.
-// Anything else a model wrapped around one is formatting.
+// The separators go too. A model writing a hyphenated id into a sentence
+// spells it with spaces or underscores, and reading "go defer in loop" as a
+// different entry from `go-defer-in-loop` is the same mistake as reading
+// `[go-defer-in-loop]` that way. TestCorpusIDsDoNotCollideWithoutSeparators
+// bounds the loosening: no two shipped ids are equal once they are gone.
 func idChars(s string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(s) {
-		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
 			b.WriteRune(r)
 		}
 	}

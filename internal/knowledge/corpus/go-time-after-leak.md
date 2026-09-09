@@ -24,5 +24,10 @@ unreferenced one can be collected before firing, and the change is keyed to the
 main module's `go` directive. A repository declaring 1.23 or later does not
 have this behaviour, and does not get this entry.
 
+One escape hatch is not read by that clause. `godebug asynctimerchan=1`, in
+`go.mod` or as a directive, restores the old timers on a module that otherwise
+declares 1.23 or later. Such a module has this leak and will not be shown this
+entry, so a reviewer working on one has to know the rule already.
+
 What to look for: `time.After` inside a `for` or a `select` that runs more than
 once, especially with a duration longer than the loop's period.

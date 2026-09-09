@@ -81,6 +81,11 @@ func TestACitationThatWasNotShownIsDropped(t *testing.T) {
 		"`go-defer-in-loop`",
 		`"go-defer-in-loop"`,
 		"[`go-defer-in-loop`]",
+		// Separators are punctuation too. A model writing the id into a
+		// sentence spells it this way, and reading that as a different entry
+		// demotes a sound verdict.
+		"go defer in loop",
+		"go_defer_in_loop",
 	} {
 		if got := citation(wrapped, shown); got != "go-defer-in-loop" {
 			t.Errorf("citation(%q) = %q, want the id: punctuation is not a different entry", wrapped, got)
@@ -233,10 +238,14 @@ func TestACitationWithNothingShownDoesNotDemote(t *testing.T) {
 func TestTheReferenceContractIsSentOnlyWithAReferenceBlock(t *testing.T) {
 	expert := prompt.ExpertFor("correctness", "a title", "")
 
-	if with := expertSystem(expert, true); !strings.Contains(with, "never name an\nentry you were not shown") {
+	// Matched on the words with the wrapping normalised away: rewrapping the
+	// contract must not fail a test about which contract was sent.
+	flat := func(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+	if with := flat(expertSystem(expert, true)); !strings.Contains(with, "never name an entry you were not shown") {
 		t.Errorf("a request carrying references was sent no instruction about them:\n%s", with)
 	}
-	if without := expertSystem(expert, false); strings.Contains(without, "reference material") {
+	if without := flat(expertSystem(expert, false)); strings.Contains(without, "reference material") {
 		t.Errorf("an expert shown nothing was primed for references:\n%s", without)
 	}
 }
@@ -255,5 +264,31 @@ func TestAWordForNoCitationIsNotAnInventedSource(t *testing.T) {
 		if !namesSomething(said) {
 			t.Errorf("cited %q was read as naming nothing", said)
 		}
+	}
+}
+
+// Only a verdict that acts on a finding is demoted for an invented citation.
+//
+// A confirmation changes nothing whatever it cites, and stamping one "could
+// not be resolved" tells the reader the check was weaker than it was.
+func TestOnlyAnActingVerdictIsDemotedForAnInventedCitation(t *testing.T) {
+	run := func(t *testing.T, verdict string) []Finding {
+		t.Helper()
+		v := newValidator(&scriptedLLM{
+			fallback: `{"verdict":"` + verdict + `","reason":"a rule I read","cited":"cwe-489-invented"}`,
+		}, config.Validation{Enabled: true, Targeted: true})
+		v.Corpus = referenceCorpus
+
+		f := claimed
+		f.Evidence = []string{"go-defer-in-loop"}
+		kept, _ := v.Validate(context.Background(), []Finding{f}, claimedCode)
+		return kept
+	}
+
+	if kept := run(t, verdictConfirmed); len(kept) != 1 || kept[0].Unresolved != "" {
+		t.Errorf("a confirmation was stamped %q", kept[0].Unresolved)
+	}
+	if kept := run(t, verdictRefuted); len(kept) != 1 || kept[0].Unresolved == "" {
+		t.Error("a refutation resting on an invented source was not demoted")
 	}
 }

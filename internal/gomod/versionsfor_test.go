@@ -80,3 +80,26 @@ func TestABlockCommentIsNotAGoModComment(t *testing.T) {
 		t.Errorf("Versions = %q, which is neither the declared version nor an abstention", got)
 	}
 }
+
+// A symlink inside the checkout cannot read a go.mod outside it.
+//
+// The containment check compares cleaned paths, and a link is clean. Without
+// resolving it, a directory in the repository pointing outward walks up into
+// a foreign module and answers with its version.
+func TestASymlinkCannotEscapeTheCheckout(t *testing.T) {
+	outside := t.TempDir()
+	write(t, filepath.Join(outside, "go.mod"), "module example.com/outside\n\ngo 1.9\n")
+	if err := os.MkdirAll(filepath.Join(outside, "pkg"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	write(t, filepath.Join(root, "go.mod"), "module example.com/x\n\ngo 1.25\n")
+	if err := os.Symlink(filepath.Join(outside, "pkg"), filepath.Join(root, "linked")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	if got := VersionsFor(root, []string{"linked/a.go"}); got != nil {
+		t.Errorf("VersionsFor through a symlink = %v, want nothing", got)
+	}
+}

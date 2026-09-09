@@ -54,8 +54,6 @@ func evidenceFor(f Finding, hits []knowledge.Hit) []string {
 	return out
 }
 
-// mine reports whether a hit was retrieved by the finding's own file. A
-// batch-wide hit has no path and belongs to every finding equally.
 // mine reports whether a hit belongs to the finding's own file. See
 // docs/harness-notes.md#evidence-ordering for what the two true cases mean.
 func mine(h knowledge.Hit, f Finding) bool {

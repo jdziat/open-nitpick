@@ -140,8 +140,12 @@ func VersionsFor(repoRoot string, paths []string) map[string]string {
 // always did. A path with no go.mod anywhere above it is not in a module, and
 // reporting one for it would be an invention.
 func moduleDir(repoRoot, rel string) (string, bool) {
-	root := filepath.Clean(repoRoot)
-	dir := filepath.Dir(filepath.Join(root, filepath.FromSlash(rel)))
+	// Symlinks resolved on both sides before comparing, so a link inside the
+	// checkout pointing outward cannot walk up into a go.mod this repository
+	// does not contain. An unresolvable path keeps its cleaned form, which the
+	// containment check below then judges.
+	root := resolved(filepath.Clean(repoRoot))
+	dir := resolved(filepath.Dir(filepath.Join(filepath.Clean(repoRoot), filepath.FromSlash(rel))))
 
 	// Refuse anything that climbed out of the repository rather than searching
 	// upward from it: a "../" in a diff path must not read a go.mod the
@@ -163,4 +167,15 @@ func moduleDir(repoRoot, rel string) (string, bool) {
 		}
 		dir = parent
 	}
+}
+
+// resolved follows symlinks, falling back to the path as given.
+//
+// The fallback is not a weakening: a path that does not exist cannot be read
+// either, so the walk finds no go.mod and the caller keeps every entry.
+func resolved(p string) string {
+	if real, err := filepath.EvalSymlinks(p); err == nil {
+		return real
+	}
+	return p
 }

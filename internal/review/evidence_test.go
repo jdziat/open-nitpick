@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/knowledge"
@@ -61,6 +62,12 @@ func TestNoHitsIsNoEvidence(t *testing.T) {
 	}
 }
 
+// Evidence survives triage, which re-decodes every finding from JSON.
+//
+// Source, Triager and the severity fields are all restored the same way and
+// for the same reason: they are json:"-", so they arrive from triage's decode
+// zeroed. A field that skipped this would be attributed at the reviewer and
+// gone by the time anything published it.
 func TestEvidenceSurvivesTriage(t *testing.T) {
 	reviewed := mustJSON(t, Result{Findings: []Finding{
 		{Path: "app.go", Line: 4, Severity: "error", Title: "Real finding"},
@@ -92,5 +99,35 @@ func TestEvidenceSurvivesTriage(t *testing.T) {
 	}
 	if got := kept[0].Evidence; len(got) != 1 || got[0] != "go-defer-in-loop" {
 		t.Errorf("evidence after triage = %v, want it restored", got)
+	}
+}
+
+// Ties keep the order retrieval gave them, so two runs publish the same
+// evidence in the same order.
+//
+// The pattern is deliberate. An unstable sort leaves an all-equal slice alone,
+// so a test built from twenty tied hits passes with sort.Slice and pins
+// nothing. Interleaving the two groups is what makes the reordering reach the
+// three ids that are published.
+func TestTiedEvidenceKeepsRetrievalOrder(t *testing.T) {
+	const n = 20
+	hits := make([]knowledge.Hit, 0, n)
+	for i := range n {
+		path := "a.go"
+		if i%2 == 1 {
+			path = "b.go"
+		}
+		hits = append(hits, hitOn(fmt.Sprintf("entry-%02d", i), path))
+	}
+
+	got := evidenceFor(Finding{Path: "a.go"}, hits)
+	want := []string{"entry-00", "entry-02", "entry-04"}
+	if len(got) != len(want) {
+		t.Fatalf("evidence = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("evidence = %v, want %v: tied hits were reordered", got, want)
+		}
 	}
 }
