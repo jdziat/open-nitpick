@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/gomod"
 	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/llm"
 )
@@ -31,7 +32,9 @@ const (
 // The error is still returned, and callers that asked for retrieval should
 // still treat construction as fatal. A status of failed exists for the run
 // that got further than construction.
-func BuildKnowledge(ctx context.Context, cfg *config.Config, log *slog.Logger) (*KnowledgeRetriever, KnowledgeStatus, error) {
+// repoRoot is where the versions an entry's `applies:` clauses are judged
+// against are read from. Empty reads none, and none keeps every entry.
+func BuildKnowledge(ctx context.Context, cfg *config.Config, repoRoot string, log *slog.Logger) (*KnowledgeRetriever, KnowledgeStatus, error) {
 	if cfg == nil || !cfg.Review.Knowledge {
 		return nil, KnowledgeStatus{State: KnowledgeOff}, nil
 	}
@@ -76,7 +79,13 @@ func BuildKnowledge(ctx context.Context, cfg *config.Config, log *slog.Logger) (
 		return fail("the index was built by a different embedding model", err)
 	}
 
-	log.Info("knowledge retrieval on", "entries", len(entries), "model", embedder.Model())
+	// Read once here rather than per batch: go.mod does not change during a
+	// review, and a filter that re-read it would give two batches of the same
+	// run different corpora if someone edited it mid-flight.
+	versions := gomod.Versions(repoRoot)
+
+	log.Info("knowledge retrieval on",
+		"entries", len(entries), "model", embedder.Model(), "versions", versions)
 	return &KnowledgeRetriever{
 		R: &knowledge.Retriever{
 			Entries:    entries,
@@ -86,6 +95,7 @@ func BuildKnowledge(ctx context.Context, cfg *config.Config, log *slog.Logger) (
 			Candidates: knowledgeCandidates,
 			Keep:       knowledgeKeep,
 			MinScore:   cfg.Review.KnowledgeMinScore,
+			Versions:   versions,
 		},
 		status: KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)},
 	}, KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)}, nil

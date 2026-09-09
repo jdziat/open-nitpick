@@ -58,6 +58,17 @@ type Entry struct {
 	Frameworks []string
 	Versions   string
 
+	// Applies is the machine-checkable half of Versions: clauses that must
+	// hold for the entry to be offered at all.
+	//
+	// Versions stays prose the model judges, because most applicability is
+	// prose ("only when the handler is registered before Serve"). This is for
+	// the part a repository can be asked: a claim about time.After's timers is
+	// about Go before 1.23, and go.mod says which side of that a repository
+	// is on. Empty means the entry is offered to everything, which is what
+	// every entry did before this existed.
+	Applies []Constraint
+
 	// Source is where the claim came from: a specification, a standard
 	// library's own documentation, a published advisory.
 	Source string
@@ -111,6 +122,12 @@ func parseEntry(id, raw string) (Entry, error) {
 			e.Frameworks = splitList(value)
 		case "versions":
 			e.Versions = value
+		case "applies":
+			c, err := parseApplies(id, value)
+			if err != nil {
+				return Entry{}, err
+			}
+			e.Applies = c
 		case "source":
 			e.Source = value
 		case "checked":

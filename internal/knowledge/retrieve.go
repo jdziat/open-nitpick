@@ -49,6 +49,11 @@ type Retriever struct {
 	// creates (the entry that would have caught the defect, cut for scoring
 	// 0.4) are both real, and which dominates is a measurement.
 	MinScore float64
+
+	// Versions is what the repository under review declares, keyed as an
+	// entry's `applies:` clauses name it. Nil means nothing is known, and
+	// nothing known keeps every entry.
+	Versions map[string]string
 }
 
 // Retrieve returns the entries closest to a change.
@@ -71,6 +76,11 @@ func (r *Retriever) Retrieve(ctx context.Context, query string, langs map[string
 	// than ranking signals: an entry the pass cannot act on is wrong, not
 	// distant, and cosine has no way to tell those apart.
 	pool = ForClasses(pool, classes)
+	// And the version cut, last of the three, for the same reason as the other
+	// two: an entry about Go before 1.23 shown to a repository on 1.25 is not
+	// a distant neighbour, it is a wrong one, and it arrives as reference
+	// material a reviewer is asked to trust.
+	pool = ForVersions(pool, r.Versions)
 	if len(pool) == 0 {
 		return nil, nil
 	}

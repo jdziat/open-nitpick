@@ -272,7 +272,7 @@ const (
 	// version below the toolchain analyzing it, so the version-gated part of the
 	// ruleset was not applied to it. It is the one reason here that is a REDUCED
 	// analysis rather than an absent one: the file was read, and part of the
-	// ruleset was held off it. See linters.belowAnalyzedLanguage for what the
+	// ruleset was held off it. See gomod.BelowAnalyzed for what the
 	// ceiling is and why it is not a fixed floor.
 	//
 	// It says the gate was CLOSED, not that anything was behind it, and the

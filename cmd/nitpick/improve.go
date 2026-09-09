@@ -72,7 +72,7 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs
 	// Fatal on a construction error, matching every other command: the
 	// operator asked for retrieval, so a broken embedder is a configuration
 	// answer rather than a review that quietly did less than it said.
-	k, status, err := review.BuildKnowledge(ctx, &icfg, log)
+	k, status, err := review.BuildKnowledge(ctx, &icfg, gh.Checkout, log)
 	if err != nil {
 		return fmt.Errorf("knowledge retrieval (%s): %w", status.Reason, err)
 	}

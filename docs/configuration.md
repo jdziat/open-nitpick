@@ -433,9 +433,20 @@ to write one that crosses them, and it has to be typed: an empty list used to
 mean the same thing, which made a forgotten key and a deliberate claim about
 every language the same entry. A change whose files resolve to no known
 language still retrieves nothing, generic entries included. `versions:` and
-`frameworks:` are optional and are rendered beside the entry rather than
-filtered on, because nothing here knows the versions a change runs under and a
-filter fed a guess would silence entries on the strength of it. The vectors are
+`frameworks:` are optional prose, rendered beside the entry for the model to
+judge rather than filtered on, because most applicability cannot be checked
+mechanically.
+
+`applies:` is the half that can be. It holds clauses of the form
+`name op version`, separated by commas, all of which must hold, with `op` one
+of `>=`, `>`, `<`, `<=`, `==`. Only `go` is answerable today, read from the
+repository's root `go.mod`. An entry whose clauses fail is not offered at all:
+`go-time-after-leak` carries `applies: go < 1.23`, because Go 1.23 changed
+timers so an unreferenced one is collected before firing, and a repository
+declaring 1.23 or later never sees the entry. A version this tool cannot read,
+a repository with no `go.mod`, or a clause naming something it does not resolve
+all keep the entry, because silencing on ignorance would make a missing
+`go.mod` look like a corpus with nothing to say. The vectors are
 committed under `internal/knowledge/indexes` and regenerated with `nitpick
 knowledge-index`, one file per embedding model. A run selects the file whose
 recorded model matches `models.embed`, so switching embedder is configuration

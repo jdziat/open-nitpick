@@ -333,7 +333,7 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	// embedder at an endpoint of its own. A misconfiguration is fatal here
 	// because the operator asked for retrieval; a failure to retrieve during a
 	// review is not, and lands on the report instead.
-	k, status, err := review.BuildKnowledge(ctx, cfg, log)
+	k, status, err := review.BuildKnowledge(ctx, cfg, repo, log)
 	if err != nil {
 		return nil, fmt.Errorf("knowledge retrieval (%s): %w", status.Reason, err)
 	}
