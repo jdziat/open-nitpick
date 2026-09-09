@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
+
+	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
@@ -24,6 +27,39 @@ import (
 // finding, which is the failure this feature has to avoid to be worth having:
 // a reviewer that invents defects out of a style guide is worse than one that
 // misses them.
+// knowledgeTokens estimates what a rendered section costs, with its framing.
+//
+// The heading and the disclaimer are counted, not just the entries: they are
+// most of a one-entry section, and a budget that ignored them would let a
+// section overrun the number an operator wrote by the size of the words that
+// make it safe to read.
+func knowledgeTokens(section string) int {
+	if section == "" {
+		return 0
+	}
+	return llms.DefaultTokenEstimator().EstimateTokens(section)
+}
+
+// fitKnowledge drops entries until the rendered section fits a token budget,
+// least relevant first.
+//
+// Zero is unbounded, which is what shipped. The entries arrive best-first, so
+// dropping from the end drops the least relevant, and a budget too small for
+// even one entry yields no section rather than a heading with nothing under
+// it: a disclaimer about reference material with no reference material is
+// tokens spent on nothing.
+func fitKnowledge(hits []knowledge.Hit, budget int) []knowledge.Hit {
+	if budget <= 0 || len(hits) == 0 {
+		return hits
+	}
+	for n := len(hits); n > 0; n-- {
+		if knowledgeTokens(knowledgeSection(hits[:n])) <= budget {
+			return hits[:n]
+		}
+	}
+	return nil
+}
+
 func knowledgeSection(hits []knowledge.Hit) string {
 	if len(hits) == 0 {
 		return ""
@@ -72,7 +108,9 @@ func (e *Engine) retrieveKnowledge(ctx context.Context, b bundle.Batch, style bo
 	// style pass gets style and maintainability entries and no others, and
 	// declines only when the corpus has none, which is the corpus's answer
 	// rather than a rule in the engine.
-	hits, err := e.Knowledge.ForBatch(ctx, b, e.knowledgeClasses(style))
+	started := time.Now()
+	hits, err := e.Knowledge.ForBatch(ctx, b, e.knowledgeClasses(style),
+		strings.EqualFold(strings.TrimSpace(e.Config.Review.KnowledgeQuery), "file"))
 	if err != nil {
 		// Still nothing rather than an error: the review worked before
 		// retrieval existed and must survive its provider. The count is what
@@ -81,7 +119,39 @@ func (e *Engine) retrieveKnowledge(ctx context.Context, b bundle.Batch, style bo
 		e.log().Warn("knowledge retrieval failed; reviewing without it", "error", err)
 		return nil
 	}
+
+	// What was retrieved and what it cost, per batch. #81 owns the in-flight
+	// progress work and this does not compete with it: it is the existing
+	// logger and the fields a results table needs, not a second mechanism.
+	hits = fitKnowledge(hits, e.Config.Review.KnowledgeTokens)
+
+	if len(hits) > 0 {
+		e.log().Debug("knowledge retrieved",
+			"entries", ids(hits),
+			"scores", scores(hits),
+			"stage", stage(style),
+			"latency", time.Since(started),
+			"tokens", knowledgeTokens(knowledgeSection(hits)))
+	}
 	return hits
+}
+
+func stage(style bool) string {
+	if style {
+		return "style"
+	}
+	return "defect"
+}
+
+// scores names how close each hit was, rounded, so a log line stays readable
+// and a run that retrieved nothing relevant is visible as a row of small
+// numbers rather than as five ids.
+func scores(hits []knowledge.Hit) []string {
+	out := make([]string, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, fmt.Sprintf("%.3f", h.Score))
+	}
+	return out
 }
 
 // KnowledgeRetriever is what the engine holds, so internal/review does not
@@ -117,10 +187,14 @@ func (k *KnowledgeRetriever) Status() KnowledgeStatus {
 // The query is the diff text rather than the whole file: a file is mostly
 // unchanged code, and embedding it retrieves entries about the parts nobody
 // touched.
-func (k *KnowledgeRetriever) ForBatch(ctx context.Context, b bundle.Batch, classes map[config.Class]bool) ([]knowledge.Hit, error) {
+func (k *KnowledgeRetriever) ForBatch(ctx context.Context, b bundle.Batch, classes map[config.Class]bool, perFile bool) ([]knowledge.Hit, error) {
 	if k == nil || k.R == nil {
 		return nil, nil
 	}
+	if perFile {
+		return k.perFile(ctx, b, classes)
+	}
+
 	var q strings.Builder
 	paths := make([]string, 0, len(b.Entries))
 	for _, e := range b.Entries {
@@ -128,28 +202,84 @@ func (k *KnowledgeRetriever) ForBatch(ctx context.Context, b bundle.Batch, class
 			continue
 		}
 		paths = append(paths, e.File.Path)
-		// The changed lines only. A hunk's context lines are code nobody
-		// touched, and embedding them retrieves entries about the parts of the
-		// file the change left alone.
-		for i := range e.File.Hunks {
-			for _, l := range e.File.Hunks[i].Lines {
-				if l.Kind == diff.LineAdded || l.Kind == diff.LineRemoved {
-					q.WriteString(l.Content)
-					q.WriteString("\n")
-				}
-			}
-		}
+		q.WriteString(changedLines(e.File))
 	}
 	if q.Len() == 0 {
 		return nil, nil
 	}
+	return k.retrieve(ctx, q.String(), knowledge.LanguagesOf(paths), classes, "")
+}
+
+// perFile queries once per changed file and merges the results.
+//
+// One query per file rather than one per batch, because a batch's query is
+// dominated by whichever file changed most: a two-line edit that is the whole
+// reason retrieval would have helped contributes two lines to a query of four
+// hundred, and the entry that would have caught it never reaches the
+// candidates. The cost is one embedding call per file instead of one per
+// batch, which is why it is not the default until something measures it.
+func (k *KnowledgeRetriever) perFile(ctx context.Context, b bundle.Batch, classes map[config.Class]bool) ([]knowledge.Hit, error) {
+	var (
+		sets     [][]knowledge.Hit
+		firstErr error
+	)
+	for _, e := range b.Entries {
+		if e.File == nil {
+			continue
+		}
+		q := changedLines(e.File)
+		if q == "" {
+			continue
+		}
+		hits, err := k.retrieve(ctx, q, knowledge.LanguagesOf([]string{e.File.Path}), classes, e.File.Path)
+		if err != nil {
+			// One file's failure is not the batch's. The others still have
+			// something to say, and the counters already record that this run
+			// did not retrieve clean.
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		sets = append(sets, hits)
+	}
+	if len(sets) == 0 {
+		return nil, firstErr
+	}
+	return knowledge.Merge(sets, k.R.Keep), nil
+}
+
+// retrieve is one query, counted.
+func (k *KnowledgeRetriever) retrieve(ctx context.Context, q string, langs map[string]bool, classes map[config.Class]bool, path string) ([]knowledge.Hit, error) {
 	k.counts.query()
-	hits, err := k.R.Retrieve(ctx, q.String(), knowledge.LanguagesOf(paths), classes)
+	hits, err := k.R.Retrieve(ctx, q, langs, classes)
 	if err != nil {
 		k.counts.failure()
 		return nil, err
 	}
+	for i := range hits {
+		hits[i].Path = path
+	}
 	return hits, nil
+}
+
+// changedLines is the query text for one file: what the change added or
+// removed.
+//
+// The changed lines only. A hunk's context lines are code nobody touched, and
+// embedding them retrieves entries about the parts of the file the change left
+// alone.
+func changedLines(f *diff.File) string {
+	var q strings.Builder
+	for i := range f.Hunks {
+		for _, l := range f.Hunks[i].Lines {
+			if l.Kind == diff.LineAdded || l.Kind == diff.LineRemoved {
+				q.WriteString(l.Content)
+				q.WriteString("\n")
+			}
+		}
+	}
+	return q.String()
 }
 
 // ids names the retrieved entries for the log, so a review that consulted the

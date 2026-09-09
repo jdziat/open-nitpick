@@ -155,3 +155,50 @@ func hasID(hay []string, needle string) bool {
 	}
 	return false
 }
+
+// An entry retrieved for four files is one entry. Repeating it would spend
+// four of five slots on one fact and teach the model the section is
+// boilerplate.
+func TestMergeKeepsOneRowPerEntryAtItsBestScore(t *testing.T) {
+	a := Hit{Entry: Entry{ID: "a"}, Score: 0.4, Path: "one.go"}
+	aAgain := Hit{Entry: Entry{ID: "a"}, Score: 0.9, Path: "two.go"}
+	b := Hit{Entry: Entry{ID: "b"}, Score: 0.5, Path: "one.go"}
+
+	got := Merge([][]Hit{{a, b}, {aAgain}}, 5)
+	if len(got) != 2 {
+		t.Fatalf("merge returned %d hits, want 2", len(got))
+	}
+	if got[0].Entry.ID != "a" || got[0].Score != 0.9 {
+		t.Errorf("best hit = %s at %.2f, want a at 0.90", got[0].Entry.ID, got[0].Score)
+	}
+	// Attribution survives, or a per-file query bought nothing.
+	if got[0].Path != "two.go" {
+		t.Errorf("kept path = %q, want the file that retrieved it most strongly", got[0].Path)
+	}
+	if got := Merge([][]Hit{{a, b}, {aAgain}}, 1); len(got) != 1 {
+		t.Errorf("keep=1 returned %d hits", len(got))
+	}
+}
+
+// A change resembling nothing in the corpus gets nothing, rather than its five
+// least distant entries. Off by default, because the entry cut for scoring 0.4
+// is as real a failure as the five irrelevant ones.
+func TestAbstentionDropsWhatIsTooDistant(t *testing.T) {
+	hits := []Hit{{Entry: Entry{ID: "near"}, Score: 0.8}, {Entry: Entry{ID: "far"}, Score: 0.2}}
+
+	if got := above(hits, 0); len(got) != 2 {
+		t.Errorf("a zero floor dropped %d hits; off is what shipped", 2-len(got))
+	}
+	kept := above(append([]Hit(nil), hits...), 0.5)
+	if len(kept) != 1 || kept[0].Entry.ID != "near" {
+		t.Errorf("a 0.5 floor kept %v, want the near hit alone", ids(entriesOf(kept)))
+	}
+}
+
+func entriesOf(hits []Hit) []Entry {
+	out := make([]Entry, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, h.Entry)
+	}
+	return out
+}

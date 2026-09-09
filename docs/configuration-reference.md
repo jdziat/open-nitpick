@@ -1010,6 +1010,21 @@ Knowledge attaches entries from the shipped corpus that the change resembles: an
 string, default `none`.
 KnowledgeIndex names an index file to retrieve from, instead of the one this build ships for the configured embedding model.
 
+### `review.knowledge_min_score`
+
+number, default `0`.
+KnowledgeMinScore drops retrieved entries below this cosine, so a change resembling nothing in the corpus gets nothing rather than its five least distant entries. Zero is off, which is what shipped.
+
+### `review.knowledge_query`
+
+string, default `none`.
+KnowledgeQuery is what gets embedded to retrieve against: "batch", the changed lines of the whole batch as one query, or "file", one query per changed file whose results are merged.
+
+### `review.knowledge_tokens`
+
+integer, default `0`.
+KnowledgeTokens bounds the retrieved section, counted with its own framing. Zero is unbounded, which is what shipped: the section carries at most five entries and the ceiling below is what a measurement would tighten.
+
 ### `review.max_file_bytes`
 
 integer, default `262144`.

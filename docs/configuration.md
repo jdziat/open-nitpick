@@ -481,6 +481,29 @@ active, skipped (something to fix, such as no `models.embed`) or failed (an
 embedder that should have worked). A measurement reads that field, so a run
 whose embedder refused its batches is never scored as the retrieval-on arm.
 
+Three knobs shape retrieval, and all three default to what shipped and what
+was measured, because none of them is an established improvement:
+
+```yaml
+review:
+  knowledge_query: file      # default "batch": the whole batch as one query
+  knowledge_min_score: 0.5   # default 0: keep the closest five whatever they score
+  knowledge_tokens: 1200     # default 0: unbounded, at most five entries
+```
+
+`knowledge_query: file` embeds each changed file separately and merges the
+results, one row per entry at its best score, keeping the file that retrieved
+it. A batch query is dominated by whichever file changed most: a two-line edit
+that is the whole reason retrieval would have helped contributes two lines to a
+query of four hundred. It costs one embedding call per file instead of one per
+batch. `knowledge_min_score` drops entries below a cosine, so a change
+resembling nothing in the corpus gets nothing rather than its five least
+distant entries; the entry cut for scoring 0.4 is as real a failure as the five
+irrelevant ones, which is why it is off. `knowledge_tokens` bounds the rendered
+section including its heading and disclaimer, dropping the least relevant
+entries first, and yields no section at all rather than a heading with nothing
+under it.
+
 It ships off. On its own corpus it took recall from 0.75 to 1.00 with noise
 falling from 0.50 to 0.33 per review
 ([Findings](findings.md#retrieved-knowledge-and-a-pre-registration-i-got-wrong-2026-09-08)),

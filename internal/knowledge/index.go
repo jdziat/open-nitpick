@@ -177,6 +177,16 @@ func LoadIndex(raw []byte, entries []Entry) (*Index, error) {
 type Hit struct {
 	Entry Entry
 	Score float64
+
+	// Path is the file whose text retrieved it, empty when the query was the
+	// whole batch.
+	//
+	// Attribution survives the combining step or a per-file query buys
+	// nothing: five entries retrieved for five files, pooled and sorted, are
+	// indistinguishable from five entries retrieved for the batch, and the
+	// reason to query per file is that a small relevant defect in one file is
+	// not buried by a large change in another.
+	Path string
 }
 
 // Nearest returns the entries closest to a query vector, best first.

@@ -84,6 +84,7 @@ func BuildKnowledge(ctx context.Context, cfg *config.Config, log *slog.Logger) (
 			Embedder:   embedder,
 			Candidates: knowledgeCandidates,
 			Keep:       knowledgeKeep,
+			MinScore:   cfg.Review.KnowledgeMinScore,
 		},
 		status: KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)},
 	}, KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)}, nil
