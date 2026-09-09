@@ -643,8 +643,11 @@ type Instruction struct {
 	// path, in the doublestar dialect, so "**/*.go" reaches every directory.
 	Path string `yaml:"path"`
 
-	// Prompt is appended to the review prompt for a matching file. It is
-	// repository text and is fenced as untrusted before the model reads it.
+	// Prompt is appended to the review prompt for a matching file.
+	//
+	// It is repository text and goes through bundle.PromptSafe, so it cannot
+	// open a line of its own and cannot draw a heading. It is not inside a
+	// fence marker.
 	Prompt string `yaml:"prompt"`
 }
 
@@ -708,12 +711,22 @@ type Linters struct {
 	// arbitrary JavaScript that eslint loads and EXECUTES with the review's
 	// credentials in the environment.
 	//
-	// These keys are not scrubbed by Config.sanitize, unlike base_url and
-	// persona.custom. Those name a network endpoint or free text that reaches a
-	// model, both of which a change can supply outright. A value here can only
-	// name a file the change cannot write, because internal/linters refuses any
-	// configuration that resolves inside the repository, so the worst a merged
-	// value does is point at a file the operator's own environment already has.
+	// The path keys here are not pruned, unlike base_url and persona.custom.
+	// Those name a network endpoint or free text that reaches a model, both of
+	// which a change can supply outright. A path here can only name a file the
+	// change cannot write, because internal/linters refuses any configuration
+	// that resolves inside the repository, so the worst a merged value does is
+	// point at a file the operator's own environment already has.
+	//
+	// That argument covers the paths and nothing else, which is why two keys
+	// it used to cover are pruned now: linters.trusted names no file at all,
+	// and a semgrep_config registry reference is a network fetch rather than a
+	// path. See untrustedElsewhere in trust.go.
+	//
+	// What stands behind the rest is not this comment but the base-revision
+	// substitution: a change that edits .nitpick.yaml is reviewed under the
+	// version already accepted, so a pull request cannot supply the analyzer
+	// settings it is reviewed under. See internal/config/policy.go.
 
 	// GolangciConfig is an absolute path to a .golangci.yml outside the
 	// repository. Empty runs golangci-lint under open-nitpick's own config,

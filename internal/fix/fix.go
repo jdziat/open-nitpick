@@ -265,21 +265,12 @@ func Proposal(r Request, res Result, pr *vcs.PullRequest, branch, body string) (
 // userMessage builds the request this model answers.
 //
 // Split out of Apply so a test can read what is sent. Both halves are text
-// people on the pull request wrote, and both go inside a marker and through
-// fence.Defang: the review comments are what to fix, and the file bodies are
-// the larger surface, since a directive planted in a code comment arrives
-// here. This model's output is written to files, which is what makes a forged
-// marker here worse than one anywhere else in this tool.
+// people on the pull request wrote, so both go inside a marker and through
+// fence.Defang. A forged marker matters more here than anywhere else in this
+// tool, because this model's output is written to files.
 //
-// Defanged line by line, so a match can never span two lines of real code,
-// which is the bound fence.Defang is written to.
-//
-// Deliberately not numbered, unlike every review path. There the model reports findings and
-// a margin costs nothing; here it returns the file to write, and a margin it
-// echoes back is a file full of line numbers. What numbering would have bought
-// is structural, that a body cannot forge the path heading above it, and that
-// is answered downstream: a path the caller did not hand over is refused
-// whatever the model claims.
+// The bodies are not numbered, unlike every review path. See
+// docs/trust-model.md#one-fence-vocabulary-and-the-audit-that-produced-it.
 func userMessage(r Request) string {
 	var b strings.Builder
 

@@ -953,6 +953,27 @@ defanged out of the code in the same request. The code is written by the change
 author, so without that a diff opens a reference block of its own and states a
 rule in this tool's voice for the expert to refute a real finding with.
 
+## Two keys a repository file may not supply
+
+`linters.trusted` and `review.knowledge_index` are ignored when they come from
+a repository's own `.nitpick.yaml`, the way `base_url` and `persona.custom`
+already were. Both are named in the log and in `nitpick explain-config`, and
+both are honoured from the user-level file or with
+`NITPICK_TRUST_CONFIG_ENDPOINTS=1`.
+
+Neither names a file, which is what the rest of the `linters` block relies on.
+`linters.trusted` is a privilege grant: it is the only gate on the analyzers
+that run the tree's own code, cargo build scripts for clippy and a project
+autoloader for phpstan, and its own documentation says to name one only where
+every change reviewed comes from people who could already run code in the job.
+`review.knowledge_index` is a path this process opens, with none of the
+containment an analyzer config path has to satisfy.
+
+A `semgrep_config` registry reference now has to look like one: `p/` or `r/`
+followed by a ruleset name, with no traversal, no scheme and no whitespace. It
+is the one analyzer setting that reaches a command line without a path check,
+because a registry reference is a network fetch rather than a file.
+
 ## A key this nitpick does not have
 
 An unrecognised key fails the run rather than being ignored, which is right for

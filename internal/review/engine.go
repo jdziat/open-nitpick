@@ -2033,8 +2033,13 @@ func oneLineTitle(s string) string { return strings.Join(strings.Fields(s), " ")
 func renderForTriage(pr *vcs.PullRequest, findings []Finding) string {
 	var b strings.Builder
 
+	// Flattened and defanged, as pullRequestContext does it. This is the same
+	// field, rendered a second time, into a numbered findings list the model
+	// answers against and whose entries this function flattens one loop below
+	// for that reason. It is also the one string here a contributor writes
+	// directly.
 	if pr != nil && pr.Title != "" {
-		fmt.Fprintf(&b, "Change under review: %s\n\n", pr.Title)
+		fmt.Fprintf(&b, "Change under review: %s\n\n", defang(oneLine(pr.Title)))
 	}
 
 	if len(findings) == 0 {
