@@ -83,6 +83,27 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs
 		Provider:  held,
 		Log:       log,
 		Knowledge: k,
+
+		// Both fields, as newEngine wires them. Policy alone would record a
+		// substitution and then review under the change's own models, because
+		// withPolicy rebuilds the roles through Models and leaves the engine
+		// untouched when it is nil.
+		//
+		// This pass is the widest of the three a mention can start: it is a
+		// whole review, so review.ignore, min_severity, validation, the budgets
+		// and instructions[].prompt all reach it. It is also the one with no
+		// permission gate in front of it.
+		Policy: &config.BasePolicy{RepoRoot: gh.Checkout, Loaded: &icfg, Provider: gh},
+		Models: func(policy *config.Config) (*llm.Roles, error) {
+			// The improve scope, applied to whichever policy won. Without this
+			// a substituted policy would review at the ordinary scope and the
+			// pass would not be the pedantic one that was asked for.
+			scoped := *policy
+			applyImproveScope(&scoped)
+			scoped.Review.ResolveSuperseded = false
+			scoped.Review.Approve.Enabled = false
+			return llm.BuildRoles(&scoped)
+		},
 		// Linters stays nil. The analyzers are deterministic and the ordinary
 		// review already ran them; a second run would spend time to publish
 		// what is already on the pull request.
