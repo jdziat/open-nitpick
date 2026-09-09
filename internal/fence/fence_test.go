@@ -72,14 +72,24 @@ func TestDefangIsBoundedToOneLine(t *testing.T) {
 // what internal/converse and internal/fix each did with <untrusted> tags: the
 // list was complete and the vocabulary was not.
 //
-// So the tree is scanned. A `===== ` literal outside this package is either a
-// marker nobody defangs or a banner that reads like one, and both are worth a
-// sentence from whoever added it.
+// So the tree is scanned for this package's own shape. A `===== ` outside it is
+// either a marker nobody defangs or a banner that reads like one, and both are
+// worth a sentence from whoever added it. The banners already there are
+// counted, so adding one is a deliberate edit here.
+//
+// It does not catch an arbitrary new vocabulary, and could not: the tags this
+// replaced were `<untrusted>`, and no scan recognises a delimiter somebody has
+// not invented yet. What it catches is the cheaper mistake, a second marker in
+// this package's own idiom.
 func TestNoPackageDrawsAMarkerOfItsOwn(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatalf("root: %v", err)
 	}
+
+	// The one literal that is not a fence: a section rule printed to a
+	// terminal, never to a model.
+	allowed := map[string]int{filepath.Join(root, "cmd", "nitpick", "review.go"): 1}
 
 	var found []string
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -104,9 +114,14 @@ func TestNoPackageDrawsAMarkerOfItsOwn(t *testing.T) {
 			return err
 		}
 		for i, line := range strings.Split(string(body), "\n") {
-			if strings.Contains(line, `"===== `) {
-				found = append(found, fmt.Sprintf("%s:%d", path, i+1))
+			if !strings.Contains(line, "===== ") {
+				continue
 			}
+			if allowed[path] > 0 {
+				allowed[path]--
+				continue
+			}
+			found = append(found, fmt.Sprintf("%s:%d", path, i+1))
 		}
 		return nil
 	})

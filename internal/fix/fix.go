@@ -290,7 +290,8 @@ func userMessage(r Request, marker string) string {
 
 	fmt.Fprintf(&b, "The findings to apply:\n%s\n", marker)
 	for _, f := range r.Findings {
-		fmt.Fprintf(&b, "%s:%d\n%s\n\n", f.Path, f.Line, fence.Defang(strings.TrimSpace(f.Body)))
+		fmt.Fprintf(&b, "%s:%d\n%s\n\n",
+			bundle.PromptSafe(f.Path), f.Line, fence.Defang(strings.TrimSpace(f.Body)))
 	}
 	fmt.Fprintf(&b, "%s\n\n", marker)
 

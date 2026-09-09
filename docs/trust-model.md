@@ -201,6 +201,17 @@ containing it forges an entry for another file the same pass may write. The
 marker is chosen per request instead, so a body cannot contain what nobody had
 read when it was written.
 
+That marker is scoped to `fix` on purpose, and the scoping is a judgement
+rather than an oversight. It is strictly stronger than a fixed marker and
+`Defang`, which is a literal-text check and says so: a homoglyph, a fullwidth
+form, a zero-width space inside a word or the words split across a line all
+pass it. What it costs is that the system prompt ends in a random string, so
+nothing about a request is reusable between calls. `fix` is gated behind write
+access, refuses forks and answers one mention at a time, and its answer is
+written to files; the review and question paths run on every push and produce a
+comment. Where the answer is bytes on disk, pay it. Where the answer is a
+comment, the literal-text check is the trade that was already being made.
+
 Two things the audit found and this page does not fix. `prompt.Options.Repository`
 renders text into a system message and has no production caller, so it is a
 door nobody has opened. `instructions[].prompt` goes through `bundle.PromptSafe`,
