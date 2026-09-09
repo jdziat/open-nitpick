@@ -1,6 +1,7 @@
 ---
 title: JSON.parse returns any, so a typed binding checks nothing at runtime
 languages: [typescript]
+classes: [correctness]
 source: https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#any
 checked: 2026-09-08
 ---

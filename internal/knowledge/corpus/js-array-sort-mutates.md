@@ -1,6 +1,7 @@
 ---
 title: Array.prototype.sort sorts in place and compares as strings by default
 languages: [javascript, typescript]
+classes: [correctness]
 source: https://tc39.es/ecma262/#sec-array.prototype.sort
 checked: 2026-09-08
 ---

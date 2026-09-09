@@ -1,6 +1,7 @@
 ---
 title: An HTTP response body must be closed even when the request returned an error status
 languages: [go]
+classes: [resource]
 source: https://pkg.go.dev/net/http#Client.Do
 checked: 2026-09-08
 ---

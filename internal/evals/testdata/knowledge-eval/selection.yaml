@@ -1,0 +1,26 @@
+# The frozen selection. Empty until the snapshots are adjudicated; the schema
+# and the guards ship first, deliberately, so the selection cannot be assembled
+# while retrieval is being tuned against it.
+#
+# One row per snapshot:
+#
+#   - id: prometheus-0001-pre
+#     repo: prometheus/prometheus
+#     commit: <sha>            # the fix
+#     parent: <sha>            # what it was fixed from
+#     arm: pre_fix             # pre_fix | repaired | clean
+#     language: go
+#     class: resource          # the review class the defect belongs to
+#     family: context-cancellation
+#     defect: >
+#       One sentence naming the defect and the observable consequence, written
+#       from the fix and its discussion, not from a review of the diff.
+#     adjudicated_by: <who>, <date>
+#
+# A refactor commit is not evidence the old code was defective, and authorship
+# is never the label. A row whose `defect` cannot be written from the fix's own
+# discussion does not belong here.
+
+version: 1
+frozen: false
+snapshots: []

@@ -228,7 +228,11 @@ func (t *mcpTools) review(ctx context.Context, _ *mcp.CallToolRequest, in Review
 	}
 	provider := vcs.NewLocal(repo, io.Discard)
 	ref := vcs.Ref{Base: f.base, Head: f.head}
-	report, err := newEngine(f, repo, cfg, provider, t.log).Review(ctx, ref)
+	engine, err := newEngine(ctx, f, repo, cfg, provider, t.log)
+	if err != nil {
+		return nil, ReviewOut{}, err
+	}
+	report, err := engine.Review(ctx, ref)
 	if err != nil && (!errors.Is(err, review.ErrPublish) || report == nil) {
 		return nil, ReviewOut{}, err
 	}

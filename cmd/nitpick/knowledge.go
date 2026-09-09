@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/knowledge"
@@ -27,7 +29,10 @@ func runKnowledgeIndex(ctx context.Context, args []string, stdout io.Writer) err
 		fs.PrintDefaults()
 	}
 	cfgPath := fs.String("config", config.FileName, "configuration file to read models.embed from")
-	out := fs.String("o", "internal/knowledge/index.json", "write the index here")
+	dir := fs.String("d", "internal/knowledge/indexes", "write the index into this directory, named after the model")
+	out := fs.String("o", "", "write the index to this exact path instead")
+	provider := fs.String("provider", "", "override models.embed.provider")
+	model := fs.String("model", "", "override models.embed.model")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -37,8 +42,19 @@ func runKnowledgeIndex(ctx context.Context, args []string, stdout io.Writer) err
 		return err
 	}
 	spec, ok := cfg.Models.ResolveEmbed()
+	// The overrides exist so one checkout can build the index for every
+	// shipped embedding model without editing the configuration it reviews
+	// under. An operator building their own index names it under
+	// review.knowledge_index; this is how the committed ones are regenerated.
+	if *provider != "" {
+		spec.Provider, ok = *provider, true
+	}
+	if *model != "" {
+		spec.Model, ok = *model, true
+	}
 	if !ok {
-		return fmt.Errorf("no models.embed is configured, so there is nothing to embed with")
+		return fmt.Errorf("no models.embed is configured and no -provider/-model given, " +
+			"so there is nothing to embed with")
 	}
 
 	embedder, err := llm.BuildEmbedder(ctx, spec)
@@ -58,11 +74,41 @@ func runKnowledgeIndex(ctx context.Context, args []string, stdout io.Writer) err
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(*out, raw, 0o644); err != nil {
+	path := *out
+	if path == "" {
+		if err := os.MkdirAll(*dir, 0o755); err != nil {
+			return err
+		}
+		path = filepath.Join(*dir, indexFileName(ix.Model))
+	}
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stdout, "wrote %s: %d entries, %d dimensions, %s\n",
-		*out, len(ix.Vectors), ix.Dimensions, ix.Model)
+	_, _ = fmt.Fprintf(stdout, "wrote %s: %d entries, %d dimensions, %s, corpus %s\n",
+		path, len(ix.Vectors), ix.Dimensions, ix.Model, ix.Corpus)
 	return nil
+}
+
+// indexFileName turns "synthetic/hf:nomic-ai/nomic-embed-text-v1.5" into a
+// filename a person can recognise in a pull request.
+//
+// The name is a convenience only. Selection reads the model recorded inside
+// the file, so a renamed or misnamed index cannot make a run query the wrong
+// vectors.
+func indexFileName(model string) string {
+	name := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '.':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r + ('a' - 'A')
+		default:
+			return '-'
+		}
+	}, model)
+	for strings.Contains(name, "--") {
+		name = strings.ReplaceAll(name, "--", "-")
+	}
+	return strings.Trim(name, "-") + ".json"
 }

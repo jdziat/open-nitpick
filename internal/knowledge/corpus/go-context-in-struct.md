@@ -1,6 +1,7 @@
 ---
 title: A Context belongs in a function's first argument, not in a struct field
 languages: [go]
+classes: [contract]
 source: https://pkg.go.dev/context
 checked: 2026-09-08
 ---

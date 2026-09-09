@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // The corpus is files rather than Go literals for the reason the expert
@@ -16,14 +18,16 @@ import (
 //go:embed corpus/*.md
 var corpusFS embed.FS
 
-// The committed index ships with the binary too. A review that had to fetch it
-// would need a network for a file that is already known at build time.
+// The committed indexes ship with the binary too. A review that had to fetch
+// one would need a network for a file that is already known at build time.
 //
-//go:embed index.json
-var indexJSON []byte
+// A directory rather than a single file: one index per embedding model, chosen
+// at run time by SelectIndex from what models.embed names.
+//
+//go:embed indexes/*.json
+var indexFS embed.FS
 
-// IndexJSON is the committed index, for a caller building a retriever.
-func IndexJSON() []byte { return indexJSON }
+const indexDir = "indexes"
 
 const corpusDir = "corpus"
 
@@ -80,11 +84,39 @@ func ForLanguages(entries []Entry, langs map[string]bool) []Entry {
 	}
 	var out []Entry
 	for _, e := range entries {
+		// A generic entry survives any language the change touches, and still
+		// needs the change to touch a language this build recognises: a diff
+		// of files nobody can name retrieves nothing, generic entries
+		// included, which is the behaviour an unknown extension had before
+		// generic entries existed.
+		if e.Generic() {
+			out = append(out, e)
+			continue
+		}
 		for _, l := range e.Languages {
 			if langs[l] {
 				out = append(out, e)
 				break
 			}
+		}
+	}
+	return out
+}
+
+// ForClasses narrows a pool to entries about the classes a pass publishes.
+//
+// After the language cut and before any vector comparison, for the same
+// reason: a style rule the defect pass cannot act on is not a near miss to be
+// ranked, it is a wrong answer, and letting cosine decide means the closest
+// wrong answer displaces a right one.
+func ForClasses(entries []Entry, allowed map[config.Class]bool) []Entry {
+	if len(allowed) == 0 {
+		return nil
+	}
+	var out []Entry
+	for _, e := range entries {
+		if e.InClasses(allowed) {
+			out = append(out, e)
 		}
 	}
 	return out

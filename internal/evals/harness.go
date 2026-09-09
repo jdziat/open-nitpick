@@ -17,7 +17,6 @@ import (
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
@@ -635,6 +634,11 @@ type RunResult struct {
 	Fixture string
 	Run     int
 
+	// Knowledge is what retrieval did on this run. An arm configured for
+	// retrieval whose status is not Retrieved() is not the on arm, whatever
+	// the run was labelled, and folding it in would measure the control twice.
+	Knowledge review.KnowledgeStatus
+
 	// UsageByModel is the usage of each model a composite run reached for,
 	// keyed by model id; nil for a single-model run.
 	UsageByModel map[string]TokenUsage
@@ -805,13 +809,13 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	// retrieval and did not would be recorded as the on arm and measure the
 	// off one.
 	if cfg.Review.Knowledge {
-		k, err := review.BuildKnowledge(ctx, cfg, knowledge.IndexJSON(), cmpLogger(opts.Log))
+		k, status, err := review.BuildKnowledge(ctx, cfg, cmpLogger(opts.Log))
 		switch {
 		case err != nil:
-			out.Err = fmt.Errorf("build knowledge retrieval: %w", err)
+			out.Err = fmt.Errorf("build knowledge retrieval (%s): %w", status.Reason, err)
 			return out
 		case k == nil:
-			out.Err = fmt.Errorf("review.knowledge is on and no retriever was built")
+			out.Err = fmt.Errorf("review.knowledge is on and retrieval %s", status)
 			return out
 		}
 		engine.Knowledge = k
@@ -827,6 +831,9 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	report, err := engine.Review(runCtx, vcs.Ref{})
 
 	out.Report = report
+	if report != nil {
+		out.Knowledge = report.Knowledge
+	}
 	out.Review = provider.review
 	out.Responses = recorder.captured()
 

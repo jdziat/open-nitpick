@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/knowledge"
@@ -19,45 +20,86 @@ const (
 	knowledgeKeep       = 5
 )
 
-// BuildKnowledge constructs the retriever, or returns nil.
+// BuildKnowledge constructs the retriever and says what it did.
 //
-// Nil is the ordinary answer: retrieval is off unless review.knowledge is on
-// and models.embed names a provider that can embed. Every reason to return nil
-// is logged, because a feature that is silently doing nothing is worse than
-// one that is off.
-func BuildKnowledge(ctx context.Context, cfg *config.Config, index []byte, log *slog.Logger) (*KnowledgeRetriever, error) {
+// The status is the point of the signature. Retrieval used to report itself by
+// returning nil and logging why, which reads fine in a terminal and is
+// unusable in a measurement: an arm whose embedder was never built and an arm
+// that retrieved for every batch both produced a review, and only one of them
+// is the treatment.
+//
+// The error is still returned, and callers that asked for retrieval should
+// still treat construction as fatal. A status of failed exists for the run
+// that got further than construction.
+func BuildKnowledge(ctx context.Context, cfg *config.Config, log *slog.Logger) (*KnowledgeRetriever, KnowledgeStatus, error) {
 	if cfg == nil || !cfg.Review.Knowledge {
-		return nil, nil
+		return nil, KnowledgeStatus{State: KnowledgeOff}, nil
 	}
+
+	skip := func(reason string) (*KnowledgeRetriever, KnowledgeStatus, error) {
+		log.Warn("review.knowledge is on and retrieval is not running; reviewing without it", "reason", reason)
+		return nil, KnowledgeStatus{State: KnowledgeSkipped, Reason: reason}, nil
+	}
+	fail := func(reason string, err error) (*KnowledgeRetriever, KnowledgeStatus, error) {
+		return nil, KnowledgeStatus{State: KnowledgeFailed, Reason: reason}, err
+	}
+
 	spec, ok := cfg.Models.ResolveEmbed()
 	if !ok {
-		log.Warn("review.knowledge is on and no models.embed is configured; reviewing without it")
-		return nil, nil
+		return skip("no models.embed is configured")
 	}
 
 	entries, err := knowledge.Corpus()
 	if err != nil {
-		return nil, err
+		return fail("the corpus could not be read", err)
 	}
-	ix, err := knowledge.LoadIndex(index, entries)
-	if err != nil {
-		return nil, err
+	if len(entries) == 0 {
+		return skip("the corpus is empty")
 	}
-
+	// The embedder first, because it names the model the index has to match.
+	// Selecting an index before knowing what will query it is how a run ends
+	// up comparing one model's vectors against another's.
 	embedder, err := llm.BuildEmbedder(ctx, spec)
 	if err != nil {
-		return nil, err
+		return fail("the embedder could not be built", err)
+	}
+
+	raw, err := resolveIndex(cfg, embedder.Model())
+	if err != nil {
+		return fail("no index is available for this embedding model", err)
+	}
+	ix, err := knowledge.LoadIndex(raw, entries)
+	if err != nil {
+		return fail("the index could not be loaded", err)
 	}
 	if err := ix.CheckModel(embedder.Model()); err != nil {
-		return nil, err
+		return fail("the index was built by a different embedding model", err)
 	}
 
 	log.Info("knowledge retrieval on", "entries", len(entries), "model", embedder.Model())
-	return &KnowledgeRetriever{R: &knowledge.Retriever{
-		Entries:    entries,
-		Index:      ix,
-		Embedder:   embedder,
-		Candidates: knowledgeCandidates,
-		Keep:       knowledgeKeep,
-	}}, nil
+	return &KnowledgeRetriever{
+		R: &knowledge.Retriever{
+			Entries:    entries,
+			Index:      ix,
+			Embedder:   embedder,
+			Candidates: knowledgeCandidates,
+			Keep:       knowledgeKeep,
+			MinScore:   cfg.Review.KnowledgeMinScore,
+		},
+		status: KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)},
+	}, KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)}, nil
+}
+
+// resolveIndex picks the vectors this run queries: the operator's own file
+// when review.knowledge_index names one, otherwise the shipped index built by
+// the configured embedding model.
+//
+// An explicit path wins and is not second-guessed. An operator who named a
+// file wants that file, and silently falling back to a shipped index when it
+// cannot be read would answer a review from vectors they did not choose.
+func resolveIndex(cfg *config.Config, model string) ([]byte, error) {
+	if p := strings.TrimSpace(cfg.Review.KnowledgeIndex); p != "" {
+		return knowledge.LoadIndexFile(p)
+	}
+	return knowledge.SelectIndex(model)
 }

@@ -1,6 +1,7 @@
 ---
 title: A Python default argument is evaluated once, so a mutable default is shared
 languages: [python]
+classes: [correctness]
 source: https://docs.python.org/3/reference/compound_stmts.html#function-definitions
 checked: 2026-09-08
 ---

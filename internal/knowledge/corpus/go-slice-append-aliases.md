@@ -1,6 +1,7 @@
 ---
 title: append may return a slice sharing the caller's backing array
 languages: [go]
+classes: [correctness]
 source: https://go.dev/blog/slices-intro
 checked: 2026-09-08
 ---

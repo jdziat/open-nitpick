@@ -1,6 +1,7 @@
 ---
 title: time.After in a loop holds its timer until it fires, however the loop exits
 languages: [go]
+classes: [resource]
 source: https://pkg.go.dev/time#After
 checked: 2026-09-08
 ---

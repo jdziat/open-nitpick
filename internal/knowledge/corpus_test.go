@@ -77,25 +77,83 @@ func contains(ss []string, s string) bool {
 	return false
 }
 
-// The committed index covers the committed corpus.
+// EVERY committed index covers the committed corpus.
 //
-// An entry added without regenerating the index is unreachable: retrieval
-// works, returns the other twelve, and nothing says the thirteenth was skipped.
-// CI runs this, so the corpus and its vectors cannot drift apart quietly.
-func TestTheCommittedIndexCoversTheCorpus(t *testing.T) {
+// An entry added without regenerating an index is unreachable through it:
+// retrieval works, returns the others, and nothing says the new one was
+// skipped. Each shipped index is checked, because an operator selecting the
+// second one gets no warning that only the first was kept current.
+func TestEveryCommittedIndexCoversTheCorpus(t *testing.T) {
 	entries, err := Corpus()
 	if err != nil {
 		t.Fatalf("Corpus: %v", err)
 	}
-	ix, err := LoadIndex(IndexJSON(), entries)
+	models, err := ShippedModels()
 	if err != nil {
-		t.Fatalf("the committed index does not match the corpus; "+
-			"run `nitpick knowledge-index`: %v", err)
+		t.Fatalf("ShippedModels: %v", err)
 	}
-	if len(ix.Vectors) != len(entries) {
-		t.Errorf("index has %d vectors for %d entries", len(ix.Vectors), len(entries))
+	if len(models) == 0 {
+		t.Fatal("this build ships no index")
 	}
-	if ix.Dimensions == 0 {
-		t.Error("the index reports no dimensions")
+
+	for _, model := range models {
+		raw, err := SelectIndex(model)
+		if err != nil {
+			t.Fatalf("SelectIndex(%q): %v", model, err)
+		}
+		ix, err := LoadIndex(raw, entries)
+		if err != nil {
+			t.Fatalf("the committed index for %s does not match the corpus; "+
+				"run `nitpick knowledge-index`: %v", model, err)
+		}
+		if len(ix.Vectors) != len(entries) {
+			t.Errorf("%s: index has %d vectors for %d entries", model, len(ix.Vectors), len(entries))
+		}
+		if ix.Dimensions == 0 {
+			t.Errorf("%s: the index reports no dimensions", model)
+		}
+		if ix.Entries != len(entries) {
+			t.Errorf("%s: index records %d entries, the corpus has %d", model, ix.Entries, len(entries))
+		}
+	}
+}
+
+// An entry EDITED without regenerating keeps its vector under the same id, so
+// every count above still agrees and the vector now describes a paragraph
+// nobody wrote. The corpus hash is what catches it.
+func TestAnEditedEntryInvalidatesTheIndex(t *testing.T) {
+	entries, err := Corpus()
+	if err != nil {
+		t.Fatalf("Corpus: %v", err)
+	}
+	models, err := ShippedModels()
+	if err != nil || len(models) == 0 {
+		t.Fatalf("ShippedModels: %v", err)
+	}
+	raw, err := SelectIndex(models[0])
+	if err != nil {
+		t.Fatalf("SelectIndex: %v", err)
+	}
+
+	edited := append([]Entry(nil), entries...)
+	edited[0].Body += "\n\nA sentence added after the vectors were computed."
+
+	if _, err := LoadIndex(raw, edited); err == nil {
+		t.Fatal("an edited entry loaded against stale vectors; retrieval would answer from text nobody wrote")
+	}
+}
+
+// Correcting a citation does not move a vector, so it must not force a
+// re-embed: an operator who has to regenerate for a URL will stop checking.
+func TestACitationFixDoesNotInvalidateTheIndex(t *testing.T) {
+	entries, err := Corpus()
+	if err != nil {
+		t.Fatalf("Corpus: %v", err)
+	}
+	recited := append([]Entry(nil), entries...)
+	recited[0].Source = "https://example.invalid/moved"
+
+	if CorpusHash(entries) != CorpusHash(recited) {
+		t.Error("the corpus hash covers the citation; a URL fix now needs an embedding run")
 	}
 }

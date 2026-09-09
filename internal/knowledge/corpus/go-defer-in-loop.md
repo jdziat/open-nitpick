@@ -1,6 +1,7 @@
 ---
 title: A defer runs at function return, not at the end of the loop iteration
 languages: [go]
+classes: [resource]
 source: https://go.dev/ref/spec#Defer_statements
 checked: 2026-09-08
 ---

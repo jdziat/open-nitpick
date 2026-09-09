@@ -14,7 +14,6 @@ import (
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/linters"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/prompt"
@@ -200,15 +199,8 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		}
 	}
 
-	engine := newEngine(&f, repo, cfg, provider, log)
-
-	// Retrieval is built from the file on disk rather than the resolved
-	// policy, and deliberately: it reads models.embed, which the trust prune
-	// strips from a repository's own file, so a change cannot point the
-	// embedder at an endpoint of its own. A misconfiguration is fatal here
-	// because the operator asked for retrieval; a failure to retrieve during a
-	// review is not, and is logged instead.
-	if engine.Knowledge, err = review.BuildKnowledge(ctx, cfg, knowledge.IndexJSON(), log); err != nil {
+	engine, err := newEngine(ctx, &f, repo, cfg, provider, log)
+	if err != nil {
 		return err
 	}
 
@@ -292,7 +284,16 @@ func skipReason(pr *vcs.PullRequest, skipDraft bool, markers []string) string {
 // driver has no base revision to resolve against), so neither omission is a
 // build error, and a test can only pin them by constructing what the command
 // constructs.
-func newEngine(f *reviewFlags, repo string, cfg *config.Config, provider vcs.Provider, log *slog.Logger) *review.Engine {
+// newEngine builds the engine every command reviews through, retrieval
+// included.
+//
+// The retriever is built HERE rather than by each caller, and that is the
+// point of the signature carrying a context and an error. Wired per command it
+// reached one of them: `nitpick review` had it and full-review, slop, the MCP
+// tools and improve did not, so `review.knowledge: true` meant four different
+// things depending on which command read it. A new entry point now gets
+// retrieval by construction instead of by remembering.
+func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Config, provider vcs.Provider, log *slog.Logger) (*review.Engine, error) {
 	engine := &review.Engine{
 		Config:   cfg,
 		Provider: provider,
@@ -326,7 +327,19 @@ func newEngine(f *reviewFlags, repo string, cfg *config.Config, provider vcs.Pro
 		}
 	}
 
-	return engine
+	// Retrieval is built from the file on disk rather than the resolved
+	// policy, and deliberately: it reads models.embed, which the trust prune
+	// strips from a repository's own file, so a change cannot point the
+	// embedder at an endpoint of its own. A misconfiguration is fatal here
+	// because the operator asked for retrieval; a failure to retrieve during a
+	// review is not, and lands on the report instead.
+	k, status, err := review.BuildKnowledge(ctx, cfg, log)
+	if err != nil {
+		return nil, fmt.Errorf("knowledge retrieval (%s): %w", status.Reason, err)
+	}
+	engine.Knowledge = k
+
+	return engine, nil
 }
 
 // gate returns the severity that decides this run's exit status: the

@@ -500,6 +500,40 @@ type Review struct {
 	// guide is worse than one that misses them.
 	Knowledge bool `yaml:"knowledge"`
 
+	// KnowledgeQuery is what gets embedded to retrieve against: "batch", the
+	// changed lines of the whole batch as one query, or "file", one query per
+	// changed file whose results are merged.
+	//
+	// Batch is what shipped and what was measured. File costs one embedding
+	// call per file and exists because a small relevant defect in one file is
+	// buried when a large change in another dominates the query, which is a
+	// failure the corpus's own fixtures are too small to show.
+	KnowledgeQuery string `yaml:"knowledge_query"`
+
+	// KnowledgeMinScore drops retrieved entries below this cosine, so a change
+	// resembling nothing in the corpus gets nothing rather than its five least
+	// distant entries. Zero is off, which is what shipped.
+	KnowledgeMinScore float64 `yaml:"knowledge_min_score"`
+
+	// KnowledgeTokens bounds the retrieved section, counted with its own
+	// framing. Zero is unbounded, which is what shipped: the section carries
+	// at most five entries and the ceiling below is what a measurement would
+	// tighten.
+	//
+	// Spent from the request budget like related context, so a large value
+	// narrows the window the changed files get.
+	KnowledgeTokens int `yaml:"knowledge_tokens"`
+
+	// KnowledgeIndex names an index file to retrieve from, instead of the one
+	// this build ships for the configured embedding model.
+	//
+	// The escape hatch that keeps the embedding model configuration rather
+	// than a property of the binary: an operator whose provider is not one of
+	// the shipped ones runs `nitpick knowledge-index` and names the result
+	// here. It is checked against the corpus and the model like any other, so
+	// naming a file buys no exemption from either.
+	KnowledgeIndex string `yaml:"knowledge_index"`
+
 	// ModelNotes adds the prompt layer addressed to the reviewing model's
 	// family (prompt.ModelGuidance). On unless set to false; the switch
 	// exists so the layer's contribution can be measured on its own.

@@ -65,7 +65,7 @@ func TestKnowledgeSimilaritySeparatesNoise(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ix, err := knowledge.LoadIndex(knowledge.IndexJSON(), entries)
+	ix, err := knowledge.LoadIndex(mustShippedIndex(t), entries)
 	if err != nil {
 		t.Fatal(err)
 	}

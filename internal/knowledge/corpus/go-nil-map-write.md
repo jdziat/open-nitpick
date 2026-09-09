@@ -1,6 +1,7 @@
 ---
 title: Reading a nil map is fine and writing to one panics
 languages: [go]
+classes: [correctness]
 source: https://go.dev/ref/spec#Map_types
 checked: 2026-09-08
 ---

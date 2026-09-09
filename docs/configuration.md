@@ -420,11 +420,92 @@ names its own provider. Synthetic includes embeddings in the subscription at no
 additional charge, which is why the example uses it.
 
 The corpus is fourteen entries under `internal/knowledge/corpus`, each naming
-the source it came from and the day that source was read. The vectors are
-committed and regenerated with `nitpick knowledge-index`; CI diffs them, so an
-entry added without regenerating fails the build that added it rather than
-being silently unreachable. An index built by one embedding model refuses a
-query from another, because vectors from two models are not comparable.
+the source it came from, the day that source was read, the languages it applies
+to and the review classes it is about. The classes route it: the defect pass
+sees correctness, concurrency, security, resource, data-loss, contract and
+tests entries, `improve`'s style pass sees style entries, maintainability goes
+to both, and slop entries arrive only when `review.slop` is on. A style rule in
+front of the defect reviewer is the same dilution the generation scope exists
+to prevent, arriving as reference material instead of as a prompt.
+
+An entry applies to the languages it names. `languages: [any]` is the only way
+to write one that crosses them, and it has to be typed: an empty list used to
+mean the same thing, which made a forgotten key and a deliberate claim about
+every language the same entry. A change whose files resolve to no known
+language still retrieves nothing, generic entries included. `versions:` and
+`frameworks:` are optional and are rendered beside the entry rather than
+filtered on, because nothing here knows the versions a change runs under and a
+filter fed a guess would silence entries on the strength of it. The vectors are
+committed under `internal/knowledge/indexes` and regenerated with `nitpick
+knowledge-index`, one file per embedding model. A run selects the file whose
+recorded model matches `models.embed`, so switching embedder is configuration
+rather than a rebuild:
+
+```yaml
+models:
+  embed:
+    provider: openrouter
+    model: openai/text-embedding-3-small
+```
+
+Two ship: `synthetic/hf:nomic-ai/nomic-embed-text-v1.5` at 768 dimensions and
+`openrouter/openai/text-embedding-3-small` at 1536. For any other provider,
+build your own and name it:
+
+```yaml
+review:
+  knowledge_index: ./my-index.json
+```
+
+An index built by one embedding model refuses a query from another, because
+vectors from two models are not comparable, and every index records the hash of
+the corpus text it was built from. That hash is the half a file listing cannot
+check: an entry *added* without regenerating has no vector and is caught by its
+absence, and an entry *edited* without regenerating keeps its vector under the
+same id, so the counts still agree and retrieval answers from a paragraph
+nobody wrote any more. The hash covers the title and body, which is what gets
+embedded, and not the citation, so correcting a URL does not cost an embedding
+run.
+
+Every reviewing command reads it: `review`, `full-review`, `slop`, the MCP
+review tools and `improve`'s defect pass. Retrieval was wired per command until
+2026-09-08 and only `review` had it, so the same setting meant different things
+depending on what you ran; a test now fails the build if a command builds a
+review engine without it.
+
+A misconfigured embedder stops the run rather than reviewing quietly without
+retrieval, because asking for it and not getting it is a question about the
+configuration. A failure once the review is under way costs that batch its
+extra context and nothing else, and the report records what retrieval did: off,
+active, skipped (something to fix, such as no `models.embed`) or failed (an
+embedder that should have worked). A measurement reads that field, so a run
+whose embedder refused its batches is never scored as the retrieval-on arm.
+
+Three knobs shape retrieval, and all three default to what shipped and what
+was measured, because none of them is an established improvement:
+
+```yaml
+review:
+  knowledge_query: file      # default "batch": the whole batch as one query
+  knowledge_min_score: 0.5   # default 0: keep the closest five whatever they score
+  knowledge_tokens: 1200     # default 0: unbounded, at most five entries
+```
+
+`knowledge_query: file` embeds each changed file separately and merges the
+results, one row per entry at its best score, keeping the file that retrieved
+it. A batch query is dominated by whichever file changed most: a two-line edit
+that is the whole reason retrieval would have helped contributes two lines to a
+query of four hundred. It costs one embedding call per file instead of one per
+batch. `knowledge_min_score` drops entries below a cosine, so a change
+resembling nothing in the corpus gets nothing rather than its five least
+distant entries; the entry cut for scoring 0.4 is as real a failure as the five
+irrelevant ones, which is why it is off. `knowledge_tokens` bounds the rendered
+section including its heading and disclaimer, dropping the least relevant
+entries first, and yields no section at all rather than a heading with nothing
+under it.
+
+The evaluation that would decide whether it should ever default on is
+pre-registered in [Evaluating retrieved knowledge](knowledge-evaluation.md).
 
 It ships off. On its own corpus it took recall from 0.75 to 1.00 with noise
 falling from 0.50 to 0.33 per review

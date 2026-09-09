@@ -26,7 +26,7 @@ func TestLiveKnowledgeReachesThePlants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Corpus: %v", err)
 	}
-	ix, err := knowledge.LoadIndex(knowledge.IndexJSON(), entries)
+	ix, err := knowledge.LoadIndex(mustShippedIndex(t), entries)
 	if err != nil {
 		t.Fatalf("LoadIndex: %v", err)
 	}
@@ -84,4 +84,19 @@ func TestLiveKnowledgeReachesThePlants(t *testing.T) {
 		t.Errorf("the needed entry reached %d of %d plants; retrieval is not what the on arm measured",
 			got, len(want))
 	}
+}
+
+// mustShippedIndex returns the first index this build ships, for a live test
+// that supplies its own embedder and only needs vectors over the same corpus.
+func mustShippedIndex(t *testing.T) []byte {
+	t.Helper()
+	models, err := knowledge.ShippedModels()
+	if err != nil || len(models) == 0 {
+		t.Fatalf("ShippedModels: %v", err)
+	}
+	raw, err := knowledge.SelectIndex(models[0])
+	if err != nil {
+		t.Fatalf("SelectIndex(%q): %v", models[0], err)
+	}
+	return raw
 }
