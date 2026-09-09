@@ -490,6 +490,16 @@ type Review struct {
 	// RelatedContext is on.
 	RelatedContextCallers bool `yaml:"related_context_callers"`
 
+	// Knowledge attaches entries from the shipped corpus that the change
+	// resembles: antipatterns and standard-library contracts a model may not
+	// carry. It needs models.embed, and does nothing without it.
+	//
+	// Off by default, and it should stay off until a measurement says
+	// otherwise. Reference material beside a diff is a reason for a model to
+	// report the reference, and a reviewer that invents defects out of a style
+	// guide is worse than one that misses them.
+	Knowledge bool `yaml:"knowledge"`
+
 	// ModelNotes adds the prompt layer addressed to the reviewing model's
 	// family (prompt.ModelGuidance). On unless set to false; the switch
 	// exists so the layer's contribution can be measured on its own.

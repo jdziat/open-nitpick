@@ -55,3 +55,10 @@ func promptSafe(s string) string {
 
 	return b.String()
 }
+
+// PromptSafe escapes a string so it cannot forge structure in a prompt.
+//
+// Exported for the knowledge section in internal/review, which renders titles
+// and sources into the same prompt under the same rule: a string that reaches
+// a model must not be able to forge a heading at column 0.
+func PromptSafe(s string) string { return promptSafe(s) }

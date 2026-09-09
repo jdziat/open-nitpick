@@ -76,3 +76,26 @@ func contains(ss []string, s string) bool {
 	}
 	return false
 }
+
+// The committed index covers the committed corpus.
+//
+// An entry added without regenerating the index is unreachable: retrieval
+// works, returns the other twelve, and nothing says the thirteenth was skipped.
+// CI runs this, so the corpus and its vectors cannot drift apart quietly.
+func TestTheCommittedIndexCoversTheCorpus(t *testing.T) {
+	entries, err := Corpus()
+	if err != nil {
+		t.Fatalf("Corpus: %v", err)
+	}
+	ix, err := LoadIndex(IndexJSON(), entries)
+	if err != nil {
+		t.Fatalf("the committed index does not match the corpus; "+
+			"run `nitpick knowledge-index`: %v", err)
+	}
+	if len(ix.Vectors) != len(entries) {
+		t.Errorf("index has %d vectors for %d entries", len(ix.Vectors), len(entries))
+	}
+	if ix.Dimensions == 0 {
+		t.Error("the index reports no dimensions")
+	}
+}

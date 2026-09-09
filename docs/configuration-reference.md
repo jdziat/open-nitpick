@@ -1000,6 +1000,11 @@ IncludeFullFiles sends whole changed files alongside the diff when the token bud
 boolean, default `true`.
 Incremental makes a run on a pull request this tool has reviewed before read only the files changed since that review, and withhold findings it has already posted.
 
+### `review.knowledge`
+
+boolean, default `false`.
+Knowledge attaches entries from the shipped corpus that the change resembles: antipatterns and standard-library contracts a model may not carry.
+
 ### `review.max_file_bytes`
 
 integer, default `262144`.

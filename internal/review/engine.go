@@ -49,6 +49,12 @@ type Engine struct {
 	// reviewed under half of one.
 	Models func(policy *config.Config) (*llm.Roles, error)
 
+	// Knowledge retrieves the entries a batch should be judged against. Nil
+	// when review.knowledge is off or no models.embed is configured, which is
+	// the shipped state: this is an option a repository turns on, not a
+	// default it inherits.
+	Knowledge *KnowledgeRetriever
+
 	// routeDecisions is where each batch of the last review went; copied
 	// into the Report.
 	routeDecisions []RouteDecision
@@ -1203,6 +1209,13 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	for _, entry := range b.Entries {
 		body.WriteString(bundle.Render(entry))
 		body.WriteString("\n")
+	}
+
+	// After the diff, not before it. The change is what the model is being
+	// asked about, and reference material placed first reads as the subject.
+	if hits := e.retrieveKnowledge(ctx, b); len(hits) > 0 {
+		body.WriteString(knowledgeSection(hits))
+		e.log().Info("knowledge retrieved", "batch", b.Paths(), "entries", ids(hits))
 	}
 
 	msgs := []llms.Message{
