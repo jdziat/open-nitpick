@@ -35,15 +35,47 @@ func BelowAnalyzed(declared, ceiling string) bool {
 	return version.Compare(version.Lang(v), version.Lang(ceiling)) < 0
 }
 
-// LanguageVersion reads the Go language version a go.mod declares, with
-// the 1-based line of the `go` directive.
+// LanguageVersion reads the Go language version a go.mod declares, with the
+// 1-based line of the `go` directive.
 //
 // The note behind it is in docs/runner-notes.md#languageversion.
 func LanguageVersion(modFile string) (declared string, line int, ok bool) {
+	f, ok := scanMod(modFile)
+	switch {
+	case !ok:
+		return "", 0, false
+	case f.hasGo:
+		return f.goVersion, f.goLine, true
+	default:
+		return AssumedLanguage, 0, true
+	}
+}
+
+// modFacts is what one pass over a go.mod found.
+type modFacts struct {
+	goVersion string
+	goLine    int
+	hasGo     bool
+	hasModule bool
+}
+
+// scanMod reads a go.mod once, reporting every fact this package answers from.
+//
+// One scan, because the package's whole reason for existing is that two
+// readings of the same file cannot disagree. A second hand-written walk for
+// the module directive would duplicate the comment stripping and the
+// parenthesis depth, and a grammar fix applied to one and not the other is the
+// disagreement this package was made to prevent.
+//
+// False means the file could not be read or does not parse, which the callers
+// answer with an abstention.
+func scanMod(modFile string) (modFacts, bool) {
 	src, err := os.ReadFile(modFile)
 	if err != nil {
-		return "", 0, false
+		return modFacts{}, false
 	}
+
+	var out modFacts
 
 	// Parenthesis depth, so that a `go` line inside require/exclude/replace/
 	// retract/godebug/tool is read as what it is, a block entry, and not as the
@@ -63,8 +95,15 @@ func LanguageVersion(modFile string) (declared string, line int, ok bool) {
 
 		// Fields rather than a split on " ": it absorbs leading indentation,
 		// which go.mod permits, and the trailing \r of a file written on Windows.
-		if fields := strings.Fields(raw); depth == 0 && len(fields) >= 2 && fields[0] == "go" {
-			return fields[1], i + 1, true
+		if fields := strings.Fields(raw); depth == 0 && len(fields) >= 2 {
+			switch fields[0] {
+			case "go":
+				if !out.hasGo {
+					out.goVersion, out.goLine, out.hasGo = fields[1], i+1, true
+				}
+			case "module":
+				out.hasModule = true
+			}
 		}
 
 		// After the check and not before it: `require (` opens the block on the
@@ -75,11 +114,11 @@ func LanguageVersion(modFile string) (declared string, line int, ok bool) {
 			// Unbalanced. The file does not load either, and guessing which of
 			// the two readings the author meant is how a misread becomes a
 			// number the ceiling comparison trusts.
-			return "", 0, false
+			return modFacts{}, false
 		}
 	}
 
-	return AssumedLanguage, 0, true
+	return out, true
 }
 
 // Versions reports what a repository's root module declares, keyed by the
@@ -95,22 +134,21 @@ func Versions(repoRoot string) map[string]string {
 		// against whatever module the binary happens to be run from.
 		return nil
 	}
-	mod := filepath.Join(repoRoot, "go.mod")
-	// A file with no `module` directive is not a loadable module, whatever
-	// else it holds. LanguageVersion still answers for it, because the go
-	// tool's assumed version is what the linter roster's coverage note needs
-	// and that reading is measured (docs/runner-notes.md#assumedlanguage).
-	// Here the question is different: an entry bounded to a version must not
-	// be judged against a number that came from a file the go tool would
-	// refuse, so this abstains and the caller keeps every entry.
-	if !declaresModule(mod) {
+	// A file with no `module` directive is not a loadable module, whatever else
+	// it holds. LanguageVersion still answers for it, because the go tool's
+	// assumed version is what the linter roster's coverage note needs and that
+	// reading is measured (docs/runner-notes.md#assumedlanguage). Here the
+	// question is different: an entry bounded to a version must not be judged
+	// against a number read out of a file the go tool would refuse, so this
+	// abstains and the caller keeps every entry.
+	f, ok := scanMod(filepath.Join(repoRoot, "go.mod"))
+	if !ok || !f.hasModule {
 		return nil
 	}
-	declared, _, ok := LanguageVersion(mod)
-	if !ok {
-		return nil
+	if !f.hasGo {
+		return map[string]string{"go": AssumedLanguage}
 	}
-	return map[string]string{"go": declared}
+	return map[string]string{"go": f.goVersion}
 }
 
 // VersionsFor reports what the module owning these paths declares.
@@ -198,27 +236,4 @@ func resolved(p string) string {
 		return real
 	}
 	return p
-}
-
-// declaresModule reports whether a go.mod carries a top-level module
-// directive, which is what makes it a module rather than a file.
-func declaresModule(modFile string) bool {
-	src, err := os.ReadFile(modFile)
-	if err != nil {
-		return false
-	}
-	depth := 0
-	for _, raw := range strings.Split(string(src), "\n") {
-		if comment := strings.Index(raw, "//"); comment >= 0 {
-			raw = raw[:comment]
-		}
-		if fields := strings.Fields(raw); depth == 0 && len(fields) >= 2 && fields[0] == "module" {
-			return true
-		}
-		depth += strings.Count(raw, "(") - strings.Count(raw, ")")
-		if depth < 0 {
-			return false
-		}
-	}
-	return false
 }
