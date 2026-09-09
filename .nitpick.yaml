@@ -57,6 +57,14 @@ review:
   # docs/findings.md's callers section is the evidence for what it finds.
   related_context: true
   related_context_callers: true
+  ignore:
+    # Generated vectors, not source. `nitpick knowledge-index` writes them and
+    # a test checks them against the corpus, so a reviewer reading them can
+    # find nothing a person would act on. The 4096-dimension bundle is 393k
+    # tokens on its own, which is three times this file's per-request budget:
+    # it does not fail to be worth reviewing, it fails to be reviewable, and
+    # the batch that tried it failed the run.
+    - "internal/knowledge/indexes/**"
 
 instructions:
   - path: "**/*.go"
