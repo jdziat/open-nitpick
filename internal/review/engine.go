@@ -1357,45 +1357,6 @@ func holdAdvisories(findings []Finding) (rest, advisories []Finding) {
 	return rest, advisories
 }
 
-// restoreSeverityProvenance puts back who reported a finding and, where it
-// still describes something, the word that reporter used, both lost by a pass
-// that decodes findings from JSON, where they carry `json:"-"`. FromAnalyzer
-// comes back for any finding still recognized, since it is a fact about origin
-// that no re-rating touches, and the other two fields follow from it.
-//
-// A model's raw word is its own rating, so a pass that moved the severity
-// leaves that word describing a rating nobody holds, and it is dropped, as
-// applyOutcomes does when an expert re-rates.
-//
-// An analyzer's raw word is what the tool printed, and semgrep printed
-// CRITICAL however triage re-rated the finding. Dropping it would publish
-// Source="semgrep(rule)" with SeverityTranslated false and no raw word,
-// asserting semgrep's word is this tool's level. SeverityTranslated is
-// likewise always true for one.
-//
-// Keying on Finding.Key() means a reworded finding keeps whatever the pass
-// said. Failing to restore prints "(word not recorded)" and is visible, where
-// restoring onto the wrong finding misquotes a reviewer.
-func (e *Engine) restoreSeverityProvenance(f *Finding, before map[string]Finding) {
-	original, ok := before[f.Key()]
-	if !ok {
-		return
-	}
-	f.FromAnalyzer = original.FromAnalyzer
-
-	if original.FromAnalyzer {
-		f.SeverityTranslated = true
-		f.RawSeverity = original.RawSeverity
-		return
-	}
-
-	if original.Severity != f.Severity {
-		return
-	}
-	f.SeverityTranslated = original.SeverityTranslated
-	f.RawSeverity = original.RawSeverity
-}
-
 // filterAnchors drops findings that cannot be placed, snaps near-misses onto a
 // real changed line, and RETURNS THE ANALYZER FINDINGS IT DROPPED.
 //
@@ -1531,7 +1492,7 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		return "", nil, nil, err
 	}
 
-	result, err := llm.Extract[Result](ctx, e.Roles.Triage, msgs, schema)
+	result, err := llm.Extract[TriageResult](ctx, e.Roles.Triage, msgs, schema)
 	if err != nil {
 		if ctx.Err() != nil {
 			return "", nil, nil, err
@@ -1544,167 +1505,130 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		return "", findings, nil, fmt.Errorf("%w: triage: %w", errStageDegraded, err)
 	}
 
-	// Triage may reword and merge, but must not invent findings for files that
-	// were never reported on. Trusting it blindly would let a summarizing model
-	// place comments on arbitrary paths.
-	allowed := make(map[string]struct{}, len(findings))
-	// classBefore preserves the class the REVIEW model assigned. Triage is a
-	// filtering pass: it may drop, merge, and reword, but it must not be able to
-	// re-author policy. Letting it do so meant a finding the reviewer classed
-	// `security` could come back `style` and be silently dropped at the default
-	// level, a real defect disappearing because a summarizer guessed.
-	classBefore := make(map[string]string, len(findings))
-	sourceBefore := make(map[string]string, len(findings))
-	// severityBefore preserves the severity PROVENANCE (the reporter's own word
-	// and the fact that we rewrote it), for the same reason sourceBefore exists.
+	// One verdict per finding, and the first verdict wins.
 	//
-	// THE BUG IT FIXES: SeverityTranslated and RawSeverity are `json:"-"`, so
-	// they arrive from triage's decode zeroed. recordSeverity below could not
-	// restore them either, because renderForTriage shows triage `[%s]` of
-	// f.Severity (this PROJECT'S word, already normalized), so a triage model
-	// that echoes what it was shown normalizes to itself and the call returns
-	// early. Every finding that survived triage was therefore published claiming
-	// nobody had translated it, and internal/evals' severityAsSaid reads that as
-	// "Severity IS the reporter's word" and quotes our substitute as the model's
-	// own, unmarked. That is verbatim the defect recordSeverity's doc comment
-	// says it fixes, one pass downstream of the fix, and it was live on the path
-	// the eval battery runs. It was worse for linter findings, because Source is
-	// deliberately restored below: the finding was published attributed to gosec
-	// with our word quoted as gosec's.
-	// Evidence is json:"-" like Source, so it arrives from triage's decode
-	// empty. Restored beside the others rather than recomputed: the hits that
-	// produced it belong to a batch this function no longer has.
-	evidenceBefore := make(map[string][]string, len(findings))
-
-	severityBefore := make(map[string]Finding, len(findings))
-	for _, f := range findings {
-		allowed[f.Path] = struct{}{}
-		if _, seen := classBefore[f.Key()]; !seen {
-			classBefore[f.Key()] = f.Class
-			sourceBefore[f.Key()] = f.Source
-			evidenceBefore[f.Key()] = f.Evidence
-			severityBefore[f.Key()] = f
+	// A number outside the list, or a second verdict for a number already
+	// judged, is dropped rather than guessed at: the finding it would have
+	// edited is then absent from the verdicts and comes back unchanged by the
+	// accounting below, which is the visible outcome rather than the silent
+	// one. Nothing here can move a verdict onto a finding it does not name.
+	judged := make(map[int]Verdict, len(result.Verdicts))
+	defer func() {
+		// A reply full of verdicts none of which name a finding means triage
+		// did nothing, and the review publishes exactly what the reviewer
+		// wrote. That is the right behaviour and the wrong silence: a test
+		// scripting the older shape passes on it, having exercised none of
+		// this. testUnusableVerdicts fails such a test rather than letting it
+		// go green, and is nil outside tests.
+		if testUnusableVerdicts != nil && len(result.Verdicts) > 0 && len(judged) == 0 {
+			testUnusableVerdicts(len(result.Verdicts))
 		}
-	}
-
-	// The no-new-claims contract, when it is on: every published finding
-	// carries the words the reviewer wrote, not triage's restatement of them.
-	byOrigin := origins{}
-	if e.Config.Review.TriageNoNewClaims {
-		byOrigin = originsOf(findings)
-	}
-
-	kept := make([]Finding, 0, len(result.Findings))
-	for _, f := range result.Findings {
-		if !f.Valid() {
+	}()
+	for _, v := range result.Verdicts {
+		if v.Number < 1 || v.Number > len(findings) {
+			e.log().Warn("triage judged a finding that was not in the list; ignoring it",
+				"number", v.Number, "findings", len(findings))
 			continue
 		}
-		if _, ok := allowed[f.Path]; !ok {
-			e.log().Warn("triage invented a finding for an unreported path; dropping",
-				"path", f.Path, "title", f.Title)
+		if _, seen := judged[v.Number]; seen {
+			e.log().Warn("triage judged one finding twice; keeping the first verdict", "number", v.Number)
 			continue
 		}
-		if e.Config.Review.TriageNoNewClaims {
-			origin, ok := byOrigin.find(f.Path, f.Line)
-			if !ok {
-				// A reported path, a line no reviewer reported at, and words
-				// triage wrote. That is a new claim, which is the thing the
-				// path check was always assumed to be catching and never did.
-				e.log().Warn("triage made a claim at a line no reviewer reported; dropping",
-					"at", describe(f), "title", f.Title)
-				continue
-			}
-			if changed := restore(&f, origin); len(changed) > 0 {
-				e.log().Debug("restored the reviewer's words over triage's",
-					"at", describe(f), "fields", changed)
-			}
-		}
-		e.recordSeverity(&f)
-		e.restoreSeverityProvenance(&f, severityBefore)
-
-		// Restore the reviewer's class when this finding is recognizably one it
-		// reported. Only new wording falls back to triage's guess.
-		if original, ok := classBefore[f.Key()]; ok && original != "" {
-			if f.Class != original {
-				e.log().Debug("restoring review-pass class over triage's",
-					"path", f.Path, "triage", f.Class, "review", original)
-			}
-			f.Class = original
-		}
-		f.Class = e.normalizeClass(f)
-
-		// Source must keep naming the ORIGINAL reporter, a gosec rule, or the review
-		// model. Overwriting it here made every linter finding claim to have come
-		// from the triage model, which destroys the one attribution chain this tool
-		// sells.
-		if original, ok := sourceBefore[f.Key()]; ok && original != "" {
-			f.Source = original
-		}
-		f.Triager = e.Roles.Triage.String()
-		if original, ok := evidenceBefore[f.Key()]; ok {
-			f.Evidence = original
-		}
-
-		kept = append(kept, f)
+		judged[v.Number] = v
 	}
 
-	// Every finding triage was given is accounted for: published, merged or
-	// reworded within a few lines of the same file, or restored. Three of eight
-	// misses on the benchmark repository were findings triage threw away as
-	// nits, and letting it drop with a stated reason only bought a
-	// rationalisation channel. So triage may not drop: it merges duplicates
-	// naming the survivor, and it re-rates. Anything else missing comes back.
-	var merged []Overruled
-	keptNumber := map[int]bool{}
-	for i, f := range findings {
-		if triageAccountedFor(f, kept) {
-			keptNumber[i+1] = true
-		}
-	}
+	// Merges, read from dropped. The survivor is the finding duplicate_of
+	// names, and it is the survivor's own object that publishes, so its
+	// attribution is its own by construction.
 	mergedInto := map[int]Drop{}
 	for _, d := range result.Dropped {
-		if d.Number >= 1 && d.Number <= len(findings) && keptNumber[d.DuplicateOf] && d.DuplicateOf != d.Number {
+		switch {
+		case d.Number < 1 || d.Number > len(findings):
+			e.log().Warn("triage merged a finding that was not in the list; ignoring it", "number", d.Number)
+		case d.DuplicateOf < 1 || d.DuplicateOf > len(findings):
+			e.log().Warn("triage merged a finding into one that was not in the list; ignoring it",
+				"number", d.Number, "into", d.DuplicateOf)
+		case d.Number == d.DuplicateOf:
+			e.log().Warn("triage merged a finding into itself; ignoring it", "number", d.Number)
+		default:
 			mergedInto[d.Number] = d
 		}
 	}
-	for i, f := range findings {
-		if keptNumber[i+1] {
+
+	// A merge whose survivor does not itself survive is refused.
+	//
+	// Absorbing into a finding that is then discarded loses what was folded
+	// into it, which is the analyzer attribution and its ceiling: 3 into 2 and
+	// 2 into 1 published finding 1 with no analyzer named and free of
+	// linters.max_severity, which is the escape this whole change exists to
+	// close, reached by another door. A cycle is worse, because both findings
+	// are skipped by the publish loop and neither comes back: two real
+	// findings leave the review with nothing restoring them.
+	//
+	// Refused wholesale rather than resolved to a terminal survivor. A chain
+	// is a model that answered the wrong shape, and following it would pick,
+	// silently, which of several findings the attribution belongs to.
+	// Decided against a snapshot of the merged set, then applied. Deleting
+	// while ranging over the same map answers a cycle differently depending on
+	// which half is visited first: 1 into 2 and 2 into 1 removed only the
+	// entry seen first, and the other still merged.
+	var chained []int
+	for number, d := range mergedInto {
+		if _, ok := mergedInto[d.DuplicateOf]; ok {
+			chained = append(chained, number)
+			e.log().Warn("triage merged a finding into one it also merged; keeping both",
+				"number", number, "into", d.DuplicateOf)
+		}
+	}
+	for _, number := range chained {
+		delete(mergedInto, number)
+	}
+
+	// The merges first, in their own pass. A survivor absorbs what was merged
+	// into it before anything publishes: folded in afterwards, the survivor has
+	// already been copied and the union lands on a value nobody reads.
+	var merged []Overruled
+	for i := range findings {
+		d, ok := mergedInto[i+1]
+		if !ok {
 			continue
 		}
-		if d, ok := mergedInto[i+1]; ok {
-			e.log().Debug("triage merged a finding", "path", f.Path, "line", f.Line, "into", d.DuplicateOf)
-			merged = append(merged, Overruled{Finding: f, Expert: "triage (" + e.Roles.Triage.String() + ")",
-				Reason: fmt.Sprintf("merged into the finding at %s:%d: %s", findings[d.DuplicateOf-1].Path, findings[d.DuplicateOf-1].Line, strings.TrimSpace(d.Reason))})
+		// A merged finding's evidence and attribution join the survivor's: the
+		// true sentence about a defect two reviewers reported names both of
+		// them, and picking one destroys half of it.
+		absorb(&findings[d.DuplicateOf-1], findings[i])
+		merged = append(merged, Overruled{
+			Finding: findings[i],
+			Expert:  "triage (" + e.Roles.Triage.String() + ")",
+			Reason: fmt.Sprintf("merged into the finding at %s:%d: %s",
+				findings[d.DuplicateOf-1].Path, findings[d.DuplicateOf-1].Line, strings.TrimSpace(d.Reason)),
+		})
+	}
+
+	kept := make([]Finding, 0, len(findings))
+	for i := range findings {
+		number := i + 1
+		if _, ok := mergedInto[number]; ok {
 			continue
 		}
-		e.log().Info("triage lost a finding; restoring it", "path", f.Path, "line", f.Line, "title", f.Title)
+
+		f := findings[i]
+		if v, ok := judged[number]; ok {
+			e.applyVerdict(&f, v)
+		} else {
+			// Absent from both: triage neither judged it nor merged it. Three
+			// of eight misses on the benchmark repository were findings triage
+			// threw away, so a finding it does not mention comes back as the
+			// reviewer wrote it.
+			e.log().Info("triage did not judge a finding; keeping it as reported",
+				"path", f.Path, "line", f.Line, "title", f.Title)
+		}
 		f.Triager = e.Roles.Triage.String()
 		kept = append(kept, f)
 	}
 	withheld := merged
 
 	return strings.TrimSpace(result.Summary), kept, withheld, nil
-}
-
-// triageAccountedFor reports whether a finding triage was given survives in
-// its output, allowing for the rewording and the small anchor moves a merge
-// makes. The tolerance is the anchor filter's snap distance: further than
-// that and the published finding is about something else.
-func triageAccountedFor(f Finding, kept []Finding) bool {
-	for _, k := range kept {
-		if k.Path != f.Path {
-			continue
-		}
-		if k.Line == f.Line {
-			return true
-		}
-		// A merge moves a line but not a class: two findings of different
-		// classes three lines apart are two findings.
-		if abs(k.Line-f.Line) <= 3 && k.Class == f.Class {
-			return true
-		}
-	}
-	return false
 }
 
 // capAnalyzerFindings applies linters.max_severity to the findings a
@@ -2213,3 +2137,7 @@ func (e *Engine) framingTokens(pr *vcs.PullRequest) int {
 	est := llms.DefaultTokenEstimator()
 	return est.EstimateTokens(base) + est.EstimateTokens(pullRequestContext(pr)) + schemaAllowance
 }
+
+// testUnusableVerdicts is set by a test to catch a triage reply whose verdicts
+// all name nothing, which is what an unconverted fixture looks like from here.
+var testUnusableVerdicts func(verdicts int)

@@ -21,7 +21,7 @@ func runWithClasses(t *testing.T, level config.NitpickLevel, review, triage []Fi
 
 	model := &scriptedLLM{
 		byPrompt: map[string]string{
-			"triaging findings":            mustJSON(t, Result{Summary: "s", Findings: triage}),
+			"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor(triage)}),
 			"Review the following changes": mustJSON(t, Result{Findings: review}),
 		},
 	}
@@ -360,7 +360,7 @@ func runWithLinter(t *testing.T, level config.NitpickLevel, review, lint, triage
 
 	model := &scriptedLLM{
 		byPrompt: map[string]string{
-			"triaging findings":            mustJSON(t, Result{Summary: "s", Findings: triage}),
+			"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor(triage)}),
 			"Review the following changes": mustJSON(t, Result{Findings: review}),
 		},
 	}

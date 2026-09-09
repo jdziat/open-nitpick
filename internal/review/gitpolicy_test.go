@@ -128,7 +128,7 @@ func TestTheAttackAgainstARealCheckout(t *testing.T) {
 	}
 	model := &scriptedLLM{byPrompt: map[string]string{
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{finding}}),
-		"triaging findings":            mustJSON(t, Result{Summary: "Configures the reviewer.", Findings: []Finding{finding}}),
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "Configures the reviewer.", Verdicts: verdictsFor([]Finding{finding})}),
 	}}
 
 	provider := &recordingLocal{Local: vcs.NewLocal(repo, io.Discard)}

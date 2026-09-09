@@ -55,8 +55,18 @@ func TestSuggestionIsNotSchemaRequired(t *testing.T) {
 				}
 			}
 
-			// The fields that make a finding actionable must be required.
-			for _, want := range []string{"path", "line", "severity", "title"} {
+			// The fields that make an answer actionable must be required, and
+			// the two passes answer different questions. The review pass
+			// returns findings, so it owes an anchor and words. Triage returns
+			// verdicts against a numbered list, so it owes the number that
+			// identifies the finding and the rating it is there to give; the
+			// anchor and the words are already held in Go and are optional
+			// edits to them.
+			required := []string{"path", "line", "severity", "title"}
+			if name == "triage" {
+				required = []string{"number", "severity", "class"}
+			}
+			for _, want := range required {
 				found := false
 				for _, r := range items.Required {
 					if r == want {

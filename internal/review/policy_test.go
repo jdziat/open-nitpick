@@ -96,7 +96,7 @@ func findingModel(t *testing.T) *scriptedLLM {
 
 	return &scriptedLLM{byPrompt: map[string]string{
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{finding}}),
-		"triaging findings":            mustJSON(t, Result{Summary: "Adds a retry path.", Findings: []Finding{finding}}),
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "Adds a retry path.", Verdicts: verdictsFor([]Finding{finding})}),
 		untrustedClaimFence:            `{"verdict":"` + verdictConfirmed + `"}`,
 	}}
 }

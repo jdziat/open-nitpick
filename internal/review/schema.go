@@ -113,13 +113,28 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 	schema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
+			// Verdicts against the numbered list, not findings. Triage names
+			// each one by the number it was shown, and the engine applies the
+			// verdict to the finding it already holds. The finding never makes
+			// the round trip, so its class, source, evidence and severity
+			// provenance cannot be lost on the way back, which is what
+			// re-emitting whole findings cost whenever triage used its
+			// permission to reword or move a line.
 			"findings": map[string]any{
 				"type":        "array",
-				"description": "The findings that should be published, most severe first.",
+				"description": "Your verdict on each finding you are publishing, most severe first, naming it by its number in the list you were given.",
 				"items": map[string]any{
-					"type":                 "object",
-					"properties":           findingProperties(classes),
-					"required":             []string{"path", "line", "severity", "category", "class", "title", "rationale"},
+					"type": "object",
+					"properties": map[string]any{
+						"number":     map[string]any{"type": "integer", "description": "The finding's number in the list you were given. This is how it is identified; do not renumber."},
+						"severity":   map[string]any{"type": "string", "enum": severityEnum, "description": "The level this finding should publish at."},
+						"class":      map[string]any{"type": "string", "enum": classes, "description": "The kind of defect. The reviewer's own class is kept where it named one."},
+						"line":       map[string]any{"type": "integer", "description": "Optional. The clearer line for this finding, when a merge moved the anchor. Omit to keep the reviewer's."},
+						"title":      map[string]any{"type": "string", "description": "Optional. A clearer title. Omit to keep the reviewer's."},
+						"rationale":  map[string]any{"type": "string", "description": "Optional. A clearer rationale. Omit to keep the reviewer's."},
+						"suggestion": map[string]any{"type": "string", "description": "Optional. A replacement suggestion. Omit to keep the reviewer's."},
+					},
+					"required":             []string{"number", "severity", "class"},
 					"additionalProperties": false,
 				},
 			},
@@ -133,9 +148,17 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 				"items": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"number": map[string]any{"type": "integer", "description": "The finding's number in the list you were given."},
-						"reason": map[string]any{"type": "string", "description": "Why it is not published: the rationale names no consequence, or asserts something about code that was not shown, or it duplicates a finding you kept."},
+						"number":       map[string]any{"type": "integer", "description": "The finding's number in the list you were given."},
+						"duplicate_of": map[string]any{"type": "integer", "description": "The number of the finding this one was merged into. Required for a merge, which is the only reason a finding may be left out."},
+						"reason":       map[string]any{"type": "string", "description": "Why it is not published: the rationale names no consequence, or asserts something about code that was not shown, or it duplicates a finding you kept."},
 					},
+					// duplicate_of is NOT required, so a drop with no merge
+					// target stays legal and rule 2 restores that finding. It
+					// was absent from this schema entirely, under strict
+					// enforcement, so the model could not emit it and every
+					// Drop decoded with DuplicateOf zero: merging has never
+					// run. Every test of it constructed the reply in Go and
+					// skipped the schema.
 					"required":             []string{"number", "reason"},
 					"additionalProperties": false,
 				},

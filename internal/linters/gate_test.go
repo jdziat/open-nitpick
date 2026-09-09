@@ -68,7 +68,7 @@ type scriptedTriage struct {
 
 // triageLine matches renderForTriage's numbered line: an index, the severity in
 // brackets, the location, an em dash, then the title.
-var triageLine = regexp.MustCompile(`(?m)^\d+\. \[([^\]]+)\] ([^:\n]+):(\d+) — (.+)$`)
+var triageLine = regexp.MustCompile(`(?m)^(\d+)\. \[([^\]]+)\] ([^:\n]+):(\d+) — (.+)$`)
 
 func (e *scriptedTriage) GenerateContent(_ context.Context, msgs []llms.Message, _ ...llms.CallOption) (*llms.Response, error) {
 	var joined strings.Builder
@@ -87,14 +87,26 @@ func (e *scriptedTriage) GenerateContent(_ context.Context, msgs []llms.Message,
 	e.rendered = append(e.rendered, text)
 	e.mu.Unlock()
 
-	out := review.Result{Summary: "Reviewed."}
-	for _, m := range triageLine.FindAllStringSubmatch(text, -1) {
-		line, err := strconv.Atoi(m[3])
+	// Verdicts against the numbered list, which is what triage answers with.
+	// This double used to return whole findings; decoded now, those carry no
+	// number, every verdict is refused as out of range, and the reply reaches
+	// nothing. A test scripting a re-rate would then pass against the very
+	// escape it exists to catch.
+	out := review.TriageResult{Summary: "Reviewed."}
+	for i, m := range triageLine.FindAllStringSubmatch(text, -1) {
+		// The number is read from the rendered line rather than counted from
+		// the loop. A regex that misses one rendered finding would otherwise
+		// shift every verdict after it onto the wrong finding, which is the
+		// failure this whole change removes, reintroduced in a test double.
+		number, err := strconv.Atoi(m[1])
 		if err != nil {
-			return nil, fmt.Errorf("unparseable rendered line %q: %w", m[3], err)
+			return nil, fmt.Errorf("unparseable rendered number %q: %w", m[1], err)
+		}
+		if number != i+1 {
+			return nil, fmt.Errorf("rendered finding %d is numbered %d; the regex missed a line", i+1, number)
 		}
 
-		severity, title := m[1], m[4]
+		severity, title := m[2], m[5]
 		if e.rerate != "" {
 			severity = e.rerate
 		}
@@ -102,9 +114,8 @@ func (e *scriptedTriage) GenerateContent(_ context.Context, msgs []llms.Message,
 			title = e.retitle
 		}
 
-		out.Findings = append(out.Findings, review.Finding{
-			Path: m[2], Line: line, Severity: severity, Title: title,
-			Category: "lint", Class: string(config.ClassSecurity),
+		out.Verdicts = append(out.Verdicts, review.Verdict{
+			Number: number, Severity: severity, Class: string(config.ClassSecurity), Title: title,
 		})
 	}
 
@@ -326,17 +337,21 @@ func TestMaxSeverityHoldsAgainstATriageThatRaises(t *testing.T) {
 	}
 }
 
-// TestARewordedAnalyzerFindingIsNoLongerTheAnalyzers states the limit of the
-// ceiling rather than leaving a reader to discover it.
+// TestARewordedAnalyzerFindingKeepsItsCeiling is the case that used to name a
+// limit and now names the fix.
 //
-// FromAnalyzer, Source and Class are all restored by Finding.Key(), which
-// contains the title. A triage pass that rewrites the title past recognition
-// loses all three together: the finding is published with no analyzer named, as
-// triage's own. The ceiling is documented as a ceiling on findings ATTRIBUTED to
-// an analyzer, and this is the run where that qualifier does work. Pinning it
-// means widening the hole, restoring Source but not the marker, say, fails
-// here instead of silently disabling a policy an operator set.
-func TestARewordedAnalyzerFindingIsNoLongerTheAnalyzers(t *testing.T) {
+// FromAnalyzer, Source and Class were restored by Finding.Key(), which
+// contains the title, so a triage pass that rewrote the title past recognition
+// lost all three together and published the finding as triage's own, outside
+// linters.max_severity. The test said, in the words above this one: if
+// attribution ever survives a rewording, the ceiling must too.
+//
+// It does. Triage now answers by the finding's number rather than re-emitting
+// it, so the reviewer's object is the one that publishes and its attribution
+// was never in the model's hands to lose. What this pins is the consequence an
+// operator configured: a reworded analyzer finding is still the analyzer's,
+// still capped, and still unable to fail a gate the ceiling put out of reach.
+func TestARewordedAnalyzerFindingKeepsItsCeiling(t *testing.T) {
 	model := &scriptedTriage{
 		rerate:  string(config.SeverityCritical),
 		retitle: "Untraceable rewording of the same defect",
@@ -352,26 +367,21 @@ func TestARewordedAnalyzerFindingIsNoLongerTheAnalyzers(t *testing.T) {
 	}
 
 	f := report.Findings[0]
-	if f.Source != "" {
-		t.Errorf("Source = %q: this test only describes a limit while the reworded finding is "+
-			"unattributable. If attribution now survives a rewording, the ceiling must too",
-			f.Source)
+	if !strings.Contains(f.Source, "semgrep") {
+		t.Errorf("Source = %q after a rewording; the analyzer that found it is still the "+
+			"analyzer that found it, and the ceiling below is a ceiling on ITS findings", f.Source)
 	}
-	if f.Severity != string(config.SeverityCritical) {
-		t.Errorf("published at %q, want critical: an unattributed finding is triage's own and "+
-			"linters.max_severity has nothing to say about it", f.Severity)
+	if f.Severity != string(config.SeverityWarning) {
+		t.Errorf("published at %q, want the warning ceiling: a rewording is not a way out of "+
+			"linters.max_severity", f.Severity)
 	}
 
-	// The published LEVEL was already asserted above; this asserts the
-	// CONSEQUENCE, which is the thing an operator configured. The two came apart
-	// once: the level was pinned here while nothing called Failed, so a reworded
-	// analyzer finding escaping the ceiling and failing a critical gate was a
-	// behaviour no test could see. An operator who sets max_severity believing
-	// analyzers cannot fail a critical gate is wrong in exactly this case, and
-	// the README says so.
-	if !report.Failed(config.SeverityCritical) {
-		t.Error("a reworded finding published at critical must also FAIL a critical gate; " +
-			"asserting the level without the gate is how this escape stayed invisible")
+	// The published LEVEL is not the thing an operator configured; the
+	// CONSEQUENCE is. The two came apart once, when the level was pinned here
+	// and nothing called Failed, so an escape was a behaviour no test could
+	// see.
+	if report.Failed(config.SeverityCritical) {
+		t.Error("a reworded analyzer finding failed a critical gate its ceiling put out of reach")
 	}
 }
 
