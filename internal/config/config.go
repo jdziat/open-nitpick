@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -907,7 +908,7 @@ func defaultConfig() (*Config, error) {
 			}
 			return nil, fmt.Errorf("parse user config %s: %w", userPath, err)
 		}
-		cfg.Unknown = append(cfg.Unknown, inFile(ignored, userPath)...)
+		cfg.Unknown = append(cfg.Unknown, render(ignored, userPath, false)...)
 		node, _ := documentNode(userData)
 		cfg.User, cfg.UserKeys = userPath, keyPaths(node)
 	}
@@ -926,7 +927,7 @@ func defaultConfig() (*Config, error) {
 // the document replace the default; fields absent from the document keep their
 // default value. Sequences replace wholesale rather than appending, so a
 // repository can narrow the default ignore list rather than only widening it.
-func (c *Config) merge(data []byte, tolerate bool) ([]string, error) {
+func (c *Config) merge(data []byte, tolerate bool) ([]unknownKey, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 
@@ -956,7 +957,7 @@ func (c *Config) merge(data []byte, tolerate bool) ([]string, error) {
 // unknown keys included. Such a decode applied some of the document and skipped
 // some, and nothing here knows which, so the caller refuses the file rather
 // than reviewing under a config it cannot describe.
-func unknownFields(err error) (keys []string, only bool) {
+func unknownFields(err error) (keys []unknownKey, only bool) {
 	var typeErr *yaml.TypeError
 	if !errors.As(err, &typeErr) || len(typeErr.Errors) == 0 {
 		return nil, false
@@ -967,9 +968,44 @@ func unknownFields(err error) (keys []string, only bool) {
 		if m == nil {
 			return nil, false
 		}
-		keys = append(keys, fmt.Sprintf("%s (line %s)", m[2], m[1]))
+		line, err := strconv.Atoi(m[1])
+		if err != nil {
+			return nil, false
+		}
+		keys = append(keys, unknownKey{Name: m[2], Line: line})
 	}
 	return keys, true
+}
+
+// unknownKey is a key this build does not have, and where it was.
+//
+// The parts are carried rather than a formatted string, because a key can
+// contain anything a yaml key can, the words "(line 4)" included. Round-
+// tripping through a rendered string let such a key be re-parsed as its own
+// location and published pointing at a line it is not on, which is the wrong
+// number withoutLines refuses to print.
+type unknownKey struct {
+	Name string
+	Line int
+
+	// File is the document's base name, empty until a caller that knows which
+	// of the two it read fills it in.
+	File string
+}
+
+// String renders one key for a reader, with the file when there is one and the
+// line when it can be trusted.
+func (k unknownKey) String() string {
+	switch {
+	case k.File == "" && k.Line == 0:
+		return k.Name
+	case k.File == "":
+		return fmt.Sprintf("%s (line %d)", k.Name, k.Line)
+	case k.Line == 0:
+		return fmt.Sprintf("%s (%s)", k.Name, k.File)
+	default:
+		return fmt.Sprintf("%s (%s line %d)", k.Name, k.File, k.Line)
+	}
 }
 
 // unknownField matches the one message yaml.v3 writes for a KnownFields
@@ -991,7 +1027,7 @@ var Version string
 // remedy: "field fix not found in type config.Models" is an answer for someone
 // reading this source, and the person who hit it copied a key out of the
 // documentation.
-func unknownKeyError(source string, keys []string) error {
+func unknownKeyError(source string, keys []unknownKey) error {
 	return worded{text: unknownKeyText(source, keys)}
 }
 
@@ -1004,11 +1040,12 @@ type worded struct{ text string }
 func (e worded) Error() string { return e.text }
 
 // unknownKeyText writes the message.
-func unknownKeyText(source string, keys []string) string {
+func unknownKeyText(source string, keys []unknownKey) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s has keys this nitpick does not know:\n\n", source)
 	for _, k := range keys {
-		fmt.Fprintf(&b, "  %s\n", k)
+		// Without the file, which the sentence above already named.
+		fmt.Fprintf(&b, "  %s\n", unknownKey{Name: k.Name, Line: k.Line})
 	}
 	b.WriteString("\n")
 	if Version != "" {

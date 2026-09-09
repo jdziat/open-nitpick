@@ -141,8 +141,8 @@ func TestTheUnknownFieldMessageIsStillYAMLsOwn(t *testing.T) {
 	if !only {
 		t.Fatalf("yaml.v3 no longer reports an unknown field the way this package reads it: %v", err)
 	}
-	if len(keys) != 1 || keys[0] != "not_a_field (line 2)" {
-		t.Errorf("keys = %v, want [\"not_a_field (line 2)\"]", keys)
+	if len(keys) != 1 || keys[0].Name != "not_a_field" || keys[0].Line != 2 {
+		t.Errorf("keys = %v, want one key not_a_field on line 2", keys)
 	}
 	if into.Known != 1 {
 		t.Error("yaml.v3 no longer applies the known fields, so ignoring a key would drop the file")
@@ -304,4 +304,49 @@ func TestAnAnchorCannotSmuggleAnEndpointPastThePrune(t *testing.T) {
 			t.Errorf("base_url = %q, want the trusted file's own value", got)
 		}
 	})
+}
+
+// A key that reads like its own location does not become one.
+//
+// The key can be anything a yaml key can, the words "(line 9)" included, and
+// it is text the change under review chose. Formatting the parts and reading
+// them back would publish that key pointing at line 9 of a file where it is
+// on line 3, which is the wrong number this branch refuses to print.
+func TestAKeyThatLooksLikeALocationIsNotReadAsOne(t *testing.T) {
+	t.Setenv(EnvIgnoreUnknownKeys, "1")
+	root := writeConfig(t, "models:\n  default: {provider: openai, model: gpt-4o}\n"+
+		"review:\n  \"weird (line 9) key\": 1\n")
+
+	cfg, err := Load(root)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Unknown) != 1 {
+		t.Fatalf("Unknown = %v, want one key", cfg.Unknown)
+	}
+	if got, want := cfg.Unknown[0], "weird (line 9) key ("+FileName+" line 4)"; got != want {
+		t.Errorf("Unknown[0] = %q, want %q", got, want)
+	}
+}
+
+// A document the trust check cannot read is refused, not passed on.
+//
+// The check decodes without KnownFields and the merge decodes with it, so the
+// merge is stricter today and would refuse the same document. Leaving it to
+// the merge would make a security check depend on that staying true, and the
+// two decoders already differ deliberately.
+func TestADocumentTheTrustCheckCannotReadIsRefused(t *testing.T) {
+	// checkPruned rather than Load, deliberately. Through Load the merge
+	// refuses this document too, so a test there passes whether or not this
+	// check does, which is the dependency the fix removes.
+	const doc = "review:\n  min_severity: blocker\n"
+
+	if err := checkPruned([]byte(doc), FileName); err == nil {
+		t.Fatal("a document the trust check could not read was passed on as clean")
+	}
+
+	// A document it can read, supplying nothing untrusted, still passes.
+	if err := checkPruned([]byte("review:\n  min_severity: info\n"), FileName); err != nil {
+		t.Errorf("a readable document supplying nothing untrusted was refused: %v", err)
+	}
 }

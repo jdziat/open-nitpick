@@ -173,7 +173,7 @@ func (c *Config) overlay(user, repo []byte, trusted bool, userPath, repoPath str
 			}
 			return nil, nil, nil, nil, err
 		}
-		unknown = append(unknown, inFile(ignored, userPath)...)
+		unknown = append(unknown, render(ignored, userPath, false)...)
 		userKeys = keyPaths(userNode)
 	}
 
@@ -212,11 +212,11 @@ func (c *Config) overlay(user, repo []byte, trusted bool, userPath, repoPath str
 	ignored, err := c.merge(repo, tolerate)
 	if err != nil {
 		if keys, only := unknownFields(err); only {
-			return nil, nil, nil, nil, unknownKeyError(repoPath, withoutLines(keys, rendered))
+			return nil, nil, nil, nil, unknownKeyError(repoPath, forget(keys, rendered))
 		}
 		return nil, nil, nil, nil, err
 	}
-	unknown = append(unknown, inFile(withoutLines(ignored, rendered), repoPath)...)
+	unknown = append(unknown, render(ignored, repoPath, rendered)...)
 
 	if len(userKeys) > 0 && repoNode != nil {
 		overridden = intersect(userKeys, keyPaths(repoNode))
@@ -306,46 +306,35 @@ func resolveNode(n *yaml.Node) *yaml.Node {
 	return n
 }
 
-// inFile names the document a recorded key came from.
-//
-// Two files reach this, and a reader sent to line 4 of the wrong one finds
-// something else. The base name rather than the path: the two are `.nitpick.yaml`
-// and `config.yaml`, which tells them apart in the width a log line and a
-// pull-request notice have.
-func inFile(keys []string, path string) []string {
+// render names each recorded key's document, and drops the line when it was
+// counted in one this tool rewrote.
+func render(keys []unknownKey, path string, rewritten bool) []string {
 	name := filepath.Base(strings.TrimSpace(path))
-	if name == "" || name == "." || name == string(filepath.Separator) {
-		return keys
+	if name == "." || name == string(filepath.Separator) {
+		name = ""
 	}
 	out := make([]string, 0, len(keys))
-	for _, k := range keys {
-		if line, ok := strings.CutSuffix(k, ")"); ok {
-			if key, at, found := strings.Cut(line, " (line "); found {
-				out = append(out, fmt.Sprintf("%s (%s line %s)", key, name, at))
-				continue
-			}
-		}
-		out = append(out, fmt.Sprintf("%s (%s)", k, name))
+	for _, k := range forget(keys, rewritten) {
+		k.File = name
+		out = append(out, k.String())
 	}
 	return out
 }
 
-// withoutLines drops the line number from each key when it was counted in a
-// document this tool rewrote.
+// forget drops the line number from each key when it was counted in a document
+// this tool rewrote.
 //
 // A wrong line is worse than none. The prune deletes keys before the merge, so
 // every key below a deleted one has moved, and a notice pointing a reader at a
 // line where the key is not costs them the search plus their trust in the rest
 // of the notice.
-func withoutLines(keys []string, rendered bool) []string {
-	if !rendered {
+func forget(keys []unknownKey, rewritten bool) []unknownKey {
+	if !rewritten {
 		return keys
 	}
-	out := make([]string, 0, len(keys))
+	out := make([]unknownKey, 0, len(keys))
 	for _, k := range keys {
-		if i := strings.LastIndex(k, " (line "); i >= 0 {
-			k = k[:i]
-		}
+		k.Line = 0
 		out = append(out, k)
 	}
 	return out

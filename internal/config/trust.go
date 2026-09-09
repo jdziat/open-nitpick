@@ -303,22 +303,28 @@ func checkPruned(repo []byte, source string) error {
 		return nil
 	}
 
-	// The repository document alone, over defaults. Merged onto the user's
-	// there would be no way to tell whose base_url survived, which is the
-	// reason the prune works on the document in the first place.
-	probe := Defaults()
+	// The repository document alone, onto a zero Config rather than the
+	// defaults: a default that ever landed on an untrusted field would refuse
+	// every repository config, and a zero value cannot.
+	//
+	// Alone, because merged onto the user's there would be no way to tell
+	// whose base_url survived, which is why the prune works on the document.
+	probe := new(Config)
 	dec := yaml.NewDecoder(bytes.NewReader(repo))
 	if err := dec.Decode(probe); err != nil && !errors.Is(err, io.EOF) {
-		// Not this function's failure to report: the merge below decides what
-		// a document that will not decode does.
-		return nil
+		// Refused rather than passed on to the merge. The merge is stricter
+		// today and would refuse it too, so this costs nothing; leaving it to
+		// the merge would make a security check depend on that staying true,
+		// and the two decoders already differ deliberately on KnownFields.
+		return worded{text: fmt.Sprintf("%s could not be read to check what it supplies: %v",
+			source, err)}
 	}
 
 	if found := untrustedIn(reflect.ValueOf(*probe)); len(found) > 0 {
 		sort.Strings(found)
 		return worded{text: fmt.Sprintf("%s supplies %s after the untrusted-key prune ran, "+
 			"which means the document reached them by a route the prune does not walk, "+
-			"such as a YAML anchor merged into a model spec. It was not applied. "+
+			"such as a YAML anchor merged into another key. It was not applied. "+
 			"Set %s=1 if you control this file",
 			source, strings.Join(found, ", "), EnvTrustConfigEndpoints)}
 	}
@@ -337,6 +343,13 @@ func untrustedIn(v reflect.Value) []string {
 	case reflect.Pointer, reflect.Interface:
 		if !v.IsNil() {
 			found = append(found, untrustedIn(v.Elem())...)
+		}
+	case reflect.Map:
+		// Nothing in Config holds a map of specs today. Walked anyway, because
+		// the Kind this does not handle is the one a later field uses, and a
+		// hole here is silent.
+		for _, k := range v.MapKeys() {
+			found = append(found, untrustedIn(v.MapIndex(k))...)
 		}
 	case reflect.Slice, reflect.Array:
 		for i := range v.Len() {
