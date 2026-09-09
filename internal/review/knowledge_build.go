@@ -31,7 +31,9 @@ const (
 // The error is still returned, and callers that asked for retrieval should
 // still treat construction as fatal. A status of failed exists for the run
 // that got further than construction.
-func BuildKnowledge(ctx context.Context, cfg *config.Config, log *slog.Logger) (*KnowledgeRetriever, KnowledgeStatus, error) {
+// repoRoot is where the versions an entry's `applies:` clauses are judged
+// against are read from. Empty reads none, and none keeps every entry.
+func BuildKnowledge(ctx context.Context, cfg *config.Config, repoRoot string, log *slog.Logger) (*KnowledgeRetriever, KnowledgeStatus, error) {
 	if cfg == nil || !cfg.Review.Knowledge {
 		return nil, KnowledgeStatus{State: KnowledgeOff}, nil
 	}
@@ -76,7 +78,8 @@ func BuildKnowledge(ctx context.Context, cfg *config.Config, log *slog.Logger) (
 		return fail("the index was built by a different embedding model", err)
 	}
 
-	log.Info("knowledge retrieval on", "entries", len(entries), "model", embedder.Model())
+	log.Info("knowledge retrieval on",
+		"entries", len(entries), "model", embedder.Model(), "root", repoRoot)
 	return &KnowledgeRetriever{
 		R: &knowledge.Retriever{
 			Entries:    entries,
@@ -87,7 +90,8 @@ func BuildKnowledge(ctx context.Context, cfg *config.Config, log *slog.Logger) (
 			Keep:       knowledgeKeep,
 			MinScore:   cfg.Review.KnowledgeMinScore,
 		},
-		status: KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)},
+		RepoRoot: repoRoot,
+		status:   KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)},
 	}, KnowledgeStatus{State: KnowledgeActive, Model: embedder.Model(), Entries: len(entries)}, nil
 }
 

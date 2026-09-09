@@ -11,6 +11,7 @@ import (
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/prompt"
 )
@@ -23,10 +24,19 @@ const (
 	verdictRefuted = "refuted"
 	// verdictSeverity means the defect is real but rated wrong.
 	verdictSeverity = "severity"
+	// verdictUnresolved means the expert could not decide from what it saw.
+	//
+	// It publishes the finding, byte for byte what `confirmed` publishes, so
+	// it is not a fourth way to delete one and adding it cannot cost recall.
+	// What it changes is the record. Without it, doubt is spelled `confirmed`,
+	// so "an expert checked this and agreed" and "an expert checked this and
+	// could not tell" reach a reader as the same output. A reader weighing a
+	// comment deserves those apart.
+	verdictUnresolved = "unresolved"
 )
 
 // verdictEnum is the closed set the schema offers.
-var verdictEnum = []string{verdictConfirmed, verdictRefuted, verdictSeverity}
+var verdictEnum = []string{verdictConfirmed, verdictRefuted, verdictSeverity, verdictUnresolved}
 
 // Overruled records a decision a domain expert made against a finding.
 //
@@ -55,6 +65,10 @@ type Overruled struct {
 	// Revised is the level the expert moved the finding to, empty when the
 	// claim was refuted outright rather than re-rated.
 	Revised config.Severity
+
+	// Cited is the knowledge entry the expert named as deciding this, empty
+	// when it named none or named one it was not shown. See citation.
+	Cited string
 }
 
 // Validator routes each finding to a domain expert that independently decides
@@ -76,6 +90,10 @@ type Validator struct {
 
 	// Log receives the verdicts; a nil logger discards them.
 	Log *slog.Logger
+
+	// Corpus is every knowledge entry this run can cite, by id. Nil, or a
+	// finding citing nothing, makes Policy.Targeted a no-op.
+	Corpus map[string]knowledge.Entry
 }
 
 // Validate checks each finding with its expert and returns the survivors plus
@@ -146,7 +164,9 @@ func applyOutcomes(outcomes []outcome) (kept []Finding, overruled []Overruled) {
 	for _, o := range outcomes {
 		switch {
 		case o.refuted:
-			overruled = append(overruled, Overruled{Finding: o.finding, Expert: o.expert, Reason: o.reason})
+			overruled = append(overruled, Overruled{
+				Finding: o.finding, Expert: o.expert, Reason: o.reason, Cited: o.cited,
+			})
 
 		case o.revised != "":
 			// Recorded even though the finding is still on its way out. Whether
@@ -154,7 +174,7 @@ func applyOutcomes(outcomes []outcome) (kept []Finding, overruled []Overruled) {
 			// only the caller knows the gate, so the validator states what it
 			// did and lets the caller decide what a reader is told.
 			overruled = append(overruled, Overruled{
-				Finding: o.finding, Expert: o.expert, Reason: o.reason, Revised: o.revised,
+				Finding: o.finding, Expert: o.expert, Reason: o.reason, Revised: o.revised, Cited: o.cited,
 			})
 
 			revised := o.finding
@@ -180,6 +200,13 @@ func applyOutcomes(outcomes []outcome) (kept []Finding, overruled []Overruled) {
 
 			kept = append(kept, revised)
 
+		case o.unresolved != "":
+			// Published, exactly as an unvalidated finding is. Only the record
+			// on it differs, which is the whole point of the verdict.
+			f := o.finding
+			f.Unresolved, f.UnresolvedBy = o.unresolved, o.expert
+			kept = append(kept, f)
+
 		default:
 			kept = append(kept, o.finding)
 		}
@@ -202,6 +229,15 @@ type outcome struct {
 	// revised is the level an expert moved the finding to, empty when nobody
 	// moved it.
 	revised config.Severity
+
+	// cited is the reference entry the expert named, already checked against
+	// what it was shown.
+	cited string
+
+	// unresolved is the doubt an expert stated when it could not decide. The
+	// finding is published either way; this is the only trace that the check
+	// ran and came back undecided.
+	unresolved string
 }
 
 // check validates one finding.
@@ -235,9 +271,11 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 		return keep
 	}
 
+	shown := v.cited(f)
+
 	msgs := []llms.Message{
-		{Role: llms.RoleSystem, Content: expertSystem(expert)},
-		{Role: llms.RoleUser, Content: validationRequest(f, code)},
+		{Role: llms.RoleSystem, Content: expertSystem(expert, len(shown) > 0)},
+		{Role: llms.RoleUser, Content: validationRequest(f, code, shown)},
 	}
 
 	result, err := llm.Extract[validationResult](ctx, v.Client, msgs, schema)
@@ -250,7 +288,40 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 		return keep
 	}
 
-	switch strings.ToLower(strings.TrimSpace(result.Verdict)) {
+	// The entries this expert was shown, so a verdict can be checked against
+	// what it was allowed to know. Recomputed rather than threaded, because
+	// cited is a pure function of the finding and the corpus.
+	cite := citation(result.Cited, shown)
+	verdict := strings.ToLower(strings.TrimSpace(result.Verdict))
+
+	// An expert that names a source it was not shown has invented one, and the
+	// verdict resting on it is the least reliable answer this pass can
+	// produce. Dropping only the citation would publish the deletion and hide
+	// the reason to doubt it, so the verdict itself is demoted to doubt: the
+	// finding stands, and the reader is told the check did not resolve.
+	//
+	// Asked at each verdict that acts on the finding rather than before the
+	// switch, because whether one acts is not known until it has been read. A
+	// re-rating to the level the finding already carries changes nothing, and
+	// stamping that "could not be resolved" tells the reader the check was
+	// weaker than it was, exactly as it would for a confirmation.
+	invented := func() bool {
+		if len(shown) == 0 || !namesSomething(result.Cited) || cite != "" {
+			return false
+		}
+		// The reason too, as both other verdicts log it. This is the path the
+		// code itself rates least reliable, so an auditor reading it later
+		// needs what the expert said and not only what it cited.
+		v.log().Warn("expert cited a reference it was not shown; publishing the finding unresolved",
+			"expert", expert.Key, "path", f.Path, "title", f.Title,
+			"cited", result.Cited, "verdict", result.Verdict,
+			"reason", strings.TrimSpace(result.Reason))
+		return true
+	}
+	demoted := outcome{finding: f, expert: expertLabel(expert),
+		unresolved: "it named a reference it was not shown, so this was not resolved"}
+
+	switch verdict {
 	case verdictRefuted:
 		reason := strings.TrimSpace(result.Reason)
 		if reason == "" {
@@ -260,19 +331,38 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 			return keep
 		}
 
+		if invented() {
+			return demoted
+		}
+
 		v.log().Info("expert refuted a finding",
 			"expert", expert.Key, "path", f.Path, "line", f.Line, "title", f.Title, "reason", reason)
-		return outcome{finding: f, refuted: true, expert: expertLabel(expert), reason: reason}
+		return outcome{finding: f, refuted: true, expert: expertLabel(expert), reason: reason, cited: cite}
 
 	case verdictSeverity:
 		revised, reason := v.revise(f, expert, result)
 		if revised == "" {
 			return keep
 		}
-		return outcome{finding: f, expert: expertLabel(expert), reason: reason, revised: revised}
+		if invented() {
+			return demoted
+		}
+		return outcome{finding: f, expert: expertLabel(expert), reason: reason, revised: revised, cited: cite}
 
 	case verdictConfirmed:
 		return keep
+
+	case verdictUnresolved:
+		// Undecided with nothing said publishes clean: applyOutcomes records
+		// the doubt only when there is one, so an empty reason falls through to
+		// the same finding a confirmation produces. Not re-checked here, since
+		// a second guard on the same condition is the kind that rots into
+		// disagreeing with the first.
+		reason := strings.TrimSpace(result.Reason)
+
+		v.log().Info("expert could not resolve a finding",
+			"expert", expert.Key, "path", f.Path, "line", f.Line, "title", f.Title, "reason", reason)
+		return outcome{finding: f, expert: expertLabel(expert), unresolved: reason}
 
 	default:
 		// Same call the class and severity normalizers make, for the same
@@ -339,6 +429,52 @@ type validationResult struct {
 	Verdict         string `json:"verdict"`
 	Reason          string `json:"reason"`
 	RevisedSeverity string `json:"revised_severity"`
+	Cited           string `json:"cited"`
+}
+
+// cited returns the entries a finding's evidence names, in the order the
+// finding names them, empty unless targeted validation is on.
+//
+// Only entries this run has. An evidence id with no entry behind it
+// is dropped rather than mentioned, because a request listing an id and no
+// text asks the model to judge against something it cannot read.
+func (v *Validator) cited(f Finding) []knowledge.Entry {
+	if !v.Policy.Targeted || len(v.Corpus) == 0 {
+		return nil
+	}
+	out := make([]knowledge.Entry, 0, len(f.Evidence))
+	for _, id := range f.Evidence {
+		if e, ok := v.Corpus[id]; ok {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// citation is the entry an expert named, empty when it named none or named one
+// it was not shown.
+//
+// The check is the point. An expert that cites an entry absent from the
+// request has invented a source, and recording it would publish a citation
+// nobody can follow, which is worse than none: the whole reason findings carry
+// evidence is that a reader can go and look.
+func citation(said string, shown []knowledge.Entry) string {
+	// Matched on the id's own characters, with punctuation and case discarded
+	// on both sides. Entries render as "[id] Title" and the schema asks for
+	// the bracketed id, so brackets are expected; backticks and quotes are
+	// what a model reaches for unasked. A failure here demotes the verdict, so
+	// a mismatch that is only punctuation would publish a correctly cited
+	// refutation as though the expert had invented its source.
+	said = idChars(said)
+	if said == "" {
+		return ""
+	}
+	for _, e := range shown {
+		if said == idChars(e.ID) {
+			return e.ID
+		}
+	}
+	return ""
 }
 
 // Fences for the two untrusted inputs an expert is shown. They are separate
@@ -347,6 +483,13 @@ type validationResult struct {
 const (
 	untrustedClaimFence = "===== UNTRUSTED CLAIM UNDER REVIEW ====="
 	untrustedCodeFence  = "===== UNTRUSTED CODE UNDER REVIEW ====="
+
+	// referenceFence holds text this repository authored and ships, so unlike
+	// the two above it is not fencing something untrusted in. It is fencing
+	// everything else out: the code in the same prompt is written by the
+	// change's author, and without a marker of its own the reference material
+	// is a paragraph that could equally have come from the diff.
+	referenceFence = "===== REFERENCE MATERIAL, NOT THIS CHANGE ====="
 )
 
 // validationContract is the task every expert is given, whatever its
@@ -369,6 +512,11 @@ Answer with exactly one verdict:
   cannot occur. The value cannot be attacker controlled. The call is already
   guarded above. The type makes the failure impossible. The code does not do
   what the claim says it does. Put that reason in ` + "`reason`" + `.
+- ` + "`unresolved`" + ` — you cannot decide from what you were shown, and you
+  can NAME what is missing. The definition you would need is not in front of
+  you. The call's behaviour depends on a caller you cannot see. Put that in
+  ` + "`reason`" + `. The finding is published either way, so this is never a
+  way to remove one, it records that the check came back undecided.
 - ` + "`severity`" + ` — the defect is real, but rated wrong. Set
   ` + "`revised_severity`" + ` to the level the demonstrated consequence
   supports and say why in ` + "`reason`" + `. Rate what you can demonstrate, not
@@ -376,21 +524,37 @@ Answer with exactly one verdict:
 
 Refute ONLY when you can state that reason. "I could not confirm this", "there
 is not enough context here", "this seems unlikely" are not refutations — they
-are doubt, and doubt is answered with ` + "`confirmed`" + `. An unrefuted false
+are doubt. Answer ` + "`unresolved`" + ` when you can name what you are missing
+and ` + "`confirmed`" + ` when you cannot. An unrefuted false
 finding costs a reader one comment they can dismiss. A wrongly refuted true
 finding is never seen by anyone.
 
 Being the wrong specialist is not a reason to refute either, and it is not a
 reason to re-rate. You were chosen by the words in the claim, so claims outside
 your speciality reach you regularly. Judge such a claim on the evidence in front
-of you and answer ` + "`confirmed`" + ` when you cannot name why it is wrong —
+of you and answer ` + "`confirmed`" + ` or ` + "`unresolved`" + ` when you
+cannot name why it is wrong —
 and do not put it on your own domain's severity scale, because a lost write
 rated as though it were a naming choice is deleted just as surely as one you
 refuted.
 
 Do not restate the code. One or two sentences.`
 
-// ValidationContract returns the task text every expert is given.
+// referenceContract is appended only when a request carries a reference block.
+//
+// Sent unconditionally it would prime every expert on every run for material
+// that is usually absent, which lends credibility to anything in the code that
+// resembles a reference block and gets past defang.
+const referenceContract = `
+
+The reference material below is what the reviewer read, not a statement about
+this code, and an entry may not apply here at all. Judge whether it applies
+before it decides anything. When one does decide your verdict, put its
+bracketed id in ` + "`cited`" + `; leave that empty otherwise, and never name an
+entry you were not shown.`
+
+// ValidationContract returns every word of contract this package can send an
+// expert, the reference paragraph included.
 //
 // Exported for the same reason as prompt.ScopeText: the guard in
 // internal/evals scans the words this project ships to a model for eval-corpus
@@ -399,19 +563,28 @@ Do not restate the code. One or two sentences.`
 // which is what makes it worth scanning, see the survey in
 // internal/evals/promptcollision_test.go for why the 14 per-domain prompts are
 // not.
-func ValidationContract() string { return validationContract }
+// The union rather than what one call sends, because the guard's question is
+// which words reach a model at all, and referenceContract reaches one whenever
+// a request carries a reference block. Returning only the always-sent half
+// would leave the newer text unscanned, which is the gap this function's
+// existence is an argument against.
+func ValidationContract() string { return validationContract + referenceContract }
 
 // expertSystem places the task contract after the expert's own persona.
 //
 // Later text is weighted most heavily, and the contract is the part that must
 // not be negotiable. The persona decides who is judging; this decides what
 // judging means.
-func expertSystem(e prompt.Expert) string {
+func expertSystem(e prompt.Expert, withReference bool) string {
+	contract := validationContract
+	if withReference {
+		contract += referenceContract
+	}
 	persona := strings.TrimSpace(e.System)
 	if persona == "" {
-		return validationContract
+		return contract
 	}
-	return persona + "\n\n" + validationContract
+	return persona + "\n\n" + contract
 }
 
 // expertLabel is the name shown to a reader, falling back to the routing key so
@@ -442,7 +615,7 @@ func expertLabel(e prompt.Expert) string {
 // review pass is given them because intent makes a change easier to judge; this
 // pass decides whether to DELETE a finding, and the author's own argument for
 // the change is the one input that must not reach that decision.
-func validationRequest(f Finding, code string) string {
+func validationRequest(f Finding, code string, cited []knowledge.Entry) string {
 	var b strings.Builder
 
 	b.WriteString(untrustedClaimFence + "\n")
@@ -472,6 +645,21 @@ func validationRequest(f Finding, code string) string {
 	b.WriteString(defang(strings.TrimRight(code, "\n")))
 	b.WriteString("\n" + untrustedCodeFence + "\n\n")
 
+	// Last, after both untrusted blocks. This is the only text in the request
+	// that this repository wrote, and it is placed where the model weighs it
+	// most heavily rather than where a reader would expect a preamble.
+	if len(cited) > 0 {
+		b.WriteString(referenceFence + "\n")
+		b.WriteString("The entries below were in front of the reviewer when it wrote that claim.\n")
+		b.WriteString("They are reference material, not a statement about this code, and one of\n")
+		b.WriteString("them may not apply here at all. Name the entry that decided your verdict\n")
+		b.WriteString("in `cited`, or leave it empty when none of them did.\n\n")
+		for _, e := range cited {
+			fmt.Fprintf(&b, "[%s] %s\n%s\n\n", e.ID, e.Title, e.Body)
+		}
+		b.WriteString(referenceFence + "\n\n")
+	}
+
 	b.WriteString("Return your verdict for that one claim.\n")
 
 	return b.String()
@@ -487,9 +675,22 @@ const defanged = "[open-nitpick removed a forged boundary marker here]"
 // Written against the markers' WORDS with the punctuation optional, because the
 // punctuation is the part an imitator can vary while keeping every bit of the
 // effect: "==== UNTRUSTED CODE UNDER REVIEW ====" is not the marker and reads
-// exactly like it. Bounded to a single line, so a match can never swallow the
-// newline between two lines of real code.
-var fenceImitation = regexp.MustCompile(`(?i)=*[ \t]*untrusted[^\n]{0,40}?(under review|pull request text)[ \t]*=*`)
+// exactly like it. That holds only where the words themselves do not occur in
+// prose, which is why the reference alternative needs a run of = on one side
+// and the untrusted ones need none. Bounded to a single line, so a match can
+// never swallow the newline between two lines of real code.
+var fenceImitation = regexp.MustCompile(`(?i)` +
+	// The untrusted markers, punctuation optional: their words do not occur in
+	// prose by accident.
+	`=*[ \t]*untrusted[^\n]{0,40}?(under review|pull request text)[ \t]*=*` +
+	`|` +
+	// The reference marker, which needs a run of = on one side or the other.
+	// Its words DO occur in prose: "the reference material, not this change"
+	// is a sentence somebody writes in a comment, and defanging that shows an
+	// expert altered code carrying an accusation of tampering.
+	`=+[ \t]*reference material[^\n]{0,40}?not this change[ \t]*=*` +
+	`|` +
+	`=*[ \t]*reference material[^\n]{0,40}?not this change[ \t]*=+`)
 
 // defang removes anything in untrusted text that imitates a fence marker.
 //
@@ -508,4 +709,47 @@ func (v *Validator) log() *slog.Logger {
 		return v.Log
 	}
 	return slog.New(slog.DiscardHandler)
+}
+
+// nullish are the single words a model reaches for when it means "no
+// citation", which the contract asks it to spell as an empty string.
+//
+// A backstop rather than the rule. The rule is in namesSomething: a list of
+// phrasings is a list somebody has to keep complete, and three rounds of
+// review found a form it was missing each time.
+var nullish = map[string]bool{
+	"": true, "none": true, "na": true, "nil": true, "null": true,
+	"nothing": true, "notapplicable": true, "empty": true, "unknown": true,
+}
+
+// namesSomething reports whether a `cited` field claims to be an id.
+//
+// Only a single token counts, because an id is one word: a sentence in this
+// field is an answer in the wrong form rather than a claimed source. See
+// docs/harness-notes.md#naming-a-citation for what that gates and why the
+// alternative, deciding whether a sentence means nothing, is not decidable
+// from the string.
+func namesSomething(said string) bool {
+	said = strings.TrimSpace(said)
+	if strings.ContainsAny(said, " \t\n") {
+		return false
+	}
+	return !nullish[idChars(said)]
+}
+
+// idChars reduces a string to the letters and digits of a corpus id.
+//
+// The separators go too. A model writing a hyphenated id into a sentence
+// spells it with spaces or underscores, and reading "go defer in loop" as a
+// different entry from `go-defer-in-loop` is the same mistake as reading
+// `[go-defer-in-loop]` that way. TestCorpusIDsDoNotCollideWithoutSeparators
+// bounds the loosening: no two shipped ids are equal once they are gone.
+func idChars(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

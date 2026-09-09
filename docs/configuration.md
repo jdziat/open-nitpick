@@ -433,9 +433,20 @@ to write one that crosses them, and it has to be typed: an empty list used to
 mean the same thing, which made a forgotten key and a deliberate claim about
 every language the same entry. A change whose files resolve to no known
 language still retrieves nothing, generic entries included. `versions:` and
-`frameworks:` are optional and are rendered beside the entry rather than
-filtered on, because nothing here knows the versions a change runs under and a
-filter fed a guess would silence entries on the strength of it. The vectors are
+`frameworks:` are optional prose, rendered beside the entry for the model to
+judge rather than filtered on, because most applicability cannot be checked
+mechanically.
+
+`applies:` is the half that can be. It holds clauses of the form
+`name op version`, separated by commas, all of which must hold, with `op` one
+of `>=`, `>`, `<`, `<=`, `==`. Only `go` is answerable today, read from the
+repository's root `go.mod`. An entry whose clauses fail is not offered at all:
+`go-time-after-leak` carries `applies: go < 1.23`, because Go 1.23 changed
+timers so an unreferenced one is collected before firing, and a repository
+declaring 1.23 or later never sees the entry. A version this tool cannot read,
+a repository with no `go.mod`, or a clause naming something it does not resolve
+all keep the entry, because silencing on ignorance would make a missing
+`go.mod` look like a corpus with nothing to say. The vectors are
 committed under `internal/knowledge/indexes` and regenerated with `nitpick
 knowledge-index`, one file per embedding model. A run selects the file whose
 recorded model matches `models.embed`, so switching embedder is configuration
@@ -900,6 +911,7 @@ which may overrule it.
 validation:
   enabled: false                   # default
   classes: [security, correctness] # empty validates every class
+  targeted: false                  # default
 ```
 
 It costs one model call per published finding, on `models.validate` if set and
@@ -911,6 +923,35 @@ direction that matters, how many real defects an expert talks itself out of.
 An unlisted class is published **without** validation, never dropped, so
 narrowing `classes` can only reduce refutations. Overruled findings are not
 discarded silently; they are reported with the reason.
+
+`validation.targeted` shows the expert the knowledge entries the reviewer had
+in front of it when it wrote the finding, and asks it to name the one that
+decided the verdict. It is off, unmeasured, and does nothing without
+`review.knowledge`, since a finding written without retrieval cites nothing.
+The reason it is not on: it narrows the question from "is this claim true of
+this code" to "is this claim true of this code given this rule", and a wrong
+retrieval makes the second easy to answer confidently and wrongly.
+
+A citation naming an entry the expert was not shown does more than get
+dropped: the verdict resting on it is demoted to `unresolved`, so the finding
+publishes and the reader is told the check did not resolve. An expert naming a
+source it never saw is the strongest signal available that its refutation is
+unreliable, and this tool's rule is that doubt does not delete a finding.
+
+Every published finding lists the entries the reviewer read, as
+`reference read: <id>`, and every withheld one lists the entry its expert
+cited. The ids are the filenames under `internal/knowledge/corpus`.
+
+Like the rest of the `validation` block, `targeted` can be set by the
+repository's own `.nitpick.yaml`, which a change may edit. That is the existing
+position for `validation.enabled` too, and `enabled` is the larger lever, since
+it creates the pass rather than changing its prompt. The trust prune covers
+model endpoints and credentials; see the trust model page.
+
+The entries are shown under a `REFERENCE MATERIAL, NOT THIS CHANGE` marker, and that marker is
+defanged out of the code in the same request. The code is written by the change
+author, so without that a diff opens a reference block of its own and states a
+rule in this tool's voice for the expert to refute a real finding with.
 
 ## Severities
 

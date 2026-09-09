@@ -1753,3 +1753,96 @@ different job than noise reduction on twelve fixtures. What it does say is that
 the obvious escalation from a vector to a model did not rescue the idea here,
 and the thing that did reduce noise was giving the reviewer better context in
 the first place.
+
+## No reranker, on arithmetic (2026-09-08)
+
+The retrieval design left a `Rerank` hook on the retriever: a cheap chat model
+that would read the candidate titles and choose which reach the prompt. Nothing
+ever set it. Before building one, I counted what it could change.
+
+Retrieval cuts the corpus by language, then by the asking pass's classes, then
+by the versions an entry declares, and keeps the top five of what survives.
+The reranker only matters when that keep truncates, so the question is the size
+of the pool it truncates.
+
+| language | entries the cuts allow | truncated at keep = 5 |
+|---|---|---|
+| go | 8 | yes |
+| python | 2 | no |
+| typescript | 2 | no |
+| javascript | 1 | no |
+| rust | 1 | no |
+| shell | 1 | no |
+
+Source: `TestPoolSizeReportsWhatTheCutsAllowed` in
+`internal/knowledge/applies_test.go`. The column sums to 15 over fourteen
+entries because `js-array-sort-mutates` declares both javascript and
+typescript, so it is in two pools. On a
+module declaring Go 1.23 or later the Go pool is 7, because `go-time-after-leak`
+is bounded below it.
+
+For five of the six languages truncation is the identity: every entry the cuts
+allowed reaches the prompt whatever order it is in. A reranker would spend one
+model call per batch to reorder a list that is then not cut. The one place it
+could act is Go, where it would choose which 3 of 8 entries to drop.
+
+So the hook is deleted rather than filled. An unimplemented interface implies
+somebody decided how to rank, and a reader finding it has no way to see that
+nothing is behind it.
+
+What replaces it is the number, in every run: `knowledge retrieved` now logs
+`pool` beside `entries`, so a corpus that has grown past the point where keep
+binds says so in the log rather than in somebody's memory of this table. The
+condition to revisit this is written here rather than left implicit: when the
+pool exceeds keep for most retrievals rather than one language in six, a
+reranker has something to do, and it can be measured against the cosine order
+as the control.
+
+## Regenerating the index is not a pure function of the corpus (2026-09-08)
+
+Editing one corpus entry and regenerating all four bundles moved two other
+entries' vectors. Measured on the diff, comparing per-entry vectors before and
+after:
+
+| entry | model | components differing | max delta | cosine |
+|---|---|---|---|---|
+| sql-rows-err-unchecked | text-embedding-3-small | 1209 of 1536 | 1.22e-4 | 0.999999228 |
+| rust-mem-forget-leak | voyage-code-4 | 598 of 1024 | 1.30e-7 | 1.000000000 |
+
+Neither entry's text changed. This is provider-side nondeterminism, and at that
+magnitude it cannot reorder retrieval: the corpus's nearest neighbours are
+separated by far more than 1e-4.
+
+Recorded because the `corpus` hash pins the text and nothing pins the vectors,
+so a bundle regenerated from an unchanged corpus is a clean diff by the test's
+standard and a changed file by git's. Nothing here needs fixing. What it rules
+out is treating a bundle diff as evidence that the corpus changed.
+
+## Targeted validation: what would decide it, and when (2026-09-09)
+
+`validation.targeted` ships off and unmeasured, and it is now the
+best-defended path in the validation pass: the reference marker, the
+conditional contract, `defang`, and a citation check that demotes a verdict
+naming an entry the expert was not shown. Four defences on a feature nobody
+has evidence for is a standing cost, so this records what would settle it
+rather than leaving that to whoever next reads the code.
+
+The measurement is the one this repository already runs. Two arms over the
+knowledge corpus, `validation.enabled` on in both, `validation.targeted` the
+only difference, two runs each, `review.knowledge` on so findings carry
+evidence at all. Recall and noise per review, the same pair every arm here is
+scored on.
+
+Ship condition, written before the number: targeted must not cost recall, and
+must reduce noise by more than one finding per review. Noise is counted per
+review over the corpus's twelve fixtures, so one finding is 1/12 = 0.083 and
+anything smaller is inside what this instrument can resolve. Recall is the
+coarser of the two and is not the same number: `CorpusResolution` reports its
+step as 1/6 = 0.167, one defect over the six the corpus plants, so "must not
+cost recall" means no defect lost rather than a fraction of one.
+
+Kill condition, so the holding position expires: if that measurement has not
+run by the release after the one carrying this branch, the flag, the
+`referenceContract`, the reference fence and the citation check come out. The
+evidence line on a published finding stays either way, because it costs no
+model call and is checkable by a reader on every run.

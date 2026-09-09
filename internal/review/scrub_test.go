@@ -1,6 +1,9 @@
 package review
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestScrubRemovesTheMechanicalTells(t *testing.T) {
 	cases := []struct{ in, want string }{
@@ -83,5 +86,25 @@ func TestScrubOverruledCoversTheReason(t *testing.T) {
 	}
 	if o[0].Finding.Title != "Nil deref, here" || o[0].Reason != "The guard covers it." {
 		t.Errorf("overruled = %+v", o[0])
+	}
+}
+
+// The stated doubt is scrubbed like every other published model string.
+//
+// It is the one field on this path an expert writes straight into a comment,
+// so a chat opener or an em dash in it reaches a pull request under this
+// tool's name while the finding beside it was cleaned.
+func TestScrubFindingsCoversTheStatedDoubt(t *testing.T) {
+	f := []Finding{{
+		Title:      "Lock is not held",
+		Unresolved: "Sure! I cannot tell — the owner is elsewhere. Hope this helps!",
+	}}
+	if n := scrubFindings(f); n != 1 {
+		t.Errorf("changed = %d, want 1", n)
+	}
+	for _, tell := range []string{"Sure!", "—", "Hope this helps"} {
+		if strings.Contains(f[0].Unresolved, tell) {
+			t.Errorf("%q survived the scrub: %q", tell, f[0].Unresolved)
+		}
 	}
 }

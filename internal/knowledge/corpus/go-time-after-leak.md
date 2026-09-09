@@ -2,6 +2,7 @@
 title: time.After in a loop holds its timer until it fires, however the loop exits
 languages: [go]
 classes: [resource]
+applies: go < 1.23
 source: https://pkg.go.dev/time#After
 checked: 2026-09-08
 ---
@@ -18,9 +19,17 @@ allocation site that explains it.
 `time.NewTimer` with an explicit `Stop`, or one timer reset outside the loop,
 does not have this property.
 
-Note the version boundary: Go 1.23 changed timers so an unreferenced one can be
-collected before firing. Code targeting an older toolchain, which `go.mod`
-states, still has the old behaviour.
+The version boundary is in the front matter: Go 1.23 changed timers so an
+unreferenced one can be collected before firing, and the change is keyed to the
+main module's `go` directive. A repository declaring 1.23 or later does not
+have this behaviour, and does not get this entry.
+
+One escape hatch is not read by that clause. `godebug asynctimerchan=1`, in
+`go.mod` or as a `//go:debug` directive, restores the old timers on a module
+that otherwise declares 1.23 or later. Such a module has this leak and will not
+be shown this entry, so a reviewer working on one has to know the rule already.
+A `go.work` in use overrides the `go.mod` setting, and the setting is removed
+in Go 1.27, so the blind spot has an end date.
 
 What to look for: `time.After` inside a `for` or a `select` that runs more than
 once, especially with a duration longer than the loop's period.

@@ -160,3 +160,30 @@ func sortedStrings(s []string) []string {
 	}
 	return out
 }
+
+// The citation reaches the text half of the result, not only the JSON.
+//
+// A client reading the text sees why a finding was removed, and the entry that
+// reason rests on is part of it. Rendering it on one half only makes the
+// documented promise true for half the consumers.
+func TestReviewTextCarriesTheCitation(t *testing.T) {
+	text := reviewText(ReviewOut{
+		Withheld: []Withheld{{
+			Path: "a.go", Line: 4, Title: "Deferred close in a loop",
+			Expert: "resource", Reason: "the loop body returns", Cited: "go-defer-in-loop",
+		}},
+	})
+	// The whole line, so the id cannot run into the reason: a reader has to be
+	// able to see where the id ends.
+	if !strings.Contains(text, "(resource: the loop body returns) (citing go-defer-in-loop)") {
+		t.Errorf("the citation did not render after the reason:\n%s", text)
+	}
+
+	// And a withheld finding with no citation reads cleanly.
+	plain := reviewText(ReviewOut{
+		Withheld: []Withheld{{Path: "a.go", Line: 4, Title: "T", Expert: "resource", Reason: "why"}},
+	})
+	if !strings.Contains(plain, "(resource: why)") {
+		t.Errorf("an uncited withheld finding did not render cleanly:\n%s", plain)
+	}
+}

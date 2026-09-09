@@ -47,6 +47,7 @@ import (
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/gomod"
 	"github.com/jdziat/open-nitpick/internal/review"
 )
 
@@ -1160,7 +1161,7 @@ func hasPath(found []review.Finding, path string) bool {
 // below measure three of them at once, io/ioutil (1.19), reflect.PtrTo (1.22)
 // and cipher.NewCFBEncrypter (1.24), and the `go 1.21` row is the attack a
 // constant floor of 1.21 used to let through: two real deprecations silenced, one
-// reported, and before this an empty coverage list. See belowAnalyzedLanguage.
+// reported, and before this an empty coverage list. See gomod.BelowAnalyzed.
 func TestAModuleUnderAnOldGoDirectiveIsNamed(t *testing.T) {
 	requireTool(t, "golangci-lint")
 
@@ -1329,8 +1330,8 @@ func TestTheLanguageVersionComparisonIsTheToolchainsOwnOrdering(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := belowAnalyzedLanguage(tc.declared, tc.ceiling); got != tc.below {
-				t.Errorf("belowAnalyzedLanguage(%q, %q) = %v, want %v", tc.declared, tc.ceiling, got, tc.below)
+			if got := gomod.BelowAnalyzed(tc.declared, tc.ceiling); got != tc.below {
+				t.Errorf("gomod.BelowAnalyzed(%q, %q) = %v, want %v", tc.declared, tc.ceiling, got, tc.below)
 			}
 		})
 	}
@@ -1405,17 +1406,17 @@ func TestTheGoDirectiveIsReadFromGoModTheWayTheGoToolReadsIt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			file := writeFile(t, t.TempDir(), "go.mod", tc.src)
 
-			declared, line, ok := moduleLanguageVersion(file)
+			declared, line, ok := gomod.LanguageVersion(file)
 			if !ok {
-				t.Fatalf("moduleLanguageVersion(%q) reported no answer", tc.src)
+				t.Fatalf("gomod.LanguageVersion(%q) reported no answer", tc.src)
 			}
 			if declared != tc.declared || line != tc.line {
-				t.Errorf("moduleLanguageVersion = (%q, %d), want (%q, %d)", declared, line, tc.declared, tc.line)
+				t.Errorf("gomod.LanguageVersion = (%q, %d), want (%q, %d)", declared, line, tc.declared, tc.line)
 			}
 		})
 	}
 
-	if _, _, ok := moduleLanguageVersion(filepath.Join(t.TempDir(), "go.mod")); ok {
+	if _, _, ok := gomod.LanguageVersion(filepath.Join(t.TempDir(), "go.mod")); ok {
 		t.Error("a go.mod that is not there reported a version; a coverage notice built on a guess " +
 			"sends an operator to the wrong file")
 	}
@@ -1425,7 +1426,7 @@ func TestTheGoDirectiveIsReadFromGoModTheWayTheGoToolReadsIt(t *testing.T) {
 	// but which reading was meant is exactly the question this must not answer
 	// by guessing, since the answer becomes the number the ceiling compares.
 	unbalanced := writeFile(t, t.TempDir(), "go.mod", "module probe\n\n)\ngo 1.25\n")
-	if _, _, ok := moduleLanguageVersion(unbalanced); ok {
+	if _, _, ok := gomod.LanguageVersion(unbalanced); ok {
 		t.Error("an unbalanced go.mod reported a version; the two readings of it differ and " +
 			"choosing one is how a misread becomes a coverage claim")
 	}

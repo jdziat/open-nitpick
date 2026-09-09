@@ -333,7 +333,7 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	// embedder at an endpoint of its own. A misconfiguration is fatal here
 	// because the operator asked for retrieval; a failure to retrieve during a
 	// review is not, and lands on the report instead.
-	k, status, err := review.BuildKnowledge(ctx, cfg, log)
+	k, status, err := review.BuildKnowledge(ctx, cfg, repo, log)
 	if err != nil {
 		return nil, fmt.Errorf("knowledge retrieval (%s): %w", status.Reason, err)
 	}
@@ -410,14 +410,20 @@ func printOverruled(report *review.Report) {
 
 	fmt.Fprintf(os.Stderr, "%d finding(s) withheld after a domain expert disagreed:\n", len(report.Overruled))
 	for _, r := range report.Overruled {
+		cited := ""
+		if r.Cited != "" {
+			cited = fmt.Sprintf(" (citing %s)", r.Cited)
+		}
 		if r.Revised != "" {
-			fmt.Fprintf(os.Stderr, "  %s:%d %s — %s re-rated %s → %s: %s\n",
+			// A re-rating carries a citation like a refutation does, and both
+			// remove a finding from the pull request.
+			fmt.Fprintf(os.Stderr, "  %s:%d %s — %s re-rated %s → %s: %s%s\n",
 				r.Finding.Path, r.Finding.Line, r.Finding.Title, r.Expert,
-				r.Finding.Sev(), r.Revised, r.Reason)
+				r.Finding.Sev(), r.Revised, r.Reason, cited)
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "  %s:%d %s — %s: %s\n",
-			r.Finding.Path, r.Finding.Line, r.Finding.Title, r.Expert, r.Reason)
+		fmt.Fprintf(os.Stderr, "  %s:%d %s — %s: %s%s\n",
+			r.Finding.Path, r.Finding.Line, r.Finding.Title, r.Expert, r.Reason, cited)
 	}
 }
 

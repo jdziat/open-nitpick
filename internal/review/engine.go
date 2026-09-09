@@ -272,7 +272,7 @@ const (
 	// version below the toolchain analyzing it, so the version-gated part of the
 	// ruleset was not applied to it. It is the one reason here that is a REDUCED
 	// analysis rather than an absent one: the file was read, and part of the
-	// ruleset was held off it. See linters.belowAnalyzedLanguage for what the
+	// ruleset was held off it. See gomod.BelowAnalyzed for what the
 	// ceiling is and why it is not a fixed floor.
 	//
 	// It says the gate was CLOSED, not that anything was behind it, and the
@@ -1250,9 +1250,19 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 
 	// After the diff, not before it. The change is what the model is being
 	// asked about, and reference material placed first reads as the subject.
-	if hits := e.retrieveKnowledge(ctx, b, style); len(hits) > 0 {
+	// Widened out of the if, because the findings below carry which entries
+	// the reviewer read and the scope used to end here.
+	hits := e.retrieveKnowledge(ctx, b, style)
+	if len(hits) > 0 {
 		body.WriteString(knowledgeSection(hits))
-		e.log().Info("knowledge retrieved", "batch", b.Paths(), "entries", ids(hits))
+		// pool beside entries, at the level an operator runs at. A pool at or
+		// below Keep means every entry the cuts allowed reached the prompt, so
+		// nothing chose between them, which is the number docs/findings.md
+		// says a corpus grown past that point will report.
+		e.log().Info("knowledge retrieved",
+			"batch", b.Paths(),
+			"entries", ids(hits),
+			"pool", e.Knowledge.PoolSize(b, e.knowledgeClasses(style)))
 	}
 
 	msgs := []llms.Message{
@@ -1280,6 +1290,8 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		// Always this client's name: a model that writes a source of its
 		// own would let two reviewers' findings pass as one's.
 		f.Source = client.String()
+		// What the reviewer read, not what persuaded it. See evidence.go.
+		f.Evidence = evidenceFor(f, hits)
 		out = append(out, f)
 	}
 	return out, nil
@@ -1559,12 +1571,18 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 	// the eval battery runs. It was worse for linter findings, because Source is
 	// deliberately restored below: the finding was published attributed to gosec
 	// with our word quoted as gosec's.
+	// Evidence is json:"-" like Source, so it arrives from triage's decode
+	// empty. Restored beside the others rather than recomputed: the hits that
+	// produced it belong to a batch this function no longer has.
+	evidenceBefore := make(map[string][]string, len(findings))
+
 	severityBefore := make(map[string]Finding, len(findings))
 	for _, f := range findings {
 		allowed[f.Path] = struct{}{}
 		if _, seen := classBefore[f.Key()]; !seen {
 			classBefore[f.Key()] = f.Class
 			sourceBefore[f.Key()] = f.Source
+			evidenceBefore[f.Key()] = f.Evidence
 			severityBefore[f.Key()] = f
 		}
 	}
@@ -1623,6 +1641,9 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 			f.Source = original
 		}
 		f.Triager = e.Roles.Triage.String()
+		if original, ok := evidenceBefore[f.Key()]; ok {
+			f.Evidence = original
+		}
 
 		kept = append(kept, f)
 	}
@@ -1794,6 +1815,10 @@ func (e *Engine) validateFindings(ctx context.Context, findings []Finding, plan 
 		Policy:      e.Config.Validation,
 		Concurrency: e.Config.Review.Concurrency,
 		Log:         e.log(),
+		// Only when it is asked for. Reading the corpus costs nothing, but a
+		// validator holding one it will never consult reads as though targeted
+		// validation were on.
+		Corpus: e.knowledgeCorpus(),
 	}
 
 	kept, overruled := v.Validate(ctx, findings, renderedFiles(plan))

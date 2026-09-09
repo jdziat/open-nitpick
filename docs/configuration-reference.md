@@ -1187,5 +1187,10 @@ Classes limits validation to these finding classes, so a team can validate secur
 boolean, default `false`.
 Enabled turns the pass on.
 
+### `validation.targeted`
+
+boolean, default `false`.
+Targeted shows an expert the knowledge entries the reviewer had in front of it when it wrote the finding, and asks it to name the one that decided the verdict.
+
 Anything not listed is not a key. The loader rejects an unrecognised one rather
 than ignoring it, so a typo fails the run instead of silently doing nothing.

@@ -205,9 +205,9 @@ variable. It was the same mistake as the MatchFile one diagnosed above: the
 detector keyed to a proxy for the child's build context rather than to the
 child's build context.
 
-## goAssumedLanguageVersion
+## AssumedLanguage
 
-`internal/linters/runners.go`
+`internal/gomod/gomod.go`
 
 Measured rather than taken from the documentation: a go.mod reading only
 `module probe` reports the same nothing as `go 1.16` on a file using
@@ -215,9 +215,9 @@ strings.Title, io/ioutil and rand.Seed, where `go 1.20` reports all three. A
 missing directive is therefore a declared version like any other and is
 reported like one, with line 0 because there is no line to send a reader to.
 
-## belowAnalyzedLanguage
+## BelowAnalyzed
 
-`internal/linters/runners.go`
+`internal/gomod/gomod.go`
 
 WHAT THE `go` DIRECTIVE does, measured against golangci-lint 2.8.0 and go1.25.5 on
 a file importing io/ioutil. With `go 1.24` in go.mod the review publishes
@@ -281,9 +281,9 @@ GOVERSION carries no language version at all; naming every module in the
 checkout because we could not read our own toolchain would be a wall of
 coverage gaps invented out of an unanswered question.
 
-## moduleLanguageVersion
+## LanguageVersion
 
-`internal/linters/runners.go`
+`internal/gomod/gomod.go`
 
 It reads the file rather than running `go list -m`, because go.mod is part of
 the tree under review and asking the go tool about it is another way to

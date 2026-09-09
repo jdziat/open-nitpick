@@ -11,6 +11,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/gomod"
 	"github.com/jdziat/open-nitpick/internal/knowledge"
 )
 
@@ -126,7 +127,10 @@ func (e *Engine) retrieveKnowledge(ctx context.Context, b bundle.Batch, style bo
 	hits = fitKnowledge(hits, e.Config.Review.KnowledgeTokens)
 
 	if len(hits) > 0 {
-		e.log().Debug("knowledge retrieved",
+		// A different message from the Info record the caller writes. Two
+		// records sharing one message and carrying different fields is a log
+		// nobody can filter.
+		e.log().Debug("knowledge retrieval detail",
 			"entries", ids(hits),
 			"scores", scores(hits),
 			"stage", stage(style),
@@ -158,6 +162,11 @@ func scores(hits []knowledge.Hit) []string {
 // depend on how retrieval is configured.
 type KnowledgeRetriever struct {
 	R *knowledge.Retriever
+
+	// RepoRoot is where the go.mod behind an entry's `applies:` clauses is
+	// read from, resolved per batch to the module that owns the batch's files.
+	// Empty reads none, and none keeps every entry.
+	RepoRoot string
 
 	// status is what construction settled: the model, the entry count and,
 	// when retrieval never got as far as answering, why.
@@ -207,7 +216,43 @@ func (k *KnowledgeRetriever) ForBatch(ctx context.Context, b bundle.Batch, class
 	if q.Len() == 0 {
 		return nil, nil
 	}
-	return k.retrieve(ctx, q.String(), knowledge.LanguagesOf(paths), classes, "")
+	return k.retrieve(ctx, q.String(), knowledge.LanguagesOf(paths), classes, paths, "")
+}
+
+// knowledgeCorpus is every entry a targeted validation can cite, by id.
+//
+// The retriever's own entries rather than a fresh read of the corpus: those
+// are the entries this run could have put in front of a reviewer, so an
+// evidence id that resolves here resolves to the text the reviewer saw. Nil
+// when retrieval is off or targeted validation is not asked for, which makes
+// Validator.cited a no-op.
+func (e *Engine) knowledgeCorpus() map[string]knowledge.Entry {
+	if !e.Config.Validation.Targeted || e.Knowledge == nil || e.Knowledge.R == nil {
+		return nil
+	}
+	out := make(map[string]knowledge.Entry, len(e.Knowledge.R.Entries))
+	for _, entry := range e.Knowledge.R.Entries {
+		out[entry.ID] = entry
+	}
+	return out
+}
+
+// PoolSize is how many entries this batch could have reached.
+//
+// The languages a batch resolves to, which is what the per-batch query uses.
+// A per-file run asks smaller questions and so has smaller pools; this reports
+// the widest one, which is the one that says whether Keep can bind at all.
+func (k *KnowledgeRetriever) PoolSize(b bundle.Batch, classes map[config.Class]bool) int {
+	if k == nil || k.R == nil {
+		return 0
+	}
+	paths := make([]string, 0, len(b.Entries))
+	for _, e := range b.Entries {
+		if e.File != nil {
+			paths = append(paths, e.File.Path)
+		}
+	}
+	return k.R.PoolSize(knowledge.LanguagesOf(paths), classes, gomod.VersionsFor(k.RepoRoot, paths))
 }
 
 // perFile queries once per changed file and merges the results.
@@ -231,7 +276,8 @@ func (k *KnowledgeRetriever) perFile(ctx context.Context, b bundle.Batch, classe
 		if q == "" {
 			continue
 		}
-		hits, err := k.retrieve(ctx, q, knowledge.LanguagesOf([]string{e.File.Path}), classes, e.File.Path)
+		hits, err := k.retrieve(ctx, q, knowledge.LanguagesOf([]string{e.File.Path}), classes,
+			[]string{e.File.Path}, e.File.Path)
 		if err != nil {
 			// One file's failure is not the batch's. The others still have
 			// something to say, and the counters already record that this run
@@ -250,9 +296,9 @@ func (k *KnowledgeRetriever) perFile(ctx context.Context, b bundle.Batch, classe
 }
 
 // retrieve is one query, counted.
-func (k *KnowledgeRetriever) retrieve(ctx context.Context, q string, langs map[string]bool, classes map[config.Class]bool, path string) ([]knowledge.Hit, error) {
+func (k *KnowledgeRetriever) retrieve(ctx context.Context, q string, langs map[string]bool, classes map[config.Class]bool, paths []string, path string) ([]knowledge.Hit, error) {
 	k.counts.query()
-	hits, err := k.R.Retrieve(ctx, q, langs, classes)
+	hits, err := k.R.Retrieve(ctx, q, langs, classes, gomod.VersionsFor(k.RepoRoot, paths))
 	if err != nil {
 		k.counts.failure()
 		return nil, err

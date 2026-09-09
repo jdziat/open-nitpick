@@ -134,6 +134,10 @@ type Withheld struct {
 	Title  string `json:"title"`
 	Expert string `json:"expert"`
 	Reason string `json:"reason"`
+
+	// Cited is the knowledge entry the expert said decided its verdict, empty
+	// when it named none or named one it was not shown.
+	Cited string `json:"cited,omitempty"`
 }
 
 // ReviewOut is what review returns.
@@ -369,7 +373,8 @@ func reviewOut(report *review.Report, failOn config.Severity) ReviewOut {
 		out.Analyzers = append(out.Analyzers, Analyzer{Name: s.Linter, Outcome: string(s.Outcome), State: s.State})
 	}
 	for _, o := range report.Overruled {
-		out.Withheld = append(out.Withheld, Withheld{Path: o.Finding.Path, Line: o.Finding.Line, Title: o.Finding.Title, Expert: o.Expert, Reason: o.Reason})
+		out.Withheld = append(out.Withheld, Withheld{Path: o.Finding.Path, Line: o.Finding.Line,
+			Title: o.Finding.Title, Expert: o.Expert, Reason: o.Reason, Cited: o.Cited})
 	}
 	if report.Policy.Replaced {
 		out.Policy = fmt.Sprintf("the change edits %s, so it was reviewed under %s", report.Policy.Modified, report.Policy.Source())
@@ -439,7 +444,17 @@ func reviewText(out ReviewOut) string {
 	if len(out.Withheld) > 0 {
 		fmt.Fprintf(&b, "\n%d finding(s) withheld:", len(out.Withheld))
 		for _, w := range out.Withheld {
-			fmt.Fprintf(&b, "\n  %s:%d %s (%s: %s)", w.Path, w.Line, w.Title, w.Expert, w.Reason)
+			// The citation belongs on both halves of the result. A client
+			// reading the text sees the reason a finding was removed, and the
+			// entry that reason rests on is part of it.
+			// After the reason, as printOverruled renders it. Between the
+			// expert and the reason the id and the sentence run together and a
+			// reader cannot see where the id ends.
+			cited := ""
+			if w.Cited != "" {
+				cited = fmt.Sprintf(" (citing %s)", w.Cited)
+			}
+			fmt.Fprintf(&b, "\n  %s:%d %s (%s: %s)%s", w.Path, w.Line, w.Title, w.Expert, w.Reason, cited)
 		}
 		b.WriteString("\n")
 	}

@@ -1,0 +1,276 @@
+// Package gomod reads what a module's go.mod declares.
+//
+// One reader, because two would disagree. The linter roster uses the declared
+// language version to say which version-gated checks did not apply to a
+// module, and knowledge retrieval uses it to drop an entry whose claim is
+// about a version this repository does not target. A second parser with its
+// own handling of block directives and comments would give those two answers
+// that differ on the same file.
+package gomod
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"go/version"
+)
+
+// AssumedLanguage is what the go tool assumes for a module whose go.mod
+// carries no `go` directive at all.
+//
+// The note behind it is in docs/runner-notes.md#assumedlanguage.
+const AssumedLanguage = "1.16"
+
+// BelowAnalyzed reports whether a module's declared Go language version is
+// below the toolchain analyzing it, so that version-gated checks this run
+// could have applied were not applied to it.
+//
+// The note behind it is in docs/runner-notes.md#belowanalyzed.
+func BelowAnalyzed(declared, ceiling string) bool {
+	v := "go" + declared
+	if !version.IsValid(v) || !version.IsValid(ceiling) {
+		return false
+	}
+	return version.Compare(version.Lang(v), version.Lang(ceiling)) < 0
+}
+
+// LanguageVersion reads the Go language version a go.mod declares, with the
+// 1-based line of the `go` directive.
+//
+// The note behind it is in docs/runner-notes.md#languageversion.
+func LanguageVersion(modFile string) (declared string, line int, ok bool) {
+	f, ok := scanMod(modFile)
+	switch {
+	case !ok:
+		return "", 0, false
+	case f.hasGo:
+		return f.goVersion, f.goLine, true
+	default:
+		return AssumedLanguage, 0, true
+	}
+}
+
+// modFacts is what one pass over a go.mod found.
+type modFacts struct {
+	goVersion string
+	goLine    int
+	hasGo     bool
+	hasModule bool
+}
+
+// scanMod reads a go.mod once, reporting every fact this package answers from.
+//
+// One scan, because the package's whole reason for existing is that two
+// readings of the same file cannot disagree. A second hand-written walk for
+// the module directive would duplicate the comment stripping and the
+// parenthesis depth, and a grammar fix applied to one and not the other is the
+// disagreement this package was made to prevent.
+//
+// False means the file could not be read or does not parse, which the callers
+// answer with an abstention.
+func scanMod(modFile string) (modFacts, bool) {
+	src, err := os.ReadFile(modFile)
+	if err != nil {
+		return modFacts{}, false
+	}
+
+	var out modFacts
+
+	// Parenthesis depth, so that a `go` line inside require/exclude/replace/
+	// retract/godebug/tool is read as what it is, a block entry, and not as the
+	// module's directive. Indentation cannot stand in for this: go.mod permits a
+	// top-level directive to be indented, which is why the scan below uses Fields
+	// in the first place.
+	depth := 0
+
+	for i, raw := range strings.Split(string(src), "\n") {
+		// Line comments only, which is every comment go.mod has: the modules
+		// reference says "Comments start with // and run to the end of a line.
+		// /* */ comments are not allowed." A file carrying one does not load,
+		// so there is nothing here to be right about.
+		if comment := strings.Index(raw, "//"); comment >= 0 {
+			raw = raw[:comment]
+		}
+
+		// Fields rather than a split on " ": it absorbs leading indentation,
+		// which go.mod permits, and the trailing \r of a file written on Windows.
+		if fields := strings.Fields(raw); depth == 0 && len(fields) >= 2 {
+			switch fields[0] {
+			case "go":
+				if !out.hasGo {
+					out.goVersion, out.goLine, out.hasGo = fields[1], i+1, true
+				}
+			case "module":
+				out.hasModule = true
+			}
+		}
+
+		// After the check and not before it: `require (` opens the block on the
+		// line that names it, and the directive itself never carries a paren, so
+		// no top-level `go` is ever hidden by its own line.
+		//
+		// Quoted parens do not count, because go.mod permits a quoted path and
+		// a directory named "libs (v1)" is legal on every filesystem this runs
+		// on. Counted, one leaves the depth above zero for the rest of the
+		// file, and the `go` directive after it is read as block content.
+		depth += parenDelta(raw)
+		if depth < 0 {
+			// Unbalanced. The file does not load either, and guessing which of
+			// the two readings the author meant is how a misread becomes a
+			// number the ceiling comparison trusts.
+			return modFacts{}, false
+		}
+	}
+
+	return out, true
+}
+
+// Versions reports what a repository's root module declares, keyed by the
+// names a knowledge entry's `applies:` line uses.
+//
+// The root go.mod only, so an entry is judged against the version the
+// repository as a whole claims. An unreadable or absent one returns nothing,
+// which AppliesTo reads as "unknown".
+func Versions(repoRoot string) map[string]string {
+	if repoRoot == "" {
+		// Not the process working directory. Joining "" with "go.mod" names a
+		// relative path, so a caller with no checkout would judge entries
+		// against whatever module the binary happens to be run from.
+		return nil
+	}
+	// A file with no `module` directive is not a loadable module, whatever else
+	// it holds. LanguageVersion still answers for it, because the go tool's
+	// assumed version is what the linter roster's coverage note needs and that
+	// reading is measured (docs/runner-notes.md#assumedlanguage). Here the
+	// question is different: an entry bounded to a version must not be judged
+	// against a number read out of a file the go tool would refuse, so this
+	// abstains and the caller keeps every entry.
+	f, ok := scanMod(filepath.Join(repoRoot, "go.mod"))
+	if !ok || !f.hasModule {
+		return nil
+	}
+	if !f.hasGo {
+		return map[string]string{"go": AssumedLanguage}
+	}
+	return map[string]string{"go": f.goVersion}
+}
+
+// VersionsFor reports what the module owning these paths declares.
+//
+// The module owning them, not the repository's root, because the Go language
+// version is a property of the main module and a repository can hold several.
+// A submodule on 1.21 under a root on 1.25 has the timer behaviour its own
+// go.mod declares, and judging its files against the root's answer would drop
+// an entry that applies: a confident wrong answer, which is worse than the
+// unknown this package's callers are built to keep everything on.
+//
+// Paths belonging to different modules return nothing, for the same reason. So
+// does a path that escapes repoRoot, which is not a path this repository
+// serves.
+func VersionsFor(repoRoot string, paths []string) map[string]string {
+	if repoRoot == "" || len(paths) == 0 {
+		return nil
+	}
+
+	var found string
+	for i, p := range paths {
+		mod, ok := moduleDir(repoRoot, p)
+		if !ok {
+			return nil
+		}
+		if i > 0 && mod != found {
+			return nil
+		}
+		found = mod
+	}
+	return Versions(found)
+}
+
+// moduleDir walks up from a repository-relative path to the nearest directory
+// holding a go.mod, stopping at repoRoot.
+//
+// The root itself counts, so a single-module repository answers the way it
+// always did. A path with no go.mod anywhere above it is not in a module, and
+// reporting one for it would be an invention.
+func moduleDir(repoRoot, rel string) (string, bool) {
+	// Symlinks resolved on both sides before comparing, so a link inside the
+	// checkout pointing outward cannot walk up into a go.mod this repository
+	// does not contain. An unresolvable path keeps its cleaned form, which the
+	// containment check below then judges.
+	root := resolved(filepath.Clean(repoRoot))
+	dir := resolved(filepath.Dir(filepath.Join(filepath.Clean(repoRoot), filepath.FromSlash(rel))))
+
+	// Refuse anything that climbed out of the repository rather than searching
+	// upward from it: a "../" in a diff path must not read a go.mod the
+	// repository does not contain.
+	if dir != root && !strings.HasPrefix(dir, root+string(filepath.Separator)) {
+		return "", false
+	}
+
+	for {
+		mod := filepath.Join(dir, "go.mod")
+		if _, _, ok := LanguageVersion(mod); ok {
+			return dir, true
+		}
+		// A go.mod that is here and unreadable ends the search rather than
+		// handing the parent's version to this module's files. That is the
+		// confident wrong answer this package exists to avoid: a submodule
+		// whose go.mod does not parse is a module nothing is known about, and
+		// nothing known keeps every entry.
+		if _, err := os.Stat(mod); err == nil {
+			return "", false
+		}
+		if dir == root {
+			return "", false
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
+}
+
+// resolved follows symlinks, falling back to the path as given.
+//
+// The fallback is not a weakening: a path that does not exist cannot be read
+// either, so the walk finds no go.mod and the caller keeps every entry.
+func resolved(p string) string {
+	if real, err := filepath.EvalSymlinks(p); err == nil {
+		return real
+	}
+	return p
+}
+
+// parenDelta counts a line's unquoted parentheses.
+//
+// go.mod tokens may be quoted, and a quoted path can hold a parenthesis. The
+// modules reference gives interpreted strings in double quotes and raw strings
+// in backquotes, with no escape inside the latter.
+func parenDelta(line string) int {
+	var (
+		delta   int
+		quote   rune
+		escaped bool
+	)
+	for _, r := range line {
+		switch {
+		case escaped:
+			escaped = false
+		case quote == '"' && r == '\\':
+			escaped = true
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			}
+		case r == '"' || r == '`':
+			quote = r
+		case r == '(':
+			delta++
+		case r == ')':
+			delta--
+		}
+	}
+	return delta
+}

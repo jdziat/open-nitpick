@@ -157,3 +157,33 @@ func TestACitationFixDoesNotInvalidateTheIndex(t *testing.T) {
 		t.Error("the corpus hash covers the citation; a URL fix now needs an embedding run")
 	}
 }
+
+// No two corpus ids are equal once their separators are gone.
+//
+// This is what bounds internal/review's citation matcher, which discards
+// punctuation on both sides so that a model writing `go-defer-in-loop` as
+// "go defer in loop" is not read as naming an entry it was never shown. That
+// loosening is only safe while the ids stay distinct without their hyphens,
+// and a new entry is where it would stop being safe.
+func TestCorpusIDsDoNotCollideWithoutSeparators(t *testing.T) {
+	entries, err := Corpus()
+	if err != nil {
+		t.Fatalf("Corpus: %v", err)
+	}
+
+	seen := map[string]string{}
+	for _, e := range entries {
+		var b strings.Builder
+		for _, r := range strings.ToLower(e.ID) {
+			if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+				b.WriteRune(r)
+			}
+		}
+		flat := b.String()
+		if prior, ok := seen[flat]; ok {
+			t.Errorf("%q and %q are the same id once separators are dropped, so a citation "+
+				"naming either resolves to whichever the corpus lists first", prior, e.ID)
+		}
+		seen[flat] = e.ID
+	}
+}

@@ -202,6 +202,46 @@ func renderComment(f Finding, emoji bool, read map[string][]string) string {
 		fmt.Fprintf(&b, "\n<sub>%s</sub>\n", attribution)
 	}
 
+	// Stated doubt, on the same footing as the attribution above it and for the
+	// same reason: a reader deciding whether to act wants to know that the
+	// expert check ran and came back undecided, which is otherwise
+	// indistinguishable from the check having agreed.
+	//
+	// Flattened and escaped, because the expert wrote it after reading a diff
+	// the change's author controls. A newline puts what follows at column 0,
+	// outside the <sub> meant to hold it; a `</sub>` closes the element and
+	// whatever follows renders as live HTML in a comment posted under this
+	// tool's name. Same call every other model-authored string here makes.
+	if u := inline(strings.TrimSpace(f.Unresolved)); u != "" {
+		// The expert's name is set beside the reason on every path that writes
+		// one, so an empty one is a caller that built the finding by hand. It
+		// still must not render "resolved by : ".
+		if by := inline(strings.TrimSpace(f.UnresolvedBy)); by != "" {
+			fmt.Fprintf(&b, "\n<sub>could not be resolved by %s: %s</sub>\n", by, u)
+		} else {
+			fmt.Fprintf(&b, "\n<sub>could not be resolved: %s</sub>\n", u)
+		}
+	}
+
+	// What the reviewer read, so a reader can go and look. Ids only: the
+	// entries ship in this repository under internal/knowledge/corpus, and a
+	// reader who wants the text has a filename. It is not a claim that any of
+	// them produced the finding, which is why the line says "read", see
+	// evidence.go.
+	//
+	// Every id resolves to a file, and nothing here checks that, because
+	// nothing here could be wrong about it: Evidence is json:"-" and is filled
+	// from the entries retrieval returned, which are the corpus. A model can
+	// neither write the field nor name an entry that is not in it. See
+	// TestEvidenceIsOnlyEverCorpusIDs.
+	if len(f.Evidence) > 0 {
+		read := make([]string, 0, len(f.Evidence))
+		for _, id := range f.Evidence {
+			read = append(read, "`"+inline(id)+"`")
+		}
+		fmt.Fprintf(&b, "\n<sub>reference read: %s</sub>\n", strings.Join(read, ", "))
+	}
+
 	// A GitHub suggestion block is one click to apply. Which makes it the most
 	// valuable thing a review bot offers and the most damaging thing it can get
 	// wrong. A suggestion is only rendered as applicable code when it plausibly
@@ -916,11 +956,11 @@ func overruledNotes(report *Report) string {
 			// (a ceiling of warning rendering "re-rated this from critical" as
 			// though critical had been published), so the level printed here is
 			// the one that WAS published for this finding.
-			fmt.Fprintf(&b, "  - %s re-rated this from %s to %s, below this repository's minimum severity: %s\n",
-				inline(r.Expert), r.Finding.Sev(), r.Revised, inline(r.Reason))
+			fmt.Fprintf(&b, "  - %s re-rated this from %s to %s, below this repository's minimum severity: %s%s\n",
+				inline(r.Expert), r.Finding.Sev(), r.Revised, inline(r.Reason), citedNote(r))
 			continue
 		}
-		fmt.Fprintf(&b, "  - %s: %s\n", inline(r.Expert), inline(r.Reason))
+		fmt.Fprintf(&b, "  - %s: %s%s\n", inline(r.Expert), inline(r.Reason), citedNote(r))
 	}
 
 	return b.String()
@@ -1073,4 +1113,16 @@ func stageNotice(report *Report) string {
 		fmt.Fprintf(&b, "> - %s\n", inline(stageSentence(st)))
 	}
 	return b.String()
+}
+
+// citedNote names the reference entry an expert said decided its verdict.
+//
+// Rendered wherever a reason is, because the reason is the claim and this is
+// what it rests on. A citation naming an entry the expert was not shown never
+// reaches here: it is dropped at the verdict, see citation.
+func citedNote(r Overruled) string {
+	if r.Cited == "" {
+		return ""
+	}
+	return fmt.Sprintf(" (citing `%s`)", inline(r.Cited))
 }

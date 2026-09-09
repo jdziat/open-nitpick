@@ -135,6 +135,13 @@ func scrubFindings(findings []Finding) int {
 		if r, changed := Scrub(findings[i].Rationale); changed {
 			findings[i].Rationale, n = r, n+1
 		}
+		// The expert's stated doubt is published prose of the same provenance
+		// as the two above, and scrubOverruled already cleans the expert's
+		// reason for a finding it removed. A finding this tool publishes must
+		// not carry the habits it reports in other people's code.
+		if u, changed := Scrub(findings[i].Unresolved); changed {
+			findings[i].Unresolved, n = u, n+1
+		}
 	}
 	return n
 }
