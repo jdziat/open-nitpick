@@ -65,8 +65,11 @@ func TestLiveKnowledgeReachesThePlants(t *testing.T) {
 			q.WriteString(body)
 		}
 		// Every class the review pass publishes: this test asks where an entry
-		// ranks for a fixture, not which pass routes it.
-		hits, err := r.Retrieve(context.Background(), q.String(), knowledge.LanguagesOf(paths), liveDefectClasses())
+		// ranks for a fixture, not which pass routes it. No versions either,
+		// for the same reason: a fixture is not a checkout, and an entry cut
+		// for the version it declares would answer a different question.
+		hits, err := r.Retrieve(context.Background(), q.String(),
+			knowledge.LanguagesOf(paths), liveDefectClasses(), nil)
 		if err != nil {
 			t.Errorf("%s: Retrieve: %v", f.Name, err)
 			continue
