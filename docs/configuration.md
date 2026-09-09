@@ -485,6 +485,12 @@ review:
   knowledge_index: ./my-index.json
 ```
 
+This key names a file nitpick opens, so it is ignored when it comes from the
+repository's own `.nitpick.yaml`, along with `linters.trusted`. Put it in the
+user-level file instead. On a runner there is none by default, and
+`NITPICK_USER_CONFIG=/path/to/config.yaml` names one, which keeps the endpoint
+and credential keys refused from the repository file where they are.
+
 An index built by one embedding model refuses a query from another, because
 vectors from two models are not comparable, and every index records the hash of
 the corpus text it was built from. That hash is the half a file listing cannot

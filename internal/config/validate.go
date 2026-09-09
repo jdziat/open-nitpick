@@ -346,8 +346,12 @@ func SemgrepRegistryRef(ref string) bool {
 }
 
 // semgrepRegistry matches p/<name> and r/<path>, the two forms semgrep's
-// registry takes. Letters, digits and the separators a ruleset name uses, so
+// registry takes: letters, digits and the separators a ruleset name uses, so
 // no traversal, no scheme, no whitespace and no leading dash.
+//
+// The character set is read off the references semgrep publishes rather than
+// off a grammar, because it does not publish one. It can only refuse a value
+// the old prefix test accepted, and it refuses loudly, naming the key.
 var semgrepRegistry = regexp.MustCompile(`^[pr]/[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$`)
 
 // prefixAll qualifies each error with its configuration path so a validation

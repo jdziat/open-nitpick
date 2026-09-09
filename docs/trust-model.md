@@ -177,7 +177,9 @@ found, per surface:
 
 | surface | enforced on | verdict |
 |---|---|---|
-| PR title, body, thread, question, findings, file bodies | the marker list, now shared | closed above |
+| PR title, body, thread, question, findings | the marker list, now shared | closed above |
+| the diff and the thread excerpt in `converse` | nothing | now fenced and defanged |
+| the file bodies `fix` sends | a fixed delimiter | a marker chosen per request |
 | the PR title in the triage prompt | nothing | now flattened and defanged |
 | `linters.trusted` | nothing | pruned from a repository file |
 | `review.knowledge_index` | nothing | pruned from a repository file |
@@ -190,6 +192,14 @@ found, per surface:
 rather than on the document, so the merge-key route that got past the prune
 does not apply to them: a `<<`-merged `golangci_config` lands on the struct
 field and is validated identically. That is the shape to copy.
+
+`fix` is the one prompt whose answer is written to files, so its bodies travel
+verbatim: a byte changed on the way in is a byte the model can echo onto disk,
+and defanging them put the placeholder into real source, this repository's own
+`internal/fence` among it. A fixed delimiter is no good either, since a body
+containing it forges an entry for another file the same pass may write. The
+marker is chosen per request instead, so a body cannot contain what nobody had
+read when it was written.
 
 Two things the audit found and this page does not fix. `prompt.Options.Repository`
 renders text into a system message and has no production caller, so it is a

@@ -14,7 +14,12 @@
 // fails the build rather than shipping a fence that is not one.
 package fence
 
-import "regexp"
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"regexp"
+)
 
 // The markers. Each names what is inside it, because a model reading a prompt
 // has to be told which region it may not take instruction from.
@@ -70,4 +75,24 @@ var imitation = regexp.MustCompile(`(?i)` +
 // caller that puts repository or model text inside a marker owes it this call:
 // without it a change closes the region, writes a paragraph in this harness's
 // voice, and reopens it.
+//
+// A literal-text defence, and only that. It reads bytes, so a homoglyph, a
+// fullwidth form, a zero-width space inside a word, or the words split across
+// a line are not matches. Where the answer is written back rather than read,
+// use Unguessable instead: a marker nobody had read cannot be approximated
+// either.
 func Defang(s string) string { return imitation.ReplaceAllString(s, Defanged) }
+
+// Unguessable returns a marker no text under review can forge, because it
+// carries bytes chosen after that text was written.
+//
+// For a caller whose model returns content to be written back, where a body
+// can be neither defanged nor delimited by anything fixed. Not in Markers, and
+// Defang does not match it. See docs/trust-model.md.
+func Unguessable() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", fmt.Errorf("fence: no randomness for a marker: %w", err)
+	}
+	return fmt.Sprintf("===== UNTRUSTED %s =====", hex.EncodeToString(b[:])), nil
+}

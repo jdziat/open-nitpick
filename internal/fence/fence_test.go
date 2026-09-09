@@ -1,6 +1,10 @@
 package fence
 
 import (
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -58,5 +62,60 @@ func TestDefangIsBoundedToOneLine(t *testing.T) {
 	}
 	if !strings.Contains(got, "line one") || !strings.Contains(got, "line three") {
 		t.Errorf("real code was removed:\n%q", got)
+	}
+}
+
+// No package draws a marker of its own.
+//
+// TestDefangCoversEveryMarker holds the list to the pattern. It does not stop
+// a package declaring a marker somewhere else and never adding it, which is
+// what internal/converse and internal/fix each did with <untrusted> tags: the
+// list was complete and the vocabulary was not.
+//
+// So the tree is scanned. A `===== ` literal outside this package is either a
+// marker nobody defangs or a banner that reads like one, and both are worth a
+// sentence from whoever added it.
+func TestNoPackageDrawsAMarkerOfItsOwn(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatalf("root: %v", err)
+	}
+
+	var found []string
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			return err
+		case d.IsDir():
+			if name := d.Name(); name == ".git" || name == "website" || name == "node_modules" {
+				return filepath.SkipDir
+			}
+			return nil
+		// Tests are where a forged marker belongs: asserting that one is
+		// defanged means writing one down.
+		case !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go"):
+			return nil
+		case strings.HasPrefix(path, filepath.Join(root, "internal", "fence")):
+			return nil
+		}
+
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for i, line := range strings.Split(string(body), "\n") {
+			if strings.Contains(line, `"===== `) {
+				found = append(found, fmt.Sprintf("%s:%d", path, i+1))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+
+	if len(found) > 0 {
+		t.Errorf("a marker literal outside internal/fence, which nothing here defangs:\n  %s",
+			strings.Join(found, "\n  "))
 	}
 }

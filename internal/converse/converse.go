@@ -195,8 +195,7 @@ const maxDiffBytes = 60_000
 // to post. The forge-authored text is fenced as untrusted: a comment can
 // carry instructions, and the model is told so.
 func Answer(ctx context.Context, client *llm.Client, c Context, question string) (string, error) {
-	diff := c.Diff
-	user := userMessage(c, question, diff)
+	user := userMessage(c, question)
 
 	system := `You are open-nitpick, a code reviewer, answering a question a person asked in a pull request thread.
 
@@ -253,12 +252,15 @@ func Excerpt(content string, line, radius int) string {
 
 // userMessage builds the question this model answers.
 //
-// Split out of Answer so a test can read what is sent. Every string a person
-// on the pull request wrote goes inside a marker and through fence.Defang: the
-// title, the body, the thread and the question are all text a contributor
-// chooses, and one of them carrying the marker would otherwise close the
-// region and address this model in the harness's voice.
-func userMessage(c Context, question, diff string) string {
+// Split out of Answer so a test can read what is sent. The rule, rather than a
+// list of the fields it happens to cover: every string this function prints
+// that a person on the pull request could have written goes inside a marker
+// and through fence.Defang, which is every field of Context and the question
+// itself. One of them carrying a marker would otherwise close the region and
+// address this model in the harness's voice, and the field a list forgets is
+// the one somebody attacks. TestEveryFieldOfContextIsDefanged walks them.
+func userMessage(c Context, question string) string {
+	diff := c.Diff
 	truncated := false
 	if len(diff) > maxDiffBytes {
 		diff, truncated = diff[:maxDiffBytes], true
@@ -270,8 +272,11 @@ func userMessage(c Context, question, diff string) string {
 		fence.PullRequestText, fence.Defang(c.Body), fence.PullRequestText)
 
 	if c.Path != "" {
-		fmt.Fprintf(&b, "The question is on a thread at %s. The lines around it, numbered:\n```\n%s\n```\n\n",
-			c.Path, c.Excerpt)
+		// The path is a repository file name and the excerpt is its contents,
+		// so both are the change author's to choose.
+		fmt.Fprintf(&b, "The question is on a thread at %s. The lines around it, numbered:\n%s\n%s\n%s\n\n",
+			fence.Defang(oneLine(c.Path)), fence.PullRequestText,
+			fence.Defang(c.Excerpt), fence.PullRequestText)
 	}
 	if len(c.Thread) > 0 {
 		fmt.Fprintf(&b, "The thread so far, oldest first:\n%s\n", fence.PullRequestText)
@@ -281,10 +286,19 @@ func userMessage(c Context, question, diff string) string {
 		fmt.Fprintf(&b, "%s\n\n", fence.PullRequestText)
 	}
 
-	fmt.Fprintf(&b, "The change under review, as a unified diff%s:\n```diff\n%s\n```\n\n",
-		map[bool]string{true: " (truncated)", false: ""}[truncated], diff)
+	// The diff is the largest thing here and the least guarded by shape: a
+	// header line and the text after an @@ hunk marker are at column 0 and are
+	// the author's, so it needs the marker and the defang as much as a comment
+	// does. internal/review fences its code under review for this reason.
+	fmt.Fprintf(&b, "The change under review, as a unified diff%s:\n%s\n%s\n%s\n\n",
+		map[bool]string{true: " (truncated)", false: ""}[truncated],
+		fence.PullRequestText, fence.Defang(diff), fence.PullRequestText)
 	fmt.Fprintf(&b, "The question:\n%s\n%s\n%s\n",
 		fence.PullRequestText, fence.Defang(question), fence.PullRequestText)
 
 	return b.String()
 }
+
+// oneLine flattens a string onto one line, so a value printed inside a
+// sentence cannot start a new one.
+func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }

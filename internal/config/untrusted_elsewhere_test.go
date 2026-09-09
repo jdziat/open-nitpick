@@ -77,6 +77,19 @@ func TestATrustedFileMaySupplyThem(t *testing.T) {
 	if len(cfg.Dropped) != 0 {
 		t.Errorf("Dropped = %v, want nothing dropped from a trusted file", cfg.Dropped)
 	}
+
+	// The control: the same file untrusted loses the key. Without this the
+	// assertions above hold whenever nothing can be dropped at all, so the
+	// test would pass with the whole prune removed.
+	t.Setenv(EnvTrustConfigEndpoints, "0")
+	untrusted, err := Load(root)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(untrusted.Linters.Trusted) != 0 {
+		t.Errorf("linters.trusted = %v from an untrusted file, want none",
+			untrusted.Linters.Trusted)
+	}
 }
 
 // A semgrep registry reference has to look like one.
