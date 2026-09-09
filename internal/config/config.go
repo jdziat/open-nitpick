@@ -856,12 +856,13 @@ func loadBytes(data []byte, source string) (*Config, error) {
 	//
 	// This runs before applyEnv so the environment can still supply what
 	// neither file said.
-	dropped, userKeys, overridden, unknown, err := cfg.overlay(userData, data, trustEndpointKeys(nil))
+	dropped, userKeys, overridden, unknown, err := cfg.overlay(userData, data, trustEndpointKeys(nil), userPath, source)
 	if err != nil {
-		// The keys-from-a-newer-nitpick message, when that is all it was. It
-		// names the file, the keys and the way out; yaml's own names a Go type.
-		if keys, only := unknownFields(err); only {
-			return nil, unknownKeyError(source, keys)
+		// overlay has already built the keys-from-a-newer-nitpick message,
+		// because only it knows which of the two documents carried them.
+		var built unknownKeys
+		if errors.As(err, &built) {
+			return nil, err
 		}
 		return nil, fmt.Errorf("parse config %s: %w", source, err)
 	}
@@ -988,6 +989,18 @@ var Version string
 // reading this source, and the person who hit it copied a key out of the
 // documentation.
 func unknownKeyError(source string, keys []string) error {
+	return unknownKeys{text: unknownKeyText(source, keys)}
+}
+
+// unknownKeys is the built message, typed so a caller can tell it from a parse
+// failure it should wrap with a file name. This one already names its file,
+// and the file it names is not always the caller's.
+type unknownKeys struct{ text string }
+
+func (e unknownKeys) Error() string { return e.text }
+
+// unknownKeyText writes the message.
+func unknownKeyText(source string, keys []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s has keys this nitpick does not know:\n\n", source)
 	for _, k := range keys {
@@ -999,7 +1012,7 @@ func unknownKeyError(source string, keys []string) error {
 	}
 	fmt.Fprintf(&b, "A key added after this version is rejected the same way a "+
 		"typo is. Set %s=1 to ignore them and continue.", EnvIgnoreUnknownKeys)
-	return errors.New(b.String())
+	return b.String()
 }
 
 // ModelNotesOn reports whether the model-family prompt layer is in force.

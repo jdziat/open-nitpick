@@ -142,7 +142,9 @@ func userDocument(getenv func(string) string) (path string, data []byte, err err
 // repo is pruned before it is merged, so a repository document cannot reach
 // any key the user-level file is trusted for. Ordering here is the invariant;
 // see the note at the top of this file.
-func (c *Config) overlay(user, repo []byte, trusted bool) (dropped, userKeys, overridden, unknown []string, err error) {
+// userPath and repoPath name the two documents, for a message that has to say
+// which of them carries the key it is refusing.
+func (c *Config) overlay(user, repo []byte, trusted bool, userPath, repoPath string) (dropped, userKeys, overridden, unknown []string, err error) {
 	tolerate := ignoreUnknownKeys(nil)
 
 	userNode, err := documentNode(user)
@@ -163,24 +165,45 @@ func (c *Config) overlay(user, repo []byte, trusted bool) (dropped, userKeys, ov
 	if len(user) > 0 {
 		ignored, err := c.merge(user, tolerate)
 		if err != nil {
+			// Named here rather than by the caller, which knows only the
+			// repository's path and would blame that file for a line in this
+			// one.
+			if keys, only := unknownFields(err); only {
+				return nil, nil, nil, nil, unknownKeyError(userPath, keys)
+			}
 			return nil, nil, nil, nil, err
 		}
 		unknown = append(unknown, ignored...)
 		userKeys = keyPaths(userNode)
 	}
 
+	// rendered records whether the bytes merged below are still the file on
+	// disk. Once the prune rewrites them a line number counted in the result
+	// points at the wrong line of the file: deleted keys shift what follows
+	// them, and Marshal drops the comments and blank lines besides.
+	var rendered bool
+
 	if !trusted && repoNode != nil {
-		dropped = pruneUntrusted(repoNode)
-		if repo, err = yaml.Marshal(repoNode); err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("rewrite config without the keys it may not supply: %w", err)
+		// Rewritten only when the prune took something. A document it left
+		// alone is the file, and round-tripping it anyway would cost every
+		// unknown key its line for nothing: most repository configs name no
+		// endpoint at all.
+		if dropped = pruneUntrusted(repoNode); len(dropped) > 0 {
+			if repo, err = yaml.Marshal(repoNode); err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("rewrite config without the keys it may not supply: %w", err)
+			}
+			rendered = true
 		}
 	}
 
 	ignored, err := c.merge(repo, tolerate)
 	if err != nil {
+		if keys, only := unknownFields(err); only {
+			return nil, nil, nil, nil, unknownKeyError(repoPath, withoutLines(keys, rendered))
+		}
 		return nil, nil, nil, nil, err
 	}
-	unknown = append(unknown, ignored...)
+	unknown = append(unknown, withoutLines(ignored, rendered)...)
 
 	if len(userKeys) > 0 && repoNode != nil {
 		overridden = intersect(userKeys, keyPaths(repoNode))
@@ -268,4 +291,25 @@ func resolveNode(n *yaml.Node) *yaml.Node {
 		n = n.Alias
 	}
 	return n
+}
+
+// withoutLines drops the line number from each key when it was counted in a
+// document this tool rewrote.
+//
+// A wrong line is worse than none. The prune deletes keys before the merge, so
+// every key below a deleted one has moved, and a notice pointing a reader at a
+// line where the key is not costs them the search plus their trust in the rest
+// of the notice.
+func withoutLines(keys []string, rendered bool) []string {
+	if !rendered {
+		return keys
+	}
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if i := strings.LastIndex(k, " (line "); i >= 0 {
+			k = k[:i]
+		}
+		out = append(out, k)
+	}
+	return out
 }

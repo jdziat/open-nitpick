@@ -136,3 +136,61 @@ func TestTheUnknownFieldMessageIsStillYAMLsOwn(t *testing.T) {
 		t.Error("yaml.v3 no longer applies the known fields, so ignoring a key would drop the file")
 	}
 }
+
+// The message names the file the key is in, not the other one.
+//
+// The user-level document merges first, so its failure reaches the caller that
+// knows only the repository's path. Blaming that file and quoting a line from
+// this one sends a reader to a line that holds something else.
+func TestTheMessageNamesTheFileTheKeyIsIn(t *testing.T) {
+	userPath := writeUser(t, "review:\n  a_user_key_from_the_future: 1\n")
+	root := writeConfig(t, "models:\n  default: {provider: openai, model: gpt-4o}\n")
+
+	_, err := Load(root)
+	if err == nil {
+		t.Fatal("an unknown key in the user file loaded")
+	}
+	if !strings.Contains(err.Error(), userPath) {
+		t.Errorf("the message does not name the user file %s:\n%s", userPath, err)
+	}
+	if strings.Contains(err.Error(), FileName) {
+		t.Errorf("the message blames the repository's file for a key in the user's:\n%s", err)
+	}
+}
+
+// A line counted in a document this tool rewrote is not reported.
+//
+// The prune deletes keys before the merge, so every key below a deleted one
+// has moved. A notice pointing a reader at a line where the key is not costs
+// them the search and their trust in the rest of it.
+func TestALineFromARewrittenDocumentIsNotReported(t *testing.T) {
+	t.Setenv(EnvIgnoreUnknownKeys, "1")
+
+	// No endpoint key, so nothing is pruned and the file is what was merged.
+	kept := writeConfig(t, "models:\n  default: {provider: openai, model: gpt-4o}\n"+
+		"review:\n  max_fils: 10\n")
+	cfg, err := Load(kept)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Unknown) != 1 || !strings.Contains(cfg.Unknown[0], "line 4") {
+		t.Errorf("Unknown = %v, want the line: nothing was pruned, so the file is what merged", cfg.Unknown)
+	}
+
+	// An endpoint key the prune takes, which rewrites the document and moves
+	// every line below it.
+	pruned := writeConfig(t, "models:\n  default:\n    provider: openai\n    model: gpt-4o\n"+
+		"    base_url: https://example.invalid\n"+
+		"review:\n  max_fils: 10\n")
+	cfg, err = Load(pruned)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Dropped) == 0 {
+		t.Fatal("nothing was pruned, so this case does not test what it says")
+	}
+	if len(cfg.Unknown) != 1 || cfg.Unknown[0] != "max_fils" {
+		t.Errorf("Unknown = %v, want the key alone: the line would be the rewritten document's",
+			cfg.Unknown)
+	}
+}
