@@ -11,8 +11,9 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/jdziat/open-nitpick/internal/config"
 	"strings"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 
 	"github.com/jdziat/open-nitpick/internal/fullreview"
 	"github.com/jdziat/open-nitpick/internal/review"
@@ -101,7 +102,7 @@ func treeReview(ctx context.Context, f *reviewFlags, paths []string, budget int,
 		return nil, nil, err
 	}
 	if len(cfg.Dropped) > 0 {
-		log.Warn("ignored endpoint settings from an untrusted config file", "keys", strings.Join(cfg.Dropped, ", "))
+		log.Warn("ignored settings an untrusted config file may not supply", "keys", strings.Join(cfg.Dropped, ", "))
 	}
 	if len(cfg.Unknown) > 0 {
 		log.Warn("ignored config keys this version does not know",

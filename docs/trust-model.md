@@ -148,6 +148,78 @@ produce findings nobody could act on. Treat analyzer text as what it is:
 attacker-influenced data with a trustworthy *source* attribution and untrusted
 *content*, exactly as this tool treats the pull request description, which is
 fenced as untrusted in the prompt. Analyzer findings are not fenced today.
+## One fence vocabulary, and the audit that produced it
+
+A fence is a boundary only while the text inside it cannot draw one. The check
+for that is a list of markers, and a list is only as complete as whoever wrote
+it. `internal/review` fences with `===== UNTRUSTED ... =====` markers and defangs
+imitations of them. `internal/converse` and `internal/fix` each drew a second
+vocabulary, `<untrusted>` tags, told the model to trust it, and defanged
+nothing, so a pull request comment carrying `</untrusted>` closed the region
+and addressed the model in this tool's voice. In `fix` that model's output is
+written to files.
+
+`fix` defangs its file bodies a line at a time and leaves them otherwise byte
+for byte what the model has to return. They are not numbered, unlike every
+review path: there the model reports findings and a margin costs nothing, here
+it returns the file to write and a margin it echoes back is a file full of line
+numbers. What numbering would have bought is structural, that a body cannot
+forge the path heading above it, and a path the caller did not hand over is
+refused downstream whatever the model claims.
+
+The markers and the check now live together in `internal/fence`, and a test
+walks the exported markers, so a fifth cannot be added without the pattern
+covering it.
+
+That was the live finding of an audit for the shape #92 exposed in the config
+prune: a security rule enforced by walking a document by name. What the audit
+found, per surface:
+
+| surface | enforced on | verdict |
+|---|---|---|
+| PR title, body, thread, question, findings | the marker list, now shared | closed above |
+| the diff and the thread excerpt in `converse` | nothing | now fenced and defanged |
+| the file bodies `fix` sends | a fixed delimiter | a marker chosen per request |
+| the PR title in the triage prompt | nothing | now flattened and defanged |
+| `linters.trusted` | nothing | pruned from a repository file |
+| `review.knowledge_index` | nothing | pruned from a repository file |
+| `semgrep_config` registry reference | `HasPrefix("p/")` | a shape: no traversal, scheme or whitespace |
+| `linters.golangci_config` and the other analyzer paths | the decoded value | already right, see below |
+| `persona.custom` | the prune, and `checkPruned` behind it | already right |
+| the knowledge corpus | `go:embed` | cannot be supplied by a repository |
+
+`checkAnalyzerConfigPath` and `Linters.validate` operate on the decoded config
+rather than on the document, so the merge-key route that got past the prune
+does not apply to them: a `<<`-merged `golangci_config` lands on the struct
+field and is validated identically. That is the shape to copy.
+
+`fix` is the one prompt whose answer is written to files, so everything inside
+its region travels verbatim, the findings as well as the bodies: a published
+finding carries the suggestion block the model turns into content. Bodies
+first, because that is where it was found: a byte changed on the way in is a byte the model can echo onto disk,
+and defanging them put the placeholder into real source, this repository's own
+`internal/fence` among it. A fixed delimiter is no good either, since a body
+containing it forges an entry for another file the same pass may write. The
+marker is chosen per request instead, so a body cannot contain what nobody had
+read when it was written.
+
+That marker is scoped to `fix` on purpose, and the scoping is a judgement
+rather than an oversight. It is strictly stronger than a fixed marker and
+`Defang`, which is a literal-text check and says so: a homoglyph, a fullwidth
+form, a zero-width space inside a word or the words split across a line all
+pass it. What it costs is that the system prompt ends in a random string, so
+nothing about a request is reusable between calls. `fix` is gated behind write
+access, refuses forks and answers one mention at a time, and its answer is
+written to files; the review and question paths run on every push and produce a
+comment. Where the answer is bytes on disk, pay it. Where the answer is a
+comment, the literal-text check is the trade that was already being made.
+
+Two things the audit found and this page does not fix. `prompt.Options.Repository`
+renders text into a system message and has no production caller, so it is a
+door nobody has opened. `instructions[].prompt` goes through `bundle.PromptSafe`,
+which stops it opening a line, but is not inside a marker; the struct comment
+that called it fenced has been corrected.
+
 ## Line directives rewrite analyzer positions
 
 A Go line directive rewrites the positions in an analyzer's report, and this

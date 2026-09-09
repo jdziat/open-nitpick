@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -334,16 +335,24 @@ func checkAnalyzerConfigPath(key, path string) error {
 }
 
 // SemgrepRegistryRef reports whether a semgrep config value names a registry
-// rule set rather than a local file. Exported so internal/linters, which
-// decides containment, and this package, which decides validity, cannot drift
-// on what counts as a path: anything that is not a registry reference has to
-// be an absolute path outside the repository, and getting that wrong in one
-// place alone lets `rules/x.yml` pass validation and then be read out of the
-// tree under review.
+// rule set rather than a local file.
+//
+// Exported so internal/linters, which decides containment, and this package,
+// which decides validity, cannot drift on what counts as a path. A shape
+// rather than a prefix, because a registry reference is returned verbatim
+// rather than resolved, so it reaches a command line with no path check.
 func SemgrepRegistryRef(ref string) bool {
-	ref = strings.TrimSpace(ref)
-	return strings.HasPrefix(ref, "p/") || strings.HasPrefix(ref, "r/")
+	return semgrepRegistry.MatchString(strings.TrimSpace(ref))
 }
+
+// semgrepRegistry matches p/<name> and r/<path>, the two forms semgrep's
+// registry takes: letters, digits and the separators a ruleset name uses, so
+// no traversal, no scheme, no whitespace and no leading dash.
+//
+// The character set is read off the references semgrep publishes rather than
+// off a grammar, because it does not publish one. It can only refuse a value
+// the old prefix test accepted, and it refuses loudly, naming the key.
+var semgrepRegistry = regexp.MustCompile(`^[pr]/[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$`)
 
 // prefixAll qualifies each error with its configuration path so a validation
 // failure names the key the user has to edit.

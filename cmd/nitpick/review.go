@@ -151,7 +151,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	// trusted to supply them. Saying so matters: an ignored base_url that
 	// nobody mentions looks exactly like a bug.
 	if len(cfg.Dropped) > 0 {
-		log.Warn("ignored endpoint settings from an untrusted config file",
+		log.Warn("ignored settings an untrusted config file may not supply",
 			"keys", strings.Join(cfg.Dropped, ", "),
 			"hint", "set "+config.EnvTrustConfigEndpoints+"=1 if you control this file")
 	}
@@ -733,7 +733,7 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 	// was dropped is also what makes the empty case evidence rather than the
 	// same output any config would produce.
 	if len(cfg.Dropped) > 0 {
-		pl("Ignored (untrusted config; set NITPICK_TRUST_CONFIG_ENDPOINTS=1 where you control the file):")
+		pl("Ignored (an untrusted config file may not supply these; set NITPICK_TRUST_CONFIG_ENDPOINTS=1 where you control it):")
 		for _, key := range cfg.Dropped {
 			pf("  %s\n", key)
 		}

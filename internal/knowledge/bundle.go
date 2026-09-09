@@ -43,7 +43,8 @@ func SelectIndex(model string) ([]byte, error) {
 	sort.Strings(have)
 	return nil, fmt.Errorf("knowledge: no index ships for embedding model %q; "+
 		"this build carries %s. Name one of those under models.embed, or build your own "+
-		"with `nitpick knowledge-index` and name it under review.knowledge_index",
+		"with `nitpick knowledge-index` and name it under review.knowledge_index in a "+
+		"file the repository under review does not supply",
 		model, strings.Join(have, ", "))
 }
 

@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"strings"
 	"sync"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/fence"
 	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/prompt"
@@ -477,19 +477,15 @@ func citation(said string, shown []knowledge.Entry) string {
 	return ""
 }
 
-// Fences for the two untrusted inputs an expert is shown. They are separate
-// because the two are untrusted in different ways and the model is told so:
-// the claim is MODEL-authored, the code is PULL-REQUEST-authored.
+// The markers live in internal/fence with the function that defangs them, so
+// a package adding one cannot add it out of the check's sight. The two an
+// expert is shown are separate because they are untrusted in different ways
+// and the model is told so: the claim is MODEL-authored, the code is
+// PULL-REQUEST-authored.
 const (
-	untrustedClaimFence = "===== UNTRUSTED CLAIM UNDER REVIEW ====="
-	untrustedCodeFence  = "===== UNTRUSTED CODE UNDER REVIEW ====="
-
-	// referenceFence holds text this repository authored and ships, so unlike
-	// the two above it is not fencing something untrusted in. It is fencing
-	// everything else out: the code in the same prompt is written by the
-	// change's author, and without a marker of its own the reference material
-	// is a paragraph that could equally have come from the diff.
-	referenceFence = "===== REFERENCE MATERIAL, NOT THIS CHANGE ====="
+	untrustedClaimFence = fence.ClaimUnderReview
+	untrustedCodeFence  = fence.CodeUnderReview
+	referenceFence      = fence.ReferenceMaterial
 )
 
 // validationContract is the task every expert is given, whatever its
@@ -665,43 +661,12 @@ func validationRequest(f Finding, code string, cited []knowledge.Entry) string {
 	return b.String()
 }
 
-// defanged replaces text that was imitating one of the fence markers.
-const defanged = "[open-nitpick removed a forged boundary marker here]"
+// defang removes anything in untrusted text that imitates a marker. See
+// internal/fence.
+func defang(s string) string { return fence.Defang(s) }
 
-// fenceImitation matches text trying to pass for one of this package's
-// markers, the two here and untrustedFence, which fences the pull request's
-// own text in the review prompt.
-//
-// Written against the markers' WORDS with the punctuation optional, because the
-// punctuation is the part an imitator can vary while keeping every bit of the
-// effect: "==== UNTRUSTED CODE UNDER REVIEW ====" is not the marker and reads
-// exactly like it. That holds only where the words themselves do not occur in
-// prose, which is why the reference alternative needs a run of = on one side
-// and the untrusted ones need none. Bounded to a single line, so a match can
-// never swallow the newline between two lines of real code.
-var fenceImitation = regexp.MustCompile(`(?i)` +
-	// The untrusted markers, punctuation optional: their words do not occur in
-	// prose by accident.
-	`=*[ \t]*untrusted[^\n]{0,40}?(under review|pull request text)[ \t]*=*` +
-	`|` +
-	// The reference marker, which needs a run of = on one side or the other.
-	// Its words DO occur in prose: "the reference material, not this change"
-	// is a sentence somebody writes in a comment, and defanging that shows an
-	// expert altered code carrying an accusation of tampering.
-	`=+[ \t]*reference material[^\n]{0,40}?not this change[ \t]*=*` +
-	`|` +
-	`=*[ \t]*reference material[^\n]{0,40}?not this change[ \t]*=+`)
-
-// defang removes anything in untrusted text that imitates a fence marker.
-//
-// A fence is a boundary only while the text inside it cannot draw one. Render
-// prints .nitpick.yaml's per-path instructions at column 0, from a file the
-// pull request may edit, so without this a change closes the region, writes a
-// paragraph in this harness's voice and reopens it. The expert then deletes a
-// real finding and publishes the author's sentence as its reason.
-func defang(s string) string {
-	return fenceImitation.ReplaceAllString(s, defanged)
-}
+// defanged is what it leaves behind, named here because tests assert on it.
+const defanged = fence.Defanged
 
 // log returns the configured logger, or a discarding one.
 func (v *Validator) log() *slog.Logger {

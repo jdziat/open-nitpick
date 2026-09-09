@@ -22,6 +22,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/fence"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/prompt"
 	"github.com/jdziat/open-nitpick/internal/vcs"
@@ -1909,7 +1910,7 @@ func (e *Engine) triagePrompt() (string, error) {
 // it makes the boundary explicit to the model, and (because the text is never
 // run through text/template), a description containing {{ }} can no longer
 // abort the run either.
-const untrustedFence = "===== UNTRUSTED PULL REQUEST TEXT ====="
+const untrustedFence = fence.PullRequestText
 
 // pullRequestContext describes author intent. A change that looks wrong in
 // isolation is often correct once you know what the author set out to do, so
@@ -1956,8 +1957,13 @@ func oneLineTitle(s string) string { return strings.Join(strings.Fields(s), " ")
 func renderForTriage(pr *vcs.PullRequest, findings []Finding) string {
 	var b strings.Builder
 
+	// Flattened and defanged, as pullRequestContext does it. This is the same
+	// field, rendered a second time, into a numbered findings list the model
+	// answers against and whose entries this function flattens one loop below
+	// for that reason. It is also the one string here a contributor writes
+	// directly.
 	if pr != nil && pr.Title != "" {
-		fmt.Fprintf(&b, "Change under review: %s\n\n", pr.Title)
+		fmt.Fprintf(&b, "Change under review: %s\n\n", defang(oneLine(pr.Title)))
 	}
 
 	if len(findings) == 0 {

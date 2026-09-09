@@ -170,6 +170,20 @@ func pruneUntrusted(root *yaml.Node) (dropped []string, changed bool) {
 		}
 	}
 
+	// Two keys that name no file and are not model specs, so neither the
+	// scrub above nor persona reaches them. See untrustedElsewhere.
+	for _, k := range untrustedElsewhere {
+		parent := mapValue(root, k.block)
+		if parent == nil {
+			continue
+		}
+		asked, deleted := deleteKey(parent, k.key)
+		changed = changed || deleted
+		if asked {
+			dropped = append(dropped, k.block+"."+k.key)
+		}
+	}
+
 	return dropped, changed
 }
 
@@ -376,12 +390,27 @@ func untrustedIn(v reflect.Value) []string {
 	return found
 }
 
-// untrustedField is untrustedSpecKeys as a set, plus persona.custom, which the
-// prune also removes.
+// untrustedElsewhere are keys a repository may not supply that live outside a
+// model spec, so the scrub does not walk to them.
+//
+// Neither names a file, which is what the rest of the linters block relies on:
+// linters.trusted is a privilege grant, and review.knowledge_index is a path
+// this process opens. See docs/trust-model.md.
+var untrustedElsewhere = []struct{ block, key string }{
+	{"linters", "trusted"},
+	{"review", "knowledge_index"},
+}
+
+// untrustedField is untrustedSpecKeys as a set, plus the keys the prune
+// removes elsewhere. checkPruned reads it, so it is what closes the routes the
+// prune's walk cannot see.
 var untrustedField = func() map[string]bool {
 	out := map[string]bool{"custom": true}
 	for _, k := range untrustedSpecKeys {
 		out[k] = true
+	}
+	for _, k := range untrustedElsewhere {
+		out[k.key] = true
 	}
 	return out
 }()
