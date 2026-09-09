@@ -32,6 +32,18 @@ type Validation struct {
 	// narrowing this list can only reduce refutations. That direction is
 	// deliberate, a configuration mistake here costs precision, not findings.
 	Classes []Class `yaml:"classes"`
+
+	// Targeted shows an expert the knowledge entries the reviewer had in front
+	// of it when it wrote the finding, and asks it to name the one that
+	// decided the verdict.
+	//
+	// Off by default, and unmeasured. It narrows what an expert is judging
+	// from "is this claim true of this code" to "is this claim true of this
+	// code given this rule", which is the question a wrong retrieval makes
+	// easy to answer confidently and wrongly. It does nothing at all without
+	// review.knowledge, since a finding written without retrieval cites
+	// nothing.
+	Targeted bool `yaml:"targeted"`
 }
 
 // ValidatesClass reports whether a finding of class c is sent to an expert.

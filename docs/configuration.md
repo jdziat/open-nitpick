@@ -911,6 +911,7 @@ which may overrule it.
 validation:
   enabled: false                   # default
   classes: [security, correctness] # empty validates every class
+  targeted: false                  # default
 ```
 
 It costs one model call per published finding, on `models.validate` if set and
@@ -922,6 +923,23 @@ direction that matters, how many real defects an expert talks itself out of.
 An unlisted class is published **without** validation, never dropped, so
 narrowing `classes` can only reduce refutations. Overruled findings are not
 discarded silently; they are reported with the reason.
+
+`validation.targeted` shows the expert the knowledge entries the reviewer had
+in front of it when it wrote the finding, and asks it to name the one that
+decided the verdict. It is off, unmeasured, and does nothing without
+`review.knowledge`, since a finding written without retrieval cites nothing.
+The reason it is not on: it narrows the question from "is this claim true of
+this code" to "is this claim true of this code given this rule", and a wrong
+retrieval makes the second easy to answer confidently and wrongly.
+
+A citation naming an entry the expert was not shown is dropped rather than
+recorded. A citation nobody can follow is worse than none, since the point of
+a finding carrying its evidence is that a reader can go and look.
+
+The entries are shown under a `REFERENCE MATERIAL` marker, and that marker is
+defanged out of the code in the same request. The code is written by the change
+author, so without that a diff opens a reference block of its own and states a
+rule in this tool's voice for the expert to refute a real finding with.
 
 ## Severities
 

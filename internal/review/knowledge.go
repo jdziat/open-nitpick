@@ -215,6 +215,24 @@ func (k *KnowledgeRetriever) ForBatch(ctx context.Context, b bundle.Batch, class
 	return k.retrieve(ctx, q.String(), knowledge.LanguagesOf(paths), classes, "")
 }
 
+// knowledgeCorpus is every entry a targeted validation can cite, by id.
+//
+// The retriever's own entries rather than a fresh read of the corpus: those
+// are the entries this run could have put in front of a reviewer, so an
+// evidence id that resolves here resolves to the text the reviewer saw. Nil
+// when retrieval is off or targeted validation is not asked for, which makes
+// Validator.cited a no-op.
+func (e *Engine) knowledgeCorpus() map[string]knowledge.Entry {
+	if !e.Config.Validation.Targeted || e.Knowledge == nil || e.Knowledge.R == nil {
+		return nil
+	}
+	out := make(map[string]knowledge.Entry, len(e.Knowledge.R.Entries))
+	for _, entry := range e.Knowledge.R.Entries {
+		out[entry.ID] = entry
+	}
+	return out
+}
+
 // PoolSize is how many entries this batch could have reached.
 //
 // The languages a batch resolves to, which is what the per-batch query uses.

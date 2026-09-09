@@ -171,7 +171,8 @@ func validationSchema() (json.RawMessage, error) {
 				"type": "string",
 				"enum": verdictEnum,
 				"description": "confirmed when the claim holds, refuted when you can name why it is wrong, " +
-					"severity when the defect is real but rated wrong.",
+					"severity when the defect is real but rated wrong, unresolved when you cannot " +
+					"decide from what you were shown and can name what is missing.",
 			},
 			"reason": map[string]any{
 				"type": "string",
@@ -182,6 +183,11 @@ func validationSchema() (json.RawMessage, error) {
 				"type":        "string",
 				"enum":        severityEnum,
 				"description": "OPTIONAL. Only for the severity verdict: the level the demonstrated consequence supports.",
+			},
+			"cited": map[string]any{
+				"type": "string",
+				"description": "OPTIONAL. The bracketed id of the reference entry that decided your verdict, " +
+					"when one did. Leave it empty otherwise; do not name an entry you were not shown.",
 			},
 		},
 		"required":             []string{"verdict", "reason"},

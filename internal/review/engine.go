@@ -1808,6 +1808,10 @@ func (e *Engine) validateFindings(ctx context.Context, findings []Finding, plan 
 		Policy:      e.Config.Validation,
 		Concurrency: e.Config.Review.Concurrency,
 		Log:         e.log(),
+		// Only when it is asked for. Reading the corpus costs nothing, but a
+		// validator holding one it will never consult reads as though targeted
+		// validation were on.
+		Corpus: e.knowledgeCorpus(),
 	}
 
 	kept, overruled := v.Validate(ctx, findings, renderedFiles(plan))

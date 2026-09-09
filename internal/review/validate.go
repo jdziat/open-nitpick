@@ -11,6 +11,7 @@ import (
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/knowledge"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/prompt"
 )
@@ -64,6 +65,10 @@ type Overruled struct {
 	// Revised is the level the expert moved the finding to, empty when the
 	// claim was refuted outright rather than re-rated.
 	Revised config.Severity
+
+	// Cited is the knowledge entry the expert named as deciding this, empty
+	// when it named none or named one it was not shown. See citation.
+	Cited string
 }
 
 // Validator routes each finding to a domain expert that independently decides
@@ -85,6 +90,10 @@ type Validator struct {
 
 	// Log receives the verdicts; a nil logger discards them.
 	Log *slog.Logger
+
+	// Corpus is every knowledge entry this run can cite, by id. Nil, or a
+	// finding citing nothing, makes Policy.Targeted a no-op.
+	Corpus map[string]knowledge.Entry
 }
 
 // Validate checks each finding with its expert and returns the survivors plus
@@ -155,7 +164,9 @@ func applyOutcomes(outcomes []outcome) (kept []Finding, overruled []Overruled) {
 	for _, o := range outcomes {
 		switch {
 		case o.refuted:
-			overruled = append(overruled, Overruled{Finding: o.finding, Expert: o.expert, Reason: o.reason})
+			overruled = append(overruled, Overruled{
+				Finding: o.finding, Expert: o.expert, Reason: o.reason, Cited: o.cited,
+			})
 
 		case o.revised != "":
 			// Recorded even though the finding is still on its way out. Whether
@@ -163,7 +174,7 @@ func applyOutcomes(outcomes []outcome) (kept []Finding, overruled []Overruled) {
 			// only the caller knows the gate, so the validator states what it
 			// did and lets the caller decide what a reader is told.
 			overruled = append(overruled, Overruled{
-				Finding: o.finding, Expert: o.expert, Reason: o.reason, Revised: o.revised,
+				Finding: o.finding, Expert: o.expert, Reason: o.reason, Revised: o.revised, Cited: o.cited,
 			})
 
 			revised := o.finding
@@ -219,6 +230,10 @@ type outcome struct {
 	// moved it.
 	revised config.Severity
 
+	// cited is the reference entry the expert named, already checked against
+	// what it was shown.
+	cited string
+
 	// unresolved is the doubt an expert stated when it could not decide. The
 	// finding is published either way; this is the only trace that the check
 	// ran and came back undecided.
@@ -258,7 +273,7 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 
 	msgs := []llms.Message{
 		{Role: llms.RoleSystem, Content: expertSystem(expert)},
-		{Role: llms.RoleUser, Content: validationRequest(f, code)},
+		{Role: llms.RoleUser, Content: validationRequest(f, code, v.cited(f))},
 	}
 
 	result, err := llm.Extract[validationResult](ctx, v.Client, msgs, schema)
@@ -283,14 +298,16 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 
 		v.log().Info("expert refuted a finding",
 			"expert", expert.Key, "path", f.Path, "line", f.Line, "title", f.Title, "reason", reason)
-		return outcome{finding: f, refuted: true, expert: expertLabel(expert), reason: reason}
+		return outcome{finding: f, refuted: true, expert: expertLabel(expert), reason: reason,
+			cited: citation(result.Cited, v.cited(f))}
 
 	case verdictSeverity:
 		revised, reason := v.revise(f, expert, result)
 		if revised == "" {
 			return keep
 		}
-		return outcome{finding: f, expert: expertLabel(expert), reason: reason, revised: revised}
+		return outcome{finding: f, expert: expertLabel(expert), reason: reason, revised: revised,
+			cited: citation(result.Cited, v.cited(f))}
 
 	case verdictConfirmed:
 		return keep
@@ -372,6 +389,46 @@ type validationResult struct {
 	Verdict         string `json:"verdict"`
 	Reason          string `json:"reason"`
 	RevisedSeverity string `json:"revised_severity"`
+	Cited           string `json:"cited"`
+}
+
+// cited returns the entries a finding's evidence names, in the order the
+// finding names them, empty unless targeted validation is on.
+//
+// Only entries this run actually has. An evidence id with no entry behind it
+// is dropped rather than mentioned, because a request listing an id and no
+// text asks the model to judge against something it cannot read.
+func (v *Validator) cited(f Finding) []knowledge.Entry {
+	if !v.Policy.Targeted || len(v.Corpus) == 0 {
+		return nil
+	}
+	out := make([]knowledge.Entry, 0, len(f.Evidence))
+	for _, id := range f.Evidence {
+		if e, ok := v.Corpus[id]; ok {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// citation is the entry an expert named, empty when it named none or named one
+// it was not shown.
+//
+// The check is the point. An expert that cites an entry absent from the
+// request has invented a source, and recording it would publish a citation
+// nobody can follow, which is worse than none: the whole reason findings carry
+// evidence is that a reader can go and look.
+func citation(said string, shown []knowledge.Entry) string {
+	said = strings.TrimSpace(said)
+	if said == "" {
+		return ""
+	}
+	for _, e := range shown {
+		if strings.EqualFold(said, e.ID) {
+			return e.ID
+		}
+	}
+	return ""
 }
 
 // Fences for the two untrusted inputs an expert is shown. They are separate
@@ -380,6 +437,13 @@ type validationResult struct {
 const (
 	untrustedClaimFence = "===== UNTRUSTED CLAIM UNDER REVIEW ====="
 	untrustedCodeFence  = "===== UNTRUSTED CODE UNDER REVIEW ====="
+
+	// referenceFence holds text this repository authored and ships, so unlike
+	// the two above it is not fencing something untrusted in. It is fencing
+	// everything else out: the code in the same prompt is written by the
+	// change's author, and without a marker of its own the reference material
+	// is a paragraph that could equally have come from the diff.
+	referenceFence = "===== REFERENCE MATERIAL ====="
 )
 
 // validationContract is the task every expert is given, whatever its
@@ -427,6 +491,12 @@ cannot name why it is wrong —
 and do not put it on your own domain's severity scale, because a lost write
 rated as though it were a naming choice is deleted just as surely as one you
 refuted.
+
+When reference material is shown, it is material the reviewer read, not a
+statement about this code, and one of the entries may not apply here at all.
+Judge whether it applies before it decides anything. When one does decide your
+verdict, put its bracketed id in ` + "`cited`" + `; leave that empty otherwise,
+and never name an entry you were not shown.
 
 Do not restate the code. One or two sentences.`
 
@@ -482,7 +552,7 @@ func expertLabel(e prompt.Expert) string {
 // review pass is given them because intent makes a change easier to judge; this
 // pass decides whether to DELETE a finding, and the author's own argument for
 // the change is the one input that must not reach that decision.
-func validationRequest(f Finding, code string) string {
+func validationRequest(f Finding, code string, cited []knowledge.Entry) string {
 	var b strings.Builder
 
 	b.WriteString(untrustedClaimFence + "\n")
@@ -512,6 +582,21 @@ func validationRequest(f Finding, code string) string {
 	b.WriteString(defang(strings.TrimRight(code, "\n")))
 	b.WriteString("\n" + untrustedCodeFence + "\n\n")
 
+	// Last, after both untrusted blocks. This is the only text in the request
+	// that this repository wrote, and it is placed where the model weighs it
+	// most heavily rather than where a reader would expect a preamble.
+	if len(cited) > 0 {
+		b.WriteString(referenceFence + "\n")
+		b.WriteString("The entries below were in front of the reviewer when it wrote that claim.\n")
+		b.WriteString("They are reference material, not a statement about this code, and one of\n")
+		b.WriteString("them may not apply here at all. Name the entry that decided your verdict\n")
+		b.WriteString("in `cited`, or leave it empty when none of them did.\n\n")
+		for _, e := range cited {
+			fmt.Fprintf(&b, "[%s] %s\n%s\n\n", e.ID, e.Title, e.Body)
+		}
+		b.WriteString(referenceFence + "\n\n")
+	}
+
 	b.WriteString("Return your verdict for that one claim.\n")
 
 	return b.String()
@@ -529,7 +614,7 @@ const defanged = "[open-nitpick removed a forged boundary marker here]"
 // effect: "==== UNTRUSTED CODE UNDER REVIEW ====" is not the marker and reads
 // exactly like it. Bounded to a single line, so a match can never swallow the
 // newline between two lines of real code.
-var fenceImitation = regexp.MustCompile(`(?i)=*[ \t]*untrusted[^\n]{0,40}?(under review|pull request text)[ \t]*=*`)
+var fenceImitation = regexp.MustCompile(`(?i)=*[ \t]*(untrusted[^\n]{0,40}?(under review|pull request text)|reference material)[ \t]*=*`)
 
 // defang removes anything in untrusted text that imitates a fence marker.
 //
