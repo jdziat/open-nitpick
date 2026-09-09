@@ -34,7 +34,12 @@ const improveMaxListed = 40
 
 // runImprove reviews the change again at pedantic scope with slop on, and
 // posts what it found as one comment.
-func runImprove(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref, ev *converse.Event, log *slog.Logger) error {
+// repo is the checkout the diff's paths are relative to. Taken rather than read
+// off gh.Checkout, which is set only when the root holds a .git. Empty, the
+// resolver refuses and this pass fails loudly. Divergent and non-empty is the
+// case worth avoiding: SelfModified would find no config under that root,
+// answer false, and review under the change's own configuration.
+func runImprove(ctx context.Context, gh *vcs.GitHub, repo string, cfg *config.Config, ref vcs.Ref, ev *converse.Event, log *slog.Logger) error {
 	// No permission gate beyond the association check the caller already ran.
 	// This command reads and comments; runFix refuses more because it writes.
 
@@ -89,21 +94,18 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs
 		// withPolicy rebuilds the roles through Models and leaves the engine
 		// untouched when it is nil.
 		//
-		// This pass is the widest of the three a mention can start: it is a
+		// This pass is the widest of the three a mention can start. It is a
 		// whole review, so review.ignore, min_severity, validation, the budgets
-		// and instructions[].prompt all reach it. It is also the one with no
-		// permission gate in front of it.
-		Policy: &config.BasePolicy{RepoRoot: gh.Checkout, Loaded: &icfg, Provider: gh},
-		Models: func(policy *config.Config) (*llm.Roles, error) {
-			// The improve scope, applied to whichever policy won. Without this
-			// a substituted policy would review at the ordinary scope and the
-			// pass would not be the pedantic one that was asked for.
-			scoped := *policy
-			applyImproveScope(&scoped)
-			scoped.Review.ResolveSuperseded = false
-			scoped.Review.Approve.Enabled = false
-			return llm.BuildRoles(&scoped)
-		},
+		// and instructions[].prompt all reach it, and no permission gate stands
+		// in front of it.
+		//
+		// The scope is applied by the resolver rather than here, because
+		// withPolicy replaces Config wholesale with whatever the resolver
+		// returned. Scoping only the roles would leave a substituted policy
+		// reviewing at the ordinary scope, which is a pass that says it was
+		// pedantic and was not.
+		Policy: improveScoped{&config.BasePolicy{RepoRoot: repo, Loaded: &icfg, Provider: gh}},
+		Models: func(policy *config.Config) (*llm.Roles, error) { return llm.BuildRoles(policy) },
 		// Linters stays nil. The analyzers are deterministic and the ordinary
 		// review already ran them; a second run would spend time to publish
 		// what is already on the pull request.
@@ -264,4 +266,26 @@ func applyImproveScope(cfg *config.Config) {
 // that argues for it existing separately.
 func runImproveCLI(ctx context.Context, args []string) error {
 	return reviewWithScope(ctx, "improve", args, applyImproveScope)
+}
+
+// improveScoped applies the improve scope to whatever policy is resolved.
+//
+// The engine replaces its whole Config with the resolver's answer, so a scope
+// applied anywhere else is lost the moment a substitution happens, and the
+// substitution happens on exactly the change a maintainer is most likely to
+// type `improve` on: the one editing the configuration.
+type improveScoped struct{ inner review.PolicyResolver }
+
+func (i improveScoped) ResolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest,
+	changed []string) (*config.Config, bool, error) {
+
+	cfg, modified, err := i.inner.ResolvePolicy(ctx, ref, pr, changed)
+	if cfg == nil {
+		return cfg, modified, err
+	}
+	scoped := *cfg
+	applyImproveScope(&scoped)
+	scoped.Review.ResolveSuperseded = false
+	scoped.Review.Approve.Enabled = false
+	return &scoped, modified, err
 }

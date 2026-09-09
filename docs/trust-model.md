@@ -113,11 +113,14 @@ repository's credit, which model answered, and which model wrote the commit a
 `fix` proposes. The `improve` pass was the widest of the three, since it is a
 whole review and every key one governs reached it.
 
-The mention itself is the one thing still read from the checkout. It decides
-only whether a comment addresses the reviewer, resolving costs a forge call,
-and paying that on every comment in a repository buys nothing: a change that
-widens its own mention makes the reviewer answer more often, which the spend
-cap already bounds.
+The mention is read twice. `converse.Command` reads the verb relative to it, so
+the mention is the parser's origin rather than a yes-or-no gate: a change
+setting `mention: please` would turn a maintainer's "please fix all of these"
+into a fix that writes to the repository. The checkout's mention is a
+pre-filter, cheap enough to run on every comment and unable to act on its own,
+and the command is parsed again against the resolved policy's mention before
+anything happens. A change can therefore make the reviewer look at a comment it
+would otherwise ignore, and cannot make it do anything with one.
 
 ## api_key_env may never name a forge credential
 

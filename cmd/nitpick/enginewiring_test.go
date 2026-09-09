@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -34,6 +35,7 @@ func TestEveryReviewingEngineResolvesItsPolicy(t *testing.T) {
 		filepath.Join(root, "cmd", "nitpick", "fullreview.go"): "a tree review, whose operator wrote the policy",
 		filepath.Join(root, "internal", "evals", "harness.go"): "fixtures, with no forge and no base revision",
 	}
+	used := map[string]bool{}
 
 	var missing []string
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -54,17 +56,29 @@ func TestEveryReviewingEngineResolvesItsPolicy(t *testing.T) {
 			return err
 		}
 		text := string(body)
+
+		// The assignment form first, because it has no literal to find.
+		// fullreview builds a policied engine through newEngine and then clears
+		// the field, so a scan of literals alone returns before it ever looks.
+		if nulled.MatchString(text) {
+			if _, ok := exempt[path]; !ok {
+				missing = append(missing, path+": clears Policy or Models after wiring them")
+			}
+			used[path] = true
+			return nil
+		}
 		if !strings.Contains(text, "review.Engine{") && !strings.Contains(text, "&Engine{") {
 			return nil
 		}
 		if _, ok := exempt[path]; ok {
+			used[path] = true
 			return nil
 		}
 
 		// The literal and everything until its closing brace at the same
 		// indentation, which is where the fields are.
 		for _, block := range engineLiterals(text) {
-			if !strings.Contains(block, "Policy:") || !strings.Contains(block, "Models:") {
+			if !wired(block, "Policy") || !wired(block, "Models") {
 				missing = append(missing, fmt.Sprintf("%s: an engine with no %s", path, missingField(block)))
 			}
 		}
@@ -72,6 +86,16 @@ func TestEveryReviewingEngineResolvesItsPolicy(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("walk: %v", err)
+	}
+
+	// A stale exemption is a claim nobody checks. This one was: it named a file
+	// whose engine is built by a helper, so the scan returned before the map
+	// was ever read and deleting the entry changed nothing.
+	for path, reason := range exempt {
+		if !used[path] {
+			t.Errorf("%s is exempt for %q and the scan never reached it, so the exemption proves nothing",
+				path, reason)
+		}
 	}
 
 	if len(missing) > 0 {
@@ -115,14 +139,27 @@ func engineLiterals(text string) []string {
 
 func missingField(block string) string {
 	switch {
-	case !strings.Contains(block, "Policy:") && !strings.Contains(block, "Models:"):
+	case !wired(block, "Policy") && !wired(block, "Models"):
 		return "Policy and no Models"
-	case !strings.Contains(block, "Policy:"):
+	case !wired(block, "Policy"):
 		return "Policy"
 	default:
 		return "Models"
 	}
 }
+
+// wired reports whether a field is set to something. `Policy: nil` is the field
+// present and saying nothing, which a Contains check reads as wired.
+func wired(block, field string) bool {
+	i := strings.Index(block, field+":")
+	if i < 0 {
+		return false
+	}
+	return !strings.HasPrefix(strings.TrimSpace(block[i+len(field)+1:]), "nil")
+}
+
+// nulled matches an engine having its resolver cleared after construction.
+var nulled = regexp.MustCompile(`\.(Policy|Models)\s*=\s*nil`)
 
 // respond resolves the policy, and reads no decision off the file on disk
 // afterwards.
@@ -147,21 +184,56 @@ func TestRespondResolvesBeforeItDecidesAnything(t *testing.T) {
 			"answered, and its findings applied, under the configuration it wrote for itself")
 	}
 
-	// Every decision reads the resolved config. cfg is the file on disk.
-	for _, forbidden := range []string{
-		"cfg.Review.Respond",
-		"cfg.Models",
-		"cfg.Review.Approve",
-		"cfg.Validation",
-	} {
-		if strings.Contains(text, forbidden) {
-			t.Errorf("respond reads %s off the file the change supplied; read it from the resolved policy", forbidden)
+	// Every decision after the resolution reads the resolved config, whatever
+	// the key. A list of forbidden names is the thing this file's other test
+	// argues against, and half of one here named keys respond never read.
+	//
+	// The config handed to runImprove is `cfg,`, not a selector, so it
+	// survives. It resolves for itself; see the comment there.
+	after := text[strings.Index(text, "respondPolicy(ctx,"):]
+	if i := strings.Index(after, "cfg."); i >= 0 {
+		line := after[i:]
+		if end := strings.IndexByte(line, '\n'); end > 0 {
+			line = line[:end]
 		}
+		t.Errorf("respond reads a decision off the file the change supplied, after resolving: %s", line)
 	}
 
 	// And the exception, asserted rather than assumed, so removing it on
 	// purpose is a deliberate edit here.
 	if !strings.Contains(text, "cfg.Review.Mention") {
 		t.Error("the mention no longer comes from the checkout; if that is deliberate, say so here")
+	}
+}
+
+// The mention that selects the command comes from the resolved policy.
+//
+// converse.Command reads the verb relative to the mention, so the mention is
+// the parser's origin rather than a yes-or-no gate: a change setting
+// `mention: please` turns a maintainer's "please fix all of these" into a fix
+// that writes to the repository. The first parse is a pre-filter that may
+// over-match and must not over-act.
+func TestTheCommandIsParsedAgainstTheResolvedMention(t *testing.T) {
+	body, err := os.ReadFile("respond.go")
+	if err != nil {
+		t.Fatalf("read respond.go: %v", err)
+	}
+	text := string(body)
+
+	if !strings.Contains(text, "converse.Command(ev.Body, policy.Review.Mention)") {
+		t.Error("the command is chosen by the mention the change supplied, including which command")
+	}
+
+	// After the resolution, not before it.
+	resolve := strings.Index(text, "respondPolicy(ctx,")
+	reparse := strings.Index(text, "converse.Command(ev.Body, policy.Review.Mention)")
+	if resolve < 0 || reparse < 0 || reparse < resolve {
+		t.Error("the second parse does not follow the resolution")
+	}
+
+	// And only when the handle came from the file. An explicit -mention is the
+	// operator naming it out of band, which no config may override.
+	if !strings.Contains(text, "if fromFile && policy.Review.Mention != mention {") {
+		t.Error("a config file can override an operator's -mention flag")
 	}
 }

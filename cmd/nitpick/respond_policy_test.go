@@ -154,3 +154,58 @@ func (f *fixedDiff) Diff(context.Context, vcs.Ref) ([]byte, error) {
 	}
 	return []byte(f.diff), nil
 }
+
+// The improve scope survives a substitution.
+//
+// withPolicy replaces the engine's whole Config with the resolver's answer, so
+// a scope applied to the roles alone is gone the moment a substitution
+// happens, on exactly the change a maintainer types `improve` on: the one
+// editing the configuration. The pass would say it was pedantic and run
+// ordinary.
+func TestTheImproveScopeSurvivesASubstitution(t *testing.T) {
+	base := config.Defaults()
+	base.Models.Default = config.ModelSpec{Provider: "openai", Model: "m"}
+
+	scoped := improveScoped{fixedPolicy{cfg: base}}
+	got, modified, err := scoped.ResolvePolicy(context.Background(), vcs.Ref{}, nil, []string{config.FileName})
+	if err != nil {
+		t.Fatalf("ResolvePolicy: %v", err)
+	}
+	if !modified {
+		t.Fatal("the fixture does not say what this test is about")
+	}
+
+	want := *config.Defaults()
+	applyImproveScope(&want)
+	if got.Persona.Nitpick != want.Persona.Nitpick {
+		t.Errorf("nitpick = %v, want %v: the substituted policy is not the pedantic pass",
+			got.Persona.Nitpick, want.Persona.Nitpick)
+	}
+	if got.Review.Slop != want.Review.Slop {
+		t.Errorf("slop = %v, want %v", got.Review.Slop, want.Review.Slop)
+	}
+	if got.Review.MinSeverity != want.Review.MinSeverity {
+		t.Errorf("min_severity = %v, want %v", got.Review.MinSeverity, want.Review.MinSeverity)
+	}
+	if got.Review.Approve.Enabled {
+		t.Error("a substituted policy re-enabled approval on a pass that gives no verdict")
+	}
+
+	// And the resolver it wraps is left alone.
+	if base.Persona.Nitpick == want.Persona.Nitpick {
+		t.Error("the scope was applied to the resolver's own config, not to a copy")
+	}
+}
+
+// fixedPolicy substitutes whenever the config file is among the changed paths.
+type fixedPolicy struct{ cfg *config.Config }
+
+func (f fixedPolicy) ResolvePolicy(_ context.Context, _ vcs.Ref, _ *vcs.PullRequest,
+	changed []string) (*config.Config, bool, error) {
+	for _, p := range changed {
+		if p == config.FileName {
+			return f.cfg, true, nil
+		}
+	}
+	return nil, false, nil
+}
