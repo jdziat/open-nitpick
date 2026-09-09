@@ -991,8 +991,25 @@ refused rather than reviewed under a config the tool cannot describe.
 The case this is for is a binary behind its config: a workflow pinned to an
 older tag, or a monorepo running two pinned versions against one file. Whoever
 sets it is asserting that. Nothing here can check the assertion, so if one of
-the keys was a typo after all, it is doing nothing and the notice is the only
-sign.
+the keys was a typo after all, that setting is not in force and the notice is
+the only sign.
+
+An ignored key is not read as a key, which is not the same as the text under it
+being inert. YAML lets an anchor declared under one key be merged into another,
+so a key nitpick does not have can still carry a value that reaches a key it
+does have. Where that value is an endpoint or a credential setting from a file
+this tool does not trust, the load is refused rather than ignored:
+
+```
+error: .nitpick.yaml supplies base_url after the untrusted-key prune ran, which
+means the document reached them by a route the prune does not walk, such as a
+YAML anchor merged into a model spec. It was not applied.
+```
+
+The prune removes those keys by name, so it only removes what it can see. That
+check asks the question the prune exists to answer, on the settings themselves
+after the document is decoded, which is why a route nobody enumerated does not
+get past it. See [Trust model](trust-model.md).
 
 ## Severities
 

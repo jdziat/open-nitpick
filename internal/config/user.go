@@ -173,7 +173,7 @@ func (c *Config) overlay(user, repo []byte, trusted bool, userPath, repoPath str
 			}
 			return nil, nil, nil, nil, err
 		}
-		unknown = append(unknown, ignored...)
+		unknown = append(unknown, inFile(ignored, userPath)...)
 		userKeys = keyPaths(userNode)
 	}
 
@@ -184,15 +184,28 @@ func (c *Config) overlay(user, repo []byte, trusted bool, userPath, repoPath str
 	var rendered bool
 
 	if !trusted && repoNode != nil {
-		// Rewritten only when the prune took something. A document it left
-		// alone is the file, and round-tripping it anyway would cost every
-		// unknown key its line for nothing: most repository configs name no
-		// endpoint at all.
-		if dropped = pruneUntrusted(repoNode); len(dropped) > 0 {
+		// Rewritten only when the prune changed the document. One it left
+		// alone is the file, and round-tripping it costs every unknown key its
+		// line for nothing.
+		//
+		// Changed, not reported: a key whose value asks for nothing is deleted
+		// and deliberately unreported, and reading the report as the change
+		// republishes the original bytes with that key still in it.
+		var changed bool
+		if dropped, changed = pruneUntrusted(repoNode); changed {
 			if repo, err = yaml.Marshal(repoNode); err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("rewrite config without the keys it may not supply: %w", err)
 			}
 			rendered = true
+		}
+	}
+
+	// After the prune and before the merge, because the question is what this
+	// document supplies: once it is merged onto the user's, nothing records
+	// whose base_url survived.
+	if !trusted {
+		if err := checkPruned(repo, repoPath); err != nil {
+			return nil, nil, nil, nil, err
 		}
 	}
 
@@ -203,7 +216,7 @@ func (c *Config) overlay(user, repo []byte, trusted bool, userPath, repoPath str
 		}
 		return nil, nil, nil, nil, err
 	}
-	unknown = append(unknown, withoutLines(ignored, rendered)...)
+	unknown = append(unknown, inFile(withoutLines(ignored, rendered), repoPath)...)
 
 	if len(userKeys) > 0 && repoNode != nil {
 		overridden = intersect(userKeys, keyPaths(repoNode))
@@ -291,6 +304,30 @@ func resolveNode(n *yaml.Node) *yaml.Node {
 		n = n.Alias
 	}
 	return n
+}
+
+// inFile names the document a recorded key came from.
+//
+// Two files reach this, and a reader sent to line 4 of the wrong one finds
+// something else. The base name rather than the path: the two are `.nitpick.yaml`
+// and `config.yaml`, which tells them apart in the width a log line and a
+// pull-request notice have.
+func inFile(keys []string, path string) []string {
+	name := filepath.Base(strings.TrimSpace(path))
+	if name == "" || name == "." || name == string(filepath.Separator) {
+		return keys
+	}
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if line, ok := strings.CutSuffix(k, ")"); ok {
+			if key, at, found := strings.Cut(line, " (line "); found {
+				out = append(out, fmt.Sprintf("%s (%s line %s)", key, name, at))
+				continue
+			}
+		}
+		out = append(out, fmt.Sprintf("%s (%s)", k, name))
+	}
+	return out
 }
 
 // withoutLines drops the line number from each key when it was counted in a

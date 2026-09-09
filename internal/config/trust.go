@@ -1,9 +1,13 @@
 package config
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -97,12 +101,15 @@ var untrustedSpecKeys = []string{
 // legitimately carry a base_url for contributors running the tool locally,
 // where the file is trusted because they wrote it. Failing the CI run would
 // punish the wrong person.
-func pruneUntrusted(root *yaml.Node) []string {
+// The second result says the document changed, which is not the same as the
+// first being non-empty: a key whose value asks for nothing is deleted and
+// deliberately not reported. A caller that reuses the original bytes unless
+// something was reported would keep that key.
+func pruneUntrusted(root *yaml.Node) (dropped []string, changed bool) {
 	if root == nil {
-		return nil
+		return nil, false
 	}
 
-	var dropped []string
 	// scrub cleans one spec and any fallback hanging from it. The fallback is
 	// a model spec in every respect, so a document that could put a base_url
 	// there and nowhere else would walk straight past a scrub that only
@@ -114,7 +121,9 @@ func pruneUntrusted(root *yaml.Node) []string {
 			return
 		}
 		for _, key := range untrustedSpecKeys {
-			if deleteKey(spec, key) {
+			asked, deleted := deleteKey(spec, key)
+			changed = changed || deleted
+			if asked {
 				dropped = append(dropped, role+"."+key)
 			}
 		}
@@ -154,12 +163,14 @@ func pruneUntrusted(root *yaml.Node) []string {
 	// visible in explain-config. Only the unbounded natural-language field is
 	// withheld.
 	if persona := mapValue(root, "persona"); persona != nil {
-		if deleteKey(persona, "custom") {
+		asked, deleted := deleteKey(persona, "custom")
+		changed = changed || deleted
+		if asked {
 			dropped = append(dropped, "persona.custom")
 		}
 	}
 
-	return dropped
+	return dropped, changed
 }
 
 // mapValue returns the value node for key, following an alias to reach it.
@@ -191,20 +202,25 @@ func sequence(n *yaml.Node) []*yaml.Node {
 // A key written with an empty or false value is deleted and not reported. It
 // asks for nothing, so naming it would put a line in the review's report for a
 // setting that was never in force, next to the lines that were.
-func deleteKey(n *yaml.Node, key string) bool {
+// The two results are different questions. asked says the value was worth
+// telling a reader about; deleted says the document changed. A caller that
+// reads the first as the second republishes the original bytes after removing
+// a key from a copy, which is how an untrusted empty value came to overwrite a
+// trusted one. See internal/config/user.go.
+func deleteKey(n *yaml.Node, key string) (asked, deleted bool) {
 	n = resolveNode(n)
 	if n == nil || n.Kind != yaml.MappingNode {
-		return false
+		return false, false
 	}
 	for i := 0; i+1 < len(n.Content); i += 2 {
 		if n.Content[i].Value != key {
 			continue
 		}
-		asked := nodeAsksForSomething(n.Content[i+1])
+		asked = nodeAsksForSomething(n.Content[i+1])
 		n.Content = append(n.Content[:i], n.Content[i+2:]...)
-		return asked
+		return asked, true
 	}
-	return false
+	return false, false
 }
 
 // nodeAsksForSomething reports whether a value is anything other than empty,
@@ -261,4 +277,106 @@ func modelRoleKeys() []string {
 		}
 	}
 	return out
+}
+
+// checkPruned refuses an untrusted document that still supplies an endpoint or
+// credential setting after the prune ran.
+//
+// The prune walks the document by name, so it only ever removes a key it can
+// see. YAML can put one somewhere it cannot: an anchor under a key this build
+// does not have, merged into a model spec with `<<`, arrives at the decoder as
+// base_url on that spec having passed nothing the prune visits. That path is
+// reachable whenever an unknown key is tolerated rather than fatal.
+//
+// So the invariant is checked where it is defined, on the decoded config,
+// rather than only enforced on the node. A node-level rule has to enumerate
+// every way YAML can move a value; this one asks the question the rule exists
+// to answer.
+//
+// Refused rather than scrubbed. The prune reports and continues because a
+// repository may legitimately carry a base_url for contributors running the
+// tool locally. This is the other case: the prune ran, said it had removed
+// everything, and was wrong. Nothing here can describe what else the document
+// did, so it is not reviewed under.
+func checkPruned(repo []byte, source string) error {
+	if len(repo) == 0 {
+		return nil
+	}
+
+	// The repository document alone, over defaults. Merged onto the user's
+	// there would be no way to tell whose base_url survived, which is the
+	// reason the prune works on the document in the first place.
+	probe := Defaults()
+	dec := yaml.NewDecoder(bytes.NewReader(repo))
+	if err := dec.Decode(probe); err != nil && !errors.Is(err, io.EOF) {
+		// Not this function's failure to report: the merge below decides what
+		// a document that will not decode does.
+		return nil
+	}
+
+	if found := untrustedIn(reflect.ValueOf(*probe)); len(found) > 0 {
+		sort.Strings(found)
+		return worded{text: fmt.Sprintf("%s supplies %s after the untrusted-key prune ran, "+
+			"which means the document reached them by a route the prune does not walk, "+
+			"such as a YAML anchor merged into a model spec. It was not applied. "+
+			"Set %s=1 if you control this file",
+			source, strings.Join(found, ", "), EnvTrustConfigEndpoints)}
+	}
+	return nil
+}
+
+// untrustedIn names every untrusted setting a decoded config carries, by field.
+//
+// Reflection over the value rather than a list of the places a spec can appear:
+// routes, ensembles and fallbacks all hold one, and a list is what modelRoleKeys
+// exists because someone forgot to extend.
+func untrustedIn(v reflect.Value) []string {
+	var found []string
+
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if !v.IsNil() {
+			found = append(found, untrustedIn(v.Elem())...)
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			found = append(found, untrustedIn(v.Index(i))...)
+		}
+	case reflect.Struct:
+		t := v.Type()
+		for i := range t.NumField() {
+			f := t.Field(i)
+			if !f.IsExported() {
+				continue
+			}
+			name, _, _ := strings.Cut(f.Tag.Get("yaml"), ",")
+			if untrustedField[name] && !v.Field(i).IsZero() {
+				found = appendOnce(found, name)
+				continue
+			}
+			found = append(found, untrustedIn(v.Field(i))...)
+		}
+	}
+	return found
+}
+
+// untrustedField is untrustedSpecKeys as a set, plus persona.custom, which the
+// prune also removes.
+var untrustedField = func() map[string]bool {
+	out := map[string]bool{"custom": true}
+	for _, k := range untrustedSpecKeys {
+		out[k] = true
+	}
+	return out
+}()
+
+// appendOnce keeps the list a set, since a document naming base_url on three
+// roles has one problem and should say so once.
+func appendOnce(list []string, v string) []string {
+	for _, have := range list {
+		if have == v {
+			return list
+		}
+	}
+	return append(list, v)
 }

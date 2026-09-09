@@ -52,13 +52,19 @@ func TestNoUnknownKeysPublishesNoNotice(t *testing.T) {
 	}
 }
 
-// A key carrying markup cannot break out of the line that holds it.
+// A key carrying markup or a backtick cannot break out of the span that holds
+// it.
 //
-// The key comes from a config file the change under review may have written,
-// and it reaches a comment posted under this tool's name.
+// The key is bytes the change under review chose, and it reaches a comment
+// posted under this tool's name. inline escapes HTML and does not neutralise
+// markdown, so the backtick half is this call site's to close: a key that ends
+// the code span renders an attacker's link as the bot's own prose.
 func TestAnUnknownKeyCannotEscapeItsNotice(t *testing.T) {
 	cfg := config.Defaults()
-	cfg.Unknown = []string{"`</blockquote><img src=x onerror=alert(1)> (line 3)"}
+	cfg.Unknown = []string{
+		"</blockquote><img src=x onerror=alert(1)> (line 3)",
+		"a`[CLICK ME](https://evil.example)`b (line 4)",
+	}
 
 	notice := unknownKeyNotice(&Report{Plan: &bundle.Plan{}, Policy: Policy{Config: cfg}})
 
@@ -67,5 +73,17 @@ func TestAnUnknownKeyCannotEscapeItsNotice(t *testing.T) {
 	}
 	if !strings.Contains(notice, "&lt;img") {
 		t.Errorf("the markup was not escaped:\n%s", notice)
+	}
+	// The link text may survive; inside a closed span it renders as text. What
+	// must not survive is the backtick that would close the span around it and
+	// leave the link live.
+	if strings.Contains(notice, "a`[CLICK ME]") {
+		t.Errorf("the key's backtick closed its code span:\n%s", notice)
+	}
+
+	// Every backtick in the rendered notice is one this function wrote, so the
+	// spans it opens are the spans it closes.
+	if n := strings.Count(notice, "`"); n%2 != 0 {
+		t.Errorf("odd number of backticks (%d), so a span is left open:\n%s", n, notice)
 	}
 }

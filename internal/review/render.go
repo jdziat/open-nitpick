@@ -561,9 +561,14 @@ func unknownKeyNotice(report *Report) string {
 		return ""
 	}
 
+	// inline escapes HTML and flattens, and does not neutralise markdown: a
+	// backtick in the key closes the code span and what follows renders as
+	// markdown, a link included, in a comment posted under this tool's name.
+	// The key is bytes the change under review chose. A config key never
+	// contains one, so replacing it costs a reader nothing and closes the span.
 	keys := make([]string, 0, len(cfg.Unknown))
 	for _, k := range cfg.Unknown {
-		keys = append(keys, "`"+inline(k)+"`")
+		keys = append(keys, "`"+inline(strings.ReplaceAll(k, "`", "'"))+"`")
 	}
 	return blockquote(fmt.Sprintf(
 		"**This nitpick does not have %s.**\n"+

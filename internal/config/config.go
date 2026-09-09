@@ -860,7 +860,7 @@ func loadBytes(data []byte, source string) (*Config, error) {
 	if err != nil {
 		// overlay has already built the keys-from-a-newer-nitpick message,
 		// because only it knows which of the two documents carried them.
-		var built unknownKeys
+		var built worded
 		if errors.As(err, &built) {
 			return nil, err
 		}
@@ -907,7 +907,7 @@ func defaultConfig() (*Config, error) {
 			}
 			return nil, fmt.Errorf("parse user config %s: %w", userPath, err)
 		}
-		cfg.Unknown = append(cfg.Unknown, ignored...)
+		cfg.Unknown = append(cfg.Unknown, inFile(ignored, userPath)...)
 		node, _ := documentNode(userData)
 		cfg.User, cfg.UserKeys = userPath, keyPaths(node)
 	}
@@ -976,7 +976,10 @@ func unknownFields(err error) (keys []string, only bool) {
 // violation, formatted at gopkg.in/yaml.v3@v3.0.1/decode.go:944.
 // TestTheUnknownFieldMessageIsStillYAMLsOwn fails when that wording changes,
 // which would otherwise turn every ignored key fatal again with nothing said.
-var unknownField = regexp.MustCompile(`^line (\d+): field (\S+) not found in type .+$`)
+// The key is `.+?` rather than `\S+`: a yaml key may contain a space, and
+// failing to match one would send it back to yaml's own Go-type message, which
+// is the message this exists to replace.
+var unknownField = regexp.MustCompile(`^line (\d+): field (.+?) not found in type .+$`)
 
 // Version is the nitpick that is running, for messages that turn on it. Set by
 // package main, whose linker sets it; empty when nobody said.
@@ -989,15 +992,16 @@ var Version string
 // reading this source, and the person who hit it copied a key out of the
 // documentation.
 func unknownKeyError(source string, keys []string) error {
-	return unknownKeys{text: unknownKeyText(source, keys)}
+	return worded{text: unknownKeyText(source, keys)}
 }
 
-// unknownKeys is the built message, typed so a caller can tell it from a parse
-// failure it should wrap with a file name. This one already names its file,
-// and the file it names is not always the caller's.
-type unknownKeys struct{ text string }
+// worded is a message that already names the file it is about, typed so a
+// caller can tell it from a parse failure it should label. The file is not
+// always the caller's: the user-level document fails inside a load that knows
+// only the repository's path.
+type worded struct{ text string }
 
-func (e unknownKeys) Error() string { return e.text }
+func (e worded) Error() string { return e.text }
 
 // unknownKeyText writes the message.
 func unknownKeyText(source string, keys []string) string {
