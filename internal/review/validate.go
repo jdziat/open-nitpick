@@ -298,7 +298,7 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 	// produce. Dropping only the citation would publish the deletion and hide
 	// the reason to doubt it, so the verdict itself is demoted to doubt: the
 	// finding stands, and the reader is told the check did not resolve.
-	if invented := len(shown) > 0 && strings.TrimSpace(result.Cited) != "" && cite == ""; invented {
+	if invented := len(shown) > 0 && namesSomething(result.Cited) && cite == ""; invented {
 		v.log().Warn("expert cited a reference it was not shown; publishing the finding unresolved",
 			"expert", expert.Key, "path", f.Path, "title", f.Title,
 			"cited", result.Cited, "verdict", result.Verdict)
@@ -647,11 +647,22 @@ const defanged = "[open-nitpick removed a forged boundary marker here]"
 // Written against the markers' WORDS with the punctuation optional, because the
 // punctuation is the part an imitator can vary while keeping every bit of the
 // effect: "==== UNTRUSTED CODE UNDER REVIEW ====" is not the marker and reads
-// exactly like it. Every alternative is a phrase rather than a word, which is
-// what makes that safe: defanging a bare "reference material" would replace
-// ordinary prose with an accusation of tampering. Bounded to a single line, so
-// a match can never swallow the newline between two lines of real code.
-var fenceImitation = regexp.MustCompile(`(?i)=*[ \t]*(untrusted[^\n]{0,40}?(under review|pull request text)|reference material[^\n]{0,40}?not this change)[ \t]*=*`)
+// exactly like it. That holds only where the words themselves do not occur in
+// prose, which is why the reference alternative needs a run of = on one side
+// and the untrusted ones need none. Bounded to a single line, so a match can
+// never swallow the newline between two lines of real code.
+var fenceImitation = regexp.MustCompile(`(?i)` +
+	// The untrusted markers, punctuation optional: their words do not occur in
+	// prose by accident.
+	`=*[ \t]*untrusted[^\n]{0,40}?(under review|pull request text)[ \t]*=*` +
+	`|` +
+	// The reference marker, which needs a run of = on one side or the other.
+	// Its words DO occur in prose: "the reference material, not this change"
+	// is a sentence somebody writes in a comment, and defanging that shows an
+	// expert altered code carrying an accusation of tampering.
+	`=+[ \t]*reference material[^\n]{0,40}?not this change[ \t]*=*` +
+	`|` +
+	`=*[ \t]*reference material[^\n]{0,40}?not this change[ \t]*=+`)
 
 // defang removes anything in untrusted text that imitates a fence marker.
 //
@@ -670,6 +681,21 @@ func (v *Validator) log() *slog.Logger {
 		return v.Log
 	}
 	return slog.New(slog.DiscardHandler)
+}
+
+// nullish are the ways a model says "no citation" when asked for an id.
+//
+// The contract asks for an empty string and gets these instead. Reading one as
+// an invented source would demote a sound refutation over a filler word, which
+// is the failure the demotion exists to avoid one direction of.
+var nullish = map[string]bool{
+	"": true, "none": true, "na": true, "nil": true, "null": true,
+	"nothing": true, "notapplicable": true, "empty": true, "unknown": true,
+}
+
+// namesSomething reports whether a `cited` field is an attempt at an id.
+func namesSomething(said string) bool {
+	return !nullish[idChars(said)]
 }
 
 // idChars reduces a string to the characters a corpus id is spelled with.
