@@ -63,3 +63,20 @@ func TestVersionsForReadsTheOwningModule(t *testing.T) {
 		t.Errorf("Versions with no root = %v, want nothing", got)
 	}
 }
+
+// A go.mod carrying a block comment is not a case this parser owes an answer.
+//
+// The modules reference: "Comments start with // and run to the end of a line.
+// /* */ comments are not allowed." Such a file does not load, so the go tool
+// has no reading of it either. Pinned because it reads like a parser gap and
+// has been raised as one.
+func TestABlockCommentIsNotAGoModComment(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "go.mod"), "/* not legal here */\nmodule example.com/x\n\ngo 1.21\n")
+
+	// Whatever this answers, it must not be a version the file does not
+	// declare, and the caller keeps every entry when the answer is nothing.
+	if got := Versions(dir)["go"]; got != "1.21" && got != AssumedLanguage && got != "" {
+		t.Errorf("Versions = %q, which is neither the declared version nor an abstention", got)
+	}
+}

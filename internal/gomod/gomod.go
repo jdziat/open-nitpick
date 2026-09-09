@@ -53,6 +53,10 @@ func LanguageVersion(modFile string) (declared string, line int, ok bool) {
 	depth := 0
 
 	for i, raw := range strings.Split(string(src), "\n") {
+		// Line comments only, which is every comment go.mod has: the modules
+		// reference says "Comments start with // and run to the end of a line.
+		// /* */ comments are not allowed." A file carrying one does not load,
+		// so there is nothing here to be right about.
 		if comment := strings.Index(raw, "//"); comment >= 0 {
 			raw = raw[:comment]
 		}

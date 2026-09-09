@@ -1775,7 +1775,9 @@ of the pool it truncates.
 | shell | 1 | no |
 
 Source: `TestPoolSizeReportsWhatTheCutsAllowed` in
-`internal/knowledge/applies_test.go`, over the fourteen shipped entries. On a
+`internal/knowledge/applies_test.go`. The column sums to 15 over fourteen
+entries because `js-array-sort-mutates` declares both javascript and
+typescript, so it is in two pools. On a
 module declaring Go 1.23 or later the Go pool is 7, because `go-time-after-leak`
 is bounded below it.
 
