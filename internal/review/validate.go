@@ -23,10 +23,19 @@ const (
 	verdictRefuted = "refuted"
 	// verdictSeverity means the defect is real but rated wrong.
 	verdictSeverity = "severity"
+	// verdictUnresolved means the expert could not decide from what it saw.
+	//
+	// It publishes the finding, byte for byte what `confirmed` publishes, so
+	// it is not a fourth way to delete one and adding it cannot cost recall.
+	// What it changes is the record. Without it, doubt is spelled `confirmed`,
+	// so "an expert checked this and agreed" and "an expert checked this and
+	// could not tell" reach a reader as the same output. A reader weighing a
+	// comment deserves those apart.
+	verdictUnresolved = "unresolved"
 )
 
 // verdictEnum is the closed set the schema offers.
-var verdictEnum = []string{verdictConfirmed, verdictRefuted, verdictSeverity}
+var verdictEnum = []string{verdictConfirmed, verdictRefuted, verdictSeverity, verdictUnresolved}
 
 // Overruled records a decision a domain expert made against a finding.
 //
@@ -180,6 +189,13 @@ func applyOutcomes(outcomes []outcome) (kept []Finding, overruled []Overruled) {
 
 			kept = append(kept, revised)
 
+		case o.unresolved != "":
+			// Published, exactly as an unvalidated finding is. Only the record
+			// on it differs, which is the whole point of the verdict.
+			f := o.finding
+			f.Unresolved = o.expert + ": " + o.unresolved
+			kept = append(kept, f)
+
 		default:
 			kept = append(kept, o.finding)
 		}
@@ -202,6 +218,11 @@ type outcome struct {
 	// revised is the level an expert moved the finding to, empty when nobody
 	// moved it.
 	revised config.Severity
+
+	// unresolved is the doubt an expert stated when it could not decide. The
+	// finding is published either way; this is the only trace that the check
+	// ran and came back undecided.
+	unresolved string
 }
 
 // check validates one finding.
@@ -273,6 +294,18 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 
 	case verdictConfirmed:
 		return keep
+
+	case verdictUnresolved:
+		// Undecided with nothing said publishes clean: applyOutcomes records
+		// the doubt only when there is one, so an empty reason falls through to
+		// the same finding a confirmation produces. Not re-checked here, since
+		// a second guard on the same condition is the kind that rots into
+		// disagreeing with the first.
+		reason := strings.TrimSpace(result.Reason)
+
+		v.log().Info("expert could not resolve a finding",
+			"expert", expert.Key, "path", f.Path, "line", f.Line, "title", f.Title, "reason", reason)
+		return outcome{finding: f, expert: expertLabel(expert), unresolved: reason}
 
 	default:
 		// Same call the class and severity normalizers make, for the same
@@ -369,6 +402,11 @@ Answer with exactly one verdict:
   cannot occur. The value cannot be attacker controlled. The call is already
   guarded above. The type makes the failure impossible. The code does not do
   what the claim says it does. Put that reason in ` + "`reason`" + `.
+- ` + "`unresolved`" + ` — you cannot decide from what you were shown, and you
+  can NAME what is missing. The definition you would need is not in front of
+  you. The call's behaviour depends on a caller you cannot see. Put that in
+  ` + "`reason`" + `. The finding is published either way, so this is never a
+  way to remove one, it records that the check came back undecided.
 - ` + "`severity`" + ` — the defect is real, but rated wrong. Set
   ` + "`revised_severity`" + ` to the level the demonstrated consequence
   supports and say why in ` + "`reason`" + `. Rate what you can demonstrate, not
@@ -376,14 +414,16 @@ Answer with exactly one verdict:
 
 Refute ONLY when you can state that reason. "I could not confirm this", "there
 is not enough context here", "this seems unlikely" are not refutations — they
-are doubt, and doubt is answered with ` + "`confirmed`" + `. An unrefuted false
+are doubt. Answer ` + "`unresolved`" + ` when you can name what you are missing
+and ` + "`confirmed`" + ` when you cannot. An unrefuted false
 finding costs a reader one comment they can dismiss. A wrongly refuted true
 finding is never seen by anyone.
 
 Being the wrong specialist is not a reason to refute either, and it is not a
 reason to re-rate. You were chosen by the words in the claim, so claims outside
 your speciality reach you regularly. Judge such a claim on the evidence in front
-of you and answer ` + "`confirmed`" + ` when you cannot name why it is wrong —
+of you and answer ` + "`confirmed`" + ` or ` + "`unresolved`" + ` when you
+cannot name why it is wrong —
 and do not put it on your own domain's severity scale, because a lost write
 rated as though it were a naming choice is deleted just as surely as one you
 refuted.

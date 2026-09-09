@@ -202,6 +202,18 @@ func renderComment(f Finding, emoji bool, read map[string][]string) string {
 		fmt.Fprintf(&b, "\n<sub>%s</sub>\n", attribution)
 	}
 
+	// Stated doubt, on the same footing as the attribution above it and for the
+	// same reason: a reader deciding whether to act wants to know that the
+	// expert check ran and came back undecided, which is otherwise
+	// indistinguishable from the check having agreed.
+	//
+	// Flattened, because the expert wrote it. A reason carrying a newline puts
+	// whatever follows at column 0, outside the <sub> that was meant to hold
+	// it, rendered as this tool's own prose.
+	if u := oneLine(strings.TrimSpace(f.Unresolved)); u != "" {
+		fmt.Fprintf(&b, "\n<sub>could not be resolved by %s</sub>\n", u)
+	}
+
 	// A GitHub suggestion block is one click to apply. Which makes it the most
 	// valuable thing a review bot offers and the most damaging thing it can get
 	// wrong. A suggestion is only rendered as applicable code when it plausibly

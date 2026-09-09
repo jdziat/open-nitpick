@@ -1250,7 +1250,10 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 
 	// After the diff, not before it. The change is what the model is being
 	// asked about, and reference material placed first reads as the subject.
-	if hits := e.retrieveKnowledge(ctx, b, style); len(hits) > 0 {
+	// Widened out of the if, because the findings below carry which entries
+	// the reviewer read and the scope used to end here.
+	hits := e.retrieveKnowledge(ctx, b, style)
+	if len(hits) > 0 {
 		body.WriteString(knowledgeSection(hits))
 		e.log().Info("knowledge retrieved", "batch", b.Paths(), "entries", ids(hits))
 	}
@@ -1280,6 +1283,8 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		// Always this client's name: a model that writes a source of its
 		// own would let two reviewers' findings pass as one's.
 		f.Source = client.String()
+		// What the reviewer read, not what persuaded it. See evidence.go.
+		f.Evidence = evidenceFor(f, hits)
 		out = append(out, f)
 	}
 	return out, nil
@@ -1559,12 +1564,18 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 	// the eval battery runs. It was worse for linter findings, because Source is
 	// deliberately restored below: the finding was published attributed to gosec
 	// with our word quoted as gosec's.
+	// Evidence is json:"-" like Source, so it arrives from triage's decode
+	// empty. Restored beside the others rather than recomputed: the hits that
+	// produced it belong to a batch this function no longer has.
+	evidenceBefore := make(map[string][]string, len(findings))
+
 	severityBefore := make(map[string]Finding, len(findings))
 	for _, f := range findings {
 		allowed[f.Path] = struct{}{}
 		if _, seen := classBefore[f.Key()]; !seen {
 			classBefore[f.Key()] = f.Class
 			sourceBefore[f.Key()] = f.Source
+			evidenceBefore[f.Key()] = f.Evidence
 			severityBefore[f.Key()] = f
 		}
 	}
@@ -1623,6 +1634,9 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 			f.Source = original
 		}
 		f.Triager = e.Roles.Triage.String()
+		if original, ok := evidenceBefore[f.Key()]; ok {
+			f.Evidence = original
+		}
 
 		kept = append(kept, f)
 	}

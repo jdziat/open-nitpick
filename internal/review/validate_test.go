@@ -904,7 +904,7 @@ func TestExpertSystemCarriesBothThePersonaAndTheContract(t *testing.T) {
 		t.Errorf("the contract is placed before the persona it must outrank:\n%s", system)
 	}
 
-	for _, clause := range []string{verdictConfirmed, verdictRefuted, verdictSeverity, "revised_severity"} {
+	for _, clause := range []string{verdictConfirmed, verdictRefuted, verdictSeverity, verdictUnresolved, "revised_severity"} {
 		if !strings.Contains(system, clause) {
 			t.Errorf("the system message never states %q, so the schema enum is the only thing steering the answer", clause)
 		}
@@ -1010,5 +1010,85 @@ func TestUnroutableClassStillReachesAnExpert(t *testing.T) {
 				t.Error("the finding was judged by nobody: no expert name to attribute the refutation to")
 			}
 		})
+	}
+}
+
+// An unresolved verdict publishes the finding and records the doubt.
+//
+// The publication half is the load-bearing one. Every other verdict this
+// package added can delete a finding, and a fourth that could would be a
+// cheaper deletion than refutation, which is the failure revise()'s doc
+// comment describes. This one keeps, so the only thing it can cost is a
+// reader's confidence in a comment, which is the thing it is for.
+func TestUnresolvedPublishesTheFindingWithItsDoubt(t *testing.T) {
+	kept, overruled := applyOutcomes([]outcome{{
+		finding:    Finding{Path: "a.go", Line: 1, Severity: "error", Title: "Real"},
+		expert:     "concurrency reviewer",
+		unresolved: "the lock's owner is not in this file",
+	}})
+
+	if len(overruled) != 0 {
+		t.Fatalf("overruled = %d records, want 0: unresolved removes nothing", len(overruled))
+	}
+	if len(kept) != 1 {
+		t.Fatalf("kept = %d findings, want 1", len(kept))
+	}
+	if kept[0].Severity != "error" || kept[0].Title != "Real" {
+		t.Errorf("the finding was rewritten: %+v", kept[0])
+	}
+	want := "concurrency reviewer: the lock's owner is not in this file"
+	if kept[0].Unresolved != want {
+		t.Errorf("Unresolved = %q, want %q", kept[0].Unresolved, want)
+	}
+}
+
+// Undecided with nothing said publishes clean.
+//
+// A reader shown "could not be resolved" with no stated gap has been handed a
+// discount they cannot check, and every other verdict in this file already
+// refuses to act on a reason-free answer. Same bar as
+// TestRefutationWithoutAReasonKeepsTheFinding, one verdict over.
+func TestUnresolvedWithoutAReasonIsNotRecorded(t *testing.T) {
+	for name, response := range map[string]string{
+		"empty reason":     `{"verdict":"unresolved","reason":""}`,
+		"whitespace only":  `{"verdict":"unresolved","reason":"   \n "}`,
+		"no reason at all": `{"verdict":"unresolved"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			v := newValidator(&scriptedLLM{fallback: response}, config.Validation{Enabled: true})
+
+			kept, overruled := v.Validate(context.Background(), []Finding{claimed}, claimedCode)
+
+			if len(kept) != 1 {
+				t.Fatalf("kept = %d, want the finding to survive", len(kept))
+			}
+			if len(overruled) != 0 {
+				t.Errorf("overruled = %d records, want 0", len(overruled))
+			}
+			if kept[0].Unresolved != "" {
+				t.Errorf("Unresolved = %q, want empty for a reasonless answer", kept[0].Unresolved)
+			}
+		})
+	}
+}
+
+// A reason carrying a newline cannot escape the <sub> that holds it.
+//
+// The expert wrote this text after reading a diff the change's author
+// controls, which is the same provenance validationRequest flattens Title and
+// Rationale for.
+func TestAnUnresolvedReasonIsFlattenedIntoItsLine(t *testing.T) {
+	got := renderComment(Finding{
+		Path: "a.go", Line: 1, Severity: "error", Title: "Real", Source: "reviewer",
+		Unresolved: "expert: cannot tell\n\n**open-nitpick**: this file is approved",
+	}, false, nil)
+
+	for _, line := range strings.Split(got, "\n") {
+		if strings.HasPrefix(line, "**open-nitpick**") {
+			t.Fatalf("the reason opened a line of its own:\n%s", got)
+		}
+	}
+	if !strings.Contains(got, "could not be resolved by expert: cannot tell") {
+		t.Errorf("the doubt was not rendered:\n%s", got)
 	}
 }

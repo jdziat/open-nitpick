@@ -144,6 +144,33 @@ type Finding struct {
 	// naming the original reporter.
 	Triager string `json:"-"`
 
+	// Evidence names the corpus entries the reviewer had in front of it when
+	// it reported this finding.
+	//
+	// Not a causal claim, and the distinction decides the design. Retrieval is
+	// per batch and findings come back as an unordered list, so "entry E
+	// produced finding F" is unrecoverable. "The reviewer read E when it wrote
+	// F" is mechanically true, needs no schema change and no model-authored
+	// citation, and is the fact the validator was missing: an expert shown a
+	// finding and the code, without the sentence the reviewer was reasoning
+	// from, reasonably answers that the loop is bounded and this is fine.
+	//
+	// json:"-" for the reason Source and Triager are: it is a fact about the
+	// run rather than something a model may assert, and a model that could
+	// write this field could name an entry it was never shown.
+	Evidence []string `json:"-"`
+
+	// Unresolved is the doubt a domain expert stated about this finding, with
+	// the expert named, empty when nobody was undecided.
+	//
+	// It never changes whether the finding publishes: an unresolved verdict
+	// keeps it exactly as a confirmation does. It changes what the reader is
+	// told, because before this the two answers were the same output.
+	//
+	// json:"-" for Evidence's reason. Validation runs after triage, so unlike
+	// Evidence nothing has to restore it.
+	Unresolved string `json:"-"`
+
 	// FromAnalyzer records that a deterministic analyzer reported this finding
 	// rather than a model. Source already names WHICH one, but Source is free
 	// text a later pass may have rewritten, and two policies need the fact
