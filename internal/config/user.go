@@ -142,10 +142,12 @@ func userDocument(getenv func(string) string) (path string, data []byte, err err
 // repo is pruned before it is merged, so a repository document cannot reach
 // any key the user-level file is trusted for. Ordering here is the invariant;
 // see the note at the top of this file.
-func (c *Config) overlay(user, repo []byte, trusted bool) (dropped, userKeys, overridden []string, err error) {
+func (c *Config) overlay(user, repo []byte, trusted bool) (dropped, userKeys, overridden, unknown []string, err error) {
+	tolerate := ignoreUnknownKeys(nil)
+
 	userNode, err := documentNode(user)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("parse user config: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("parse user config: %w", err)
 	}
 	repoNode, err := documentNode(repo)
 	if err != nil {
@@ -155,31 +157,35 @@ func (c *Config) overlay(user, repo []byte, trusted bool) (dropped, userKeys, ov
 		// would carry every key the prune exists to remove. Trusted, the
 		// decoder is about to reject the same bytes anyway, and reporting it
 		// here says which parse failed.
-		return nil, nil, nil, fmt.Errorf("parse config: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("parse config: %w", err)
 	}
 
 	if len(user) > 0 {
-		if err := c.merge(user); err != nil {
-			return nil, nil, nil, err
+		ignored, err := c.merge(user, tolerate)
+		if err != nil {
+			return nil, nil, nil, nil, err
 		}
+		unknown = append(unknown, ignored...)
 		userKeys = keyPaths(userNode)
 	}
 
 	if !trusted && repoNode != nil {
 		dropped = pruneUntrusted(repoNode)
 		if repo, err = yaml.Marshal(repoNode); err != nil {
-			return nil, nil, nil, fmt.Errorf("rewrite config without the keys it may not supply: %w", err)
+			return nil, nil, nil, nil, fmt.Errorf("rewrite config without the keys it may not supply: %w", err)
 		}
 	}
 
-	if err := c.merge(repo); err != nil {
-		return nil, nil, nil, err
+	ignored, err := c.merge(repo, tolerate)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
+	unknown = append(unknown, ignored...)
 
 	if len(userKeys) > 0 && repoNode != nil {
 		overridden = intersect(userKeys, keyPaths(repoNode))
 	}
-	return dropped, userKeys, overridden, nil
+	return dropped, userKeys, overridden, unknown, nil
 }
 
 // documentNode parses a document down to its root mapping, or nil when the

@@ -122,4 +122,10 @@ is set, for every role. So is ` + "`persona.custom`" + `. See
 const footer = `
 Anything not listed is not a key. The loader rejects an unrecognised one rather
 than ignoring it, so a typo fails the run instead of silently doing nothing.
+
+That also refuses a key added to a newer nitpick than the one running, which
+reads exactly the same from here. Setting ` + "`NITPICK_IGNORE_UNKNOWN_KEYS=1`" + `
+ignores such keys instead, naming them in the log and on the pull request. It is
+off by default and it is an environment variable rather than a key, so a config
+file cannot switch off the check on its own keys.
 `

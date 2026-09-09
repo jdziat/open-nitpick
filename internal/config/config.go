@@ -13,6 +13,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -57,6 +58,14 @@ type Config struct {
 	// config file is not trusted to supply them. Callers should log these: a
 	// silently ignored setting is very hard to diagnose.
 	Dropped []string `yaml:"-"`
+
+	// Unknown names keys this build does not have, which were ignored because
+	// NITPICK_IGNORE_UNKNOWN_KEYS is set. Each reads "name (line N)".
+	//
+	// Callers log these and publish them, for Dropped's reason and one more:
+	// the key was ignored on the operator's word that their binary is behind
+	// their config, and if that word was wrong the key is a typo doing nothing.
+	Unknown []string `yaml:"-"`
 
 	// User is the user-level configuration file this one was overlaid onto,
 	// empty when none applied. See internal/config/user.go.
@@ -847,11 +856,17 @@ func loadBytes(data []byte, source string) (*Config, error) {
 	//
 	// This runs before applyEnv so the environment can still supply what
 	// neither file said.
-	dropped, userKeys, overridden, err := cfg.overlay(userData, data, trustEndpointKeys(nil))
+	dropped, userKeys, overridden, unknown, err := cfg.overlay(userData, data, trustEndpointKeys(nil))
 	if err != nil {
+		// The keys-from-a-newer-nitpick message, when that is all it was. It
+		// names the file, the keys and the way out; yaml's own names a Go type.
+		if keys, only := unknownFields(err); only {
+			return nil, unknownKeyError(source, keys)
+		}
 		return nil, fmt.Errorf("parse config %s: %w", source, err)
 	}
 	cfg.Dropped = dropped
+	cfg.Unknown = unknown
 	cfg.User, cfg.UserKeys, cfg.UserOverridden = userPath, userKeys, overridden
 
 	cfg.applyEnv(nil)
@@ -884,9 +899,14 @@ func defaultConfig() (*Config, error) {
 		return nil, err
 	}
 	if len(userData) > 0 {
-		if err := cfg.merge(userData); err != nil {
+		ignored, err := cfg.merge(userData, ignoreUnknownKeys(nil))
+		if err != nil {
+			if keys, only := unknownFields(err); only {
+				return nil, unknownKeyError(userPath, keys)
+			}
 			return nil, fmt.Errorf("parse user config %s: %w", userPath, err)
 		}
+		cfg.Unknown = append(cfg.Unknown, ignored...)
 		node, _ := documentNode(userData)
 		cfg.User, cfg.UserKeys = userPath, keyPaths(node)
 	}
@@ -905,18 +925,81 @@ func defaultConfig() (*Config, error) {
 // the document replace the default; fields absent from the document keep their
 // default value. Sequences replace wholesale rather than appending, so a
 // repository can narrow the default ignore list rather than only widening it.
-func (c *Config) merge(data []byte) error {
+func (c *Config) merge(data []byte, tolerate bool) ([]string, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 
-	if err := dec.Decode(c); err != nil {
-		// An empty document yields io.EOF and leaves defaults in place.
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-		return err
+	err := dec.Decode(c)
+	switch {
+	case err == nil:
+		return nil, nil
+	// An empty document yields io.EOF and leaves defaults in place.
+	case errors.Is(err, io.EOF):
+		return nil, nil
 	}
-	return nil
+
+	unknown, only := unknownFields(err)
+	if !only || !tolerate {
+		return nil, err
+	}
+	// Everything the document did set is already applied: yaml.v3 records an
+	// unknown field and carries on, which is what makes ignoring one a matter
+	// of keeping this config rather than decoding it again.
+	return unknown, nil
+}
+
+// unknownFields reads a decode failure as a list of keys this build does not
+// have, and says whether that is all it was.
+//
+// only is false for a failure with anything else in it, a type error among the
+// unknown keys included. Such a decode applied some of the document and skipped
+// some, and nothing here knows which, so the caller refuses the file rather
+// than reviewing under a config it cannot describe.
+func unknownFields(err error) (keys []string, only bool) {
+	var typeErr *yaml.TypeError
+	if !errors.As(err, &typeErr) || len(typeErr.Errors) == 0 {
+		return nil, false
+	}
+
+	for _, e := range typeErr.Errors {
+		m := unknownField.FindStringSubmatch(e)
+		if m == nil {
+			return nil, false
+		}
+		keys = append(keys, fmt.Sprintf("%s (line %s)", m[2], m[1]))
+	}
+	return keys, true
+}
+
+// unknownField matches the one message yaml.v3 writes for a KnownFields
+// violation, formatted at gopkg.in/yaml.v3@v3.0.1/decode.go:944.
+// TestTheUnknownFieldMessageIsStillYAMLsOwn fails when that wording changes,
+// which would otherwise turn every ignored key fatal again with nothing said.
+var unknownField = regexp.MustCompile(`^line (\d+): field (\S+) not found in type .+$`)
+
+// Version is the nitpick that is running, for messages that turn on it. Set by
+// package main, whose linker sets it; empty when nobody said.
+var Version string
+
+// unknownKeyError is the fatal message for keys this build does not have.
+//
+// Built rather than wrapping yaml's, because yaml's names a Go type and no
+// remedy: "field fix not found in type config.Models" is an answer for someone
+// reading this source, and the person who hit it copied a key out of the
+// documentation.
+func unknownKeyError(source string, keys []string) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s has keys this nitpick does not know:\n\n", source)
+	for _, k := range keys {
+		fmt.Fprintf(&b, "  %s\n", k)
+	}
+	b.WriteString("\n")
+	if Version != "" {
+		fmt.Fprintf(&b, "This is nitpick %s. ", Version)
+	}
+	fmt.Fprintf(&b, "A key added after this version is rejected the same way a "+
+		"typo is. Set %s=1 to ignore them and continue.", EnvIgnoreUnknownKeys)
+	return errors.New(b.String())
 }
 
 // ModelNotesOn reports whether the model-family prompt layer is in force.

@@ -262,7 +262,8 @@ ceiling has nothing to reduce.
 two are complementary and neither substitutes for the other.
 
 Unknown keys are rejected at load time, so a typo fails immediately instead of
-being silently ignored.
+being silently ignored. A key from a newer nitpick is refused the same way; see
+the configuration page for the opt-in that ignores one.
 
 
 ## Notes from the runners

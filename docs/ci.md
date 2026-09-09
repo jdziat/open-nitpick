@@ -261,6 +261,12 @@ a tag for a build that never changes under you. GitHub Enterprise Server is
 supported: the API URL comes from the runner; releases are fetched from
 github.com.
 
+A pinned binary and a `.nitpick.yaml` written for a newer one is the mismatch
+worth knowing about: a key the pinned build does not have fails the run before
+the diff is read. Set `NITPICK_IGNORE_UNKNOWN_KEYS=1` on that workflow to
+ignore those keys and continue; see
+[A key this nitpick does not have](configuration.md#a-key-this-nitpick-does-not-have).
+
 ## Any other CI
 
 ```bash

@@ -383,6 +383,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// findings, these skips and these budgets are the product of a policy that
 	// is not the one in the change.
 	b.WriteString(policyNotice(report))
+	b.WriteString(unknownKeyNotice(report))
 	b.WriteString(incrementalNotice(report))
 	b.WriteString(nothingReviewedNotice(report))
 	b.WriteString(linterNotice(report))
@@ -541,6 +542,35 @@ func policyNotice(report *Report) string {
 			"for reviews after it lands. To try it out first, pass `-config` a copy kept\n"+
 			"outside the repository.",
 		inline(report.Policy.Modified), report.Policy.Source()))
+}
+
+// unknownKeyNotice states, on the pull request, which config keys this build
+// does not have and therefore did not apply.
+//
+// Beside policyNotice for its reason: a setting a reader believes is in force
+// and is not changes how every finding below should be read. It is published
+// rather than only logged because the person who wrote the key reads the pull
+// request, and the operator who set the environment variable reads the CI log.
+//
+// The keys were ignored on that operator's word that the binary is behind the
+// config. Nothing here can check that, so the notice says what was ignored and
+// leaves the reading to whoever knows which it was.
+func unknownKeyNotice(report *Report) string {
+	cfg := report.Policy.Config
+	if cfg == nil || len(cfg.Unknown) == 0 {
+		return ""
+	}
+
+	keys := make([]string, 0, len(cfg.Unknown))
+	for _, k := range cfg.Unknown {
+		keys = append(keys, "`"+inline(k)+"`")
+	}
+	return blockquote(fmt.Sprintf(
+		"**This nitpick does not have %s.**\n"+
+			"They were ignored rather than failing the run, because %s is set.\n"+
+			"A key added to a newer nitpick reads exactly like a typo here, so if one of\n"+
+			"these is a typo it is doing nothing.",
+		strings.Join(keys, ", "), config.EnvIgnoreUnknownKeys))
 }
 
 // linterNotice states, ON THE PULL REQUEST, what each deterministic analyzer

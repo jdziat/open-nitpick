@@ -17,6 +17,13 @@ import (
 // point is that the config file must not be able to grant itself this power.
 const EnvTrustConfigEndpoints = "NITPICK_TRUST_CONFIG_ENDPOINTS"
 
+// EnvIgnoreUnknownKeys lets a run continue past config keys this build does
+// not have, recording them instead of refusing to start.
+//
+// Off by default: a key from a newer nitpick and a typo are the same bytes
+// from in here. See docs/configuration.md, "A key this nitpick does not have".
+const EnvIgnoreUnknownKeys = "NITPICK_IGNORE_UNKNOWN_KEYS"
+
 // The settings pruneUntrusted deletes, base_url, api_key_env, extra and
 // allow_private_endpoint, are the ones that decide *where* a request goes and
 // *which* credential rides along with it.
@@ -49,6 +56,17 @@ func trustEndpointKeys(getenv func(string) string) bool {
 	}
 
 	v, err := strconv.ParseBool(strings.TrimSpace(getenv(EnvTrustConfigEndpoints)))
+	return err == nil && v
+}
+
+// ignoreUnknownKeys reports whether a key this build does not have is recorded
+// rather than fatal.
+func ignoreUnknownKeys(getenv func(string) string) bool {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+
+	v, err := strconv.ParseBool(strings.TrimSpace(getenv(EnvIgnoreUnknownKeys)))
 	return err == nil && v
 }
 

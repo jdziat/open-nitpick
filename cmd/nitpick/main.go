@@ -12,6 +12,8 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // version is set at build time via -ldflags.
@@ -31,6 +33,10 @@ func main() {
 }
 
 func run() int {
+	// The version the linker set, where a message about what this build knows
+	// can reach it. internal/config cannot see a package main variable.
+	config.Version = version
+
 	if len(os.Args) < 2 {
 		usage()
 		return exitUsage
