@@ -536,7 +536,20 @@ func Render(e Entry) string {
 	b.WriteString(e.File.String())
 	b.WriteString("```\n")
 
-	if e.HasContent() {
+	// A file the change adds is already whole in its own diff: every line is
+	// an addition, and the diff renders each with its new-file line number, so
+	// the full-file section that follows would be the same content a second
+	// time in a different costume. It was 43,569 of 100,070 prompt characters
+	// on the three-file fixture in #81.
+	//
+	// Content itself is kept rather than dropped at assembly, because related
+	// context parses it for the imports a new file brings in, which is where
+	// that context is worth most.
+	//
+	// Only when the whole file is there. A window is a window even of an
+	// addition, and saying so is the point of the heading it carries.
+	wholeAddition := e.File != nil && e.File.Kind == diff.ChangeAdded && !e.Truncated
+	if e.HasContent() && !wholeAddition {
 		if e.Truncated {
 			// The width is stated because it tells the model how much of the
 			// file it is not seeing. Without it, a window reads like a whole
