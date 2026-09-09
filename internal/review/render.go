@@ -207,10 +207,12 @@ func renderComment(f Finding, emoji bool, read map[string][]string) string {
 	// expert check ran and came back undecided, which is otherwise
 	// indistinguishable from the check having agreed.
 	//
-	// Flattened, because the expert wrote it. A reason carrying a newline puts
-	// whatever follows at column 0, outside the <sub> that was meant to hold
-	// it, rendered as this tool's own prose.
-	if u := oneLine(strings.TrimSpace(f.Unresolved)); u != "" {
+	// Flattened and escaped, because the expert wrote it after reading a diff
+	// the change's author controls. A newline puts what follows at column 0,
+	// outside the <sub> meant to hold it; a `</sub>` closes the element and
+	// whatever follows renders as live HTML in a comment posted under this
+	// tool's name. Same call every other model-authored string here makes.
+	if u := inline(strings.TrimSpace(f.Unresolved)); u != "" {
 		fmt.Fprintf(&b, "\n<sub>could not be resolved by %s</sub>\n", u)
 	}
 

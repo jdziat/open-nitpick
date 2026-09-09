@@ -1072,11 +1072,27 @@ func TestUnresolvedWithoutAReasonIsNotRecorded(t *testing.T) {
 	}
 }
 
-// A reason carrying a newline cannot escape the <sub> that holds it.
+// A reason cannot escape the <sub> that holds it, by newline or by markup.
 //
 // The expert wrote this text after reading a diff the change's author
 // controls, which is the same provenance validationRequest flattens Title and
-// Rationale for.
+// Rationale for. Flattening alone is not enough: a `</sub>` closes the element
+// and everything after it renders as live HTML in a comment posted under this
+// tool's name.
+func TestAnUnresolvedReasonCannotEscapeItsElement(t *testing.T) {
+	got := renderComment(Finding{
+		Path: "a.go", Line: 1, Severity: "error", Title: "Real", Source: "reviewer",
+		Unresolved: `expert: cannot tell</sub><img src=x onerror=alert(1)>`,
+	}, false, nil)
+
+	if strings.Contains(got, "</sub><img") {
+		t.Errorf("the reason closed its element and opened a tag:\n%s", got)
+	}
+	if !strings.Contains(got, "&lt;img") {
+		t.Errorf("the markup was not escaped:\n%s", got)
+	}
+}
+
 func TestAnUnresolvedReasonIsFlattenedIntoItsLine(t *testing.T) {
 	got := renderComment(Finding{
 		Path: "a.go", Line: 1, Severity: "error", Title: "Real", Source: "reviewer",

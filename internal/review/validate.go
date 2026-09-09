@@ -443,7 +443,7 @@ const (
 	// everything else out: the code in the same prompt is written by the
 	// change's author, and without a marker of its own the reference material
 	// is a paragraph that could equally have come from the diff.
-	referenceFence = "===== REFERENCE MATERIAL ====="
+	referenceFence = "===== REFERENCE MATERIAL, NOT THIS CHANGE ====="
 )
 
 // validationContract is the task every expert is given, whatever its
@@ -612,9 +612,11 @@ const defanged = "[open-nitpick removed a forged boundary marker here]"
 // Written against the markers' WORDS with the punctuation optional, because the
 // punctuation is the part an imitator can vary while keeping every bit of the
 // effect: "==== UNTRUSTED CODE UNDER REVIEW ====" is not the marker and reads
-// exactly like it. Bounded to a single line, so a match can never swallow the
-// newline between two lines of real code.
-var fenceImitation = regexp.MustCompile(`(?i)=*[ \t]*(untrusted[^\n]{0,40}?(under review|pull request text)|reference material)[ \t]*=*`)
+// exactly like it. Every alternative is a phrase rather than a word, which is
+// what makes that safe: defanging a bare "reference material" would replace
+// ordinary prose with an accusation of tampering. Bounded to a single line, so
+// a match can never swallow the newline between two lines of real code.
+var fenceImitation = regexp.MustCompile(`(?i)=*[ \t]*(untrusted[^\n]{0,40}?(under review|pull request text)|reference material[^\n]{0,40}?not this change)[ \t]*=*`)
 
 // defang removes anything in untrusted text that imitates a fence marker.
 //

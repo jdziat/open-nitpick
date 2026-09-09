@@ -936,7 +936,7 @@ A citation naming an entry the expert was not shown is dropped rather than
 recorded. A citation nobody can follow is worse than none, since the point of
 a finding carrying its evidence is that a reader can go and look.
 
-The entries are shown under a `REFERENCE MATERIAL` marker, and that marker is
+The entries are shown under a `REFERENCE MATERIAL, NOT THIS CHANGE` marker, and that marker is
 defanged out of the code in the same request. The code is written by the change
 author, so without that a diff opens a reference block of its own and states a
 rule in this tool's voice for the expert to refute a real finding with.
