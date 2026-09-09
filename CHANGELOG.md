@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.1](https://github.com/jdziat/open-nitpick/compare/v1.12.0...v2.0.1) (2026-09-09)
+
+Same tree as the 2.0.0 release commit. The v2.0.0 tag was created and removed
+before its release ran, and tag immutability is on, so the name cannot be
+reused. The breaking changes below are 2.0.0's and land here instead.
+
 ## [2.0.0](https://github.com/jdziat/open-nitpick/compare/v1.12.0...v2.0.0) (2026-09-09)
 
 
