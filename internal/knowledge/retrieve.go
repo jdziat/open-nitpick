@@ -16,6 +16,19 @@ type Retriever struct {
 	Index    *Index
 	Embedder Embedder
 
+	// Model names what Embedder is, so retrieval can refuse a query the index
+	// cannot answer.
+	//
+	// BuildKnowledge checks this once at construction, and that was the whole
+	// guard until four bundles shipped. Index.Nearest compares widths, and a
+	// width is not an identity: text-embedding-3-small and gemini-embedding-001
+	// are both 1536, so one model's query against the other's vectors passes
+	// every shape check and returns the nearest neighbours of a point in a
+	// space it does not belong to. Real numbers, ordered, meaningless. The
+	// check moves here so a Retriever assembled by any other caller cannot
+	// skip it.
+	Model string
+
 	// Candidates is how many the vector search returns, and Keep how many
 	// survive to the prompt. Keep is what costs tokens; Candidates is what
 	// gives the reranker something to choose between.
@@ -42,6 +55,12 @@ type Retriever struct {
 func (r *Retriever) Retrieve(ctx context.Context, query string, langs map[string]bool, classes map[config.Class]bool) ([]Hit, error) {
 	if r == nil || r.Index == nil || r.Embedder == nil {
 		return nil, nil
+	}
+	// Identity before similarity. Empty means a caller that has not said what
+	// it embeds with, and that is refused rather than assumed: the failure it
+	// would cause is silent and looks like a bad corpus.
+	if err := r.Index.CheckModel(r.Model); err != nil {
+		return nil, err
 	}
 	// The language cut first, before any vector is compared. Similarity alone
 	// puts Python's mutable default beside Go's slice aliasing, because both

@@ -1,8 +1,11 @@
 package knowledge
 
 import (
+	"context"
 	"strings"
 	"testing"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // Selection reads the model recorded inside the file, not the filename, so a
@@ -80,4 +83,71 @@ func TestTheShippedIndexesAgreeOnTheCorpus(t *testing.T) {
 			t.Errorf("%s records no build date", m)
 		}
 	}
+}
+
+// A width is not an identity, and four bundles make that reachable:
+// text-embedding-3-small and gemini-embedding-001 are both 1536, so one
+// model's query against the other's vectors passes every shape check and
+// returns the nearest neighbours of a point in a space it does not belong to.
+func TestRetrievalRefusesAQueryFromAnotherModelOfTheSameWidth(t *testing.T) {
+	entries, err := Corpus()
+	if err != nil {
+		t.Fatalf("Corpus: %v", err)
+	}
+	raw, err := SelectIndex("openrouter/openai/text-embedding-3-small")
+	if err != nil {
+		t.Fatalf("SelectIndex: %v", err)
+	}
+	ix, err := LoadIndex(raw, entries)
+	if err != nil {
+		t.Fatalf("LoadIndex: %v", err)
+	}
+
+	// Same width, different model. Nothing about the vectors says so.
+	r := &Retriever{
+		Entries:  entries,
+		Index:    ix,
+		Embedder: fixedEmbedder(ix.Dimensions),
+		Model:    "google/gemini-embedding-001",
+		Keep:     5,
+	}
+	if _, err := r.Retrieve(context.Background(), "some changed lines", map[string]bool{"go": true}, everyClass()); err == nil {
+		t.Fatal("a query from another model of the same width was answered; the result would be ordered nonsense")
+	}
+
+	// And a retriever that does not say what it embeds with is refused too,
+	// rather than assumed to match.
+	r.Model = ""
+	if _, err := r.Retrieve(context.Background(), "some changed lines", map[string]bool{"go": true}, everyClass()); err == nil {
+		t.Fatal("a retriever naming no model was answered")
+	}
+
+	r.Model = ix.Model
+	if _, err := r.Retrieve(context.Background(), "some changed lines", map[string]bool{"go": true}, everyClass()); err != nil {
+		t.Fatalf("the index's own model was refused: %v", err)
+	}
+}
+
+// fixedEmbedder returns one vector of the given width, so the test is about
+// identity rather than about shape.
+type fixedEmbedder int
+
+func (f fixedEmbedder) Embed(_ context.Context, texts []string) ([][]float32, error) {
+	out := make([][]float32, len(texts))
+	for i := range out {
+		v := make([]float32, int(f))
+		for j := range v {
+			v[j] = 0.1
+		}
+		out[i] = v
+	}
+	return out, nil
+}
+
+func everyClass() map[config.Class]bool {
+	out := map[config.Class]bool{}
+	for _, c := range config.Classes() {
+		out[c] = true
+	}
+	return out
 }
