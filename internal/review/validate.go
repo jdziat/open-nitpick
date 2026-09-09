@@ -553,7 +553,8 @@ before it decides anything. When one does decide your verdict, put its
 bracketed id in ` + "`cited`" + `; leave that empty otherwise, and never name an
 entry you were not shown.`
 
-// ValidationContract returns the task text every expert is given.
+// ValidationContract returns every word of contract this package can send an
+// expert, the reference paragraph included.
 //
 // Exported for the same reason as prompt.ScopeText: the guard in
 // internal/evals scans the words this project ships to a model for eval-corpus
@@ -562,7 +563,12 @@ entry you were not shown.`
 // which is what makes it worth scanning, see the survey in
 // internal/evals/promptcollision_test.go for why the 14 per-domain prompts are
 // not.
-func ValidationContract() string { return validationContract }
+// The union rather than what one call sends, because the guard's question is
+// which words reach a model at all, and referenceContract reaches one whenever
+// a request carries a reference block. Returning only the always-sent half
+// would leave the newer text unscanned, which is the gap this function's
+// existence is an argument against.
+func ValidationContract() string { return validationContract + referenceContract }
 
 // expertSystem places the task contract after the expert's own persona.
 //

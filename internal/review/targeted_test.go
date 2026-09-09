@@ -332,3 +332,26 @@ func TestANoChangeRerateIsNotDemotedForAnInventedCitation(t *testing.T) {
 		t.Errorf("severity = %q, want it untouched", kept[0].Severity)
 	}
 }
+
+// Every word this package can send an expert is on the scanned surface.
+//
+// internal/evals scans ValidationContract for eval-corpus keywords, and a
+// surface it cannot read is a surface nobody checks. referenceContract reaches
+// a model whenever a request carries a reference block, so it belongs there
+// too.
+func TestTheScannedContractCoversWhatIsSent(t *testing.T) {
+	scanned := ValidationContract()
+	expert := prompt.ExpertFor("correctness", "a title", "")
+
+	for _, sent := range []string{expertSystem(expert, false), expertSystem(expert, true)} {
+		for _, line := range strings.Split(sent, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.Contains(expert.System, line) {
+				continue
+			}
+			if !strings.Contains(scanned, line) {
+				t.Errorf("this line reaches a model and not the scanner:\n%s", line)
+			}
+		}
+	}
+}
