@@ -448,9 +448,26 @@ models:
     model: openai/text-embedding-3-small
 ```
 
-Two ship: `synthetic/hf:nomic-ai/nomic-embed-text-v1.5` at 768 dimensions and
-`openrouter/openai/text-embedding-3-small` at 1536. For any other provider,
-build your own and name it:
+Four ship, all built from the same corpus:
+
+| model | dimensions |
+|---|---|
+| `synthetic/hf:nomic-ai/nomic-embed-text-v1.5` | 768 |
+| `openrouter/voyageai/voyage-code-4` | 1024 |
+| `openrouter/openai/text-embedding-3-small` | 1536 |
+| `openrouter/qwen/qwen3-embedding-8b` | 4096 |
+
+Which of them retrieves best is unmeasured. They are here so the choice is a
+configuration line rather than a rebuild, and so the held-out evaluation has
+more than one vector space to compare; `voyage-code-4` is trained on code and
+`qwen3-embedding-8b` is open weights, which is the reason those two are the
+ones added.
+
+OpenRouter serves embeddings on `/api/v1/embeddings`, listed separately from
+the chat catalogue at `/api/v1/embeddings/models`. It carries no
+`nomic-embed-text`, which is why the default bundle is Synthetic's.
+
+For any other provider, build your own and name it:
 
 ```yaml
 review:
