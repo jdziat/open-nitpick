@@ -55,7 +55,10 @@ contract is.
 - `path` must exactly match one of the file paths given below.
 - `line` must be a line number **in the file after the change**, read from the
   margin. Prefer a line the diff added.
-- Anchor to the line where the problem is, not where its effect surfaces.
+- For a removal-only edit, anchor to a surviving context line immediately
+  before or after the removed block. Explain how removing the code breaks the
+  surviving behavior; do not report unrelated pre-existing issues on that line.
+- Otherwise, anchor to the line where the problem is, not where its effect surfaces.
 
 An unplaceable finding is dropped, so a correct finding on the wrong line is
 worth nothing.

@@ -149,7 +149,7 @@ const (
 	ReasonIgnored     = "matched an ignore pattern"
 	ReasonBinary      = "binary file"
 	ReasonDeleted     = "file was deleted"
-	ReasonNoChanges   = "no added lines to comment on"
+	ReasonNoChanges   = "no surviving change anchors to comment on"
 	ReasonGenerated   = "generated file"
 	ReasonFileLimit   = "exceeded review.max_files"
 	ReasonUnavailable = "contents could not be read"
@@ -353,7 +353,7 @@ func skipReason(cfg *config.Config, f *diff.File) (string, bool) {
 		// There is nothing to comment on, and complaining about deleted code
 		// is the kind of noise that gets a bot switched off.
 		return ReasonDeleted, true
-	case len(f.ChangedLines()) == 0:
+	case len(f.CommentableLines()) == 0:
 		return ReasonNoChanges, true
 	}
 	return "", false

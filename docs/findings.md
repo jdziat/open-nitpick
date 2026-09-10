@@ -2166,3 +2166,29 @@ convention, so choosing one is choosing which claim to test, and a probe whose
 sites disagree with a person's labels is measuring a different rule than the one
 it names. None of the four shipped, and the fourth was deleted rather than
 committed with a number nobody believes.
+## Removal-only edits reached neither review nor publication (2026-09-09)
+
+Planning required an added line, and finding placement snapped only to added
+lines. A change that deleted a guard without adding anything was skipped
+entirely. Three regression tests reproduced the failure: anchor resolution,
+planner admission, and an end-to-end scripted review through publication.
+
+`CommentableLines` now includes surviving context immediately beside a
+removal-only edit block. Added-line detection remains separate, and a
+replacement keeps its added-line anchors. Tests cover start/end removals,
+separate additions and removals, shared boundaries, unchanged content, and
+removals without surviving context.
+
+A live synthetic check used a Go division helper with two identical zero-divisor
+guards. Removing both guards was skipped by the v2.0.0 source binary; the updated
+binary reported the resulting panic instead of `ErrZero` in 9.57 seconds. Removing
+only the redundant guard was reviewed without findings in 4.20 seconds.
+GLM-5.3-Flash reviewed through OpenRouter Baseten fp8, Qwen3.8-27b triaged through
+Parasail fp8, with Voyage Code 4 retrieval, low reasoning, and linters off.
+The clean control recovered from two provider retries. This single bug/control
+check establishes coverage of that edit shape, not general recall.
+
+`go test ./...` passed. A subsequent model review read all six implementation
+and test files and returned no findings; that is not proof of correctness.
+Whole-file deletions and zero-context removals still require old-file anchor
+support throughout the finding pipeline.

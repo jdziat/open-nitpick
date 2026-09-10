@@ -107,6 +107,11 @@ section to be read as a repository with no conventions.
 A language no probe reads is named in the report rather than left out of it.
 Six probes read Go today and nothing reads anything else, so a TypeScript tree
 reports that it was not measured instead of reporting that it passed.
+A change that only removes code is still reviewed when the diff includes a
+surviving line immediately beside the removal. Findings can anchor to that
+line: deleting a guard can break code that did not itself change. Whole-file
+deletions and removals with no surviving diff context are still skipped;
+inline findings currently require a new-file line number.
 
 ## The whole repository
 
