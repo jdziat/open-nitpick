@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/converse"
+	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
@@ -64,7 +66,11 @@ func runRespond(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	if mention == "" {
+	// Whether the handle is the operator's word or the checkout's. Only the
+	// checkout's is re-checked below; an explicit flag is the operator naming
+	// it out of band, which no config may override.
+	fromFile := mention == ""
+	if fromFile {
 		mention = cfg.Review.Mention
 	}
 	log := newLogger(f.verbose, f.logFormat)
@@ -88,19 +94,46 @@ func runRespond(ctx context.Context, args []string) error {
 		log.Info("the comment is the reviewer's own; nothing to do", "comment", ev.CommentID)
 		return nil
 	}
+	// A change may not supply the policy it is answered under. Resolving needs
+	// the change's file list, so it happens here and not at the load.
+	policy, diffBytes, err := respondPolicy(ctx, gh, repo, cfg, ref, log)
+	if err != nil {
+		return err
+	}
+
+	// The command, parsed again against the mention the resolved policy names.
+	// The mention is the parser's origin, not a yes-or-no gate: the verb is
+	// read relative to it, so a change setting `mention: please` turns a
+	// maintainer's "please fix all of these" into a fix that writes to the
+	// repository. The first parse above is a pre-filter that may over-match
+	// and now cannot over-act, and this costs no forge call, since the policy
+	// is already in hand.
+	if fromFile && policy.Review.Mention != mention {
+		kind, text, ok = converse.Command(ev.Body, policy.Review.Mention)
+		if !ok {
+			log.Info("the comment addresses the mention this change names, not the accepted one; nothing to do",
+				"comment", ev.CommentID)
+			return nil
+		}
+		// And the handle every message below quotes back. Telling somebody to
+		// retype the checkout's mention is telling them to retype the one this
+		// parser has just stopped accepting.
+		mention = policy.Review.Mention
+	}
+
 	// Who is allowed to spend the repository's money by talking to the
 	// reviewer. Checked before the reaction, not only before the model call: a
 	// reaction tells a stranger the mention was seen, which is an invitation to
 	// try again, and the whole point here is to be boring to poke at.
-	if !cfg.Review.Respond.Allows(ev.Association) {
+	if !policy.Review.Respond.Allows(ev.Association) {
 		log.Info("ignoring a mention from outside the allowed set; "+
 			"answering it would spend this repository's model credit",
 			"author", ev.Author, "association", strings.ToLower(ev.Association),
-			"allowed", cfg.Review.Respond.String(), "comment", ev.CommentID)
+			"allowed", policy.Review.Respond.String(), "comment", ev.CommentID)
 		return nil
 	}
 
-	if cap := cfg.Review.Respond.MaxPerPullRequest; cap > 0 {
+	if cap := policy.Review.Respond.MaxPerPullRequest; cap > 0 {
 		answered, err := gh.CountAnswers(ctx, ref)
 		switch {
 		case err != nil:
@@ -149,17 +182,19 @@ func runRespond(ctx context.Context, args []string) error {
 		return gh.React(ctx, ref, ev.CommentID, ev.Inline, "+1")
 
 	case converse.KindFix:
-		return runFix(ctx, gh, cfg, ref, ev, converse.FixesAll(text), log)
+		return runFix(ctx, gh, policy, ref, ev, converse.FixesAll(text), log)
 
 	case converse.KindImprove:
-		if err := runImprove(ctx, gh, cfg, ref, ev, log); err != nil {
+		// The config as loaded. runImprove builds a reviewing engine and
+		// resolves for itself. Handing it a resolved one would resolve twice.
+		if err := runImprove(ctx, gh, repo, cfg, ref, ev, log); err != nil {
 			_ = gh.React(ctx, ref, ev.CommentID, ev.Inline, "confused")
 			return err
 		}
 		return nil
 
 	default:
-		client, err := llm.BuildContext(ctx, cfg.Models.ResolveModel(config.RoleReview))
+		client, err := llm.BuildContext(ctx, policy.Models.ResolveModel(config.RoleReview))
 		if err != nil {
 			return err
 		}
@@ -168,11 +203,8 @@ func runRespond(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		diff, err := gh.Diff(ctx, ref)
-		if err != nil {
-			return err
-		}
-		c := converse.Context{Title: pr.Title, Body: pr.Body, Diff: string(diff)}
+		// The diff respondPolicy already read.
+		c := converse.Context{Title: pr.Title, Body: pr.Body, Diff: string(diffBytes)}
 		if ev.Inline {
 			c.Path = ev.Path
 			if content, err := gh.FileContent(ctx, ref, ev.Path); err == nil {
@@ -226,4 +258,53 @@ func refForEvent(f *reviewFlags, ev *converse.Event) (vcs.Ref, error) {
 		return vcs.Ref{}, errors.New("the event names no pull request")
 	}
 	return vcs.Ref{Owner: owner, Repo: name, Number: ev.Number}, nil
+}
+
+// respondPolicy resolves the configuration this answer runs under, and returns
+// the diff it read so the caller does not fetch it twice.
+//
+// The seam the review path has had since config.BasePolicy existed and respond
+// never built. It costs one diff read per addressed comment. Only the question
+// arm reuses it, so the others pay for a read they did not need, which is the
+// price of resolving before the gates. See docs/trust-model.md.
+func respondPolicy(ctx context.Context, provider vcs.Provider, repo string, cfg *config.Config,
+	ref vcs.Ref, log *slog.Logger) (*config.Config, []byte, error) {
+
+	raw, err := provider.Diff(ctx, ref)
+	if err != nil {
+		// Fatal, and deliberately. Continuing would answer under the config on
+		// disk. That is the thing this exists to stop.
+		return nil, nil, fmt.Errorf("read the change to resolve the policy: %w", err)
+	}
+
+	files, err := diff.Parse(raw)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse the change to resolve the policy: %w", err)
+	}
+
+	// Both paths of a rename. internal/review's resolver sends them the same way.
+	changed := make([]string, 0, len(files))
+	for _, f := range files {
+		changed = append(changed, f.Path)
+		if f.OldPath != "" && f.OldPath != f.Path {
+			changed = append(changed, f.OldPath)
+		}
+	}
+
+	policy := &config.BasePolicy{RepoRoot: repo, Loaded: cfg, Provider: provider}
+	resolved, modified, err := policy.ResolvePolicy(ctx, ref, nil, changed)
+	switch {
+	case err != nil:
+		return nil, nil, fmt.Errorf("resolve the policy this answer runs under: %w", err)
+	case !modified:
+		return cfg, raw, nil
+	case resolved == nil:
+		// Falling back here would apply the change's own policy at the one
+		// moment it must not be applied.
+		return nil, nil, errors.New("the change modifies the configuration but no replacement policy was returned")
+	}
+
+	log.Warn("the change modifies the configuration; the version in the change was not applied",
+		"policy", resolved.Policy.String())
+	return resolved, raw, nil
 }

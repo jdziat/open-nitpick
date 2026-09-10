@@ -208,6 +208,15 @@ func (s ModelSpec) validate(required bool) []error {
 func (r Review) validate() []error {
 	var errs []error
 
+	// A mention is the origin converse.Command reads the verb relative to, so
+	// a blank one anchors at the start of every comment and reads whatever
+	// word is there as the command. It is a handle that matches everything,
+	// not a handle that matches nothing.
+	if strings.TrimSpace(r.Mention) == "" {
+		errs = append(errs, errors.New("review.mention is blank; a handle that matches nothing "+
+			"anchors at the start of every comment and matches everything"))
+	}
+
 	errs = append(errs, r.Budget.validate()...)
 	errs = append(errs, r.Respond.Fix.validate()...)
 	errs = append(errs, r.Respond.validate()...)

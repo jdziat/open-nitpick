@@ -91,6 +91,12 @@ func (e *Engine) resolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.PullReq
 	current := Policy{Config: e.Config}
 
 	if e.Policy == nil {
+		// Said out loud. An engine reviewing a pull request without a resolver
+		// runs under whatever configuration it was handed, and this branch was
+		// silent, so the one command that had forgotten ran that way with
+		// nothing anywhere recording it. Two callers reach here on purpose, a
+		// tree review and the eval harness, and neither reviews a pull request.
+		e.log().Debug("no policy resolver; reviewing under the configuration this engine was given")
 		return current, nil
 	}
 

@@ -103,6 +103,28 @@ revision is not an error; policy falls back to defaults and the run says so.
 Running locally, where you wrote the file, there is no pull request and the
 checkout's config is used as written.
 
+This holds for a comment as well as for a push. `@open-nitpick` answers,
+`@open-nitpick improve` and `@open-nitpick fix` all resolve the same way, and
+until recently none of them did: `respond` read the checkout and built no
+substitution at all. For an inline thread comment, the event a `fix` is usually
+typed on, `actions/checkout` with no `ref` resolves the pull request's merge
+ref, so the file on disk was the change's own. It chose who could spend the
+repository's credit, which model answered, and which model wrote the commit a
+`fix` proposes. The `improve` pass was the widest of the three, since it is a
+whole review and every key one governs reached it.
+
+The mention is read twice. `converse.Command` reads the verb relative to it, so
+the mention is the parser's origin rather than a yes-or-no gate: a change
+setting `mention: please` would turn a maintainer's "please fix all of these"
+into a fix that writes to the repository. The checkout's mention is a
+pre-filter, cheap enough to run on every comment and unable to act on its own,
+and the command is parsed again against the resolved policy's mention before
+anything happens. A change can therefore make the reviewer look at a comment it
+would otherwise ignore, and cannot make it do anything with one. The other
+direction is self-harm and is left alone: a change that narrows its own mention
+fails the pre-filter, so the reviewer answers nothing on that pull request,
+including a maintainer asking it to.
+
 ## api_key_env may never name a forge credential
 
 `api_key_env` may never name a forge credential (`GITHUB_TOKEN` and
