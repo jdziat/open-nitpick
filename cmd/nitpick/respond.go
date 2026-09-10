@@ -115,6 +115,10 @@ func runRespond(ctx context.Context, args []string) error {
 				"comment", ev.CommentID)
 			return nil
 		}
+		// And the handle every message below quotes back. Telling somebody to
+		// retype the checkout's mention is telling them to retype the one this
+		// parser has just stopped accepting.
+		mention = policy.Review.Mention
 	}
 
 	// Who is allowed to spend the repository's money by talking to the

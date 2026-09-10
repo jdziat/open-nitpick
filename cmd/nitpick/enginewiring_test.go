@@ -65,7 +65,10 @@ func TestEveryReviewingEngineResolvesItsPolicy(t *testing.T) {
 				missing = append(missing, path+": clears Policy or Models after wiring them")
 			}
 			used[path] = true
-			return nil
+			// And on into the literals below, rather than returning: a file
+			// that clears one engine may also build another, and one `= nil`
+			// anywhere in it must not be what stops this scan from reading the
+			// rest.
 		}
 		if !strings.Contains(text, "review.Engine{") && !strings.Contains(text, "&Engine{") {
 			return nil
@@ -159,6 +162,11 @@ func wired(block, field string) bool {
 }
 
 // nulled matches an engine having its resolver cleared after construction.
+//
+// The literal spelling only. A field cleared through a variable holding nil,
+// or through a helper, reads as wired here. That is the narrowing this guard
+// accepts: it catches the form fullreview.go uses and the form somebody
+// copying it would write, and it is a source scan rather than a type system.
 var nulled = regexp.MustCompile(`\.(Policy|Models)\s*=\s*nil`)
 
 // respond resolves the policy, and reads no decision off the file on disk
