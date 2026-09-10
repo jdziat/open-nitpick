@@ -49,7 +49,7 @@ code demonstrates. The evidence after each is a band, not a count: run
 `nitpick standards` for the exact numbers and for the contested probes, and
 `make agents` to regenerate this block.
 
-- Open an exported declaration's doc comment with the declaration's own name. (every site of 600+ places)
+- Open an exported declaration's doc comment with the declaration's own name. (every site of 700+ places)
 - Wrap an error you are formatting into a new one with %w, not %v or %s. (every site of 200+ places)
 - Call t.Helper() at the top of a test helper. (every site of 100+ places)
 - Put context.Context first in the parameter list. (98%+ of 200+ places)
