@@ -1846,3 +1846,52 @@ run by the release after the one carrying this branch, the flag, the
 `referenceContract`, the reference fence and the citation check come out. The
 evidence line on a published finding stays either way, because it costs no
 model call and is checkable by a reader on every run.
+
+## A convention is a count, and the denominator is what goes wrong (2026-09-10)
+
+`internal/standards` measures what this repository demonstrates rather than
+asserting it, so that a rule the code stops following stops being reported.
+Every probe names the places it has an opinion about and how many of them
+conform, and the share is the whole claim.
+
+Three readings of the same question were wrong before one was right, all three
+in the direction that keeps a real convention out of the report:
+
+| Reading of "an exported declaration's doc comment opens with its name" | Result | Reads as |
+| --- | --- | --- |
+| the line directly above the declaration | 109/262, 42% | not a standard |
+| the first line of the comment block | 259/262, 98% | a standard |
+| the same, counting test files | 1221/2000, 61% | not a standard |
+| the same, test files excluded | 686/723, 95% | a standard |
+
+The first is a multi-line comment ending on a line that does not repeat the
+name. The third is a test function: exported, and never documented by godoc, so
+counting it asks whether this repository writes doc comments on its tests, which
+nobody intends. Neither bug changes which sites are reported as violations, so a
+test asserting only the violations would have passed against both. Every probe
+therefore asserts its conforming count and its total, and owns a test naming
+what is deliberately not a site.
+
+A fourth was found by mutation rather than by reading. `opensWith` assigned the
+first comment line and then re-derived it in a loop, so replacing the first
+assignment with the last changed nothing and the mutation survived. The dead
+assignment is gone. A fifth was a test of the parameter walk that could not
+fail: reading a Go parameter list by field and by parameter agree on "is the
+context first" for every input, so the walk is by field now and the test pins
+the answer instead of the mechanism.
+
+The floor is two numbers, 85% over 12 sites, because a share alone lies at small
+counts: three sites out of three is 100% and is evidence of nothing. Below either
+number a probe reports as `contested` and scores no change. The two are
+configurable so a repository midway through adopting a convention can watch the
+number climb before the rule is asserted.
+
+Measured on this repository the day the package landed, all six probes clearing
+the floor: doc comments 691/728, error wrapping 194/194, context first 220/221,
+no naked return 49/51, test names 1168/1192, test helpers marked 132/132. The
+three violations the probes name are real and a maintainer recognises them.
+
+What this does not establish: that these six are the conventions worth having,
+or that a probe measuring the right thing was written for each. Six probes over
+one language is a start on an instrument, not a verdict on a codebase, and the
+number a probe reports is worth exactly what its denominator is worth.

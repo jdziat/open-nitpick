@@ -57,6 +57,8 @@ func run() int {
 		err = runRepoScore(ctx, os.Args[2:])
 	case "improve":
 		err = runImproveCLI(ctx, os.Args[2:])
+	case "standards":
+		err = runStandards(ctx, os.Args[2:])
 	case "slop":
 		err = runSlop(ctx, os.Args[2:])
 	case "respond":

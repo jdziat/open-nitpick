@@ -1175,6 +1175,23 @@ TokenBudgetPerRequest bounds the context assembled for a single model call, incl
 boolean, default `false`.
 TriageNoNewClaims restores the reviewer's own words over anything triage rewrote, so triage may select, drop, group and re-anchor findings but may not author them.
 
+## standards
+
+### `standards.disabled`
+
+list of string, default `none`.
+Disabled are probe IDs to skip.
+
+### `standards.min_share`
+
+number, default `0`.
+MinShare is the conforming fraction a probe needs before its rule is written down. Zero means the built-in floor.
+
+### `standards.min_sites`
+
+integer, default `0`.
+MinSites is how many places a probe must have an opinion about before a share means anything. Zero means the built-in floor.
+
 ## validation
 
 ### `validation.classes`
