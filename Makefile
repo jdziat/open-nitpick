@@ -53,6 +53,13 @@ cover:
 # pages, and website/ for what only the site has (landing page, styling).
 # Staged into .website/ so every relative link in the repository resolves on
 # the site unchanged. Needs mkdocs-material (pip install mkdocs-material).
+# AGENTS.md carries the conventions this repository demonstrates, measured
+# rather than asserted, so a rule the code stops following stops being
+# published. Only the marked block is generated; the prose around it is ours.
+.PHONY: agents
+agents:
+	go run ./cmd/nitpick standards -agents AGENTS.md
+
 .PHONY: docs docs-serve docs-reference
 # The configuration reference is generated from the configuration, so a key
 # the loader accepts and the docs never mention cannot survive a build.

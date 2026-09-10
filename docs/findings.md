@@ -1895,3 +1895,36 @@ What this does not establish: that these six are the conventions worth having,
 or that a probe measuring the right thing was written for each. Six probes over
 one language is a start on an instrument, not a verdict on a codebase, and the
 number a probe reports is worth exactly what its denominator is worth.
+
+### The conventions file is generated, budgeted, and drift-gated (2026-09-10)
+
+AGENTS.md carries what `internal/standards` measured, and `make agents`
+regenerates it. CI runs the same command and fails on `git diff --exit-code`, so
+a change that moves a convention updates the file that tells agents about it, in
+the pull request that moved it.
+
+Only the block between `<!-- nitpick:standards:begin -->` and its closing marker
+is generated. Everything outside is preserved byte for byte, which is where the
+gates, the build commands and anything else no probe can see belong. The drift
+gate therefore covers the block alone, which is the only part this tool has any
+claim to know.
+
+The budget is 120 lines for the block. Length is how a conventions file fails:
+past a screen or two nobody reads to the end, and the rules that matter are
+diluted by the rules that were easy to write. Rules rank by evidence, the tail
+is dropped, and the block states how many were dropped and where to read them.
+A file that truncates in silence reads as the whole of what a repository
+decided.
+
+This repository's block is six rules and 23 lines, so the budget is not binding
+yet and the guard is a synthetic 200-rule report rather than a live one. Five
+mutations were run against it: removing the budget, dropping rules silently,
+clobbering the text above the block, clobbering the text below it, and guessing
+at a half-written marker pair. All five turn a test red.
+
+One defect the dogfood found. `nitpick standards` loaded and validated the whole
+configuration to read one block, so a `models:` section it never reads decided
+whether it ran, and `make agents` failed on a machine whose model configuration
+was mid-edit. It reads the `standards:` block alone now, and validates that.
+"No model is called" was a claim about credentials; it has to also be a claim
+about whether the command starts.

@@ -122,6 +122,12 @@ jobs:
       # undocumented until someone notices.
       - name: The generated reference is current
         run: git diff --exit-code -- docs/configuration-reference.md
+      - run: make agents
+      # The measured conventions are generated from the tree, so a change that
+      # moves one updates the file that tells agents about it, in the same
+      # pull request. A rule nobody can retire is a rule nobody can trust.
+      - name: The measured conventions are current
+        run: git diff --exit-code -- AGENTS.md
 
   # Pull request commits follow Conventional Commits, which is what
   # release-please reads to version and describe the next release.

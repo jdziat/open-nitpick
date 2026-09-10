@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -13,16 +14,16 @@ import (
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/standards"
 	"github.com/jdziat/open-nitpick/internal/vcs"
+	"gopkg.in/yaml.v3"
 )
 
 // The measured half of the house style.
 //
 // `nitpick slop` scores prose against rules this tool ships. This scores code
-// against rules the repository itself demonstrates, which is why nothing here
-// calls a model: a convention is a count over named sites, and a count is
-// either right or checkable. What a model could add is a nicer sentence for a
-// rule that counting already established, and that is a later pass over the
-// output rather than a step in the measurement.
+// against rules the repository demonstrates. Nothing here calls a model. A
+// convention is a count over named sites, and a count is either right or
+// checkable. A model could phrase a rule that counting already established;
+// that would be a later pass over this output, not a step in the measurement.
 
 // StandardsResult is what nitpick standards returns.
 type StandardsResult struct {
@@ -47,12 +48,14 @@ func runStandards(ctx context.Context, args []string) error {
 		base       string
 		configPath string
 		asJSON     bool
+		agentsOut  string
 	)
 	fs := flag.NewFlagSet("standards", flag.ContinueOnError)
 	fs.StringVar(&repo, "repo", ".", "repository root")
 	fs.StringVar(&base, "base", "", "base revision: measure standards there and score the change against them")
 	fs.StringVar(&configPath, "config", "", "path to .nitpick.yaml (default: <repo>/.nitpick.yaml)")
 	fs.BoolVar(&asJSON, "json", false, "print the result as JSON")
+	fs.StringVar(&agentsOut, "agents", "", "write the measured standards into this agent instructions file (e.g. AGENTS.md)")
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: nitpick standards [flags]\n\n"+
 			"Measures the conventions this repository demonstrates, as counts over named sites,\n"+
@@ -70,8 +73,8 @@ func runStandards(ctx context.Context, args []string) error {
 		return err
 	}
 	opts := standards.Options{
-		Floor:    standards.Floor{MinShare: cfg.Standards.MinShare, MinSites: cfg.Standards.MinSites},
-		Disabled: cfg.Standards.Disabled,
+		Floor:    standards.Floor{MinShare: cfg.MinShare, MinSites: cfg.MinSites},
+		Disabled: cfg.Disabled,
 	}
 	// A disabled ID that names no probe disables nothing, and the report it
 	// produces looks exactly like the one the author wanted. internal/config
@@ -84,6 +87,10 @@ func runStandards(ctx context.Context, args []string) error {
 	result, err := measureStandards(ctx, repo, base, opts)
 	if err != nil {
 		return err
+	}
+
+	if agentsOut != "" {
+		return writeAgents(agentsOut, result.Report)
 	}
 
 	if asJSON {
@@ -153,9 +160,9 @@ func measureStandards(ctx context.Context, repo, base string, opts standards.Opt
 // readAtBase reads each probed file as it stood at the base revision.
 //
 // A file the base does not have is skipped rather than read from the working
-// tree: a file this change created has no base version, and counting its
-// contents into the base's own share lets the change vote on the standard it
-// is about to be measured against.
+// tree. A file this change created has no base version. Counting its contents
+// into the base's own share lets the change vote on the standard it is about
+// to be measured against.
 func readAtBase(ctx context.Context, local *vcs.Local, base string, files []standards.File) ([]standards.File, error) {
 	ref := vcs.Ref{Base: base, Head: base}
 	out := make([]standards.File, 0, len(files))
@@ -181,17 +188,39 @@ func skipStandardsDir(name string) bool {
 	return name == "website" || name == "dist" || name == "public" || name == ".website"
 }
 
-// loadStandardsConfig reads the repository's configuration for the standards
-// block, tolerating its absence.
-func loadStandardsConfig(repo, configPath string) (*config.Config, error) {
+// loadStandardsConfig reads the standards block, and only that block.
+//
+// The full loader validates models, providers and every other key, and this
+// command reads none of them. Refusing to count a repository's conventions
+// because its model configuration names a provider that is not a router would
+// make "no model is called and no credentials are read" false in the way that
+// matters, which is whether the command runs at all.
+//
+// The repository's own file, not the user-level one. A convention belongs to a
+// codebase rather than to whoever is looking at it, and a floor set in a home
+// directory would silently change what a shared report says.
+func loadStandardsConfig(repo, configPath string) (config.Standards, error) {
 	if configPath == "" {
-		configPath = filepath.Join(repo, ".nitpick.yaml")
+		configPath = filepath.Join(repo, config.FileName)
 	}
-	cfg, err := config.LoadFile(configPath)
+	raw, err := os.ReadFile(configPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return config.Standards{}, nil
+	}
 	if err != nil {
-		return nil, err
+		return config.Standards{}, fmt.Errorf("read %s: %w", configPath, err)
 	}
-	return cfg, nil
+
+	var file struct {
+		Standards config.Standards `yaml:"standards"`
+	}
+	if err := yaml.Unmarshal(raw, &file); err != nil {
+		return config.Standards{}, fmt.Errorf("parse %s: %w", configPath, err)
+	}
+	if errs := file.Standards.Validate(); errs != nil {
+		return config.Standards{}, fmt.Errorf("invalid standards block in %s: %w", configPath, errs)
+	}
+	return file.Standards, nil
 }
 
 // checkDisabled refuses a disabled entry that names no probe.
@@ -211,4 +240,29 @@ func checkDisabled(ids []string) error {
 	}
 	return fmt.Errorf("standards.disabled names no probe: %s; the probes are %s",
 		strings.Join(unknown, ", "), strings.Join(known, ", "))
+}
+
+// writeAgents regenerates the managed block of an agent instructions file.
+//
+// The file is read first and rewritten whole, so everything outside the
+// markers survives byte for byte. A missing file is written from scratch; a
+// file with a broken marker pair is refused rather than guessed at, since
+// guessing where a block ended would overwrite prose nobody can recover.
+func writeAgents(path string, rep standards.Report) error {
+	existing, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+
+	out, err := standards.Render(string(existing), rep)
+	if err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	if string(existing) == out {
+		return nil
+	}
+	if err := os.WriteFile(path, []byte(out), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	return nil
 }
