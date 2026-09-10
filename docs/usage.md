@@ -65,6 +65,36 @@ nitpick providers                       # available model providers
 Local reviews print to stdout as `path:line`, which most terminals and editors
 turn into a clickable link.
 
+## The conventions this repository demonstrates
+
+```bash
+nitpick standards                   # what the tree does, as counts
+nitpick standards -base main        # and how this change sits against them
+nitpick standards -json
+```
+
+No model is called and no credentials are read. Each probe names the sites it
+has an opinion about and reports how many conform, so a convention is a count
+rather than an assertion, and a rule the code stops following stops being
+reported without anybody having to notice.
+
+A rule is only written down at or above `standards.min_share` over
+`standards.min_sites` places. Below either it is reported as `contested`, which
+is a proposal rather than a standard: a convention half the tree ignores is not
+one to measure an author against, and `-base` scores a change against the
+standards only.
+
+Those standards are measured at the base revision, over the file list that
+revision holds rather than the one on disk. A change cannot supply the
+convention it is scored against, and cannot remove the evidence against one by
+deleting or renaming the files that carry it. Only lines the change touched are
+scored, so code that predates a convention is never counted against whoever
+edits near it.
+
+A language no probe reads is named in the report rather than left out of it.
+Six probes read Go today and nothing reads anything else, so a TypeScript tree
+reports that it was not measured instead of reporting that it passed.
+
 ## The whole repository
 
 ```bash

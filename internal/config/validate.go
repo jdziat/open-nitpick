@@ -24,6 +24,7 @@ func (c *Config) Validate() error {
 	errs = append(errs, c.Linters.validate()...)
 	errs = append(errs, c.Persona.validate()...)
 	errs = append(errs, c.Validation.validate()...)
+	errs = append(errs, c.Standards.Validate())
 
 	for i, ins := range c.Instructions {
 		if strings.TrimSpace(ins.Path) == "" {
@@ -371,4 +372,31 @@ func prefixAll(prefix string, errs []error) []error {
 		out = append(out, fmt.Errorf("%s: %w", prefix, err))
 	}
 	return out
+}
+
+// Validate checks the standards block on its own.
+//
+// Exported because `nitpick standards` reads this block without loading the
+// rest of the configuration: it calls no model, so a models section it never
+// reads should not decide whether it runs.
+//
+// A floor outside 0..1 is the mistake this catches: min_share written as 85
+// rather than 0.85 asks for a share no count can reach, and every rule the
+// repository follows then reports as contested. Silence with a
+// plausible cause is the worst kind, so it is refused at load.
+func (s Standards) Validate() error {
+	var errs []error
+	if s.MinShare < 0 || s.MinShare > 1 {
+		errs = append(errs, fmt.Errorf("standards.min_share is %v; it is a fraction between 0 and 1, "+
+			"so 85%% is 0.85 and a value above 1 is a floor no count can clear", s.MinShare))
+	}
+	if s.MinSites < 0 {
+		errs = append(errs, fmt.Errorf("standards.min_sites is %d; a count of sites cannot be negative", s.MinSites))
+	}
+	for i, id := range s.Disabled {
+		if strings.TrimSpace(id) == "" {
+			errs = append(errs, fmt.Errorf("standards.disabled[%d] is blank", i))
+		}
+	}
+	return errors.Join(errs...)
 }

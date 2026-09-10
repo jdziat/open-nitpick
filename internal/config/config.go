@@ -39,6 +39,10 @@ type Config struct {
 	// to publication.
 	Validation Validation `yaml:"validation"`
 
+	// Standards controls the measurement of the conventions this repository
+	// demonstrates.
+	Standards Standards `yaml:"standards"`
+
 	// Source records where the configuration was loaded from. It is empty when
 	// only built-in defaults were used.
 	Source string `yaml:"-"`
@@ -633,6 +637,35 @@ type Approve struct {
 	// it on, an analyzer recorded as skipped or failed, or any entry in the
 	// coverage list, holds the review at a comment.
 	RequireAnalyzers bool `yaml:"require_analyzers"`
+}
+
+// Standards controls how conventions are measured and how much evidence one
+// needs before it is written down as a rule.
+//
+// The probes themselves are compiled in, so nothing here can add one. A
+// measurement whose instrument arrived with the thing being measured is not a
+// measurement, and a repository able to define its own probe could define one
+// that passes.
+type Standards struct {
+	// MinShare is the conforming fraction a probe needs before its rule is
+	// written down. Zero means the built-in floor.
+	//
+	// A repository midway through adopting a convention wants to watch the
+	// number climb without the rule being asserted yet; one that has finished
+	// wants a higher bar than the default. Both are the same knob.
+	MinShare float64 `yaml:"min_share"`
+
+	// MinSites is how many places a probe must have an opinion about before a
+	// share means anything. Zero means the built-in floor.
+	//
+	// A share alone lies at small counts: three out of three is 100% and is
+	// evidence of nothing.
+	MinSites int `yaml:"min_sites"`
+
+	// Disabled are probe IDs to skip. A disabled probe is absent from the
+	// report rather than present at zero, so switching one off cannot be
+	// mistaken for a repository that fails it.
+	Disabled []string `yaml:"disabled"`
 }
 
 // Instruction is a path-scoped prompt addition. Every instruction whose Path
