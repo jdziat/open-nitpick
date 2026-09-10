@@ -91,6 +91,19 @@ deleting or renaming the files that carry it. Only lines the change touched are
 scored, so code that predates a convention is never counted against whoever
 edits near it.
 
+Setting `review.standards: true` hands the same measured conventions to the
+reviewer as reference material, beside the retrieved knowledge entries and
+after the diff. Only rules that cleared the floor are offered, each with the
+share behind it, and each goes to the pass its class belongs to: a style
+convention never reaches the defect pass. The prompt says a departure is worth
+raising where it costs a reader or breaks something, not on the strength of the
+section alone.
+
+It is off by default, needs a local checkout for git to read the base revision
+in, and needs a base revision to read. Without either the run says which and
+reviews without it, and the report records that rather than leaving an absent
+section to be read as a repository with no conventions.
+
 A language no probe reads is named in the report rather than left out of it.
 Six probes read Go today and nothing reads anything else, so a TypeScript tree
 reports that it was not measured instead of reporting that it passed.

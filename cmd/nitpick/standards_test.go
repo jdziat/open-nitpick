@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/standards"
-	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // A disabled entry that names no probe is refused.
@@ -226,7 +226,7 @@ type failingBase struct{ paths []string }
 
 func (f failingBase) Tree(context.Context, string) ([]string, error) { return f.paths, nil }
 
-func (f failingBase) FileContent(context.Context, vcs.Ref, string) ([]byte, error) {
+func (f failingBase) Read(context.Context, string, string) ([]byte, error) {
 	return nil, errors.New("object store is having a day")
 }
 
@@ -429,5 +429,22 @@ func TestRunStandardsWritesAndRefusesTheWrongPairs(t *testing.T) {
 	}
 	if err := runStandards(ctx, []string{"-repo", dir, "-json"}); err != nil {
 		t.Errorf("json: %v", err)
+	}
+}
+
+// The command and the reviewer skip the same directories.
+//
+// They cannot share one list: internal packages do not import cmd. Two copies
+// that drift measure different sets, so the same convention reads one way in
+// `nitpick standards` and another in the reference material a review is given,
+// with nothing saying why.
+func TestTheCommandAndTheReviewerSkipTheSameDirectories(t *testing.T) {
+	for _, name := range []string{
+		"website", "dist", "public", ".website", "testdata",
+		"internal", "cmd", "docs", "",
+	} {
+		if got, want := skipStandardsDir(name), review.SkipsForStandards(name); got != want {
+			t.Errorf("%q: the command skips=%v and the reviewer skips=%v", name, got, want)
+		}
 	}
 }

@@ -1155,6 +1155,11 @@ SkipMarkers are phrases that, in a pull request's title, body or head commit mes
 boolean, default `false`.
 Slop asks the model for, and publishes, findings in the slop class: generated-looking code that costs a reader, defined rule by rule in the prompt layer prompt.SlopGuidance.
 
+### `review.standards`
+
+boolean, default `false`.
+Standards hands the reviewer the conventions this repository was measured to follow, counted at the base revision.
+
 ### `review.summary`
 
 boolean, default `true`.

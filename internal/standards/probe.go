@@ -28,6 +28,8 @@ import (
 	"go/token"
 	"sort"
 	"strings"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // Probe is one checkable claim about how this repository writes code.
@@ -39,6 +41,14 @@ type Probe struct {
 	// ID is the stable identifier. It appears in reports, in AGENTS.md and in
 	// the disabled list, so it never changes once shipped.
 	ID string
+
+	// Class is the review class this probe's rule belongs to, from the same
+	// taxonomy knowledge entries are routed by.
+	//
+	// What decides which pass sees it. A style convention handed to the defect
+	// pass is the dilution the generation scope exists to prevent, arriving as
+	// reference material instead of as a prompt.
+	Class config.Class
 
 	// Language is the language this probe reads, as internal/bundle.Language
 	// spells it. A file of any other language is not offered to it, which is

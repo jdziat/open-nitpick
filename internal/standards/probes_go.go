@@ -5,6 +5,8 @@ import (
 	"go/token"
 	"strconv"
 	"strings"
+
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // docCommentName: an exported declaration carries a doc comment opening with
@@ -34,6 +36,7 @@ import (
 // false positives and no true ones. Corrected, this tree reads 683/683.
 var docCommentName = Probe{
 	ID:       "go-doc-comment-name",
+	Class:    config.ClassStyle,
 	Language: "go",
 	Rule:     "Open an exported declaration's doc comment with the declaration's own name.",
 	Why:      "godoc renders the comment as the entry for that name, and a reader greps for it.",
@@ -153,6 +156,7 @@ func isIdentByte(b byte) bool {
 // counts and should not. A name is not a type.
 var errorWrap = Probe{
 	ID:       "go-error-wrap",
+	Class:    config.ClassCorrectness,
 	Language: "go",
 	Rule:     "Wrap an error you are formatting into a new one with %w, not %v or %s.",
 	Why:      "errors.Is and errors.As walk the wrapped chain; %v flattens the cause to text.",
@@ -228,6 +232,7 @@ func errorName(n string) bool {
 // its own count.
 var contextFirstArg = Probe{
 	ID:       "go-ctx-first-arg",
+	Class:    config.ClassContract,
 	Language: "go",
 	Rule:     "Put context.Context first in the parameter list.",
 	Why:      "callers pass it positionally, and a context anywhere else is a context somebody forgets.",
@@ -271,6 +276,7 @@ var contextFirstArg = Probe{
 // measured here.
 var namedResultNoNakedReturn = Probe{
 	ID:       "go-no-naked-return",
+	Class:    config.ClassStyle,
 	Language: "go",
 	Rule:     "Return named results explicitly; do not use a bare return.",
 	Why:      "a bare return makes the reader scroll to the signature to learn what was returned.",
@@ -327,6 +333,7 @@ func hasNamedResults(t *ast.FuncType) bool {
 // written down, which is the floor doing its job rather than the probe failing.
 var testNameSentence = Probe{
 	ID:       "go-test-name-sentence",
+	Class:    config.ClassTests,
 	Language: "go",
 	Rule:     "Name a test after the behaviour it pins, in at least three words.",
 	Why:      "the name is what a failing run prints, and it should say what broke.",
@@ -387,6 +394,7 @@ func lower(r rune) bool { return r >= 'a' && r <= 'z' }
 // reader needs.
 var testHelperMarks = Probe{
 	ID:       "go-test-helper-marks",
+	Class:    config.ClassTests,
 	Language: "go",
 	Rule:     "Call t.Helper() at the top of a test helper.",
 	Why:      "without it a failure is reported at the helper's line, not the caller's.",

@@ -248,7 +248,7 @@ func TestTheReviewEngineIsWiredAgainstTheChangesOwnPolicy(t *testing.T) {
 		t.Fatalf("loadConfig: %v", err)
 	}
 
-	engine, err := newEngine(context.Background(), &reviewFlags{}, repo, cfg, vcs.NewLocal(repo, io.Discard), slog.New(slog.DiscardHandler))
+	engine, err := newEngine(context.Background(), &reviewFlags{}, repo, cfg, vcs.NewLocal(repo, io.Discard), vcs.Ref{}, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("newEngine: %v", err)
 	}

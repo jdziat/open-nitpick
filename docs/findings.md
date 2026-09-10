@@ -2038,3 +2038,43 @@ doing it.
 The count for this feature: eleven denominator or overclaim defects, one found
 by its own first draft of its tests. The instrument works; it needed four
 readers to point it at itself.
+
+### The measured conventions reach the reviewer (2026-09-10)
+
+`review.standards: true` renders the standards measured at the base revision
+into the review prompt, beside the knowledge entries and after the diff. The two
+are deliberately alike and differ in their citation: a knowledge entry cites a
+source outside the tree, and a rule here cites a count over the tree, so a
+reader who doubts it can recount it. That is why the share travels with every
+rule rather than the rule alone.
+
+Off by default, and it should stay off until a measurement says otherwise. The
+argument against it is the argument already written for `review.knowledge`:
+reference material beside a diff is a reason for a model to report the
+reference, and a reviewer that turns a house convention into a finding on every
+departure is worse than one that never heard of it. The prompt says so in as
+many words, and only rules that cleared the floor are offered, routed by class
+so a style convention never reaches the defect pass.
+
+The measurement is of the base revision, read through git in a local checkout.
+Without a checkout it is skipped with a reason rather than run against the
+working tree, because reference material is the one place a measurement lands in
+front of the model rather than in a report, and a change that rewrote a
+package's style would otherwise be told the repository has always written it
+that way. Off, skipped and active-with-nothing-found all render as the same
+absent section, so the report carries which of the three happened.
+
+Two defects in this stage, both in the guard rather than the feature. The engine
+scan accepted only the field set in a struct literal, so it reported the one
+caller that wires the measurement the way `Knowledge` is wired and passed the
+ones that do not. And it carried an exemption for `fullreview.go`, which builds
+through `newEngine` and is covered rather than excused: an exemption the scan
+never reaches is a claim nobody checks, which the policy scan beside it learned
+the same way. Five mutations were run against the stage and all five turn a test
+red.
+
+One thing worth recording as a cost rather than a feature. Reading a whole tree
+to measure it is affordable over a clone and is thousands of requests over an
+API, so this needs the checkout the Action always has. A reviewer running
+against a forge with no clone gets a skip and a reason, which is honest and is
+also less than the feature promises.

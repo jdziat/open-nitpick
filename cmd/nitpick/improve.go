@@ -82,7 +82,16 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, repo string, cfg *config.Co
 		return fmt.Errorf("knowledge retrieval (%s): %w", status.Reason, err)
 	}
 
+	// The wider pass reads the same measured conventions, and gets the style
+	// half of them. improve resolves its own policy just below, so the base
+	// revision here is the one that resolution used.
+	std, stdStatus := review.BuildStandards(ctx, &icfg, gh.Checkout,
+		baseRevisionFor(ctx, gh, ref, log), log)
+
 	engine := &review.Engine{
+		Standards:       std,
+		StandardsStatus: stdStatus,
+
 		Config:    &icfg,
 		Roles:     roles,
 		Provider:  held,
