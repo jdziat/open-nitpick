@@ -25,6 +25,13 @@ import (
 // writes doc comments on its tests, which nobody intends and no reader wants.
 // Including them read 1221/2000, 61%, contested. Excluding them reads
 // 686/723, 95%, a standard, and the second number is the one about the rule.
+//
+// Nor is a method on an unexported receiver. `func (d *dryRunProvider) Name()`
+// is an exported identifier that godoc renders nowhere, because the type it
+// hangs off is not in the package's API. These are interface adapters, Go
+// documents the interface rather than the adapter, and every one of the 37
+// violations this probe reported on its own repository was one of them: 37
+// false positives and no true ones. Corrected, this tree reads 683/683.
 var docCommentName = Probe{
 	ID:       "go-doc-comment-name",
 	Language: "go",
@@ -39,7 +46,7 @@ var docCommentName = Probe{
 		for _, d := range f.Decls {
 			switch d := d.(type) {
 			case *ast.FuncDecl:
-				if !d.Name.IsExported() {
+				if !d.Name.IsExported() || !exportedReceiver(d) {
 					continue
 				}
 				out = append(out, s.site(fset, d.Pos(), opensWith(d.Doc, d.Name.Name)))
@@ -81,12 +88,16 @@ func opensWith(doc *ast.CommentGroup, name string) bool {
 	// the sentence: `//go:build` and friends sit above the comment that does.
 	text := ""
 	for _, c := range doc.List {
-		t := strings.TrimSpace(strings.TrimPrefix(c.Text, "//"))
-		if strings.HasPrefix(t, "go:") || t == "" {
-			continue
+		for _, t := range commentLines(c.Text) {
+			if strings.HasPrefix(t, "go:") || t == "" {
+				continue
+			}
+			text = t
+			break
 		}
-		text = t
-		break
+		if text != "" {
+			break
+		}
 	}
 	rest, ok := strings.CutPrefix(text, name)
 	if !ok {
@@ -96,20 +107,50 @@ func opensWith(doc *ast.CommentGroup, name string) bool {
 	return rest == "" || !isIdentByte(rest[0])
 }
 
+// commentLines strips a comment's markers and returns its lines, trimmed.
+//
+// Both spellings, because `/* Alpha does a thing. */` is a legal doc comment
+// and reading it as one token left every declaration documented that way
+// counted as a violation, deflating the share on any tree that prefers the
+// block form.
+func commentLines(raw string) []string {
+	if after, ok := strings.CutPrefix(raw, "/*"); ok {
+		raw = strings.TrimSuffix(after, "*/")
+		lines := strings.Split(raw, "\n")
+		for i, l := range lines {
+			lines[i] = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(l), "*"))
+		}
+		return lines
+	}
+	return []string{strings.TrimSpace(strings.TrimPrefix(raw, "//"))}
+}
+
 func isIdentByte(b byte) bool {
 	return b == '_' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9'
 }
 
 // errorWrap: an error carried into fmt.Errorf is wrapped with %w.
 //
-// A site is a call to fmt.Errorf that has an error in hand. Without type
-// information the test for that is the identifier `err`, which is the name Go
-// code gives an error and is what makes the denominator defensible:
-// fmt.Errorf("no such user: %s", name) is not a site, because there is no
-// cause there to lose.
+// A site is a call to fmt.Errorf that has an error in hand. There is no type
+// information here, so the test is the argument's name, and what the name test
+// admits is the whole denominator. fmt.Errorf("no such user: %s", name) is not
+// a site: there is no cause there to lose.
 //
-// The cost of the heuristic is a variable named err that holds something else,
-// which would be a stranger thing to find than a missed wrap.
+// Read the count as a share of the calls this naming can see, which is less
+// than every call carrying an error. Accepted: a bare `err` or `somethingErr`,
+// a selector ending the same way such as `r.Err`, and an `Error()` call. Not
+// accepted: an error in a variable named `e` or `cause`, one pulled out of a
+// slice, or one returned inline by a function whose name says nothing. A
+// forgotten wrap hides in those spellings, and this probe does not count them
+// either way.
+//
+// The first version accepted only a bare identifier. It read 200/200 on this
+// repository, which is what a probe reports when the population it can see is
+// idiomatic by construction: a bare `err` almost only appears in
+// `if err != nil { return fmt.Errorf("...: %w", err) }`.
+//
+// The cost in the other direction is a `wantErr` holding a bool, which this
+// counts and should not. A name is not a type.
 var errorWrap = Probe{
 	ID:       "go-error-wrap",
 	Language: "go",
@@ -142,16 +183,36 @@ var errorWrap = Probe{
 	},
 }
 
-// carriesAnError reports whether one of the arguments is an identifier this
-// package is willing to treat as an error value.
+// carriesAnError reports whether one of the arguments is spelled the way Go
+// spells an error value.
 func carriesAnError(args []ast.Expr) bool {
 	for _, a := range args {
-		id, ok := a.(*ast.Ident)
-		if ok && (id.Name == "err" || strings.HasSuffix(id.Name, "Err")) {
+		if errorish(a) {
 			return true
 		}
 	}
 	return false
+}
+
+// errorish reads an expression's trailing name.
+func errorish(e ast.Expr) bool {
+	switch e := e.(type) {
+	case *ast.Ident:
+		return errorName(e.Name)
+	case *ast.SelectorExpr:
+		return errorName(e.Sel.Name)
+	case *ast.CallExpr:
+		// `err.Error()` and `x.Err()`, where the cause is being flattened to a
+		// string on the way in.
+		sel, ok := e.Fun.(*ast.SelectorExpr)
+		return ok && errorName(sel.Sel.Name)
+	}
+	return false
+}
+
+func errorName(n string) bool {
+	return n == "err" || n == "Err" || n == "Error" ||
+		strings.HasSuffix(n, "Err") || strings.HasSuffix(n, "Error")
 }
 
 // contextFirstArg: a context.Context is the function's first parameter.
@@ -159,10 +220,16 @@ func carriesAnError(args []ast.Expr) bool {
 // Sites are functions and methods that take a context at all. A function
 // without one is not a violation, so it is not counted, and the share is about
 // placement rather than about how much of the tree is context-aware.
+//
+// Position only. The rule said "named ctx" for a while and nothing here read
+// the name, so the count endorsed a convention it had never checked and
+// AGENTS.md published it with a real-looking denominator. Whether the
+// parameter is called ctx is a second claim and belongs to a second probe with
+// its own count.
 var contextFirstArg = Probe{
 	ID:       "go-ctx-first-arg",
 	Language: "go",
-	Rule:     "Put context.Context first in the parameter list, named ctx.",
+	Rule:     "Put context.Context first in the parameter list.",
 	Why:      "callers pass it positionally, and a context anywhere else is a context somebody forgets.",
 	sites: func(s *source) []Site {
 		f, fset := s.goFile()
@@ -356,8 +423,16 @@ func testingParam(fl *ast.FieldList) (string, bool) {
 		return "", false
 	}
 	for _, f := range fl.List {
-		star, ok := f.Type.(*ast.StarExpr)
-		if !ok || !isSelector(star.X, "testing", "T") && !isSelector(star.X, "testing", "B") {
+		// *testing.T, *testing.B, and the bare testing.TB interface, which is
+		// not a StarExpr and was silently missing from the denominator. A
+		// helper written against TB is usually the more disciplined one, so
+		// dropping them biased the share downward.
+		t := f.Type
+		if star, ok := t.(*ast.StarExpr); ok {
+			t = star.X
+		}
+		if !isSelector(t, "testing", "T") && !isSelector(t, "testing", "B") &&
+			!isSelector(t, "testing", "TB") {
 			continue
 		}
 		if len(f.Names) == 0 || f.Names[0].Name == "_" {
@@ -401,4 +476,28 @@ func stringLit(e ast.Expr) (string, bool) {
 		return "", false
 	}
 	return v, true
+}
+
+// exportedReceiver reports whether a declaration's receiver, if it has one, is
+// a type godoc will render.
+//
+// A method on an unexported type is not API however exported its own name is,
+// and the doc-comment rule is about what godoc renders. Handles `T`, `*T` and
+// the generic forms `T[U]` and `*T[U, V]`.
+func exportedReceiver(d *ast.FuncDecl) bool {
+	if d.Recv == nil || len(d.Recv.List) == 0 {
+		return true
+	}
+	t := d.Recv.List[0].Type
+	if star, ok := t.(*ast.StarExpr); ok {
+		t = star.X
+	}
+	if idx, ok := t.(*ast.IndexExpr); ok {
+		t = idx.X
+	}
+	if idx, ok := t.(*ast.IndexListExpr); ok {
+		t = idx.X
+	}
+	id, ok := t.(*ast.Ident)
+	return ok && id.IsExported()
 }

@@ -45,15 +45,15 @@ documents.
 ## Conventions, measured
 
 Counted from this repository rather than asserted, so a rule here is one the
-code demonstrates. The count after each is how many places were read and how
-many of them follow it. Run `nitpick standards` to see every probe including
-the contested ones, and `make agents` to regenerate this block.
+code demonstrates. The evidence after each is a band, not a count: run
+`nitpick standards` for the exact numbers and for the contested probes, and
+`make agents` to regenerate this block.
 
-- Wrap an error you are formatting into a new one with %w, not %v or %s. (199/199)
-- Call t.Helper() at the top of a test helper. (134/134)
-- Put context.Context first in the parameter list, named ctx. (220/221)
-- Name a test after the behaviour it pins, in at least three words. (1178/1202)
-- Return named results explicitly; do not use a bare return. (49/51)
-- Open an exported declaration's doc comment with the declaration's own name. (694/731)
+- Open an exported declaration's doc comment with the declaration's own name. (every site of 600+ places)
+- Wrap an error you are formatting into a new one with %w, not %v or %s. (every site of 200+ places)
+- Call t.Helper() at the top of a test helper. (every site of 100+ places)
+- Put context.Context first in the parameter list. (98%+ of 200+ places)
+- Name a test after the behaviour it pins, in at least three words. (98%+ of 1000+ places)
+- Return named results explicitly; do not use a bare return. (95%+ of 50+ places)
 
 <!-- nitpick:standards:end -->

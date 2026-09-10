@@ -167,3 +167,70 @@ func TestANewFileSaysTheProseIsNotGenerated(t *testing.T) {
 		t.Error("the scaffold has no managed block")
 	}
 }
+
+// A rule that falls below the floor is retired out loud.
+//
+// Regeneration removes a rule the moment the code stops following it, which is
+// the property this design rests on. Removing it in silence is the same
+// property with the reader taken out: `make agents` deletes the line, CI is
+// green because the author regenerated, and a convention erodes with nobody
+// told. The block names what has sites and no longer clears the floor.
+func TestARetiredRuleIsNamedRatherThanDeletedInSilence(t *testing.T) {
+	rep := synthetic(2)
+	rep.Results = append(rep.Results, Result{
+		ID: "rule-fallen", Rule: "Do the fallen thing.",
+		Conforming: 60, Total: 100, Standing: StandingContested,
+	})
+
+	block := rep.Block()
+	if strings.Contains(block, "Do the fallen thing.") {
+		t.Error("a contested probe was published as a rule")
+	}
+	if !strings.Contains(block, "rule-fallen") {
+		t.Errorf("a probe that stopped clearing the floor vanished without a word:\n%s", block)
+	}
+	if !strings.Contains(block, "do not clear the floor") {
+		t.Error("the block does not say why the probe is not a rule")
+	}
+
+	// A probe that was never seen at all is not a retirement.
+	quiet := synthetic(1)
+	quiet.Results = append(quiet.Results, Result{ID: "rule-quiet", Standing: StandingUnseen})
+	if strings.Contains(quiet.Block(), "rule-quiet") {
+		t.Error("a probe with no sites was reported as having failed the floor")
+	}
+}
+
+// The evidence is banded, and the band still falls when the share does.
+//
+// An exact count moves whenever anybody adds a function, so a gated artifact
+// carrying one fails CI on nearly every pull request touching Go. Bucketing
+// buys that back, and it is only worth having if a convention the code stops
+// following still loses its rule.
+func TestTheBandSurvivesChurnAndStillFalls(t *testing.T) {
+	for _, tc := range []struct {
+		conforming, total int
+		want              string
+	}{
+		{1205, 1205, "every site of 1000+ places"},
+		{1181, 1205, "98%+ of 1000+ places"},
+		{1182, 1206, "98%+ of 1000+ places"},
+		{49, 51, "95%+ of 50+ places"},
+		{91, 100, "90%+ of 100+ places"},
+		{86, 100, "85%+ of 100+ places"},
+	} {
+		got := band(Result{Conforming: tc.conforming, Total: tc.total})
+		if got != tc.want {
+			t.Errorf("band(%d/%d) = %q, want %q", tc.conforming, tc.total, got, tc.want)
+		}
+	}
+
+	// The two readings a day apart render the same, which is the point.
+	if band(Result{Conforming: 1181, Total: 1205}) != band(Result{Conforming: 1182, Total: 1206}) {
+		t.Error("one added function moved the band, so the gated file still churns")
+	}
+	// And a real fall moves it.
+	if band(Result{Conforming: 1181, Total: 1205}) == band(Result{Conforming: 1100, Total: 1205}) {
+		t.Error("a share falling from 98% to 91% left the band unchanged")
+	}
+}

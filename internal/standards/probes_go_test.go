@@ -250,3 +250,111 @@ func TestAFileThatDoesNotParseContributesNothing(t *testing.T) {
 		t.Errorf("an unparseable file contributed %d sites", got.Total)
 	}
 }
+
+// A block doc comment is a doc comment.
+//
+// `/* Alpha does a thing. */` is legal Go and was read as one token beginning
+// with a slash, so every declaration documented that way counted as a
+// violation. On a tree that prefers the block form the share would have been
+// deflated by however much of it used the legal spelling this probe did not
+// know about.
+func TestABlockCommentIsReadLikeALineComment(t *testing.T) {
+	const src = `package p
+
+/* Alpha does a thing. */
+func Alpha() {}
+
+/*
+Beta does a thing, and this comment
+runs to a second line.
+*/
+func Beta() {}
+
+/* This one never names itself. */
+func Gamma() {}
+`
+	want(t, measureOne(t, "go-doc-comment-name", "p.go", src), 2, 3)
+}
+
+// A method on an unexported type is not something godoc renders.
+//
+// The probe's own Why is "godoc renders the comment as the entry for that
+// name", and godoc renders nothing for a method hanging off a type the package
+// does not export. These are interface adapters: Go documents the interface,
+// not the adapter. Counting them produced 37 violations on this repository and
+// not one of them was real, which is the fourth denominator error in this
+// package and the fourth in the same direction.
+func TestAMethodOnAnUnexportedTypeIsNotASite(t *testing.T) {
+	const src = `package p
+
+type held struct{}
+
+func (h *held) Name() string { return "" }
+func (h held) Diff() string { return "" }
+
+// Exported is a type.
+type Exported struct{}
+
+// Name is documented.
+func (e *Exported) Name() string { return "" }
+
+func (e *Exported) Undocumented() string { return "" }
+
+type box[T any] struct{ v T }
+
+func (b *box[T]) Get() T { return b.v }
+`
+	// Two sites: the type Exported, and its two methods. The adapters on
+	// `held` and on the generic `box` are not API.
+	got := measureOne(t, "go-doc-comment-name", "p.go", src)
+	want(t, got, 2, 3)
+	for _, s := range got.Off {
+		if strings.Contains(s.Excerpt, "held") || strings.Contains(s.Excerpt, "box") {
+			t.Errorf("an unexported receiver was counted: %s", s.Excerpt)
+		}
+	}
+}
+
+// The wrap probe's population is the spellings its naming can see.
+//
+// This pins the denominator rather than the conformance, because the
+// denominator is the claim. A count of 200/200 means 200 calls named in a way
+// this can read, not 200 wrapping decisions audited, and the difference is the
+// whole reason to write this down.
+func TestTheWrapProbePopulationIsPinned(t *testing.T) {
+	const src = `package p
+
+import "fmt"
+
+type box struct{ Err error }
+
+func a(err error) error { return fmt.Errorf("op: %w", err) }
+func b(err error) error { return fmt.Errorf("op: %v", err) }
+func c(x box) error { return fmt.Errorf("op: %v", x.Err) }
+func d(err error) error { return fmt.Errorf("op: %s", err.Error()) }
+func e(readErr error) error { return fmt.Errorf("op: %v", readErr) }
+
+func f(name string) error { return fmt.Errorf("no such user: %s", name) }
+func g(cause error) error { return fmt.Errorf("op: %v", cause) }
+func h(errs []error) error { return fmt.Errorf("op: %v", errs[0]) }
+func i(x box) error { return fmt.Errorf("op: %v", trunc(x.Err)) }
+
+func trunc(err error) string { return err.Error() }
+`
+	// The five it can see: a wraps, the other four do not. The four below the
+	// blank line are invisible to it, and a call wrapped inside a function
+	// whose own name says nothing is the shape that stays invisible.
+	want(t, measureOne(t, "go-error-wrap", "p.go", src), 1, 5)
+}
+
+// A helper written against testing.TB is still a helper.
+func TestATestingTBHelperIsASite(t *testing.T) {
+	const src = `package p
+
+import "testing"
+
+func marked(tb testing.TB) { tb.Helper() }
+func unmarked(tb testing.TB) { tb.Log("x") }
+`
+	want(t, measureOne(t, "go-test-helper-marks", "p_test.go", src), 1, 2)
+}

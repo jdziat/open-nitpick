@@ -231,14 +231,6 @@ type Adherence struct {
 	Off        []Site `json:"off,omitempty"`
 }
 
-// Share is the conforming fraction of the change's own sites.
-func (a Adherence) Share() (float64, bool) {
-	if a.Total == 0 {
-		return 0, false
-	}
-	return float64(a.Conforming) / float64(a.Total), true
-}
-
 // Score reads a change against standards already measured on the base
 // revision.
 //
@@ -292,10 +284,16 @@ func Score(files []File, base Report, touched map[string]map[int]bool, opts Opti
 	return out
 }
 
-// ReadTree reads every file under root that some probe could read.
+// ReadTree reads every file under root that some probe could read, and names
+// the rest without reading them.
 //
-// It skips what a review skips and what no probe can speak for, so the
-// denominator is files a probe was offered rather than files on disk.
+// A file of a language no probe reads comes back with no Src. It is in no
+// probe's denominator and it is in the report's language census, which is the
+// difference between a report that says 900 TypeScript files went unmeasured
+// and one that quietly says nothing. Returning only probed files made
+// Report.Unprobed unreachable from every real measurement, and the test that
+// named the field passed anyway because it built its own file list. See
+// docs/measurement.md Rule 10.
 func ReadTree(root string, skipDir func(name string) bool) ([]File, error) {
 	probed := map[string]bool{}
 	for _, l := range Languages() {
@@ -320,7 +318,14 @@ func ReadTree(root string, skipDir func(name string) bool) ([]File, error) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if !probed[bundle.Language(rel)] {
+		lang := bundle.Language(rel)
+		if lang == "" {
+			// No extension this tool has a name for, so there is no language to
+			// report as unmeasured either.
+			return nil
+		}
+		if !probed[lang] {
+			out = append(out, File{Path: rel})
 			return nil
 		}
 		src, err := os.ReadFile(path)

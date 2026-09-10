@@ -1916,7 +1916,7 @@ is dropped, and the block states how many were dropped and where to read them.
 A file that truncates in silence reads as the whole of what a repository
 decided.
 
-This repository's block is six rules and 23 lines, so the budget is not binding
+This repository's block is six rules and 17 lines, so the budget is not binding
 yet and the guard is a synthetic 200-rule report rather than a live one. Five
 mutations were run against it: removing the budget, dropping rules silently,
 clobbering the text above the block, clobbering the text below it, and guessing
@@ -1928,3 +1928,113 @@ whether it ran, and `make agents` failed on a machine whose model configuration
 was mid-edit. It reads the `standards:` block alone now, and validates that.
 "No model is called" was a claim about credentials; it has to also be a claim
 about whether the command starts.
+
+### The tool found three defects in the feature that measures the tool (2026-09-10)
+
+`nitpick review` over this branch returned three warnings, all real, and the
+most useful of them is one the branch's own tests could not have caught.
+
+`ReadTree` dropped every file whose language no probe reads before `Measure`
+saw it, so `Report.Unprobed` was unreachable from any real run and the report
+was silent about the languages it had not read. That is the failure the field
+exists to prevent, docs/measurement.md Rule 10, shipped inside the change that
+cites the rule. `TestAnUnprobedLanguageIsNamed` passed throughout because it
+builds its own file list and never touches the reading path. A guard that
+avoids the production path guards the fixture. The new test goes through
+`ReadTree`, and the real report names seven unprobed languages the reader can
+now see.
+
+The doc-comment probe read `/* Alpha does a thing. */` as one token beginning
+with a slash, so every declaration documented in the block form counted as a
+violation. This repository writes `//` throughout, so its own share was
+unaffected and nothing here would ever have shown it: a fourth denominator
+error, found only because a reviewer read the code rather than the number.
+
+`readAtBase` treated every failed read as "the base does not have this file".
+Absent and unreadable are opposite facts that look identical at the call site,
+and conflating them let a transient git error compute the base's share over a
+subset with nothing saying so. Which files the base lacks now comes from the
+diff, where git already said it, and any other failure stops the command.
+
+All three are fixed with a guard each, and each guard was mutated red. The
+count that matters: four denominator or silence bugs in one feature, three
+found by tools and one by a reviewer, none by the feature's own first draft of
+its tests.
+
+### Two reviewers found what four tools and one dogfood had not (2026-09-10)
+
+`nitpick review` over this branch found three defects and both review agents
+found six more. Every one is a variant of the same two failures this package was
+written about: a denominator that counts the wrong sites, and a claim that says
+more than its measurement.
+
+**The doc-comment probe counted interface adapters.** `func (d *dryRunProvider)
+Name() string` has an exported identifier on an unexported receiver, so godoc
+renders nothing for it and Go documents the interface rather than the adapter.
+All 37 violations this probe reported on its own repository were of that shape:
+37 false positives and no true ones. Corrected, this tree reads 683/683. Across
+five external repositories the reviewer measured, the correction moved
+kubernetes/client-go from 81.5% contested to 86.7% standard, which is the
+difference between telling a maintainer their convention is not one and
+recognising it. That is a fifth reading of the same question, in the same
+direction as the four before it.
+
+**`go-ctx-first-arg` published a rule it never measured.** Its text said "named
+ctx" and its sites function computed `at == 0` and nothing else, so a repository
+naming the parameter `c` everywhere would have been handed a fabricated
+convention carrying a real denominator. The rule now says only what the count
+covers. Whether the parameter is called ctx is a second claim and wants a second
+probe with its own number.
+
+**The base seam leaked in the deletion and rename directions.** The base file
+list was a walk of the working tree read at the base revision, so a file the
+change deleted was never asked about. A reviewer demonstrated a branch deleting
+the counterevidence for a convention, watching the tool report the convention as
+a standard the base never held, and then issuing a finding against the author
+under it. The guard for this seam existed and covered only file addition: it
+passed against the bug it named. The base list now comes from `git ls-tree` at
+the base, which also fixes a hard failure that made `-base` unusable for anybody
+with an untracked `.go` file in their tree, and the guard covers deletion,
+rename and the untracked case.
+
+**`go-error-wrap` read 200/200 because its population was idiomatic by
+construction.** It admitted only a bare identifier named `err`, and a bare `err`
+in Go almost only appears in `if err != nil { return fmt.Errorf("...: %w", err) }`.
+The spellings where a forgotten wrap hides, an error in `e` or `cause`, one
+pulled from a slice, one returned inline, were invisible. It now reads
+selectors and `Error()` calls too, and the probe's doc states the population it
+can see, because 200/200 means 200 calls this naming could read rather than 200
+wrapping decisions audited.
+
+**Three functions the previous entry cites as fixes had no coverage at all.**
+`runStandards`, `loadStandardsConfig` and `writeAgents` were at 0.0%: the
+config-scope fix recorded above as the dogfood's headline defect was guarded by
+nothing, and reverting it left the suite green. So was `writeAgents`, which is
+what CI's `make agents` runs. And a test asserting on a `.nitpick.yaml` called a
+function that never loads config, so replacing that file with one disabling the
+probe under test left it passing.
+
+**The gated file churned on every pull request.** The block carried exact counts,
+so adding one test function moved a line and `git diff --exit-code` failed for a
+number no reader can use. The evidence is banded now, `98%+ of 1000+ places`
+rather than `1181/1205`. Adding a test leaves the file byte-identical, and the
+band still falls when the share does, which is the only property worth keeping.
+The exact counts stay one command away.
+
+**A retired rule left in silence.** `make agents` measures HEAD, so a change
+taking a probe under the floor deletes its rule and CI passes because the author
+regenerated. Silent retirement was the design; it is also how a convention
+erodes with a green build over it. The block names what has sites and no longer
+clears the floor.
+
+Smaller: `220/221` printed as `100%`, which is the one rounding a tool whose
+claim is checkable counts cannot afford; `testing.TB` helpers were invisible to
+the helper probe and are usually the more disciplined ones; `testdata` was
+measured, which asks whether a repository's deliberately-wrong fixtures follow
+its conventions; and `-agents` with `-base` would have written the base
+revision's standards into the working tree's AGENTS.md and passed the drift gate
+doing it.
+
+The count for this feature: eleven denominator or overclaim defects, one found
+by its own first draft of its tests. The instrument works; it needed four
+readers to point it at itself.

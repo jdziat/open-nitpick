@@ -1,7 +1,10 @@
 package standards
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -154,5 +157,49 @@ func TestAContestedProbeDoesNotScoreAChange(t *testing.T) {
 	got := Score(files, base, TouchedLines(map[string][]int{"p.go": {5, 6, 7}}), Options{})
 	if len(got) != 0 {
 		t.Errorf("a contested probe scored the change: %v", got)
+	}
+}
+
+// The census reaches the report through the path a caller uses.
+//
+// TestAnUnprobedLanguageIsNamed builds its own file list, so it passed while
+// ReadTree, the only file-reading path in the package, dropped every unprobed
+// file before Measure could count it. Report.Unprobed was unreachable from any
+// real run and the report said nothing about the languages it had not read.
+// A guard that never touches the production path guards the fixture.
+func TestReadTreeNamesTheLanguagesItCannotProbe(t *testing.T) {
+	dir := t.TempDir()
+	for name, body := range map[string]string{
+		"a.go":       "package p\n",
+		"b.ts":       "export const x = 1\n",
+		"c.py":       "x = 1\n",
+		"notes.txt":  "no language here\n",
+		"skipme.txt": "ignored\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	files, err := ReadTree(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rep := Measure(files, Options{})
+
+	if !slices.Contains(rep.Unprobed, "typescript") || !slices.Contains(rep.Unprobed, "python") {
+		t.Errorf("unprobed = %v, want typescript and python; the report is silent about what it did not read",
+			rep.Unprobed)
+	}
+	if rep.Files["go"] != 1 {
+		t.Errorf("files = %v, want one go file", rep.Files)
+	}
+
+	// And an unprobed file is named without being read, so a tree of large
+	// binaries in an unread language costs a walk rather than a load.
+	for _, f := range files {
+		if strings.HasSuffix(f.Path, ".ts") && f.Src != nil {
+			t.Errorf("%s was read, and no probe can use it", f.Path)
+		}
 	}
 }

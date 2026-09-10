@@ -6,6 +6,25 @@ import (
 	"strings"
 )
 
+// percent renders a share, and reserves 100% for a count that is whole.
+//
+// %.0f rounds 220/221 to 100%, and a tool whose claim is that the count is
+// checkable cannot print a perfect score for an imperfect one. Rounding down
+// everywhere else keeps the digit a floor rather than a flattery.
+func percent(conforming, total int) string {
+	switch {
+	case total == 0:
+		return "n/a"
+	case conforming == total:
+		return "100%"
+	}
+	p := int(float64(conforming) / float64(total) * 100)
+	if p >= 100 {
+		p = 99
+	}
+	return fmt.Sprintf("%d%%", p)
+}
+
 // maxListedOff bounds how many violating sites one rule prints.
 //
 // The count above the list is the claim and the list is evidence for it, so
@@ -31,13 +50,12 @@ func (r Report) Text() string {
 		b.WriteString("No probe read any of these files.\n")
 	}
 	for _, res := range r.Results {
-		share, ok := res.Share()
-		if !ok {
+		if _, ok := res.Share(); !ok {
 			fmt.Fprintf(&b, "  %-24s %13s        %s\n", res.ID, "no sites", res.Standing)
 			continue
 		}
-		fmt.Fprintf(&b, "  %-24s %6d/%-6d %3.0f%%  %s\n",
-			res.ID, res.Conforming, res.Total, share*100, res.Standing)
+		fmt.Fprintf(&b, "  %-24s %6d/%-6d %3s  %s\n",
+			res.ID, res.Conforming, res.Total, percent(res.Conforming, res.Total), res.Standing)
 	}
 
 	// Named rather than left to be noticed. A language no probe reads is a

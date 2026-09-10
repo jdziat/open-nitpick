@@ -84,10 +84,12 @@ is a proposal rather than a standard: a convention half the tree ignores is not
 one to measure an author against, and `-base` scores a change against the
 standards only.
 
-Those standards are measured at the base revision. A change cannot supply the
-convention it is scored against, for the reason a change cannot supply the
-policy it is reviewed under. Only lines the change touched are scored, so code
-that predates a convention is never counted against whoever edits near it.
+Those standards are measured at the base revision, over the file list that
+revision holds rather than the one on disk. A change cannot supply the
+convention it is scored against, and cannot remove the evidence against one by
+deleting or renaming the files that carry it. Only lines the change touched are
+scored, so code that predates a convention is never counted against whoever
+edits near it.
 
 A language no probe reads is named in the report rather than left out of it.
 Six probes read Go today and nothing reads anything else, so a TypeScript tree

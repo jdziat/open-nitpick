@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/standards"
@@ -66,6 +67,20 @@ func runStandards(ctx context.Context, args []string) error {
 	}
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	// -agents writes the measurement to a file, and with -base the measurement
+	// is of the base revision. Writing the base's standards into the working
+	// tree's AGENTS.md would publish yesterday's conventions and pass the drift
+	// gate while doing it. -json has nowhere to go once the output is a file.
+	if agentsOut != "" {
+		switch {
+		case base != "":
+			return errors.New("-agents writes what the working tree demonstrates, and -base measures the " +
+				"base revision instead; run them separately")
+		case asJSON:
+			return errors.New("-agents writes a file and -json writes stdout; pick one")
+		}
 	}
 
 	cfg, err := loadStandardsConfig(repo, configPath)
@@ -140,7 +155,7 @@ func measureStandards(ctx context.Context, repo, base string, opts standards.Opt
 		return nil, fmt.Errorf("parse the diff against %s: %w", base, err)
 	}
 
-	baseFiles, err := readAtBase(ctx, local, base, files)
+	baseFiles, err := readAtBase(ctx, local, base)
 	if err != nil {
 		return nil, err
 	}
@@ -157,35 +172,84 @@ func measureStandards(ctx context.Context, repo, base string, opts standards.Opt
 	return out, nil
 }
 
-// readAtBase reads each probed file as it stood at the base revision.
+// baseReader is the part of a provider readAtBase needs, as an interface so
+// the failure path has a guard.
+type baseReader interface {
+	Tree(ctx context.Context, rev string) ([]string, error)
+	FileContent(ctx context.Context, ref vcs.Ref, path string) ([]byte, error)
+}
+
+// readAtBase reads the base revision's own file list at the base revision.
 //
-// A file the base does not have is skipped rather than read from the working
-// tree. A file this change created has no base version. Counting its contents
-// into the base's own share lets the change vote on the standard it is about
-// to be measured against.
-func readAtBase(ctx context.Context, local *vcs.Local, base string, files []standards.File) ([]standards.File, error) {
+// The list comes from `git ls-tree`, so the base is enumerated from the base.
+// Walking the working tree made the base a function of the change; see
+// docs/findings.md. Every path here is one the base holds, so a failed read is
+// a failure rather than an absence and it stops the command.
+func readAtBase(ctx context.Context, local baseReader, base string) ([]standards.File, error) {
+	paths, err := local.Tree(ctx, base)
+	if err != nil {
+		return nil, fmt.Errorf("list %s: %w", base, err)
+	}
+
+	probed := map[string]bool{}
+	for _, l := range standards.Languages() {
+		probed[l] = true
+	}
+
 	ref := vcs.Ref{Base: base, Head: base}
-	out := make([]standards.File, 0, len(files))
-	for _, f := range files {
-		src, err := local.FileContent(ctx, ref, f.Path)
-		if err != nil {
+	out := make([]standards.File, 0, len(paths))
+	for _, p := range paths {
+		if skipStandardsPath(p) {
 			continue
 		}
-		out = append(out, standards.File{Path: f.Path, Src: src})
+		lang := bundle.Language(p)
+		if lang == "" {
+			continue
+		}
+		if !probed[lang] {
+			// In the census, and there is nothing at the base worth fetching.
+			out = append(out, standards.File{Path: p})
+			continue
+		}
+		src, err := local.FileContent(ctx, ref, p)
+		if err != nil {
+			return nil, fmt.Errorf("read %s at %s: %w", p, base, err)
+		}
+		out = append(out, standards.File{Path: p, Src: src})
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no file readable at %s: the base revision has nothing to measure", base)
+		return nil, fmt.Errorf("%s holds no file any probe reads", base)
 	}
 	return out, nil
+}
+
+// skipStandardsPath reports whether a base path lies under a skipped directory.
+//
+// ReadTree prunes these while walking; a flat list from git has to check each
+// path's segments for itself, and the two have to agree or the base and the
+// working tree are measured over different sets.
+func skipStandardsPath(p string) bool {
+	for _, seg := range strings.Split(p, "/") {
+		if skipStandardsDir(seg) {
+			return true
+		}
+	}
+	return false
 }
 
 // skipStandardsDir names directories a measurement should not walk.
 //
 // The generated site and the release output are copies of files already
 // counted once, and counting them again weights whatever they happen to
-// contain.
+// contain. testdata is worse than a copy: Go's own convention is that it holds
+// code written to be wrong, so measuring it asks whether a repository's
+// fixtures follow its conventions, which is a question nobody has.
 func skipStandardsDir(name string) bool {
-	return name == "website" || name == "dist" || name == "public" || name == ".website"
+	switch name {
+	case "website", "dist", "public", ".website", "testdata":
+		return true
+	}
+	return false
 }
 
 // loadStandardsConfig reads the standards block, and only that block.
