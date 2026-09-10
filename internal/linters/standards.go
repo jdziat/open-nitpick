@@ -63,7 +63,19 @@ func (s *StandardsSource) Observe(ctx context.Context, root string, files []stan
 		return nil, standards.Coverage{}, fmt.Errorf("resolve %s: %w", root, err)
 	}
 
-	set := New(abs, s.cfg, s.log)
+	// The conformity ruleset, not the review's. An operator who named their own
+	// config keeps it: that is policy and this is not the place to override it.
+	cfg := *s.cfg
+	if cfg.Linters.GolangciConfig == "" {
+		path, cleanup, err := WriteGolangciConventions(abs)
+		if err != nil {
+			return nil, standards.Coverage{Why: "conformity ruleset: " + err.Error()}, nil
+		}
+		defer cleanup()
+		cfg.Linters.GolangciConfig = path
+	}
+
+	set := New(abs, &cfg, s.log)
 	claims := claimedFiles(set, files)
 	if len(claims) == 0 {
 		return nil, standards.Coverage{Why: "no enabled analyzer reads any file in this tree"}, nil

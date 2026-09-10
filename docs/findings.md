@@ -2131,3 +2131,38 @@ Correcting it changed a verdict, which is the arithmetic doing its job: revive
 read 95.5% clean over 396 files when markdown, JSON and YAML were in its
 denominator, and 94.1% over the 290 files an analyzer actually read. Same
 violations, correct denominator, standard becomes contested.
+
+### A conformity ruleset, separate from the review's (2026-09-10)
+
+`internal/linters/golangci.yml` pins `default: standard`, and over this tree it
+reports nothing. That is correct for a review and useless for a measurement: the
+standard set finds defects, and a review posts a comment for each one, so a
+noisy rule costs a reader's attention on a pull request.
+
+A conformity scan posts nothing and asks a different question, so it reads a
+different ruleset. `golangci-conventions.yml` adds revive with six named rules,
+errorlint, thelper, nakedret, gocritic and misspell. Over the same 292 files
+that produced zero observations, it produces 21 across four rules, and the
+spread is the signal: errcheck, revive and thelper at 99.3% clean, gocritic at
+97.9%. An operator who named their own config keeps it, because that is policy.
+
+### Four site definitions for one convention, and none of them shippable (2026-09-10)
+
+`nitpick standards` was pointed at this repository's constructor habits, and the
+denominator was the whole disagreement four times over. Every exported struct:
+10/167. Plus unexported fields: 6/22. Plus methods: 6/20. A collaborator
+discriminator built from the field types: it disagreed with a hand-labelled set
+on 5 of 20, calling `evals.Aggregate`, `Meter`, `Price` and `llm.Roles`
+collaborators and `review.Engine` a value.
+
+The reading that holds is in issue #105 and came from looking at the split
+rather than from another guess: the six types with constructors are all
+collaborators, the fourteen without divide into nine value types nobody would
+give one and five genuine collaborators, two of which already have `Build*`
+builders. The convention is 6/11, not 6/20.
+
+What that establishes is not a probe. It is that the site definition IS the
+convention, so choosing one is choosing which claim to test, and a probe whose
+sites disagree with a person's labels is measuring a different rule than the one
+it names. None of the four shipped, and the fourth was deleted rather than
+committed with a number nobody believes.
