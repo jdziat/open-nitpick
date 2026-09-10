@@ -160,9 +160,9 @@ func (f *File) ChangedLines() []int {
 }
 
 // CommentableLines returns added lines and surviving context immediately beside
-// a removal-only edit. A removed guard can break an unchanged caller; that caller
-// is a valid RIGHT-side anchor even though it is not an added line. Replacement
-// edits retain their added-line anchors. Deleted files have no RIGHT-side anchor.
+// a removal-only edit. A removed guard can break an unchanged caller, and that
+// caller anchors on the new side of the diff even though nothing added it. A
+// replacement keeps its added-line anchors, and a deleted file has none.
 func (f *File) CommentableLines() []int {
 	if f.Kind == ChangeDeleted || f.Binary {
 		return nil

@@ -2192,3 +2192,38 @@ check establishes coverage of that edit shape, not general recall.
 and test files and returned no findings; that is not proof of correctness.
 Whole-file deletions and zero-context removals still require old-file anchor
 support throughout the finding pipeline.
+
+### The snap radius now reaches unchanged code (2026-09-09)
+
+`NearestCommentableLine` snapped to added lines, so a finding placed on
+unchanged code was dropped unless an added line sat within `snapDistance`. It
+now snaps to `CommentableLines`, which includes surviving context beside a
+removal-only block, so in any file carrying such a block the set of lines a
+stray finding can be rescued onto is larger than it was. That is the same
+mechanism that publishes the removed-guard finding; there is no version of this
+change that widens one without the other.
+
+The evidence for the cost is one control: removing only the redundant guard was
+reviewed and returned nothing. One clean fixture is a check that the widening
+does not obviously fire, not a precision number, and it is reported that way
+above.
+
+Accepted unmeasured, with the reason stated: the corpus plants defects in added
+and modified code, so it has no removal-only fixture to measure precision
+against, and the number this instrument would report would be about a shape the
+corpus does not contain. Building those fixtures is the measurement, and it is
+worth more than a figure derived from the ones already there.
+
+Kill condition, so the acceptance expires rather than becoming the record: if
+the corpus has not gained at least two removal-only fixtures, one planting a
+defect the removal causes and one clean, by the release after the one carrying
+this branch, then `CommentableLines` is narrowed to the immediately following
+context line only, halving the widening, and this note says the narrowing was
+taken for want of a measurement rather than because it was the better anchor.
+
+A second reader should also know what was not touched. `IsChangedLine` still
+means added, so `linters.only_changed_lines` and the linter file skip at
+`internal/linters/linters.go:684` continue to ignore removal-only files. That
+is deliberate: a linter finding on a line the change did not write is
+pre-existing, and the argument for publishing it is not the argument this
+section makes.
