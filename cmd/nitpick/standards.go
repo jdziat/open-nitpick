@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/standards"
@@ -155,7 +154,7 @@ func measureStandards(ctx context.Context, repo, base string, opts standards.Opt
 		return nil, fmt.Errorf("parse the diff against %s: %w", base, err)
 	}
 
-	baseFiles, err := readAtBase(ctx, local, base)
+	baseFiles, err := readAtBase(ctx, baseTree{local: local}, base)
 	if err != nil {
 		return nil, err
 	}
@@ -172,11 +171,18 @@ func measureStandards(ctx context.Context, repo, base string, opts standards.Opt
 	return out, nil
 }
 
-// baseReader is the part of a provider readAtBase needs, as an interface so
-// the failure path has a guard.
-type baseReader interface {
-	Tree(ctx context.Context, rev string) ([]string, error)
-	FileContent(ctx context.Context, ref vcs.Ref, path string) ([]byte, error)
+// baseTree adapts a local checkout to the reader internal/standards wants.
+//
+// One implementation of the base read, shared with the review engine, so the
+// command and the reviewer cannot drift into measuring different sets.
+type baseTree struct{ local *vcs.Local }
+
+func (b baseTree) Tree(ctx context.Context, rev string) ([]string, error) {
+	return b.local.Tree(ctx, rev)
+}
+
+func (b baseTree) Read(ctx context.Context, rev, path string) ([]byte, error) {
+	return b.local.FileContent(ctx, vcs.Ref{Base: rev, Head: rev}, path)
 }
 
 // readAtBase reads the base revision's own file list at the base revision.
@@ -185,71 +191,15 @@ type baseReader interface {
 // Walking the working tree made the base a function of the change; see
 // docs/findings.md. Every path here is one the base holds, so a failed read is
 // a failure rather than an absence and it stops the command.
-func readAtBase(ctx context.Context, local baseReader, base string) ([]standards.File, error) {
-	paths, err := local.Tree(ctx, base)
+func readAtBase(ctx context.Context, r standards.TreeReader, base string) ([]standards.File, error) {
+	out, err := standards.ReadAtRevision(ctx, r, base, skipStandardsDir)
 	if err != nil {
-		return nil, fmt.Errorf("list %s: %w", base, err)
-	}
-
-	probed := map[string]bool{}
-	for _, l := range standards.Languages() {
-		probed[l] = true
-	}
-
-	ref := vcs.Ref{Base: base, Head: base}
-	out := make([]standards.File, 0, len(paths))
-	for _, p := range paths {
-		if skipStandardsPath(p) {
-			continue
-		}
-		lang := bundle.Language(p)
-		if lang == "" {
-			continue
-		}
-		if !probed[lang] {
-			// In the census, and there is nothing at the base worth fetching.
-			out = append(out, standards.File{Path: p})
-			continue
-		}
-		src, err := local.FileContent(ctx, ref, p)
-		if err != nil {
-			return nil, fmt.Errorf("read %s at %s: %w", p, base, err)
-		}
-		out = append(out, standards.File{Path: p, Src: src})
+		return nil, fmt.Errorf("read %s: %w", base, err)
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("%s holds no file any probe reads", base)
 	}
 	return out, nil
-}
-
-// skipStandardsPath reports whether a base path lies under a skipped directory.
-//
-// ReadTree prunes these while walking; a flat list from git has to check each
-// path's segments for itself, and the two have to agree or the base and the
-// working tree are measured over different sets.
-func skipStandardsPath(p string) bool {
-	for _, seg := range strings.Split(p, "/") {
-		if skipStandardsDir(seg) {
-			return true
-		}
-	}
-	return false
-}
-
-// skipStandardsDir names directories a measurement should not walk.
-//
-// The generated site and the release output are copies of files already
-// counted once, and counting them again weights whatever they happen to
-// contain. testdata is worse than a copy: Go's own convention is that it holds
-// code written to be wrong, so measuring it asks whether a repository's
-// fixtures follow its conventions, which is a question nobody has.
-func skipStandardsDir(name string) bool {
-	switch name {
-	case "website", "dist", "public", ".website", "testdata":
-		return true
-	}
-	return false
 }
 
 // loadStandardsConfig reads the standards block, and only that block.
@@ -329,4 +279,18 @@ func writeAgents(path string, rep standards.Report) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
+}
+
+// skipStandardsDir names directories a measurement should not walk.
+//
+// testdata is the one worth arguing: Go's convention is that it holds code
+// written to be wrong. The review engine keeps its own copy, since internal
+// packages do not import cmd, and the two are pinned together by
+// TestTheCommandAndTheReviewerSkipTheSameDirectories.
+func skipStandardsDir(name string) bool {
+	switch name {
+	case "website", "dist", "public", ".website", "testdata":
+		return true
+	}
+	return false
 }

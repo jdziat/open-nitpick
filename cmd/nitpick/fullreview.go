@@ -132,7 +132,7 @@ func treeReview(ctx context.Context, f *reviewFlags, paths []string, budget int,
 	ref := vcs.Ref{Head: vcs.Worktree}
 
 	log.Info("reviewing the tree", "repo", repo, "paths", strings.Join(paths, ","), "budget", budget)
-	engine, err := newEngine(ctx, f, repo, cfg, tree, log)
+	engine, err := newEngine(ctx, f, repo, cfg, tree, ref, log)
 	if err != nil {
 		return nil, nil, err
 	}

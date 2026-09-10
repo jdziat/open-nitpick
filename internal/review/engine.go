@@ -56,6 +56,14 @@ type Engine struct {
 	// default it inherits.
 	Knowledge *KnowledgeRetriever
 
+	// Standards is what this repository was measured to do, at the base
+	// revision. Nil is off, which is not the same as a repository with no
+	// conventions; StandardsStatus says which.
+	Standards *StandardsRef
+
+	// StandardsStatus records what the measurement did, and reaches the report.
+	StandardsStatus StandardsStatus
+
 	// routeDecisions is where each batch of the last review went; copied
 	// into the Report.
 	routeDecisions []RouteDecision
@@ -384,6 +392,10 @@ type Report struct {
 	// control twice.
 	Knowledge KnowledgeStatus
 
+	// Standards is what the convention measurement did on this run: off,
+	// active or skipped, with a reason.
+	Standards StandardsStatus
+
 	// Escalated records the batches a fallback model reviewed after the
 	// primary could not, so a reader can tell which findings came from which
 	// model. Silence here would put a weaker model's findings beside a
@@ -629,6 +641,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		e.log().Info("nothing to review")
 		report.Counts = counts(nil)
 		report.Knowledge = e.Knowledge.Status()
+		report.Standards = e.StandardsStatus
 		return report, e.publish(ctx, ref, report, files)
 	}
 
@@ -805,6 +818,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// Read after every batch, so the counts are the run's and not a snapshot
 	// taken before retrieval was asked for anything.
 	report.Knowledge = e.Knowledge.Status()
+	report.Standards = e.StandardsStatus
 
 	// The report is returned WITH a publish error rather than instead of it: by
 	// this point the review has happened and been paid for, and a caller that
@@ -1253,6 +1267,13 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	// asked about, and reference material placed first reads as the subject.
 	// Widened out of the if, because the findings below carry which entries
 	// the reviewer read and the scope used to end here.
+	// Before the retrieved entries and after the diff. Six lines about how
+	// this repository writes code is the cheapest context in the prompt and
+	// the only part of it no model could have been taught.
+	if rules := e.Standards.forClasses(e.standardsClasses(style)); len(rules) > 0 {
+		body.WriteString(standardsSection(rules))
+	}
+
 	hits := e.retrieveKnowledge(ctx, b, style)
 	if len(hits) > 0 {
 		body.WriteString(knowledgeSection(hits))

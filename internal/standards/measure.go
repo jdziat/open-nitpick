@@ -1,6 +1,8 @@
 package standards
 
 import (
+	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -8,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // The floor a count clears before it is written down as a standard.
@@ -51,13 +54,14 @@ const (
 
 // Result is one probe's reading over a set of files.
 type Result struct {
-	ID         string   `json:"id"`
-	Rule       string   `json:"rule"`
-	Why        string   `json:"why"`
-	Language   string   `json:"language"`
-	Conforming int      `json:"conforming"`
-	Total      int      `json:"total"`
-	Standing   Standing `json:"standing"`
+	ID         string       `json:"id"`
+	Rule       string       `json:"rule"`
+	Why        string       `json:"why"`
+	Language   string       `json:"language"`
+	Class      config.Class `json:"class"`
+	Conforming int          `json:"conforming"`
+	Total      int          `json:"total"`
+	Standing   Standing     `json:"standing"`
 
 	// Off are the sites that do not conform, so a report can name them. Capped
 	// by the caller rather than here: the count is the claim and the list is
@@ -163,7 +167,7 @@ func Measure(files []File, opts Options) Report {
 		if !opts.enabled(p) {
 			continue
 		}
-		counts[p.ID] = &Result{ID: p.ID, Rule: p.Rule, Why: p.Why, Language: p.Language}
+		counts[p.ID] = &Result{ID: p.ID, Rule: p.Rule, Why: p.Why, Language: p.Language, Class: p.Class}
 		order = append(order, p.ID)
 	}
 
@@ -353,4 +357,99 @@ func TouchedLines(changed map[string][]int) map[string]map[int]bool {
 		out[strings.TrimPrefix(path, "./")] = set
 	}
 	return out
+}
+
+// ForClasses returns the standards belonging to the allowed classes, best
+// evidence first.
+//
+// The routing knowledge entries already have. A style convention offered to
+// the defect pass dilutes it, and a correctness convention offered to the style
+// pass is context that pass cannot act on.
+func (r Report) ForClasses(allowed map[config.Class]bool) []Result {
+	var out []Result
+	for _, res := range r.Standards() {
+		if allowed[res.Class] {
+			out = append(out, res)
+		}
+	}
+	return out
+}
+
+// Evidence renders a result's support coarsely, the way AGENTS.md does.
+//
+// Exported so a prompt and a file say the same thing about the same rule. A
+// reviewer told "98%+ of 1000+ places" is being handed what a reader of the
+// conventions file was handed.
+func (r Result) Evidence() string { return band(r) }
+
+// TreeReader is the part of a version control provider ReadAtRevision needs.
+type TreeReader interface {
+	Tree(ctx context.Context, rev string) ([]string, error)
+	Read(ctx context.Context, rev, path string) ([]byte, error)
+}
+
+// ReadAtRevision reads a revision's own file list at that revision.
+//
+// The revision is enumerated from itself rather than from the working tree.
+// Walking the tree on disk and reading those paths at a base makes the base
+// measurement a function of the change: a file the change deleted or renamed is
+// never asked about, so a branch can remove the evidence against a convention
+// and have it reported as one.
+//
+// Every path here is one the revision holds, so a failed read is a failure and
+// not an absence. Dropping it would compute a share over a subset with nothing
+// saying which.
+func ReadAtRevision(ctx context.Context, r TreeReader, rev string, skipDir func(string) bool) ([]File, error) {
+	paths, err := r.Tree(ctx, rev)
+	if err != nil {
+		return nil, err
+	}
+
+	probed := map[string]bool{}
+	for _, l := range Languages() {
+		probed[l] = true
+	}
+
+	out := make([]File, 0, len(paths))
+	for _, p := range paths {
+		if skipPath(p, skipDir) {
+			continue
+		}
+		lang := bundle.Language(p)
+		if lang == "" {
+			continue
+		}
+		if !probed[lang] {
+			// In the census, and there is nothing at the revision worth
+			// fetching for it.
+			out = append(out, File{Path: p})
+			continue
+		}
+		src, err := r.Read(ctx, rev, p)
+		if err != nil {
+			// Named, because the caller reports this and a reader chasing a
+			// failed measurement needs the path rather than the revision they
+			// already typed.
+			return nil, fmt.Errorf("%s at %s: %w", p, rev, err)
+		}
+		out = append(out, File{Path: p, Src: src})
+	}
+	return out, nil
+}
+
+// skipPath reports whether any segment of a path is a skipped directory.
+//
+// ReadTree prunes while walking; a flat list from version control checks each
+// path for itself, and the two have to agree or a base and a working tree are
+// measured over different sets.
+func skipPath(p string, skipDir func(string) bool) bool {
+	if skipDir == nil {
+		return false
+	}
+	for _, seg := range strings.Split(p, "/") {
+		if skipDir(seg) {
+			return true
+		}
+	}
+	return false
 }

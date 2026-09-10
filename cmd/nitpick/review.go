@@ -209,7 +209,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		}
 	}
 
-	engine, err := newEngine(ctx, &f, repo, cfg, provider, log)
+	engine, err := newEngine(ctx, &f, repo, cfg, provider, ref, log)
 	if err != nil {
 		return err
 	}
@@ -303,7 +303,7 @@ func skipReason(pr *vcs.PullRequest, skipDraft bool, markers []string) string {
 // tools and improve did not, so `review.knowledge: true` meant four different
 // things depending on which command read it. A new entry point now gets
 // retrieval by construction instead of by remembering.
-func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Config, provider vcs.Provider, log *slog.Logger) (*review.Engine, error) {
+func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Config, provider vcs.Provider, ref vcs.Ref, log *slog.Logger) (*review.Engine, error) {
 	engine := &review.Engine{
 		Config:   cfg,
 		Provider: provider,
@@ -349,7 +349,29 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	}
 	engine.Knowledge = k
 
+	// The conventions this repository was measured to follow, counted at the
+	// base revision so the change cannot supply the standard it is reviewed
+	// against. Resolved here rather than inside the engine because this layer
+	// knows the checkout git can be run in; without one the run says so.
+	engine.Standards, engine.StandardsStatus = review.BuildStandards(ctx, cfg, repo,
+		baseRevisionFor(ctx, provider, ref, log), log)
+
 	return engine, nil
+}
+
+// baseRevisionFor resolves the revision a measurement should read, empty when
+// the provider cannot name one.
+//
+// Empty rather than an error: BuildStandards turns it into a skip with a
+// reason on the report, and a review that worked without a convention
+// measurement should not fail for want of one.
+func baseRevisionFor(ctx context.Context, provider vcs.Provider, ref vcs.Ref, log *slog.Logger) string {
+	rev, err := vcs.BaseRevision(ctx, provider, ref)
+	if err != nil {
+		log.Debug("no base revision for the convention measurement", "error", err)
+		return ""
+	}
+	return rev
 }
 
 // gate returns the severity that decides this run's exit status: the

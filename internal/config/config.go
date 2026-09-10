@@ -40,7 +40,7 @@ type Config struct {
 	Validation Validation `yaml:"validation"`
 
 	// Standards controls the measurement of the conventions this repository
-	// demonstrates.
+	// demonstrates, and `nitpick standards`.
 	Standards Standards `yaml:"standards"`
 
 	// Source records where the configuration was loaded from. It is empty when
@@ -528,6 +528,22 @@ type Review struct {
 	// report the reference, and a reviewer that invents defects out of a style
 	// guide is worse than one that misses them.
 	Knowledge bool `yaml:"knowledge"`
+
+	// Standards hands the reviewer the conventions this repository was measured
+	// to follow, counted at the base revision.
+	//
+	// The same shape as Knowledge and the same caution, with one difference
+	// that matters: an entry under knowledge is a claim about a language, and a
+	// rule here is a claim about this tree, so a reader who doubts it can
+	// recount it. That is why the share is rendered beside every rule rather
+	// than the rule alone.
+	//
+	// Off by default. Reference material beside a diff is a reason for a model
+	// to report the reference, and a reviewer that turns a house convention
+	// into a defect on every departure is worse than one that never heard of
+	// it. It needs a local checkout and a base revision; without either the run
+	// says so rather than measuring something else.
+	Standards bool `yaml:"standards"`
 
 	// KnowledgeQuery is what gets embedded to retrieve against: "batch", the
 	// changed lines of the whole batch as one query, or "file", one query per

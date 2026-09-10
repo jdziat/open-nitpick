@@ -245,3 +245,90 @@ func TestTheCommandIsParsedAgainstTheResolvedMention(t *testing.T) {
 		t.Error("a config file can override an operator's -mention flag")
 	}
 }
+
+// Every engine that reviews a pull request is offered the measured
+// conventions, or is named here with its reason.
+//
+// The same shape as the policy scan above and for the same reason: Engine is a
+// struct literal, so a caller who forgets the field gets a clean build, a green
+// suite, and a review that was never told what this repository does. The
+// difference from Policy is what forgetting costs: a missing resolver lets a
+// change choose its own rules, a missing measurement only loses context. It is
+// still a scan, because the thing being guarded is somebody adding a caller.
+func TestEveryReviewingEngineIsOfferedTheStandards(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatalf("root: %v", err)
+	}
+
+	// One exemption, not two. fullreview builds through newEngine, so it is
+	// covered rather than excused, and naming it here would be an exemption
+	// the scan never reaches: a claim nobody checks, which is what the policy
+	// scan above learned the same way.
+	exempt := map[string]string{
+		filepath.Join(root, "internal", "evals", "harness.go"): "fixtures, with no forge and no base revision",
+	}
+	used := map[string]bool{}
+
+	var missing []string
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			return err
+		case d.IsDir():
+			if name := d.Name(); name == ".git" || name == "website" || name == "node_modules" {
+				return filepath.SkipDir
+			}
+			return nil
+		case !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go"):
+			return nil
+		}
+
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(body)
+		if !strings.Contains(text, "review.Engine{") && !strings.Contains(text, "&Engine{") {
+			return nil
+		}
+		if _, ok := exempt[path]; ok {
+			used[path] = true
+			return nil
+		}
+		// In the literal or assigned afterwards. Knowledge is wired the second
+		// way and this follows it, so the scan reads whether the field is set
+		// rather than where. Accepting only the literal reported the one
+		// caller that does it correctly.
+		if assigned.MatchString(text) {
+			return nil
+		}
+		for _, block := range engineLiterals(text) {
+			if !wired(block, "Standards") {
+				missing = append(missing, path+": an engine that is never told what this repository does")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+
+	for path, reason := range exempt {
+		if !used[path] {
+			t.Errorf("%s is exempt for %q and the scan never reached it, so the exemption proves nothing",
+				path, reason)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("engines built without the measured conventions:\n  %s", strings.Join(missing, "\n  "))
+	}
+}
+
+// assigned matches an engine having its measurement set after construction,
+// the way Knowledge already is.
+//
+// Both the single and the multiple assignment forms, since the caller sets the
+// measurement and its status together. A field set through a helper reads as
+// unwired here, and this is a source scan rather than a type system.
+var assigned = regexp.MustCompile(`\.Standards\b[^=\n]*=\s*[^=]`)

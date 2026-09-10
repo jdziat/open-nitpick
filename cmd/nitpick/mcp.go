@@ -232,7 +232,7 @@ func (t *mcpTools) review(ctx context.Context, _ *mcp.CallToolRequest, in Review
 	}
 	provider := vcs.NewLocal(repo, io.Discard)
 	ref := vcs.Ref{Base: f.base, Head: f.head}
-	engine, err := newEngine(ctx, f, repo, cfg, provider, t.log)
+	engine, err := newEngine(ctx, f, repo, cfg, provider, ref, t.log)
 	if err != nil {
 		return nil, ReviewOut{}, err
 	}

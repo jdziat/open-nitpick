@@ -104,7 +104,7 @@ func TestNewEngineRefusesAMisconfiguredEmbedder(t *testing.T) {
 	cfg.Models.Embed = &config.ModelSpec{Provider: "synthetic", Model: "hf:not-the-indexed-model"}
 
 	_, err := newEngine(context.Background(), &reviewFlags{}, t.TempDir(), cfg,
-		vcs.NewLocal(t.TempDir(), io.Discard), slog.New(slog.DiscardHandler))
+		vcs.NewLocal(t.TempDir(), io.Discard), vcs.Ref{}, slog.New(slog.DiscardHandler))
 	if err == nil {
 		t.Fatal("an index built by a different embedding model was accepted; the run would report retrieval on and retrieve nothing")
 	}
@@ -119,7 +119,7 @@ func TestNewEngineLeavesRetrievalOffByDefault(t *testing.T) {
 	cfg := config.Defaults()
 
 	engine, err := newEngine(context.Background(), &reviewFlags{}, t.TempDir(), cfg,
-		vcs.NewLocal(t.TempDir(), io.Discard), slog.New(slog.DiscardHandler))
+		vcs.NewLocal(t.TempDir(), io.Discard), vcs.Ref{}, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("newEngine with retrieval off: %v", err)
 	}
