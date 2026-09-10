@@ -1,0 +1,49 @@
+# The ruleset a CONFORMITY MEASUREMENT reads, distinct from the one a review runs.
+#
+# golangci.yml beside this file pins `default: standard`, which is the right set
+# for a review: those rules find defects, and a review posts a comment for every
+# one it finds, so a noisy rule costs a reader's attention on a pull request.
+#
+# A conformity measurement posts nothing. It counts, over a whole tree, and asks
+# a different question: what does this repository do consistently. The rules that
+# answer that are exactly the ones a review must not run, because a convention is
+# not a defect and a reviewer reporting every departure from house style is the
+# dilution the generation scope exists to prevent.
+#
+# Measured over open-nitpick with `default: standard` alone: zero observations
+# across 290 files, which is correct and says nothing. Adding these: four rules
+# and enough spread that revive lands at 94% and reads as contested.
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    # Naming, documentation and idiom: what a person joining the repository has
+    # to learn by reading it.
+    - revive
+    # Wrapping, so errors.Is reaches a cause. errorlint's errorf check is the
+    # one a review would also want and does not have.
+    - errorlint
+    # Test discipline. A helper that does not mark itself reports failures at
+    # its own line.
+    - thelper
+    - nakedret
+    # Idiom a compiler accepts and a reader trips over.
+    - gocritic
+    - misspell
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+        - name: context-as-argument
+        - name: indent-error-flow
+        - name: var-naming
+        - name: receiver-naming
+        - name: error-strings
+
+  exclusions:
+    # The same reason as golangci.yml: under "lax" the first line of a file
+    # decides whether the file is analyzed, and the file is written by the tree
+    # being measured.
+    generated: disable

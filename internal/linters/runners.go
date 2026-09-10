@@ -231,8 +231,30 @@ func resolveConfig(path, repoRoot string) (string, error) {
 //go:embed golangci.yml
 var golangciDefaults []byte
 
-// writeGolangciDefaults materializes the embedded config and returns its path
-// and a cleanup function.
+// golangciConventions is the ruleset a conformity measurement reads.
+//
+// Separate from the review's because the two ask different questions. See the
+// file's own header.
+//
+//go:embed golangci-conventions.yml
+var golangciConventions []byte
+
+// writeGolangciDefaults materializes the review's ruleset outside the tree.
+func writeGolangciDefaults(repoRoot string) (string, func(), error) {
+	return writeGolangciConfig(repoRoot, golangciDefaults)
+}
+
+// WriteGolangciConventions materializes the conformity ruleset outside the
+// repository and returns its path and a cleanup function.
+//
+// Exported because the conformity measurement lives beside this package and has
+// to point the runner at a ruleset the review does not use.
+func WriteGolangciConventions(repoRoot string) (string, func(), error) {
+	return writeGolangciConfig(repoRoot, golangciConventions)
+}
+
+// writeGolangciConfig materializes one of our embedded rulesets and returns its
+// path and a cleanup function.
 //
 // The file must not be written inside the repository under review, that would
 // be this tool putting a config file into the tree and then reading policy out
@@ -246,7 +268,7 @@ var golangciDefaults []byte
 // It can be defeated by an operator whose TMPDIR points inside the checkout, and
 // that is precisely why the check is here rather than assumed: the answer is a
 // refusal with a reason, not a config written into the tree.
-func writeGolangciDefaults(repoRoot string) (string, func(), error) {
+func writeGolangciConfig(repoRoot string, body []byte) (string, func(), error) {
 	dir, err := os.MkdirTemp("", "open-nitpick-golangci-")
 	if err != nil {
 		return "", nil, fmt.Errorf("create a directory for open-nitpick's analyzer config: %w", err)
@@ -254,7 +276,7 @@ func writeGolangciDefaults(repoRoot string) (string, func(), error) {
 	cleanup := func() { _ = os.RemoveAll(dir) }
 
 	file := filepath.Join(dir, "golangci.yml")
-	if err := os.WriteFile(file, golangciDefaults, 0o600); err != nil {
+	if err := os.WriteFile(file, body, 0o600); err != nil {
 		cleanup()
 		return "", nil, fmt.Errorf("write open-nitpick's analyzer config: %w", err)
 	}

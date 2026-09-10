@@ -26,6 +26,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path"
 	"sort"
 	"strings"
 
@@ -97,11 +98,59 @@ type source struct {
 	// compile is skipped once rather than retried by every probe. A tree with
 	// a broken file still reports on the rest of itself.
 	parsed bool
+
+	// pkg is what the file's whole package declares, for a probe whose
+	// question is not answerable from one file.
+	//
+	// A constructor lives beside its type far more often than in the same
+	// file, so a per-file reading of "does this type have one" reported this
+	// repository at 27% against a true 75%. A probe about a package has to be
+	// given the package.
+	pkg *packageIndex
+}
+
+// packageIndex is what one directory's files declare between them.
+type packageIndex struct {
+	// constructors are the names after a New prefix, so NewEngine is "Engine"
+	// and a package-level New is "".
+	constructors map[string]bool
 }
 
 // newSource reads one file's text without parsing it.
-func newSource(path string, src []byte) *source {
-	return &source{path: path, lines: strings.Split(string(src), "\n")}
+func newSource(path string, src []byte, pkg *packageIndex) *source {
+	return &source{path: path, lines: strings.Split(string(src), "\n"), pkg: pkg}
+}
+
+// indexPackages reads what each directory declares, once, before any probe
+// looks at a file.
+func indexPackages(files []File) map[string]*packageIndex {
+	out := map[string]*packageIndex{}
+	for _, f := range files {
+		if f.Src == nil || !strings.HasSuffix(f.Path, ".go") || strings.HasSuffix(f.Path, "_test.go") {
+			continue
+		}
+		dir := path.Dir(f.Path)
+		ix := out[dir]
+		if ix == nil {
+			ix = &packageIndex{constructors: map[string]bool{}}
+			out[dir] = ix
+		}
+		fset := token.NewFileSet()
+		parsed, err := parser.ParseFile(fset, f.Path, f.Src, 0)
+		if err != nil {
+			continue
+		}
+		for _, d := range parsed.Decls {
+			fn, ok := d.(*ast.FuncDecl)
+			if !ok || fn.Recv != nil {
+				continue
+			}
+			if name, found := strings.CutPrefix(fn.Name.Name, "New"); found {
+				ix.constructors[name] = true
+			}
+		}
+	}
+	return out
 }
 
 // goFile parses the file as Go, returning nil when it does not parse.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -176,6 +177,8 @@ func Measure(files []File, opts Options) Report {
 		probed[l] = true
 	}
 
+	packages := indexPackages(files)
+
 	for _, f := range files {
 		lang := bundle.Language(f.Path)
 		rep.Files[lang]++
@@ -186,7 +189,7 @@ func Measure(files []File, opts Options) Report {
 				continue
 			}
 			if s == nil {
-				s = newSource(f.Path, f.Src)
+				s = newSource(f.Path, f.Src, packages[path.Dir(f.Path)])
 			}
 			acc := counts[p.ID]
 			for _, site := range p.sites(s) {
@@ -247,6 +250,7 @@ type Adherence struct {
 // proposal, and failing an author against a proposal is how a gate earns the
 // reputation that gets it switched off.
 func Score(files []File, base Report, touched map[string]map[int]bool, opts Options) map[string]Adherence {
+	packages := indexPackages(files)
 	standing := map[string]bool{}
 	for _, r := range base.Standards() {
 		standing[r.ID] = true
@@ -266,7 +270,7 @@ func Score(files []File, base Report, touched map[string]map[int]bool, opts Opti
 				continue
 			}
 			if s == nil {
-				s = newSource(f.Path, f.Src)
+				s = newSource(f.Path, f.Src, packages[path.Dir(f.Path)])
 			}
 			a := out[p.ID]
 			for _, site := range p.sites(s) {

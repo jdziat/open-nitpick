@@ -2078,3 +2078,91 @@ to measure it is affordable over a clone and is thousands of requests over an
 API, so this needs the checkout the Action always has. A reviewer running
 against a forge with no clone gets a skip and a reason, which is honest and is
 also less than the feature promises.
+
+### The analyzers become the instrument (2026-09-10)
+
+Six hand-written Go AST probes were the first instrument. Planting one violation
+per probe and running golangci-lint over the same file showed five of the six
+restating linters that already exist: `revive exported`, which this repository
+has had enabled the whole time, plus `errorlint errorf`, `revive
+context-as-argument`, `thelper` and `nakedret`. Only `go-test-name-sentence` has
+no linter equivalent. Writing more probes means reimplementing mature tools one
+language at a time, and `internal/linters` already carries 37 of them.
+
+So the analyzers are the instrument now and this package is what turns their
+output into something retirable. `Source`, `Observation` and `Coverage` are the
+whole interface, and a source can be a linter, a prose scan, an AST probe or a
+model without the arithmetic downstream being able to tell.
+
+A linter reports violations and never says out of what, so the denominator is
+the files it read. That is coarser than a site count and the floor moves with
+it: 95% of files clean over 12 covered files, against 85% over 12 sites. A file
+is a coarse unit and most files touch most rules zero times, so file shares sit
+near the top of the range, and at 85% nearly every rule any analyzer offers
+would be called a standard.
+
+Three things this measured on its own account, in one afternoon.
+
+**The shipped analyzer config measures defects, not conventions.**
+`internal/linters/golangci.yml` pins `default: standard`, which is errcheck,
+govet, ineffassign, staticcheck and unused. Over this tree it reports nothing,
+correctly, and a conformity report built on it is six rules of silence. The
+rules that express a convention are exactly the ones a review must not run,
+because a review posts comments and a conformity scan only counts. A conventions
+ruleset, separate from the review's, is the next piece of work and is not in
+this change.
+
+**A relative root silently measured nothing.** The runners resolve Go modules
+against the repository root, and passing `.` found no module, so every analyzer
+reported having run over zero targets. Absolute now.
+
+**And the defect this package exists to prevent, shipped again.** The first
+version set `Coverage.Ran` unconditionally and counted every file an enabled
+analyzer claims. On this machine `GOTOOLCHAIN=local` pins a go older than go.mod
+asks for, golangci-lint loads no packages, exits, and reports nothing: that
+version would have published the whole repository as conforming on the strength
+of an analyzer that never looked at it. Coverage is read back from the
+analyzers' own statuses now, and a tool that did not run contributes none of its
+files. The guard that names it passed against the bug at first, because its
+fixture gave the absent source no observations and a source with no observations
+contributes no denominator whatever the code does.
+
+Correcting it changed a verdict, which is the arithmetic doing its job: revive
+read 95.5% clean over 396 files when markdown, JSON and YAML were in its
+denominator, and 94.1% over the 290 files an analyzer actually read. Same
+violations, correct denominator, standard becomes contested.
+
+### A conformity ruleset, separate from the review's (2026-09-10)
+
+`internal/linters/golangci.yml` pins `default: standard`, and over this tree it
+reports nothing. That is correct for a review and useless for a measurement: the
+standard set finds defects, and a review posts a comment for each one, so a
+noisy rule costs a reader's attention on a pull request.
+
+A conformity scan posts nothing and asks a different question, so it reads a
+different ruleset. `golangci-conventions.yml` adds revive with six named rules,
+errorlint, thelper, nakedret, gocritic and misspell. Over the same 292 files
+that produced zero observations, it produces 21 across four rules, and the
+spread is the signal: errcheck, revive and thelper at 99.3% clean, gocritic at
+97.9%. An operator who named their own config keeps it, because that is policy.
+
+### Four site definitions for one convention, and none of them shippable (2026-09-10)
+
+`nitpick standards` was pointed at this repository's constructor habits, and the
+denominator was the whole disagreement four times over. Every exported struct:
+10/167. Plus unexported fields: 6/22. Plus methods: 6/20. A collaborator
+discriminator built from the field types: it disagreed with a hand-labelled set
+on 5 of 20, calling `evals.Aggregate`, `Meter`, `Price` and `llm.Roles`
+collaborators and `review.Engine` a value.
+
+The reading that holds is in issue #105 and came from looking at the split
+rather than from another guess: the six types with constructors are all
+collaborators, the fourteen without divide into nine value types nobody would
+give one and five genuine collaborators, two of which already have `Build*`
+builders. The convention is 6/11, not 6/20.
+
+What that establishes is not a probe. It is that the site definition IS the
+convention, so choosing one is choosing which claim to test, and a probe whose
+sites disagree with a person's labels is measuring a different rule than the one
+it names. None of the four shipped, and the fourth was deleted rather than
+committed with a number nobody believes.
