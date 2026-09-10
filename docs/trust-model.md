@@ -120,7 +120,10 @@ into a fix that writes to the repository. The checkout's mention is a
 pre-filter, cheap enough to run on every comment and unable to act on its own,
 and the command is parsed again against the resolved policy's mention before
 anything happens. A change can therefore make the reviewer look at a comment it
-would otherwise ignore, and cannot make it do anything with one.
+would otherwise ignore, and cannot make it do anything with one. The other
+direction is self-harm and is left alone: a change that narrows its own mention
+fails the pre-filter, so the reviewer answers nothing on that pull request,
+including a maintainer asking it to.
 
 ## api_key_env may never name a forge credential
 

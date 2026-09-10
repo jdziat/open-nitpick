@@ -744,6 +744,11 @@ func TestTheAdoptionPullRequestIsToldWhyNothingRan(t *testing.T) {
 	t.Setenv(config.EnvProvider, "")
 	t.Setenv(config.EnvModel, "")
 
+	// And no user-level file, which merges under the one this writes. A
+	// machine set up to run the eval battery has one, so without this the
+	// fixture is not the config the test says it is.
+	t.Setenv(config.EnvNoUserConfig, "1")
+
 	root := t.TempDir()
 	path := filepath.Join(root, config.FileName)
 	body := "models:\n  default:\n    provider: openai\n    model: gpt-4o\n"

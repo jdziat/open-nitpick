@@ -31,6 +31,12 @@ func clearModelEnv(t *testing.T) {
 	} {
 		t.Setenv(name, "")
 	}
+
+	// And the developer's own config, which merges under whatever a test
+	// loads. Without this, a machine set up to run the eval battery fails
+	// TestDefaultConfigSurvivesSanitize on a repository config that is fine,
+	// and reads as this repository being unable to load its own settings.
+	t.Setenv(config.EnvNoUserConfig, "1")
 }
 
 // TestOpenRouterBuildsWithOnlyItsOwnKey is the shipped default's contract: a
