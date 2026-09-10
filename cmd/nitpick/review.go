@@ -304,25 +304,17 @@ func skipReason(pr *vcs.PullRequest, skipDraft bool, markers []string) string {
 // things depending on which command read it. A new entry point now gets
 // retrieval by construction instead of by remembering.
 func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Config, provider vcs.Provider, ref vcs.Ref, log *slog.Logger) (*review.Engine, error) {
-	engine := &review.Engine{
-		Config:   cfg,
-		Provider: provider,
-		Log:      log,
-
-		// A change may not supply the policy it is reviewed under. Wired here
-		// rather than defaulted inside the engine because only this layer knows
-		// the checkout the diff's paths are relative to and which forge resolves
-		// revisions.
-		Policy: &config.BasePolicy{RepoRoot: repo, Loaded: cfg, Provider: provider},
-
-		// Built from the policy the engine resolved, never from the file on
-		// disk: models.* names the model, its temperature and its token ceiling,
-		// so clients built here from cfg would let a change that edits.
-		// nitpick.yaml still choose what reviews it.
-		Models: func(policy *config.Config) (*llm.Roles, error) { return llm.BuildRoles(policy) },
-
-		Instruction: f.instruction,
-	}
+	// A change may not supply the policy it is reviewed under, and the models
+	// are built from the policy the engine resolved rather than the file on
+	// disk: models.* names the model, its temperature and its token ceiling, so
+	// clients built here from cfg would let a change that edits .nitpick.yaml
+	// still choose what reviews it. Both are arguments rather than fields
+	// because a review without them means something other than a review.
+	engine := review.NewEngine(cfg, provider,
+		&config.BasePolicy{RepoRoot: repo, Loaded: cfg, Provider: provider},
+		func(policy *config.Config) (*llm.Roles, error) { return llm.BuildRoles(policy) },
+		log)
+	engine.Instruction = f.instruction
 
 	// Built per review from the resolved policy for the same reason. The
 	// analyzers read review.ignore themselves, so a change that edits.
