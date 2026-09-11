@@ -2175,3 +2175,38 @@ func (e *Engine) framingTokens(pr *vcs.PullRequest) int {
 // testUnusableVerdicts is set by a test to catch a triage reply whose verdicts
 // all name nothing, which is what an unconverted fixture looks like from here.
 var testUnusableVerdicts func(verdicts int)
+
+// NewEngine builds a reviewing engine with the wiring a review cannot do
+// without: the four arguments whose absence changes what a review MEANS rather
+// than what it covers. Everything else is optional and set on the result.
+//
+// The fields stay exported, so this cannot stop anyone writing the literal.
+func NewEngine(cfg *config.Config, provider vcs.Provider, policy PolicyResolver,
+	models func(policy *config.Config) (*llm.Roles, error), log *slog.Logger) *Engine {
+	if log == nil {
+		log = slog.New(slog.DiscardHandler)
+	}
+	return &Engine{Config: cfg, Provider: provider, Policy: policy, Models: models, Log: log}
+}
+
+// NoPolicy is the resolver for a review with no base revision, carrying the
+// reason to the call site.
+//
+// Two constructions legitimately have none: a tree review, whose operator wrote
+// the policy, and the eval harness, which reviews fixtures with no forge behind
+// them. Both were exemptions in a map inside a test file, which is a claim
+// nobody reads where it applies.
+func NoPolicy(reason string) PolicyResolver { return noPolicy{reason: reason} }
+
+// noPolicy resolves nothing and says why.
+type noPolicy struct{ reason string }
+
+// ResolvePolicy reports that the change modified no policy, which is the
+// answer when there is no base revision to have modified one against.
+func (n noPolicy) ResolvePolicy(context.Context, vcs.Ref, *vcs.PullRequest, []string) (
+	*config.Config, bool, error) {
+	return nil, false, nil
+}
+
+// Reason names why this construction resolves no policy.
+func (n noPolicy) Reason() string { return n.reason }

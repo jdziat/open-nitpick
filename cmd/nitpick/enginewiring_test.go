@@ -57,6 +57,16 @@ func TestEveryReviewingEngineResolvesItsPolicy(t *testing.T) {
 		}
 		text := string(body)
 
+		// Before the early return below, and that placement is the point. A
+		// caller moved to review.NewEngine has no literal left, so a scan that
+		// reads literals alone passes that file by absence and reports nothing
+		// about the one construction it most wants to check. This guard was
+		// written after the return the first time and stayed green with the
+		// resolver set to nil.
+		if nilArg.MatchString(text) {
+			missing = append(missing, path+": calls NewEngine with a bare nil argument")
+		}
+
 		// The assignment form first, because it has no literal to find.
 		// fullreview builds a policied engine through newEngine and then clears
 		// the field, so a scan of literals alone returns before it ever looks.
@@ -332,3 +342,11 @@ func TestEveryReviewingEngineIsOfferedTheStandards(t *testing.T) {
 // measurement and its status together. A field set through a helper reads as
 // unwired here, and this is a source scan rather than a type system.
 var assigned = regexp.MustCompile(`\.Standards\b[^=\n]*=\s*[^=]`)
+
+// nilArg matches a NewEngine call passing a bare nil for any argument.
+//
+// The negated class spans newlines deliberately: the first version stopped at
+// the line break and the only call in the tree is spelled across four, so the
+// guard stayed green with the resolver nil. A nil arriving through a variable
+// still reads as wired.
+var nilArg = regexp.MustCompile(`NewEngine\([^()]*\bnil\b`)
