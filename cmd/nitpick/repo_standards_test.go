@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -120,6 +121,9 @@ func TestRepoStandardsRejectsEmptyAndMistypedChecks(t *testing.T) {
 }
 
 func TestRepoStandardsRunsRealLinterAdapter(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fixture is a POSIX shell script")
+	}
 	repo := t.TempDir()
 	write(t, repo, "app.py", "import os\n")
 	toolDir := t.TempDir()
