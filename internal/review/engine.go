@@ -521,6 +521,23 @@ func (r *Report) Complete() bool { return len(r.Incomplete) == 0 }
 // when the broad one was meant is how a failed triage reached exit 0.
 func (r *Report) PipelineComplete() bool { return r.Complete() && len(r.Stages) == 0 }
 
+// reusableCoverage requires completed work for every file the policy included.
+func (r *Report) reusableCoverage() bool {
+	if !r.PipelineComplete() {
+		return false
+	}
+	if r.Plan != nil {
+		for _, skip := range r.Plan.Skipped {
+			switch skip.Reason {
+			case bundle.ReasonIgnored, bundle.ReasonGenerated, bundle.ReasonBinary, bundle.ReasonDeleted, bundle.ReasonNoChanges:
+			default:
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // FailedStages names the stages that did not complete, for an output that
 // carries one line.
 func (r *Report) FailedStages() []string {
@@ -833,8 +850,8 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// After the gate, so what is counted as "already posted" is what would
 	// otherwise have been posted, and nothing below min_severity is.
 	findings, report.AlreadyReported = withholdAlreadyReported(findings, prior)
-	if report.PipelineComplete() && len(plan.Skipped) == 0 {
-		report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported)
+	if report.reusableCoverage() {
+		report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported, plan.Skipped)
 	}
 
 	// Triage's drops are disclosed exactly as an expert's refutations are:
@@ -1014,7 +1031,7 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 // comment when the earlier revision could not be compared. Each resolved
 // thread gets a reply saying why, so a reader is not left with a silent
 // close.
-func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorReview, inc *Incremental, findings, withheld []Finding) []vcs.PriorComment {
+func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorReview, inc *Incremental, findings, withheld []Finding, skipped []bundle.Skip) []vcs.PriorComment {
 	if !e.Config.Review.ResolveSuperseded || prior == nil || inc == nil || inc.Since == "" {
 		return nil
 	}
@@ -1026,6 +1043,10 @@ func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorRe
 	for _, p := range inc.Reviewed {
 		reread[p] = true
 	}
+	excluded := map[string]bool{}
+	for _, skip := range skipped {
+		excluded[skip.Path] = true
+	}
 	recurred := map[string]bool{}
 	for _, f := range append(append([]Finding(nil), findings...), withheld...) {
 		recurred[Fingerprint(f)] = true
@@ -1033,7 +1054,7 @@ func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorRe
 	var candidates []vcs.PriorComment
 	var ids []int64
 	for _, c := range prior.Comments {
-		if c.ID == 0 || recurred[c.Fingerprint] {
+		if c.ID == 0 || recurred[c.Fingerprint] || excluded[c.Path] {
 			continue
 		}
 		if c.Line == 0 || reread[c.Path] {

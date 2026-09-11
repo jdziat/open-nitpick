@@ -24,10 +24,14 @@ func TestCheckoutSkipPolicyMustNotSkipReview(t *testing.T) {
 			return
 		}
 		if strings.Contains(r.URL.Path, "/commits/") {
-			json.NewEncoder(w).Encode(map[string]any{"commit": map[string]any{"message": "normal commit"}})
+			if err := json.NewEncoder(w).Encode(map[string]any{"commit": map[string]any{"message": "normal commit"}}); err != nil {
+				t.Error(err)
+			}
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]any{"number": 7, "title": "BYPASS", "head": map[string]any{"sha": "deadbeef"}, "base": map[string]any{"sha": "beef0001"}})
+		if err := json.NewEncoder(w).Encode(map[string]any{"number": 7, "title": "BYPASS", "head": map[string]any{"sha": "deadbeef"}, "base": map[string]any{"sha": "beef0001"}}); err != nil {
+			t.Error(err)
+		}
 	}))
 	defer srv.Close()
 	t.Setenv("GITHUB_API_URL", srv.URL+"/")

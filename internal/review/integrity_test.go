@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/llm"
@@ -135,5 +136,48 @@ func TestSkipMarkersComeFromAcceptedPolicy(t *testing.T) {
 		if !accepted && m.callCount() == 0 {
 			t.Fatal("hostile skip marker prevented review")
 		}
+	}
+}
+
+func TestIntentionalExclusionsPreserveReusableCoverage(t *testing.T) {
+	for _, tc := range []struct {
+		reason     string
+		incomplete bool
+	}{
+		{bundle.ReasonIgnored, false}, {bundle.ReasonGenerated, false},
+		{bundle.ReasonBinary, false}, {bundle.ReasonDeleted, false},
+		{bundle.ReasonNoChanges, false}, {bundle.ReasonFileLimit, true},
+		{bundle.ReasonUnavailable, true}, {"unknown reason", true},
+	} {
+		t.Run(tc.reason, func(t *testing.T) {
+			r := &Report{Plan: &bundle.Plan{Skipped: []bundle.Skip{{Path: "excluded.go", Reason: tc.reason}}}}
+			if got := Render(r, nil, config.Defaults()).Incomplete; got != tc.incomplete {
+				t.Fatalf("incomplete=%v, want %v", got, tc.incomplete)
+			}
+		})
+	}
+}
+
+func TestIgnoredFilesKeepTheirThreadsWithoutBlockingReviewedThreads(t *testing.T) {
+	p := &resolvingProvider{incrementalProvider: incrementalProvider{
+		stubProvider: stubProvider{diff: incrementalDiff}, head: "beef02",
+		prior: &vcs.PriorReview{Head: "beef01", Comments: []vcs.PriorComment{
+			{ID: 1, Path: "app.go", Line: 4, Fingerprint: "abcd"},
+			{ID: 2, Path: "other.go", Line: 3, Fingerprint: "beef"},
+		}},
+	}}
+	e := newEngine(t, &scriptedLLM{fallback: `{"findings":[]}`}, p, func(c *config.Config) { c.Review.Ignore = []string{"other.go"} })
+	r, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Plan.Skipped) != 1 || r.Plan.Skipped[0].Reason != bundle.ReasonIgnored {
+		t.Fatalf("expected an ignored file: %+v", r.Plan.Skipped)
+	}
+	if len(p.resolved) != 1 || p.resolved[0] != 1 {
+		t.Fatalf("resolved %v, want only reviewed app.go thread", p.resolved)
+	}
+	if p.published.Incomplete {
+		t.Fatal("ignored file prevented baseline reuse")
 	}
 }

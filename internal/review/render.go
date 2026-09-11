@@ -52,7 +52,7 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 		Event:      reviewEvent(report, cfg),
 		Comments:   make([]vcs.Comment, 0, len(report.Findings)),
 		Head:       report.Head,
-		Incomplete: !report.PipelineComplete() || (report.Plan != nil && len(report.Plan.Skipped) > 0),
+		Incomplete: !report.reusableCoverage(),
 	}
 
 	// What this run was priced at, recorded with the review so a later run
