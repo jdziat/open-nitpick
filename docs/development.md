@@ -113,3 +113,23 @@ The whole pipeline is tested against a scripted model and a stub GitHub API, so
 the test suite exercises real behavior rather than mocks of its own design. Diff
 position mapping is additionally cross-checked against real `git diff` output by
 a second, independent implementation.
+
+
+### Language standards integration tests
+
+`TestLanguageConventionLintersRejectViolationsAndAcceptCleanFiles` runs Ruff,
+ESLint, PMD, and RuboCop on bad and clean fixtures, including project configs
+that try to disable rules. Install the pinned tools outside this checkout with
+`scripts/install-language-linters.sh /tmp/nitpick-language-tools`. The script
+requires Python with venv, Node 24, Ruby, Java 21, curl, and unzip. Add its
+`python/bin`, `node/node_modules/.bin`, `gems/bin`, and `pmd-bin-7.27.0/bin`
+directories to `PATH`, and set `GEM_HOME` and `GEM_PATH` to its `gems` directory.
+
+Run the integration checks with all four tools required:
+
+```bash
+NITPICK_REQUIRE_LANGUAGE_LINTERS=1 go test ./internal/linters -run '^TestLanguageConvention' -count=1 -v
+```
+
+ CI uses that
+mode so a missing binary fails instead of skipping the integration tests.

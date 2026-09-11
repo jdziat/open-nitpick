@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -75,6 +77,11 @@ func (s *StandardsSource) Observe(ctx context.Context, root string, files []stan
 		cfg.Linters.GolangciConfig = path
 	}
 
+	cleanup, err := languageConventionConfigs(abs, &cfg)
+	if err != nil {
+		return nil, standards.Coverage{Why: "conformity ruleset: " + err.Error()}, nil
+	}
+	defer cleanup()
 	set := New(abs, &cfg, s.log)
 	claims := claimedFiles(set, files)
 	if len(claims) == 0 {
@@ -219,4 +226,48 @@ func countLines(path string) (int, error) {
 		return 0, err
 	}
 	return strings.Count(string(src), "\n") + 1, nil
+}
+
+// languageConventionConfigs preserves explicit operator settings and supplies
+// portable convention rules without loading project plugins or configuration.
+func languageConventionConfigs(root string, cfg *config.Config) (func(), error) {
+	dir, err := os.MkdirTemp("", "open-nitpick-conventions-")
+	if err != nil {
+		return nil, err
+	}
+	cleanup := func() { _ = os.RemoveAll(dir) }
+	cfg.Linters.Configs = maps.Clone(cfg.Linters.Configs)
+	if cfg.Linters.Configs == nil {
+		cfg.Linters.Configs = map[string]string{}
+	}
+	for _, spec := range []struct {
+		name, file string
+		target     *string
+	}{
+		{"ruff", "ruff-conventions.toml", &cfg.Linters.RuffConfig},
+		{"eslint", "eslint-conventions.mjs", &cfg.Linters.ESLintConfig},
+		{"rubocop", "rubocop-conventions.yml", nil},
+		{"pmd", "pmd-conventions.xml", nil},
+	} {
+		if !slices.Contains(cfg.Linters.Enabled, spec.name) {
+			continue
+		}
+		if spec.target != nil && *spec.target != "" || spec.target == nil && cfg.Linters.Configs[spec.name] != "" {
+			continue
+		}
+		file, err := writeShipped(dir, spec.file)
+		if err == nil {
+			file, err = resolveConfig(file, root)
+		}
+		if err != nil {
+			cleanup()
+			return nil, err
+		}
+		if spec.target != nil {
+			*spec.target = file
+		} else {
+			cfg.Linters.Configs[spec.name] = file
+		}
+	}
+	return cleanup, nil
 }

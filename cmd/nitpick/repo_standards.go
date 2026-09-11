@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/linters"
 	"github.com/jdziat/open-nitpick/internal/standards"
@@ -80,7 +81,7 @@ func repoStandardsCommand(ctx context.Context, args []string, out io.Writer, sou
 	if err != nil {
 		return err
 	}
-	result := RepoStandardsResult{Report: report, Analyzers: linters.Suggest(paths)}
+	result := RepoStandardsResult{Report: report, Analyzers: repoStandardsAnalyzers(paths)}
 	result.Recommendations = repoStandardsRecommendations(result.Report)
 	if !noLinters {
 		lintCfg := config.Defaults()
@@ -142,6 +143,9 @@ func repoStandardsRecommendations(report standards.Report) []string {
 }
 
 func (r RepoStandardsResult) check(noLinters bool) error {
+	if len(r.Report.Unmeasured) > 0 {
+		return errIncomplete
+	}
 	sites := 0
 	violates := false
 	for _, res := range r.Report.Results {
@@ -214,4 +218,20 @@ func (r RepoStandardsResult) text() string {
 	}
 	b.WriteString("\nUse nitpick repo-standards -check in CI to enforce established conventions and linter checks.\n")
 	return b.String()
+}
+
+func repoStandardsAnalyzers(paths []string) []linters.CatalogEntry {
+	entries := linters.Suggest(paths)
+	selected := map[string]bool{}
+	for _, language := range bundle.Languages(paths) {
+		selected[map[string]string{"go": "golangci-lint", "python": "ruff", "javascript": "eslint", "ruby": "rubocop", "java": "pmd"}[language]] = true
+	}
+	for i := range entries {
+		if selected[entries[i].Name] {
+			entries[i].Default = true
+			entries[i].NeedsConfig = false
+			entries[i].Configuration = "open-nitpick's isolated convention rules"
+		}
+	}
+	return entries
 }

@@ -81,11 +81,14 @@ proposals, lists the exceptions, and suggests analyzers for the languages it
 finds. A linter's silence is not evidence that a particular convention is
 universal; the report keeps linter observations separate from probe counts.
 
-Applicable default analyzers run across whole files: golangci-lint for Go and
-ruff for Python. Select additional tools with `-linters`; `nitpick linters`
-lists their configuration requirements. Tools must already be installed.
+Applicable default analyzers run across whole files: golangci-lint for Go,
+Ruff for Python, ESLint for JavaScript, PMD for Java, and RuboCop for Ruby.
+Select additional tools with `-linters`; `nitpick linters` lists their
+configuration requirements. Tools must already be installed.
 Analyzers use nitpick's isolated rules, including its Go convention ruleset,
-and do not execute repository-supplied linter configurations. The command does
+and do not execute repository-supplied linter configurations. The standards
+command supplies an ESLint config using built-in rules; ordinary reviews still
+require an operator ESLint config. The command does
 not install tools or change source, linter configuration, or `AGENTS.md`.
 
 `-check` fails for exceptions to established conventions or any linter
@@ -96,8 +99,38 @@ Without `-check`, the report is advisory and still discloses unavailable checks.
 disabled probes, leaving model configuration and credentials unused.
 
 This repository runs `go run ./cmd/nitpick repo-standards -check` in CI after
-ordinary lint, using the Go toolchain in `go.mod` and golangci-lint pinned in
-`tools/go.mod`. Run the same command before pushing.
+ordinary lint, using the Go toolchain in `go.mod`, golangci-lint pinned in
+`tools/go.mod`, and ESLint 10.8.0 for the shipped JavaScript configuration.
+Run the same command before pushing.
+
+The probes now measure these additional conventions:
+
+| Language | Probe | Sites counted | Linter rules |
+|---|---|---|---|
+| Python | `python-function-snake-case` | Named functions and methods, including async and special methods | Ruff N802 |
+| Python | `python-class-pascal-case` | Class declarations; leading private underscores allowed | Ruff N801 |
+| JavaScript | `javascript-class-pascal-case` | Named class declarations and expressions | ESLint class-name selectors |
+| JavaScript | `javascript-strict-equality` | `==`, `!=`, `===`, and `!==` operators | ESLint eqeqeq |
+| Java | `java-type-pascal-case` | Classes, interfaces, annotation types, enums, and records | PMD ClassNamingConventions |
+| Java | `java-package-lowercase` | Package declarations | PMD PackageCase |
+| Ruby | `ruby-method-snake-case` | Explicit method definitions; operator methods excluded | RuboCop Naming/MethodName |
+| Ruby | `ruby-type-pascal-case` | Class and module declarations, including qualified names | RuboCop Naming/ClassAndModuleCamelCase |
+
+These are lexical checks, not full language parsers. Comments and literal text
+are excluded; JavaScript template and JSX expressions are code. Ruby predicate,
+bang, and setter suffixes are allowed. Ruby heredoc bodies are excluded,
+including interpolation inside those bodies. `Gemfile`, `Rakefile`, `.gemspec`,
+and `.rake` files are recognized as Ruby; `.pyi` is Python, and `.mjs`, `.cjs`,
+and `.jsx` are JavaScript. TypeScript has no convention probes yet.
+
+Lexer failures appear in `unmeasured` in JSON, make `-check` exit 2, and prevent
+`agents` from writing an incomplete measurement. Java Unicode escapes and
+multiple heredoc openers on one Ruby line are not supported by these probes.
+Unterminated Ruby `<<` and `<<-` arguments can resemble append expressions and
+escape lexical detection; RuboCop reports their syntax errors. Probe-only
+measurements do not establish that source files parse successfully.
+Linters provide syntax checks and broader rule coverage; their observations
+remain separate from the probe denominators.
 
 The evidence is measured in the current tree. For conventions fixed at a base
 revision when evaluating a pull request, use `nitpick standards -base main`.

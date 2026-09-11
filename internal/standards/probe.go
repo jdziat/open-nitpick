@@ -89,6 +89,10 @@ type Site struct {
 // Six probes over a tree is six parses per file if each parses for itself, and
 // the parse dominates the walk.
 type source struct {
+	tokens   []sourceToken
+	lexed    bool
+	lexError string
+
 	path  string
 	lines []string
 
@@ -204,6 +208,14 @@ var Probes = []Probe{
 	namedResultNoNakedReturn,
 	testNameSentence,
 	testHelperMarks,
+	pythonFunctionSnakeCase,
+	pythonClassPascalCase,
+	javascriptClassPascalCase,
+	javascriptStrictEquality,
+	javaTypePascalCase,
+	javaPackageLowercase,
+	rubyMethodSnakeCase,
+	rubyTypePascalCase,
 }
 
 // Find returns the probe with the given ID.
@@ -218,7 +230,7 @@ func Find(id string) (Probe, bool) {
 
 // Languages are the languages some probe reads, sorted.
 //
-// A caller reports "no probes for python" from this rather than from an empty
+// A caller reports "no probes for typescript" from this rather than from an empty
 // result, so silence over an unprobed language is distinguishable from a tree
 // that conforms. See docs/measurement.md Rule 10.
 func Languages() []string {

@@ -2255,3 +2255,35 @@ analyzer and toolchain. The probes cover Go only, and analyzer file coverage
 does not prove that every build tag was checked. Eval-tag compilation remains
 a separate vet gate. The thresholds describe the current tree, so a broad
 convention change can alter which rules qualify as established standards.
+
+### Standards probes for four more languages (2026-09-11)
+
+Eight lexical probes add Python function/class naming, JavaScript class naming
+and strict equality, Java type/package naming, and Ruby method/type naming.
+They use Chroma 2.27.0 without a language runtime; external linters validate
+syntax and supply separate observations. TypeScript remains unprobed.
+
+The integration test runs four bad/clean fixture pairs against Ruff 0.16.1,
+ESLint 10.8.0, PMD 7.27.0, and RuboCop 1.81.7. Each bad fixture must report both
+of its target rules, and each clean fixture must report zero observations with
+nonempty coverage. Project configurations that disable rules accompany the
+fixtures. All four pairs passed locally; CI requires the tools to be present.
+This verifies those rules and their configuration isolation, not precision on
+production repositories.
+
+The lexical controls exclude comments, strings, Ruby heredoc bodies, and JSX
+text while retaining JSX expressions. One Ruby namespace fixture initially
+returned the expected conforming/total count while identifying the wrong
+declaration. It now asserts the violating line as well as the count. This is
+why a correct numerator and denominator alone do not establish correct sites.
+
+These probes do not validate complete language grammars. Lexer errors, Java
+Unicode escapes, and unsupported Ruby heredoc forms are reported as unmeasured;
+`repo-standards -check` exits 2 and `agents` refuses to regenerate from that
+measurement. Ruby heredoc interpolation is outside the probe denominator.
+
+Review exposed ambiguity between Ruby append expressions and heredoc openers.
+Regression controls cover three append spacing forms. Unterminated `<<` and
+`<<-` arguments can still be counted lexically; a real RuboCop integration
+control requires syntax findings for those forms and `<<~`. This limits the
+probe-only measurement: it does not establish syntactic validity.
