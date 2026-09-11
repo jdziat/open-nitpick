@@ -393,3 +393,20 @@ date. They remain visible in the report. File evidence
 changes invalidate the fingerprint; exceptions cannot attest that a skipped
 instrument ran. AI slop findings describe defects in code or prose and never
 classify authorship.
+
+### This repository's engineering policy
+
+Open-nitpick requires its convention, analyzer, commit, and deterministic slop
+checks to complete. Its six established Go conventions remain required even
+if later violations would lower them below the inference threshold. Direct
+imports of `os/exec` and `net/http` are forbidden in the commit validator and
+convention probes; this is a source import constraint, not a sandbox guarantee.
+
+CI reports deterministic engineering coverage over the accepted commit range;
+the existing standards and commit jobs remain gates.
+Pull request reviews build the current source and select the engineering profile
+from accepted policy. Model slop/design checks run but are optional and advisory:
+provider failures stay visible, and a passing policy gate does not mean these
+assessments completed. The paired controls in `docs/findings.md` do not justify
+blocking merges on model judgments. Deterministic prose tells also remain
+advisory while their existing findings are assessed.

@@ -2400,3 +2400,14 @@ second captured-tree diff, rejecting a deletion-only source scope, and hiding a
 failed stage behind empty-scope inapplicability. The deletion-only control requires
 one examined commit and zero model targets; it does not call an unexecuted model
 assessment completed.
+
+
+The internal-adoption boundary control used a temporary module named
+`github.com/jdziat/open-nitpick` and one tracked source file at
+`internal/commits/subject.go`. Under the proposed repository policy, the
+blank import `strings` completed the boundary check over one source with zero
+findings; replacing it with `net/http` completed the same check with one blocking
+finding. Models and linters were disabled for this control, so this establishes
+only direct-import matching. It does not establish full engineering completion.
+The four-file adoption diff passed a Nitpick review with zero findings, a
+deterministic slop scan with zero tells, and actionlint 1.7.7.
