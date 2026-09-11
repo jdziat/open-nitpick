@@ -80,7 +80,7 @@ func TestAlreadyReportedMatchesByFingerprintOrPlace(t *testing.T) {
 	}
 }
 
-func TestIncrementalReviewReadsOnlyChangedFilesAndWithholdsPosted(t *testing.T) {
+func TestStandingFindingsAreRecheckedWithoutDuplicateComments(t *testing.T) {
 	appFinding := Finding{
 		Path: "app.go", Line: 4, Severity: "error", Category: "correctness", Class: "correctness",
 		Title: "Ignored error from http.Get", Rationale: "resp may be nil, so the deferred Close panics.",
@@ -107,16 +107,11 @@ func TestIncrementalReviewReadsOnlyChangedFilesAndWithholdsPosted(t *testing.T) 
 	if report.Incremental == nil {
 		t.Fatal("expected an incremental note")
 	}
-	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go" {
-		t.Errorf("reviewed = %q, want only the file that moved", got)
+	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go,other.go" {
+		t.Errorf("reviewed = %q, want the whole change while prior findings stand", got)
 	}
-	if got := strings.Join(report.Incremental.Unchanged, ","); got != "other.go" {
-		t.Errorf("unchanged = %q", got)
-	}
-	for _, p := range model.prompts() {
-		if strings.Contains(p, "other.go") {
-			t.Error("a file unchanged since the last review was sent to the model")
-		}
+	if len(report.Incremental.Unchanged) != 0 {
+		t.Errorf("unread files = %v", report.Incremental.Unchanged)
 	}
 
 	if len(report.Findings) != 0 || len(report.AlreadyReported) != 1 {
@@ -129,7 +124,7 @@ func TestIncrementalReviewReadsOnlyChangedFilesAndWithholdsPosted(t *testing.T) 
 		t.Errorf("published head = %q", provider.published.Head)
 	}
 	if !strings.Contains(provider.published.Summary, "already posted") ||
-		!strings.Contains(provider.published.Summary, "changed since the review at `old`") {
+		!strings.Contains(provider.published.Summary, "Rechecked the whole change") {
 		t.Errorf("summary does not disclose the incremental review:\n%s", provider.published.Summary)
 	}
 	if len(provider.published.Comments) != 0 {
@@ -349,13 +344,13 @@ func TestIncrementalRunResolvesSupersededComments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Review: %v", err)
 	}
-	if got := fmt.Sprint(provider.resolved); got != "[2 4]" {
+	if got := fmt.Sprint(provider.resolved); got != "[2 3 4]" {
 		t.Errorf("resolved = %s, want the superseded comment on the re-read file and the outdated one", got)
 	}
-	if len(report.Superseded) != 2 || !strings.Contains(provider.reply, "did not recur") || !strings.Contains(provider.reply, "old") {
+	if len(report.Superseded) != 3 || !strings.Contains(provider.reply, "did not recur") || !strings.Contains(provider.reply, "old") {
 		t.Errorf("superseded = %+v, reply = %q", report.Superseded, provider.reply)
 	}
-	if !strings.Contains(Render(report, report.Files, newEngine(t, model, provider, nil).Config).Summary, "2 earlier comment thread(s) were resolved") {
+	if !strings.Contains(Render(report, report.Files, newEngine(t, model, provider, nil).Config).Summary, "3 earlier comment thread(s) were resolved") {
 		t.Error("the notice does not say the threads were resolved")
 	}
 

@@ -524,3 +524,16 @@ run's incomplete list; it is never reported as a clean review.
 
 This is what makes small local models usable: they need the fallback, and
 hard-coding the strict path would exclude them.
+
+## Review history and commit identity
+
+Persisted review markers are accepted only from the trusted posting account,
+resolved independently through GitHub. Model-authored markers are removed
+before publication. A completed-run marker permits incremental reuse; a
+failed run cannot certify the files it missed.
+
+Pull request content reads use the captured head SHA, and the diff is refused
+if the PR moved while it was fetched. Published reviews carry `commit_id`;
+approvals also check that the head is still current before submission. Skip
+markers are evaluated after resolving the accepted configuration, so a change
+cannot supply its own reason to skip review.

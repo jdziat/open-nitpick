@@ -183,6 +183,9 @@ type Review struct {
 	// pull request knows what has already been reviewed.
 	Head string
 
+	// Incomplete prevents this run from becoming an incremental baseline.
+	Incomplete bool
+
 	// Spend is what this review was estimated to cost, in US dollars, and is
 	// recorded with it for the same reason Head is: a ceiling that covers a
 	// whole pull request has to know what earlier runs already spent. Zero
@@ -332,6 +335,9 @@ type ThreadComment struct {
 	ID     int64
 	Author string
 	Body   string
+
+	// Own identifies comments authenticated as this reviewer.
+	Own bool
 }
 
 // Conversationalist is implemented by providers that can carry the @mention

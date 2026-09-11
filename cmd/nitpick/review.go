@@ -196,25 +196,19 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 
 	actions := actionsFromEnv()
 
-	if ref.Number > 0 {
-		pr, err := provider.PullRequest(ctx, ref)
-		if err != nil {
-			return err
-		}
-		if reason := skipReason(pr, f.skipDraft, cfg.Review.SkipMarkers); reason != "" {
-			fmt.Fprintln(os.Stderr, reason)
-			actions.setOutputs(resultSkipped, nil)
-			actions.writeSummary(resultSkipped, nil, nil, ref, reason)
-			return nil
-		}
-	}
-
+	// Operator configuration errors must surface even when accepted policy skips the PR.
 	engine, err := newEngine(ctx, &f, repo, cfg, provider, ref, log)
 	if err != nil {
 		return err
 	}
 
 	report, err := engine.Review(ctx, ref)
+	if err == nil && report.Skipped != "" {
+		fmt.Fprintln(os.Stderr, report.Skipped)
+		actions.setOutputs(resultSkipped, nil)
+		actions.writeSummary(resultSkipped, nil, nil, ref, report.Skipped)
+		return nil
+	}
 	var note string
 	switch {
 	case err == nil:
@@ -315,6 +309,8 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 		func(policy *config.Config) (*llm.Roles, error) { return llm.BuildRoles(policy) },
 		log)
 	engine.Instruction = f.instruction
+	engine.SkipDraft = f.skipDraft
+	engine.Full = f.full
 
 	// Built per review from the resolved policy for the same reason. The
 	// analyzers read review.ignore themselves, so a change that edits.
@@ -500,8 +496,9 @@ func githubProvider(repo string) (*vcs.GitHub, error) {
 	}
 
 	gh, err := vcs.NewGitHub(vcs.GitHubOptions{
-		Token:   token,
-		BaseURL: os.Getenv("GITHUB_API_URL"),
+		Token:    token,
+		BaseURL:  os.Getenv("GITHUB_API_URL"),
+		BotLogin: os.Getenv("NITPICK_BOT_LOGIN"),
 	})
 	if err != nil {
 		return nil, err

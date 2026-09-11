@@ -16,7 +16,13 @@ import (
 func newFakeGitHub(t *testing.T, handler http.HandlerFunc) *GitHub {
 	t.Helper()
 
-	server := httptest.NewServer(handler)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v3/user" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 42, "login": "nitpick"})
+			return
+		}
+		handler(w, r)
+	}))
 	t.Cleanup(server.Close)
 
 	gh, err := NewGitHub(GitHubOptions{Token: "test-token", BaseURL: server.URL + "/"})

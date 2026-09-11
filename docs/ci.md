@@ -82,8 +82,8 @@ the run starts and a thumbs-up when it has answered. The handle is
 
 ### Superseded comments
 
-On a later push, an earlier inline comment whose
-lines changed and whose finding did not recur is resolved with a reply
+On a later review, an earlier inline comment whose file was rechecked and
+whose finding did not recur is resolved with a reply
 saying so, and the walkthrough counts them. `review.resolve_superseded:
 false` leaves threads for a person to close.
 
@@ -145,6 +145,7 @@ than the repository root.
 | `config` | `.nitpick.yaml` | path to the configuration file, relative to the workspace |
 | `provider` | from the config file | overrides `models.default.provider`; `nitpick providers` prints the list |
 | `model` | from the config file | overrides `models.default.model` |
+| `bot-login` | `github-actions[bot]` | trusted posting account; set `<app-slug>[bot]` for an App token, or the account name for a personal token |
 | `api-key` | none | the provider's key. Pass a secret, never a literal. Ignored where the provider reads its own conventional variable |
 | `fail-on` | from `review.fail_on` | lowest severity that fails the job: `nit`, `info`, `warning`, `error`, `critical`, or `none` |
 | `instruction` | none | one extra instruction, applied to this run only |
@@ -237,10 +238,10 @@ saying so is more use than a workaround that leaks the key.
 
 ### Incremental review
 
-A push to a pull request this tool has already
-reviewed is reviewed incrementally: only the files changed since the last
-review are read, and a finding an earlier run already posted is withheld
-rather than posted again. The review says which files it read and how many
+After a completed review with no standing findings, a later push is reviewed
+incrementally: only files changed since that review are read. While earlier
+findings remain, the whole change is rechecked. Confirmed findings affect the
+failure gate even when their comments are withheld from reposting. The review says which files it read and how many
 findings it withheld. A force push that makes the earlier revision
 unreachable reviews the whole change again. `review.incremental: false`
 reviews the whole change on every push.
@@ -275,3 +276,19 @@ nitpick review -owner acme -repo-name widgets -pr 42
 
 with `GITHUB_TOKEN` in the environment. Inside GitHub Actions the repository and
 pull request number are detected automatically.
+
+### Review identity and retries
+
+The Action's `bot-login` input identifies the account whose review history may
+be reused. For an App token, set it to the app slug followed by `[bot]`, for
+example `${{ format('{0}[bot]', steps.app.outputs.app-slug) }}`. For the CLI,
+set `NITPICK_BOT_LOGIN`; personal tokens can leave it unset to resolve their
+authenticated user. A comment's HTML markers alone establish no identity.
+
+Only completed reviews carrying the completion marker can be reused. Legacy
+reviews and failed runs trigger a full review. While earlier findings remain,
+the whole change is rechecked; confirmed findings still affect `fail_on` even
+when their comments are not posted twice. Strict analyzer failures exit 2.
+
+On `merge_group`, the Action reviews the event's base/head SHAs as a local
+range. Both commits must be available in the checkout; use `fetch-depth: 0`.

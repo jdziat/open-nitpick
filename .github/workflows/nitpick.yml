@@ -74,6 +74,7 @@ jobs:
 
       - uses: ./
         with:
+          bot-login: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
           github-token: ${{ steps.app.outputs.token || github.token }}
           # Must agree with .nitpick.yaml. The config file wins on provider and
           # model; these inputs only reach LLM_PROVIDER/LLM_MODEL, which are a

@@ -86,6 +86,12 @@ type Engine struct {
 
 	// Instruction is an extra instruction for this run only.
 	Instruction string
+
+	// SkipDraft is the operator flag for leaving draft pull requests alone.
+	SkipDraft bool
+
+	// Full bypasses incremental history on an explicit operator request.
+	Full bool
 }
 
 // LinterRunner produces deterministic findings for the changed files.
@@ -348,6 +354,9 @@ const (
 
 // Report is the outcome of a review.
 type Report struct {
+	// Skipped names the accepted policy decision that prevented a review.
+	Skipped string
+
 	// Findings are the published findings, most severe first.
 	Findings []Finding
 
@@ -482,6 +491,9 @@ type Incremental struct {
 	// ones it did not, because nothing in them moved since Since.
 	Reviewed  []string
 	Unchanged []string
+
+	// Recheck means standing findings required another review of the whole change.
+	Recheck bool
 }
 
 // StageStatus records a required stage that did not complete.
@@ -509,6 +521,23 @@ func (r *Report) Complete() bool { return len(r.Incomplete) == 0 }
 // when the broad one was meant is how a failed triage reached exit 0.
 func (r *Report) PipelineComplete() bool { return r.Complete() && len(r.Stages) == 0 }
 
+// reusableCoverage requires completed work for every file the policy included.
+func (r *Report) reusableCoverage() bool {
+	if !r.PipelineComplete() {
+		return false
+	}
+	if r.Plan != nil {
+		for _, skip := range r.Plan.Skipped {
+			switch skip.Reason {
+			case bundle.ReasonIgnored, bundle.ReasonGenerated, bundle.ReasonBinary, bundle.ReasonDeleted, bundle.ReasonNoChanges:
+			default:
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // FailedStages names the stages that did not complete, for an output that
 // carries one line.
 func (r *Report) FailedStages() []string {
@@ -522,7 +551,7 @@ func (r *Report) FailedStages() []string {
 // Failed reports whether the run should exit non-zero under the configured
 // gate.
 func (r *Report) Failed(failOn config.Severity) bool {
-	for _, f := range r.Findings {
+	for _, f := range append(append([]Finding(nil), r.Findings...), r.AlreadyReported...) {
 		if f.Sev().AtLeast(failOn) {
 			return true
 		}
@@ -539,6 +568,14 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	pr, err := e.Provider.PullRequest(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("read pull request: %w", err)
+	}
+
+	if ref.Number > 0 {
+		if pr.HeadSHA == "" {
+			return nil, errors.New("review: pull request has no head revision")
+		}
+		ref = ref.At(pr.HeadSHA)
+		ref.Base = pr.BaseSHA
 	}
 
 	raw, err := e.Provider.Diff(ctx, ref)
@@ -576,6 +613,19 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		return nil, err
 	}
 
+	if ref.Number > 0 {
+		reason := ""
+		if e.SkipDraft && pr.Draft {
+			reason = "Draft pull request; not reviewed."
+		}
+		if marker, ok := vcs.SkipRequested(pr, policy.Config.Review.SkipMarkers); ok {
+			reason = fmt.Sprintf("Pull request carries %s; not reviewed.", marker)
+		}
+		if reason != "" {
+			return &Report{Policy: policy, Head: pr.HeadSHA, Skipped: reason}, nil
+		}
+	}
+
 	// Installed on a copy so that everything below reads the resolved policy
 	// through e.Config and e.Roles without threading it through a dozen call
 	// sites, and on a copy rather than in place, because mutating the caller's
@@ -603,6 +653,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// and the whole change is reviewed, which is also what happens on a first
 	// run.
 	prior := e.priorReview(ctx, ref)
+	if prior != nil {
+		report.PriorComments = len(prior.Comments)
+	}
 	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, prior)
 	report.Files = files
 
@@ -697,9 +750,11 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	if runner := e.linters(); runner != nil {
 		lint, err := runner.Run(ctx, files)
 		if err != nil {
-			// Linters are evidence, not a gate. Losing the whole review
-			// because a linter misbehaved would be a bad trade.
+			// Preserve findings even when strict mode requires a failed exit.
 			e.log().Warn("linters failed", "error", err)
+			if e.Config.Linters.Mode == config.LinterStrict {
+				report.Stages = append(report.Stages, StageStatus{Stage: "analyzers", Reason: "a required analyzer failed"})
+			}
 		}
 		// Read after Run and regardless of its error: the statuses are how the
 		// analyzers were configured and which of them did not run, which is
@@ -795,10 +850,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// After the gate, so what is counted as "already posted" is what would
 	// otherwise have been posted, and nothing below min_severity is.
 	findings, report.AlreadyReported = withholdAlreadyReported(findings, prior)
-	if prior != nil {
-		report.PriorComments = len(prior.Comments)
+	if report.reusableCoverage() {
+		report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported, plan.Skipped)
 	}
-	report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported)
 
 	// Triage's drops are disclosed exactly as an expert's refutations are:
 	// on the pull request, under "reported, then withheld", with the reason.
@@ -892,7 +946,7 @@ func validateSuggestions(findings []Finding, files diff.Files) []Finding {
 // what every run did before this existed, while the cost of guessing would be
 // a review that skipped files on the strength of a request that failed.
 func (e *Engine) priorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview {
-	if !e.Config.Review.Incremental {
+	if e.Full || !e.Config.Review.Incremental {
 		return nil
 	}
 	reader, ok := e.Provider.(vcs.PriorReviewer)
@@ -918,6 +972,9 @@ func (e *Engine) priorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview 
 func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, files diff.Files, prior *vcs.PriorReview) (diff.Files, *Incremental) {
 	if prior == nil || prior.Head == "" || pr == nil {
 		return files, nil
+	}
+	if len(prior.Comments) > 0 {
+		return files, &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true}
 	}
 	if prior.Head == pr.HeadSHA {
 		// The same commit reviewed again (a reopen, or a re-run). Nothing
@@ -974,7 +1031,7 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 // comment when the earlier revision could not be compared. Each resolved
 // thread gets a reply saying why, so a reader is not left with a silent
 // close.
-func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorReview, inc *Incremental, findings, withheld []Finding) []vcs.PriorComment {
+func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorReview, inc *Incremental, findings, withheld []Finding, skipped []bundle.Skip) []vcs.PriorComment {
 	if !e.Config.Review.ResolveSuperseded || prior == nil || inc == nil || inc.Since == "" {
 		return nil
 	}
@@ -986,6 +1043,10 @@ func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorRe
 	for _, p := range inc.Reviewed {
 		reread[p] = true
 	}
+	excluded := map[string]bool{}
+	for _, skip := range skipped {
+		excluded[skip.Path] = true
+	}
 	recurred := map[string]bool{}
 	for _, f := range append(append([]Finding(nil), findings...), withheld...) {
 		recurred[Fingerprint(f)] = true
@@ -993,7 +1054,7 @@ func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorRe
 	var candidates []vcs.PriorComment
 	var ids []int64
 	for _, c := range prior.Comments {
-		if c.ID == 0 || recurred[c.Fingerprint] {
+		if c.ID == 0 || recurred[c.Fingerprint] || excluded[c.Path] {
 			continue
 		}
 		if c.Line == 0 || reread[c.Path] {
@@ -1004,7 +1065,7 @@ func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorRe
 	if len(ids) == 0 {
 		return nil
 	}
-	reply := fmt.Sprintf("Resolved by open-nitpick: the lines this pointed at changed after %s was reviewed, and the finding did not recur on the current head.", short(inc.Since))
+	reply := fmt.Sprintf("Resolved by open-nitpick: the change was reviewed again after %s, and the finding did not recur on the current head.", short(inc.Since))
 	resolved, err := resolver.ResolveThreads(ctx, ref, ids, reply)
 	if err != nil {
 		e.log().Warn("could not resolve superseded comments", "error", err, "resolved", len(resolved), "of", len(ids))
@@ -1048,8 +1109,7 @@ func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publis
 
 // analyze reviews every batch, bounded by the configured concurrency.
 //
-// A batch that fails does not fail the run: partial review output is far more
-// useful than none, and the failure is logged and surfaced rather than hidden.
+// Partial results are published with failed batches recorded as incomplete.
 func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.Plan, sem chan struct{}) ([]Finding, []string, []Escalation, error) {
 	// Built once for the default reviewer so a prompt error surfaces before
 	// any batch runs; routed reviewers build theirs on first use.

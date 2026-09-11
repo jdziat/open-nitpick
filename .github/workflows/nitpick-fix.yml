@@ -69,6 +69,7 @@ jobs:
       - uses: ./
         with:
           command: respond
+          bot-login: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
           github-token: ${{ steps.app.outputs.token }}
           provider: synthetic
           model: hf:moonshotai/Kimi-K3

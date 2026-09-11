@@ -49,9 +49,10 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 	}
 
 	review := vcs.Review{
-		Event:    reviewEvent(report, cfg),
-		Comments: make([]vcs.Comment, 0, len(report.Findings)),
-		Head:     report.Head,
+		Event:      reviewEvent(report, cfg),
+		Comments:   make([]vcs.Comment, 0, len(report.Findings)),
+		Head:       report.Head,
+		Incomplete: !report.reusableCoverage(),
 	}
 
 	// What this run was priced at, recorded with the review so a later run
@@ -440,6 +441,8 @@ func incrementalNotice(report *Report) string {
 			since = since[:7]
 		}
 		switch {
+		case inc.Recheck:
+			fmt.Fprintf(&b, "**Rechecked the whole change because findings from the review at `%s` remain.**\n", since)
 		case len(inc.Reviewed) == 0:
 			fmt.Fprintf(&b, "**Nothing in this change has moved since the review at `%s`.**\n", since)
 		default:

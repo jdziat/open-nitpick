@@ -95,3 +95,18 @@ func parseHead(body string) (string, bool) {
 	}
 	return m[1], true
 }
+
+// completionMarker distinguishes a reusable review from legacy or failed runs.
+func completionMarker(sha string) string {
+	return fmt.Sprintf("<!-- open-nitpick complete:%s -->", sha)
+}
+
+// stripMarkers keeps model-authored prose from supplying persisted review state.
+func stripMarkers(body string) string {
+	for _, pattern := range []*regexp.Regexp{headPattern, spendPattern, fingerprintPattern, completionPattern} {
+		body = pattern.ReplaceAllString(body, "")
+	}
+	return body
+}
+
+var completionPattern = regexp.MustCompile(`<!-- open-nitpick complete:([0-9a-fA-F]+) -->`)
