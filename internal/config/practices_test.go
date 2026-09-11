@@ -48,13 +48,18 @@ func TestPracticePolicyUsesAcceptedRulesWithoutModelCredentials(t *testing.T) {
 }
 
 func TestPracticePolicyRejectsUnknownKeysAndInvalidRequirements(t *testing.T) {
+	t.Setenv(EnvIgnoreUnknownKeys, "0")
+	defaults := Defaults()
 	for _, raw := range []string{
 		"practices: {requird: []}", "practices: {required: [typo]}",
 		"practices: {commits: {max_description_runes: 0}}",
 		"practices: {profile: mystery}", "standards: {min_sites: -1}",
 		"practices: {}\npractices: {}",
 	} {
-		p := PracticePolicy{Practices: DefaultPractices()}
+		p := PracticePolicy{Practices: DefaultPractices(), Review: defaults.Review, Linters: defaults.Linters}
+		if err := decodePracticeBlocks(nil, &p); err != nil {
+			t.Fatalf("invalid policy control: %v", err)
+		}
 		if err := decodePracticeBlocks([]byte(raw), &p); err == nil {
 			t.Errorf("accepted invalid policy %s", raw)
 		}
@@ -124,6 +129,7 @@ func TestPracticePolicyOverlaysUserRulesBeforeAcceptedRepositoryRules(t *testing
 }
 
 func TestPracticePolicyRejectsMisspelledTopLevelBlocks(t *testing.T) {
+	t.Setenv(EnvIgnoreUnknownKeys, "0")
 	defaults := Defaults()
 	defaults.Models.Default = ModelSpec{Provider: "synthetic", Model: "fixture"}
 	if err := defaults.Validate(); err != nil {
@@ -140,5 +146,37 @@ func TestPracticePolicyRejectsMisspelledTopLevelBlocks(t *testing.T) {
 		if err := cfg.Validate(); err == nil {
 			t.Fatal("full configuration validation accepted a blank rule")
 		}
+	}
+}
+
+func TestPracticePolicyHonorsOperatorUnknownKeysWithoutIgnoringInvalidValues(t *testing.T) {
+	t.Setenv(EnvIgnoreUnknownKeys, "1")
+	defaults := Defaults()
+	policy := PracticePolicy{Practices: defaults.Practices, Review: defaults.Review, Linters: defaults.Linters}
+	raw := "future_block: true\nreview: {ignore: &paths [vendor/**]}\npractices: {ignore: *paths, future_rule: true, required: [commits]}\n"
+	if err := decodePracticeBlocks([]byte(raw), &policy); err != nil || strings.Join(policy.IgnoredUnknown, ",") != "future_block,future_rule" || len(policy.Practices.Ignore) != 1 || policy.Practices.Ignore[0] != "vendor/**" || len(policy.Practices.Required) != 1 || policy.Practices.Required[0] != "commits" {
+		t.Fatalf("operator compatibility or aliased policy lost: %+v %v", policy, err)
+	}
+	for _, raw := range []string{"practices: {future_rule: true, budget: invalid}", "practices: {required: [unknown]}", "future_block: 1\nfuture_block: 2"} {
+		candidate := PracticePolicy{Practices: DefaultPractices(), Review: defaults.Review, Linters: defaults.Linters}
+		if err := decodePracticeBlocks(nil, &candidate); err != nil {
+			t.Fatal(err)
+		}
+		if err := decodePracticeBlocks([]byte(raw), &candidate); err == nil {
+			t.Fatalf("ignore-unknown masked invalid policy: %s", raw)
+		}
+	}
+}
+
+func TestIgnoredPolicyKeysRemainVisibleInAcceptedProvenance(t *testing.T) {
+	t.Setenv(EnvNoUserConfig, "1")
+	t.Setenv(EnvIgnoreUnknownKeys, "1")
+	operator := filepath.Join(t.TempDir(), "operator.yaml")
+	if err := os.WriteFile(operator, []byte("future_policy: true\npractices: {future_rule: true}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	policy, err := ReadPracticePolicy(t.Context(), t.TempDir(), operator, "")
+	if err != nil || len(policy.IgnoredUnknown) != 2 || !strings.Contains(policy.Source, "ignored unknown keys: future_policy, future_rule") || policy.Digest == "" {
+		t.Fatalf("ignored policy became invisible: %+v %v", policy, err)
 	}
 }

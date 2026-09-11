@@ -47,9 +47,10 @@ type Practices struct {
 
 // PracticeBoundary prohibits dependency edges from a named import-path pattern.
 type PracticeBoundary struct {
-	// From matches source Go import paths using path.Match syntax.
+	// From matches full Go import paths using path.Match syntax; * does not cross /.
+	// All selected Go sources contribute direct imports, across build constraints.
 	From string `yaml:"from" json:"from"`
-	// Forbid matches dependency import paths that the source may not import.
+	// Forbid matches direct dependency import paths, with no implicit subtree match.
 	Forbid []string `yaml:"forbid" json:"forbid"`
 	// Reason records the accepted architectural constraint behind the restriction.
 	Reason string `yaml:"reason" json:"reason"`
@@ -133,13 +134,14 @@ func (p Practices) Validate() error {
 
 // PracticePolicy records the blocks deterministic checks need without loading models.
 type PracticePolicy struct {
-	Practices    Practices `yaml:"practices" json:"practices"`
-	Standards    Standards `yaml:"standards" json:"standards"`
-	Review       Review    `yaml:"review" json:"review"`
-	Linters      Linters   `yaml:"linters" json:"linters"`
-	Source       string    `yaml:"-" json:"-"`
-	Digest       string    `yaml:"-" json:"-"`
-	BaseRevision string    `yaml:"-" json:"-"`
+	Practices      Practices `yaml:"practices" json:"practices"`
+	Standards      Standards `yaml:"standards" json:"standards"`
+	Review         Review    `yaml:"review" json:"review"`
+	Linters        Linters   `yaml:"linters" json:"linters"`
+	Source         string    `yaml:"-" json:"-"`
+	Digest         string    `yaml:"-" json:"-"`
+	BaseRevision   string    `yaml:"-" json:"-"`
+	IgnoredUnknown []string  `yaml:"-" json:"ignored_unknown,omitempty"`
 }
 
 // ReadPracticePolicy reads accepted policy at base or an external operator file.
@@ -196,6 +198,9 @@ func ReadPracticePolicy(ctx context.Context, root, path, base string) (PracticeP
 	if err := decodePracticeBlocks(raw, &result); err != nil {
 		return result, err
 	}
+	if len(result.IgnoredUnknown) > 0 {
+		result.Source += "; ignored unknown keys: " + strings.Join(result.IgnoredUnknown, ", ")
+	}
 	encoded, err := json.Marshal(result)
 	if err != nil {
 		return result, err
@@ -206,6 +211,7 @@ func ReadPracticePolicy(ctx context.Context, root, path, base string) (PracticeP
 }
 
 func decodePracticeBlocks(raw []byte, result *PracticePolicy) error {
+	allowUnknown := ignoreUnknownKeys(nil)
 	var document yaml.Node
 	if err := yaml.Unmarshal(raw, &document); err != nil {
 		return fmt.Errorf("parse practices policy: %w", err)
@@ -225,38 +231,45 @@ func decodePracticeBlocks(raw []byte, result *PracticePolicy) error {
 		}
 		seen := map[string]bool{}
 		for i := 0; i < len(mapping.Content); i += 2 {
-			name := mapping.Content[i].Value
-			if !known[name] {
-				return fmt.Errorf("unknown policy block %q", name)
+			key := mapping.Content[i]
+			if key.Kind != yaml.ScalarNode || key.Tag != "!!str" {
+				return errors.New("policy block names must be strings")
 			}
-			if name != "practices" && name != "standards" && name != "review" && name != "linters" {
-				continue
-			}
+			name := key.Value
 			if seen[name] {
 				return fmt.Errorf("duplicate policy block %q", name)
 			}
 			seen[name] = true
-			data, err := yaml.Marshal(mapping.Content[i+1])
-			if err != nil {
-				return err
-			}
-			decoder := yaml.NewDecoder(bytes.NewReader(data))
-			decoder.KnownFields(true)
-			var target any = &result.Practices
-			if name == "standards" {
-				target = &result.Standards
-			}
-			if name == "review" {
-				target = &result.Review
-			}
-			if name == "linters" {
-				target = &result.Linters
-			}
-			if err := decoder.Decode(target); err != nil {
-				return fmt.Errorf("invalid %s block: %w", name, err)
+			if !known[name] {
+				if !allowUnknown {
+					return fmt.Errorf("unknown policy block %q", name)
+				}
+				result.IgnoredUnknown = append(result.IgnoredUnknown, name)
 			}
 		}
+		// Decode the original document so aliases can cross policy blocks.
+		decoded := struct {
+			Practices Practices            `yaml:"practices"`
+			Standards Standards            `yaml:"standards"`
+			Review    Review               `yaml:"review"`
+			Linters   Linters              `yaml:"linters"`
+			Other     map[string]yaml.Node `yaml:",inline"`
+		}{Practices: result.Practices, Standards: result.Standards, Review: result.Review, Linters: result.Linters}
+		decoder := yaml.NewDecoder(bytes.NewReader(raw))
+		decoder.KnownFields(true)
+		if err := decoder.Decode(&decoded); err != nil {
+			keys, onlyUnknown := unknownFields(err)
+			if !allowUnknown || !onlyUnknown {
+				return fmt.Errorf("invalid practices policy: %w", err)
+			}
+			for _, key := range keys {
+				result.IgnoredUnknown = append(result.IgnoredUnknown, key.Name)
+			}
+		}
+		result.Practices, result.Standards = decoded.Practices, decoded.Standards
+		result.Review, result.Linters = decoded.Review, decoded.Linters
 	}
+
 	problems := []error{result.Practices.Validate(), result.Standards.Validate()}
 	problems = append(problems, result.Review.validate()...)
 	problems = append(problems, result.Linters.validate()...)

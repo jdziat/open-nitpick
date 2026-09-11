@@ -40,6 +40,7 @@ func InspectDesign(files []standards.File, boundaries []config.PracticeBoundary)
 	inventory := DesignInventory{Limitations: []string{
 		"Go import graph only; dynamic calls and external dependency implementations are not resolved",
 		"package inventory is not proof of complete architecture review",
+		"imports include all selected Go sources regardless of build constraints",
 	}}
 	check := Check{ID: "design-boundaries", Version: "1", Instrument: Deterministic, State: Completed, Tool: "go/parser"}
 	for _, boundary := range boundaries {

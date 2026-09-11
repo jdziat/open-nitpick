@@ -978,12 +978,12 @@ Verbosity controls how much prose accompanies each finding. One of: terse, norma
 ### `practices.boundaries[].forbid`
 
 list of string, default `none`.
-Forbid matches dependency import paths that the source may not import.
+Forbid matches direct dependency import paths, with no implicit subtree match.
 
 ### `practices.boundaries[].from`
 
 string, default `none`.
-From matches source Go import paths using path.Match syntax.
+From matches full Go import paths using path.Match syntax; * does not cross /.
 
 ### `practices.boundaries[].reason`
 

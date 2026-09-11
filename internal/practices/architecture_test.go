@@ -1,6 +1,7 @@
 package practices
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
@@ -76,5 +77,15 @@ func TestInvalidBoundaryPatternCannotReportCompletedCoverage(t *testing.T) {
 	_, check := InspectDesign([]standards.File{{Path: "go.mod", Src: []byte("module example.com/app\n")}, {Path: "a.go", Src: []byte("package app\n")}}, []config.PracticeBoundary{{From: "[", Forbid: []string{"*"}, Reason: "fixture"}})
 	if check.State != Failed || check.Reason == "" {
 		t.Fatalf("invalid boundary reported clean: %+v", check)
+	}
+}
+
+func TestBoundaryInventoryIncludesSelectedSourcesAcrossBuildConstraints(t *testing.T) {
+	for _, tag := range []string{"windows", "ignore"} {
+		files := []standards.File{{Path: "go.mod", Src: []byte("module example.com/app\n")}, {Path: "api/tool.go", Src: []byte("//go:build " + tag + "\n\npackage api\nimport _ \"example.com/app/db\"\n")}}
+		inventory, check := InspectDesign(files, []config.PracticeBoundary{{From: "example.com/app/api", Forbid: []string{"example.com/app/db"}, Reason: "API sources must not import storage"}})
+		if check.State != Completed || len(check.Examined) != 1 || len(check.Findings) != 1 || check.Findings[0].Target.ID != "api/tool.go" || !strings.Contains(strings.Join(inventory.Limitations, " "), "build constraints") {
+			t.Fatalf("selected build variant disappeared: %+v %+v", inventory, check)
+		}
 	}
 }

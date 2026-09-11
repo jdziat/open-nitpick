@@ -274,6 +274,9 @@ func (r Report) ExitCode() int {
 func (r Report) Text() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Engineering practices (%s):\n", r.Profile)
+	if r.PolicySource != "" {
+		fmt.Fprintf(&b, "  Policy: %s\n", r.PolicySource)
+	}
 	for _, c := range r.Checks {
 		fmt.Fprintf(&b, "  %s: %s; %d/%d targets examined, %d findings\n", c.ID, c.State, len(c.Examined), len(c.Planned), len(c.Findings))
 		if c.Reason != "" {
