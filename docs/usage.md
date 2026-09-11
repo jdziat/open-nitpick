@@ -95,6 +95,10 @@ Without `-check`, the report is advisory and still discloses unavailable checks.
 `-repo` selects a root; `-config` reads only the `standards` thresholds and
 disabled probes, leaving model configuration and credentials unused.
 
+This repository runs `go run ./cmd/nitpick repo-standards -check` in CI after
+ordinary lint, using the Go toolchain in `go.mod` and golangci-lint pinned in
+`tools/go.mod`. Run the same command before pushing.
+
 The evidence is measured in the current tree. For conventions fixed at a base
 revision when evaluating a pull request, use `nitpick standards -base main`.
 

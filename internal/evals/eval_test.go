@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// TestPrompts is the battery. It reviews every fixture with every model and
+// TestPromptsDetectPlantedDefects is the battery. It reviews every fixture with every model and
 // reports three separate things, which must not be conflated:
 //
 //  1. INVARIANTS, properties open-nitpick must uphold no matter how a model
@@ -54,7 +54,7 @@ func TestMain(m *testing.M) {
 //     means the prompt or the plumbing is broken rather than merely weak.
 //  3. NOISE, findings explaining no planted defect. Reported, because the
 //     acceptable level is a judgment call about this specific corpus.
-func TestPrompts(t *testing.T) {
+func TestPromptsDetectPlantedDefects(t *testing.T) {
 	opts, err := OptionsFromEnv()
 	if err != nil {
 		t.Fatalf("options: %v", err)

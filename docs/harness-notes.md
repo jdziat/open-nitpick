@@ -322,8 +322,8 @@ path's collision check reads. Batteries that want retention ask for it here.
 
 Which batteries those are is derived rather than listed. Saying the tuning
 axes stay on OpenDump because "their corpus can be reviewed again" is true of
-TestTunePersona, the one battery that remains there, and false of
-TestJudgeModels, which prints the same judged table the head-to-head does and
+TestTunePersonaMeasuresFilterEffects, the one battery that remains there, and false of
+TestJudgeModelsScoresFixtureReviews, which prints the same judged table the head-to-head does and
 which `make judge-models FIXTURES=$(HELD_OUT)` points at the spent-once
 corpus: a class of caller named where a property of one was meant.
 TestEveryJudgedBatteryRetainsItsFindingsWithoutBeingAsked derives the list

@@ -63,12 +63,13 @@ func TestPublishedApprovalPinsAndChecksReviewedCommit(t *testing.T) {
 	for _, current := range []string{"deadbeef", "beef0002"} {
 		var body map[string]any
 		gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost {
+			switch {
+			case r.Method == http.MethodPost:
 				_ = json.NewDecoder(r.Body).Decode(&body)
 				_ = json.NewEncoder(w).Encode(map[string]any{"id": 1})
-			} else if strings.Contains(r.URL.Path, "/commits/") {
+			case strings.Contains(r.URL.Path, "/commits/"):
 				_ = json.NewEncoder(w).Encode(map[string]any{"commit": map[string]any{"message": "normal"}})
-			} else {
+			default:
 				_ = json.NewEncoder(w).Encode(map[string]any{"head": map[string]any{"sha": current}})
 			}
 		})

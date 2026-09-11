@@ -51,7 +51,7 @@ func TestDefectClassesSurviveEveryLevel(t *testing.T) {
 	}
 }
 
-func TestClassNormalize(t *testing.T) {
+func TestClassNormalizeRecognizesAliases(t *testing.T) {
 	cases := map[string]Class{
 		"security": ClassSecurity, "SECURITY": ClassSecurity,
 		"race": ClassConcurrency, "injection": ClassSecurity,

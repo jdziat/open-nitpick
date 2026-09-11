@@ -264,7 +264,7 @@ func TestAPartialDumpIsRefusedAsARejudgeInput(t *testing.T) {
 //
 // IT COVERS every BATTERY that PRINTS THE JUDGED TABLE, not the head-to-head
 // alone, and that is the correction rather than a generalisation for its own
-// sake. Retention was fixed on the benchmark and TestJudgeModels was described
+// sake. Retention was fixed on the benchmark and TestJudgeModelsScoresFixtureReviews was described
 // as a tuning axis over a re-reviewable corpus, which it is not. It prints the
 // same reportJudgedModels table, and `make judge-models FIXTURES=$(HELD_OUT)`
 // points it at the spent-once corpus, which is the original incident exactly.
@@ -451,7 +451,7 @@ func TestAFinishedRunIsNotRenamedOverAnother(t *testing.T) {
 // named here so a guard over them fails when a third arrives without being
 // wired the same way.
 func judgedBatteries() []string {
-	return []string{"TestBenchmarkAgainstIncumbent", "TestJudgeModels"}
+	return []string{"TestBenchmarkAgainstIncumbent", "TestJudgeModelsScoresFixtureReviews"}
 }
 
 // batteryBody returns one battery's function body from the package source.

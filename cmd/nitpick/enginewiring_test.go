@@ -197,7 +197,8 @@ func TestRespondResolvesBeforeItDecidesAnything(t *testing.T) {
 	}
 	text := string(body)
 
-	if !strings.Contains(text, "respondPolicy(ctx,") {
+	policyStart := strings.Index(text, "respondPolicy(ctx,")
+	if policyStart < 0 {
 		t.Fatal("runRespond does not resolve a policy: a change that edits .nitpick.yaml is " +
 			"answered, and its findings applied, under the configuration it wrote for itself")
 	}
@@ -208,7 +209,7 @@ func TestRespondResolvesBeforeItDecidesAnything(t *testing.T) {
 	//
 	// The config handed to runImprove is `cfg,`, not a selector, so it
 	// survives. It resolves for itself; see the comment there.
-	after := text[strings.Index(text, "respondPolicy(ctx,"):]
+	after := text[policyStart:]
 	if i := strings.Index(after, "cfg."); i >= 0 {
 		line := after[i:]
 		if end := strings.IndexByte(line, '\n'); end > 0 {

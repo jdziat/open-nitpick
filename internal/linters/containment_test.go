@@ -332,6 +332,7 @@ func TestGolangciLintDoesNotReadAFailedAnalysisAsCleanCode(t *testing.T) {
 		{
 			name: "go.work that omits the module",
 			apply: func(t *testing.T, repo string) {
+				t.Helper()
 				writeFile(t, repo, "other/go.mod", "module other\n\ngo 1.24\n")
 				writeFile(t, repo, "go.work", "go 1.24\n\nuse ./other\n")
 			},
@@ -347,6 +348,7 @@ func TestGolangciLintDoesNotReadAFailedAnalysisAsCleanCode(t *testing.T) {
 			// TestAChangedFileTheBuildExcludesIsNamed.
 			name: "a build constraint excluding every file in the directory",
 			apply: func(t *testing.T, repo string) {
+				t.Helper()
 				writeFile(t, repo, "app.go", "//go:build ignore\n\npackage probe\n\nfunc F() {}\n")
 			},
 			want: "build constraints",

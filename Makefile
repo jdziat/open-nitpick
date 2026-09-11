@@ -42,7 +42,7 @@ test:
 # detector is not optional here.
 .PHONY: race
 race:
-	go test -race ./...
+	go test -race -p 1 ./...
 
 .PHONY: cover
 cover:
@@ -282,7 +282,7 @@ eval:
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(CAPTURE),NITPICK_EVAL_CAPTURE='$(CAPTURE)') \
 	$(if $(RELATED),NITPICK_EVAL_RELATED_CONTEXT='$(RELATED)') \
-	go test -tags=eval -count=1 -timeout=60m -v -run 'TestPrompts|TestPlanted|TestKeywords' ./internal/evals/
+	go test -tags=eval -count=1 -timeout=60m -v -run 'TestPromptsDetectPlantedDefects|TestPlanted|TestKeywords' ./internal/evals/
 
 # Compare persona variants, judged by a strong model standing in for a senior
 # human reviewer. AXIS=nitpick (default) or AXIS=voice.
@@ -295,7 +295,7 @@ tune:
 	$(if $(JUDGE2),NITPICK_EVAL_JUDGE2='$(JUDGE2)') \
 	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
 	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
-	go test -tags=eval -count=1 -timeout=45m -v -run TestTunePersona ./internal/evals/
+	go test -tags=eval -count=1 -timeout=45m -v -run TestTunePersonaMeasuresFilterEffects ./internal/evals/
 
 # Rank every model in the battery by JUDGED quality, not keyword recall.
 .PHONY: judge-models
@@ -306,7 +306,7 @@ judge-models:
 	$(if $(JUDGE2),NITPICK_EVAL_JUDGE2='$(JUDGE2)') \
 	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
 	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
-	go test -tags=eval -count=1 -timeout=90m -v -run TestJudgeModels ./internal/evals/
+	go test -tags=eval -count=1 -timeout=90m -v -run TestJudgeModelsScoresFixtureReviews ./internal/evals/
 
 # Head-to-head against Incumbent on identical fixtures, same judge.
 # Requires the incumbent CLI, authenticated: incumbent auth login
@@ -328,7 +328,7 @@ rejudge:
 	$(if $(REJUDGE),NITPICK_EVAL_REJUDGE_DUMP='$(REJUDGE)') \
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
 	$(if $(BASELINE),NITPICK_EVAL_BASELINE_JUDGE='$(BASELINE)') \
-	go test -tags=eval -count=1 -timeout=90m -v -run TestRejudgeDump ./internal/evals/
+	go test -tags=eval -count=1 -timeout=90m -v -run TestRejudgeDumpScoresRecordedFindings ./internal/evals/
 
 # The iteration model. Cheap enough to run the whole tuning corpus for a few
 # cents, so a prompt or analyzer change can be measured before it is committed

@@ -8,9 +8,10 @@ above the generated block is written by hand and no command rewrites it.
 A change passes all of these before it is pushed:
 
 ```bash
-go test ./... -race          # internal/linters contends on golangci-lint's lock; use -p 1
+go test -race -p 1 ./...     # serialize packages that use golangci-lint's lock
 go vet -tags=eval ./...      # the eval build tag has call sites a plain vet misses
 golangci-lint run ./...
+go run ./cmd/nitpick repo-standards -check
 make docs                    # the configuration reference is generated
 make agents                  # so is the block below
 nitpick slop -no-model       # the prose tells, on the files you touched
@@ -49,11 +50,11 @@ code demonstrates. The evidence after each is a band, not a count: run
 `nitpick standards` for the exact numbers and for the contested probes, and
 `make agents` to regenerate this block.
 
+- Name a test after the behaviour it pins, in at least three words. (every site of 1000+ places)
 - Open an exported declaration's doc comment with the declaration's own name. (every site of 700+ places)
+- Put context.Context first in the parameter list. (every site of 200+ places)
 - Wrap an error you are formatting into a new one with %w, not %v or %s. (every site of 200+ places)
 - Call t.Helper() at the top of a test helper. (every site of 100+ places)
-- Put context.Context first in the parameter list. (98%+ of 200+ places)
-- Name a test after the behaviour it pins, in at least three words. (98%+ of 1000+ places)
-- Return named results explicitly; do not use a bare return. (95%+ of 50+ places)
+- Return named results explicitly; do not use a bare return. (every site of 50+ places)
 
 <!-- nitpick:standards:end -->

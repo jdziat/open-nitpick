@@ -31,7 +31,7 @@ func TestSeverityNoneIsNotAFindingSeverity(t *testing.T) {
 	}
 }
 
-func TestSeverityNormalize(t *testing.T) {
+func TestSeverityNormalizeReportsUnknownValues(t *testing.T) {
 	cases := []struct {
 		in     Severity
 		want   Severity

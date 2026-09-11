@@ -112,9 +112,20 @@ func TestTheAgentPromptFenceOutlivesBackticksInModelText(t *testing.T) {
 
 	// The fence is wider than anything inside it.
 	start := strings.Index(body, "<details><summary>Fix prompt</summary>")
+	if start < 0 {
+		t.Fatalf("no block rendered:\n%s", body)
+	}
 	block := body[start:]
-	fence := block[strings.Index(block, "`"):]
-	fence = fence[:strings.IndexFunc(fence, func(r rune) bool { return r != '`' })]
+	openStart := strings.Index(block, "`")
+	if openStart < 0 {
+		t.Fatalf("no fence rendered:\n%s", body)
+	}
+	fence := block[openStart:]
+	fenceEnd := strings.IndexFunc(fence, func(r rune) bool { return r != '`' })
+	if fenceEnd < 0 {
+		t.Fatalf("unterminated fence:\n%s", body)
+	}
+	fence = fence[:fenceEnd]
 	if len(fence) < 4 {
 		t.Errorf("fence is %d backticks against content holding three:\n%s", len(fence), body)
 	}
@@ -162,8 +173,15 @@ func TestModelTextCannotCloseTheAgentPromptBlock(t *testing.T) {
 
 	// The opening fence is wider than the model's own four backticks.
 	openStart := strings.Index(block, "`")
+	if openStart < 0 {
+		t.Fatalf("no fence rendered:\n%s", body)
+	}
 	fence := block[openStart:]
-	fence = fence[:strings.IndexFunc(fence, func(r rune) bool { return r != '`' })]
+	fenceEnd := strings.IndexFunc(fence, func(r rune) bool { return r != '`' })
+	if fenceEnd < 0 {
+		t.Fatalf("unterminated fence:\n%s", body)
+	}
+	fence = fence[:fenceEnd]
 	if len(fence) < 5 {
 		t.Fatalf("fence is %d backticks against a rationale holding four:\n%s", len(fence), body)
 	}
