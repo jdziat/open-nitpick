@@ -156,3 +156,29 @@ integration control and the engine's policy-skip path. The implemented opt-in
 profile has no remaining confirmed findings from these reviews. Broader mechanism
 controls, package-wide planning and internal model-gate adoption remain outside
 this initial release's demonstrated coverage.
+
+## Hosted foundation review corrections
+
+PR #113 exposed a false-positive invalid-policy guard: its zero-value review
+and linter settings were already invalid. The guard now proves its control valid
+before checking rejected policy, and fails when practice validation is removed.
+Standalone configuration-reference sources again work without a sibling commits
+package. The accepted policy loader honors the operator's unknown-key setting,
+keeps ignored keys visible in provenance, preserves cross-block YAML aliases,
+and still rejects invalid known values and duplicate blocks.
+
+Build constraints and package-pattern comments describe intended behavior:
+selected Go sources contribute direct imports across platforms, and path.Match
+does not give an exact package name an implicit recursive match. A build-tagged
+source control pins that contract.
+
+A stronger Actions guard exposed a narrower completion bug than the earlier
+review claimed: optional practice failures still inherited the ordinary pipeline
+gate. Engineering completion now follows required practice evidence; ordinary
+reviews retain their stage-failure gate. Four targeted mutations failed the
+policy-validation, malformed-value, supplemental-documentation, and optional
+completion guards. The corrected targeted suites pass.
+
+The subsequent Nitpick pass examined eleven changed files and returned zero
+findings. Deterministic slop flagged one existing oversized engine comment,
+which was shortened, and cadence in the generated configuration reference.

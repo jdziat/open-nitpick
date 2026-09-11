@@ -367,7 +367,11 @@ practices:
       reason: API handlers use the service contract.
 ```
 
-Go import boundaries use module paths and `path.Match` patterns. Configured
+Go import boundaries inspect direct imports in every selected Go source, including
+files behind build constraints. They use full module import paths and `path.Match`
+patterns: `*` does not cross `/`, and an exact package does not imply its subpackages.
+Exclude scratch sources through accepted ignore policy when they are outside the
+intended boundary. Configured
 boundaries require a completed check. Missing or malformed module metadata is
 reported rather than treated as an empty import graph. The inventory distinguishes
 available local packages, unresolved local imports and external dependencies.

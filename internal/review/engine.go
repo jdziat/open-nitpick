@@ -536,7 +536,10 @@ func (r *Report) Complete() bool { return len(r.Incomplete) == 0 }
 // Complete alone answers a narrower one, and answering the narrow question
 // when the broad one was meant is how a failed triage reached exit 0.
 func (r *Report) PipelineComplete() bool {
-	return r.Complete() && len(r.Stages) == 0 && (r.Practices == nil || r.Practices.ExitCode() != 2)
+	if r.Practices != nil {
+		return r.Practices.ExitCode() != 2
+	}
+	return r.Complete() && len(r.Stages) == 0
 }
 
 // reusableCoverage requires completed work for every file the policy included.
@@ -1668,23 +1671,9 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		}
 	}
 
-	// A merge whose survivor does not itself survive is refused.
-	//
-	// Absorbing into a finding that is then discarded loses what was folded
-	// into it, which is the analyzer attribution and its ceiling: 3 into 2 and
-	// 2 into 1 published finding 1 with no analyzer named and free of
-	// linters.max_severity, which is the escape this whole change exists to
-	// close, reached by another door. A cycle is worse, because both findings
-	// are skipped by the publish loop and neither comes back: two real
-	// findings leave the review with nothing restoring them.
-	//
-	// Refused wholesale rather than resolved to a terminal survivor. A chain
-	// is a model that answered the wrong shape, and following it would pick,
-	// silently, which of several findings the attribution belongs to.
-	// Decided against a snapshot of the merged set, then applied. Deleting
-	// while ranging over the same map answers a cycle differently depending on
-	// which half is visited first: 1 into 2 and 2 into 1 removed only the
-	// entry seen first, and the other still merged.
+	// Reject merge chains and cycles: they can lose findings and analyzer attribution.
+	// Collect removals before applying them so map iteration order cannot choose
+	// which half of a cycle survives.
 	var chained []int
 	for number, d := range mergedInto {
 		if _, ok := mergedInto[d.DuplicateOf]; ok {

@@ -301,7 +301,7 @@ func TestEngineeringCallbackUsesTheResolvedReviewPolicy(t *testing.T) {
 
 func TestActionsCannotReportIncompletePracticesAsClean(t *testing.T) {
 	target := practices.Target{Kind: practices.FileTarget, ID: "a.go"}
-	r := &review.Report{Practices: &practices.Report{SchemaVersion: 1, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: []practices.Check{
+	r := &review.Report{Stages: []review.StageStatus{{Stage: "triage", Reason: "provider unavailable"}}, Incomplete: []string{"a.go"}, Practices: &practices.Report{SchemaVersion: 1, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: []practices.Check{
 		{ID: "conventions", Version: "1", Instrument: practices.Deterministic, State: practices.Completed, Planned: []practices.Target{target}, Examined: []practices.Target{target}},
 		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Partial, Required: true, Reason: "budget"},
 	}}}
@@ -311,6 +311,10 @@ func TestActionsCannotReportIncompletePracticesAsClean(t *testing.T) {
 	r.Practices.Checks[1].Required = false
 	if resultFor(r, config.SeverityNone) != resultClean {
 		t.Fatal("optional incomplete assessment blocked completed required evidence")
+	}
+	r.Practices = nil
+	if resultFor(r, config.SeverityNone) != resultError {
+		t.Fatal("ordinary review lost its required-stage failure")
 	}
 }
 
