@@ -503,6 +503,20 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 		copts.Page = resp.NextPage
 	}
 
+	if len(out.Comments) > 0 {
+		// Unknown resolution state keeps the finding standing, including when
+		// the token can read REST comments but cannot query GraphQL threads.
+		if threads, err := g.reviewThreads(ctx, ref); err == nil {
+			standing := out.Comments[:0]
+			for _, c := range out.Comments {
+				if th, known := threads[c.ID]; !known || !th.resolved {
+					standing = append(standing, c)
+				}
+			}
+			out.Comments = standing
+		}
+	}
+
 	return out, nil
 }
 

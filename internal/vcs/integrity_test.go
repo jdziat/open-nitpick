@@ -206,3 +206,40 @@ func TestRejectedInlineFindingsCannotEstablishCoverage(t *testing.T) {
 		t.Fatalf("fallback lost reviewed head: %s", head)
 	}
 }
+
+func TestResolvedHistoryIsExcludedOnlyWhenConfirmed(t *testing.T) {
+	for _, unavailable := range []bool{false, true} {
+		gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.URL.Path == "/api/graphql":
+				if unavailable {
+					http.Error(w, "unavailable", http.StatusServiceUnavailable)
+					return
+				}
+				_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"T1","isResolved":true,"comments":{"nodes":[{"databaseId":1}]}},{"id":"T2","isResolved":false,"comments":{"nodes":[{"databaseId":2}]}}],"pageInfo":{"hasNextPage":false}}}}}}`))
+			case strings.HasSuffix(r.URL.Path, "/reviews"):
+				_ = json.NewEncoder(w).Encode([]any{})
+			default:
+				var comments []map[string]any
+				for _, id := range []int{1, 2, 3} {
+					comments = append(comments, map[string]any{"id": id, "user": map[string]any{"id": 42}, "body": DefaultBotMarker + "\n" + fingerprintMarker("abcd", "security")})
+				}
+				_ = json.NewEncoder(w).Encode(comments)
+			}
+		})
+		prior, err := gh.PriorReview(context.Background(), testRef())
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := 2
+		if unavailable {
+			want = 3
+		}
+		if len(prior.Comments) != want {
+			t.Fatalf("unavailable=%v comments=%+v", unavailable, prior.Comments)
+		}
+		if !unavailable && (prior.Comments[0].ID != 2 || prior.Comments[1].ID != 3) {
+			t.Fatalf("lost open or unknown thread: %+v", prior.Comments)
+		}
+	}
+}

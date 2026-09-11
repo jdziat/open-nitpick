@@ -76,6 +76,8 @@ func TestGitHubPublishEmbedsHeadWithoutSummary(t *testing.T) {
 func TestGitHubPriorReviewReadsOwnMarkersOnly(t *testing.T) {
 	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case r.URL.Path == "/api/graphql":
+			http.Error(w, "thread status unavailable", http.StatusServiceUnavailable)
 		case strings.HasSuffix(r.URL.Path, "/pulls/7/reviews"):
 			_ = json.NewEncoder(w).Encode([]map[string]any{
 				// A human review, and an older bot review; the newest bot
@@ -186,6 +188,8 @@ func TestGitHubPriorReviewKeepsTheCommentBody(t *testing.T) {
 
 	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case r.URL.Path == "/api/graphql":
+			http.Error(w, "thread status unavailable", http.StatusServiceUnavailable)
 		case strings.HasSuffix(r.URL.Path, "/pulls/7/reviews"):
 			_ = json.NewEncoder(w).Encode([]map[string]any{
 				{"id": 30, "user": map[string]any{"id": 42}, "body": "Run.\n" + DefaultBotMarker + "\n" + headMarker("beef02") + "\n" + completionMarker("beef02")},
