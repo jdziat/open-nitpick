@@ -205,9 +205,9 @@ func (g *GitHub) FileContent(ctx context.Context, ref Ref, path string) ([]byte,
 		sha = pr.HeadSHA
 	}
 
-	// GetContents caps inline content at 1 MB and returns a download URL
-	// beyond that; DownloadContents handles both.
-	reader, resp, err := g.client.Repositories.DownloadContents(ctx, ref.Owner, ref.Repo, path,
+	// DownloadContents falls back to listing the parent even after a file 404,
+	// which can erase the missing-file status. Preserve the direct lookup first.
+	file, _, resp, err := g.client.Repositories.GetContents(ctx, ref.Owner, ref.Repo, path,
 		&github.RepositoryContentGetOptions{Ref: sha})
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
@@ -215,11 +215,39 @@ func (g *GitHub) FileContent(ctx context.Context, ref Ref, path string) ([]byte,
 		}
 		return nil, fmt.Errorf("github: get contents %s: %w", path, err)
 	}
+	if file == nil {
+		return nil, fmt.Errorf("%s at %s is not a file: %w", path, sha, ErrNotFound)
+	}
+	if file.GetSubmoduleGitURL() != "" || file.GetType() == "submodule" || file.GetType() == "symlink" {
+		return nil, fmt.Errorf("github: contents %s are not regular file source", path)
+	}
+	if file.GetEncoding() != "none" {
+		if file.Content == nil && (file.Size == nil || file.GetSize() != 0) {
+			return nil, fmt.Errorf("github: missing inline content for %s", path)
+		}
+		content, err := file.GetContent()
+		if err != nil {
+			return nil, fmt.Errorf("github: decode contents %s: %w", path, err)
+		}
+		return []byte(content), nil
+	}
+
+	reader, resp, err := g.client.Repositories.DownloadContents(ctx, ref.Owner, ref.Repo, path,
+		&github.RepositoryContentGetOptions{Ref: sha})
+	if err != nil {
+		return nil, fmt.Errorf("github: download contents %s: %w", path, err)
+	}
 	defer func() { _ = reader.Close() }()
+	if resp == nil || resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github: download contents %s did not return a complete response", path)
+	}
 
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("github: read contents %s: %w", path, err)
+	}
+	if file.Size != nil && len(data) != file.GetSize() {
+		return nil, fmt.Errorf("github: downloaded contents %s have %d bytes, expected %d", path, len(data), file.GetSize())
 	}
 	return data, nil
 }
