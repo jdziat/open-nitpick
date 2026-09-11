@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.1.0](https://github.com/jdziat/open-nitpick/compare/v2.0.1...v2.1.0) (2026-09-11)
+
+
+### Features
+
+* **review:** hand the reviewer what this repository was measured to do ([#104](https://github.com/jdziat/open-nitpick/issues/104)) ([641dc47](https://github.com/jdziat/open-nitpick/commit/641dc4777c494cfb15da8d30c5c5b2d71edfccb0))
+* **review:** NewEngine names the wiring a review cannot do without ([#107](https://github.com/jdziat/open-nitpick/issues/107)) ([9bfa4b5](https://github.com/jdziat/open-nitpick/commit/9bfa4b5d82ae64d8abe26aa3f97d195fd38655f7))
+* **standards:** measure conformity from the analyzers ([#106](https://github.com/jdziat/open-nitpick/issues/106)) ([ce581c3](https://github.com/jdziat/open-nitpick/commit/ce581c3f77ac71b94f459acb5f9a1f38b4994667))
+* **standards:** measure repo conventions and generate AGENTS.md ([#103](https://github.com/jdziat/open-nitpick/issues/103)) ([64e82a1](https://github.com/jdziat/open-nitpick/commit/64e82a1aa2f0ae2342173aaa339f55908d7772a5))
+
+
+### Fixes
+
+* **respond:** a change may not supply the policy it is answered under ([#99](https://github.com/jdziat/open-nitpick/issues/99)) ([e9bd59f](https://github.com/jdziat/open-nitpick/commit/e9bd59fe42b74ed123e588c327ab433be68369c6))
+* **review:** catch bugs introduced by removal-only edits ([#98](https://github.com/jdziat/open-nitpick/issues/98)) ([9aab6da](https://github.com/jdziat/open-nitpick/commit/9aab6dad72f820ba9e4a871ba32abe2bb58b7508))
+
 ## [2.0.1](https://github.com/jdziat/open-nitpick/compare/v1.12.0...v2.0.1) (2026-09-09)
 
 Same tree as the 2.0.0 release commit. The v2.0.0 tag was created and removed
