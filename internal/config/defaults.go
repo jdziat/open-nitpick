@@ -62,6 +62,7 @@ var DefaultLinters = []string{"golangci-lint", "ruff"}
 // unset: naming a model is the one thing a user must decide.
 func Defaults() *Config {
 	return &Config{
+		Practices: DefaultPractices(),
 		Models: Models{
 			Default: ModelSpec{
 				StructuredOutput: StructuredAuto,

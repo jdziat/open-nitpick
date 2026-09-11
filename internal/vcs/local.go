@@ -270,6 +270,10 @@ func (l *Local) ListDir(ctx context.Context, ref Ref, dir string) ([]string, err
 // is no reason for a reviewer to follow links at all, and refusing them keeps
 // the rule easy to state.
 func (l *Local) readContained(path string) ([]byte, error) {
+	return l.readContainedLimit(path, 0)
+}
+
+func (l *Local) readContainedLimit(path string, limit int64) ([]byte, error) {
 	clean := filepath.FromSlash(strings.TrimPrefix(path, "/"))
 
 	root, err := os.OpenRoot(l.Dir)
@@ -304,6 +308,9 @@ func (l *Local) readContained(path string) ([]byte, error) {
 	}
 	defer func() { _ = f.Close() }()
 
+	if limit > 0 {
+		return io.ReadAll(io.LimitReader(f, limit))
+	}
 	return io.ReadAll(f)
 }
 

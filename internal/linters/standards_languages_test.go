@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/standards"
 )
 
@@ -151,5 +152,41 @@ func TestLanguageConventionRubySyntaxErrorsCannotReportClean(t *testing.T) {
 		if !syntax {
 			t.Errorf("%s: missing syntax finding: %+v", opener, found)
 		}
+	}
+}
+
+func TestStandardsCoverageIgnoresAnalyzersWithNoApplicableInputs(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "a.go"), []byte("package a\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	set := &Set{statuses: []review.LinterStatus{
+		{Linter: "golangci-lint", Outcome: review.LinterRan},
+		{Linter: "ruff", Outcome: review.LinterSkipped, State: "no files it analyzes were selected for review"},
+	}}
+	source := NewStandardsSource(config.Defaults(), nil)
+	coverage := source.coverage(root, set, map[string][]string{"golangci-lint": {"a.go"}})
+	if !coverage.Ran || coverage.Why != "" || len(coverage.Files) != 1 {
+		t.Fatalf("irrelevant Python analyzer made Go coverage incomplete: %+v", coverage)
+	}
+	coverage = source.coverage(root, set, map[string][]string{"golangci-lint": {"a.go"}, "ruff": {"a.py"}})
+	if coverage.Why == "" {
+		t.Fatal("skipped analyzer with applicable input silently passed")
+	}
+}
+
+func TestCatalogCoverageIncludesGlobSelectedAnalyzerInputs(t *testing.T) {
+	entries := map[string]CatalogEntry{}
+	for _, entry := range Catalog() {
+		entries[entry.Name] = entry
+	}
+	for _, name := range []string{"actionlint", "zizmor"} {
+		entry := entries[name]
+		if !entry.Reads(".github/workflows/ci.yml") || entry.Reads("docs/ci.yml") {
+			t.Fatalf("%s does not preserve workflow glob coverage: %+v", name, entry)
+		}
+	}
+	if !entries["checkov"].Reads("deploy/k8s/pod.yaml") {
+		t.Fatal("infrastructure glob disappeared from coverage")
 	}
 }

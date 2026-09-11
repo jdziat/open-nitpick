@@ -43,6 +43,9 @@ type Config struct {
 	// demonstrates, and `nitpick standards`.
 	Standards Standards `yaml:"standards"`
 
+	// Practices selects engineering checks and their explicit requirements.
+	Practices Practices `yaml:"practices"`
+
 	// Source records where the configuration was loaded from. It is empty when
 	// only built-in defaults were used.
 	Source string `yaml:"-"`
@@ -459,7 +462,7 @@ type Review struct {
 	Concurrency int `yaml:"concurrency"`
 
 	// FailOn is the lowest severity that makes the run exit non-zero.
-	// "none" never fails the run.
+	// "none" disables this finding threshold, not required stages or practice policy.
 	FailOn Severity `yaml:"fail_on"`
 
 	// MinSeverity drops findings below this severity before publishing.

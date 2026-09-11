@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/config"
@@ -26,7 +27,7 @@ func runConfigRef(args []string, stdout io.Writer) error {
 		fmt.Fprintln(os.Stderr, "Usage: nitpick config-reference [flags]\n\n"+
 			"Writes every key .nitpick.yaml accepts, with its type, its shipped default and one\n"+
 			"sentence about it, read from the source of the package -src names. It reads that\n"+
-			"package from disk, so it runs from a checkout.\n\nFlags:")
+			"package and, when present, its sibling commit-policy package from disk.\n\nFlags:")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -36,6 +37,21 @@ func runConfigRef(args []string, stdout io.Writer) error {
 	docs, values, err := docgen.ReadDocs(*src)
 	if err != nil {
 		return err
+	}
+	commitDir := filepath.Join(filepath.Dir(*src), "commits")
+	if info, statErr := os.Stat(commitDir); statErr != nil && !os.IsNotExist(statErr) {
+		return statErr
+	} else if statErr == nil && info.IsDir() {
+		commitDocs, _, err := docgen.ReadDocs(commitDir)
+		if err != nil {
+			return err
+		}
+		for key, text := range commitDocs {
+			if prior, ok := docs[key]; ok && prior != text {
+				return fmt.Errorf("ambiguous field documentation for %s", key)
+			}
+			docs[key] = text
+		}
 	}
 	fields := docgen.Walk(config.Defaults(), docs, values)
 

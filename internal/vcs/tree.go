@@ -49,6 +49,14 @@ type Tree struct {
 	// Lines is the line count of each covered file, the denominator a score
 	// per thousand lines needs.
 	Lines map[string]int
+
+	// Snapshot supplies immutable content instead of reading the checkout.
+	Snapshot map[string][]byte
+	// Capture freezes the first successful Diff and its coverage. Create a new
+	// provider to assess a different scope.
+	Capture      bool
+	captured     bool
+	capturedDiff []byte
 }
 
 // TreeSkip is one file the tree review left out on purpose.
@@ -68,6 +76,63 @@ func NewTree(local *Local, paths []string) *Tree {
 		clean = append(clean, p)
 	}
 	return &Tree{Local: local, Paths: clean}
+}
+
+// NewSnapshot copies a selected tree so every model batch reads the same bytes.
+func NewSnapshot(local *Local, files map[string][]byte) *Tree {
+	tree := NewTree(local, nil)
+	tree.Snapshot = make(map[string][]byte, len(files))
+	for name, content := range files {
+		tree.Snapshot[name] = bytes.Clone(content)
+	}
+	return tree
+}
+
+// FileContent reads the frozen source when this provider owns a snapshot.
+func (t *Tree) FileContent(ctx context.Context, ref Ref, name string) ([]byte, error) {
+	if t.Snapshot == nil {
+		return t.Local.FileContent(ctx, ref, name)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	content, ok := t.Snapshot[name]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	return bytes.Clone(content), nil
+}
+
+// ListDir lists the snapshot when present, otherwise the live checkout.
+func (t *Tree) ListDir(ctx context.Context, ref Ref, dir string) ([]string, error) {
+	if t.Snapshot == nil {
+		return t.Local.ListDir(ctx, ref, dir)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if dir != "" {
+		dir = strings.TrimSuffix(dir, "/") + "/"
+	}
+	seen := map[string]bool{}
+	for name := range t.Snapshot {
+		if !strings.HasPrefix(name, dir) {
+			continue
+		}
+		rest := strings.TrimPrefix(name, dir)
+		if slash := strings.IndexByte(rest, '/'); slash >= 0 {
+			rest = rest[:slash+1]
+		}
+		if rest != "" {
+			seen[rest] = true
+		}
+	}
+	var entries []string
+	for name := range seen {
+		entries = append(entries, name)
+	}
+	sort.Strings(entries)
+	return entries, nil
 }
 
 // Name identifies the provider in logs and the review header.
@@ -98,8 +163,14 @@ func (t *Tree) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error) {
 
 // Diff lists the tree and renders every included file as an addition.
 func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if ref.Head != Worktree {
 		return nil, fmt.Errorf("a tree review reads the working tree; a revision cannot be reviewed whole")
+	}
+	if t.captured {
+		return bytes.Clone(t.capturedDiff), nil
 	}
 	names, err := t.list(ctx)
 	if err != nil {
@@ -127,6 +198,8 @@ func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 	t.Covered, t.Unbudgeted, t.Skipped = nil, nil, nil
 	t.Lines = map[string]int{}
 	var out bytes.Buffer
+	captured := map[string][]byte{}
+	capture := t.Capture && t.Snapshot == nil
 	spent := 0
 	for _, name := range names {
 		if err := ctx.Err(); err != nil {
@@ -139,13 +212,18 @@ func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 			t.Unbudgeted = append(t.Unbudgeted, name)
 			continue
 		}
-		// Size is checked before the read, so an oversized file costs a
-		// stat, not its bytes in memory.
-		if info, err := os.Stat(filepath.Join(t.Dir, filepath.FromSlash(name))); err == nil && t.MaxBytes > 0 && info.Size() > int64(t.MaxBytes) {
-			t.Skipped = append(t.Skipped, TreeSkip{Path: name, Reason: fmt.Sprintf("larger than %d bytes", t.MaxBytes)})
-			continue
+		// Avoid loading oversized files from disk; snapshot bytes are already held.
+		if t.Snapshot == nil {
+			if info, err := os.Stat(filepath.Join(t.Dir, filepath.FromSlash(name))); err == nil && t.MaxBytes > 0 && info.Size() > int64(t.MaxBytes) {
+				reason := fmt.Sprintf("larger than %d bytes", t.MaxBytes)
+				if prefix, err := t.readContainedLimit(name, 4096); err == nil && bytes.ContainsRune(prefix, 0) {
+					reason = "binary"
+				}
+				t.Skipped = append(t.Skipped, TreeSkip{Path: name, Reason: reason})
+				continue
+			}
 		}
-		content, err := t.readContained(name)
+		content, err := t.FileContent(ctx, ref, name)
 		if err != nil {
 			t.Skipped = append(t.Skipped, TreeSkip{Path: name, Reason: "unreadable: " + err.Error()})
 			continue
@@ -158,10 +236,21 @@ func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 			t.Skipped = append(t.Skipped, TreeSkip{Path: name, Reason: "binary"})
 			continue
 		}
+		if t.MaxBytes > 0 && len(content) > t.MaxBytes {
+			t.Skipped = append(t.Skipped, TreeSkip{Path: name, Reason: fmt.Sprintf("larger than %d bytes", t.MaxBytes)})
+			continue
+		}
 		spent += len(content) / 4
 		t.Covered = append(t.Covered, name)
+		if capture {
+			captured[name] = bytes.Clone(content)
+		}
 		t.Lines[name] = len(strings.Split(strings.TrimSuffix(string(content), "\n"), "\n"))
 		writeAddition(&out, name, content)
+	}
+	if capture {
+		t.Snapshot = captured
+		t.captured, t.capturedDiff = true, bytes.Clone(out.Bytes())
 	}
 	return out.Bytes(), nil
 }
@@ -169,6 +258,17 @@ func (t *Tree) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 // list names the files git sees in the tree: tracked, plus untracked files
 // that are not ignored, in path order.
 func (t *Tree) list(ctx context.Context) ([]string, error) {
+	if t.Snapshot != nil {
+		var names []string
+		for name := range t.Snapshot {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return names, nil
+	}
 	raw, err := t.gitRaw(ctx, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
 	if err != nil {
 		return nil, fmt.Errorf("list the tree: %w", err)
