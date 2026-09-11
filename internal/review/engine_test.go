@@ -677,7 +677,7 @@ func TestDedupeCollapsesIdenticalFindings(t *testing.T) {
 	}
 }
 
-func TestCountsRendering(t *testing.T) {
+func TestCountsRenderingIncludesSeverityTotals(t *testing.T) {
 	c := counts([]Finding{
 		{Severity: "error"}, {Severity: "error"}, {Severity: "nit"},
 	})

@@ -10,10 +10,10 @@ import (
 	"testing"
 )
 
-// TestProbeModel runs the selected fixtures against the selected models and
+// TestProbeModelReportsRawFailures runs the selected fixtures against the selected models and
 // prints every failure with the raw responses that preceded it, for
 // diagnosing a model that loses reviews in the battery.
-func TestProbeModel(t *testing.T) {
+func TestProbeModelReportsRawFailures(t *testing.T) {
 	opts, err := OptionsFromEnv()
 	if err != nil {
 		t.Fatal(err)

@@ -1175,8 +1175,8 @@ const (
 )
 
 // overlay returns base with every field the override sets replaced.
-func (base ModelSpec) overlay(over ModelSpec) ModelSpec {
-	out := base
+func (s ModelSpec) overlay(over ModelSpec) ModelSpec {
+	out := s
 	if over.Provider != "" {
 		out.Provider = over.Provider
 	}
@@ -1191,7 +1191,7 @@ func (base ModelSpec) overlay(over ModelSpec) ModelSpec {
 	switch {
 	case over.Providers != nil:
 		out.Providers = append([]string(nil), over.Providers...)
-	case over.Model != "" && over.Model != base.Model:
+	case over.Model != "" && over.Model != s.Model:
 		out.Providers = nil
 	}
 	if over.BaseURL != "" {
@@ -1229,8 +1229,8 @@ func (base ModelSpec) overlay(over ModelSpec) ModelSpec {
 		out.AllowPrivateEndpoint = true
 	}
 	if len(over.Extra) > 0 {
-		out.Extra = make(map[string]string, len(base.Extra)+len(over.Extra))
-		maps.Copy(out.Extra, base.Extra)
+		out.Extra = make(map[string]string, len(s.Extra)+len(over.Extra))
+		maps.Copy(out.Extra, s.Extra)
 		maps.Copy(out.Extra, over.Extra)
 	}
 	return out
@@ -1280,4 +1280,4 @@ func ReasoningLevels() []string {
 }
 
 // ReasoningValues reports the same, for the generated reference.
-func (m ModelSpec) ReasoningValues() []string { return ReasoningLevels() }
+func (s ModelSpec) ReasoningValues() []string { return ReasoningLevels() }

@@ -95,14 +95,18 @@ func TestHandWrittenTextOutsideTheMarkersIsUntouched(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	head := handWritten[:strings.Index(handWritten, BeginMarker)]
-	tail := handWritten[strings.Index(handWritten, EndMarker)+len(EndMarker):]
+	begin, end := strings.Index(handWritten, BeginMarker), strings.Index(handWritten, EndMarker)
+	if begin < 0 || end < begin {
+		t.Fatal("fixture must contain ordered markers")
+	}
+	head := handWritten[:begin]
+	tail := handWritten[end+len(EndMarker):]
 
 	if !strings.HasPrefix(out, head) {
-		t.Errorf("the text above the block changed:\n%q", out[:len(head)+40])
+		t.Errorf("the text above the block changed:\n%q", out)
 	}
 	if !strings.HasSuffix(out, tail) {
-		t.Errorf("the text below the block changed:\n%q", out[len(out)-len(tail)-40:])
+		t.Errorf("the text below the block changed:\n%q", out)
 	}
 	if strings.Contains(out, "stale content") {
 		t.Error("the old block survived the regeneration")

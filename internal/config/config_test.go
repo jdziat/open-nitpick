@@ -222,7 +222,7 @@ func TestValidateAllowsFailOnNone(t *testing.T) {
 	}
 }
 
-func TestSeverityOrdering(t *testing.T) {
+func TestSeverityOrderingRespectsThresholds(t *testing.T) {
 	if !SeverityError.AtLeast(SeverityWarning) {
 		t.Error("error should outrank warning")
 	}
@@ -269,7 +269,7 @@ func TestInstructionsForMatchingPaths(t *testing.T) {
 	}
 }
 
-func TestIgnoreDefaults(t *testing.T) {
+func TestIgnoreDefaultsExcludeGeneratedDependencies(t *testing.T) {
 	cfg := Defaults()
 
 	ignored := []string{

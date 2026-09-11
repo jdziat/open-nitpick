@@ -362,7 +362,7 @@ func extractJSON[T any](ctx context.Context, c *Client, msgs []llms.Message, opt
 	}
 
 	// Repair: show the model its own output and the parse error.
-	repair := append(prompted,
+	prompted = append(prompted,
 		llms.Message{Role: llms.RoleAssistant, Content: resp.Content},
 		llms.Message{Role: llms.RoleUser, Content: fmt.Sprintf(
 			"That response could not be parsed: %v\n\n"+
@@ -370,7 +370,7 @@ func extractJSON[T any](ctx context.Context, c *Client, msgs []llms.Message, opt
 			parseErr)},
 	)
 
-	retry, err := generateContent(ctx, c, repair, call)
+	retry, err := generateContent(ctx, c, prompted, call)
 	if err != nil {
 		return zero, fmt.Errorf("%s: repair attempt failed: %w (original parse error: %w)", c, err, parseErr)
 	}

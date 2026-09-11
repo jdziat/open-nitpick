@@ -325,7 +325,8 @@ func degradedByPath(p *Plan) map[string]string {
 }
 
 // row renders one case as a table line: the packing a human needs to see.
-func row(w *tabwriter.Writer, c packCase, cfg *config.Config, plan *Plan) {
+func row(t *testing.T, w *tabwriter.Writer, c packCase, cfg *config.Config, plan *Plan) {
+	t.Helper()
 	degraded := degradedByPath(plan)
 
 	var (
@@ -365,7 +366,7 @@ func row(w *tabwriter.Writer, c packCase, cfg *config.Config, plan *Plan) {
 		}
 	}
 
-	fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%s\t%s\t%.1f%%\t%d\t%d/%d/%d/%d/%d\t%s\n",
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%s\t%s\t%.1f%%\t%d\t%d/%d/%d/%d/%d\t%s\n",
 		c.Name,
 		cfg.Review.TokenBudgetPerRequest,
 		cfg.Review.MaxFilesPerRequest,
@@ -377,7 +378,9 @@ func row(w *tabwriter.Writer, c packCase, cfg *config.Config, plan *Plan) {
 		total,
 		states[stateFull], states[stateWindow], states[stateFetchDrop], states[stateSizeDrop], states[stateUnrecorded],
 		widthList(widths),
-	)
+	); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // widthList renders the context widths a case settled on, most common first.
@@ -453,10 +456,10 @@ func alternating(a, b fileSpec, n int) []fileSpec {
 	return out
 }
 
-// TestPackingTable prints the packing behaviour of every case. It exists to be
-// read (go test -run TestPackingTable -v ./internal/bundle), not only to pass:
+// TestPackingTableReportsBudgetUse prints the packing behaviour of every case. It exists to be
+// read (go test -run TestPackingTableReportsBudgetUse -v ./internal/bundle), not only to pass:
 // the numbers are the argument for or against the current policy.
-func TestPackingTable(t *testing.T) {
+func TestPackingTableReportsBudgetUse(t *testing.T) {
 	var out strings.Builder
 	w := tabwriter.NewWriter(&out, 0, 0, 2, ' ', 0)
 
@@ -464,7 +467,9 @@ func TestPackingTable(t *testing.T) {
 	// budget means a file that needs a window grows until it fills a request by
 	// itself, so context per file and requests per run trade directly against
 	// each other. The column exists so that trade is priced rather than assumed.
-	fmt.Fprintln(w, "case\tbudget\tmax/req\tfiles\tbatches\tfiles per batch\ttokens per batch\tpeak use\ttotal tokens\tfull/window/fetch-drop/size-drop/unrecorded\twindow widths")
+	if _, err := fmt.Fprintln(w, "case\tbudget\tmax/req\tfiles\tbatches\tfiles per batch\ttokens per batch\tpeak use\ttotal tokens\tfull/window/fetch-drop/size-drop/unrecorded\twindow widths"); err != nil {
+		t.Fatal(err)
+	}
 
 	// Kept so the notes below are derived from what was just measured rather
 	// than from numbers pasted into a comment and left to rot.
@@ -472,7 +477,7 @@ func TestPackingTable(t *testing.T) {
 
 	for _, c := range packCases() {
 		cfg, plan := measure(t, c)
-		row(w, c, cfg, plan)
+		row(t, w, c, cfg, plan)
 		measured[c.Name] = plan
 	}
 
@@ -952,7 +957,7 @@ func TestBudgetBoundFilesNeverReachTheFileCeiling(t *testing.T) {
 	}
 
 	if half := cfg.Review.TokenBudgetPerRequest / 2; smallest <= half {
-		t.Skipf("smallest entry is %d tokens, at or under half the %d-token budget, so this band is now empty; re-measure with TestPackingTable",
+		t.Skipf("smallest entry is %d tokens, at or under half the %d-token budget, so this band is now empty; re-measure with TestPackingTableReportsBudgetUse",
 			smallest, cfg.Review.TokenBudgetPerRequest)
 	}
 

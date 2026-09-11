@@ -85,7 +85,7 @@ type scored struct {
 	notes    []string
 }
 
-// TestTunePersona measures the nitpick levels against one shared corpus.
+// TestTunePersonaMeasuresFilterEffects measures the nitpick levels against one shared corpus.
 //
 // Each fixture is reviewed ONCE at the generation scope and judged ONCE. The
 // levels are then applied offline with review.Filter, and each level's stats are
@@ -97,7 +97,7 @@ type scored struct {
 // exactly the model-variance confound the design removes, two levels would
 // differ because the model answered differently, not because the filter did
 // anything.
-func TestTunePersona(t *testing.T) {
+func TestTunePersonaMeasuresFilterEffects(t *testing.T) {
 	opts, err := OptionsFromEnv()
 	if err != nil {
 		t.Fatalf("options: %v", err)
@@ -461,9 +461,9 @@ func reportVariants(t *testing.T, results []scored, panel JudgePanel) {
 	}
 }
 
-// TestJudgeModels ranks every model in the battery by JUDGED quality.
+// TestJudgeModelsScoresFixtureReviews ranks every model in the battery by JUDGED quality.
 //
-// TestPrompts measures keyword recall against planted defects: did the model
+// TestPromptsDetectPlantedDefects measures keyword recall against planted defects: did the model
 // find a bug we already knew about. That is a floor, not a ranking, it cannot
 // say whether a finding was worth a colleague's attention, whether its severity
 // was honest, or whether it labelled the problem correctly. Only a judgement
@@ -471,7 +471,7 @@ func reportVariants(t *testing.T, results []scored, panel JudgePanel) {
 //
 // Each model reviews every fixture once, and a strong model assesses the result
 // as a senior engineer would.
-func TestJudgeModels(t *testing.T) {
+func TestJudgeModelsScoresFixtureReviews(t *testing.T) {
 	opts, err := OptionsFromEnv()
 	if err != nil {
 		t.Fatalf("options: %v", err)
@@ -629,7 +629,7 @@ func TestJudgeModels(t *testing.T) {
 
 	wg.Wait()
 
-	panel := corroborate(t, ctx, judge, persona, nil, samples, notes)
+	panel := corroborate(ctx, t, judge, persona, nil, samples, notes)
 	reportJudgedModels(t, opts.Fixtures, byModel, panel, notes)
 }
 
@@ -638,8 +638,8 @@ func TestJudgeModels(t *testing.T) {
 //
 // The note behind it is in docs/harness-notes.md#corroborate.
 func corroborate(
-	t *testing.T,
 	ctx context.Context,
+	t *testing.T,
 	primary *Judge,
 	persona config.Persona,
 	byVariant map[string]config.Persona,
@@ -1318,17 +1318,17 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 
 	wg.Wait()
 
-	panel := corroborate(t, ctx, judge, persona, nil, samples, notes)
+	panel := corroborate(ctx, t, judge, persona, nil, samples, notes)
 	reportJudgedModels(t, opts.Fixtures, byName, panel, notes)
 }
 
-// TestCollectIncumbent gathers Incumbent's reviews one fixture at a time,
+// TestCollectIncumbentCachesMissingReviews gathers Incumbent's reviews one fixture at a time,
 // caching each so a rate limit costs a wait rather than lost progress.
 //
 // Run it repeatedly until it reports nothing outstanding; it skips whatever is
 // already cached. The free CLI allowance is small enough that a single pass is
 // unlikely to finish, which is exactly why this is separate from scoring.
-func TestCollectIncumbent(t *testing.T) {
+func TestCollectIncumbentCachesMissingReviews(t *testing.T) {
 	ctx := context.Background()
 
 	if !IncumbentAvailable(ctx) {
@@ -1459,7 +1459,7 @@ func corroborateVariants(
 	t.Helper()
 
 	notes := map[string][]string{}
-	panel := corroborate(t, context.Background(), judge, config.DefaultPersona(), personas, samples, notes)
+	panel := corroborate(context.Background(), t, judge, config.DefaultPersona(), personas, samples, notes)
 
 	for i := range results {
 		results[i].notes = append(results[i].notes, notes[contenderLabel(results[i].model, results[i].variant)]...)

@@ -222,6 +222,7 @@ Review complete
 `),
 			want: 1,
 			check: func(t *testing.T, got []review.Finding) {
+				t.Helper()
 				if got[0].Path != "config.go" {
 					t.Errorf("path = %q, want config.go", got[0].Path)
 				}
@@ -246,6 +247,7 @@ Review complete
 `),
 			want: 1,
 			check: func(t *testing.T, got []review.Finding) {
+				t.Helper()
 				if got[0].Line != 7 {
 					t.Errorf("line = %d, want 7", got[0].Line)
 				}
@@ -257,6 +259,7 @@ Review complete
 				"\x1b[1;31mcritical\x1b[0m \x1b[2m[Security & Privacy]\x1b[0m", 1),
 			want: 1,
 			check: func(t *testing.T, got []review.Finding) {
+				t.Helper()
 				if got[0].Severity != string(config.SeverityCritical) || got[0].Line != 10 {
 					t.Errorf("CSI escapes changed the parse: %+v", got[0])
 				}
@@ -278,6 +281,7 @@ Review complete
 `),
 			want: 1,
 			check: func(t *testing.T, got []review.Finding) {
+				t.Helper()
 				// The prose contains none of classifyText's security keywords, so
 				// this only passes if the category decided the class.
 				if guess := classifyText(got[0].Title + " " + got[0].Rationale); guess == config.ClassSecurity {
@@ -300,6 +304,7 @@ Review complete
 `),
 			want: 1,
 			check: func(t *testing.T, got []review.Finding) {
+				t.Helper()
 				if got[0].Class != string(config.ClassConcurrency) {
 					t.Errorf("class = %q, want concurrency from classifyText", got[0].Class)
 				}
@@ -910,7 +915,7 @@ func TestShippedCacheReflectsTheCurrentParser(t *testing.T) {
 	for _, f := range AllFixtures() {
 		blob, err := os.ReadFile(filepath.Join(crCacheDir, f.Name+".json"))
 		if err != nil {
-			continue // not yet collected; TestCollectIncumbent reports that
+			continue // not yet collected; TestCollectIncumbentCachesMissingReviews reports that
 		}
 
 		var c crCache

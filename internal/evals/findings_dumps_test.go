@@ -305,7 +305,11 @@ func readGrid(t *testing.T, path string, runs int) *grid {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	g := &grid{runs: runs, fixtures: map[string]bool{}}
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<24)
@@ -366,7 +370,7 @@ func (g *grid) perFixture(fixture, variant string) (hits, lost int) {
 			hits++
 		}
 	}
-	return
+	return hits, lost
 }
 
 func (g *grid) lost(variant string) int {
@@ -395,7 +399,7 @@ func (g *grid) tally(variant string, defects map[string][]Defect) (hits, reviews
 			noise++
 		}
 	}
-	return
+	return hits, reviews, noise
 }
 
 func (g *grid) findingsOn(fixture string) int {

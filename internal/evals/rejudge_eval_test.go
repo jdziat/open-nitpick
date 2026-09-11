@@ -11,7 +11,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
-// TestRejudgeDump re-judges findings that were already collected, with a
+// TestRejudgeDumpScoresRecordedFindings re-judges findings that were already collected, with a
 // different judge, and prints the two rankings side by side.
 //
 // It runs no review. Every finding it submits came out of the dump named by
@@ -27,7 +27,7 @@ import (
 // Pointing it at the same judge id is the other measurement rather than a
 // mistake: identical input judged twice by one model is that model's own
 // variance, which is the noise floor any vendor comparison has to clear.
-func TestRejudgeDump(t *testing.T) {
+func TestRejudgeDumpScoresRecordedFindings(t *testing.T) {
 	path := strings.TrimSpace(os.Getenv(EnvRejudgeDump))
 	if path == "" {
 		t.Skipf("set %s to a dump file written by %s; this test re-judges recorded findings and runs no review",

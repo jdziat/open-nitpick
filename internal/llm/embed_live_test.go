@@ -11,7 +11,7 @@ import (
 )
 
 // A live check that a provider can actually embed, run by hand.
-func TestLiveEmbed(t *testing.T) {
+func TestLiveEmbedReturnsProviderVectors(t *testing.T) {
 	provider, model := os.Getenv("EMBED_PROVIDER"), os.Getenv("EMBED_MODEL")
 	if provider == "" || model == "" {
 		t.Skip("set EMBED_PROVIDER and EMBED_MODEL")

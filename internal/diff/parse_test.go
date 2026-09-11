@@ -212,7 +212,7 @@ index abc1234..0000000
 	}
 }
 
-func TestParseRename(t *testing.T) {
+func TestParseRenamePreservesBothPaths(t *testing.T) {
 	const d = `diff --git a/old/path.go b/new/path.go
 similarity index 92%
 rename from old/path.go
@@ -376,7 +376,7 @@ diff --git a/a.go b/a.go
 	}
 }
 
-func TestPositionLookup(t *testing.T) {
+func TestPositionLookupResolvesOnlyDiffLines(t *testing.T) {
 	files, _ := Parse([]byte(modifiedDiff))
 	f := files[0]
 
@@ -445,7 +445,7 @@ func TestIsChangedLine(t *testing.T) {
 	}
 }
 
-func TestChangedLines(t *testing.T) {
+func TestChangedLinesListsAddedLines(t *testing.T) {
 	files, _ := Parse([]byte(modifiedDiff))
 
 	got := files[0].ChangedLines()

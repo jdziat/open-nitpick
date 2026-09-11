@@ -585,7 +585,7 @@ temperature zero is real, and this is inside it.
 **What it costs in lost reviews, and why: found and fixed.** glm-5.3-flash
 lost 2 of 16 reviews on the tuning corpus and 3 of 40 on the multi-file
 corpus in this run, and 11 of 88 the next evening, to "all review batches
-failed" with no response recorded. `TestProbeModel` caught one with the
+failed" with no response recorded. `TestProbeModelReportsRawFailures` caught one with the
 engine's log:
 
     schema path failed (structured output is not valid JSON: invalid character 'L' ...);
@@ -2227,3 +2227,31 @@ means added, so `linters.only_changed_lines` and the linter file skip at
 is deliberate: a linter finding on a line the change did not write is
 pre-existing, and the argument for publishing it is not the argument this
 section makes.
+
+### Repository standards become a CI gate (2026-09-11)
+
+`nitpick repo-standards -check -json` on `4f36b0c` exited 1 with 27 probe
+exceptions and 22 linter observations. After the cleanup in this change, the
+same command exits 0. Both runs used Go 1.25.5, golangci-lint 2.8.0 and the
+embedded convention ruleset over 302 Go files; neither used a model.
+
+| Probe | Before: conforming / sites | After: conforming / sites |
+|---|---:|---:|
+| Exported comment names | 720 / 720 | 720 / 720 |
+| Error wrapping | 206 / 206 | 206 / 206 |
+| Context first | 245 / 246 | 246 / 246 |
+| Explicit named returns | 49 / 51 | 51 / 51 |
+| Test names | 1237 / 1261 | 1261 / 1261 |
+| Helper markers | 137 / 137 | 138 / 138 |
+
+Linter observations fell from 22 to zero. These were convention departures,
+not 22 confirmed defects. One observation is deliberately suppressed at its
+source: the credit-limit retry fixture preserves the provider's capitalized,
+punctuated error text. The added named helper takes the helper denominator
+from 137 to 138; anonymous callbacks are checked by the linter, not that probe.
+
+CI runs the standards command after ordinary lint, using the same pinned
+analyzer and toolchain. The probes cover Go only, and analyzer file coverage
+does not prove that every build tag was checked. Eval-tag compilation remains
+a separate vet gate. The thresholds describe the current tree, so a broad
+convention change can alter which rules qualify as established standards.

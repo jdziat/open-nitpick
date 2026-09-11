@@ -502,7 +502,7 @@ func fitEntry(e *Entry, budget, maxBytes int, estimator *llms.TokenEstimator) st
 //
 // Which of the two limits binds is decided entirely by file size, because
 // fitEntry has already sized every entry against the whole request budget on
-// its own. Measured by TestPackingTable at the shipped 60k budget and 6 files
+// its own. Measured by TestPackingTableReportsBudgetUse at the shipped 60k budget and 6 files
 // per request, by the row names it prints: "6 tiny" (20-line files) fills a
 // request to 4.9% of budget and "6 small (200L)" to 36.1%, both split only by
 // the file ceiling, while "6 big (2000L)" costs 33,116 tokens a file and takes

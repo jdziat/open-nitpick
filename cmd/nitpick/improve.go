@@ -114,7 +114,7 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, repo string, cfg *config.Co
 		// reviewing at the ordinary scope, which is a pass that says it was
 		// pedantic and was not.
 		Policy: improveScoped{&config.BasePolicy{RepoRoot: repo, Loaded: &icfg, Provider: gh}},
-		Models: func(policy *config.Config) (*llm.Roles, error) { return llm.BuildRoles(policy) },
+		Models: llm.BuildRoles,
 		// Linters stays nil. The analyzers are deterministic and the ordinary
 		// review already ran them; a second run would spend time to publish
 		// what is already on the pull request.

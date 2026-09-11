@@ -88,7 +88,7 @@ func TestWrapperKeyIsRejected(t *testing.T) {
 	}
 }
 
-func TestStripReasoning(t *testing.T) {
+func TestStripReasoningPreservesAnswerText(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"<think>a{b</think>x", "x"},
 		{"<thinking>a</thinking>x", "x"},

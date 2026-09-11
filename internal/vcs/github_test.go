@@ -329,7 +329,7 @@ func TestRefFromEnv(t *testing.T) {
 	}
 }
 
-func TestRefString(t *testing.T) {
+func TestRefStringIdentifiesReviewTarget(t *testing.T) {
 	if got := (Ref{Owner: "o", Repo: "r", Number: 3}).String(); got != "o/r#3" {
 		t.Errorf("String = %q", got)
 	}

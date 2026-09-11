@@ -237,7 +237,7 @@ func TestUnreadableReportIsAnErrorNotACleanRun(t *testing.T) {
 }
 
 // Parser samples, in each tool's documented machine format.
-func TestCatalogParsers(t *testing.T) {
+func TestCatalogParsersDecodeToolReports(t *testing.T) {
 	inv := invocation{repoRoot: "/repo", files: []string{"x"}}
 	cases := []struct {
 		tool     string

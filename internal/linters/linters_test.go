@@ -325,12 +325,12 @@ deleted file mode 100644
 	}
 }
 
-// TestMapSeverity pins the whole table, including the entry that was wrong.
+// TestMapSeverityPreservesKnownLevels pins the whole table, including the entry that was wrong.
 //
 // Every level in config's vocabulary appears in the codomain here. That is the
 // property the old table failed: critical was unreachable, so `fail_on: critical`
 // gated on nothing an analyzer could ever produce.
-func TestMapSeverity(t *testing.T) {
+func TestMapSeverityPreservesKnownLevels(t *testing.T) {
 	cases := map[string]config.Severity{
 		// Analyzer vocabularies, folded onto ours. Semgrep documents
 		// ERROR/WARNING/INFO as the older spellings of HIGH/MEDIUM/LOW, so the
@@ -414,7 +414,7 @@ func TestAnUnreadableAnalyzerWordIsRankedWhereSilenceIs(t *testing.T) {
 	}
 }
 
-func TestPrefixRule(t *testing.T) {
+func TestPrefixRuleIncludesAnalyzerName(t *testing.T) {
 	cases := []struct{ linter, rule, want string }{
 		{"golangci-lint", "errcheck", "golangci-lint(errcheck)"},
 		{"ruff", "", "ruff"},
@@ -511,7 +511,7 @@ func TestGoTargetsDeduplicatesWithinAModule(t *testing.T) {
 	}
 }
 
-func TestFilterExt(t *testing.T) {
+func TestFilterExtMatchesCaseInsensitively(t *testing.T) {
 	got := filterExt([]string{"a.py", "b.go", "c.PY"}, ".py")
 	if len(got) != 2 {
 		t.Errorf("filterExt = %v, want the two Python files (case-insensitive)", got)

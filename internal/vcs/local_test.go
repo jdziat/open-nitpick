@@ -220,7 +220,7 @@ func TestLocalDiffAgainstBaseUsesMergeBase(t *testing.T) {
 	}
 }
 
-func TestLocalName(t *testing.T) {
+func TestLocalNameIdentifiesProvider(t *testing.T) {
 	if got := NewLocal(".", nil).Name(); got != "local" {
 		t.Errorf("Name = %q, want local", got)
 	}

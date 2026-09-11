@@ -6,7 +6,7 @@ prompt or analyzer change against real models before it ships.
 
 ```bash
 go test ./...        # no network or credentials required
-go test -race ./...
+go test -race -p 1 ./...
 make quick           # measure a prompt or analyzer change for a few cents (see below)
 ```
 

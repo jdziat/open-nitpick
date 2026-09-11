@@ -53,7 +53,7 @@ func (c *creditLLM) GenerateContent(_ context.Context, _ []llms.Message, opts ..
 		o(&co)
 	}
 	if co.MaxTokens == nil {
-		return nil, errors.New("API error (status 402): This request requires more credits, or fewer max_tokens.")
+		return nil, errors.New("API error (status 402): This request requires more credits, or fewer max_tokens.") //nolint:revive // Match the provider response that triggers the retry.
 	}
 	return &llms.Response{Content: `{"findings":[],"summary":"ok"}`}, nil
 }
