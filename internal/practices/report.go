@@ -3,6 +3,8 @@
 package practices
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 )
@@ -76,6 +78,12 @@ type DesignTask struct {
 	Source  Target   `json:"source"`
 	Purpose string   `json:"purpose"`
 	Context []Target `json:"context,omitempty"`
+	// Sources contains the complete package source intended for this task.
+	Sources []Target `json:"sources,omitempty"`
+	// Omitted records required source or graph context unavailable to the task.
+	Omitted []Omission `json:"omitted,omitempty"`
+	// SourceDigest binds the planned source and context, not a model cache entry.
+	SourceDigest string `json:"source_digest,omitempty"`
 }
 
 // Decision retains a claim an expert withheld, together with the stated reason.
@@ -184,11 +192,38 @@ func (r Report) Problems() []string {
 		for _, target := range c.Context {
 			evidence[normalize(target)] = true
 		}
+		taskIDs := map[string]bool{}
 		for _, task := range c.Tasks {
+			if taskIDs[task.ID] {
+				bad("duplicate design task")
+			}
+			taskIDs[task.ID] = true
+			sourceTargets := map[Target]bool{}
+			for _, source := range task.Sources {
+				if source.Kind != FileTarget || !source.valid() || sourceTargets[source] {
+					bad("design task has invalid or duplicate source")
+				}
+				sourceTargets[source] = true
+			}
+			if len(task.Sources) > 0 && !sourceTargets[task.Source] {
+				bad("design task primary source is outside its source scope")
+			}
 			if !task.Source.valid() || task.Purpose == "" || !planned[Target{Kind: UnitTarget, ID: task.ID}] {
 				bad("design task lacks a planned unit, source or purpose")
 			}
 			if read[Target{Kind: UnitTarget, ID: task.ID}] {
+				if len(task.Omitted) > 0 {
+					bad("examined design task has omitted context")
+				}
+				if len(task.Sources) > 0 {
+					digest, err := hex.DecodeString(task.SourceDigest)
+					if err != nil || len(digest) != sha256.Size {
+						bad("examined design task lacks a source digest")
+					}
+				}
+				for _, source := range task.Sources {
+					evidence[normalize(source)] = true
+				}
 				evidence[normalize(task.Source)] = true
 				for _, target := range task.Context {
 					evidence[normalize(target)] = true

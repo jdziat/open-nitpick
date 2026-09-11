@@ -26,7 +26,9 @@ type ContentFetcher func(ctx context.Context, path string) ([]byte, error)
 
 // Entry is one file prepared for review.
 type Entry struct {
-	File *diff.File
+	// SourceOnly marks unchanged source supplied as design evidence.
+	SourceOnly bool
+	File       *diff.File
 
 	// Content is the new-side file, empty when it was unavailable, binary, or
 	// excluded by the token budget.
@@ -56,7 +58,11 @@ func (e *Entry) HasContent() bool { return e.Content != "" }
 
 // Batch is a group of entries reviewed in one model call.
 type Batch struct {
-	Entries []Entry
+	// DesignTask identifies the complete package assessment carried by this call.
+	DesignTask string
+	// Assessment describes the task and its source scope.
+	Assessment string
+	Entries    []Entry
 
 	// Tokens is the estimated total for the batch.
 	Tokens int
@@ -214,7 +220,7 @@ func AssembleReserving(ctx context.Context, cfg *config.Config, files diff.Files
 	plan := &Plan{}
 	estimator := llms.DefaultTokenEstimator()
 
-	// The budget the entries actually get, after the framing that travels with
+	// The budget available to entries, after the framing that travels with
 	// them. Computed here rather than at packing, because a single file is
 	// fitted against it too: reserving only at packing let one entry fill the
 	// whole budget and then be sent with the system prompt on top, which is
@@ -558,6 +564,15 @@ func RenderDiffOnly(e Entry) string {
 // lives in. Line numbers are included throughout, since a finding is only
 // actionable if the model can cite where it belongs.
 func Render(e Entry) string {
+	if e.SourceOnly {
+		var b strings.Builder
+		fmt.Fprintf(&b, "### Supporting source: %s\nFindings here are summary evidence, not inline comments.\n", promptSafe(e.File.Path))
+		for _, instruction := range e.Instructions {
+			fmt.Fprintf(&b, "Path instruction: %s\n", promptSafe(instruction))
+		}
+		fmt.Fprintf(&b, "\n```\n%s```\n", numberLines(e.Content))
+		return b.String()
+	}
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "### File: %s\n", promptSafe(e.File.Path))
@@ -670,4 +685,18 @@ func numberLines(content string) string {
 		fmt.Fprintf(&b, "%6d  %s\n", i+1, line)
 	}
 	return b.String()
+}
+
+// RenderBatch renders the source and task metadata sent together in one call.
+func RenderBatch(b Batch) string {
+	var out strings.Builder
+	if b.Assessment != "" {
+		out.WriteString(promptSafe(b.Assessment))
+		out.WriteString("\n\n")
+	}
+	for _, entry := range b.Entries {
+		out.WriteString(Render(entry))
+		out.WriteByte('\n')
+	}
+	return out.String()
 }

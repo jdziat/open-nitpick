@@ -1,0 +1,92 @@
+package practices
+
+import (
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/diff"
+	llms "github.com/nocturnium/llm-go-sdk/v6"
+)
+
+func TestDesignPackingKeepsWholeTaskInOneRequest(t *testing.T) {
+	files, inventory := designPlanningFixture()
+	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
+	cfg := config.Defaults()
+	cfg.Review.MaxFilesPerRequest = 6
+	packed := PackDesign(t.Context(), cfg, design, files, diff.Files{&diff.File{Path: "store/read.go", Kind: diff.ChangeModified}}, bundle.Reserve{Tokens: 100})
+	if len(packed.Plan.Batches) != 1 || len(packed.Design.Tasks[0].Omitted) != 0 {
+		t.Fatalf("packing=%+v", packed)
+	}
+	batch := packed.Plan.Batches[0]
+	if batch.DesignTask != design.Tasks[0].ID {
+		t.Fatal("request lost task identity")
+	}
+	for _, name := range []string{"store/read.go", "store/state.go", "service/service.go"} {
+		if !slices.Contains(batch.Paths(), name) {
+			t.Fatalf("same request lost %s", name)
+		}
+	}
+	rendered := bundle.RenderBatch(batch)
+	if !strings.Contains(rendered, "var state int") || !strings.Contains(rendered, design.Tasks[0].SourceDigest) {
+		t.Fatal("source or task binding absent from rendered request")
+	}
+	if batch.Tokens != llms.DefaultTokenEstimator().EstimateTokens(rendered) {
+		t.Fatal("budget omitted rendered task overhead")
+	}
+	if packed.Plan.BudgetPerBatch != cfg.Review.TokenBudgetPerRequest-100 {
+		t.Fatal("framing reserve lost")
+	}
+}
+
+func TestDesignPackingDoesNotPromoteLimitedOrMissingContext(t *testing.T) {
+	files, inventory := designPlanningFixture()
+	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
+	for _, cause := range []string{"file count", "total files", "tokens", "bytes", "missing", "excluded", "changed source"} {
+		t.Run(cause, func(t *testing.T) {
+			cfg := config.Defaults()
+			source := slices.Clone(files)
+			switch cause {
+			case "total files":
+				cfg.Review.MaxFiles = 1
+			case "file count":
+				cfg.Review.MaxFilesPerRequest = 1
+			case "tokens":
+				cfg.Review.TokenBudgetPerRequest = 101
+			case "bytes":
+				cfg.Review.MaxFileBytes = 1
+			case "missing":
+				source = slices.Delete(source, 2, 3)
+			case "changed source":
+				source[2].Src = []byte("package store\nvar state any\n")
+			case "excluded":
+				cfg.Review.Ignore = append(cfg.Review.Ignore, "store/state.go")
+			}
+			packed := PackDesign(t.Context(), cfg, design, source, nil, bundle.Reserve{Tokens: 100})
+			if len(packed.Plan.Batches) != 0 || len(packed.Design.Tasks) != 1 || len(packed.Design.Tasks[0].Omitted) == 0 {
+				t.Fatalf("limited package claimed a request: %+v", packed)
+			}
+			if len(design.Tasks[0].Omitted) != 0 {
+				t.Fatal("packing mutated intended input")
+			}
+		})
+	}
+}
+
+func TestDesignPackingCountsRepeatedContextOnceAgainstFileLimit(t *testing.T) {
+	files, inventory := designPlanningFixture()
+	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go", "service/service.go"})
+	cfg := config.Defaults()
+	cfg.Review.MaxFiles = 4
+	packed := PackDesign(t.Context(), cfg, design, files, nil, bundle.Reserve{})
+	if len(packed.Plan.Batches) != 2 {
+		t.Fatalf("repeated context consumed extra file slots: %+v", packed.Design.Tasks)
+	}
+	cfg.Review.MaxFiles = 3
+	limited := PackDesign(t.Context(), cfg, design, files, nil, bundle.Reserve{})
+	if len(limited.Plan.Batches) != 1 {
+		t.Fatalf("whole tasks ignored total file bound: %+v", limited.Design.Tasks)
+	}
+}
