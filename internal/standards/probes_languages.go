@@ -236,13 +236,24 @@ var rubyTypePascalCase = Probe{
 var rubyLexer = sync.OnceValue(func() chroma.Lexer {
 	original := lexers.Get("ruby").(*chroma.RegexLexer)
 	rules := original.MustRules().Clone()
+	for state, entries := range rules {
+		kept := entries[:0]
+		for _, rule := range entries {
+			if rule.Type == chroma.LiteralString && strings.Contains(rule.Pattern, "(<<-?)") {
+				continue
+			}
+			kept = append(kept, rule)
+		}
+		rules[state] = kept
+	}
 	emitter := chroma.ByGroups(chroma.LiteralString, chroma.LiteralString, chroma.LiteralString, chroma.UsingSelf("root"), chroma.LiteralString)
 	quotes := "[\"'`]?"
 	rules["root"] = append([]chroma.Rule{
 		{Pattern: `module\b`, Type: chroma.Keyword},
-		{Pattern: `(?m)(<<[-~])(` + quotes + `)([a-zA-Z_]\w*)\2([^\n]*\n)(.*?^[\t ]*\3(?:\r?\n|\z))`, Type: emitter},
-		{Pattern: `(?m)(<<)(` + quotes + `)([a-zA-Z_]\w*)\2([^\n]*\n)(.*?^\3(?:\r?\n|\z))`, Type: emitter},
-		{Pattern: `(<<[-~]?)(` + quotes + `)([a-zA-Z_]\w*)\2[^\n]*(?:\n|\z)`, Type: chroma.Error},
+		{Pattern: `(?m)(?<!\w)(<<[-~])(` + quotes + `)([a-zA-Z_]\w*)\2([^\n]*\n)(.*?^[\t ]*\3(?:\r?\n|\z))`, Type: emitter},
+		{Pattern: `(?m)(?<!\w)(<<)(` + quotes + `)([a-zA-Z_]\w*)\2([^\n]*\n)(.*?^\3(?:\r?\n|\z))`, Type: emitter},
+		{Pattern: `(?<!\w)<<~[\"'` + "`" + `]?[a-zA-Z_]\w*[^\n]*(?:\n|\z)`, Type: chroma.Error},
+		{Pattern: `(?<=[=(,:]\s*)(<<[-~]?)(` + quotes + `)([a-zA-Z_]\w*)\2[^\n]*(?:\n|\z)`, Type: chroma.Error},
 	}, rules["root"]...)
 	return chroma.MustNewLexer(original.Config(), func() chroma.Rules { return rules })
 })

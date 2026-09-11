@@ -151,3 +151,21 @@ func TestRubyRootQualifiedDeclarationsIncludeTheirFinalName(t *testing.T) {
 		t.Fatalf("wrong declaration: %+v", got.Off)
 	}
 }
+
+func TestRubyAppendOperatorsDoNotTurnFilesIntoHeredocs(t *testing.T) {
+	for _, expr := range []string{"acc<<item", "acc <<item", "acc << item"} {
+		src := "acc = []\nitem = 1\n" + expr + "\nclass RealType; end\n"
+		rep := Measure([]File{{Path: "app.rb", Src: []byte(src)}}, Options{})
+		if len(rep.Unmeasured) != 0 {
+			t.Errorf("%s: %v", expr, rep.Unmeasured)
+		}
+		want(t, measureOne(t, "ruby-type-pascal-case", "app.rb", src), 1, 1)
+	}
+}
+
+func TestUnterminatedRubyArgumentHeredocsReportIncompleteCoverage(t *testing.T) {
+	rep := Measure([]File{{Path: "app.rb", Src: []byte("puts <<~DOC\nclass Fake_End; end\n")}}, Options{})
+	if len(rep.Unmeasured) != 1 {
+		t.Fatalf("unterminated argument heredoc was counted: %+v", rep)
+	}
+}
