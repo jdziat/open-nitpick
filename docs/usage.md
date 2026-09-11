@@ -65,6 +65,39 @@ nitpick providers                       # available model providers
 Local reviews print to stdout as `path:line`, which most terminals and editors
 turn into a clickable link.
 
+## Evaluate repository standards
+
+```bash
+nitpick repo-standards                       # measured conventions, proposals, and lint evidence
+nitpick repo-standards -json                  # all counts and violation locations
+nitpick repo-standards -check                 # CI: 0 passed, 1 violations, 2 incomplete checks
+nitpick repo-standards -linters ruff,pylint    # explicitly select analyzers
+nitpick repo-standards -no-linters            # convention probes only
+```
+
+`repo-standards` evaluates the current working tree without a model. It reuses
+`standards`' evidence thresholds to distinguish established conventions from
+proposals, lists the exceptions, and suggests analyzers for the languages it
+finds. A linter's silence is not evidence that a particular convention is
+universal; the report keeps linter observations separate from probe counts.
+
+Applicable default analyzers run across whole files: golangci-lint for Go and
+ruff for Python. Select additional tools with `-linters`; `nitpick linters`
+lists their configuration requirements. Tools must already be installed.
+Analyzers use nitpick's isolated rules, including its Go convention ruleset,
+and do not execute repository-supplied linter configurations. The command does
+not install tools or change source, linter configuration, or `AGENTS.md`.
+
+`-check` fails for exceptions to established conventions or any linter
+observation. An unavailable analyzer exits 2; an empty or entirely unmeasured
+tree also exits 2. With `-no-linters`, only the convention probes gate the run.
+Without `-check`, the report is advisory and still discloses unavailable checks.
+`-repo` selects a root; `-config` reads only the `standards` thresholds and
+disabled probes, leaving model configuration and credentials unused.
+
+The evidence is measured in the current tree. For conventions fixed at a base
+revision when evaluating a pull request, use `nitpick standards -base main`.
+
 ## The conventions this repository demonstrates
 
 ```bash
