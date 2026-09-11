@@ -28,8 +28,9 @@ type DesignPacking struct {
 func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, files []standards.File, changes diff.Files, reserve bundle.Reserve) DesignPacking {
 	out := DesignPacking{Design: design, Plan: &bundle.Plan{}}
 	out.Design.Tasks = slices.Clone(design.Tasks)
+	out.Design.Errors = slices.Clone(design.Errors)
 	if cfg == nil || cfg.Review.MaxFiles <= 0 || cfg.Review.MaxFilesPerRequest <= 0 || cfg.Review.MaxFileBytes <= 0 || cfg.Review.TokenBudgetPerRequest <= 0 || reserve.Tokens < 0 {
-		out.Design.Errors = append(slices.Clone(design.Errors), "design packing requires positive file and token limits and a nonnegative framing reserve")
+		out.Design.Errors = append(out.Design.Errors, "design packing requires positive file and token limits and a nonnegative framing reserve")
 		return out
 	}
 	out.Plan.BudgetPerBatch = max(0, cfg.Review.TokenBudgetPerRequest-reserve.Tokens)
@@ -48,7 +49,12 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 		task := &out.Design.Tasks[i]
 		task.Omitted = slices.Clone(task.Omitted)
 		earlyReason := ""
-		if len(task.Omitted) > 0 {
+		if err := ctx.Err(); err != nil {
+			earlyReason = err.Error()
+			if !slices.Contains(out.Design.Errors, earlyReason) {
+				out.Design.Errors = append(out.Design.Errors, earlyReason)
+			}
+		} else if len(task.Omitted) > 0 {
 			earlyReason = "intended design source or context is unavailable"
 		} else if cfg.Review.MaxFilesPerRequest > 0 && len(task.Sources)+len(task.Context) > cfg.Review.MaxFilesPerRequest {
 			earlyReason = "complete design task exceeds review.max_files_per_request"
@@ -62,7 +68,12 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 		bound := *task
 		bound.SourceDigest = ""
 		bindDesignSource(ctx, &bound, sources)
-		if bound.SourceDigest != task.SourceDigest {
+		if err := ctx.Err(); err != nil {
+			task.Omitted = append(task.Omitted, Omission{Target: Target{Kind: UnitTarget, ID: task.ID}, Reason: err.Error()})
+			if !slices.Contains(out.Design.Errors, err.Error()) {
+				out.Design.Errors = append(out.Design.Errors, err.Error())
+			}
+		} else if bound.SourceDigest != task.SourceDigest {
 			task.Omitted = append(task.Omitted, Omission{Target: Target{Kind: UnitTarget, ID: task.ID}, Reason: "planned source digest does not match packing source"})
 		}
 		batch := bundle.Batch{DesignTask: task.ID}
@@ -104,7 +115,13 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 			}
 		}
 		reason := ""
+		cancelErr := ctx.Err()
 		switch {
+		case cancelErr != nil:
+			reason = cancelErr.Error()
+			if !slices.Contains(out.Design.Errors, reason) {
+				out.Design.Errors = append(out.Design.Errors, reason)
+			}
 		case len(task.Omitted) > 0:
 			reason = "intended design source or context is unavailable"
 		case cfg.Review.MaxFiles > 0 && len(admitted)+newFiles > cfg.Review.MaxFiles:

@@ -1,6 +1,7 @@
 package practices
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"testing"
@@ -117,5 +118,56 @@ func TestDesignPackingRejectsUnsetLimitsWithoutLosingTasks(t *testing.T) {
 				t.Fatalf("invalid limits became a usable plan: %+v", packed)
 			}
 		})
+	}
+}
+
+func TestDesignPackingKeepsCancellationDistinctFromChangedSource(t *testing.T) {
+	files, inventory := designPlanningFixture()
+	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	packed := PackDesign(ctx, config.Defaults(), design, files, nil, bundle.Reserve{})
+	if len(packed.Plan.Batches) != 0 || len(packed.Design.Tasks) != 1 || len(packed.Design.Errors) == 0 {
+		t.Fatalf("cancellation lost its cause or scope: %+v", packed)
+	}
+	for _, omission := range packed.Design.Tasks[0].Omitted {
+		if strings.Contains(omission.Reason, "digest") {
+			t.Fatalf("cancellation became changed source: %+v", omission)
+		}
+	}
+}
+
+type cancelAfterPoll struct {
+	context.Context
+	cancel    context.CancelFunc
+	remaining int
+}
+
+func (c *cancelAfterPoll) Err() error {
+	err := c.Context.Err()
+	c.remaining--
+	if c.remaining == 0 {
+		c.cancel()
+	}
+	return err
+}
+
+func TestDesignPackingChecksCancellationAfterRendering(t *testing.T) {
+	files, inventory := designPlanningFixture()
+	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
+	base, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	task := design.Tasks[0]
+	// Cancel just after the last source poll returns nil, before it is rendered.
+	ctx := &cancelAfterPoll{Context: base, cancel: cancel, remaining: 2 + 2*(len(task.Sources)+len(task.Context))}
+	packed := PackDesign(ctx, config.Defaults(), design, files, nil, bundle.Reserve{})
+	if base.Err() == nil {
+		t.Fatal("control never cancelled")
+	}
+	if len(packed.Plan.Batches) != 0 || len(packed.Design.Errors) == 0 {
+		t.Fatalf("late cancellation admitted a task: %+v", packed)
+	}
+	if len(packed.Plan.Skipped) != 1 || !strings.Contains(packed.Plan.Skipped[0].Reason, context.Canceled.Error()) {
+		t.Fatalf("skip lost cancellation cause: %+v", packed.Plan.Skipped)
 	}
 }
