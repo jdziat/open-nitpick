@@ -16,7 +16,8 @@ import (
 // is why it is opt-in and why every ambiguous answer keeps the finding. See
 // review.Validator for the enforcement.
 type Validation struct {
-	// Enabled turns the pass on.
+	// Enabled turns the pass on. Selected validation that cannot complete keeps
+	// its findings visible and marks the review incomplete.
 	//
 	// Off by default because it is UNMEASURED. It costs one model call per
 	// published finding, and its effect on recall, the number of real defects

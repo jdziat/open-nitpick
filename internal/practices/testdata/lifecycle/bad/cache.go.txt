@@ -1,0 +1,12 @@
+package fixture
+
+var values map[string]string
+
+// Configure initializes the cache.
+func Configure() { values = make(map[string]string) }
+
+// Put saves a value in the cache.
+func Put(key, value string) { values[key] = value }
+
+// Ready reports whether Configure has initialized the cache.
+func Ready() bool { return true }

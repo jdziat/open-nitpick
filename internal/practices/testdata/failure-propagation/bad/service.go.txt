@@ -1,0 +1,8 @@
+package records
+
+import "io"
+
+// Register persists the record and returns any persistence failure.
+func Register(dst io.Writer, record any) error {
+ return save(dst, record)
+}

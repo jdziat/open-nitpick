@@ -16,7 +16,12 @@ make quick           # measure a prompt or analyzer change for a few cents (see 
 
 Commit subjects follow [Conventional Commits](https://www.conventionalcommits.org/):
 `feat(scope): what changed`, `fix: …`, `docs: …`, `evals: …`, `prompt: …`.
-CI checks every pull request's commits with `scripts/check-commits.sh`.
+CI checks every pull request's commits with `scripts/check-commits.sh`, which
+uses `nitpick commits` and accepts a two-dot `base..head` range. The wrapper keeps
+its historical success for an empty valid range; the standalone CLI reports no
+assessment. Merge exemptions depend on parent count, not a `Merge ` prefix.
+Descriptions are limited to 72 Unicode characters and may not contain control
+characters.
 On each push to main, release-please keeps one pull request open with the
 next version and its changelog; merging it tags the release. The release
 workflow then builds the binaries, writes `checksums.txt`, and signs every

@@ -112,6 +112,14 @@ outputs:
     description: Number of findings published.
     value: ${{ steps.review.outputs.findings }}
 
+  practice_findings:
+    description: Findings retained in the engineering practice report, including advisory findings and accepted exceptions. May overlap inline findings.
+    value: ${{ steps.review.outputs.practice_findings }}
+
+  practice_blocking:
+    description: Engineering policy violations without an accepted exception or unresolved uncertainty.
+    value: ${{ steps.review.outputs.practice_blocking }}
+
   critical:
     description: Findings at critical.
     value: ${{ steps.review.outputs.critical }}

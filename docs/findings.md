@@ -2287,3 +2287,116 @@ Regression controls cover three append spacing forms. Unterminated `<<` and
 `<<-` arguments can still be counted lexically; a real RuboCop integration
 control requires syntax findings for those forms and `<<~`. This limits the
 probe-only measurement: it does not establish syntactic validity.
+
+
+## Engineering profile development controls (2026-09-11)
+
+The first lifecycle trial used Synthetic `hf:moonshotai/Kimi-K3` for review and
+validation and `hf:zai-org/GLM-5.3-Flash` for triage. It retained one finding:
+`Put` could write to a nil map before `Configure`. It did not report the misleading
+readiness comment. The corrected clean control completed both analyzer targets
+and all three selected slop/design targets with zero findings. The fixture sources
+are in [the lifecycle controls](../internal/practices/testdata/lifecycle/README.md).
+Those initial single runs did not establish precision. Repeated controls below
+record adverse results as well as detections.
+
+An earlier attempted clean control was not clean: its entry point discarded the
+cache it created. The model identified that consequence. The same run also asserted
+that valid provider model identifiers did not exist; an expert marked that claim
+unresolved. The engineering adapter initially lost the expert's uncertainty. It
+now retains uncertainty and withheld decisions, and unresolved claims cannot be
+promoted to blocking findings. The rerun selected the code fixture without its
+provider configuration, so its zero findings do not validate model-catalog claims.
+
+That trial also found an applicability bug: a skipped Python analyzer made a
+Go-only assessment incomplete. Coverage now requires input claims before a
+skipped analyzer can count as missing work. Its control retains failure when the
+skipped analyzer actually has an applicable input.
+
+Twelve targeted mutations were killed by their named guard tests: inheriting a
+parent module after malformed nested metadata, counting a source snapshot as an
+assessment, omitting review-policy validation, labeling analyzer output as model
+evidence, dropping accepted-base convention standing, replacing accepted analyzer
+settings, reversing the source-consistency check, restoring captured configuration
+in the assessment callback, omitting required boundary placeholders, withholding
+routes until after assessment, dropping analyzer globs, and accepting unknown
+configuration blocks. This is a bounded mutation
+audit, not a mutation score for the repository.
+
+
+Three paired lifecycle repeats with prompt `engineering-1` selected slop and
+design only, with the same external policy and three examined files per run.
+Every bad run retained the false readiness comment and nil-map lifecycle claim.
+The clean fixture produced design output in all three repeats: zero-value cache
+behavior, a request for a status-key constant, and an objection to the constructor's
+name. The last two are style preferences rather than demonstrated design defects.
+One bad-run expert could not resolve the lifecycle claim with its supplied context.
+
+| Repeat | Bad seconds | Bad slop/design findings | Clean seconds | Clean slop/design findings |
+| --- | ---: | --- | ---: | --- |
+| 1 | 65.87 | 1 / 1 | 72.01 | 0 / 2 |
+| 2 | 88.83 | 1 / 2 | 67.81 | 0 / 1 |
+| 3 | 47.04 | 1 / 1 | 69.68 | 0 / 1 |
+
+These retained model outputs are not independently adjudicated precision counts.
+They do not support blocking on design findings. Prompt `engineering-2` removes
+the separate pedantic style pass, retains style output as advisory signals, and
+requires evidence for external API/catalog claims. Usage metering now records
+provider-reported tokens and calls, including missing usage and failed calls;
+SDK-hidden retries make those counts a lower bound. No dollar cost is inferred.
+
+
+Three paired `engineering-2` lifecycle runs retained the initialization defect
+in every bad case. Clean cases returned zero, one and one findings: the latter
+two questioned whether the exported cache supports its zero value. That remains
+an API-contract concern rather than proof the constructor-based design is wrong.
+The third bad run hit a provider concurrency limit during expert validation;
+the pre-fix report incorrectly marked both model checks completed. This run is
+not valid completed coverage. The failure led to a regression that makes failed
+expert validation a recorded incomplete stage while preserving its finding.
+
+| Repeat | Bad seconds | Bad input/output tokens | Clean seconds | Clean input/output tokens |
+| --- | ---: | --- | ---: | --- |
+| 1 | 136.25 | 8,950 / 6,703 | 5.72 | 1,233 / 197 |
+| 2 | 78.27 | 3,008 / 4,913 | 31.83 | 3,188 / 1,824 |
+| 3 (bad validation failed) | 111.53 | 4,333 / 5,235 | 81.78 | 2,442 / 4,481 |
+
+These are provider-reported prompt/completion tokens, with cache tokens recorded
+separately in the [measurement artifact](../notes/engineering-control-results.json).
+Hidden provider retries may cost more. Latencies include shared-provider contention;
+they are not a throughput benchmark.
+
+A separate [failure-propagation pair](../internal/practices/testdata/failure-propagation/README.md)
+completed three targets per check with prompt `engineering-2`. The bad helper's
+swallowed serialization/write errors were retained as one slop finding (74.25 s,
+4,495 input / 3,622 output tokens). The good helper returned encoder errors through
+the caller and produced zero findings (23.68 s, 1,153 / 1,012 tokens). Findings can
+land in slop or design because the engine preserves the selected defect class;
+this pair demonstrates one lost-failure mechanism, not comprehensive design recall.
+
+
+Four further mutations were killed by the intended assertions: dropping expert
+failure stages, dropping duplicate-check detection, overwriting an existing
+snapshot during capture, and omitting practices from full configuration
+validation. The duplicate-check fixture previously failed for having no substantive
+assessment before duplication; a valid-control assertion exposed and corrected
+that weakness. These controls establish those four guards, not general test quality.
+
+The subsequent deterministic self-assessment examined 332 convention/analyzer
+file targets and found zero violations. It examined 584 text targets, retained
+246 advisory prose tells, excluded fourteen inputs, and omitted none from the
+snapshot. The selected one-commit range conformed. Slop and design model checks
+were deliberately disabled and reported unavailable; no explicit import boundary
+was configured. The overall engineering profile therefore exited 2. These counts
+establish deterministic coverage for that worktree, not complete internal
+best-practice compliance or a clean semantic-slop assessment.
+
+That assessment identified its source as `worktree:sha256:4cefb4d6712de813395a8c6f073f4ae95a808a29d28332ac135f0329a078d3bd`
+and accepted policy as `70a43ac107f6bcb4a3e25bb6e6840adf0f3544af9244946cba1854efbeb25376`.
+
+Five later mutations were also killed by their intended guards: erasing a
+reasonless unresolved verdict, undercounting an outage, losing omissions on a
+second captured-tree diff, rejecting a deletion-only source scope, and hiding a
+failed stage behind empty-scope inapplicability. The deletion-only control requires
+one examined commit and zero model targets; it does not call an unexecuted model
+assessment completed.

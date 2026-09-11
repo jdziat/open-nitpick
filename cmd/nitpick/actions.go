@@ -92,6 +92,18 @@ func (a actionsEnv) setOutputs(result actionResult, report *review.Report) {
 	fmt.Fprintf(&b, "findings=%d\n", total)
 	fmt.Fprintf(&b, "files=%d\n", files)
 	fmt.Fprintf(&b, "withheld=%d\n", withheld)
+	practiceFindings, practiceBlocking := 0, 0
+	if report != nil && report.Practices != nil {
+		for _, check := range report.Practices.Checks {
+			for _, finding := range check.Findings {
+				practiceFindings++
+				if finding.Blocking && finding.Exception == "" && finding.Uncertainty == "" {
+					practiceBlocking++
+				}
+			}
+		}
+	}
+	fmt.Fprintf(&b, "practice_findings=%d\npractice_blocking=%d\n", practiceFindings, practiceBlocking)
 
 	// A workflow that only reads result= sees "error" and stops, which is the
 	// point. One that wants to act on the difference between a reviewer that
@@ -136,8 +148,12 @@ func (a actionsEnv) writeSummary(result actionResult, report *review.Report, ren
 	if report.Plan != nil {
 		files = report.Plan.Files()
 	}
-	fmt.Fprintf(&b, "Result: **%s** — %d file(s) reviewed, %s.\n\n", result, files, countsOr(report.Counts, "no findings"))
+	fmt.Fprintf(&b, "Result: **%s** — %d file(s) reviewed, %s.\n\n", result, files, countsOr(report.Counts, "no inline review findings"))
 
+	if report.Practices != nil && (rendered == nil || !strings.Contains(rendered.Summary, report.Practices.Text())) {
+		b.WriteString(report.Practices.Text())
+		b.WriteString("\n\n")
+	}
 	if rendered != nil && strings.TrimSpace(rendered.Summary) != "" {
 		b.WriteString(rendered.Summary)
 		b.WriteString("\n\n")
@@ -201,6 +217,9 @@ func resultFor(report *review.Report, gate config.Severity) actionResult {
 	}
 	if !report.PipelineComplete() {
 		return resultError
+	}
+	if report.Practices != nil && report.Practices.ExitCode() == 1 {
+		return resultFindings
 	}
 	if report.Failed(gate) {
 		return resultFindings

@@ -414,6 +414,9 @@ func renderSummary(report *Report, cfg *config.Config) string {
 		b.WriteString("\n</details>\n")
 	}
 
+	if report.Practices != nil {
+		b.WriteString("\n\n<details><summary>Engineering practices</summary>\n\n<pre>" + html.EscapeString(report.Practices.Text()) + "</pre>\n\n</details>")
+	}
 	out := strings.TrimSpace(b.String())
 	if out == "" {
 		return ""

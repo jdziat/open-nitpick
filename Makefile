@@ -94,8 +94,8 @@ docs: docs-reference
 	# names no file on the site, where the same document is staged as guide.md.
 	# Written the other way round it is the repository copy that breaks, and
 	# these pages are read in both places.
-	for f in .website/docs/*.md; do sed -E -e 's#\]\(\.\./(internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' -e 's#\]\(\.\./README\.md#](../guide.md#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
-	sed -E 's#\]\((internal|cmd|action|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' .website/guide.md > .website/guide.md.tmp && mv .website/guide.md.tmp .website/guide.md
+	for f in .website/docs/*.md; do sed -E -e 's#\]\(\.\./(internal|cmd|action|notes|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' -e 's#\]\(\.\./README\.md#](../guide.md#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
+	sed -E 's#\]\((internal|cmd|action|notes|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' .website/guide.md > .website/guide.md.tmp && mv .website/guide.md.tmp .website/guide.md
 	mkdocs build
 
 docs-serve: docs

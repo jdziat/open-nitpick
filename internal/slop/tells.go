@@ -50,7 +50,7 @@ var (
 	enDash  = regexp.MustCompile(`\s–\s`)
 	arrow   = regexp.MustCompile(`(\s|^)(→|->)(\s|$)`)
 	filler  = regexp.MustCompile(`(?i)\b(genuinely|honestly|actually|truly|simply|crucially|importantly|it'?s worth noting( that)?)\b`)
-	chat    = regexp.MustCompile(`(?i)\b(sure!|here'?s (the|a|an|your)|note that this|hope this helps|let me know if|as an ai|i hope this|great question)\b`)
+	chat    = regexp.MustCompile(`(?i)\bsure!|\b(here'?s (the|a|an|your)|note that this|hope this helps|let me know if|as an ai|i hope this|great question)\b`)
 	triplet = regexp.MustCompile(`(?i)\b(\w+), (\w+),? and (\w+)\b`)
 
 	// antithesis is the shape "it is not X, it is Y" and "not a X, but a Y".

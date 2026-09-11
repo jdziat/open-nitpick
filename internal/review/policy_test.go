@@ -845,3 +845,19 @@ func TestTheAcceptedConfigurationGoverns(t *testing.T) {
 		}
 	}
 }
+
+type operatorScopePolicy struct{ cfg *config.Config }
+
+func (p operatorScopePolicy) ResolvePolicy(context.Context, vcs.Ref, *vcs.PullRequest, []string) (*config.Config, bool, error) {
+	return p.cfg, false, nil
+}
+
+func TestOperatorScopeDoesNotClaimAConfigurationEdit(t *testing.T) {
+	original, scoped := config.Defaults(), config.Defaults()
+	scoped.Review.Slop = true
+	engine := &Engine{Config: original, Policy: operatorScopePolicy{cfg: scoped}}
+	policy, err := engine.resolvePolicy(context.Background(), vcs.Ref{}, nil, nil)
+	if err != nil || policy.Config != scoped || policy.Replaced || policy.Modified != "" || original.Review.Slop {
+		t.Fatalf("operator scope was lost or mislabeled as a config edit: %+v %v", policy, err)
+	}
+}

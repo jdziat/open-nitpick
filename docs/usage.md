@@ -75,7 +75,9 @@ nitpick repo-standards -linters ruff,pylint    # explicitly select analyzers
 nitpick repo-standards -no-linters            # convention probes only
 ```
 
-`repo-standards` evaluates the current working tree without a model. It reuses
+The default `repo-standards` profile evaluates the current working tree without a model.
+Selecting `-profile engineering` enables model assessments and sends selected
+source to the configured provider unless `-no-model` is supplied. It reuses
 `standards`' evidence thresholds to distinguish established conventions from
 proposals, lists the exceptions, and suggests analyzers for the languages it
 finds. A linter's silence is not evidence that a particular convention is
@@ -95,7 +97,7 @@ not install tools or change source, linter configuration, or `AGENTS.md`.
 observation. An unavailable analyzer exits 2; an empty or entirely unmeasured
 tree also exits 2. With `-no-linters`, only the convention probes gate the run.
 Without `-check`, the report is advisory and still discloses unavailable checks.
-`-repo` selects a root; `-config` reads only the `standards` thresholds and
+In the default profile, `-repo` selects a root; `-config` reads only the `standards` thresholds and
 disabled probes, leaving model configuration and credentials unused.
 
 This repository runs `go run ./cmd/nitpick repo-standards -check` in CI after
@@ -315,3 +317,75 @@ It is off by default in a review, whatever the nitpick level, and on in
 planted/control pairs, and the number that matters is silence on the
 controls: a human-written file with a plain comment is what the class is
 measured against.
+
+
+## Engineering practice coverage
+
+The opt-in engineering profile combines convention checks, analyzers, commit
+subjects, deterministic prose tells, and a shared model assessment of slop and
+design mechanisms:
+
+```sh
+nitpick repo-standards -profile engineering -base main -check
+nitpick repo-standards -profile engineering -base main -check -json
+nitpick review -profile engineering -base main
+nitpick commits -base main -check
+```
+
+`repo-standards` examines the selected working tree; `review` examines changed
+files with available related context. `-base` also selects the accepted repository
+policy and the commit range. An external `-config` file is operator policy.
+Repository configuration edits cannot weaken their own checks.
+
+Each check reports what it planned, examined and omitted. Exit 0 means selected
+policy was satisfied, 1 means blocking findings, and 2 means incomplete required
+coverage or no substantive assessment. Incompleteness takes precedence and keeps
+the findings. A valid empty commit range is inapplicable; `commits -check` alone
+returns 2 because it assessed no commits. `-title` adds a separate intended squash
+title check, without claiming that the source commits conformed.
+
+The engineering tree scan runs models. `-no-model` provides
+deterministic results but leaves required slop and design assessments unavailable.
+`-budget` limits estimated source tokens for the tree model pass; omitted targets
+remain visible. It is not a monetary spending limit.
+
+The initial policy requires completion of conventions, linters, commits, slop
+tells, slop assessment and design assessment. Commit and analyzer violations
+block by default. Model findings and prose tells begin advisory. Accepted policy
+can require specific convention rules and prose tells independently of their
+frequency:
+
+```yaml
+practices:
+  profile: engineering
+  required: [conventions, linters, commits, slop-tells, slop, design]
+  required_conventions: [go-doc-comment-name]
+  slop_rules: [chat-prose]
+  boundaries:
+    - from: example.com/app/api
+      forbid: [example.com/app/db]
+      reason: API handlers use the service contract.
+```
+
+Go import boundaries use module paths and `path.Match` patterns. Configured
+boundaries require a completed check. Missing or malformed module metadata is
+reported rather than treated as an empty import graph. The inventory distinguishes
+available local packages, unresolved local imports and external dependencies.
+
+Design coverage means completion of declared source review tasks over the context
+provided. Tasks currently follow individual source files and their available related
+definitions; they are not a package-wide lifecycle or migration planner. It does not certify an architecture. The inventory currently supports
+Go imports; it does not resolve dynamic calls or external implementations. The
+shared model pass assesses lifecycle, contracts, failure handling, duplication
+and tests, retaining the finding's original class. A completed pass can miss a
+defect. Separate security scans and executed test/build evidence are not claimed
+by this profile. The published controls exercise lifecycle and lost-failure cases;
+duplication, indirection, migration compatibility and ineffective-test prompts do
+not yet have equivalent held-out controls.
+
+Exceptions require an accepted rule, exact target, evidence fingerprint and
+reason, with optional expiry. Expiry takes effect at 00:00 UTC on the named
+date. They remain visible in the report. File evidence
+changes invalidate the fingerprint; exceptions cannot attest that a skipped
+instrument ran. AI slop findings describe defects in code or prose and never
+classify authorship.

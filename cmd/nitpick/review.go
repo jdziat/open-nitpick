@@ -16,6 +16,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/linters"
 	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/jdziat/open-nitpick/internal/practices"
 	"github.com/jdziat/open-nitpick/internal/prompt"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
@@ -23,6 +24,7 @@ import (
 
 // reviewFlags holds the review command's options.
 type reviewFlags struct {
+	profile     string
 	repo        string
 	configPath  string
 	base        string
@@ -60,6 +62,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	var slop bool
 
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.StringVar(&f.profile, "profile", "", "opt-in engineering assessment profile")
 	fs.StringVar(&f.repo, "repo", ".", "repository root")
 	fs.StringVar(&f.configPath, "config", "", "path to .nitpick.yaml (default: <repo>/.nitpick.yaml)")
 	fs.StringVar(&f.base, "base", "", "base revision (default: review uncommitted changes)")
@@ -95,6 +98,9 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if f.profile != "" && f.profile != "engineering" {
+		return fmt.Errorf("unknown profile %q", f.profile)
 	}
 
 	// Go's flag package stops at the first non-flag argument and leaves the
@@ -308,7 +314,32 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 		&config.BasePolicy{RepoRoot: repo, Loaded: cfg, Provider: provider},
 		llm.BuildRoles,
 		log)
+	var usage engineeringUsage
+	buildModels := engine.Models
+	engine.Models = func(policy *config.Config) (*llm.Roles, error) {
+		usage.reset()
+		roles, err := buildModels(policy)
+		if err == nil && (f.profile == "engineering" || policy.Practices.Profile == "engineering") {
+			usage.attach(roles)
+		}
+		return roles, err
+	}
+	engine.ModelUsage = usage.snapshot
 	engine.Instruction = f.instruction
+	engine.Policy = &engineeringReviewPolicy{source: engine.Policy, loaded: cfg, explicit: f.profile == "engineering", selected: func() {
+		engine.Instruction = engineeringPrompt + "\n" + f.instruction
+		engine.Full = true
+	}}
+	engine.AssessPractices = func(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, report *review.Report) *practices.Report {
+		accepted := report.Policy.Config
+		if accepted == nil {
+			return &practices.Report{SchemaVersion: 1, Profile: "engineering"}
+		}
+		if f.profile != "engineering" && accepted.Practices.Profile != "engineering" {
+			return nil
+		}
+		return assessReviewPractices(ctx, repo, accepted, ref, pr, report, engine.Provider)
+	}
 	engine.SkipDraft = f.skipDraft
 	engine.Full = f.full
 

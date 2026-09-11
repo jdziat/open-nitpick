@@ -1,0 +1,12 @@
+package records
+
+import (
+ "encoding/json"
+ "io"
+)
+
+func save(dst io.Writer, record any) error {
+ data, _ := json.Marshal(record)
+ _, _ = dst.Write(data)
+ return nil
+}

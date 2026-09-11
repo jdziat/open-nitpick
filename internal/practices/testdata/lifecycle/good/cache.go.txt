@@ -1,0 +1,13 @@
+package fixture
+
+// Cache owns the values for one service instance.
+type Cache struct{ values map[string]string }
+
+// NewCache returns an initialized cache.
+func NewCache() *Cache { return &Cache{values: make(map[string]string)} }
+
+// Put stores a value. The caller serializes access to this instance.
+func (c *Cache) Put(key, value string) { c.values[key] = value }
+
+// Ready reports whether the cache has been initialized.
+func (c *Cache) Ready() bool { return c.values != nil }

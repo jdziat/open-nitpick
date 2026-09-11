@@ -1,0 +1,8 @@
+package fixture
+
+// Start creates a cache owned by its caller and stores its initial value.
+func Start() *Cache {
+	cache := NewCache()
+	cache.Put("status", "ready")
+	return cache
+}

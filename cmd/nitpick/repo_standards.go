@@ -14,15 +14,19 @@ import (
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/linters"
+	"github.com/jdziat/open-nitpick/internal/practices"
+	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/standards"
 )
 
 // RepoStandardsResult separates observed conventions from proposed enforcement.
 type RepoStandardsResult struct {
-	Report          standards.Report         `json:"report"`
-	Recommendations []string                 `json:"recommendations"`
-	Analyzers       []linters.CatalogEntry   `json:"applicable_analyzers"`
-	Sources         []standards.SourceResult `json:"sources"`
+	analyzerFindings []review.Finding
+	Report           standards.Report         `json:"report"`
+	Recommendations  []string                 `json:"recommendations"`
+	Analyzers        []linters.CatalogEntry   `json:"applicable_analyzers"`
+	Sources          []standards.SourceResult `json:"sources"`
+	Practices        *practices.Report        `json:"practices,omitempty"`
 }
 
 func runRepoStandards(ctx context.Context, args []string, out io.Writer) error {
@@ -32,9 +36,15 @@ func runRepoStandards(ctx context.Context, args []string, out io.Writer) error {
 }
 
 func repoStandardsCommand(ctx context.Context, args []string, out io.Writer, source func(*config.Config) standards.Source) error {
-	var repo, configPath, enabled string
+	var repo, configPath, enabled, profile, base string
+	var noModel bool
+	var budget int
 	var asJSON, check, noLinters bool
 	fs := flag.NewFlagSet("repo-standards", flag.ContinueOnError)
+	fs.StringVar(&profile, "profile", "", "opt-in engineering assessment profile")
+	fs.StringVar(&base, "base", "", "accepted policy and commit range base for engineering checks")
+	fs.BoolVar(&noModel, "no-model", false, "omit model assessments and report their coverage as missing")
+	fs.IntVar(&budget, "budget", 0, "estimated source-token ceiling for model assessments")
 	fs.StringVar(&repo, "repo", ".", "repository root")
 	fs.StringVar(&configPath, "config", "", "configuration file for the standards evidence thresholds")
 	fs.StringVar(&enabled, "linters", "", "comma-separated analyzers to run (default: applicable default analyzers)")
@@ -48,8 +58,20 @@ func repoStandardsCommand(ctx context.Context, args []string, out io.Writer, sou
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	if profile != "" && profile != "engineering" {
+		return fmt.Errorf("unknown profile %q", profile)
+	}
+	if profile == "" && (base != "" || noModel || budget != 0) {
+		return errors.New("-base, -no-model and -budget require -profile engineering")
+	}
+	if budget < 0 {
+		return errors.New("-budget must be nonnegative")
+	}
 	if fs.NArg() != 0 {
 		return errors.New("repo-standards accepts no positional arguments; use -repo")
+	}
+	if profile == "engineering" && enabled != "" {
+		return errors.New("-linters cannot override the engineering profile; set linters.enabled in accepted policy or an external -config")
 	}
 	if noLinters && enabled != "" {
 		return errors.New("-no-linters and -linters cannot be combined")
@@ -61,7 +83,14 @@ func repoStandardsCommand(ctx context.Context, args []string, out io.Writer, sou
 	if err != nil {
 		return err
 	}
-	cfg, err := loadStandardsConfig(root, configPath)
+	var cfg config.Standards
+	var policy config.PracticePolicy
+	if profile == "engineering" {
+		policy, err = config.ReadPracticePolicy(ctx, root, configPath, base)
+		cfg = policy.Standards
+	} else {
+		cfg, err = loadStandardsConfig(root, configPath)
+	}
 	if err != nil {
 		return err
 	}
@@ -69,7 +98,13 @@ func repoStandardsCommand(ctx context.Context, args []string, out io.Writer, sou
 	if err := checkDisabled(opts.Disabled); err != nil {
 		return err
 	}
-	files, err := standards.ReadTreeContext(ctx, root, skipStandardsDir)
+	var files []standards.File
+	var excluded, omitted []practices.Omission
+	if profile == "engineering" {
+		files, excluded, omitted, err = readEngineeringTree(ctx, root, policy)
+	} else {
+		files, err = standards.ReadTreeContext(ctx, root, skipStandardsDir)
+	}
 	if err != nil {
 		return fmt.Errorf("read repository: %w", err)
 	}
@@ -107,10 +142,33 @@ func repoStandardsCommand(ctx context.Context, args []string, out io.Writer, sou
 				}
 			}
 		}
-		result.Sources = standards.Gather(ctx, root, files, []standards.Source{source(lintCfg)})
+		if profile == "engineering" {
+			lintCfg.Review = policy.Review
+			lintCfg.Review.Ignore = append(slices.Clone(policy.Review.Ignore), policy.Practices.Ignore...)
+			lintCfg.Linters = policy.Linters
+			lintCfg.Linters.OnlyChangedLines = false
+		}
+		instrument := source(lintCfg)
+		result.Sources = standards.Gather(ctx, root, files, []standards.Source{instrument})
+		if evidence, ok := instrument.(interface{ Findings() []review.Finding }); ok {
+			result.analyzerFindings = evidence.Findings()
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if profile == "engineering" {
+		assessment := assessEngineering(ctx, root, configPath, base, noModel, budget, policy, files, result)
+		assessment.Excluded = excluded
+		current, _, _, readErr := readEngineeringTree(ctx, root, policy)
+		reason := ""
+		if readErr != nil {
+			reason = readErr.Error()
+		} else if sourceDigest(current) != sourceDigest(files) {
+			reason = "source files changed during assessment"
+		}
+		assessment.Checks = append(assessment.Checks, snapshotCheck(files, omitted, reason))
+		result.Practices = &assessment
 	}
 	if asJSON {
 		enc := json.NewEncoder(out)
@@ -143,6 +201,9 @@ func repoStandardsRecommendations(report standards.Report) []string {
 }
 
 func (r RepoStandardsResult) check(noLinters bool) error {
+	if r.Practices != nil {
+		return practiceExit(*r.Practices)
+	}
 	if len(r.Report.Unmeasured) > 0 {
 		return errIncomplete
 	}
@@ -176,6 +237,9 @@ func (r RepoStandardsResult) check(noLinters bool) error {
 func (r RepoStandardsResult) text() string {
 	var b strings.Builder
 	b.WriteString(r.Report.Text())
+	if r.Practices != nil {
+		b.WriteString("\n" + r.Practices.Text())
+	}
 	b.WriteString("\nStandards to apply:\n")
 	for _, recommendation := range r.Recommendations {
 		fmt.Fprintf(&b, "- %s\n", recommendation)

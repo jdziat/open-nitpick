@@ -28,7 +28,8 @@ import (
 // remember. The invariant does not grow with the schema.
 type PolicyResolver interface {
 	// ResolvePolicy reports whether the change under review modifies the
-	// configuration's own source, and returns the policy to apply when it does.
+	// configuration's own source. A nonnil configuration selects the policy to
+	// apply, including operator scope adjustments when modified is false.
 	//
 	// changed carries every path in the change, taken from the parsed diff
 	// before any policy has narrowed it. Deciding this against an
@@ -116,6 +117,9 @@ func (e *Engine) resolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.PullReq
 		return Policy{}, fmt.Errorf("resolve review policy: %w", err)
 	}
 	if !modified {
+		if resolved != nil {
+			current.Config = resolved
+		}
 		return current, nil
 	}
 	if resolved == nil {
