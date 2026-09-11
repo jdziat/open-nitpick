@@ -2411,3 +2411,16 @@ finding. Models and linters were disabled for this control, so this establishes
 only direct-import matching. It does not establish full engineering completion.
 The four-file adoption diff passed a Nitpick review with zero findings, a
 deterministic slop scan with zero tells, and actionlint 1.7.7.
+
+The adoption checkpoint passed its deterministic engineering gate.
+Convention and analyzer checks each examined 333 file targets with zero findings.
+The two direct-import boundaries examined 331 Go sources with zero violations.
+The text scan examined 585 targets and retained 245 advisory tells; the snapshot
+omitted none. `-base HEAD` selected an explicitly empty commit range; commit
+validation was checked separately by the CI wrapper. Model slop and design were
+disabled and reported unavailable, as optional checks under this policy. Exit 0
+means the selected deterministic requirements passed, not that semantic slop
+or design quality was assessed.
+
+Source: `worktree:sha256:b24d876d03c1a3da647aa8776c83c67e049a74cedb261e33fc743b067141cc28`.
+Policy: `ac17759ea7ff4c528645ebc521f637d5ac35b1d3eaa5ff068cfbe5a575ca38da`.
