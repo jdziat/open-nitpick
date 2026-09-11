@@ -2,6 +2,7 @@ package vcs
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -437,5 +438,137 @@ func TestGitHubConversationMethods(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Errorf("no request to %s:\n%s", want, joined)
 		}
+	}
+}
+
+func TestGitHubMissingContentDoesNotBecomeAParentDirectoryError(t *testing.T) {
+	parentReads := 0
+	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v3/repos/o/r/contents/cmd/nitpick/go.mod":
+			if r.URL.Query().Get("ref") != "abc" {
+				t.Error("content read did not pin the head")
+			}
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"message":"Not Found"}`)
+		case "/api/v3/repos/o/r/contents/cmd/nitpick":
+			parentReads++
+			_, _ = io.WriteString(w, `[{"name":"main.go","type":"file"}]`)
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	_, err := gh.FileContent(t.Context(), Ref{Owner: "o", Repo: "r", Number: 7, Head: "abc"}, "cmd/nitpick/go.mod")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing file lost its classification: %v", err)
+	}
+	if parentReads != 0 {
+		t.Fatalf("missing file caused %d parent directory reads", parentReads)
+	}
+}
+
+func TestGitHubContentPreservesEmptyFilesAndAccessFailures(t *testing.T) {
+	for _, status := range []int{http.StatusOK, http.StatusForbidden} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/v3/repos/o/r/contents/empty.go" {
+					t.Errorf("unexpected fallback request %s", r.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				w.WriteHeader(status)
+				if status == http.StatusOK {
+					_, _ = io.WriteString(w, `{"type":"file","encoding":"base64","content":"","size":0}`)
+				} else {
+					_, _ = io.WriteString(w, `{"message":"denied"}`)
+				}
+			})
+			body, err := gh.FileContent(t.Context(), Ref{Owner: "o", Repo: "r", Number: 7, Head: "abc"}, "empty.go")
+			if status == http.StatusOK {
+				if err != nil || len(body) != 0 {
+					t.Fatalf("empty file became missing: %q %v", body, err)
+				}
+			} else if err == nil || errors.Is(err, ErrNotFound) || !strings.Contains(err.Error(), "403") {
+				t.Fatalf("access failure became missing content: %v", err)
+			}
+		})
+	}
+}
+
+func TestGitHubContentReadsInlineAndDownloadedBodies(t *testing.T) {
+	const source = "package source\n"
+	for _, tc := range []struct {
+		name      string
+		download  bool
+		status    int
+		body      string
+		wantError bool
+	}{
+		{"inline", false, http.StatusOK, source, false},
+		{"download", true, http.StatusOK, source, false},
+		{"download failure", true, http.StatusNotFound, source, true},
+		{"truncated download", true, http.StatusOK, "short", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			downloads := 0
+			gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/v3/repos/o/r/contents/source.go":
+					encoding, content := "base64", base64.StdEncoding.EncodeToString([]byte(source))
+					if tc.download {
+						encoding, content = "none", ""
+					}
+					_ = json.NewEncoder(w).Encode(map[string]any{"type": "file", "name": "source.go", "encoding": encoding, "content": content, "size": len(source)})
+				case "/api/v3/repos/o/r/contents/":
+					_ = json.NewEncoder(w).Encode([]map[string]any{{"type": "file", "name": "source.go", "download_url": "http://" + r.Host + "/download"}})
+				case "/download":
+					downloads++
+					w.WriteHeader(tc.status)
+					_, _ = io.WriteString(w, tc.body)
+				default:
+					t.Errorf("unexpected path %s", r.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+				}
+			})
+			got, err := gh.FileContent(t.Context(), Ref{Owner: "o", Repo: "r", Number: 7, Head: "abc"}, "source.go")
+			if tc.wantError {
+				if err == nil || errors.Is(err, ErrNotFound) {
+					t.Fatalf("known file download failure became absence or source: %q %v", got, err)
+				}
+			} else if err != nil || string(got) != source {
+				t.Fatalf("source changed: %q %v", got, err)
+			}
+			expected := 0
+			if tc.download {
+				expected = 1
+			}
+			if downloads != expected {
+				t.Fatalf("download requests=%d, want %d", downloads, expected)
+			}
+		})
+	}
+}
+
+func TestGitHubNonFileCannotBecomeEmptySource(t *testing.T) {
+	for _, metadata := range []string{
+		`{"type":"file","size":0,"content":null,"download_url":null,"submodule_git_url":"https://github.com/o/dependency.git"}`,
+		`{"type":"submodule","size":0,"content":null}`,
+		`{"type":"symlink","size":0,"content":null,"target":"outside"}`,
+	} {
+		t.Run(metadata, func(t *testing.T) {
+			gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/v3/repos/o/r/contents/vendor-module" {
+					t.Errorf("unexpected fallback request %s", r.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				_, _ = io.WriteString(w, metadata)
+			})
+			body, err := gh.FileContent(t.Context(), Ref{Owner: "o", Repo: "r", Number: 7, Head: "abc"}, "vendor-module")
+			if err == nil || errors.Is(err, ErrNotFound) || len(body) != 0 {
+				t.Fatalf("known submodule became source or absence: %q %v", body, err)
+			}
+		})
 	}
 }
