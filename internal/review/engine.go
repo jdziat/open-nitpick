@@ -1453,7 +1453,14 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) ([]Finding,
 		// Moving the anchor without dropping it means one click replaces a DIFFERENT
 		// line with that text, observed live, and it leaves the file uncompilable.
 		// The finding is still worth publishing; the fix-it button is not.
-		if f.Suggestion != "" {
+		//
+		// Reaching here once meant the anchor had moved, because the snap
+		// returned added lines and an added line is handled above. Surviving
+		// context is commentable and is not an added line, so a finding placed
+		// where the prompt asks for one now snaps to itself, and stripping on
+		// the branch alone would take the fix-it button from every
+		// removal-only finding: the shape this all exists to publish.
+		if f.Suggestion != "" && snapped != f.Line {
 			e.log().Info("dropping suggestion from a relocated finding",
 				"path", f.Path, "from", f.Line, "to", snapped, "title", f.Title)
 			f.Suggestion = ""

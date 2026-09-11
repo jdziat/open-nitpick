@@ -2166,3 +2166,64 @@ convention, so choosing one is choosing which claim to test, and a probe whose
 sites disagree with a person's labels is measuring a different rule than the one
 it names. None of the four shipped, and the fourth was deleted rather than
 committed with a number nobody believes.
+## Removal-only edits reached neither review nor publication (2026-09-09)
+
+Planning required an added line, and finding placement snapped only to added
+lines. A change that deleted a guard without adding anything was skipped
+entirely. Three regression tests reproduced the failure: anchor resolution,
+planner admission, and an end-to-end scripted review through publication.
+
+`CommentableLines` now includes surviving context immediately beside a
+removal-only edit block. Added-line detection remains separate, and a
+replacement keeps its added-line anchors. Tests cover start/end removals,
+separate additions and removals, shared boundaries, unchanged content, and
+removals without surviving context.
+
+A live synthetic check used a Go division helper with two identical zero-divisor
+guards. Removing both guards was skipped by the v2.0.0 source binary; the updated
+binary reported the resulting panic instead of `ErrZero` in 9.57 seconds. Removing
+only the redundant guard was reviewed without findings in 4.20 seconds.
+GLM-5.3-Flash reviewed through OpenRouter Baseten fp8, Qwen3.8-27b triaged through
+Parasail fp8, with Voyage Code 4 retrieval, low reasoning, and linters off.
+The clean control recovered from two provider retries. This single bug/control
+check establishes coverage of that edit shape, not general recall.
+
+`go test ./...` passed. A subsequent model review read all six implementation
+and test files and returned no findings; that is not proof of correctness.
+Whole-file deletions and zero-context removals still require old-file anchor
+support throughout the finding pipeline.
+
+### The snap radius now reaches unchanged code (2026-09-09)
+
+`NearestCommentableLine` snapped to added lines, so a finding placed on
+unchanged code was dropped unless an added line sat within `snapDistance`. It
+now snaps to `CommentableLines`, which includes surviving context beside a
+removal-only block, so in any file carrying such a block the set of lines a
+stray finding can be rescued onto is larger than it was. That is the same
+mechanism that publishes the removed-guard finding; there is no version of this
+change that widens one without the other.
+
+The evidence for the cost is one control: removing only the redundant guard was
+reviewed and returned nothing. One clean fixture is a check that the widening
+does not obviously fire, not a precision number, and it is reported that way
+above.
+
+Accepted unmeasured, with the reason stated: the corpus plants defects in added
+and modified code, so it has no removal-only fixture to measure precision
+against, and the number this instrument would report would be about a shape the
+corpus does not contain. Building those fixtures is the measurement, and it is
+worth more than a figure derived from the ones already there.
+
+Kill condition, so the acceptance expires rather than becoming the record: if
+the corpus has not gained at least two removal-only fixtures, one planting a
+defect the removal causes and one clean, by the release after the one carrying
+this branch, then `CommentableLines` is narrowed to the immediately following
+context line only, halving the widening, and this note says the narrowing was
+taken for want of a measurement rather than because it was the better anchor.
+
+A second reader should also know what was not touched. `IsChangedLine` still
+means added, so `linters.only_changed_lines` and the linter file skip at
+`internal/linters/linters.go:684` continue to ignore removal-only files. That
+is deliberate: a linter finding on a line the change did not write is
+pre-existing, and the argument for publishing it is not the argument this
+section makes.

@@ -9,6 +9,7 @@ package diff
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -158,6 +159,42 @@ func (f *File) ChangedLines() []int {
 	return out
 }
 
+// CommentableLines returns added lines and surviving context immediately beside
+// a removal-only edit. A removed guard can break an unchanged caller, and that
+// caller anchors on the new side of the diff even though nothing added it. A
+// replacement keeps its added-line anchors, and a deleted file has none.
+func (f *File) CommentableLines() []int {
+	if f.Kind == ChangeDeleted || f.Binary {
+		return nil
+	}
+	out := f.ChangedLines()
+	for _, h := range f.Hunks {
+		for i := 0; i < len(h.Lines); {
+			if h.Lines[i].Kind == LineContext {
+				i++
+				continue
+			}
+			start := i
+			added := false
+			for i < len(h.Lines) && h.Lines[i].Kind != LineContext {
+				added = added || h.Lines[i].Kind == LineAdded
+				i++
+			}
+			if added {
+				continue
+			}
+			if start > 0 && h.Lines[start-1].NewLine > 0 {
+				out = append(out, h.Lines[start-1].NewLine)
+			}
+			if i < len(h.Lines) && h.Lines[i].NewLine > 0 {
+				out = append(out, h.Lines[i].NewLine)
+			}
+		}
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
 // IsChangedLine reports whether the given new-file line was added by this diff.
 // Findings on unchanged lines are typically dropped, since a pull request
 // review should discuss what the pull request did.
@@ -189,9 +226,9 @@ func (f *File) Position(newLine int) (int, bool) {
 	return 0, false
 }
 
-// NearestCommentableLine snaps a line number to the closest added line in the
-// same file, within maxDistance. Models routinely anchor a finding a line or
-// two off, to a closing brace, or to the line after the one they mean, and
+// NearestCommentableLine snaps a line number to the closest CommentableLines
+// anchor in the same file, within maxDistance. Models routinely anchor a finding
+// a line or two off, to a closing brace, or to the line after the one they mean, and
 // snapping recovers those comments instead of discarding them.
 //
 // Ties prefer the earlier line, which reads as the start of the construct being
@@ -199,19 +236,13 @@ func (f *File) Position(newLine int) (int, bool) {
 func (f *File) NearestCommentableLine(newLine, maxDistance int) (int, bool) {
 	best, bestDist := 0, maxDistance+1
 
-	for _, h := range f.Hunks {
-		for _, l := range h.Lines {
-			if l.Kind != LineAdded {
-				continue
-			}
-
-			dist := l.NewLine - newLine
-			if dist < 0 {
-				dist = -dist
-			}
-			if dist < bestDist || (dist == bestDist && l.NewLine < best) {
-				best, bestDist = l.NewLine, dist
-			}
+	for _, line := range f.CommentableLines() {
+		dist := line - newLine
+		if dist < 0 {
+			dist = -dist
+		}
+		if dist < bestDist || (dist == bestDist && line < best) {
+			best, bestDist = line, dist
 		}
 	}
 
