@@ -171,3 +171,23 @@ func TestDesignPackingChecksCancellationAfterRendering(t *testing.T) {
 		t.Fatalf("skip lost cancellation cause: %+v", packed.Plan.Skipped)
 	}
 }
+
+func TestDesignPackingRecordsCancellationOncePerTarget(t *testing.T) {
+	files, inventory := designPlanningFixture()
+	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
+	base, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	task := design.Tasks[0]
+	ctx := &cancelAfterPoll{Context: base, cancel: cancel, remaining: 1 + len(task.Sources) + len(task.Context)}
+	packed := PackDesign(ctx, config.Defaults(), design, files, nil, bundle.Reserve{})
+	if base.Err() == nil || len(packed.Plan.Batches) != 0 {
+		t.Fatal("control did not cancel before admission")
+	}
+	seen := map[Target]bool{}
+	for _, omission := range packed.Design.Tasks[0].Omitted {
+		if seen[omission.Target] {
+			t.Fatalf("one cancellation counted twice: %+v", packed.Design.Tasks[0].Omitted)
+		}
+		seen[omission.Target] = true
+	}
+}

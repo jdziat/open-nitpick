@@ -73,6 +73,8 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 			if !slices.Contains(out.Design.Errors, err.Error()) {
 				out.Design.Errors = append(out.Design.Errors, err.Error())
 			}
+			out.Plan.Skipped = append(out.Plan.Skipped, bundle.Skip{Path: task.Source.ID, Reason: fmt.Sprintf("%s: %s", task.ID, err.Error())})
+			continue
 		} else if bound.SourceDigest != task.SourceDigest {
 			task.Omitted = append(task.Omitted, Omission{Target: Target{Kind: UnitTarget, ID: task.ID}, Reason: "planned source digest does not match packing source"})
 		}
