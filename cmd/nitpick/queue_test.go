@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -11,6 +12,9 @@ import (
 )
 
 func TestMergeQueueActionReviewsTheEventRange(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the Action runs a POSIX shell script")
+	}
 	data, err := os.ReadFile("../../action.yml")
 	if err != nil {
 		t.Fatal(err)

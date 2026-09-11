@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -16,10 +17,10 @@ func TestCheckoutSkipPolicyMustNotSkipReview(t *testing.T) {
 	if e := os.WriteFile(filepath.Join(repo, ".nitpick.yaml"), []byte("models:\n  default:\n    provider: openai\n    model: test\nreview:\n  skip_markers: [BYPASS]\n"), 0600); e != nil {
 		t.Fatal(e)
 	}
-	diffReads := 0
+	var diffReads atomic.Int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Accept"), "diff") {
-			diffReads++
+			diffReads.Add(1)
 			http.Error(w, "stop before model", 500)
 			return
 		}
@@ -41,7 +42,7 @@ func TestCheckoutSkipPolicyMustNotSkipReview(t *testing.T) {
 	t.Setenv("GITHUB_OUTPUT", "")
 	t.Setenv("GITHUB_STEP_SUMMARY", "")
 	err := runReview(context.Background(), []string{"-repo", repo, "-owner", "o", "-repo-name", "r", "-pr", "7"})
-	if err == nil && diffReads == 0 {
+	if err == nil && diffReads.Load() == 0 {
 		t.Fatal("untrusted checkout skip_markers returned success before reading diff or base policy")
 	}
 }

@@ -196,6 +196,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 
 	actions := actionsFromEnv()
 
+	// Operator configuration errors must surface even when accepted policy skips the PR.
 	engine, err := newEngine(ctx, &f, repo, cfg, provider, ref, log)
 	if err != nil {
 		return err
