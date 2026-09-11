@@ -90,3 +90,32 @@ func TestDesignPackingCountsRepeatedContextOnceAgainstFileLimit(t *testing.T) {
 		t.Fatalf("whole tasks ignored total file bound: %+v", limited.Design.Tasks)
 	}
 }
+
+func TestDesignPackingRejectsUnsetLimitsWithoutLosingTasks(t *testing.T) {
+	files, inventory := designPlanningFixture()
+	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
+	for _, cause := range []string{"nil", "files", "request files", "bytes", "tokens", "reserve"} {
+		t.Run(cause, func(t *testing.T) {
+			cfg := config.Defaults()
+			reserve := bundle.Reserve{}
+			switch cause {
+			case "nil":
+				cfg = nil
+			case "files":
+				cfg.Review.MaxFiles = 0
+			case "request files":
+				cfg.Review.MaxFilesPerRequest = 0
+			case "bytes":
+				cfg.Review.MaxFileBytes = 0
+			case "tokens":
+				cfg.Review.TokenBudgetPerRequest = 0
+			case "reserve":
+				reserve.Tokens = -1
+			}
+			packed := PackDesign(t.Context(), cfg, design, files, nil, reserve)
+			if len(packed.Design.Errors) == 0 || len(packed.Design.Tasks) != 1 || len(packed.Plan.Batches) != 0 {
+				t.Fatalf("invalid limits became a usable plan: %+v", packed)
+			}
+		})
+	}
+}

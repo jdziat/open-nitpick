@@ -128,6 +128,15 @@ func TestPackageTaskRequiresCompleteSourcesBeforePromotingCoverage(t *testing.T)
 		t.Fatal("omitted package source claimed complete coverage")
 	}
 	report.Checks[0].Tasks[0].Omitted = nil
+	savedFindings := report.Checks[0].Findings
+	report.Checks[0].Findings = nil
+	report.Checks[0].Tasks[0].Sources = nil
+	report.Checks[0].Tasks[0].SourceDigest = ""
+	if len(report.Problems()) == 0 {
+		t.Fatal("package task omitted its source list to bypass digest binding")
+	}
+	report.Checks[0].Tasks[0].Sources = task.Sources
+	report.Checks[0].Findings = savedFindings
 	report.Checks[0].Tasks[0].SourceDigest = ""
 	if len(report.Problems()) == 0 {
 		t.Fatal("unbound source claimed complete coverage")

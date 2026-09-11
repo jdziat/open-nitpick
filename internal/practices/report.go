@@ -205,6 +205,9 @@ func (r Report) Problems() []string {
 				}
 				sourceTargets[source] = true
 			}
+			if strings.HasPrefix(task.ID, "package:") && len(task.Sources) == 0 {
+				bad("package design task has no source scope")
+			}
 			if len(task.Sources) > 0 && !sourceTargets[task.Source] {
 				bad("design task primary source is outside its source scope")
 			}

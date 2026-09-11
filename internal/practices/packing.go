@@ -26,8 +26,14 @@ type DesignPacking struct {
 // PackDesign keeps package source and caller/dependency context in one request.
 // The input must contain only permitted, frozen source. It never fetches more.
 func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, files []standards.File, changes diff.Files, reserve bundle.Reserve) DesignPacking {
-	out := DesignPacking{Design: design, Plan: &bundle.Plan{BudgetPerBatch: max(0, cfg.Review.TokenBudgetPerRequest-reserve.Tokens), FramingReserved: reserve.Tokens}}
+	out := DesignPacking{Design: design, Plan: &bundle.Plan{}}
 	out.Design.Tasks = slices.Clone(design.Tasks)
+	if cfg == nil || cfg.Review.MaxFiles <= 0 || cfg.Review.MaxFilesPerRequest <= 0 || cfg.Review.MaxFileBytes <= 0 || cfg.Review.TokenBudgetPerRequest <= 0 || reserve.Tokens < 0 {
+		out.Design.Errors = append(slices.Clone(design.Errors), "design packing requires positive file and token limits and a nonnegative framing reserve")
+		return out
+	}
+	out.Plan.BudgetPerBatch = max(0, cfg.Review.TokenBudgetPerRequest-reserve.Tokens)
+	out.Plan.FramingReserved = reserve.Tokens
 	sources := map[string][]byte{}
 	for _, file := range files {
 		sources[file.Path] = file.Src
