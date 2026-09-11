@@ -159,6 +159,15 @@ type File struct {
 
 // Measure runs every enabled probe over the files and returns the reading.
 func Measure(files []File, opts Options) Report {
+	report, _ := MeasureContext(context.Background(), files, opts)
+	return report
+}
+
+// MeasureContext measures conventions while honoring cancellation between files and probes.
+func MeasureContext(ctx context.Context, files []File, opts Options) (Report, error) {
+	if err := ctx.Err(); err != nil {
+		return Report{}, err
+	}
 	floor := opts.floor()
 	rep := Report{Files: map[string]int{}, Floor: floor}
 
@@ -177,14 +186,23 @@ func Measure(files []File, opts Options) Report {
 		probed[l] = true
 	}
 
-	packages := indexPackages(files)
+	packages, err := indexPackagesContext(ctx, files)
+	if err != nil {
+		return Report{}, err
+	}
 
 	for _, f := range files {
+		if err := ctx.Err(); err != nil {
+			return Report{}, err
+		}
 		lang := bundle.Language(f.Path)
 		rep.Files[lang]++
 
 		var s *source
 		for _, p := range Probes {
+			if err := ctx.Err(); err != nil {
+				return Report{}, err
+			}
 			if p.Language != lang || !opts.enabled(p) {
 				continue
 			}
@@ -215,7 +233,7 @@ func Measure(files []File, opts Options) Report {
 		res.Standing = floor.standing(res)
 		rep.Results = append(rep.Results, res)
 	}
-	return rep
+	return rep, nil
 }
 
 // standing reads a result against this floor.
@@ -292,17 +310,14 @@ func Score(files []File, base Report, touched map[string]map[int]bool, opts Opti
 	return out
 }
 
-// ReadTree reads every file under root that some probe could read, and names
-// the rest without reading them.
-//
-// A file of a language no probe reads comes back with no Src. It is in no
-// probe's denominator and it is in the report's language census, which is the
-// difference between a report that says 900 TypeScript files went unmeasured
-// and one that quietly says nothing. Returning only probed files made
-// Report.Unprobed unreachable from every real measurement, and the test that
-// named the field passed anyway because it built its own file list. See
-// docs/measurement.md Rule 10.
+// ReadTree reads probe inputs and records other languages without their contents.
+// Use ReadTreeContext when traversal must honor cancellation.
 func ReadTree(root string, skipDir func(name string) bool) ([]File, error) {
+	return ReadTreeContext(context.Background(), root, skipDir)
+}
+
+// ReadTreeContext reads the tree while honoring cancellation between directory entries.
+func ReadTreeContext(ctx context.Context, root string, skipDir func(name string) bool) ([]File, error) {
 	probed := map[string]bool{}
 	for _, l := range Languages() {
 		probed[l] = true
@@ -310,6 +325,9 @@ func ReadTree(root string, skipDir func(name string) bool) ([]File, error) {
 
 	var out []File
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		switch {
 		case err != nil:
 			return err

@@ -23,6 +23,7 @@
 package standards
 
 import (
+	"context"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -124,8 +125,16 @@ func newSource(path string, src []byte, pkg *packageIndex) *source {
 // indexPackages reads what each directory declares, once, before any probe
 // looks at a file.
 func indexPackages(files []File) map[string]*packageIndex {
+	result, _ := indexPackagesContext(context.Background(), files)
+	return result
+}
+
+func indexPackagesContext(ctx context.Context, files []File) (map[string]*packageIndex, error) {
 	out := map[string]*packageIndex{}
 	for _, f := range files {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if f.Src == nil || !strings.HasSuffix(f.Path, ".go") || strings.HasSuffix(f.Path, "_test.go") {
 			continue
 		}
@@ -150,7 +159,7 @@ func indexPackages(files []File) map[string]*packageIndex {
 			}
 		}
 	}
-	return out
+	return out, nil
 }
 
 // goFile parses the file as Go, returning nil when it does not parse.
