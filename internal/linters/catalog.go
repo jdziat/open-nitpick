@@ -53,8 +53,8 @@ func pylintSpec() toolSpec {
 				"--disable=all", "--enable=E,W", "--"}, inv.files...)
 		},
 		parse: func(inv invocation, report []byte, exit int) ([]Finding, error) {
-			if strings.TrimSpace(string(report)) == "" {
-				return nil, nil
+			if exit < 0 || exit & ^30 != 0 {
+				return nil, fmt.Errorf("pylint could not analyze the files (exit %d)", exit)
 			}
 			var msgs []msg
 			if err := decodeJSON(report, &msgs); err != nil {
@@ -504,6 +504,9 @@ func sqlfluffSpec() toolSpec {
 				"--ignore-local-config", "--config", inv.config, "--"}, inv.files...)
 		},
 		parse: func(inv invocation, report []byte, exit int) ([]Finding, error) {
+			if exit != 0 && exit != 1 {
+				return nil, fmt.Errorf("sqlfluff could not analyze the files (exit %d)", exit)
+			}
 			var files []file
 			if err := decodeJSON(report, &files); err != nil {
 				return nil, fmt.Errorf("parse sqlfluff output: %w", err)
@@ -511,14 +514,9 @@ func sqlfluffSpec() toolSpec {
 			var findings []Finding
 			for _, f := range files {
 				for _, v := range f.Violations {
-					// PRS and TMP are sqlfluff saying it could not parse or
-					// template the file, almost always the wrong dialect for
-					// this repository, which is a fact about the analyzer's
-					// configuration, not a finding about the change. Publishing
-					// "unparsable SQL" on a valid migration is noise the
-					// operator fixes with linters.configs.sqlfluff.
+					// Configuration failures belong in the analyzer roster, not inline findings.
 					if strings.HasPrefix(v.Code, "PRS") || strings.HasPrefix(v.Code, "TMP") {
-						continue
+						return nil, fmt.Errorf("sqlfluff could not parse or template %s (%s); check its configured dialect and templater", f.Filepath, v.Code)
 					}
 					line := v.Line
 					if line == 0 {

@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -20,7 +21,10 @@ import (
 
 // GitHub reviews pull requests through the GitHub REST API.
 type GitHub struct {
-	client *github.Client
+	client     *github.Client
+	identityMu sync.Mutex
+	actorID    int64
+	actorLogin string
 
 	// Bot marks published comments so a follow-up run can recognize its own
 	// previous output rather than piling duplicates onto a pull request.
@@ -43,6 +47,10 @@ type GitHubOptions struct {
 
 	// Bot is the marker appended to published comments.
 	Bot string
+
+	// BotLogin names the trusted posting account for installation tokens.
+	// Empty resolves the authenticated user, for personal access tokens.
+	BotLogin string
 }
 
 // DefaultBotMarker identifies comments this tool published.
@@ -78,7 +86,7 @@ func NewGitHub(opts GitHubOptions) (*GitHub, error) {
 		bot = DefaultBotMarker
 	}
 
-	return &GitHub{client: client, Bot: bot}, nil
+	return &GitHub{client: client, Bot: bot, actorLogin: opts.BotLogin}, nil
 }
 
 // Name identifies the provider.
@@ -132,13 +140,26 @@ func (g *GitHub) Diff(ctx context.Context, ref Ref) ([]byte, error) {
 			if prErr != nil {
 				return nil, fmt.Errorf("github: get diff for %s: %w (and the pull request could not be read for a local diff: %w)", ref, err, prErr)
 			}
-			out, localErr := localDiff(ctx, g.Checkout, pr.BaseSHA, pr.HeadSHA)
+			base, head := pr.BaseSHA, pr.HeadSHA
+			if ref.Head != "" && ref.Base != "" {
+				base, head = ref.Base, ref.Head
+			}
+			out, localErr := localDiff(ctx, g.Checkout, base, head)
 			if localErr != nil {
 				return nil, fmt.Errorf("github: get diff for %s: %w (and a local diff failed: %w)", ref, err, localErr)
 			}
 			return out, nil
 		}
 		return nil, fmt.Errorf("github: get diff for %s: %w", ref, err)
+	}
+	if ref.Head != "" {
+		pr, err := g.PullRequest(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		if pr.HeadSHA != ref.Head || (ref.Base != "" && pr.BaseSHA != ref.Base) {
+			return nil, fmt.Errorf("github: diff snapshot: %w", ErrHeadMoved)
+		}
 	}
 	return []byte(raw), nil
 }
@@ -263,6 +284,19 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 		return err
 	}
 
+	if review.Event == EventApprove {
+		if review.Head == "" {
+			return errors.New("github: approval requires a reviewed commit")
+		}
+		pr, err := g.PullRequest(ctx, ref)
+		if err != nil {
+			return err
+		}
+		if pr.HeadSHA != review.Head {
+			return fmt.Errorf("github: approval: %w", ErrHeadMoved)
+		}
+	}
+
 	comments := review.Comments
 	truncated := 0
 	if len(comments) > maxCommentsPerReview {
@@ -270,7 +304,7 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 		comments = comments[:maxCommentsPerReview]
 	}
 
-	body := review.Summary
+	body := stripMarkers(review.Summary)
 	if truncated > 0 {
 		body += fmt.Sprintf("\n\n_%d further finding(s) were omitted to keep this review readable._", truncated)
 	}
@@ -283,6 +317,9 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	if marker := headMarker(review.Head); marker != "" {
 		body += "\n" + marker
 	}
+	if !review.Incomplete && review.Head != "" {
+		body += "\n" + completionMarker(review.Head)
+	}
 	if marker := spendMarker(review.Spend); marker != "" {
 		body += "\n" + marker
 	}
@@ -294,7 +331,7 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 			side = SideRight
 		}
 
-		body := c.Body + "\n" + g.Bot
+		body := stripMarkers(c.Body) + "\n" + g.Bot
 		if marker := fingerprintMarker(c.Fingerprint, c.Class); marker != "" {
 			body += "\n" + marker
 		}
@@ -331,11 +368,15 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	}
 
 	request := &github.PullRequestReviewRequest{
+		CommitID: github.Ptr(review.Head),
 		Event:    github.Ptr(event),
 		Comments: drafts,
 		Body:     github.Ptr(body),
 	}
 
+	if review.Head == "" {
+		request.CommitID = nil
+	}
 	_, _, err := g.client.PullRequests.CreateReview(ctx, ref.Owner, ref.Repo, ref.Number, request)
 	if err == nil {
 		return nil
@@ -345,10 +386,13 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	// GitHub computed. Rather than lose the whole review, fall back to posting
 	// the summary alone: a reviewer gets the walkthrough and can act on it.
 	if len(drafts) > 0 && isUnprocessable(err) {
+		// Missing inline findings must be retried before this head is reusable.
+		body = strings.ReplaceAll(body, completionMarker(review.Head), "")
 		if _, _, fallbackErr := g.client.PullRequests.CreateReview(ctx, ref.Owner, ref.Repo, ref.Number,
 			&github.PullRequestReviewRequest{
-				Event: github.Ptr(string(EventComment)),
-				Body:  github.Ptr(summaryFallback(body, err)),
+				CommitID: request.CommitID,
+				Event:    github.Ptr(string(EventComment)),
+				Body:     github.Ptr(summaryFallback(body, err)),
 			}); fallbackErr == nil {
 			return nil
 		}
@@ -385,6 +429,10 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 		return nil, err
 	}
 
+	actor, err := g.postingActor(ctx)
+	if err != nil {
+		return nil, err
+	}
 	out := &PriorReview{}
 
 	// The head of the LATEST review this tool submitted. Reviews arrive oldest
@@ -399,7 +447,7 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 		}
 		for _, r := range reviews {
 			body := r.GetBody()
-			if !strings.Contains(body, g.Bot) {
+			if r.GetUser().GetID() != actor || !strings.Contains(body, g.Bot) {
 				continue
 			}
 			// Spend is totalled over every run, so it is read before the
@@ -410,11 +458,14 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 			}
 
 			head, ok := parseHead(body)
-			if !ok || r.GetID() < latestID {
+			if r.GetID() < latestID {
 				continue
 			}
 			latestID = r.GetID()
-			out.Head = head
+			out.Head = ""
+			if ok && strings.Contains(body, completionMarker(head)) {
+				out.Head = head
+			}
 		}
 		if resp == nil || resp.NextPage == 0 {
 			break
@@ -430,7 +481,7 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 		}
 		for _, c := range comments {
 			body := c.GetBody()
-			if !strings.Contains(body, g.Bot) {
+			if c.GetUser().GetID() != actor || !strings.Contains(body, g.Bot) {
 				continue
 			}
 			fp, class, ok := parseFingerprint(body)
@@ -787,6 +838,10 @@ func (g *GitHub) ThreadComments(ctx context.Context, ref Ref, rootID int64) ([]T
 	if err := validateRef(ref); err != nil {
 		return nil, err
 	}
+	actor, err := g.postingActor(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var out []ThreadComment
 	opts := &github.PullRequestListCommentsOptions{ListOptions: github.ListOptions{PerPage: 100}}
 	for {
@@ -796,7 +851,7 @@ func (g *GitHub) ThreadComments(ctx context.Context, ref Ref, rootID int64) ([]T
 		}
 		for _, c := range comments {
 			if c.GetID() == rootID || c.GetInReplyTo() == rootID {
-				out = append(out, ThreadComment{ID: c.GetID(), Author: c.GetUser().GetLogin(), Body: c.GetBody()})
+				out = append(out, ThreadComment{ID: c.GetID(), Author: c.GetUser().GetLogin(), Body: c.GetBody(), Own: c.GetUser().GetID() == actor})
 			}
 		}
 		if resp == nil || resp.NextPage == 0 {
@@ -825,6 +880,10 @@ func (g *GitHub) CountAnswers(ctx context.Context, ref Ref) (int, error) {
 		return 0, err
 	}
 
+	actor, err := g.postingActor(ctx)
+	if err != nil {
+		return 0, err
+	}
 	var n int
 
 	opts := &github.IssueListCommentsOptions{ListOptions: github.ListOptions{PerPage: 100}}
@@ -834,7 +893,7 @@ func (g *GitHub) CountAnswers(ctx context.Context, ref Ref) (int, error) {
 			return 0, fmt.Errorf("github: list comments on %s: %w", ref, err)
 		}
 		for _, c := range comments {
-			if strings.Contains(c.GetBody(), AnswerMarker) {
+			if c.GetUser().GetID() == actor && strings.Contains(c.GetBody(), g.Bot) && strings.Contains(c.GetBody(), AnswerMarker) {
 				n++
 			}
 		}
@@ -851,7 +910,7 @@ func (g *GitHub) CountAnswers(ctx context.Context, ref Ref) (int, error) {
 			return 0, fmt.Errorf("github: list review comments on %s: %w", ref, err)
 		}
 		for _, c := range comments {
-			if strings.Contains(c.GetBody(), AnswerMarker) {
+			if c.GetUser().GetID() == actor && strings.Contains(c.GetBody(), g.Bot) && strings.Contains(c.GetBody(), AnswerMarker) {
 				n++
 			}
 		}

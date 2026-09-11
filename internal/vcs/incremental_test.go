@@ -80,15 +80,15 @@ func TestGitHubPriorReviewReadsOwnMarkersOnly(t *testing.T) {
 			_ = json.NewEncoder(w).Encode([]map[string]any{
 				// A human review, and an older bot review; the newest bot
 				// review by id wins even though it is listed first.
-				{"id": 30, "body": "Older run.\n" + DefaultBotMarker + "\n" + headMarker("beef02")},
+				{"id": 30, "user": map[string]any{"id": 42}, "body": "Older run.\n" + DefaultBotMarker + "\n" + headMarker("beef02") + "\n" + completionMarker("beef02")},
 				{"id": 10, "body": "LGTM"},
-				{"id": 20, "body": "Old run.\n" + DefaultBotMarker + "\n" + headMarker("beef01")},
+				{"id": 20, "user": map[string]any{"id": 42}, "body": "Old run.\n" + DefaultBotMarker + "\n" + headMarker("beef01") + "\n" + completionMarker("beef01")},
 			})
 		case strings.HasSuffix(r.URL.Path, "/pulls/7/comments"):
 			_ = json.NewEncoder(w).Encode([]map[string]any{
-				{"id": 1, "path": "a.go", "line": 12, "body": "Ours.\n" + DefaultBotMarker + "\n" + fingerprintMarker("aa11", "correctness")},
+				{"id": 1, "user": map[string]any{"id": 42}, "path": "a.go", "line": 12, "body": "Ours.\n" + DefaultBotMarker + "\n" + fingerprintMarker("aa11", "correctness")},
 				{"id": 2, "path": "b.go", "line": 3, "body": "A human's comment about open-nitpick"},
-				{"id": 3, "path": "c.go", "line": 5, "body": "Ours, but from before fingerprints existed.\n" + DefaultBotMarker},
+				{"id": 3, "user": map[string]any{"id": 42}, "path": "c.go", "line": 5, "body": "Ours, but from before fingerprints existed.\n" + DefaultBotMarker},
 			})
 		default:
 			t.Errorf("unexpected request %s", r.URL.Path)
@@ -188,11 +188,11 @@ func TestGitHubPriorReviewKeepsTheCommentBody(t *testing.T) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/pulls/7/reviews"):
 			_ = json.NewEncoder(w).Encode([]map[string]any{
-				{"id": 30, "body": "Run.\n" + DefaultBotMarker + "\n" + headMarker("beef02")},
+				{"id": 30, "user": map[string]any{"id": 42}, "body": "Run.\n" + DefaultBotMarker + "\n" + headMarker("beef02") + "\n" + completionMarker("beef02")},
 			})
 		case strings.HasSuffix(r.URL.Path, "/pulls/7/comments"):
 			_ = json.NewEncoder(w).Encode([]map[string]any{
-				{"id": 1, "path": "a.go", "line": 12,
+				{"id": 1, "user": map[string]any{"id": 42}, "path": "a.go", "line": 12,
 					"body": published + "\n" + DefaultBotMarker + "\n" + fingerprintMarker("aa11", "correctness")},
 			})
 		default:

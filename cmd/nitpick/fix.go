@@ -195,7 +195,7 @@ func gatherFindings(ctx context.Context, gh *vcs.GitHub, ref vcs.Ref, ev *conver
 		return nil, err
 	}
 	for _, c := range thread {
-		if !strings.Contains(c.Body, gh.Bot) {
+		if !c.Own || !strings.Contains(c.Body, gh.Bot) {
 			continue
 		}
 		// The fingerprint comes from the comment, not from nothing. Without

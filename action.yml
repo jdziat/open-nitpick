@@ -7,6 +7,9 @@ branding:
   color: purple
 
 inputs:
+  bot-login:
+    description: "Trusted posting account; use <app-slug>[bot] for an App token"
+    default: github-actions[bot]
   github-token:
     description: >-
       Token used to read the pull request and publish the review. The default
@@ -347,6 +350,7 @@ runs:
       # arbitrary commands in this step.
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
+        NITPICK_BOT_LOGIN: ${{ inputs.bot-login }}
         LLM_PROVIDER: ${{ inputs.provider }}
         LLM_MODEL: ${{ inputs.model }}
         LLM_API_KEY: ${{ inputs.api-key }}
@@ -360,6 +364,8 @@ runs:
         EVENT_NAME: ${{ github.event_name }}
         NITPICK_COMMAND: ${{ inputs.command }}
         EVENT_BEFORE: ${{ github.event.before }}
+        MERGE_BASE: ${{ github.event.merge_group.base_sha }}
+        MERGE_HEAD: ${{ github.event.merge_group.head_sha }}
         HEAD_SHA: ${{ github.sha }}
         IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
       run: |
@@ -408,7 +414,15 @@ runs:
         # one through pr-number; a push has no pull request and is reviewed as
         # the pushed range, printed rather than posted.
         case "$EVENT_NAME" in
-          pull_request|pull_request_target|merge_group)
+          pull_request|pull_request_target)
+            ;;
+          merge_group)
+            if [ -z "$MERGE_BASE" ] || [ -z "$MERGE_HEAD" ]; then
+              echo "::error::open-nitpick: merge_group requires base and head SHAs"
+              echo "result=error" >> "$GITHUB_OUTPUT"
+              exit 2
+            fi
+            flags+=(-base "$MERGE_BASE" -head "$MERGE_HEAD")
             ;;
           push)
             base="$EVENT_BEFORE"
