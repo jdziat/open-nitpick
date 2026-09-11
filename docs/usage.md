@@ -403,7 +403,9 @@ imports of `os/exec` and `net/http` are forbidden in the commit validator and
 convention probes; this is a source import constraint, not a sandbox guarantee.
 
 CI reports deterministic engineering coverage over the accepted commit range;
-the existing standards and commit jobs remain gates.
+the existing standards and commit jobs remain gates. The commit job validates
+both branch subjects and the proposed squash title, and reruns when the PR title
+is edited without rerunning the build and test workflows.
 Pull request reviews build the current source and select the engineering profile
 from accepted policy. Model slop/design checks run but are optional and advisory:
 provider failures stay visible, and a passing policy gate does not mean these

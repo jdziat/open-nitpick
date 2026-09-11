@@ -76,4 +76,12 @@ func TestCommitCommandRequiresScopeAndKeepsSquashTitleSeparate(t *testing.T) {
 	if err := json.Unmarshal(output.Bytes(), &report); err != nil || len(report.Checks) != 2 || report.Checks[1].Findings[0].Target.Kind != practices.TitleTarget {
 		t.Fatalf("title claimed commit coverage: %+v %v", report, err)
 	}
+	output.Reset()
+	err = runCommits(context.Background(), []string{"-repo", root, "-base", "main", "-title", "fix: preserve the title contract", "-check", "-json"}, &output)
+	if err != nil {
+		t.Fatalf("valid title failed: %v %s", err, output.String())
+	}
+	if err := json.Unmarshal(output.Bytes(), &report); err != nil || len(report.Checks) != 2 || report.Checks[0].State != practices.NotApplicable || len(report.Checks[0].Examined) != 0 || report.Checks[1].State != practices.Completed || len(report.Checks[1].Examined) != 1 || len(report.Checks[1].Findings) != 0 {
+		t.Fatalf("valid title lost scope evidence: %+v %v", report, err)
+	}
 }

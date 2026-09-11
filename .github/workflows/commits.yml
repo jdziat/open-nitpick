@@ -1,0 +1,36 @@
+---
+name: Commit policy
+
+"on":
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: commit-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Pull request commits follow Conventional Commits, which is what
+  # release-please reads to version and describe the next release.
+  commits:
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      # actions/setup-go v5.6.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+      - name: Check branch commits and squash title
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: >-
+          go run ./cmd/nitpick commits -base "$BASE_SHA" -head "$HEAD_SHA"
+          -title "$PR_TITLE" -check
