@@ -102,8 +102,35 @@ jobs:
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
       - name: Lint
         run: golangci-lint run
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install ESLint
+        run: |
+          npm install --prefix "$RUNNER_TEMP/nitpick-node" --no-audit --no-fund eslint@10.8.0
+          echo "$RUNNER_TEMP/nitpick-node/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Enforce repository standards
         run: go run ./cmd/nitpick repo-standards -check
+
+  language-standards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install language linters
+        run: ./scripts/install-language-linters.sh "$RUNNER_TEMP/nitpick-language-tools"
+      - name: Verify conventions with real linters
+        env:
+          NITPICK_REQUIRE_LANGUAGE_LINTERS: '1'
+        run: go test ./internal/linters -run '^TestLanguageConvention' -count=1 -v
 
   # The documentation site builds in strict mode, so a broken link in the
   # README or docs/ fails the pull request rather than the deploy.

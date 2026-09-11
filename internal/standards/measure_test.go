@@ -59,8 +59,8 @@ func TestAnUnprobedLanguageIsNamed(t *testing.T) {
 		{Path: "c.py", Src: []byte("x = 1\n")},
 	}, Options{})
 
-	if !slices.Contains(rep.Unprobed, "typescript") || !slices.Contains(rep.Unprobed, "python") {
-		t.Errorf("unprobed = %v, want typescript and python named", rep.Unprobed)
+	if !slices.Contains(rep.Unprobed, "typescript") || slices.Contains(rep.Unprobed, "python") {
+		t.Errorf("unprobed = %v, want typescript named and python probed", rep.Unprobed)
 	}
 	if slices.Contains(rep.Unprobed, "go") {
 		t.Error("go is named unprobed, and six probes read it")
@@ -187,8 +187,8 @@ func TestReadTreeNamesTheLanguagesItCannotProbe(t *testing.T) {
 	}
 	rep := Measure(files, Options{})
 
-	if !slices.Contains(rep.Unprobed, "typescript") || !slices.Contains(rep.Unprobed, "python") {
-		t.Errorf("unprobed = %v, want typescript and python; the report is silent about what it did not read",
+	if !slices.Contains(rep.Unprobed, "typescript") || slices.Contains(rep.Unprobed, "python") {
+		t.Errorf("unprobed = %v, want typescript unprobed and python measured",
 			rep.Unprobed)
 	}
 	if rep.Files["go"] != 1 {

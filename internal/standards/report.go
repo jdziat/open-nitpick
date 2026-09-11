@@ -66,6 +66,10 @@ func (r Report) Text() string {
 			strings.Join(r.Unprobed, ", "))
 	}
 
+	if len(r.Unmeasured) > 0 {
+		fmt.Fprintf(&b, "\nCould not measure: %s.\n", strings.Join(r.Unmeasured, "; "))
+	}
+
 	standards := r.Standards()
 	contested := 0
 	for _, res := range r.Results {

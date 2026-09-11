@@ -153,6 +153,9 @@ func band(r Result) string {
 //
 // existing is the file's current content, empty when there is none.
 func Render(existing string, rep Report) (string, error) {
+	if len(rep.Unmeasured) > 0 {
+		return "", fmt.Errorf("cannot generate standards from an incomplete measurement: %s", strings.Join(rep.Unmeasured, "; "))
+	}
 	block := rep.Block()
 
 	if strings.TrimSpace(existing) == "" {

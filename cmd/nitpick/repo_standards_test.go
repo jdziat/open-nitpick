@@ -70,8 +70,8 @@ func TestRepoStandardsChecksWholeTreeAndDistinguishesMissingAnalyzers(t *testing
 			if !tc.missing && (len(source.seen) != 2 || !strings.Contains(strings.Join(source.seen, ","), "app.py")) {
 				t.Fatalf("source did not receive whole tree: %v", source.seen)
 			}
-			if len(result.Report.Unprobed) == 0 {
-				t.Fatal("Python was presented as probed")
+			if strings.Contains(strings.Join(result.Report.Unprobed, ","), "python") {
+				t.Fatal("Python was presented as unprobed")
 			}
 		})
 	}
@@ -147,5 +147,49 @@ func TestRepoStandardsRunsRealLinterAdapter(t *testing.T) {
 	output.Reset()
 	if err := runRepoStandards(context.Background(), []string{"-repo", repo, "-linters", "ruff", "-check"}, &output); err != nil {
 		t.Fatalf("clean analyzer did not pass: %v\n%s", err, output.String())
+	}
+}
+
+func TestRepoStandardsSelectsConventionLintersForEachLanguage(t *testing.T) {
+	for _, tc := range []struct{ path, source, tool string }{
+		{"app.py", "def fetch_user(): pass\n", "ruff"},
+		{"app.js", "class Client {}\n", "eslint"},
+		{"App.java", "package com.example;\n", "pmd"},
+		{"Gemfile", "def fetch_user; end\n", "rubocop"},
+	} {
+		t.Run(tc.tool, func(t *testing.T) {
+			repo := t.TempDir()
+			write(t, repo, tc.path, tc.source)
+			var out bytes.Buffer
+			err := repoStandardsCommand(context.Background(), []string{"-repo", repo, "-check", "-json"}, &out, func(cfg *config.Config) standards.Source {
+				if strings.Join(cfg.Linters.Enabled, ",") != tc.tool {
+					t.Fatalf("selected=%v", cfg.Linters.Enabled)
+				}
+				return &repoStandardsSource{}
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestRepoStandardsReportsLexerFailuresAsIncomplete(t *testing.T) {
+	repo := t.TempDir()
+	write(t, repo, "app.py", "def fetch_user(): pass\n\x00\n")
+	var out bytes.Buffer
+	err := runRepoStandards(context.Background(), []string{"-repo", repo, "-check", "-no-linters", "-json"}, &out)
+	if !errors.Is(err, errIncomplete) {
+		t.Fatalf("error=%v output=%s", err, out.String())
+	}
+	var got RepoStandardsResult
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Report.Unmeasured) != 1 || !strings.Contains(got.Report.Unmeasured[0], "app.py") {
+		t.Fatalf("unmeasured=%v", got.Report.Unmeasured)
+	}
+	if _, err := standards.Render("handwritten instructions", got.Report); err == nil {
+		t.Fatal("generated standards from incomplete measurement")
 	}
 }

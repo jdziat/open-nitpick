@@ -13,6 +13,8 @@ func Language(path string) string {
 	ext := strings.ToLower(filepath.Ext(path))
 	if ext == "" {
 		switch strings.ToLower(filepath.Base(path)) {
+		case "gemfile", "rakefile":
+			return "ruby"
 		case "dockerfile":
 			return "docker"
 		case "makefile", "gnumakefile":
@@ -44,7 +46,7 @@ var languages = map[string]string{
 	".py": "python", ".pyi": "python",
 	".js": "javascript", ".mjs": "javascript", ".cjs": "javascript", ".jsx": "javascript",
 	".ts": "typescript", ".tsx": "typescript", ".mts": "typescript", ".cts": "typescript",
-	".rb": "ruby", ".rake": "ruby",
+	".rb": "ruby", ".rake": "ruby", ".gemspec": "ruby",
 	".php":  "php",
 	".java": "java",
 	".kt":   "kotlin", ".kts": "kotlin",

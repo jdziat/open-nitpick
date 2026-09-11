@@ -85,6 +85,9 @@ func (r Result) Share() (float64, bool) {
 
 // Report is a measurement over a tree, plus what it could not speak for.
 type Report struct {
+	// Unmeasured lists files whose lexical probes could not finish.
+	Unmeasured []string `json:"unmeasured,omitempty"`
+
 	Results []Result `json:"results"`
 
 	// Files counted per language, including languages no probe reads. It is
@@ -218,6 +221,9 @@ func MeasureContext(ctx context.Context, files []File, opts Options) (Report, er
 					acc.Off = append(acc.Off, site)
 				}
 			}
+		}
+		if s != nil && s.lexError != "" {
+			rep.Unmeasured = append(rep.Unmeasured, f.Path+": "+s.lexError)
 		}
 	}
 
