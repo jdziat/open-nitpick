@@ -16,6 +16,7 @@ import (
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/fullreview"
+	"github.com/jdziat/open-nitpick/internal/practices"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
@@ -142,15 +143,16 @@ type Withheld struct {
 
 // ReviewOut is what review returns.
 type ReviewOut struct {
-	Summary   string         `json:"summary" jsonschema:"the walkthrough the triage model wrote"`
-	Findings  []Finding      `json:"findings"`
-	Counts    map[string]int `json:"counts" jsonschema:"findings by severity"`
-	Files     int            `json:"files" jsonschema:"files reviewed"`
-	Analyzers []Analyzer     `json:"analyzers,omitempty"`
-	Withheld  []Withheld     `json:"withheld,omitempty"`
-	Policy    string         `json:"policy,omitempty" jsonschema:"set when the change's own configuration was set aside, and why"`
-	FailOn    string         `json:"fail_on" jsonschema:"the configured gate"`
-	Failed    bool           `json:"failed" jsonschema:"whether a finding reached the gate"`
+	Practices *practices.Report `json:"practices,omitempty" jsonschema:"engineering check coverage and policy findings when selected"`
+	Summary   string            `json:"summary" jsonschema:"the walkthrough the triage model wrote"`
+	Findings  []Finding         `json:"findings"`
+	Counts    map[string]int    `json:"counts" jsonschema:"findings by severity"`
+	Files     int               `json:"files" jsonschema:"files reviewed"`
+	Analyzers []Analyzer        `json:"analyzers,omitempty"`
+	Withheld  []Withheld        `json:"withheld,omitempty"`
+	Policy    string            `json:"policy,omitempty" jsonschema:"set when the change's own configuration was set aside, and why"`
+	FailOn    string            `json:"fail_on" jsonschema:"the selected gate: a severity threshold or engineering policy"`
+	Failed    bool              `json:"failed" jsonschema:"whether the selected policy failed, including required incomplete engineering checks"`
 	// An agent reading this over a socket has no exit code and no log, so the
 	// tree tools' Unreviewed has a counterpart here. Without it a review whose
 	// triage died is indistinguishable from one that had nothing to say.
@@ -329,6 +331,9 @@ func (t *mcpTools) tree(ctx context.Context, in TreeIn, score bool) (*mcp.CallTo
 		out.Sections = strings.TrimSpace(fullreview.Sections(&filtered))
 		out.Plan = strings.TrimSpace(fullreview.RemediationPlan(filtered.Findings))
 		out.Failed = filtered.Failed(failOn)
+		if report.Practices != nil {
+			out.Summary += "\n\nThe class filter changes displayed findings; the engineering policy gate still evaluates every required practice."
+		}
 		out.Summary = strings.TrimSpace(out.Summary) + fmt.Sprintf("\n\nFiltered to %s: %d of %d finding(s) shown.", strings.Join(in.Classes, ", "), len(kept), total)
 	}
 	text := reviewText(out.ReviewOut) + "\n\n" + out.Sections + "\n\n" + out.Plan + "\n" + strings.TrimSpace(fullreview.CoverageNotice(report, tree))
@@ -356,11 +361,15 @@ func (t *mcpTools) explainConfig(_ context.Context, _ *mcp.CallToolRequest, in E
 func reviewOut(report *review.Report, failOn config.Severity) ReviewOut {
 	out := ReviewOut{
 		Summary:      report.Summary,
+		Practices:    report.Practices,
 		Files:        report.Plan.Files(),
 		FailOn:       string(failOn),
 		Failed:       report.Failed(failOn),
 		Complete:     report.PipelineComplete(),
 		FailedStages: report.FailedStages(),
+	}
+	if report.Practices != nil {
+		out.FailOn = "engineering"
 	}
 	for _, f := range report.Findings {
 		out.Findings = append(out.Findings, Finding{
@@ -402,6 +411,9 @@ func reviewText(out ReviewOut) string {
 	var b strings.Builder
 	if out.Summary != "" {
 		b.WriteString(strings.TrimSpace(out.Summary) + "\n\n")
+	}
+	if out.Practices != nil {
+		b.WriteString(out.Practices.Text() + "\n")
 	}
 	fmt.Fprintf(&b, "%d file(s) reviewed, %d finding(s)", out.Files, len(out.Findings))
 	if len(out.Counts) > 0 {

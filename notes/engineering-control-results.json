@@ -1,0 +1,605 @@
+[
+  {
+    "case": "bad",
+    "iteration": 1,
+    "exit": 0,
+    "seconds": 65.87,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v1",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Ready returns true unconditionally, contradicting its documented initialization check",
+            "uncertainty": ""
+          }
+        ]
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Put panics on nil map when Configure has not run",
+            "uncertainty": ""
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "case": "good",
+    "iteration": 1,
+    "exit": 0,
+    "seconds": 72.01,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v1",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": []
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Put panics on zero-value Cache: assignment to nil map",
+            "uncertainty": ""
+          },
+          {
+            "title": "Ready() advertises a state no caller checks and Put does not tolerate",
+            "uncertainty": ""
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "case": "bad",
+    "iteration": 2,
+    "exit": 0,
+    "seconds": 88.83,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v1",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Ready always returns true, contradicting its documented contract",
+            "uncertainty": ""
+          }
+        ]
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Put panics on nil map when Configure has not run",
+            "uncertainty": "Neither Put, the `values` map, nor Configure is shown in the diff; whether Start panics depends entirely on Put's implementation (nil-map write vs. own guard vs. lazy init), which I cannot see."
+          },
+          {
+            "title": "Start's comment omits dependency on package-level cache state",
+            "uncertainty": "The claim hinges on facts not visible here: Put is called but never defined in this file, and the claimed Configure-before-use lifecycle and panic-on-unconfigured-cache behavior cannot be verified from the four lines shown. The definitions of Put, Configure, and the cache are needed to decide whether the comment omits contract a caller needs."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "case": "good",
+    "iteration": 2,
+    "exit": 0,
+    "seconds": 67.81,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v1",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": []
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Start hardcodes the status key with no named constant",
+            "uncertainty": ""
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "case": "bad",
+    "iteration": 3,
+    "exit": 0,
+    "seconds": 47.04,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v1",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Ready always returns true despite doc claiming it reports initialization",
+            "uncertainty": ""
+          }
+        ]
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Put panics on nil map when Configure has not run",
+            "uncertainty": ""
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "case": "good",
+    "iteration": 3,
+    "exit": 0,
+    "seconds": 69.68,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v1",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": []
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-1",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Start names a constructor, not a lifecycle entry",
+            "uncertainty": ""
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "case": "bad",
+    "iteration": 1,
+    "exit": 0,
+    "seconds": 136.25,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v2",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": []
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Ready() returns true before initialization, so Start() panics on nil map",
+            "uncertainty": ""
+          },
+          {
+            "title": "Exported Put writes a package-level map with no synchronization",
+            "uncertainty": ""
+          }
+        ]
+      }
+    ],
+    "model_usage": [
+      {
+        "model": "synthetic/hf:moonshotai/Kimi-K3",
+        "reported_calls": 3,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 7269,
+        "completion_tokens": 2999,
+        "cache_read_tokens": 1664,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      {
+        "model": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 1681,
+        "completion_tokens": 3704,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      }
+    ]
+  },
+  {
+    "case": "good",
+    "iteration": 1,
+    "exit": 0,
+    "seconds": 5.72,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v2",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": []
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": []
+      }
+    ],
+    "model_usage": [
+      {
+        "model": "synthetic/hf:moonshotai/Kimi-K3",
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 1233,
+        "completion_tokens": 197,
+        "cache_read_tokens": 3200,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      }
+    ]
+  },
+  {
+    "case": "bad",
+    "iteration": 2,
+    "exit": 0,
+    "seconds": 78.27,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v2",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": []
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Ready() always reports true while Put panics before Configure",
+            "uncertainty": ""
+          }
+        ]
+      }
+    ],
+    "model_usage": [
+      {
+        "model": "synthetic/hf:moonshotai/Kimi-K3",
+        "reported_calls": 2,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 1457,
+        "completion_tokens": 1369,
+        "cache_read_tokens": 5120,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      {
+        "model": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 1551,
+        "completion_tokens": 3544,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      }
+    ]
+  },
+  {
+    "case": "good",
+    "iteration": 2,
+    "exit": 0,
+    "seconds": 31.83,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v2",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": []
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Put panics on a zero-value Cache",
+            "uncertainty": ""
+          }
+        ]
+      }
+    ],
+    "model_usage": [
+      {
+        "model": "synthetic/hf:moonshotai/Kimi-K3",
+        "reported_calls": 2,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 1597,
+        "completion_tokens": 936,
+        "cache_read_tokens": 5120,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      {
+        "model": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 1591,
+        "completion_tokens": 888,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      }
+    ]
+  },
+  {
+    "case": "bad",
+    "iteration": 3,
+    "exit": 0,
+    "seconds": 111.53,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v2",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Ready always returns true, contradicting its documented check",
+            "uncertainty": ""
+          }
+        ]
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Put panics on nil map when Start runs before Configure",
+            "uncertainty": "cache.go does show that values stays nil until Configure runs and Put writes to it unconditionally, but the claim's panic depends on service.go's Start calling Put before Configure, and that file is not shown, so the actual call sequence cannot be verified from the code in front of me."
+          },
+          {
+            "title": "Package-level cache map has no synchronization",
+            "uncertainty": ""
+          }
+        ]
+      }
+    ],
+    "model_usage": [
+      {
+        "model": "synthetic/hf:moonshotai/Kimi-K3",
+        "reported_calls": 3,
+        "unreported_calls": 0,
+        "failed_calls": 1,
+        "prompt_tokens": 2562,
+        "completion_tokens": 1641,
+        "cache_read_tokens": 5952,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      {
+        "model": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 1771,
+        "completion_tokens": 3594,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      }
+    ],
+    "audit_note": "Invalid completion claim: an expert request failed after provider rate limits, but the pre-fix adapter reported completed. The later validation-stage guard covers this defect."
+  },
+  {
+    "case": "good",
+    "iteration": 3,
+    "exit": 0,
+    "seconds": 81.78,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "lifecycle-v2",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": []
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "Ready() tests a lifecycle state that panics if used",
+            "uncertainty": ""
+          }
+        ]
+      }
+    ],
+    "model_usage": [
+      {
+        "model": "synthetic/hf:moonshotai/Kimi-K3",
+        "reported_calls": 2,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 2230,
+        "completion_tokens": 1699,
+        "cache_read_tokens": 4480,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      {
+        "model": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 212,
+        "completion_tokens": 2782,
+        "cache_read_tokens": 1344,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      }
+    ]
+  },
+  {
+    "case": "bad",
+    "iteration": 1,
+    "exit": 0,
+    "seconds": 74.25,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "failure-propagation-v2",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": [
+          {
+            "title": "save swallows Marshal and Write errors, reporting failed persistence as success",
+            "uncertainty": ""
+          }
+        ]
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": []
+      }
+    ],
+    "model_usage": [
+      {
+        "model": "synthetic/hf:moonshotai/Kimi-K3",
+        "reported_calls": 2,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 4258,
+        "completion_tokens": 1547,
+        "cache_read_tokens": 2304,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      {
+        "model": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 237,
+        "completion_tokens": 2075,
+        "cache_read_tokens": 1344,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      }
+    ]
+  },
+  {
+    "case": "good",
+    "iteration": 1,
+    "exit": 0,
+    "seconds": 23.68,
+    "policy_digest": "9b70aec7cae6040066c09208216b54f015fde86891a1ac83171acd759b310c7a",
+    "suite": "failure-propagation-v2",
+    "checks": [
+      {
+        "id": "slop",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": []
+      },
+      {
+        "id": "design",
+        "state": "completed",
+        "prompt_version": "engineering-2",
+        "examined_targets": 3,
+        "findings": []
+      }
+    ],
+    "model_usage": [
+      {
+        "model": "synthetic/hf:moonshotai/Kimi-K3",
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "failed_calls": 0,
+        "prompt_tokens": 1153,
+        "completion_tokens": 1012,
+        "cache_read_tokens": 3200,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 0
+      }
+    ]
+  }
+]

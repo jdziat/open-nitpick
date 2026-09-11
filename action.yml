@@ -112,6 +112,18 @@ outputs:
     description: Number of findings published.
     value: ${{ steps.review.outputs.findings }}
 
+  practice_findings:
+    description: >-
+      Findings retained in the engineering practice report, including advisory
+      findings and accepted exceptions. May overlap inline findings.
+    value: ${{ steps.review.outputs.practice_findings }}
+
+  practice_blocking:
+    description: >-
+      Engineering policy violations without an accepted exception or unresolved
+      uncertainty.
+    value: ${{ steps.review.outputs.practice_blocking }}
+
   critical:
     description: Findings at critical.
     value: ${{ steps.review.outputs.critical }}
@@ -134,18 +146,17 @@ outputs:
 
   complete:
     description: >-
-      Whether every planned file was reviewed and every required stage ran.
-      False sets result to "error" and exits 2 whatever fail-on says: a run
-      whose triage died published findings nothing ranked, and reporting that
-      as clean is the one output this tool must not produce.
+      Whether the selected policy's required assessment completed. Ordinary
+      reviews require every planned file and stage; the engineering profile
+      uses practices.required and reports optional failures separately.
+      False sets result to "error" and exits 2 regardless of fail-on.
     value: ${{ steps.review.outputs.complete }}
 
   failed_stages:
     description: >-
-      Comma-separated names of the required stages that did not complete, empty
-      when none did. Reading it apart from complete tells a reviewer that could
-      not start (no stages, nil report) from one whose triage failed after the
-      files were read.
+      Comma-separated names of model stages that did not complete, empty when
+      none did. Under the engineering profile these can be optional; use
+      complete and the practice report to determine policy satisfaction.
     value: ${{ steps.review.outputs.failed_stages }}
 
 runs:

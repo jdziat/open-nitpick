@@ -9,6 +9,7 @@ import (
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/practices"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
@@ -118,5 +119,21 @@ func TestExitForSeparatesFindingsFromNotFinishing(t *testing.T) {
 	// arm returning nil. This is the assertion that makes it a test.
 	if exitFor(resultError) == nil {
 		t.Error("a degraded run returned no error, so the process would exit 0")
+	}
+}
+
+func TestActionsExposePracticeViolationsWithoutInlineFindings(t *testing.T) {
+	dir := t.TempDir()
+	a := actionsEnv{outputs: filepath.Join(dir, "out"), summary: filepath.Join(dir, "summary")}
+	report := &review.Report{Practices: &practices.Report{Profile: "engineering", Checks: []practices.Check{{ID: "commits", State: practices.Completed, Findings: []practices.Finding{{Title: "invalid subject", Blocking: true}}}}}}
+	a.setOutputs(resultFindings, report)
+	a.writeSummary(resultFindings, report, nil, vcs.Ref{}, "")
+	output, err := os.ReadFile(a.outputs)
+	if err != nil || !strings.Contains(string(output), "practice_findings=1\npractice_blocking=1\n") {
+		t.Fatalf("practice gate invisible: %s %v", output, err)
+	}
+	summary, err := os.ReadFile(a.summary)
+	if err != nil || !strings.Contains(string(summary), "invalid subject") || !strings.Contains(string(summary), "policy violation") {
+		t.Fatalf("practice violation missing from summary: %s %v", summary, err)
 	}
 }

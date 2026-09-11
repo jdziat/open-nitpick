@@ -18,6 +18,9 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 	if len(report.Findings) > 0 {
 		return vcs.EventComment
 	}
+	if report.Practices != nil && report.Practices.ExitCode() != 0 {
+		return vcs.EventComment
+	}
 
 	// An earlier run's comment threads outlive the run that made them, and a
 	// narrowed run never re-produces a finding on a file it did not re-read,

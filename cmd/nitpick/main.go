@@ -59,6 +59,8 @@ func run() int {
 		err = runImproveCLI(ctx, os.Args[2:])
 	case "repo-standards":
 		err = runRepoStandards(ctx, os.Args[2:], os.Stdout)
+	case "commits":
+		err = runCommits(ctx, os.Args[2:], os.Stdout)
 	case "standards":
 		err = runStandards(ctx, os.Args[2:])
 	case "slop":
@@ -132,6 +134,7 @@ Usage:
   nitpick repo-score [flags] [path...]
                                    The same, plus slop, bug and security findings per thousand lines, by language
   nitpick repo-standards [flags]   Measure repository conventions and enforce them with linters
+  nitpick commits [flags]          Validate commit subjects against accepted policy
   nitpick improve [flags]          The wider pass: the classes a normal review filters out
   nitpick slop [flags] [path...]   AI slop only: the tells without a model, the model's slop rules, a score, and fixes
   nitpick respond [flags]          Answer an @open-nitpick comment on a pull request (review again, resolve, or a question)

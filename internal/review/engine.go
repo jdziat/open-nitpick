@@ -24,6 +24,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/fence"
 	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/jdziat/open-nitpick/internal/practices"
 	"github.com/jdziat/open-nitpick/internal/prompt"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
@@ -31,6 +32,12 @@ import (
 // Engine reviews changes. It is the library the CLI drives, and the same one a
 // future webhook server would drive.
 type Engine struct {
+	// AssessPractices attaches engineering evidence before rendering and gating.
+	// Nil leaves the existing review policy in control.
+	AssessPractices func(context.Context, vcs.Ref, *vcs.PullRequest, *Report) *practices.Report
+	// ModelUsage reads the optional per-run provider usage meter after model work.
+	ModelUsage func() []practices.ModelUsage
+
 	Config   *config.Config
 	Roles    *llm.Roles
 	Provider vcs.Provider
@@ -354,6 +361,15 @@ const (
 
 // Report is the outcome of a review.
 type Report struct {
+	// Practices records selected engineering checks alongside the code review.
+	Practices *practices.Report
+	// ModelUsage retains reported usage independently of findings and gating.
+	ModelUsage []practices.ModelUsage
+	// PullRequest pins the metadata used for commit and title checks.
+	PullRequest *vcs.PullRequest
+	// AnalyzerFindings preserves deterministic evidence before model triage.
+	AnalyzerFindings []Finding
+
 	// Skipped names the accepted policy decision that prevented a review.
 	Skipped string
 
@@ -513,13 +529,15 @@ type StageStatus struct {
 // and evals and the tree scorecard both phrase this one as a count of files.
 func (r *Report) Complete() bool { return len(r.Incomplete) == 0 }
 
-// PipelineComplete reports whether every planned file was reviewed and every
-// required stage ran.
-//
-// This is the question a caller is asking before it calls a run clean.
-// Complete alone answers a narrower one, and answering the narrow question
-// when the broad one was meant is how a failed triage reached exit 0.
-func (r *Report) PipelineComplete() bool { return r.Complete() && len(r.Stages) == 0 }
+// PipelineComplete reports whether the selected policy's required work completed.
+// Engineering profiles use per-check completion requirements; ordinary reviews
+// require every planned file and stage. Optional failures remain in the report.
+func (r *Report) PipelineComplete() bool {
+	if r.Practices != nil {
+		return r.Practices.ExitCode() != 2
+	}
+	return r.Complete() && len(r.Stages) == 0
+}
 
 // reusableCoverage requires completed work for every file the policy included.
 func (r *Report) reusableCoverage() bool {
@@ -549,8 +567,12 @@ func (r *Report) FailedStages() []string {
 }
 
 // Failed reports whether the run should exit non-zero under the configured
-// gate.
+// gate. An attached practices report owns the gate, including advisory model
+// findings; otherwise failOn applies to the review findings.
 func (r *Report) Failed(failOn config.Severity) bool {
+	if r.Practices != nil {
+		return r.Practices.ExitCode() != 0
+	}
 	for _, f := range append(append([]Finding(nil), r.Findings...), r.AlreadyReported...) {
 		if f.Sev().AtLeast(failOn) {
 			return true
@@ -644,7 +666,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	}
 	e = next
 
-	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA}
+	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr}
 	defer func() { report.Routes = e.routeDecisions }()
 
 	// What an earlier run left on the pull request, read after the policy is
@@ -749,6 +771,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// paths the change asked it to.
 	if runner := e.linters(); runner != nil {
 		lint, err := runner.Run(ctx, files)
+		report.AnalyzerFindings = append([]Finding(nil), lint...)
 		if err != nil {
 			// Preserve findings even when strict mode requires a failed exit.
 			e.log().Warn("linters failed", "error", err)
@@ -836,7 +859,8 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// unplaceable finding is ever paid for. It runs before the gate because a
 	// severity verdict has to be able to move a finding across the gate's
 	// threshold in either direction.
-	findings, overruled := e.validateFindings(ctx, findings, plan)
+	findings, overruled, validationFailures := e.validateFindings(ctx, findings, plan)
+	report.Stages = append(report.Stages, validationFailures...)
 	findings = append(findings, advisories...)
 
 	// After every pass that can raise a severity, and before the gate reads
@@ -1644,23 +1668,9 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		}
 	}
 
-	// A merge whose survivor does not itself survive is refused.
-	//
-	// Absorbing into a finding that is then discarded loses what was folded
-	// into it, which is the analyzer attribution and its ceiling: 3 into 2 and
-	// 2 into 1 published finding 1 with no analyzer named and free of
-	// linters.max_severity, which is the escape this whole change exists to
-	// close, reached by another door. A cycle is worse, because both findings
-	// are skipped by the publish loop and neither comes back: two real
-	// findings leave the review with nothing restoring them.
-	//
-	// Refused wholesale rather than resolved to a terminal survivor. A chain
-	// is a model that answered the wrong shape, and following it would pick,
-	// silently, which of several findings the attribution belongs to.
-	// Decided against a snapshot of the merged set, then applied. Deleting
-	// while ranging over the same map answers a cycle differently depending on
-	// which half is visited first: 1 into 2 and 2 into 1 removed only the
-	// entry seen first, and the other still merged.
+	// Reject merge chains and cycles: they can lose findings and analyzer attribution.
+	// Collect removals before applying them so map iteration order cannot choose
+	// which half of a cycle survives.
 	var chained []int
 	for number, d := range mergedInto {
 		if _, ok := mergedInto[d.DuplicateOf]; ok {
@@ -1817,9 +1827,9 @@ func FilterWith(findings []Finding, level config.NitpickLevel, minimum config.Se
 // be published, and its effect on RECALL (how many real defects an expert
 // talks itself out of) is unmeasured. Until the eval harness has measured it,
 // the honest default is not to run it.
-func (e *Engine) validateFindings(ctx context.Context, findings []Finding, plan *bundle.Plan) ([]Finding, []Overruled) {
+func (e *Engine) validateFindings(ctx context.Context, findings []Finding, plan *bundle.Plan) ([]Finding, []Overruled, []StageStatus) {
 	if !e.Config.Validation.Enabled || len(findings) == 0 {
-		return findings, nil
+		return findings, nil, nil
 	}
 	e.log().Info("validating with domain experts", "findings", len(findings))
 
@@ -1834,13 +1844,13 @@ func (e *Engine) validateFindings(ctx context.Context, findings []Finding, plan 
 		Corpus: e.knowledgeCorpus(),
 	}
 
-	kept, overruled := v.Validate(ctx, findings, renderedFiles(plan))
+	kept, overruled, failures := v.validateWithCoverage(ctx, findings, renderedFiles(plan))
 	if len(overruled) > 0 {
 		e.log().Info("experts overruled findings",
 			"overruled", len(overruled), "kept", len(kept), "of", len(findings))
 	}
 
-	return kept, overruled
+	return kept, overruled, failures
 }
 
 // gateOverruled keeps only the expert decisions a reader would otherwise have
@@ -1917,6 +1927,13 @@ func renderedFiles(plan *bundle.Plan) map[string]string {
 
 // publish renders and delivers the review.
 func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files diff.Files) error {
+	report.Routes = e.routeDecisions
+	if e.ModelUsage != nil {
+		report.ModelUsage = e.ModelUsage()
+	}
+	if e.AssessPractices != nil {
+		report.Practices = e.AssessPractices(ctx, ref, report.PullRequest, report)
+	}
 	e.log().Info("publishing", "findings", len(report.Findings), "provider", e.Provider.Name())
 	review := Render(report, files, e.Config)
 

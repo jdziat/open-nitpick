@@ -103,8 +103,13 @@ type Validator struct {
 // finding whose file is missing from it survives unvalidated: judging
 // reachability or attacker control from a title alone is not validation.
 func (v *Validator) Validate(ctx context.Context, findings []Finding, code map[string]string) ([]Finding, []Overruled) {
+	kept, overruled, _ := v.validateWithCoverage(ctx, findings, code)
+	return kept, overruled
+}
+
+func (v *Validator) validateWithCoverage(ctx context.Context, findings []Finding, code map[string]string) ([]Finding, []Overruled, []StageStatus) {
 	if v == nil || v.Client == nil || len(findings) == 0 {
-		return findings, nil
+		return findings, nil, nil
 	}
 
 	// One slot per finding, written only by that finding's own goroutine. This
@@ -137,7 +142,7 @@ func (v *Validator) Validate(ctx context.Context, findings []Finding, code map[s
 			case <-ctx.Done():
 				// The call never started, so nothing was checked. A cancelled
 				// or timed-out run must not empty a review.
-				outcomes[i] = outcome{finding: f}
+				outcomes[i] = outcome{finding: f, failure: ctx.Err().Error()}
 				return
 			}
 
@@ -147,7 +152,21 @@ func (v *Validator) Validate(ctx context.Context, findings []Finding, code map[s
 
 	wg.Wait()
 
-	return applyOutcomes(outcomes)
+	failed, firstFailure := 0, ""
+	for _, result := range outcomes {
+		if result.failure != "" {
+			failed++
+			if firstFailure == "" {
+				firstFailure = result.finding.Path + ": " + result.failure
+			}
+		}
+	}
+	var failures []StageStatus
+	if failed > 0 {
+		failures = []StageStatus{{Stage: "validation", Reason: fmt.Sprintf("%d findings could not be validated; first failure: %s", failed, firstFailure)}}
+	}
+	kept, overruled := applyOutcomes(outcomes)
+	return kept, overruled, failures
 }
 
 // applyOutcomes turns each expert's verdict into the finding that is published
@@ -163,6 +182,10 @@ func applyOutcomes(outcomes []outcome) (kept []Finding, overruled []Overruled) {
 
 	for _, o := range outcomes {
 		switch {
+		case o.failure != "":
+			f := o.finding
+			f.Unresolved, f.UnresolvedBy = "expert validation did not complete: "+o.failure, "validation"
+			kept = append(kept, f)
 		case o.refuted:
 			overruled = append(overruled, Overruled{
 				Finding: o.finding, Expert: o.expert, Reason: o.reason, Cited: o.cited,
@@ -238,6 +261,7 @@ type outcome struct {
 	// finding is published either way; this is the only trace that the check
 	// ran and came back undecided.
 	unresolved string
+	failure    string
 }
 
 // check validates one finding.
@@ -259,6 +283,7 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 		// guessing. The finding stands rather than being put to a coin flip.
 		v.log().Warn("no rendered code for a finding's file; publishing it unvalidated",
 			"path", f.Path, "title", f.Title)
+		keep.failure = "no rendered code available for expert validation"
 		return keep
 	}
 
@@ -268,6 +293,7 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 	if err != nil {
 		// A programming error here is still not a reason to drop a finding.
 		v.log().Error("validation schema could not be built; publishing unvalidated", "error", err)
+		keep.failure = "validation schema unavailable"
 		return keep
 	}
 
@@ -285,6 +311,7 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 		// cost, and only one of those is visible to the reader.
 		v.log().Warn("expert validation failed; keeping the finding",
 			"expert", expert.Key, "path", f.Path, "title", f.Title, "error", err)
+		keep.failure = errorKind(err)
 		return keep
 	}
 
@@ -328,6 +355,7 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 			// An expert that cannot say why is expressing doubt.
 			v.log().Warn("refutation carried no reason; keeping the finding",
 				"expert", expert.Key, "path", f.Path, "title", f.Title)
+			keep.failure = "refutation omitted its reason"
 			return keep
 		}
 
@@ -342,6 +370,9 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 	case verdictSeverity:
 		revised, reason := v.revise(f, expert, result)
 		if revised == "" {
+			if _, valid := config.Severity(result.RevisedSeverity).Normalize(); !valid || strings.TrimSpace(result.Reason) == "" {
+				keep.failure = "invalid severity verdict"
+			}
 			return keep
 		}
 		if invented() {
@@ -353,12 +384,11 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 		return keep
 
 	case verdictUnresolved:
-		// Undecided with nothing said publishes clean: applyOutcomes records
-		// the doubt only when there is one, so an empty reason falls through to
-		// the same finding a confirmation produces. Not re-checked here, since
-		// a second guard on the same condition is the kind that rots into
-		// disagreeing with the first.
 		reason := strings.TrimSpace(result.Reason)
+		if reason == "" {
+			keep.failure = "unresolved verdict omitted its reason"
+			return keep
+		}
 
 		v.log().Info("expert could not resolve a finding",
 			"expert", expert.Key, "path", f.Path, "line", f.Line, "title", f.Title, "reason", reason)
@@ -370,6 +400,7 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 		// a disappeared one.
 		v.log().Warn("unrecognized validation verdict; keeping the finding",
 			"verdict", result.Verdict, "expert", expert.Key, "path", f.Path, "title", f.Title)
+		keep.failure = "unrecognized validation verdict"
 		return keep
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -1044,13 +1045,7 @@ func TestUnresolvedPublishesTheFindingWithItsDoubt(t *testing.T) {
 	}
 }
 
-// Undecided with nothing said publishes clean.
-//
-// A reader shown "could not be resolved" with no stated gap has been handed a
-// discount they cannot check, and every other verdict in this file already
-// refuses to act on a reason-free answer. Same bar as
-// TestRefutationWithoutAReasonKeepsTheFinding, one verdict over.
-func TestUnresolvedWithoutAReasonIsNotRecorded(t *testing.T) {
+func TestUnresolvedWithoutAReasonCannotClaimCompletedValidation(t *testing.T) {
 	for name, response := range map[string]string{
 		"empty reason":     `{"verdict":"unresolved","reason":""}`,
 		"whitespace only":  `{"verdict":"unresolved","reason":"   \n "}`,
@@ -1060,15 +1055,8 @@ func TestUnresolvedWithoutAReasonIsNotRecorded(t *testing.T) {
 			model := &scriptedLLM{fallback: response}
 			v := newValidator(model, config.Validation{Enabled: true})
 
-			kept, overruled := v.Validate(context.Background(), []Finding{claimed}, claimedCode)
+			kept, overruled, failures := v.validateWithCoverage(context.Background(), []Finding{claimed}, claimedCode)
 
-			// The expert ran. Without this the whole test passes when
-			// validation is skipped, since that produces the same three values
-			// below. Same assertion, for the same reason, as
-			// TestGatedOutRefutationsAreNotReported. It leaves an
-			// unimplemented verdict open, since that publishes clean here too;
-			// TestAnUnresolvedVerdictReachesTheFindingFromJSON is what pins
-			// that the branch exists.
 			if model.callCount() != 1 {
 				t.Fatalf("expert calls = %d, want 1: nothing below proves anything unless it ran",
 					model.callCount())
@@ -1079,8 +1067,8 @@ func TestUnresolvedWithoutAReasonIsNotRecorded(t *testing.T) {
 			if len(overruled) != 0 {
 				t.Errorf("overruled = %d records, want 0", len(overruled))
 			}
-			if kept[0].Unresolved != "" {
-				t.Errorf("Unresolved = %q, want empty for a reasonless answer", kept[0].Unresolved)
+			if kept[0].Unresolved == "" || len(failures) != 1 || failures[0].Stage != "validation" {
+				t.Fatalf("unexplained doubt became completed validation: %+v %+v", kept, failures)
 			}
 		})
 	}
@@ -1151,5 +1139,53 @@ func TestAnUnresolvedVerdictReachesTheFindingFromJSON(t *testing.T) {
 	}
 	if kept[0].UnresolvedBy == "" {
 		t.Error("UnresolvedBy is empty, so the record does not say who was undecided")
+	}
+}
+
+func TestValidationFailureMakesPipelineIncompleteAndRetainsEvidence(t *testing.T) {
+	finding := Finding{Path: "app.go", Line: 4, Severity: "error", Class: "correctness", Title: "Ignored HTTP error", Rationale: "The response can be nil."}
+	for _, broken := range []bool{false, true} {
+		t.Run(fmt.Sprint(broken), func(t *testing.T) {
+			model := &scriptedLLM{byPrompt: map[string]string{
+				"Review the following changes": mustJSON(t, Result{Findings: []Finding{finding}}),
+				"triaging findings":            mustJSON(t, TriageResult{Verdicts: verdictsFor([]Finding{finding})}),
+			}}
+			expert := &scriptedLLM{fallback: `{"verdict":"confirmed","reason":"The response can be nil."}`}
+			if broken {
+				expert.err = errors.New("503 service unavailable")
+			}
+			provider := &stubProvider{diff: engineDiff}
+			engine := newEngine(t, model, provider, func(cfg *config.Config) { cfg.Validation.Enabled = true })
+			engine.Roles.Validate = llm.NewClientForTest(expert, engine.Config.Models.Default)
+			report, err := engine.Review(t.Context(), vcs.Ref{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if expert.callCount() == 0 || len(report.Findings) != 1 || provider.published == nil {
+				t.Fatalf("validation or publication skipped: %+v", report)
+			}
+			if report.PipelineComplete() == broken {
+				t.Fatalf("validation completion=%v for broken=%v; stages=%+v", report.PipelineComplete(), broken, report.Stages)
+			}
+			if broken && (len(report.Stages) != 1 || report.Stages[0].Stage != "validation" || report.Findings[0].Unresolved == "") {
+				t.Fatalf("failed validation evidence lost: %+v", report)
+			}
+		})
+	}
+}
+
+func TestValidationOutageReportsOneStageAndRetainsEveryFailure(t *testing.T) {
+	model := &scriptedLLM{err: errors.New("503 service unavailable")}
+	v := newValidator(model, config.Validation{Enabled: true})
+	second := claimed
+	second.Title = "A second claim"
+	kept, overruled, failures := v.validateWithCoverage(t.Context(), []Finding{claimed, second}, claimedCode)
+	if model.callCount() < 2 || len(kept) != 2 || len(overruled) != 0 || len(failures) != 1 || !strings.Contains(failures[0].Reason, "2 findings") {
+		t.Fatalf("outage coverage was lost or duplicated: %+v %+v", kept, failures)
+	}
+	for _, finding := range kept {
+		if finding.Unresolved == "" {
+			t.Fatal("failed validation lost its per-finding detail")
+		}
 	}
 }

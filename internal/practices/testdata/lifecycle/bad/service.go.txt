@@ -1,0 +1,4 @@
+package fixture
+
+// Start records that the service has started.
+func Start() { Put("ready", "true") }

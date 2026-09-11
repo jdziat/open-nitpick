@@ -1,25 +1,22 @@
 #!/usr/bin/env sh
-# Every commit in RANGE (default: the commits not on origin/main) has a
-# Conventional Commits subject: type(scope)!: description. release-please
-# reads these to choose the next version and write the notes, so a subject
-# it cannot parse is a release it cannot describe. GitHub's own merge
-# commits are exempt; they are not released.
-#
-# The offenders are collected before anything is printed. Piping the loop
-# into `grep -q` ends the pipe at the first match, and every ::error:: line
-# after it dies with "echo: I/O error", so the job fails naming nothing.
+# Keep the CI entry point while sharing policy with `nitpick commits`.
 set -eu
+[ "$#" -le 1 ] || { echo 'usage: check-commits.sh [base..head]' >&2; exit 2; }
 range="${1:-origin/main..HEAD}"
-pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|evals|prompt)(\([a-z0-9._/-]+\))?!?: [^ ].{0,71}$'
-
-bad=$(git log --format='%h %s' "$range" | while read -r sha subject; do
-  case "$subject" in "Merge "*) continue ;; esac
-  printf '%s\n' "$subject" | grep -Eq "$pattern" || printf '%s %s\n' "$sha" "$subject"
-done)
-
-[ -z "$bad" ] && exit 0
-
-printf '%s\n' "$bad" | while read -r sha subject; do
-  echo "::error::$sha: not a conventional commit subject: $subject"
-done
-exit 1
+case "$range" in
+  *...*) echo 'use a two-dot base..head commit range' >&2; exit 2 ;;
+  *..*)
+    base=${range%%..*}; head=${range#*..}
+    case "$head" in *..*) echo 'use a two-dot base..head commit range' >&2; exit 2 ;; esac
+    ;;
+  *) echo 'use a two-dot base..head commit range' >&2; exit 2 ;;
+esac
+[ -n "$base" ] && [ -n "$head" ] || { echo 'both base and head are required' >&2; exit 2; }
+[ "$(git --no-replace-objects rev-parse --is-shallow-repository)" = false ] || { echo 'commit coverage requires complete Git history' >&2; exit 2; }
+base_sha=$(git --no-replace-objects rev-parse --verify --end-of-options "$base^{commit}")
+head_sha=$(git --no-replace-objects rev-parse --verify --end-of-options "$head^{commit}")
+# The historical CI wrapper accepts a valid range with no commits to lint.
+[ "$(git --no-replace-objects rev-list --count "$base_sha..$head_sha")" -ne 0 ] || exit 0
+repo=$(git --no-replace-objects rev-parse --show-toplevel)
+tool_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+exec go -C "$tool_root" run ./cmd/nitpick commits -repo "$repo" -base "$base_sha" -head "$head_sha" -check
