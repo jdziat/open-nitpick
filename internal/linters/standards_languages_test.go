@@ -121,3 +121,35 @@ func TestLanguageConventionSetupFailuresReportIncompleteCoverage(t *testing.T) {
 		t.Fatalf("found=%v coverage=%+v err=%v", found, coverage, err)
 	}
 }
+
+func TestLanguageConventionRubySyntaxErrorsCannotReportClean(t *testing.T) {
+	if _, err := exec.LookPath("rubocop"); err != nil {
+		if os.Getenv("NITPICK_REQUIRE_LANGUAGE_LINTERS") == "1" {
+			t.Fatal(err)
+		}
+		t.Skip("rubocop is not installed")
+	}
+	root := t.TempDir()
+	cfg := config.Defaults()
+	cfg.Linters.Enabled = []string{"rubocop"}
+	cfg.Linters.AutoDetect = new(bool)
+	cfg.Linters.Mode = config.LinterStrict
+	cfg.Linters.OnlyChangedLines = false
+	for _, opener := range []string{"<<DOC", "<<-DOC", "<<~DOC"} {
+		body := []byte("puts " + opener + "\nclass Fake_End; end\n")
+		if err := os.WriteFile(filepath.Join(root, "app.rb"), body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		found, cov, err := NewStandardsSource(cfg, nil).Observe(context.Background(), root, []standards.File{{Path: "app.rb", Src: body}})
+		if err != nil || !cov.Ran || len(cov.Files) != 1 {
+			t.Fatalf("coverage=%+v err=%v", cov, err)
+		}
+		syntax := false
+		for _, obs := range found {
+			syntax = syntax || strings.Contains(obs.Rule, "Lint/Syntax")
+		}
+		if !syntax {
+			t.Errorf("%s: missing syntax finding: %+v", opener, found)
+		}
+	}
+}

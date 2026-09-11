@@ -2281,3 +2281,9 @@ These probes do not validate complete language grammars. Lexer errors, Java
 Unicode escapes, and unsupported Ruby heredoc forms are reported as unmeasured;
 `repo-standards -check` exits 2 and `agents` refuses to regenerate from that
 measurement. Ruby heredoc interpolation is outside the probe denominator.
+
+Review exposed ambiguity between Ruby append expressions and heredoc openers.
+Regression controls cover three append spacing forms. Unterminated `<<` and
+`<<-` arguments can still be counted lexically; a real RuboCop integration
+control requires syntax findings for those forms and `<<~`. This limits the
+probe-only measurement: it does not establish syntactic validity.

@@ -126,6 +126,9 @@ and `.jsx` are JavaScript. TypeScript has no convention probes yet.
 Lexer failures appear in `unmeasured` in JSON, make `-check` exit 2, and prevent
 `agents` from writing an incomplete measurement. Java Unicode escapes and
 multiple heredoc openers on one Ruby line are not supported by these probes.
+Unterminated Ruby `<<` and `<<-` arguments can resemble append expressions and
+escape lexical detection; RuboCop reports their syntax errors. Probe-only
+measurements do not establish that source files parse successfully.
 Linters provide syntax checks and broader rule coverage; their observations
 remain separate from the probe denominators.
 
