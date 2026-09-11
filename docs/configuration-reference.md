@@ -973,6 +973,98 @@ Praise permits acknowledging good work.
 string, default `normal`.
 Verbosity controls how much prose accompanies each finding. One of: terse, normal, detailed.
 
+## practices
+
+### `practices.boundaries[].forbid`
+
+list of string, default `none`.
+Forbid matches dependency import paths that the source may not import.
+
+### `practices.boundaries[].from`
+
+string, default `none`.
+From matches source Go import paths using path.Match syntax.
+
+### `practices.boundaries[].reason`
+
+string, default `none`.
+Reason records the accepted architectural constraint behind the restriction.
+
+### `practices.budget`
+
+integer, default `0`.
+Budget limits estimated source tokens for a tree model assessment; zero leaves source selection unlimited.
+
+### `practices.commits.exempt_merges`
+
+boolean, default `true`.
+ExemptMerges skips subjects only when Git records multiple parents.
+
+### `practices.commits.max_description_runes`
+
+integer, default `72`.
+MaxDescriptionRunes limits Unicode characters after the colon and space.
+
+### `practices.commits.types`
+
+list of string, default `[feat fix docs style refactor perf test build ci chore revert evals prompt]`.
+Types lists allowed lowercase Conventional Commit types.
+
+### `practices.exceptions[].expires`
+
+string, default `none`.
+Expires disables the exception at 00:00 UTC on this YYYY-MM-DD date; empty means no expiry.
+
+### `practices.exceptions[].fingerprint`
+
+string, default `none`.
+Fingerprint binds the exception to the rule version, location and source evidence.
+
+### `practices.exceptions[].reason`
+
+string, default `none`.
+Reason explains why this particular finding is accepted.
+
+### `practices.exceptions[].rule`
+
+string, default `none`.
+Rule names the exact finding rule accepted by this exception.
+
+### `practices.exceptions[].target`
+
+string, default `none`.
+Target identifies the exact file, commit or title represented by the finding.
+
+### `practices.fail_on`
+
+map of string, default `none`.
+FailOn sets blocking severity thresholds by check ID; none disables findings gates without waiving required completion.
+
+### `practices.ignore`
+
+list of string, default `none`.
+Ignore adds path exclusions to review.ignore; an empty list adds no exclusions.
+
+### `practices.profile`
+
+string, default `none`.
+Profile selects engineering checks for reviews; repository-wide scans require -profile engineering.
+
+### `practices.required`
+
+list of string, default `[conventions linters commits slop-tells slop design]`.
+Required names checks that must finish; finding severity is controlled separately by FailOn.
+
+### `practices.required_conventions`
+
+list of string, default `none`.
+RequiredConventions enforces named probe rules even when repository adherence falls below the inference threshold.
+
+### `practices.slop_rules`
+
+list of string, default `none`.
+SlopRules makes the named deterministic tells blocking independently of their density.
+
 ## review
 
 ### `review.agent_prompt`
@@ -1033,7 +1125,7 @@ Concurrency bounds in-flight model calls.
 ### `review.fail_on`
 
 string, default `none`.
-FailOn is the lowest severity that makes the run exit non-zero. "none" never fails the run. One of: none, nit, info, warning, error, critical.
+FailOn is the lowest severity that makes the run exit non-zero. "none" disables this finding threshold, not required stages or practice policy. One of: none, nit, info, warning, error, critical.
 
 ### `review.ignore`
 

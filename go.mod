@@ -9,6 +9,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/nocturnium/llm-go-sdk/v6 v6.7.0
 	github.com/zalando/go-keyring v0.2.8
+	golang.org/x/mod v0.31.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

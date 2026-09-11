@@ -26,8 +26,9 @@ import (
 
 // StandardsSource runs the configured analyzers over a whole tree.
 type StandardsSource struct {
-	cfg *config.Config
-	log *slog.Logger
+	cfg      *config.Config
+	log      *slog.Logger
+	findings []review.Finding
 }
 
 // NewStandardsSource builds a source from the operator's analyzer settings.
@@ -43,6 +44,10 @@ func NewStandardsSource(cfg *config.Config, log *slog.Logger) *StandardsSource {
 	return &StandardsSource{cfg: cfg, log: log}
 }
 
+// Findings retains raw diagnostics, including evidence from partial runs outside
+// the successful-file denominator used for convention measurements.
+func (s *StandardsSource) Findings() []review.Finding { return slices.Clone(s.findings) }
+
 // Name identifies this source in a rule name and a report.
 func (s *StandardsSource) Name() string { return "linters" }
 
@@ -53,6 +58,7 @@ func (s *StandardsSource) Name() string { return "linters" }
 func (s *StandardsSource) Observe(ctx context.Context, root string, files []standards.File) (
 	[]standards.Observation, standards.Coverage, error) {
 
+	s.findings = nil
 	if s.cfg == nil || s.cfg.Linters.Mode == config.LinterOff {
 		return nil, standards.Coverage{Why: "linters.mode is off"}, nil
 	}
@@ -94,6 +100,7 @@ func (s *StandardsSource) Observe(ctx context.Context, root string, files []stan
 	}
 
 	found, runErr := set.Run(ctx, parsed)
+	s.findings = slices.Clone(found)
 	if runErr != nil {
 		// A partial run is still a measurement, and saying so beats losing it.
 		// Which analyzers managed it is read from the statuses below, so the
@@ -129,6 +136,9 @@ func (s *StandardsSource) coverage(root string, set *Set, claims map[string][]st
 
 	var quiet []string
 	for _, st := range set.Statuses() {
+		if len(claims[st.Linter]) == 0 {
+			continue
+		}
 		if st.Outcome != review.LinterRan {
 			quiet = append(quiet, fmt.Sprintf("%s (%s: %s)", st.Linter, st.Outcome, st.State))
 			continue

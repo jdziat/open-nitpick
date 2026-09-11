@@ -689,7 +689,12 @@ type CatalogEntry struct {
 	// Exts, Names and Prefixes are the inputs the tool reads: file
 	// extensions, exact basenames, and basename prefixes. Suggest matches a
 	// checkout against them.
-	Exts, Names, Prefixes []string
+	Exts, Names, Prefixes, Globs []string
+}
+
+// Reads reports whether the analyzer accepts this repository-relative path.
+func (e CatalogEntry) Reads(path string) bool {
+	return (toolSpec{exts: e.Exts, names: e.Names, prefixes: e.Prefixes, globs: e.Globs}).matches(path)
 }
 
 // Catalog describes every tool, for `nitpick linters` and the README.
@@ -715,7 +720,7 @@ func Catalog() []CatalogEntry {
 			Name: s.name, Languages: s.languages, Configuration: conf,
 			Default: defaults[s.name], Auto: s.auto, Trusted: s.trusted,
 			NeedsConfig: s.isolation == operatorOnly,
-			Exts:        s.exts, Names: s.names, Prefixes: s.prefixes,
+			Exts:        s.exts, Names: s.names, Prefixes: s.prefixes, Globs: s.globs,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })

@@ -1,9 +1,7 @@
 package linters
 
 import (
-	"path/filepath"
 	"sort"
-	"strings"
 )
 
 // Builtins describes the four hand-written runners, which are not in catalog()
@@ -76,26 +74,9 @@ func Suggest(files []string) []CatalogEntry {
 
 // matchesAny reports whether any path is an input to this entry.
 func matchesAny(e CatalogEntry, files []string) bool {
-	if len(e.Exts) == 0 && len(e.Names) == 0 && len(e.Prefixes) == 0 {
-		return false
-	}
-	for _, f := range files {
-		base := filepath.Base(filepath.ToSlash(f))
-		ext := strings.ToLower(filepath.Ext(base))
-		for _, x := range e.Exts {
-			if ext == x {
-				return true
-			}
-		}
-		for _, n := range e.Names {
-			if base == n {
-				return true
-			}
-		}
-		for _, p := range e.Prefixes {
-			if strings.HasPrefix(base, p) {
-				return true
-			}
+	for _, file := range files {
+		if e.Reads(file) {
+			return true
 		}
 	}
 	return false

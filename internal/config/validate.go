@@ -25,6 +25,7 @@ func (c *Config) Validate() error {
 	errs = append(errs, c.Persona.validate()...)
 	errs = append(errs, c.Validation.validate()...)
 	errs = append(errs, c.Standards.Validate())
+	errs = append(errs, c.Practices.Validate())
 
 	for i, ins := range c.Instructions {
 		if strings.TrimSpace(ins.Path) == "" {
