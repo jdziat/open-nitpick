@@ -151,8 +151,8 @@ type ReviewOut struct {
 	Analyzers []Analyzer        `json:"analyzers,omitempty"`
 	Withheld  []Withheld        `json:"withheld,omitempty"`
 	Policy    string            `json:"policy,omitempty" jsonschema:"set when the change's own configuration was set aside, and why"`
-	FailOn    string            `json:"fail_on" jsonschema:"the configured gate"`
-	Failed    bool              `json:"failed" jsonschema:"whether a finding reached the gate"`
+	FailOn    string            `json:"fail_on" jsonschema:"the selected gate: a severity threshold or engineering policy"`
+	Failed    bool              `json:"failed" jsonschema:"whether the selected policy failed, including required incomplete engineering checks"`
 	// An agent reading this over a socket has no exit code and no log, so the
 	// tree tools' Unreviewed has a counterpart here. Without it a review whose
 	// triage died is indistinguishable from one that had nothing to say.

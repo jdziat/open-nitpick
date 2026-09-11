@@ -182,3 +182,21 @@ completion guards. The corrected targeted suites pass.
 The subsequent Nitpick pass examined eleven changed files and returned zero
 findings. Deterministic slop flagged one existing oversized engine comment,
 which was shortened, and cadence in the generated configuration reference.
+
+## Hosted integration review
+
+The 48-file hosted pass retained five findings. Its YAML line-length report
+was corrected with folded descriptions. The completion and severity comments
+questioned deliberate engineering policy ownership, already covered by required
+and optional stage controls; model findings remain advisory by default.
+MCP's verdict calls `Report.Failed`, which applies that same policy. Its schema
+description now makes this explicit. The claimed missing commit command coverage
+is present in `TestCommitCommandReportsSubjectsAndKnownRangeCoverage` and
+`TestCommitCommandRequiresScopeAndKeepsSquashTitleSeparate`: they assert clean,
+violation, and incomplete command results and inspect actual examined targets.
+
+The final foundation test-isolation claim is refuted by the package's `TestMain`,
+which replaces HOME/XDG_CONFIG_HOME and clears user-config overrides. An external
+user-policy attempt still passed the test because this existing isolation ran.
+The snapshot check-ID suggestion does not identify a behavior failure; existing
+empty-assessment and snapshot integration guards exercise the shared contract.

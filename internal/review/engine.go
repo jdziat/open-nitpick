@@ -529,12 +529,9 @@ type StageStatus struct {
 // and evals and the tree scorecard both phrase this one as a count of files.
 func (r *Report) Complete() bool { return len(r.Incomplete) == 0 }
 
-// PipelineComplete reports whether every planned file was reviewed and every
-// required stage ran.
-//
-// This is the question a caller is asking before it calls a run clean.
-// Complete alone answers a narrower one, and answering the narrow question
-// when the broad one was meant is how a failed triage reached exit 0.
+// PipelineComplete reports whether the selected policy's required work completed.
+// Engineering profiles use per-check completion requirements; ordinary reviews
+// require every planned file and stage. Optional failures remain in the report.
 func (r *Report) PipelineComplete() bool {
 	if r.Practices != nil {
 		return r.Practices.ExitCode() != 2
