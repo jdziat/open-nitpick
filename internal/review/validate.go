@@ -146,7 +146,11 @@ func (v *Validator) validateWithCoverage(ctx context.Context, findings []Finding
 				return
 			}
 
-			outcomes[i] = v.check(ctx, f, code[f.Path])
+			source := code[f.Path]
+			if f.TaskContext != nil {
+				source = f.TaskContext.Text
+			}
+			outcomes[i] = v.check(ctx, f, source)
 		}(i, f)
 	}
 

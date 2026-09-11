@@ -73,7 +73,8 @@ type Engine struct {
 
 	// routeDecisions is where each batch of the last review went; copied
 	// into the Report.
-	routeDecisions []RouteDecision
+	routeDecisions      []RouteDecision
+	assessedDesignTasks []string
 
 	// Linters supplies deterministic findings to merge with the model's.
 	//
@@ -361,6 +362,8 @@ const (
 
 // Report is the outcome of a review.
 type Report struct {
+	// AssessedDesignTasks identifies package requests that completed successfully.
+	AssessedDesignTasks []string
 	// Practices records selected engineering checks alongside the code review.
 	Practices *practices.Report
 	// ModelUsage retains reported usage independently of findings and gating.
@@ -747,6 +750,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	}
 
 	findings, unreviewed, escalated, err := e.analyze(ctx, pr, plan, sem)
+	report.AssessedDesignTasks = append([]string(nil), e.assessedDesignTasks...)
 	styleWG.Wait()
 	if err != nil {
 		return nil, err
@@ -1135,6 +1139,7 @@ func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publis
 //
 // Partial results are published with failed batches recorded as incomplete.
 func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.Plan, sem chan struct{}) ([]Finding, []string, []Escalation, error) {
+	e.assessedDesignTasks = nil
 	// Built once for the default reviewer so a prompt error surfaces before
 	// any batch runs; routed reviewers build theirs on first use.
 	if _, err := e.reviewPromptFor(e.Roles.Review); err != nil {
@@ -1154,8 +1159,9 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 
 		// unreviewed collects the files whose batch never produced a result,
 		// so the report can say so instead of implying they were clean.
-		unreviewed []string
-		decisions  []RouteDecision
+		unreviewed          []string
+		decisions           []RouteDecision
+		assessedDesignTasks []string
 
 		wg sync.WaitGroup
 	)
@@ -1209,6 +1215,9 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 				unreviewed = append(unreviewed, b.Paths()...)
 				return
 			}
+			if b.DesignTask != "" {
+				assessedDesignTasks = append(assessedDesignTasks, b.DesignTask)
+			}
 			findings = append(findings, result...)
 			e.log().Info("batch done", "batch", i+1, "of", total, "done", done.Add(1), "findings", len(result), "elapsed", time.Since(started).Round(time.Second))
 		}(i, b)
@@ -1220,6 +1229,8 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 		return strings.Join(decisions[i].Files, ",") < strings.Join(decisions[j].Files, ",")
 	})
 	e.routeDecisions = decisions
+	sort.Strings(assessedDesignTasks)
+	e.assessedDesignTasks = assessedDesignTasks
 
 	if err := ctx.Err(); err != nil {
 		return nil, nil, nil, err
@@ -1342,10 +1353,7 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		body.WriteString("\n")
 	}
 	body.WriteString("Review the following changes.\n\n")
-	for _, entry := range b.Entries {
-		body.WriteString(bundle.Render(entry))
-		body.WriteString("\n")
-	}
+	body.WriteString(bundle.RenderBatch(b))
 
 	// After the diff, not before it. The change is what the model is being
 	// asked about, and reference material placed first reads as the subject.
@@ -1386,6 +1394,16 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		return nil, err
 	}
 
+	var taskContext *TaskContext
+	if b.DesignTask != "" {
+		taskContext = &TaskContext{ID: b.DesignTask, Text: bundle.RenderBatch(b), Lines: map[string]int{}}
+		for _, entry := range b.Entries {
+			taskContext.Lines[entry.File.Path] = 0
+			if entry.Content != "" {
+				taskContext.Lines[entry.File.Path] = len(strings.Split(strings.TrimSuffix(entry.Content, "\n"), "\n"))
+			}
+		}
+	}
 	out := make([]Finding, 0, len(result.Findings))
 	for _, f := range result.Findings {
 		if !f.Valid() {
@@ -1398,6 +1416,7 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		f.Source = client.String()
 		// What the reviewer read, not what persuaded it. See evidence.go.
 		f.Evidence = evidenceFor(f, hits)
+		f.TaskContext = taskContext
 		out = append(out, f)
 	}
 	return out, nil

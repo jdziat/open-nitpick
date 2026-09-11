@@ -9,12 +9,21 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
+// TaskContext retains the exact source rendering that produced a design claim.
+type TaskContext struct {
+	ID    string
+	Text  string
+	Lines map[string]int
+}
+
 // Finding is one issue reported about the change.
 //
-// Every field is a plain scalar or slice of scalars: the SDK derives the JSON
+// Every model-facing field is a plain scalar or slice of scalars: the SDK derives the JSON
 // Schema for structured output by reflection, and maps or interface fields
 // would produce an unconstrained schema that strict validators reject.
 type Finding struct {
+	// TaskContext is engine-owned evidence; models cannot assert their own scope.
+	TaskContext *TaskContext `json:"-"`
 	// Path is the repository-relative file the finding is about.
 	Path string `json:"path"`
 

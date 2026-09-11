@@ -112,6 +112,7 @@ func (p engineeringPolicy) ResolvePolicy(ctx context.Context, _ vcs.Ref, _ *vcs.
 }
 
 func applyEngineeringScope(cfg *config.Config) {
+	cfg.Practices.Profile = "engineering"
 	cfg.Review.Ignore = append(slices.Clone(cfg.Review.Ignore), cfg.Practices.Ignore...)
 	cfg.Review.Slop = true
 	cfg.Review.MinSeverity = config.SeverityNit
@@ -119,7 +120,6 @@ func applyEngineeringScope(cfg *config.Config) {
 	cfg.Review.RelatedContext = true
 	cfg.Review.RelatedContextCallers = true
 	cfg.Review.Incremental = false
-	cfg.Review.MaxFiles = 1 << 30
 	cfg.Persona.Nitpick = config.NitpickNormal
 	cfg.Validation.Enabled = true
 	cfg.Validation.Classes = nil

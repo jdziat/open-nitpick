@@ -460,3 +460,12 @@ func TestReviewBoundaryApplicabilityKeepsMissingGoInputsIncomplete(t *testing.T)
 		})
 	}
 }
+
+func TestEngineeringScopeRetainsFileLimitAndMarksSelectedProfile(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Review.MaxFiles = 3
+	applyEngineeringScope(cfg)
+	if cfg.Practices.Profile != "engineering" || cfg.Review.MaxFiles != 3 {
+		t.Fatalf("profile selection lost the explicit scope: profile=%q files=%d", cfg.Practices.Profile, cfg.Review.MaxFiles)
+	}
+}
