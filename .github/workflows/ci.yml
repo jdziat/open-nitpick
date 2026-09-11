@@ -88,6 +88,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       # go.mod's toolchain, for the reason the test job pins it: golangci-lint
       # 2.8.0 cannot read a newer Go's export data.
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
@@ -111,6 +113,10 @@ jobs:
           echo "$RUNNER_TEMP/nitpick-node/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Enforce repository standards
         run: go run ./cmd/nitpick repo-standards -check
+      - name: Report engineering coverage
+        env:
+          POLICY_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: go run ./cmd/nitpick repo-standards -profile engineering -no-model -base "$POLICY_BASE"
 
   language-standards:
     runs-on: ubuntu-latest

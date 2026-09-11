@@ -72,18 +72,10 @@ jobs:
         working-directory: tools
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 
-      - uses: ./
-        with:
-          bot-login: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
-          github-token: ${{ steps.app.outputs.token || github.token }}
-          # Must agree with .nitpick.yaml. The config file wins on provider and
-          # model; these inputs only reach LLM_PROVIDER/LLM_MODEL, which are a
-          # fallback for what the file does not say, but api-key is passed as
-          # LLM_API_KEY regardless, so naming a different vendor's secret here
-          # would hand that credential to whatever endpoint the file selected.
-          provider: synthetic
-          model: hf:moonshotai/Kimi-K3
-          api-key: ${{ secrets.SYNTHETIC_API_KEY }}
-          # Advisory until the reviewer has earned the right to block merges.
-          fail-on: none
-          skip-drafts: true
+      # Build this checkout so the review exercises the policy implementation in CI.
+      - name: Review with the current source
+        env:
+          GITHUB_TOKEN: ${{ steps.app.outputs.token || github.token }}
+          NITPICK_BOT_LOGIN: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
+          SYNTHETIC_API_KEY: ${{ secrets.SYNTHETIC_API_KEY }}
+        run: go run ./cmd/nitpick review -skip-draft -fail-on none
