@@ -111,13 +111,13 @@ func TestLanguageConventionConfigsKeepOperatorChoicesAndCleanUp(t *testing.T) {
 func TestLanguageConventionSetupFailuresReportIncompleteCoverage(t *testing.T) {
 	root := t.TempDir()
 	for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
-		t.Setenv(name, root)
+		t.Setenv(name, filepath.Join(root, "does-not-exist"))
 	}
 	cfg := config.Defaults()
 	cfg.Linters.Enabled = []string{"ruff"}
 	cfg.Linters.GolangciConfig = "/operator/golangci.yml"
 	found, coverage, err := NewStandardsSource(cfg, nil).Observe(context.Background(), root, nil)
-	if err != nil || coverage.Ran || coverage.Why == "" || len(found) != 0 {
+	if err != nil || coverage.Ran || !strings.HasPrefix(coverage.Why, "conformity ruleset: ") || len(found) != 0 {
 		t.Fatalf("found=%v coverage=%+v err=%v", found, coverage, err)
 	}
 }
