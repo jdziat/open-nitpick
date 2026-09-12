@@ -2,8 +2,8 @@
 
 Work in progress on `feat/package-design-execution`. Package assembly now runs
 inside `Engine.Review`, after accepted policy resolution. Ordinary reviews keep
-their existing assembly path. PR #118 merged as 47b39d4. The execution branch
-still needs rebasing onto that squash commit, final gates and review.
+their existing assembly path. PR #118 merged as 47b39d4. The execution branch is based on that squash commit and still needs final
+gates and review.
 
 Sizing is a current acceptance blocker: the whole-package planner produced
 24 tasks, 22 above 120,000 estimated tokens. The reference-selection experiment
@@ -50,7 +50,19 @@ Remaining:
 - Revise oversized units without losing declared source/caller obligations;
   remeasure against this repository before activation.
 
-- Rebase onto the final parent PR without losing execution or source bindings.
 - Run full gates and local/hosted reviews; publish a separate execution PR.
 - Complete paired mechanism fixtures and live evaluations, then audit every
   requirement in best-practice-coverage.md. The overall goal is still incomplete.
+
+Supporting source ranges now travel through packing, source binding, exact
+reviewer/expert context, anchor filtering and report validation. Omitted bytes
+are absent from prompts and the binding; range metadata and supplied bytes are
+bound. Snippets cannot count as whole-file coverage. Focused race tests passed
+for bundle, practices, review and cmd/nitpick; focused eval-tag vet and full lint
+passed. Four deliberate mutations (rendering, source binding, anchor gaps and
+report gaps) each failed its behavioral guard. Local artifacts:
+`/tmp/design-spans-race.log`, `/tmp/design-spans-vet.log`,
+`/tmp/design-spans-lint.log`, `/tmp/design-span-mutations.json`.
+
+The planner does not yet produce these ranges. Declaration selection and a new
+sizing probe remain necessary; these transport checks are not sizing evidence.

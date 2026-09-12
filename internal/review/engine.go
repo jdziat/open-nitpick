@@ -1423,8 +1423,12 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 
 	var taskContext *TaskContext
 	if b.DesignTask != "" {
-		taskContext = &TaskContext{ID: b.DesignTask, Text: bundle.RenderBatch(b), Lines: map[string]int{}}
+		taskContext = &TaskContext{ID: b.DesignTask, Text: bundle.RenderBatch(b), Lines: map[string]int{}, Spans: map[string][]bundle.SourceSpan{}}
 		for _, entry := range b.Entries {
+			if len(entry.SourceSpans) > 0 {
+				taskContext.Spans[entry.File.Path] = slices.Clone(entry.SourceSpans)
+				continue
+			}
 			taskContext.Lines[entry.File.Path] = 0
 			if entry.Content != "" {
 				taskContext.Lines[entry.File.Path] = len(strings.Split(strings.TrimSuffix(entry.Content, "\n"), "\n"))

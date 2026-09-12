@@ -34,6 +34,9 @@ type Entry struct {
 	// excluded by the token budget.
 	Content string
 
+	// SourceSpans restrict supporting design evidence to original line ranges.
+	SourceSpans []SourceSpan
+
 	// Truncated marks that Content is a window around the changed hunks
 	// rather than the whole file.
 	Truncated bool
@@ -54,7 +57,7 @@ type Entry struct {
 }
 
 // HasContent reports whether full-file context is attached.
-func (e *Entry) HasContent() bool { return e.Content != "" }
+func (e *Entry) HasContent() bool { return e.Content != "" && len(e.SourceSpans) == 0 }
 
 // Batch is a group of entries reviewed in one model call.
 type Batch struct {
@@ -574,6 +577,9 @@ func RenderDiffOnly(e Entry) string {
 // lives in. Line numbers are included throughout, since a finding is only
 // actionable if the model can cite where it belongs.
 func Render(e Entry) string {
+	if len(e.SourceSpans) > 0 {
+		return renderSourceSpans(e)
+	}
 	if e.SourceOnly {
 		var b strings.Builder
 		fmt.Fprintf(&b, "### Supporting source: %s\nFindings here are summary evidence, not inline comments.\n", promptSafe(e.File.Path))

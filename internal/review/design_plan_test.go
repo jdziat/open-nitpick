@@ -314,3 +314,40 @@ func (m *cancelAfterFirstDesign) GenerateContent(ctx context.Context, messages [
 	}
 	return m.scriptedLLM.GenerateContent(ctx, messages, options...)
 }
+
+func TestDesignBatchKeepsSupportingSpansThroughExpertValidation(t *testing.T) {
+	model := &scriptedLLM{fallback: `{"findings":[{"path":"caller.go","line":3,"severity":"warning","class":"correctness","title":"contract failure","rationale":"caller mismatch"}]}`}
+	e := newEngine(t, model, &stubProvider{}, nil)
+	batch := bundle.Batch{DesignTask: "package:fixture", Entries: []bundle.Entry{
+		{File: &diff.File{Path: "app.go"}, Content: "package app\n"},
+		{File: &diff.File{Path: "caller.go"}, Content: "package caller\nHIDDEN SENTINEL\nfunc Call() {}\n", SourceOnly: true, SourceSpans: []bundle.SourceSpan{{Start: 1, End: 1}, {Start: 3, End: 3}}},
+	}}
+	findings, err := e.analyzeBatch(t.Context(), "Review source", "", batch, false)
+	if err != nil || len(findings) != 1 || model.callCount() != 1 {
+		t.Fatalf("review failed: %v %v", findings, err)
+	}
+	if _, whole := findings[0].TaskContext.Lines["caller.go"]; whole {
+		t.Fatal("span evidence promoted to whole file")
+	}
+	kept, _, unpublished := e.filterTaskAnchors(findings, nil)
+	if len(kept) != 1 || len(unpublished) != 0 {
+		t.Fatalf("valid supplied line rejected: %v %v", kept, unpublished)
+	}
+	expert := &scriptedLLM{fallback: `{"verdict":"confirmed","reason":"contract is violated"}`}
+	validator := newValidator(expert, config.Validation{Enabled: true})
+	_, _, failures := validator.validateWithCoverage(t.Context(), kept, map[string]string{"caller.go": "HIDDEN SENTINEL"})
+	if len(failures) != 0 || expert.callCount() != 1 {
+		t.Fatalf("expert did not validate: %v", failures)
+	}
+	for _, prompts := range [][]string{model.prompts(), expert.prompts()} {
+		text := strings.Join(prompts, "\n")
+		if strings.Contains(text, "HIDDEN SENTINEL") || !strings.Contains(text, "     3  func Call() {}") {
+			t.Fatal("model evidence leaked or lost original line numbers")
+		}
+	}
+	findings[0].Line = 2
+	kept, _, unpublished = e.filterTaskAnchors(findings, nil)
+	if len(kept) != 0 || len(unpublished) != 1 {
+		t.Fatal("unseen gap passed engine evidence validation")
+	}
+}

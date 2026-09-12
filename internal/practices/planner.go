@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/standards"
 )
 
@@ -110,6 +111,12 @@ func PlanDesign(ctx context.Context, inventory DesignInventory, files []standard
 }
 
 func bindDesignSource(ctx context.Context, task *DesignTask, sources map[string][]byte) {
+	task.SourceDigest = ""
+	ranges, err := task.contextRanges()
+	if err != nil {
+		task.Omitted = append(task.Omitted, Omission{Target: Target{Kind: UnitTarget, ID: task.ID}, Reason: err.Error()})
+		return
+	}
 	targets := append(slices.Clone(task.Sources), task.Context...)
 	for _, target := range targets {
 		if _, ok := sources[target.ID]; !ok {
@@ -131,6 +138,14 @@ func bindDesignSource(ctx context.Context, task *DesignTask, sources map[string]
 			return
 		}
 		source, available := sources[target.ID]
+		if spans := ranges[target.ID]; len(spans) > 0 {
+			selected, err := bundle.SelectSourceSpans(string(source), spans)
+			if err != nil || !available {
+				task.Omitted = append(task.Omitted, Omission{Target: target, Reason: "planned context spans are unavailable"})
+				return
+			}
+			source = []byte(selected)
+		}
 		_, _ = fmt.Fprintf(hash, "%d:%s:%t:%d:", len(target.ID), target.ID, available, len(source))
 		_, _ = hash.Write(source)
 	}

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/jdziat/open-nitpick/internal/bundle"
 )
 
 // State describes execution, independently of the findings a check produced.
@@ -73,12 +75,20 @@ type Finding struct {
 	Uncertainty string   `json:"uncertainty,omitempty"`
 }
 
+// ContextSpan records the exact supporting source supplied for a task.
+type ContextSpan struct {
+	Path string `json:"path"`
+	bundle.SourceSpan
+}
+
 // DesignTask links a bounded design assessment to its source and context.
 type DesignTask struct {
 	ID      string   `json:"id"`
 	Source  Target   `json:"source"`
 	Purpose string   `json:"purpose"`
 	Context []Target `json:"context,omitempty"`
+	// ContextSpans narrows named context files; absent paths are supplied whole.
+	ContextSpans []ContextSpan `json:"context_spans,omitempty"`
 	// Sources lists the primary source files intended for this task.
 	Sources []Target `json:"sources,omitempty"`
 	// Omitted records required source or graph context unavailable to the task.
@@ -201,12 +211,17 @@ func (r Report) Problems() []string {
 		for _, target := range c.Context {
 			evidence[normalize(target)] = true
 		}
+		spanEvidence := map[Target][]bundle.SourceSpan{}
 		taskIDs := map[string]bool{}
 		for _, task := range c.Tasks {
 			if taskIDs[task.ID] {
 				bad("duplicate design task")
 			}
 			taskIDs[task.ID] = true
+			ranges, rangeErr := task.contextRanges()
+			if rangeErr != nil {
+				bad(rangeErr.Error())
+			}
 			sourceTargets := map[Target]bool{}
 			for _, source := range task.Sources {
 				if source.Kind != FileTarget || !source.valid() || sourceTargets[source] {
@@ -251,13 +266,18 @@ func (r Report) Problems() []string {
 				}
 				evidence[normalize(task.Source)] = true
 				for _, target := range task.Context {
+					if spans := ranges[target.ID]; len(spans) > 0 {
+						key := normalize(target)
+						spanEvidence[key] = append(spanEvidence[key], spans...)
+						continue
+					}
 					evidence[normalize(target)] = true
 				}
 			}
 		}
 		for _, finding := range c.Findings {
 			for _, target := range append([]Target{finding.Target}, finding.AlsoAt...) {
-				if !target.valid() || (c.State == Completed && !evidence[normalize(target)]) {
+				if !target.valid() || (c.State == Completed && !evidence[normalize(target)] && !slices.ContainsFunc(spanEvidence[normalize(target)], func(span bundle.SourceSpan) bool { return target.Line >= span.Start && target.Line <= span.End })) {
 					bad("finding has an invalid target or lacks examined evidence")
 				}
 			}

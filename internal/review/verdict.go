@@ -1,6 +1,10 @@
 package review
 
-import "strings"
+import (
+	"github.com/jdziat/open-nitpick/internal/bundle"
+	"slices"
+	"strings"
+)
 
 // Triage answers against the numbered list it was given, not with findings of
 // its own.
@@ -152,11 +156,26 @@ func absorb(survivor *Finding, merged Finding) {
 		if survivor.TaskContext == nil {
 			survivor.TaskContext = merged.TaskContext
 		} else if survivor.TaskContext.ID != merged.TaskContext.ID || survivor.TaskContext.Text != merged.TaskContext.Text {
-			combined := &TaskContext{ID: survivor.TaskContext.ID + "+" + merged.TaskContext.ID, Text: survivor.TaskContext.Text + "\n\n" + merged.TaskContext.Text, Lines: map[string]int{}}
+			combined := &TaskContext{ID: survivor.TaskContext.ID + "+" + merged.TaskContext.ID, Text: survivor.TaskContext.Text + "\n\n" + merged.TaskContext.Text, Lines: map[string]int{}, Spans: map[string][]bundle.SourceSpan{}}
 			for _, scope := range []*TaskContext{survivor.TaskContext, merged.TaskContext} {
+				for name, spans := range scope.Spans {
+					combined.Spans[name] = append(combined.Spans[name], spans...)
+				}
 				for name, lines := range scope.Lines {
 					combined.Lines[name] = max(combined.Lines[name], lines)
 				}
+			}
+			for name, spans := range combined.Spans {
+				slices.SortFunc(spans, func(a, b bundle.SourceSpan) int {
+					if a.Start < b.Start {
+						return -1
+					}
+					if a.Start > b.Start {
+						return 1
+					}
+					return 0
+				})
+				combined.Spans[name] = spans
 			}
 			survivor.TaskContext = combined
 		}

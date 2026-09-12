@@ -61,3 +61,29 @@ func TestDesignReceiptCountsOnlySuccessfulChangedSources(t *testing.T) {
 		t.Fatalf("successful task scope was miscounted: %s", text)
 	}
 }
+
+func TestDesignEvidenceRejectsUnseenRangesAfterContextMerge(t *testing.T) {
+	first := Finding{Path: "caller.go", Line: 2, TaskContext: &TaskContext{ID: "a", Text: "a", Spans: map[string][]bundle.SourceSpan{"caller.go": {{Start: 2, End: 3}}}}}
+	second := Finding{TaskContext: &TaskContext{ID: "b", Text: "b", Spans: map[string][]bundle.SourceSpan{"caller.go": {{Start: 5, End: 6}}}}}
+	absorb(&first, second)
+	engine := &Engine{Config: config.Defaults()}
+	for _, test := range []struct {
+		start, end int
+		want       bool
+	}{{2, 3, true}, {5, 6, true}, {4, 4, false}, {3, 5, false}, {1, 1, false}, {6, 7, false}} {
+		first.Line, first.EndLine = test.start, test.end
+		kept, _, unpublished := engine.filterTaskAnchors([]Finding{first}, nil)
+		if (len(kept) == 1) != test.want || (len(unpublished) == 1) == test.want {
+			t.Fatalf("range %+v: kept=%v unpublished=%v", test, kept, unpublished)
+		}
+	}
+	if len(second.TaskContext.Spans["caller.go"]) != 1 {
+		t.Fatal("merge mutated shared context")
+	}
+	absorb(&first, Finding{TaskContext: &TaskContext{ID: "whole", Text: "whole", Lines: map[string]int{"caller.go": 8}}})
+	first.Line, first.EndLine = 3, 5
+	kept, _, _ := engine.filterTaskAnchors([]Finding{first}, nil)
+	if len(kept) != 1 {
+		t.Fatal("whole-file evidence lost during merge")
+	}
+}

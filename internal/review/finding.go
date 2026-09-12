@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
@@ -14,6 +15,8 @@ type TaskContext struct {
 	ID    string
 	Text  string
 	Lines map[string]int
+	// Spans records partial files; Lines contains only whole-file evidence.
+	Spans map[string][]bundle.SourceSpan
 }
 
 // Finding is one issue reported about the change.

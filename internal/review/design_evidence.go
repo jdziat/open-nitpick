@@ -3,6 +3,7 @@ package review
 import (
 	"slices"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/diff"
 )
 
@@ -19,7 +20,15 @@ func (e *Engine) filterTaskAnchors(findings []Finding, files diff.Files) ([]Find
 			continue
 		}
 		lines, known := finding.TaskContext.Lines[finding.Path]
-		if !known || finding.Line < 1 || finding.Line > lines {
+		end := finding.EndLine
+		if end == 0 {
+			end = finding.Line
+		}
+		visible := known && finding.Line >= 1 && end >= finding.Line && end <= lines
+		if !visible {
+			visible = bundle.ContainsSourceRange(finding.TaskContext.Spans[finding.Path], finding.Line, end)
+		}
+		if !visible {
 			finding.Unresolved = "finding location is outside the source supplied to its design task"
 			unpublished = append(unpublished, finding)
 			continue
