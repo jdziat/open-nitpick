@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.2.0](https://github.com/jdziat/open-nitpick/compare/v2.1.0...v2.2.0) (2026-09-12)
+
+
+### Features
+
+* assess engineering practices with explicit coverage ([#114](https://github.com/jdziat/open-nitpick/issues/114)) ([cd63852](https://github.com/jdziat/open-nitpick/commit/cd638524a2194375798b2519f9d24f1cfce9dc35))
+* evaluate and enforce repository standards ([4f36b0c](https://github.com/jdziat/open-nitpick/commit/4f36b0c3a9c530cebd89a4967ac4705e8a8bf6c7))
+* evaluate repository standards with linter enforcement ([2f6b861](https://github.com/jdziat/open-nitpick/commit/2f6b8612cd2662d7a6829f12786296feb3af6f5b))
+* measure Python JavaScript Java and Ruby standards ([6c14794](https://github.com/jdziat/open-nitpick/commit/6c1479426b765927e377804faf1d20f3c402fa44))
+* measure standards in Python JavaScript Java and Ruby ([b3f0420](https://github.com/jdziat/open-nitpick/commit/b3f04206d94cbe7e2269d7727b44996eee4c6d31))
+* plan and bind package design review tasks ([47b39d4](https://github.com/jdziat/open-nitpick/commit/47b39d4b04c82a3c5ca14363bd266af06a7651cf))
+
+
+### Fixes
+
+* distinguish Ruby appends from heredoc openers ([8eaa316](https://github.com/jdziat/open-nitpick/commit/8eaa3163c4c18b73db6e8804f399ce2b9773035f))
+* enforce pull request squash titles ([#116](https://github.com/jdziat/open-nitpick/issues/116)) ([05aa782](https://github.com/jdziat/open-nitpick/commit/05aa78270862f2175fdc66e1a286b56c4efdf472))
+* preserve coverage across intentional exclusions ([43eb94d](https://github.com/jdziat/open-nitpick/commit/43eb94dcfdcc9a07f42f622351c632ae6ce55a79))
+* preserve GitHub content lookup failures ([#117](https://github.com/jdziat/open-nitpick/issues/117)) ([6cf7fda](https://github.com/jdziat/open-nitpick/commit/6cf7fda713ab5326ae97a4009e38f8e3e0e03e22))
+* preserve review integrity across retries ([333cd6e](https://github.com/jdziat/open-nitpick/commit/333cd6ee3ce9e8512619773adea7698108709161))
+* preserve review integrity across retries and publication ([ed1d676](https://github.com/jdziat/open-nitpick/commit/ed1d676500ead9a5a92b5c2b266b1fcec8f46dea))
+* stop rechecking confirmed resolved threads ([2a340a0](https://github.com/jdziat/open-nitpick/commit/2a340a02c941b78cabc59a2ec7ceafb88e8ec08c))
+
 ## [2.1.0](https://github.com/jdziat/open-nitpick/compare/v2.0.1...v2.1.0) (2026-09-11)
 
 
