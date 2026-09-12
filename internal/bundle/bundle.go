@@ -141,11 +141,21 @@ type Skip struct {
 	Reason string
 }
 
-// Files returns every file across all batches.
+// Files counts reviewed files; design context and repeated paths count once.
 func (p *Plan) Files() int {
 	n := 0
+	seen := map[string]bool{}
 	for _, b := range p.Batches {
-		n += len(b.Entries)
+		if b.DesignTask == "" {
+			n += len(b.Entries)
+			continue
+		}
+		for _, entry := range b.Entries {
+			if !entry.SourceOnly && !seen[entry.File.Path] {
+				seen[entry.File.Path] = true
+				n++
+			}
+		}
 	}
 	return n
 }

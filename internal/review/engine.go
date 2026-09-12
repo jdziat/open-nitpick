@@ -362,6 +362,10 @@ const (
 
 // Report is the outcome of a review.
 type Report struct {
+	// UnpublishedModelFindings retains claims whose source locations were unsupported.
+	UnpublishedModelFindings []Finding
+	// DesignExecution binds package assessment to its frozen source and task plan.
+	DesignExecution *DesignExecution `json:"-"`
 	// AssessedDesignTasks identifies package requests that completed successfully.
 	AssessedDesignTasks []string
 	// Practices records selected engineering checks alongside the code review.
@@ -692,10 +696,17 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// before the plan and does not depend on it, so what it costs is known
 	// here. A budget that bounded only the entries let a request estimated at
 	// 24,852 tokens reach the provider at 32,653.
-	plan, err := bundle.AssembleReserving(ctx, e.Config, files, fetch,
-		bundle.ListerFrom(e.Provider, ref), bundle.Reserve{Tokens: e.framingTokens(pr)})
-	if err != nil {
-		return nil, fmt.Errorf("assemble review: %w", err)
+	var plan *bundle.Plan
+	if e.Config.Practices.Profile == "engineering" {
+		execution := e.assembleDesign(ctx, ref, files, bundle.Reserve{Tokens: e.framingTokens(pr)})
+		report.DesignExecution = &execution
+		plan = execution.Plan
+	} else {
+		plan, err = bundle.AssembleReserving(ctx, e.Config, files, fetch,
+			bundle.ListerFrom(e.Provider, ref), bundle.Reserve{Tokens: e.framingTokens(pr)})
+		if err != nil {
+			return nil, fmt.Errorf("assemble review: %w", err)
+		}
 	}
 	if plan.RelatedDefinitions > 0 {
 		e.log().Info("attached related context", "definitions", plan.RelatedDefinitions, "files", len(plan.RelatedFiles))
@@ -704,7 +715,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		e.log().Debug("skipped file", "path", s.Path, "reason", s.Reason)
 	}
 
-	if fit, trimmed, err := e.applyBudget(ctx, ref, prior, plan, files, fetch); err != nil {
+	if report.DesignExecution != nil {
+		report.Budget = e.applyDesignBudget(ctx, ref, prior, &report.DesignExecution.DesignPacking, files)
+	} else if fit, trimmed, err := e.applyBudget(ctx, ref, prior, plan, files, fetch); err != nil {
 		return nil, err
 	} else if fit != nil {
 		report.Budget = fit
@@ -752,11 +765,14 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings, unreviewed, escalated, err := e.analyze(ctx, pr, plan, sem)
 	report.AssessedDesignTasks = append([]string(nil), e.assessedDesignTasks...)
 	styleWG.Wait()
-	if err != nil {
-		return nil, err
-	}
 	report.Incomplete = append(report.Incomplete, unreviewed...)
 	report.Escalated = append(report.Escalated, escalated...)
+	if err != nil {
+		if report.DesignExecution != nil {
+			return e.incompleteDesignReview(ctx, ref, report, findings, "review", err)
+		}
+		return nil, err
+	}
 
 	if styleErr != nil {
 		e.log().Warn("style pass failed; the review is complete for defects "+
@@ -804,7 +820,8 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		findings = append(findings, lint...)
 	}
 
-	findings, dropped := e.filterAnchors(findings, files)
+	findings, dropped, unpublished := e.filterTaskAnchors(findings, files)
+	report.UnpublishedModelFindings = append(report.UnpublishedModelFindings, unpublished...)
 	discarded = append(discarded, dropped...)
 
 	// A known advisory is deterministic evidence: a scanner matched a pinned
@@ -817,6 +834,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// class and their line, and still pass the operator's ceiling and gate.
 	findings, advisories := holdAdvisories(dedupe(findings))
 
+	beforeTriage := findings
 	summary, findings, withheldByTriage, err := e.triage(ctx, pr, findings)
 	switch {
 	case errors.Is(err, errStageDegraded):
@@ -825,6 +843,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		// downstream from reading this as a clean review.
 		report.Stages = append(report.Stages, StageStatus{Stage: "triage", Reason: errorKind(err)})
 	case err != nil:
+		if report.DesignExecution != nil {
+			return e.incompleteDesignReview(ctx, ref, report, beforeTriage, "triage", err)
+		}
 		return nil, err
 	}
 	// The summary was written over what triage saw, which the advisories
@@ -842,7 +863,11 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// validated again afterwards. Without this a triage model can move a comment
 	// onto a line that is not in the diff, which the forge rejects, taking every
 	// inline comment in the review down with it.
-	findings, dropped = e.filterAnchors(findings, files)
+	findings, dropped, unpublished = e.filterTaskAnchors(findings, files)
+	report.UnpublishedModelFindings = append(report.UnpublishedModelFindings, unpublished...)
+	if len(report.UnpublishedModelFindings) > 0 {
+		report.Stages = append(report.Stages, StageStatus{Stage: "design evidence", Reason: "model findings cited source outside their task"})
+	}
 	discarded = append(discarded, dropped...)
 
 	// Assembled here rather than where the analyzer set was read, BECAUSE READING
@@ -1233,12 +1258,12 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 	e.assessedDesignTasks = assessedDesignTasks
 
 	if err := ctx.Err(); err != nil {
-		return nil, nil, nil, err
+		return findings, unreviewed, escalated, err
 	}
 	// Every batch failing means something systemic (bad credentials, a wrong
 	// model name), and reporting "no issues found" would be a lie.
 	if failures > 0 && failures == len(plan.Batches) {
-		return nil, nil, nil, fmt.Errorf("all %d review batches failed; see log for details", failures)
+		return findings, unreviewed, escalated, fmt.Errorf("all %d review batches failed; see log for details", failures)
 	}
 	if failures > 0 {
 		e.log().Warn("review is incomplete",
@@ -1863,6 +1888,9 @@ func (e *Engine) validateFindings(ctx context.Context, findings []Finding, plan 
 		Corpus: e.knowledgeCorpus(),
 	}
 
+	if e.Config.Practices.Profile == "engineering" {
+		v.PromptTokenLimit = e.Config.Review.TokenBudgetPerRequest
+	}
 	kept, overruled, failures := v.validateWithCoverage(ctx, findings, renderedFiles(plan))
 	if len(overruled) > 0 {
 		e.log().Info("experts overruled findings",
@@ -2306,3 +2334,15 @@ func (n noPolicy) ResolvePolicy(context.Context, vcs.Ref, *vcs.PullRequest, []st
 
 // Reason names why this construction resolves no policy.
 func (n noPolicy) Reason() string { return n.reason }
+
+func (e *Engine) incompleteDesignReview(ctx context.Context, ref vcs.Ref, report *Report, findings []Finding, stage string, err error) (*Report, error) {
+	report.Findings, report.Counts = findings, counts(findings)
+	report.Stages = append(report.Stages, StageStatus{Stage: stage, Reason: errorKind(err)})
+	if e.ModelUsage != nil {
+		report.ModelUsage = e.ModelUsage()
+	}
+	if e.AssessPractices != nil {
+		report.Practices = e.AssessPractices(ctx, ref, report.PullRequest, report)
+	}
+	return report, err
+}

@@ -1,52 +1,47 @@
 # Design execution integration
 
-Work in progress. The source capture and assembly helpers exist and have focused
-race tests, but the review engine does not call them yet.
+Work in progress on `feat/package-design-execution`. Package assembly now runs
+inside `Engine.Review`, after accepted policy resolution. Ordinary reviews keep
+their existing assembly path. The execution branch still needs the latest parent
+report contract changes and a final review before publication.
 
-`bundle.CaptureDesignSources` freezes changed source and Go graph candidates,
-records exclusions and missing scope, bounds enumeration and reads, rejects
-traversal paths, and refuses blocked tree-budget source before fetching it.
-Three targeted mutations fail: bypassed tree omissions, mutable source aliases,
-and unbounded explicit-file reads.
+Implemented:
 
-`Engine.assembleDesign` connects that view to the planner and packer. A control
-checks same-request package siblings and a caller, then marks a sibling as
-unbudgeted and checks that its bytes do not return as context and that coverage
-retains the missing scope. Inventory errors must prevent completed design
-coverage even if a remaining package task can run.
+- Frozen bounded source capture, explicit exclusions and omissions, and rejection
+  of whole-file additions whose diff differs from captured source.
+- Whole-task packing and spending selection, including framing costs. Dropped
+  tasks stay declared with omissions; successful task IDs are separate from the
+  shared immutable plan.
+- Package coverage uses both actual batches and successful task IDs. Shared
+  paths alone cannot establish completion.
+- Deterministic assessment reuses frozen source and module metadata. Boundary
+  checks retain changed-file scope. Unknown nested module metadata cannot be
+  interpreted as known absence during this assessment.
+- Prompt version 3 describes per-request design tasks rather than individual
+  files. Historical prompt-version measurements are unchanged.
+- Valid context-only claims retain their locations and appear in the summary,
+  with forge-derived links pinned to the head revision. Unsupported locations
+  remain raw evidence with a failed stage.
+- Experts receive exact task context. Merged claims retain both contexts; the
+  engineering prompt budget rejects oversized expert requests without dropping
+  the claim or silently truncating evidence.
+- Design file counts exclude context-only and repeated paths.
 
-Explicit engineering selection now sets the effective profile and retains the
-operator's `review.max_files` limit. Its regression reproduced the previous
-profile omission and unlimited-file override, then passed after correction.
+Scripted checks cover actual Engine.Review requests containing a package sibling
+and caller, zero-finding task completion, and spending omissions with no model
+call. Focused tests cover frozen assessment without provider reads, module
+metadata ambiguity, source links, merged expert evidence and expert limits.
+Full-pipeline controls now cover context-only claims through review, triage,
+expert validation and summary publication, plus cancellation during review and
+triage with completed task evidence preserved. Planning also refuses invented
+module identities when manifests or enumeration are incomplete.
+Activation and snapshot-reread mutations both fail their controls. Earlier
+source-capture, exact-context and completion mutations also failed.
 
-Design batches now render their task metadata with source. Findings retain
-engine-owned task context through triage, and experts select that context before
-the path-only fallback. Successful task IDs are recorded separately from the
-shared immutable plan. Scripted-provider tests cover an empty successful response
-and exact context passed from reviewer to expert; three mutations fail for lost
-context, substituted expert context and lost completion evidence.
+Remaining:
 
-Remaining integration:
-
-- Activate assembly only after accepted policy resolution.
-- Use the frozen view for all planning and execution. Empty files, intentional
-  exclusions, deleted sources and unreadable files need distinct scope outcomes.
-- Preserve whole tasks under spending limits. Price framing as well as rendered
-  task/source content; retain intended tasks when they are dropped.
-- Make the reporting adapter consume successful task IDs independently of
-  other batches that happen to contain the same source paths.
-- Cover triage merges and repeated paths across different tasks, including
-  expert token limits; retained context must not be silently truncated.
-- Keep valid context-only design findings through validation and publish them
-  as summary evidence. Do not invent inline diff anchors.
-- Make adapters use actual package tasks and completion evidence. Global graph
-  omissions, cancellation and failed stages must remain incomplete.
-- Add scripted-provider controls, then complete the remaining mechanism pairs
-  and repeat the live repository assessment before the CTO acceptance review.
-
-Before activation, check addition rendering against frozen source: ordinary
-`bundle.Render` omits Content for a whole-file addition because the diff normally
-contains identical bytes. A diff captured before a worktree mutation can violate
-that assumption. Package requests must either reject that mismatch or render the
-captured source explicitly and disclose inconsistency. Do not claim the source
-digest describes bytes the model never saw.
+- Audit summary counts beyond Plan.Files and add repeated-task count controls.
+- Rebase onto the final parent PR without losing execution or source bindings.
+- Run full gates and local/hosted reviews; publish a separate execution PR.
+- Complete paired mechanism fixtures and live evaluations, then audit every
+  requirement in best-practice-coverage.md. The overall goal is still incomplete.

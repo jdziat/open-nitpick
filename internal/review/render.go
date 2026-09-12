@@ -3,6 +3,8 @@ package review
 import (
 	"fmt"
 	"html"
+	"net/url"
+	"path"
 	"sort"
 	"strings"
 
@@ -63,6 +65,9 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 	}
 
 	for _, f := range report.Findings {
+		if f.SummaryOnly {
+			continue
+		}
 		file := files.Find(f.Path)
 		if file == nil {
 			continue
@@ -414,6 +419,18 @@ func renderSummary(report *Report, cfg *config.Config) string {
 		b.WriteString("\n</details>\n")
 	}
 
+	for _, finding := range report.Findings {
+		if finding.SummaryOnly {
+			fmt.Fprintf(&b, "\n\n<details><summary>Design evidence: %s</summary>\n\n%s\n</details>\n", designEvidenceLocation(report, finding), renderComment(finding, cfg == nil || cfg.Persona.EmojiEnabled(), nil))
+		}
+	}
+	if len(report.UnpublishedModelFindings) > 0 {
+		b.WriteString("\n\n<details><summary>Model claims with unsupported source locations</summary>\n\n")
+		for _, finding := range report.UnpublishedModelFindings {
+			fmt.Fprintf(&b, "<p><code>%s:%d</code>: %s — %s</p>\n", inline(finding.Path), finding.Line, inline(finding.Title), inline(finding.Unresolved))
+		}
+		b.WriteString("\n</details>\n")
+	}
 	if report.Practices != nil {
 		b.WriteString("\n\n<details><summary>Engineering practices</summary>\n\n<pre>" + html.EscapeString(report.Practices.Text()) + "</pre>\n\n</details>")
 	}
@@ -1166,4 +1183,22 @@ func citedNote(r Overruled) string {
 		return ""
 	}
 	return fmt.Sprintf(" (citing `%s`)", inline(r.Cited))
+}
+
+func designEvidenceLocation(report *Report, finding Finding) string {
+	label := fmt.Sprintf("<code>%s:%d</code>", inline(finding.Path), finding.Line)
+	if report.PullRequest == nil || report.PullRequest.SourceBaseURL == "" {
+		return label
+	}
+	base, err := url.Parse(report.PullRequest.SourceBaseURL)
+	if err != nil || (base.Scheme != "https" && base.Scheme != "http") || base.Host == "" || base.User != nil {
+		return label
+	}
+	if finding.Line < 1 || path.Clean(finding.Path) != finding.Path || strings.HasPrefix(finding.Path, "/") || strings.HasPrefix(finding.Path, "../") || strings.ContainsAny(finding.Path, "\\\x00") {
+		return label
+	}
+	base.Path = strings.TrimSuffix(base.Path, "/") + "/" + finding.Path
+	base.RawPath, base.RawQuery = "", ""
+	base.Fragment = fmt.Sprintf("L%d", finding.Line)
+	return fmt.Sprintf("<a href=\"%s\">%s</a>", html.EscapeString(base.String()), label)
 }

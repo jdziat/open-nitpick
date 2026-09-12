@@ -120,6 +120,10 @@ type PullRequest struct {
 	HeadRepo string
 	BaseRepo string
 
+	// SourceBaseURL is a forge-provided browse URL pinned to the head revision.
+	// Paths append to it; line anchors use the forge's #L convention.
+	SourceBaseURL string
+
 	// HeadMessage is the head commit's full message, when the provider can
 	// read it; a [skip review] marker may sit there rather than in the
 	// title or body.

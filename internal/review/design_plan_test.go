@@ -1,13 +1,18 @@
 package review
 
 import (
+	"context"
+	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/vcs"
+	llms "github.com/nocturnium/llm-go-sdk/v6"
 )
 
 func TestDesignAssemblyKeepsSiblingAndCallerSourceTogether(t *testing.T) {
@@ -71,4 +76,241 @@ func TestDesignClaimCarriesItsBatchContextIntoExpertValidation(t *testing.T) {
 	if len(failures) != 0 || expert.callCount() != 1 || !strings.Contains(prompt, strings.TrimSpace(bundle.RenderBatch(batch))) || strings.Contains(prompt, "wrong task context") {
 		t.Fatalf("expert saw a different task: failures=%v prompt=%s", failures, prompt)
 	}
+}
+
+func TestDesignAssemblyRejectsAdditionThatDiffersFromFrozenSource(t *testing.T) {
+	cfg := config.Defaults()
+	tree := vcs.NewSnapshot(vcs.NewLocal(t.TempDir(), nil), map[string][]byte{"go.mod": []byte("module example.com/app\n\ngo 1.25\n"), "app.go": []byte("package app\nvar Answer = 2\n")})
+	file := &diff.File{Path: "app.go", Kind: diff.ChangeAdded, Hunks: []diff.Hunk{{NewStart: 1, NewLines: 2, Lines: []diff.Line{{Kind: diff.LineAdded, Content: "package app", NewLine: 1}, {Kind: diff.LineAdded, Content: "var Answer = 1", NewLine: 2}}}}}
+	e := &Engine{Config: cfg, Provider: tree}
+	stale := e.assembleDesign(t.Context(), vcs.Ref{Head: vcs.Worktree}, diff.Files{file}, bundle.Reserve{})
+	if len(stale.Design.Errors) == 0 || len(stale.Plan.Batches) != 0 {
+		t.Fatalf("digest bound source hidden by the addition diff: %+v", stale.Design)
+	}
+	file.Hunks[0].Lines[1].Content = "var Answer = 2"
+	matched := e.assembleDesign(t.Context(), vcs.Ref{Head: vcs.Worktree}, diff.Files{file}, bundle.Reserve{})
+	if len(matched.Design.Errors) != 0 || len(matched.Plan.Batches) != 1 || !strings.Contains(bundle.RenderBatch(matched.Plan.Batches[0]), "var Answer = 2") {
+		t.Fatalf("consistent source control failed: %+v", matched.Design)
+	}
+}
+
+func TestEngineeringReviewExecutesWholePackageAndRetainsBudgetOmissions(t *testing.T) {
+	for _, limited := range []bool{false, true} {
+		provider := &designReviewProvider{stubProvider: stubProvider{diff: `diff --git a/store/read.go b/store/read.go
+--- a/store/read.go
++++ b/store/read.go
+@@ -1,2 +1,2 @@
+ package store
+-func Read() {}
++func Read() { state++ }
+`, content: map[string]string{
+			"go.mod":             "module example.com/app\n\ngo 1.25\n",
+			"store/read.go":      "package store\nfunc Read() { state++ }\n",
+			"store/state.go":     "package store\nvar state int\n",
+			"service/service.go": "package service\nimport _ \"example.com/app/store\"\n",
+		}}}
+		model := &scriptedLLM{fallback: `{"findings":[]}`}
+		engine := newEngine(t, model, provider, func(cfg *config.Config) {
+			cfg.Practices.Profile = "engineering"
+			cfg.Persona.Nitpick = config.NitpickNormal
+			cfg.Review.Summary = false
+			if limited {
+				cfg.Review.Budget = config.Budget{MaxSpend: 0.000001, Prices: config.BudgetPrices{Input: 1, Output: 1}, CompletionRatio: 1, Overhead: 1}
+			}
+		})
+		report, err := engine.Review(t.Context(), vcs.Ref{})
+		if err != nil || report == nil || report.DesignExecution == nil {
+			t.Fatalf("engineering execution unavailable: report=%+v err=%v", report, err)
+		}
+		tasks := report.DesignExecution.Design.Tasks
+		if len(tasks) != 1 || tasks[0].ID != "package:example.com/app/store" || tasks[0].SourceDigest == "" || len(report.Findings) != 0 || len(report.DesignExecution.Design.Errors) != 0 {
+			t.Fatalf("package execution lost its declared evidence: %+v", report)
+		}
+		if limited {
+			if model.callCount() != 0 || len(report.Plan.Batches) != 0 || len(report.AssessedDesignTasks) != 0 || len(tasks[0].Omitted) == 0 || report.Budget == nil {
+				t.Fatalf("spending omission claimed completion: %+v", report)
+			}
+			continue
+		}
+		if model.callCount() != 1 || report.Plan.Files() != 1 || len(report.Plan.Batches) != 1 || len(report.AssessedDesignTasks) != 1 || report.AssessedDesignTasks[0] != tasks[0].ID {
+			t.Fatalf("empty result lacks actual task execution: %+v; calls=%d", report, model.callCount())
+		}
+		prompt := strings.Join(model.prompts(), "\n")
+		for _, source := range []string{"var state int", "service/service.go", "package:example.com/app/store"} {
+			if !strings.Contains(prompt, source) {
+				t.Fatalf("executed request lacks %q", source)
+			}
+		}
+	}
+}
+
+type designReviewProvider struct {
+	stubProvider
+}
+
+func (p *designReviewProvider) ListDir(_ context.Context, _ vcs.Ref, dir string) ([]string, error) {
+	switch dir {
+	case "":
+		return []string{"go.mod", "store/", "service/"}, nil
+	case "store":
+		return []string{"read.go", "state.go"}, nil
+	case "service":
+		return []string{"service.go"}, nil
+	default:
+		return nil, vcs.ErrNotFound
+	}
+}
+
+func TestMergedDesignClaimsKeepBothContextsUnderExpertLimit(t *testing.T) {
+	model := &scriptedLLM{fallback: `{"verdict":"confirmed","reason":"both callers violate the contract"}`}
+	validator := newValidator(model, config.Validation{Enabled: true})
+	first := Finding{Path: "shared.go", Line: 1, Class: "correctness", Title: "contract failure", TaskContext: &TaskContext{ID: "first", Text: "first task exact source", Lines: map[string]int{"shared.go": 3}}}
+	second := first
+	second.TaskContext = &TaskContext{ID: "second", Text: "second task exact source", Lines: map[string]int{"shared.go": 3, "caller.go": 5}}
+	deduplicated := dedupe([]Finding{first, second})
+	if len(deduplicated) != 1 {
+		t.Fatalf("same claim did not deduplicate: %+v", deduplicated)
+	}
+	first = deduplicated[0]
+	if first.TaskContext == second.TaskContext || first.TaskContext.Lines["caller.go"] != 5 || second.TaskContext.Text != "second task exact source" {
+		t.Fatalf("merging mutated or lost task evidence: %+v", first.TaskContext)
+	}
+	validator.PromptTokenLimit = 1
+	kept, _, failures := validator.validateWithCoverage(t.Context(), []Finding{first}, nil)
+	if len(kept) != 1 || len(failures) != 1 || model.callCount() != 0 || !strings.Contains(kept[0].Unresolved, "token limit") {
+		t.Fatalf("oversized expert evidence lost its claim or ran anyway: kept=%+v failures=%v", kept, failures)
+	}
+	validator.PromptTokenLimit = 60000
+	_, _, failures = validator.validateWithCoverage(t.Context(), []Finding{first}, nil)
+	prompt := strings.Join(model.prompts(), "\n")
+	if len(failures) != 0 || model.callCount() != 1 || !strings.Contains(prompt, "first task exact source") || !strings.Contains(prompt, "second task exact source") {
+		t.Fatalf("expert lost merged task evidence: failures=%v prompt=%s", failures, prompt)
+	}
+}
+
+func TestDesignAssemblyDoesNotAssignAnUnreadableNestedModuleToItsParent(t *testing.T) {
+	cfg := config.Defaults()
+	tree := vcs.NewSnapshot(vcs.NewLocal(t.TempDir(), nil), map[string][]byte{
+		"go.mod":        []byte("module example.com/outer\n"),
+		"nested/go.mod": []byte("module example.com/inner\n"),
+		"nested/a.go":   []byte("package inner\n"),
+	})
+	tree.Unbudgeted = []string{"nested/go.mod"}
+	packed := (&Engine{Config: cfg, Provider: tree}).assembleDesign(t.Context(), vcs.Ref{}, diff.Files{&diff.File{Path: "nested/a.go", Kind: diff.ChangeModified}}, bundle.Reserve{})
+	if len(packed.Design.Errors) == 0 || len(packed.Design.Tasks) != 1 || packed.Design.Tasks[0].ID != "source:nested/a.go" {
+		t.Fatalf("unreadable module inherited an invented package identity: %+v", packed.Design)
+	}
+	for _, file := range packed.Sources {
+		if file.Path == "nested/go.mod" {
+			t.Fatal("invented module bytes entered the frozen source")
+		}
+	}
+}
+
+func TestEngineeringReviewValidatesContextOnlyClaimAndPublishesSummary(t *testing.T) {
+	for _, cancelTriage := range []bool{false, true} {
+		provider := &designReviewProvider{stubProvider: stubProvider{diff: `diff --git a/store/read.go b/store/read.go
+--- a/store/read.go
++++ b/store/read.go
+@@ -1,2 +1,2 @@
+ package store
+-func Read() {}
++func Read() { state++ }
+`, content: map[string]string{
+			"go.mod":             "module example.com/app\n",
+			"store/read.go":      "package store\nfunc Read() { state++ }\n",
+			"store/state.go":     "package store\nvar state int\n",
+			"service/service.go": "package service\nimport _ \"example.com/app/store\"\n",
+		}}}
+		finding := Finding{Path: "service/service.go", Line: 2, Class: "maintainability", Severity: "warning", Title: "Caller relies on implicit state", Rationale: "The changed read now mutates shared state."}
+		model := &scriptedLLM{byPrompt: map[string]string{
+			"Review the following changes": mustJSON(t, Result{Findings: []Finding{finding}}),
+			"triaging findings":            mustJSON(t, TriageResult{Verdicts: verdictsFor([]Finding{finding})}),
+			validationNeedle:               `{"verdict":"confirmed","reason":"the caller observes the shared mutation"}`,
+		}}
+		engine := newEngine(t, model, provider, func(cfg *config.Config) {
+			cfg.Practices.Profile = "engineering"
+			cfg.Validation.Enabled = true
+			cfg.Validation.Classes = nil
+			cfg.Persona.Nitpick = config.NitpickNormal
+		})
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		if cancelTriage {
+			triage := &cancelAfterFirstDesign{cancel: cancel}
+			triage.started.Store(1)
+			engine.Roles.Triage = llm.NewClientForTest(triage, engine.Config.Models.Default)
+		}
+		report, err := engine.Review(ctx, vcs.Ref{})
+		if cancelTriage {
+			if !errors.Is(err, context.Canceled) || report == nil || len(report.Findings) != 1 || report.Findings[0].Title != finding.Title || len(report.AssessedDesignTasks) != 1 || len(report.Stages) != 1 || report.Stages[0].Stage != "triage" || provider.published != nil {
+				t.Fatalf("triage cancellation lost evidence or published: report=%+v err=%v", report, err)
+			}
+			continue
+		}
+		if err != nil || len(report.Findings) != 1 || !report.Findings[0].SummaryOnly || len(report.Stages) != 0 || model.callCount() != 3 {
+			t.Fatalf("context claim did not traverse all stages: report=%+v err=%v calls=%d", report, err, model.callCount())
+		}
+		if provider.published == nil || len(provider.published.Comments) != 0 || !strings.Contains(provider.published.Summary, finding.Title) {
+			t.Fatalf("context claim did not reach summary: %+v", provider.published)
+		}
+		var expertPrompt string
+		for _, request := range model.prompts() {
+			if strings.Contains(request, validationNeedle) {
+				expertPrompt = request
+			}
+		}
+		for _, evidence := range []string{"var state int", "service/service.go", "func Read() { state++ }"} {
+			if !strings.Contains(expertPrompt, evidence) {
+				t.Fatalf("expert missing %q from complete task: %s", evidence, expertPrompt)
+			}
+		}
+	}
+}
+
+func TestEngineeringCancellationRetainsCompletedTaskEvidence(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	model := &cancelAfterFirstDesign{scriptedLLM: scriptedLLM{fallback: `{"findings":[]}`}, cancel: cancel}
+	tree := vcs.NewSnapshot(vcs.NewLocal(t.TempDir(), nil), map[string][]byte{
+		"go.mod":      []byte("module example.com/app\n"),
+		"first/a.go":  []byte("package first\n"),
+		"second/b.go": []byte("package second\n"),
+	})
+	engine := newEngine(t, &model.scriptedLLM, tree, func(cfg *config.Config) {
+		cfg.Practices.Profile = "engineering"
+		cfg.Persona.Nitpick = config.NitpickNormal
+		cfg.Review.Concurrency = 1
+	})
+	engine.Roles.Review = llm.NewClientForTest(model, engine.Config.Models.Default)
+	report, err := engine.Review(ctx, vcs.Ref{})
+	if !errors.Is(err, context.Canceled) || report == nil || report.DesignExecution == nil || len(report.AssessedDesignTasks) != 1 || len(report.Incomplete) == 0 || len(report.Stages) == 0 {
+		t.Fatalf("cancellation lost partial execution: report=%+v err=%v", report, err)
+	}
+	if len(report.DesignExecution.Design.Tasks) < 2 || len(report.Plan.Batches) < 2 || model.callCount() != 1 {
+		t.Fatalf("cancellation invented or removed intended work: %+v calls=%d", report, model.callCount())
+	}
+	found := false
+	for _, task := range report.DesignExecution.Design.Tasks {
+		if task.ID == report.AssessedDesignTasks[0] {
+			found = task.SourceDigest != "" && len(task.Omitted) == 0
+		}
+	}
+	if !found {
+		t.Fatal("completed task evidence no longer matches the intended plan")
+	}
+}
+
+type cancelAfterFirstDesign struct {
+	scriptedLLM
+	started atomic.Int32
+	cancel  context.CancelFunc
+}
+
+func (m *cancelAfterFirstDesign) GenerateContent(ctx context.Context, messages []llms.Message, options ...llms.CallOption) (*llms.Response, error) {
+	if m.started.Add(1) > 1 {
+		m.cancel()
+		return nil, context.Canceled
+	}
+	return m.scriptedLLM.GenerateContent(ctx, messages, options...)
 }

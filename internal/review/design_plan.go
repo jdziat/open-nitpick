@@ -3,7 +3,9 @@ package review
 import (
 	"context"
 	"fmt"
+	"path"
 	"slices"
+	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/diff"
@@ -12,8 +14,15 @@ import (
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
+// DesignExecution retains the frozen inputs and intended tasks of a design pass.
+type DesignExecution struct {
+	practices.DesignPacking
+	Sources  []standards.File
+	Excluded []bundle.Skip
+}
+
 // assembleDesign captures one bounded source view before package planning.
-func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Files, reserve bundle.Reserve) practices.DesignPacking {
+func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Files, reserve bundle.Reserve) DesignExecution {
 	var blocked []bundle.Skip
 	if tree, ok := e.Provider.(*vcs.Tree); ok {
 		for _, name := range tree.Unbudgeted {
@@ -31,6 +40,12 @@ func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Fil
 	}
 	fetch := func(ctx context.Context, name string) ([]byte, error) { return e.Provider.FileContent(ctx, ref, name) }
 	view := bundle.CaptureDesignSources(ctx, e.Config, changed, fetch, bundle.ListerFrom(e.Provider, ref), blocked, bundle.SourceLimits{Paths: 4096, Bytes: 32 << 20})
+	for _, file := range files {
+		if source, ok := view.Content[file.Path]; ok && file.Kind == diff.ChangeAdded && !additionMatchesSource(file, string(source)) {
+			delete(view.Content, file.Path)
+			view.Omitted = append(view.Omitted, bundle.Skip{Path: file.Path, Reason: "addition diff does not match the frozen source"})
+		}
+	}
 	names := make([]string, 0, len(view.Content))
 	for name := range view.Content {
 		names = append(names, name)
@@ -40,7 +55,19 @@ func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Fil
 	for _, name := range names {
 		source = append(source, standards.File{Path: name, Src: view.Content[name]})
 	}
-	inventory, _ := practices.InspectDesign(source, nil)
+	inventorySources := slices.Clone(source)
+	for _, skip := range append(slices.Clone(view.Omitted), view.Excluded...) {
+		if path.Base(skip.Path) == "go.mod" {
+			// Preserve an unreadable module boundary without supplying invented source.
+			inventorySources = append(inventorySources, standards.File{Path: skip.Path})
+		}
+	}
+	inventory, _ := practices.InspectDesign(inventorySources, nil)
+	if len(view.Errors) > 0 {
+		// Incomplete enumeration cannot establish that nested manifests are absent.
+		inventory.Units = nil
+		inventory.Limitations = append(inventory.Limitations, "package identities unavailable because repository enumeration was incomplete")
+	}
 	inventory.Errors = append(inventory.Errors, view.Errors...)
 	for _, skip := range view.Omitted {
 		inventory.Errors = append(inventory.Errors, fmt.Sprintf("%s: %s", skip.Path, skip.Reason))
@@ -52,5 +79,22 @@ func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Fil
 	plan := practices.PlanDesign(ctx, inventory, source, changed)
 	packed := practices.PackDesign(ctx, e.Config, plan, source, files, reserve)
 	packed.Plan.Skipped = append(packed.Plan.Skipped, view.Excluded...)
-	return packed
+	return DesignExecution{DesignPacking: packed, Sources: source, Excluded: view.Excluded}
+}
+
+func additionMatchesSource(file *diff.File, source string) bool {
+	var lines []string
+	if source != "" {
+		lines = strings.Split(strings.TrimSuffix(source, "\n"), "\n")
+	}
+	seen := 0
+	for _, hunk := range file.Hunks {
+		for _, line := range hunk.Lines {
+			if line.Kind != diff.LineAdded || seen >= len(lines) || line.NewLine != seen+1 || line.Content != lines[seen] {
+				return false
+			}
+			seen++
+		}
+	}
+	return seen == len(lines)
 }

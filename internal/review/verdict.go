@@ -148,6 +148,19 @@ func (e *Engine) applyVerdict(f *Finding, v Verdict) {
 // analyzer flag is sticky for the same reason, so a merge cannot lift an
 // analyzer finding out of linters.max_severity.
 func absorb(survivor *Finding, merged Finding) {
+	if merged.TaskContext != nil {
+		if survivor.TaskContext == nil {
+			survivor.TaskContext = merged.TaskContext
+		} else if survivor.TaskContext.ID != merged.TaskContext.ID || survivor.TaskContext.Text != merged.TaskContext.Text {
+			combined := &TaskContext{ID: survivor.TaskContext.ID + "+" + merged.TaskContext.ID, Text: survivor.TaskContext.Text + "\n\n" + merged.TaskContext.Text, Lines: map[string]int{}}
+			for _, scope := range []*TaskContext{survivor.TaskContext, merged.TaskContext} {
+				for name, lines := range scope.Lines {
+					combined.Lines[name] = max(combined.Lines[name], lines)
+				}
+			}
+			survivor.TaskContext = combined
+		}
+	}
 	survivor.Evidence = capEvidence(union(survivor.Evidence, merged.Evidence))
 
 	switch {
