@@ -1,6 +1,9 @@
 package practices
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -62,6 +65,8 @@ func TestSeparateContractsKeepTheirOwnThresholds(t *testing.T) {
 					}
 					writeMechanism(t, root, "oracle_test.go", body)
 					runMechanism(t, root, variant == "good")
+				case "indirection":
+					pinIndirectionMechanism(t, root, variant)
 				case "ineffective-tests":
 					source, err := os.ReadFile(filepath.Join(root, "session.go"))
 					if err != nil {
@@ -134,4 +139,66 @@ func runMechanism(t *testing.T, root string, wantPass bool, args ...string) {
 	if !wantPass && !strings.Contains(string(output), "--- FAIL: Test") {
 		t.Fatalf("fixture failed without exercising its assertion: %v\n%s", err, output)
 	}
+}
+
+func pinIndirectionMechanism(t *testing.T, root, variant string) {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(root, "service.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(body)
+	if variant == "good" {
+		mutated := strings.Replace(source, "return store.Name(id)", `return "Ada"`, 1)
+		if mutated == source {
+			t.Fatal("storage substitution mutation no longer applies")
+		}
+		writeMechanism(t, root, "service.go", mutated)
+		runMechanism(t, root, false, "-run", "^TestProfileNameUsesProvidedStorage$")
+		return
+	}
+	parsed, err := parser.ParseFile(token.NewFileSet(), "service.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, declaration := range parsed.Decls {
+		if method, ok := declaration.(*ast.FuncDecl); ok && method.Recv != nil && method.Name.Name == "name" {
+			if method.Body == nil || len(method.Body.List) != 1 {
+				t.Fatal("bad forwarding layer acquired behavior outside its return")
+			}
+		}
+	}
+	for _, hop := range []struct{ expression, name string }{
+		{"p.next.name(id)", "proxy"},
+		{"b.next.name(id)", "bridge"},
+		{"storedName(id)", "adapter"},
+	} {
+		original := "return " + hop.expression
+		if strings.Count(source, original) != 1 {
+			t.Fatalf("forwarding site %s changed", hop.name)
+		}
+		source = strings.Replace(source, original, `return recordHop("`+hop.name+`", `+hop.expression+`)`, 1)
+	}
+	writeMechanism(t, root, "service.go", source)
+	writeMechanism(t, root, "oracle_test.go", `package fixture
+import (
+ "strings"
+ "testing"
+)
+var traversed []string
+func recordHop(layer, value string) string {
+ traversed = append(traversed, layer)
+ return value
+}
+func TestProfileNameTraversesAllForwardingLayers(t *testing.T) {
+ for _, input := range []struct{ id, want string }{{"42", "Ada"}, {"", ""}} {
+  traversed = nil
+  got := ProfileName(input.id)
+  if got != input.want || strings.Join(traversed, ",") != "adapter,bridge,proxy" {
+   t.Fatalf("name=%q layers=%v", got, traversed)
+  }
+ }
+}
+`)
+	runMechanism(t, root, true)
 }

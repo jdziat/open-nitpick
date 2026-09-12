@@ -5,3 +5,9 @@ The bad public operation traverses three private forwarders with one fixed imple
 Use the lifecycle fixture's temporary-repository procedure. Keep this README
 and variant names outside model inputs. Record coverage, model and prompt
 versions, usage and unexpected findings; one pair cannot establish precision.
+
+The harness instruments the bad chain in a temporary copy and verifies that the
+public operation traverses all three forwarding layers without changing its
+result. For the good fixture, replacing caller-owned storage with a constant must
+fail its existing substitution test. These guard the fixture mechanisms; they do
+not make the design-cost judgment a functional failure.

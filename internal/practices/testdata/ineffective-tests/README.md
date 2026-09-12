@@ -5,3 +5,7 @@ The bad expiration test logs when the behavior is wrong and therefore passes aft
 Use the lifecycle fixture's temporary-repository procedure. Keep this README
 and variant names outside model inputs. Record coverage, model and prompt
 versions, usage and unexpected findings; one pair cannot establish precision.
+
+The good tests are in [good/session_test.go.txt](good/session_test.go.txt).
+The harness strips `.txt` while materializing the fixture, then runs those tests
+against the original implementation and the injected regressions.
