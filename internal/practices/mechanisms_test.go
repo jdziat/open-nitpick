@@ -1,0 +1,204 @@
+package practices
+
+import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"io/fs"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/standards"
+)
+
+func TestDesignMechanismFixturesBuildAndPinBehavior(t *testing.T) {
+	for _, mechanism := range []string{"boundaries", "contracts", "coupled-duplication", "indirection", "ineffective-tests"} {
+		for _, variant := range []string{"bad", "good"} {
+			t.Run(mechanism+"/"+variant, func(t *testing.T) {
+				root := materializeMechanism(t, mechanism, variant)
+				runMechanism(t, root, true)
+				switch mechanism {
+				case "boundaries":
+					var files []standards.File
+					for _, name := range []string{"go.mod", "ui/ui.go", "service/service.go", "storage/storage.go"} {
+						body, err := os.ReadFile(filepath.Join(root, name))
+						if err != nil {
+							t.Fatal(err)
+						}
+						files = append(files, standards.File{Path: name, Src: body})
+					}
+					inventory, check := InspectDesign(files, []config.PracticeBoundary{{From: "example.com/fixture/ui", Forbid: []string{"example.com/fixture/storage"}, Reason: "UI uses the service boundary"}})
+					want := 0
+					if variant == "bad" {
+						want = 1
+					}
+					if len(inventory.Errors) != 0 || check.State != Completed || len(check.Examined) != 3 || len(check.Findings) != want {
+						t.Fatalf("boundary control lost its scope or distinction: inventory=%+v check=%+v", inventory, check)
+					}
+				case "contracts":
+					writeMechanism(t, root, "oracle_test.go", `package fixture
+import "testing"
+func TestLegacyNameSurvivesUpgrade(t *testing.T) {
+ name, err := Decode([]byte(`+"`"+`{"version":1,"name":"Ada"}`+"`"+`))
+ if err != nil || name != "Ada" { t.Fatalf("name=%q error=%v", name, err) }
+}
+`)
+					runMechanism(t, root, variant == "good")
+				case "coupled-duplication":
+					body := `package fixture
+import "testing"
+func TestRetailPreviewMatchesCheckout(t *testing.T) {
+ if PreviewShipping(5500) != CheckoutShipping(5500) { t.Fatal("two quotes for the same retail order") }
+}
+`
+					if variant == "good" {
+						body = `package fixture
+import "testing"
+func TestSeparateContractsKeepTheirOwnThresholds(t *testing.T) {
+ if RetailShipping(5500) != 0 || WholesaleShipping(5500) != 500 { t.Fatal("independent shipping contract changed") }
+}
+`
+					}
+					writeMechanism(t, root, "oracle_test.go", body)
+					runMechanism(t, root, variant == "good")
+				case "indirection":
+					pinIndirectionMechanism(t, root, variant)
+				case "ineffective-tests":
+					source, err := os.ReadFile(filepath.Join(root, "session.go"))
+					if err != nil {
+						t.Fatal(err)
+					}
+					mutated := strings.Replace(string(source), "return now < expires", "return true", 1)
+					if mutated == string(source) {
+						t.Fatal("expiration mutation no longer applies")
+					}
+					writeMechanism(t, root, "session.go", mutated)
+					runMechanism(t, root, variant == "bad")
+					if variant == "good" {
+						panicking := strings.Replace(string(source), "return now < expires", `panic("seeded panic")`, 1)
+						writeMechanism(t, root, "session.go", panicking)
+						runMechanism(t, root, false, "-run", "^TestSessionCheckDoesNotPanicAtIntegerLimits$")
+					}
+				}
+			})
+		}
+	}
+}
+
+func materializeMechanism(t *testing.T, mechanism, variant string) string {
+	t.Helper()
+	root := t.TempDir()
+	source := filepath.Join("testdata", mechanism, variant)
+	err := filepath.WalkDir(source, func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		if !strings.HasSuffix(name, ".txt") {
+			return nil
+		}
+		rel, err := filepath.Rel(source, name)
+		if err != nil {
+			return err
+		}
+		body, err := os.ReadFile(name)
+		if err != nil {
+			return err
+		}
+		writeMechanism(t, root, strings.TrimSuffix(rel, ".txt"), string(body))
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func writeMechanism(t *testing.T, root, name, body string) {
+	t.Helper()
+	name = filepath.Join(root, name)
+	if err := os.MkdirAll(filepath.Dir(name), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(name, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runMechanism(t *testing.T, root string, wantPass bool, args ...string) {
+	t.Helper()
+	cmd := exec.CommandContext(t.Context(), "go", append([]string{"test", "./..."}, args...)...)
+	cmd.Dir = root
+	output, err := cmd.CombinedOutput()
+	if (err == nil) != wantPass {
+		t.Fatalf("fixture pass=%t, wanted %t: %v\n%s", err == nil, wantPass, err, output)
+	}
+	if !wantPass && !strings.Contains(string(output), "--- FAIL: Test") {
+		t.Fatalf("fixture failed without exercising its assertion: %v\n%s", err, output)
+	}
+}
+
+func pinIndirectionMechanism(t *testing.T, root, variant string) {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(root, "service.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(body)
+	if variant == "good" {
+		mutated := strings.Replace(source, "return store.Name(id)", `return "Ada"`, 1)
+		if mutated == source {
+			t.Fatal("storage substitution mutation no longer applies")
+		}
+		writeMechanism(t, root, "service.go", mutated)
+		runMechanism(t, root, false, "-run", "^TestProfileNameUsesProvidedStorage$")
+		return
+	}
+	parsed, err := parser.ParseFile(token.NewFileSet(), "service.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, declaration := range parsed.Decls {
+		if method, ok := declaration.(*ast.FuncDecl); ok && method.Recv != nil && method.Name.Name == "name" {
+			if method.Body == nil || len(method.Body.List) != 1 {
+				t.Fatal("bad forwarding layer acquired behavior outside its return")
+			}
+		}
+	}
+	for _, hop := range []struct{ expression, name string }{
+		{"p.next.name(id)", "proxy"},
+		{"b.next.name(id)", "bridge"},
+		{"storedName(id)", "adapter"},
+	} {
+		original := "return " + hop.expression
+		if strings.Count(source, original) != 1 {
+			t.Fatalf("forwarding site %s changed", hop.name)
+		}
+		source = strings.Replace(source, original, `return recordHop("`+hop.name+`", `+hop.expression+`)`, 1)
+	}
+	writeMechanism(t, root, "service.go", source)
+	writeMechanism(t, root, "oracle_test.go", `package fixture
+import (
+ "strings"
+ "testing"
+)
+var traversed []string
+func recordHop(layer, value string) string {
+ traversed = append(traversed, layer)
+ return value
+}
+func TestProfileNameTraversesAllForwardingLayers(t *testing.T) {
+ for _, input := range []struct{ id, want string }{{"42", "Ada"}, {"", ""}} {
+  traversed = nil
+  got := ProfileName(input.id)
+  if got != input.want || strings.Join(traversed, ",") != "adapter,bridge,proxy" {
+   t.Fatalf("name=%q layers=%v", got, traversed)
+  }
+ }
+}
+`)
+	runMechanism(t, root, true)
+}

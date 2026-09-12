@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/jdziat/open-nitpick/internal/config"
 )
 
 // Verdict is triage's decision about one numbered finding.
@@ -30,16 +31,23 @@ type Verdict struct {
 	Suggestion string `json:"suggestion,omitempty"`
 }
 
+// Acknowledgement identifies a model nit that reports successful assessment
+// without alleging a defect. Quote must repeat its entire original rationale.
+type Acknowledgement struct {
+	Number int    `json:"number"`
+	Quote  string `json:"quote"`
+	Reason string `json:"reason"`
+}
+
 // TriageResult is what the triage pass returns.
 type TriageResult struct {
 	// Verdicts retain the JSON name used in the triage prompt.
 	Verdicts []Verdict `json:"findings"`
 	Summary  string    `json:"summary"`
 
-	// Dropped is triage's account of what it merged, by list number. It is the
-	// only place a finding may go missing from Verdicts, and the engine
-	// restores anything absent from both.
-	Dropped []Drop `json:"dropped,omitempty"`
+	// Unaccounted entries are restored; explicit decisions remain in Overruled.
+	Dropped          []Drop            `json:"dropped,omitempty"`
+	Acknowledgements []Acknowledgement `json:"acknowledgements,omitempty"`
 }
 
 // anchorTolerance bounds relocation to nearby duplicate findings.
@@ -186,4 +194,36 @@ func (e *Engine) moveAnchor(f *Finding, line int) {
 		f.EndLine += delta
 	}
 	f.Line = line
+}
+
+// acknowledgementDecisions excludes conflicting decisions and substantive evidence
+// before allowing triage to classify an entry as an assessment acknowledgement.
+func acknowledgementDecisions(findings []Finding, result TriageResult, judged map[int]Verdict) map[int]Acknowledgement {
+	conflicted := make(map[int]bool)
+	for _, d := range result.Dropped {
+		conflicted[d.Number] = true
+		conflicted[d.DuplicateOf] = true
+	}
+	counts := make(map[int]int)
+	for _, a := range result.Acknowledgements {
+		counts[a.Number]++
+	}
+	accepted := make(map[int]Acknowledgement)
+	for _, a := range result.Acknowledgements {
+		if a.Number < 1 || a.Number > len(findings) || counts[a.Number] != 1 || conflicted[a.Number] {
+			continue
+		}
+		if _, ok := judged[a.Number]; ok {
+			continue
+		}
+		f := findings[a.Number-1]
+		if f.FromAnalyzer || f.Sev() != config.SeverityNit || strings.TrimSpace(f.Suggestion) != "" {
+			continue
+		}
+		if strings.TrimSpace(a.Reason) == "" || strings.TrimSpace(a.Quote) == "" || a.Quote != f.Rationale {
+			continue
+		}
+		accepted[a.Number] = a
+	}
+	return accepted
 }

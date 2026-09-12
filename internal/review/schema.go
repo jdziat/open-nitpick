@@ -142,15 +142,29 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 				"type":        "string",
 				"description": "Short walkthrough of the change for the pull request description.",
 			},
+			"acknowledgements": map[string]any{
+				"type":        "array",
+				"description": "Original model nits that only report successful assessment and allege no defect. Never analyzer findings, weak claims, verdicts, or merge participants. Retained as visible decisions.",
+				"items": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"number": map[string]any{"type": "integer"},
+						"quote":  map[string]any{"type": "string", "description": "Copy the entire original rationale exactly, not an excerpt."},
+						"reason": map[string]any{"type": "string", "description": "Explain why the original title and rationale allege no defect, risk, missing coverage, or requested change."},
+					},
+					"required":             []string{"number", "quote", "reason"},
+					"additionalProperties": false,
+				},
+			},
 			"dropped": map[string]any{
 				"type":        "array",
-				"description": "Findings from the numbered list that are NOT published, each with the number it had in the list and the reason. A finding absent from findings and absent from here is restored unchanged.",
+				"description": "Duplicate findings merged into another numbered entry. An entry without a valid verdict, merge or acknowledgement decision is restored unchanged.",
 				"items": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"number":       map[string]any{"type": "integer", "description": "The finding's number in the list you were given."},
-						"duplicate_of": map[string]any{"type": "integer", "description": "The number of the finding this one was merged into. Required for a merge, which is the only reason a finding may be left out."},
-						"reason":       map[string]any{"type": "string", "description": "Why it is not published: the rationale names no consequence, or asserts something about code that was not shown, or it duplicates a finding you kept."},
+						"duplicate_of": map[string]any{"type": "integer", "description": "The number of the finding this one was merged into. Required for a duplicate merge."},
+						"reason":       map[string]any{"type": "string", "description": "Why it duplicates a finding you kept. Unsupported or uncertain claims must be retained."},
 					},
 					// duplicate_of is NOT required, so a drop with no merge
 					// target stays legal and rule 2 restores that finding. It
@@ -164,7 +178,7 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 				},
 			},
 		},
-		"required":             []string{"findings", "summary", "dropped"},
+		"required":             []string{"findings", "summary", "dropped", "acknowledgements"},
 		"additionalProperties": false,
 	}
 
@@ -189,25 +203,31 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 func validationSchema() (json.RawMessage, error) {
 	schema := map[string]any{
 		"type": "object",
-		"properties": map[string]any{
-			"verdict": map[string]any{
+		// Field order lets the model choose a verdict before its conditional level.
+		"properties": struct {
+			Verdict         map[string]any `json:"verdict"`
+			RevisedSeverity map[string]any `json:"revised_severity"`
+			Reason          map[string]any `json:"reason"`
+			Cited           map[string]any `json:"cited"`
+		}{
+			Verdict: map[string]any{
 				"type": "string",
 				"enum": verdictEnum,
 				"description": "confirmed when the claim holds, refuted when you can name why it is wrong, " +
 					"severity when the defect is real but rated wrong, unresolved when you cannot " +
 					"decide from what you were shown and can name what is missing.",
 			},
-			"reason": map[string]any{
+			RevisedSeverity: map[string]any{
+				"type":        "string",
+				"enum":        severityEnum,
+				"description": "Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.",
+			},
+			Reason: map[string]any{
 				"type": "string",
 				"description": "One or two sentences. For a refutation this is the specific reason the claim " +
 					"is wrong; uncertainty is not a reason.",
 			},
-			"revised_severity": map[string]any{
-				"type":        "string",
-				"enum":        severityEnum,
-				"description": "OPTIONAL. Only for the severity verdict: the level the demonstrated consequence supports.",
-			},
-			"cited": map[string]any{
+			Cited: map[string]any{
 				"type": "string",
 				"description": "OPTIONAL. The bracketed id of the reference entry that decided your verdict, " +
 					"when one did. Leave it empty otherwise; do not name an entry you were not shown.",

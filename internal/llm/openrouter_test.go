@@ -14,17 +14,10 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
-// clearModelEnv empties every variable that can supply a model's credential or
-// its endpoint, so a test claiming "only OPENROUTER_API_KEY is set" is telling
-// the truth on a developer machine that has the others exported.
-//
-// LLM_BASE_URL is in the list because config.LoadFile calls applyEnv after
-// sanitize, and applyEnv fills Models.Default.BaseURL whenever it is empty,
-// which is exactly the post-sanitize state of the shipped config. Without this,
-// TestDefaultConfigSurvivesSanitize passed or failed according to the
-// developer's shell rather than according to the code.
+// clearModelEnv isolates credential and endpoint tests from operator settings.
 func clearModelEnv(t *testing.T) {
 	t.Helper()
+	stubKeyring(t, nil, errors.New("test keystore is empty"))
 	for _, name := range []string{
 		envOpenRouterAPIKey, "OPENAI_API_KEY", llms.EnvLLMAPIKey,
 		config.EnvBaseURL, config.EnvProvider, config.EnvModel,
@@ -68,6 +61,7 @@ func TestOpenRouterBuildsWithOnlyItsOwnKey(t *testing.T) {
 // api.openai.com to openrouter.ai, and report the wrong variable when it was
 // rejected.
 func TestOpenRouterMissingKeyIsNamed(t *testing.T) {
+	stubKeyring(t, map[string]string{KeyringService + "/openrouter": "operator-test-key"}, nil)
 	clearModelEnv(t)
 	t.Setenv("OPENAI_API_KEY", "sk-openai-must-not-be-used")
 
@@ -187,7 +181,7 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 	}
 
 	if gotAuth != "Bearer sk-or-test" {
-		t.Errorf("Authorization = %q, want the OpenRouter key as a bearer token", gotAuth)
+		t.Error("Authorization did not carry the configured test credential")
 	}
 	if !strings.HasSuffix(gotPath, "/chat/completions") {
 		t.Errorf("path = %q, want the OpenAI-compatible chat completions route", gotPath)

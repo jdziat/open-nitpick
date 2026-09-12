@@ -1,0 +1,25 @@
+package fixture
+
+// ProfileName resolves a stored name. The implementation is fixed for this
+// package; callers cannot configure its storage or transformation.
+func ProfileName(id string) string { return newNameProxy().name(id) }
+
+type nameProxy struct{ next nameBridge }
+
+func newNameProxy() nameProxy             { return nameProxy{next: nameBridge{next: nameAdapter{}}} }
+func (p nameProxy) name(id string) string { return p.next.name(id) }
+
+type nameBridge struct{ next nameAdapter }
+
+func (b nameBridge) name(id string) string { return b.next.name(id) }
+
+type nameAdapter struct{}
+
+func (nameAdapter) name(id string) string { return storedName(id) }
+
+func storedName(id string) string {
+	if id == "" {
+		return ""
+	}
+	return "Ada"
+}

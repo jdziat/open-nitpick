@@ -1,0 +1,10 @@
+package fixture
+
+// WholesaleShipping applies the independent wholesale contract: orders of at
+// least 6000 cents ship free; smaller wholesale orders cost 500 cents.
+func WholesaleShipping(subtotal int) int {
+	if subtotal >= 6000 {
+		return 0
+	}
+	return 500
+}

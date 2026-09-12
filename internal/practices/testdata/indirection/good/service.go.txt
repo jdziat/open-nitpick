@@ -1,0 +1,7 @@
+package fixture
+
+// NameReader supplies the storage operation this consumer needs.
+type NameReader interface{ Name(string) string }
+
+// ProfileName resolves a stored name through caller-owned storage.
+func ProfileName(store NameReader, id string) string { return store.Name(id) }

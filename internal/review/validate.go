@@ -566,7 +566,9 @@ Answer with exactly one verdict:
   way to remove one, it records that the check came back undecided.
 - ` + "`severity`" + ` — the defect is real, but rated wrong. Set
   ` + "`revised_severity`" + ` to the level the demonstrated consequence
-  supports and say why in ` + "`reason`" + `. Rate what you can demonstrate, not
+  supports and say why in ` + "`reason`" + `. This verdict requires a nonempty
+  revised level; naming severity without that value is invalid. For other
+  verdicts, omit the revised level. Rate what you can demonstrate, not
   the worst imaginable outcome; when torn between two levels, choose the lower.
 
 Refute ONLY when you can state that reason. "I could not confirm this", "there
