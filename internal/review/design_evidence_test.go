@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
@@ -45,5 +47,17 @@ func TestDesignEvidenceLinksEscapePathsAndRejectUnsafeMetadata(t *testing.T) {
 		if location := designEvidenceLocation(report, finding); strings.Contains(location, "href=") || !strings.Contains(location, "src/a #?.go:7") {
 			t.Fatalf("unsafe metadata produced a link or hid location: %s", location)
 		}
+	}
+}
+
+func TestDesignReceiptCountsOnlySuccessfulChangedSources(t *testing.T) {
+	file := &diff.File{Path: "a.go"}
+	report := &Report{Files: diff.Files{file}, DesignExecution: &DesignExecution{}, Plan: &bundle.Plan{Batches: []bundle.Batch{{DesignTask: "a", Entries: []bundle.Entry{{File: file}, {File: &diff.File{Path: "caller.go"}, SourceOnly: true}}}}}}
+	if text := receipt(report); !strings.Contains(text, "Read 0 of 1 changed file") {
+		t.Fatalf("planned task counted as read: %s", text)
+	}
+	report.AssessedDesignTasks = []string{"a"}
+	if text := receipt(report); !strings.Contains(text, "Read 1 changed file.") {
+		t.Fatalf("successful task scope was miscounted: %s", text)
 	}
 }

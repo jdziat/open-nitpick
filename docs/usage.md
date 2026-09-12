@@ -332,8 +332,10 @@ nitpick review -profile engineering -base main
 nitpick commits -base main -check
 ```
 
-`repo-standards` examines the selected working tree; `review` examines changed
-files with available related context. `-base` also selects the accepted repository
+`repo-standards` examines the selected working tree. Engineering `review` groups
+changed Go files with their package siblings, direct dependencies and callers
+in one model request per task. Other languages receive source tasks with graph
+limitations stated in the report. `-base` also selects the accepted repository
 policy and the commit range. An external `-config` file is operator policy.
 Repository configuration edits cannot weaken their own checks.
 
@@ -353,6 +355,15 @@ The engineering tree scan runs models. `-no-model` provides
 deterministic results but leaves required slop and design assessments unavailable.
 `-budget` limits estimated source tokens for the tree model pass; omitted targets
 remain visible. It is not a monetary spending limit.
+
+Package tasks use a frozen, bounded source snapshot. Missing source and tasks
+that exceed file, token or spending limits remain incomplete; separate successful
+requests containing the same files do not establish package coverage. Expert
+validation keeps the complete task context or records that it exceeded the
+prompt limit. Context-only findings appear in the summary, with revision-pinned
+source links when the forge supplies them. Cancellation preserves completed task
+evidence and marks unfinished stages. These are coverage records, not a claim
+that every architectural defect was ruled out.
 
 The initial policy requires completion of conventions, linters, commits, slop
 tells, slop assessment and design assessment. Commit and analyzer violations

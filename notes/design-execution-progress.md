@@ -2,8 +2,8 @@
 
 Work in progress on `feat/package-design-execution`. Package assembly now runs
 inside `Engine.Review`, after accepted policy resolution. Ordinary reviews keep
-their existing assembly path. The execution branch still needs the latest parent
-report contract changes and a final review before publication.
+their existing assembly path. The execution branch is rebased through parent commit aaf1924; its final
+parent follow-up, final gates and review are still required before publication.
 
 Implemented:
 
@@ -25,7 +25,8 @@ Implemented:
 - Experts receive exact task context. Merged claims retain both contexts; the
   engineering prompt budget rejects oversized expert requests without dropping
   the claim or silently truncating evidence.
-- Design file counts exclude context-only and repeated paths.
+- Design file counts exclude context-only and repeated paths. Summary receipts
+  count successful tasks only, and incomplete source paths are deduplicated.
 
 Scripted checks cover actual Engine.Review requests containing a package sibling
 and caller, zero-finding task completion, and spending omissions with no model
@@ -35,12 +36,11 @@ Full-pipeline controls now cover context-only claims through review, triage,
 expert validation and summary publication, plus cancellation during review and
 triage with completed task evidence preserved. Planning also refuses invented
 module identities when manifests or enumeration are incomplete.
-Activation and snapshot-reread mutations both fail their controls. Earlier
-source-capture, exact-context and completion mutations also failed.
+Activation and snapshot-reread mutations both fail their controls. Count, merged-context and expert-limit mutations also fail their controls.
+Earlier source-capture, exact-context and completion mutations failed.
 
 Remaining:
 
-- Audit summary counts beyond Plan.Files and add repeated-task count controls.
 - Rebase onto the final parent PR without losing execution or source bindings.
 - Run full gates and local/hosted reviews; publish a separate execution PR.
 - Complete paired mechanism fixtures and live evaluations, then audit every

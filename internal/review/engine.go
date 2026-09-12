@@ -766,6 +766,8 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	report.AssessedDesignTasks = append([]string(nil), e.assessedDesignTasks...)
 	styleWG.Wait()
 	report.Incomplete = append(report.Incomplete, unreviewed...)
+	slices.Sort(report.Incomplete)
+	report.Incomplete = slices.Compact(report.Incomplete)
 	report.Escalated = append(report.Escalated, escalated...)
 	if err != nil {
 		if report.DesignExecution != nil {
