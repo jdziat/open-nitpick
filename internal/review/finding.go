@@ -6,15 +6,29 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
+// TaskContext retains the exact source rendering that produced a design claim.
+type TaskContext struct {
+	ID    string
+	Text  string
+	Lines map[string]int
+	// Spans records partial files; Lines contains only whole-file evidence.
+	Spans map[string][]bundle.SourceSpan
+}
+
 // Finding is one issue reported about the change.
 //
-// Every field is a plain scalar or slice of scalars: the SDK derives the JSON
+// Every model-facing field is a plain scalar or slice of scalars: the SDK derives the JSON
 // Schema for structured output by reflection, and maps or interface fields
 // would produce an unconstrained schema that strict validators reject.
 type Finding struct {
+	// TaskContext is engine-owned evidence; models cannot assert their own scope.
+	TaskContext *TaskContext `json:"-"`
+	// SummaryOnly keeps valid source evidence off invented inline anchors.
+	SummaryOnly bool `json:"-"`
 	// Path is the repository-relative file the finding is about.
 	Path string `json:"path"`
 
@@ -266,15 +280,16 @@ func sortFindings(findings []Finding) {
 // dedupe removes findings that report the same defect at the same place,
 // keeping the first occurrence.
 func dedupe(findings []Finding) []Finding {
-	seen := make(map[string]struct{}, len(findings))
+	seen := make(map[string]int, len(findings))
 	out := make([]Finding, 0, len(findings))
 
 	for _, f := range findings {
 		key := f.Key()
-		if _, ok := seen[key]; ok {
+		if index, ok := seen[key]; ok {
+			absorb(&out[index], f)
 			continue
 		}
-		seen[key] = struct{}{}
+		seen[key] = len(out)
 		out = append(out, f)
 	}
 

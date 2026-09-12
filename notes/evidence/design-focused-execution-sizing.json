@@ -1,0 +1,123 @@
+{
+  "design_tasks": 4666,
+  "errors": null,
+  "excluded": [
+    {
+      "Path": "internal/knowledge/indexes",
+      "Reason": "matched an ignore pattern"
+    },
+    {
+      "Path": "internal/review/design_repository_probe_test.go",
+      "Reason": "matched an ignore pattern"
+    },
+    {
+      "Path": "internal/evals/1",
+      "Reason": "empty"
+    },
+    {
+      "Path": "website/assets/fonts/Inter-var.woff2",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/fonts/JetBrainsMono-var.woff2",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/logo-candidates/hunk-bracket-v2.png",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/logo-candidates/hunk-bracket.png",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/logo-candidates/n-gutter.png",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/logo-candidates/tweezers.png",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/logo.jpg",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/social.png",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/hooks/__pycache__/page_sources.cpython-312.pyc",
+      "Reason": "binary"
+    }
+  ],
+  "omitted_tasks": null,
+  "request_tokens": 19667514,
+  "requests": 183,
+  "snapshot_skipped": [
+    {
+      "Path": "internal/evals/1",
+      "Reason": "empty"
+    },
+    {
+      "Path": "internal/knowledge/indexes/openrouter-openai-text-embedding-3-small.json",
+      "Reason": "larger than 262144 bytes"
+    },
+    {
+      "Path": "internal/knowledge/indexes/openrouter-qwen-qwen3-embedding-8b.json",
+      "Reason": "larger than 262144 bytes"
+    },
+    {
+      "Path": "internal/knowledge/indexes/openrouter-voyageai-voyage-code-4.json",
+      "Reason": "larger than 262144 bytes"
+    },
+    {
+      "Path": "website/assets/fonts/Inter-var.woff2",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/fonts/JetBrainsMono-var.woff2",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/logo-candidates/hunk-bracket-v2.png",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/logo-candidates/hunk-bracket.png",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/logo-candidates/n-gutter.png",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/logo-candidates/tweezers.png",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/logo.jpg",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/assets/social.png",
+      "Reason": "binary"
+    },
+    {
+      "Path": "website/hooks/__pycache__/page_sources.cpython-312.pyc",
+      "Reason": "binary"
+    }
+  ],
+  "sources": 619,
+  "whole_source_slop_tasks": 357,
+  "measurement": "Deterministic sizing only; no model assessment. Source snapshot excludes temporary probe.",
+  "limits": {
+    "max_files": 1024,
+    "max_files_per_request": 256,
+    "tokens_per_request": 200000,
+    "framing_reserve": 20000,
+    "tasks_per_request": 64
+  },
+  "tracked_source_digest": "549ad3085475f800ecc9a847f1031080a262f4c0d78948702defcf784a3c4fcf",
+  "base_commit": "b4e269e541853a5391a1e7a21efdfc31ef7e44fb"
+}

@@ -34,6 +34,9 @@ type Entry struct {
 	// excluded by the token budget.
 	Content string
 
+	// SourceSpans restrict supporting design evidence to original line ranges.
+	SourceSpans []SourceSpan
+
 	// Truncated marks that Content is a window around the changed hunks
 	// rather than the whole file.
 	Truncated bool
@@ -54,18 +57,41 @@ type Entry struct {
 }
 
 // HasContent reports whether full-file context is attached.
-func (e *Entry) HasContent() bool { return e.Content != "" }
+func (e *Entry) HasContent() bool { return e.Content != "" && len(e.SourceSpans) == 0 }
 
 // Batch is a group of entries reviewed in one model call.
 type Batch struct {
-	// DesignTask identifies the complete package assessment carried by this call.
+	// DesignTask identifies the first complete assessment carried by this call.
 	DesignTask string
+	// AdditionalDesignTasks share this request and complete or fail with it.
+	AdditionalDesignTasks []string
 	// Assessment describes the task and its source scope.
 	Assessment string
 	Entries    []Entry
 
 	// Tokens is the estimated total for the batch.
 	Tokens int
+}
+
+// DesignTaskIDs returns every indivisible assessment assigned to this request.
+func (b Batch) DesignTaskIDs() []string {
+	if b.DesignTask == "" {
+		return nil
+	}
+	return append([]string{b.DesignTask}, b.AdditionalDesignTasks...)
+}
+
+// DesignAssessed reports whether every task in the request completed.
+func (b Batch) DesignAssessed(completed []string) bool {
+	if b.DesignTask == "" || !slices.Contains(completed, b.DesignTask) {
+		return false
+	}
+	for _, id := range b.AdditionalDesignTasks {
+		if !slices.Contains(completed, id) {
+			return false
+		}
+	}
+	return true
 }
 
 // Paths returns the batch's file paths.
@@ -141,11 +167,21 @@ type Skip struct {
 	Reason string
 }
 
-// Files returns every file across all batches.
+// Files counts reviewed files; design context and repeated paths count once.
 func (p *Plan) Files() int {
 	n := 0
+	seen := map[string]bool{}
 	for _, b := range p.Batches {
-		n += len(b.Entries)
+		if b.DesignTask == "" {
+			n += len(b.Entries)
+			continue
+		}
+		for _, entry := range b.Entries {
+			if !entry.SourceOnly && !seen[entry.File.Path] {
+				seen[entry.File.Path] = true
+				n++
+			}
+		}
 	}
 	return n
 }
@@ -564,6 +600,9 @@ func RenderDiffOnly(e Entry) string {
 // lives in. Line numbers are included throughout, since a finding is only
 // actionable if the model can cite where it belongs.
 func Render(e Entry) string {
+	if len(e.SourceSpans) > 0 {
+		return renderSourceSpans(e)
+	}
 	if e.SourceOnly {
 		var b strings.Builder
 		fmt.Fprintf(&b, "### Supporting source: %s\nFindings here are summary evidence, not inline comments.\n", promptSafe(e.File.Path))

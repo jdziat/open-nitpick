@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -117,6 +118,9 @@ func (g *GitHub) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error)
 		HeadRepo: pr.GetHead().GetRepo().GetFullName(),
 		BaseRepo: pr.GetBase().GetRepo().GetFullName(),
 		Draft:    pr.GetDraft(),
+	}
+	if repositoryURL := pr.GetHead().GetRepo().GetHTMLURL(); repositoryURL != "" && out.HeadSHA != "" {
+		out.SourceBaseURL = strings.TrimSuffix(repositoryURL, "/") + "/blob/" + url.PathEscape(out.HeadSHA)
 	}
 	// The head commit's message, for a skip marker; a failure to read it
 	// is not a failure to review, so it is logged by absence only.

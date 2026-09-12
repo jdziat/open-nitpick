@@ -67,6 +67,12 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 			}
 		}
 	}
+	frozen := map[string][]byte{}
+	if execution := reviewReport.DesignExecution; execution != nil {
+		for _, file := range execution.Sources {
+			frozen[file.Path] = file.Src
+		}
+	}
 	for index, file := range reviewReport.Files {
 		if file.Kind == diff.ChangeDeleted || cfg.Ignored(file.Path) {
 			continue
@@ -79,7 +85,20 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 			}
 			break
 		}
-		body, err := provider.FileContent(ctx, ref, file.Path)
+		var body []byte
+		var err error
+		if execution := reviewReport.DesignExecution; execution != nil {
+			if frozenExcluded(file.Path, execution.Excluded) {
+				continue
+			}
+			var ok bool
+			body, ok = frozen[file.Path]
+			if !ok {
+				err = errors.New("source absent from design snapshot")
+			}
+		} else {
+			body, err = provider.FileContent(ctx, ref, file.Path)
+		}
 		if err != nil {
 			failed = append(failed, file.Path)
 			continue
@@ -127,7 +146,13 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 		conventions.State, conventions.Reason = practices.Partial, "accepted convention measurement unavailable: "+status.Reason
 	}
 	r.Checks = append(r.Checks, conventions)
-	inventoryFiles, metadataErrors := designContextFiles(ctx, provider, ref, files)
+	var inventoryFiles []standards.File
+	var metadataErrors []string
+	if execution := reviewReport.DesignExecution; execution != nil {
+		inventoryFiles, metadataErrors = frozenDesignContext(files, execution)
+	} else {
+		inventoryFiles, metadataErrors = designContextFiles(ctx, provider, ref, files)
+	}
 	inventory, boundaries := practices.InspectDesign(inventoryFiles, cfg.Practices.Boundaries)
 	if boundaries.State == practices.Unavailable && len(reviewReport.Files) > 0 && !goBoundaryChange(reviewReport.Files) {
 		boundaries.State, boundaries.Reason = practices.NotApplicable, "change contains no Go source or module boundary changes"
@@ -155,7 +180,7 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 			r.Checks = append(r.Checks, practices.Check{ID: "commit-title", Version: "1", Instrument: practices.Deterministic, State: practices.Unavailable, Reason: "no forge PR title available"})
 		}
 	}
-	checks := []practices.Check{{ID: "slop", Version: "1", Instrument: practices.Model, PromptVersion: "engineering-2"}, {ID: "design", Version: "1", Instrument: practices.Model, PromptVersion: "engineering-2"}}
+	checks := []practices.Check{{ID: "slop", Version: "1", Instrument: practices.Model, PromptVersion: "engineering-4"}, {ID: "design", Version: "1", Instrument: practices.Model, PromptVersion: "engineering-4"}}
 	for i := range checks {
 		for _, file := range files {
 			checks[i].Planned = append(checks[i].Planned, practices.Target{Kind: practices.FileTarget, ID: file.Path})
@@ -283,4 +308,46 @@ func goBoundaryChange(files diff.Files) bool {
 		}
 	}
 	return false
+}
+
+func frozenExcluded(name string, excluded []bundle.Skip) bool {
+	for _, skip := range excluded {
+		if name == skip.Path || strings.HasPrefix(name, strings.TrimSuffix(skip.Path, "/")+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func frozenDesignContext(files []standards.File, execution *review.DesignExecution) ([]standards.File, []string) {
+	out := slices.Clone(files)
+	seen := map[string]bool{}
+	for _, file := range out {
+		seen[file.Path] = true
+	}
+	for _, file := range execution.Sources {
+		if path.Base(file.Path) == "go.mod" && !seen[file.Path] {
+			out = append(out, file)
+			seen[file.Path] = true
+		}
+	}
+	problems := slices.Clone(execution.Design.Errors)
+	for _, file := range files {
+		if path.Ext(file.Path) != ".go" {
+			continue
+		}
+		for dir := path.Dir(file.Path); ; dir = path.Dir(dir) {
+			name := path.Join(dir, "go.mod")
+			if !seen[name] && (len(execution.Design.Errors) > 0 || frozenExcluded(name, execution.Excluded)) {
+				// An unknown nested module must not inherit an outer module's identity.
+				out = append(out, standards.File{Path: name})
+				seen[name] = true
+				problems = append(problems, name+": module metadata unavailable in design snapshot")
+			}
+			if dir == "." {
+				break
+			}
+		}
+	}
+	return out, problems
 }

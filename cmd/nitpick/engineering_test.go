@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -458,5 +459,175 @@ func TestReviewBoundaryApplicabilityKeepsMissingGoInputsIncomplete(t *testing.T)
 			}
 			t.Fatal("boundary instrument did not report its state")
 		})
+	}
+}
+
+func TestEngineeringScopeRetainsFileLimitAndMarksSelectedProfile(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Review.MaxFiles = 3
+	applyEngineeringScope(cfg)
+	if cfg.Practices.Profile != "engineering" || cfg.Review.MaxFiles != 3 {
+		t.Fatalf("profile selection lost the explicit scope: profile=%q files=%d", cfg.Practices.Profile, cfg.Review.MaxFiles)
+	}
+}
+
+func TestPackageCoverageUsesSuccessfulTasksInsteadOfSharedFiles(t *testing.T) {
+	a := practices.Target{Kind: practices.FileTarget, ID: "a.go"}
+	b := practices.Target{Kind: practices.FileTarget, ID: "b.go"}
+	tasks := []practices.DesignTask{
+		{ID: "package:a", Source: a, Sources: []practices.Target{a}, Context: []practices.Target{b}, SourceDigest: strings.Repeat("a", 64), Purpose: "assess a"},
+		{ID: "package:b", Source: b, Sources: []practices.Target{b}, Context: []practices.Target{a}, SourceDigest: strings.Repeat("b", 64), Purpose: "assess b"},
+	}
+	entries := []bundle.Entry{{File: &diff.File{Path: "a.go"}, Content: "package a"}, {File: &diff.File{Path: "b.go"}, Content: "package b"}}
+	report := &review.Report{DesignExecution: &review.DesignExecution{DesignPacking: practices.DesignPacking{Design: practices.DesignPlan{Tasks: tasks}}}, Plan: &bundle.Plan{Batches: []bundle.Batch{{DesignTask: "package:a", Entries: entries}, {DesignTask: "package:b", Entries: entries}}}, AssessedDesignTasks: []string{"package:a"}}
+	result := modelCheckResults([]practices.Check{{ID: "design", Planned: []practices.Target{a, b}}}, report)[0]
+	if result.State != practices.Partial || len(result.Examined) != 1 || result.Examined[0].ID != "package:a" || len(result.Omitted) != 1 || result.Omitted[0].Target.ID != "package:b" {
+		t.Fatalf("shared source became successful task coverage: %+v", result)
+	}
+	report.AssessedDesignTasks = append(report.AssessedDesignTasks, "package:b")
+	completed := modelCheckResults([]practices.Check{{ID: "design"}}, report)[0]
+	if completed.State != practices.Completed || len(completed.Examined) != 2 || len(completed.Tasks) != 2 {
+		t.Fatalf("empty successful assessments lost task evidence: %+v", completed)
+	}
+	report.DesignExecution.Design.Errors = []string{"caller inventory truncated"}
+	partial := modelCheckResults([]practices.Check{{ID: "design"}}, report)[0]
+	if partial.State != practices.Partial || len(partial.FailedStages) == 0 {
+		t.Fatalf("unknown graph scope was promoted: %+v", partial)
+	}
+}
+
+func TestEngineeringAssessmentUsesFrozenSourceWithoutProviderReads(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "-q", "-b", "main")
+	write(t, root, "go.mod", "module example.com/frozen\n\ngo 1.25\n")
+	write(t, root, "a.go", "package frozen\n")
+	git(t, root, "add", ".")
+	git(t, root, "commit", "-qm", "feat: initial")
+	provider := &assessmentReadTrap{Provider: vcs.NewLocal(root, nil)}
+	report := &review.Report{Files: diff.Files{&diff.File{Path: "a.go"}}, Plan: &bundle.Plan{}, DesignExecution: &review.DesignExecution{Sources: []standards.File{
+		{Path: "a.go", Src: []byte("package frozen\n")},
+		{Path: "go.mod", Src: []byte("module example.com/frozen\n")},
+		{Path: "background/b.go", Src: []byte("package background\n")},
+	}}}
+	cfg := config.Defaults()
+	cfg.Practices.Boundaries = []config.PracticeBoundary{{From: "*", Forbid: []string{"forbidden"}}}
+	result := assessReviewPractices(t.Context(), root, cfg, vcs.Ref{Base: "main", Head: vcs.Worktree}, nil, report, provider)
+	if provider.reads != 0 {
+		t.Fatalf("assessment reread frozen source %d times", provider.reads)
+	}
+	for _, check := range result.Checks {
+		if check.ID == "snapshot" {
+			t.Fatalf("frozen source became unavailable: %+v", check)
+		}
+		if check.ID == "design-boundaries" && (check.State != practices.Completed || len(check.Examined) != 1 || check.Examined[0].ID != "a.go") {
+			t.Fatalf("boundary scope changed: %+v", check)
+		}
+	}
+	if len(result.Design.Units) != 1 || result.Design.Units[0].ID != "example.com/frozen" {
+		t.Fatalf("frozen module identity lost: %+v", result.Design)
+	}
+}
+
+type assessmentReadTrap struct {
+	vcs.Provider
+	reads int
+}
+
+func (p *assessmentReadTrap) FileContent(context.Context, vcs.Ref, string) ([]byte, error) {
+	p.reads++
+	return nil, errors.New("source changed after capture")
+}
+
+func TestFrozenMetadataDoesNotInventAnOuterModuleIdentity(t *testing.T) {
+	for _, excluded := range []bool{false, true} {
+		execution := &review.DesignExecution{Sources: []standards.File{{Path: "go.mod", Src: []byte("module example.com/outer\n")}}}
+		if excluded {
+			execution.Excluded = []bundle.Skip{{Path: "nested/go.mod", Reason: bundle.ReasonIgnored}}
+		} else {
+			execution.Design.Errors = []string{"nested/go.mod: unavailable"}
+		}
+		files, problems := frozenDesignContext([]standards.File{{Path: "nested/a.go", Src: []byte("package nested\n")}}, execution)
+		inventory, _ := practices.InspectDesign(files, nil)
+		if len(problems) == 0 || len(inventory.Errors) == 0 || len(inventory.Units) != 0 {
+			t.Fatalf("missing metadata invented a package: %+v; %v", inventory, problems)
+		}
+	}
+}
+
+func TestDesignCoveragePublishesThePlannerScopeLimitations(t *testing.T) {
+	report := &review.Report{DesignExecution: &review.DesignExecution{DesignPacking: practices.DesignPacking{Design: practices.DesignPlan{Limitations: []string{"deeper implementation bodies were not supplied"}}}}}
+	check := practices.Check{ID: "design"}
+	applyPackageCoverage(&check, report)
+	if !slices.Equal(check.Limitations, report.DesignExecution.Design.Limitations) {
+		t.Fatalf("lost planner limits: %+v", check)
+	}
+	text := (practices.Report{Profile: "engineering", Checks: []practices.Check{check}}).Text()
+	if !strings.Contains(text, "Scope limit: deeper implementation bodies were not supplied") {
+		t.Fatalf("hidden planner limit: %s", text)
+	}
+	data, err := json.Marshal(check)
+	if err != nil || !strings.Contains(string(data), `"limitations":["deeper implementation bodies were not supplied"]`) {
+		t.Fatalf("JSON lost limits: %s %v", data, err)
+	}
+}
+
+func TestSlopCoverageKeepsSuccessfulReadsAcrossSharedTaskFailures(t *testing.T) {
+	source := practices.Target{Kind: practices.FileTarget, ID: "source.go"}
+	tasks := []practices.DesignTask{
+		{ID: "first", Source: source, Sources: []practices.Target{source}, SourceDigest: strings.Repeat("a", 64), Purpose: "first declaration"},
+		{ID: "second", Source: source, Sources: []practices.Target{source}, SourceDigest: strings.Repeat("b", 64), Purpose: "second declaration"},
+	}
+	entry := bundle.Entry{File: &diff.File{Path: source.ID}, Content: "package fixture\nfunc A() {}\nfunc B() {}\n"}
+	report := &review.Report{DesignExecution: &review.DesignExecution{DesignPacking: practices.DesignPacking{Design: practices.DesignPlan{Tasks: tasks}}}, Plan: &bundle.Plan{Batches: []bundle.Batch{{DesignTask: "first", Entries: []bundle.Entry{entry}}, {DesignTask: "second", Entries: []bundle.Entry{entry}}}}, AssessedDesignTasks: []string{"first"}, Incomplete: []string{source.ID}}
+	checks := func() []practices.Check {
+		return modelCheckResults([]practices.Check{{ID: "slop", Planned: []practices.Target{source}}, {ID: "design"}}, report)
+	}
+	got := checks()
+	if got[0].State != practices.Completed || len(got[0].Examined) != 1 || got[1].State != practices.Partial || len(got[1].Examined) != 1 || len(got[1].Omitted) != 1 {
+		t.Fatalf("shared failure erased completed evidence: %+v", got)
+	}
+	report.AssessedDesignTasks = nil
+	report.Incomplete = nil
+	for _, check := range checks() {
+		if len(check.Examined) != 0 || check.State == practices.Completed {
+			t.Fatalf("planned source claimed a read: %+v", check)
+		}
+	}
+}
+
+func TestFocusedDesignCompletionDoesNotInventWholeFileSlopCoverage(t *testing.T) {
+	files := []standards.File{{Path: "go.mod", Src: []byte("module example.com/app\n")}, {Path: "app.go", Src: []byte("package app\nfunc First(){}\nfunc Second(){}\n")}}
+	inventory, _ := practices.InspectDesign(files, nil)
+	plan := practices.PlanDesignInteractions(t.Context(), inventory, files, []string{"app.go"})
+	designOnly, slopOnly := plan, plan
+	designOnly.Tasks = slices.DeleteFunc(slices.Clone(plan.Tasks), func(task practices.DesignTask) bool { return task.SlopOnly })
+	slopOnly.Tasks = slices.DeleteFunc(slices.Clone(plan.Tasks), func(task practices.DesignTask) bool { return !task.SlopOnly })
+	if len(designOnly.Tasks) != 2 || len(slopOnly.Tasks) != 1 {
+		t.Fatalf("unexpected task scope: %+v", plan)
+	}
+	packed := practices.PackDesign(t.Context(), config.Defaults(), designOnly, files, nil, bundle.Reserve{})
+	report := &review.Report{Plan: packed.Plan, DesignExecution: &review.DesignExecution{DesignPacking: practices.DesignPacking{Design: plan}}}
+	for _, batch := range packed.Plan.Batches {
+		report.AssessedDesignTasks = append(report.AssessedDesignTasks, batch.DesignTaskIDs()...)
+	}
+	checks := func() []practices.Check {
+		return modelCheckResults([]practices.Check{{ID: "slop", Planned: []practices.Target{{Kind: practices.FileTarget, ID: "app.go"}}}, {ID: "design"}}, report)
+	}
+	got := checks()
+	if got[0].State != practices.Partial || len(got[0].Examined) != 0 || got[1].State != practices.Completed || len(got[1].Examined) != 2 || len(got[1].Context) != 0 {
+		t.Fatalf("design excerpts claimed a whole-source pass: %+v", got)
+	}
+	full := practices.PackDesign(t.Context(), config.Defaults(), slopOnly, files, nil, bundle.Reserve{})
+	if len(full.Plan.Batches) != 1 {
+		t.Fatal("whole-source slop request did not pack")
+	}
+	report.Plan.Batches = append(report.Plan.Batches, full.Plan.Batches...)
+	if checks()[0].State != practices.Partial || len(checks()[1].Context) != 0 {
+		t.Fatal("planned slop request claimed success or supplied examined context")
+	}
+	report.AssessedDesignTasks = append(report.AssessedDesignTasks, full.Plan.Batches[0].DesignTaskIDs()...)
+	got = checks()
+	if got[0].State != practices.Completed || len(got[0].Examined) != 1 || len(got[1].Examined) != 2 || len(got[1].Tasks) != 2 || !slices.Contains(got[1].Context, practices.Target{Kind: practices.FileTarget, ID: "app.go"}) {
+		t.Fatalf("whole-source pass lost slop or inflated design coverage: %+v", got)
 	}
 }
