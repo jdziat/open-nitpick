@@ -1,0 +1,10 @@
+package fixture
+
+// CheckoutShipping quotes the shared retail shipping policy: orders of at least
+// 5000 cents ship free; smaller orders cost 500 cents.
+func CheckoutShipping(subtotal int) int {
+	if subtotal >= 5000 {
+		return 0
+	}
+	return 500
+}

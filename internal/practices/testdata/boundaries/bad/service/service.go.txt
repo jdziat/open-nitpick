@@ -1,0 +1,6 @@
+package service
+
+import "example.com/fixture/storage"
+
+// Name resolves the display name used by the UI.
+func Name(id string) string { return storage.Load(id) }
