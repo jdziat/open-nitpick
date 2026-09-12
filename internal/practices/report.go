@@ -223,7 +223,12 @@ func (r Report) Problems() []string {
 			if !task.Source.valid() || task.Purpose == "" || !planned[Target{Kind: UnitTarget, ID: task.ID}] {
 				bad("design task lacks a planned unit, source or purpose")
 			}
+			seenOmissions := map[Omission]bool{}
 			for _, omission := range task.Omitted {
+				if seenOmissions[omission] {
+					bad("design task repeats an omission")
+				}
+				seenOmissions[omission] = true
 				if !omission.Target.valid() || (omission.Target.Kind != FileTarget && omission.Target.Kind != UnitTarget) || strings.TrimSpace(omission.Reason) == "" {
 					bad("design task has invalid omission target or reason")
 				}

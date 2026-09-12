@@ -151,3 +151,18 @@ func TestTaskOmissionsRequireValidScopeAndAnExplanation(t *testing.T) {
 		}
 	}
 }
+
+func TestTaskOmissionsRejectDuplicateEvidenceButRetainDistinctReasons(t *testing.T) {
+	source := Target{Kind: FileTarget, ID: "a.go"}
+	unit := Target{Kind: UnitTarget, ID: "package:a"}
+	commit := Target{Kind: CommitTarget, ID: "sha"}
+	r := fixtureReport(Check{ID: "commits", Version: "1", Instrument: Deterministic, State: Completed, Planned: []Target{commit}, Examined: []Target{commit}},
+		Check{ID: "design", Version: "1", Instrument: Model, State: Partial, Reason: "budget", Planned: []Target{unit}, Omitted: []Omission{{Target: unit, Reason: "budget"}}, Tasks: []DesignTask{{ID: unit.ID, Source: source, Sources: []Target{source}, Purpose: "review a", Omitted: []Omission{{Target: unit, Reason: "missing source"}, {Target: unit, Reason: "cancelled"}}}}})
+	if len(r.Problems()) != 0 {
+		t.Fatalf("distinct causes were conflated: %v", r.Problems())
+	}
+	r.Checks[1].Tasks[0].Omitted[1] = r.Checks[1].Tasks[0].Omitted[0]
+	if !strings.Contains(strings.Join(r.Problems(), ";"), "repeats an omission") {
+		t.Fatalf("duplicate omission passed: %v", r.Problems())
+	}
+}
