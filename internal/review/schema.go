@@ -217,15 +217,15 @@ func validationSchema() (json.RawMessage, error) {
 					"severity when the defect is real but rated wrong, unresolved when you cannot " +
 					"decide from what you were shown and can name what is missing.",
 			},
-			Reason: map[string]any{
-				"type": "string",
-				"description": "One or two sentences. For a refutation this is the specific reason the claim " +
-					"is wrong; uncertainty is not a reason.",
-			},
 			RevisedSeverity: map[string]any{
 				"type":        "string",
 				"enum":        severityEnum,
 				"description": "Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.",
+			},
+			Reason: map[string]any{
+				"type": "string",
+				"description": "One or two sentences. For a refutation this is the specific reason the claim " +
+					"is wrong; uncertainty is not a reason.",
 			},
 			Cited: map[string]any{
 				"type": "string",

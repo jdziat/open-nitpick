@@ -1,6 +1,6 @@
 # Triage acknowledgement controls
 
-Status: protocol controls pass; follow-up implementation review pending. Engineering
+Status: live triage controls pass; implementation review adjudicated. Engineering
 prompt version 7 asks reviewers to return an empty findings array when they have
 no alleged problem. Task completion is recorded by the engine.
 

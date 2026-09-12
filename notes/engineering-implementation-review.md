@@ -20,6 +20,23 @@ substitution test to fail. The [four mutation results](evidence/indirection-cont
 cover bypassed layers, added forwarder behavior and a weakened substitution test.
 The fixture source digests remain unchanged from the version-5 trials.
 
-A follow-up review of `bf03e53..74d46f5` is pending. It enables expert validation
-and excludes raw `notes/evidence/**` from model input while retaining the written
-summaries. This review does not substitute for a full internal engineering run.
+The [follow-up reviews](evidence/implementation-v9-review.json) assessed
+`bf03e53..74d46f5` with expert validation, excluding raw `notes/evidence/**`
+while retaining the written summaries. The first published zero findings but
+filtered a candidate without retaining its text. It is not counted as resolved.
+The second enabled every severity and pedantic publication, which also runs an
+additional style pass. It published five nits and retained one expert refutation.
+
+Two nits claim the recorder's counter is never read. Both are false:
+`validation_contract_eval_test.go` reads it before and after the validator call
+to prove the model ran. The suggested removal would weaken that control.
+The remaining nits are addressed by sharing the engineering prompt-version
+constant, aligning the validation literal with its declared field order, and
+using “live triage controls” in the status line. Prompt text and emitted schema
+remain unchanged.
+
+The withheld finding names stale audit wording. The audit was updated in
+`65d7cb2`, after the reviewed snapshot. Its expert's claim that no schema change
+existed is incorrect: the expert saw a narrower excerpt than the full change.
+Retain that context limitation rather than counting the refutation as evidence
+of accuracy. These reviews do not substitute for a full internal engineering run.

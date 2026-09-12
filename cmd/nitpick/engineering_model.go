@@ -18,6 +18,8 @@ import (
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
+const engineeringPromptVersion = "engineering-9"
+
 const engineeringPrompt = `Engineering assessment, version 9.
 A request can contain several assessment tasks. Assess every listed design focus
 with the supplied related evidence. A slop_only task requests a whole-source slop
@@ -53,8 +55,8 @@ func engineeringInstruction(files []standards.File) string {
 
 func engineeringModelChecks(ctx context.Context, root, configPath, base string, noModel bool, budget int, files []standards.File) ([]practices.Check, []practices.ModelUsage) {
 	checks := []practices.Check{
-		{ID: "slop", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-9"},
-		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-9"},
+		{ID: "slop", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: engineeringPromptVersion},
+		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: engineeringPromptVersion},
 	}
 	for i := range checks {
 		for _, file := range files {

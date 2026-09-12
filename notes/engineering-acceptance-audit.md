@@ -82,5 +82,7 @@ agents generation, touched-file slop and commit checks all exited successfully.
 The slop scan retained eight prose tells; its successful exit does not mean zero
 findings. The [implementation adjudication](engineering-implementation-review.md)
 records the earlier review's false missing-test claim and repaired indirection
-control. The follow-up source review and full internal model assessment remain
-pending.
+control. Follow-up source review returned five nits: two duplicate false claims
+and three addressed suggestions. An additional expert refutation relied on
+incomplete context; its stale-documentation issue was already corrected. The
+full internal model assessment remains pending.
