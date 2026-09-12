@@ -86,3 +86,21 @@ control. Follow-up source review returned five nits: two duplicate false claims
 and three addressed suggestions. An additional expert refutation relied on
 incomplete context; its stale-documentation issue was already corrected. The
 full internal model assessment remains pending.
+
+## Internal profile execution result
+
+The first unbounded internal run planned 200 requests over 657 files and was
+stopped after 40 requests because the operator policy had no total review budget.
+A cost-capped retry selected 11 requests over 184 files under a `$2` ceiling
+using explicitly supplied placeholder rates; three requests completed before
+repeated GLM provider 500/502 responses and a stalled request forced an
+interruption. A smaller 60,000-token/64-file retry selected 25 requests over 202
+files; two completed before the same provider failure pattern. The [retained
+run evidence](evidence/internal-profile-runs.json) records logs and hashes.
+
+These runs establish practical execution limits and unavailable-provider
+behavior. They do not establish full repository quality, model precision, or
+required engineering-profile completion. The profile remains partial and its
+model checks remain advisory. Do not merge or require model completion in CI
+until a healthy provider run completes the selected coverage or the policy
+explicitly accepts bounded partial coverage.
