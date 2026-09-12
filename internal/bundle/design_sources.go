@@ -81,6 +81,10 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 				continue
 			}
 			name := path.Join(dir, base)
+			if designMetadataPath(name) {
+				exclude(name, "repository metadata")
+				continue
+			}
 			if cfg.Ignored(name) || cfg.Ignored(name+"/") {
 				exclude(name, ReasonIgnored)
 				continue
@@ -101,6 +105,10 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 	slices.Sort(ordered)
 	used, reads := 0, 0
 	for _, name := range ordered {
+		if designMetadataPath(name) {
+			exclude(name, "repository metadata")
+			continue
+		}
 		reason := denied[name]
 		if path.Clean(name) != name || name == "." || strings.HasPrefix(name, "/") || strings.HasPrefix(name, "../") || strings.ContainsAny(name, "\\\x00") {
 			reason = "invalid source path"
@@ -154,4 +162,14 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 		}
 	}
 	return view
+}
+
+func designMetadataPath(name string) bool {
+	for _, component := range strings.Split(name, "/") {
+		switch strings.ToLower(component) {
+		case ".git", ".hg", ".svn":
+			return true
+		}
+	}
+	return false
 }

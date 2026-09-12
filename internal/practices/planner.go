@@ -26,22 +26,19 @@ type DesignPlan struct {
 // A nil changed slice selects the tree; an empty nonnil slice selects no tasks.
 // The caller must supply an inventory of the full permitted source scope.
 func PlanDesign(ctx context.Context, inventory DesignInventory, files []standards.File, changed []string) DesignPlan {
-	plan := DesignPlan{Version: "1", Limitations: slices.Clone(inventory.Limitations), Errors: slices.Clone(inventory.Errors)}
+	plan := DesignPlan{Version: "2", Limitations: slices.Clone(inventory.Limitations), Errors: slices.Clone(inventory.Errors)}
 	plan.Limitations = append(plan.Limitations, "package context follows direct Go imports; dynamic calls and transitive effects are not resolved")
 	sources := make(map[string][]byte, len(files))
 	for _, file := range files {
 		sources[file.Path] = file.Src
 	}
-	units := make(map[string]DesignUnit, len(inventory.Units))
+	contextIndex := indexDesignContext(ctx, inventory, files)
+	plan.Errors = append(plan.Errors, contextIndex.errors...)
+	plan.Limitations = append(plan.Limitations, "dependency context follows referenced declarations and local helpers; caller context follows importing files; selection does not type-check dynamic dispatch")
 	members := map[string]bool{}
-	callers := map[string][]string{}
 	for _, unit := range inventory.Units {
-		units[unit.ID] = unit
 		for _, name := range unit.Files {
 			members[name] = true
-		}
-		for _, dependency := range unit.Dependencies {
-			callers[dependency] = append(callers[dependency], unit.ID)
 		}
 	}
 	selected := map[string]bool{}
@@ -72,26 +69,13 @@ func PlanDesign(ctx context.Context, inventory DesignInventory, files []standard
 			own[name] = true
 			task.Sources = append(task.Sources, Target{Kind: FileTarget, ID: name})
 		}
-		neighbors := append(slices.Clone(unit.Dependencies), callers[unit.ID]...)
-		sort.Strings(neighbors)
-		neighbors = slices.Compact(neighbors)
-		contextFiles := map[string]bool{}
-		for _, id := range neighbors {
-			neighbor, ok := units[id]
-			if !ok {
-				task.Omitted = append(task.Omitted, Omission{Target: Target{Kind: UnitTarget, ID: "package:" + id}, Reason: "dependency package is absent from the permitted inventory"})
-				continue
-			}
-			for _, name := range neighbor.Files {
-				if !own[name] {
-					contextFiles[name] = true
-				}
+		contextNames, omissions := contextIndex.contextFor(unit)
+		task.Omitted = append(task.Omitted, omissions...)
+		for _, name := range contextNames {
+			if !own[name] {
+				task.Context = append(task.Context, Target{Kind: FileTarget, ID: name})
 			}
 		}
-		for name := range contextFiles {
-			task.Context = append(task.Context, Target{Kind: FileTarget, ID: name})
-		}
-		slices.SortFunc(task.Context, func(a, b Target) int { return strings.Compare(a.ID, b.ID) })
 		unresolved := slices.Clone(unit.Unresolved)
 		sort.Strings(unresolved)
 		for _, id := range slices.Compact(unresolved) {

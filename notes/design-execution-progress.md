@@ -2,8 +2,14 @@
 
 Work in progress on `feat/package-design-execution`. Package assembly now runs
 inside `Engine.Review`, after accepted policy resolution. Ordinary reviews keep
-their existing assembly path. The execution branch is rebased through parent commit aaf1924; its final
-parent follow-up, final gates and review are still required before publication.
+their existing assembly path. PR #118 merged as 47b39d4. The execution branch
+still needs rebasing onto that squash commit, final gates and review.
+
+Sizing is a current acceptance blocker: the whole-package planner produced
+24 tasks, 22 above 120,000 estimated tokens. The reference-selection experiment
+still leaves 20 above that limit. See design-context-sizing.md. Execution remains
+unpublished; the implementation's ability to report omissions does not establish
+that its units are practical.
 
 Implemented:
 
@@ -40,6 +46,9 @@ Activation and snapshot-reread mutations both fail their controls. Count, merged
 Earlier source-capture, exact-context and completion mutations failed.
 
 Remaining:
+
+- Revise oversized units without losing declared source/caller obligations;
+  remeasure against this repository before activation.
 
 - Rebase onto the final parent PR without losing execution or source bindings.
 - Run full gates and local/hosted reviews; publish a separate execution PR.

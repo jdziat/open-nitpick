@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
@@ -74,5 +75,24 @@ func TestDesignSourceCaptureBoundsExplicitChangesAndRejectsTraversal(t *testing.
 	view := CaptureDesignSources(t.Context(), cfg, []string{"../outside.go", "a.go", "b.go", "c.go"}, fetch, nil, nil, SourceLimits{Paths: 1, Bytes: 1000})
 	if !slices.Equal(reads, []string{"a.go"}) || len(view.Content) != 1 || len(view.Omitted) != 3 {
 		t.Fatalf("scope escaped bounds: %+v reads=%v", view, reads)
+	}
+}
+
+func TestDesignSourceCaptureExcludesRepositoryMetadataBeforeWalking(t *testing.T) {
+	list := func(_ context.Context, dir string) ([]string, error) {
+		if dir != "" {
+			t.Fatalf("walk entered repository metadata: %s", dir)
+		}
+		return []string{".git/", "app.go", "go.mod"}, nil
+	}
+	fetch := func(_ context.Context, name string) ([]byte, error) {
+		if strings.Contains(name, ".git/") {
+			t.Fatalf("explicit metadata path was read: %s", name)
+		}
+		return []byte("source"), nil
+	}
+	view := CaptureDesignSources(t.Context(), config.Defaults(), []string{"app.go", ".git/hidden.go"}, fetch, list, nil, SourceLimits{Paths: 4, Bytes: 1024})
+	if len(view.Errors) != 0 || len(view.Content) != 2 || len(view.Excluded) != 2 {
+		t.Fatalf("metadata consumed source inventory or disappeared without an exclusion: %+v", view)
 	}
 }
