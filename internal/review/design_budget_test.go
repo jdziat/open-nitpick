@@ -42,3 +42,15 @@ func TestDesignBudgetMinimumDoesNotForceEveryBackgroundPackage(t *testing.T) {
 		t.Fatalf("minimum forced unbounded background scope: %+v %+v", fit, packed)
 	}
 }
+
+func TestDesignBudgetRetainsEveryOmissionInSharedRequest(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Review.Budget = config.Budget{MaxSpend: 0.001, Prices: config.BudgetPrices{Input: 1, Output: 1}, CompletionRatio: 1, Overhead: 1}
+	first := practices.Target{Kind: practices.FileTarget, ID: "first.go"}
+	second := practices.Target{Kind: practices.FileTarget, ID: "second.go"}
+	packed := practices.DesignPacking{Design: practices.DesignPlan{Tasks: []practices.DesignTask{{ID: "first", Source: first, Sources: []practices.Target{first}}, {ID: "second", Source: second, Sources: []practices.Target{second}}}}, Plan: &bundle.Plan{Batches: []bundle.Batch{{DesignTask: "first", AdditionalDesignTasks: []string{"second"}, Tokens: 4000}}}}
+	fit := (&Engine{Config: cfg}).applyDesignBudget(t.Context(), vcs.Ref{}, nil, &packed, nil)
+	if len(packed.Plan.Batches) != 0 || len(fit.Dropped) != 2 || len(packed.Design.Tasks[0].Omitted) != 1 || len(packed.Design.Tasks[1].Omitted) != 1 {
+		t.Fatalf("budget lost shared obligation: %+v %+v", fit, packed)
+	}
+}

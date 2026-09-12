@@ -140,10 +140,13 @@ func modelCheckResults(checks []practices.Check, report *review.Report) []practi
 	contexts := map[string][]practices.Target{}
 	if report.Plan != nil {
 		for _, batch := range report.Plan.Batches {
+			if report.DesignExecution != nil && !batch.DesignAssessed(report.AssessedDesignTasks) {
+				continue
+			}
 			digest := sha256.Sum256([]byte(bundle.RenderBatch(batch)))
 			for _, entry := range batch.Entries {
 				digests[entry.File.Path] = hex.EncodeToString(digest[:])
-				if entry.HasContent() && !entry.Truncated && !slices.Contains(report.Incomplete, entry.File.Path) {
+				if entry.HasContent() && !entry.Truncated && (report.DesignExecution != nil || !slices.Contains(report.Incomplete, entry.File.Path)) {
 					read[entry.File.Path] = true
 				}
 				for _, other := range batch.Entries {
@@ -263,11 +266,14 @@ func applyPackageCoverage(check *practices.Check, report *review.Report) {
 	execution := report.DesignExecution
 	check.Planned, check.Examined, check.Omitted, check.Context = nil, nil, nil, nil
 	check.Tasks = slices.Clone(execution.Design.Tasks)
+	check.Limitations = slices.Clone(execution.Design.Limitations)
 	check.State, check.Reason = practices.Completed, ""
 	batched := map[string]bool{}
 	if report.Plan != nil {
 		for _, batch := range report.Plan.Batches {
-			batched[batch.DesignTask] = true
+			for _, id := range batch.DesignTaskIDs() {
+				batched[id] = true
+			}
 		}
 	}
 	for _, task := range check.Tasks {

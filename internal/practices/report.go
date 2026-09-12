@@ -81,12 +81,23 @@ type ContextSpan struct {
 	bundle.SourceSpan
 }
 
+// DesignInteraction names a caller obligation assigned to a review task.
+type DesignInteraction struct {
+	Caller Target `json:"caller"`
+	Callee Target `json:"callee"`
+}
+
 // DesignTask links a bounded design assessment to its source and context.
 type DesignTask struct {
-	ID      string   `json:"id"`
-	Source  Target   `json:"source"`
-	Purpose string   `json:"purpose"`
-	Context []Target `json:"context,omitempty"`
+	ID string `json:"id"`
+	// Package identifies the inventory unit, not a claim of package completion.
+	Package      string              `json:"package,omitempty"`
+	Interactions []DesignInteraction `json:"interactions,omitempty"`
+	// Focus narrows the design question; whole Sources remain available for slop.
+	Focus   []ContextSpan `json:"focus,omitempty"`
+	Source  Target        `json:"source"`
+	Purpose string        `json:"purpose"`
+	Context []Target      `json:"context,omitempty"`
 	// ContextSpans narrows named context files; absent paths are supplied whole.
 	ContextSpans []ContextSpan `json:"context_spans,omitempty"`
 	// Sources lists the primary source files intended for this task.
@@ -131,6 +142,7 @@ type Check struct {
 	Signals       []Finding    `json:"signals,omitempty"`
 	Decisions     []Decision   `json:"decisions,omitempty"`
 	FailedStages  []string     `json:"failed_stages,omitempty"`
+	Limitations   []string     `json:"limitations,omitempty"`
 	Tool          string       `json:"tool,omitempty"`
 	PromptVersion string       `json:"prompt_version,omitempty"`
 	ModelRuns     []ModelRun   `json:"model_runs,omitempty"`
@@ -228,6 +240,22 @@ func (r Report) Problems() []string {
 					bad("design task has invalid or duplicate source")
 				}
 				sourceTargets[source] = true
+			}
+			for _, focus := range task.Focus {
+				if !sourceTargets[Target{Kind: FileTarget, ID: focus.Path}] || focus.Start < 1 || focus.End < focus.Start {
+					bad("design focus lies outside its primary source")
+				}
+			}
+			seenInteractions := map[DesignInteraction]bool{}
+			for _, relation := range task.Interactions {
+				caller := normalize(relation.Caller)
+				if relation.Caller.Kind != FileTarget || !relation.Caller.valid() || !sourceTargets[caller] || !relation.Callee.valid() || (relation.Callee.Kind != FileTarget && relation.Callee.Kind != UnitTarget) || seenInteractions[relation] {
+					bad("design task has invalid or duplicate caller obligation")
+				}
+				if relation.Callee.Kind == FileTarget && !sourceTargets[normalize(relation.Callee)] && !slices.Contains(task.Context, normalize(relation.Callee)) {
+					bad("design task omits its declared callee context")
+				}
+				seenInteractions[relation] = true
 			}
 			if len(task.Sources) == 0 {
 				bad("design task has no source scope")
@@ -361,6 +389,9 @@ func (r Report) Text() string {
 		fmt.Fprintf(&b, "  %s: %s; %d/%d targets examined, %d findings\n", c.ID, c.State, len(c.Examined), len(c.Planned), len(c.Findings))
 		if c.Reason != "" {
 			fmt.Fprintf(&b, "    %s\n", c.Reason)
+		}
+		for _, limitation := range c.Limitations {
+			fmt.Fprintf(&b, "    Scope limit: %s\n", limitation)
 		}
 		for _, signal := range c.Signals {
 			fmt.Fprintf(&b, "    Advisory model signal (%s): %s\n", signal.Rule, signal.Title)

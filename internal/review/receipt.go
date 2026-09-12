@@ -2,7 +2,6 @@ package review
 
 import (
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 
@@ -37,7 +36,7 @@ func receipt(report *Report) string {
 		if report.DesignExecution != nil {
 			plan.Batches = nil
 			for _, batch := range report.Plan.Batches {
-				if slices.Contains(report.AssessedDesignTasks, batch.DesignTask) {
+				if batch.DesignAssessed(report.AssessedDesignTasks) {
 					plan.Batches = append(plan.Batches, batch)
 				}
 			}

@@ -36,8 +36,10 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 	out.Plan.BudgetPerBatch = max(0, cfg.Review.TokenBudgetPerRequest-reserve.Tokens)
 	out.Plan.FramingReserved = reserve.Tokens
 	sources := map[string][]byte{}
+	sourceText := map[string]string{}
 	for _, file := range files {
 		sources[file.Path] = file.Src
+		sourceText[file.Path] = string(file.Src)
 	}
 	changed := map[string]*diff.File{}
 	for _, file := range changes {
@@ -45,6 +47,7 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 	}
 	estimator := llms.DefaultTokenEstimator()
 	admitted := map[string]bool{}
+	lastFocusBatch := map[string]int{}
 	for i := range out.Design.Tasks {
 		task := &out.Design.Tasks[i]
 		task.Omitted = slices.Clone(task.Omitted)
@@ -113,7 +116,7 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 			if contextOnly {
 				file = &diff.File{Path: target.ID, Kind: diff.ChangeModified}
 			}
-			entry := bundle.Entry{File: file, Content: string(source), SourceOnly: contextOnly, SourceSpans: ranges[target.ID], Instructions: cfg.InstructionsFor(target.ID)}
+			entry := bundle.Entry{File: file, Content: sourceText[target.ID], SourceOnly: contextOnly, SourceSpans: ranges[target.ID], Instructions: cfg.InstructionsFor(target.ID)}
 			entry.Tokens = estimator.EstimateTokens(bundle.Render(entry))
 			batch.Entries = append(batch.Entries, entry)
 		}
@@ -148,6 +151,16 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 		}
 		for _, entry := range batch.Entries {
 			admitted[entry.File.Path] = true
+		}
+		if len(task.Focus) > 0 {
+			if previous, ok := lastFocusBatch[task.Source.ID]; ok {
+				combined, fits := combineDesignBatches(out.Plan.Batches[previous], batch, cfg.Review.MaxFilesPerRequest, out.Plan.BudgetPerBatch)
+				if fits {
+					out.Plan.Batches[previous] = combined
+					continue
+				}
+			}
+			lastFocusBatch[task.Source.ID] = len(out.Plan.Batches)
 		}
 		out.Plan.Batches = append(out.Plan.Batches, batch)
 	}

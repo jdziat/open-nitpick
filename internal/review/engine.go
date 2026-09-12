@@ -1243,7 +1243,7 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 				return
 			}
 			if b.DesignTask != "" {
-				assessedDesignTasks = append(assessedDesignTasks, b.DesignTask)
+				assessedDesignTasks = append(assessedDesignTasks, b.DesignTaskIDs()...)
 			}
 			findings = append(findings, result...)
 			e.log().Info("batch done", "batch", i+1, "of", total, "done", done.Add(1), "findings", len(result), "elapsed", time.Since(started).Round(time.Second))
@@ -1423,7 +1423,7 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 
 	var taskContext *TaskContext
 	if b.DesignTask != "" {
-		taskContext = &TaskContext{ID: b.DesignTask, Text: bundle.RenderBatch(b), Lines: map[string]int{}, Spans: map[string][]bundle.SourceSpan{}}
+		taskContext = &TaskContext{ID: strings.Join(b.DesignTaskIDs(), "+"), Text: bundle.RenderBatch(b), Lines: map[string]int{}, Spans: map[string][]bundle.SourceSpan{}}
 		for _, entry := range b.Entries {
 			if len(entry.SourceSpans) > 0 {
 				taskContext.Spans[entry.File.Path] = slices.Clone(entry.SourceSpans)

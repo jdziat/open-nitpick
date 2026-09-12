@@ -54,7 +54,7 @@ func (e *Engine) applyDesignBudget(ctx context.Context, ref vcs.Ref, prior *vcs.
 			reason := "over the review.budget.max_spend ceiling"
 			for i := range packed.Design.Tasks {
 				task := &packed.Design.Tasks[i]
-				if task.ID == batch.DesignTask {
+				if slices.Contains(batch.DesignTaskIDs(), task.ID) {
 					task.Omitted = append(task.Omitted, practices.Omission{Target: practices.Target{Kind: practices.UnitTarget, ID: task.ID}, Reason: reason})
 					packed.Plan.Skipped = append(packed.Plan.Skipped, bundle.Skip{Path: task.Source.ID, Reason: reason})
 					for _, source := range task.Sources {
@@ -65,10 +65,12 @@ func (e *Engine) applyDesignBudget(ctx context.Context, ref vcs.Ref, prior *vcs.
 			continue
 		}
 		kept = append(kept, batch)
-		for _, source := range sourcesByTask[batch.DesignTask] {
-			if !admitted[source.ID] {
-				admitted[source.ID] = true
-				fit.Kept = append(fit.Kept, source.ID)
+		for _, id := range batch.DesignTaskIDs() {
+			for _, source := range sourcesByTask[id] {
+				if !admitted[source.ID] {
+					admitted[source.ID] = true
+					fit.Kept = append(fit.Kept, source.ID)
+				}
 			}
 		}
 	}

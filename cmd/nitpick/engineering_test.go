@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -549,6 +550,47 @@ func TestFrozenMetadataDoesNotInventAnOuterModuleIdentity(t *testing.T) {
 		inventory, _ := practices.InspectDesign(files, nil)
 		if len(problems) == 0 || len(inventory.Errors) == 0 || len(inventory.Units) != 0 {
 			t.Fatalf("missing metadata invented a package: %+v; %v", inventory, problems)
+		}
+	}
+}
+
+func TestDesignCoveragePublishesThePlannerScopeLimitations(t *testing.T) {
+	report := &review.Report{DesignExecution: &review.DesignExecution{DesignPacking: practices.DesignPacking{Design: practices.DesignPlan{Limitations: []string{"deeper implementation bodies were not supplied"}}}}}
+	check := practices.Check{ID: "design"}
+	applyPackageCoverage(&check, report)
+	if !slices.Equal(check.Limitations, report.DesignExecution.Design.Limitations) {
+		t.Fatalf("lost planner limits: %+v", check)
+	}
+	text := (practices.Report{Profile: "engineering", Checks: []practices.Check{check}}).Text()
+	if !strings.Contains(text, "Scope limit: deeper implementation bodies were not supplied") {
+		t.Fatalf("hidden planner limit: %s", text)
+	}
+	data, err := json.Marshal(check)
+	if err != nil || !strings.Contains(string(data), `"limitations":["deeper implementation bodies were not supplied"]`) {
+		t.Fatalf("JSON lost limits: %s %v", data, err)
+	}
+}
+
+func TestSlopCoverageKeepsSuccessfulReadsAcrossSharedTaskFailures(t *testing.T) {
+	source := practices.Target{Kind: practices.FileTarget, ID: "source.go"}
+	tasks := []practices.DesignTask{
+		{ID: "first", Source: source, Sources: []practices.Target{source}, SourceDigest: strings.Repeat("a", 64), Purpose: "first declaration"},
+		{ID: "second", Source: source, Sources: []practices.Target{source}, SourceDigest: strings.Repeat("b", 64), Purpose: "second declaration"},
+	}
+	entry := bundle.Entry{File: &diff.File{Path: source.ID}, Content: "package fixture\nfunc A() {}\nfunc B() {}\n"}
+	report := &review.Report{DesignExecution: &review.DesignExecution{DesignPacking: practices.DesignPacking{Design: practices.DesignPlan{Tasks: tasks}}}, Plan: &bundle.Plan{Batches: []bundle.Batch{{DesignTask: "first", Entries: []bundle.Entry{entry}}, {DesignTask: "second", Entries: []bundle.Entry{entry}}}}, AssessedDesignTasks: []string{"first"}, Incomplete: []string{source.ID}}
+	checks := func() []practices.Check {
+		return modelCheckResults([]practices.Check{{ID: "slop", Planned: []practices.Target{source}}, {ID: "design"}}, report)
+	}
+	got := checks()
+	if got[0].State != practices.Completed || len(got[0].Examined) != 1 || got[1].State != practices.Partial || len(got[1].Examined) != 1 || len(got[1].Omitted) != 1 {
+		t.Fatalf("shared failure erased completed evidence: %+v", got)
+	}
+	report.AssessedDesignTasks = nil
+	report.Incomplete = nil
+	for _, check := range checks() {
+		if len(check.Examined) != 0 || check.State == practices.Completed {
+			t.Fatalf("planned source claimed a read: %+v", check)
 		}
 	}
 }

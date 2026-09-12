@@ -61,14 +61,37 @@ func (e *Entry) HasContent() bool { return e.Content != "" && len(e.SourceSpans)
 
 // Batch is a group of entries reviewed in one model call.
 type Batch struct {
-	// DesignTask identifies the complete package assessment carried by this call.
+	// DesignTask identifies the first complete assessment carried by this call.
 	DesignTask string
+	// AdditionalDesignTasks share this request and complete or fail with it.
+	AdditionalDesignTasks []string
 	// Assessment describes the task and its source scope.
 	Assessment string
 	Entries    []Entry
 
 	// Tokens is the estimated total for the batch.
 	Tokens int
+}
+
+// DesignTaskIDs returns every indivisible assessment assigned to this request.
+func (b Batch) DesignTaskIDs() []string {
+	if b.DesignTask == "" {
+		return nil
+	}
+	return append([]string{b.DesignTask}, b.AdditionalDesignTasks...)
+}
+
+// DesignAssessed reports whether every task in the request completed.
+func (b Batch) DesignAssessed(completed []string) bool {
+	if b.DesignTask == "" || !slices.Contains(completed, b.DesignTask) {
+		return false
+	}
+	for _, id := range b.AdditionalDesignTasks {
+		if !slices.Contains(completed, id) {
+			return false
+		}
+	}
+	return true
 }
 
 // Paths returns the batch's file paths.

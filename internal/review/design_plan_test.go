@@ -3,6 +3,8 @@ package review
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -349,5 +351,29 @@ func TestDesignBatchKeepsSupportingSpansThroughExpertValidation(t *testing.T) {
 	kept, _, unpublished = e.filterTaskAnchors(findings, nil)
 	if len(kept) != 0 || len(unpublished) != 1 {
 		t.Fatal("unseen gap passed engine evidence validation")
+	}
+}
+
+func TestSharedDesignRequestCompletesEveryTaskOnlyAfterSuccess(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		t.Run(fmt.Sprint(fail), func(t *testing.T) {
+			model := &scriptedLLM{fallback: `{"findings":[]}`}
+			if fail {
+				model.err = errors.New("provider unavailable")
+			}
+			e := newEngine(t, model, &stubProvider{}, nil)
+			batch := bundle.Batch{DesignTask: "first", AdditionalDesignTasks: []string{"second"}, Assessment: "first and second obligations", Entries: []bundle.Entry{{File: &diff.File{Path: "app.go"}, Content: "package app\n"}}}
+			findings, missing, _, err := e.analyze(t.Context(), &vcs.PullRequest{}, &bundle.Plan{Batches: []bundle.Batch{batch}}, make(chan struct{}, 1))
+			if len(findings) != 0 || model.callCount() == 0 {
+				t.Fatalf("control did not execute: findings=%v calls=%d", findings, model.callCount())
+			}
+			if fail {
+				if err == nil || len(missing) == 0 || len(e.assessedDesignTasks) != 0 {
+					t.Fatalf("failed request claimed assessment: %v %v %v", err, missing, e.assessedDesignTasks)
+				}
+			} else if err != nil || len(missing) != 0 || !slices.Equal(e.assessedDesignTasks, []string{"first", "second"}) || model.callCount() != 1 {
+				t.Fatalf("shared completion lost tasks or repeated requests: %v %v %v", err, missing, e.assessedDesignTasks)
+			}
+		})
 	}
 }
