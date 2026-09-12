@@ -1,0 +1,273 @@
+{
+  "model": "synthetic/hf:zai-org/GLM-5.3-Flash",
+  "limitation": "Two selected version-5 claims replayed against full fixture source, not original focused excerpts. Small protocol controls, not semantic precision or an isolated causal estimate.",
+  "trials": [
+    {
+      "version": 8,
+      "source_commit": "d5b29ebe2514a4a663d30a4b1862db677fd44afe",
+      "binary_sha256": "af85c2a9d6cbcf6a1f4c0fe7d585ff1c08891f74217fd467fc41a067f69138e1",
+      "log_sha256": "ff463ecff901332ec8c604fc6617f6c044d530ba509f483576d2b671d0b208d7",
+      "log": "=== RUN   TestLiveValidationReturnsCompleteVerdicts\n=== RUN   TestLiveValidationReturnsCompleteVerdicts/lifecycle\n=== NAME  TestLiveValidationReturnsCompleteVerdicts\n    acknowledgement_eval_test.go:118: response_schema={\"additionalProperties\":false,\"properties\":{\"cited\":{\"description\":\"OPTIONAL. The bracketed id of the reference entry that decided your verdict, when one did. Leave it empty otherwise; do not name an entry you were not shown.\",\"type\":\"string\"},\"reason\":{\"description\":\"One or two sentences. For a refutation this is the specific reason the claim is wrong; uncertainty is not a reason.\",\"type\":\"string\"},\"revised_severity\":{\"description\":\"Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.\",\"enum\":[\"nit\",\"info\",\"warning\",\"error\",\"critical\"],\"type\":\"string\"},\"verdict\":{\"description\":\"confirmed when the claim holds, refuted when you can name why it is wrong, severity when the defect is real but rated wrong, unresolved when you cannot decide from what you were shown and can name what is missing.\",\"enum\":[\"confirmed\",\"refuted\",\"severity\",\"unresolved\"],\"type\":\"string\"}},\"required\":[\"verdict\",\"reason\"],\"type\":\"object\"}\n    acknowledgement_eval_test.go:122: raw_response=\"{\\n  \\\"reason\\\": \\\"The mechanism is real: `values` is a package-level map whose zero value is nil, nothing initializes it except an explicit `Configure()` call, and `Put` writes `values[key] = value` with no guard \u2014 assigning to a nil map panics. `Start` calls `Put` unconditionally, so `Start` before `Configure` panics too, and nothing in the shown code enforces or checks the ordering (`Ready()` returning `true` unconditionally is a separate matter). However, the failing path requires a caller to invoke `Put`/`Start` before `Configure`, and no caller shown exercises that ordering, so the demonstrated consequence is 'panics under a condition this code does not prevent' rather than an incorrect behavior on a shown-to-run path. That is warning on the stated scale, not error.\\\",\\n  \\\"verdict\\\": \\\"severity\\\"\\n}\"\n=== NAME  TestLiveValidationReturnsCompleteVerdicts/lifecycle\n    validation_contract_eval_test.go:102: model=synthetic/hf:zai-org/GLM-5.3-Flash source_sha256=7c389ededd82f8e49b643d2bb9b70646c8436dc947dca833b7fb79e5658dc789 seconds=48.88 result={\"failure\":\"invalid severity verdict\",\"finding\":{\"path\":\"cache.go\",\"line\":9,\"severity\":\"error\",\"category\":\"\",\"class\":\"correctness\",\"title\":\"Put panics on nil map before Configure\",\"rationale\":\"values is nil until Configure assigns it, and Put writes without a guard, so the first pre-Configure Put panics with assignment to entry in nil map. Start calls Put, so the exported Start fails the same way.\",\"suggestion\":\"\"},\"reason\":\"\",\"refuted\":false,\"revised\":\"\",\"unresolved\":\"\"}\n    validation_contract_eval_test.go:107: incomplete expert response: invalid severity verdict\n=== RUN   TestLiveValidationReturnsCompleteVerdicts/contracts\n=== NAME  TestLiveValidationReturnsCompleteVerdicts\n    acknowledgement_eval_test.go:118: response_schema={\"additionalProperties\":false,\"properties\":{\"cited\":{\"description\":\"OPTIONAL. The bracketed id of the reference entry that decided your verdict, when one did. Leave it empty otherwise; do not name an entry you were not shown.\",\"type\":\"string\"},\"reason\":{\"description\":\"One or two sentences. For a refutation this is the specific reason the claim is wrong; uncertainty is not a reason.\",\"type\":\"string\"},\"revised_severity\":{\"description\":\"Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.\",\"enum\":[\"nit\",\"info\",\"warning\",\"error\",\"critical\"],\"type\":\"string\"},\"verdict\":{\"description\":\"confirmed when the claim holds, refuted when you can name why it is wrong, severity when the defect is real but rated wrong, unresolved when you cannot decide from what you were shown and can name what is missing.\",\"enum\":[\"confirmed\",\"refuted\",\"severity\",\"unresolved\"],\"type\":\"string\"}},\"required\":[\"verdict\",\"reason\"],\"type\":\"object\"}\n    acknowledgement_eval_test.go:122: raw_response=\"{ \\\"reason\\\": \\\"No test is shown anywhere in this change; nothing exercises Decode's case 1, and the failure mode is nameable: renaming the `json:\\\\\\\"name\\\\\\\"` tag makes every v1 record decode to (\\\\\\\"\\\\\\\", nil) silently, and deleting case 1 errors on all existing records \u2014 exactly the contract the docstring says must hold. That is uncovered compatibility branching over persisted data, which is warning-level, not a nit (nits are for tests that already have teeth).\\\", \\\"revised_severity\\\": \\\"warning\\\", \\\"verdict\\\": \\\"severity\\\" }\"\n=== NAME  TestLiveValidationReturnsCompleteVerdicts/contracts\n    validation_contract_eval_test.go:102: model=synthetic/hf:zai-org/GLM-5.3-Flash source_sha256=2533cffbad5bfdc58e63e066cb98bb426bd7339ddb8e9ee5d1d4c6cacd636386 seconds=34.97 result={\"failure\":\"\",\"finding\":{\"path\":\"store.go\",\"line\":28,\"severity\":\"nit\",\"category\":\"\",\"class\":\"slop\",\"title\":\"No test pins version-1 readability contract\",\"rationale\":\"No test exercises the version-1 decode path, so a tag rename or removed case can ship and break existing records. The v1 bytes in the docstring are a stable fixture for a table test. Add Decode on those bytes plus an Encode/Decode round trip.\",\"suggestion\":\"\"},\"reason\":\"No test is shown anywhere in this change; nothing exercises Decode's case 1, and the failure mode is nameable: renaming the `json:\\\"name\\\"` tag makes every v1 record decode to (\\\"\\\", nil) silently, and deleting case 1 errors on all existing records \u2014 exactly the contract the docstring says must hold. That is uncovered compatibility branching over persisted data, which is warning-level, not a nit (nits are for tests that already have teeth).\",\"refuted\":false,\"revised\":\"warning\",\"unresolved\":\"\"}\n--- FAIL: TestLiveValidationReturnsCompleteVerdicts (83.86s)\n    --- FAIL: TestLiveValidationReturnsCompleteVerdicts/lifecycle (48.88s)\n    --- PASS: TestLiveValidationReturnsCompleteVerdicts/contracts (34.97s)\nFAIL\n",
+      "results": [
+        {
+          "source_sha256": "7c389ededd82f8e49b643d2bb9b70646c8436dc947dca833b7fb79e5658dc789",
+          "seconds": 48.88,
+          "outcome": {
+            "failure": "invalid severity verdict",
+            "finding": {
+              "path": "cache.go",
+              "line": 9,
+              "severity": "error",
+              "category": "",
+              "class": "correctness",
+              "title": "Put panics on nil map before Configure",
+              "rationale": "values is nil until Configure assigns it, and Put writes without a guard, so the first pre-Configure Put panics with assignment to entry in nil map. Start calls Put, so the exported Start fails the same way.",
+              "suggestion": ""
+            },
+            "reason": "",
+            "refuted": false,
+            "revised": "",
+            "unresolved": ""
+          },
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "cited": {
+                "description": "OPTIONAL. The bracketed id of the reference entry that decided your verdict, when one did. Leave it empty otherwise; do not name an entry you were not shown.",
+                "type": "string"
+              },
+              "reason": {
+                "description": "One or two sentences. For a refutation this is the specific reason the claim is wrong; uncertainty is not a reason.",
+                "type": "string"
+              },
+              "revised_severity": {
+                "description": "Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.",
+                "enum": [
+                  "nit",
+                  "info",
+                  "warning",
+                  "error",
+                  "critical"
+                ],
+                "type": "string"
+              },
+              "verdict": {
+                "description": "confirmed when the claim holds, refuted when you can name why it is wrong, severity when the defect is real but rated wrong, unresolved when you cannot decide from what you were shown and can name what is missing.",
+                "enum": [
+                  "confirmed",
+                  "refuted",
+                  "severity",
+                  "unresolved"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "verdict",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "schema_sha256": "25bf582ddab786d576c8c08e62c7c42abfd9051f726dc2ec7d0952bd95818237",
+          "raw_response": "{\n  \"reason\": \"The mechanism is real: `values` is a package-level map whose zero value is nil, nothing initializes it except an explicit `Configure()` call, and `Put` writes `values[key] = value` with no guard \u2014 assigning to a nil map panics. `Start` calls `Put` unconditionally, so `Start` before `Configure` panics too, and nothing in the shown code enforces or checks the ordering (`Ready()` returning `true` unconditionally is a separate matter). However, the failing path requires a caller to invoke `Put`/`Start` before `Configure`, and no caller shown exercises that ordering, so the demonstrated consequence is 'panics under a condition this code does not prevent' rather than an incorrect behavior on a shown-to-run path. That is warning on the stated scale, not error.\",\n  \"verdict\": \"severity\"\n}"
+        },
+        {
+          "source_sha256": "2533cffbad5bfdc58e63e066cb98bb426bd7339ddb8e9ee5d1d4c6cacd636386",
+          "seconds": 34.97,
+          "outcome": {
+            "failure": "",
+            "finding": {
+              "path": "store.go",
+              "line": 28,
+              "severity": "nit",
+              "category": "",
+              "class": "slop",
+              "title": "No test pins version-1 readability contract",
+              "rationale": "No test exercises the version-1 decode path, so a tag rename or removed case can ship and break existing records. The v1 bytes in the docstring are a stable fixture for a table test. Add Decode on those bytes plus an Encode/Decode round trip.",
+              "suggestion": ""
+            },
+            "reason": "No test is shown anywhere in this change; nothing exercises Decode's case 1, and the failure mode is nameable: renaming the `json:\"name\"` tag makes every v1 record decode to (\"\", nil) silently, and deleting case 1 errors on all existing records \u2014 exactly the contract the docstring says must hold. That is uncovered compatibility branching over persisted data, which is warning-level, not a nit (nits are for tests that already have teeth).",
+            "refuted": false,
+            "revised": "warning",
+            "unresolved": ""
+          },
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "cited": {
+                "description": "OPTIONAL. The bracketed id of the reference entry that decided your verdict, when one did. Leave it empty otherwise; do not name an entry you were not shown.",
+                "type": "string"
+              },
+              "reason": {
+                "description": "One or two sentences. For a refutation this is the specific reason the claim is wrong; uncertainty is not a reason.",
+                "type": "string"
+              },
+              "revised_severity": {
+                "description": "Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.",
+                "enum": [
+                  "nit",
+                  "info",
+                  "warning",
+                  "error",
+                  "critical"
+                ],
+                "type": "string"
+              },
+              "verdict": {
+                "description": "confirmed when the claim holds, refuted when you can name why it is wrong, severity when the defect is real but rated wrong, unresolved when you cannot decide from what you were shown and can name what is missing.",
+                "enum": [
+                  "confirmed",
+                  "refuted",
+                  "severity",
+                  "unresolved"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "verdict",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "schema_sha256": "25bf582ddab786d576c8c08e62c7c42abfd9051f726dc2ec7d0952bd95818237",
+          "raw_response": "{ \"reason\": \"No test is shown anywhere in this change; nothing exercises Decode's case 1, and the failure mode is nameable: renaming the `json:\\\"name\\\"` tag makes every v1 record decode to (\\\"\\\", nil) silently, and deleting case 1 errors on all existing records \u2014 exactly the contract the docstring says must hold. That is uncovered compatibility branching over persisted data, which is warning-level, not a nit (nits are for tests that already have teeth).\", \"revised_severity\": \"warning\", \"verdict\": \"severity\" }"
+        }
+      ]
+    },
+    {
+      "version": 9,
+      "source_commit": "74d46f508d985ceff3108b00174d6e80d33ea241",
+      "binary_sha256": "571ebc01a32e0dbf23219c3de64370b96420399a74fd0e16080eebc7cb2e7015",
+      "log_sha256": "af249916d05f1f9a1e807ecb6e94ab112a22821680718b92b5d5052603012be9",
+      "log": "=== RUN   TestLiveValidationReturnsCompleteVerdicts\n=== RUN   TestLiveValidationReturnsCompleteVerdicts/lifecycle\n=== NAME  TestLiveValidationReturnsCompleteVerdicts\n    acknowledgement_eval_test.go:118: response_schema={\"additionalProperties\":false,\"properties\":{\"verdict\":{\"description\":\"confirmed when the claim holds, refuted when you can name why it is wrong, severity when the defect is real but rated wrong, unresolved when you cannot decide from what you were shown and can name what is missing.\",\"enum\":[\"confirmed\",\"refuted\",\"severity\",\"unresolved\"],\"type\":\"string\"},\"revised_severity\":{\"description\":\"Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.\",\"enum\":[\"nit\",\"info\",\"warning\",\"error\",\"critical\"],\"type\":\"string\"},\"reason\":{\"description\":\"One or two sentences. For a refutation this is the specific reason the claim is wrong; uncertainty is not a reason.\",\"type\":\"string\"},\"cited\":{\"description\":\"OPTIONAL. The bracketed id of the reference entry that decided your verdict, when one did. Leave it empty otherwise; do not name an entry you were not shown.\",\"type\":\"string\"}},\"required\":[\"verdict\",\"reason\"],\"type\":\"object\"}\n    acknowledgement_eval_test.go:122: raw_response=\"{\\n  \\\"verdict\\\": \\\"severity\\\",\\n  \\\"revised_severity\\\": \\\"warning\\\",\\n  \\\"reason\\\": \\\"The mechanism is real: `var values map[string]string` is nil until Configure runs, Put writes with no guard, so any Put (directly or via Start) before Configure panics with 'assignment to entry in nil map' \u2014 and Ready() returns true unconditionally, so it offers no protection. But no caller shown in this change exercises Put or Start at all, let alone before Configure, so the demonstrable consequence is a panic under a condition this code does not prevent, not incorrect behavior on a path shown to run. That is warning, not error.\\\"\\n}\"\n=== NAME  TestLiveValidationReturnsCompleteVerdicts/lifecycle\n    validation_contract_eval_test.go:102: model=synthetic/hf:zai-org/GLM-5.3-Flash source_sha256=7c389ededd82f8e49b643d2bb9b70646c8436dc947dca833b7fb79e5658dc789 seconds=57.34 result={\"failure\":\"\",\"finding\":{\"path\":\"cache.go\",\"line\":9,\"severity\":\"error\",\"category\":\"\",\"class\":\"correctness\",\"title\":\"Put panics on nil map before Configure\",\"rationale\":\"values is nil until Configure assigns it, and Put writes without a guard, so the first pre-Configure Put panics with assignment to entry in nil map. Start calls Put, so the exported Start fails the same way.\",\"suggestion\":\"\"},\"reason\":\"The mechanism is real: `var values map[string]string` is nil until Configure runs, Put writes with no guard, so any Put (directly or via Start) before Configure panics with 'assignment to entry in nil map' \u2014 and Ready() returns true unconditionally, so it offers no protection. But no caller shown in this change exercises Put or Start at all, let alone before Configure, so the demonstrable consequence is a panic under a condition this code does not prevent, not incorrect behavior on a path shown to run. That is warning, not error.\",\"refuted\":false,\"revised\":\"warning\",\"unresolved\":\"\"}\n=== RUN   TestLiveValidationReturnsCompleteVerdicts/contracts\n=== NAME  TestLiveValidationReturnsCompleteVerdicts\n    acknowledgement_eval_test.go:118: response_schema={\"additionalProperties\":false,\"properties\":{\"verdict\":{\"description\":\"confirmed when the claim holds, refuted when you can name why it is wrong, severity when the defect is real but rated wrong, unresolved when you cannot decide from what you were shown and can name what is missing.\",\"enum\":[\"confirmed\",\"refuted\",\"severity\",\"unresolved\"],\"type\":\"string\"},\"revised_severity\":{\"description\":\"Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.\",\"enum\":[\"nit\",\"info\",\"warning\",\"error\",\"critical\"],\"type\":\"string\"},\"reason\":{\"description\":\"One or two sentences. For a refutation this is the specific reason the claim is wrong; uncertainty is not a reason.\",\"type\":\"string\"},\"cited\":{\"description\":\"OPTIONAL. The bracketed id of the reference entry that decided your verdict, when one did. Leave it empty otherwise; do not name an entry you were not shown.\",\"type\":\"string\"}},\"required\":[\"verdict\",\"reason\"],\"type\":\"object\"}\n    acknowledgement_eval_test.go:122: raw_response=\"{ \\\"verdict\\\": \\\"severity\\\", \\\"revised_severity\\\": \\\"warning\\\", \\\"reason\\\": \\\"The claim is true: nothing shown exercises Decode's version-1 arm, and refuting a no-test claim requires naming a test, which I cannot \u2014 the docstring's v1 bytes are a comment, not coverage. But nit is mis-rated under this scale (nit is for structure of tests that already have teeth); this is missing coverage of branching logic at a data-format boundary with a nameable failure mode \u2014 renaming the `json:\\\\\\\"name\\\\\\\"` tag decodes existing v1 records to an empty name with no error, and deleting `case 1` errors every old record \u2014 so warning.\\\" }\"\n=== NAME  TestLiveValidationReturnsCompleteVerdicts/contracts\n    validation_contract_eval_test.go:102: model=synthetic/hf:zai-org/GLM-5.3-Flash source_sha256=2533cffbad5bfdc58e63e066cb98bb426bd7339ddb8e9ee5d1d4c6cacd636386 seconds=93.25 result={\"failure\":\"\",\"finding\":{\"path\":\"store.go\",\"line\":28,\"severity\":\"nit\",\"category\":\"\",\"class\":\"slop\",\"title\":\"No test pins version-1 readability contract\",\"rationale\":\"No test exercises the version-1 decode path, so a tag rename or removed case can ship and break existing records. The v1 bytes in the docstring are a stable fixture for a table test. Add Decode on those bytes plus an Encode/Decode round trip.\",\"suggestion\":\"\"},\"reason\":\"The claim is true: nothing shown exercises Decode's version-1 arm, and refuting a no-test claim requires naming a test, which I cannot \u2014 the docstring's v1 bytes are a comment, not coverage. But nit is mis-rated under this scale (nit is for structure of tests that already have teeth); this is missing coverage of branching logic at a data-format boundary with a nameable failure mode \u2014 renaming the `json:\\\"name\\\"` tag decodes existing v1 records to an empty name with no error, and deleting `case 1` errors every old record \u2014 so warning.\",\"refuted\":false,\"revised\":\"warning\",\"unresolved\":\"\"}\n--- PASS: TestLiveValidationReturnsCompleteVerdicts (150.61s)\n    --- PASS: TestLiveValidationReturnsCompleteVerdicts/lifecycle (57.34s)\n    --- PASS: TestLiveValidationReturnsCompleteVerdicts/contracts (93.25s)\nPASS\n",
+      "results": [
+        {
+          "source_sha256": "7c389ededd82f8e49b643d2bb9b70646c8436dc947dca833b7fb79e5658dc789",
+          "seconds": 57.34,
+          "outcome": {
+            "failure": "",
+            "finding": {
+              "path": "cache.go",
+              "line": 9,
+              "severity": "error",
+              "category": "",
+              "class": "correctness",
+              "title": "Put panics on nil map before Configure",
+              "rationale": "values is nil until Configure assigns it, and Put writes without a guard, so the first pre-Configure Put panics with assignment to entry in nil map. Start calls Put, so the exported Start fails the same way.",
+              "suggestion": ""
+            },
+            "reason": "The mechanism is real: `var values map[string]string` is nil until Configure runs, Put writes with no guard, so any Put (directly or via Start) before Configure panics with 'assignment to entry in nil map' \u2014 and Ready() returns true unconditionally, so it offers no protection. But no caller shown in this change exercises Put or Start at all, let alone before Configure, so the demonstrable consequence is a panic under a condition this code does not prevent, not incorrect behavior on a path shown to run. That is warning, not error.",
+            "refuted": false,
+            "revised": "warning",
+            "unresolved": ""
+          },
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "verdict": {
+                "description": "confirmed when the claim holds, refuted when you can name why it is wrong, severity when the defect is real but rated wrong, unresolved when you cannot decide from what you were shown and can name what is missing.",
+                "enum": [
+                  "confirmed",
+                  "refuted",
+                  "severity",
+                  "unresolved"
+                ],
+                "type": "string"
+              },
+              "revised_severity": {
+                "description": "Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.",
+                "enum": [
+                  "nit",
+                  "info",
+                  "warning",
+                  "error",
+                  "critical"
+                ],
+                "type": "string"
+              },
+              "reason": {
+                "description": "One or two sentences. For a refutation this is the specific reason the claim is wrong; uncertainty is not a reason.",
+                "type": "string"
+              },
+              "cited": {
+                "description": "OPTIONAL. The bracketed id of the reference entry that decided your verdict, when one did. Leave it empty otherwise; do not name an entry you were not shown.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "verdict",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "schema_sha256": "02d410fa15f954898ce414c174366b365e9ea3809f964bf59b0636ce2da47c6c",
+          "raw_response": "{\n  \"verdict\": \"severity\",\n  \"revised_severity\": \"warning\",\n  \"reason\": \"The mechanism is real: `var values map[string]string` is nil until Configure runs, Put writes with no guard, so any Put (directly or via Start) before Configure panics with 'assignment to entry in nil map' \u2014 and Ready() returns true unconditionally, so it offers no protection. But no caller shown in this change exercises Put or Start at all, let alone before Configure, so the demonstrable consequence is a panic under a condition this code does not prevent, not incorrect behavior on a path shown to run. That is warning, not error.\"\n}"
+        },
+        {
+          "source_sha256": "2533cffbad5bfdc58e63e066cb98bb426bd7339ddb8e9ee5d1d4c6cacd636386",
+          "seconds": 93.25,
+          "outcome": {
+            "failure": "",
+            "finding": {
+              "path": "store.go",
+              "line": 28,
+              "severity": "nit",
+              "category": "",
+              "class": "slop",
+              "title": "No test pins version-1 readability contract",
+              "rationale": "No test exercises the version-1 decode path, so a tag rename or removed case can ship and break existing records. The v1 bytes in the docstring are a stable fixture for a table test. Add Decode on those bytes plus an Encode/Decode round trip.",
+              "suggestion": ""
+            },
+            "reason": "The claim is true: nothing shown exercises Decode's version-1 arm, and refuting a no-test claim requires naming a test, which I cannot \u2014 the docstring's v1 bytes are a comment, not coverage. But nit is mis-rated under this scale (nit is for structure of tests that already have teeth); this is missing coverage of branching logic at a data-format boundary with a nameable failure mode \u2014 renaming the `json:\"name\"` tag decodes existing v1 records to an empty name with no error, and deleting `case 1` errors every old record \u2014 so warning.",
+            "refuted": false,
+            "revised": "warning",
+            "unresolved": ""
+          },
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "verdict": {
+                "description": "confirmed when the claim holds, refuted when you can name why it is wrong, severity when the defect is real but rated wrong, unresolved when you cannot decide from what you were shown and can name what is missing.",
+                "enum": [
+                  "confirmed",
+                  "refuted",
+                  "severity",
+                  "unresolved"
+                ],
+                "type": "string"
+              },
+              "revised_severity": {
+                "description": "Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.",
+                "enum": [
+                  "nit",
+                  "info",
+                  "warning",
+                  "error",
+                  "critical"
+                ],
+                "type": "string"
+              },
+              "reason": {
+                "description": "One or two sentences. For a refutation this is the specific reason the claim is wrong; uncertainty is not a reason.",
+                "type": "string"
+              },
+              "cited": {
+                "description": "OPTIONAL. The bracketed id of the reference entry that decided your verdict, when one did. Leave it empty otherwise; do not name an entry you were not shown.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "verdict",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "schema_sha256": "02d410fa15f954898ce414c174366b365e9ea3809f964bf59b0636ce2da47c6c",
+          "raw_response": "{ \"verdict\": \"severity\", \"revised_severity\": \"warning\", \"reason\": \"The claim is true: nothing shown exercises Decode's version-1 arm, and refuting a no-test claim requires naming a test, which I cannot \u2014 the docstring's v1 bytes are a comment, not coverage. But nit is mis-rated under this scale (nit is for structure of tests that already have teeth); this is missing coverage of branching logic at a data-format boundary with a nameable failure mode \u2014 renaming the `json:\\\"name\\\"` tag decodes existing v1 records to an empty name with no error, and deleting `case 1` errors every old record \u2014 so warning.\" }"
+        }
+      ]
+    }
+  ],
+  "harness_invocation_error": "=== RUN   TestLiveValidationReturnsCompleteVerdicts\n    validation_contract_eval_test.go:28: open ../../notes/evidence/design-v5-trials.json: no such file or directory\n--- FAIL: TestLiveValidationReturnsCompleteVerdicts (0.00s)\nFAIL\n"
+}

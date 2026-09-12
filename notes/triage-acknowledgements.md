@@ -1,6 +1,6 @@
 # Triage acknowledgement controls
 
-Status: protocol controls pass; implementation review pending. Engineering
+Status: protocol controls pass; follow-up implementation review pending. Engineering
 prompt version 7 asks reviewers to return an empty findings array when they have
 no alleged problem. Task completion is recorded by the engine.
 
@@ -44,3 +44,8 @@ decision arrays. All three
 retaining the six substantive/protected entries and recording three
 acknowledgements each. The safeguards are unchanged. These explicit synthetic
 controls do not estimate false-negative rates on ambiguous natural findings.
+
+The [implementation review adjudication](engineering-implementation-review.md)
+records two fixture-harness findings and their disposition. The subsequent
+validation response controls are recorded separately in the
+[acceptance checkpoint](engineering-acceptance-audit.md#validation-response-contract).

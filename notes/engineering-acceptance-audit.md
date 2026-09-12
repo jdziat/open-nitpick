@@ -2,7 +2,8 @@
 
 Decision: needs revision. This is a checkpoint against
 [the coverage contract](best-practice-coverage.md), not CTO acceptance.
-Execution candidate: `c8cef1e`, draft PR #119. Acknowledgement protocol candidate: `bf03e53`. The retired evaluation used planner 4 and prompt `engineering-4` with Kimi-K3
+Execution candidate: `c8cef1e`, draft PR #119. Protocol candidate: `74d46f5`,
+prompt `engineering-9`. The retired evaluation used planner 4 and prompt `engineering-4` with Kimi-K3
 review and GLM-5.3-Flash triage. The user changed model roles after its first full
 cycle; 15 completed reports are retained in
 `evidence/design-v4-retired-trials.json`, including one report recovered after
@@ -12,7 +13,7 @@ These are incomplete repeated trials, not acceptance evidence for the new roles.
 | Contract area | Current evidence | Remaining acceptance work |
 | --- | --- | --- |
 | Explicit scope and states | Typed targets, omissions, failed stages and policy aggregation; local gates pass | Audit final real-repository report for completeness |
-| Commits | Shared validator and pinned range enumeration; 11 branch commits pass the accepted policy | Preserve commit-range evidence in the internal profile run |
+| Commits | Shared validator and pinned range enumeration; 20 branch commits passed the accepted policy at `74d46f5` | Preserve commit-range evidence in the internal profile run |
 | Slop | Deterministic tells and semantic assessment; full-source completion separate from design excerpts | Version-7 protocol controls pass; finish real-source review |
 | Design execution | Focused declarations/callers, exact excerpts, shared request IDs, cancellation evidence; 20 final mutations killed | Finish implementation review and measure full-repository execution |
 | Accepted boundaries | Bad boundary trial fails the deterministic policy; matching good boundary check passes | Distinguish unrelated slop findings in that good control |
@@ -67,8 +68,19 @@ effect. Kimi-K3 remains the fix model.
 ## Validation response contract
 
 Both incomplete version-5 trials selected a severity verdict without a usable
-revised level. The schema describes that field as optional, while the runtime
-requires it for severity changes. Clarify the conditional requirement without
-forcing a rating on confirmations/refutations. The existing fail-closed behavior
-must remain: an unusable expert answer retains the finding and marks the stage
-incomplete. Resolve this before relying on a full internal required-model run.
+revised level. Version 8 clarified the conditional requirement, but the lifecycle
+replay still omitted the level. Version 9 places the verdict before its conditional
+severity in the response schema. Both selected claims then returned usable levels.
+The [retained replays](evidence/validation-contract-replays.json) include the
+failed trial, raw responses, schemas, source digests and binary hashes. These use
+full fixture source instead of the original focused excerpts; two passing cases
+do not establish a general protocol failure rate or isolate the cause of improvement.
+Unusable expert answers still retain the finding and mark the stage incomplete.
+
+At `74d46f5`, serialized race tests, eval-tag vet, lint, repo-standards, docs,
+agents generation, touched-file slop and commit checks all exited successfully.
+The slop scan retained eight prose tells; its successful exit does not mean zero
+findings. The [implementation adjudication](engineering-implementation-review.md)
+records the earlier review's false missing-test claim and repaired indirection
+control. The follow-up source review and full internal model assessment remain
+pending.
