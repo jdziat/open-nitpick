@@ -20,7 +20,7 @@ import (
 )
 
 func assessEngineering(ctx context.Context, root, configPath, base string, noModel bool, budget int, policy config.PracticePolicy, files []standards.File, measured RepoStandardsResult) practices.Report {
-	r := practices.Report{SchemaVersion: 1, Profile: "engineering", Revision: sourceDigest(files), PolicySource: policy.Source, PolicyDigest: policy.Digest}
+	r := practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: sourceDigest(files), PolicySource: policy.Source, PolicyDigest: policy.Digest}
 	inventory, boundaries := practices.InspectDesign(files, policy.Practices.Boundaries)
 	r.Design = &inventory
 	conventions := conventionCheck(files, measured.Report, policy.Practices.RequiredConventions)

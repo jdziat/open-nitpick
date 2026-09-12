@@ -301,7 +301,7 @@ func TestEngineeringCallbackUsesTheResolvedReviewPolicy(t *testing.T) {
 
 func TestActionsCannotReportIncompletePracticesAsClean(t *testing.T) {
 	target := practices.Target{Kind: practices.FileTarget, ID: "a.go"}
-	r := &review.Report{Stages: []review.StageStatus{{Stage: "triage", Reason: "provider unavailable"}}, Incomplete: []string{"a.go"}, Practices: &practices.Report{SchemaVersion: 1, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: []practices.Check{
+	r := &review.Report{Stages: []review.StageStatus{{Stage: "triage", Reason: "provider unavailable"}}, Incomplete: []string{"a.go"}, Practices: &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: []practices.Check{
 		{ID: "conventions", Version: "1", Instrument: practices.Deterministic, State: practices.Completed, Planned: []practices.Target{target}, Examined: []practices.Target{target}},
 		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Partial, Required: true, Reason: "budget"},
 	}}}
@@ -347,7 +347,7 @@ func TestEngineeringDesignScopeKeepsStyleSignalsSeparate(t *testing.T) {
 
 func TestMCPPracticeGateRetainsItsEvidenceAndPolicyName(t *testing.T) {
 	target := practices.Target{Kind: practices.CommitTarget, ID: "commit-sha"}
-	assessment := &practices.Report{SchemaVersion: 1, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: []practices.Check{{ID: "commits", Version: "1", Instrument: practices.Deterministic, State: practices.Completed, Planned: []practices.Target{target}, Examined: []practices.Target{target}, Findings: []practices.Finding{{Rule: "subject", Target: target, Title: "invalid subject", Blocking: true}}}}}
+	assessment := &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: []practices.Check{{ID: "commits", Version: "1", Instrument: practices.Deterministic, State: practices.Completed, Planned: []practices.Target{target}, Examined: []practices.Target{target}, Findings: []practices.Finding{{Rule: "subject", Target: target, Title: "invalid subject", Blocking: true}}}}}
 	out := reviewOut(&review.Report{Plan: &bundle.Plan{}, Practices: assessment}, config.SeverityNone)
 	if out.Practices != assessment || out.FailOn != "engineering" || !out.Failed || !out.Complete || !strings.Contains(reviewText(out), "invalid subject") {
 		t.Fatalf("practice verdict lost its evidence: %+v", out)

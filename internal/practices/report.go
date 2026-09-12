@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -82,7 +83,9 @@ type DesignTask struct {
 	Sources []Target `json:"sources,omitempty"`
 	// Omitted records required source or graph context unavailable to the task.
 	Omitted []Omission `json:"omitted,omitempty"`
-	// SourceDigest binds the planned source and context, not a model cache entry.
+	// SourceDigest is an opaque, builder-specific binding, not a model cache key.
+	// PlanDesign hashes task metadata and source bytes; the legacy file adapter
+	// hashes its rendered request. Compare only within the same builder.
 	SourceDigest string `json:"source_digest,omitempty"`
 }
 
@@ -140,6 +143,9 @@ type ModelUsage struct {
 	ReasoningTokens  int    `json:"reasoning_tokens"`
 }
 
+// SchemaVersion identifies reports whose design coverage requires bound source.
+const SchemaVersion = 2
+
 // Report is the versioned evidence for a selected engineering policy.
 type Report struct {
 	SchemaVersion int              `json:"schema_version"`
@@ -156,7 +162,10 @@ type Report struct {
 // Problems lists incomplete or internally inconsistent evidence, preserving findings.
 func (r Report) Problems() []string {
 	var problems []string
-	if r.SchemaVersion != 1 || r.Profile == "" || r.Revision == "" || r.PolicySource == "" || r.PolicyDigest == "" {
+	if r.SchemaVersion != SchemaVersion {
+		problems = append(problems, fmt.Sprintf("unsupported report schema version %d; expected %d", r.SchemaVersion, SchemaVersion))
+	}
+	if r.Profile == "" || r.Revision == "" || r.PolicySource == "" || r.PolicyDigest == "" {
 		problems = append(problems, "report lacks supported schema, scope or policy provenance")
 	}
 	seen := map[string]bool{}
@@ -213,6 +222,14 @@ func (r Report) Problems() []string {
 			}
 			if !task.Source.valid() || task.Purpose == "" || !planned[Target{Kind: UnitTarget, ID: task.ID}] {
 				bad("design task lacks a planned unit, source or purpose")
+			}
+			for _, omission := range task.Omitted {
+				if !omission.Target.valid() || (omission.Target.Kind != FileTarget && omission.Target.Kind != UnitTarget) || strings.TrimSpace(omission.Reason) == "" {
+					bad("design task has invalid omission target or reason")
+				}
+				if omission.Target.Kind == FileTarget && !slices.Contains(task.Sources, omission.Target) && !slices.Contains(task.Context, omission.Target) {
+					bad("design task omits source outside its declared scope")
+				}
 			}
 			if read[Target{Kind: UnitTarget, ID: task.ID}] {
 				if len(task.Omitted) > 0 {

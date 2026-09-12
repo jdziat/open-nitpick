@@ -2,6 +2,7 @@ package practices
 
 import (
 	"github.com/jdziat/open-nitpick/internal/config"
+	"strings"
 	"testing"
 )
 
@@ -80,7 +81,7 @@ func TestUnpinnedReportsAndDuplicateChecksCannotPass(t *testing.T) {
 }
 
 func fixtureReport(checks ...Check) Report {
-	return Report{SchemaVersion: 1, Profile: "engineering", Revision: "head-sha", PolicySource: "defaults", PolicyDigest: "policy-sha", Checks: checks}
+	return Report{SchemaVersion: SchemaVersion, Profile: "engineering", Revision: "head-sha", PolicySource: "defaults", PolicyDigest: "policy-sha", Checks: checks}
 }
 
 func TestSnapshotAloneCannotEstablishEngineeringAssessment(t *testing.T) {
@@ -113,5 +114,40 @@ func TestConfiguredBoundariesCannotDisappearFromTheReport(t *testing.T) {
 	ApplyPolicy(&r, config.Practices{Boundaries: []config.PracticeBoundary{{From: "app/api", Forbid: []string{"app/db"}, Reason: "fixture"}}})
 	if len(r.Checks) != 2 || r.Checks[1].ID != "design-boundaries" || !r.Checks[1].Required || r.Checks[1].State != Unavailable || r.ExitCode() != 2 {
 		t.Fatalf("configured boundary silently disappeared: %+v", r)
+	}
+}
+
+func TestReportSchemaDistinguishesOlderCoverageContracts(t *testing.T) {
+	target := Target{Kind: CommitTarget, ID: "sha"}
+	r := fixtureReport(Check{ID: "commits", Version: "1", Instrument: Deterministic, State: Completed, Planned: []Target{target}, Examined: []Target{target}})
+	if len(r.Problems()) != 0 || r.SchemaVersion != 2 {
+		t.Fatalf("current report contract invalid: %+v", r)
+	}
+	r.SchemaVersion = 1
+	if !strings.Contains(strings.Join(r.Problems(), ";"), "unsupported report schema version 1; expected 2") {
+		t.Fatalf("old contract lacks an explicit version diagnosis: %v", r.Problems())
+	}
+}
+
+func TestTaskOmissionsRequireValidScopeAndAnExplanation(t *testing.T) {
+	source := Target{Kind: FileTarget, ID: "a.go"}
+	unit := Target{Kind: UnitTarget, ID: "package:a"}
+	commit := Target{Kind: CommitTarget, ID: "sha"}
+	for _, omission := range []Omission{
+		{Target: source},
+		{Target: source, Reason: " \t"},
+		{Reason: "budget"},
+		{Target: commit, Reason: "budget"},
+		{Target: Target{Kind: FileTarget, ID: "unrelated.go"}, Reason: "budget"},
+	} {
+		r := fixtureReport(Check{ID: "commits", Version: "1", Instrument: Deterministic, State: Completed, Planned: []Target{commit}, Examined: []Target{commit}},
+			Check{ID: "design", Version: "1", Instrument: Model, State: Partial, Reason: "budget", Planned: []Target{unit}, Omitted: []Omission{{Target: unit, Reason: "budget"}}, Tasks: []DesignTask{{ID: unit.ID, Source: source, Sources: []Target{source}, Purpose: "review a", Omitted: []Omission{{Target: source, Reason: "budget"}}}}})
+		if len(r.Problems()) != 0 {
+			t.Fatalf("valid optional omission control failed: %v", r.Problems())
+		}
+		r.Checks[1].Tasks[0].Omitted[0] = omission
+		if len(r.Problems()) == 0 {
+			t.Fatalf("invalid task omission accepted: %+v", omission)
+		}
 	}
 }

@@ -13,7 +13,7 @@ import (
 )
 
 func TestDesignPackingKeepsWholeTaskInOneRequest(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
 	cfg := config.Defaults()
 	cfg.Review.MaxFilesPerRequest = 6
@@ -43,7 +43,7 @@ func TestDesignPackingKeepsWholeTaskInOneRequest(t *testing.T) {
 }
 
 func TestDesignPackingDoesNotPromoteLimitedOrMissingContext(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
 	for _, cause := range []string{"file count", "total files", "tokens", "bytes", "missing", "excluded", "changed source"} {
 		t.Run(cause, func(t *testing.T) {
@@ -77,7 +77,7 @@ func TestDesignPackingDoesNotPromoteLimitedOrMissingContext(t *testing.T) {
 }
 
 func TestDesignPackingCountsRepeatedContextOnceAgainstFileLimit(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go", "service/service.go"})
 	cfg := config.Defaults()
 	cfg.Review.MaxFiles = 4
@@ -93,7 +93,7 @@ func TestDesignPackingCountsRepeatedContextOnceAgainstFileLimit(t *testing.T) {
 }
 
 func TestDesignPackingRejectsUnsetLimitsWithoutLosingTasks(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
 	for _, cause := range []string{"nil", "files", "request files", "bytes", "tokens", "reserve"} {
 		t.Run(cause, func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestDesignPackingRejectsUnsetLimitsWithoutLosingTasks(t *testing.T) {
 }
 
 func TestDesignPackingKeepsCancellationDistinctFromChangedSource(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -153,7 +153,7 @@ func (c *cancelAfterPoll) Err() error {
 }
 
 func TestDesignPackingChecksCancellationAfterRendering(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
 	base, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -173,7 +173,7 @@ func TestDesignPackingChecksCancellationAfterRendering(t *testing.T) {
 }
 
 func TestDesignPackingRecordsCancellationOncePerTarget(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
 	base, cancel := context.WithCancel(t.Context())
 	defer cancel()

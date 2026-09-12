@@ -9,7 +9,8 @@ import (
 	"github.com/jdziat/open-nitpick/internal/standards"
 )
 
-func designPlanningFixture() ([]standards.File, DesignInventory) {
+func designPlanningFixture(t *testing.T) ([]standards.File, DesignInventory) {
+	t.Helper()
 	files := []standards.File{
 		{Path: "go.mod", Src: []byte("module example.com/app\n\ngo 1.25\n")},
 		{Path: "store/read.go", Src: []byte("package store\nfunc Read() {}\n")},
@@ -19,11 +20,14 @@ func designPlanningFixture() ([]standards.File, DesignInventory) {
 		{Path: "unrelated/other.go", Src: []byte("package unrelated\n")},
 	}
 	inventory, _ := InspectDesign(files, nil)
+	if len(inventory.Errors) > 0 {
+		t.Fatalf("fixture inventory failed: %v", inventory.Errors)
+	}
 	return files, inventory
 }
 
 func TestDesignPlanIncludesPackageSiblingsDependenciesAndCallers(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	plan := PlanDesign(t.Context(), inventory, files, []string{"service/service.go"})
 	if len(plan.Errors) != 0 || len(plan.Tasks) != 1 {
 		t.Fatalf("plan=%+v", plan)
@@ -46,7 +50,7 @@ func TestDesignPlanIncludesPackageSiblingsDependenciesAndCallers(t *testing.T) {
 }
 
 func TestDesignPlanDistinguishesEmptyChangeFromWholeTree(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	tree := PlanDesign(t.Context(), inventory, files, nil)
 	if len(tree.Tasks) != 5 {
 		t.Fatalf("tree did not plan four packages and manifest: %+v", tree)
@@ -62,7 +66,7 @@ func TestDesignPlanDistinguishesEmptyChangeFromWholeTree(t *testing.T) {
 }
 
 func TestDesignPlanDigestChangesWithUnchangedFilesDependencies(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	original := PlanDesign(t.Context(), inventory, files, []string{"service/service.go"})
 	reversed := slices.Clone(files)
 	slices.Reverse(reversed)
@@ -82,7 +86,7 @@ func TestDesignPlanDigestChangesWithUnchangedFilesDependencies(t *testing.T) {
 }
 
 func TestDesignPlanKeepsMissingSourceAndImportsVisible(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	for i := range inventory.Units {
 		if inventory.Units[i].ID == "example.com/app/service" {
 			inventory.Units[i].Unresolved = []string{"example.com/app/missing"}
@@ -101,7 +105,7 @@ func TestDesignPlanKeepsMissingSourceAndImportsVisible(t *testing.T) {
 }
 
 func TestDesignPlanReportsCancellationInsteadOfAnEmptyAssessment(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	plan := PlanDesign(ctx, inventory, files, nil)
@@ -116,10 +120,10 @@ func TestDesignPlanReportsCancellationInsteadOfAnEmptyAssessment(t *testing.T) {
 }
 
 func TestPackageTaskRequiresCompleteSourcesBeforePromotingCoverage(t *testing.T) {
-	files, inventory := designPlanningFixture()
+	files, inventory := designPlanningFixture(t)
 	task := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"}).Tasks[0]
 	unit := Target{Kind: UnitTarget, ID: task.ID}
-	report := Report{SchemaVersion: 1, Profile: "engineering", Revision: "fixture", PolicySource: "operator", PolicyDigest: "fixture", Checks: []Check{{ID: "design", Version: "1", Instrument: Model, State: Completed, Planned: []Target{unit}, Examined: []Target{unit}, Tasks: []DesignTask{task}, Findings: []Finding{{Rule: "state", Target: Target{Kind: FileTarget, ID: "store/state.go", Line: 2}}}}}}
+	report := Report{SchemaVersion: SchemaVersion, Profile: "engineering", Revision: "fixture", PolicySource: "operator", PolicyDigest: "fixture", Checks: []Check{{ID: "design", Version: "1", Instrument: Model, State: Completed, Planned: []Target{unit}, Examined: []Target{unit}, Tasks: []DesignTask{task}, Findings: []Finding{{Rule: "state", Target: Target{Kind: FileTarget, ID: "store/state.go", Line: 2}}}}}}
 	if problems := report.Problems(); len(problems) != 0 {
 		t.Fatalf("complete package control rejected: %v", problems)
 	}
@@ -144,9 +148,12 @@ func TestPackageTaskRequiresCompleteSourcesBeforePromotingCoverage(t *testing.T)
 }
 
 func TestDesignPlanRetainsRemovedSourceAndSurvivingPackage(t *testing.T) {
-	files, _ := designPlanningFixture()
+	files, _ := designPlanningFixture(t)
 	files = slices.Delete(files, 1, 2)
 	inventory, _ := InspectDesign(files, nil)
+	if len(inventory.Errors) > 0 {
+		t.Fatalf("fixture inventory failed: %v", inventory.Errors)
+	}
 	plan := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
 	if len(plan.Tasks) != 2 {
 		t.Fatalf("removed source lost affected package or omission: %+v", plan)
@@ -168,7 +175,7 @@ func TestDesignPlanRetainsRemovedSourceAndSurvivingPackage(t *testing.T) {
 func TestNonPackageDesignTaskCannotOmitItsSourceBinding(t *testing.T) {
 	task := PlanDesign(t.Context(), DesignInventory{}, []standards.File{{Path: "app.py", Src: []byte("answer = 42\n")}}, nil).Tasks[0]
 	target := Target{Kind: UnitTarget, ID: task.ID}
-	report := Report{SchemaVersion: 1, Profile: "engineering", Revision: "fixture", PolicySource: "operator", PolicyDigest: "fixture", Checks: []Check{{ID: "design", Version: "1", Instrument: Model, State: Completed, Planned: []Target{target}, Examined: []Target{target}, Tasks: []DesignTask{task}}}}
+	report := Report{SchemaVersion: SchemaVersion, Profile: "engineering", Revision: "fixture", PolicySource: "operator", PolicyDigest: "fixture", Checks: []Check{{ID: "design", Version: "1", Instrument: Model, State: Completed, Planned: []Target{target}, Examined: []Target{target}, Tasks: []DesignTask{task}}}}
 	if problems := report.Problems(); len(problems) != 0 {
 		t.Fatalf("bound source control rejected: %v", problems)
 	}

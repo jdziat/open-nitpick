@@ -337,6 +337,11 @@ files with available related context. `-base` also selects the accepted reposito
 policy and the commit range. An external `-config` file is operator policy.
 Repository configuration edits cannot weaken their own checks.
 
+Engineering JSON reports use schema version 2. Completed design tasks require
+source scope and a source digest; schema 1 reports predate that requirement and
+must be regenerated before validating them with this version. Digests are opaque
+bindings local to the task builder, not portable model-cache keys.
+
 Each check reports what it planned, examined and omitted. Exit 0 means selected
 policy was satisfied, 1 means blocking findings, and 2 means incomplete required
 coverage or no substantive assessment. Incompleteness takes precedence and keeps
