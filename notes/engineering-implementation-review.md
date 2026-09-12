@@ -40,3 +40,16 @@ The withheld finding names stale audit wording. The audit was updated in
 existed is incorrect: the expert saw a narrower excerpt than the full change.
 Retain that context limitation rather than counting the refutation as evidence
 of accuracy. These reviews do not substitute for a full internal engineering run.
+
+The final race run exposed test setup that still consulted the operator keystore.
+`6c8864a` stubs it and removes credential headers from assertion output. A fake
+operator credential is seeded before the helper; removing the helper's stub
+[kills the guard](evidence/credential-test-isolation-mutation.json). The
+[focused review](evidence/credential-test-isolation-review.json) called that seed
+dead setup, overlooking its role in testing isolation. No production credential
+precedence changed. The reviewer also reported a truncated caller search.
+
+All eight [final local gates](evidence/engineering-controls-final-gates.json)
+passed at `6c8864a`. Slop retained eight tells and omitted the oversized raw trial
+JSON. The first gate attempt's analyzer contention and credential-test failures
+remain recorded separately from the passing rerun.
