@@ -64,5 +64,19 @@ report gaps) each failed its behavioral guard. Local artifacts:
 `/tmp/design-spans-race.log`, `/tmp/design-spans-vet.log`,
 `/tmp/design-spans-lint.log`, `/tmp/design-span-mutations.json`.
 
-The planner does not yet produce these ranges. Declaration selection and a new
-sizing probe remain necessary; these transport checks are not sizing evidence.
+The planner now produces ranges for complete referenced declarations and their
+local helpers, initializers and receiver methods. Caller selection follows
+referencing declarations. Header/import context and physical source positions
+are preserved. A missing dependency file stays declared even when it cannot be
+parsed. Focused race tests and eval-tag vet passed for practices, review and
+cmd/nitpick, and full lint passed. Three mutations (adjusted line directives,
+lost helper closure and whole-file reference collection) failed their guards.
+Artifacts: `/tmp/design-declaration-context-race.log`,
+`/tmp/design-declaration-context-vet.log`,
+`/tmp/design-declaration-context-lint.log`,
+`/tmp/design-declaration-mutations.json`.
+
+The new sizing observation still has 14 of 24 tasks above 120,000 estimated
+source tokens. Evidence and the next planner requirements are in
+[design-context-sizing.md](design-context-sizing.md). No execution PR has been
+pushed; practical interaction planning and full acceptance remain unfinished.

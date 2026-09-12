@@ -35,7 +35,7 @@ func PlanDesign(ctx context.Context, inventory DesignInventory, files []standard
 	}
 	contextIndex := indexDesignContext(ctx, inventory, files)
 	plan.Errors = append(plan.Errors, contextIndex.errors...)
-	plan.Limitations = append(plan.Limitations, "dependency context follows referenced declarations and local helpers; caller context follows importing files; selection does not type-check dynamic dispatch")
+	plan.Limitations = append(plan.Limitations, "dependency context follows referenced declarations and local helpers; caller context follows declarations referencing the primary package; selection does not type-check dynamic dispatch")
 	members := map[string]bool{}
 	for _, unit := range inventory.Units {
 		for _, name := range unit.Files {
@@ -70,7 +70,12 @@ func PlanDesign(ctx context.Context, inventory DesignInventory, files []standard
 			own[name] = true
 			task.Sources = append(task.Sources, Target{Kind: FileTarget, ID: name})
 		}
-		contextNames, omissions := contextIndex.contextFor(unit)
+		contextNames, spans, omissions := contextIndex.contextFor(unit)
+		for _, span := range spans {
+			if !own[span.Path] {
+				task.ContextSpans = append(task.ContextSpans, span)
+			}
+		}
 		task.Omitted = append(task.Omitted, omissions...)
 		for _, name := range contextNames {
 			if !own[name] {

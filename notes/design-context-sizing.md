@@ -40,3 +40,41 @@ must use declared, bounded interactions or source spans while preserving the
 context needed for each claim. It must not mark an oversized package assessed
 because pieces appeared in unrelated successful requests. Activation remains
 unpublished pending that work and a fresh adversarial review.
+
+Declaration-span selection produced 24 rendered tasks, 14 above 120,000
+estimated source tokens. The largest was 983,215 tokens across 261 files.
+This is another scope observation with changed implementation source, not a
+controlled comparison with the earlier probes. The source hashes, task bindings,
+limits and per-task sizes are retained in
+[evidence/design-declaration-span-sizing.json](evidence/design-declaration-span-sizing.json).
+No paid model requests were made by this probe. It excludes prompt framing.
+
+The selector now retains complete referenced declarations, local helpers,
+initializers and receiver methods, with original physical source lines. Primary
+packages remain whole. Whole-package primary scope and automatic expansion to
+all receiver methods still produce broad dependency and caller context. The
+current package unit therefore remains unsuitable for internal activation.
+
+The next planner must declare bounded interactions before admission:
+
+- Keep the inventory of packages, declarations and available edges independent
+  of budgets. Assign each planned obligation to a named unit so a budget cannot
+  improve apparent coverage by removing work from the denominator.
+- Separate package identity from request identity. A successful request covers
+  its named interaction; package completion requires every required interaction.
+- Select the primary source and relevant state, invoked methods, helper closure,
+  dependencies and caller obligations for that interaction. A reference to a
+  receiver type alone must not expand every method into every request. Unknown
+  dispatch remains an explicit inventory limitation.
+- If callers need separate requests, retain the primary contract and required
+  state/dependency evidence in each request. Do not infer cross-file findings
+  from fragments supplied to unrelated requests.
+- Preserve full-source slop coverage separately. Design spans cannot count as
+  a completed file assessment merely because some declarations were supplied.
+- Keep an indivisible oversized interaction omitted, with its cause. Add a
+  fixture where splitting would strand the failure or lifecycle evidence, and
+  require it to stay incomplete rather than pass as unrelated small tasks.
+
+Remeasure before choosing internal policy limits or enabling required model
+completion. Existing transport, mutation and selection checks validate the
+mechanism; they do not establish practical or effective repository assessment.

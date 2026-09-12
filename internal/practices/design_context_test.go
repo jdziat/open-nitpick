@@ -1,7 +1,10 @@
 package practices
 
 import (
+	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/jdziat/open-nitpick/internal/config"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/standards"
@@ -59,5 +62,33 @@ func TestDesignContextRetainsGenericReceiverMethodsAndInitializers(t *testing.T)
 	plan := PlanDesign(t.Context(), inventory, files, []string{"service/service.go"})
 	if len(plan.Errors) != 0 || len(plan.Tasks) != 1 || len(plan.Tasks[0].Omitted) != 0 || len(plan.Tasks[0].Context) != 6 {
 		t.Fatalf("constructor, receiver or init dependency disappeared: %+v", plan)
+	}
+}
+
+func TestDesignContextSelectsDeclarationsWithOriginalPhysicalLines(t *testing.T) {
+	files := []standards.File{
+		{Path: "go.mod", Src: []byte("module example.com/app\n")},
+		{Path: "service/service.go", Src: []byte("package service\nimport \"example.com/app/store\"\nfunc Read() int { return store.Read() }\n")},
+		{Path: "store/read.go", Src: []byte("package store\n//line invented.go:400\n// Read preserves the stored contract.\nfunc Read() int { return readValue() }\nfunc Unrelated() string { return \"UNRELATED DEPENDENCY\" }\n")},
+		{Path: "store/helper.go", Src: []byte("package store\nfunc readValue() int { return 42 }\nfunc Other() string { return \"UNRELATED HELPER\" }\n")},
+		{Path: "client/client.go", Src: []byte("package client\nimport \"example.com/app/service\"\nfunc Start() int { return service.Read() + local() }\nfunc local() int { return 1 }\nfunc Other() string { return \"UNRELATED CALLER\" }\n")},
+	}
+	inventory, _ := InspectDesign(files, nil)
+	plan := PlanDesign(t.Context(), inventory, files, []string{"service/service.go"})
+	packed := PackDesign(t.Context(), config.Defaults(), plan, files, nil, bundle.Reserve{})
+	if len(plan.Errors) != 0 || len(packed.Plan.Batches) != 1 {
+		t.Fatalf("selection failed: %+v", packed.Design)
+	}
+	text := bundle.RenderBatch(packed.Plan.Batches[0])
+	for _, required := range []string{"Read preserves the stored contract", "     4  func Read()", "func readValue()", "func Start()", "func local()"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("missing %q: %s", required, text)
+		}
+	}
+	if strings.Contains(text, "UNRELATED") || strings.Contains(text, "Lines 400") {
+		t.Fatalf("selection includes unrelated declarations or adjusted positions: %s", text)
+	}
+	if len(plan.Tasks[0].ContextSpans) == 0 {
+		t.Fatal("selection did not declare its partial scope")
 	}
 }
