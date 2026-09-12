@@ -392,3 +392,27 @@ func TestDeletedOnlyReviewAssessesCommitsWithoutInventingModelWork(t *testing.T)
 		t.Fatalf("valid empty source scope failed: %v", result.Problems())
 	}
 }
+
+func TestFileDesignAdapterBindsSourceAndRelatedContext(t *testing.T) {
+	file := &diff.File{Path: "a.py"}
+	entry := bundle.Entry{File: file, Content: "answer = 42\n", Related: []bundle.Related{{Path: "b.py", Line: 1, Snippet: "limit = 42\n"}}}
+	report := &review.Report{Plan: &bundle.Plan{Batches: []bundle.Batch{{Entries: []bundle.Entry{entry, {File: &diff.File{Path: "peer.py"}, Content: "peer = 42\n"}}}}}}
+	checks := func() []practices.Check {
+		return []practices.Check{{ID: "design", Planned: []practices.Target{{Kind: practices.FileTarget, ID: "a.py"}}}}
+	}
+	original := modelCheckResults(checks(), report)[0]
+	if len(original.Tasks) != 1 || len(original.Tasks[0].Sources) != 1 || len(original.Tasks[0].SourceDigest) != 64 {
+		t.Fatalf("file adapter lost source binding: %+v", original)
+	}
+	report.Plan.Batches[0].Entries[0].Related[0].Snippet = "limit = 43\n"
+	changed := modelCheckResults(checks(), report)[0]
+	if changed.Tasks[0].SourceDigest == original.Tasks[0].SourceDigest {
+		t.Fatal("related source changed without changing task binding")
+	}
+	report.Plan.Batches[0].Entries[0].Related[0].Snippet = "limit = 42\n"
+	report.Plan.Batches[0].Entries[1].Content = "peer = 43\n"
+	peer := modelCheckResults(checks(), report)[0]
+	if peer.Tasks[0].SourceDigest == original.Tasks[0].SourceDigest {
+		t.Fatal("batch source changed without changing task binding")
+	}
+}

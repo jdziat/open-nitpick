@@ -78,7 +78,7 @@ type DesignTask struct {
 	Source  Target   `json:"source"`
 	Purpose string   `json:"purpose"`
 	Context []Target `json:"context,omitempty"`
-	// Sources contains the complete package source intended for this task.
+	// Sources lists the primary source files intended for this task.
 	Sources []Target `json:"sources,omitempty"`
 	// Omitted records required source or graph context unavailable to the task.
 	Omitted []Omission `json:"omitted,omitempty"`
@@ -205,8 +205,8 @@ func (r Report) Problems() []string {
 				}
 				sourceTargets[source] = true
 			}
-			if strings.HasPrefix(task.ID, "package:") && len(task.Sources) == 0 {
-				bad("package design task has no source scope")
+			if len(task.Sources) == 0 {
+				bad("design task has no source scope")
 			}
 			if len(task.Sources) > 0 && !sourceTargets[task.Source] {
 				bad("design task primary source is outside its source scope")

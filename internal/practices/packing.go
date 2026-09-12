@@ -56,7 +56,7 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 			}
 		} else if len(task.Omitted) > 0 {
 			earlyReason = "intended design source or context is unavailable"
-		} else if cfg.Review.MaxFilesPerRequest > 0 && len(task.Sources)+len(task.Context) > cfg.Review.MaxFilesPerRequest {
+		} else if len(task.Sources)+len(task.Context) > cfg.Review.MaxFilesPerRequest {
 			earlyReason = "complete design task exceeds review.max_files_per_request"
 		}
 		if earlyReason != "" {
@@ -93,7 +93,7 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 				reason = bundle.ReasonUnavailable
 			case !utf8.Valid(source) || bytes.ContainsRune(source, 0):
 				reason = bundle.ReasonNotText
-			case cfg.Review.MaxFileBytes > 0 && len(source) > cfg.Review.MaxFileBytes:
+			case len(source) > cfg.Review.MaxFileBytes:
 				reason = bundle.ReasonTooLarge
 			}
 			if reason != "" {
@@ -126,7 +126,7 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 			}
 		case len(task.Omitted) > 0:
 			reason = "intended design source or context is unavailable"
-		case cfg.Review.MaxFiles > 0 && len(admitted)+newFiles > cfg.Review.MaxFiles:
+		case len(admitted)+newFiles > cfg.Review.MaxFiles:
 			reason = "complete design task exceeds review.max_files"
 		case batch.Tokens > out.Plan.BudgetPerBatch:
 			reason = "complete design task exceeds review.token_budget_per_request after framing"

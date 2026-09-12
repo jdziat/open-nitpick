@@ -164,3 +164,17 @@ func TestDesignPlanRetainsRemovedSourceAndSurvivingPackage(t *testing.T) {
 		t.Fatalf("removed=%t surviving=%t: %+v", removed, surviving, plan)
 	}
 }
+
+func TestNonPackageDesignTaskCannotOmitItsSourceBinding(t *testing.T) {
+	task := PlanDesign(t.Context(), DesignInventory{}, []standards.File{{Path: "app.py", Src: []byte("answer = 42\n")}}, nil).Tasks[0]
+	target := Target{Kind: UnitTarget, ID: task.ID}
+	report := Report{SchemaVersion: 1, Profile: "engineering", Revision: "fixture", PolicySource: "operator", PolicyDigest: "fixture", Checks: []Check{{ID: "design", Version: "1", Instrument: Model, State: Completed, Planned: []Target{target}, Examined: []Target{target}, Tasks: []DesignTask{task}}}}
+	if problems := report.Problems(); len(problems) != 0 {
+		t.Fatalf("bound source control rejected: %v", problems)
+	}
+	report.Checks[0].Tasks[0].Sources = nil
+	report.Checks[0].Tasks[0].SourceDigest = ""
+	if len(report.Problems()) == 0 {
+		t.Fatal("non-package task reported completed without source binding")
+	}
+}
