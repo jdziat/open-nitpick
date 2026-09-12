@@ -2,7 +2,7 @@
 
 Decision: needs revision. This is a checkpoint against
 [the coverage contract](best-practice-coverage.md), not CTO acceptance.
-Execution candidate: `52f402a`, draft PR #119. The retired evaluation used planner 4 and prompt `engineering-4` with Kimi-K3
+Execution candidate: `c8cef1e`, draft PR #119. Acknowledgement protocol candidate: `bf03e53`. The retired evaluation used planner 4 and prompt `engineering-4` with Kimi-K3
 review and GLM-5.3-Flash triage. The user changed model roles after its first full
 cycle; 15 completed reports are retained in
 `evidence/design-v4-retired-trials.json`, including one report recovered after
@@ -13,8 +13,8 @@ These are incomplete repeated trials, not acceptance evidence for the new roles.
 | --- | --- | --- |
 | Explicit scope and states | Typed targets, omissions, failed stages and policy aggregation; local gates pass | Audit final real-repository report for completeness |
 | Commits | Shared validator and pinned range enumeration; 11 branch commits pass the accepted policy | Preserve commit-range evidence in the internal profile run |
-| Slop | Deterministic tells and semantic assessment; full-source completion separate from design excerpts | Finish repeated controls and adjudicate misleading-comment findings |
-| Design execution | Focused declarations/callers, exact excerpts, shared request IDs, cancellation evidence; 20 final mutations killed | Finish live precision and cost evaluation |
+| Slop | Deterministic tells and semantic assessment; full-source completion separate from design excerpts | Version-7 protocol controls pass; finish real-source review |
+| Design execution | Focused declarations/callers, exact excerpts, shared request IDs, cancellation evidence; 20 final mutations killed | Finish implementation review and measure full-repository execution |
 | Accepted boundaries | Bad boundary trial fails the deterministic policy; matching good boundary check passes | Distinguish unrelated slop findings in that good control |
 | Incremental reuse | Engineering scope disables incremental narrowing | No cached-result speedup is being claimed |
 | Language coverage | Go graph, source tasks for other languages, explicit graph limitations | Wider language graph support remains a separate change |
@@ -23,8 +23,11 @@ These are incomplete repeated trials, not acceptance evidence for the new roles.
 
 ## Blocking acceptance gaps
 
-The repeated seven-mechanism evaluation is unfinished. Counts of returned
-findings cannot substitute for identifying the seeded defect. The first
+The version-5 seven-mechanism evaluation finished all 42 trials; 40 completed
+their required model assessments and two were partial. The
+[adjudicated results](design-v5-evaluation.md) retain acknowledgement noise,
+unsupported assumptions, a reversed shipping diagnosis, and fixture ambiguities.
+Counts of returned findings cannot substitute for identifying the seeded defect. The first
 intended-good lifecycle trial flagged an exported cache's zero-value behavior:
 the supplied caller constructs it correctly, but the public contract does not
 say whether other construction is supported. Retain the disagreement and the
@@ -60,3 +63,12 @@ harness now injects a panic and runs only that no-panic test to prove it fails.
 New live trials must use GLM-5.3-Flash review and Qwen3.8-27B triage. Those trials
 change both policy and prompt, so they cannot establish either change's isolated
 effect. Kimi-K3 remains the fix model.
+
+## Validation response contract
+
+Both incomplete version-5 trials selected a severity verdict without a usable
+revised level. The schema describes that field as optional, while the runtime
+requires it for severity changes. Clarify the conditional requirement without
+forcing a rating on confirmations/refutations. The existing fail-closed behavior
+must remain: an unusable expert answer retains the finding and marks the stage
+incomplete. Resolve this before relying on a full internal required-model run.

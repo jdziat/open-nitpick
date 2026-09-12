@@ -1,0 +1,13 @@
+models:
+  default: {provider: synthetic, model: 'hf:zai-org/GLM-5.3-Flash'}
+  triage: {provider: synthetic, model: 'hf:Qwen/Qwen3.8-27B'}
+review:
+  summary: false
+  knowledge: false
+  concurrency: 1
+practices:
+  required: [slop, design]
+  boundaries:
+    - from: example.com/fixture/ui
+      forbid: [example.com/fixture/storage]
+      reason: UI must use the service API to access stored names.

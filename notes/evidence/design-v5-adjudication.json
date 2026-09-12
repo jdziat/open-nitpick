@@ -1,0 +1,868 @@
+{
+  "evaluation": "engineering-5, GLM-5.3-Flash review, Qwen3.8-27B triage",
+  "adjudicator": "Codex manual source/rationale review; not independent CTO acceptance",
+  "source_results_sha256": "e0579171df44eac4008e318718a8d3764dca609f92107783fb042c0d43fa5a26",
+  "planned_runs": 42,
+  "retained_runs": 42,
+  "adjudicated_runs": 42,
+  "adjudication_status": "complete",
+  "counts_by_finding": {
+    "seeded_defect": 22,
+    "additional_valid_coverage_gap": 5,
+    "disputed_public_contract": 2,
+    "unsupported_assumption": 6,
+    "acknowledgement": 20,
+    "seeded_boundary_violation": 3,
+    "additional_valid_comment_mismatch": 6,
+    "false_positive_public_doc": 1,
+    "seeded_mechanism_with_reversed_behavior": 1
+  },
+  "limits": [
+    "Repeated synthetic controls are not real-repository precision.",
+    "Only final findings are classified here; withheld decisions remain in the retained source reports.",
+    "Deterministic boundary detections are counted separately from model detections.",
+    "A detected defect in a partial run does not complete its required assessment.",
+    "Prompt and model roles changed from v4; this is not an isolated causal comparison.",
+    "A no-finding result is accepted only with completed required model checks."
+  ],
+  "runs": [
+    {
+      "mechanism": "ineffective-tests",
+      "variant": "bad",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "6259c10f32085b3abbfa6cf57c43b7f18ee6348d73da0895f8dc19ba077fa08c",
+          "title": "Test logs instead of asserting, so it can never fail",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "ineffective-tests",
+      "variant": "good",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "81357117cf4076ff3a46b4b4ec1d6d3eebf2078968a642636bd7c6934ec5a343",
+          "title": "Session tests miss accept and equality boundary",
+          "classification": "additional_valid_coverage_gap",
+          "reason": "The expiry suite lacks acceptance/equality cases, or the decode fixture lacks a v1 compatibility test. This does not show that the existing no-panic test is ineffective."
+        }
+      ]
+    },
+    {
+      "mechanism": "lifecycle",
+      "variant": "bad",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "9faec4e754aba1a82ec03a834e377f6b84dd83d51108b84b9238581c657e5ab6",
+          "title": "Ready hides unconfigured cache that panics in Put",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        },
+        {
+          "check": "design",
+          "fingerprint": "f51c59e9847225524d4e08181efa2a8e7f05b0e62c4c710c8329b3dd99181139",
+          "title": "Put panics unless Configure ran, and nothing shown calls Configure",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "lifecycle",
+      "variant": "good",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "80710c0dd8c4cedf9fdcc6ba41966df03ec76c1cc75e68481c837f6b6de93538",
+          "title": "Exported Cache zero value panics in Put",
+          "classification": "disputed_public_contract",
+          "reason": "The supplied consumer constructs with NewCache correctly. Cache is exported and its zero-value contract is unspecified. The intended-good fixture is ambiguous; retain the disagreement."
+        },
+        {
+          "check": "design",
+          "fingerprint": "bda62657668ad65af7bda726be813ee1a437bec766aa4f3a54762779a92a9e0a",
+          "title": "Missing require directives leave import boundary unverified",
+          "classification": "unsupported_assumption",
+          "reason": "The alleged consequence depends on unprovided requirements or callers: external publication, older toolchains, dependencies, blank-label semantics, or observable lifecycle markers. It is not demonstrated by this fixture."
+        }
+      ]
+    },
+    {
+      "mechanism": "failure-propagation",
+      "variant": "bad",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "3268deb5f6dea058bb7b301c0e789e0ab0b7ca33eeb9817b87cf9b9722e5c83f",
+          "title": "save discards persistence errors and Register reports false success",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "2991094fa69157d884017f98f03ab8e2b800d113cb5d92a320d7dac79a71d99e",
+          "title": "Register docstring promises persistence-failure returns the code never delivers",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "failure-propagation",
+      "variant": "good",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "1112ad1a8981177260cb2c40fcdd3b2739863274faa4f26cf7733b87519d8925",
+          "title": "No defect found in records package",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "boundaries",
+      "variant": "bad",
+      "iteration": 1,
+      "exit": 1,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design-boundaries",
+          "fingerprint": "c40c5a733abf1a8ac9ee96273b831be9ade7536702064ff726f4f2dea4717d44",
+          "title": "example.com/fixture/ui imports forbidden dependency example.com/fixture/storage",
+          "classification": "seeded_boundary_violation",
+          "reason": "The deterministic import check names the exact edge forbidden by the supplied operator policy. This is not a model detection."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "2122529bd81fea7392549bf6fb8d5b694ead2cb7fa03cf827807693ca77e16da",
+          "title": "Doc comment overclaims persistence for stub Load",
+          "classification": "additional_valid_comment_mismatch",
+          "reason": "The storage comment promises a persisted read while the supplied body returns a constant; score separately from compliant/forbidden imports."
+        },
+        {
+          "check": "design",
+          "fingerprint": "bac0a056a2cbee2b25b18acd51ce3ce7c765858999fba8902281f2f299eaeb8e",
+          "title": "Label conflates unknown, missing, and empty labels",
+          "classification": "unsupported_assumption",
+          "reason": "The alleged consequence depends on unprovided requirements or callers: external publication, older toolchains, dependencies, blank-label semantics, or observable lifecycle markers. It is not demonstrated by this fixture."
+        }
+      ]
+    },
+    {
+      "mechanism": "boundaries",
+      "variant": "good",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "fc22286eba00a69a615241eb6872dd91d87a42824bb0066a9f3f61eb83d70312",
+          "title": "Doc comment promises persisted read the body does not perform",
+          "classification": "additional_valid_comment_mismatch",
+          "reason": "The storage comment promises a persisted read while the supplied body returns a constant; score separately from compliant/forbidden imports."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "c95c5884ad589e8673894b5df1758f393b063f1a96d854141041eb3c7e938005",
+          "title": "No rule matches in service/service.go",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        },
+        {
+          "check": "design",
+          "fingerprint": "83acd7cd954dd6450c1c814c4f0ae5b68a6eb8e1776dfc1c9ed0fca8f0f0da76",
+          "title": "Doc comment restates the one-line delegation beneath it",
+          "classification": "false_positive_public_doc",
+          "reason": "The exported Label comment documents its caller-facing purpose; this falls under the public API documentation exclusion."
+        },
+        {
+          "check": "design",
+          "fingerprint": "cb33e1be17ba534c3c45c28cfb7a2ee270170814b6685a6cb21263fa3a51a03b",
+          "title": "Label's string-only return cannot represent a lookup miss",
+          "classification": "unsupported_assumption",
+          "reason": "The alleged consequence depends on unprovided requirements or callers: external publication, older toolchains, dependencies, blank-label semantics, or observable lifecycle markers. It is not demonstrated by this fixture."
+        }
+      ]
+    },
+    {
+      "mechanism": "coupled-duplication",
+      "variant": "bad",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "199cfe91fcc9f2918789af4ed75ec9955e0e029cae5ba535fe4883370371c67e",
+          "title": "Preview and checkout quote different shipping for 5000 to 5999 cents",
+          "classification": "seeded_mechanism_with_reversed_behavior",
+          "reason": "Identifies shipping-policy disagreement but reverses the observed direction: PreviewShipping charges 500 for 5000..5999; CheckoutShipping charges zero. Do not count as a fully correct finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "coupled-duplication",
+      "variant": "good",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "80a13c441adc76f3ba855f6e42ed1d89b0fd6d82a11d3107e9f0ade21c47ac04",
+          "title": "No action needed: shipping boundary matches contract",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        },
+        {
+          "check": "design",
+          "fingerprint": "724574b0fe2551659013edd4de43cefb864d85faef872945b12cf23b0985baa3",
+          "title": "No action needed: wholesale boundary matches contract",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "indirection",
+      "variant": "bad",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "cde61368cef1a54879e1f14281f085059eb36f89bd1754899425320b2502476a",
+          "title": "No-op name forwarding chain adds maintenance cost",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "indirection",
+      "variant": "good",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "ca0ecf99cf125113777ad366d1b41b6741ff9566ea82ff0ee342036cbcdbae6c",
+          "title": "No slop findings in go.mod",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "37d576119b428765426250fc474f162907608d69b2dfcc72e714bd36e82ff85a",
+          "title": "No slop findings in service.go",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "contracts",
+      "variant": "bad",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "f5f9f886d1c05c0a1a2a8203959097f7e82a43388a6646e5e0b8e60f504809ac",
+          "title": "Decode returns empty name for version-1 records",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "contracts",
+      "variant": "good",
+      "iteration": 1,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": []
+    },
+    {
+      "mechanism": "ineffective-tests",
+      "variant": "bad",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "9e8408f0752307fd926324a5af2c6bb0174d38b34736046d2c9ab77fc36ded73",
+          "title": "Expired-session test logs instead of asserting and always passes",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "ineffective-tests",
+      "variant": "good",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "0d64c3181c7081f81e0b041d3fee215117725bd3441fa0e9d00e2df21c5db5a9",
+          "title": "Strict-expiry boundary is untested",
+          "classification": "additional_valid_coverage_gap",
+          "reason": "The expiry suite lacks acceptance/equality cases, or the decode fixture lacks a v1 compatibility test. This does not show that the existing no-panic test is ineffective."
+        }
+      ]
+    },
+    {
+      "mechanism": "lifecycle",
+      "variant": "bad",
+      "iteration": 2,
+      "exit": 2,
+      "assessment_complete": false,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "0cef9d59e735ee25fc9c4048ab7a133e36e548e96576dfd8ce7400a847edd603",
+          "title": "Ready always returns true",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        },
+        {
+          "check": "design",
+          "fingerprint": "6dafc62b1eab8519a753972d85e7d802e0a63d23319c06db5a73f0887eeab557",
+          "title": "Put panics on nil map before Configure",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        },
+        {
+          "check": "design",
+          "fingerprint": "898a210287b61a0985915c00b6169e41c24d7aad5e72f216ee58af8e63963f53",
+          "title": "Start stores lifecycle state as a magic cache key",
+          "classification": "unsupported_assumption",
+          "reason": "The alleged consequence depends on unprovided requirements or callers: external publication, older toolchains, dependencies, blank-label semantics, or observable lifecycle markers. It is not demonstrated by this fixture."
+        }
+      ]
+    },
+    {
+      "mechanism": "lifecycle",
+      "variant": "good",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "f9c95806bbfc8aca20d256f3a29a4f6b6c949a0a6d53ce1a4195ab4b6bf47335",
+          "title": "Ready models an uninitialized state that Put cannot survive",
+          "classification": "disputed_public_contract",
+          "reason": "The supplied consumer constructs with NewCache correctly. Cache is exported and its zero-value contract is unspecified. The intended-good fixture is ambiguous; retain the disagreement."
+        }
+      ]
+    },
+    {
+      "mechanism": "failure-propagation",
+      "variant": "bad",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "03837b01b2b30c49b8abb9445d36fe5685e3783427211200d20bd9d1f10e5972",
+          "title": "save discards Marshal and Write errors",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "4069b36faa513c07bc7cdcbdfe285aef58c94991f6300c134015a0455917ff85",
+          "title": "Write error discarded, failed persistence reports success",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "failure-propagation",
+      "variant": "good",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": []
+    },
+    {
+      "mechanism": "boundaries",
+      "variant": "bad",
+      "iteration": 2,
+      "exit": 1,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design-boundaries",
+          "fingerprint": "c40c5a733abf1a8ac9ee96273b831be9ade7536702064ff726f4f2dea4717d44",
+          "title": "example.com/fixture/ui imports forbidden dependency example.com/fixture/storage",
+          "classification": "seeded_boundary_violation",
+          "reason": "The deterministic import check names the exact edge forbidden by the supplied operator policy. This is not a model detection."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "d27e64bf8be9cfa2ee16e8bbc2b358055535d0750d62a0c8c82882d43dc31e4b",
+          "title": "Storage docstring claims a persisted read",
+          "classification": "additional_valid_comment_mismatch",
+          "reason": "The storage comment promises a persisted read while the supplied body returns a constant; score separately from compliant/forbidden imports."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "8cd086d96a9d692b543a6ea91944422c3903cd33e0eae7e7db64bbebc7e28f72",
+          "title": "Slop rules evaluated over service.go: none triggered",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        },
+        {
+          "check": "design",
+          "fingerprint": "4cc59c9bdb7e64cc3428b4ddec434e144a4fd464d6c65aca9beab20ba32f99c0",
+          "title": "Service declaration has no reachable defect",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "boundaries",
+      "variant": "good",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "10847b9556c11d5885b6548ff87fe03d15ae0260861fc81b16d6fc4f5fb77f79",
+          "title": "Module declaration has no demonstrable defect",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "29c9998a3fa895f683c931b00f9c5aa960aeb321506d51c2edaa71844e78bc3e",
+          "title": "Go version directive has no demonstrable defect",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "db767234f16a0108d6ea915c0b256f8f29ff7c7eac5ae11e58a18aaaa83066d1",
+          "title": "Load docstring promises persistence the body does not implement",
+          "classification": "additional_valid_comment_mismatch",
+          "reason": "The storage comment promises a persisted read while the supplied body returns a constant; score separately from compliant/forbidden imports."
+        }
+      ]
+    },
+    {
+      "mechanism": "coupled-duplication",
+      "variant": "bad",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "f8e128b642e28a2cb350e455fe49655236020cddf71ce9a5d5349f8424831c99",
+          "title": "Preview free-shipping threshold contradicts checkout policy",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "coupled-duplication",
+      "variant": "good",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": []
+    },
+    {
+      "mechanism": "indirection",
+      "variant": "bad",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "800f0ddfd0978275e38025aad69d0bd0adc0ae42a531001826f76c57db3d2094",
+          "title": "Proxy chain duplicates ProfileName signature",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        },
+        {
+          "check": "design",
+          "fingerprint": "12d8f999750038eb4a09cdea478d37b5f10204b654f3e35f2072dd63c530953e",
+          "title": "Module path uses reserved example.com placeholder",
+          "classification": "unsupported_assumption",
+          "reason": "The alleged consequence depends on unprovided requirements or callers: external publication, older toolchains, dependencies, blank-label semantics, or observable lifecycle markers. It is not demonstrated by this fixture."
+        }
+      ]
+    },
+    {
+      "mechanism": "indirection",
+      "variant": "good",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "ffdc3e027e5bbc64bd9ae939c3b8335629ef6063b1d77bf4ebf9df4582fbbc18",
+          "title": "Slop rule check reports no match",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "contracts",
+      "variant": "bad",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "e8c1c478d142529257ded249dd74d8df3386857ab7ac53a3b75107010600459b",
+          "title": "Version 1 records decode to empty name",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        },
+        {
+          "check": "design",
+          "fingerprint": "842d2ecb00f82307c0975c0f3f3cddaa2323dcd6ca47cc3d813d3dae561edc49",
+          "title": "No test covers version 1 decode",
+          "classification": "additional_valid_coverage_gap",
+          "reason": "The expiry suite lacks acceptance/equality cases, or the decode fixture lacks a v1 compatibility test. This does not show that the existing no-panic test is ineffective."
+        }
+      ]
+    },
+    {
+      "mechanism": "contracts",
+      "variant": "good",
+      "iteration": 2,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": []
+    },
+    {
+      "mechanism": "ineffective-tests",
+      "variant": "bad",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "7c66ae8b7d32fbb75c4d0f9b3437968f26141f225d53491afe72c2d0b84e0b53",
+          "title": "Test logs instead of asserting, so it cannot fail",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "a78b2cf14d20ace8aeb81a0064ad740fe46c36105227e706a5b890a4d98c8a61",
+          "title": "No slop rule applies to go.mod",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "ineffective-tests",
+      "variant": "good",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "f4d2dba1d229e8338fa490b4e920d69f5d05b63deb3f85f7520989ef07da9df9",
+          "title": "Missing tests for accept path and equality boundary",
+          "classification": "additional_valid_coverage_gap",
+          "reason": "The expiry suite lacks acceptance/equality cases, or the decode fixture lacks a v1 compatibility test. This does not show that the existing no-panic test is ineffective."
+        }
+      ]
+    },
+    {
+      "mechanism": "lifecycle",
+      "variant": "bad",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "333acee7fa9db44e8025cbaab6046890153d04400c9c4b4f0734dcbd703a4771",
+          "title": "Cache usable before Configure: Put panics and Ready misreports",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        },
+        {
+          "check": "design",
+          "fingerprint": "b19efc5f236ae8a20bc0c1c03eb9b3c1b3d93cc2e1bf27cbd4f487f69ef2d4b7",
+          "title": "Ready returns true before Configure has initialized the cache",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "lifecycle",
+      "variant": "good",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "b19b5aef3ca67ee5b149c1eb1e5ec1a0ff59f55228925acfc7de99f75af187cd",
+          "title": "No defect demonstrated in fixture package",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        },
+        {
+          "check": "design",
+          "fingerprint": "4aaa2ccf02924db5b93e5a6528da57645d4b1e2daa2162eb07dd2691c7ffaec6",
+          "title": "Go 1.25 floor requires newer toolchains",
+          "classification": "unsupported_assumption",
+          "reason": "The alleged consequence depends on unprovided requirements or callers: external publication, older toolchains, dependencies, blank-label semantics, or observable lifecycle markers. It is not demonstrated by this fixture."
+        }
+      ]
+    },
+    {
+      "mechanism": "failure-propagation",
+      "variant": "bad",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "20bc6f6d48d3e7c514b8e7e4a64ee8b0241ccb3b357a10f1134cf184ae561a59",
+          "title": "save discards both errors, so Register reports success on failure",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "efb413c0d08c958b1b2899df5df7c6fbdfd645774e18cbb57817e3920a5f96e2",
+          "title": "No slop rule triggers in go.mod",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "failure-propagation",
+      "variant": "good",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "8d68c4aa5843ef4004a1cb851354e1f03a22c735188fdc0acbf8efe9511040f0",
+          "title": "No slop findings in store.go",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "boundaries",
+      "variant": "bad",
+      "iteration": 3,
+      "exit": 1,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design-boundaries",
+          "fingerprint": "c40c5a733abf1a8ac9ee96273b831be9ade7536702064ff726f4f2dea4717d44",
+          "title": "example.com/fixture/ui imports forbidden dependency example.com/fixture/storage",
+          "classification": "seeded_boundary_violation",
+          "reason": "The deterministic import check names the exact edge forbidden by the supplied operator policy. This is not a model detection."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "9bab1e0fd02dd317d0c850f6d74298292c031a355e8d5d0099822b043280d3ab",
+          "title": "Load comment overstates persisted read behavior",
+          "classification": "additional_valid_comment_mismatch",
+          "reason": "The storage comment promises a persisted read while the supplied body returns a constant; score separately from compliant/forbidden imports."
+        }
+      ]
+    },
+    {
+      "mechanism": "boundaries",
+      "variant": "good",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "e4c5f751caaaee18253c97a247a46b25163234960b176d3c7a39857a40ccb8cc",
+          "title": "Docstring claims persistence the fixture does not perform",
+          "classification": "additional_valid_comment_mismatch",
+          "reason": "The storage comment promises a persisted read while the supplied body returns a constant; score separately from compliant/forbidden imports."
+        },
+        {
+          "check": "design",
+          "fingerprint": "141aae853f44bea862d4745542af8e97538b52581a4ce32965d666389b3ec61b",
+          "title": "Module path check is a non-actionable confirmation",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "coupled-duplication",
+      "variant": "bad",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "4a96ae53e4ecfe13eceeeaa998995e9ca9c766706cd7bf7da9e14da1639a5ef7",
+          "title": "Preview and checkout free-shipping thresholds disagree",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "coupled-duplication",
+      "variant": "good",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "2908785a9336cc7343e4fd7ff3ff8fa95244fab74f2237791844be1a769dc43e",
+          "title": "No defect in checkout doc comment",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "627f7b6667c7f4138e952a2f0bd3356deb6551be0338ccad81cef4b9456afcfd",
+          "title": "No defect in preview doc comment",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "indirection",
+      "variant": "bad",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "bfc4be77f3cedd0b51682253304c3f12046391e236e52009c3f619e94be9f946",
+          "title": "Wrapper layers add edit cost without behavior",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified."
+        }
+      ]
+    },
+    {
+      "mechanism": "indirection",
+      "variant": "good",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "f3653e7fdc74badffa4651b4ab74c5e1fb1faea7ff530686b6d83c494c54b32a",
+          "title": "No defect in interface comment",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        },
+        {
+          "check": "slop",
+          "fingerprint": "a5262ddf9dbb864181bdd4a87330ddb9b3925322c2e47ec38fe206654d2193a8",
+          "title": "No defect in ProfileName comment",
+          "classification": "acknowledgement",
+          "reason": "The entry alleges no problem and reports successful assessment. It should be recorded as assessment evidence, not a finding."
+        }
+      ]
+    },
+    {
+      "mechanism": "contracts",
+      "variant": "bad",
+      "iteration": 3,
+      "exit": 0,
+      "assessment_complete": true,
+      "findings": [
+        {
+          "check": "design",
+          "fingerprint": "2f83e8080ce348b236891d35657fbaa2a2ef2e75a52db36805dfa76e93f95802",
+          "title": "Decode drops version-1 name field",
+          "classification": "seeded_defect",
+          "reason": "Identifies the mechanism described in this fixture README; severity and recommendations are not separately qualified.",
+          "remedy_caveat": "The fallback-field remedy restores v1 decoding. Merely removing the compatibility comment would not restore persisted v1 records; changing that contract needs a migration/deprecation decision."
+        }
+      ]
+    },
+    {
+      "mechanism": "contracts",
+      "variant": "good",
+      "iteration": 3,
+      "exit": 2,
+      "assessment_complete": false,
+      "findings": [
+        {
+          "check": "slop",
+          "fingerprint": "c0798c71877caa346f90b4846b0807086a8fb1272745a864a2bb4552a75eac3f",
+          "title": "No test pins version-1 readability contract",
+          "classification": "additional_valid_coverage_gap",
+          "reason": "The expiry suite lacks acceptance/equality cases, or the decode fixture lacks a v1 compatibility test. This does not show that the existing no-panic test is ineffective.",
+          "classification_caveat": "Missing compatibility coverage is a real gap, but no existing ineffective test is shown. Its slop classification is not justified. The validation severity verdict also omitted a usable level, leaving the assessment partial."
+        }
+      ]
+    }
+  ]
+}

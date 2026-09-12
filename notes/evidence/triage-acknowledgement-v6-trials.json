@@ -1,0 +1,369 @@
+{
+  "source_commit": "6caea5ece1fb105e75c10d8adba1fb895e3bca4a",
+  "state": "live acknowledgement controls failed; implementation review not started",
+  "jobs": [
+    {
+      "name": "acknowledgement-controls",
+      "command": [
+        "/tmp/nitpick-ack-controls-v6.test",
+        "-test.run=TestLiveTriageSeparatesAcknowledgementsFromWeakClaims",
+        "-test.v",
+        "-test.count=1",
+        "-test.timeout=20m"
+      ],
+      "exit": 1,
+      "seconds": 175.25
+    }
+  ],
+  "nitpick-ack-controls-v6.test_sha256": "9d6582374ca357934fc32f4dd1125af18e379c32f230c8ad672ecbc01b90d475",
+  "nitpick-engineering-v6_sha256": "40cba11c89e261fb52eb4a1348b0751c3446904c0128a3c87bcc3ab2f0687372",
+  "controls": [
+    {
+      "order": "order_1",
+      "seconds": 69.78,
+      "result": {
+        "kept": [
+          {
+            "path": "ack.go",
+            "line": 7,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No defect found in records package",
+            "rationale": "Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.",
+            "suggestion": ""
+          },
+          {
+            "path": "success.go",
+            "line": 4,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "Shipping boundary matches contract",
+            "rationale": "The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.",
+            "suggestion": ""
+          },
+          {
+            "path": "slop.go",
+            "line": 1,
+            "severity": "nit",
+            "category": "",
+            "class": "slop",
+            "title": "No slop findings in service.go",
+            "rationale": "This is a negative check result, not a defect. It names no consequence and has no action.",
+            "suggestion": ""
+          },
+          {
+            "path": "weak.go",
+            "line": 3,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "An unseen caller might pass nil",
+            "rationale": "An external caller might pass nil and panic. No such caller is shown, so the consequence depends on unavailable context.",
+            "suggestion": ""
+          },
+          {
+            "path": "mixed.go",
+            "line": 9,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No defect found on the happy path; failure handling may lose data",
+            "rationale": "The successful path is correct. If a caller passes a failing writer, its error is discarded and the record may be lost.",
+            "suggestion": ""
+          },
+          {
+            "path": "coverage.go",
+            "line": 5,
+            "severity": "nit",
+            "category": "",
+            "class": "tests",
+            "title": "Equality boundary has no assertion",
+            "rationale": "The shown tests check rejection after expiry but omit equality; changing the comparison to <= would pass them.",
+            "suggestion": ""
+          },
+          {
+            "path": "analyzer.go",
+            "line": 8,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "Analyzer reports no issue",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "warning.go",
+            "line": 2,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "patch.go",
+            "line": 6,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": "return err"
+          }
+        ],
+        "decisions": null
+      }
+    },
+    {
+      "order": "order_2",
+      "seconds": 80.93,
+      "result": {
+        "kept": [
+          {
+            "path": "patch.go",
+            "line": 6,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": "return err"
+          },
+          {
+            "path": "warning.go",
+            "line": 2,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "analyzer.go",
+            "line": 8,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "Analyzer reports no issue",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "coverage.go",
+            "line": 5,
+            "severity": "nit",
+            "category": "",
+            "class": "tests",
+            "title": "Equality boundary has no assertion",
+            "rationale": "The shown tests check rejection after expiry but omit equality; changing the comparison to <= would pass them.",
+            "suggestion": ""
+          },
+          {
+            "path": "mixed.go",
+            "line": 9,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No defect found on the happy path; failure handling may lose data",
+            "rationale": "The successful path is correct. If a caller passes a failing writer, its error is discarded and the record may be lost.",
+            "suggestion": ""
+          },
+          {
+            "path": "weak.go",
+            "line": 3,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "An unseen caller might pass nil",
+            "rationale": "An external caller might pass nil and panic. No such caller is shown, so the consequence depends on unavailable context.",
+            "suggestion": ""
+          },
+          {
+            "path": "slop.go",
+            "line": 1,
+            "severity": "nit",
+            "category": "",
+            "class": "slop",
+            "title": "No slop findings in service.go",
+            "rationale": "This is a negative check result, not a defect. It names no consequence and has no action.",
+            "suggestion": ""
+          },
+          {
+            "path": "success.go",
+            "line": 4,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "Shipping boundary matches contract",
+            "rationale": "The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.",
+            "suggestion": ""
+          },
+          {
+            "path": "ack.go",
+            "line": 7,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No defect found in records package",
+            "rationale": "Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.",
+            "suggestion": ""
+          }
+        ],
+        "decisions": null
+      }
+    },
+    {
+      "order": "order_3",
+      "seconds": 24.49,
+      "result": {
+        "kept": [
+          {
+            "path": "weak.go",
+            "line": 3,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "An unseen caller might pass nil",
+            "rationale": "An external caller might pass nil and panic. No such caller is shown, so the consequence depends on unavailable context.",
+            "suggestion": ""
+          },
+          {
+            "path": "mixed.go",
+            "line": 9,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No defect found on the happy path; failure handling may lose data",
+            "rationale": "The successful path is correct. If a caller passes a failing writer, its error is discarded and the record may be lost.",
+            "suggestion": ""
+          },
+          {
+            "path": "coverage.go",
+            "line": 5,
+            "severity": "nit",
+            "category": "",
+            "class": "tests",
+            "title": "Equality boundary has no assertion",
+            "rationale": "The shown tests check rejection after expiry but omit equality; changing the comparison to <= would pass them.",
+            "suggestion": ""
+          },
+          {
+            "path": "analyzer.go",
+            "line": 8,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "Analyzer reports no issue",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "warning.go",
+            "line": 2,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "patch.go",
+            "line": 6,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": "return err"
+          }
+        ],
+        "decisions": [
+          {
+            "Finding": {
+              "path": "ack.go",
+              "line": 7,
+              "severity": "nit",
+              "category": "",
+              "class": "correctness",
+              "title": "No defect found in records package",
+              "rationale": "Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: The rationale confirms the persistence contract is met and identifies no branching, state, or additional caller that would introduce a hidden rule. It alleges no defect.; original rationale: \"Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.\"",
+            "Revised": "",
+            "Cited": ""
+          },
+          {
+            "Finding": {
+              "path": "success.go",
+              "line": 4,
+              "severity": "nit",
+              "category": "",
+              "class": "correctness",
+              "title": "Shipping boundary matches contract",
+              "rationale": "The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: The rationale confirms the boundary value matches the documented contract across all shown paths. It alleges no defect.; original rationale: \"The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.\"",
+            "Revised": "",
+            "Cited": ""
+          },
+          {
+            "Finding": {
+              "path": "slop.go",
+              "line": 1,
+              "severity": "nit",
+              "category": "",
+              "class": "slop",
+              "title": "No slop findings in service.go",
+              "rationale": "This is a negative check result, not a defect. It names no consequence and has no action.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: The rationale explicitly identifies the entry as a negative check result with no consequence and no action. It alleges no defect.; original rationale: \"This is a negative check result, not a defect. It names no consequence and has no action.\"",
+            "Revised": "",
+            "Cited": ""
+          }
+        ]
+      }
+    }
+  ],
+  "expected": {
+    "retained": [
+      "weak.go",
+      "mixed.go",
+      "coverage.go",
+      "analyzer.go",
+      "warning.go",
+      "patch.go"
+    ],
+    "acknowledgements": [
+      "ack.go",
+      "success.go",
+      "slop.go"
+    ]
+  },
+  "diagnostic": {
+    "change": "test-only raw response capture; same prompt and schema digests",
+    "binary_sha256": "7c5cbfbc8aec6f01c753dec2b85d8d4dbf04902351b88e2f8c337ea0dba0b0eb",
+    "order": "order_1",
+    "raw_response": "{\n  \"dropped\": [],\n  \"findings\": [\n    {\n      \"class\": \"correctness\",\n      \"number\": 4,\n      \"rationale\": \"The function does not guard nil input, so an unseen caller that passes nil can panic. The shown code has no such caller, so this rests on unavailable context.\",\n      \"severity\": \"nit\",\n      \"title\": \"Missing nil guard for unseen caller\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 5,\n      \"rationale\": \"A failing writer's error is discarded, so the record can be lost. The shown successful path does not cover that failure case.\",\n      \"severity\": \"nit\",\n      \"title\": \"Discarded writer error can lose a record\"\n    },\n    {\n      \"class\": \"tests\",\n      \"number\": 6,\n      \"rationale\": \"The tests reject times after expiry but omit the equal boundary. Changing the comparison to <= would still pass, so the boundary is unguarded.\",\n      \"severity\": \"nit\",\n      \"title\": \"Equality boundary lacks a test assertion\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 7,\n      \"rationale\": \"The golangci-lint gosec analyzer found no issue. This entry names no defect and has no action.\",\n      \"severity\": \"nit\",\n      \"title\": \"Gosec analyzer result is negative\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 8,\n      \"rationale\": \"The entry states no issue was found. It names no consequence and has no action.\",\n      \"severity\": \"nit\",\n      \"title\": \"Warning result is negative\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 9,\n      \"rationale\": \"The entry reports no defect but suggests returning err. The shown code does not demonstrate that the change is required.\",\n      \"severity\": \"nit\",\n      \"suggestion\": \"return err\",\n      \"title\": \"Return err patch suggested\"\n    }\n  ],\n  \"summary\": \"No actionable merge-blocking issues were found. The remaining items are nits or retained negative results.\"\n}",
+    "result": "The model omitted entries 1-3 from findings but omitted the acknowledgement array entirely; accounting restored the entries."
+  },
+  "model": "synthetic/hf:Qwen/Qwen3.8-27B",
+  "prompt_sha256": "b4377163f5494deffffe260111290a119f4283bd66f9c61ed489e89e64e775d4",
+  "schema_sha256": "3bef210f558146982e7f1507fb621ffe7c690425f71a1a80e22eff7264c22ef1",
+  "policy": {
+    "triage_no_new_claims": true,
+    "slop": true,
+    "temperature": "unspecified; provider default",
+    "assessment": "triage-only synthetic protocol controls"
+  }
+}
