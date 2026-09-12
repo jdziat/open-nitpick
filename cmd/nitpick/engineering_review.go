@@ -54,7 +54,7 @@ func (p *engineeringReviewPolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref
 func assessReviewPractices(ctx context.Context, root string, cfg *config.Config, ref vcs.Ref, pr *vcs.PullRequest, reviewReport *review.Report, provider vcs.Provider) *practices.Report {
 	data, _ := json.Marshal(config.PracticePolicy{Practices: cfg.Practices, Standards: cfg.Standards, Review: cfg.Review, Linters: cfg.Linters})
 	digest := sha256.Sum256(data)
-	r := &practices.Report{SchemaVersion: 1, Profile: "engineering", Revision: reviewReport.Head, PolicySource: cfg.Policy.String(), PolicyDigest: hex.EncodeToString(digest[:]), ModelUsage: reviewReport.ModelUsage}
+	r := &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: reviewReport.Head, PolicySource: cfg.Policy.String(), PolicyDigest: hex.EncodeToString(digest[:]), ModelUsage: reviewReport.ModelUsage}
 	var files []standards.File
 	var failed []string
 	reviewed := map[string]string{}

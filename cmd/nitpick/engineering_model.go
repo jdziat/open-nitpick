@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"slices"
 	"time"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/fence"
 	"github.com/jdziat/open-nitpick/internal/practices"
@@ -130,10 +133,13 @@ func modelCheckResults(checks []practices.Check, report *review.Report) []practi
 		return checks
 	}
 	read := map[string]bool{}
+	digests := map[string]string{}
 	contexts := map[string][]practices.Target{}
 	if report.Plan != nil {
 		for _, batch := range report.Plan.Batches {
+			digest := sha256.Sum256([]byte(bundle.RenderBatch(batch)))
 			for _, entry := range batch.Entries {
+				digests[entry.File.Path] = hex.EncodeToString(digest[:])
 				if entry.HasContent() && !entry.Truncated && !slices.Contains(report.Incomplete, entry.File.Path) {
 					read[entry.File.Path] = true
 				}
@@ -204,8 +210,10 @@ func modelCheckResults(checks []practices.Check, report *review.Report) []practi
 		if checks[i].ID == "design" {
 			for j := range checks[i].Planned {
 				checks[i].Tasks = append(checks[i].Tasks, practices.DesignTask{
-					ID:     "source:" + checks[i].Planned[j].ID,
-					Source: checks[i].Planned[j], Purpose: "inspect source contracts, state ownership and failure propagation with available related definitions",
+					ID:           "source:" + checks[i].Planned[j].ID,
+					Sources:      []practices.Target{checks[i].Planned[j]},
+					SourceDigest: digests[checks[i].Planned[j].ID],
+					Source:       checks[i].Planned[j], Purpose: "inspect source contracts, state ownership and failure propagation with available related definitions",
 				})
 				checks[i].Planned[j].Kind = practices.UnitTarget
 				checks[i].Planned[j].ID = "source:" + checks[i].Planned[j].ID

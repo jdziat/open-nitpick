@@ -44,7 +44,7 @@ func runCommits(ctx context.Context, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	report := practices.Report{SchemaVersion: 1, Profile: "commits", Revision: rangeResult.HeadSHA,
+	report := practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "commits", Revision: rangeResult.HeadSHA,
 		PolicySource: policy.Source, PolicyDigest: policy.Digest,
 		Checks: []practices.Check{practices.CommitCheck(rangeResult.Commits, policy.Practices.Commits)}}
 	report.Checks[0].BaseRevision, report.Checks[0].Revision = rangeResult.BaseSHA, rangeResult.HeadSHA

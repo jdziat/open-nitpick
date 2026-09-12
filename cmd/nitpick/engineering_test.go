@@ -301,7 +301,7 @@ func TestEngineeringCallbackUsesTheResolvedReviewPolicy(t *testing.T) {
 
 func TestActionsCannotReportIncompletePracticesAsClean(t *testing.T) {
 	target := practices.Target{Kind: practices.FileTarget, ID: "a.go"}
-	r := &review.Report{Stages: []review.StageStatus{{Stage: "triage", Reason: "provider unavailable"}}, Incomplete: []string{"a.go"}, Practices: &practices.Report{SchemaVersion: 1, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: []practices.Check{
+	r := &review.Report{Stages: []review.StageStatus{{Stage: "triage", Reason: "provider unavailable"}}, Incomplete: []string{"a.go"}, Practices: &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: []practices.Check{
 		{ID: "conventions", Version: "1", Instrument: practices.Deterministic, State: practices.Completed, Planned: []practices.Target{target}, Examined: []practices.Target{target}},
 		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Partial, Required: true, Reason: "budget"},
 	}}}
@@ -347,7 +347,7 @@ func TestEngineeringDesignScopeKeepsStyleSignalsSeparate(t *testing.T) {
 
 func TestMCPPracticeGateRetainsItsEvidenceAndPolicyName(t *testing.T) {
 	target := practices.Target{Kind: practices.CommitTarget, ID: "commit-sha"}
-	assessment := &practices.Report{SchemaVersion: 1, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: []practices.Check{{ID: "commits", Version: "1", Instrument: practices.Deterministic, State: practices.Completed, Planned: []practices.Target{target}, Examined: []practices.Target{target}, Findings: []practices.Finding{{Rule: "subject", Target: target, Title: "invalid subject", Blocking: true}}}}}
+	assessment := &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: []practices.Check{{ID: "commits", Version: "1", Instrument: practices.Deterministic, State: practices.Completed, Planned: []practices.Target{target}, Examined: []practices.Target{target}, Findings: []practices.Finding{{Rule: "subject", Target: target, Title: "invalid subject", Blocking: true}}}}}
 	out := reviewOut(&review.Report{Plan: &bundle.Plan{}, Practices: assessment}, config.SeverityNone)
 	if out.Practices != assessment || out.FailOn != "engineering" || !out.Failed || !out.Complete || !strings.Contains(reviewText(out), "invalid subject") {
 		t.Fatalf("practice verdict lost its evidence: %+v", out)
@@ -390,5 +390,29 @@ func TestDeletedOnlyReviewAssessesCommitsWithoutInventingModelWork(t *testing.T)
 	}
 	if result.ExitCode() != 0 {
 		t.Fatalf("valid empty source scope failed: %v", result.Problems())
+	}
+}
+
+func TestFileDesignAdapterBindsSourceAndRelatedContext(t *testing.T) {
+	file := &diff.File{Path: "a.py"}
+	entry := bundle.Entry{File: file, Content: "answer = 42\n", Related: []bundle.Related{{Path: "b.py", Line: 1, Snippet: "limit = 42\n"}}}
+	report := &review.Report{Plan: &bundle.Plan{Batches: []bundle.Batch{{Entries: []bundle.Entry{entry, {File: &diff.File{Path: "peer.py"}, Content: "peer = 42\n"}}}}}}
+	checks := func() []practices.Check {
+		return []practices.Check{{ID: "design", Planned: []practices.Target{{Kind: practices.FileTarget, ID: "a.py"}}}}
+	}
+	original := modelCheckResults(checks(), report)[0]
+	if len(original.Tasks) != 1 || len(original.Tasks[0].Sources) != 1 || len(original.Tasks[0].SourceDigest) != 64 {
+		t.Fatalf("file adapter lost source binding: %+v", original)
+	}
+	report.Plan.Batches[0].Entries[0].Related[0].Snippet = "limit = 43\n"
+	changed := modelCheckResults(checks(), report)[0]
+	if changed.Tasks[0].SourceDigest == original.Tasks[0].SourceDigest {
+		t.Fatal("related source changed without changing task binding")
+	}
+	report.Plan.Batches[0].Entries[0].Related[0].Snippet = "limit = 42\n"
+	report.Plan.Batches[0].Entries[1].Content = "peer = 43\n"
+	peer := modelCheckResults(checks(), report)[0]
+	if peer.Tasks[0].SourceDigest == original.Tasks[0].SourceDigest {
+		t.Fatal("batch source changed without changing task binding")
 	}
 }

@@ -3,7 +3,10 @@
 package practices
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -76,6 +79,14 @@ type DesignTask struct {
 	Source  Target   `json:"source"`
 	Purpose string   `json:"purpose"`
 	Context []Target `json:"context,omitempty"`
+	// Sources lists the primary source files intended for this task.
+	Sources []Target `json:"sources,omitempty"`
+	// Omitted records required source or graph context unavailable to the task.
+	Omitted []Omission `json:"omitted,omitempty"`
+	// SourceDigest is an opaque, builder-specific binding, not a model cache key.
+	// PlanDesign hashes task metadata and source bytes; the legacy file adapter
+	// hashes its rendered request. Compare only within the same builder.
+	SourceDigest string `json:"source_digest,omitempty"`
 }
 
 // Decision retains a claim an expert withheld, together with the stated reason.
@@ -132,6 +143,9 @@ type ModelUsage struct {
 	ReasoningTokens  int    `json:"reasoning_tokens"`
 }
 
+// SchemaVersion identifies reports whose design coverage requires bound source.
+const SchemaVersion = 2
+
 // Report is the versioned evidence for a selected engineering policy.
 type Report struct {
 	SchemaVersion int              `json:"schema_version"`
@@ -148,7 +162,10 @@ type Report struct {
 // Problems lists incomplete or internally inconsistent evidence, preserving findings.
 func (r Report) Problems() []string {
 	var problems []string
-	if r.SchemaVersion != 1 || r.Profile == "" || r.Revision == "" || r.PolicySource == "" || r.PolicyDigest == "" {
+	if r.SchemaVersion != SchemaVersion {
+		problems = append(problems, fmt.Sprintf("unsupported report schema version %d; expected %d", r.SchemaVersion, SchemaVersion))
+	}
+	if r.Profile == "" || r.Revision == "" || r.PolicySource == "" || r.PolicyDigest == "" {
 		problems = append(problems, "report lacks supported schema, scope or policy provenance")
 	}
 	seen := map[string]bool{}
@@ -184,11 +201,54 @@ func (r Report) Problems() []string {
 		for _, target := range c.Context {
 			evidence[normalize(target)] = true
 		}
+		taskIDs := map[string]bool{}
 		for _, task := range c.Tasks {
+			if taskIDs[task.ID] {
+				bad("duplicate design task")
+			}
+			taskIDs[task.ID] = true
+			sourceTargets := map[Target]bool{}
+			for _, source := range task.Sources {
+				if source.Kind != FileTarget || !source.valid() || sourceTargets[source] {
+					bad("design task has invalid or duplicate source")
+				}
+				sourceTargets[source] = true
+			}
+			if len(task.Sources) == 0 {
+				bad("design task has no source scope")
+			}
+			if len(task.Sources) > 0 && !sourceTargets[task.Source] {
+				bad("design task primary source is outside its source scope")
+			}
 			if !task.Source.valid() || task.Purpose == "" || !planned[Target{Kind: UnitTarget, ID: task.ID}] {
 				bad("design task lacks a planned unit, source or purpose")
 			}
+			seenOmissions := map[Omission]bool{}
+			for _, omission := range task.Omitted {
+				if seenOmissions[omission] {
+					bad("design task repeats an omission")
+				}
+				seenOmissions[omission] = true
+				if !omission.Target.valid() || (omission.Target.Kind != FileTarget && omission.Target.Kind != UnitTarget) || strings.TrimSpace(omission.Reason) == "" {
+					bad("design task has invalid omission target or reason")
+				}
+				if omission.Target.Kind == FileTarget && !slices.Contains(task.Sources, omission.Target) && !slices.Contains(task.Context, omission.Target) {
+					bad("design task omits source outside its declared scope")
+				}
+			}
 			if read[Target{Kind: UnitTarget, ID: task.ID}] {
+				if len(task.Omitted) > 0 {
+					bad("examined design task has omitted context")
+				}
+				if len(task.Sources) > 0 {
+					digest, err := hex.DecodeString(task.SourceDigest)
+					if err != nil || len(digest) != sha256.Size {
+						bad("examined design task lacks a source digest")
+					}
+				}
+				for _, source := range task.Sources {
+					evidence[normalize(source)] = true
+				}
 				evidence[normalize(task.Source)] = true
 				for _, target := range task.Context {
 					evidence[normalize(target)] = true

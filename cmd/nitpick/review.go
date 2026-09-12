@@ -333,7 +333,7 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	engine.AssessPractices = func(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, report *review.Report) *practices.Report {
 		accepted := report.Policy.Config
 		if accepted == nil {
-			return &practices.Report{SchemaVersion: 1, Profile: "engineering"}
+			return &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering"}
 		}
 		if f.profile != "engineering" && accepted.Practices.Profile != "engineering" {
 			return nil
