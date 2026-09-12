@@ -219,7 +219,7 @@ func validationSchema() (json.RawMessage, error) {
 			"revised_severity": map[string]any{
 				"type":        "string",
 				"enum":        severityEnum,
-				"description": "OPTIONAL. Only for the severity verdict: the level the demonstrated consequence supports.",
+				"description": "Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.",
 			},
 			"cited": map[string]any{
 				"type": "string",

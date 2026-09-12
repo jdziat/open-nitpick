@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -103,10 +104,12 @@ func TestLiveTriageSeparatesAcknowledgementsFromWeakClaims(t *testing.T) {
 // malformed or conflicting entries, so a live failure can be diagnosed offline.
 type acknowledgementRecorder struct {
 	llms.LLM
-	t *testing.T
+	t     *testing.T
+	calls atomic.Int64
 }
 
 func (r *acknowledgementRecorder) GenerateContent(ctx context.Context, msgs []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
+	r.calls.Add(1)
 	var call llms.CallOptions
 	for _, option := range opts {
 		option(&call)
