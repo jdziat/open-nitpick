@@ -178,7 +178,7 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 				},
 			},
 		},
-		"required":             []string{"findings", "summary", "dropped"},
+		"required":             []string{"findings", "summary", "dropped", "acknowledgements"},
 		"additionalProperties": false,
 	}
 

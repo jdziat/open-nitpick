@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -111,6 +112,7 @@ func TestAcknowledgementWireContractAllowsAuditableDecisions(t *testing.T) {
 		t.Fatal(err)
 	}
 	var schema struct {
+		Required   []string
 		Properties map[string]struct {
 			Items struct {
 				Properties map[string]any
@@ -120,6 +122,9 @@ func TestAcknowledgementWireContractAllowsAuditableDecisions(t *testing.T) {
 	}
 	if err := json.Unmarshal(raw, &schema); err != nil {
 		t.Fatal(err)
+	}
+	if !slices.Contains(schema.Required, "acknowledgements") {
+		t.Fatal("optional acknowledgements can be omitted despite excluding those entries from findings")
 	}
 	item, ok := schema.Properties["acknowledgements"]
 	if !ok {

@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	llms "github.com/nocturnium/llm-go-sdk/v6"
+
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/vcs"
@@ -32,6 +34,7 @@ func TestLiveTriageSeparatesAcknowledgementsFromWeakClaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	client.LLM = &acknowledgementRecorder{LLM: client.LLM, t: t}
 	engine := &Engine{Config: cfg, Roles: &llm.Roles{Triage: client}}
 	prompt, err := engine.triagePrompt()
 	if err != nil {
@@ -94,4 +97,26 @@ func TestLiveTriageSeparatesAcknowledgementsFromWeakClaims(t *testing.T) {
 			}
 		})
 	}
+}
+
+// acknowledgementRecorder retains the model decision before accounting rejects
+// malformed or conflicting entries, so a live failure can be diagnosed offline.
+type acknowledgementRecorder struct {
+	llms.LLM
+	t *testing.T
+}
+
+func (r *acknowledgementRecorder) GenerateContent(ctx context.Context, msgs []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
+	var call llms.CallOptions
+	for _, option := range opts {
+		option(&call)
+	}
+	if call.ResponseFormat != nil && call.ResponseFormat.JSONSchema != nil {
+		r.t.Logf("response_schema=%s", call.ResponseFormat.JSONSchema.Schema)
+	}
+	response, err := r.LLM.GenerateContent(ctx, msgs, opts...)
+	if response != nil {
+		r.t.Logf("raw_response=%q", response.Content)
+	}
+	return response, err
 }

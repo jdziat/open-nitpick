@@ -60,6 +60,12 @@
       "killed": true,
       "exit": 1,
       "output": "--- FAIL: TestTriageAcknowledgementRetainsOriginalEvidenceInDecisions (0.00s)\n    acknowledgement_test.go:26: kept=[{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found in records package Rationale:Register returns the encoder error from save, so the documented persistence contract is met. Suggestion: FixEndLine:0 FixValidated:false Source:review-model Triager:openai/gpt-4o Evidence:[service.go:7] Unresolved: UnresolvedBy: FromAnalyzer:false}] decisions=[]\n--- FAIL: TestAcknowledgementWireContractAllowsAuditableDecisions (0.00s)\n    acknowledgement_test.go:140: wire decision did not run: [{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class: Title:No issue found Rationale:All paths return errors. Suggestion: FixEndLine:0 FixValidated:false Source: Triager:openai/gpt-4o Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false}] []\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.027s\nFAIL\n"
+    },
+    {
+      "mutation": "required-acknowledgement-array",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestAcknowledgementWireContractAllowsAuditableDecisions (0.00s)\n    acknowledgement_test.go:127: optional acknowledgements can be omitted despite excluding those entries from findings\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.023s\nFAIL\n"
     }
   ]
 }

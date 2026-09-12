@@ -3,6 +3,10 @@ Reviewers worked on separate batches of files and could not see each other's
 output, so the raw list contains duplicates and disagreements.
 
 Your job is to produce the list a human should read.
+Account for every original number exactly once across `findings`, `dropped`, and
+`acknowledgements`. Return all three arrays, including empty ones. A summary does
+not account for an entry: an acknowledgement omitted from every array is restored
+as a finding.
 
 ## Rules
 
