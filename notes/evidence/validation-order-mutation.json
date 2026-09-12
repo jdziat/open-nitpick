@@ -1,0 +1,7 @@
+{
+  "mutation": "conditional level before verdict",
+  "killed": true,
+  "exit": 1,
+  "output": "--- FAIL: TestValidationSchemaDeclaresVerdictBeforeConditionalLevel (0.00s)\n    validate_test.go:1203: conditional fields precede their discriminator: {\"additionalProperties\":false,\"properties\":{\"revised_severity\":{\"description\":\"Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.\",\"enum\":[\"nit\",\"info\",\"warning\",\"error\",\"critical\"],\"type\":\"string\"},\"verdict\":{\"description\":\"confirmed when the claim holds, refuted when you can name why it is wrong, severity when the defect is real but rated wrong, unresolved when you cannot decide from what you were shown and can name what is missing.\",\"enum\":[\"confirmed\",\"refuted\",\"severity\",\"unresolved\"],\"type\":\"string\"},\"reason\":{\"description\":\"One or two sentences. For a refutation this is the specific reason the claim is wrong; uncertainty is not a reason.\",\"type\":\"string\"},\"cited\":{\"description\":\"OPTIONAL. The bracketed id of the reference entry that decided your verdict, when one did. Leave it empty otherwise; do not name an entry you were not shown.\",\"type\":\"string\"}},\"required\":[\"verdict\",\"reason\"],\"type\":\"object\"}\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.021s\nFAIL\n",
+  "scope": "Serialized schema ordering; does not establish model compliance"
+}

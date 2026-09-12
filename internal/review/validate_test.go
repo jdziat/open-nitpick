@@ -1,6 +1,7 @@
 package review
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1187,5 +1188,18 @@ func TestValidationOutageReportsOneStageAndRetainsEveryFailure(t *testing.T) {
 		if finding.Unresolved == "" {
 			t.Fatal("failed validation lost its per-finding detail")
 		}
+	}
+}
+
+func TestValidationSchemaDeclaresVerdictBeforeConditionalLevel(t *testing.T) {
+	raw, err := validationSchema()
+	if err != nil {
+		t.Fatal(err)
+	}
+	verdict := bytes.Index(raw, []byte(`"verdict":`))
+	level := bytes.Index(raw, []byte(`"revised_severity":`))
+	reason := bytes.Index(raw, []byte(`"reason":`))
+	if verdict < 0 || level < verdict || reason < level {
+		t.Fatalf("conditional fields precede their discriminator: %s", raw)
 	}
 }

@@ -203,25 +203,31 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 func validationSchema() (json.RawMessage, error) {
 	schema := map[string]any{
 		"type": "object",
-		"properties": map[string]any{
-			"verdict": map[string]any{
+		// Field order lets the model choose a verdict before its conditional level.
+		"properties": struct {
+			Verdict         map[string]any `json:"verdict"`
+			RevisedSeverity map[string]any `json:"revised_severity"`
+			Reason          map[string]any `json:"reason"`
+			Cited           map[string]any `json:"cited"`
+		}{
+			Verdict: map[string]any{
 				"type": "string",
 				"enum": verdictEnum,
 				"description": "confirmed when the claim holds, refuted when you can name why it is wrong, " +
 					"severity when the defect is real but rated wrong, unresolved when you cannot " +
 					"decide from what you were shown and can name what is missing.",
 			},
-			"reason": map[string]any{
+			Reason: map[string]any{
 				"type": "string",
 				"description": "One or two sentences. For a refutation this is the specific reason the claim " +
 					"is wrong; uncertainty is not a reason.",
 			},
-			"revised_severity": map[string]any{
+			RevisedSeverity: map[string]any{
 				"type":        "string",
 				"enum":        severityEnum,
 				"description": "Required when verdict is severity: the explicit level the demonstrated consequence supports. Omit for other verdicts. A severity verdict without this value is invalid.",
 			},
-			"cited": map[string]any{
+			Cited: map[string]any{
 				"type": "string",
 				"description": "OPTIONAL. The bracketed id of the reference entry that decided your verdict, " +
 					"when one did. Leave it empty otherwise; do not name an entry you were not shown.",

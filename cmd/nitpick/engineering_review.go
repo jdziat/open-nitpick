@@ -180,7 +180,7 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 			r.Checks = append(r.Checks, practices.Check{ID: "commit-title", Version: "1", Instrument: practices.Deterministic, State: practices.Unavailable, Reason: "no forge PR title available"})
 		}
 	}
-	checks := []practices.Check{{ID: "slop", Version: "1", Instrument: practices.Model, PromptVersion: "engineering-8"}, {ID: "design", Version: "1", Instrument: practices.Model, PromptVersion: "engineering-8"}}
+	checks := []practices.Check{{ID: "slop", Version: "1", Instrument: practices.Model, PromptVersion: "engineering-9"}, {ID: "design", Version: "1", Instrument: practices.Model, PromptVersion: "engineering-9"}}
 	for i := range checks {
 		for _, file := range files {
 			checks[i].Planned = append(checks[i].Planned, practices.Target{Kind: practices.FileTarget, ID: file.Path})
