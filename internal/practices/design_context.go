@@ -257,7 +257,7 @@ func (index designContextIndex) contextFor(unit DesignUnit) ([]string, []Context
 	slices.Sort(names)
 	var spans []ContextSpan
 	for _, name := range names {
-		ranges := append(byFile[name], index.nodes[name].spans...)
+		ranges := append(slices.Clone(byFile[name]), index.nodes[name].spans...)
 		slices.SortFunc(ranges, func(a, b bundle.SourceSpan) int { return a.Start - b.Start })
 		var merged []bundle.SourceSpan
 		for _, span := range ranges {
