@@ -22,9 +22,9 @@ models:
 
   fix:
     provider: openrouter
-    model: moonshotai/kimi-k3
-    # Preserve the Kimi endpoint selection for edits.
-    providers: [moonshotai/mxfp4, fireworks, together]
+    model: z-ai/glm-5.3-flash
+    # Use the same GLM model for deterministic edits.
+    providers: [z-ai]
     temperature: 0
 
 review:
@@ -32,11 +32,10 @@ review:
   # block its own PRs.
   fail_on: none
   min_severity: info
-  concurrency: 4
-  # A million-token model can read far more than 60k tokens per request; the
-  # budget is about how much one call is asked to judge at once, not what
-  # the model can hold. Raised here, where the reviewer is a frontier model.
-  token_budget_per_request: 120000
+  concurrency: 2
+  # Keep each request bounded so repository-wide scans finish predictably;
+  # related context is still attached across batches.
+  token_budget_per_request: 24000
   # Definitions the change imports are attached by default. The caller
   # walk, which reads files the change never named, is off by default and
   # on here, where reviews are advisory and the repository is this one;

@@ -25,6 +25,9 @@ import (
 // developer's shell rather than according to the code.
 func clearModelEnv(t *testing.T) {
 	t.Helper()
+	// Keep developer keystore entries from supplying credentials behind the
+	// test's back. The tests below exercise environment precedence explicitly.
+	stubKeyring(t, nil, errors.New("test keyring unavailable"))
 	for _, name := range []string{
 		envOpenRouterAPIKey, "OPENAI_API_KEY", llms.EnvLLMAPIKey,
 		config.EnvBaseURL, config.EnvProvider, config.EnvModel,
