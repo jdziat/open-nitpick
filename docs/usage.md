@@ -15,7 +15,7 @@ works that way. All of them assume `nitpick` is on your PATH; the
 
 ```bash
 nitpick init                            # writes .nitpick.yaml here
-nitpick init -provider synthetic -model hf:moonshotai/Kimi-K3
+nitpick init -provider synthetic -model hf:zai-org/GLM-5.3-Flash
 nitpick init -workflow                  # also .github/workflows/nitpick.yml
 nitpick init -force                     # overwrite an existing file
 ```

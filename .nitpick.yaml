@@ -2,40 +2,18 @@
 # README points at, so it stays readable rather than exhaustive.
 
 models:
-  # synthetic carries its endpoint in the binary (internal/llm/synthetic.go),
-  # which is why this file names no base_url and no api_key_env: both are
-  # stripped from a config the reviewer does not trust, so a default built on
-  # them would silently work for nobody but its author. Only SYNTHETIC_API_KEY
-  # is needed. Run "nitpick providers" to see every option. Kimi-K3 ties the
-  # sweep's default on recall and a flat subscription does not charge the one
-  # column it lost on; see the README's Synthetic section.
+  # Synthetic's built-in endpoint lets committed policy select models without
+  # storing credentials. Set SYNTHETIC_API_KEY in the environment or keystore.
   default:
     provider: synthetic
-    model: hf:moonshotai/Kimi-K3
-    # No max_tokens and no timeout here: unset, the model's own output
-    # maximum applies and the call has ten minutes, so a reasoning model's
-    # thinking neither truncates its answer nor times it out. Setting a
-    # lower cap is how reviews get lost, not a saving.
+    model: hf:zai-org/GLM-5.3-Flash
 
-  # Triage only merges and filters findings, so it does not need the expensive
-  # model. Splitting the roles is most of the cost saving available here.
-  # glm-5.3-flash is also the iteration model (`make quick`); docs/findings.md
-  # records how it compares as a reviewer.
   triage:
     provider: synthetic
-    model: hf:zai-org/GLM-5.3-Flash
+    model: hf:Qwen/Qwen3.8-27B
     temperature: 0
 
-  # The model that edits code on "@open-nitpick fix". There is no default for
-  # this and there should not be: every measurement in docs/findings.md scores
-  # a reviewer on recall and noise, and neither says whether a model can
-  # produce a change that compiles.
-  #
-  # So this line is a choice rather than a result, and worth naming as one.
-  # Kimi-K3 is picked because it is the model this repository already runs and
-  # is known to return correctly shaped structured output here. It has not been
-  # measured as an editor; nothing has. A fix it writes stays unverified until
-  # the checks on the pull request it opens have run.
+  # Editing quality has not been measured; fixes still require review and CI.
   fix:
     provider: synthetic
     model: hf:moonshotai/Kimi-K3

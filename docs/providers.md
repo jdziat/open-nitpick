@@ -221,9 +221,8 @@ shipped default, `anthropic/claude-sonnet-4.6`, on recall on both tuned
 corpora ([Findings](findings.md#kimi-k3-and-the-second-half-of-the-multi-file-corpus)),
 and was marked down there on one column only, price per review, which is why
 it is absent from the twelve-model price table below. A flat subscription
-does not charge that column. GLM-5.3-Flash is the triage and iteration model
-this repository's own configuration uses, and with Kimi-K3 as the expert pass
-over it, noise on the tuning corpus halved at the same recall
+does not charge that column. In the recorded GLM-5.3-Flash trial, adding
+Kimi-K3 as the expert pass halved noise on the tuning corpus at the same recall
 ([Findings](findings.md#callers-2026-09-05)). Neither of those is
 a claim that Kimi-K3 is the best reviewer measured; `qwen/qwen3.8-27b` and
 `openai/gpt-5.6-luna` are, per dollar on metered pricing, and the table says
@@ -234,16 +233,22 @@ referral credit if you sign up through it. <https://synthetic.new> without it
 is the same service at the same price.
 
 `synthetic` is a provider with a compiled-in endpoint, so a committed config
-can name it and nothing else is needed:
+can name it and nothing else is needed. This repository uses GLM-5.3-Flash
+for review, Qwen3.8-27B for triage and Kimi-K3 for fixes. That role selection is
+operator policy, not a new evaluation result:
 
 ```yaml
 models:
   default:
     provider: synthetic
-    model: hf:moonshotai/Kimi-K3
+    model: hf:zai-org/GLM-5.3-Flash
   triage:
     provider: synthetic
-    model: hf:zai-org/GLM-5.3-Flash
+    model: hf:Qwen/Qwen3.8-27B
+    temperature: 0
+  fix:
+    provider: synthetic
+    model: hf:moonshotai/Kimi-K3
     temperature: 0
 ```
 

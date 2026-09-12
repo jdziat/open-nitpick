@@ -66,5 +66,5 @@ jobs:
           bot-login: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
           github-token: ${{ steps.app.outputs.token || github.token }}
           provider: synthetic
-          model: hf:moonshotai/Kimi-K3
+          model: hf:zai-org/GLM-5.3-Flash
           api-key: ${{ secrets.SYNTHETIC_API_KEY }}

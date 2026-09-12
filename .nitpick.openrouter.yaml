@@ -10,34 +10,21 @@
 # both files.
 
 models:
-  # openrouter carries its endpoint in the binary (internal/llm), so a
-  # committed default can name it; only OPENROUTER_API_KEY is needed.
-  # Kimi-K3 is the same reviewer .nitpick.yaml names on Synthetic, priced
-  # per token here rather than on a subscription; the README's "Choosing a
-  # model by price" section has the sweep it came from.
+  # The built-in endpoint uses OPENROUTER_API_KEY; credentials stay local.
   default:
     provider: openrouter
-    model: moonshotai/kimi-k3
-    # OpenRouter serves kimi-k3 from eighteen upstreams and, unpinned,
-    # picks the cheapest, which on 2026-09-06 were fp4 quantisations of a
-    # reasoning model: one review stalled for ten minutes, was cut at the
-    # output cap on the retry, and answered invalid JSON on the third try.
-    # Pinned to Moonshot's own endpoint first, with two full-precision
-    # fallbacks that support structured output; no fallback beyond them.
-    # The slugs are OpenRouter's endpoint tags (see the README, "Pinning
-    # a router to one upstream"), and a pull request that edits this file
-    # can change them, which chooses who reads the code.
-    providers: [moonshotai/mxfp4, fireworks, together]
-    # No max_tokens and no timeout here: unset, the model's own output
-    # maximum applies and the call has ten minutes, so a reasoning model's
-    # thinking neither truncates its answer nor times it out.
+    model: z-ai/glm-5.3-flash
 
-  # Triage only merges and filters findings, so it does not need the
-  # expensive model; glm-5.3-flash is the iteration model (`make quick`)
-  # and docs/findings.md records how it compares as a reviewer.
   triage:
     provider: openrouter
-    model: z-ai/glm-5.3-flash
+    model: qwen/qwen3.8-27b
+    temperature: 0
+
+  fix:
+    provider: openrouter
+    model: moonshotai/kimi-k3
+    # Preserve the Kimi endpoint selection for edits.
+    providers: [moonshotai/mxfp4, fireworks, together]
     temperature: 0
 
 review:
