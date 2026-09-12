@@ -1,0 +1,65 @@
+{
+  "scope": "Scripted triage accounting and report visibility; does not measure semantic model precision",
+  "results": [
+    {
+      "mutation": "analyzer-protection",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions (0.00s)\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/analyzer (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion: FixEndLine:0 FixValidated:false Source: Triager: Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:true} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: Reports successful assessment.; original rationale: \"No defect found. The function preserves its documented contract.\" Revised: Cited:}]\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.027s\nFAIL\n"
+    },
+    {
+      "mutation": "severity-protection",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions (0.00s)\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/warning (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:warning SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion: FixEndLine:0 FixValidated:false Source: Triager: Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: Reports successful assessment.; original rationale: \"No defect found. The function preserves its documented contract.\" Revised: Cited:}]\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.027s\nFAIL\n"
+    },
+    {
+      "mutation": "patch-protection",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions (0.00s)\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/patch (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion:return err FixEndLine:0 FixValidated:false Source: Triager: Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: Reports successful assessment.; original rationale: \"No defect found. The function preserves its documented contract.\" Revised: Cited:}]\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.027s\nFAIL\n"
+    },
+    {
+      "mutation": "reason-required",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions (0.00s)\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/blank_reason (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion: FixEndLine:0 FixValidated:false Source: Triager: Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: ; original rationale: \"No defect found. The function preserves its documented contract.\" Revised: Cited:}]\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.027s\nFAIL\n"
+    },
+    {
+      "mutation": "exact-rationale",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions (0.00s)\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/partial_quote (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion: FixEndLine:0 FixValidated:false Source: Triager: Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: Reports successful assessment.; original rationale: \"No defect found.\" Revised: Cited:}]\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.025s\nFAIL\n"
+    },
+    {
+      "mutation": "quote-binding",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions (0.00s)\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/partial_quote (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion: FixEndLine:0 FixValidated:false Source: Triager: Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: Reports successful assessment.; original rationale: \"No defect found.\" Revised: Cited:}]\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/invented_quote (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion: FixEndLine:0 FixValidated:false Source: Triager: Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: Reports successful assessment.; original rationale: \"This was never said.\" Revised: Cited:}]\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.026s\nFAIL\n"
+    },
+    {
+      "mutation": "duplicate-decision",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions (0.00s)\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/duplicate_decision (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion: FixEndLine:0 FixValidated:false Source: Triager: Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: Reports successful assessment.; original rationale: \"No defect found. The function preserves its documented contract.\" Revised: Cited:}]\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.026s\nFAIL\n"
+    },
+    {
+      "mutation": "merge-conflict",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions (0.00s)\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/merge_survivor (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:app.go Line:9 EndLine:0 AlsoAt:[] Severity:error SeverityTranslated:true RawSeverity:HIGH Category: Class:security Title:Analyzer defect Rationale:why Suggestion: FixEndLine:0 FixValidated:false Source:golangci-lint(gosec) Triager: Evidence:[go-defer-in-loop] Unresolved: UnresolvedBy: FromAnalyzer:true} Expert:triage (openai/gpt-4o) Reason:merged into the finding at service.go:7: same claim Revised: Cited:} {Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion: FixEndLine:0 FixValidated:false Source:golangci-lint(gosec) Triager: Evidence:[go-defer-in-loop] Unresolved: UnresolvedBy: FromAnalyzer:true} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: Reports successful assessment.; original rationale: \"No defect found. The function preserves its documented contract.\" Revised: Cited:}]\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/invalid_merge (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion: FixEndLine:0 FixValidated:false Source: Triager: Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: Reports successful assessment.; original rationale: \"No defect found. The function preserves its documented contract.\" Revised: Cited:}]\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.027s\nFAIL\n"
+    },
+    {
+      "mutation": "verdict-conflict",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions (0.00s)\n    --- FAIL: TestTriageAcknowledgementRejectsUnsafeOrAmbiguousDecisions/verdict_conflict (0.00s)\n        acknowledgement_test.go:90: kept=[] decisions=[{Finding:{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found Rationale:No defect found. The function preserves its documented contract. Suggestion: FixEndLine:0 FixValidated:false Source: Triager: Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false} Expert:triage (openai/gpt-4o) Reason:assessment acknowledgement: Reports successful assessment.; original rationale: \"No defect found. The function preserves its documented contract.\" Revised: Cited:}]\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.027s\nFAIL\n"
+    },
+    {
+      "mutation": "acceptance-path",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestTriageAcknowledgementRetainsOriginalEvidenceInDecisions (0.00s)\n    acknowledgement_test.go:26: kept=[{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class:correctness Title:No defect found in records package Rationale:Register returns the encoder error from save, so the documented persistence contract is met. Suggestion: FixEndLine:0 FixValidated:false Source:review-model Triager:openai/gpt-4o Evidence:[service.go:7] Unresolved: UnresolvedBy: FromAnalyzer:false}] decisions=[]\n--- FAIL: TestAcknowledgementWireContractAllowsAuditableDecisions (0.00s)\n    acknowledgement_test.go:140: wire decision did not run: [{TaskContext:<nil> SummaryOnly:false Path:service.go Line:7 EndLine:0 AlsoAt:[] Severity:nit SeverityTranslated:false RawSeverity: Category: Class: Title:No issue found Rationale:All paths return errors. Suggestion: FixEndLine:0 FixValidated:false Source: Triager:openai/gpt-4o Evidence:[] Unresolved: UnresolvedBy: FromAnalyzer:false}] []\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/review\t0.027s\nFAIL\n"
+    }
+  ]
+}

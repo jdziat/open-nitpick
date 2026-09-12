@@ -18,12 +18,15 @@ import (
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
-const engineeringPrompt = `Engineering assessment, version 5.
+const engineeringPrompt = `Engineering assessment, version 6.
 A request can contain several assessment tasks. Assess every listed design focus
 with the supplied related evidence. A slop_only task requests a whole-source slop
 assessment, not completion of a design unit. Source excerpts omit other lines;
 do not infer behavior from code that was not supplied.
 Evaluate the slop rules explicitly, with their documented exclusions.
+Only report alleged problems in findings. Do not emit "no defect found", "no action
+needed", or successful-assessment acknowledgements as findings. An empty findings
+array is valid; the engine records task completion independently.
 Assess design mechanisms: dependency boundaries, state and lifecycle ownership,
 rules duplicated at sites that must change together, hidden coupling, error
 propagation, test assertions, and interface or migration compatibility.
@@ -50,8 +53,8 @@ func engineeringInstruction(files []standards.File) string {
 
 func engineeringModelChecks(ctx context.Context, root, configPath, base string, noModel bool, budget int, files []standards.File) ([]practices.Check, []practices.ModelUsage) {
 	checks := []practices.Check{
-		{ID: "slop", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-5"},
-		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-5"},
+		{ID: "slop", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-6"},
+		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-6"},
 	}
 	for i := range checks {
 		for _, file := range files {

@@ -142,15 +142,29 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 				"type":        "string",
 				"description": "Short walkthrough of the change for the pull request description.",
 			},
+			"acknowledgements": map[string]any{
+				"type":        "array",
+				"description": "Original model nits that only report successful assessment and allege no defect. Never analyzer findings, weak claims, verdicts, or merge participants. Retained as visible decisions.",
+				"items": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"number": map[string]any{"type": "integer"},
+						"quote":  map[string]any{"type": "string", "description": "Copy the entire original rationale exactly, not an excerpt."},
+						"reason": map[string]any{"type": "string", "description": "Explain why the original title and rationale allege no defect, risk, missing coverage, or requested change."},
+					},
+					"required":             []string{"number", "quote", "reason"},
+					"additionalProperties": false,
+				},
+			},
 			"dropped": map[string]any{
 				"type":        "array",
-				"description": "Findings from the numbered list that are NOT published, each with the number it had in the list and the reason. A finding absent from findings and absent from here is restored unchanged.",
+				"description": "Duplicate findings merged into another numbered entry. An entry without a valid verdict, merge or acknowledgement decision is restored unchanged.",
 				"items": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"number":       map[string]any{"type": "integer", "description": "The finding's number in the list you were given."},
-						"duplicate_of": map[string]any{"type": "integer", "description": "The number of the finding this one was merged into. Required for a merge, which is the only reason a finding may be left out."},
-						"reason":       map[string]any{"type": "string", "description": "Why it is not published: the rationale names no consequence, or asserts something about code that was not shown, or it duplicates a finding you kept."},
+						"duplicate_of": map[string]any{"type": "integer", "description": "The number of the finding this one was merged into. Required for a duplicate merge."},
+						"reason":       map[string]any{"type": "string", "description": "Why it duplicates a finding you kept. Unsupported or uncertain claims must be retained."},
 					},
 					// duplicate_of is NOT required, so a drop with no merge
 					// target stays legal and rule 2 restores that finding. It
