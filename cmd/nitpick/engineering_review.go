@@ -129,6 +129,9 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 	r.Checks = append(r.Checks, conventions)
 	inventoryFiles, metadataErrors := designContextFiles(ctx, provider, ref, files)
 	inventory, boundaries := practices.InspectDesign(inventoryFiles, cfg.Practices.Boundaries)
+	if boundaries.State == practices.Unavailable && len(reviewReport.Files) > 0 && !goBoundaryChange(reviewReport.Files) {
+		boundaries.State, boundaries.Reason = practices.NotApplicable, "change contains no Go source or module boundary changes"
+	}
 	inventory.Errors = append(inventory.Errors, metadataErrors...)
 	if len(metadataErrors) > 0 && len(cfg.Practices.Boundaries) > 0 {
 		boundaries.State, boundaries.Reason = practices.Partial, strings.Join(metadataErrors, "; ")
@@ -269,4 +272,15 @@ func designContextFiles(ctx context.Context, provider vcs.Provider, ref vcs.Ref,
 		}
 	}
 	return out, problems
+}
+
+func goBoundaryChange(files diff.Files) bool {
+	for _, file := range files {
+		for _, name := range []string{file.Path, file.OldPath} {
+			if path.Ext(name) == ".go" || path.Base(name) == "go.mod" || path.Base(name) == "go.work" {
+				return true
+			}
+		}
+	}
+	return false
 }

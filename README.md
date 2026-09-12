@@ -33,7 +33,7 @@ os=$(uname -s | tr 'A-Z' 'a-z'); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch6
 curl -fsSLo nitpick "https://github.com/jdziat/open-nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
 chmod +x nitpick && sudo mv nitpick /usr/local/bin/
 
-export LLM_PROVIDER=synthetic LLM_MODEL=hf:moonshotai/Kimi-K3
+export LLM_PROVIDER=synthetic LLM_MODEL=hf:zai-org/GLM-5.3-Flash
 export SYNTHETIC_API_KEY=syn_...
 
 nitpick init            # writes .nitpick.yaml for this repository

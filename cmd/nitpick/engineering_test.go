@@ -416,3 +416,47 @@ func TestFileDesignAdapterBindsSourceAndRelatedContext(t *testing.T) {
 		t.Fatal("batch source changed without changing task binding")
 	}
 }
+
+func TestReviewBoundaryApplicabilityKeepsMissingGoInputsIncomplete(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "-q", "-b", "main")
+	write(t, root, "go.mod", "module example.com/app\ngo 1.25\n")
+	write(t, root, "api.go", "package app\n")
+	write(t, root, "README.md", "Project documentation.\n")
+	git(t, root, "add", ".")
+	git(t, root, "commit", "-qm", "feat: initial")
+	cfg := config.Defaults()
+	cfg.Practices.Boundaries = []config.PracticeBoundary{{From: "*", Forbid: []string{"net/http"}, Reason: "no HTTP dependencies"}}
+	for _, tc := range []struct {
+		name         string
+		file         *diff.File
+		inapplicable bool
+	}{
+		{"empty diff", nil, false},
+		{"documentation", &diff.File{Path: "README.md"}, true},
+		{"configuration", &diff.File{Path: ".nitpick.yaml"}, true},
+		{"missing source", &diff.File{Path: "missing.go"}, false},
+		{"deleted source", &diff.File{Path: "api.go", Kind: diff.ChangeDeleted}, false},
+		{"renamed source", &diff.File{Path: "api.txt", OldPath: "api.go", Kind: diff.ChangeRenamed}, false},
+		{"module", &diff.File{Path: "go.mod"}, false},
+		{"workspace", &diff.File{Path: "go.work"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report := &review.Report{Head: "HEAD", Plan: &bundle.Plan{}}
+			if tc.file != nil {
+				report.Files = diff.Files{tc.file}
+			}
+			result := assessReviewPractices(t.Context(), root, cfg, vcs.Ref{Base: "main"}, nil, report, vcs.NewLocal(root, nil))
+			for _, check := range result.Checks {
+				if check.ID != "design-boundaries" {
+					continue
+				}
+				if (check.State == practices.NotApplicable) != tc.inapplicable || len(check.Examined) != 0 {
+					t.Fatalf("incorrect boundary applicability: %+v", check)
+				}
+				return
+			}
+			t.Fatal("boundary instrument did not report its state")
+		})
+	}
+}
