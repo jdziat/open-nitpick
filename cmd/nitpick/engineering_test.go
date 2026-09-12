@@ -594,3 +594,40 @@ func TestSlopCoverageKeepsSuccessfulReadsAcrossSharedTaskFailures(t *testing.T) 
 		}
 	}
 }
+
+func TestFocusedDesignCompletionDoesNotInventWholeFileSlopCoverage(t *testing.T) {
+	files := []standards.File{{Path: "go.mod", Src: []byte("module example.com/app\n")}, {Path: "app.go", Src: []byte("package app\nfunc First(){}\nfunc Second(){}\n")}}
+	inventory, _ := practices.InspectDesign(files, nil)
+	plan := practices.PlanDesignInteractions(t.Context(), inventory, files, []string{"app.go"})
+	designOnly, slopOnly := plan, plan
+	designOnly.Tasks = slices.DeleteFunc(slices.Clone(plan.Tasks), func(task practices.DesignTask) bool { return task.SlopOnly })
+	slopOnly.Tasks = slices.DeleteFunc(slices.Clone(plan.Tasks), func(task practices.DesignTask) bool { return !task.SlopOnly })
+	if len(designOnly.Tasks) != 2 || len(slopOnly.Tasks) != 1 {
+		t.Fatalf("unexpected task scope: %+v", plan)
+	}
+	packed := practices.PackDesign(t.Context(), config.Defaults(), designOnly, files, nil, bundle.Reserve{})
+	report := &review.Report{Plan: packed.Plan, DesignExecution: &review.DesignExecution{DesignPacking: practices.DesignPacking{Design: plan}}}
+	for _, batch := range packed.Plan.Batches {
+		report.AssessedDesignTasks = append(report.AssessedDesignTasks, batch.DesignTaskIDs()...)
+	}
+	checks := func() []practices.Check {
+		return modelCheckResults([]practices.Check{{ID: "slop", Planned: []practices.Target{{Kind: practices.FileTarget, ID: "app.go"}}}, {ID: "design"}}, report)
+	}
+	got := checks()
+	if got[0].State != practices.Partial || len(got[0].Examined) != 0 || got[1].State != practices.Completed || len(got[1].Examined) != 2 || len(got[1].Context) != 0 {
+		t.Fatalf("design excerpts claimed a whole-source pass: %+v", got)
+	}
+	full := practices.PackDesign(t.Context(), config.Defaults(), slopOnly, files, nil, bundle.Reserve{})
+	if len(full.Plan.Batches) != 1 {
+		t.Fatal("whole-source slop request did not pack")
+	}
+	report.Plan.Batches = append(report.Plan.Batches, full.Plan.Batches...)
+	if checks()[0].State != practices.Partial || len(checks()[1].Context) != 0 {
+		t.Fatal("planned slop request claimed success or supplied examined context")
+	}
+	report.AssessedDesignTasks = append(report.AssessedDesignTasks, full.Plan.Batches[0].DesignTaskIDs()...)
+	got = checks()
+	if got[0].State != practices.Completed || len(got[0].Examined) != 1 || len(got[1].Examined) != 2 || len(got[1].Tasks) != 2 || !slices.Contains(got[1].Context, practices.Target{Kind: practices.FileTarget, ID: "app.go"}) {
+		t.Fatalf("whole-source pass lost slop or inflated design coverage: %+v", got)
+	}
+}

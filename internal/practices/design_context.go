@@ -248,6 +248,7 @@ func collectDesignReferences(info *designSourceInfo, root ast.Node, free func(*a
 	info.members = map[string]bool{}
 	info.writes = map[string]bool{}
 	info.arguments = map[string]bool{}
+	fieldQualifiers := map[*ast.SelectorExpr]bool{}
 
 	var visit func(ast.Node) bool
 	visit = func(node ast.Node) bool {
@@ -298,8 +299,20 @@ func collectDesignReferences(info *designSourceInfo, root ast.Node, free func(*a
 					}
 				}
 			}
-			if !packageSelector {
+			if !packageSelector && !fieldQualifiers[node] {
 				info.members[node.Sel.Name] = true
+			}
+			qualifier := node.X
+			for {
+				paren, ok := qualifier.(*ast.ParenExpr)
+				if !ok {
+					break
+				}
+				qualifier = paren.X
+			}
+			// A function value has no selectable fields, so this is not a method value.
+			if field, ok := qualifier.(*ast.SelectorExpr); ok {
+				fieldQualifiers[field] = true
 			}
 			ast.Inspect(node.X, visit)
 			return false

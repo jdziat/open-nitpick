@@ -1,6 +1,7 @@
 package practices
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -19,6 +20,7 @@ func TestFocusedTasksShareSourceWithoutLosingObligations(t *testing.T) {
 	}
 	inventory, _ := InspectDesign(files, nil)
 	plan := PlanDesignInteractions(t.Context(), inventory, files, []string{"main.go"})
+	plan = isolateSourceTasks(t, plan, "main.go")
 	cfg := config.Defaults()
 	packed := PackDesign(t.Context(), cfg, plan, files, nil, bundle.Reserve{})
 	var taskIDs []string
@@ -96,5 +98,81 @@ func TestSharedDesignSourcePreservesExactCitationIntervals(t *testing.T) {
 	next.Entries = append(next.Entries, bundle.Entry{File: &diff.File{Path: "other.go"}, Content: "other"})
 	if _, ok := combineDesignBatches(first, next, 1, 10000); ok {
 		t.Fatal("merged beyond file limit")
+	}
+}
+
+func TestPackageSharingPreservesEveryTaskAndSuppliesSharedSourceOnce(t *testing.T) {
+	files := []standards.File{
+		{Path: "go.mod", Src: []byte("module example.com/app\n")},
+		{Path: "first.go", Src: []byte("package app\nfunc First() int {return shared}\n")},
+		{Path: "second.go", Src: []byte("package app\nfunc Second() int {return shared}\n")},
+		{Path: "shared.go", Src: []byte("package app\nconst shared = 42\n")},
+		{Path: "other/other.go", Src: []byte("package other\nfunc Other() {}\n")},
+	}
+	inventory, _ := InspectDesign(files, nil)
+	plan := PlanDesignInteractions(t.Context(), inventory, files, []string{"first.go", "second.go", "shared.go", "other/other.go"})
+	cfg := config.Defaults()
+	packed := PackDesign(t.Context(), cfg, plan, files, nil, bundle.Reserve{})
+	if len(plan.Tasks) != 8 || len(packed.Plan.Batches) != 2 {
+		t.Fatalf("package grouping lost tasks: %+v", packed.Design)
+	}
+	found := map[string]bool{}
+	for _, batch := range packed.Plan.Batches {
+		text := bundle.RenderBatch(batch)
+		for _, id := range batch.DesignTaskIDs() {
+			if found[id] {
+				t.Fatalf("task duplicated: %s", id)
+			}
+			found[id] = true
+			task := plan.Tasks[slices.IndexFunc(plan.Tasks, func(task DesignTask) bool { return task.ID == id })]
+			if !strings.Contains(text, task.SourceDigest) {
+				t.Fatalf("shared request lost %s binding", id)
+			}
+		}
+		if slices.Contains(batch.DesignTaskIDs(), "file:first.go") {
+			if len(batch.DesignTaskIDs()) != 6 || strings.Count(text, "const shared = 42") != 1 || !strings.Contains(text, "func Second()") || strings.Contains(text, "func Other()") {
+				t.Fatalf("source or package boundary lost: %s", text)
+			}
+		}
+	}
+	if len(found) != len(plan.Tasks) {
+		t.Fatal("planned task was not assigned a request")
+	}
+}
+
+func TestLargeFocusSetKeepsEveryTaskWithinRequestCountLimit(t *testing.T) {
+	var source strings.Builder
+	source.WriteString("package fixture\n")
+	for i := 0; i < 129; i++ {
+		fmt.Fprintf(&source, "func F%d() {}\n", i)
+	}
+	files := []standards.File{{Path: "go.mod", Src: []byte("module example.com/app\n")}, {Path: "app.go", Src: []byte(source.String())}}
+	inventory, _ := InspectDesign(files, nil)
+	plan := PlanDesignInteractions(t.Context(), inventory, files, []string{"app.go"})
+	cfg := config.Defaults()
+	packed := PackDesign(t.Context(), cfg, plan, files, nil, bundle.Reserve{})
+	if len(plan.Tasks) != 130 || len(packed.Plan.Batches) != 3 {
+		t.Fatalf("large focus set lost work or ignored task limit: tasks=%d requests=%d", len(plan.Tasks), len(packed.Plan.Batches))
+	}
+	seen := map[string]bool{}
+	full := 0
+	for _, batch := range packed.Plan.Batches {
+		if len(batch.DesignTaskIDs()) > 64 || batch.Tokens > cfg.Review.TokenBudgetPerRequest {
+			t.Fatal("request exceeded task or token limit")
+		}
+		for _, id := range batch.DesignTaskIDs() {
+			if seen[id] {
+				t.Fatalf("duplicate task %s", id)
+			}
+			seen[id] = true
+		}
+		for _, entry := range batch.Entries {
+			if entry.File.Path == "app.go" && entry.HasContent() {
+				full++
+			}
+		}
+	}
+	if len(seen) != 130 || full != 1 {
+		t.Fatalf("focus or whole-source slop evidence lost: tasks=%d full reads=%d", len(seen), full)
 	}
 }

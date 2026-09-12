@@ -55,14 +55,14 @@ func TestInteractionPlanKeepsCallerAndStateEvidenceWithoutEveryMethod(t *testing
 		if strings.Contains(text, "UNRELATED METHOD") {
 			t.Fatal("receiver type expanded unrelated methods")
 		}
-		foundFull := false
+		foundExcerpt := false
 		for _, entry := range batch.Entries {
 			if entry.File.Path == "service/service.go" {
-				foundFull = entry.HasContent()
+				foundExcerpt = !entry.HasContent() && len(entry.SourceSpans) > 0
 			}
 		}
-		if !foundFull {
-			t.Fatal("caller source lost whole-file slop evidence")
+		if !foundExcerpt {
+			t.Fatal("background caller did not retain its bounded design excerpt")
 		}
 	}
 	if !matched {
@@ -70,9 +70,9 @@ func TestInteractionPlanKeepsCallerAndStateEvidenceWithoutEveryMethod(t *testing
 	}
 	count := 0
 	for _, task := range plan.Tasks {
-		if task.Source.ID == "service/service.go" {
+		if task.Source.ID == "service/service.go" && !task.SlopOnly {
 			count++
-			if len(task.Interactions) < 2 {
+			if len(task.Interactions) < 1 || !slices.Contains(task.Context, Target{Kind: FileTarget, ID: "store/new.go"}) {
 				t.Fatalf("constructor/read obligations lost: %+v", task)
 			}
 		}
@@ -92,7 +92,7 @@ func TestInteractionBudgetCannotSplitAnObligationIntoUnrelatedRequests(t *testin
 		t.Fatal("budget changed intended scope")
 	}
 	for _, task := range packed.Design.Tasks {
-		if task.Source.ID == "service/service.go" && (len(task.Omitted) == 0 || len(task.Interactions) < 2) {
+		if task.Source.ID == "service/service.go" && !task.SlopOnly && (len(task.Omitted) == 0 || len(task.Interactions) < 1) {
 			t.Fatal("budget lost caller obligation or counted partial evidence complete")
 		}
 	}
@@ -125,7 +125,7 @@ func TestInteractionPlanRetainsCallerOfRemovedDeclaration(t *testing.T) {
 	plan := PlanDesignInteractions(t.Context(), inventory, files, []string{"store/read.go"})
 	found := false
 	for _, task := range plan.Tasks {
-		if task.Source.ID != "service/service.go" {
+		if task.Source.ID != "service/service.go" || task.SlopOnly {
 			continue
 		}
 		found = true
@@ -166,6 +166,7 @@ func TestInteractionCandidatesRetainBothCoupledRuleImplementations(t *testing.T)
 	}
 	inventory, _ := InspectDesign(files, nil)
 	plan := PlanDesignInteractions(t.Context(), inventory, files, []string{"preview.go"})
+	plan = isolateSourceTasks(t, plan, "preview.go")
 	packed := PackDesign(t.Context(), config.Defaults(), plan, files, nil, bundle.Reserve{})
 	found := false
 	for _, batch := range packed.Plan.Batches {
@@ -192,6 +193,7 @@ func TestInteractionReadsDoNotMakeEveryArgumentConsumerAStateWriter(t *testing.T
 	}
 	inventory, _ := InspectDesign(files, nil)
 	plan := PlanDesignInteractions(t.Context(), inventory, files, []string{"read.go"})
+	plan = isolateSourceTasks(t, plan, "read.go")
 	packed := PackDesign(t.Context(), config.Defaults(), plan, files, nil, bundle.Reserve{})
 	found := false
 	for _, batch := range packed.Plan.Batches {
@@ -218,6 +220,7 @@ func TestInteractionStateDeclarationIncludesRangeAssignmentWriter(t *testing.T) 
 	}
 	inventory, _ := InspectDesign(files, nil)
 	plan := PlanDesignInteractions(t.Context(), inventory, files, []string{"state.go"})
+	plan = isolateSourceTasks(t, plan, "state.go")
 	packed := PackDesign(t.Context(), config.Defaults(), plan, files, nil, bundle.Reserve{})
 	found := false
 	for _, batch := range packed.Plan.Batches {
@@ -243,6 +246,7 @@ func TestPackageFunctionDoesNotSelectUnrelatedSameNamedMethods(t *testing.T) {
 	}
 	inventory, _ := InspectDesign(files, nil)
 	plan := PlanDesignInteractions(t.Context(), inventory, files, []string{"call.go"})
+	plan = isolateSourceTasks(t, plan, "call.go")
 	packed := PackDesign(t.Context(), config.Defaults(), plan, files, nil, bundle.Reserve{})
 	found := false
 	for _, batch := range packed.Plan.Batches {
@@ -305,5 +309,119 @@ func TestInteractionFallbackSuppliesWholeCalleeOrReportsMissingSource(t *testing
 				t.Fatalf("missing callee claimed complete: %+v", packed.Design)
 			}
 		})
+	}
+}
+
+// Inspect required context without unrelated tasks sharing its request.
+func isolateSourceTasks(t *testing.T, plan DesignPlan, source string) DesignPlan {
+	t.Helper()
+	plan.Tasks = slices.DeleteFunc(plan.Tasks, func(task DesignTask) bool { return task.Source.ID != source || task.SlopOnly })
+	if len(plan.Tasks) == 0 {
+		t.Fatalf("planner omitted source task %s", source)
+	}
+	return plan
+}
+
+func TestFieldQualifierDoesNotSelectSameNamedMethodImplementations(t *testing.T) {
+	files := []standards.File{
+		{Path: "go.mod", Src: []byte("module example.com/app\n")},
+		{Path: "call.go", Src: []byte("package fixture\nfunc Read(c Config) int {return (c.Review).Value}\n")},
+		{Path: "types.go", Src: []byte("package fixture\ntype Config struct{ Review Settings }; type Settings struct{Value int}\n")},
+		{Path: "unrelated.go", Src: []byte("package fixture\ntype Reviewer struct{}\nfunc(Reviewer) Review() int {return 999} // UNRELATED REVIEW BODY\n")},
+	}
+	inventory, _ := InspectDesign(files, nil)
+	plan := isolateSourceTasks(t, PlanDesignInteractions(t.Context(), inventory, files, []string{"call.go"}), "call.go")
+	packed := PackDesign(t.Context(), config.Defaults(), plan, files, nil, bundle.Reserve{})
+	if len(packed.Plan.Batches) != 1 {
+		t.Fatalf("field task did not pack: %+v", packed.Design)
+	}
+	text := bundle.RenderBatch(packed.Plan.Batches[0])
+	if !strings.Contains(text, "(c.Review).Value") || !strings.Contains(text, "type Config") || strings.Contains(text, "UNRELATED REVIEW BODY") {
+		t.Fatalf("field qualifier became a method edge: %s", text)
+	}
+}
+
+func TestMethodValueRetainsItsImplementationWithoutImmediateCall(t *testing.T) {
+	files := []standards.File{
+		{Path: "go.mod", Src: []byte("module example.com/app\n")},
+		{Path: "call.go", Src: []byte("package fixture\nfunc Prepare(r Reader) func() int {return r.Read}\n")},
+		{Path: "reader.go", Src: []byte("package fixture\ntype Reader struct{}\nfunc(Reader) Read() int {return 42}\n")},
+	}
+	inventory, _ := InspectDesign(files, nil)
+	plan := isolateSourceTasks(t, PlanDesignInteractions(t.Context(), inventory, files, []string{"call.go"}), "call.go")
+	packed := PackDesign(t.Context(), config.Defaults(), plan, files, nil, bundle.Reserve{})
+	if len(packed.Plan.Batches) != 1 {
+		t.Fatalf("method-value task did not pack: %+v", packed.Design)
+	}
+	text := bundle.RenderBatch(packed.Plan.Batches[0])
+	if !strings.Contains(text, "return r.Read") || !strings.Contains(text, "return 42") {
+		t.Fatalf("uncalled method value lost its body: %s", text)
+	}
+}
+
+func TestChangedHelperKeepsPublicCallerChainWithoutUnrelatedSiblingTasks(t *testing.T) {
+	files := []standards.File{
+		{Path: "go.mod", Src: []byte("module example.com/app\n")},
+		{Path: "api/helper.go", Src: []byte("package api\nfunc helper() int {return 42}\n")},
+		{Path: "api/read.go", Src: []byte("package api\nfunc Read() int {return helper()}\n")},
+		{Path: "api/other.go", Src: []byte("package api\nfunc Other() int {return 99}\n")},
+		{Path: "service/service.go", Src: []byte("package service\nimport \"example.com/app/api\"\nfunc Use() int {return api.Read()}\nfunc Unrelated() int {return api.Other()}\n")},
+	}
+	inventory, _ := InspectDesign(files, nil)
+	plan := PlanDesignInteractions(t.Context(), inventory, files, []string{"api/helper.go"})
+	slop := 0
+	design := 0
+	var callerID string
+	for _, task := range plan.Tasks {
+		if task.SlopOnly {
+			slop++
+			if task.Source.ID != "api/helper.go" {
+				t.Fatalf("background source became a required slop pass: %+v", task)
+			}
+			continue
+		}
+		design++
+		if task.Source.ID == "api/other.go" {
+			t.Fatal("unrelated sibling became a review unit")
+		}
+		if task.Source.ID == "service/service.go" {
+			callerID = task.ID
+			if len(task.Focus) != 1 || task.Focus[0].Start != 3 {
+				t.Fatalf("unrelated importing declaration became a task: %+v", task)
+			}
+		}
+	}
+	if design != 3 || slop != 1 || callerID == "" {
+		t.Fatalf("changed helper lost caller scope: %+v", plan)
+	}
+	packed := PackDesign(t.Context(), config.Defaults(), plan, files, nil, bundle.Reserve{})
+	found := false
+	for _, batch := range packed.Plan.Batches {
+		if !slices.Contains(batch.DesignTaskIDs(), callerID) {
+			continue
+		}
+		found = true
+		text := bundle.RenderBatch(batch)
+		for _, want := range []string{"return api.Read()", "return helper()", "return 42"} {
+			if !strings.Contains(text, want) {
+				t.Fatalf("caller request lost %q: %s", want, text)
+			}
+		}
+		if strings.Contains(text, "return api.Other()") {
+			t.Fatal("unrelated caller body entered the focused request")
+		}
+	}
+	if !found {
+		t.Fatalf("caller chain did not pack: %+v", packed.Design)
+	}
+	tree := PlanDesignInteractions(t.Context(), inventory, files, nil)
+	count := 0
+	for _, task := range tree.Tasks {
+		if !task.SlopOnly {
+			count++
+		}
+	}
+	if count != 6 {
+		t.Fatalf("tree scan lost declarations or module source: %+v", tree)
 	}
 }

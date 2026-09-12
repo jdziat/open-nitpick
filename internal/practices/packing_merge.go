@@ -9,7 +9,7 @@ import (
 )
 
 // A token limit alone could combine thousands of tiny, independent questions.
-const maxDesignTasksPerBatch = 16
+const maxDesignTasksPerBatch = 64
 
 func combineDesignBatches(first, next bundle.Batch, maxFiles, maxTokens int) (bundle.Batch, bool) {
 	if len(first.DesignTaskIDs())+len(next.DesignTaskIDs()) > maxDesignTasksPerBatch {

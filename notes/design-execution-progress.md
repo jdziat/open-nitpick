@@ -173,3 +173,51 @@ check passed. The standards scan reported zero analyzer observations. Docs and
 the generated AGENTS block were rebuilt; deterministic slop found zero tells
 across the touched files. These gates validate this implementation milestone,
 not design-assessment precision or the unfinished internal-adoption contract.
+
+## Focused execution activation (in progress)
+
+Planner version 4 now executes declaration and caller tasks. Change reviews
+select changed source declarations and two caller hops; tree reviews select the
+permitted tree. Whole-source slop tasks have a separate completion obligation
+and cannot inflate the design-unit denominator. Primary excerpts retain exact
+citation ranges. Requests share source within a package, up to 64 tasks and the
+configured file/token limits. Non-Go source can share requests by directory.
+
+Twenty injected regressions failed their final behavioral guards, including false
+method edges, missing method values, citation gaps, invented full-source reads,
+missing caller hops, unrelated sibling selection and ignored packing limits.
+The results are retained in `evidence/design-focused-execution-mutations.json`.
+The first cancellation mutation survived because its fixture could execute only
+a single-task manifest request. The revised fixture guarantees shared requests;
+30 unmutated race repetitions passed, and dropping secondary task completion
+then failed the guard. Both attempts are retained.
+
+The deterministic full-tree sizing probe admitted 4,666 design tasks and 357
+separate Go whole-source slop tasks over 619 source files in 183 requests, with
+no planning errors or omitted tasks. Non-Go full-source tasks also supply slop
+evidence. The requests sum to 19,667,514 estimated source tokens. This used
+operator limits of 1,024 files, 256 files per request, 200,000 tokens per request
+and a 20,000-token framing reserve; repository defaults were not changed.
+The source digest and exclusions are in
+`evidence/design-focused-execution-sizing.json`. These are sizing results,
+not a model assessment or a controlled comparison with earlier snapshots.
+
+The local Nitpick implementation review completed all three requests over 14
+changed files with zero findings; its operator policy disabled engineering-profile
+execution. The report is in `evidence/design-focused-execution-review.json`.
+The final serial race suite, eval-tag vet, full lint, repository standards check,
+docs generators, touched-file deterministic slop and commit checks passed. The
+standards scan reported zero analyzer observations across 358 files. The initial
+race invocation lost a temporary probe between enumeration and compilation; a
+stable rerun exposed the stale cancellation guard described above, now corrected.
+The test-fixture correction followed the model review; production code did not
+change after it.
+
+Repeated mechanism evaluation is running against a frozen version-4 binary.
+The first lifecycle pair completed: the bad fixture yielded three design findings,
+and the intended-good fixture yielded a zero-value-cache warning. Its supplied
+caller uses the constructor, but the exported API's zero-value contract is
+ambiguous. Retain that disagreement when scoring the run. Internal required-model
+adoption and the CTO acceptance audit remain unfinished. Deleted source still
+reports unavailable context; base-source assessment is not implemented. Lexical
+graph and call-depth limitations remain visible in the report.

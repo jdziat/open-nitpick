@@ -18,7 +18,11 @@ import (
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
-const engineeringPrompt = `Engineering assessment, version 3.
+const engineeringPrompt = `Engineering assessment, version 4.
+A request can contain several assessment tasks. Assess every listed design focus
+with the supplied related evidence. A slop_only task requests a whole-source slop
+assessment, not completion of a design unit. Source excerpts omit other lines;
+do not infer behavior from code that was not supplied.
 Evaluate the slop rules explicitly, with their documented exclusions.
 Assess design mechanisms: dependency boundaries, state and lifecycle ownership,
 rules duplicated at sites that must change together, hidden coupling, error
@@ -41,8 +45,8 @@ func engineeringInstruction(files []standards.File) string {
 
 func engineeringModelChecks(ctx context.Context, root, configPath, base string, noModel bool, budget int, files []standards.File) ([]practices.Check, []practices.ModelUsage) {
 	checks := []practices.Check{
-		{ID: "slop", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-3"},
-		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-3"},
+		{ID: "slop", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-4"},
+		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-4"},
 	}
 	for i := range checks {
 		for _, file := range files {
@@ -265,7 +269,7 @@ func practiceModelFinding(finding review.Finding) practices.Finding {
 func applyPackageCoverage(check *practices.Check, report *review.Report) {
 	execution := report.DesignExecution
 	check.Planned, check.Examined, check.Omitted, check.Context = nil, nil, nil, nil
-	check.Tasks = slices.Clone(execution.Design.Tasks)
+	check.Tasks = slices.DeleteFunc(slices.Clone(execution.Design.Tasks), func(task practices.DesignTask) bool { return task.SlopOnly })
 	check.Limitations = slices.Clone(execution.Design.Limitations)
 	check.State, check.Reason = practices.Completed, ""
 	batched := map[string]bool{}
@@ -273,6 +277,16 @@ func applyPackageCoverage(check *practices.Check, report *review.Report) {
 		for _, batch := range report.Plan.Batches {
 			for _, id := range batch.DesignTaskIDs() {
 				batched[id] = true
+			}
+			if batch.DesignAssessed(report.AssessedDesignTasks) {
+				for _, entry := range batch.Entries {
+					if entry.HasContent() && !entry.Truncated {
+						target := practices.Target{Kind: practices.FileTarget, ID: entry.File.Path}
+						if !slices.Contains(check.Context, target) {
+							check.Context = append(check.Context, target)
+						}
+					}
+				}
 			}
 		}
 	}

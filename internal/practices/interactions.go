@@ -3,6 +3,7 @@ package practices
 import (
 	"context"
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 
@@ -11,20 +12,34 @@ import (
 )
 
 // PlanDesignInteractions declares focused assessments with named caller obligations.
-// Full primary source remains available for the slop assessment.
+// Separate whole-source tasks retain slop coverage when design tasks use excerpts.
 // Budgets are applied only after this complete intended scope is recorded.
 func PlanDesignInteractions(ctx context.Context, inventory DesignInventory, files []standards.File, changed []string) DesignPlan {
 	packages := PlanDesign(ctx, inventory, files, changed)
 	index := indexDesignContext(ctx, inventory, files)
-	plan := DesignPlan{Version: "3", Errors: slices.Clone(packages.Errors), Limitations: slices.Clone(inventory.Limitations)}
+	plan := DesignPlan{Version: "4", Errors: slices.Clone(packages.Errors), Limitations: slices.Clone(inventory.Limitations)}
 	plan.Limitations = append(plan.Limitations,
 		"tasks assess named declaration and caller interactions; completion is not proof of every package-level design property",
+		"change scope follows changed source declarations and two caller hops; manifest changes expand package scope; deeper callers remain outside the declared assessment",
 		"coupling candidates match signature and body-token shape within a Go package; a shape match does not establish a shared policy",
 		"context includes two implementation-call hops within the root package and its direct imports, state writers and package contracts; deeper bodies, transitive imports, dynamic dispatch and reflection are outside the task scope; method selection does not type-check receivers; aliases and unknown returned reference types are not tracked as state writes")
 	sources := map[string][]byte{}
 	for _, file := range files {
 		sources[file.Path] = file.Src
 	}
+	changedNames := map[string]bool{}
+	missingDirs := map[string]bool{}
+	whole := changed == nil
+	for _, name := range changed {
+		changedNames[name] = true
+		whole = whole || path.Base(name) == "go.mod" || path.Base(name) == "go.work"
+		if _, available := sources[name]; !available && path.Ext(name) == ".go" {
+			missingDirs[path.Dir(name)] = true
+		}
+	}
+	primary := map[string]bool{}
+	focusRoots := map[string]bool{}
+	directCallers := map[string]bool{}
 	pending := map[string]bool{}
 	interactions := map[string][]DesignInteraction{}
 	for _, group := range packages.Tasks {
@@ -39,23 +54,47 @@ func PlanDesignInteractions(ctx context.Context, inventory DesignInventory, file
 				plan.Errors = append(plan.Errors, problem)
 			}
 		}
-		for name, info := range index.files {
-			if _, imports := info.imports[unit]; imports {
-				pending[name] = true
-				relation := DesignInteraction{Caller: Target{Kind: FileTarget, ID: name}, Callee: Target{Kind: UnitTarget, ID: "package:" + unit}}
-				if !slices.Contains(interactions[name], relation) {
-					interactions[name] = append(interactions[name], relation)
+		for key, info := range index.nodes {
+			alias, imports := info.imports[unit]
+			unresolved := false
+			for name := range info.selected[unit] {
+				unresolved = unresolved || len(index.declarations[unit][name]) == 0
+			}
+			if imports && (alias == "_" || alias == "." || unresolved) {
+				pending[info.file], focusRoots[key] = true, true
+				relation := DesignInteraction{Caller: Target{Kind: FileTarget, ID: info.file, Line: info.spans[0].Start}, Callee: Target{Kind: UnitTarget, ID: "package:" + unit}}
+				if !slices.Contains(interactions[info.file], relation) {
+					interactions[info.file] = append(interactions[info.file], relation)
 				}
 			}
 		}
 		for _, source := range group.Sources {
-			pending[source.ID] = true
+			if !whole && !changedNames[source.ID] && !missingDirs[path.Dir(source.ID)] {
+				continue
+			}
+			pending[source.ID], primary[source.ID] = true, true
 			for _, caller := range index.callersOf(unit, source.ID, index.fileNodes(source.ID)) {
 				node := index.nodes[caller]
-				pending[node.file] = true
+				pending[node.file], focusRoots[caller], directCallers[caller] = true, true, true
 				relation := DesignInteraction{Caller: Target{Kind: FileTarget, ID: node.file, Line: node.spans[0].Start}, Callee: source}
 				if !slices.Contains(interactions[node.file], relation) {
 					interactions[node.file] = append(interactions[node.file], relation)
+				}
+			}
+		}
+	}
+	if !whole {
+		for key := range directCallers {
+			node := index.nodes[key]
+			if primary[node.file] {
+				continue
+			}
+			for _, caller := range index.callersOf(node.unit, node.file, []string{key}) {
+				info := index.nodes[caller]
+				pending[info.file], focusRoots[caller] = true, true
+				relation := DesignInteraction{Caller: Target{Kind: FileTarget, ID: info.file, Line: info.spans[0].Start}, Callee: Target{Kind: FileTarget, ID: node.file}}
+				if !slices.Contains(interactions[info.file], relation) {
+					interactions[info.file] = append(interactions[info.file], relation)
 				}
 			}
 		}
@@ -66,11 +105,20 @@ func PlanDesignInteractions(ctx context.Context, inventory DesignInventory, file
 	}
 	slices.Sort(names)
 	for _, name := range names {
+		if changed == nil || changedNames[name] {
+			target := Target{Kind: FileTarget, ID: name}
+			slopTask := DesignTask{ID: "slop:" + name, Package: index.files[name].unit, SlopOnly: true, Source: target, Sources: []Target{target}, Purpose: "assess semantic slop rules over the complete source; this task alone does not establish design-unit completion"}
+			bindDesignSource(ctx, &slopTask, sources)
+			plan.Tasks = append(plan.Tasks, slopTask)
+		}
 		roots := index.fileNodes(name)
 		if len(roots) > 1 {
 			roots = slices.DeleteFunc(roots, func(key string) bool { return key == name })
 		}
 		for _, root := range roots {
+			if !primary[name] && !focusRoots[root] {
+				continue
+			}
 			node := index.nodes[root]
 			selected := index.interactionContext([]string{root})
 			source := Target{Kind: FileTarget, ID: name}
@@ -78,7 +126,7 @@ func PlanDesignInteractions(ctx context.Context, inventory DesignInventory, file
 			if len(roots) > 1 {
 				id = "declaration:" + root
 			}
-			purpose := "assess the focused declaration and its declared calls using supporting implementations, state and failure paths; assess slop over the whole primary file; context beyond two call hops contains contracts without bodies; do not infer behavior from unseen bodies"
+			purpose := "assess the focused declaration and its declared calls using supporting implementations, state and failure paths; context beyond two call hops contains contracts without bodies; do not infer behavior from unseen bodies"
 			task := index.interactionTask(id, index.files[name].unit, source, purpose, selected)
 			if len(node.spans) > 0 {
 				task.Focus = []ContextSpan{{Path: name, SourceSpan: node.spans[0]}}
@@ -110,10 +158,6 @@ func PlanDesignInteractions(ctx context.Context, inventory DesignInventory, file
 	}
 	if ctx.Err() != nil && !slices.Contains(plan.Errors, ctx.Err().Error()) {
 		plan.Errors = append(plan.Errors, ctx.Err().Error())
-	}
-	changedNames := map[string]bool{}
-	for _, name := range changed {
-		changedNames[name] = true
 	}
 	slices.SortFunc(plan.Tasks, func(a, b DesignTask) int {
 		if changedNames[a.Source.ID] != changedNames[b.Source.ID] {
@@ -313,9 +357,7 @@ func (index designContextIndex) interactionTask(id, unit string, source Target, 
 		if depth > interactionBodyDepth && node.contract != nil {
 			node = node.contract
 		}
-		if node.file != source.ID {
-			byFile[node.file] = append(byFile[node.file], node.spans...)
-		}
+		byFile[node.file] = append(byFile[node.file], node.spans...)
 	}
 	var names []string
 	for name := range byFile {
@@ -323,7 +365,9 @@ func (index designContextIndex) interactionTask(id, unit string, source Target, 
 	}
 	slices.Sort(names)
 	for _, name := range names {
-		task.Context = append(task.Context, Target{Kind: FileTarget, ID: name})
+		if name != source.ID {
+			task.Context = append(task.Context, Target{Kind: FileTarget, ID: name})
+		}
 		spans := append(slices.Clone(byFile[name]), index.nodes[name].spans...)
 		slices.SortFunc(spans, func(a, b bundle.SourceSpan) int { return a.Start - b.Start })
 		var merged []bundle.SourceSpan
@@ -335,7 +379,11 @@ func (index designContextIndex) interactionTask(id, unit string, source Target, 
 			}
 		}
 		for _, span := range merged {
-			task.ContextSpans = append(task.ContextSpans, ContextSpan{Path: name, SourceSpan: span})
+			if name == source.ID {
+				task.SourceSpans = append(task.SourceSpans, ContextSpan{Path: name, SourceSpan: span})
+			} else {
+				task.ContextSpans = append(task.ContextSpans, ContextSpan{Path: name, SourceSpan: span})
+			}
 		}
 	}
 	for key, depth := range selected {

@@ -93,7 +93,11 @@ type DesignTask struct {
 	// Package identifies the inventory unit, not a claim of package completion.
 	Package      string              `json:"package,omitempty"`
 	Interactions []DesignInteraction `json:"interactions,omitempty"`
-	// Focus narrows the design question; whole Sources remain available for slop.
+	// SlopOnly reserves a whole-source assessment without claiming a design unit.
+	SlopOnly bool `json:"slop_only,omitempty"`
+	// SourceSpans narrows primary source; absent paths are supplied whole.
+	SourceSpans []ContextSpan `json:"source_spans,omitempty"`
+	// Focus names the declaration assessed with its required context.
 	Focus   []ContextSpan `json:"focus,omitempty"`
 	Source  Target        `json:"source"`
 	Purpose string        `json:"purpose"`
@@ -242,7 +246,7 @@ func (r Report) Problems() []string {
 				sourceTargets[source] = true
 			}
 			for _, focus := range task.Focus {
-				if !sourceTargets[Target{Kind: FileTarget, ID: focus.Path}] || focus.Start < 1 || focus.End < focus.Start {
+				if !sourceTargets[Target{Kind: FileTarget, ID: focus.Path}] || focus.Start < 1 || focus.End < focus.Start || (len(ranges[focus.Path]) > 0 && !bundle.ContainsSourceRange(ranges[focus.Path], focus.Start, focus.End)) {
 					bad("design focus lies outside its primary source")
 				}
 			}
@@ -289,11 +293,7 @@ func (r Report) Problems() []string {
 						bad("examined design task lacks a source digest")
 					}
 				}
-				for _, source := range task.Sources {
-					evidence[normalize(source)] = true
-				}
-				evidence[normalize(task.Source)] = true
-				for _, target := range task.Context {
+				for _, target := range append(slices.Clone(task.Sources), task.Context...) {
 					if spans := ranges[target.ID]; len(spans) > 0 {
 						key := normalize(target)
 						spanEvidence[key] = append(spanEvidence[key], spans...)

@@ -82,3 +82,30 @@ func TestDesignReportRejectsFindingsInUnsuppliedContextGaps(t *testing.T) {
 		t.Fatal("gap claimed as examined evidence")
 	}
 }
+
+func TestPrimarySourceExcerptsCannotSupportUnseenFindingLocations(t *testing.T) {
+	source := Target{Kind: FileTarget, ID: "source.go"}
+	task := DesignTask{ID: "focus", Source: source, Sources: []Target{source}, Purpose: "inspect function contract", SourceSpans: []ContextSpan{{Path: source.ID, SourceSpan: bundle.SourceSpan{Start: 1, End: 1}}, {Path: source.ID, SourceSpan: bundle.SourceSpan{Start: 3, End: 3}}}, Focus: []ContextSpan{{Path: source.ID, SourceSpan: bundle.SourceSpan{Start: 3, End: 3}}}}
+	files := []standards.File{{Path: source.ID, Src: []byte("package fixture\n// Hidden commentary.\nfunc Call(){}\n")}}
+	bindDesignSource(t.Context(), &task, map[string][]byte{source.ID: files[0].Src})
+	plan := DesignPlan{Tasks: []DesignTask{task}}
+	packed := PackDesign(t.Context(), config.Defaults(), plan, files, nil, bundle.Reserve{})
+	if len(packed.Plan.Batches) != 1 || strings.Contains(bundle.RenderBatch(packed.Plan.Batches[0]), "Hidden commentary") || packed.Plan.Batches[0].Entries[0].HasContent() {
+		t.Fatalf("primary excerpt claimed whole source: %+v", packed)
+	}
+	unit := Target{Kind: UnitTarget, ID: task.ID}
+	report := Report{SchemaVersion: SchemaVersion, Profile: "engineering", Revision: "fixture", PolicySource: "operator", PolicyDigest: "fixture", Checks: []Check{{ID: "design", Version: "1", Instrument: Model, State: Completed, Planned: []Target{unit}, Examined: []Target{unit}, Tasks: packed.Design.Tasks, Findings: []Finding{{Rule: "contract", Target: Target{Kind: FileTarget, ID: source.ID, Line: 3}}}}}}
+	if problems := report.Problems(); len(problems) > 0 {
+		t.Fatalf("visible finding rejected: %v", problems)
+	}
+	report.Checks[0].Findings[0].Target.Line = 2
+	if len(report.Problems()) == 0 {
+		t.Fatal("primary source gap accepted as finding evidence")
+	}
+	task.Focus[0].Start = 2
+	task.Focus[0].End = 2
+	bindDesignSource(t.Context(), &task, map[string][]byte{source.ID: files[0].Src})
+	if len(task.Omitted) == 0 {
+		t.Fatal("focus outside supplied primary excerpt remained bound")
+	}
+}

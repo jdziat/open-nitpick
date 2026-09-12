@@ -24,11 +24,16 @@ type DesignExecution struct {
 // assembleDesign captures one bounded source view before package planning.
 func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Files, reserve bundle.Reserve) DesignExecution {
 	var blocked []bundle.Skip
+	routine := map[string]string{}
 	if tree, ok := e.Provider.(*vcs.Tree); ok {
 		for _, name := range tree.Unbudgeted {
 			blocked = append(blocked, bundle.Skip{Path: name, Reason: "tree review budget excluded source"})
 		}
 		for _, skip := range tree.Skipped {
+			base := path.Base(skip.Path)
+			if (skip.Reason == "binary" || skip.Reason == "empty") && base != "go.mod" && base != "go.work" {
+				routine[skip.Path] = skip.Reason
+			}
 			blocked = append(blocked, bundle.Skip{Path: skip.Path, Reason: skip.Reason})
 		}
 	}
@@ -40,6 +45,13 @@ func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Fil
 	}
 	fetch := func(ctx context.Context, name string) ([]byte, error) { return e.Provider.FileContent(ctx, ref, name) }
 	view := bundle.CaptureDesignSources(ctx, e.Config, changed, fetch, bundle.ListerFrom(e.Provider, ref), blocked, bundle.SourceLimits{Paths: 4096, Bytes: 32 << 20})
+	view.Omitted = slices.DeleteFunc(view.Omitted, func(skip bundle.Skip) bool {
+		if reason, ok := routine[skip.Path]; ok && reason == skip.Reason {
+			view.Excluded = append(view.Excluded, skip)
+			return true
+		}
+		return false
+	})
 	for _, file := range files {
 		if source, ok := view.Content[file.Path]; ok && file.Kind == diff.ChangeAdded && !additionMatchesSource(file, string(source)) {
 			delete(view.Content, file.Path)
@@ -76,7 +88,7 @@ func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Fil
 		inventory.Limitations = append(inventory.Limitations, fmt.Sprintf("%s excluded: %s", skip.Path, skip.Reason))
 	}
 	inventory.Limitations = append(inventory.Limitations, "source inventory is bounded to 4096 paths and 32 MiB; only Go source has a dependency graph")
-	plan := practices.PlanDesign(ctx, inventory, source, changed)
+	plan := practices.PlanDesignInteractions(ctx, inventory, source, changed)
 	packed := practices.PackDesign(ctx, e.Config, plan, source, files, reserve)
 	packed.Plan.Skipped = append(packed.Plan.Skipped, view.Excluded...)
 	return DesignExecution{DesignPacking: packed, Sources: source, Excluded: view.Excluded}

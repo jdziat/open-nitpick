@@ -1,0 +1,9 @@
+{
+  "base": "b4e269e",
+  "profile": "Ordinary implementation review; engineering execution disabled",
+  "files": 14,
+  "requests_completed": 3,
+  "findings": 0,
+  "output": "Read 14 changed files. Nothing found in what was read.\n\n<sub>Reviewed by open-nitpick.</sub>\n\n",
+  "log": "time=2026-09-11T20:40:13.705-07:00 level=INFO msg=reviewing provider=local ref=b4e269e...\ntime=2026-09-11T20:40:13.733-07:00 level=INFO msg=\"parsed diff\" files=14\ntime=2026-09-11T20:40:13.739-07:00 level=INFO msg=\"models ready\" review=synthetic/hf:moonshotai/Kimi-K3 triage=synthetic/hf:zai-org/GLM-5.3-Flash validate=synthetic/hf:moonshotai/Kimi-K3 policy=/tmp/nitpick-design-span-review.yaml\ntime=2026-09-11T20:40:25.646-07:00 level=INFO msg=\"attached related context\" definitions=26 files=15\ntime=2026-09-11T20:40:25.646-07:00 level=INFO msg=reviewing batches=3 files=14 concurrency=4\ntime=2026-09-11T20:40:25.646-07:00 level=INFO msg=\"batch started\" batch=3 of=3 files=2 tokens=14312 first=internal/review/design_plan.go\ntime=2026-09-11T20:40:25.646-07:00 level=INFO msg=\"batch started\" batch=2 of=3 files=6 tokens=31270 first=internal/practices/interactions.go\ntime=2026-09-11T20:40:25.646-07:00 level=INFO msg=\"batch started\" batch=1 of=3 files=6 tokens=35628 first=cmd/nitpick/engineering_model.go\ntime=2026-09-11T20:41:28.218-07:00 level=INFO msg=\"batch done\" batch=3 of=3 done=1 findings=0 elapsed=1m3s\ntime=2026-09-11T20:41:58.454-07:00 level=INFO msg=\"batch done\" batch=1 of=3 done=2 findings=0 elapsed=1m33s\ntime=2026-09-11T20:42:28.148-07:00 level=INFO msg=\"batch done\" batch=2 of=3 done=3 findings=0 elapsed=2m3s\ntime=2026-09-11T20:42:28.148-07:00 level=INFO msg=triaging findings=0 model=synthetic/hf:zai-org/GLM-5.3-Flash\ntime=2026-09-11T20:42:28.148-07:00 level=INFO msg=publishing findings=0 provider=local\n\nReviewed 14 file(s): no findings\n"
+}

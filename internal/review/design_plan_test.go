@@ -28,10 +28,16 @@ func TestDesignAssemblyKeepsSiblingAndCallerSourceTogether(t *testing.T) {
 	e := &Engine{Config: cfg, Provider: tree}
 	files := diff.Files{&diff.File{Path: "store/read.go", Kind: diff.ChangeModified}}
 	packed := e.assembleDesign(t.Context(), vcs.Ref{Head: vcs.Worktree}, files, bundle.Reserve{Tokens: 100})
-	if len(packed.Design.Errors) != 0 || len(packed.Plan.Batches) != 1 {
+	if len(packed.Design.Errors) != 0 || len(packed.Plan.Batches) != 2 {
 		t.Fatalf("assembly=%+v", packed.Design)
 	}
-	rendered := bundle.RenderBatch(packed.Plan.Batches[0])
+	caller := slices.IndexFunc(packed.Plan.Batches, func(batch bundle.Batch) bool {
+		return slices.Contains(batch.DesignTaskIDs(), "file:service/service.go")
+	})
+	if caller < 0 {
+		t.Fatal("caller obligation was not assigned a request")
+	}
+	rendered := bundle.RenderBatch(packed.Plan.Batches[caller])
 	for _, evidence := range []string{"var state int", "service/service.go", "package:example.com/app/store"} {
 		if !strings.Contains(rendered, evidence) {
 			t.Fatalf("same request lacks %q", evidence)
@@ -96,7 +102,7 @@ func TestDesignAssemblyRejectsAdditionThatDiffersFromFrozenSource(t *testing.T) 
 	}
 }
 
-func TestEngineeringReviewExecutesWholePackageAndRetainsBudgetOmissions(t *testing.T) {
+func TestEngineeringReviewExecutesEveryTaskAndRetainsBudgetOmissions(t *testing.T) {
 	for _, limited := range []bool{false, true} {
 		provider := &designReviewProvider{stubProvider: stubProvider{diff: `diff --git a/store/read.go b/store/read.go
 --- a/store/read.go
@@ -125,8 +131,13 @@ func TestEngineeringReviewExecutesWholePackageAndRetainsBudgetOmissions(t *testi
 			t.Fatalf("engineering execution unavailable: report=%+v err=%v", report, err)
 		}
 		tasks := report.DesignExecution.Design.Tasks
-		if len(tasks) != 1 || tasks[0].ID != "package:example.com/app/store" || tasks[0].SourceDigest == "" || len(report.Findings) != 0 || len(report.DesignExecution.Design.Errors) != 0 {
+		if len(tasks) != 3 || tasks[0].ID != "file:store/read.go" || tasks[0].SourceDigest == "" || len(report.Findings) != 0 || len(report.DesignExecution.Design.Errors) != 0 {
 			t.Fatalf("package execution lost its declared evidence: %+v", report)
+		}
+		for _, task := range tasks {
+			if task.SourceDigest == "" || (limited && len(task.Omitted) == 0) || (!limited && !slices.Contains(report.AssessedDesignTasks, task.ID)) {
+				t.Fatalf("task lost binding or disposition: %+v", task)
+			}
 		}
 		if limited {
 			if model.callCount() != 0 || len(report.Plan.Batches) != 0 || len(report.AssessedDesignTasks) != 0 || len(tasks[0].Omitted) == 0 || report.Budget == nil {
@@ -134,7 +145,7 @@ func TestEngineeringReviewExecutesWholePackageAndRetainsBudgetOmissions(t *testi
 			}
 			continue
 		}
-		if model.callCount() != 1 || report.Plan.Files() != 1 || len(report.Plan.Batches) != 1 || len(report.AssessedDesignTasks) != 1 || report.AssessedDesignTasks[0] != tasks[0].ID {
+		if model.callCount() != 2 || report.Plan.Files() != 1 || len(report.Plan.Batches) != 2 || len(report.AssessedDesignTasks) != len(tasks) {
 			t.Fatalf("empty result lacks actual task execution: %+v; calls=%d", report, model.callCount())
 		}
 		prompt := strings.Join(model.prompts(), "\n")
@@ -225,17 +236,19 @@ func TestEngineeringReviewValidatesContextOnlyClaimAndPublishesSummary(t *testin
 			"service/service.go": "package service\nimport _ \"example.com/app/store\"\n",
 		}}}
 		finding := Finding{Path: "service/service.go", Line: 2, Class: "maintainability", Severity: "warning", Title: "Caller relies on implicit state", Rationale: "The changed read now mutates shared state."}
-		model := &scriptedLLM{byPrompt: map[string]string{
-			"Review the following changes": mustJSON(t, Result{Findings: []Finding{finding}}),
-			"triaging findings":            mustJSON(t, TriageResult{Verdicts: verdictsFor([]Finding{finding})}),
-			validationNeedle:               `{"verdict":"confirmed","reason":"the caller observes the shared mutation"}`,
+		model := &scriptedLLM{fallback: `{"findings":[]}`, byPrompt: map[string]string{
+			`"id":"file:service/service.go"`: mustJSON(t, Result{Findings: []Finding{finding}}),
 		}}
+		triageModel := &scriptedLLM{fallback: mustJSON(t, TriageResult{Verdicts: verdictsFor([]Finding{finding})})}
+		expert := &scriptedLLM{fallback: `{"verdict":"confirmed","reason":"the caller observes the shared mutation"}`}
 		engine := newEngine(t, model, provider, func(cfg *config.Config) {
 			cfg.Practices.Profile = "engineering"
 			cfg.Validation.Enabled = true
 			cfg.Validation.Classes = nil
 			cfg.Persona.Nitpick = config.NitpickNormal
 		})
+		engine.Roles.Triage = llm.NewClientForTest(triageModel, engine.Config.Models.Default)
+		engine.Roles.Validate = llm.NewClientForTest(expert, engine.Config.Models.Default)
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		if cancelTriage {
@@ -245,19 +258,19 @@ func TestEngineeringReviewValidatesContextOnlyClaimAndPublishesSummary(t *testin
 		}
 		report, err := engine.Review(ctx, vcs.Ref{})
 		if cancelTriage {
-			if !errors.Is(err, context.Canceled) || report == nil || len(report.Findings) != 1 || report.Findings[0].Title != finding.Title || len(report.AssessedDesignTasks) != 1 || len(report.Stages) != 1 || report.Stages[0].Stage != "triage" || provider.published != nil {
+			if !errors.Is(err, context.Canceled) || report == nil || len(report.Findings) != 1 || report.Findings[0].Title != finding.Title || len(report.AssessedDesignTasks) != len(report.DesignExecution.Design.Tasks) || len(report.Stages) != 1 || report.Stages[0].Stage != "triage" || provider.published != nil {
 				t.Fatalf("triage cancellation lost evidence or published: report=%+v err=%v", report, err)
 			}
 			continue
 		}
-		if err != nil || len(report.Findings) != 1 || !report.Findings[0].SummaryOnly || len(report.Stages) != 0 || model.callCount() != 3 {
+		if err != nil || len(report.Findings) != 1 || !report.Findings[0].SummaryOnly || len(report.Stages) != 0 || model.callCount() != 2 || triageModel.callCount() != 1 || expert.callCount() != 1 {
 			t.Fatalf("context claim did not traverse all stages: report=%+v err=%v calls=%d", report, err, model.callCount())
 		}
 		if provider.published == nil || len(provider.published.Comments) != 0 || !strings.Contains(provider.published.Summary, finding.Title) {
 			t.Fatalf("context claim did not reach summary: %+v", provider.published)
 		}
 		var expertPrompt string
-		for _, request := range model.prompts() {
+		for _, request := range expert.prompts() {
 			if strings.Contains(request, validationNeedle) {
 				expertPrompt = request
 			}
@@ -275,9 +288,10 @@ func TestEngineeringCancellationRetainsCompletedTaskEvidence(t *testing.T) {
 	defer cancel()
 	model := &cancelAfterFirstDesign{scriptedLLM: scriptedLLM{fallback: `{"findings":[]}`}, cancel: cancel}
 	tree := vcs.NewSnapshot(vcs.NewLocal(t.TempDir(), nil), map[string][]byte{
-		"go.mod":      []byte("module example.com/app\n"),
-		"first/a.go":  []byte("package first\n"),
-		"second/b.go": []byte("package second\n"),
+		"first/a.py":  []byte("value = 1\n"),
+		"first/b.py":  []byte("value = 2\n"),
+		"second/a.py": []byte("value = 3\n"),
+		"second/b.py": []byte("value = 4\n"),
 	})
 	engine := newEngine(t, &model.scriptedLLM, tree, func(cfg *config.Config) {
 		cfg.Practices.Profile = "engineering"
@@ -286,20 +300,35 @@ func TestEngineeringCancellationRetainsCompletedTaskEvidence(t *testing.T) {
 	})
 	engine.Roles.Review = llm.NewClientForTest(model, engine.Config.Models.Default)
 	report, err := engine.Review(ctx, vcs.Ref{})
-	if !errors.Is(err, context.Canceled) || report == nil || report.DesignExecution == nil || len(report.AssessedDesignTasks) != 1 || len(report.Incomplete) == 0 || len(report.Stages) == 0 {
+	if !errors.Is(err, context.Canceled) || report == nil || report.DesignExecution == nil || len(report.AssessedDesignTasks) == 0 || len(report.Incomplete) == 0 || len(report.Stages) == 0 {
 		t.Fatalf("cancellation lost partial execution: report=%+v err=%v", report, err)
 	}
 	if len(report.DesignExecution.Design.Tasks) < 2 || len(report.Plan.Batches) < 2 || model.callCount() != 1 {
 		t.Fatalf("cancellation invented or removed intended work: %+v calls=%d", report, model.callCount())
 	}
-	found := false
-	for _, task := range report.DesignExecution.Design.Tasks {
-		if task.ID == report.AssessedDesignTasks[0] {
-			found = task.SourceDigest != "" && len(task.Omitted) == 0
+	completed := slices.Clone(report.AssessedDesignTasks)
+	slices.Sort(completed)
+	matchingRequests := 0
+	for _, batch := range report.Plan.Batches {
+		ids := slices.Clone(batch.DesignTaskIDs())
+		slices.Sort(ids)
+		if slices.Equal(ids, completed) {
+			matchingRequests++
 		}
 	}
-	if !found {
-		t.Fatal("completed task evidence no longer matches the intended plan")
+	if matchingRequests != 1 {
+		t.Fatalf("completion does not match exactly one successful request: %v", completed)
+	}
+	for _, id := range completed {
+		found := false
+		for _, task := range report.DesignExecution.Design.Tasks {
+			if task.ID == id {
+				found = task.SourceDigest != "" && len(task.Omitted) == 0
+			}
+		}
+		if !found {
+			t.Fatalf("completed task %q lacks intended evidence", id)
+		}
 	}
 }
 
@@ -375,5 +404,37 @@ func TestSharedDesignRequestCompletesEveryTaskOnlyAfterSuccess(t *testing.T) {
 				t.Fatalf("shared completion lost tasks or repeated requests: %v %v %v", err, missing, e.assessedDesignTasks)
 			}
 		})
+	}
+}
+
+func TestTreeAssemblySeparatesRoutineExclusionsFromUnreadableSource(t *testing.T) {
+	cfg := config.Defaults()
+	tree := vcs.NewSnapshot(vcs.NewLocal(t.TempDir(), nil), map[string][]byte{"go.mod": []byte("module example.com/app\n"), "app.go": []byte("package app\nfunc Read(){}\n")})
+	tree.Skipped = []vcs.TreeSkip{{Path: "asset.bin", Reason: "binary"}, {Path: "empty.txt", Reason: "empty"}}
+	e := &Engine{Config: cfg, Provider: tree}
+	files := diff.Files{&diff.File{Path: "app.go", Kind: diff.ChangeModified}}
+	packed := e.assembleDesign(t.Context(), vcs.Ref{Head: vcs.Worktree}, files, bundle.Reserve{})
+	if len(packed.Design.Errors) != 0 || len(packed.Plan.Batches) != 1 || len(packed.Excluded) != 2 {
+		t.Fatalf("routine exclusions became failed scope: %+v", packed)
+	}
+	for _, skip := range tree.Skipped {
+		if !slices.Contains(packed.Excluded, bundle.Skip{Path: skip.Path, Reason: skip.Reason}) {
+			t.Fatalf("exclusion disappeared: %s", skip.Path)
+		}
+	}
+	tree.Skipped = append(tree.Skipped, vcs.TreeSkip{Path: "unreadable.go", Reason: "unreadable: permission denied"})
+	incomplete := e.assembleDesign(t.Context(), vcs.Ref{Head: vcs.Worktree}, files, bundle.Reserve{})
+	if len(incomplete.Design.Errors) == 0 || len(incomplete.Excluded) != 2 {
+		t.Fatalf("unreadable source became routine: %+v", incomplete)
+	}
+}
+
+func TestEmptyModuleManifestCannotBecomeRoutineTreeExclusion(t *testing.T) {
+	cfg := config.Defaults()
+	tree := vcs.NewSnapshot(vcs.NewLocal(t.TempDir(), nil), map[string][]byte{"go.mod": []byte("module example.com/outer\n"), "nested/a.go": []byte("package inner\nfunc Read(){}\n")})
+	tree.Skipped = []vcs.TreeSkip{{Path: "nested/go.mod", Reason: "empty"}}
+	packed := (&Engine{Config: cfg, Provider: tree}).assembleDesign(t.Context(), vcs.Ref{Head: vcs.Worktree}, diff.Files{&diff.File{Path: "nested/a.go", Kind: diff.ChangeModified}}, bundle.Reserve{})
+	if len(packed.Design.Errors) == 0 || len(packed.Excluded) != 0 || len(packed.Design.Tasks) != 1 || packed.Design.Tasks[0].ID != "source:nested/a.go" {
+		t.Fatalf("empty manifest invented a parent package: %+v", packed)
 	}
 }
