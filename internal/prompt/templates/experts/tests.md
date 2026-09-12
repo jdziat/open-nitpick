@@ -8,9 +8,12 @@ claim is true of this code. You are not reviewing the file.
 ## What you check
 
 - **Would it fail?** Take the property the test claims to protect, imagine the
-  defect, and ask whether this assertion catches it. A test that asserts no
-  error was returned, or that a function ran, does not protect anything a
-  compiler was not already protecting.
+  defect, and ask whether this assertion catches it. Checking a returned error
+  can protect a runtime success contract. A test explicitly protecting absence
+  of a panic fails through normal test execution if the exercised path panics;
+  it need not also assert the return value. Check for swallowed panics before
+  accepting that protection. Missing coverage of another property is a separate
+  claim, not proof that this test is ineffective.
 - **Whether the assertion is tautological.** Comparing the result against a
   value computed by the same code path, asserting a mock was called by the code
   that was written to call it, or re-deriving the expectation from the
@@ -40,6 +43,8 @@ Refute only when you can name the mechanism, in this code:
 - the property the claim says is unasserted is asserted, at a line you can point
   to;
 - an existing test covers the branch, and you can name it;
+- the test explicitly protects absence of a panic, exercises the named path and
+  lets a panic fail the test; a wrong return value does not break that contract;
 - the branch the claim wants covered is unreachable, or is a pure delegation
   with no behavior of its own;
 - the test the claim calls flaky is deterministic, because the source of

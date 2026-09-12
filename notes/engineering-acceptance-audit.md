@@ -2,9 +2,12 @@
 
 Decision: needs revision. This is a checkpoint against
 [the coverage contract](best-practice-coverage.md), not CTO acceptance.
-Execution candidate: `52f402a`, draft PR #119. Live evaluation uses planner 4 and
-prompt `engineering-4`; production code matches the candidate, while later
-cancellation-test and documentation changes do not affect that binary.
+Execution candidate: `52f402a`, draft PR #119. The retired evaluation used planner 4 and prompt `engineering-4` with Kimi-K3
+review and GLM-5.3-Flash triage. The user changed model roles after its first full
+cycle; 15 completed reports are retained in
+`evidence/design-v4-retired-trials.json`, including one report recovered after
+the controller stopped. Its process exit and exact duration were not collected.
+These are incomplete repeated trials, not acceptance evidence for the new roles.
 
 | Contract area | Current evidence | Remaining acceptance work |
 | --- | --- | --- |
@@ -45,3 +48,15 @@ The repository still requires only conventions, linters, commits and slop tells
 in `.nitpick.yaml`; CI's engineering-report step uses `-no-model`. Therefore green
 CI does not establish required design/slop model completion or internal adoption.
 Keep the execution PR draft while these acceptance decisions are pending.
+
+## Follow-up from the test control
+
+The intended-good no-panic test received an ineffective-test finding despite its
+explicitly named purpose. The test expert had claimed error checks and running
+code provide no protection beyond compilation, contradicting the slop exclusion.
+Prompt version 5 distinguishes runtime error and no-panic contracts from missing
+value coverage, in both engineering instructions and the test expert. The fixture
+harness now injects a panic and runs only that no-panic test to prove it fails.
+New live trials must use GLM-5.3-Flash review and Qwen3.8-27B triage. Those trials
+change both policy and prompt, so they cannot establish either change's isolated
+effect. Kimi-K3 remains the fix model.

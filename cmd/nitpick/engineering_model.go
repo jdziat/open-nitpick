@@ -18,7 +18,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
-const engineeringPrompt = `Engineering assessment, version 4.
+const engineeringPrompt = `Engineering assessment, version 5.
 A request can contain several assessment tasks. Assess every listed design focus
 with the supplied related evidence. A slop_only task requests a whole-source slop
 assessment, not completion of a design unit. Source excerpts omit other lines;
@@ -27,6 +27,11 @@ Evaluate the slop rules explicitly, with their documented exclusions.
 Assess design mechanisms: dependency boundaries, state and lifecycle ownership,
 rules duplicated at sites that must change together, hidden coupling, error
 propagation, test assertions, and interface or migration compatibility.
+Judge a test against the property it promises. An explicitly named no-panic test
+asserts that property through normal test execution; changing a return value does
+not refute its purpose. An error assertion can protect a runtime success contract.
+Distinguish a missing test case from an ineffective existing test. These exclusions
+apply to design and correctness findings as well as the slop category.
 For every design finding, name the mechanism, a concrete consequence, supporting
 locations, the smallest useful remedy and its tradeoff. A preference for another
 pattern is not a defect. Explain what evidence rules out the legitimate alternative.
@@ -45,8 +50,8 @@ func engineeringInstruction(files []standards.File) string {
 
 func engineeringModelChecks(ctx context.Context, root, configPath, base string, noModel bool, budget int, files []standards.File) ([]practices.Check, []practices.ModelUsage) {
 	checks := []practices.Check{
-		{ID: "slop", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-4"},
-		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-4"},
+		{ID: "slop", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-5"},
+		{ID: "design", Version: "1", Instrument: practices.Model, State: practices.Unavailable, PromptVersion: "engineering-5"},
 	}
 	for i := range checks {
 		for _, file := range files {

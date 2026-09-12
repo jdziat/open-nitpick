@@ -73,6 +73,11 @@ func TestSeparateContractsKeepTheirOwnThresholds(t *testing.T) {
 					}
 					writeMechanism(t, root, "session.go", mutated)
 					runMechanism(t, root, variant == "bad")
+					if variant == "good" {
+						panicking := strings.Replace(string(source), "return now < expires", `panic("seeded panic")`, 1)
+						writeMechanism(t, root, "session.go", panicking)
+						runMechanism(t, root, false, "-run", "^TestSessionCheckDoesNotPanicAtIntegerLimits$")
+					}
 				}
 			})
 		}
@@ -118,9 +123,9 @@ func writeMechanism(t *testing.T, root, name, body string) {
 	}
 }
 
-func runMechanism(t *testing.T, root string, wantPass bool) {
+func runMechanism(t *testing.T, root string, wantPass bool, args ...string) {
 	t.Helper()
-	cmd := exec.CommandContext(t.Context(), "go", "test", "./...")
+	cmd := exec.CommandContext(t.Context(), "go", append([]string{"test", "./..."}, args...)...)
 	cmd.Dir = root
 	output, err := cmd.CombinedOutput()
 	if (err == nil) != wantPass {
