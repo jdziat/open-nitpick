@@ -191,3 +191,17 @@ func TestDesignPackingRecordsCancellationOncePerTarget(t *testing.T) {
 		seen[omission.Target] = true
 	}
 }
+
+func TestDesignPackingPreservesOneSpecificStaleSourceOmission(t *testing.T) {
+	files, inventory := designPlanningFixture(t)
+	design := PlanDesign(t.Context(), inventory, files, []string{"store/read.go"})
+	files[2].Src = []byte("package store\nvar state any\n")
+	packed := PackDesign(t.Context(), config.Defaults(), design, files, nil, bundle.Reserve{})
+	if len(packed.Plan.Batches) != 0 || len(packed.Design.Tasks[0].Omitted) != 1 || len(packed.Plan.Skipped) != 1 {
+		t.Fatalf("stale source lost its single omission: %+v %+v", packed.Design, packed.Plan)
+	}
+	reason := packed.Design.Tasks[0].Omitted[0].Reason
+	if !strings.Contains(reason, "digest does not match") || !strings.Contains(packed.Plan.Skipped[0].Reason, reason) {
+		t.Fatalf("specific stale source reason was replaced: %+v %+v", packed.Design, packed.Plan)
+	}
+}

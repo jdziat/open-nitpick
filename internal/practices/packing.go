@@ -76,7 +76,10 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 			out.Plan.Skipped = append(out.Plan.Skipped, bundle.Skip{Path: task.Source.ID, Reason: fmt.Sprintf("%s: %s", task.ID, err.Error())})
 			continue
 		} else if bound.SourceDigest != task.SourceDigest {
-			task.Omitted = append(task.Omitted, Omission{Target: Target{Kind: UnitTarget, ID: task.ID}, Reason: "planned source digest does not match packing source"})
+			reason := "planned source digest does not match packing source"
+			task.Omitted = append(task.Omitted, Omission{Target: Target{Kind: UnitTarget, ID: task.ID}, Reason: reason})
+			out.Plan.Skipped = append(out.Plan.Skipped, bundle.Skip{Path: task.Source.ID, Reason: fmt.Sprintf("%s: %s", task.ID, reason)})
+			continue
 		}
 		batch := bundle.Batch{DesignTask: task.ID}
 		metadata, _ := json.Marshal(task)
