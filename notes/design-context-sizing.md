@@ -14,7 +14,7 @@ most of the repository into its context.
 
 Keep each primary package's source complete. Select dependency context from the
 exported declarations its source references, and caller context from files that
-actually import the primary package. Include local declaration dependencies and
+import the primary package. Include local declaration dependencies and
 receiver methods so these selections do not strand a helper or lifecycle method
 in an unseen sibling. Blank and dot imports conservatively need the dependency's
 non-test source. Type resolution and dynamic dispatch remain stated limitations.

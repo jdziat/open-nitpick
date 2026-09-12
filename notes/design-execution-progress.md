@@ -80,3 +80,29 @@ The new sizing observation still has 14 of 24 tasks above 120,000 estimated
 source tokens. Evidence and the next planner requirements are in
 [design-context-sizing.md](design-context-sizing.md). No execution PR has been
 pushed; practical interaction planning and full acceptance remain unfinished.
+
+Local Nitpick review of 7cf118f..ce68f8f completed with two informational
+findings (Kimi-K3 review, GLM-5.3-Flash triage). It used an operator config with
+package execution disabled to review the implementation while package sizing
+remains unresolved; this was not an engineering-profile acceptance run.
+The report is in `/tmp/design-span-model-review.log`.
+
+- The claimed lack of span-merge coverage was a false positive:
+  `TestDesignEvidenceRejectsUnseenRangesAfterContextMerge` checks both retained
+  spans and unseen gaps. Removing merged spans fails that test.
+- The whole-file EndLine behavior is intentional: every line cited in a range
+  needs source evidence. Added
+  `TestDesignEvidenceValidatesEveryLineOfWholeFileRanges` for valid ranges,
+  invalid end lines and the single-line default. Replacing end-line validation
+  with start-line validation fails it. EndLine is not offered by the model-facing
+  schema, but the finding type supports range-producing reviewers.
+
+Both follow-up mutations failed their guards, and review race tests passed.
+The full serial race suite and eval-tag vet also passed. Docs and generated
+standards were rebuilt; the tracked Python cache was restored. Deterministic
+slop checks found historical commentary and one filler word in touched files;
+those were shortened or removed, and the recheck reported zero tells. The
+repository standards check passed with zero analyzer observations after copying
+range slices before appending. Commit validation passed for the seven commits
+then on the branch. These checks do not close the remaining sizing, live
+mechanism evaluation, internal adoption or CTO acceptance work.

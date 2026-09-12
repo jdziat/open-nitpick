@@ -87,3 +87,17 @@ func TestDesignEvidenceRejectsUnseenRangesAfterContextMerge(t *testing.T) {
 		t.Fatal("whole-file evidence lost during merge")
 	}
 }
+
+func TestDesignEvidenceValidatesEveryLineOfWholeFileRanges(t *testing.T) {
+	engine := &Engine{Config: config.Defaults()}
+	for _, test := range []struct {
+		start, end int
+		want       bool
+	}{{1, 2, true}, {3, 0, true}, {1, 4, false}, {3, 2, false}, {0, 2, false}} {
+		finding := Finding{Path: "caller.go", Line: test.start, EndLine: test.end, TaskContext: &TaskContext{ID: "whole", Lines: map[string]int{"caller.go": 3}}}
+		kept, _, unpublished := engine.filterTaskAnchors([]Finding{finding}, nil)
+		if (len(kept) == 1) != test.want || (len(unpublished) == 1) == test.want {
+			t.Fatalf("range %+v: kept=%v unpublished=%v", test, kept, unpublished)
+		}
+	}
+}
