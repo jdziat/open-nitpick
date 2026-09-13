@@ -5,9 +5,8 @@
 #
 #   nitpick review -config .nitpick.openrouter.yaml
 #
-# or copy it over .nitpick.yaml. Everything below the models block is kept
-# identical to .nitpick.yaml on purpose; a change to the policy belongs in
-# both files.
+# or copy it over .nitpick.yaml. Review policy stays aligned with the shipped
+# defaults; model routing and scan performance may differ by endpoint.
 
 models:
   # The built-in endpoint uses OPENROUTER_API_KEY; credentials stay local.
