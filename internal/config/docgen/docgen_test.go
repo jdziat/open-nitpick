@@ -1,6 +1,8 @@
 package docgen_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -59,5 +61,31 @@ func TestRowsNameTheValuesTheyAccept(t *testing.T) {
 		if strings.Contains(rows[path], "One of:") {
 			t.Errorf("%s repeats values its sentence already names: %q", path, rows[path])
 		}
+	}
+}
+
+func TestReadDocsIncludesBuildVariantsAndSkipsTestFiles(t *testing.T) {
+	root := t.TempDir()
+	for name, source := range map[string]string{
+		"variant.go":     "//go:build never_enabled\n\npackage sample\ntype Config struct {\n// Value selects a value.\nValue string\n}\n",
+		"broken_test.go": "invalid Go",
+		"notes.txt":      "invalid Go",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(source), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	docs, _, err := docgen.ReadDocs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(docs["Config.Value"], "Value selects a value.") {
+		t.Fatalf("missing field documentation: %v", docs)
+	}
+	if err := os.WriteFile(filepath.Join(root, "broken.go"), []byte("invalid Go"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := docgen.ReadDocs(root); err == nil {
+		t.Fatal("malformed source returned a successful scan")
 	}
 }

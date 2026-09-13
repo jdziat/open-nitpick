@@ -18,7 +18,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
+	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"sort"
@@ -58,13 +59,22 @@ type Enums map[string][]string
 // which is how the configuration is written today.
 func ReadDocs(dir string) (Docs, Enums, error) {
 	set := token.NewFileSet()
-	// Documentation generation needs syntax and comments only; type loading is
-	// unnecessary overhead for this source scan.
-	pkgs, err := parser.ParseDir(set, dir, func(fi fs.FileInfo) bool {
-		return !strings.HasSuffix(fi.Name(), "_test.go")
-	}, parser.ParseComments)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, nil, fmt.Errorf("docgen: parse %s: %w", dir, err)
+		return nil, nil, fmt.Errorf("docgen: read %s: %w", dir, err)
+	}
+	var files []*ast.File
+	// Include all build variants: documentation describes the source schema.
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(set, filepath.Join(dir, name), nil, parser.ParseComments)
+		if err != nil {
+			return nil, nil, fmt.Errorf("docgen: parse %s: %w", name, err)
+		}
+		files = append(files, file)
 	}
 
 	out := Docs{}
@@ -73,48 +83,46 @@ func ReadDocs(dir string) (Docs, Enums, error) {
 	// file and are not, for Severity.
 	named := map[string]bool{}
 	values := Enums{}
-	for _, pkg := range pkgs {
-		for _, file := range pkg.Files {
-			ast.Inspect(file, func(n ast.Node) bool {
-				switch n := n.(type) {
-				case *ast.TypeSpec:
-					if id, ok := n.Type.(*ast.Ident); ok && id.Name == "string" {
-						named[n.Name.Name] = true
-						return true
-					}
-					st, ok := n.Type.(*ast.StructType)
-					if !ok {
-						return true
-					}
-					for _, f := range st.Fields.List {
-						text := f.Doc.Text()
-						if text == "" {
-							text = f.Comment.Text()
-						}
-						for _, name := range f.Names {
-							if s := firstSentence(text); s != "" {
-								out[n.Name.Name+"."+name.Name] = s
-							}
-						}
-					}
-				case *ast.ValueSpec:
-					id, ok := n.Type.(*ast.Ident)
-					if !ok || len(n.Values) != 1 {
-						return true
-					}
-					lit, ok := n.Values[0].(*ast.BasicLit)
-					if !ok || lit.Kind != token.STRING {
-						return true
-					}
-					v, err := strconv.Unquote(lit.Value)
-					if err != nil || v == "" {
-						return true
-					}
-					values[id.Name] = appendOnce(values[id.Name], v)
+	for _, file := range files {
+		ast.Inspect(file, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.TypeSpec:
+				if id, ok := n.Type.(*ast.Ident); ok && id.Name == "string" {
+					named[n.Name.Name] = true
+					return true
 				}
-				return true
-			})
-		}
+				st, ok := n.Type.(*ast.StructType)
+				if !ok {
+					return true
+				}
+				for _, f := range st.Fields.List {
+					text := f.Doc.Text()
+					if text == "" {
+						text = f.Comment.Text()
+					}
+					for _, name := range f.Names {
+						if s := firstSentence(text); s != "" {
+							out[n.Name.Name+"."+name.Name] = s
+						}
+					}
+				}
+			case *ast.ValueSpec:
+				id, ok := n.Type.(*ast.Ident)
+				if !ok || len(n.Values) != 1 {
+					return true
+				}
+				lit, ok := n.Values[0].(*ast.BasicLit)
+				if !ok || lit.Kind != token.STRING {
+					return true
+				}
+				v, err := strconv.Unquote(lit.Value)
+				if err != nil || v == "" {
+					return true
+				}
+				values[id.Name] = appendOnce(values[id.Name], v)
+			}
+			return true
+		})
 	}
 	for name := range values {
 		if !named[name] {

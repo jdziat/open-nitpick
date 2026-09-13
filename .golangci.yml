@@ -28,10 +28,6 @@ linters:
       - path: _test\.go
         linters:
           - errcheck
-      - path: (cmd/nitpick/knowledge_wiring_test\.go|internal/config/docgen/docgen\.go)
-        text: "go/parser.ParseDir has been deprecated"
-        linters:
-          - staticcheck
 
 formatters:
   enable:
