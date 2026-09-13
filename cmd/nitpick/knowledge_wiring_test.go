@@ -27,7 +27,7 @@ func TestEveryEngineWiresRetrieval(t *testing.T) {
 	fset := token.NewFileSet()
 	// This structural guard intentionally scans syntax without type checking;
 	// go/packages would add dependency loading without improving this check.
-	pkgs, err := parser.ParseDir(fset, ".", nil, 0) //nolint:staticcheck // syntax-only guard
+	pkgs, err := parser.ParseDir(fset, ".", nil, 0)
 	if err != nil {
 		t.Fatalf("parse the command package: %v", err)
 	}

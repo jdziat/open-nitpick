@@ -60,7 +60,7 @@ func ReadDocs(dir string) (Docs, Enums, error) {
 	set := token.NewFileSet()
 	// Documentation generation needs syntax and comments only; type loading is
 	// unnecessary overhead for this source scan.
-	pkgs, err := parser.ParseDir(set, dir, func(fi fs.FileInfo) bool { //nolint:staticcheck // syntax-only scan
+	pkgs, err := parser.ParseDir(set, dir, func(fi fs.FileInfo) bool {
 		return !strings.HasSuffix(fi.Name(), "_test.go")
 	}, parser.ParseComments)
 	if err != nil {

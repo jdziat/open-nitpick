@@ -30,3 +30,9 @@ linters:
     # decides whether that file is analyzed -- and the file under review is
     # written by the change under review.
     generated: disable
+    rules:
+      # These two syntax-only scans intentionally use ParseDir; replacing it
+      # with go/packages would load and type-check the tree for no benefit.
+      - linters: [staticcheck]
+        text: "go/parser.ParseDir has been deprecated"
+        path: "(cmd/nitpick/knowledge_wiring_test.go|internal/config/docgen/docgen.go)"
