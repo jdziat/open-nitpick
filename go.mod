@@ -1,6 +1,6 @@
 module github.com/jdziat/open-nitpick
 
-go 1.25.5
+go 1.26.0
 
 require (
 	github.com/alecthomas/chroma/v2 v2.27.0
@@ -9,7 +9,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/nocturnium/llm-go-sdk/v6 v6.7.0
 	github.com/zalando/go-keyring v0.2.8
-	golang.org/x/mod v0.31.0
+	golang.org/x/mod v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
