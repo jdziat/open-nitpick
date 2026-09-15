@@ -13,10 +13,10 @@
 
   // ---- zoom and pan --------------------------------------------------------
 
-  var MIN_SCALE = 0.15, MAX_SCALE = 4;
+  var MIN_SCALE = 0.1, MAX_SCALE = 4;
   // A node label is drawn at 12 units; below about 11 CSS pixels it stops
   // being readable, which sets the floor the default view may not go under.
-  var MIN_READABLE = 0.92;
+  var MIN_READABLE = 0.70;
 
   function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
@@ -59,11 +59,15 @@
   View.prototype.fit = function () {
     var f = this.fitted();
     var readable = MIN_READABLE / f;
-    this.scale = Math.max(1, Math.min(readable, MAX_SCALE));
-    if (this.scale === 1) { this.x = 0; this.y = 0; this.apply(); return; }
-    this.centre();
-    // Anchor to the top-left of the drawing so the first rank is on screen.
-    this.y = 0;
+    // If the graph fits in the viewport at or above the readability floor, fill it.
+    // Otherwise zoom to the readable floor and let the user pan.
+    if (readable >= 1) {
+      // Graph fits: use scale=1 so the browser's own viewBox scaling centres it.
+      this.scale = 1; this.x = 0; this.y = 0; this.apply(); return;
+    }
+    this.scale = Math.max(MIN_READABLE / f, MIN_SCALE);
+    // Anchor to the left margin so the first column is always visible.
+    this.x = 0; this.y = 0;
     this.apply();
   };
 
@@ -344,7 +348,7 @@
     panel.appendChild(chips);
 
     var where = document.createElement("p");
-    where.className = "meta mono";
+    where.className = "panel-path";
     if (node.link) {
       var a = document.createElement("a");
       a.href = node.link;
@@ -358,7 +362,7 @@
     panel.appendChild(where);
 
     if (node.snippet) {
-      panel.appendChild(text("h3", "Source"));
+      panel.appendChild(text("span", "Source", "panel-section-label"));
       var codeWrap = document.createElement("div");
       codeWrap.className = "code-wrap";
       var pre = document.createElement("pre");
@@ -476,7 +480,7 @@
 
   function appendRefs(panel, title, refs) {
     if (!refs || !refs.length) { return; }
-    panel.appendChild(text("h3", title + " (" + refs.length + ")"));
+    panel.appendChild(text("span", title + " (" + refs.length + ")", "panel-section-label"));
     var list = document.createElement("ul");
     list.className = "refs";
     refs.forEach(function (ref) {
