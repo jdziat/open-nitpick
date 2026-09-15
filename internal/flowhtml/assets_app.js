@@ -434,7 +434,13 @@
     // Scroll active item into view within the nav list
     if (id) {
       var activeBtn = listEl.querySelector("button[data-nav-id=\"" + id + "\"]");
-      if (activeBtn) { activeBtn.scrollIntoView({ block: "nearest" }); }
+      if (activeBtn) {
+        // Avoid page-level scroll when the panel is stacked (non-sticky) at narrow widths.
+        var panel = document.getElementById("panel");
+        if (panel && getComputedStyle(panel).position === "sticky") {
+          activeBtn.scrollIntoView({ block: "nearest" });
+        }
+      }
     }
   }
 
@@ -607,7 +613,7 @@
 
   // ---- panel resize --------------------------------------------------------
 
-  var PANEL_MIN = 420, PANEL_MAX = 1200, PANEL_KEY = "nitpick-flow-panel-v3";
+  var PANEL_MIN = 320, PANEL_MAX = 1200, PANEL_KEY = "nitpick-flow-panel-v4";
 
   function wirePanelResize() {
     var handle = $("#panel-resize");
@@ -657,7 +663,7 @@
     }
     handle.addEventListener("pointerup", endDrag);
     handle.addEventListener("pointercancel", endDrag);
-    handle.addEventListener("dblclick", function () { setWidth(580); });
+    handle.addEventListener("dblclick", function () { setWidth(560); });
     handle.addEventListener("keydown", function (event) {
       var current = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--panel-width")) || 420;
       var step = event.shiftKey ? 80 : 24;
@@ -665,7 +671,7 @@
       else if (event.key === "ArrowRight") { event.preventDefault(); setWidth(current - step); }
       else if (event.key === "Home") { event.preventDefault(); setWidth(PANEL_MIN); }
       else if (event.key === "End") { event.preventDefault(); setWidth(PANEL_MAX); }
-      else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setWidth(580); }
+      else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setWidth(560); }
     });
     window.addEventListener("resize", function () { setWidth(clampWidth(parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--panel-width")) || 420)); });
   }
