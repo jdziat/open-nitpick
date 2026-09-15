@@ -16,7 +16,10 @@
   var MIN_SCALE = 0.1, MAX_SCALE = 4;
   // A node label is drawn at 12 units; below about 11 CSS pixels it stops
   // being readable, which sets the floor the default view may not go under.
-  var MIN_READABLE = 0.70;
+  // Setting this to 0.80 means any graph whose fitted scale is 0.80+ uses
+  // scale=1 (the browser centres it naturally); a graph that requires more
+  // zoom-out than that sits at the readable floor and lets the user pan.
+  var MIN_READABLE = 0.80;
 
   function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
