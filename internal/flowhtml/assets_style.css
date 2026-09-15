@@ -199,39 +199,25 @@ footer{padding:12px 20px;border-top:1px solid var(--rule);color:var(--dim2);font
 #graph-tip{position:fixed;z-index:50;pointer-events:none;padding:5px 10px;background:var(--panel2);border:1px solid var(--rule);border-radius:var(--radius-sm);font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fg);max-width:340px;word-break:break-all;white-space:normal;box-shadow:var(--shadow);opacity:0;transition:opacity .1s;line-height:1.4}
 #graph-tip.visible{opacity:1}
 
-.flow-tree-wrap{display:flex;flex-direction:column;gap:12px}
-.tree-header h2{margin:0}
-.tree-header .hint{margin:4px 0 0}
-#flow-tree{display:flex;flex-direction:column;font-size:13px;user-select:none}
-.tree-node{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:var(--radius-sm);cursor:pointer;line-height:1.35;transition:background .1s;min-height:32px}
-.tree-node:hover{background:var(--panel2)}
-.tree-node.selected{background:var(--accent-bg);box-shadow:inset 2px 0 0 var(--accent)}
-.tree-node .chevron{width:16px;height:16px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:var(--dim);transition:transform .12s;border-radius:3px}
-.tree-node .chevron:hover{background:var(--rule);color:var(--fg)}
-.tree-node .chevron.leaf{visibility:hidden}
-.tree-node .chevron.expanded{transform:rotate(90deg)}
-.tree-node .tree-label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tree-node .tree-badge{font-size:9px;font-weight:600;padding:1px 6px;border-radius:999px;border:1px solid;flex-shrink:0;text-transform:uppercase;letter-spacing:.03em}
-.tree-node .tree-badge.added{color:var(--add);border-color:var(--add);background:var(--ok-bg)}
-.tree-node .tree-badge.modified{color:var(--mod);border-color:var(--mod);background:var(--warn-bg)}
-.tree-node .tree-badge.removed{color:var(--rem);border-color:var(--rem);background:var(--bad-bg)}
-.tree-node .tree-badge.unchanged{color:var(--dim);border-color:var(--rule);background:var(--panel2)}
-.tree-node .tree-depth{font-size:10px;color:var(--dim2);flex-shrink:0;font-variant-numeric:tabular-nums}
-.tree-children{margin-left:22px;border-left:1px solid var(--rule2);padding-left:8px}
-.tree-children.collapsed{display:none}
-.tree-empty{color:var(--dim);font-style:italic;padding:12px 8px;font-size:13px}
+/* Change review list: one card per changed declaration, with inline source and risk flags */
+.review-list{display:flex;flex-direction:column;gap:12px}
+.review-card{border:1px solid var(--rule);border-radius:var(--radius);background:var(--panel);overflow:hidden}
+.review-card.state-removed{opacity:.75}
+.review-head{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel2);border-bottom:1px solid var(--rule);flex-wrap:wrap}
+.review-head .rv-name{font:600 13px ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
+.review-head .rv-path{color:var(--dim);font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-left:auto;word-break:break-all}
+.review-body{padding:10px 14px}
+.risk-flag{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);font-size:12px;line-height:1.45;margin:0 0 8px}
+.risk-flag.warn{background:var(--warn-bg);border-left:3px solid var(--warn);color:var(--fg)}
+.risk-flag.info{background:var(--accent-bg);border-left:3px solid var(--accent);color:var(--fg)}
+.risk-flag .risk-icon{flex-shrink:0;font-weight:700}
+.risk-flag .risk-body{flex:1;min-width:0}
+.risk-flag .risk-body button{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0;text-align:left}
+.risk-flag .risk-body button:hover{text-decoration:underline}
+.risk-none{color:var(--dim);font-size:11px;font-style:italic;margin:0 0 8px}
+.rv-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--dim2);margin:12px 0 4px;display:block}
+.review-body .code-wrap{margin:4px 0 0}
 
-/* Neighbourhood mini-graph */
-.tree-neighbourhood{border:1px solid var(--rule);border-radius:var(--radius);background:var(--panel);padding:12px;display:none}
-.tree-neighbourhood.has-selection{display:block}
-.tree-neighbourhood h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
-.tree-neighbourhood .nb-row{display:flex;align-items:center;gap:8px;margin:6px 0}
-.tree-neighbourhood .nb-label{font-size:11px;color:var(--dim);flex-shrink:0;min-width:60px;text-transform:uppercase;letter-spacing:.05em}
-.tree-neighbourhood .nb-items{display:flex;flex-wrap:wrap;gap:4px}
-.tree-neighbourhood .nb-item{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--rule);background:var(--panel2);color:var(--fg);cursor:pointer;transition:border-color .1s}
-.tree-neighbourhood .nb-item:hover{border-color:var(--accent);color:var(--accent)}
-.tree-neighbourhood .nb-item.current{border-color:var(--accent);background:var(--accent-bg);color:var(--accent);font-weight:600}
-.tree-neighbourhood .nb-empty{font-size:11px;color:var(--dim2);font-style:italic}
 
 .diff-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px 20px;border-bottom:1px solid var(--rule2);background:var(--panel2);font-size:12px}
 .diff-stat{display:flex;gap:6px;align-items:center;flex-wrap:wrap}

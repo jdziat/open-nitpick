@@ -83,6 +83,7 @@ type viewRef struct {
 	Label      string `json:"label"`
 	Kind       string `json:"kind"`
 	Resolution string `json:"resolution,omitempty"`
+	Changed    bool   `json:"changed,omitempty"`
 }
 
 func viewNodes(doc document) map[string]viewNode {
@@ -100,8 +101,8 @@ func viewNodes(doc document) map[string]viewNode {
 			Path:     node.SourcePath,
 			Line:     node.SourceLine,
 			Link:     node.Link,
-			Callers:  refs(node.Callers),
-			Callees:  refs(node.Callees),
+			Callers:  refs(node.Callers, changedByID(doc)),
+			Callees:  refs(node.Callees, changedByID(doc)),
 		}
 		if node.Snippet != nil {
 			entry.Snippet = snippetHTML(*node.Snippet)
@@ -111,13 +112,26 @@ func viewNodes(doc document) map[string]viewNode {
 	return out
 }
 
-func refs(in []docRef) []viewRef {
+func refs(in []docRef, changed map[string]bool) []viewRef {
 	if len(in) == 0 {
 		return nil
 	}
 	out := make([]viewRef, 0, len(in))
 	for _, ref := range in {
-		out = append(out, viewRef{ID: ref.ID, Label: ref.Label, Kind: ref.Kind, Resolution: ref.Resolution})
+		out = append(out, viewRef{ID: ref.ID, Label: ref.Label, Kind: ref.Kind, Resolution: ref.Resolution, Changed: changed[ref.ID]})
+	}
+	return out
+}
+
+// changedByID indexes which nodes the change touched, so a ref can say whether
+// its target was also modified. A caller outside the change is the reviewer's
+// risk signal: it runs against code this PR altered and was not itself updated.
+func changedByID(doc document) map[string]bool {
+	out := make(map[string]bool, len(doc.Nodes))
+	for _, node := range doc.Nodes {
+		if node.Changed {
+			out[node.ID] = true
+		}
 	}
 	return out
 }

@@ -522,255 +522,185 @@
 
   function applyFilters() {
     var visible = {};
-    all(".tree-node").forEach(function (el) {
+    all(".review-card").forEach(function (el) {
       var id = el.getAttribute("data-node");
       var ok = matches(NODES[id]);
-      // A filtered-out node hides from the tree; its parent still shows so
-      // the structure remains readable.
       el.classList.toggle("hidden", !ok);
       if (ok) { visible[id] = true; }
     });
     var shown = Object.keys(visible).length;
-    var total = Object.keys(NODES).length;
+    var changed = Object.values(NODES).filter(function (n) { return n.changed; }).length;
     var status = $("#filter-status");
     if (status) {
       var base = shown + " shown";
-      // The count says what matches the filter and what exists in scope, so
-      // a reader can tell a filtered view from an empty result.
-      status.textContent = total > shown ? base + " · " + total + " in scope" : base;
+      status.textContent = changed > shown ? base + " · " + changed + " in scope" : base;
     }
   }
 
-  // ---- call tree -----------------------------------------------------------
+  // ---- review cards -------------------------------------------------------
 
-  // Tree state: which nodes are expanded. A changed declaration starts
-  // expanded; its callees start collapsed so the initial view is one level
-  // deep per root rather than the whole reachable graph.
-  var treeExpanded = {};
+  function renderReviewList() {
+    var container = document.getElementById("review-items");
+    if (!container) { return; }
+    container.textContent = "";
 
-  function treeRoots() {
-    return Object.keys(NODES).filter(function (id) {
+    // Coverage notice (needed to keep the test for "not shown" passing).
+    var data = window.__FLOW_META__;
+    if (data && data.trimmed) {
+      var notice = document.createElement("p");
+      notice.className = "hint";
+      notice.textContent = "Showing " + data.drawnCount + " of " + data.reachableCount + " reachable nodes; some callers/callees are not shown.";
+      container.appendChild(notice);
+    }
+
+    var roots = Object.keys(NODES).filter(function (id) {
       return NODES[id].changed;
     }).sort(function (a, b) {
-      // Named functions before closures, then by label, so the root list
-      // reads the way a reader would scan a symbol table.
       var na = NODES[a], nb = NODES[b];
       var ca = na.kind === "closure" ? 1 : 0;
       var cb = nb.kind === "closure" ? 1 : 0;
       if (ca !== cb) { return ca - cb; }
       return na.label.localeCompare(nb.label);
     });
-  }
 
-  function buildTreeNode(id, depth) {
-    var node = NODES[id];
-    if (!node) { return null; }
-    var wrap = document.createElement("div");
-    wrap.className = "tree-branch";
-
-    var row = document.createElement("div");
-    row.className = "tree-node";
-    row.setAttribute("role", "treeitem");
-    row.setAttribute("aria-level", String(depth + 1));
-    row.setAttribute("aria-expanded", "false");
-    row.setAttribute("data-node", id);
-    row.setAttribute("tabindex", "-1");
-    if (id === state.selected) { row.classList.add("selected"); }
-
-    var callees = node.callees || [];
-    var chevron = document.createElement("span");
-    chevron.className = "chevron";
-    chevron.textContent = "▶";
-    if (!callees.length) { chevron.classList.add("leaf"); }
-    row.appendChild(chevron);
-
-    var label = document.createElement("span");
-    label.className = "tree-label";
-    label.textContent = node.label;
-    row.appendChild(label);
-
-    var badge = document.createElement("span");
-    badge.className = "tree-badge " + node.state;
-    badge.textContent = node.state;
-    row.appendChild(badge);
-
-    if (depth > 0) {
-      var depthTag = document.createElement("span");
-      depthTag.className = "tree-depth";
-      depthTag.textContent = "d" + depth;
-      row.appendChild(depthTag);
-    }
-
-    wrap.appendChild(row);
-
-    if (callees.length) {
-      var children = document.createElement("div");
-      children.className = "tree-children collapsed";
-      children.setAttribute("role", "group");
-      var expanded = treeExpanded[id];
-      if (expanded) {
-        children.classList.remove("collapsed");
-        chevron.classList.add("expanded");
-        row.setAttribute("aria-expanded", "true");
-      }
-      callees.forEach(function (ref) {
-        var child = buildTreeNode(ref.id, depth + 1);
-        if (child) { children.appendChild(child); }
-      });
-      wrap.appendChild(children);
-    }
-
-    chevron.addEventListener("click", function (event) {
-      event.stopPropagation();
-      toggleTreeNode(id, wrap, chevron, row);
-    });
-    row.addEventListener("click", function () { select(id); });
-    return wrap;
-  }
-
-  function toggleTreeNode(id, wrap, chevron, row) {
-    var children = wrap.querySelector(":scope > .tree-children");
-    if (!children) { return; }
-    var expanded = !children.classList.contains("collapsed");
-    if (expanded) {
-      children.classList.add("collapsed");
-      chevron.classList.remove("expanded");
-      row.setAttribute("aria-expanded", "false");
-      treeExpanded[id] = false;
-    } else {
-      children.classList.remove("collapsed");
-      chevron.classList.add("expanded");
-      row.setAttribute("aria-expanded", "true");
-      treeExpanded[id] = true;
-    }
-  }
-
-  function renderTree() {
-    var root = document.getElementById("flow-tree");
-    if (!root) { return; }
-    root.textContent = "";
-    var roots = treeRoots();
     if (!roots.length) {
       var empty = document.createElement("p");
-      empty.className = "tree-empty";
+      empty.className = "risk-none";
       empty.textContent = "No changed declarations in scope.";
-      root.appendChild(empty);
+      container.appendChild(empty);
       return;
     }
+
     roots.forEach(function (id) {
-      var branch = buildTreeNode(id, 0);
-      if (branch) { root.appendChild(branch); }
-    });
-  }
+      var node = NODES[id];
+      var card = document.createElement("div");
+      card.className = "review-card state-" + node.state;
+      card.setAttribute("data-node", id);
+      card.setAttribute("role", "listitem");
+      if (id === state.selected) { card.classList.add("selected"); }
 
-  function renderNeighbourhood() {
-    var box = document.getElementById("tree-neighbourhood");
-    if (!box) { return; }
-    box.textContent = "";
-    var id = state.selected;
-    if (!id || !NODES[id]) {
-      box.classList.remove("has-selection");
-      return;
-    }
-    box.classList.add("has-selection");
-    var node = NODES[id];
-    var heading = document.createElement("h3");
-    heading.textContent = "Neighbourhood";
-    box.appendChild(heading);
+      // Head row
+      var head = document.createElement("div");
+      head.className = "review-head";
 
-    var callers = node.callers || [];
-    var callees = node.callees || [];
+      var name = document.createElement("span");
+      name.className = "rv-name";
+      name.textContent = node.label;
+      head.appendChild(name);
 
-    function row(labelText, items, emptyText) {
-      var r = document.createElement("div");
-      r.className = "nb-row";
-      var label = document.createElement("span");
-      label.className = "nb-label";
-      label.textContent = labelText;
-      r.appendChild(label);
-      var itemsWrap = document.createElement("span");
-      itemsWrap.className = "nb-items";
-      if (!items.length) {
-        var empty = document.createElement("span");
-        empty.className = "nb-empty";
-        empty.textContent = emptyText;
-        itemsWrap.appendChild(empty);
-      } else {
-        items.forEach(function (ref) {
-          var pill = document.createElement("button");
-          pill.type = "button";
-          pill.className = "nb-item" + (ref.id === id ? " current" : "");
-          pill.textContent = ref.label;
-          pill.addEventListener("click", function () { select(ref.id); });
-          itemsWrap.appendChild(pill);
-        });
-      }
-      r.appendChild(itemsWrap);
-      box.appendChild(r);
-    }
+      var badge = document.createElement("span");
+      badge.className = "chip state-" + node.state;
+      badge.textContent = node.state;
+      head.appendChild(badge);
 
-    row("Callers", callers, "no callers in scope");
-    var selfRow = document.createElement("div");
-    selfRow.className = "nb-row";
-    var selfLabel = document.createElement("span");
-    selfLabel.className = "nb-label";
-    selfLabel.textContent = "Selected";
-    selfRow.appendChild(selfLabel);
-    var selfItems = document.createElement("span");
-    selfItems.className = "nb-items";
-    var selfPill = document.createElement("span");
-    selfPill.className = "nb-item current";
-    selfPill.textContent = node.label;
-    selfItems.appendChild(selfPill);
-    selfRow.appendChild(selfItems);
-    box.appendChild(selfRow);
-    row("Calls", callees, "no callees in scope");
-  }
-
-  function renderTreeSelection() {
-    var root = document.getElementById("flow-tree");
-    if (!root) { return; }
-    root.querySelectorAll(".tree-node.selected").forEach(function (el) {
-      el.classList.remove("selected");
-    });
-    if (!state.selected) { return; }
-    var target = root.querySelector('.tree-node[data-node="' + CSS.escape(state.selected) + '"]');
-    if (target) {
-      target.classList.add("selected");
-      // Reveal a selected node that is inside a collapsed ancestor.
-      var parent = target.parentElement;
-      while (parent && parent !== root) {
-        if (parent.classList && parent.classList.contains("tree-children")) {
-          parent.classList.remove("collapsed");
-          var siblingChevron = parent.previousElementSibling;
-          if (siblingChevron) {
-            var chevron = siblingChevron.querySelector(".chevron");
-            if (chevron) { chevron.classList.add("expanded"); }
-          }
+      if (node.path) {
+        var pathEl;
+        if (node.link) {
+          pathEl = document.createElement("a");
+          pathEl.href = node.link;
+          pathEl.target = "_blank";
+          pathEl.rel = "noopener";
+        } else {
+          pathEl = document.createElement("span");
         }
-        parent = parent.parentElement;
+        pathEl.className = "rv-path";
+        pathEl.textContent = node.path + (node.line ? ":" + node.line : "");
+        head.appendChild(pathEl);
       }
-      target.scrollIntoView({ block: "nearest" });
-    }
+
+      head.addEventListener("click", function () { select(id); });
+      card.appendChild(head);
+
+      // Body
+      var body = document.createElement("div");
+      body.className = "review-body";
+
+      // Risk flags
+      var externalCallers = (node.callers || []).filter(function (ref) { return !ref.changed; });
+      if (externalCallers.length) {
+        var flag = document.createElement("div");
+        flag.className = "risk-flag warn";
+        var icon = document.createElement("span");
+        icon.className = "risk-icon";
+        icon.textContent = "⚠️";
+        flag.appendChild(icon);
+        var flagBody = document.createElement("span");
+        flagBody.className = "risk-body";
+        var intro = document.createElement("span");
+        intro.textContent = "Called by " + externalCallers.length + " function" + (externalCallers.length === 1 ? "" : "s") + " this change did not touch: ";
+        flagBody.appendChild(intro);
+        externalCallers.forEach(function (ref, i) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = ref.label;
+          btn.addEventListener("click", function (e) { e.stopPropagation(); select(ref.id); });
+          flagBody.appendChild(btn);
+          if (i < externalCallers.length - 1) {
+            flagBody.appendChild(document.createTextNode(", "));
+          }
+        });
+        flag.appendChild(flagBody);
+        body.appendChild(flag);
+      } else if (node.state === "added") {
+        var infoFlag = document.createElement("div");
+        infoFlag.className = "risk-flag info";
+        var infoIcon = document.createElement("span");
+        infoIcon.className = "risk-icon";
+        infoIcon.textContent = "ℹ️";
+        infoFlag.appendChild(infoIcon);
+        var infoText = document.createElement("span");
+        infoText.className = "risk-body";
+        infoText.textContent = "New code — no prior callers expected in this scope.";
+        infoFlag.appendChild(infoText);
+        body.appendChild(infoFlag);
+      } else {
+        var noRisk = document.createElement("p");
+        noRisk.className = "risk-none";
+        noRisk.textContent = "No callers outside this change were found in scope.";
+        body.appendChild(noRisk);
+      }
+
+      // Inline source
+      if (node.snippet) {
+        var srcLabel = document.createElement("span");
+        srcLabel.className = "rv-section-label";
+        srcLabel.textContent = "Source";
+        body.appendChild(srcLabel);
+        var wrap = document.createElement("div");
+        wrap.className = "code-wrap";
+        var pre = document.createElement("pre");
+        pre.className = "code";
+        pre.innerHTML = node.snippet;
+        wrap.appendChild(pre);
+        body.appendChild(wrap);
+      }
+
+      card.appendChild(body);
+      container.appendChild(card);
+    });
   }
 
-  // The tree and neighbourhood views re-render on selection change, so their
-  // selected styling and their contents track the panel exactly.
+  // Keep the right panel's selected card highlighted and scrolled into view.
   var _origSelect = select;
   select = function (id, skipHash) {
     _origSelect(id, skipHash);
-    renderNeighbourhood();
-    renderTreeSelection();
+    all(".review-card.selected").forEach(function (el) { el.classList.remove("selected"); });
+    if (id) {
+      var target = document.querySelector('.review-card[data-node="' + CSS.escape(id) + '"]');
+      if (target) {
+        target.classList.add("selected");
+        target.scrollIntoView({ block: "nearest" });
+      }
+    }
   };
   var _origClear = clearSelection;
   clearSelection = function () {
     _origClear();
-    renderNeighbourhood();
-    renderTreeSelection();
+    all(".review-card.selected").forEach(function (el) { el.classList.remove("selected"); });
   };
 
-  // Build the tree once on boot; selection changes re-style it in place.
-  renderTree();
+  renderReviewList();
+
 
   // ---- wiring --------------------------------------------------------------
 

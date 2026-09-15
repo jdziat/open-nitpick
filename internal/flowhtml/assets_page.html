@@ -36,13 +36,8 @@
 <main>
   <section id="graphs" aria-label="Flow diagrams">
     {{if .Flows}}
-      <div class="flow-tree-wrap">
-        <div class="tree-header">
-          <h2>Call tree</h2>
-          <p class="hint">Expand a changed declaration to follow what it calls. Click any node to open its source and context in the panel.{{if .TreeTrimmed}} The tree draws {{.DrawnCount}} of {{.ReachableCount}} reachable node(s); the remaining {{.ReachableCount}} are not shown here, and search reaches them.{{end}}</p>
-        </div>
-        <div id="tree-neighbourhood" class="tree-neighbourhood" aria-label="Neighbourhood of the selected declaration"></div>
-        <div id="flow-tree" class="flow-tree" role="tree" aria-label="Call tree of changed declarations and their callees"></div>
+      <div class="review-list" role="list" aria-label="Changed declarations with source and risk context">
+        <div id="review-items"></div>
       </div>
     {{else}}
       <p class="empty">No path was resolved in the selected scope. This is not evidence that the change has no effect; see the coverage details for what ran and what could not be established.</p>
