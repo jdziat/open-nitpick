@@ -65,17 +65,18 @@ func svgDiagram(flowID string, layout Layout, nodes map[string]docNode, edges ma
 		if node.Changed {
 			classes = append(classes, "changed")
 		}
-		fmt.Fprintf(&b, "<g class=\"%s\" data-node=\"%s\" tabindex=\"-1\" role=\"button\" aria-label=\"%s\">",
+		fmt.Fprintf(&b, "<g class=\"%s\" data-node=\"%s\" data-label=\"%s\" tabindex=\"-1\" role=\"button\" aria-label=\"%s\">",
 			strings.Join(classes, " "),
 			html.EscapeString(p.ID),
+			html.EscapeString(node.Label),
 			html.EscapeString(nodeAriaLabel(node)),
 		)
 		fmt.Fprintf(&b, "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"8\"/>", p.X, p.Y, p.Width, p.Height)
 		fmt.Fprintf(&b, "<rect class=\"halo\" x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"11\" fill=\"none\" stroke=\"none\"/>", p.X-5, p.Y-5, p.Width+10, p.Height+10)
 		fmt.Fprintf(&b, "<text x=\"%.1f\" y=\"%.1f\" class=\"label\">%s</text>",
-			p.X+12, p.Y+p.Height/2+1, html.EscapeString(truncateLabel(shown[p.ID], 28)))
+			p.X+12, p.Y+p.Height/2-1, html.EscapeString(truncateLabel(shown[p.ID], 32)))
 		fmt.Fprintf(&b, "<text x=\"%.1f\" y=\"%.1f\" class=\"sub\">%s</text>",
-			p.X+12, p.Y+p.Height-8, html.EscapeString(node.State))
+			p.X+12, p.Y+p.Height-9, html.EscapeString(node.State))
 		b.WriteString("<title>" + html.EscapeString(node.Label+"\n"+node.SourcePath+":"+fmt.Sprint(node.SourceLine)) + "</title>")
 		b.WriteString("</g>")
 	}

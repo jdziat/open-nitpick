@@ -194,3 +194,17 @@ footer{padding:12px 20px;border-top:1px solid var(--rule);color:var(--dim2);font
 .panel-empty-hint .hint-text{font-size:12px;max-width:24ch;line-height:1.5;color:var(--dim)}
 
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Node tooltip on hover */
+#graph-tip{position:fixed;z-index:50;pointer-events:none;padding:5px 10px;background:var(--panel2);border:1px solid var(--rule);border-radius:var(--radius-sm);font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fg);max-width:340px;word-break:break-all;white-space:normal;box-shadow:var(--shadow);opacity:0;transition:opacity .1s;line-height:1.4}
+#graph-tip.visible{opacity:1}
+
+.diff-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px 20px;border-bottom:1px solid var(--rule2);background:var(--panel2);font-size:12px}
+.diff-stat{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.diff-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid}
+.diff-pill.add{color:var(--add);border-color:var(--add);background:var(--ok-bg)}
+.diff-pill.mod{color:var(--mod);border-color:var(--mod);background:var(--warn-bg)}
+.diff-pill.rem{color:var(--rem);border-color:var(--rem);background:var(--bad-bg)}
+.diff-shas{color:var(--dim);font-size:11px;letter-spacing:.02em}
+.diff-meta{color:var(--dim2);font-size:11px;margin-left:auto}
+@media(max-width:600px){.diff-bar{padding:6px 14px}.diff-meta{margin-left:0}}

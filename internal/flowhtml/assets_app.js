@@ -687,6 +687,36 @@
   document.body.appendChild(live);
 
   all(".canvas").forEach(wireView);
+
+  // ---- node hover tooltip ---------------------------------------------------
+  // Shows the full label when the truncated SVG text is hard to read.
+  var tip = document.createElement("div");
+  tip.id = "graph-tip";
+  document.body.appendChild(tip);
+  var tipTimeout = null;
+  document.addEventListener("mouseover", function (event) {
+    var node = event.target.closest ? event.target.closest("svg.graph .node") : null;
+    if (!node) { tip.classList.remove("visible"); return; }
+    var label = node.getAttribute("data-label") || "";
+    if (!label) { return; }
+    tip.textContent = label;
+    tip.classList.add("visible");
+  });
+  document.addEventListener("mousemove", function (event) {
+    var node = event.target.closest ? event.target.closest("svg.graph .node") : null;
+    if (!node) { tip.classList.remove("visible"); return; }
+    var x = event.clientX + 14, y = event.clientY + 14;
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    if (x + tw > innerWidth - 8) { x = event.clientX - tw - 8; }
+    if (y + th > innerHeight - 8) { y = event.clientY - th - 8; }
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  });
+  document.addEventListener("mouseout", function (event) {
+    var node = event.target.closest ? event.target.closest("svg.graph .node") : null;
+    if (node) { return; }
+    tip.classList.remove("visible");
+  });
+
   window.addEventListener("resize", function () { views.forEach(function (v) { v.apply(); }); });
 
   renderPanel(null, null);

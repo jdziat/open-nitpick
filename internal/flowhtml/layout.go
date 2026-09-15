@@ -69,10 +69,10 @@ type LayoutOptions struct {
 
 func (o LayoutOptions) withDefaults() LayoutOptions {
 	if o.NodeWidth <= 0 {
-		o.NodeWidth = 220
+		o.NodeWidth = 240
 	}
 	if o.NodeHeight <= 0 {
-		o.NodeHeight = 44
+		o.NodeHeight = 48
 	}
 	if o.LayerGap <= 0 {
 		o.LayerGap = 90

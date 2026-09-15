@@ -143,6 +143,9 @@ type document struct {
 	ChangedCount    int
 	BoundaryCount   int
 	UnresolvedCount int
+	AddedCount      int
+	ModifiedCount   int
+	RemovedCount    int
 	IncludesSource  bool
 	SourceBytes     int
 	SourceTruncated bool
@@ -257,6 +260,14 @@ func build(ctx context.Context, result prflow.Result, reader SourceReader, o Opt
 		doc.Nodes = append(doc.Nodes, entry)
 		if entry.Changed {
 			doc.ChangedCount++
+			switch entry.State {
+			case "added":
+				doc.AddedCount++
+			case "modified":
+				doc.ModifiedCount++
+			case "removed":
+				doc.RemovedCount++
+			}
 		}
 		if entry.Boundary {
 			doc.BoundaryCount++

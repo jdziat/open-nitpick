@@ -24,6 +24,15 @@
     <span class="meta" id="filter-status" role="status" aria-live="polite"></span>
   </div>
 </header>
+{{if or .AddedCount .ModifiedCount .RemovedCount}}<div class="diff-bar" role="status" aria-label="Diff summary">
+  <span class="diff-stat">
+    {{if .AddedCount}}<span class="diff-pill add">+{{.AddedCount}} added</span>{{end}}
+    {{if .ModifiedCount}}<span class="diff-pill mod">~{{.ModifiedCount}} modified</span>{{end}}
+    {{if .RemovedCount}}<span class="diff-pill rem">-{{.RemovedCount}} removed</span>{{end}}
+  </span>
+  {{if and .HeadSHA .BaseSHA}}<span class="diff-shas mono">{{slice .BaseSHA 0 7}}…{{slice .HeadSHA 0 7}}</span>{{end}}
+  <span class="diff-meta">{{.Coverage.Files}} file(s) · {{.Coverage.Declarations}} declaration(s)</span>
+</div>{{end}}
 <main>
   <section id="graphs" aria-label="Flow diagrams">
     {{if .Flows}}
