@@ -522,37 +522,255 @@
 
   function applyFilters() {
     var visible = {};
-    all("svg.graph .node").forEach(function (el) {
+    all(".tree-node").forEach(function (el) {
       var id = el.getAttribute("data-node");
       var ok = matches(NODES[id]);
-      el.classList.toggle("dimmed", !ok);
-      // A filtered-out node leaves the accessibility tree too, so a screen
-      // reader and a sighted reader are told the same thing.
-      if (ok) { el.removeAttribute("aria-hidden"); } else { el.setAttribute("aria-hidden", "true"); }
+      // A filtered-out node hides from the tree; its parent still shows so
+      // the structure remains readable.
+      el.classList.toggle("hidden", !ok);
       if (ok) { visible[id] = true; }
     });
-    all("svg.graph .edge").forEach(function (el) {
-      var live = visible[el.getAttribute("data-from")] && visible[el.getAttribute("data-to")];
-      el.classList.toggle("dimmed", !live);
-      if (live) { el.removeAttribute("aria-hidden"); } else { el.setAttribute("aria-hidden", "true"); }
-    });
     var shown = Object.keys(visible).length;
-    var drawnTotal = Object.keys(NODES).filter(function (id) { return NODES[id].drawn; }).length;
     var total = Object.keys(NODES).length;
     var status = $("#filter-status");
     if (status) {
-      var base = shown === drawnTotal
-        ? drawnTotal + " node(s) drawn"
-        : shown + " of " + drawnTotal + " drawn";
-      // The count says what is on the canvas and what exists behind it, so a
-      // trimmed diagram never reads as the whole flow.
-      status.textContent = total > drawnTotal ? base + " · " + total + " in scope" : base;
+      var base = shown + " shown";
+      // The count says what matches the filter and what exists in scope, so
+      // a reader can tell a filtered view from an empty result.
+      status.textContent = total > shown ? base + " · " + total + " in scope" : base;
     }
-    all("details.flow").forEach(function (flow) {
-      var any = all("svg.graph .node", flow).some(function (el) { return !el.classList.contains("dimmed"); });
-      flow.classList.toggle("hidden", !any && (state.changedOnly || state.hideBoundary || !!state.query));
+  }
+
+  // ---- call tree -----------------------------------------------------------
+
+  // Tree state: which nodes are expanded. A changed declaration starts
+  // expanded; its callees start collapsed so the initial view is one level
+  // deep per root rather than the whole reachable graph.
+  var treeExpanded = {};
+
+  function treeRoots() {
+    return Object.keys(NODES).filter(function (id) {
+      return NODES[id].changed;
+    }).sort(function (a, b) {
+      // Named functions before closures, then by label, so the root list
+      // reads the way a reader would scan a symbol table.
+      var na = NODES[a], nb = NODES[b];
+      var ca = na.kind === "closure" ? 1 : 0;
+      var cb = nb.kind === "closure" ? 1 : 0;
+      if (ca !== cb) { return ca - cb; }
+      return na.label.localeCompare(nb.label);
     });
   }
+
+  function buildTreeNode(id, depth) {
+    var node = NODES[id];
+    if (!node) { return null; }
+    var wrap = document.createElement("div");
+    wrap.className = "tree-branch";
+
+    var row = document.createElement("div");
+    row.className = "tree-node";
+    row.setAttribute("role", "treeitem");
+    row.setAttribute("aria-level", String(depth + 1));
+    row.setAttribute("aria-expanded", "false");
+    row.setAttribute("data-node", id);
+    row.setAttribute("tabindex", "-1");
+    if (id === state.selected) { row.classList.add("selected"); }
+
+    var callees = node.callees || [];
+    var chevron = document.createElement("span");
+    chevron.className = "chevron";
+    chevron.textContent = "▶";
+    if (!callees.length) { chevron.classList.add("leaf"); }
+    row.appendChild(chevron);
+
+    var label = document.createElement("span");
+    label.className = "tree-label";
+    label.textContent = node.label;
+    row.appendChild(label);
+
+    var badge = document.createElement("span");
+    badge.className = "tree-badge " + node.state;
+    badge.textContent = node.state;
+    row.appendChild(badge);
+
+    if (depth > 0) {
+      var depthTag = document.createElement("span");
+      depthTag.className = "tree-depth";
+      depthTag.textContent = "d" + depth;
+      row.appendChild(depthTag);
+    }
+
+    wrap.appendChild(row);
+
+    if (callees.length) {
+      var children = document.createElement("div");
+      children.className = "tree-children collapsed";
+      children.setAttribute("role", "group");
+      var expanded = treeExpanded[id];
+      if (expanded) {
+        children.classList.remove("collapsed");
+        chevron.classList.add("expanded");
+        row.setAttribute("aria-expanded", "true");
+      }
+      callees.forEach(function (ref) {
+        var child = buildTreeNode(ref.id, depth + 1);
+        if (child) { children.appendChild(child); }
+      });
+      wrap.appendChild(children);
+    }
+
+    chevron.addEventListener("click", function (event) {
+      event.stopPropagation();
+      toggleTreeNode(id, wrap, chevron, row);
+    });
+    row.addEventListener("click", function () { select(id); });
+    return wrap;
+  }
+
+  function toggleTreeNode(id, wrap, chevron, row) {
+    var children = wrap.querySelector(":scope > .tree-children");
+    if (!children) { return; }
+    var expanded = !children.classList.contains("collapsed");
+    if (expanded) {
+      children.classList.add("collapsed");
+      chevron.classList.remove("expanded");
+      row.setAttribute("aria-expanded", "false");
+      treeExpanded[id] = false;
+    } else {
+      children.classList.remove("collapsed");
+      chevron.classList.add("expanded");
+      row.setAttribute("aria-expanded", "true");
+      treeExpanded[id] = true;
+    }
+  }
+
+  function renderTree() {
+    var root = document.getElementById("flow-tree");
+    if (!root) { return; }
+    root.textContent = "";
+    var roots = treeRoots();
+    if (!roots.length) {
+      var empty = document.createElement("p");
+      empty.className = "tree-empty";
+      empty.textContent = "No changed declarations in scope.";
+      root.appendChild(empty);
+      return;
+    }
+    roots.forEach(function (id) {
+      var branch = buildTreeNode(id, 0);
+      if (branch) { root.appendChild(branch); }
+    });
+  }
+
+  function renderNeighbourhood() {
+    var box = document.getElementById("tree-neighbourhood");
+    if (!box) { return; }
+    box.textContent = "";
+    var id = state.selected;
+    if (!id || !NODES[id]) {
+      box.classList.remove("has-selection");
+      return;
+    }
+    box.classList.add("has-selection");
+    var node = NODES[id];
+    var heading = document.createElement("h3");
+    heading.textContent = "Neighbourhood";
+    box.appendChild(heading);
+
+    var callers = node.callers || [];
+    var callees = node.callees || [];
+
+    function row(labelText, items, emptyText) {
+      var r = document.createElement("div");
+      r.className = "nb-row";
+      var label = document.createElement("span");
+      label.className = "nb-label";
+      label.textContent = labelText;
+      r.appendChild(label);
+      var itemsWrap = document.createElement("span");
+      itemsWrap.className = "nb-items";
+      if (!items.length) {
+        var empty = document.createElement("span");
+        empty.className = "nb-empty";
+        empty.textContent = emptyText;
+        itemsWrap.appendChild(empty);
+      } else {
+        items.forEach(function (ref) {
+          var pill = document.createElement("button");
+          pill.type = "button";
+          pill.className = "nb-item" + (ref.id === id ? " current" : "");
+          pill.textContent = ref.label;
+          pill.addEventListener("click", function () { select(ref.id); });
+          itemsWrap.appendChild(pill);
+        });
+      }
+      r.appendChild(itemsWrap);
+      box.appendChild(r);
+    }
+
+    row("Callers", callers, "no callers in scope");
+    var selfRow = document.createElement("div");
+    selfRow.className = "nb-row";
+    var selfLabel = document.createElement("span");
+    selfLabel.className = "nb-label";
+    selfLabel.textContent = "Selected";
+    selfRow.appendChild(selfLabel);
+    var selfItems = document.createElement("span");
+    selfItems.className = "nb-items";
+    var selfPill = document.createElement("span");
+    selfPill.className = "nb-item current";
+    selfPill.textContent = node.label;
+    selfItems.appendChild(selfPill);
+    selfRow.appendChild(selfItems);
+    box.appendChild(selfRow);
+    row("Calls", callees, "no callees in scope");
+  }
+
+  function renderTreeSelection() {
+    var root = document.getElementById("flow-tree");
+    if (!root) { return; }
+    root.querySelectorAll(".tree-node.selected").forEach(function (el) {
+      el.classList.remove("selected");
+    });
+    if (!state.selected) { return; }
+    var target = root.querySelector('.tree-node[data-node="' + CSS.escape(state.selected) + '"]');
+    if (target) {
+      target.classList.add("selected");
+      // Reveal a selected node that is inside a collapsed ancestor.
+      var parent = target.parentElement;
+      while (parent && parent !== root) {
+        if (parent.classList && parent.classList.contains("tree-children")) {
+          parent.classList.remove("collapsed");
+          var siblingChevron = parent.previousElementSibling;
+          if (siblingChevron) {
+            var chevron = siblingChevron.querySelector(".chevron");
+            if (chevron) { chevron.classList.add("expanded"); }
+          }
+        }
+        parent = parent.parentElement;
+      }
+      target.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  // The tree and neighbourhood views re-render on selection change, so their
+  // selected styling and their contents track the panel exactly.
+  var _origSelect = select;
+  select = function (id, skipHash) {
+    _origSelect(id, skipHash);
+    renderNeighbourhood();
+    renderTreeSelection();
+  };
+  var _origClear = clearSelection;
+  clearSelection = function () {
+    _origClear();
+    renderNeighbourhood();
+    renderTreeSelection();
+  };
+
+  // Build the tree once on boot; selection changes re-style it in place.
+  renderTree();
 
   // ---- wiring --------------------------------------------------------------
 

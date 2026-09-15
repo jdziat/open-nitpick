@@ -176,19 +176,21 @@ func TestRenderEmbedsTheStartNodeAndDrawnFlags(t *testing.T) {
 	}
 }
 
-func TestRenderKeepsTheCanvasWithinTheWidthBudget(t *testing.T) {
+func TestRenderKeepsTheTreePayloadWithinTheVisibleBudget(t *testing.T) {
 	out, err := Render(context.Background(), wideResult(t, 200, 40), nil, Options{})
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	for _, field := range strings.Split(string(out), `viewBox="0 0 `)[1:] {
-		var width float64
-		if _, err := fmt.Sscanf(field, "%g", &width); err != nil {
-			continue
-		}
-		if width > 1600 {
-			t.Fatalf("canvas width %v exceeds the readable budget", width)
-		}
+	// The browser payload lists every reachable node so search works, but a
+	// diagram that drew all 200 nodes would not be readable. The tree view
+	// opens on the changed declarations and their immediate callees instead.
+	if !strings.Contains(string(out), "__FLOW_NODES__") {
+		t.Fatal("the payload must still be embedded for the tree to render")
+	}
+	doc := build(context.Background(), wideResult(t, 200, 40), nil, Options{}.withDefaults())
+	if doc.DrawnCount == 0 || doc.DrawnCount >= doc.ReachableCount {
+		t.Fatalf("expected a trimmed tree, got drawn=%d reachable=%d",
+			doc.DrawnCount, doc.ReachableCount)
 	}
 }
 

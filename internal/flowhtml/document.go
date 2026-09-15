@@ -146,6 +146,9 @@ type document struct {
 	AddedCount      int
 	ModifiedCount   int
 	RemovedCount    int
+	DrawnCount      int
+	ReachableCount  int
+	TreeTrimmed     bool
 	IncludesSource  bool
 	SourceBytes     int
 	SourceTruncated bool
@@ -255,6 +258,9 @@ func build(ctx context.Context, result prflow.Result, reader SourceReader, o Opt
 		}
 		entry := byID[node.ID]
 		entry.Drawn = drawn.placed[node.ID]
+		if entry.Drawn {
+			doc.DrawnCount++
+		}
 		entry.Callers = filterRefs(entry.Callers, drawn.nodes)
 		entry.Callees = filterRefs(entry.Callees, drawn.nodes)
 		doc.Nodes = append(doc.Nodes, entry)
@@ -286,6 +292,8 @@ func build(ctx context.Context, result prflow.Result, reader SourceReader, o Opt
 		kept = append(kept, edge)
 	}
 	doc.Edges = kept
+	doc.ReachableCount = len(doc.Nodes)
+	doc.TreeTrimmed = doc.DrawnCount < doc.ReachableCount
 	return doc
 }
 

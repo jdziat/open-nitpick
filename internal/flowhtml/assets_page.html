@@ -36,24 +36,14 @@
 <main>
   <section id="graphs" aria-label="Flow diagrams">
     {{if .Flows}}
-      {{range .Flows}}
-      <details class="flow" open>
-        <summary>{{.Name}}<span class="count">{{.Nodes}} node(s), {{.Edges}} edge(s){{if .Focused}} · {{.Hidden}} more not shown{{end}}</span></summary>
-        <div class="canvas" data-flow="{{.ID}}">
-          {{if .Focused}}<p class="focus-note">Showing the changed declarations and what they call directly. {{.Hidden}} further node(s) in this flow are not drawn; search or filter to reach them.</p>{{end}}
-          <div class="canvas-body">
-            <div class="zoom" role="group" aria-label="Diagram view controls">
-              <button type="button" data-zoom="out" aria-label="Zoom out">&minus;</button>
-              <span class="level" aria-hidden="true">100%</span>
-              <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
-              <button type="button" data-zoom="fit">Fit</button>
-              <button type="button" data-zoom="actual">100%</button>
-            </div>
-            <div class="viewport" tabindex="0" role="application" aria-label="{{.Name}} diagram. Use arrow keys to move between nodes, Enter to open details, and Escape to clear.">{{.SVG}}</div>
-          </div>
+      <div class="flow-tree-wrap">
+        <div class="tree-header">
+          <h2>Call tree</h2>
+          <p class="hint">Expand a changed declaration to follow what it calls. Click any node to open its source and context in the panel.{{if .TreeTrimmed}} The tree draws {{.DrawnCount}} of {{.ReachableCount}} reachable node(s); the remaining {{.ReachableCount}} are not shown here, and search reaches them.{{end}}</p>
         </div>
-      </details>
-      {{end}}
+        <div id="tree-neighbourhood" class="tree-neighbourhood" aria-label="Neighbourhood of the selected declaration"></div>
+        <div id="flow-tree" class="flow-tree" role="tree" aria-label="Call tree of changed declarations and their callees"></div>
+      </div>
     {{else}}
       <p class="empty">No path was resolved in the selected scope. This is not evidence that the change has no effect; see the coverage details for what ran and what could not be established.</p>
     {{end}}
