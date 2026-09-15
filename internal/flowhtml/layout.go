@@ -72,19 +72,21 @@ func (o LayoutOptions) withDefaults() LayoutOptions {
 		o.NodeWidth = 240
 	}
 	if o.NodeHeight <= 0 {
-		o.NodeHeight = 48
+		o.NodeHeight = 44
 	}
 	if o.LayerGap <= 0 {
-		o.LayerGap = 90
+		o.LayerGap = 80
 	}
 	if o.NodeGap <= 0 {
-		o.NodeGap = 24
+		o.NodeGap = 18
 	}
 	if o.Margin <= 0 {
-		o.Margin = 32
+		o.Margin = 28
 	}
 	if o.MaxCanvasWidth <= 0 {
-		o.MaxCanvasWidth = 1100
+		// Used as canvas height budget in the left-to-right layout; controls
+		// how many nodes stack in one column before wrapping to a second band.
+		o.MaxCanvasWidth = 720
 	}
 	if o.MaxIterations <= 0 {
 		o.MaxIterations = 24
@@ -391,14 +393,17 @@ func reindex(layer []string, position map[string]int) {
 	}
 }
 
-// place assigns coordinates. Each layer is laid out left to right at a fixed
-// pitch, then centred against the widest layer, so a narrow layer sits under
-// the middle of a wide one instead of hugging the left margin.
-// perRow reports how many nodes fit in one row without exceeding the canvas
-// budget. It is at least one, so an oversized node still places instead of
-// producing an empty row.
-func perRow(o LayoutOptions) int {
-	pitch := o.NodeWidth + o.NodeGap
+// place assigns coordinates in a left-to-right layout. Each layer becomes a
+// column: depth increases left to right, and nodes within one layer are stacked
+// top to bottom. A tall layer wraps onto adjacent column bands when it would
+// exceed the canvas height budget.
+// perColumn reports how many nodes fit vertically in one column band before the
+// layer wraps. MaxCanvasWidth is reused as the height budget for backward
+// compatibility with callers that tune it; semantically it now caps height.
+// It is at least one, so an oversized layer still places instead of producing
+// an empty band.
+func perColumn(o LayoutOptions) int {
+	pitch := o.NodeHeight + o.NodeGap
 	budget := o.MaxCanvasWidth - 2*o.Margin + o.NodeGap
 	n := int(budget / pitch)
 	if n < 1 {
@@ -407,62 +412,65 @@ func perRow(o LayoutOptions) int {
 	return n
 }
 
-// place resolves geometry for every node. A layer wider than the canvas
-// budget wraps onto further rows, keeping the drawing within a width a
-// viewport can show at readable scale; rows of one layer stay adjacent so
-// the layer still reads as a single rank.
+// place resolves geometry for every node in a left-to-right layout. Layer
+// depth increases along the X axis (left to right) and nodes within one layer
+// are stacked along the Y axis (top to bottom). A tall layer wraps onto
+// adjacent column bands so that no single column exceeds the canvas height
+// budget; bands of one layer stay side by side so the layer reads as a rank.
 func (g *graph) place(layers [][]string, o LayoutOptions) map[string]Placed {
-	pitch := o.NodeWidth + o.NodeGap
-	columns := perRow(o)
-	widest := 0
+	vpitch := o.NodeHeight + o.NodeGap // vertical pitch between nodes in a column
+	rows := perColumn(o)               // max nodes per column band before wrapping
+	tallest := 0
 	for _, layer := range layers {
 		n := len(layer)
-		if n > columns {
-			n = columns
+		if n > rows {
+			n = rows
 		}
-		if n > widest {
-			widest = n
+		if n > tallest {
+			tallest = n
 		}
 	}
-	totalWidth := float64(widest)*pitch - o.NodeGap
+	totalHeight := float64(tallest)*vpitch - o.NodeGap
 	placed := make(map[string]Placed, len(g.order))
-	y := o.Margin
+	x := o.Margin
 	for depth, layer := range layers {
-		for start := 0; start < len(layer); start += columns {
-			end := start + columns
+		for start := 0; start < len(layer); start += rows {
+			end := start + rows
 			if end > len(layer) {
 				end = len(layer)
 			}
-			row := layer[start:end]
-			rowWidth := float64(len(row))*pitch - o.NodeGap
-			offset := o.Margin + (totalWidth-rowWidth)/2
-			for i, id := range row {
+			band := layer[start:end]
+			bandHeight := float64(len(band))*vpitch - o.NodeGap
+			offset := o.Margin + (totalHeight-bandHeight)/2
+			for i, id := range band {
 				placed[id] = Placed{
 					ID:     id,
-					X:      offset + float64(i)*pitch,
-					Y:      y,
+					X:      x,
+					Y:      offset + float64(i)*vpitch,
 					Width:  o.NodeWidth,
 					Height: o.NodeHeight,
 					Layer:  depth,
 				}
 			}
-			y += o.NodeHeight + o.NodeGap
+			x += o.NodeWidth + o.NodeGap
 		}
-		// Trade the last row's tight gap for the full inter-layer gap.
-		y += o.LayerGap - o.NodeGap
+		// Trade the last band's tight gap for the full inter-layer gap.
+		x += o.LayerGap - o.NodeGap
 	}
 	return placed
 }
 
-// route builds polylines. A forward edge that spans more than one layer jogs
-// through the gap between layers so it does not cut through the boxes in
-// between; a back edge leaves the column entirely and returns on the right.
+// route builds polylines for a left-to-right layout. A forward edge exits the
+// right face of the source and enters the left face of the target; it jogs
+// through the column gap when source and target are not adjacent layers. A back
+// edge exits the bottom face and returns below the canvas so it does not cross
+// forward edges.
 func (g *graph) route(placed map[string]Placed, o LayoutOptions) []Route {
 	routes := make([]Route, 0, len(g.edges))
-	rightEdge := 0.0
+	bottomEdge := 0.0
 	for _, p := range placed {
-		if p.X+p.Width > rightEdge {
-			rightEdge = p.X + p.Width
+		if p.Y+p.Height > bottomEdge {
+			bottomEdge = p.Y + p.Height
 		}
 	}
 	for _, e := range g.edges {
@@ -473,10 +481,10 @@ func (g *graph) route(placed map[string]Placed, o LayoutOptions) []Route {
 				ID: e.ID, From: e.From, To: e.To, SelfLoop: true,
 				Points: selfLoopPoints(from),
 			})
-		case g.backward[e.ID] || to.Y <= from.Y:
+		case g.backward[e.ID] || to.X <= from.X:
 			routes = append(routes, Route{
 				ID: e.ID, From: e.From, To: e.To, Backward: true,
-				Points: backwardPoints(from, to, rightEdge, o),
+				Points: backwardPoints(from, to, bottomEdge, o),
 			})
 		default:
 			routes = append(routes, Route{
@@ -489,33 +497,36 @@ func (g *graph) route(placed map[string]Placed, o LayoutOptions) []Route {
 }
 
 func forwardPoints(from, to Placed, o LayoutOptions) []Point {
-	start := Point{X: from.X + from.Width/2, Y: from.Y + from.Height}
-	end := Point{X: to.X + to.Width/2, Y: to.Y}
-	if start.X == end.X {
+	// Exit the right face of the source, enter the left face of the target.
+	start := Point{X: from.X + from.Width, Y: from.Y + from.Height/2}
+	end := Point{X: to.X, Y: to.Y + to.Height/2}
+	if start.Y == end.Y {
 		return []Point{start, end}
 	}
-	// Turn inside the gap below the source so the diagonal never crosses the
-	// row of boxes that sits between two non-adjacent layers.
-	mid := start.Y + o.LayerGap/2
-	return []Point{start, {X: start.X, Y: mid}, {X: end.X, Y: mid}, end}
+	// Jog through the horizontal gap between columns so the route never cuts
+	// through boxes that sit between two non-adjacent layers.
+	mid := start.X + o.LayerGap/2
+	return []Point{start, {X: mid, Y: start.Y}, {X: mid, Y: end.Y}, end}
 }
 
-func backwardPoints(from, to Placed, rightEdge float64, o LayoutOptions) []Point {
-	start := Point{X: from.X + from.Width, Y: from.Y + from.Height/2}
-	end := Point{X: to.X + to.Width, Y: to.Y + to.Height/2}
-	lane := rightEdge + o.NodeGap + o.Margin/2
-	return []Point{start, {X: lane, Y: start.Y}, {X: lane, Y: end.Y}, end}
+// backwardPoints routes a cycle edge below the canvas and back, so it does not
+// cross the forward edges that fill the main drawing area.
+func backwardPoints(from, to Placed, bottomEdge float64, o LayoutOptions) []Point {
+	start := Point{X: from.X + from.Width/2, Y: from.Y + from.Height}
+	end := Point{X: to.X + to.Width/2, Y: to.Y + to.Height}
+	lane := bottomEdge + o.NodeGap + o.Margin/2
+	return []Point{start, {X: start.X, Y: lane}, {X: end.X, Y: lane}, end}
 }
 
 func selfLoopPoints(node Placed) []Point {
-	right := node.X + node.Width
-	top := node.Y + node.Height/3
-	bottom := node.Y + 2*node.Height/3
-	lane := right + 26
+	bottom := node.Y + node.Height
+	left := node.X + node.Width/3
+	right := node.X + 2*node.Width/3
+	lane := bottom + 26
 	return []Point{
-		{X: right, Y: top},
-		{X: lane, Y: top},
-		{X: lane, Y: bottom},
+		{X: left, Y: bottom},
+		{X: left, Y: lane},
+		{X: right, Y: lane},
 		{X: right, Y: bottom},
 	}
 }

@@ -65,8 +65,8 @@ func TestComputeOrdersAChainIntoIncreasingLayers(t *testing.T) {
 			t.Fatalf("node %s layer = %d, want %d", id, byID[id].Layer, i)
 		}
 	}
-	if byID["n0"].Y >= byID["n3"].Y {
-		t.Fatalf("chain did not descend: n0 y=%v n3 y=%v", byID["n0"].Y, byID["n3"].Y)
+	if byID["n0"].X >= byID["n3"].X {
+		t.Fatalf("chain did not advance left to right: n0 x=%v n3 x=%v", byID["n0"].X, byID["n3"].X)
 	}
 }
 
@@ -177,18 +177,19 @@ func TestComputeWrapsALayerWiderThanTheCanvasBudget(t *testing.T) {
 		nodes = append(nodes, LayoutNode{ID: id, Rank: -1})
 		edges = append(edges, LayoutEdge{ID: "e" + id, From: "root", To: id})
 	}
+	// MaxCanvasWidth is reused as the canvas height budget in left-to-right layout.
 	layout := Compute(nodes, edges, LayoutOptions{MaxCanvasWidth: 1600})
-	if layout.Width > 1600 {
-		t.Fatalf("canvas width %v exceeds the 1600 budget", layout.Width)
+	if layout.Height > 1600 {
+		t.Fatalf("canvas height %v exceeds the 1600 budget", layout.Height)
 	}
-	rows := map[float64]int{}
+	cols := map[float64]int{}
 	for _, n := range layout.Nodes {
 		if n.Layer == 1 {
-			rows[n.Y]++
+			cols[n.X]++
 		}
 	}
-	if len(rows) < 2 {
-		t.Fatalf("expected the 30-node layer to wrap onto several rows, got %d", len(rows))
+	if len(cols) < 2 {
+		t.Fatalf("expected the 30-node layer to wrap onto several column bands, got %d", len(cols))
 	}
 }
 
