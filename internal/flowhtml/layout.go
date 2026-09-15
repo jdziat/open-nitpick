@@ -84,7 +84,7 @@ func (o LayoutOptions) withDefaults() LayoutOptions {
 		o.Margin = 32
 	}
 	if o.MaxCanvasWidth <= 0 {
-		o.MaxCanvasWidth = 1600
+		o.MaxCanvasWidth = 1100
 	}
 	if o.MaxIterations <= 0 {
 		o.MaxIterations = 24

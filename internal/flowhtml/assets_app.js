@@ -2,7 +2,7 @@
 (function () {
   var NODES = window.__FLOW_NODES__ || {};
   var START = window.__FLOW_START__ || "";
-  var state = { selected: null, changedOnly: false, hideBoundary: false, query: "", kbd: null };
+  var state = { selected: null, changedOnly: true, hideBoundary: false, query: "", kbd: null };
   var views = [];
 
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -593,11 +593,12 @@
   var reset = $("#reset");
   if (reset) {
     reset.addEventListener("click", function () {
-      state.query = ""; state.changedOnly = false; state.hideBoundary = false;
+      state.query = ""; state.changedOnly = true; state.hideBoundary = false;
       if (search) { search.value = ""; }
+      var defaults = { "changed-only": "true", "hide-boundary": "false" };
       ["changed-only", "hide-boundary"].forEach(function (id) {
         var b = $("#" + id);
-        if (b) { b.setAttribute("aria-pressed", "false"); }
+        if (b) { b.setAttribute("aria-pressed", defaults[id]); }
       });
       views.forEach(function (v) { v.fit(); });
       clearSelection();
@@ -685,6 +686,9 @@
   renderPanel(null, null);
   buildChangedNav();
   try { applyFilters(); } catch (ignored) { void ignored; }
+  // Sync toggle buttons to match the initial state values.
+  var changedOnlyBtn = $("#changed-only");
+  if (changedOnlyBtn) { changedOnlyBtn.setAttribute("aria-pressed", state.changedOnly ? "true" : "false"); }
 
   // A shared link opens on its node; otherwise the document opens on the
   // declaration the change most affects, so the panel is never dead on arrival.
