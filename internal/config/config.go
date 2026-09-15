@@ -26,8 +26,11 @@ const FileName = ".nitpick.yaml"
 
 // Config is the fully resolved open-nitpick configuration.
 type Config struct {
-	Models       Models        `yaml:"models"`
-	Review       Review        `yaml:"review"`
+	Models Models `yaml:"models"`
+	Review Review `yaml:"review"`
+	// Flow controls deterministic source-level application-flow extraction.
+	// The flow pass makes no model calls and is independent of review.summary.
+	Flow         Flow          `yaml:"flow"`
 	Instructions []Instruction `yaml:"instructions"`
 	Linters      Linters       `yaml:"linters"`
 
@@ -631,6 +634,65 @@ type Review struct {
 	Budget Budget `yaml:"budget"`
 }
 
+// Flow configures deterministic, source-linked application-flow extraction.
+// It is independent of the model review and does not consume review tokens.
+// The pass is disabled by default until its analysis and rendering limits have
+// been qualified for a repository.
+type Flow struct {
+	// Mode controls when flow extraction runs: "off" skips it, "auto" runs it
+	// for eligible changed Go files, and "on" requires an eligible scan and
+	// reports unsupported or no-flow results explicitly.
+	Mode FlowMode `yaml:"mode"`
+
+	// MaxFiles bounds the number of Go source files materialized for analysis.
+	MaxFiles int `yaml:"max_files"`
+
+	// MaxBytes bounds source bytes materialized for analysis.
+	MaxBytes int `yaml:"max_bytes"`
+
+	// MaxDepthCallers bounds traversal toward callers of changed declarations.
+	MaxDepthCallers int `yaml:"max_depth_callers"`
+
+	// MaxDepthCallees bounds traversal toward callees from changed declarations.
+	MaxDepthCallees int `yaml:"max_depth_callees"`
+
+	// MaxNodes bounds nodes retained in the extracted result.
+	MaxNodes int `yaml:"max_nodes"`
+
+	// MaxEdges bounds edges retained in the extracted result.
+	MaxEdges int `yaml:"max_edges"`
+
+	// MaxFlows bounds connected flows retained in the extracted result.
+	MaxFlows int `yaml:"max_flows"`
+
+	// Timeout bounds one analysis run. A timeout returns a partial result with
+	// an omission rather than silently claiming complete coverage.
+	Timeout time.Duration `yaml:"timeout"`
+
+	// IncludeUnchanged includes unchanged context around changed declarations.
+	IncludeUnchanged bool `yaml:"include_unchanged"`
+
+	// Entrypoints seeds extraction from fully qualified package or symbol names.
+	// An empty list derives roots from changed declarations.
+	Entrypoints []string `yaml:"entrypoints"`
+
+	// Exclude lists doublestar globs omitted from flow analysis.
+	Exclude []string `yaml:"exclude"`
+
+	// BuildTags supplies additional Go build tags for source selection.
+	BuildTags []string `yaml:"build_tags"`
+}
+
+// FlowMode selects when application-flow extraction runs.
+type FlowMode string
+
+// Supported flow modes.
+const (
+	FlowOff  FlowMode = "off"
+	FlowAuto FlowMode = "auto"
+	FlowOn   FlowMode = "on"
+)
+
 // Approve decides whether a review that found nothing is submitted as an
 // approval instead of a comment.
 //
@@ -896,6 +958,40 @@ func LoadFile(path string) (*Config, error) {
 	}
 
 	return loadBytes(data, path)
+}
+
+// LoadFlowFile loads strictly decoded configuration and validates the flow
+// settings without requiring model credentials or valid review-only settings.
+func LoadFlowFile(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("read config %s: %w", path, err)
+	}
+	cfg := Defaults()
+	if err := applyFlowDocument(cfg, data, path); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func applyFlowDocument(cfg *Config, data []byte, source string) error {
+	if userPath, userData, err := userDocument(nil); err != nil {
+		return err
+	} else if len(userData) > 0 {
+		if _, err := cfg.merge(userData, false); err != nil {
+			return fmt.Errorf("parse user config %s: %w", userPath, err)
+		}
+	}
+	if _, err := cfg.merge(data, false); err != nil {
+		return fmt.Errorf("parse config %s: %w", source, err)
+	}
+	cfg.Persona = cfg.Persona.Resolve()
+	cfg.Source = source
+	cfg.Policy = Policy{Origin: OriginCheckout, Path: source}
+	if err := cfg.Flow.Validate(); err != nil {
+		return fmt.Errorf("invalid config %s: %w", source, err)
+	}
+	return nil
 }
 
 // loadBytes builds a validated Config from one config file's contents.

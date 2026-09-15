@@ -102,6 +102,7 @@ nav:
   - Guide:
       - Overview: guide.md
       - Usage: docs/usage.md
+      - Application flows: docs/flows.md
       - GitHub Actions and other CI: docs/ci.md
       - Configuration: docs/configuration.md
       - Configuration reference: docs/configuration-reference.md

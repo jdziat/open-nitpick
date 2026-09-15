@@ -65,6 +65,30 @@ jobs:
       - name: Build
         run: go build ./...
 
+  # The renderer's string tests cannot prove Mermaid accepts the emitted
+  # grammar. Keep this parser smoke separate from the application dependency
+  # tree: the exact Mermaid/jsdom versions are checked into scripts/ and npm ci
+  # installs them into the runner's temporary directory.
+  flow-mermaid-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install pinned Mermaid smoke dependencies
+        run: |
+          mkdir -p "$RUNNER_TEMP/nitpick-flow-mermaid"
+          cp scripts/flow-mermaid-package.json "$RUNNER_TEMP/nitpick-flow-mermaid/package.json"
+          cp scripts/flow-mermaid-package-lock.json "$RUNNER_TEMP/nitpick-flow-mermaid/package-lock.json"
+          npm ci --prefix "$RUNNER_TEMP/nitpick-flow-mermaid" --ignore-scripts --no-audit --no-fund
+          echo "FLOW_MERMAID_NODE_MODULES=$RUNNER_TEMP/nitpick-flow-mermaid/node_modules" >> "$GITHUB_ENV"
+      - name: Parse the Go renderer's emitted Mermaid
+        run: node scripts/flow-mermaid-smoke.mjs
+
   # Binaries for every push and pull request, built by the same target the
   # release uses, so a change can be tried on a runner before it is tagged.
   build:

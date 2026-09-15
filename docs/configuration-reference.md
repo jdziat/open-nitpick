@@ -30,6 +30,73 @@ withheld from a repository's own file unless `NITPICK_TRUST_CONFIG_ENDPOINTS=1`
 is set, for every role. So is `persona.custom`. See
 [Trust model](trust-model.md).
 
+## flow
+
+### `flow.build_tags`
+
+list of string, default `none`.
+BuildTags supplies additional Go build tags for source selection.
+
+### `flow.entrypoints`
+
+list of string, default `none`.
+Entrypoints seeds extraction from fully qualified package or symbol names.
+
+### `flow.exclude`
+
+list of string, default `none`.
+Exclude lists doublestar globs omitted from flow analysis.
+
+### `flow.include_unchanged`
+
+boolean, default `false`.
+IncludeUnchanged includes unchanged context around changed declarations.
+
+### `flow.max_bytes`
+
+integer, default `33554432`.
+MaxBytes bounds source bytes materialized for analysis.
+
+### `flow.max_depth_callees`
+
+integer, default `4`.
+MaxDepthCallees bounds traversal toward callees from changed declarations.
+
+### `flow.max_depth_callers`
+
+integer, default `8`.
+MaxDepthCallers bounds traversal toward callers of changed declarations.
+
+### `flow.max_edges`
+
+integer, default `1000`.
+MaxEdges bounds edges retained in the extracted result.
+
+### `flow.max_files`
+
+integer, default `2000`.
+MaxFiles bounds the number of Go source files materialized for analysis.
+
+### `flow.max_flows`
+
+integer, default `3`.
+MaxFlows bounds connected flows retained in the extracted result.
+
+### `flow.max_nodes`
+
+integer, default `500`.
+MaxNodes bounds nodes retained in the extracted result.
+
+### `flow.mode`
+
+string, default `off`.
+Mode controls when flow extraction runs: "off" skips it, "auto" runs it for eligible changed Go files, and "on" requires an eligible scan and reports unsupported or no-flow results explicitly.
+
+### `flow.timeout`
+
+duration, default `15s`.
+Timeout bounds one analysis run.
+
 ## instructions
 
 ### `instructions[].path`

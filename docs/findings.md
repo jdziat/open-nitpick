@@ -2440,3 +2440,61 @@ rejected the invalid title with `commits.subject-format`;
 [run 34656158969](https://github.com/jdziat/open-nitpick/actions/runs/34656158969)
 passed after the valid title was restored on the same commit. Those edits
 started two commit-policy runs and no new main CI run.
+
+## Flow analysis qualification
+
+The new flow extractor was exercised without a model or network on 2026-09-13.
+On this checkout (`go1.25.5`, Linux/amd64, EPYC 9R14),
+`go test ./internal/prflow -run '^$' -bench 'BenchmarkAnalyze(ChangedGraphs|MaterializationBounds|MissingDependency)' -benchtime=100ms -count=3`
+reported these medians across the three samples (the source and parser are
+synthetic, so these are capacity signals rather than user-facing latency
+targets):
+
+| case | median time | allocations |
+|---|---:|---:|
+| changed graph, 8 files | 110 µs/op | 54.6 KiB/op, 756 allocs/op |
+| changed graph, 64 files | 918 µs/op | 462.0 KiB/op, 5,005 allocs/op |
+| source-backed, 96 files, 32 KiB cap | 398 µs/op | 216.3 KiB/op, 1,654 allocs/op |
+| missing import, two module-shaped roots | 81 µs/op | 29.9 KiB/op, 428 allocs/op |
+
+The source-backed case retained no more than 32 files and 32 KiB of source in
+the result; parser/type metadata still accounts for additional allocations.
+The missing-import run completed in bounded time with `status: partial` and
+`missing_import: 1` plus `type_check_error: 2` omissions. The unavailable
+package is therefore visible and does not receive a full-resolution claim in
+this fixture. This is a narrow synthetic check, not a qualification of every
+module-loader failure mode.
+
+A local dry run over the changed Go files used:
+
+```text
+go run ./cmd/nitpick flow -mode on -format json -output - \
+  -max-files 24 -max-bytes 65536 -max-depth-callers 2 \
+  -max-depth-callees 2 -max-nodes 50 -max-edges 100 -max-flows 2 -timeout 5s
+```
+
+It exited zero and returned `status: partial`, 3 files/34,755 source bytes,
+28 declarations, 50 nodes, 66 edges, and 2 flows. Coverage reported 80
+traversal-limit, 12 byte-limit, 8 missing-import, and 38 type-check omissions;
+the output was 48,529 bytes of JSON and identified the head as a working-tree
+content digest. These figures are one local snapshot and are not a throughput
+promise; rerun the command after changing limits or source materialization.
+
+The renderer also has a parser smoke: `npm ci` installs the checked-in
+`mermaid@11.12.2` and `jsdom@26.1.0` lockfile into a temporary directory, then
+`node scripts/flow-mermaid-smoke.mjs` runs the Go fixture and
+`mermaid.parse`. It passed on Node 24 with the hostile-label, changed,
+inferred, boundary, removed, and empty-edge fixture (10 diagram lines, 499
+bytes). This checks syntax acceptance; it does not measure browser layout.
+
+Seven mutation checks used temporary Go overlays against dispatch discovery,
+direct-call resolution, deletion seeding, added-state markers, base evidence,
+Mermaid escaping, and coverage notices. All seven made their corresponding
+behavior tests fail; none survived. The unchanged targeted tests passed.
+
+A local browser preview of the emitted fixture rendered Mermaid and its text
+table at 320, 768, 1024, 1280, and 1440 pixels. Screenshots at 320 and 1280
+pixels showed all four labels and three relationship styles without clipping;
+the accessibility snapshot retained the matching table and coverage reasons.
+No browser console errors were recorded. The preview used a local Markdown
+shell, so it does not verify GitHub's production renderer or theme.

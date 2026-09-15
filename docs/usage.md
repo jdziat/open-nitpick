@@ -65,6 +65,23 @@ nitpick providers                       # available model providers
 Local reviews print to stdout as `path:line`, which most terminals and editors
 turn into a clickable link.
 
+## Inspecting application flow
+
+```bash
+nitpick flow -mode on                  # changed Go files in the working tree
+nitpick flow -mode on -base main -head feature  # two committed revisions
+nitpick flow -mode on -format json -output flow.json
+nitpick flow -mode on -entry cmd/main.go:42
+```
+
+`flow` makes no model call and never publishes a review, so it does not need a
+model configuration. It emits static Go source relationships, not a runtime
+trace or proof of complete coverage. Set `flow.mode: auto` or `on` in
+`.nitpick.yaml` to share the same bounded result with a review; the shipped
+default is `off` while repositories qualify the output for their codebase.
+See [Application flows](flows.md) for unchanged context, source links, statuses,
+and limits.
+
 ## Evaluate repository standards
 
 ```bash

@@ -12,6 +12,11 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/prflow"
+	"github.com/jdziat/open-nitpick/internal/review"
 )
 
 // mcpSession connects a client to the server over in-memory transports.
@@ -185,5 +190,20 @@ func TestReviewTextCarriesTheCitation(t *testing.T) {
 	})
 	if !strings.Contains(plain, "(resource: why)") {
 		t.Errorf("an uncited withheld finding did not render cleanly:\n%s", plain)
+	}
+}
+
+func TestMCPReviewOutputCarriesTheCanonicalFlowResult(t *testing.T) {
+	flow := &prflow.Result{Version: 1, Status: prflow.StatusPartial, Explanation: "limit reached"}
+	out := reviewOut(&review.Report{Flow: flow, Plan: &bundle.Plan{}}, config.SeverityWarning)
+	if out.Flow != flow {
+		t.Fatalf("flow = %+v, want canonical result %+v", out.Flow, flow)
+	}
+	data, err := json.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"flow":{"version":1,"status":"partial"`) {
+		t.Fatalf("flow absent from JSON output: %s", data)
 	}
 }

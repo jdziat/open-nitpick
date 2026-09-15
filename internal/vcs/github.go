@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -91,6 +92,48 @@ func NewGitHub(opts GitHubOptions) (*GitHub, error) {
 
 // Name identifies the provider.
 func (g *GitHub) Name() string { return "github" }
+
+// SourceBase returns the immutable web URL prefix for source evidence at
+// revision. Pull-request metadata supplies the head repository so a change
+// from a fork is never linked to the base repository by accident.
+func (g *GitHub) SourceBase(ctx context.Context, ref Ref, revision string) (string, error) {
+	revision = strings.TrimSpace(revision)
+	if !immutableRevision(revision) {
+		return "", fmt.Errorf("github: source revision must be an immutable commit SHA")
+	}
+	if ref.Number <= 0 || strings.TrimSpace(ref.Owner) == "" || strings.TrimSpace(ref.Repo) == "" {
+		return "", fmt.Errorf("github: %w", ErrNoSourceLink)
+	}
+
+	pr, err := g.PullRequest(ctx, ref)
+	if err != nil {
+		return "", fmt.Errorf("github: source repository: %w", err)
+	}
+	repository := strings.TrimSpace(pr.HeadRepo)
+	if revision == pr.BaseSHA {
+		repository = strings.TrimSpace(pr.BaseRepo)
+	} else if revision != pr.HeadSHA {
+		return "", fmt.Errorf("github: %w", ErrNoSourceLink)
+	}
+	if repository == "" {
+		return "", fmt.Errorf("github: %w", ErrNoSourceLink)
+	}
+	parts := strings.Split(repository, "/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", fmt.Errorf("github: source repository %q is invalid", repository)
+	}
+
+	origin := "https://github.com"
+	if base := g.client.BaseURL; base != nil && base.Host != "" && base.Host != "api.github.com" {
+		scheme := base.Scheme
+		if scheme == "" {
+			scheme = "https"
+		}
+		prefix := strings.TrimSuffix(strings.TrimRight(base.Path, "/"), "/api/v3")
+		origin = scheme + "://" + base.Host + prefix
+	}
+	return origin + "/" + url.PathEscape(parts[0]) + "/" + url.PathEscape(parts[1]) + "/blob/" + revision, nil
+}
 
 // PullRequest fetches pull request metadata.
 func (g *GitHub) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error) {
@@ -192,6 +235,10 @@ func (g *GitHub) BaseRevision(ctx context.Context, ref Ref) (string, error) {
 
 // FileContent fetches a file at the pull request's head.
 func (g *GitHub) FileContent(ctx context.Context, ref Ref, path string) ([]byte, error) {
+	return g.fileContent(ctx, ref, path, 0)
+}
+
+func (g *GitHub) fileContent(ctx context.Context, ref Ref, path string, limit int) ([]byte, error) {
 	if err := validateRef(ref); err != nil {
 		return nil, err
 	}
@@ -221,6 +268,9 @@ func (g *GitHub) FileContent(ctx context.Context, ref Ref, path string) ([]byte,
 	if file.GetSubmoduleGitURL() != "" || file.GetType() == "submodule" || file.GetType() == "symlink" {
 		return nil, fmt.Errorf("github: contents %s are not regular file source", path)
 	}
+	if limit > 0 && file.GetSize() > limit {
+		return nil, ErrSourceLimit
+	}
 	if file.GetEncoding() != "none" {
 		if file.Content == nil && (file.Size == nil || file.GetSize() != 0) {
 			return nil, fmt.Errorf("github: missing inline content for %s", path)
@@ -228,6 +278,9 @@ func (g *GitHub) FileContent(ctx context.Context, ref Ref, path string) ([]byte,
 		content, err := file.GetContent()
 		if err != nil {
 			return nil, fmt.Errorf("github: decode contents %s: %w", path, err)
+		}
+		if limit > 0 && len(content) > limit {
+			return nil, ErrSourceLimit
 		}
 		return []byte(content), nil
 	}
@@ -242,9 +295,16 @@ func (g *GitHub) FileContent(ctx context.Context, ref Ref, path string) ([]byte,
 		return nil, fmt.Errorf("github: download contents %s did not return a complete response", path)
 	}
 
-	data, err := io.ReadAll(reader)
+	var input io.Reader = reader
+	if limit > 0 {
+		input = io.LimitReader(reader, int64(limit)+1)
+	}
+	data, err := io.ReadAll(input)
 	if err != nil {
 		return nil, fmt.Errorf("github: read contents %s: %w", path, err)
+	}
+	if limit > 0 && len(data) > limit {
+		return nil, ErrSourceLimit
 	}
 	if file.Size != nil && len(data) != file.GetSize() {
 		return nil, fmt.Errorf("github: downloaded contents %s have %d bytes, expected %d", path, len(data), file.GetSize())
@@ -332,7 +392,7 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 		comments = comments[:maxCommentsPerReview]
 	}
 
-	body := stripMarkers(review.Summary)
+	body := stripMarkers(review.SummaryWithFlow())
 	if truncated > 0 {
 		body += fmt.Sprintf("\n\n_%d further finding(s) were omitted to keep this review readable._", truncated)
 	}

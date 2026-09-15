@@ -123,6 +123,19 @@ func Defaults() *Config {
 			Slop:                 false,
 			RelatedContextTokens: 16000,
 		},
+		Flow: Flow{
+			// Flow extraction is opt-in while the static-analysis and rendering
+			// limits are qualified against real repositories.
+			Mode:            FlowOff,
+			MaxFiles:        2000,
+			MaxBytes:        32 << 20,
+			MaxDepthCallers: 8,
+			MaxDepthCallees: 4,
+			MaxNodes:        500,
+			MaxEdges:        1000,
+			MaxFlows:        3,
+			Timeout:         15 * time.Second,
+		},
 		Persona: DefaultPersona(),
 		// Stated rather than left to the zero value, because "off" here is a
 		// decision with a reason: the pass is unmeasured and its risk is to

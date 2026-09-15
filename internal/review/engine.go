@@ -25,6 +25,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/fence"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/practices"
+	"github.com/jdziat/open-nitpick/internal/prflow"
 	"github.com/jdziat/open-nitpick/internal/prompt"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
@@ -99,6 +100,11 @@ type Engine struct {
 
 	// Full bypasses incremental history on an explicit operator request.
 	Full bool
+
+	// FlowWorker is the nitpick executable used to isolate parsing and type
+	// checking from the review process. Empty uses the in-process API for
+	// library callers that already provide their own process boundary.
+	FlowWorker string
 }
 
 // LinterRunner produces deterministic findings for the changed files.
@@ -384,6 +390,20 @@ type Report struct {
 	// Summary is the walkthrough, empty when summaries are disabled.
 	Summary string
 
+	// FlowMarkdown is the optional, bounded application-flow section. It is
+	// independent of the narrative summary setting: when present, Render
+	// carries it into the published review even if review.summary is disabled.
+	FlowMarkdown string
+
+	// FlowEvidence retains changed declaration links when the complete flow
+	// diagram cannot fit alongside the ordinary review walkthrough.
+	FlowEvidence string
+
+	// Flow is the canonical versioned static-analysis result. It remains
+	// separate from pipeline completion because flow evidence never gates a
+	// model review.
+	Flow *prflow.Result
+
 	// Plan records what was reviewed and what was skipped.
 	Plan *bundle.Plan
 
@@ -668,6 +688,11 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 
 	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr}
 	defer func() { report.Routes = e.routeDecisions }()
+
+	// Flow analysis sees the whole policy-filtered change before incremental
+	// review narrows the model context. Its outcome is descriptive evidence,
+	// never a condition for the review gate or baseline reuse.
+	report.Flow, report.FlowMarkdown, report.FlowEvidence = e.flow(ctx, ref, pr, files, e.Config)
 
 	// What an earlier run left on the pull request, read after the policy is
 	// settled because review.incremental is policy. A provider that cannot answer

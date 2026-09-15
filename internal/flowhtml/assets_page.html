@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>{{.Title}}</title>
+<style>{{.CSS}}</style>
+</head>
+<body>
+<a class="skip" href="#graphs">Skip to diagrams</a>
+<header>
+  <div class="bar">
+    <h1>{{.Title}}</h1>
+    <span class="badge {{.StatusClass}}">{{.Status}}</span>
+    <span class="meta counts">{{.ChangedCount}} changed · {{.Coverage.Declarations}} declaration(s) · {{.UnresolvedCount}} unresolved</span>
+  </div>
+  <div class="toolbar">
+    <input type="search" id="search" placeholder="Filter by symbol, path, or reason" aria-label="Filter nodes by symbol, path, or reason">
+    <button type="button" class="toggle" id="changed-only" aria-pressed="false">Changed only</button>
+    <button type="button" class="toggle" id="hide-boundary" aria-pressed="false">Hide boundaries</button>
+    <button type="button" id="expand-all">Collapse all</button>
+    <button type="button" id="reset">Reset</button>
+    <span class="meta" id="filter-status" role="status" aria-live="polite"></span>
+  </div>
+</header>
+<main>
+  <section id="graphs" aria-label="Flow diagrams">
+    {{if .Flows}}
+      {{range .Flows}}
+      <details class="flow" open>
+        <summary>{{.Name}}<span class="count">{{.Nodes}} node(s), {{.Edges}} edge(s){{if .Focused}} · {{.Hidden}} more not shown{{end}}</span></summary>
+        <div class="canvas" data-flow="{{.ID}}">
+          <div class="zoom" role="group" aria-label="Diagram view controls">
+            <button type="button" data-zoom="out" aria-label="Zoom out">&minus;</button>
+            <span class="level" aria-hidden="true">100%</span>
+            <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
+            <button type="button" data-zoom="fit">Fit</button>
+            <button type="button" data-zoom="actual">100%</button>
+          </div>
+          {{if .Focused}}<p class="focus-note">Showing the changed declarations and what they call directly. {{.Hidden}} further node(s) in this flow are not drawn; search or filter to reach them.</p>{{end}}
+          <div class="viewport" tabindex="0" role="application" aria-label="{{.Name}} diagram. Use arrow keys to move between nodes, Enter to open details, and Escape to clear.">{{.SVG}}</div>
+        </div>
+      </details>
+      {{end}}
+    {{else}}
+      <p class="empty">No path was resolved in the selected scope. This is not evidence that the change has no effect; see the coverage details for what ran and what could not be established.</p>
+    {{end}}
+
+    <details class="about">
+      <summary>About this document</summary>
+      <div class="about-body">
+        {{if .Explanation}}<p class="meta">{{.Explanation}}</p>{{end}}
+        <p class="disclaimer">These are static source relationships extracted from the selected snapshot. They are not a runtime trace and not proof that every affected path was found. An empty diagram is not evidence that the change has no effect.</p>
+        {{if .IncludesSource}}<p class="notice">This document embeds repository source ({{.SourceBytes}} bytes){{if .SourceTruncated}}, truncated at the embedding limit{{end}}. Share it only where the source may go.</p>{{end}}
+        <h3>Legend</h3>
+        <ul class="legend">
+          {{range .Legend}}<li><span class="swatch {{.Class}}"></span>{{.Title}} — {{.Detail}}</li>{{end}}
+        </ul>
+        <h3>Coverage</h3>
+        <dl class="kv">
+          <dt>Status</dt><dd>{{.Status}}</dd>
+          {{if .HeadSHA}}<dt>Head</dt><dd class="mono">{{.HeadSHA}}</dd>{{end}}
+          {{if .BaseSHA}}<dt>Base</dt><dd class="mono">{{.BaseSHA}}</dd>{{end}}
+          {{if .Snapshot}}<dt>Snapshot</dt><dd class="mono">{{.Snapshot}}</dd>{{end}}
+          <dt>Files</dt><dd>{{.Coverage.Files}}</dd>
+          <dt>Bytes</dt><dd>{{.Coverage.Bytes}}</dd>
+          <dt>Declarations</dt><dd>{{.Coverage.Declarations}}</dd>
+          <dt>Edges</dt><dd>{{.Coverage.Edges}}</dd>
+          {{if .Generator}}<dt>Generator</dt><dd class="mono">{{.Generator}}</dd>{{end}}
+          {{if .GOOS}}<dt>Build</dt><dd class="mono">{{.GOOS}}/{{.GOARCH}}</dd>{{end}}
+          {{if .OptionsDigest}}<dt>Options</dt><dd class="mono">{{.OptionsDigest}}</dd>{{end}}
+        </dl>
+        {{if .Omissions}}
+        <h3>Omissions</h3>
+        <table class="omissions">
+          {{range .Omissions}}<tr><td class="mono">{{.Reason}}</td><td>{{.Count}}</td></tr>{{end}}
+        </table>
+        <p class="hint">An omission is work the extractor did not do and says so, rather than a relationship it guessed.</p>
+        {{end}}
+      </div>
+    </details>
+  </section>
+  <div id="panel-resize" role="separator" aria-orientation="vertical" aria-label="Resize the detail panel" aria-valuenow="420" aria-valuemin="280" aria-valuemax="1200" tabindex="0"></div>
+  <aside id="panel" aria-label="Selected declaration"><nav id="panel-changed-nav" aria-label="Changed declarations"><h3>Changed</h3><ul id="panel-changed-list"></ul></nav><div id="panel-body"></div></aside>
+</main>
+<footer>Generated by open-nitpick{{if .Generator}} · {{.Generator}}{{end}}. Deterministic: the same result and options always produce this same document.</footer>
+<script>window.__FLOW_NODES__={{.NodeJSON}};window.__FLOW_START__={{.StartJSON}};</script>
+<script>{{.JS}}</script>
+</body>
+</html>

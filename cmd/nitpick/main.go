@@ -65,6 +65,10 @@ func run() int {
 		err = runStandards(ctx, os.Args[2:])
 	case "slop":
 		err = runSlop(ctx, os.Args[2:])
+	case "flow":
+		err = runFlow(ctx, os.Args[2:])
+	case "__flow-worker":
+		err = runFlowWorker(ctx)
 	case "respond":
 		err = runRespond(ctx, os.Args[2:])
 	case "mcp":
@@ -137,6 +141,7 @@ Usage:
   nitpick commits [flags]          Validate commit subjects against accepted policy
   nitpick improve [flags]          The wider pass: the classes a normal review filters out
   nitpick slop [flags] [path...]   AI slop only: the tells without a model, the model's slop rules, a score, and fixes
+  nitpick flow [flags]             Extract source-linked application flows (no model, no publishing)
   nitpick respond [flags]          Answer an @open-nitpick comment on a pull request (review again, resolve, or a question)
   nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
   nitpick mcp install <client>     Register that server with an agent client (claude-code, cursor, opencode, codex, ...)

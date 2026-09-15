@@ -314,6 +314,11 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 		&config.BasePolicy{RepoRoot: repo, Loaded: cfg, Provider: provider},
 		llm.BuildRoles,
 		log)
+	worker, err := os.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("locate flow worker: %w", err)
+	}
+	engine.FlowWorker = worker
 	var usage engineeringUsage
 	buildModels := engine.Models
 	engine.Models = func(policy *config.Config) (*llm.Roles, error) {
@@ -562,6 +567,24 @@ func (d *dryRunProvider) Diff(ctx context.Context, ref vcs.Ref) ([]byte, error) 
 
 func (d *dryRunProvider) FileContent(ctx context.Context, ref vcs.Ref, path string) ([]byte, error) {
 	return d.source.FileContent(ctx, ref, path)
+}
+
+func (d *dryRunProvider) FileContentLimit(ctx context.Context, ref vcs.Ref, name string, limit int) ([]byte, error) {
+	if provider, ok := d.source.(vcs.LimitedFileProvider); ok {
+		return provider.FileContentLimit(ctx, ref, name, limit)
+	}
+	return d.source.FileContent(ctx, ref, name)
+}
+
+func (d *dryRunProvider) ListDir(ctx context.Context, ref vcs.Ref, dir string) ([]string, error) {
+	if provider, ok := d.source.(vcs.DirLister); ok {
+		return provider.ListDir(ctx, ref, dir)
+	}
+	return nil, vcs.ErrNotFound
+}
+
+func (d *dryRunProvider) SourceBase(ctx context.Context, ref vcs.Ref, revision string) (string, error) {
+	return vcs.SourceBase(ctx, d.source, ref, revision)
 }
 
 // BaseRevision forwards to the wrapped forge so a dry run resolves policy the

@@ -17,19 +17,34 @@ type Location struct {
 
 // Node is a step in a flow, with its declaration or call site as evidence.
 type Node struct {
+	ID      string   `json:"id,omitempty"`
 	Label   string   `json:"label"`
 	Source  Location `json:"source"`
 	Changed bool     `json:"changed"`
+	// State is the extractor's change state (added, modified, unchanged,
+	// removed). It is rendered alongside the label so the diagram remains
+	// understandable without colour or Mermaid support.
+	State string `json:"state,omitempty"`
+	// Boundary marks a node that represents an unresolved or external target.
+	Boundary bool `json:"boundary,omitempty"`
+	// Reason explains why a boundary exists.
+	Reason string `json:"reason,omitempty"`
 }
 
 // Edge connects node indices and names the source that establishes the relation.
 // Inferred connections must remain visually distinct from resolved connections.
 type Edge struct {
-	From     int      `json:"from"`
-	To       int      `json:"to"`
-	Label    string   `json:"label"`
-	Source   Location `json:"source"`
-	Inferred bool     `json:"inferred"`
+	ID         string   `json:"id,omitempty"`
+	From       int      `json:"from"`
+	To         int      `json:"to"`
+	Label      string   `json:"label"`
+	Source     Location `json:"source"`
+	Inferred   bool     `json:"inferred"`
+	Unresolved bool     `json:"unresolved,omitempty"`
+	// Removed selects the base revision for source evidence when this relation
+	// belongs to a declaration that was removed by the change.
+	Removed bool   `json:"removed,omitempty"`
+	Reason  string `json:"reason,omitempty"`
 }
 
 // Graph contains one scoped flow and explicit limits on its interpretation.
@@ -39,12 +54,24 @@ type Graph struct {
 	Unresolved []string `json:"unresolved,omitempty"`
 }
 
-// Markdown renders a Mermaid flow and an evidence table. sourceBase must be
-// an HTTPS URL ending at the immutable source revision, such as a GitHub blob URL.
+// Markdown renders a Mermaid flow and an evidence table. A nonempty sourceBase
+// must be an immutable HTTPS revision URL, such as a GitHub blob URL. An empty
+// sourceBase is for a local working tree and deliberately emits plain evidence.
 func (g Graph) Markdown(sourceBase string) (string, error) {
-	base, err := url.Parse(sourceBase)
-	if err != nil || base.Scheme != "https" || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
-		return "", fmt.Errorf("source base must be an HTTPS revision URL without credentials, query, or fragment")
+	return g.MarkdownSources(sourceBase, "")
+}
+
+// MarkdownSources renders a graph using headBase for current evidence and
+// baseBase for evidence belonging to removed declarations.
+func (g Graph) MarkdownSources(headBase, baseBase string) (string, error) {
+	// Empty bases retain plain path:line evidence (the local working-tree case).
+	head, err := parseSourceBase(headBase)
+	if err != nil {
+		return "", err
+	}
+	base, err := parseSourceBase(baseBase)
+	if err != nil {
+		return "", err
 	}
 	for i, node := range g.Nodes {
 		if err := node.Source.validate(); err != nil {
@@ -64,16 +91,23 @@ func (g Graph) Markdown(sourceBase string) (string, error) {
 	if len(g.Nodes) == 0 {
 		b.WriteString("No flow was resolved in the supplied scope. This is not evidence that the change has no effect.\n")
 	} else {
-		b.WriteString("Highlighted nodes changed. Dashed edges are inferred. Connections describe source relationships, not a runtime trace.\n\n```mermaid\nflowchart TD\n")
+		b.WriteString("Highlighted nodes changed. Solid arrows are resolved, dashed arrows inferred, and crossed ends unresolved. Connections describe source relationships, not a runtime trace.\n\n```mermaid\nflowchart TD\n")
 		for i, node := range g.Nodes {
-			fmt.Fprintf(&b, "  n%d[\"%s\"]\n", i, escape(node.Label))
+			fmt.Fprintf(&b, "  n%d[\"%s\"]\n", i, escapeMermaid(node.displayLabel()))
 		}
 		for _, edge := range g.Edges {
 			arrow := "-->"
 			if edge.Inferred {
 				arrow = "-.->"
 			}
-			fmt.Fprintf(&b, "  n%d %s|\"%s\"| n%d\n", edge.From, arrow, escape(edge.Label), edge.To)
+			if edge.Unresolved {
+				arrow = "--x"
+			}
+			if edge.Label == "" {
+				fmt.Fprintf(&b, "  n%d %s n%d\n", edge.From, arrow, edge.To)
+			} else {
+				fmt.Fprintf(&b, "  n%d %s|\"%s\"| n%d\n", edge.From, arrow, escapeMermaid(edge.Label), edge.To)
+			}
 		}
 		b.WriteString("  classDef changed fill:#fff3cd,stroke:#806000,color:#302500,stroke-width:3px\n")
 		for i, node := range g.Nodes {
@@ -83,10 +117,22 @@ func (g Graph) Markdown(sourceBase string) (string, error) {
 		}
 		b.WriteString("```\n\n| Element | Source evidence |\n| --- | --- |\n")
 		for i, node := range g.Nodes {
-			fmt.Fprintf(&b, "| Node %d: %s | %s |\n", i, escape(node.Label), node.Source.link(base))
+			evidenceBase := head
+			if node.State == "removed" {
+				evidenceBase = base
+			}
+			fmt.Fprintf(&b, "| Node %d: %s | %s |\n", i, escape(node.displayLabel()), node.Source.link(evidenceBase))
 		}
 		for i, edge := range g.Edges {
-			fmt.Fprintf(&b, "| Edge %d: %s | %s |\n", i, escape(edge.Label), edge.Source.link(base))
+			evidenceBase := head
+			if edge.Removed {
+				evidenceBase = base
+			}
+			label := edge.Label
+			if edge.Reason != "" {
+				label += " (" + edge.Reason + ")"
+			}
+			fmt.Fprintf(&b, "| Edge %d: node %d → node %d; %s | %s |\n", i, edge.From, edge.To, escape(label), edge.Source.link(evidenceBase))
 		}
 	}
 	if len(g.Unresolved) > 0 {
@@ -98,6 +144,32 @@ func (g Graph) Markdown(sourceBase string) (string, error) {
 	return b.String(), nil
 }
 
+func parseSourceBase(sourceBase string) (*url.URL, error) {
+	if sourceBase == "" {
+		return nil, nil
+	}
+	parsed, err := url.Parse(sourceBase)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return nil, fmt.Errorf("source base must be an HTTPS revision URL without credentials, query, or fragment")
+	}
+	return parsed, nil
+}
+
+func (n Node) displayLabel() string {
+	label := n.Label
+	if n.State != "" {
+		label += " (" + n.State + ")"
+	}
+	if n.Boundary {
+		if n.Reason != "" {
+			label += " (boundary: " + n.Reason + ")"
+		} else {
+			label += " (boundary)"
+		}
+	}
+	return label
+}
+
 func (l Location) validate() error {
 	if l.Line < 1 || l.Path == "" || path.IsAbs(l.Path) || path.Clean(l.Path) != l.Path || l.Path == ".." || strings.HasPrefix(l.Path, "../") || strings.ContainsAny(l.Path, "\\\r\n\x00") {
 		return fmt.Errorf("source location needs a relative repository path and positive line")
@@ -106,6 +178,9 @@ func (l Location) validate() error {
 }
 
 func (l Location) link(base *url.URL) string {
+	if base == nil {
+		return escape(l.Path) + ":" + strconv.Itoa(l.Line)
+	}
 	target := *base
 	target.Path = strings.TrimRight(base.Path, "/") + "/" + l.Path
 	target.RawPath = ""
@@ -113,7 +188,7 @@ func (l Location) link(base *url.URL) string {
 	return "[" + escape(l.Path) + ":" + strconv.Itoa(l.Line) + "](<" + target.String() + ">)"
 }
 
-// Encode punctuation so repository text cannot become Mermaid or Markdown syntax.
+// escapeHTML encodes untrusted text for Markdown table cells and list items.
 func escape(s string) string {
 	var b strings.Builder
 	for _, r := range s {
@@ -121,6 +196,19 @@ func escape(s string) string {
 			b.WriteRune(r)
 		} else {
 			fmt.Fprintf(&b, "&#%d;", r)
+		}
+	}
+	return b.String()
+}
+
+// escapeMermaid uses Mermaid entity syntax (without the HTML ampersand).
+func escapeMermaid(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == ' ' {
+			b.WriteRune(r)
+		} else {
+			fmt.Fprintf(&b, "#%d;", r)
 		}
 	}
 	return b.String()

@@ -17,6 +17,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/fullreview"
 	"github.com/jdziat/open-nitpick/internal/practices"
+	"github.com/jdziat/open-nitpick/internal/prflow"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
@@ -145,6 +146,7 @@ type Withheld struct {
 type ReviewOut struct {
 	Practices *practices.Report `json:"practices,omitempty" jsonschema:"engineering check coverage and policy findings when selected"`
 	Summary   string            `json:"summary" jsonschema:"the walkthrough the triage model wrote"`
+	Flow      *prflow.Result    `json:"flow,omitempty" jsonschema:"versioned deterministic static application-flow evidence, when flow analysis ran"`
 	Findings  []Finding         `json:"findings"`
 	Counts    map[string]int    `json:"counts" jsonschema:"findings by severity"`
 	Files     int               `json:"files" jsonschema:"files reviewed"`
@@ -361,6 +363,7 @@ func (t *mcpTools) explainConfig(_ context.Context, _ *mcp.CallToolRequest, in E
 func reviewOut(report *review.Report, failOn config.Severity) ReviewOut {
 	out := ReviewOut{
 		Summary:      report.Summary,
+		Flow:         report.Flow,
 		Practices:    report.Practices,
 		Files:        report.Plan.Files(),
 		FailOn:       string(failOn),

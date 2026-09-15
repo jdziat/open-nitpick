@@ -59,6 +59,11 @@ var ErrOutsideChange = errors.New("vcs: the path is not part of this change")
 // protected path, an underived branch name.
 var ErrNoWriteAccess = errors.New("vcs: the credential may not write to this repository")
 
+// ErrNoSourceLink reports that a provider cannot build an immutable web link
+// for evidence in a reviewed revision. Callers should retain a plain
+// path:line location rather than fabricating a mutable URL.
+var ErrNoSourceLink = errors.New("vcs: immutable source links unavailable")
+
 // Ref identifies what to review.
 type Ref struct {
 	// Owner and Repo identify the repository on a forge. Both are empty for
@@ -172,6 +177,16 @@ type Review struct {
 	// Summary is the top-level walkthrough comment. It may be empty.
 	Summary string
 
+	// FlowMarkdown is an optional, bounded application-flow section. Renderers
+	// that already fold it into Summary may set both fields; SummaryWithFlow
+	// avoids publishing the section twice. Providers that support review output
+	// should use SummaryWithFlow when constructing their body.
+	FlowMarkdown string
+
+	// FlowEvidence is the changed-declaration source table used when the full
+	// flow diagram cannot fit alongside the review walkthrough.
+	FlowEvidence string
+
 	// Comments are anchored to a line of the diff.
 	Comments []Comment
 
@@ -192,6 +207,166 @@ type Review struct {
 	// means nothing was priced, which is the case whenever no ceiling is
 	// configured.
 	Spend float64
+}
+
+// SummaryWithFlow returns the review walkthrough with its optional flow
+// section appended exactly once. Keeping this composition here gives local,
+// GitHub, and future providers identical publication semantics.
+func (r Review) SummaryWithFlow() string {
+	summary := strings.TrimSpace(r.Summary)
+	flow := strings.TrimSpace(r.FlowMarkdown)
+	if flow == "" {
+		return summary
+	}
+	if strings.Contains(summary, flow) {
+		summary = strings.TrimSpace(strings.Replace(summary, flow, "", 1))
+	}
+	// Leave room for provider markers below GitHub's 65,536-byte body limit.
+	// Findings and the ordinary review summary keep their existing space.
+	const maxBody = 60 << 10
+	if len(summary)+len(flow)+2 > maxBody {
+		flow = boundedFlowEvidence(r.FlowEvidence, flow, maxBody-len(summary)-2)
+	}
+	if flow == "" {
+		return summary
+	}
+	if summary == "" {
+		return flow
+	}
+	return summary + "\n\n" + flow
+}
+
+// boundedFlowEvidence returns changed source evidence that fits in available.
+// It preserves only complete Markdown lines and reports the number of table
+// rows it had to omit, so a compact review cannot look like complete evidence.
+func boundedFlowEvidence(evidence, full string, available int) string {
+	evidence = strings.TrimSpace(evidence)
+	if available <= 0 {
+		return ""
+	}
+	if evidence == "" {
+		return boundedFlowStatus(full, available)
+	}
+	if len(evidence) <= available {
+		return evidence
+	}
+
+	totalRows := countFlowEvidenceRows(evidence)
+	keptRows, bestEnd, bestOmitted := 0, 0, 0
+	for start := 0; start < len(evidence); {
+		end, next := nextFlowEvidenceLine(evidence, start)
+		if isFlowEvidenceRow(evidence[start:end]) {
+			keptRows++
+		}
+		omitted := totalRows - keptRows
+		if end > 0 && end+len(flowEvidenceOmissionNotice(omitted)) <= available {
+			bestEnd, bestOmitted = end, omitted
+		}
+		start = next
+	}
+	if bestEnd == 0 {
+		// A summary can leave less room than one flow heading. Keep its wording
+		// intact instead of splitting a status line or Markdown table row.
+		return ""
+	}
+	return strings.TrimSpace(evidence[:bestEnd]) + flowEvidenceOmissionNotice(bestOmitted)
+}
+
+func countFlowEvidenceRows(evidence string) int {
+	rows := 0
+	for start := 0; start < len(evidence); {
+		end, next := nextFlowEvidenceLine(evidence, start)
+		if isFlowEvidenceRow(evidence[start:end]) {
+			rows++
+		}
+		start = next
+	}
+	return rows
+}
+
+func nextFlowEvidenceLine(evidence string, start int) (end, next int) {
+	newline := strings.IndexByte(evidence[start:], '\n')
+	if newline < 0 {
+		return len(evidence), len(evidence)
+	}
+	end = start + newline
+	return end, end + 1
+}
+
+func flowEvidenceOmissionNotice(omitted int) string {
+	if omitted == 0 {
+		return ""
+	}
+	return fmt.Sprintf("\n\n%d source-evidence row(s) were omitted because the review body reached its size limit.", omitted)
+}
+
+func boundedFlowStatus(full string, available int) string {
+	const notice = "\n\nFlow evidence was omitted because the review body reached its size limit."
+	status := flowStatus(full)
+	if status == "" {
+		return ""
+	}
+	if len(status)+len(notice) <= available {
+		return status + notice
+	}
+	for _, line := range strings.Split(status, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && len(line)+len(notice) <= available {
+			return line + notice
+		}
+	}
+	return ""
+}
+
+func isFlowEvidenceRow(line string) bool {
+	return strings.HasPrefix(line, "| Node ") || strings.HasPrefix(line, "| Edge ")
+}
+
+func flowStatus(flow string) string {
+	status, _, _ := strings.Cut(flow, "<details>")
+	return strings.TrimSpace(status)
+}
+
+// SourceLinker builds immutable source URLs for evidence in a reviewed
+// revision. Implementations must reject mutable branch names and preserve the
+// repository identity of a pull-request fork.
+type SourceLinker interface {
+	SourceBase(context.Context, Ref, string) (string, error)
+}
+
+// SourceBase asks a provider for the immutable source URL base for revision.
+// Providers without a web origin return ErrNoSourceLink; callers can still
+// publish a plain repository-relative path and line.
+func SourceBase(ctx context.Context, p Provider, ref Ref, revision string) (string, error) {
+	if !immutableRevision(strings.TrimSpace(revision)) {
+		return "", fmt.Errorf("%s: source revision must be an immutable commit SHA", p.Name())
+	}
+	linker, ok := p.(SourceLinker)
+	if !ok {
+		return "", fmt.Errorf("%s: %w", p.Name(), ErrNoSourceLink)
+	}
+	base, err := linker.SourceBase(ctx, ref, revision)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(base) == "" {
+		return "", fmt.Errorf("%s: %w", p.Name(), ErrNoSourceLink)
+	}
+	return base, nil
+}
+
+// immutableRevision accepts abbreviated or full hexadecimal commit IDs while
+// rejecting branch names and URL syntax that could make evidence drift.
+func immutableRevision(revision string) bool {
+	if len(revision) < 7 || len(revision) > 128 {
+		return false
+	}
+	for _, r := range revision {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
+			return false
+		}
+	}
+	return true
 }
 
 // DirLister is implemented by providers that can name the entries of a

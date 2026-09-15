@@ -26,6 +26,7 @@ func (c *Config) Validate() error {
 	errs = append(errs, c.Validation.validate()...)
 	errs = append(errs, c.Standards.Validate())
 	errs = append(errs, c.Practices.Validate())
+	errs = append(errs, c.Flow.validate()...)
 
 	for i, ins := range c.Instructions {
 		if strings.TrimSpace(ins.Path) == "" {
@@ -39,6 +40,60 @@ func (c *Config) Validate() error {
 	}
 
 	return errors.Join(errs...)
+}
+
+// Validate checks flow settings independently of model and review settings.
+func (f Flow) Validate() error {
+	return errors.Join(f.validate()...)
+}
+
+func (f Flow) validate() []error {
+	var errs []error
+	switch f.Mode {
+	case "", FlowOff, FlowAuto, FlowOn:
+	default:
+		errs = append(errs, fmt.Errorf("flow.mode %q is invalid (want off, auto, or on)", f.Mode))
+	}
+	if f.MaxFiles <= 0 {
+		errs = append(errs, fmt.Errorf("flow.max_files must be positive, got %d", f.MaxFiles))
+	}
+	if f.MaxBytes <= 0 {
+		errs = append(errs, fmt.Errorf("flow.max_bytes must be positive, got %d", f.MaxBytes))
+	}
+	if f.MaxDepthCallers < 0 {
+		errs = append(errs, fmt.Errorf("flow.max_depth_callers must not be negative, got %d", f.MaxDepthCallers))
+	}
+	if f.MaxDepthCallees < 0 {
+		errs = append(errs, fmt.Errorf("flow.max_depth_callees must not be negative, got %d", f.MaxDepthCallees))
+	}
+	if f.MaxNodes <= 0 {
+		errs = append(errs, fmt.Errorf("flow.max_nodes must be positive, got %d", f.MaxNodes))
+	}
+	if f.MaxEdges <= 0 {
+		errs = append(errs, fmt.Errorf("flow.max_edges must be positive, got %d", f.MaxEdges))
+	}
+	if f.MaxFlows <= 0 {
+		errs = append(errs, fmt.Errorf("flow.max_flows must be positive, got %d", f.MaxFlows))
+	}
+	if f.Timeout <= 0 {
+		errs = append(errs, fmt.Errorf("flow.timeout must be positive, got %s", f.Timeout))
+	}
+	for i, pattern := range f.Exclude {
+		if strings.TrimSpace(pattern) == "" || !validGlob(pattern) {
+			errs = append(errs, fmt.Errorf("flow.exclude[%d]: invalid path glob %q", i, pattern))
+		}
+	}
+	for i, entry := range f.Entrypoints {
+		if strings.TrimSpace(entry) == "" {
+			errs = append(errs, fmt.Errorf("flow.entrypoints[%d]: value is empty", i))
+		}
+	}
+	for i, tag := range f.BuildTags {
+		if strings.TrimSpace(tag) == "" {
+			errs = append(errs, fmt.Errorf("flow.build_tags[%d]: value is empty", i))
+		}
+	}
+	return errs
 }
 
 func (m Models) validate() []error {

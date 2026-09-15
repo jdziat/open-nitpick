@@ -49,10 +49,12 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 	}
 
 	review := vcs.Review{
-		Event:      reviewEvent(report, cfg),
-		Comments:   make([]vcs.Comment, 0, len(report.Findings)),
-		Head:       report.Head,
-		Incomplete: !report.reusableCoverage(),
+		Event:        reviewEvent(report, cfg),
+		Comments:     make([]vcs.Comment, 0, len(report.Findings)),
+		Head:         report.Head,
+		Incomplete:   !report.reusableCoverage(),
+		FlowMarkdown: report.FlowMarkdown,
+		FlowEvidence: report.FlowEvidence,
 	}
 
 	// What this run was priced at, recorded with the review so a later run
@@ -92,6 +94,15 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 	}
 
 	review.Summary = renderSummary(report, cfg)
+	// Flow coverage is an independent output contract. Keep it visible when a
+	// caller turns the model-authored narrative summary off, and compose it in
+	// the review value so every provider can publish the same bounded section.
+	if flow := strings.TrimSpace(report.FlowMarkdown); flow != "" {
+		if review.Summary != "" {
+			review.Summary += "\n\n"
+		}
+		review.Summary += flow
+	}
 	return review
 }
 

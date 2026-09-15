@@ -115,6 +115,50 @@ func TestGitHubPullRequest(t *testing.T) {
 	}
 }
 
+func TestGitHubSourceBaseUsesForkAndImmutableRevision(t *testing.T) {
+	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/commits/") {
+			_ = json.NewEncoder(w).Encode(map[string]any{"sha": "deadbeef", "commit": map[string]any{"message": "flow"}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"number": 7,
+			"base":   map[string]any{"ref": "main", "sha": "base"},
+			"head": map[string]any{
+				"ref": "feature", "sha": "deadbeef",
+				"repo": map[string]any{"full_name": "contributor/project"},
+			},
+		})
+	})
+
+	got, err := gh.SourceBase(context.Background(), testRef(), "deadbeef")
+	if err != nil {
+		t.Fatalf("SourceBase: %v", err)
+	}
+	if !strings.HasSuffix(got, "/contributor/project/blob/deadbeef") {
+		t.Fatalf("SourceBase = %q, want fork repository and SHA", got)
+	}
+	if _, err := gh.SourceBase(context.Background(), testRef(), "feature"); err == nil {
+		t.Fatal("SourceBase accepted a mutable branch name")
+	}
+}
+
+func TestGitHubSourceBaseRefusesUnknownHeadRepository(t *testing.T) {
+	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/commits/") {
+			_ = json.NewEncoder(w).Encode(map[string]any{"sha": "deadbeef", "commit": map[string]any{"message": "flow"}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"number": 7,
+			"head":   map[string]any{"ref": "feature", "sha": "deadbeef"},
+		})
+	})
+	if _, err := gh.SourceBase(context.Background(), testRef(), "deadbeef"); !errors.Is(err, ErrNoSourceLink) {
+		t.Fatalf("SourceBase error = %v, want no immutable link for unknown head repository", err)
+	}
+}
+
 func TestGitHubDiffRequestsDiffMediaType(t *testing.T) {
 	const body = "diff --git a/a.go b/a.go\n"
 

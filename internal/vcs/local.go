@@ -334,8 +334,8 @@ func (l *Local) PublishReview(_ context.Context, _ Ref, review Review) error {
 func renderText(r Review) string {
 	var b strings.Builder
 
-	if r.Summary != "" {
-		b.WriteString(r.Summary)
+	if summary := r.SummaryWithFlow(); summary != "" {
+		b.WriteString(summary)
 		b.WriteString("\n\n")
 	}
 

@@ -51,10 +51,11 @@ code demonstrates. The evidence after each is a band, not a count: run
 `make agents` to regenerate this block.
 
 - Name a test after the behaviour it pins, in at least three words. (every site of 1000+ places)
-- Open an exported declaration's doc comment with the declaration's own name. (every site of 700+ places)
-- Put context.Context first in the parameter list. (every site of 200+ places)
+- Open an exported declaration's doc comment with the declaration's own name. (every site of 800+ places)
+- Put context.Context first in the parameter list. (every site of 300+ places)
 - Wrap an error you are formatting into a new one with %w, not %v or %s. (every site of 200+ places)
 - Call t.Helper() at the top of a test helper. (every site of 100+ places)
 - Return named results explicitly; do not use a bare return. (every site of 50+ places)
+- Use === and !== for JavaScript equality comparisons. (every site of 40+ places)
 
 <!-- nitpick:standards:end -->
