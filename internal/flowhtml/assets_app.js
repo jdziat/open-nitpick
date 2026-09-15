@@ -326,7 +326,7 @@
     panel.textContent = "";
     var node = id ? NODES[id] : null;
     if (!node) {
-      panel.appendChild(text("p", "Select a node in a diagram to see its declaration, its callers and callees, and its source.", "hint"));
+      var emptyDiv = document.createElement("div");emptyDiv.className="panel-empty-hint";var icon=document.createElement("div");icon.className="hint-icon";icon.textContent="→";emptyDiv.appendChild(icon);var hint=document.createElement("p");hint.className="hint-text";hint.textContent="Select any node to see its source, callers, and callees.";emptyDiv.appendChild(hint);panel.appendChild(emptyDiv);
       appendChangedIndex(panel);
       return;
     }
@@ -602,7 +602,7 @@
 
   // ---- panel resize --------------------------------------------------------
 
-  var PANEL_MIN = 380, PANEL_MAX = 1200, PANEL_KEY = "nitpick-flow-panel-v2";
+  var PANEL_MIN = 420, PANEL_MAX = 1200, PANEL_KEY = "nitpick-flow-panel-v3";
 
   function wirePanelResize() {
     var handle = $("#panel-resize");
@@ -652,7 +652,7 @@
     }
     handle.addEventListener("pointerup", endDrag);
     handle.addEventListener("pointercancel", endDrag);
-    handle.addEventListener("dblclick", function () { setWidth(420); });
+    handle.addEventListener("dblclick", function () { setWidth(580); });
     handle.addEventListener("keydown", function (event) {
       var current = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--panel-width")) || 420;
       var step = event.shiftKey ? 80 : 24;
@@ -660,7 +660,7 @@
       else if (event.key === "ArrowRight") { event.preventDefault(); setWidth(current - step); }
       else if (event.key === "Home") { event.preventDefault(); setWidth(PANEL_MIN); }
       else if (event.key === "End") { event.preventDefault(); setWidth(PANEL_MAX); }
-      else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setWidth(420); }
+      else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setWidth(580); }
     });
     window.addEventListener("resize", function () { setWidth(clampWidth(parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--panel-width")) || 420)); });
   }
