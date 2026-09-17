@@ -297,6 +297,8 @@ review:
   incremental: true                # on a re-run, read only what changed since the last review
   related_context: true            # default: attach imported definitions used on changed lines (see below)
   related_context_callers: false   # default: also walk the repository for callers of what the change redefines
+  related_context_preamble: ""     # default: the shipped "Context only" sentence; replace to tune how a model treats attached context
+  related_context_rerank: false    # default: order by use count; set true to prefer definitions whose body overlaps the change
   slop: false                      # default: also report the slop class (see "The slop class" below)
   max_files: 60
   token_budget_per_request: 60000  # per model CALL; raise it for large-context models

@@ -134,7 +134,10 @@ func (e *Engine) applyVerdict(f *Finding, v Verdict) {
 	// with themselves into a patch that no longer matched the file, so the
 	// no-op check stopped firing and a one-click commit appeared for a change
 	// that changes nothing. The emptiness test trims; the value never does.
-	if strings.TrimSpace(v.Suggestion) != "" {
+	// A relocated finding has no suggestion: moveAnchor already cleared it
+	// because a patch over the wrong line is worse than no patch. Reattaching
+	// triage's own suggestion would defeat that.
+	if strings.TrimSpace(v.Suggestion) != "" && v.Line == f.Line {
 		f.Suggestion = v.Suggestion
 	}
 }

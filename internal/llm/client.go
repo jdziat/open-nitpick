@@ -276,7 +276,9 @@ func (r *Roles) WithLogger(l *slog.Logger) *Roles {
 func (c *Client) setLog(l *slog.Logger) {
 	for ; c != nil; c = c.fallback {
 		c.Log = l
-		c.retries.set(l)
+		if c.retries != nil {
+			c.retries.set(l)
+		}
 	}
 }
 
@@ -399,6 +401,9 @@ func (c *Client) CallOptions() []llms.CallOption {
 		// this is the closest the direct Anthropic path can get without
 		// asking the API what each model's maximum is.
 		opts = append(opts, llms.WithMaxTokens(anthropicUnsetMaxTokens))
+	}
+	if tier := strings.TrimSpace(c.Spec.ServiceTier); tier != "" {
+		opts = append(opts, llms.WithExtraBodyParam("service_tier", tier))
 	}
 
 	return opts

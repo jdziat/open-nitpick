@@ -171,6 +171,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.default.service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
+
 ### `models.default.structured_output`
 
 string, default `auto`.
@@ -250,6 +255,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
+### `models.embed.service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
 
 ### `models.embed.structured_output`
 
@@ -331,6 +341,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.ensemble[].service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
+
 ### `models.ensemble[].structured_output`
 
 string, default `auto`.
@@ -410,6 +425,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
+### `models.fix.service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
 
 ### `models.fix.structured_output`
 
@@ -491,6 +511,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.review.service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
+
 ### `models.review.structured_output`
 
 string, default `auto`.
@@ -571,6 +596,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.router.service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
+
 ### `models.router.structured_output`
 
 string, default `auto`.
@@ -650,6 +680,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
+### `models.routes[].ensemble[].service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
 
 ### `models.routes[].ensemble[].structured_output`
 
@@ -756,6 +791,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.routes[].review.service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
+
 ### `models.routes[].review.structured_output`
 
 string, default `auto`.
@@ -836,6 +876,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.triage.service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
+
 ### `models.triage.structured_output`
 
 string, default `auto`.
@@ -915,6 +960,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
+### `models.validate.service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
 
 ### `models.validate.structured_output`
 
@@ -1206,6 +1256,16 @@ RelatedContext attaches, beside each changed file, the definitions it imports fr
 
 boolean, default `false`.
 RelatedContextCallers also attaches, for each exported symbol the change redefines, the untouched functions that call it, found by walking the repository's own files.
+
+### `review.related_context_preamble`
+
+string, default `none`.
+RelatedContextPreamble replaces the sentence bundle.Render writes above every attached definition.
+
+### `review.related_context_rerank`
+
+boolean, default `false`.
+RelatedContextRerank sorts attached definitions by how much of their snippet overlaps the change's added text, and drops ones whose only overlap is the name that already selected them.
 
 ### `review.related_context_tokens`
 

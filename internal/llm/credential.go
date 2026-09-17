@@ -281,6 +281,6 @@ func DeleteCredential(provider string) error {
 // which providers are configured, and answering it with the secret puts that
 // secret on a terminal and in a scrollback buffer.
 func HasCredential(provider string) bool {
-	key, err := keyringGet(KeyringService, strings.TrimSpace(provider))
-	return err == nil && strings.TrimSpace(key) != ""
+	key, ok := defaultKeystoreLookup(context.Background(), strings.TrimSpace(provider))
+	return ok && strings.TrimSpace(key) != ""
 }

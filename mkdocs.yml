@@ -114,6 +114,7 @@ nav:
   - Measurement:
       - Rules: docs/measurement.md
       - Findings: docs/findings.md
+      - Model breakdown: docs/model-breakdown.md
       - Against Incumbent: docs/comparison.md
       - Remediation: docs/remediation.md
   # Commentary on the harness and the analyzer runners, one section per

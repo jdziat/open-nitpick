@@ -219,6 +219,17 @@ type ModelSpec struct {
 	// OpenRouter's fifteen endpoints for it, and a pin names the one that
 	// answers.
 	Providers []string `yaml:"providers"`
+	// ServiceTier routes an OpenRouter request to a capacity grade: "default"
+	// for the standard tier, "flex" for discounted capacity that trades
+	// latency and availability for price, "priority" (alias "fast") for
+	// premium capacity at a higher rate. Empty is the provider's own default
+	// and sends no field.
+	//
+	// Flex never falls back to a standard endpoint: a capacity failure
+	// surfaces as an error, so a tier is a request, not a guarantee. A model
+	// with no flex endpoint at all routes normally at standard rates.
+	// OpenRouter only; other providers ignore it.
+	ServiceTier string `yaml:"service_tier"`
 }
 
 // StructuredMode selects a structured-output strategy.
@@ -432,7 +443,7 @@ func (m Models) ResolveRouter() (ModelSpec, bool) {
 // Key identifies a spec for client caching: the fields that change which
 // endpoint or weights answer, and nothing that only shapes the request.
 func (s ModelSpec) Key() string {
-	return strings.Join(append([]string{s.Provider, s.Model, s.BaseURL}, s.Providers...), "|")
+	return strings.Join(append([]string{s.Provider, s.Model, s.BaseURL, s.ServiceTier, fmt.Sprint(s.Extra)}, s.Providers...), "|")
 }
 
 func intersects(a, b []string) bool {
@@ -521,6 +532,25 @@ type Review struct {
 	// separate switch, and off unless asked for. It does nothing unless
 	// RelatedContext is on.
 	RelatedContextCallers bool `yaml:"related_context_callers"`
+
+	// RelatedContextPreamble replaces the sentence bundle.Render writes above
+	// every attached definition. The shipped sentence says the context is
+	// reference only and is not under review, which is the right default for
+	// a model that treats additional code as more surface to comment on, and
+	// the wrong one for a model that reads the same context as license to
+	// override a finding the diff alone justified. Tuning the phrasing is
+	// how the second behaviour is measured against the first.
+	//
+	// Empty keeps the shipped sentence.
+	RelatedContextPreamble string `yaml:"related_context_preamble"`
+
+	// RelatedContextRerank sorts attached definitions by how much of their
+	// snippet overlaps the change's added text, and drops ones whose only
+	// overlap is the name that already selected them. The default orders by
+	// use count, which attaches a frequently-named helper even when its body
+	// has nothing in common with the change. Off until a measurement says
+	// otherwise; see docs/experiment-context-framing.md.
+	RelatedContextRerank bool `yaml:"related_context_rerank"`
 
 	// Knowledge attaches entries from the shipped corpus that the change
 	// resembles: antipatterns and standard-library contracts a model may not
@@ -1224,6 +1254,9 @@ func (s ModelSpec) overlay(over ModelSpec) ModelSpec {
 	}
 	if over.Reasoning != "" {
 		out.Reasoning = over.Reasoning
+	}
+	if over.ServiceTier != "" {
+		out.ServiceTier = over.ServiceTier
 	}
 	if over.MaxRetries != nil {
 		out.MaxRetries = over.MaxRetries

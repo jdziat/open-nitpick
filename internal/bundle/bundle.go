@@ -49,6 +49,12 @@ type Entry struct {
 	// because a changed line uses them. See related.go.
 	Related []Related
 
+	// RelatedPreamble replaces the sentence Render writes above the Related
+	// definitions. Empty keeps the shipped sentence. Set from
+	// review.related_context_preamble, so a run can tune how the model treats
+	// attached context without editing the prompt.
+	RelatedPreamble string
+
 	// Tokens is the estimated cost of rendering this entry.
 	Tokens int
 }
@@ -238,6 +244,7 @@ func AssembleReserving(ctx context.Context, cfg *config.Config, files diff.Files
 		related = newRelatedCollector(ctx, files, fetch, list)
 		related.maxBytes = cfg.Review.MaxFileBytes
 		related.callers = cfg.Review.RelatedContextCallers
+		related.rerank = cfg.Review.RelatedContextRerank
 	}
 
 	// Selection and content run in one pass so that review.max_files counts
@@ -263,8 +270,9 @@ func AssembleReserving(ctx context.Context, cfg *config.Config, files diff.Files
 		}
 
 		entry := Entry{
-			File:         f,
-			Instructions: cfg.InstructionsFor(f.Path),
+			File:            f,
+			Instructions:    cfg.InstructionsFor(f.Path),
+			RelatedPreamble: cfg.Review.RelatedContextPreamble,
 		}
 
 		if cfg.Review.IncludeFullFiles && fetch != nil {
@@ -650,7 +658,12 @@ func Render(e Entry) string {
 		}
 		if len(defs) > 0 {
 			b.WriteString("\n#### Definitions this change uses, from files it does not touch\n\n")
-			b.WriteString("Context only. These files are not under review: judge the change by them, but do not report findings on them.\n\n")
+			preamble := e.RelatedPreamble
+			if preamble == "" {
+				preamble = "Context only. These files are not under review: judge the change by them, but do not report findings on them."
+			}
+			b.WriteString(preamble)
+			b.WriteString("\n\n")
 			for _, r := range defs {
 				b.WriteString(renderRelated(r))
 			}

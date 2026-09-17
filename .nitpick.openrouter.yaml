@@ -7,22 +7,47 @@
 #
 # or copy it over .nitpick.yaml. Review policy stays aligned with the shipped
 # defaults; model routing and scan performance may differ by endpoint.
+#
+# Model assignments follow /home/jdziat/Code/jdziat/mega-smart-router/docs/model-breakdown.md
+# (benchmarked 2026-09-16):
+#   - gpt-5.6-luna scores 10.00 at $0.00045/call with flex, the benchmark's
+#     best quality-per-dollar. Flex halves the standard $0.00090 rate.
+#   - glm-5.3-flash scores 9.93 at $0.00057/call, the cheapest serious model,
+#     but has no flex tier and collapses on architecture tasks (4/10 rate
+#     limiter, 0/10 distributed scheduler).
+#   - qwen/qwen3.8-27b is not in the benchmark's viable tiers; it is replaced.
+#     The reasoning-light optimum is glm-5.3-flash (same as reasoning tier).
 
 models:
   # The built-in endpoint uses OPENROUTER_API_KEY; credentials stay local.
   default:
     provider: openrouter
-    model: z-ai/glm-5.3-flash
+    model: openai/gpt-5.6-luna
+    # Flex trades latency and availability for price. A review is advisory
+    # and offline, so a slow or deferred endpoint costs nothing but time.
+    # Flex never falls back to standard, so a capacity failure is reported
+    # rather than silently billed at the higher rate.
+    service_tier: flex
 
   triage:
     provider: openrouter
-    model: qwen/qwen3.8-27b
+    model: z-ai/glm-5.3-flash
     temperature: 0
+    # Triage merges and filters findings. It is deterministic work on a list
+    # of already-extracted findings, not architecture, and glm-5.3-flash is
+    # the benchmark's cheapest serious model for it. No flex tier exists for
+    # this model, so it prices at standard.
+    #
+    # service_tier is deliberately unset: sending flex to a model without
+    # flex endpoints routes normally, and it is clearer to omit the field
+    # than to send it and have it be a no-op.
 
   fix:
     provider: openrouter
     model: z-ai/glm-5.3-flash
-    # Use the same GLM model for deterministic edits.
+    # Use the same GLM model for deterministic edits. Temperature stays 0:
+    # a suggested patch that varies between runs is not a suggested patch.
+    # No flex tier exists for this model.
     providers: [z-ai]
     temperature: 0
 

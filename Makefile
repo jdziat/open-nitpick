@@ -363,7 +363,7 @@ eval-fullreview:
 eval-knowledge:
 	NITPICK_EVAL_EMBED_PROVIDER=$${NITPICK_EVAL_EMBED_PROVIDER:-synthetic} \
 	NITPICK_EVAL_EMBED_MODEL=$${NITPICK_EVAL_EMBED_MODEL:-hf:nomic-ai/nomic-embed-text-v1.5} \
-	$(MAKE) benchmark-multifile FIXTURES=$(KNOWLEDGE) MODELS=$${MODELS:-z-ai/glm-5.3-flash} RUNS=$${RUNS:-2}
+	$(MAKE) benchmark-multifile FIXTURES=$(KNOWLEDGE) MODELS='$(or $(MODELS),z-ai/glm-5.3-flash)' RUNS='$(or $(RUNS),2)'
 
 eval-slop:
 	NITPICK_EVAL_SLOP=1 $(MAKE) benchmark-multifile FIXTURES='$(SLOP)' MODELS='$(or $(MODELS),z-ai/glm-5.3-flash)' RUNS='$(or $(RUNS),1)'

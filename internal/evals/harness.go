@@ -29,6 +29,10 @@ const (
 
 	// EnvModels overrides the model list (comma-separated OpenRouter ids).
 	EnvModels = "NITPICK_EVAL_MODELS"
+	// EnvServiceTier sets the capacity grade a run routes to.
+	// "flex" asks for discounted capacity on providers that sell it;
+	// empty is the provider default. Applies to every role in the run.
+	EnvServiceTier = "NITPICK_EVAL_SERVICE_TIER"
 
 	// EnvRuns sets how many times each fixture is reviewed, which is what makes
 	// a stability column possible.
@@ -57,6 +61,17 @@ const (
 	// the run, so the feature can be measured against the same corpus with it
 	// off. Any non-empty value other than "0" or "false" enables it.
 	EnvRelatedContext = "NITPICK_EVAL_RELATED_CONTEXT"
+
+	// EnvRelatedContextPreamble replaces the sentence bundle.Render writes
+	// above every attached definition, so an experiment can tune the phrasing
+	// without editing fixtures. Empty keeps the shipped sentence.
+	EnvRelatedContextPreamble = "NITPICK_EVAL_RELATED_CONTEXT_PREAMBLE"
+
+	// EnvRelatedContextRerank switches review.related_context_rerank on so an
+	// experiment can measure relevance-sorted attachments against the use-count
+	// order without editing fixtures. Any non-empty value other than "0" or
+	// "false" enables it.
+	EnvRelatedContextRerank = "NITPICK_EVAL_RELATED_CONTEXT_RERANK"
 
 	// EnvSlop switches review.slop on for every review in the run, which the
 	// slop corpus needs: its plants are in a class the default never asks
@@ -915,6 +930,9 @@ func applyRouteFile(cfg *config.Config, path string) error {
 		if spec.Timeout == 0 {
 			spec.Timeout = baseline.Timeout
 		}
+		if spec.ServiceTier == "" {
+			spec.ServiceTier = baseline.ServiceTier
+		}
 		if spec.StructuredOutput == "" {
 			spec.StructuredOutput = baseline.StructuredOutput
 		}
@@ -926,6 +944,11 @@ func applyRouteFile(cfg *config.Config, path string) error {
 	for _, spec := range []*config.ModelSpec{rf.Models.Review, rf.Models.Triage, rf.Models.Validate, rf.Models.Router} {
 		if spec != nil && spec.Provider == "" && spec.Model == "" {
 			continue
+		}
+	}
+	for _, spec := range []*config.ModelSpec{rf.Models.Review, rf.Models.Triage, rf.Models.Validate, rf.Models.Router} {
+		if spec != nil {
+			fill(spec)
 		}
 	}
 	for i := range rf.Models.Routes {
@@ -985,6 +1008,9 @@ func evalConfig(model Model) *config.Config {
 		// Auto exercises the real negotiation: schema first, JSON fallback for
 		// providers that reject it. That path is the point of the matrix.
 		StructuredOutput: config.StructuredAuto,
+		// ServiceTier routes this run through the capacity grade set
+		// by NITPICK_EVAL_SERVICE_TIER. Empty is the provider default.
+		ServiceTier: strings.TrimSpace(os.Getenv(EnvServiceTier)),
 	}
 
 	if model.RouteFile != "" {
@@ -1017,6 +1043,14 @@ func evalConfig(model Model) *config.Config {
 	default:
 		cfg.Review.RelatedContext = true
 		cfg.Review.RelatedContextCallers = true
+	}
+	if preamble := strings.TrimSpace(os.Getenv(EnvRelatedContextPreamble)); preamble != "" {
+		cfg.Review.RelatedContextPreamble = preamble
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvRelatedContextRerank))) {
+	case "", "0", "false", "off":
+	default:
+		cfg.Review.RelatedContextRerank = true
 	}
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvValidation))) {
 	case "", "0", "false", "off":

@@ -235,7 +235,9 @@ func countLines(path string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return strings.Count(string(src), "\n") + 1, nil
+	// A conventional file ends in a newline; trimming it before counting
+	// prevents that trailing character from creating a phantom extra line.
+	return strings.Count(strings.TrimSuffix(string(src), "\n"), "\n") + 1, nil
 }
 
 // languageConventionConfigs preserves explicit operator settings and supplies

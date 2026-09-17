@@ -1155,12 +1155,19 @@ which is the quietest way this corpus has to lose a plant.
 `internal/evals/fixtures_nit.go`
 
 This is the shape the corpus has never had. Read report/summary.go alone and
-the copy is the careful thing to do rather than merely defensible: a caller
-holding a slice another goroutine can append to is a real bug, and the
-comment above the copy says exactly that. Read store/store.go, changed by
-the same pull request, so it is in the diff, and Snapshot's contract says
-the slice is already fresh, built under the lock, sharing no backing array.
-The copy defends against something that cannot happen.
+the copy looks careful: a caller holding a slice another goroutine can append
+to is a real bug. Read store/store.go in the same pull request: Snapshot
+already copied under the lock before this change, and Head only documents
+that the returned slice is already the caller's. The second allocation
+defends against something that cannot happen.
+
+Snapshot already existed and copied in Base. Head clarifies the ownership
+contract (the same doc-comment move as cross-file-sort-nit) and adds the
+caller. An earlier revision put a justifying comment above the caller's
+copy ("Keep our own copy so nothing the store does later can change…");
+with the contract visible, models read that as intentional defensive
+programming and returned no finding under every preamble. The comment is
+gone so the plant is wasted work, not a debate about intent.
 
 Nothing here is wrong in the sense the higher anchors describe. Build returns
 the same Summary either way; there is no input that produces a different

@@ -121,7 +121,12 @@ func Scan(p, content string) []Tell {
 				}
 				continue
 			}
-			if strings.Count(raw, "`")%2 == 1 {
+			// Skip comment lines: a backtick inside a // comment is prose,
+			// not a raw-string delimiter, and counting it toggles inRawString
+			// incorrectly, silencing all subsequent lines until the next odd backtick.
+			trimmed := strings.TrimSpace(raw)
+			isCommentLine := comment != "" && strings.HasPrefix(trimmed, comment)
+			if !isCommentLine && strings.Count(raw, "`")%2 == 1 {
 				inRawString = true
 			}
 		}

@@ -700,17 +700,17 @@ func declaredProbes() map[string]fixtureProbes {
 		"cross-file-copy-nit": {
 			hit: []probe{
 				{"names the contract the callee already provides",
-					review.Finding{Path: "report/summary.go", Line: 17, Severity: "nit", Category: "performance",
+					review.Finding{Path: "report/summary.go", Line: 15, Severity: "nit", Category: "performance",
 						Title:     "Snapshot already returns a copy",
 						Rationale: "The slice is built under the lock and shares no backing array, so this allocates a second slice for nothing."}},
 				{"names the redundancy directly",
-					review.Finding{Path: "report/summary.go", Line: 17, Severity: "nit", Category: "performance",
+					review.Finding{Path: "report/summary.go", Line: 15, Severity: "nit", Category: "performance",
 						Title:     "Copy of a copy",
 						Rationale: "The store hands this slice over exclusively; copying it again buys nothing."}},
 			},
 			miss: []probe{
 				{"the hallucination the cross-file contract refutes",
-					review.Finding{Path: "report/summary.go", Line: 17, Severity: "error", Category: "concurrency",
+					review.Finding{Path: "report/summary.go", Line: 15, Severity: "error", Category: "concurrency",
 						Title:     "The store may append after Snapshot returns",
 						Rationale: "Another goroutine calling Add could race with this read and leave the summary stale."}},
 				{"a design remark about the struct",
@@ -1682,8 +1682,8 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 		"data-loss-migration|0|migrations/0007_backfill_plan.sql:8|duplicate-test-case-nit|declared objection|The table repeats one expectation": "bare phrase `every row`, typed about the rows of a TEST TABLE",
 		"removed-guard|0|project.go:31|php-forbidden-vs-404|declared objection|Insecure direct object reference":                                 "shared mechanism: the objection php declares as a false positive — there is no authorization check — is a true description of THIS plant, so `authoriz` is doing its job in both places",
 		"removed-guard|0|project.go:31|php-forbidden-vs-404|declared objection|Missing ownership check":                                          "shared mechanism, as above, on `ownership`",
-		"cross-file-copy-nit|0|report/summary.go:17|defensive-copy-nit|declared objection|Prefer List.copyOf":                                    "shared mechanism: `redundant copy`. Both plants ARE an unnecessary copy, one in Go and one in Java",
-		"cross-file-copy-nit|0|report/summary.go:17|defensive-copy-nit|declared objection|Use List.copyOf instead of wrapping an ArrayList":      "shared mechanism: `unnecessary copy`, as above",
+		"cross-file-copy-nit|0|report/summary.go:15|defensive-copy-nit|declared objection|Prefer List.copyOf":                                    "shared mechanism: `redundant copy`. Both plants ARE an unnecessary copy, one in Go and one in Java",
+		"cross-file-copy-nit|0|report/summary.go:15|defensive-copy-nit|declared objection|Use List.copyOf instead of wrapping an ArrayList":      "shared mechanism: `unnecessary copy`, as above",
 		// The one no reader would predict, and the reason a generator is worth
 		// having at all: `error return` is matched ACROSS the word boundary in
 		// "the context error Returning ctx.Err() bare". Nothing about the sentence
@@ -2557,8 +2557,6 @@ func knownWhyGaps() map[string]string {
 			"so it credits python-command-injection's description of ITS plant and not its own",
 		"python-timing-unsafe-hmac|0|webhook.py:15": "the Why says `returns at the first differing byte`; the list carries " +
 			"`byte-by-byte` and `byte by byte`, neither of which that phrase contains",
-		"cross-file-copy-nit|0|report/summary.go:17": "the Why says `already returns a slice the caller owns` and `copying it " +
-			"again`; the list carries `already returns its own` and `copies it again`, which miss both by a word",
 	}
 }
 
@@ -3343,7 +3341,7 @@ func TestPlantedSeveritiesArePinned(t *testing.T) {
 		"ts-unbounded-memo-key/src/search.ts:13/resource":   config.SeverityWarning,
 		"go-cancel-goroutine-leak/resolve.go:24/resource":   config.SeverityWarning,
 		"python-timing-unsafe-hmac/webhook.py:15/security":  config.SeverityWarning,
-		"cross-file-copy-nit/report/summary.go:17/resource": config.SeverityNit,
+		"cross-file-copy-nit/report/summary.go:15/resource": config.SeverityNit,
 		"sorted-for-min-nit/sensors.py:23/resource":         config.SeverityNit,
 
 		// The info plants, which took the corpus from four resolvable levels to
@@ -3940,13 +3938,18 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 	// it stale would compute the totals below over a corpus that no longer
 	// exists and read as the incumbent having changed, which is exactly what
 	// this guard refuses.
+	//
+	// cross-file-copy-nit is omitted: the plant was redesigned so +ctx no longer
+	// suppresses it, which invalidates the shipped cache fingerprint. Re-add it
+	// in the same change that re-collects (make collect-incumbent). The old
+	// entry scored 0 findings, so the Acc/Infl/Under pins below are unchanged.
 	covered := map[string]bool{
 		"go-nil-deref": true, "go-sql-injection": true, "go-hardcoded-secret": true,
 		"python-command-injection": true, "clean-refactor": true, "style-only": true,
 		"multi-defect": true, "capacity-hint-nit": true,
 		"ts-unbounded-memo-key": true, "go-cancel-goroutine-leak": true,
-		"python-timing-unsafe-hmac": true, "cross-file-copy-nit": true,
-		"sorted-for-min-nit": true, "kotlin-widened-input": true,
+		"python-timing-unsafe-hmac": true,
+		"sorted-for-min-nit":        true, "kotlin-widened-input": true,
 		"php-forbidden-vs-404": true, "go-package-singleton": true,
 	}
 

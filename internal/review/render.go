@@ -1082,7 +1082,11 @@ func groupByReason(skips []bundle.Skip, omit string) string {
 
 	var b strings.Builder
 	for _, reason := range order {
-		fmt.Fprintf(&b, "- %s: %s\n", reason, strings.Join(byReason[reason], ", "))
+		paths := make([]string, len(byReason[reason]))
+		for i, p := range byReason[reason] {
+			paths[i] = inline(p)
+		}
+		fmt.Fprintf(&b, "- %s: %s\n", inline(reason), strings.Join(paths, ", "))
 	}
 	return b.String()
 }

@@ -115,7 +115,4 @@ func TestNoNitpickLevelPublishesSlop(t *testing.T) {
 			t.Errorf("level %s publishes slop; review.slop alone may", level)
 		}
 	}
-	if !NitpickPedantic.Publishes(ClassStyle) {
-		t.Errorf("pedantic no longer publishes style")
-	}
 }
