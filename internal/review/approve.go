@@ -39,7 +39,12 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 	// never read, and a run whose triage died published findings nothing
 	// ranked. Reading either as clean is how an approval comes to mean less
 	// than nothing.
-	if !report.PipelineComplete() {
+	//
+	// Complete() is checked on its own because PipelineComplete follows an
+	// attached practices report, and that report can be green while model
+	// batches still failed: engineering profiles gate on deterministic checks
+	// and leave model coverage advisory. An approval must not inherit that.
+	if !report.Complete() || !report.PipelineComplete() {
 		return vcs.EventComment
 	}
 

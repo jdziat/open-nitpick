@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/practices"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
@@ -58,6 +59,37 @@ func TestAPartlyFailedRunIsNotApproved(t *testing.T) {
 	r := &Report{Incomplete: []string{"unreviewed.go"}}
 	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
 		t.Errorf("event on an incomplete run = %q, want %q: an unreviewed file is not a clean one", got, vcs.EventComment)
+	}
+}
+
+// TestIncompleteFilesBlockApprovalEvenWhenPracticesAreGreen pins the
+// engineering-profile hole: PipelineComplete follows practices.ExitCode, and
+// that can be 0 while model batches still failed. Complete() is what refuses
+// the approval the practices green light would otherwise permit.
+func TestIncompleteFilesBlockApprovalEvenWhenPracticesAreGreen(t *testing.T) {
+	target := practices.Target{Kind: practices.FileTarget, ID: "a.go"}
+	r := &Report{
+		Incomplete: []string{"unreviewed.go"},
+		Practices: &practices.Report{
+			SchemaVersion: practices.SchemaVersion,
+			Profile:       "engineering",
+			Revision:      "head",
+			PolicySource:  "operator",
+			PolicyDigest:  "digest",
+			Checks: []practices.Check{{
+				ID: "conventions", Version: "1", Instrument: practices.Deterministic,
+				State: practices.Completed, Planned: []practices.Target{target}, Examined: []practices.Target{target},
+			}},
+		},
+	}
+	if !r.PipelineComplete() {
+		t.Fatalf("setup: PipelineComplete must be true under a green practices report; problems=%v", r.Practices.Problems())
+	}
+	if r.Complete() {
+		t.Fatal("setup: Complete must be false while Incomplete is set")
+	}
+	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
+		t.Errorf("event = %q, want %q: practices green must not approve unread files", got, vcs.EventComment)
 	}
 }
 

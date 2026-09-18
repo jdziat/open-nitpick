@@ -40,6 +40,7 @@ var Rules = []Rule{
 	{"oversized-doc-comment", "a doc comment longer than the declaration it documents", "keep the one sentence a caller needs; move the rest to a design note or delete it"},
 	{"triplet-rhythm", "three parallel adjectives or nouns in a row (fast, reliable, and secure)", "keep the one that is true and specific; the other two are padding"},
 	{"antithesis", "a sentence that sets up a contrast to sound decisive (not a nicety, it is a correctness matter)", "state the second half only; the negated half was never the claim"},
+	{"essay-comment", "a comment that argues with a comparative justification or a defeat clause", "state the constraint in one clause; the comparison and the counterfactual belong in the commit"},
 	{"shouting-emphasis", "capitals used for emphasis in a comment (NOT, WHOLE, MUST)", "the sentence should carry the emphasis; if it cannot, the sentence is the problem"},
 	{"changelog-comment", "a comment narrating what the code used to do or which bug it fixed", "say what the code does now; the history belongs in the commit that changed it"},
 	{"prose-cadence", "a whole file written in one rhythm: appositive tails, colon expansions and three-part lists, above 10 per 100 lines", "vary the sentences. Split the longest into two, and let some of them end where the fact ends"},
@@ -57,6 +58,11 @@ var (
 	// It reads as decisive and carries only the second half, since the first
 	// half is a claim nobody made.
 	antithesis = regexp.MustCompile(`(?i)\b(is|was|are|were)\s+not\s+(a|an|the)?[^,.;:!?]{2,50},\s*(it|they|that)\s+(is|are|was|were)\b|\bnot\s+(a|an)\s[^,.;:!?]{2,40},\s*but\s+(a|an)\b`)
+
+	// essay-comment catches a stacked justification: a because-clause that
+	// ends in a worse/better-than comparison, or a would-defeat
+	// counterfactual. A bare comparative stating a constraint is fine.
+	essay = regexp.MustCompile(`(?i)\bbecause\b[^.;]{0,100}\b(worse|better) than\b|\bwould defeat\b`)
 
 	// The three components of the cadence rule. None is a fault on its own,
 	// which is why they are counted over a file rather than flagged on a line:
@@ -289,6 +295,7 @@ func lineRules(p string, n int, text string) []Tell {
 	add("filler-qualifier", filler.FindStringIndex(text))
 	add("chat-prose", chat.FindStringIndex(text))
 	add("antithesis", antithesis.FindStringIndex(text))
+	add("essay-comment", essay.FindStringIndex(text))
 	add("changelog-comment", changelog.FindStringIndex(text))
 	add("shouting-emphasis", shouting.FindStringIndex(text))
 	if m := triplet.FindStringSubmatchIndex(text); m != nil {
@@ -318,8 +325,9 @@ func adjective(w string) bool {
 }
 
 // commentRules are the tells a comment block shows against the code after
-// it: a comment that restates its line, and a doc comment longer than the
-// declaration it documents.
+// it: a comment that restates its line, a doc comment longer than the
+// declaration it documents, and an essay justification whose halves sit on
+// consecutive lines of the same block.
 func commentRules(p string, lines []string, block []int, next, comment string) []Tell {
 	var out []Tell
 	last := block[len(block)-1]
@@ -336,6 +344,37 @@ func commentRules(p string, lines []string, block []int, next, comment string) [
 		body := declLength(lines, last+1)
 		if body > 0 && len(block) > body {
 			out = append(out, Tell{Path: p, Line: block[0] + 1, Rule: "oversized-doc-comment", Excerpt: fmt.Sprintf("%d comment lines over a %d-line declaration", len(block), body), Fix: fixFor("oversized-doc-comment")})
+		}
+	}
+	// Cross-line essays only: same-line forms already fired from lineRules.
+	// Joining catches a comparative split across two lines of one block
+	// without double-counting the same-line case.
+	if len(block) >= 2 {
+		var parts []string
+		sameLine := false
+		for _, i := range block {
+			c, _ := commentText(lines[i], comment)
+			parts = append(parts, c)
+			if essay.MatchString(c) {
+				sameLine = true
+			}
+		}
+		if !sameLine {
+			joined := strings.Join(parts, " ")
+			if loc := essay.FindStringIndex(joined); loc != nil {
+				at := block[0]
+				cursor := 0
+				for _, i := range block {
+					c, _ := commentText(lines[i], comment)
+					nextCursor := cursor + len(c) + 1
+					if loc[0] < nextCursor {
+						at = i
+						break
+					}
+					cursor = nextCursor
+				}
+				out = append(out, Tell{Path: p, Line: at + 1, Rule: "essay-comment", Excerpt: excerpt(joined, loc[0]), Fix: fixFor("essay-comment")})
+			}
 		}
 	}
 	return out

@@ -129,14 +129,8 @@ func (e *Engine) applyVerdict(f *Finding, v Verdict) {
 	if strings.TrimSpace(v.Rationale) != "" {
 		f.Rationale = v.Rationale
 	}
-	// Taken verbatim. A suggestion is committable code and its leading
-	// whitespace is part of it: trimming one turned a replacement of two lines
-	// with themselves into a patch that no longer matched the file, so the
-	// no-op check stopped firing and a one-click commit appeared for a change
-	// that changes nothing. The emptiness test trims; the value never does.
-	// A relocated finding has no suggestion: moveAnchor already cleared it
-	// because a patch over the wrong line is worse than no patch. Reattaching
-	// triage's own suggestion would defeat that.
+	// Suggestion text keeps its leading whitespace (it is part of the patch).
+	// Skip when the anchor moved: moveAnchor already cleared Suggestion.
 	if strings.TrimSpace(v.Suggestion) != "" && v.Line == f.Line {
 		f.Suggestion = v.Suggestion
 	}

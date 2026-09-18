@@ -876,6 +876,13 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings, report.AlreadyReported = withholdAlreadyReported(findings, prior)
 	if report.reusableCoverage() {
 		report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported, plan.Skipped)
+		// A clean completed run under review.approve must not leave its own
+		// earlier threads open: reviewEvent refuses APPROVE while any stand,
+		// and a reader who sees COMMENT beside "0 findings" has no reason to
+		// trust the next push will close them either.
+		if more := e.resolveClearedForApprove(ctx, ref, prior, report, findings, plan.Skipped); len(more) > 0 {
+			report.Superseded = append(report.Superseded, more...)
+		}
 	}
 
 	// Triage's drops are disclosed exactly as an expert's refutations are:
@@ -994,11 +1001,17 @@ func (e *Engine) priorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview 
 // made the earlier head unreachable. Every one of those is a full review, and
 // the note is what tells the reader the difference.
 func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, files diff.Files, prior *vcs.PriorReview) (diff.Files, *Incremental) {
-	if prior == nil || prior.Head == "" || pr == nil {
+	if prior == nil || pr == nil {
 		return files, nil
 	}
+	// Standing findings force a full re-read even when the earlier run left no
+	// head to compare against: without that, superseded cannot close them and
+	// an approval would be held forever beside threads nothing re-checked.
 	if len(prior.Comments) > 0 {
 		return files, &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true}
+	}
+	if prior.Head == "" {
+		return files, nil
 	}
 	if prior.Head == pr.HeadSHA {
 		// The same commit reviewed again (a reopen, or a re-run). Nothing
@@ -1106,6 +1119,78 @@ func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorRe
 	}
 	if len(out) > 0 {
 		e.log().Info("resolved superseded comments", "count", len(out))
+	}
+	return out
+}
+
+// resolveClearedForApprove closes every earlier comment a clean approval
+// would otherwise be held beside.
+//
+// superseded already covers the incremental case. This is the remainder: a
+// completed recheck that found nothing, under review.approve, still carrying
+// threads that the line-change heuristic left alone (an empty earlier head,
+// a path that fell out of the diff, a comment whose file was reviewed but
+// whose line the forge no longer places). Without it, PriorComments stays
+// above Superseded and reviewEvent publishes COMMENT forever.
+func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prior *vcs.PriorReview, report *Report, findings []Finding, skipped []bundle.Skip) []vcs.PriorComment {
+	if e.Config == nil || !e.Config.Review.Approve.Enabled || prior == nil || report == nil {
+		return nil
+	}
+	if len(findings) > 0 || len(report.AlreadyReported) > 0 || !report.Complete() {
+		return nil
+	}
+	resolver, ok := e.Provider.(vcs.ThreadResolver)
+	if !ok {
+		return nil
+	}
+	done := map[int64]bool{}
+	for _, c := range report.Superseded {
+		done[c.ID] = true
+	}
+	excluded := map[string]bool{}
+	for _, skip := range skipped {
+		excluded[skip.Path] = true
+	}
+	reread := map[string]bool{}
+	if report.Incremental != nil {
+		for _, p := range report.Incremental.Reviewed {
+			reread[p] = true
+		}
+	}
+	var candidates []vcs.PriorComment
+	var ids []int64
+	for _, c := range prior.Comments {
+		if c.ID == 0 || done[c.ID] || excluded[c.Path] {
+			continue
+		}
+		// Same eligibility as superseded: only close what this run re-read, or
+		// a comment the forge no longer places on the diff.
+		if c.Line != 0 && !reread[c.Path] {
+			continue
+		}
+		candidates = append(candidates, c)
+		ids = append(ids, c.ID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	reply := "Resolved by open-nitpick: the change was reviewed again and no findings remain."
+	resolved, err := resolver.ResolveThreads(ctx, ref, ids, reply)
+	if err != nil {
+		e.log().Warn("could not resolve comments before approval", "error", err, "resolved", len(resolved), "of", len(ids))
+	}
+	closed := map[int64]bool{}
+	for _, id := range resolved {
+		closed[id] = true
+	}
+	var out []vcs.PriorComment
+	for _, c := range candidates {
+		if closed[c.ID] {
+			out = append(out, c)
+		}
+	}
+	if len(out) > 0 {
+		e.log().Info("resolved comments before approval", "count", len(out))
 	}
 	return out
 }

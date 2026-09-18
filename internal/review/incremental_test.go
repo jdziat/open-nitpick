@@ -310,6 +310,59 @@ func (p *resolvingProvider) ResolveThreads(_ context.Context, _ vcs.Ref, ids []i
 	return ids, nil
 }
 
+// A clean completed recheck under review.approve resolves every earlier
+// comment thread and submits APPROVE. Without the resolve step, standing
+// threads hold the review at COMMENT forever; without APPROVE, a green
+// check still leaves the pull request looking unreviewed.
+func TestCleanApproveResolvesStandingCommentsAndApproves(t *testing.T) {
+	provider := &resolvingProvider{incrementalProvider: incrementalProvider{
+		stubProvider: stubProvider{diff: engineDiff},
+		head:         "beef02",
+		prior: &vcs.PriorReview{Head: "beef01", Comments: []vcs.PriorComment{
+			{ID: 1, Path: "app.go", Line: 4, Fingerprint: "abcd", Class: "correctness"},
+			{ID: 2, Path: "app.go", Line: 2, Fingerprint: "beef", Class: "style"},
+		}},
+	}}
+	report, err := newEngine(t, &scriptedLLM{fallback: `{"findings":[]}`}, provider, func(c *config.Config) {
+		c.Review.Approve.Enabled = true
+	}).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if got := fmt.Sprint(provider.resolved); got != "[1 2]" {
+		t.Errorf("resolved = %s, want every standing thread closed before approval", got)
+	}
+	if len(report.Superseded) != 2 {
+		t.Errorf("superseded = %d, want 2", len(report.Superseded))
+	}
+	if provider.published == nil || provider.published.Event != vcs.EventApprove {
+		t.Fatalf("published event = %v, want APPROVE", provider.published)
+	}
+}
+
+// Standing comments on the same head force a full Recheck (not the empty
+// same-head skip). Under review.approve the recheck that finds nothing
+// resolves those threads and submits APPROVE.
+func TestSameHeadStandingCommentsAreRecheckedThenApproved(t *testing.T) {
+	provider := &resolvingProvider{incrementalProvider: incrementalProvider{
+		stubProvider: stubProvider{diff: engineDiff},
+		head:         "deadbeef",
+		prior: &vcs.PriorReview{Head: "deadbeef", Comments: []vcs.PriorComment{
+			{ID: 1, Path: "app.go", Line: 4, Fingerprint: "abcd", Class: "correctness"},
+		}},
+	}}
+	report, err := newEngine(t, &scriptedLLM{fallback: `{"findings":[]}`}, provider, func(c *config.Config) {
+		c.Review.Approve.Enabled = true
+	}).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if len(provider.resolved) != 1 || provider.published == nil || provider.published.Event != vcs.EventApprove {
+		t.Fatalf("resolved=%v event=%v prior=%d superseded=%d files=%d",
+			provider.resolved, provider.published, report.PriorComments, len(report.Superseded), report.Plan.Files())
+	}
+}
+
 // An earlier comment whose file was re-read and whose finding did not recur
 // is resolved with a reply; one whose finding recurred is not, nor is one
 // on a file this run did not re-read, since nothing there was checked. A

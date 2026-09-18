@@ -1085,7 +1085,13 @@ Two conditions always hold, whatever else is configured:
 - **Every planned file was reviewed.** A run whose batches partly failed
   published no findings for the files it never read, and reading that as
   clean is how an approval comes to mean less than nothing. The files are
-  listed under "Reviewed from the diff only" and its neighbours.
+  listed under "Reviewed from the diff only" and its neighbours. File
+  coverage is required even when an engineering practices profile would
+  otherwise call the pipeline complete on deterministic checks alone.
+
+When those hold, earlier comment threads this tool left on the pull request
+are resolved first (via `review.resolve_superseded`) so the approval is not
+held back by findings the clean run already closed.
 
 `review.approve.require_analyzers` (default off) adds a third: every enabled
 analyzer ran, and none of them reported a coverage gap. Off by default because

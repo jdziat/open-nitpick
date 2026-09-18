@@ -284,6 +284,7 @@ much each would remove. The tells need no model and run first.
 | `oversized-doc-comment` | a doc comment longer than what it documents |
 | `triplet-rhythm` | three adjectives of praise in a row |
 | `antithesis` | "not a nicety, it is a correctness matter" |
+| `essay-comment` | "because X is worse than Y" / "would defeat that" |
 | `shouting-emphasis` | capitals doing a sentence's work: NOT, MUST, WHOLE |
 | `changelog-comment` | a comment narrating what the code used to do |
 | `prose-cadence` | a file written in one rhythm, measured over the file |
