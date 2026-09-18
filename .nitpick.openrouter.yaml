@@ -8,7 +8,8 @@
 # or copy it over .nitpick.yaml. Review policy stays aligned with the shipped
 # defaults; model routing and scan performance may differ by endpoint.
 #
-# Model assignments follow /home/jdziat/Code/jdziat/mega-smart-router/docs/model-breakdown.md
+# Model assignments follow the measured pairing in
+# /home/jdziat/Code/jdziat/mega-smart-router/docs/model-breakdown.md
 # (benchmarked 2026-09-16):
 #   - gpt-5.6-luna scores 10.00 at $0.00045/call with flex, the benchmark's
 #     best quality-per-dollar. Flex halves the standard $0.00090 rate.
