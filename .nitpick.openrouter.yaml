@@ -30,6 +30,15 @@ models:
     # rather than silently billed at the higher rate.
     service_tier: flex
 
+  # Security model pass for nitpick security / security_scan. Measured
+  # 2026-09-18 (docs/findings.md security persona bake-off): gpt-5.6-luna
+  # held-out RECALL 1.00, NOISE 0.00, ~$0.0004/review under the security
+  # instruction. Falls back to review/default when this block is omitted.
+  security:
+    provider: openrouter
+    model: openai/gpt-5.6-luna
+    service_tier: flex
+
   triage:
     provider: openrouter
     model: z-ai/glm-5.3-flash

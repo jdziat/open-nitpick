@@ -19,6 +19,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/review"
+	securitypkg "github.com/jdziat/open-nitpick/internal/security"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
@@ -77,6 +78,15 @@ const (
 	// slop corpus needs: its plants are in a class the default never asks
 	// for. Any non-empty value other than "0" or "false" enables it.
 	EnvSlop = "NITPICK_EVAL_SLOP"
+
+	// EnvSecurity applies the nitpick security model instruction for every
+	// review in the run, so the bake-off measures that persona rather than a
+	// generic review on security-class fixtures.
+	EnvSecurity = "NITPICK_EVAL_SECURITY"
+
+	// EnvSecurityDepth selects light | deep | extreme when EnvSecurity is on.
+	// Empty or deep is the shipped Instruction.
+	EnvSecurityDepth = "NITPICK_EVAL_SECURITY_DEPTH"
 
 	// EnvKnowledge switches review.knowledge, which is the arm of the
 	// knowledge corpus measurement. Off unless the run asks, whatever the
@@ -463,6 +473,12 @@ func HeldOut(fixture string) bool {
 // header. A mixed selection is called out as mixed rather than rounded to
 // whichever half is larger.
 func CorpusLabel(fixtures []Fixture) string {
+	switch securityCorpusToken(fixtures) {
+	case "security":
+		return fmt.Sprintf("SECURITY tuning corpus (%d fixture(s)) — persona ranking, not a generalization claim", len(fixtures))
+	case "security-heldout":
+		return fmt.Sprintf("SECURITY HELD-OUT corpus (%d fixture(s)) — spent once; a gain measured here is a security-persona generalization claim", len(fixtures))
+	}
 	var held, tuning, multi, info, callers, slop int
 	for _, f := range fixtures {
 		switch {
@@ -814,9 +830,10 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		// shipped pairing, in particular a model annotated in DefaultModels as
 		// good value was ranked as a REVIEWER and has never been measured
 		// triaging another model's findings.
-		Roles:    roles,
-		Provider: provider,
-		Log:      cmpLogger(opts.Log),
+		Roles:       roles,
+		Provider:    provider,
+		Log:         cmpLogger(opts.Log),
+		Instruction: securityPersonaInstruction(),
 	}
 
 	// Retrieval, when the arm asks for it. A failure to build it fails the run
@@ -1092,6 +1109,19 @@ func ourSeverityScale(cfg *config.Config) SeverityScale {
 		return UndeclaredSeverityScale
 	}
 	return OurSeverityScale
+}
+
+// securityPersonaInstruction returns the security command's model instruction
+// when NITPICK_EVAL_SECURITY is on, otherwise empty. Depth comes from
+// NITPICK_EVAL_SECURITY_DEPTH (light | deep | extreme). Mutation: drop the env
+// check and the bake-off would measure a generic review on security fixtures.
+func securityPersonaInstruction() string {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvSecurity))) {
+	case "", "0", "false", "off":
+		return ""
+	default:
+		return securitypkg.InstructionForDepth(os.Getenv(EnvSecurityDepth))
+	}
 }
 
 func floatPtr(v float64) *float64 { return &v }

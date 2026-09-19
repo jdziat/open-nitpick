@@ -79,10 +79,13 @@ func (s Score) Findings() []review.Finding {
 
 // ScoreRun evaluates one run against its fixture.
 func ScoreRun(r RunResult, f Fixture) Score {
+	plants := PersonaDefects(f)
+	scoped := f
+	scoped.Defects = plants
 	s := Score{
 		RunResult: r,
 		Detected:  map[string]bool{},
-		Total:     len(f.Defects),
+		Total:     len(plants),
 		Severity:  SeverityScore{Planted: PlantedLevels{}},
 	}
 
@@ -99,8 +102,10 @@ func ScoreRun(r RunResult, f Fixture) Score {
 	// ScoreSeverity takes the same census again on the path that reaches it, and
 	// the duplication is deliberate: it is exported and its own contract is that
 	// a score carries its denominators, so neither caller may rely on the other
-	// having done it.
-	s.Severity.Planted.Add(f)
+	// having done it. Under NITPICK_EVAL_SECURITY the census follows
+	// PersonaDefects so a security run is not graded on classes it was told
+	// not to report.
+	s.Severity.Planted.Add(scoped)
 
 	if r.Err != nil {
 		s.Violations = append(s.Violations, fmt.Sprintf("review failed: %v", r.Err))
@@ -119,21 +124,21 @@ func ScoreRun(r RunResult, f Fixture) Score {
 				len(r.Report.Incomplete), strings.Join(r.Report.Incomplete, ", ")))
 	}
 
-	// Every DETECTION READING COMES FROM ScoreDetection, including the located
-	// set this function used to compute for itself. Two reasons, and the second
-	// is the one that matters: the judged batteries hold a finding list and never
-	// build a RunResult for the incumbent, so they must read these off the same
-	// code; and "which defects were located" was written out twice, here and
-	// inside the anchor arithmetic, which is two expressions for one integer and
-	// free to drift under an edit to either.
-	det := ScoreDetection(f, r.Report.Findings)
+	// Every DETECTION READING COMES FROM ScoreDetectionForEval, including the
+	// located set this function used to compute for itself. Two reasons, and
+	// the second is the one that matters: the judged batteries hold a finding
+	// list and never build a RunResult for the incumbent, so they must read
+	// these off the same code; and "which defects were located" was written
+	// out twice, here and inside the anchor arithmetic, which is two
+	// expressions for one integer and free to drift under an edit to either.
+	det := ScoreDetectionForEval(f, r.Report.Findings)
 	s.WidestAnchor = det.WidestAnchor
 	s.Unmatched = det.Unmatched
 	s.Detected = det.Detected
 	s.Matched = det.Matched
 	s.AnchoredLines = det.AnchoredLines
 
-	s.Severity = ScoreSeverity(f, r.Report.Findings)
+	s.Severity = ScoreSeverityForEval(f, r.Report.Findings)
 
 	s.Violations = append(s.Violations, checkInvariants(r)...)
 
@@ -211,20 +216,80 @@ func (d DetectionScore) Noise() int { return len(d.Unmatched) }
 // the cached incumbent's side of the head-to-head and re-runnable offline over a
 // retained dump: no run index, no usage record and no judge verdict is consulted.
 func ScoreDetection(f Fixture, findings []review.Finding) DetectionScore {
+	return scoreDetectionAgainst(f.Defects, findings, nil)
+}
+
+// ScoreDetectionForEval scores detection under the active eval persona.
+//
+// When NITPICK_EVAL_SECURITY is on, only ClassSecurity plants are in the
+// denominator. Findings that match a non-security plant on the same fixture
+// are out of scope — neither a credit nor noise — so multi-defect stays in
+// the security corpus without punishing a persona that was told not to
+// report races or descriptor leaks.
+//
+// Mutation: always call ScoreDetection and a security run's RECALL divides by
+// every planted class; multi-defect then caps recall at 1/3 for a perfect
+// security review.
+func ScoreDetectionForEval(f Fixture, findings []review.Finding) DetectionScore {
+	if !securityPersonaActive() {
+		return ScoreDetection(f, findings)
+	}
+	return scoreDetectionAgainst(PersonaDefects(f), findings, outOfScopeDefects(f.Defects))
+}
+
+// ScoreSeverityForEval grades severity under the active eval persona, using
+// the same plant set as ScoreDetectionForEval.
+func ScoreSeverityForEval(f Fixture, findings []review.Finding) SeverityScore {
+	if !securityPersonaActive() {
+		return ScoreSeverity(f, findings)
+	}
+	scoped := f
+	scoped.Defects = PersonaDefects(f)
+	return ScoreSeverity(scoped, findings)
+}
+
+// PersonaDefects is the plant set the active eval persona is scored on.
+func PersonaDefects(f Fixture) []Defect {
+	if !securityPersonaActive() {
+		return f.Defects
+	}
+	return securityClassDefects(f.Defects)
+}
+
+func securityPersonaActive() bool {
+	return securityPersonaInstruction() != ""
+}
+
+func securityClassDefects(defects []Defect) []Defect {
+	out := make([]Defect, 0, len(defects))
+	for _, d := range defects {
+		if d.Class == config.ClassSecurity {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func outOfScopeDefects(defects []Defect) []Defect {
+	out := make([]Defect, 0, len(defects))
+	for _, d := range defects {
+		if d.Class != config.ClassSecurity {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func scoreDetectionAgainst(defects []Defect, findings []review.Finding, outOfScope []Defect) DetectionScore {
 	out := DetectionScore{Detected: map[string]bool{}}
 
 	for _, finding := range findings {
 		out.WidestAnchor = max(out.WidestAnchor, anchoredLines(finding))
 	}
 
-	// Per FINDING is not enough on its own: it cannot tell one comment claiming
-	// seventeen regions from seventeen comments claiming one line each about the
-	// same defect, and for a reader those are the same seventeen lines. Both are
-	// taken because neither subsumes the other, a wide finding on a fixture that
-	// plants nothing belongs to no defect and would vanish from the second.
-	claimed := defectAnchoredLines(findings, f.Defects)
+	claimed := defectAnchoredLines(findings, defects)
 
-	for i, d := range f.Defects {
+	for i, d := range defects {
 		out.WidestAnchor = max(out.WidestAnchor, claimed[i])
 
 		found := false
@@ -235,8 +300,6 @@ func ScoreDetection(f Fixture, findings []review.Finding) DetectionScore {
 			}
 		}
 
-		// OR rather than assignment: two defects may share a Why, and one of them
-		// being located is what the map is asked about.
 		out.Detected[d.Why] = out.Detected[d.Why] || found
 		if !found {
 			continue
@@ -245,11 +308,13 @@ func ScoreDetection(f Fixture, findings []review.Finding) DetectionScore {
 		out.AnchoredLines += claimed[i]
 	}
 
-	// Anything not explaining a planted defect is noise on this corpus.
 	for _, finding := range findings {
-		if !explainsAny(finding, f.Defects) {
+		if len(outOfScope) > 0 && explainsAny(finding, outOfScope) {
+			continue
+		}
+		if !explainsAny(finding, defects) {
 			out.Unmatched = append(out.Unmatched, finding)
-			if nearMiss(finding, f.Defects) {
+			if nearMiss(finding, defects) {
 				out.NearMisses++
 			}
 		}

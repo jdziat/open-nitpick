@@ -26,6 +26,7 @@ func (c *Config) Validate() error {
 	errs = append(errs, c.Validation.validate()...)
 	errs = append(errs, c.Standards.Validate())
 	errs = append(errs, c.Practices.Validate())
+	errs = append(errs, c.Security.validate()...)
 
 	for i, ins := range c.Instructions {
 		if strings.TrimSpace(ins.Path) == "" {
@@ -61,6 +62,12 @@ func (m Models) validate() []error {
 		errs = append(errs, prefixAll("models.fix", m.Fix.validate(false))...)
 		if strings.TrimSpace(m.Fix.Model) == "" {
 			errs = append(errs, errors.New("models.fix: model is required"))
+		}
+	}
+	if m.Security != nil {
+		errs = append(errs, prefixAll("models.security", m.Security.validate(false))...)
+		if strings.TrimSpace(m.Security.Model) == "" {
+			errs = append(errs, errors.New("models.security: model is required"))
 		}
 	}
 	if m.Embed != nil {

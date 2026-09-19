@@ -89,14 +89,15 @@ func TestBenchmarkMultiFile(t *testing.T) {
 			r.usd += cost.USD
 			r.priced++
 		}
-		d := ScoreDetection(f, findings)
-		r.plants += len(f.Defects)
+		d := ScoreDetectionForEval(f, findings)
+		plants := PersonaDefects(f)
+		r.plants += len(plants)
 		r.located += d.Matched
 		r.findings += len(findings)
 		r.noise += d.Noise()
 		r.anchor = max(r.anchor, d.WidestAnchor)
 		r.near += d.NearMisses
-		for _, def := range f.Defects {
+		for _, def := range plants {
 			b := r.byBand[def.WantSeverity]
 			b[1]++
 			if d.Detected[def.Why] {
@@ -104,7 +105,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 			}
 			r.byBand[def.WantSeverity] = b
 		}
-		cell := fmt.Sprintf("%d/%d", d.Matched, len(f.Defects))
+		cell := fmt.Sprintf("%d/%d", d.Matched, len(plants))
 		if n := d.Noise(); n > 0 {
 			cell += fmt.Sprintf(" +%dn", n)
 		}

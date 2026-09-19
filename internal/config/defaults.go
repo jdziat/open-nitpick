@@ -141,6 +141,11 @@ func Defaults() *Config {
 			// gate says so.
 			MaxSeverity: SeverityCritical,
 		},
+		Security: Security{
+			// Warning, not none: a security scan that never fails is theater.
+			FailOn: SeverityWarning,
+			Model:  ptr(true),
+		},
 	}
 }
 

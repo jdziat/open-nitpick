@@ -811,6 +811,91 @@ Temperature is passed through unchanged. Unset leaves the role's default, which 
 duration, default `10m0s`.
 Timeout bounds one call, retries excluded.
 
+### `models.security.allow_private_endpoint`
+
+boolean, default `false`.
+AllowPrivateEndpoint permits base_url to use plain HTTP or resolve to a loopback or private address.
+
+### `models.security.api_key_env`
+
+string, default `none`.
+APIKeyEnv names the environment variable holding the credential.
+
+### `models.security.api_key_keyring`
+
+string, default `none`.
+APIKeyKeyring names a secret in the operating system's keystore as "service/account", for example "open-nitpick/synthetic". Empty still consults the keystore under a default name; see internal/llm/credential.go.
+
+### `models.security.base_url`
+
+string, default `none`.
+BaseURL points at an alternate endpoint.
+
+### `models.security.credential_command`
+
+list of string, default `none`.
+CredentialCommand is a command whose standard output is the credential, for a secret manager the keystore cannot reach: 1Password, AWS Secrets Manager, Vault.
+
+### `models.security.extra`
+
+map of string, default `none`.
+Extra carries provider-specific construction parameters (for example runpod's endpoint_id) straight through to the SDK.
+
+### `models.security.fallback`
+
+same keys as models.security, default `none`.
+Fallback is the model a role escalates to when this one cannot answer: a request cut at the output cap because the model looped, or structured output that never parsed.
+
+### `models.security.max_retries`
+
+integer, default `none`.
+MaxRetries bounds two loops, not one, and they multiply.
+
+### `models.security.max_tokens`
+
+integer, default `0`.
+MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+
+### `models.security.model`
+
+string, default `none`.
+Model is the model id as that provider spells it, which is not a name this project validates: an id the vendor does not serve fails at the call, not at load.
+
+### `models.security.provider`
+
+string, default `none`.
+Provider names the vendor or gateway the call goes to. "nitpick providers" prints the list.
+
+### `models.security.providers`
+
+list of string, default `none`.
+Providers pins a router to these upstream providers, tried in order, with no fallback beyond them.
+
+### `models.security.reasoning`
+
+string, default `none`.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
+### `models.security.service_tier`
+
+string, default `none`.
+ServiceTier routes an OpenRouter request to a capacity grade: "default" for the standard tier, "flex" for discounted capacity that trades latency and availability for price, "priority" (alias "fast") for premium capacity at a higher rate. Empty is the provider's own default and sends no field.
+
+### `models.security.structured_output`
+
+string, default `auto`.
+StructuredOutput selects how findings are constrained to the schema: "auto" (default) prefers a JSON-Schema response format and falls back to JSON mode and then to prompt-carried text, "schema" forces the schema path, "json" forces JSON mode, "text" forces the text path, where the schema rides in the prompt and the reply is parsed leniently.
+
+### `models.security.temperature`
+
+number, default `0`.
+Temperature is passed through unchanged. Unset leaves the role's default, which is 0 for every role here: a review that varies between runs on the same diff is one nobody can hold to a measurement.
+
+### `models.security.timeout`
+
+duration, default `10m0s`.
+Timeout bounds one call, retries excluded.
+
 ### `models.triage.allow_private_endpoint`
 
 boolean, default `false`.
@@ -1331,6 +1416,23 @@ TokenBudgetPerRequest bounds the context assembled for a single model call, incl
 
 boolean, default `false`.
 TriageNoNewClaims restores the reviewer's own words over anything triage rewrote, so triage may select, drop, group and re-anchor findings but may not author them.
+
+## security
+
+### `security.analyzers`
+
+list of string, default `none`.
+Analyzers names extra scanners beyond the frozen required set.
+
+### `security.fail_on`
+
+string, default `warning`.
+FailOn is the lowest finding severity that fails a complete security run. One of: none, nit, info, warning, error, critical.
+
+### `security.model`
+
+boolean, default `true`.
+Model turns the optional security model pass on.
 
 ## standards
 

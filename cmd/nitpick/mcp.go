@@ -49,7 +49,7 @@ func runMCP(ctx context.Context, args []string) error {
 	fs.StringVar(&repo, "repo", ".", "default repository root for tools that do not name one")
 	fs.BoolVar(&verbose, "v", false, "verbose logging on stderr")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: nitpick mcp [flags]\n       nitpick mcp install <client> [-user] [-print]\n       nitpick mcp clients\n\nServes the review tools over the Model Context Protocol on stdio, for an agent session.\nTools: review, full_review, repo_score, code_smell, ai_slop, explain_config.\ninstall writes the server into a client's configuration (claude-code, claude-desktop, cursor, windsurf, vscode, opencode, gemini-cli, codex).\n\nFlags:")
+		fmt.Fprintln(os.Stderr, "Usage: nitpick mcp [flags]\n       nitpick mcp install <client> [-user] [-print]\n       nitpick mcp clients\n\nServes the review tools over the Model Context Protocol on stdio, for an agent session.\nTools: review, full_review, repo_score, code_smell, ai_slop, security_scan, explain_config.\ninstall writes the server into a client's configuration (claude-code, claude-desktop, cursor, windsurf, vscode, opencode, gemini-cli, codex).\n\nFlags:")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -101,6 +101,14 @@ func newMCPServer(root string, log *slog.Logger) *mcp.Server {
 			"and, unless no_model is set, the model's nine slop rules through the review engine (a docstring that describes behaviour the code does not have, a swallowed error, a tautological guard, generic names, and so on). " +
 			"Returns tells by rule, the model's findings with suggestions, both per thousand lines, findings outside the slop class the review made (hidden), and recommendations ordered by count. Pass paths to keep the model's pass cheap; no_model is free.",
 	}, t.aiSlop)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "security_scan",
+		Description: "Security scan of the paths given (or the whole tree). Required deterministic scanners always run (osv-scanner, gitleaks, and catalog-applicable tools such as golangci-lint with gosec, zizmor, checkov, brakeman); " +
+			"an optional model pass is filtered to class security (non-security findings are hidden, not dropped). " +
+			"complete=true means required instruments finished — not that every language had a SAST (Python/JS need Semgrep configured). " +
+			"Absolute repo paths are trusted-operator-only. There is no no_linters and no budget. fail_on none requires allow_clean_with_no_gate. " +
+			"Returns findings, scanner roster, model status, complete/failed_stages, and whether the security gate failed.",
+	}, t.securityScan)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "explain_config",
 		Description: "The resolved open-nitpick configuration for a repository: config source, models per role, validation, gating, budget, analyzers, persona, and the instructions that apply to a given path.",
@@ -274,6 +282,26 @@ func (t *mcpTools) aiSlop(ctx context.Context, _ *mcp.CallToolRequest, in SlopIn
 	res, err := slopScore(ctx, f, in.Paths, in.Budget, in.NoModel, t.log)
 	if err != nil {
 		return nil, SlopResult{}, err
+	}
+	return textResult(strings.TrimSpace(res.Text())), *res, nil
+}
+
+// SecurityIn selects the tree for security_scan. Deliberately omits no_linters
+// and budget: the security surface rejects those theater knobs.
+type SecurityIn struct {
+	Repo                 string   `json:"repo,omitempty" jsonschema:"repository root; absolute paths are trusted-operator-only; the server's default when omitted"`
+	Paths                []string `json:"paths,omitempty" jsonschema:"paths under the repository root; the whole tree when omitted"`
+	Instruction          string   `json:"instruction,omitempty"`
+	NoModel              bool     `json:"no_model,omitempty" jsonschema:"deterministic scanners only: no model call"`
+	FailOn               string   `json:"fail_on,omitempty" jsonschema:"override security.fail_on: nit, info, warning, error, critical or none"`
+	AllowCleanWithNoGate bool     `json:"allow_clean_with_no_gate,omitempty" jsonschema:"loud waiver required before fail_on none may green a complete run"`
+}
+
+func (t *mcpTools) securityScan(ctx context.Context, _ *mcp.CallToolRequest, in SecurityIn) (*mcp.CallToolResult, SecurityResult, error) {
+	f := &reviewFlags{repo: t.repoFor(in.Repo), instruction: in.Instruction}
+	res, err := securityScan(ctx, f, in.Paths, in.NoModel, in.FailOn, in.AllowCleanWithNoGate, t.log)
+	if err != nil {
+		return nil, SecurityResult{}, err
 	}
 	return textResult(strings.TrimSpace(res.Text())), *res, nil
 }

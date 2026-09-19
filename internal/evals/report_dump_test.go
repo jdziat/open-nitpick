@@ -73,7 +73,8 @@ func TestReportFromDump(t *testing.T) {
 			if k.variant != "" {
 				name += " " + k.variant
 			}
-			d := ScoreDetection(f, grouped[k])
+			d := ScoreDetectionForEval(f, grouped[k])
+			plants := PersonaDefects(f)
 			for _, lang := range []string{fixtureLanguage(f), "all"} {
 				c := cells[key{name, lang}]
 				if c == nil {
@@ -81,7 +82,7 @@ func TestReportFromDump(t *testing.T) {
 					cells[key{name, lang}] = c
 				}
 				c.reviews++
-				c.plants += len(f.Defects)
+				c.plants += len(plants)
 				c.located += d.Matched
 				c.noise += d.Noise()
 				c.anchor = max(c.anchor, d.WidestAnchor)

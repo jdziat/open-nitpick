@@ -2440,3 +2440,135 @@ rejected the invalid title with `commits.subject-format`;
 [run 34656158969](https://github.com/jdziat/open-nitpick/actions/runs/34656158969)
 passed after the valid title was restored on the same commit. Those edits
 started two commit-policy runs and no new main CI run.
+
+## Security persona bake-off (2026-09-18)
+
+Which chat model should drive `nitpick security`'s optional model pass.
+
+**Instrument.** `make eval-security`: `NITPICK_EVAL_SECURITY=1` applies the
+same instruction the command injects (`internal/security.Instruction`). Corpus
+is seven security-class plants plus `clean-refactor` and `style-only` (Rule 10
+silence). Eight contenders, two runs each, with and without related context, one
+within-run table (Rule 2). Linters off so the score is the model. Harness limit:
+review and triage are the same weights (not the shipped luna+glm pairing).
+
+**Dump.** `internal/evals/.eval-runs/multifile-mixed-20260918T125032Z-2476545.jsonl`.
+
+**Tuning (shared coverage, every row 18 reviews, 0 lost):**
+
+| contender | RECALL | NOISE | $/REVIEW | $/LOCATED |
+|---|---:|---:|---:|---:|
+| z-ai/glm-5.3-flash +ctx | 0.83 | 0.06 | $0.0016 | $0.0020 |
+| anthropic/claude-opus-5 | 0.78 | 0.06 | $0.1383 | $0.1778 |
+| anthropic/claude-sonnet-4.6 +ctx | 0.72 | 0.00 | $0.0186 | $0.0258 |
+| openai/gpt-5.6-luna | 0.72 | 0.00 | $0.0003 | $0.0004 |
+| anthropic/claude-opus-5 +ctx | 0.72 | 0.06 | $0.0458 | $0.0635 |
+| google/gemini-3.5-flash (+ctx same) | 0.67 | 0.00 | ~$0.02 | ~$0.03 |
+| openai/gpt-5.6-luna +ctx | 0.67 | 0.11 | $0.0003 | $0.0004 |
+| openai/gpt-5.6-terra (±ctx) | 0.61 | 0.06 | ~$0.002 | ~$0.003 |
+| moonshotai/kimi-k2.7-code | 0.39–0.50 | 0.06 | ~$0.006 | ~$0.01–0.015 |
+
+Silence controls stayed clean for every contender. `php-forbidden-vs-404` (info
+band) and `multi-defect` were the main separators.
+
+**Held-out spend (once):** `removed-guard`, `bash-fixed-temp-path`,
+`clean-sql-allowlist` — three fixtures, top contenders only.
+
+| contender | RECALL | NOISE | $/REVIEW |
+|---|---:|---:|---:|
+| openai/gpt-5.6-luna (±ctx) | 1.00 | 0.00 | ~$0.0004 |
+| anthropic/claude-sonnet-4.6 (±ctx) | 1.00 | 0.00 | ~$0.18 |
+| z-ai/glm-5.3-flash | 1.00 | 0.00 | $0.0011 |
+| z-ai/glm-5.3-flash +ctx | 0.75 | 0.00 | $0.0011 |
+
+glm's tuning lead did not hold under +ctx on held-out (missed one
+`removed-guard` run). luna and sonnet stayed perfect; luna is ~400× cheaper than
+sonnet on that spend.
+
+**Call.** Pin `models.security` to `openai/gpt-5.6-luna` (done in
+`.nitpick.openrouter.yaml`). Leave `models.review` as luna for PR review; the
+security role exists so a later bake-off can diverge without forcing every
+review onto security-tuned weights. Rule 8: single-file/multifile fixtures are
+not PRs; this ranks the security *persona* on planted defects, not tree-scan
+completeness (scanners are separate).
+
+## Hard security corpus (2026-09-18)
+
+The bake-off above hit RECALL 1.00 on held-out because that spend was only two
+plants plus one silence. Under Rule 7 those three fixtures
+(`removed-guard`, `bash-fixed-temp-path`, `clean-sql-allowlist`) are **spent**
+for security-persona generalization and must not be re-spent as
+`SECURITY_HELD_OUT`.
+
+**Tuning (`make eval-security`, `SECURITY`):** easy sinks, medium plants,
+promoted spent hard plants, `go-idor-wrong-principal` (authz present, wrong
+principal), silence including `clean-sql-allowlist` and
+`php-clean-404-on-forbidden`. Goal: RECALL 1.00 should be rare on tuning alone.
+
+**Fresh held-out (`make eval-security-heldout`, `SECURITY_HELD_OUT`, spend once):**
+`python-expired-token-accepted`, `python-hmac-unbound-compare`,
+`python-hmac-bound-clean`. Distinct from global `HELD_OUT`.
+
+Do not treat the 2026-09-18 three-fixture held-out 1.00 as the bar for the next
+model pick.
+
+**Smoke (tuning only, before any held-out spend):**
+`make eval-security MODELS=z-ai/glm-5.3-flash RUNS=1` → RECALL **0.83**
+(no ctx) / **0.92** (+ctx). Misses without ctx: `removed-guard`, one plant in
+`multi-defect`. Not 1.00; corpus is hard enough to rank without spending
+`SECURITY_HELD_OUT` yet.
+
+**Label check (2026-09-19):** that smoke's header said MIXED (10 tuning + 3
+HELD-OUT + 1 multi-file) because `removed-guard`, `bash-fixed-temp-path`, and
+`clean-sql-allowlist` are still in global `HeldOutFixtures`. The security
+battery is now labeled `SECURITY tuning` and the dump token is `security`,
+not `mixed`. A one-fixture subset does not inherit that label.
+
+**Pinned-model check, same corpus, RUNS=1, held-out not spent:**
+`make eval-security MODELS=openai/gpt-5.6-luna RUNS=1` → RECALL **0.75** /
+**0.83** (+ctx). Header: `SECURITY tuning corpus (14 fixture(s))`. Silence
+stayed silent (`clean-refactor`, `style-only`, `clean-sql-allowlist`,
+`php-clean-404-on-forbidden` all 0/0). `go-idor-wrong-principal` was located
+both ways. Under the then-unscoped scorer, `multi-defect` was 1/3 because the
+race and descriptor leak are not `ClassSecurity` and
+`security.Instruction` forbids reporting them.
+
+**Persona scoring layer (keep `multi-defect`):** under `NITPICK_EVAL_SECURITY`,
+`ScoreDetectionForEval` / `ScoreSeverityForEval` count only `ClassSecurity`
+plants. Findings that match a non-security plant on the same fixture are out
+of scope (not noise). Raw `ScoreDetection` stays unscoped for non-security
+batteries.
+
+**Re-score of the luna dump with that layer (no new spend):**
+`NITPICK_EVAL_SECURITY=1` over
+`multifile-security-20260919T011046Z-500927.jsonl` → luna **9/10** (0.90),
+luna +ctx **10/10** (1.00). The old 0.75/0.83 was the unscoped denominator.
+
+**Live end-to-end with the layer (2026-09-19):**
+`make eval-security MODELS=openai/gpt-5.6-luna RUNS=1` → RECALL **0.90** /
+**1.00** (+ctx); `multi-defect` **1/1** (not 1/3); severity error band **2/2**
+(not 2/4); header `SECURITY tuning`. Matches the dump re-score. With +ctx
+already at 1.00 on tuning, do not spend `SECURITY_HELD_OUT` to pick a model
+until a ranking that is not already saturated exists (harder plants, or rank
+the no-ctx arm).
+
+## Security prompt depth A/B (2026-09-19)
+
+Does luna vs glm-5.3-flash move with light / deep / extreme security prompts?
+Tuning corpus, RUNS=1, persona scoring on, held-out not spent.
+`DEPTH=` → `NITPICK_EVAL_SECURITY_DEPTH` (`InstructionLight` / shipped
+`Instruction` / `InstructionExtreme`). Eval-only; shipped `nitpick security`
+still uses `Instruction` (deep).
+
+| depth | luna | luna +ctx | glm | glm +ctx |
+|---|---:|---:|---:|---:|
+| light | 0.90 / 0.00 | 0.70 / 0.07 | 0.90 / 0.00 | 0.90 / 0.00 |
+| deep | **1.00 / 0.00** | 0.90 / 0.07 | 0.90 / 0.14 | **1.00 / 0.07** |
+| extreme | 1.00 / **0.36** | 0.90 / 0.14 | 0.90 / 0.14 | 1.00 / **0.21** |
+
+Cells are RECALL / NOISE. Fixture signal: light left `php-forbidden-vs-404`
+at 0/1 for every arm; deep/extreme recovered it on some arms. Extreme put
+`+1n` on `php-clean-404-on-forbidden` for every arm (the silence twin). Luna
+no-ctx is already perfect and silent on deep; extreme adds noise without
+recall. Call: keep shipped depth at deep; do not promote extreme.
+

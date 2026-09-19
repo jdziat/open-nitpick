@@ -158,7 +158,10 @@ func New(repoRoot string, cfg *config.Config, log *slog.Logger) *Set {
 // Detect refuse a runner whose configuration was rejected.
 func builtins(repoRoot string, cfg *config.Config) []Runner {
 	runners := []Runner{
-		&golangciLint{cfg: fileConfig(repoRoot, cfg.Linters.GolangciConfig)},
+		&golangciLint{
+			cfg:        fileConfig(repoRoot, cfg.Linters.GolangciConfig),
+			ForceGosec: cfg.Linters.ForceGosec,
+		},
 		&ruff{cfg: fileConfig(repoRoot, cfg.Linters.RuffConfig)},
 		&eslint{cfg: fileConfig(repoRoot, cfg.Linters.ESLintConfig)},
 		&semgrep{cfg: semgrepConfig(repoRoot, cfg.Linters.SemgrepConfig)},

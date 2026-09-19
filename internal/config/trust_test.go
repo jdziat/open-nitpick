@@ -63,7 +63,7 @@ func TestUntrustedConfigIgnoresEndpointKeysForEveryRole(t *testing.T) {
 	roles := modelRoleKeys()
 	// Named so the derivation itself is held to something. A role removed from
 	// Models should fail here loudly rather than shrink the test silently.
-	for _, want := range []string{"default", "review", "triage", "validate", "router", "fix"} {
+	for _, want := range []string{"default", "review", "triage", "validate", "router", "fix", "security"} {
 		if !slices.Contains(roles, want) {
 			t.Fatalf("modelRoleKeys() = %v, want it to include %q", roles, want)
 		}

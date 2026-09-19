@@ -357,6 +357,11 @@ const dumpPartialSuffix = ".partial"
 // TestARetainedRunRefusesToOverwriteAnEarlierOne covers the residual.
 func runDumpName(battery string, fixtures []Fixture, now time.Time, pid int) string {
 	corpus := "empty"
+	if token := securityCorpusToken(fixtures); token != "" {
+		corpus = token
+		return fmt.Sprintf("%s-%s-%s-%d.jsonl",
+			sanitizeDumpName(battery), corpus, now.UTC().Format("20060102T150405Z"), pid)
+	}
 	kinds := map[string]int{}
 	for _, f := range fixtures {
 		switch {

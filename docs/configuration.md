@@ -140,6 +140,12 @@ model can produce a change that compiles, so falling back to `models.default`
 would ship an unmeasured capability under a measured model's name. Without
 `models.fix` the command refuses and says why.
 
+`models.security` is the optional model for `nitpick security` / `security_scan`.
+When unset, the security model pass falls back to `models.review` (then
+`models.default`). Unlike `models.fix`, that fallback is deliberate: a security
+pass is still a review, and the bake-off in `docs/findings.md` pins a measured
+winner here without forcing every PR review onto those weights.
+
 **Nothing is compiled, run, tested, formatted or linted before the pull request
 opens.** There is no checkout: the change is written through the forge's data
 API. The body says so, and the checks on the fix pull request are the only

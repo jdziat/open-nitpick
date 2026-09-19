@@ -154,6 +154,19 @@ TUNING := go-nil-deref,go-sql-injection,go-hardcoded-secret,python-command-injec
 # class the review never asks for.
 SLOP := go-slop-restating-comments,go-clean-why-comments,python-slop-swallowed-exception,python-clean-logged-and-reraised,ts-slop-chat-prose,ts-clean-doc-comment,go-slop-type-excluded-check,go-clean-real-guard,python-slop-test-asserts-nothing,python-clean-test-asserts
 
+# Security-persona tuning corpus (make eval-security). Harder than the 2026-09-18
+# bake-off: spent held-out plants are promoted here; clean-sql-allowlist is the
+# FP magnet; go-idor and php-clean-404 raise the bar. Global HELD_OUT ≠ this list.
+# Prior security held-out spend (removed-guard, bash-fixed-temp-path,
+# clean-sql-allowlist) is SPENT for generalization claims — do not re-spend it.
+SECURITY := go-sql-injection,go-hardcoded-secret,python-command-injection,python-timing-unsafe-hmac,python-secret-to-audit-log,multi-defect,bash-fixed-temp-path,removed-guard,php-forbidden-vs-404,go-idor-wrong-principal,clean-refactor,style-only,clean-sql-allowlist,php-clean-404-on-forbidden
+
+# Never-spent security held-out. Spend once with make eval-security-heldout.
+# Distinct from HELD_OUT. Includes silence twin python-hmac-bound-clean.
+SECURITY_HELD_OUT := python-expired-token-accepted,python-hmac-unbound-compare,python-hmac-bound-clean
+
+SECURITY_MODELS := openai/gpt-5.6-luna,openai/gpt-5.6-terra,anthropic/claude-sonnet-4.6,anthropic/claude-opus-5,google/gemini-3.5-flash,deepseek/deepseek-v4-pro,z-ai/glm-5.3-flash,moonshotai/kimi-k2.7-code
+
 CALLERS := go-error-identity-changed,go-clean-wrapped-sentinel,go-return-units-changed,python-precondition-added,python-clean-precondition-satisfied,ts-return-units-changed
 
 # Every fixture in evals.KnowledgeFixtures(): six plants whose defect needs one
@@ -367,6 +380,19 @@ eval-knowledge:
 
 eval-slop:
 	NITPICK_EVAL_SLOP=1 $(MAKE) benchmark-multifile FIXTURES='$(SLOP)' MODELS='$(or $(MODELS),z-ai/glm-5.3-flash)' RUNS='$(or $(RUNS),1)'
+
+# Security persona bake-off: ground-truth security plants under the same
+# instruction nitpick security injects. Contenders share one run (Rule 2).
+# Tuning only — do not pass SECURITY_HELD_OUT here (Rule 7).
+# DEPTH=light|deep|extreme selects the security persona prompt (default deep).
+.PHONY: eval-security
+eval-security:
+	NITPICK_EVAL_SECURITY=1 NITPICK_EVAL_SECURITY_DEPTH='$(or $(DEPTH),deep)' $(MAKE) benchmark-multifile FIXTURES='$(SECURITY)' MODELS='$(or $(MODELS),$(SECURITY_MODELS))' RUNS='$(or $(RUNS),2)'
+
+# One-shot security held-out spend. Never mix into eval-security tuning.
+.PHONY: eval-security-heldout
+eval-security-heldout:
+	NITPICK_EVAL_SECURITY=1 NITPICK_EVAL_SECURITY_DEPTH='$(or $(DEPTH),deep)' $(MAKE) benchmark-multifile FIXTURES='$(SECURITY_HELD_OUT)' MODELS='$(or $(MODELS),$(SECURITY_MODELS))' RUNS='$(or $(RUNS),2)'
 
 .PHONY: benchmark-multifile
 benchmark-multifile:

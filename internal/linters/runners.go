@@ -239,6 +239,14 @@ var golangciDefaults []byte
 //go:embed golangci-conventions.yml
 var golangciConventions []byte
 
+// golangciSecurityDefaults is the ruleset `nitpick security` uses when the
+// operator supplied no golangci_config: standard plus gosec. Review keeps
+// golangciDefaults without gosec; enabling it there would post every gosec
+// finding on ordinary pull requests.
+//
+//go:embed golangci-security.yml
+var golangciSecurityDefaults []byte
+
 // writeGolangciDefaults materializes the review's ruleset outside the tree.
 func writeGolangciDefaults(repoRoot string) (string, func(), error) {
 	return writeGolangciConfig(repoRoot, golangciDefaults)
@@ -251,6 +259,12 @@ func writeGolangciDefaults(repoRoot string) (string, func(), error) {
 // to point the runner at a ruleset the review does not use.
 func WriteGolangciConventions(repoRoot string) (string, func(), error) {
 	return writeGolangciConfig(repoRoot, golangciConventions)
+}
+
+// writeGolangciSecurityDefaults materializes the security ruleset (gosec on)
+// outside the tree.
+func writeGolangciSecurityDefaults(repoRoot string) (string, func(), error) {
+	return writeGolangciConfig(repoRoot, golangciSecurityDefaults)
 }
 
 // writeGolangciConfig materializes one of our embedded rulesets and returns its
@@ -291,7 +305,14 @@ func writeGolangciConfig(repoRoot string, body []byte) (string, func(), error) {
 }
 
 // golangciLint runs golangci-lint over the changed Go packages.
-type golangciLint struct{ cfg analyzerConfig }
+type golangciLint struct {
+	cfg analyzerConfig
+
+	// ForceGosec enables gosec for this run: security defaults when the
+	// operator supplied no config, and `--enable=gosec` on every invocation so
+	// an operator config that disables it cannot greenwash the security roster.
+	ForceGosec bool
+}
 
 func (g *golangciLint) Name() string { return "golangci-lint" }
 
@@ -333,8 +354,20 @@ func (g *golangciLint) Detect(_ context.Context, repoRoot string, files []string
 // stock defaults, which is how a `// Code generated` line in the diff switches
 // the analyzer off for that file. A reader has to tell "nothing configured
 // this" from "open-nitpick configured this".
+//
+// When ForceGosec is set the string always contains "gosec:enabled" so the
+// security roster can prove the overlay was requested, whether the config came
+// from the security embed or an operator path.
 func (g *golangciLint) State() string {
-	return g.cfg.state("isolated: open-nitpick's own analyzer config")
+	isolated := "isolated: open-nitpick's own analyzer config"
+	if g.ForceGosec && g.cfg.Ref == "" && g.cfg.Err == nil {
+		isolated = "isolated: open-nitpick's security analyzer config"
+	}
+	state := g.cfg.state(isolated)
+	if g.ForceGosec {
+		return state + "; gosec:enabled"
+	}
+	return state
 }
 
 // golangciOutput is the part of golangci-lint's JSON report this package reads.
@@ -390,10 +423,15 @@ func (g *golangciLint) Run(ctx context.Context, repoRoot string, files []string)
 
 	// Ours when the operator supplied none. Not "no config": --no-config leaves
 	// golangci-lint's own defaults deciding what the tree can suppress, and
-	// exclusions.generated is one of them.
+	// exclusions.generated is one of them. ForceGosec swaps in the security
+	// embed so gosec is in the file as well as on the command line.
 	configRef := g.cfg.Ref
 	if configRef == "" {
-		file, cleanup, err := writeGolangciDefaults(repoRoot)
+		write := writeGolangciDefaults
+		if g.ForceGosec {
+			write = writeGolangciSecurityDefaults
+		}
+		file, cleanup, err := write(repoRoot)
 		if err != nil {
 			// A failure to CONFIGURE the analyzer is reported as the analyzer not
 			// running, never as a quieter run under whatever defaults were left:
@@ -422,6 +460,11 @@ func (g *golangciLint) Run(ctx context.Context, repoRoot string, files []string)
 	for _, t := range targets {
 		args := []string{"run", "--config", configRef}
 		args = append(args, golangciReportArgs...)
+		// Always, including when the operator supplied golangci_config: a file
+		// with default: none or gosec disabled must not report ran without it.
+		if g.ForceGosec {
+			args = append(args, "--enable=gosec")
+		}
 		args = append(args, "--")
 		args = append(args, t.Dirs...)
 

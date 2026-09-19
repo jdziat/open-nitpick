@@ -459,6 +459,36 @@ func TestTheFixModelDoesNotFallBackToTheReviewer(t *testing.T) {
 	}
 }
 
+func TestResolveSecurityFallsBackToReviewThenDefault(t *testing.T) {
+	m := Models{Default: ModelSpec{Provider: "openai", Model: "default-model"}}
+	got := m.ResolveSecurity()
+	if got.Model != "default-model" || got.Provider != "openai" {
+		t.Errorf("unset security = %s/%s, want default", got.Provider, got.Model)
+	}
+
+	m.Review = &ModelSpec{Model: "review-model"}
+	got = m.ResolveSecurity()
+	if got.Model != "review-model" {
+		t.Errorf("security with review only = %q, want review-model", got.Model)
+	}
+
+	m.Security = &ModelSpec{Model: "security-model"}
+	got = m.ResolveSecurity()
+	if got.Model != "security-model" || got.Provider != "openai" {
+		t.Errorf("named security = %s/%s", got.Provider, got.Model)
+	}
+}
+
+func TestSecurityModelRequiresAName(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "m"}
+	cfg.Models.Security = &ModelSpec{}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "models.security") {
+		t.Fatalf("empty models.security: %v", err)
+	}
+}
+
 // Every request-shaping field survives the overlay.
 //
 // A field added to ModelSpec and forgotten here is set in the file, accepted by

@@ -3646,6 +3646,9 @@ func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 	for _, f := range KnowledgeFixtures() {
 		multi[f.Name] = true // a sixth, pairs for retrieval from the knowledge corpus
 	}
+	for _, f := range append(SecurityTuningFixtures(), SecurityHeldOutFixtures()...) {
+		multi[f.Name] = true // security-persona extras outside AllFixtures
+	}
 
 	for name, where := range authored {
 		reason, excused := exempt[name]
@@ -4274,10 +4277,13 @@ func TestMistypedFixtureNameIsAnError(t *testing.T) {
 // matters most: it is deliberately built to look like the SQL-injection
 // fixture, and it is safe.
 func TestFixturesWhoseCorrectReviewIsSilenceHaveNoDefects(t *testing.T) {
-	silent := []string{"clean-refactor", "style-only", "clean-sql-allowlist"}
+	silent := []string{
+		"clean-refactor", "style-only", "clean-sql-allowlist",
+		"php-clean-404-on-forbidden", "python-hmac-bound-clean",
+	}
 
 	byName := map[string]Fixture{}
-	for _, f := range AllFixtures() {
+	for _, f := range EveryFixture() {
 		byName[f.Name] = f
 	}
 

@@ -239,7 +239,21 @@ func EveryFixture() []Fixture {
 	all = append(all, InfoFixtures()...)
 	all = append(all, CallerFixtures()...)
 	all = append(all, SlopFixtures()...)
-	return append(all, KnowledgeFixtures()...)
+	all = append(all, KnowledgeFixtures()...)
+	// Security-persona extras (not in Fixtures/HeldOut) so SECURITY lists can
+	// name them without shifting the AllFixtures severity census.
+	seen := map[string]bool{}
+	for _, f := range all {
+		seen[f.Name] = true
+	}
+	for _, f := range append(SecurityTuningFixtures(), SecurityHeldOutFixtures()...) {
+		if seen[f.Name] {
+			continue
+		}
+		all = append(all, f)
+		seen[f.Name] = true
+	}
+	return all
 }
 
 // contractBreakFixture renames the wire name of a field on a public payload.

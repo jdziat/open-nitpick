@@ -46,6 +46,9 @@ type Config struct {
 	// Practices selects engineering checks and their explicit requirements.
 	Practices Practices `yaml:"practices"`
 
+	// Security configures the tree security scan (`nitpick security`).
+	Security Security `yaml:"security"`
+
 	// Source records where the configuration was loaded from. It is empty when
 	// only built-in defaults were used.
 	Source string `yaml:"-"`
@@ -277,6 +280,13 @@ type Models struct {
 	// ship an unmeasured capability under a measured model's name.
 	Fix *ModelSpec `yaml:"fix"`
 
+	// Security is the model the nitpick security / security_scan model pass
+	// uses. Optional: when unset, ResolveSecurity falls back to the review
+	// model (unlike Fix/Embed), because a security pass is still a review and
+	// the bake-off pins a measured winner here without forcing all PR reviews
+	// onto those weights.
+	Security *ModelSpec `yaml:"security"`
+
 	// Embed is the model that turns text into vectors for knowledge
 	// retrieval. It has no default and no fallback to Default, because an
 	// embedding model is not a chat model and naming the reviewer here would
@@ -429,6 +439,19 @@ func (m Models) ResolveFix() (ModelSpec, bool) {
 		return ModelSpec{}, false
 	}
 	return m.Default.overlay(*m.Fix), true
+}
+
+// ResolveSecurity returns the model for the security command's model pass.
+//
+// When models.security is unset it falls back to the review model (then
+// default), so an operator who has only named models.review still gets a
+// security pass. A named models.security overlays Default the way other
+// optional roles do.
+func (m Models) ResolveSecurity() ModelSpec {
+	if m.Security == nil {
+		return m.ResolveModel(RoleReview)
+	}
+	return m.Default.overlay(*m.Security)
 }
 
 // ResolveRouter returns the router spec, overlaid on Default, and whether
@@ -866,6 +889,11 @@ type Linters struct {
 	// refused by default. Name one here only where every change reviewed
 	// comes from people who could already run code in this CI job.
 	Trusted []string `yaml:"trusted"`
+
+	// ForceGosec asks golangci-lint to enable gosec for this run. Set only by
+	// the security command; it is not a YAML key, so a repository cannot opt
+	// into or out of the overlay through .nitpick.yaml.
+	ForceGosec bool `yaml:"-"`
 }
 
 // AutoDetects reports whether catalog analyzers run without being named.
