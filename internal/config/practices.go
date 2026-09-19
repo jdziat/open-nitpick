@@ -229,6 +229,10 @@ func decodePracticeBlocks(raw []byte, result *PracticePolicy) error {
 				known[name] = true
 			}
 		}
+		// security configures the tree scan command, not a practices policy.
+		// Leaving it in known would route a misplaced security: block into
+		// Other and drop it silently.
+		delete(known, "security")
 		seen := map[string]bool{}
 		for i := 0; i < len(mapping.Content); i += 2 {
 			key := mapping.Content[i]

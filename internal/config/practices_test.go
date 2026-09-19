@@ -139,6 +139,11 @@ func TestPracticePolicyRejectsMisspelledTopLevelBlocks(t *testing.T) {
 	if err := decodePracticeBlocks([]byte("practisez: {required: [commits]}"), &policy); err == nil {
 		t.Fatal("misspelled policy silently defaulted")
 	}
+	// security belongs on .nitpick.yaml, not a practices policy. Leaving it in
+	// the known-block set would drop a misplaced security: into Other.
+	if err := decodePracticeBlocks([]byte("security: {fail_on: warning}"), &policy); err == nil {
+		t.Fatal("security: block in a practices policy was accepted as known")
+	}
 	for _, rules := range []Practices{{SlopRules: []string{" "}}, {RequiredConventions: []string{""}}} {
 		rules.Commits = defaults.Practices.Commits
 		cfg := *defaults

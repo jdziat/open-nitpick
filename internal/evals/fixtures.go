@@ -222,12 +222,35 @@ func HeldOutFixtures() []Fixture {
 //
 // It exists so the NITPICK_EVAL_FIXTURES filter can name a held-out fixture
 // without Fixtures(), the default run, and therefore every tuning loop,
-// changing what it returns. Ground-truth tests iterate this: a corpus that is
-// not validated is worse than no corpus, and "held out" is not an excuse to
-// skip the check that caught four wrong line numbers in the first eight.
+// changing what it returns. Ground-truth tests iterate GroundTruthFixtures:
+// a corpus that is not validated is worse than no corpus, and "held out" is
+// not an excuse to skip the check that caught four wrong line numbers in the
+// first eight.
 func AllFixtures() []Fixture {
 	all := Fixtures()
 	return append(all, HeldOutFixtures()...)
+}
+
+// GroundTruthFixtures is AllFixtures plus security-persona plants that live
+// outside AllFixtures so the severity census stays stable. Keyword, silence,
+// and anchor probes iterate this set. Plants that already sit in
+// MultiFileFixtures keep that corpus's own well-formed suite and are not
+// double-admitted here (python-expired-token-accepted is both multi-file and
+// security held-out by name).
+func GroundTruthFixtures() []Fixture {
+	all := AllFixtures()
+	seen := map[string]bool{}
+	for _, f := range all {
+		seen[f.Name] = true
+	}
+	for _, f := range append(SecurityTuningFixtures(), SecurityHeldOutFixtures()...) {
+		if seen[f.Name] || MultiFile(f.Name) {
+			continue
+		}
+		all = append(all, f)
+		seen[f.Name] = true
+	}
+	return all
 }
 
 // EveryFixture is AllFixtures plus the multi-file corpus, for name lookup.

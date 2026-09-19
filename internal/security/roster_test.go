@@ -44,7 +44,7 @@ func TestNonRequiredRanAloneCannotMakeComplete(t *testing.T) {
 }
 
 func TestGolangciRanWithoutGosecEnabledIsIncomplete(t *testing.T) {
-	// Mutation: accepting golangci ran without gosec:enabled ⇒ exit 0.
+	// Mutation: accepting golangci ran without GosecEnabled ⇒ exit 0.
 	roster := BuildRoster(
 		[]review.LinterStatus{
 			{Linter: "osv-scanner", Outcome: review.LinterRan, State: "isolated"},
@@ -56,7 +56,7 @@ func TestGolangciRanWithoutGosecEnabledIsIncomplete(t *testing.T) {
 		false,
 	)
 	if roster.Complete {
-		t.Fatal("golangci-lint ran without gosec:enabled must be incomplete")
+		t.Fatal("golangci-lint ran without GosecEnabled must be incomplete")
 	}
 	gl := scannerByID(t, roster, "golangci-lint")
 	if gl.Status != StatusFailed || gl.Reason != "gosec not enabled" {
@@ -118,15 +118,15 @@ func TestLinterSkippedMapsToNotApplicable(t *testing.T) {
 	roster := BuildRoster(
 		[]review.LinterStatus{
 			{Linter: "osv-scanner", Outcome: review.LinterRan, State: "isolated"},
-			{Linter: "gitleaks", Outcome: review.LinterSkipped, State: "no files it analyzes were selected for review"},
-			{Linter: "golangci-lint", Outcome: review.LinterRan, State: "isolated; gosec:enabled"},
+			{Linter: "gitleaks", Outcome: review.LinterSkipped, State: "no files it analyzes were selected for review", NoTargets: true},
+			{Linter: "golangci-lint", Outcome: review.LinterRan, State: "isolated", GosecEnabled: true},
 		},
 		append(RequiredAlways, "golangci-lint"),
 		ModelStatus{Status: ModelSkippedByFlag},
 		false,
 	)
 	if !roster.Complete {
-		t.Fatalf("skipped→not_applicable should satisfy; failed=%v", roster.FailedStages)
+		t.Fatalf("NoTargets skip should satisfy; failed=%v", roster.FailedStages)
 	}
 	if got := scannerByID(t, roster, "gitleaks").Status; got != StatusNotApplicable {
 		t.Fatalf("gitleaks status=%q, want not_applicable", got)

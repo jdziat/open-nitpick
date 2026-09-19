@@ -3,7 +3,6 @@ package security
 import (
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/review"
 )
@@ -111,10 +110,10 @@ func statusFor(id string, byID map[string]review.LinterStatus) ScannerStatus {
 	case review.LinterRan:
 		out.Status = StatusRan
 	case review.LinterSkipped:
-		// Only "no matching files" is not_applicable. Any other skip reason
-		// (or an empty one) stays skipped so RequiredAlways cannot greenwash
-		// a disabled or aborted attempt as a satisfied N/A.
-		if isNoTargetsSkip(st.State) {
+		// Only a typed no-targets skip is not_applicable. Any other skip
+		// stays skipped so RequiredAlways cannot greenwash a disabled or
+		// aborted attempt as a satisfied N/A.
+		if st.NoTargets {
 			out.Status = StatusNotApplicable
 		} else {
 			out.Status = StatusSkipped
@@ -130,15 +129,9 @@ func statusFor(id string, byID map[string]review.LinterStatus) ScannerStatus {
 			out.Reason = fmt.Sprintf("unknown linter outcome %q", st.Outcome)
 		}
 	}
-	if id == "golangci-lint" && out.Status == StatusRan && !strings.Contains(st.State, "gosec:enabled") {
+	if id == "golangci-lint" && out.Status == StatusRan && !st.GosecEnabled {
 		out.Status = StatusFailed
 		out.Reason = "gosec not enabled"
 	}
 	return out
-}
-
-// isNoTargetsSkip reports whether a LinterSkipped state is the catalog
-// "nothing to read" outcome (errNoTargets), which may count as not_applicable.
-func isNoTargetsSkip(state string) bool {
-	return strings.Contains(state, "no files it analyzes")
 }

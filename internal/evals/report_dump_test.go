@@ -47,12 +47,14 @@ func TestReportFromDump(t *testing.T) {
 			run                     int
 		}
 		grouped := map[reviewKey][]review.Finding{}
+		persona := map[reviewKey]bool{}
 		var order []reviewKey
 		for _, rec := range records {
 			k := reviewKey{rec.Model, rec.Variant, rec.Fixture, rec.Run}
 			if _, seen := grouped[k]; !seen {
 				order = append(order, k)
 				grouped[k] = nil
+				persona[k] = rec.SecurityPersona
 			}
 			if rec.Path == "" {
 				continue
@@ -73,8 +75,9 @@ func TestReportFromDump(t *testing.T) {
 			if k.variant != "" {
 				name += " " + k.variant
 			}
-			d := ScoreDetectionForEval(f, grouped[k])
-			plants := PersonaDefects(f)
+			sec := persona[k]
+			d := ScoreDetectionForPersona(f, grouped[k], sec)
+			plants := PersonaDefectsFor(f, sec)
 			for _, lang := range []string{fixtureLanguage(f), "all"} {
 				c := cells[key{name, lang}]
 				if c == nil {

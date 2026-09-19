@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -214,9 +215,39 @@ func TestSecurityRunOnFixtureDoesNotPanic(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("# x\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	cfgYAML := "models:\n  default:\n    provider: openai\n    model: test\n"
+	if err := os.WriteFile(filepath.Join(root, ".nitpick.yaml"), []byte(cfgYAML), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	// May be incomplete (missing binaries) or clean under a complete roster;
 	// either is fine. A panic or config theater error is not.
-	_ = runSecurity(context.Background(), []string{"-repo", root, "-no-model", "-json"})
+	if err := runSecurity(context.Background(), []string{"-repo", root, "-no-model", "-json"}); err != nil && !errors.Is(err, errIncomplete) {
+		t.Fatalf("unexpected security run error: %v", err)
+	}
+}
+
+func TestSecurityGateHidesNonSecurityFindings(t *testing.T) {
+	sec := review.Finding{Class: string(config.ClassSecurity), Severity: string(config.SeverityWarning), Title: "inj"}
+	race := review.Finding{Class: string(config.ClassConcurrency), Severity: string(config.SeverityError), Title: "race"}
+	kept, hidden := partitionSecurityFindings([]review.Finding{sec, race})
+	if len(kept) != 1 || kept[0].Title != "inj" {
+		t.Fatalf("kept = %+v, want the security finding", kept)
+	}
+	if len(hidden) != 1 || hidden[0].Title != "race" {
+		t.Fatalf("hidden = %+v, want the concurrency finding", hidden)
+	}
+}
+
+func TestSecurityRefusesWeakerFailOnFromConfig(t *testing.T) {
+	if err := refuseWeakerSecurityGate(config.SeverityCritical); err == nil {
+		t.Fatal("fail_on critical must be refused as weaker than warning")
+	}
+	if err := refuseWeakerSecurityGate(config.SeverityWarning); err != nil {
+		t.Fatalf("shipped default: %v", err)
+	}
+	if err := refuseWeakerSecurityGate(config.SeverityInfo); err != nil {
+		t.Fatalf("stronger gate: %v", err)
+	}
 }
 
 func containsString(ss []string, want string) bool {

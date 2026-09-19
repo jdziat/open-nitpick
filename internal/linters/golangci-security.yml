@@ -1,3 +1,4 @@
+---
 # golangci-lint configuration for `nitpick security` only.
 #
 # Same containment story as golangci.yml: embedded, written outside the tree,

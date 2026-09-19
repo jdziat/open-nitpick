@@ -14,7 +14,7 @@ Required deterministic scanners always run: `osv-scanner`, `gitleaks`, and
 catalog-applicable tools (`golangci-lint` with gosec forced on for Go,
 `zizmor`, `checkov`, `brakeman` when their matchers hit). Semgrep runs only
 when `linters.semgrep_config` is set (local path or explicit `p/`/`r/`
-registry ref — operator-accepted supply chain). There is no `no_linters` and
+registry ref (operator-accepted supply chain). There is no `no_linters` and
 no `budget`.
 
 Pass `no_model: true` for scanners only. The model pass, when on, is

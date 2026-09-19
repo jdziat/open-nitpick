@@ -451,17 +451,36 @@ func OptionsFromEnv() (Options, error) {
 	}
 	opts.Prices = prices
 
+	// Validate security depth at setup so a mistyped DEPTH cannot silently
+	// measure the shipped deep instruction.
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvSecurity))) {
+	case "", "0", "false", "off":
+	default:
+		if _, err := securitypkg.InstructionForDepth(os.Getenv(EnvSecurityDepth)); err != nil {
+			return opts, fmt.Errorf("%s: %w", EnvSecurityDepth, err)
+		}
+	}
+
 	return opts, nil
 }
 
-// HeldOut reports whether a fixture belongs to the held-out corpus.
-//
-// Exported so a report can LABEL the corpus it measured. A held-out table and a
-// tuning table were textually identical, which meant the one number the
-// held-out set exists to produce could not be told apart from a training score
-// after the fact, not by a reader, and not by whoever kept the artifact.
+// HeldOut reports whether a fixture belongs to the global prompt held-out
+// corpus (HeldOutFixtures / HELD_OUT). Security-persona held-out is separate:
+// see securityHeldOut. Dump records OR the two so a security spend is still
+// marked held_out without making a multi-file plant that shares a name look
+// like it left the multi-file corpus.
 func HeldOut(fixture string) bool {
 	for _, f := range HeldOutFixtures() {
+		if f.Name == fixture {
+			return true
+		}
+	}
+	return false
+}
+
+// securityHeldOut reports whether a fixture belongs to SecurityHeldOutFixtures.
+func securityHeldOut(fixture string) bool {
+	for _, f := range SecurityHeldOutFixtures() {
 		if f.Name == fixture {
 			return true
 		}
@@ -1120,7 +1139,13 @@ func securityPersonaInstruction() string {
 	case "", "0", "false", "off":
 		return ""
 	default:
-		return securitypkg.InstructionForDepth(os.Getenv(EnvSecurityDepth))
+		text, err := securitypkg.InstructionForDepth(os.Getenv(EnvSecurityDepth))
+		if err != nil {
+			// OptionsFromEnv validates depth before any review; a late failure
+			// here is a programming error, not an operator typo.
+			panic(err)
+		}
+		return text
 	}
 }
 

@@ -164,6 +164,13 @@ func securityScan(ctx context.Context, f *reviewFlags, paths []string, noModel b
 	if err != nil {
 		return nil, err
 	}
+	// Working-tree config cannot weaken the shipped gate; an explicit -fail-on
+	// is the operator's own choice and is not subject to this clamp.
+	if failOnFlag == "" {
+		if err := refuseWeakerSecurityGate(failOn); err != nil {
+			return nil, err
+		}
+	}
 	if err := refuseSeverityMute(cfg, failOn); err != nil {
 		return nil, err
 	}
@@ -208,35 +215,52 @@ func securityScan(ctx context.Context, f *reviewFlags, paths []string, noModel b
 		CoverageNote: "complete means required instruments finished, not that every language had a SAST; Python/JS need Semgrep configured for required SAST coverage",
 	}
 	for _, s := range tree.Skipped {
-		out.Skipped = append(out.Skipped, s.Path+": "+s.Reason)
+		out.Skipped = append(out.Skipped, bundle.PromptSafe(s.Path)+": "+s.Reason)
 		// Oversized files never reach scanners; treating the run as complete
 		// would greenwash a secret or vuln that lived only in the omitted file.
 		if strings.Contains(s.Reason, "larger than") {
 			out.Complete = false
-			out.FailedStages = append(out.FailedStages, s.Path+": "+s.Reason)
+			out.FailedStages = append(out.FailedStages, bundle.PromptSafe(s.Path)+": "+s.Reason)
 		}
 	}
 
 	for i := range report.Findings {
 		security.RedactFinding(&report.Findings[i])
 	}
-	for _, fd := range report.Findings {
-		conv := Finding{
-			Path: fd.Path, Line: fd.Line, Severity: fd.Severity, Class: fd.Class,
-			Title: fd.Title, Rationale: fd.Rationale, Suggestion: fd.Suggestion,
-			Source: analyzerSource(fd),
-		}
-		if fd.Class == string(config.ClassSecurity) || fd.IsAdvisory() {
-			out.Findings = append(out.Findings, conv)
-		} else {
-			out.Hidden = append(out.Hidden, conv)
-		}
+	kept, hidden := partitionSecurityFindings(report.Findings)
+	for _, fd := range kept {
+		out.Findings = append(out.Findings, findingFromReview(fd))
+	}
+	for _, fd := range hidden {
+		out.Hidden = append(out.Hidden, findingFromReview(fd))
 	}
 
 	if roster.Complete && failOn != config.SeverityNone {
 		out.Failed = findingsMeetGate(out.Findings, failOn)
 	}
 	return out, nil
+}
+
+// partitionSecurityFindings keeps class-security findings and advisories;
+// everything else is hidden so the gate cannot fail on a race the persona
+// was told not to report.
+func partitionSecurityFindings(in []review.Finding) (kept, hidden []review.Finding) {
+	for _, fd := range in {
+		if fd.Class == string(config.ClassSecurity) || fd.IsAdvisory() {
+			kept = append(kept, fd)
+		} else {
+			hidden = append(hidden, fd)
+		}
+	}
+	return kept, hidden
+}
+
+func findingFromReview(fd review.Finding) Finding {
+	return Finding{
+		Path: fd.Path, Line: fd.Line, Severity: fd.Severity, Class: fd.Class,
+		Title: fd.Title, Rationale: fd.Rationale, Suggestion: fd.Suggestion,
+		Source: analyzerSource(fd),
+	}
 }
 
 func resolveSecurityFailOn(cfg *config.Config, flag string, allowNone bool) (config.Severity, error) {
@@ -251,6 +275,20 @@ func resolveSecurityFailOn(cfg *config.Config, flag string, allowNone bool) (con
 		return "", fmt.Errorf("security.fail_on none requires -allow-clean-with-no-gate (or MCP allow_clean_with_no_gate)")
 	}
 	return failOn, nil
+}
+
+// refuseWeakerSecurityGate rejects a FailOn threshold above the shipped
+// default. fail_on: critical (or none without a loud waiver) greens findings
+// that warning would fail; a pull request must not supply that weaker gate.
+func refuseWeakerSecurityGate(failOn config.Severity) error {
+	def := config.Defaults().Security.FailOn
+	if failOn == config.SeverityNone {
+		return nil // loud waiver path already gated
+	}
+	if failOn.Rank() > def.Rank() {
+		return fmt.Errorf("security.fail_on %q is weaker than the shipped default %q; refuse rather than greenwash", failOn, def)
+	}
+	return nil
 }
 
 // refuseSeverityMute rejects configs that would silence findings at or above

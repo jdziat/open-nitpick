@@ -35,7 +35,7 @@ import (
 // once, so a wrong anchor in it would be discovered at the moment the number it
 // corrupted was already being reported.
 func TestPlantedDefectsPointAtRealLines(t *testing.T) {
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			content, ok := f.Head[d.Path]
 			if !ok {
@@ -123,9 +123,13 @@ func TestPlantedDefectsAreOnTheRightLine(t *testing.T) {
 		"cross-file-sort-nit":       {"[...listed].sort("},
 		"duplicate-test-case-nit":   {"space becomes a hyphen"},
 		"defensive-copy-nit":        {"new ArrayList<>(labels)"},
+
+		// Security-persona plants outside AllFixtures.
+		"go-idor-wrong-principal":     {"return h.store.Project"},
+		"python-hmac-unbound-compare": {"return hmac.compare_digest"},
 	}
 
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		needles, ok := want[f.Name]
 		if !ok {
 			// Silence here would let a new fixture ship an unchecked anchor,
@@ -163,7 +167,7 @@ func TestPlantedDefectsAreOnTheRightLine(t *testing.T) {
 
 	for name := range want {
 		found := false
-		for _, f := range AllFixtures() {
+		for _, f := range GroundTruthFixtures() {
 			if f.Name == name {
 				found = true
 				break
@@ -203,7 +207,7 @@ func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
 	cases := declaredProbes()
 
 	byName := map[string]Fixture{}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		byName[f.Name] = f
 	}
 
@@ -230,7 +234,7 @@ func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
 
 	// Every fixture that plants something has to be exercised, or the next one
 	// added inherits the silence this test was written to end.
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		if !f.Clean() && cases[f.Name].hit == nil {
 			t.Errorf("fixture %q plants defects but no finding is probed against it; add cases", f.Name)
 		}
@@ -626,6 +630,36 @@ func declaredProbes() map[string]fixtureProbes {
 						Title:     "Hex digests should be compared case-insensitively",
 						Rationale: "A sender that transmits uppercase hex is rejected; normalize both sides before comparing them."}},
 			},
+		},
+
+		"go-idor-wrong-principal": {
+			hit: []probe{{
+				"names the ownership hole after the session check",
+				review.Finding{Path: "project.go", Line: 40, Severity: "critical", Category: "security",
+					Title:     "Signed-in callers can read projects they do not own",
+					Rationale: "GetProject drops the OwnerID equality, so anyone who supplies another project's id in the query reads it."},
+			}},
+			miss: []probe{{
+				"asks for authentication that is already present",
+				review.Finding{Path: "project.go", Line: 40, Severity: "error", Category: "security",
+					Title:     "Add authentication",
+					Rationale: "ServeHTTP should reject callers with no session before loading a project."},
+			}},
+		},
+
+		"python-hmac-unbound-compare": {
+			hit: []probe{{
+				"names the ignored timestamp binding",
+				review.Finding{Path: "app/webhook.py", Line: 23, Severity: "error", Category: "security",
+					Title:     "MAC covers only the body",
+					Rationale: "verify never mixes ts into the signed payload, so the contract's anti-replay binding is absent."},
+			}},
+			miss: []probe{{
+				"the timing objection the digest helper already closes",
+				review.Finding{Path: "app/webhook.py", Line: 23, Severity: "warning", Category: "security",
+					Title:     "Digest equality may leak prefix length",
+					Rationale: "Plain string equality on digests can reveal how many prefix bytes match."},
+			}},
 		},
 
 		"csharp-client-per-request": {
@@ -1289,7 +1323,7 @@ func generatedSources() []generatedSource {
 			add(name, sourceObjection, m.finding)
 		}
 	}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		cached, ok := CachedIncumbent(crCacheDir, f)
 		if !ok {
 			continue
@@ -1454,7 +1488,7 @@ func corpusVocabulary() map[string]map[string]bool {
 			put(s.fixture, w)
 		}
 	}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			for _, w := range proseWords(d.Why) {
 				put(f.Name, w)
@@ -1717,7 +1751,7 @@ func TestReviewProseAboutAnotherFixtureIsNotCredited(t *testing.T) {
 
 	seen := map[string]bool{}
 	probes := 0
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for i, d := range f.Defects {
 			for _, s := range sources {
 				// A fixture's own findings are the recall direction, which the
@@ -1820,7 +1854,7 @@ func TestAFixturesOwnObjectionsAreNotCreditedAtItsPlants(t *testing.T) {
 
 	seen := map[string]bool{}
 	probes := 0
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for i, d := range f.Defects {
 			for _, s := range byFixture[f.Name] {
 				probes++
@@ -1896,9 +1930,10 @@ func TestAFixturesOwnObjectionsAreNotCreditedAtItsPlants(t *testing.T) {
 // that credits is inside a sentence that credits". corpusVocabulary does not
 // draw only on generatedSources. It also reads every plant's Why and every
 // fixture's SOURCE TEXT, and neither is a probed sentence. Measured, this sweep
-// reaches 2 keywords the sentence loop cannot: `utc`, via the word "outcome" in
-// another fixture's code comment, and `placeholder`, via an identifier in
-// clean-sql-allowlist's source. The first of those targets timezone-boundary,
+// reaches 3 keywords the sentence loop cannot: `utc`, via the word "outcome" in
+// another fixture's code comment; `placeholder`, via an identifier in
+// clean-sql-allowlist's source; and `compare_digest` on the timing plant, via
+// the security HMAC extras' source. The first of those targets timezone-boundary,
 // which the entire 3963-probe sentence loop credits zero times, so the claim
 // was not merely unproven, its own headline example was the counterexample. Both
 // figures are recomputed below and read back out of this comment, because the
@@ -1936,13 +1971,17 @@ func TestNoBareWordFromAnotherFixtureCreditsAPlant(t *testing.T) {
 		// so an ordinary English word credits a reviewer with detecting a
 		// timezone bug it never mentioned.
 		"timezone-boundary|utc": "SUBSTRING INSIDE A LONGER WORD: `utc` sits in \"outcome\". This is not a shared mechanism and not a topic collision, it is the keyword being three letters long",
+		// Security held-out / tuning extras put the fix name in their source and
+		// Why; a reviewer quoting those plants types compare_digest without
+		// noticing the timing plant's ==.
+		"python-timing-unsafe-hmac|compare_digest": "reached by hmac.compare_digest in the unbound/bound HMAC fixtures' source and Why",
 	}
 
 	vocab := corpusVocabulary()
 
 	// The wrapper has to be inert or every plant leaks and the sweep says so
 	// about the corpus rather than about the wrapper.
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			if creditsAt(fmt.Sprintf(inertProse, "it"), "", d) {
 				t.Fatalf("the probe wrapper itself is credited with %s's plant at %s:%d (fires %v); "+
@@ -1961,7 +2000,7 @@ func TestNoBareWordFromAnotherFixtureCreditsAPlant(t *testing.T) {
 	}
 
 	seen := map[string]bool{}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		// One sorted list per target, so a failure names the same word every run.
 		var candidates []string
 		for other, m := range vocab {
@@ -2036,7 +2075,7 @@ func checkVocabularyReachesBeyondSentences(t *testing.T, vocab map[string]map[st
 
 	beyond := map[string]bool{}
 	creditedBySentences := map[string]bool{}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			for _, s := range sources {
 				if s.fixture != f.Name && creditsAt(s.text, s.category, d) {
@@ -2167,7 +2206,7 @@ func TestNoOrdinaryEnglishWordCreditsAPlant(t *testing.T) {
 
 	// The wrapper has to be inert here for the same reason it does in the
 	// corpus sweep: a keyword hiding in this sentence would credit every plant.
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			if creditsAt(fmt.Sprintf(inertProse, "it"), "", d) {
 				t.Fatalf("the probe wrapper itself is credited with %s's plant at %s:%d (fires %v)",
@@ -2182,7 +2221,7 @@ func TestNoOrdinaryEnglishWordCreditsAPlant(t *testing.T) {
 	}
 
 	seen := map[string]bool{}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			for _, w := range words {
 				hay := fmt.Sprintf(inertProse, w)
@@ -2274,7 +2313,7 @@ func TestShortKeywordsAreSubstringHazards(t *testing.T) {
 	}
 
 	seen := map[string]bool{}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			for _, kw := range d.Keywords {
 				if !alphabetic(kw) || len(kw) > substringHazardLength {
@@ -2444,7 +2483,7 @@ func TestKeywordsAreNotTokensOfTheirOwnChange(t *testing.T) {
 	}
 
 	seen := map[string]bool{}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		shown := diffLines(f)
 		for _, d := range f.Defects {
 			for _, kw := range d.Keywords {
@@ -2588,7 +2627,7 @@ func plantKey(fixture string, i int, d Defect) string {
 //
 // SeverityNote WAS MEASURED AS A SECOND SOURCE AND REJECTED, which is worth
 // recording because it is the obvious next field to reach for. Run through
-// matches() over every plant it is credited for 13, uncredited for 10, and absent
+// matches() over every plant it is credited for 15, uncredited for 10, and absent
 // from 6, and the first version of this paragraph said "credited for 14 and
 // uncredited for 15", which folded the six plants that carry NO NOTE AT ALL into
 // the evidence. An empty haystack is uncredited by construction, so 40 percent of
@@ -2608,7 +2647,7 @@ func TestEveryPlantIsCreditedForItsOwnDescription(t *testing.T) {
 	knownGaps := knownWhyGaps()
 
 	seen := map[string]bool{}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for i, d := range f.Defects {
 			// Category is left empty on purpose. mentionsAny reads it, so
 			// putting the defect's Class there would let a plant whose keywords
@@ -2692,7 +2731,7 @@ func TestEveryPlantIsCreditedForItsOwnDescription(t *testing.T) {
 //
 // SeverityNote is NOT a source, and it is the obvious second one to reach for, so
 // the refusal is measured rather than asserted. Split into sentences it runs
-// 15 credited, 63 uncredited, because a note argues which anchor in review.md a
+// 18 credited, 65 uncredited, because a note argues which anchor in review.md a
 // level sits under and compares the plant to others BY NAME, so most of its
 // sentences are prose about the severity table. Requiring them would pull every
 // keyword list toward that table's vocabulary, which is not where a reviewer's
@@ -2746,7 +2785,7 @@ func TestNaturalPhrasingsOfAPlantStayCredited(t *testing.T) {
 
 	seen := map[string]bool{}
 	probes := 0
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for i, d := range f.Defects {
 			whyCredited := creditsAt(d.Why, "", d)
 			for _, phrasing := range whyPhrasings(d.Why) {
@@ -2811,7 +2850,7 @@ func checkSeverityNoteSentenceCensus(t *testing.T) {
 	t.Helper()
 
 	credited, uncredited := 0, 0
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			for _, s := range probeSentences(d.SeverityNote) {
 				if creditsAt(s, "", d) {
@@ -2934,7 +2973,7 @@ func checkSeverityNoteCensus(t *testing.T) {
 	t.Helper()
 
 	credited, uncredited, absent := 0, 0, 0
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			switch {
 			case strings.TrimSpace(d.SeverityNote) == "":
@@ -3024,7 +3063,7 @@ func checkSeverityNoteCensus(t *testing.T) {
 // rather than by all of them.
 func TestTheInfoRecallThisInstrumentCannotBuy(t *testing.T) {
 	byName := map[string]Fixture{}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		byName[f.Name] = f
 	}
 
@@ -3133,7 +3172,7 @@ func TestTheInfoRecallThisInstrumentCannotBuy(t *testing.T) {
 // INFLATED and every nit as UNDERSTATED, in the exact column the prompt is
 // being tuned against, with nothing to say it happened.
 func TestEveryDefectDeclaresAUsableSeverity(t *testing.T) {
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			if !d.WantSeverity.IsFinding() {
 				t.Errorf("%s: defect at %s:%d has WantSeverity %q, which is not a severity a finding can carry; "+
@@ -3183,7 +3222,7 @@ type classPlant struct {
 func TestSeverityIsConsistentWithinADefectClass(t *testing.T) {
 	byClass := map[config.Class][]classPlant{}
 
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			class, known := d.Class.Normalize()
 			if !known {
@@ -3371,10 +3410,14 @@ func TestPlantedSeveritiesArePinned(t *testing.T) {
 
 		"rust-crate-for-one-call/Cargo.toml:7/maintainability":            config.SeverityInfo,
 		"ruby-default-page-size/app/queries/comments_query.rb:9/resource": config.SeverityInfo,
+
+		// Security-persona plants outside AllFixtures (GroundTruthFixtures).
+		"go-idor-wrong-principal/project.go:40/security":         config.SeverityCritical,
+		"python-hmac-unbound-compare/app/webhook.py:23/security": config.SeverityError,
 	}
 
 	got := map[string]config.Severity{}
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		for _, d := range f.Defects {
 			class, _ := d.Class.Normalize()
 			key := fmt.Sprintf("%s/%s:%d/%s", f.Name, d.Path, d.Line, class)
@@ -3684,7 +3727,7 @@ func TestEveryAuthoredFixtureIsWiredIntoExactlyOneCorpus(t *testing.T) {
 	// The other direction. A corpus fixture the scan did not find is one the
 	// scan is blind to, and a blind scan passes for the same reason the old
 	// list-driven version did.
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		if _, ok := authored[f.Name]; !ok {
 			t.Errorf("%q is in a corpus and this scan did not discover it, so the scan cannot see "+
 				"whichever function builds it and would not notice that function being unwired. "+
@@ -4307,7 +4350,7 @@ func TestFixturesWhoseCorrectReviewIsSilenceHaveNoDefects(t *testing.T) {
 // review, so it scores as a perfect clean run no matter what the prompt says.
 // A silent free pass is the worst kind of corpus bug: it raises the score.
 func TestEveryFixtureChangesSomething(t *testing.T) {
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		changed := false
 		for path, head := range f.Head {
 			if base, ok := f.Base[path]; !ok || base != head {
@@ -4344,7 +4387,7 @@ func TestEveryPlantedDefectIsReportable(t *testing.T) {
 	// engine's value would make this test agree with a regression in it.
 	const snapDistance = 3
 
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		dir := t.TempDir()
 		if err := buildRepo(dir, f); err != nil {
 			t.Errorf("%s: build repo: %v", f.Name, err)
@@ -4436,7 +4479,7 @@ func TestTheCorpusStillAssemblesTheWayItsCommentsClaim(t *testing.T) {
 
 	multi := map[string]int{}
 
-	for _, f := range AllFixtures() {
+	for _, f := range GroundTruthFixtures() {
 		dir := t.TempDir()
 		if err := buildRepo(dir, f); err != nil {
 			t.Errorf("%s: build repo: %v", f.Name, err)

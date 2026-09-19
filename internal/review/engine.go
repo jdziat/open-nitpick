@@ -334,6 +334,15 @@ type LinterStatus struct {
 	// "isolated" or "operator config <path>" when it ran, and the reason
 	// otherwise.
 	State string
+
+	// NoTargets is true when Outcome is Skipped because the analyzer had no
+	// files of its kind in the selection. Callers must use this flag rather
+	// than substring-matching State.
+	NoTargets bool
+
+	// GosecEnabled is true when golangci-lint ran with gosec forced on.
+	// Security roster completeness must read this flag, not State prose.
+	GosecEnabled bool
 }
 
 // LinterOutcome is what happened to one analyzer.

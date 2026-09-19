@@ -223,34 +223,47 @@ func ScoreDetection(f Fixture, findings []review.Finding) DetectionScore {
 //
 // When NITPICK_EVAL_SECURITY is on, only ClassSecurity plants are in the
 // denominator. Findings that match a non-security plant on the same fixture
-// are out of scope — neither a credit nor noise — so multi-defect stays in
-// the security corpus without punishing a persona that was told not to
-// report races or descriptor leaks.
-//
-// Mutation: always call ScoreDetection and a security run's RECALL divides by
-// every planted class; multi-defect then caps recall at 1/3 for a perfect
-// security review.
+// are out of scope (neither a credit nor noise) so multi-defect stays honest.
+// Mutation: always call ScoreDetection and multi-defect caps a perfect
+// security review at 1/3.
 func ScoreDetectionForEval(f Fixture, findings []review.Finding) DetectionScore {
-	if !securityPersonaActive() {
+	return ScoreDetectionForPersona(f, findings, securityPersonaActive())
+}
+
+// ScoreDetectionForPersona scores detection for an explicit security persona
+// flag. Dump replay must pass the recorded SecurityPersona rather than reading
+// the caller's environment.
+func ScoreDetectionForPersona(f Fixture, findings []review.Finding, security bool) DetectionScore {
+	if !security {
 		return ScoreDetection(f, findings)
 	}
-	return scoreDetectionAgainst(PersonaDefects(f), findings, outOfScopeDefects(f.Defects))
+	return scoreDetectionAgainst(securityClassDefects(f.Defects), findings, outOfScopeDefects(f.Defects))
 }
 
 // ScoreSeverityForEval grades severity under the active eval persona, using
 // the same plant set as ScoreDetectionForEval.
 func ScoreSeverityForEval(f Fixture, findings []review.Finding) SeverityScore {
-	if !securityPersonaActive() {
+	return ScoreSeverityForPersona(f, findings, securityPersonaActive())
+}
+
+// ScoreSeverityForPersona grades severity for an explicit security persona flag.
+func ScoreSeverityForPersona(f Fixture, findings []review.Finding, security bool) SeverityScore {
+	if !security {
 		return ScoreSeverity(f, findings)
 	}
 	scoped := f
-	scoped.Defects = PersonaDefects(f)
+	scoped.Defects = securityClassDefects(f.Defects)
 	return ScoreSeverity(scoped, findings)
 }
 
 // PersonaDefects is the plant set the active eval persona is scored on.
 func PersonaDefects(f Fixture) []Defect {
-	if !securityPersonaActive() {
+	return PersonaDefectsFor(f, securityPersonaActive())
+}
+
+// PersonaDefectsFor returns the plant set for an explicit security persona flag.
+func PersonaDefectsFor(f Fixture, security bool) []Defect {
+	if !security {
 		return f.Defects
 	}
 	return securityClassDefects(f.Defects)

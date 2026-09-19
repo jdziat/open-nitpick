@@ -5,7 +5,7 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // goIDORWrongPrincipalFixture: the handler checks that a session exists, then
 // loads whatever ?id= names. Authz looks present; the principal is wrong.
 //
-// THE FALSE POSITIVE this INVITES is "add authentication" — the session check
+// THE FALSE POSITIVE this INVITES is "add authentication": the session check
 // already proves a caller is signed in. Keywords require the reviewer to name
 // the ownership mismatch, not the absence of a login gate. Bare "idor" is
 // deliberately absent: it fires inside "corridor" (see groundtruth_test).
@@ -128,22 +128,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, s Session) {
 		},
 		Defects: []Defect{{
 			Path: "project.go",
-			Line: 40, // return h.store.Project — no OwnerID check
+			Line: 40, // return h.store.Project: no OwnerID check
 			Keywords: []string{
-				"wrong principal", "any project", "any user's", "another user's",
-				"another project's", "does not check ownership", "without checking ownership",
-				"ownership check", "horizontal privilege",
-				"authorization bypass", "access other users", "other users' projects",
-				"query parameter id", "loads by id", "trusts the id",
-				"reads that project", "supplies another",
+				"wrong principal", "OwnerID equality", "drops the OwnerID",
+				"another project's id", "another user's project",
+				"horizontal privilege", "trusts the id", "supplies another",
+				"query parameter id", "ownership was removed", "no ownership check",
 			},
 			Class:        config.ClassSecurity,
 			WantSeverity: config.SeverityCritical,
 			SeverityNote: "critical under \"a security breach\": any signed-in caller who can guess " +
 				"an id reads another user's project. Above injection plants that need an untrusted " +
 				"input the diff does not show, because the query id IS the demonstrated input. Same " +
-				"band as removed-guard: the ownership check is what was deleted.",
-			Why: "any signed-in user who supplies another project's id in ?id= reads that project because GetProject no longer checks ownership after confirming a session exists",
+				"band as removed-guard: the OwnerID equality is what was deleted.",
+			Why: "GetProject drops the OwnerID equality after the session check, so any signed-in user who supplies another project's id in ?id= reads that project",
 		}},
 	}
 }
@@ -191,8 +189,8 @@ namespace App\Http;
 /**
  * ProjectController answers the project endpoints.
  *
- * Non-members MUST receive the same 404 as a missing id so project existence
- * is not disclosed. Do not return 403 from show().
+ * Non-members MUST receive the same 404 as a missing id so whether a project
+ * is present is not disclosed. Do not return 403 from show().
  */
 final class ProjectController
 {
@@ -275,8 +273,8 @@ def signature(body: bytes) -> str:
 def verify(body: bytes, provided: str, ts: str) -> bool:
     """Report whether provided matches the signature for this request.
 
-    ts is accepted for API compatibility with app.contract; production senders
-    still emit the legacy MAC that covers only the request body.
+    ts is accepted so callers can pass the header through as app.contract names;
+    production senders still emit the legacy MAC that covers only the request body.
     """
     _ = ts
     expected = signature(body)
@@ -287,18 +285,18 @@ def verify(body: bytes, provided: str, ts: str) -> bool:
 			Path: "app/webhook.py",
 			Line: 23, // return hmac.compare_digest
 			Keywords: []string{
-				"not bound", "unbound", "binding", "anti-replay",
-				"does not include", "ignores ts", "unused ts", "replay",
-				"mac over body", "signed payload", "concatenat",
-				"dot-separated", "contract requires",
+				"ignores ts", "unused ts", "never mixes ts",
+				"mac covers only the body", "signed payload",
+				"timestamp + \".\"", "dot-separated", "anti-replay binding",
+				"contract requires", "timestamp binding", "body alone",
 			},
 			Class:        config.ClassSecurity,
 			WantSeverity: config.SeverityError,
-			SeverityNote: "error: compare_digest makes the comparison timing-safe, so the timing plant's " +
-				"warning does not apply — the bug is that the contract's required timestamp binding is " +
+			SeverityNote: "error: the digest equality already uses the library helper the timing plant asks for, " +
+				"so that warning does not apply: the bug is that the contract's required timestamp binding is " +
 				"ignored, so a captured body verifies forever under any timestamp. Below critical because " +
 				"the attacker already holds a previously signed body (calibration rule 1).",
-			Why: "verify uses compare_digest on a MAC that never mixes ts into the signed payload, so the contract's anti-replay binding is absent despite the secure-looking comparison",
+			Why: "verify never mixes ts into the signed payload, so the contract's anti-replay binding is absent",
 		}},
 	}
 }

@@ -12,9 +12,6 @@ import (
 const redacted = "REDACTED"
 
 var (
-	// Already-redacted placeholders from gitleaks --redact, left alone.
-	alreadyRedacted = regexp.MustCompile(`REDACTED`)
-
 	pemBlock = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----`)
 
 	awsAccessKey = regexp.MustCompile(`\b(AKIA|ASIA)[A-Z0-9]{16}\b`)
@@ -33,20 +30,14 @@ var (
 )
 
 // RedactSecrets replaces credential-shaped and high-entropy spans with
-// REDACTED. Existing gitleaks REDACTED markers are left unchanged when they
-// are the entire matched span; a longer secret that merely contains that
-// substring is still scrubbed.
+// REDACTED. An input that is already exactly REDACTED is returned unchanged.
 func RedactSecrets(text string) string {
 	if text == "" || text == redacted {
 		return text
 	}
-	protected := alreadyRedacted.FindAllStringIndex(text, -1)
 	var b strings.Builder
 	last := 0
 	for _, span := range redactSpans(text) {
-		if isExactProtectedMarker(span, protected) {
-			continue
-		}
 		if span[0] < last {
 			continue
 		}
@@ -169,15 +160,6 @@ func isHexToken(s string) bool {
 		}
 	}
 	return true
-}
-
-func isExactProtectedMarker(span []int, protected [][]int) bool {
-	for _, p := range protected {
-		if span[0] == p[0] && span[1] == p[1] {
-			return true
-		}
-	}
-	return false
 }
 
 func mergeSpans(spans [][]int) [][]int {

@@ -253,15 +253,11 @@ func (s *Set) Uncovered() []review.LinterUncovered {
 }
 
 // record stores one analyzer's outcome for Statuses.
-func (s *Set) record(linter string, outcome review.LinterOutcome, state string) {
+func (s *Set) record(st review.LinterStatus) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.statuses = append(s.statuses, review.LinterStatus{
-		Linter:  linter,
-		Outcome: outcome,
-		State:   state,
-	})
+	s.statuses = append(s.statuses, st)
 }
 
 // state describes a runner's configuration, for runners that have one.
@@ -330,7 +326,9 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 				// strict mode: an analyzer with nothing to read has not gone
 				// missing, and treating it as missing would make strict mode
 				// unusable in every repository that is not polyglot.
-				s.record(r.Name(), review.LinterSkipped, reason)
+				s.record(review.LinterStatus{
+					Linter: r.Name(), Outcome: review.LinterSkipped, State: reason, NoTargets: true,
+				})
 
 				// But "nothing to read" and "nothing to say" are different
 				// claims, and this arm used to publish the first while meaning
@@ -351,7 +349,7 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 				continue
 			}
 
-			s.record(r.Name(), review.LinterFailed, reason)
+			s.record(review.LinterStatus{Linter: r.Name(), Outcome: review.LinterFailed, State: reason})
 
 			if s.cfg.Linters.Mode == config.LinterStrict {
 				mu.Lock()
@@ -392,7 +390,7 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 			defer mu.Unlock()
 
 			if err != nil {
-				s.record(r.Name(), review.LinterFailed, oneLine(err.Error()))
+				s.record(review.LinterStatus{Linter: r.Name(), Outcome: review.LinterFailed, State: oneLine(err.Error())})
 				s.log.Warn("linter failed", "linter", r.Name(), "error", err)
 				if s.cfg.Linters.Mode == config.LinterStrict {
 					errs = append(errs, fmt.Errorf("linter %s: %w", r.Name(), err))
@@ -400,7 +398,11 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 				return
 			}
 
-			s.record(r.Name(), review.LinterRan, state(r))
+			ran := review.LinterStatus{Linter: r.Name(), Outcome: review.LinterRan, State: state(r)}
+			if g, ok := r.(interface{ GosecForced() bool }); ok && g.GosecForced() {
+				ran.GosecEnabled = true
+			}
+			s.record(ran)
 			s.log.Debug("linter finished", "linter", r.Name(), "findings", len(found))
 			s.uncover(gaps)
 

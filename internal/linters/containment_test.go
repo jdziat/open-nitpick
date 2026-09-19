@@ -1237,9 +1237,9 @@ func TestStrictModeWorksWithTheShippedDefaults(t *testing.T) {
 func TestStatusesAreOrderedByName(t *testing.T) {
 	set := New(t.TempDir(), baseConfig(), nil)
 
-	set.record("semgrep", review.LinterSkipped, "nothing to read")
-	set.record("golangci-lint", review.LinterRan, "isolated")
-	set.record("ruff", review.LinterRan, "isolated")
+	set.record(review.LinterStatus{Linter: "semgrep", Outcome: review.LinterSkipped, State: "nothing to read"})
+	set.record(review.LinterStatus{Linter: "golangci-lint", Outcome: review.LinterRan, State: "isolated"})
+	set.record(review.LinterStatus{Linter: "ruff", Outcome: review.LinterRan, State: "isolated"})
 
 	var got []string
 	for _, st := range set.Statuses() {

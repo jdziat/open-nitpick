@@ -316,6 +316,9 @@ type golangciLint struct {
 
 func (g *golangciLint) Name() string { return "golangci-lint" }
 
+// GosecForced reports whether this runner enables gosec for the security roster.
+func (g *golangciLint) GosecForced() bool { return g.ForceGosec }
+
 // Detect reports why golangci-lint will not run, and nil when it will.
 //
 // THE BUG: it required go.mod at the CHECKOUT ROOT, so in any repository whose

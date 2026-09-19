@@ -2513,19 +2513,19 @@ Do not treat the 2026-09-18 three-fixture held-out 1.00 as the bar for the next
 model pick.
 
 **Smoke (tuning only, before any held-out spend):**
-`make eval-security MODELS=z-ai/glm-5.3-flash RUNS=1` → RECALL **0.83**
+`make eval-security MODELS=z-ai/glm-5.3-flash RUNS=1` gives RECALL **0.83**
 (no ctx) / **0.92** (+ctx). Misses without ctx: `removed-guard`, one plant in
 `multi-defect`. Not 1.00; corpus is hard enough to rank without spending
 `SECURITY_HELD_OUT` yet.
 
 **Label check (2026-09-19):** that smoke's header said MIXED (10 tuning + 3
-HELD-OUT + 1 multi-file) because `removed-guard`, `bash-fixed-temp-path`, and
+held-out + 1 multi-file) because `removed-guard`, `bash-fixed-temp-path`, and
 `clean-sql-allowlist` are still in global `HeldOutFixtures`. The security
 battery is now labeled `SECURITY tuning` and the dump token is `security`,
 not `mixed`. A one-fixture subset does not inherit that label.
 
 **Pinned-model check, same corpus, RUNS=1, held-out not spent:**
-`make eval-security MODELS=openai/gpt-5.6-luna RUNS=1` → RECALL **0.75** /
+`make eval-security MODELS=openai/gpt-5.6-luna RUNS=1` gives RECALL **0.75** /
 **0.83** (+ctx). Header: `SECURITY tuning corpus (14 fixture(s))`. Silence
 stayed silent (`clean-refactor`, `style-only`, `clean-sql-allowlist`,
 `php-clean-404-on-forbidden` all 0/0). `go-idor-wrong-principal` was located
@@ -2541,11 +2541,11 @@ batteries.
 
 **Re-score of the luna dump with that layer (no new spend):**
 `NITPICK_EVAL_SECURITY=1` over
-`multifile-security-20260919T011046Z-500927.jsonl` → luna **9/10** (0.90),
+`multifile-security-20260919T011046Z-500927.jsonl` gives luna **9/10** (0.90),
 luna +ctx **10/10** (1.00). The old 0.75/0.83 was the unscoped denominator.
 
 **Live end-to-end with the layer (2026-09-19):**
-`make eval-security MODELS=openai/gpt-5.6-luna RUNS=1` → RECALL **0.90** /
+`make eval-security MODELS=openai/gpt-5.6-luna RUNS=1` gives RECALL **0.90** /
 **1.00** (+ctx); `multi-defect` **1/1** (not 1/3); severity error band **2/2**
 (not 2/4); header `SECURITY tuning`. Matches the dump re-score. With +ctx
 already at 1.00 on tuning, do not spend `SECURITY_HELD_OUT` to pick a model
@@ -2556,7 +2556,7 @@ the no-ctx arm).
 
 Does luna vs glm-5.3-flash move with light / deep / extreme security prompts?
 Tuning corpus, RUNS=1, persona scoring on, held-out not spent.
-`DEPTH=` → `NITPICK_EVAL_SECURITY_DEPTH` (`InstructionLight` / shipped
+`DEPTH=` selects `NITPICK_EVAL_SECURITY_DEPTH` (`InstructionLight` / shipped
 `Instruction` / `InstructionExtreme`). Eval-only; shipped `nitpick security`
 still uses `Instruction` (deep).
 
