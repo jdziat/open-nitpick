@@ -76,6 +76,11 @@ func isAutoDetected(r Runner) bool {
 	return ok && t.detected
 }
 
+// gosecForcer is the optional capability a golangci-lint runner exposes when
+// it forced gosec on for the security roster. Named so a rename fails to
+// compile at the call site rather than silently leaving GosecEnabled false.
+type gosecForcer interface{ GosecForced() bool }
+
 // errNoTargets is Detect's answer when nothing this analyzer reads survived
 // the review's file selection. Only "it could not run" is a degradation: ruff
 // sitting out a Go-only change is not a Python review that went missing. It
@@ -399,7 +404,7 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 			}
 
 			ran := review.LinterStatus{Linter: r.Name(), Outcome: review.LinterRan, State: state(r)}
-			if g, ok := r.(interface{ GosecForced() bool }); ok && g.GosecForced() {
+			if g, ok := r.(gosecForcer); ok && g.GosecForced() {
 				ran.GosecEnabled = true
 			}
 			s.record(ran)

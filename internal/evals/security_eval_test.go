@@ -32,6 +32,16 @@ func TestSecurityEvalFlagAppliesInstruction(t *testing.T) {
 	if _, err := security.InstructionForDepth("typo"); err == nil {
 		t.Fatal("unknown depth must error")
 	}
+	// OptionsFromEnv validates depth before any review; a late typo here
+	// panics so a mistyped DEPTH cannot silently measure deep.
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("securityPersonaInstruction must panic on a depth typo while the flag is on")
+			}
+		}()
+		_ = securityPersonaInstruction()
+	}()
 	t.Setenv(EnvSecurity, "0")
 	if got := securityPersonaInstruction(); got != "" {
 		t.Fatalf("flag off: instruction = %q, want empty", got)
