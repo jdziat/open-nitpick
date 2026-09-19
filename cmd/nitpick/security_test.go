@@ -258,3 +258,15 @@ func containsString(ss []string, want string) bool {
 	}
 	return false
 }
+
+func TestIncompleteSecurityRunStillFailsTheGate(t *testing.T) {
+	// Mutation: folding roster.Complete into this predicate leaves a critical
+	// finding looking clean to a JSON consumer.
+	critical := []Finding{{Severity: string(config.SeverityCritical), Class: string(config.ClassSecurity)}}
+	if !securityFailed(config.SeverityWarning, critical) {
+		t.Fatal("a critical finding fails the warning gate")
+	}
+	if securityFailed(config.SeverityNone, critical) {
+		t.Fatal("fail_on none does not fail the gate")
+	}
+}

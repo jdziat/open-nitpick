@@ -138,12 +138,11 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, repo string, cfg *config.Co
 		findings = scoped
 	}
 
-	// A failure to read what is already published is not a failure of the
-	// pass: the worst outcome is repeating something already said, and losing
-	// the whole answer to avoid that is the worse trade.
+	// A failed prior read used to republish every finding. Repeating a
+	// published comment is the failure; an unread prior is an incomplete pass.
 	prior, err := gh.PriorReview(ctx, ref)
 	if err != nil {
-		log.Warn("could not read the prior review, so this pass may repeat a published finding", "error", err)
+		return fmt.Errorf("read the prior review before posting: %w", err)
 	}
 	findings = dropPublished(findings, prior)
 

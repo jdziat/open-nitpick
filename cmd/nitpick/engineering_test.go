@@ -461,6 +461,52 @@ func TestReviewBoundaryApplicabilityKeepsMissingGoInputsIncomplete(t *testing.T)
 	}
 }
 
+type fixedContent struct{ body []byte }
+
+func (fixedContent) Name() string { return "fixture" }
+func (fixedContent) PullRequest(context.Context, vcs.Ref) (*vcs.PullRequest, error) {
+	return &vcs.PullRequest{}, nil
+}
+func (fixedContent) Diff(context.Context, vcs.Ref) ([]byte, error)            { return nil, nil }
+func (fixedContent) PublishReview(context.Context, vcs.Ref, vcs.Review) error { return nil }
+func (p fixedContent) FileContent(context.Context, vcs.Ref, string) ([]byte, error) {
+	return p.body, nil
+}
+
+func TestDriftedReviewedFileIsNotMeasured(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "-q")
+	git(t, root, "commit", "--allow-empty", "-qm", "feat: initial")
+	cfg := config.Defaults()
+	report := &review.Report{
+		Head:  "HEAD",
+		Files: diff.Files{{Path: "a.go"}},
+		Plan: &bundle.Plan{Batches: []bundle.Batch{{Entries: []bundle.Entry{{
+			File: &diff.File{Path: "a.go"}, Content: "package a",
+		}}}}},
+	}
+	result := assessReviewPractices(t.Context(), root, cfg, vcs.Ref{Base: "HEAD", Head: "HEAD"}, nil, report, fixedContent{body: []byte("package b")})
+	var sawSnapshot bool
+	for _, c := range result.Checks {
+		switch c.ID {
+		case "snapshot":
+			sawSnapshot = true
+			if len(c.Omitted) != 1 || c.Omitted[0].Target.ID != "a.go" {
+				t.Fatalf("snapshot omitted = %+v", c.Omitted)
+			}
+		case "slop", "design":
+			for _, planned := range c.Planned {
+				if planned.ID == "a.go" {
+					t.Fatalf("%s still measures the drifted file", c.ID)
+				}
+			}
+		}
+	}
+	if !sawSnapshot {
+		t.Fatal("drift was not recorded")
+	}
+}
+
 // nilPolicy answers the BasePolicy "untouched config" tuple: nil cfg, not modified.
 type nilPolicy struct{}
 

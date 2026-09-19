@@ -96,7 +96,10 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 			continue
 		}
 		if prior, ok := reviewed[file.Path]; ok && !bytes.Equal(body, []byte(prior)) {
+			// The model reviewed a different body. Measuring the fresh bytes
+			// would report standards over a file the snapshot says was omitted.
 			failed = append(failed, file.Path)
+			continue
 		}
 		files = append(files, standards.File{Path: file.Path, Src: body})
 	}
@@ -136,6 +139,15 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 	conventions := conventionCheck(files, measured, cfg.Practices.RequiredConventions)
 	if status.State != review.StandardsActive {
 		conventions.State, conventions.Reason = practices.Partial, "accepted convention measurement unavailable: "+status.Reason
+	}
+	if pinErr != nil {
+		conventions.State = practices.Partial
+		note := "base revision unpinned: " + pinErr.Error()
+		if conventions.Reason == "" {
+			conventions.Reason = note
+		} else {
+			conventions.Reason += "; " + note
+		}
 	}
 	r.Checks = append(r.Checks, conventions)
 	inventoryFiles, metadataErrors := designContextFiles(ctx, provider, ref, files)

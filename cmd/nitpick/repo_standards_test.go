@@ -67,8 +67,19 @@ func TestRepoStandardsChecksWholeTreeAndDistinguishesMissingAnalyzers(t *testing
 			if len(result.Sources) != 1 || result.Sources[0].Coverage.Ran == tc.missing {
 				t.Fatalf("coverage=%+v", result.Sources)
 			}
-			if !tc.missing && (len(source.seen) != 2 || !strings.Contains(strings.Join(source.seen, ","), "app.py")) {
-				t.Fatalf("source did not receive whole tree: %v", source.seen)
+			if !tc.missing {
+				got := map[string]bool{}
+				for _, p := range source.seen {
+					got[p] = true
+				}
+				for _, want := range []string{"app.py", ".nitpick.yaml"} {
+					if !got[want] {
+						t.Errorf("source did not receive %s: %v", want, source.seen)
+					}
+				}
+				if len(got) != 2 {
+					t.Fatalf("source received %v, want exactly app.py and .nitpick.yaml", source.seen)
+				}
 			}
 			if strings.Contains(strings.Join(result.Report.Unprobed, ","), "python") {
 				t.Fatal("Python was presented as unprobed")

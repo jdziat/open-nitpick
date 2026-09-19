@@ -241,8 +241,10 @@ func securityScan(ctx context.Context, f *reviewFlags, paths []string, noModel b
 		out.Hidden = append(out.Hidden, findingFromReview(fd))
 	}
 
-	if roster.Complete && failOn != config.SeverityNone {
-		out.Failed = findingsMeetGate(out.Findings, failOn)
+	// Failed is independent of Complete. An incomplete roster used to leave
+	// Failed false, so a JSON consumer read a clean gate beside a critical finding.
+	if failOn != config.SeverityNone {
+		out.Failed = securityFailed(failOn, out.Findings)
 	}
 	return out, nil
 }
@@ -384,6 +386,9 @@ func securityTreeReview(ctx context.Context, f *reviewFlags, cfg *config.Config,
 	if err != nil {
 		return nil, nil, err
 	}
+	// A tree scan "changes" every file, .nitpick.yaml included. Re-reading
+	// policy from a base revision would drop the operator's loaded config.
+	// The person running this on their checkout is the policy's author.
 	engine.Policy = nil
 	report, err := engine.Review(ctx, ref)
 	if err != nil && (!errors.Is(err, review.ErrPublish) || report == nil) {
@@ -441,4 +446,14 @@ func findingsMeetGate(findings []Finding, gate config.Severity) bool {
 		}
 	}
 	return false
+}
+
+// securityFailed reports whether findings meet the gate. Completeness is a
+// separate field: an incomplete roster must not hide a finding that already
+// meets fail_on.
+func securityFailed(failOn config.Severity, findings []Finding) bool {
+	if failOn == config.SeverityNone {
+		return false
+	}
+	return findingsMeetGate(findings, failOn)
 }

@@ -91,6 +91,9 @@ func presentation(f evals.Fixture) (title, body string) {
 		return p[0], p[1]
 	}
 	title = strings.NewReplacer("-nit", "", "-", " ").Replace(f.Name)
+	if title == "" {
+		return f.Name, "Small change; see the diff."
+	}
 	return strings.ToUpper(title[:1]) + title[1:], "Small change; see the diff."
 }
 
@@ -318,7 +321,10 @@ func openPRs(repo string) error {
 		}
 		fmt.Println("opened", out, "=", f.Name)
 	}
-	blob, _ := json.MarshalIndent(manifest, "", "  ")
+	blob, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(manifestPath(repo)), 0o755); err != nil {
 		return err
 	}
@@ -371,7 +377,10 @@ func trigger(repo string) error {
 }
 
 func prNumbers(repo string) (map[string]int, error) {
-	raw, err := gh("pr", "list", "--repo", repo, "--state", "all", "--limit", "200", "--json", "number,headRefName")
+	// gh's --limit tops out at 1000. Hitting the cap means the map is a
+	// prefix, and trigger/score would skip the rest without saying so.
+	const cap = 1000
+	raw, err := gh("pr", "list", "--repo", repo, "--state", "all", "--limit", strconv.Itoa(cap), "--json", "number,headRefName")
 	if err != nil {
 		return nil, err
 	}
@@ -381,6 +390,9 @@ func prNumbers(repo string) (map[string]int, error) {
 	}
 	if err := json.Unmarshal([]byte(raw), &prs); err != nil {
 		return nil, err
+	}
+	if len(prs) >= cap {
+		return nil, fmt.Errorf("gh pr list returned %d pull requests, the --limit cap; refusing a truncated map", len(prs))
 	}
 	out := map[string]int{}
 	for _, p := range prs {

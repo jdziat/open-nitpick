@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -36,7 +37,7 @@ import (
 // hand a new user a broken repository on their first command.
 
 // runInit writes .nitpick.yaml, and optionally a workflow, for a repository.
-func runInit(args []string, out io.Writer) error {
+func runInit(ctx context.Context, args []string, out io.Writer) error {
 	var (
 		repo     string
 		provider string
@@ -81,7 +82,7 @@ Flags:
 		return err
 	}
 
-	files, err := scanRepo(root)
+	files, err := scanRepo(ctx, root)
 	if err != nil {
 		return fmt.Errorf("read %s: %w", root, err)
 	}
@@ -187,11 +188,14 @@ const scanLimit = 50_000
 // It walks the checkout rather than asking git, because init runs before there
 // is anything to ask: a fresh clone, or a directory that is not a repository
 // at all.
-func scanRepo(root string) ([]string, error) {
+func scanRepo(ctx context.Context, root string) ([]string, error) {
 	var out []string
 
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if walkErr != nil {
 			// An unreadable directory is not a reason to write no config. The
 			// walk continues and the suggestion is made from what was legible.
 			if d != nil && d.IsDir() {
@@ -461,13 +465,13 @@ func writeVerified(path, body string, c chosenModel) error {
 		return fmt.Errorf("the generated config did not load, so nothing was written: %w", err)
 	}
 
-	if err := os.Chmod(keep, 0o644); err != nil {
-		return err
-	}
 	if err := os.Rename(keep, path); err != nil {
 		return err
 	}
 	keep = ""
+	if err := os.Chmod(path, 0o644); err != nil {
+		return fmt.Errorf("wrote %s but could not relax its mode: %w", path, err)
+	}
 	return nil
 }
 
