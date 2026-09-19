@@ -460,3 +460,19 @@ func TestReviewBoundaryApplicabilityKeepsMissingGoInputsIncomplete(t *testing.T)
 		})
 	}
 }
+
+// nilPolicy answers the BasePolicy "untouched config" tuple: nil cfg, not modified.
+type nilPolicy struct{}
+
+func (nilPolicy) ResolvePolicy(context.Context, vcs.Ref, *vcs.PullRequest, []string) (*config.Config, bool, error) {
+	return nil, false, nil
+}
+
+func TestEngineeringReviewPolicySurvivesNilSourceAndLoaded(t *testing.T) {
+	// Mutation: drop the cfg-nil guard and this panics on cfg.Practices.
+	p := &engineeringReviewPolicy{source: nilPolicy{}, loaded: nil}
+	cfg, modified, err := p.ResolvePolicy(context.Background(), vcs.Ref{}, nil, nil)
+	if err != nil || cfg != nil || modified {
+		t.Fatalf("got cfg=%v modified=%v err=%v, want nil/false/nil", cfg, modified, err)
+	}
+}

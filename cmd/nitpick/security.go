@@ -201,6 +201,12 @@ func securityScan(ctx context.Context, f *reviewFlags, paths []string, noModel b
 	if err != nil {
 		return nil, err
 	}
+	if tree == nil {
+		return nil, errors.New("security scan produced no tree")
+	}
+	if report == nil {
+		return nil, errors.New("security scan produced no report")
+	}
 
 	required := securityRequiredIDs(cfg)
 	roster := security.BuildRoster(report.Linters, required, model, gateWaived)

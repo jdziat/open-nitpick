@@ -2572,3 +2572,34 @@ at 0/1 for every arm; deep/extreme recovered it on some arms. Extreme put
 no-ctx is already perfect and silent on deep; extreme adds noise without
 recall. Call: keep shipped depth at deep; do not promote extreme.
 
+## Full-review health pass (2026-09-19)
+
+Branch `chore/full-review-health`. First pass: `nitpick repo-score -budget 120000
+cmd internal` (raw report:
+`docs/full-review-health-2026-09-19-cmd-internal.txt`).
+
+**Coverage:** 30 of 50 files in the budget window answered; 20 model-batch
+failures (not silence); 481 files past the budget. Rates below are over the
+answered files only.
+
+**Score (weighted findings / 1k lines; critical 8, error 4, warning 2, info 1):**
+
+| language | files | lines | slop | bugs | security |
+|---|---:|---:|---:|---:|---:|
+| go | 29 | 7548 | 0.26 | 6.09 | 0.00 |
+| all | 30 | 7594 | 0.26 | 6.06 | 0.00 |
+
+26 findings: 2 error, 16 warning, 8 info. No security class hits in the window.
+Slop under the 2.0 / 1k threshold.
+
+**Remediation started on this branch:** nil `cfg` panic in
+`engineeringReviewPolicy.ResolvePolicy` when `BasePolicy` returns the untouched
+`(nil, false, nil)` tuple and `loaded` is also nil; discarded
+`json.Marshal` for the practices policy digest; defensive nil tree/report
+guards after `securityScan`'s analyzer/model switch.
+
+**Still open (top of the plan):** benchrepo empty-title panic and discarded
+manifest marshal; engineering drift/designContextFiles; improve/respond
+correctness warnings; incomplete-batch retries for the 20 failed files;
+raise budget or path-split for `internal/`.
+

@@ -37,6 +37,12 @@ func (p *engineeringReviewPolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref
 	if cfg == nil {
 		cfg = p.loaded
 	}
+	// BasePolicy answers (nil, false, nil) for an untouched config file. When
+	// loaded is also nil there is no profile to read; returning nil keeps the
+	// "no engineering scope" answer without panicking on cfg.Practices.
+	if cfg == nil {
+		return nil, false, nil
+	}
 	if !p.explicit && cfg.Practices.Profile != "engineering" {
 		if !modified {
 			return nil, false, nil
@@ -52,7 +58,12 @@ func (p *engineeringReviewPolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref
 }
 
 func assessReviewPractices(ctx context.Context, root string, cfg *config.Config, ref vcs.Ref, pr *vcs.PullRequest, reviewReport *review.Report, provider vcs.Provider) *practices.Report {
-	data, _ := json.Marshal(config.PracticePolicy{Practices: cfg.Practices, Standards: cfg.Standards, Review: cfg.Review, Linters: cfg.Linters})
+	data, err := json.Marshal(config.PracticePolicy{Practices: cfg.Practices, Standards: cfg.Standards, Review: cfg.Review, Linters: cfg.Linters})
+	if err != nil {
+		// A digest of nothing would claim the reviewed policy matched without
+		// evidence; leave it empty so the report cannot greenwash the miss.
+		data = nil
+	}
 	digest := sha256.Sum256(data)
 	r := &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: reviewReport.Head, PolicySource: cfg.Policy.String(), PolicyDigest: hex.EncodeToString(digest[:]), ModelUsage: reviewReport.ModelUsage}
 	var files []standards.File
