@@ -2592,14 +2592,9 @@ answered files only.
 26 findings: 2 error, 16 warning, 8 info. No security class hits in the window.
 Slop under the 2.0 / 1k threshold.
 
-**Remediation started on this branch:** nil `cfg` panic in
-`engineeringReviewPolicy.ResolvePolicy` when `BasePolicy` returns the untouched
-`(nil, false, nil)` tuple and `loaded` is also nil; discarded
-`json.Marshal` for the practices policy digest; defensive nil tree/report
-guards after `securityScan`'s analyzer/model switch.
+**Remediation on this branch:** nil `cfg` in `engineeringReviewPolicy`; practices digest marshal; nil tree/report on `securityScan`; empty benchrepo titles; discarded manifest marshal; `prNumbers` refuses a 1000-cap truncation; drifted files are omitted from measurement; `improve` fails closed when the prior review cannot be read; `security.Failed` is independent of roster completeness; `init` walk honors cancellation and a chmod failure no longer drops a validated config; workflow-overwrite and whole-tree standards tests now fail if the guard they name is deleted.
 
-**Still open (top of the plan):** benchrepo empty-title panic and discarded
-manifest marshal; engineering drift/designContextFiles; improve/respond
-correctness warnings; incomplete-batch retries for the 20 failed files;
-raise budget or path-split for `internal/`.
+**Left as designed:** publish failure stays a warning so a fork PR is still gated (`review.go`); respond re-parses the mention against resolved policy on purpose; `designContextFiles` returns problems, not a discarded error. `Roles.Build` lock is blocked: `internal/llm/client.go` is claimed by another agent.
+
+**Still open:** the 20 model-batch failures and the 481 files past the 120000-token budget.
 
