@@ -274,7 +274,7 @@ func TestIncompleteSecurityRunStillFailsTheGate(t *testing.T) {
 func TestIncompleteSecurityScanFailsGateOnCriticalFinding(t *testing.T) {
 	// Drive the same finalizer securityScan uses after an incomplete roster.
 	// Mutation: wrap Failed in `if out.Complete` inside finalizeSecurityGate
-	// and this stays green only if Complete is true — so force Complete false.
+	// and this stays green only if Complete is true, so force Complete false.
 	out := &SecurityResult{
 		Complete: false,
 		FailOn:   string(config.SeverityWarning),
