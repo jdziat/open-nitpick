@@ -59,13 +59,15 @@ func (p *engineeringReviewPolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref
 
 func assessReviewPractices(ctx context.Context, root string, cfg *config.Config, ref vcs.Ref, pr *vcs.PullRequest, reviewReport *review.Report, provider vcs.Provider) *practices.Report {
 	data, err := json.Marshal(config.PracticePolicy{Practices: cfg.Practices, Standards: cfg.Standards, Review: cfg.Review, Linters: cfg.Linters})
-	if err != nil {
-		// A digest of nothing would claim the reviewed policy matched without
-		// evidence; leave it empty so the report cannot greenwash the miss.
-		data = nil
+	// On marshal failure leave digest empty. Hashing a nil buffer would still
+	// produce sha256("") and look like proven policy matching; Problems()
+	// refuses an empty digest as missing provenance instead.
+	digest := ""
+	if err == nil {
+		sum := sha256.Sum256(data)
+		digest = hex.EncodeToString(sum[:])
 	}
-	digest := sha256.Sum256(data)
-	r := &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: reviewReport.Head, PolicySource: cfg.Policy.String(), PolicyDigest: hex.EncodeToString(digest[:]), ModelUsage: reviewReport.ModelUsage}
+	r := &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: reviewReport.Head, PolicySource: cfg.Policy.String(), PolicyDigest: digest, ModelUsage: reviewReport.ModelUsage}
 	var files []standards.File
 	var failed []string
 	reviewed := map[string]string{}

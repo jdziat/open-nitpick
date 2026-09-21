@@ -346,11 +346,14 @@ func TestOSVScannerKeepsAdvisoriesWithoutARegion(t *testing.T) {
 }
 
 func TestGitleaksRuleClassIsSecurityNotResource(t *testing.T) {
-	// Mutation: a bare "leak" substring match classed gitleaks(…) as resource,
-	// so partitionSecurityFindings hid every credential finding from the gate.
+	// Mutation: matching "leak" before gitleaks classed gitleaks(…) as
+	// resource, so partitionSecurityFindings hid every credential finding.
 	got := classForRule(prefixRule("gitleaks", "private-key"))
 	if got != config.ClassSecurity {
 		t.Fatalf("gitleaks rule class = %s, want security", got)
+	}
+	if got := classForRule("memleak"); got != config.ClassResource {
+		t.Fatalf("memleak class = %s, want resource", got)
 	}
 	if got := classForRule("goleak"); got != config.ClassResource {
 		t.Fatalf("goleak class = %s, want resource", got)

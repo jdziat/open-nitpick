@@ -658,10 +658,10 @@ func classForRule(rule string) config.Class {
 		strings.Contains(r, "atomic"), strings.Contains(r, "sync"):
 		return config.ClassConcurrency
 
-	// "leak" alone would swallow gitleaks(…) into resource; goleak and
-	// bodyclose name the resource-handle class this branch is for.
+	// gitleaks is matched as security above. A bare "leak" here still
+	// covers memleak, goleak, and similar resource-handle rules.
 	case strings.Contains(r, "bodyclose"), strings.Contains(r, "sqlclosecheck"),
-		strings.Contains(r, "rowserr"), strings.Contains(r, "goleak"),
+		strings.Contains(r, "rowserr"), strings.Contains(r, "leak"),
 		strings.Contains(r, "close"):
 		return config.ClassResource
 
