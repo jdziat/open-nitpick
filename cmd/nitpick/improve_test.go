@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -54,10 +55,25 @@ func TestDropPublishedRemovesWhatIsAlreadyOnThePullRequest(t *testing.T) {
 		t.Fatalf("dropPublished kept %d finding(s) %+v, want only b.go", len(got), got)
 	}
 
-	// A read that failed hands back nil, and losing the answer would be the
-	// worse trade than repeating one finding.
+	// nil prior drops nothing; runImprove fails the read before Review.
 	if got := dropPublished([]review.Finding{posted, fresh}, nil); len(got) != 2 {
 		t.Errorf("a nil prior review dropped %d finding(s), want 0 dropped", 2-len(got))
+	}
+}
+
+func TestImproveReadsPriorBeforeTheModelPass(t *testing.T) {
+	body, err := os.ReadFile("improve.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(body)
+	prior := strings.Index(src, "gh.PriorReview(ctx, ref)")
+	pass := strings.Index(src, "engine.Review(ctx, ref)")
+	if prior < 0 || pass < 0 {
+		t.Fatal("runImprove must call both PriorReview and Review")
+	}
+	if prior > pass {
+		t.Fatal("PriorReview must precede engine.Review")
 	}
 }
 
