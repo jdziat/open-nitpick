@@ -284,7 +284,7 @@ being the thing this project has gotten wrong most often.
 ## The incumbent's baseline, on the full corpus
 
 Incumbent was re-collected over all 30 fixtures after the corpus grew, because
-its cached reviews covered only the original 15 (the set the prompt had been
+its cached reviews covered only the first 15 fixtures (the set the prompt was
 tuned against for seven rounds). Scored deterministically, no judge:
 
 | | detection | findings | unexplained | precision |
@@ -931,7 +931,7 @@ Read the run dumps first; most of the noise was ours.
   mode) were found by the pinned run within an hour of each other.
 - **Raw control characters inside JSON strings** are now escaped by the
   lenient decoder. Without a response format, gemma emits them on most
-  replies; with one, the provider had been hiding the habit.
+  replies; with one, the provider hides the habit.
 
 ## Routing and ensembles (2026-09-05)
 
@@ -2129,7 +2129,7 @@ contributes no denominator whatever the code does.
 
 Correcting it changed a verdict, which is the arithmetic doing its job: revive
 read 95.5% clean over 396 files when markdown, JSON and YAML were in its
-denominator, and 94.1% over the 290 files an analyzer actually read. Same
+denominator, and 94.1% over the 290 files an analyzer read. Same
 violations, correct denominator, standard becomes contested.
 
 ### A conformity ruleset, separate from the review's (2026-09-10)
@@ -2311,7 +2311,7 @@ provider configuration, so its zero findings do not validate model-catalog claim
 That trial also found an applicability bug: a skipped Python analyzer made a
 Go-only assessment incomplete. Coverage now requires input claims before a
 skipped analyzer can count as missing work. Its control retains failure when the
-skipped analyzer actually has an applicable input.
+skipped analyzer has an applicable input.
 
 Twelve targeted mutations were killed by their named guard tests: inheriting a
 parent module after malformed nested metadata, counting a source snapshot as an
@@ -2378,9 +2378,8 @@ this pair demonstrates one lost-failure mechanism, not comprehensive design reca
 Four further mutations were killed by the intended assertions: dropping expert
 failure stages, dropping duplicate-check detection, overwriting an existing
 snapshot during capture, and omitting practices from full configuration
-validation. The duplicate-check fixture previously failed for having no substantive
-assessment before duplication; a valid-control assertion exposed and corrected
-that weakness. These controls establish those four guards, not general test quality.
+validation. The duplicate-check control requires a substantive assessment
+before duplication. These controls establish those four guards, not general test quality.
 
 The subsequent deterministic self-assessment examined 332 convention/analyzer
 file targets and found zero violations. It examined 584 text targets, retained
@@ -2472,7 +2471,7 @@ Silence controls stayed clean for every contender. `php-forbidden-vs-404` (info
 band) and `multi-defect` were the main separators.
 
 **Held-out spend (once):** `removed-guard`, `bash-fixed-temp-path`,
-`clean-sql-allowlist` — three fixtures, top contenders only.
+`clean-sql-allowlist`: three fixtures, top contenders only.
 
 | contender | RECALL | NOISE | $/REVIEW |
 |---|---:|---:|---:|
@@ -2592,9 +2591,9 @@ answered files only.
 26 findings: 2 error, 16 warning, 8 info. No security class hits in the window.
 Slop under the 2.0 / 1k threshold.
 
-**Remediation on this branch:** nil `cfg` in `engineeringReviewPolicy`; practices digest marshal; nil tree/report on `securityScan`; empty benchrepo titles; discarded manifest marshal; `prNumbers` refuses a 1000-cap truncation; drifted files are omitted from measurement; `improve` fails closed when the prior review cannot be read; `security.Failed` is independent of roster completeness; `init` walk honors cancellation and a chmod failure no longer drops a validated config; workflow-overwrite and whole-tree standards tests now fail if the guard they name is deleted.
+**Remediation on this branch:** nil `cfg` in `engineeringReviewPolicy`; practices digest marshal; nil tree/report on `securityScan`; empty benchrepo titles; discarded manifest marshal; `prNumbers` refuses a 1000-cap truncation; drifted files are omitted from measurement; `improve` fails closed when the prior review cannot be read; `security.Failed` is independent of roster completeness; `init` walk honors cancellation and a chmod failure no longer drops a validated config; workflow-overwrite and whole-tree standards tests now fail if the guard they name is deleted; `captureStdout` joins its reader on cleanup so a panic inside the test cannot leak the pipe.
 
-**Left as designed:** publish failure stays a warning so a fork PR is still gated (`review.go`); respond re-parses the mention against resolved policy on purpose; `designContextFiles` returns problems, not a discarded error. `Roles.Build` lock is blocked: `internal/llm/client.go` is claimed by another agent.
+**Left as designed:** publish failure stays a warning so a fork PR is still gated (`review.go`); respond re-parses the mention against resolved policy on purpose; `designContextFiles` returns problems, not a discarded error; `wired` only rejects a literal `nil` suffix because the enginewiring guard is a source scan of the form `fullreview.go` uses, not a type system. `Roles.Build` lock is blocked: `internal/llm/client.go` is claimed by another agent.
 
 **Still open:** the 20 model-batch failures and the 481 files past the 120000-token budget.
 

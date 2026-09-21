@@ -4,9 +4,9 @@
 Analyzer configuration is policy, and a change may not supply the policy it is
 reviewed under, so no analyzer read this repository's own lint settings.
 
-- gitleaks — ran: isolated: open-nitpick&#39;s own analyzer config
-- golangci-lint — ran: isolated: open-nitpick&#39;s own analyzer config
-- osv-scanner — skipped: no files it analyzes were selected for review
+- gitleaks: ran: isolated: open-nitpick&#39;s own analyzer config
+- golangci-lint: ran: isolated: open-nitpick&#39;s own analyzer config
+- osv-scanner: skipped: no files it analyzes were selected for review
 
 </details>
 Read 50 changed files. 26 findings: 2 error, 16 warning, 8 info. Analyzers: gitleaks, golangci-lint. 20 files could not be reviewed.
