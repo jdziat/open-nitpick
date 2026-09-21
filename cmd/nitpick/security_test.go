@@ -270,3 +270,79 @@ func TestIncompleteSecurityRunStillFailsTheGate(t *testing.T) {
 		t.Fatal("fail_on none does not fail the gate")
 	}
 }
+
+func TestIncompleteSecurityScanFailsGateOnCriticalFinding(t *testing.T) {
+	// Drive the same finalizer securityScan uses after an incomplete roster.
+	// Mutation: wrap Failed in `if out.Complete` inside finalizeSecurityGate
+	// and this stays green only if Complete is true — so force Complete false.
+	out := &SecurityResult{
+		Complete: false,
+		FailOn:   string(config.SeverityWarning),
+	}
+	kept := []review.Finding{{
+		Class:    string(config.ClassSecurity),
+		Severity: string(config.SeverityCritical),
+		Title:    "planted credential",
+	}}
+	finalizeSecurityGate(out, config.SeverityWarning, kept)
+	if out.Complete {
+		t.Fatal("fixture must remain incomplete")
+	}
+	if len(out.Findings) != 1 {
+		t.Fatalf("findings = %d, want the critical plant", len(out.Findings))
+	}
+	if !out.Failed {
+		t.Fatal("incomplete roster with a critical finding must set Failed")
+	}
+}
+
+func TestSecurityScanIncompleteWithSecretFailsGate(t *testing.T) {
+	// End-to-end through securityScan: oversized skip ⇒ Complete=false, and a
+	// small file holding a private-key plant ⇒ a finding that meets the gate.
+	if _, err := exec.LookPath("gitleaks"); err != nil {
+		t.Skip("gitleaks not on PATH")
+	}
+	t.Setenv("NITPICK_NO_USER_CONFIG", "1")
+	root := t.TempDir()
+	run := exec.Command("git", "init")
+	run.Dir = root
+	if out, err := run.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	// secrets.env (~183B) must clear the cap; big.env must not.
+	cfgYAML := "models:\n  default:\n    provider: openai\n    model: test\n" +
+		"review:\n  max_file_bytes: 200\n" +
+		"security:\n  fail_on: warning\n"
+	if err := os.WriteFile(filepath.Join(root, ".nitpick.yaml"), []byte(cfgYAML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "big.env"), bytes.Repeat([]byte("A"), 400), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// PEM-shaped plant: AWS example keys are allowlisted by gitleaks. Split so
+	// static scanners do not treat this test source as a live credential.
+	pem := strings.Join([]string{
+		"-----BEGIN RSA PRIVATE KEY-----",
+		"MIIEowIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF6PZGFwodaQb0N/" +
+			"ExamplePrivateKeyMaterialThatIsLongEnoughToTriggerDetectionButNotReal",
+		"-----END RSA PRIVATE KEY-----",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(root, "secrets.env"), []byte(pem), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f := &reviewFlags{repo: root}
+	res, err := securityScan(context.Background(), f, nil, true, "", false, newLogger(false, "text"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Complete {
+		t.Fatalf("oversized skip must leave Complete false; stages=%v", res.FailedStages)
+	}
+	if len(res.Findings) == 0 {
+		t.Fatalf("expected gitleaks to report the planted private key; hidden=%+v scanners=%+v", res.Hidden, res.Scanners)
+	}
+	if !res.Failed {
+		t.Fatalf("incomplete scan with security findings must set Failed; findings=%+v", res.Findings)
+	}
+}

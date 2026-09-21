@@ -649,16 +649,19 @@ func classForRule(rule string) config.Class {
 		return config.ClassSecurity
 
 	case strings.Contains(r, "gosec"), strings.Contains(r, "semgrep"),
-		strings.Contains(r, "security"), strings.Contains(r, "bandit"),
-		strings.Contains(r, "injection"), strings.Contains(r, "crypto"):
+		strings.Contains(r, "gitleaks"), strings.Contains(r, "security"),
+		strings.Contains(r, "bandit"), strings.Contains(r, "injection"),
+		strings.Contains(r, "crypto"):
 		return config.ClassSecurity
 
 	case strings.Contains(r, "race"), strings.Contains(r, "concurren"),
 		strings.Contains(r, "atomic"), strings.Contains(r, "sync"):
 		return config.ClassConcurrency
 
+	// "leak" alone would swallow gitleaks(…) into resource; goleak and
+	// bodyclose name the resource-handle class this branch is for.
 	case strings.Contains(r, "bodyclose"), strings.Contains(r, "sqlclosecheck"),
-		strings.Contains(r, "rowserr"), strings.Contains(r, "leak"),
+		strings.Contains(r, "rowserr"), strings.Contains(r, "goleak"),
 		strings.Contains(r, "close"):
 		return config.ClassResource
 

@@ -234,19 +234,25 @@ func securityScan(ctx context.Context, f *reviewFlags, paths []string, noModel b
 		security.RedactFinding(&report.Findings[i])
 	}
 	kept, hidden := partitionSecurityFindings(report.Findings)
-	for _, fd := range kept {
-		out.Findings = append(out.Findings, findingFromReview(fd))
-	}
 	for _, fd := range hidden {
 		out.Hidden = append(out.Hidden, findingFromReview(fd))
 	}
-
 	// Failed is independent of Complete. An incomplete roster used to leave
 	// Failed false, so a JSON consumer read a clean gate beside a critical finding.
+	finalizeSecurityGate(out, failOn, kept)
+	return out, nil
+}
+
+// finalizeSecurityGate records the kept findings and whether they meet failOn.
+// Complete is not consulted: restoring a Complete guard here is the mutation
+// TestIncompleteSecurityScanFailsGateOnCriticalFinding is built to catch.
+func finalizeSecurityGate(out *SecurityResult, failOn config.Severity, kept []review.Finding) {
+	for _, fd := range kept {
+		out.Findings = append(out.Findings, findingFromReview(fd))
+	}
 	if failOn != config.SeverityNone {
 		out.Failed = securityFailed(failOn, out.Findings)
 	}
-	return out, nil
 }
 
 // partitionSecurityFindings keeps class-security findings and advisories;
