@@ -246,6 +246,18 @@ func TestValidateRejectsResidualMaxSeverityCritical(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsResidualMaxSeverityTypo(t *testing.T) {
+	// normalized() only lowercases; it does not map unknowns to info. A typo
+	// must fail validation rather than silently widen the residual floor.
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.Approve.Residual.MaxSeverity = "warn"
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "max_severity") {
+		t.Fatalf("want max_severity rejection for typo, got %v", err)
+	}
+}
+
 func TestValidateAllowsResidualInfoFloor(t *testing.T) {
 	cfg := Defaults()
 	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
