@@ -513,9 +513,9 @@ type Report struct {
 	// ResidualReason is the judge's short rationale, for logs only.
 	ResidualReason string
 
-	// prior is the earlier review read for incremental work. Residual thread
-	// resolve reuses it so a second PriorReview round trip is not owed when
-	// incremental already paid for the first.
+	// prior is the earlier review. Incremental narrowing may load it first;
+	// residual approve loads it when incremental is off so withhold and
+	// standing-thread gates see the same prior.
 	prior *vcs.PriorReview
 
 	// priorReadFailed is set when residual needed the prior and the provider
@@ -1030,11 +1030,12 @@ func (e *Engine) priorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview 
 }
 
 // priorForResidualResolve returns the earlier review for residual thread
-// resolve. Reuses report.prior when incremental already loaded it; otherwise
-// reads once (incremental off returns nil from priorReview without a fetch).
+// resolve. Reuses report.prior (filled by Review from incremental or the
+// residual early load); otherwise reads once.
 //
-// ok is false when the provider can answer PriorReview but the read failed:
-// residual must hold COMMENT rather than treat the failure as "no comments".
+// ok is false when the provider can answer PriorReview but the read failed,
+// or when the early residual load already failed: residual must hold COMMENT
+// rather than treat the failure as "no comments".
 func (e *Engine) priorForResidualResolve(ctx context.Context, ref vcs.Ref, report *Report) (prior *vcs.PriorReview, ok bool) {
 	if report != nil && report.priorReadFailed {
 		return nil, false
