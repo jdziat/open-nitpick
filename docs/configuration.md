@@ -1119,7 +1119,8 @@ remain, but every published finding is at most
 `info`, `warning`), the triage model judges whether those residuals are still
 non-blocking at the configured `persona.nitpick` level. A yes becomes APPROVE;
 a no, a model error, or any finding above the floor stays a comment. Residual
-cannot be enabled without `review.approve.enabled`.
+cannot be enabled without `review.approve.enabled`, and the floor must be at
+least `review.min_severity` or Validate refuses it as unreachable.
 
 The GitHub App or token needs Pull requests write, which posting reviews
 already needs. A GitHub App cannot approve a pull request it opened itself, so
