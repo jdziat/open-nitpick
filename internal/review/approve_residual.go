@@ -9,6 +9,7 @@ import (
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/fence"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/prompt"
 )
@@ -62,6 +63,7 @@ func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
 		if ctx.Err() != nil {
 			return
 		}
+		report.Stages = append(report.Stages, StageStatus{Stage: "residual-approve", Reason: "judge-failed"})
 		e.log().Warn("residual approve judge failed; publishing as comment", "error", err)
 		return
 	}
@@ -86,14 +88,14 @@ func renderForResidualJudge(cfg *config.Config, findings []Finding) string {
 	}
 	fmt.Fprintf(&b, "Nitpick level: %s\nResidual max severity: %s\n\nFindings:\n", nitpick, max)
 	for i, f := range findings {
-		title := strings.ReplaceAll(strings.TrimSpace(f.Title), "\n", " ")
+		title := fence.Defang(strings.ReplaceAll(strings.TrimSpace(f.Title), "\n", " "))
 		fmt.Fprintf(&b, "%d. [%s/%s] %s:%d  %s\n", i+1, f.Severity, f.Class, f.Path, f.Line, title)
 		if r := strings.TrimSpace(f.Rationale); r != "" {
 			runes := []rune(r)
 			if len(runes) > 240 {
 				r = string(runes[:240]) + "..."
 			}
-			r = strings.ReplaceAll(r, "\n", " ")
+			r = fence.Defang(strings.ReplaceAll(r, "\n", " "))
 			fmt.Fprintf(&b, "   %s\n", r)
 		}
 	}
