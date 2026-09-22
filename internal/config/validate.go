@@ -260,8 +260,31 @@ func (r Review) validate() []error {
 			errs = append(errs, fmt.Errorf("review.ignore[%d]: invalid glob %q", i, pattern))
 		}
 	}
+	errs = append(errs, r.Approve.validate()...)
 
 	return errs
+}
+
+func (a Approve) validate() []error {
+	var errs []error
+	if a.Residual.Enabled && !a.Enabled {
+		errs = append(errs, errors.New("review.approve.residual.enabled requires review.approve.enabled"))
+	}
+	errs = append(errs, a.Residual.validate()...)
+	return errs
+}
+
+func (r ApproveResidual) validate() []error {
+	max := r.MaxSeverity.normalized()
+	if max == "" {
+		return nil
+	}
+	switch max {
+	case SeverityNit, SeverityInfo, SeverityWarning:
+		return nil
+	default:
+		return []error{fmt.Errorf("review.approve.residual.max_severity %q must be nit, info, or warning", r.MaxSeverity)}
+	}
 }
 
 func (l Linters) validate() []error {

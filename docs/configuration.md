@@ -1081,9 +1081,12 @@ review:
   approve:
     enabled: true
     require_analyzers: false   # the default
+    residual:
+      enabled: false           # the default
+      max_severity: info       # nit, info, or warning
 ```
 
-Two conditions always hold, whatever else is configured:
+Two conditions always hold for a clean approval, whatever else is configured:
 
 - **No findings were published.** A finding filtered out by
   `review.min_severity` or the nitpick level is not a finding for this
@@ -1106,6 +1109,17 @@ wants the deterministic half counted says so. With it on, an analyzer that was
 skipped or failed holds the review at a comment, and so does a file
 `golangci-lint` read without checking, such as one a build constraint excluded
 or one the change suppressed.
+
+### Residual findings
+
+`review.approve.residual.enabled` (default off) is a second path under the
+same hard gates. When the clean path does not apply because published findings
+remain, but every published finding is at most
+`review.approve.residual.max_severity` (default `info`; allowed: `nit`,
+`info`, `warning`), the triage model judges whether those residuals are still
+non-blocking at the configured `persona.nitpick` level. A yes becomes APPROVE;
+a no, a model error, or any finding above the floor stays a comment. Residual
+cannot be enabled without `review.approve.enabled`.
 
 The GitHub App or token needs Pull requests write, which posting reviews
 already needs. A GitHub App cannot approve a pull request it opened itself, so

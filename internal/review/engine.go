@@ -504,6 +504,14 @@ type Report struct {
 	// how many, so a push whose only defects were already on the pull request
 	// does not read as a push that introduced none.
 	AlreadyReported []Finding
+
+	// ResidualApprove is set when the residual judge allows APPROVE despite
+	// published low-severity findings. reviewEvent reads it; it never calls
+	// the model.
+	ResidualApprove bool
+
+	// ResidualReason is the judge's short rationale, for logs only.
+	ResidualReason string
 }
 
 // Incremental describes a run that reviewed part of a change because an
@@ -2028,6 +2036,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	if e.AssessPractices != nil {
 		report.Practices = e.AssessPractices(ctx, ref, report.PullRequest, report)
 	}
+	e.judgeResidualApprove(ctx, report)
 	e.log().Info("publishing", "findings", len(report.Findings), "provider", e.Provider.Name())
 	review := Render(report, files, e.Config)
 

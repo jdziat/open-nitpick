@@ -8,20 +8,38 @@ import (
 // reviewEvent decides how a review is submitted.
 //
 // Comment is the answer for everything except a review that found nothing and
-// read everything it planned to, under an operator who asked for approvals.
+// read everything it planned to, under an operator who asked for approvals,
+// or a residual-eligible run whose judge set ResidualApprove.
 // review.approve is off by default, so nothing changes for a repository that
 // has not opted in.
 func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 	if cfg == nil || !cfg.Review.Approve.Enabled || report == nil {
 		return vcs.EventComment
 	}
-	if len(report.Findings) > 0 {
+	if !approveHardGates(report, cfg) {
 		return vcs.EventComment
 	}
-	if report.Practices != nil && report.Practices.ExitCode() != 0 {
+	if len(report.Findings) == 0 {
+		return vcs.EventApprove
+	}
+	if !cfg.Review.Approve.Residual.Enabled {
 		return vcs.EventComment
 	}
+	if !residualWithinFloor(report.Findings, residualMaxSeverity(cfg)) {
+		return vcs.EventComment
+	}
+	if report.ResidualApprove {
+		return vcs.EventApprove
+	}
+	return vcs.EventComment
+}
 
+// approveHardGates are the completeness and standing-thread checks shared by
+// clean and residual approve. Residual never weakens these.
+func approveHardGates(report *Report, cfg *config.Config) bool {
+	if report.Practices != nil && report.Practices.ExitCode() != 0 {
+		return false
+	}
 	// An earlier run's comment threads outlive the run that made them, and a
 	// narrowed run never re-produces a finding on a file it did not re-read,
 	// so Findings and AlreadyReported are both empty while a thread stands
@@ -32,9 +50,8 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 	// cannot see: that refuses an approval it might have earned, and the
 	// direction to be wrong in is the one that publishes a comment.
 	if len(report.AlreadyReported) > 0 || report.PriorComments > len(report.Superseded) {
-		return vcs.EventComment
+		return false
 	}
-
 	// A run whose batches partly failed published no findings for the files it
 	// never read, and a run whose triage died published findings nothing
 	// ranked. Reading either as clean is how an approval comes to mean less
@@ -45,13 +62,46 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 	// batches still failed: engineering profiles gate on deterministic checks
 	// and leave model coverage advisory. An approval must not inherit that.
 	if !report.Complete() || !report.PipelineComplete() {
-		return vcs.EventComment
+		return false
 	}
-
 	if cfg.Review.Approve.RequireAnalyzers && !analyzersCovered(report, cfg) {
-		return vcs.EventComment
+		return false
 	}
-	return vcs.EventApprove
+	return true
+}
+
+func residualMaxSeverity(cfg *config.Config) config.Severity {
+	max := cfg.Review.Approve.Residual.MaxSeverity
+	if max == "" {
+		return config.SeverityInfo
+	}
+	return max
+}
+
+// residualWithinFloor reports whether every published finding is at most max.
+func residualWithinFloor(findings []Finding, max config.Severity) bool {
+	ceiling := max.Rank()
+	for _, f := range findings {
+		if config.Severity(f.Severity).Rank() > ceiling {
+			return false
+		}
+	}
+	return true
+}
+
+// residualEligible is true when the residual judge should run: approve and
+// residual are on, hard gates pass, findings are non-empty and within the floor.
+func residualEligible(report *Report, cfg *config.Config) bool {
+	if cfg == nil || !cfg.Review.Approve.Enabled || !cfg.Review.Approve.Residual.Enabled || report == nil {
+		return false
+	}
+	if len(report.Findings) == 0 {
+		return false
+	}
+	if !approveHardGates(report, cfg) {
+		return false
+	}
+	return residualWithinFloor(report.Findings, residualMaxSeverity(cfg))
 }
 
 // analyzersCovered reports whether the deterministic half of the review

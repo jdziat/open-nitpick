@@ -222,6 +222,42 @@ func TestValidateAllowsFailOnNone(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsResidualWithoutApprove(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.Approve.Residual.Enabled = true
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "review.approve.residual.enabled requires review.approve.enabled") {
+		t.Fatalf("want residual-requires-approve error, got %v", err)
+	}
+}
+
+func TestValidateRejectsResidualMaxSeverityCritical(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.Residual.Enabled = true
+	cfg.Review.Approve.Residual.MaxSeverity = SeverityCritical
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "max_severity") {
+		t.Fatalf("want max_severity rejection, got %v", err)
+	}
+}
+
+func TestValidateAllowsResidualInfoFloor(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.Residual.Enabled = true
+	cfg.Review.Approve.Residual.MaxSeverity = SeverityInfo
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("residual with info floor: %v", err)
+	}
+}
+
 func TestSeverityOrderingRespectsThresholds(t *testing.T) {
 	if !SeverityError.AtLeast(SeverityWarning) {
 		t.Error("error should outrank warning")
