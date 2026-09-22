@@ -517,6 +517,11 @@ type Report struct {
 	// resolve reuses it so a second PriorReview round trip is not owed when
 	// incremental already paid for the first.
 	prior *vcs.PriorReview
+
+	// priorReadFailed is set when residual needed the prior and the provider
+	// that can answer PriorReview returned an error. Residual must hold
+	// COMMENT rather than retrying after the judge and greenwashing a miss.
+	priorReadFailed bool
 }
 
 // Incremental describes a run that reviewed part of a change because an

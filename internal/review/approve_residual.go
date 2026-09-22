@@ -37,6 +37,9 @@ func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
 	if report == nil || e.Config == nil || !residualJudgeEligible(report, e.Config) {
 		return
 	}
+	if report.priorReadFailed {
+		return
+	}
 	// Standing threads need a ThreadResolver after a yes; without one the
 	// judge cannot earn APPROVE, so skip the model call.
 	if standingThreadsRemain(report) {
