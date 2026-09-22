@@ -1009,11 +1009,17 @@ func (e *Engine) priorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview 
 // priorForResidualResolve returns the earlier review for residual thread
 // resolve. Reuses report.prior when incremental already loaded it; otherwise
 // reads once (incremental off returns nil from priorReview without a fetch).
-func (e *Engine) priorForResidualResolve(ctx context.Context, ref vcs.Ref, report *Report) *vcs.PriorReview {
+//
+// ok is false when the provider can answer PriorReview but the read failed:
+// residual must hold COMMENT rather than treat the failure as "no comments".
+func (e *Engine) priorForResidualResolve(ctx context.Context, ref vcs.Ref, report *Report) (prior *vcs.PriorReview, ok bool) {
 	if report != nil && report.prior != nil {
-		return report.prior
+		return report.prior, true
 	}
-	prior := e.readPriorReview(ctx, ref)
+	prior, err := e.readPriorReviewResult(ctx, ref)
+	if err != nil {
+		return nil, false
+	}
 	if report != nil {
 		report.prior = prior
 		// Incremental off never set PriorComments; residual still needs the
@@ -1022,20 +1028,28 @@ func (e *Engine) priorForResidualResolve(ctx context.Context, ref vcs.Ref, repor
 			report.PriorComments = len(prior.Comments)
 		}
 	}
-	return prior
+	return prior, true
 }
 
 func (e *Engine) readPriorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview {
-	reader, ok := e.Provider.(vcs.PriorReviewer)
-	if !ok {
-		return nil
-	}
-	prior, err := reader.PriorReview(ctx, ref)
+	prior, err := e.readPriorReviewResult(ctx, ref)
 	if err != nil {
 		e.log().Warn("could not read earlier reviews; reviewing the whole change", "error", err)
 		return nil
 	}
 	return prior
+}
+
+func (e *Engine) readPriorReviewResult(ctx context.Context, ref vcs.Ref) (*vcs.PriorReview, error) {
+	reader, ok := e.Provider.(vcs.PriorReviewer)
+	if !ok {
+		return nil, nil
+	}
+	prior, err := reader.PriorReview(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return prior, nil
 }
 
 // narrowToChangedSince restricts a diff to the files that moved since the last
@@ -2084,7 +2098,12 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	if report.ResidualApprove {
 		// priorReview hides the prior when incremental is off; residual still
 		// needs it to close standing threads after a yes.
-		if prior := e.priorForResidualResolve(ctx, ref, report); prior != nil {
+		prior, priorOK := e.priorForResidualResolve(ctx, ref, report)
+		if !priorOK {
+			e.log().Warn("residual approve held; could not read earlier reviews")
+			report.ResidualApprove = false
+			report.ResidualReason = ""
+		} else if prior != nil {
 			var skipped []bundle.Skip
 			if report.Plan != nil {
 				skipped = report.Plan.Skipped
@@ -2095,7 +2114,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 		}
 		// reviewEvent still refuses APPROVE while threads stand; clear the
 		// flag so a granted log does not outlive a held event.
-		if report.PriorComments > len(report.Superseded) {
+		if report.ResidualApprove && report.PriorComments > len(report.Superseded) {
 			e.log().Info("residual approve held; standing threads remain",
 				"prior", report.PriorComments, "superseded", len(report.Superseded))
 			report.ResidualApprove = false

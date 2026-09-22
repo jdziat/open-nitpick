@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -194,6 +195,44 @@ func TestResidualApproveClearedWhenIncrementalOff(t *testing.T) {
 	}
 	if report.ResidualApprove {
 		t.Fatal("ResidualApprove must clear when standing threads remain")
+	}
+	if provider.published == nil || provider.published.Event != vcs.EventComment {
+		t.Fatalf("published event = %v, want COMMENT", provider.published)
+	}
+}
+
+type failingPriorProvider struct {
+	stubProvider
+}
+
+func (p *failingPriorProvider) PriorReview(context.Context, vcs.Ref) (*vcs.PriorReview, error) {
+	return nil, errors.New("forge unavailable")
+}
+
+// TestResidualApproveHeldWhenPriorReadFails pins that a PriorReviewer error
+// is not treated as "no standing threads".
+func TestResidualApproveHeldWhenPriorReadFails(t *testing.T) {
+	f := Finding{
+		Path: "app.go", Line: 4, Severity: "info", Class: "correctness",
+		Title: "document the ignored error", Rationale: "the blank identifier hides a failure mode",
+	}
+	model := &scriptedLLM{byPrompt: map[string]string{
+		"Review the following changes":             mustJSON(t, Result{Findings: []Finding{f}}),
+		"triaging findings":                        mustJSON(t, TriageResult{Verdicts: verdictsFor([]Finding{f})}),
+		"You decide whether a pull request review": `{"approve":true,"reason":"advisory only"}`,
+	}}
+	provider := &failingPriorProvider{stubProvider: stubProvider{diff: engineDiff}}
+	report, err := newEngine(t, model, provider, func(c *config.Config) {
+		c.Review.Approve.Enabled = true
+		c.Review.Approve.Residual.Enabled = true
+		c.Review.Incremental = false
+		c.Review.MinSeverity = config.SeverityInfo
+	}).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if report.ResidualApprove {
+		t.Fatal("ResidualApprove must clear when PriorReview fails")
 	}
 	if provider.published == nil || provider.published.Event != vcs.EventComment {
 		t.Fatalf("published event = %v, want COMMENT", provider.published)

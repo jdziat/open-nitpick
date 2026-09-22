@@ -711,7 +711,7 @@ type Approve struct {
 	RequireAnalyzers bool `yaml:"require_analyzers"`
 
 	// Residual optionally allows APPROVE when only low-severity findings remain.
-	// See ApproveResidual. Ignored unless Enabled is true.
+	// See ApproveResidual. Requires Enabled; residual.enabled alone fails Validate.
 	Residual ApproveResidual `yaml:"residual"`
 }
 
