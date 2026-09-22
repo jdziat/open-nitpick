@@ -136,15 +136,15 @@ func TestResidualApproveClearedWhenStandingRemain(t *testing.T) {
 		"triaging findings":                        mustJSON(t, TriageResult{Verdicts: verdictsFor([]Finding{f})}),
 		"You decide whether a pull request review": `{"approve":true,"reason":"advisory only"}`,
 	}}
-	// No ThreadResolver: resolveClearedForApprove cannot close the prior, so
-	// standing remains and ResidualApprove must be cleared before Render.
-	provider := &incrementalProvider{
+	// ThreadResolver that closes nothing: the judge still runs, ResidualApprove
+	// is set, then publish clears it because standing threads remain.
+	provider := &noopResolverProvider{incrementalProvider: incrementalProvider{
 		stubProvider: stubProvider{diff: engineDiff},
 		head:         "beef02",
 		prior: &vcs.PriorReview{Head: "beef01", Comments: []vcs.PriorComment{
 			{ID: 9, Path: "app.go", Line: 4, Fingerprint: "stale", Class: "style"},
 		}},
-	}
+	}}
 	report, err := newEngine(t, model, provider, func(c *config.Config) {
 		c.Review.Approve.Enabled = true
 		c.Review.Approve.Residual.Enabled = true
@@ -153,12 +153,28 @@ func TestResidualApproveClearedWhenStandingRemain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Review: %v", err)
 	}
+	for _, p := range model.prompts() {
+		if strings.Contains(p, "You decide whether a pull request review") {
+			goto judged
+		}
+	}
+	t.Fatal("judge must run when a ThreadResolver is present")
+judged:
 	if report.ResidualApprove {
 		t.Fatal("ResidualApprove must clear when standing threads remain")
 	}
 	if provider.published == nil || provider.published.Event != vcs.EventComment {
 		t.Fatalf("published event = %v, want COMMENT", provider.published)
 	}
+}
+
+// noopResolverProvider implements ThreadResolver but closes no threads.
+type noopResolverProvider struct {
+	incrementalProvider
+}
+
+func (p *noopResolverProvider) ResolveThreads(context.Context, vcs.Ref, []int64, string) ([]int64, error) {
+	return nil, nil
 }
 
 // TestResidualApproveClearedWhenIncrementalOff pins that PriorComments is
