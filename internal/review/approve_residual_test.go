@@ -60,6 +60,9 @@ func TestResidualApproveJudgeErrorHoldsAtComment(t *testing.T) {
 	if report.ResidualApprove {
 		t.Fatal("judge parse failure must not set ResidualApprove")
 	}
+	if !report.PipelineComplete() {
+		t.Fatalf("judge parse failure must not degrade the run: stages=%v", report.Stages)
+	}
 	if provider.published == nil || provider.published.Event != vcs.EventComment {
 		t.Fatalf("published event = %v, want COMMENT", provider.published)
 	}

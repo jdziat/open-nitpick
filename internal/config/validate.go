@@ -297,7 +297,7 @@ func (r ApproveResidual) validate() []error {
 			return nil
 		}
 	}
-	return []error{fmt.Errorf("review.approve.residual.max_severity %q must be %s", r.MaxSeverity, strings.Join(ResidualMaxSeverities(), ", "))}
+	return []error{fmt.Errorf("review.approve.residual.max_severity %q must be %s", max, strings.Join(ResidualMaxSeverities(), ", "))}
 }
 
 func (l Linters) validate() []error {

@@ -88,7 +88,10 @@ func renderForResidualJudge(cfg *config.Config, findings []Finding) string {
 	fmt.Fprintf(&b, "Nitpick level: %s\nResidual max severity: %s\n\nFindings:\n", nitpick, max)
 	for i, f := range findings {
 		title := fence.Defang(strings.ReplaceAll(strings.TrimSpace(f.Title), "\n", " "))
-		fmt.Fprintf(&b, "%d. [%s/%s] %s:%d  %s\n", i+1, f.Severity, f.Class, f.Path, f.Line, title)
+		path := fence.Defang(strings.ReplaceAll(strings.TrimSpace(f.Path), "\n", " "))
+		class := fence.Defang(strings.ReplaceAll(strings.TrimSpace(f.Class), "\n", " "))
+		sev := fence.Defang(strings.ReplaceAll(strings.TrimSpace(f.Severity), "\n", " "))
+		fmt.Fprintf(&b, "%d. [%s/%s] %s:%d  %s\n", i+1, sev, class, path, f.Line, title)
 		if r := strings.TrimSpace(f.Rationale); r != "" {
 			runes := []rune(r)
 			if len(runes) > 240 {

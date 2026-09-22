@@ -1183,7 +1183,7 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 		return nil
 	}
 	residual := report.ResidualApprove
-	if len(report.AlreadyReported) > 0 || !report.Complete() {
+	if len(report.AlreadyReported) > 0 || !report.Complete() || !report.PipelineComplete() {
 		return nil
 	}
 	if residual {
