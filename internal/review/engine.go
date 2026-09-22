@@ -759,6 +759,8 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		e.log().Debug("skipped file", "path", s.Path, "reason", s.Reason)
 	}
 
+	// prior, not narrowPrior: pull-request budget scope needs prior spend even
+	// when residual loaded the prior without enabling incremental narrowing.
 	if fit, trimmed, err := e.applyBudget(ctx, ref, prior, plan, files, fetch); err != nil {
 		return nil, err
 	} else if fit != nil {
