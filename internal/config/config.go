@@ -733,6 +733,12 @@ type ApproveResidual struct {
 
 // MaxSeverityValues reports what review.approve.residual.max_severity accepts.
 func (a ApproveResidual) MaxSeverityValues() []string {
+	return ResidualMaxSeverities()
+}
+
+// ResidualMaxSeverities is the residual floor set, shared by validation and
+// the generated reference.
+func ResidualMaxSeverities() []string {
 	return []string{string(SeverityNit), string(SeverityInfo), string(SeverityWarning)}
 }
 

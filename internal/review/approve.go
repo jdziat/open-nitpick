@@ -33,7 +33,7 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 // approveHardGates are the completeness and standing-thread checks shared by
 // clean and residual approve. Residual never weakens these.
 func approveHardGates(report *Report, cfg *config.Config) bool {
-	if report.Practices != nil && report.Practices.ExitCode() != 0 {
+	if !approveCompletenessGates(report, cfg) {
 		return false
 	}
 	// An earlier run's comment threads outlive the run that made them, and a
@@ -52,15 +52,15 @@ func approveHardGates(report *Report, cfg *config.Config) bool {
 	if len(report.AlreadyReported) > 0 || report.PriorComments > len(report.Superseded) {
 		return false
 	}
-	// A run whose batches partly failed published no findings for the files it
-	// never read, and a run whose triage died published findings nothing
-	// ranked. Reading either as clean is how an approval comes to mean less
-	// than nothing.
-	//
-	// Complete() is checked on its own because PipelineComplete follows an
-	// attached practices report, and that report can be green while model
-	// batches still failed: engineering profiles gate on deterministic checks
-	// and leave model coverage advisory. An approval must not inherit that.
+	return true
+}
+
+// approveCompletenessGates are the non-standing checks shared by the event
+// path and the residual judge.
+func approveCompletenessGates(report *Report, cfg *config.Config) bool {
+	if report.Practices != nil && report.Practices.ExitCode() != 0 {
+		return false
+	}
 	if !report.Complete() || !report.PipelineComplete() {
 		return false
 	}
@@ -104,26 +104,16 @@ func residualEligible(report *Report, cfg *config.Config) bool {
 	return residualWithinFloor(report.Findings, residualMaxSeverity(cfg))
 }
 
-// residualJudgeEligible is the pre-judge gate: same completeness rules as
-// approveHardGates, but standing threads are allowed so the judge can run
-// before publish closes them.
+// residualJudgeEligible is the pre-judge gate: completeness without the
+// standing-thread check, so the judge can run before publish closes them.
 func residualJudgeEligible(report *Report, cfg *config.Config) bool {
 	if cfg == nil || !cfg.Review.Approve.Enabled || !cfg.Review.Approve.Residual.Enabled || report == nil {
 		return false
 	}
-	if len(report.Findings) == 0 {
+	if len(report.Findings) == 0 || len(report.AlreadyReported) > 0 {
 		return false
 	}
-	if len(report.AlreadyReported) > 0 {
-		return false
-	}
-	if report.Practices != nil && report.Practices.ExitCode() != 0 {
-		return false
-	}
-	if !report.Complete() || !report.PipelineComplete() {
-		return false
-	}
-	if cfg.Review.Approve.RequireAnalyzers && !analyzersCovered(report, cfg) {
+	if !approveCompletenessGates(report, cfg) {
 		return false
 	}
 	return residualWithinFloor(report.Findings, residualMaxSeverity(cfg))

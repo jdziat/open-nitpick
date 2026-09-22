@@ -1164,10 +1164,10 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 		return nil
 	}
 	residual := report.ResidualApprove
-	if !residual && (len(findings) > 0 || len(report.AlreadyReported) > 0) {
+	if len(report.AlreadyReported) > 0 || !report.Complete() {
 		return nil
 	}
-	if !report.Complete() {
+	if !residual && len(findings) > 0 {
 		return nil
 	}
 	resolver, ok := e.Provider.(vcs.ThreadResolver)

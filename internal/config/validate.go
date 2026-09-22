@@ -279,12 +279,12 @@ func (r ApproveResidual) validate() []error {
 	if max == "" {
 		return nil
 	}
-	switch max {
-	case SeverityNit, SeverityInfo, SeverityWarning:
-		return nil
-	default:
-		return []error{fmt.Errorf("review.approve.residual.max_severity %q must be nit, info, or warning", r.MaxSeverity)}
+	for _, allowed := range ResidualMaxSeverities() {
+		if string(max) == allowed {
+			return nil
+		}
 	}
+	return []error{fmt.Errorf("review.approve.residual.max_severity %q must be nit, info, or warning", r.MaxSeverity)}
 }
 
 func (l Linters) validate() []error {
