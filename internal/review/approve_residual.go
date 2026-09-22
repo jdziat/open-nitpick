@@ -32,7 +32,7 @@ const residualApproveSchema = `{
 // judgeResidualApprove asks the triage model whether residual findings still
 // allow APPROVE. Failures leave ResidualApprove false (comment).
 func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
-	if report == nil || !residualEligible(report, e.Config) {
+	if report == nil || !residualJudgeEligible(report, e.Config) {
 		return
 	}
 	if e.Roles == nil || e.Roles.Triage == nil {
@@ -83,8 +83,9 @@ func renderForResidualJudge(cfg *config.Config, findings []Finding) string {
 	for i, f := range findings {
 		fmt.Fprintf(&b, "%d. [%s/%s] %s:%d  %s\n", i+1, f.Severity, f.Class, f.Path, f.Line, f.Title)
 		if r := strings.TrimSpace(f.Rationale); r != "" {
-			if len(r) > 240 {
-				r = r[:240] + "..."
+			runes := []rune(r)
+			if len(runes) > 240 {
+				r = string(runes[:240]) + "..."
 			}
 			fmt.Fprintf(&b, "   %s\n", r)
 		}

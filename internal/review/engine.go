@@ -1153,7 +1153,11 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 	if e.Config == nil || !e.Config.Review.Approve.Enabled || prior == nil || report == nil {
 		return nil
 	}
-	if len(findings) > 0 || len(report.AlreadyReported) > 0 || !report.Complete() {
+	residual := report.ResidualApprove
+	if !residual && (len(findings) > 0 || len(report.AlreadyReported) > 0) {
+		return nil
+	}
+	if !report.Complete() {
 		return nil
 	}
 	resolver, ok := e.Provider.(vcs.ThreadResolver)
@@ -1192,6 +1196,9 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 		return nil
 	}
 	reply := "Resolved by open-nitpick: the change was reviewed again and no findings remain."
+	if residual {
+		reply = "Resolved by open-nitpick: the change was reviewed again; remaining findings are within the residual approve floor."
+	}
 	resolved, err := resolver.ResolveThreads(ctx, ref, ids, reply)
 	if err != nil {
 		e.log().Warn("could not resolve comments before approval", "error", err, "resolved", len(resolved), "of", len(ids))
@@ -2037,6 +2044,22 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 		report.Practices = e.AssessPractices(ctx, ref, report.PullRequest, report)
 	}
 	e.judgeResidualApprove(ctx, report)
+	if report.ResidualApprove {
+		if reader, ok := e.Provider.(vcs.PriorReviewer); ok {
+			prior, err := reader.PriorReview(ctx, ref)
+			if err != nil {
+				e.log().Warn("could not read prior review before residual approve", "error", err)
+			} else {
+				var skipped []bundle.Skip
+				if report.Plan != nil {
+					skipped = report.Plan.Skipped
+				}
+				if more := e.resolveClearedForApprove(ctx, ref, prior, report, report.Findings, skipped); len(more) > 0 {
+					report.Superseded = append(report.Superseded, more...)
+				}
+			}
+		}
+	}
 	e.log().Info("publishing", "findings", len(report.Findings), "provider", e.Provider.Name())
 	review := Render(report, files, e.Config)
 

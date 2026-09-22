@@ -323,8 +323,24 @@ func TestResidualJudgeRefuseHoldsAtComment(t *testing.T) {
 	}
 }
 
+// TestResidualEmptyMaxSeverityFloorsAtInfo pins that an unset floor still
+// means info at comparison time, matching Defaults.
+func TestResidualEmptyMaxSeverityFloorsAtInfo(t *testing.T) {
+	cfg := residualApproving("")
+	cfg.Review.Approve.Residual.MaxSeverity = ""
+	if got := residualMaxSeverity(cfg); got != config.SeverityInfo {
+		t.Fatalf("empty max_severity = %q, want info", got)
+	}
+	if !residualWithinFloor([]Finding{{Severity: "info"}}, residualMaxSeverity(cfg)) {
+		t.Fatal("info must pass an empty-configured floor")
+	}
+	if residualWithinFloor([]Finding{{Severity: "warning"}}, residualMaxSeverity(cfg)) {
+		t.Fatal("warning must fail an empty-configured floor")
+	}
+}
+
 // TestResidualEligibleRequiresNonEmptyFindingsWithinFloor pins when the
-// judge should run at all.
+// judge and the event path may approve.
 func TestResidualEligibleRequiresNonEmptyFindingsWithinFloor(t *testing.T) {
 	cfg := residualApproving(config.SeverityInfo)
 	if residualEligible(&Report{}, cfg) {
@@ -338,5 +354,11 @@ func TestResidualEligibleRequiresNonEmptyFindingsWithinFloor(t *testing.T) {
 	}
 	if residualEligible(&Report{Findings: []Finding{{Severity: "info"}}, Incomplete: []string{"x.go"}}, cfg) {
 		t.Error("incomplete run must not be residualEligible")
+	}
+	if !residualJudgeEligible(&Report{Findings: []Finding{{Severity: "info"}}, PriorComments: 2}, cfg) {
+		t.Error("judge eligibility must not require cleared standing threads")
+	}
+	if residualEligible(&Report{Findings: []Finding{{Severity: "info"}}, PriorComments: 2}, cfg) {
+		t.Error("residualEligible must still require cleared standing threads")
 	}
 }

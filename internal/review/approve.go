@@ -22,13 +22,7 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 	if len(report.Findings) == 0 {
 		return vcs.EventApprove
 	}
-	if !cfg.Review.Approve.Residual.Enabled {
-		return vcs.EventComment
-	}
-	if !residualWithinFloor(report.Findings, residualMaxSeverity(cfg)) {
-		return vcs.EventComment
-	}
-	if report.ResidualApprove {
+	if residualEligible(report, cfg) && report.ResidualApprove {
 		return vcs.EventApprove
 	}
 	return vcs.EventComment
@@ -49,7 +43,15 @@ func approveHardGates(report *Report, cfg *config.Config) bool {
 	// standing, including a thread a person resolved by hand, which this tool
 	// cannot see: that refuses an approval it might have earned, and the
 	// direction to be wrong in is the one that publishes a comment.
-	if len(report.AlreadyReported) > 0 || report.PriorComments > len(report.Superseded) {
+	standing := report.PriorComments > len(report.Superseded)
+	if report.ResidualApprove {
+		// Residual judged the published findings. AlreadyReported entries are
+		// the prior threads publish closes after a yes; only uncleared
+		// threads still block.
+		if standing {
+			return false
+		}
+	} else if len(report.AlreadyReported) > 0 || standing {
 		return false
 	}
 	// A run whose batches partly failed published no findings for the files it
@@ -89,8 +91,8 @@ func residualWithinFloor(findings []Finding, max config.Severity) bool {
 	return true
 }
 
-// residualEligible is true when the residual judge should run: approve and
-// residual are on, hard gates pass, findings are non-empty and within the floor.
+// residualEligible is true when residual findings may earn APPROVE: approve
+// and residual are on, hard gates pass, findings are non-empty and within the floor.
 func residualEligible(report *Report, cfg *config.Config) bool {
 	if cfg == nil || !cfg.Review.Approve.Enabled || !cfg.Review.Approve.Residual.Enabled || report == nil {
 		return false
@@ -99,6 +101,28 @@ func residualEligible(report *Report, cfg *config.Config) bool {
 		return false
 	}
 	if !approveHardGates(report, cfg) {
+		return false
+	}
+	return residualWithinFloor(report.Findings, residualMaxSeverity(cfg))
+}
+
+// residualJudgeEligible is residualEligible without the standing-thread gate.
+// The judge runs first; publish then closes standing threads when it says yes
+// so approveHardGates can pass.
+func residualJudgeEligible(report *Report, cfg *config.Config) bool {
+	if cfg == nil || !cfg.Review.Approve.Enabled || !cfg.Review.Approve.Residual.Enabled || report == nil {
+		return false
+	}
+	if len(report.Findings) == 0 {
+		return false
+	}
+	if report.Practices != nil && report.Practices.ExitCode() != 0 {
+		return false
+	}
+	if !report.Complete() || !report.PipelineComplete() {
+		return false
+	}
+	if cfg.Review.Approve.RequireAnalyzers && !analyzersCovered(report, cfg) {
 		return false
 	}
 	return residualWithinFloor(report.Findings, residualMaxSeverity(cfg))
