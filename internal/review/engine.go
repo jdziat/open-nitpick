@@ -75,6 +75,11 @@ type Engine struct {
 	// into the Report.
 	routeDecisions []RouteDecision
 
+	// priorReadErr is the last PriorReview failure from this run, so residual
+	// can hold COMMENT without a second forge round trip after incremental
+	// already paid for a failed read.
+	priorReadErr error
+
 	// Linters supplies deterministic findings to merge with the model's.
 	//
 	// It is a constructor rather than a runner because the policy a review runs
