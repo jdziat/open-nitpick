@@ -2067,6 +2067,9 @@ func renderedFiles(plan *bundle.Plan) map[string]string {
 // publish renders and delivers the review.
 func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files diff.Files) error {
 	report.Routes = e.routeDecisions
+	if e.ModelUsage != nil {
+		report.ModelUsage = e.ModelUsage()
+	}
 	if e.AssessPractices != nil {
 		report.Practices = e.AssessPractices(ctx, ref, report.PullRequest, report)
 	}
@@ -2083,6 +2086,14 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 			if more := e.resolveClearedForApprove(ctx, ref, prior, report, report.Findings, skipped); len(more) > 0 {
 				report.Superseded = append(report.Superseded, more...)
 			}
+		}
+		// reviewEvent still refuses APPROVE while threads stand; clear the
+		// flag so a granted log does not outlive a held event.
+		if report.PriorComments > len(report.Superseded) {
+			e.log().Info("residual approve held; standing threads remain",
+				"prior", report.PriorComments, "superseded", len(report.Superseded))
+			report.ResidualApprove = false
+			report.ResidualReason = ""
 		}
 	}
 	if e.ModelUsage != nil {

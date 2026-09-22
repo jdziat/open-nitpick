@@ -119,3 +119,40 @@ func TestResidualFloorBlocksEngineApproveDespiteJudgeYes(t *testing.T) {
 		t.Fatalf("published event = %v, want COMMENT", provider.published)
 	}
 }
+
+// TestResidualApproveClearedWhenStandingRemain pins that a judge yes does not
+// leave ResidualApprove set when standing threads still refuse the event.
+func TestResidualApproveClearedWhenStandingRemain(t *testing.T) {
+	f := Finding{
+		Path: "app.go", Line: 4, Severity: "info", Class: "correctness",
+		Title: "document the ignored error", Rationale: "the blank identifier hides a failure mode",
+	}
+	model := &scriptedLLM{byPrompt: map[string]string{
+		"Review the following changes":             mustJSON(t, Result{Findings: []Finding{f}}),
+		"triaging findings":                        mustJSON(t, TriageResult{Verdicts: verdictsFor([]Finding{f})}),
+		"You decide whether a pull request review": `{"approve":true,"reason":"advisory only"}`,
+	}}
+	// No ThreadResolver: resolveClearedForApprove cannot close the prior, so
+	// standing remains and ResidualApprove must be cleared before Render.
+	provider := &incrementalProvider{
+		stubProvider: stubProvider{diff: engineDiff},
+		head:         "beef02",
+		prior: &vcs.PriorReview{Head: "beef01", Comments: []vcs.PriorComment{
+			{ID: 9, Path: "app.go", Line: 4, Fingerprint: "stale", Class: "style"},
+		}},
+	}
+	report, err := newEngine(t, model, provider, func(c *config.Config) {
+		c.Review.Approve.Enabled = true
+		c.Review.Approve.Residual.Enabled = true
+		c.Review.MinSeverity = config.SeverityInfo
+	}).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if report.ResidualApprove {
+		t.Fatal("ResidualApprove must clear when standing threads remain")
+	}
+	if provider.published == nil || provider.published.Event != vcs.EventComment {
+		t.Fatalf("published event = %v, want COMMENT", provider.published)
+	}
+}
