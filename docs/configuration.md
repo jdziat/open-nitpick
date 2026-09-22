@@ -1120,7 +1120,8 @@ remain, but every published finding is at most
 non-blocking at the configured `persona.nitpick` level. A yes becomes APPROVE;
 a no, a model error, or any finding above the floor stays a comment. Residual
 cannot be enabled without `review.approve.enabled`, and the floor must be at
-least `review.min_severity` or Validate refuses it as unreachable.
+least `review.min_severity` or Validate refuses it as unreachable. The engine
+path is `judgeResidualApprove` in package `review`.
 
 The GitHub App or token needs Pull requests write, which posting reviews
 already needs. A GitHub App cannot approve a pull request it opened itself, so
