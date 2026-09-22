@@ -711,12 +711,19 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// it, withholdAlreadyReported cannot see recurrences and standing threads
 	// are invisible until after the judge has already run.
 	if prior == nil && e.Config.Review.Approve.Enabled && e.Config.Review.Approve.Residual.Enabled {
-		loaded, err := e.readPriorReviewResult(ctx, ref)
-		if err != nil {
-			e.log().Warn("could not read earlier reviews for residual approve", "error", err)
-			report.priorReadFailed = true
+		if e.Config.Review.Incremental && !e.Full {
+			// priorReview already attempted the read; reuse its failure.
+			if e.priorReadErr != nil {
+				report.priorReadFailed = true
+			}
 		} else {
-			prior = loaded
+			loaded, err := e.readPriorReviewResult(ctx, ref)
+			if err != nil {
+				e.log().Warn("could not read earlier reviews for residual approve", "error", err)
+				report.priorReadFailed = true
+			} else {
+				prior = loaded
+			}
 		}
 	}
 	report.prior = prior
@@ -1076,9 +1083,11 @@ func (e *Engine) readPriorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorRev
 func (e *Engine) readPriorReviewResult(ctx context.Context, ref vcs.Ref) (*vcs.PriorReview, error) {
 	reader, ok := e.Provider.(vcs.PriorReviewer)
 	if !ok {
+		e.priorReadErr = nil
 		return nil, nil
 	}
 	prior, err := reader.PriorReview(ctx, ref)
+	e.priorReadErr = err
 	if err != nil {
 		return nil, err
 	}
