@@ -352,6 +352,14 @@ func TestResidualInvalidMaxSeverityFloorsAtInfo(t *testing.T) {
 	}
 }
 
+// TestResidualUnknownFindingSeverityFailsFloor pins that Rank's info fallback
+// cannot greenwash an unrecognized severity into residual approve.
+func TestResidualUnknownFindingSeverityFailsFloor(t *testing.T) {
+	if residualWithinFloor([]Finding{{Severity: "mystery"}}, config.SeverityInfo) {
+		t.Fatal("unknown finding severity must fail the residual floor")
+	}
+}
+
 // TestResidualEligibleRequiresNonEmptyFindingsWithinFloor pins when the
 // judge and the event path may approve.
 func TestResidualEligibleRequiresNonEmptyFindingsWithinFloor(t *testing.T) {

@@ -22,9 +22,7 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 	if len(report.Findings) == 0 {
 		return vcs.EventApprove
 	}
-	if cfg.Review.Approve.Residual.Enabled &&
-		report.ResidualApprove &&
-		residualWithinFloor(report.Findings, residualMaxSeverity(cfg)) {
+	if report.ResidualApprove && residualEligible(report, cfg) {
 		return vcs.EventApprove
 	}
 	return vcs.EventComment
@@ -82,10 +80,13 @@ func residualMaxSeverity(cfg *config.Config) config.Severity {
 }
 
 // residualWithinFloor reports whether every published finding is at most max.
+// An unrecognized severity cannot pass: Rank would map it to info and greenwash
+// a finding that never cleared a known floor.
 func residualWithinFloor(findings []Finding, max config.Severity) bool {
 	ceiling := max.Rank()
 	for _, f := range findings {
-		if config.Severity(f.Severity).Rank() > ceiling {
+		sev := config.Severity(f.Severity)
+		if !sev.Valid() || sev.Rank() > ceiling {
 			return false
 		}
 	}

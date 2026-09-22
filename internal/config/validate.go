@@ -19,6 +19,12 @@ import (
 func (c *Config) Validate() error {
 	var errs []error
 
+	// Empty residual floor is unset, not "below nit". Materialize the default
+	// so callers reading the field directly see what residualMaxSeverity uses.
+	if c.Review.Approve.Residual.MaxSeverity == "" {
+		c.Review.Approve.Residual.MaxSeverity = SeverityInfo
+	}
+
 	errs = append(errs, c.Models.validate()...)
 	errs = append(errs, c.Review.validate()...)
 	errs = append(errs, c.Linters.validate()...)
@@ -276,8 +282,6 @@ func (a Approve) validate() []error {
 
 func (r ApproveResidual) validate() []error {
 	max := r.MaxSeverity.normalized()
-	// Empty means unset: residualMaxSeverity floors at info. Unknown values
-	// never reach here via YAML (Severity.UnmarshalYAML rejects them first).
 	if max == "" {
 		return nil
 	}

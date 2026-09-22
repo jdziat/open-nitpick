@@ -258,6 +258,18 @@ func TestValidateAllowsResidualInfoFloor(t *testing.T) {
 	}
 }
 
+func TestValidateMaterializesEmptyResidualMaxSeverity(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.Approve.Residual.MaxSeverity = ""
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("empty residual floor: %v", err)
+	}
+	if cfg.Review.Approve.Residual.MaxSeverity != SeverityInfo {
+		t.Fatalf("MaxSeverity = %q, want info after Validate", cfg.Review.Approve.Residual.MaxSeverity)
+	}
+}
+
 func TestSeverityOrderingRespectsThresholds(t *testing.T) {
 	if !SeverityError.AtLeast(SeverityWarning) {
 		t.Error("error should outrank warning")
