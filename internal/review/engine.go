@@ -512,6 +512,11 @@ type Report struct {
 
 	// ResidualReason is the judge's short rationale, for logs only.
 	ResidualReason string
+
+	// prior is the earlier review read for incremental work. Residual thread
+	// resolve reuses it so a second PriorReview round trip is not owed when
+	// incremental already paid for the first.
+	prior *vcs.PriorReview
 }
 
 // Incremental describes a run that reviewed part of a change because an
@@ -692,6 +697,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// and the whole change is reviewed, which is also what happens on a first
 	// run.
 	prior := e.priorReview(ctx, ref)
+	report.prior = prior
 	if prior != nil {
 		report.PriorComments = len(prior.Comments)
 	}
@@ -1000,10 +1006,18 @@ func (e *Engine) priorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview 
 	return e.readPriorReview(ctx, ref)
 }
 
-// priorForResidualResolve loads the prior even when incremental narrowing is
-// off: residual approve still has to close standing threads after a yes.
-func (e *Engine) priorForResidualResolve(ctx context.Context, ref vcs.Ref) *vcs.PriorReview {
-	return e.readPriorReview(ctx, ref)
+// priorForResidualResolve returns the earlier review for residual thread
+// resolve. Reuses report.prior when incremental already loaded it; otherwise
+// reads once (incremental off returns nil from priorReview without a fetch).
+func (e *Engine) priorForResidualResolve(ctx context.Context, ref vcs.Ref, report *Report) *vcs.PriorReview {
+	if report != nil && report.prior != nil {
+		return report.prior
+	}
+	prior := e.readPriorReview(ctx, ref)
+	if report != nil {
+		report.prior = prior
+	}
+	return prior
 }
 
 func (e *Engine) readPriorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview {
@@ -1167,7 +1181,13 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 	if len(report.AlreadyReported) > 0 || !report.Complete() {
 		return nil
 	}
-	if !residual && len(findings) > 0 {
+	if residual {
+		// ResidualApprove is set only after the floor gate, but resolve must
+		// not close threads if that invariant ever fails.
+		if !residualWithinFloor(findings, residualMaxSeverity(e.Config)) {
+			return nil
+		}
+	} else if len(findings) > 0 {
 		return nil
 	}
 	resolver, ok := e.Provider.(vcs.ThreadResolver)
@@ -2054,7 +2074,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	if report.ResidualApprove {
 		// priorReview hides the prior when incremental is off; residual still
 		// needs it to close standing threads after a yes.
-		if prior := e.priorForResidualResolve(ctx, ref); prior != nil {
+		if prior := e.priorForResidualResolve(ctx, ref, report); prior != nil {
 			var skipped []bundle.Skip
 			if report.Plan != nil {
 				skipped = report.Plan.Skipped

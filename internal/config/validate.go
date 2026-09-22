@@ -276,6 +276,8 @@ func (a Approve) validate() []error {
 
 func (r ApproveResidual) validate() []error {
 	max := r.MaxSeverity.normalized()
+	// Empty means unset: residualMaxSeverity floors at info. Unknown values
+	// never reach here via YAML (Severity.UnmarshalYAML rejects them first).
 	if max == "" {
 		return nil
 	}

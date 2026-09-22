@@ -339,6 +339,19 @@ func TestResidualEmptyMaxSeverityFloorsAtInfo(t *testing.T) {
 	}
 }
 
+// TestResidualInvalidMaxSeverityFloorsAtInfo pins that a value validate would
+// reject cannot widen the residual floor at runtime.
+func TestResidualInvalidMaxSeverityFloorsAtInfo(t *testing.T) {
+	cfg := residualApproving(config.SeverityInfo)
+	cfg.Review.Approve.Residual.MaxSeverity = config.SeverityCritical
+	if got := residualMaxSeverity(cfg); got != config.SeverityInfo {
+		t.Fatalf("critical max_severity = %q, want info", got)
+	}
+	if residualWithinFloor([]Finding{{Severity: "warning"}}, residualMaxSeverity(cfg)) {
+		t.Fatal("warning must fail when an invalid floor collapses to info")
+	}
+}
+
 // TestResidualEligibleRequiresNonEmptyFindingsWithinFloor pins when the
 // judge and the event path may approve.
 func TestResidualEligibleRequiresNonEmptyFindingsWithinFloor(t *testing.T) {

@@ -71,11 +71,14 @@ func approveCompletenessGates(report *Report, cfg *config.Config) bool {
 }
 
 func residualMaxSeverity(cfg *config.Config) config.Severity {
-	max := cfg.Review.Approve.Residual.MaxSeverity
-	if max == "" {
+	switch cfg.Review.Approve.Residual.MaxSeverity {
+	case config.SeverityNit, config.SeverityInfo, config.SeverityWarning:
+		return cfg.Review.Approve.Residual.MaxSeverity
+	default:
+		// Empty (unset) and any value validate would have rejected both floor
+		// at info, never below nit.
 		return config.SeverityInfo
 	}
-	return max
 }
 
 // residualWithinFloor reports whether every published finding is at most max.
