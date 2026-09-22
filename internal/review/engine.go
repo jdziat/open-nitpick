@@ -2072,9 +2072,6 @@ func renderedFiles(plan *bundle.Plan) map[string]string {
 // publish renders and delivers the review.
 func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files diff.Files) error {
 	report.Routes = e.routeDecisions
-	if e.ModelUsage != nil {
-		report.ModelUsage = e.ModelUsage()
-	}
 	if e.AssessPractices != nil {
 		report.Practices = e.AssessPractices(ctx, ref, report.PullRequest, report)
 	}
@@ -2101,6 +2098,8 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 			report.ResidualReason = ""
 		}
 	}
+	// Snapshot once after the residual judge so usage includes that call.
+	// The meter is cumulative; practices copy ModelUsage from the finished report.
 	if e.ModelUsage != nil {
 		report.ModelUsage = e.ModelUsage()
 	}
