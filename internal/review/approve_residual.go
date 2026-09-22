@@ -63,7 +63,6 @@ func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
 		if ctx.Err() != nil {
 			return
 		}
-		report.Stages = append(report.Stages, StageStatus{Stage: "residual-approve", Reason: "judge-failed"})
 		e.log().Warn("residual approve judge failed; publishing as comment", "error", err)
 		return
 	}
