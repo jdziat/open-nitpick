@@ -19,12 +19,6 @@ import (
 func (c *Config) Validate() error {
 	var errs []error
 
-	// Empty residual floor is unset, not "below nit". Materialize the default
-	// so callers reading the field directly see what residualMaxSeverity uses.
-	if c.Review.Approve.Residual.MaxSeverity == "" {
-		c.Review.Approve.Residual.MaxSeverity = SeverityInfo
-	}
-
 	errs = append(errs, c.Models.validate()...)
 	errs = append(errs, c.Review.validate()...)
 	errs = append(errs, c.Linters.validate()...)

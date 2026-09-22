@@ -2070,6 +2070,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	if e.AssessPractices != nil {
 		report.Practices = e.AssessPractices(ctx, ref, report.PullRequest, report)
 	}
+	// Failures stay COMMENT: ResidualApprove is set only on a parsed yes.
 	e.judgeResidualApprove(ctx, report)
 	if report.ResidualApprove {
 		// priorReview hides the prior when incremental is off; residual still
