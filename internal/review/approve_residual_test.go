@@ -293,3 +293,26 @@ func TestResidualApproveHeldWhenPriorReadFails(t *testing.T) {
 		t.Fatalf("published event = %v, want COMMENT", provider.published)
 	}
 }
+
+// TestCleanApproveHeldWhenResidualPriorReadFails pins that a failed prior
+// read under residual also holds the zero-finding approve path.
+func TestCleanApproveHeldWhenResidualPriorReadFails(t *testing.T) {
+	model := &scriptedLLM{byPrompt: map[string]string{
+		"Review the following changes": `{"findings":[]}`,
+	}}
+	provider := &failingPriorProvider{stubProvider: stubProvider{diff: engineDiff}}
+	report, err := newEngine(t, model, provider, func(c *config.Config) {
+		c.Review.Approve.Enabled = true
+		c.Review.Approve.Residual.Enabled = true
+		c.Review.Incremental = false
+	}).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if !report.priorReadFailed {
+		t.Fatal("priorReadFailed must be set when PriorReview errors")
+	}
+	if provider.published == nil || provider.published.Event != vcs.EventComment {
+		t.Fatalf("published event = %v, want COMMENT", provider.published)
+	}
+}
