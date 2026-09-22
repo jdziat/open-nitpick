@@ -997,6 +997,16 @@ func (e *Engine) priorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview 
 	if e.Full || !e.Config.Review.Incremental {
 		return nil
 	}
+	return e.readPriorReview(ctx, ref)
+}
+
+// priorForResidualResolve loads the prior even when incremental narrowing is
+// off: residual approve still has to close standing threads after a yes.
+func (e *Engine) priorForResidualResolve(ctx context.Context, ref vcs.Ref) *vcs.PriorReview {
+	return e.readPriorReview(ctx, ref)
+}
+
+func (e *Engine) readPriorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview {
 	reader, ok := e.Provider.(vcs.PriorReviewer)
 	if !ok {
 		return nil
@@ -2037,28 +2047,25 @@ func renderedFiles(plan *bundle.Plan) map[string]string {
 // publish renders and delivers the review.
 func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files diff.Files) error {
 	report.Routes = e.routeDecisions
-	if e.ModelUsage != nil {
-		report.ModelUsage = e.ModelUsage()
-	}
 	if e.AssessPractices != nil {
 		report.Practices = e.AssessPractices(ctx, ref, report.PullRequest, report)
 	}
 	e.judgeResidualApprove(ctx, report)
 	if report.ResidualApprove {
-		if reader, ok := e.Provider.(vcs.PriorReviewer); ok {
-			prior, err := reader.PriorReview(ctx, ref)
-			if err != nil {
-				e.log().Warn("could not read prior review before residual approve", "error", err)
-			} else {
-				var skipped []bundle.Skip
-				if report.Plan != nil {
-					skipped = report.Plan.Skipped
-				}
-				if more := e.resolveClearedForApprove(ctx, ref, prior, report, report.Findings, skipped); len(more) > 0 {
-					report.Superseded = append(report.Superseded, more...)
-				}
+		// priorReview hides the prior when incremental is off; residual still
+		// needs it to close standing threads after a yes.
+		if prior := e.priorForResidualResolve(ctx, ref); prior != nil {
+			var skipped []bundle.Skip
+			if report.Plan != nil {
+				skipped = report.Plan.Skipped
+			}
+			if more := e.resolveClearedForApprove(ctx, ref, prior, report, report.Findings, skipped); len(more) > 0 {
+				report.Superseded = append(report.Superseded, more...)
 			}
 		}
+	}
+	if e.ModelUsage != nil {
+		report.ModelUsage = e.ModelUsage()
 	}
 	e.log().Info("publishing", "findings", len(report.Findings), "provider", e.Provider.Name())
 	review := Render(report, files, e.Config)

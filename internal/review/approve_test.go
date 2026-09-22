@@ -358,6 +358,9 @@ func TestResidualEligibleRequiresNonEmptyFindingsWithinFloor(t *testing.T) {
 	if !residualJudgeEligible(&Report{Findings: []Finding{{Severity: "info"}}, PriorComments: 2}, cfg) {
 		t.Error("judge eligibility must not require cleared standing threads")
 	}
+	if residualJudgeEligible(&Report{Findings: []Finding{{Severity: "info"}}, AlreadyReported: []Finding{{Severity: "info"}}}, cfg) {
+		t.Error("judge eligibility must refuse when findings already stand on the pull request")
+	}
 	if residualEligible(&Report{Findings: []Finding{{Severity: "info"}}, PriorComments: 2}, cfg) {
 		t.Error("residualEligible must still require cleared standing threads")
 	}

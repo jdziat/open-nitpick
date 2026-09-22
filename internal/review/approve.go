@@ -22,7 +22,9 @@ func reviewEvent(report *Report, cfg *config.Config) vcs.ReviewEvent {
 	if len(report.Findings) == 0 {
 		return vcs.EventApprove
 	}
-	if residualEligible(report, cfg) && report.ResidualApprove {
+	if cfg.Review.Approve.Residual.Enabled &&
+		report.ResidualApprove &&
+		residualWithinFloor(report.Findings, residualMaxSeverity(cfg)) {
 		return vcs.EventApprove
 	}
 	return vcs.EventComment
@@ -43,15 +45,11 @@ func approveHardGates(report *Report, cfg *config.Config) bool {
 	// standing, including a thread a person resolved by hand, which this tool
 	// cannot see: that refuses an approval it might have earned, and the
 	// direction to be wrong in is the one that publishes a comment.
-	standing := report.PriorComments > len(report.Superseded)
-	if report.ResidualApprove {
-		// Residual judged the published findings. AlreadyReported entries are
-		// the prior threads publish closes after a yes; only uncleared
-		// threads still block.
-		if standing {
-			return false
-		}
-	} else if len(report.AlreadyReported) > 0 || standing {
+	//
+	// AlreadyReported is always load-bearing: those findings recurred and are
+	// still on the pull request. Residual may clear other standing threads
+	// after a yes, but it must not approve while withheld recurrences remain.
+	if len(report.AlreadyReported) > 0 || report.PriorComments > len(report.Superseded) {
 		return false
 	}
 	// A run whose batches partly failed published no findings for the files it
@@ -106,14 +104,17 @@ func residualEligible(report *Report, cfg *config.Config) bool {
 	return residualWithinFloor(report.Findings, residualMaxSeverity(cfg))
 }
 
-// residualJudgeEligible is residualEligible without the standing-thread gate.
-// The judge runs first; publish then closes standing threads when it says yes
-// so approveHardGates can pass.
+// residualJudgeEligible is the pre-judge gate: same completeness rules as
+// approveHardGates, but standing threads are allowed so the judge can run
+// before publish closes them.
 func residualJudgeEligible(report *Report, cfg *config.Config) bool {
 	if cfg == nil || !cfg.Review.Approve.Enabled || !cfg.Review.Approve.Residual.Enabled || report == nil {
 		return false
 	}
 	if len(report.Findings) == 0 {
+		return false
+	}
+	if len(report.AlreadyReported) > 0 {
 		return false
 	}
 	if report.Practices != nil && report.Practices.ExitCode() != 0 {
