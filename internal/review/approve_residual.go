@@ -81,25 +81,24 @@ func renderForResidualJudge(cfg *config.Config, findings []Finding) string {
 	if cfg != nil {
 		nitpick = cfg.Persona.Nitpick
 	}
-	max := config.SeverityInfo
+	max := config.ResidualMaxSeverityDefault
 	if cfg != nil {
 		max = residualMaxSeverity(cfg)
 	}
 	fmt.Fprintf(&b, "Nitpick level: %s\nResidual max severity: %s\n\nFindings:\n", nitpick, max)
 	for i, f := range findings {
-		title := fence.Defang(strings.ReplaceAll(strings.TrimSpace(f.Title), "\n", " "))
-		path := fence.Defang(strings.ReplaceAll(strings.TrimSpace(f.Path), "\n", " "))
-		class := fence.Defang(strings.ReplaceAll(strings.TrimSpace(f.Class), "\n", " "))
-		sev := fence.Defang(strings.ReplaceAll(strings.TrimSpace(f.Severity), "\n", " "))
-		fmt.Fprintf(&b, "%d. [%s/%s] %s:%d  %s\n", i+1, sev, class, path, f.Line, title)
+		fmt.Fprintf(&b, "%d. [%s/%s] %s:%d  %s\n", i+1, residualJudgeField(f.Severity), residualJudgeField(f.Class), residualJudgeField(f.Path), f.Line, residualJudgeField(f.Title))
 		if r := strings.TrimSpace(f.Rationale); r != "" {
 			runes := []rune(r)
 			if len(runes) > 240 {
 				r = string(runes[:240]) + "..."
 			}
-			r = fence.Defang(strings.ReplaceAll(r, "\n", " "))
-			fmt.Fprintf(&b, "   %s\n", r)
+			fmt.Fprintf(&b, "   %s\n", residualJudgeField(r))
 		}
 	}
 	return b.String()
+}
+
+func residualJudgeField(s string) string {
+	return fence.Defang(strings.ReplaceAll(strings.TrimSpace(s), "\n", " "))
 }

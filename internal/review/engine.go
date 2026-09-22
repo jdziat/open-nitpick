@@ -1227,6 +1227,11 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 		for _, p := range report.Incremental.Reviewed {
 			reread[p] = true
 		}
+	} else {
+		// Incremental off reviewed the whole change; Files is the reread set.
+		for _, p := range report.Files.Paths() {
+			reread[p] = true
+		}
 	}
 	var candidates []vcs.PriorComment
 	var ids []int64

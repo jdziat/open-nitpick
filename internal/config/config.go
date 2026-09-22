@@ -736,6 +736,9 @@ func (a ApproveResidual) MaxSeverityValues() []string {
 	return ResidualMaxSeverities()
 }
 
+// ResidualMaxSeverityDefault is the residual floor when max_severity is unset.
+const ResidualMaxSeverityDefault = SeverityInfo
+
 // ResidualMaxSeverities is the residual floor set, shared by validation and
 // the generated reference.
 func ResidualMaxSeverities() []string {

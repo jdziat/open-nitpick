@@ -274,7 +274,7 @@ func (a Approve) validate(minSeverity Severity) []error {
 	if a.Residual.Enabled {
 		floor := a.Residual.MaxSeverity.normalized()
 		if floor == "" {
-			floor = SeverityInfo
+			floor = ResidualMaxSeverityDefault
 		}
 		if floor.Valid() && minSeverity.Valid() && floor.Rank() < minSeverity.Rank() {
 			errs = append(errs, fmt.Errorf(

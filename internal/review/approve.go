@@ -75,7 +75,7 @@ func residualMaxSeverity(cfg *config.Config) config.Severity {
 	default:
 		// Empty (unset) and any value validate would have rejected both floor
 		// at info, never below nit.
-		return config.SeverityInfo
+		return config.ResidualMaxSeverityDefault
 	}
 }
 

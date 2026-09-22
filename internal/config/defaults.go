@@ -125,7 +125,7 @@ func Defaults() *Config {
 			Approve: Approve{
 				// Residual max_severity is stated so an operator who turns
 				// residual on without naming a floor gets info, not zero.
-				Residual: ApproveResidual{MaxSeverity: SeverityInfo},
+				Residual: ApproveResidual{MaxSeverity: ResidualMaxSeverityDefault},
 			},
 		},
 		Persona: DefaultPersona(),
