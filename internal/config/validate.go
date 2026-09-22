@@ -276,6 +276,8 @@ func (a Approve) validate() []error {
 
 func (r ApproveResidual) validate() []error {
 	max := r.MaxSeverity.normalized()
+	// Empty is unset: Defaults and residualMaxSeverity floor at info. Rejecting
+	// it here would force every overlay to restate the default.
 	if max == "" {
 		return nil
 	}
@@ -284,7 +286,7 @@ func (r ApproveResidual) validate() []error {
 			return nil
 		}
 	}
-	return []error{fmt.Errorf("review.approve.residual.max_severity %q must be nit, info, or warning", r.MaxSeverity)}
+	return []error{fmt.Errorf("review.approve.residual.max_severity %q must be %s", r.MaxSeverity, strings.Join(ResidualMaxSeverities(), ", "))}
 }
 
 func (l Linters) validate() []error {

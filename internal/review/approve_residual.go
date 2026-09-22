@@ -32,14 +32,16 @@ const residualApproveSchema = `{
 // judgeResidualApprove asks the triage model whether residual findings still
 // allow APPROVE. Failures leave ResidualApprove false (comment).
 func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
-	if report == nil || !residualJudgeEligible(report, e.Config) {
+	if report == nil || e.Config == nil || !residualJudgeEligible(report, e.Config) {
 		return
 	}
 	if e.Roles == nil || e.Roles.Triage == nil {
 		return
 	}
 
-	p, err := prompt.Build(prompt.NameApproveResidual, prompt.Options{})
+	p, err := prompt.Build(prompt.NameApproveResidual, prompt.Options{
+		PersonaText: prompt.Persona(e.Config.Persona),
+	})
 	if err != nil {
 		e.log().Warn("residual approve prompt failed; publishing as comment", "error", err)
 		return
@@ -57,6 +59,9 @@ func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
 	}
 	result, err := llm.Extract[residualJudgment](ctx, e.Roles.Triage, msgs, schema)
 	if err != nil {
+		if ctx.Err() != nil {
+			return
+		}
 		e.log().Warn("residual approve judge failed; publishing as comment", "error", err)
 		return
 	}
@@ -81,12 +86,14 @@ func renderForResidualJudge(cfg *config.Config, findings []Finding) string {
 	}
 	fmt.Fprintf(&b, "Nitpick level: %s\nResidual max severity: %s\n\nFindings:\n", nitpick, max)
 	for i, f := range findings {
-		fmt.Fprintf(&b, "%d. [%s/%s] %s:%d  %s\n", i+1, f.Severity, f.Class, f.Path, f.Line, f.Title)
+		title := strings.ReplaceAll(strings.TrimSpace(f.Title), "\n", " ")
+		fmt.Fprintf(&b, "%d. [%s/%s] %s:%d  %s\n", i+1, f.Severity, f.Class, f.Path, f.Line, title)
 		if r := strings.TrimSpace(f.Rationale); r != "" {
 			runes := []rune(r)
 			if len(runes) > 240 {
 				r = string(runes[:240]) + "..."
 			}
+			r = strings.ReplaceAll(r, "\n", " ")
 			fmt.Fprintf(&b, "   %s\n", r)
 		}
 	}

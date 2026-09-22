@@ -1016,6 +1016,11 @@ func (e *Engine) priorForResidualResolve(ctx context.Context, ref vcs.Ref, repor
 	prior := e.readPriorReview(ctx, ref)
 	if report != nil {
 		report.prior = prior
+		// Incremental off never set PriorComments; residual still needs the
+		// count so standing threads refuse APPROVE after a judge yes.
+		if prior != nil && report.PriorComments == 0 {
+			report.PriorComments = len(prior.Comments)
+		}
 	}
 	return prior
 }
