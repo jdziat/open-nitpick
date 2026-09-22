@@ -12,6 +12,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/fence"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/prompt"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 // residualJudgment is the triage model's answer for near-clean approve.
