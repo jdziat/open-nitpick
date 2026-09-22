@@ -258,6 +258,19 @@ func TestValidateRejectsResidualMaxSeverityTypo(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsResidualFloorBelowMinSeverity(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.MinSeverity = SeverityInfo
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.Residual.Enabled = true
+	cfg.Review.Approve.Residual.MaxSeverity = SeverityNit
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "below review.min_severity") {
+		t.Fatalf("want residual floor below min rejection, got %v", err)
+	}
+}
+
 func TestValidateAllowsResidualInfoFloor(t *testing.T) {
 	cfg := Defaults()
 	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}

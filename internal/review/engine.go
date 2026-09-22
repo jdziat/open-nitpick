@@ -2072,10 +2072,14 @@ func renderedFiles(plan *bundle.Plan) map[string]string {
 // publish renders and delivers the review.
 func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files diff.Files) error {
 	report.Routes = e.routeDecisions
+	if e.ModelUsage != nil {
+		report.ModelUsage = e.ModelUsage()
+	}
 	if e.AssessPractices != nil {
 		report.Practices = e.AssessPractices(ctx, ref, report.PullRequest, report)
 	}
 	// Failures stay COMMENT: ResidualApprove is set only on a parsed yes.
+	judgeRan := residualJudgeEligible(report, e.Config)
 	e.judgeResidualApprove(ctx, report)
 	if report.ResidualApprove {
 		// priorReview hides the prior when incremental is off; residual still
@@ -2098,9 +2102,8 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 			report.ResidualReason = ""
 		}
 	}
-	// Snapshot once after the residual judge so usage includes that call.
-	// The meter is cumulative; practices copy ModelUsage from the finished report.
-	if e.ModelUsage != nil {
+	// Refresh only when the judge could have added usage; the meter is cumulative.
+	if judgeRan && e.ModelUsage != nil {
 		report.ModelUsage = e.ModelUsage()
 	}
 	e.log().Info("publishing", "findings", len(report.Findings), "provider", e.Provider.Name())

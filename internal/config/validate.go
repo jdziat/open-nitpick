@@ -260,17 +260,28 @@ func (r Review) validate() []error {
 			errs = append(errs, fmt.Errorf("review.ignore[%d]: invalid glob %q", i, pattern))
 		}
 	}
-	errs = append(errs, r.Approve.validate()...)
+	errs = append(errs, r.Approve.validate(r.MinSeverity)...)
 
 	return errs
 }
 
-func (a Approve) validate() []error {
+func (a Approve) validate(minSeverity Severity) []error {
 	var errs []error
 	if a.Residual.Enabled && !a.Enabled {
 		errs = append(errs, errors.New("review.approve.residual.enabled requires review.approve.enabled"))
 	}
 	errs = append(errs, a.Residual.validate()...)
+	if a.Residual.Enabled {
+		floor := a.Residual.MaxSeverity.normalized()
+		if floor == "" {
+			floor = SeverityInfo
+		}
+		if floor.Valid() && minSeverity.Valid() && floor.Rank() < minSeverity.Rank() {
+			errs = append(errs, fmt.Errorf(
+				"review.approve.residual.max_severity %q is below review.min_severity %q; residual would never see published findings",
+				floor, minSeverity.normalized()))
+		}
+	}
 	return errs
 }
 
