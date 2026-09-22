@@ -697,11 +697,23 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// and the whole change is reviewed, which is also what happens on a first
 	// run.
 	prior := e.priorReview(ctx, ref)
+	// Residual approve still needs the prior when incremental is off: without
+	// it, withholdAlreadyReported cannot see recurrences and standing threads
+	// are invisible until after the judge has already run.
+	if prior == nil && e.Config.Review.Approve.Enabled && e.Config.Review.Approve.Residual.Enabled {
+		prior = e.readPriorReview(ctx, ref)
+	}
 	report.prior = prior
 	if prior != nil {
 		report.PriorComments = len(prior.Comments)
 	}
-	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, prior)
+	// Narrowing still follows review.incremental: a residual-only prior read
+	// must not shrink the change.
+	narrowPrior := prior
+	if !e.Config.Review.Incremental || e.Full {
+		narrowPrior = nil
+	}
+	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, narrowPrior)
 	report.Files = files
 
 	fetch := func(ctx context.Context, path string) ([]byte, error) {
@@ -2120,7 +2132,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 		}
 		// reviewEvent still refuses APPROVE while threads stand; clear the
 		// flag so a granted log does not outlive a held event.
-		if report.ResidualApprove && report.PriorComments > len(report.Superseded) {
+		if report.ResidualApprove && standingThreadsRemain(report) {
 			e.log().Info("residual approve held; standing threads remain",
 				"prior", report.PriorComments, "superseded", len(report.Superseded))
 			report.ResidualApprove = false

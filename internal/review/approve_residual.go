@@ -39,7 +39,7 @@ func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
 	}
 	// Standing threads need a ThreadResolver after a yes; without one the
 	// judge cannot earn APPROVE, so skip the model call.
-	if report.PriorComments > len(report.Superseded) {
+	if standingThreadsRemain(report) {
 		if _, ok := e.Provider.(vcs.ThreadResolver); !ok {
 			return
 		}
@@ -80,7 +80,7 @@ func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
 	}
 	report.ResidualApprove = true
 	report.ResidualReason = strings.TrimSpace(result.Reason)
-	e.log().Info("residual approve granted", "reason", report.ResidualReason, "findings", len(report.Findings))
+	e.log().Info("residual judge said yes", "reason", report.ResidualReason, "findings", len(report.Findings))
 }
 
 func renderForResidualJudge(cfg *config.Config, findings []Finding) string {

@@ -47,10 +47,16 @@ func approveHardGates(report *Report, cfg *config.Config) bool {
 	// AlreadyReported is always load-bearing: those findings recurred and are
 	// still on the pull request. Residual may clear other standing threads
 	// after a yes, but it must not approve while withheld recurrences remain.
-	if len(report.AlreadyReported) > 0 || report.PriorComments > len(report.Superseded) {
+	if len(report.AlreadyReported) > 0 || standingThreadsRemain(report) {
 		return false
 	}
 	return true
+}
+
+// standingThreadsRemain reports whether earlier comments still stand after
+// this run's supersedes.
+func standingThreadsRemain(report *Report) bool {
+	return report.PriorComments > len(report.Superseded)
 }
 
 // approveCompletenessGates are the non-standing checks shared by the event
