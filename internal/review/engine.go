@@ -1018,6 +1018,7 @@ func (e *Engine) priorForResidualResolve(ctx context.Context, ref vcs.Ref, repor
 	}
 	prior, err := e.readPriorReviewResult(ctx, ref)
 	if err != nil {
+		e.log().Warn("could not read earlier reviews for residual resolve", "error", err)
 		return nil, false
 	}
 	if report != nil {
