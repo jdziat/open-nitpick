@@ -41,9 +41,14 @@ func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
 		return
 	}
 	// Standing threads need a ThreadResolver after a yes; without one the
-	// judge cannot earn APPROVE, so skip the model call.
+	// judge cannot earn APPROVE, so skip the model call. Skip also when
+	// nothing residual can close: unread or plan-skipped leftovers still
+	// hold COMMENT, and a yes would only be discarded.
 	if standingThreadsRemain(report) {
 		if _, ok := e.Provider.(vcs.ThreadResolver); !ok {
+			return
+		}
+		if len(residualStandingForJudge(report)) == 0 {
 			return
 		}
 	}

@@ -1333,7 +1333,9 @@ func residualReread(report *Report) map[string]bool {
 }
 
 // residualStandingForJudge lists earlier comments residual would close after a
-// yes: on a path this run re-read, and not already superseded.
+// yes: on a path this run re-read, not plan-skipped, and not already superseded.
+// The set must match resolveClearedForApprove's residual candidates so the
+// judge is not shown threads publish will leave open.
 func residualStandingForJudge(report *Report) []vcs.PriorComment {
 	if report == nil || report.prior == nil {
 		return nil
@@ -1343,9 +1345,15 @@ func residualStandingForJudge(report *Report) []vcs.PriorComment {
 	for _, c := range report.Superseded {
 		done[c.ID] = true
 	}
+	excluded := map[string]bool{}
+	if report.Plan != nil {
+		for _, skip := range report.Plan.Skipped {
+			excluded[skip.Path] = true
+		}
+	}
 	var out []vcs.PriorComment
 	for _, c := range report.prior.Comments {
-		if c.ID == 0 || done[c.ID] || !reread[c.Path] {
+		if c.ID == 0 || done[c.ID] || excluded[c.Path] || !reread[c.Path] {
 			continue
 		}
 		out = append(out, c)

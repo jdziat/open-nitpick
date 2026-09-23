@@ -6,7 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
@@ -275,7 +277,8 @@ func TestResidualApproveResolvesStandingWhenIncrementalOff(t *testing.T) {
 }
 
 // TestResidualApproveDoesNotClearUnreadPriorThread pins that a Line-zero
-// comment on a file this run did not re-read stays open and holds COMMENT.
+// comment on a file this run did not re-read stays open and holds COMMENT,
+// without spending a residual judge call that cannot earn APPROVE.
 func TestResidualApproveDoesNotClearUnreadPriorThread(t *testing.T) {
 	f := Finding{
 		Path: "app.go", Line: 4, Severity: "info", Class: "correctness",
@@ -284,7 +287,7 @@ func TestResidualApproveDoesNotClearUnreadPriorThread(t *testing.T) {
 	model := &scriptedLLM{byPrompt: map[string]string{
 		"Review the following changes":             mustJSON(t, Result{Findings: []Finding{f}}),
 		"triaging findings":                        mustJSON(t, TriageResult{Verdicts: verdictsFor([]Finding{f})}),
-		"You decide whether a pull request review": `{"approve":true,"reason":"advisory only"}`,
+		"You decide whether a pull request review": `{"approve":true,"reason":"must not run"}`,
 	}}
 	provider := &resolvingProvider{incrementalProvider: incrementalProvider{
 		stubProvider: stubProvider{diff: engineDiff},
@@ -302,11 +305,16 @@ func TestResidualApproveDoesNotClearUnreadPriorThread(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Review: %v", err)
 	}
+	for _, p := range model.prompts() {
+		if strings.Contains(p, "You decide whether a pull request review") {
+			t.Fatal("judge must not run when no standing thread is closable")
+		}
+	}
 	if len(provider.resolved) != 0 {
 		t.Fatalf("resolved unread prior thread ids = %v, want none", provider.resolved)
 	}
 	if report.ResidualApprove {
-		t.Fatal("ResidualApprove must clear when an unread prior thread remains")
+		t.Fatal("ResidualApprove must stay false when an unread prior thread remains")
 	}
 	if provider.published == nil || provider.published.Event != vcs.EventComment {
 		t.Fatalf("published event = %v, want COMMENT", provider.published)
@@ -340,6 +348,24 @@ func TestResidualApproveHeldWhenPriorReadFails(t *testing.T) {
 	}
 	if provider.published == nil || provider.published.Event != vcs.EventComment {
 		t.Fatalf("published event = %v, want COMMENT", provider.published)
+	}
+}
+
+// TestResidualStandingForJudgeOmitsPlanSkipped pins that a prior on a
+// plan-skipped path is not shown to the judge: resolveClearedForApprove
+// will not close it either.
+func TestResidualStandingForJudgeOmitsPlanSkipped(t *testing.T) {
+	report := &Report{
+		Files: diff.Files{{Path: "app.go"}, {Path: "skip.go"}},
+		Plan:  &bundle.Plan{Skipped: []bundle.Skip{{Path: "skip.go", Reason: bundle.ReasonIgnored}}},
+		prior: &vcs.PriorReview{Comments: []vcs.PriorComment{
+			{ID: 1, Path: "app.go", Line: 4, Class: "style"},
+			{ID: 2, Path: "skip.go", Line: 1, Class: "correctness", Body: "on an ignored file"},
+		}},
+	}
+	got := residualStandingForJudge(report)
+	if len(got) != 1 || got[0].ID != 1 {
+		t.Fatalf("standing = %+v, want only the re-read non-skipped comment", got)
 	}
 }
 
