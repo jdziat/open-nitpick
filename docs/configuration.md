@@ -1119,8 +1119,10 @@ remain, but every published finding is at most
 `info`, `warning`), the triage model judges whether those residuals are still
 non-blocking at the configured `persona.nitpick` level. A yes becomes APPROVE;
 a no, a model error, or any finding above the floor stays a comment. Residual
-cannot be enabled without `review.approve.enabled`, and the floor must be at
-least `review.min_severity` or Validate refuses it as unreachable. The engine
+cannot be enabled without `review.approve.enabled`. The floor must be at
+least `review.min_severity` or Validate refuses it as unreachable, and when
+`review.fail_on` is a finding severity the floor must sit strictly below it
+so residual cannot APPROVE a run that still fails the gate. The engine
 path is `judgeResidualApprove` in package `review`.
 
 The GitHub App or token needs Pull requests write, which posting reviews

@@ -60,7 +60,7 @@ func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
 	}
 	msgs := []llms.Message{
 		{Role: llms.RoleSystem, Content: p.String()},
-		{Role: llms.RoleUser, Content: renderForResidualJudge(e.Config, report.Findings)},
+		{Role: llms.RoleUser, Content: renderForResidualJudge(e.Config, report.Findings, residualStandingForJudge(report))},
 	}
 	schema, err := schemaOption("residual_approve", func() (json.RawMessage, error) {
 		return json.RawMessage(residualApproveSchema), nil
@@ -86,7 +86,7 @@ func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
 	e.log().Info("residual judge said yes", "reason", report.ResidualReason, "findings", len(report.Findings))
 }
 
-func renderForResidualJudge(cfg *config.Config, findings []Finding) string {
+func renderForResidualJudge(cfg *config.Config, findings []Finding, standing []vcs.PriorComment) string {
 	var b strings.Builder
 	nitpick := config.NitpickNormal
 	if cfg != nil {
@@ -105,6 +105,20 @@ func renderForResidualJudge(cfg *config.Config, findings []Finding) string {
 				r = string(runes[:240]) + "..."
 			}
 			fmt.Fprintf(&b, "   %s\n", residualJudgeField(r))
+		}
+	}
+	if len(standing) == 0 {
+		return b.String()
+	}
+	b.WriteString("\nStanding earlier comments this run would close on approve:\n")
+	for i, c := range standing {
+		fmt.Fprintf(&b, "%d. [%s] %s:%d\n", i+1, residualJudgeField(c.Class), residualJudgeField(c.Path), c.Line)
+		if body := strings.TrimSpace(c.Body); body != "" {
+			runes := []rune(body)
+			if len(runes) > 240 {
+				body = string(runes[:240]) + "..."
+			}
+			fmt.Fprintf(&b, "   %s\n", residualJudgeField(body))
 		}
 	}
 	return b.String()

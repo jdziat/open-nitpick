@@ -271,6 +271,31 @@ func TestValidateRejectsResidualFloorBelowMinSeverity(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsResidualFloorAtOrAboveFailOn(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.FailOn = SeverityInfo
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.Residual.Enabled = true
+	cfg.Review.Approve.Residual.MaxSeverity = SeverityInfo
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "review.fail_on") {
+		t.Fatalf("want residual floor vs fail_on rejection, got %v", err)
+	}
+}
+
+func TestValidateAllowsResidualFloorBelowFailOn(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.FailOn = SeverityWarning
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.Residual.Enabled = true
+	cfg.Review.Approve.Residual.MaxSeverity = SeverityInfo
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("info floor below fail_on warning: %v", err)
+	}
+}
+
 func TestValidateAllowsResidualInfoFloor(t *testing.T) {
 	cfg := Defaults()
 	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}

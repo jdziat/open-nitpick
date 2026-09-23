@@ -260,12 +260,12 @@ func (r Review) validate() []error {
 			errs = append(errs, fmt.Errorf("review.ignore[%d]: invalid glob %q", i, pattern))
 		}
 	}
-	errs = append(errs, r.Approve.validate(r.MinSeverity)...)
+	errs = append(errs, r.Approve.validate(r.MinSeverity, r.FailOn)...)
 
 	return errs
 }
 
-func (a Approve) validate(minSeverity Severity) []error {
+func (a Approve) validate(minSeverity, failOn Severity) []error {
 	var errs []error
 	if a.Residual.Enabled && !a.Enabled {
 		errs = append(errs, errors.New("review.approve.residual.enabled requires review.approve.enabled"))
@@ -280,6 +280,14 @@ func (a Approve) validate(minSeverity Severity) []error {
 			errs = append(errs, fmt.Errorf(
 				"review.approve.residual.max_severity %q is below review.min_severity %q; residual would never see published findings",
 				floor, minSeverity.normalized()))
+		}
+		// fail_on is the CLI/CI gate. A floor at or above it lets residual
+		// APPROVE a run that still exits non-zero. none is not a finding
+		// severity, so it does not constrain the floor.
+		if floor.Valid() && failOn.Valid() && failOn != SeverityNone && floor.Rank() >= failOn.Rank() {
+			errs = append(errs, fmt.Errorf(
+				"review.approve.residual.max_severity %q meets or exceeds review.fail_on %q; residual would APPROVE a run that fails the gate",
+				floor, failOn.normalized()))
 		}
 	}
 	return errs

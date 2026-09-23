@@ -1265,26 +1265,22 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 	for _, skip := range skipped {
 		excluded[skip.Path] = true
 	}
-	reread := map[string]bool{}
-	if report.Incremental != nil {
-		for _, p := range report.Incremental.Reviewed {
-			reread[p] = true
-		}
-	} else {
-		// Incremental off reviewed the whole change; Files is the reread set.
-		for _, p := range report.Files.Paths() {
-			reread[p] = true
-		}
-	}
+	reread := residualReread(report)
 	var candidates []vcs.PriorComment
 	var ids []int64
 	for _, c := range prior.Comments {
 		if c.ID == 0 || done[c.ID] || excluded[c.Path] {
 			continue
 		}
-		// Same eligibility as superseded: only close what this run re-read, or
-		// a comment the forge no longer places on the diff.
-		if c.Line != 0 && !reread[c.Path] {
+		// Clean approve may close a comment the forge no longer places, even
+		// off the reread set: nothing remains to re-check. Residual must not:
+		// that would clear a prior warning the judge never saw on a file this
+		// run did not read.
+		if residual {
+			if !reread[c.Path] {
+				continue
+			}
+		} else if c.Line != 0 && !reread[c.Path] {
 			continue
 		}
 		candidates = append(candidates, c)
@@ -1313,6 +1309,46 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 	}
 	if len(out) > 0 {
 		e.log().Info("resolved comments before approval", "count", len(out))
+	}
+	return out
+}
+
+// residualReread is the set of paths this run actually reviewed, for residual
+// thread close and for what the judge is shown as standing leftovers.
+func residualReread(report *Report) map[string]bool {
+	reread := map[string]bool{}
+	if report == nil {
+		return reread
+	}
+	if report.Incremental != nil {
+		for _, p := range report.Incremental.Reviewed {
+			reread[p] = true
+		}
+		return reread
+	}
+	for _, p := range report.Files.Paths() {
+		reread[p] = true
+	}
+	return reread
+}
+
+// residualStandingForJudge lists earlier comments residual would close after a
+// yes: on a path this run re-read, and not already superseded.
+func residualStandingForJudge(report *Report) []vcs.PriorComment {
+	if report == nil || report.prior == nil {
+		return nil
+	}
+	reread := residualReread(report)
+	done := map[int64]bool{}
+	for _, c := range report.Superseded {
+		done[c.ID] = true
+	}
+	var out []vcs.PriorComment
+	for _, c := range report.prior.Comments {
+		if c.ID == 0 || done[c.ID] || !reread[c.Path] {
+			continue
+		}
+		out = append(out, c)
 	}
 	return out
 }

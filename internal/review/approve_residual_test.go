@@ -262,6 +262,55 @@ func TestResidualApproveResolvesStandingWhenIncrementalOff(t *testing.T) {
 	if provider.published == nil || provider.published.Event != vcs.EventApprove {
 		t.Fatalf("published event = %v, want APPROVE", provider.published)
 	}
+	sawStanding := false
+	for _, p := range model.prompts() {
+		if strings.Contains(p, "Standing earlier comments this run would close on approve") {
+			sawStanding = true
+			break
+		}
+	}
+	if !sawStanding {
+		t.Fatal("judge must see standing comments it would close")
+	}
+}
+
+// TestResidualApproveDoesNotClearUnreadPriorThread pins that a Line-zero
+// comment on a file this run did not re-read stays open and holds COMMENT.
+func TestResidualApproveDoesNotClearUnreadPriorThread(t *testing.T) {
+	f := Finding{
+		Path: "app.go", Line: 4, Severity: "info", Class: "correctness",
+		Title: "document the ignored error", Rationale: "the blank identifier hides a failure mode",
+	}
+	model := &scriptedLLM{byPrompt: map[string]string{
+		"Review the following changes":             mustJSON(t, Result{Findings: []Finding{f}}),
+		"triaging findings":                        mustJSON(t, TriageResult{Verdicts: verdictsFor([]Finding{f})}),
+		"You decide whether a pull request review": `{"approve":true,"reason":"advisory only"}`,
+	}}
+	provider := &resolvingProvider{incrementalProvider: incrementalProvider{
+		stubProvider: stubProvider{diff: engineDiff},
+		head:         "beef02",
+		prior: &vcs.PriorReview{Head: "beef01", Comments: []vcs.PriorComment{
+			{ID: 9, Path: "other.go", Line: 0, Fingerprint: "stale", Class: "correctness", Body: "old warning on a file this run did not read"},
+		}},
+	}}
+	report, err := newEngine(t, model, provider, func(c *config.Config) {
+		c.Review.Approve.Enabled = true
+		c.Review.Approve.Residual.Enabled = true
+		c.Review.Incremental = false
+		c.Review.MinSeverity = config.SeverityInfo
+	}).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if len(provider.resolved) != 0 {
+		t.Fatalf("resolved unread prior thread ids = %v, want none", provider.resolved)
+	}
+	if report.ResidualApprove {
+		t.Fatal("ResidualApprove must clear when an unread prior thread remains")
+	}
+	if provider.published == nil || provider.published.Event != vcs.EventComment {
+		t.Fatalf("published event = %v, want COMMENT", provider.published)
+	}
 }
 
 // TestResidualApproveHeldWhenPriorReadFails pins that a PriorReviewer error
