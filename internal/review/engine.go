@@ -102,8 +102,12 @@ type Engine struct {
 	// SkipDraft is the operator flag for leaving draft pull requests alone.
 	SkipDraft bool
 
-	// Full bypasses incremental history on an explicit operator request.
+	// Full bypasses result reuse on an explicit operator request.
 	Full bool
+
+	// Resume reuses successful model requests while rerunning downstream checks.
+	Resume   bool
+	progress *reviewProgress
 }
 
 // LinterRunner produces deterministic findings for the changed files.
@@ -375,6 +379,11 @@ const (
 
 // Report is the outcome of a review.
 type Report struct {
+	// Progress carries successful model results; downstream checks run again.
+	Progress json.RawMessage
+	// ReusedRequests counts model requests recovered from an earlier review.
+	ReusedRequests int
+
 	// Practices records selected engineering checks alongside the code review.
 	Practices *practices.Report
 	// ModelUsage retains reported usage independently of findings and gating.
@@ -707,11 +716,15 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// and the whole change is reviewed, which is also what happens on a first
 	// run.
 	prior := e.priorReview(ctx, ref)
+	if e.Resume && e.priorReadErr != nil {
+		report.priorReadFailed = true
+	}
+	e.startProgress(pr, prior)
 	// Residual approve still needs the prior when incremental is off: without
 	// it, withholdAlreadyReported cannot see recurrences and standing threads
 	// are invisible until after the judge has already run.
 	if prior == nil && e.Config.Review.Approve.Enabled && e.Config.Review.Approve.Residual.Enabled {
-		if e.Config.Review.Incremental && !e.Full {
+		if e.Resume || (e.Config.Review.Incremental && !e.Full) {
 			// priorReview already attempted the read; reuse its failure.
 			if e.priorReadErr != nil {
 				report.priorReadFailed = true
@@ -730,10 +743,10 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	if prior != nil {
 		report.PriorComments = len(prior.Comments)
 	}
-	// Narrowing still follows review.incremental: a residual-only prior read
-	// must not shrink the change.
+	// Resume keeps the full plan for downstream checks; model requests reuse
+	// matching results later. A residual-only prior read must not shrink it.
 	narrowPrior := prior
-	if !e.Config.Review.Incremental || e.Full {
+	if !e.Resume && (!e.Config.Review.Incremental || e.Full) {
 		narrowPrior = nil
 	}
 	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, narrowPrior)
@@ -1037,7 +1050,7 @@ func validateSuggestions(findings []Finding, files diff.Files) []Finding {
 // what every run did before this existed, while the cost of guessing would be
 // a review that skipped files on the strength of a request that failed.
 func (e *Engine) priorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview {
-	if e.Full || !e.Config.Review.Incremental {
+	if !e.Resume && (e.Full || !e.Config.Review.Incremental) {
 		return nil
 	}
 	return e.readPriorReview(ctx, ref)
@@ -1096,14 +1109,9 @@ func (e *Engine) readPriorReviewResult(ctx context.Context, ref vcs.Ref) (*vcs.P
 	return prior, nil
 }
 
-// narrowToChangedSince restricts a diff to the files that moved since the last
-// run this tool made on the pull request.
-//
-// It returns the files unchanged, and no note, whenever the question cannot be
-// answered: no earlier run, an earlier run that did not record its head, the
-// same head as before, a provider that cannot compare, or a force push that
-// made the earlier head unreachable. Every one of those is a full review, and
-// the note is what tells the reader the difference.
+// narrowToChangedSince keeps full scope for standing findings and request-level
+// resume. Otherwise it narrows to changed files when the prior revision can be
+// compared; missing history or an unreachable revision keeps the full diff.
 func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, files diff.Files, prior *vcs.PriorReview) (diff.Files, *Incremental) {
 	if prior == nil || pr == nil {
 		return files, nil
@@ -1114,7 +1122,7 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 	if len(prior.Comments) > 0 {
 		return files, &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true}
 	}
-	if prior.Head == "" {
+	if e.Resume || prior.Head == "" {
 		return files, nil
 	}
 	if prior.Head == pr.HeadSHA {
@@ -1632,9 +1640,17 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		return nil, err
 	}
 
-	result, err := llm.Extract[Result](ctx, client, msgs, schema)
-	if err != nil {
-		return nil, err
+	key := e.progress.key(client, base, body.String())
+	cached, reused := e.progress.load(key)
+	result := Result{Findings: cached}
+	if reused {
+		e.log().Info("reusing completed model review", "files", b.Paths(), "model", client.String())
+	} else {
+		result, err = llm.Extract[Result](ctx, client, msgs, schema)
+		if err != nil {
+			return nil, err
+		}
+		e.progress.save(key, result.Findings)
 	}
 
 	out := make([]Finding, 0, len(result.Findings))
@@ -2179,6 +2195,7 @@ func renderedFiles(plan *bundle.Plan) map[string]string {
 // publish renders and delivers the review.
 func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files diff.Files) error {
 	report.Routes = e.routeDecisions
+	report.Progress, report.ReusedRequests = e.progress.snapshot(report.Head)
 	if e.ModelUsage != nil {
 		report.ModelUsage = e.ModelUsage()
 	}
@@ -2225,7 +2242,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	// clean run under review.approve with review.summary off renders no
 	// comments and no summary, and returning here would drop the approval and
 	// log "nothing to publish" over a review that had something to say.
-	if len(review.Comments) == 0 && review.Summary == "" && review.Event == vcs.EventComment {
+	if len(review.Comments) == 0 && review.Summary == "" && review.Event == vcs.EventComment && len(review.Progress) == 0 {
 		e.log().Info("nothing to publish")
 		return nil
 	}

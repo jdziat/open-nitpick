@@ -8,6 +8,7 @@ package vcs
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -183,6 +184,9 @@ type Review struct {
 	// pull request knows what has already been reviewed.
 	Head string
 
+	// Progress carries successful model results for a later retry.
+	Progress json.RawMessage
+
 	// Incomplete prevents this run from becoming an incremental baseline.
 	Incomplete bool
 
@@ -210,6 +214,9 @@ type DirLister interface {
 
 // PriorReview is what earlier runs of this tool left on a pull request.
 type PriorReview struct {
+	// Progress belongs to the latest authenticated review, including partial runs.
+	Progress json.RawMessage
+
 	// Head is the revision the most recent earlier run reviewed, or empty
 	// when no earlier run recorded one.
 	Head string

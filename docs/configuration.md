@@ -300,7 +300,7 @@ models:
 review:
   fail_on: none                    # default: advisory. Set to error/critical to gate CI.
   min_severity: info               # drop anything below this entirely
-  incremental: true                # on a re-run, read only what changed since the last review
+  incremental: true                # reuse successful model requests whose inputs still match
   related_context: true            # default: attach imported definitions used on changed lines (see below)
   related_context_callers: false   # default: also walk the repository for callers of what the change redefines
   related_context_preamble: ""     # default: the shipped "Context only" sentence; replace to tune how a model treats attached context

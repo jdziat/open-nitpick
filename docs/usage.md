@@ -435,3 +435,11 @@ provider failures stay visible, and a passing policy gate does not mean these
 assessments completed. The paired controls in `docs/findings.md` do not justify
 blocking merges on model judgments. Deterministic prose tells also remain
 advisory while their existing findings are assessed.
+
+### Resume or restart a pull request review
+
+Comment `@open-nitpick review` to retry unfinished work and reuse successful
+model requests whose inputs still match. With no previous review, it starts a
+new one. Comment `@open-nitpick restart-review` to start fresh, or use
+`nitpick review -owner OWNER -repo-name REPO -pr NUMBER -full` from the CLI.
+See [incremental review](ci.md#incremental-review) for reuse and approval rules.
