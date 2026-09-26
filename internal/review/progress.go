@@ -33,6 +33,9 @@ type progressRecord struct {
 
 func (e *Engine) startProgress(pr *vcs.PullRequest, prior *vcs.PriorReview) {
 	e.progress = nil
+	if e.Resume && !e.Config.Review.Incremental {
+		e.log().Warn("resume disabled: set review.incremental=true to reuse prior model results; reviewing the whole change")
+	}
 	if !e.Resume || !e.Config.Review.Incremental || pr.HeadSHA == "" {
 		return
 	}

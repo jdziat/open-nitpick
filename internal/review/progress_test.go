@@ -1,9 +1,11 @@
 package review
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"testing"
@@ -11,6 +13,27 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
+
+func TestResumeWarnsWhenIncrementalIsDisabled(t *testing.T) {
+	for _, resume := range []bool{false, true} {
+		for _, incremental := range []bool{false, true} {
+			t.Run(fmt.Sprintf("resume=%t/incremental=%t", resume, incremental), func(t *testing.T) {
+				var logs bytes.Buffer
+				cfg := config.Defaults()
+				cfg.Review.Incremental = incremental
+				engine := &Engine{Config: cfg, Resume: resume, Log: slog.New(slog.NewTextHandler(&logs, nil))}
+				engine.startProgress(&vcs.PullRequest{HeadSHA: "abcdef"}, nil)
+				warn := resume && !incremental
+				if got := strings.Contains(logs.String(), "review.incremental=true"); got != warn {
+					t.Fatalf("resume warning=%t, want %t: %s", got, warn, logs.String())
+				}
+				if got := engine.progress != nil; got != (resume && incremental) {
+					t.Fatalf("progress enabled=%t for resume=%t incremental=%t", got, resume, incremental)
+				}
+			})
+		}
+	}
+}
 
 func resumeEngine(t *testing.T, model *scriptedLLM, provider *incrementalProvider) *Engine {
 	t.Helper()
