@@ -118,7 +118,6 @@ func applyEngineeringScope(cfg *config.Config) {
 	cfg.Review.SkipMarkers = nil
 	cfg.Review.RelatedContext = true
 	cfg.Review.RelatedContextCallers = true
-	cfg.Review.Incremental = false
 	cfg.Review.MaxFiles = 1 << 30
 	cfg.Persona.Nitpick = config.NitpickNormal
 	cfg.Validation.Enabled = true
