@@ -113,8 +113,10 @@ func ParseEvent(name string, payload []byte) (*Event, error) {
 type Kind string
 
 const (
-	// KindReview asks for the pull request to be reviewed again, whole.
+	// KindReview asks to resume the pull request review.
 	KindReview Kind = "review"
+	// KindRestartReview asks for a fresh review of the whole pull request.
+	KindRestartReview Kind = "restart-review"
 	// KindResolve asks for this thread to be resolved.
 	KindResolve Kind = "resolve"
 	// KindAsk is a question, answered in the thread.
@@ -147,8 +149,10 @@ func Command(body, mention string) (Kind, string, bool) {
 	}
 	first := strings.ToLower(strings.Fields(rest)[0])
 	switch strings.Trim(first, ".!?") {
-	case "review", "re-review", "rereview":
+	case "review":
 		return KindReview, rest, true
+	case "restart-review", "re-review", "rereview":
+		return KindRestartReview, rest, true
 	case "resolve", "resolved", "done", "fixed":
 		// "fixed" is the person saying they fixed it, and it stays here rather
 		// than joining the case below. It is one letter from its own opposite,

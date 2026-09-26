@@ -519,8 +519,8 @@ type Review struct {
 	Summary bool `yaml:"summary"`
 
 	// Mention is the handle a comment uses to talk to the reviewer:
-	// "@open-nitpick review" reviews again, "@open-nitpick resolve" closes the
-	// thread, anything else is a question answered in the thread.
+	// "@open-nitpick review" resumes, "@open-nitpick restart-review" starts fresh,
+	// "@open-nitpick resolve" closes the thread; anything else is a question.
 	Mention string `yaml:"mention"`
 
 	// SkipMarkers are phrases that, in a pull request's title, body or head
@@ -528,11 +528,10 @@ type Review struct {
 	// posts nothing. Matched case-insensitively.
 	SkipMarkers []string `yaml:"skip_markers"`
 
-	// Incremental makes a run on a pull request this tool has reviewed before
-	// read only the files changed since that review, and withhold findings it
-	// has already posted. It has no effect on a first review, on a local
-	// review, or when the earlier revision is no longer reachable, a force
-	// push reviews the whole change again.
+	// Incremental reuses successful model requests from the previous PR review
+	// when their prompts, context, model and policy still match. Failed work
+	// retries; analyzers, triage, validation and approval run again. False
+	// disables reuse. Local reviews have no persisted progress.
 	Incremental bool `yaml:"incremental"`
 
 	// ResolveSuperseded lets an incremental run resolve its own earlier

@@ -328,7 +328,6 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	engine.Instruction = f.instruction
 	engine.Policy = &engineeringReviewPolicy{source: engine.Policy, loaded: cfg, explicit: f.profile == "engineering", selected: func() {
 		engine.Instruction = engineeringPrompt + "\n" + f.instruction
-		engine.Full = true
 	}}
 	engine.AssessPractices = func(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, report *review.Report) *practices.Report {
 		accepted := report.Policy.Config
@@ -342,6 +341,7 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	}
 	engine.SkipDraft = f.skipDraft
 	engine.Full = f.full
+	engine.Resume = true
 
 	// Built per review from the resolved policy for the same reason. The
 	// analyzers read review.ignore themselves, so a change that edits.
