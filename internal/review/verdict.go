@@ -45,7 +45,8 @@ type TriageResult struct {
 	Verdicts []Verdict `json:"findings"`
 	Summary  string    `json:"summary"`
 
-	// Unaccounted entries are restored; explicit decisions remain in Overruled.
+	// Unaccounted entries are restored; explicit decisions remain in the two
+	// fields below, alongside Verdicts.
 	Dropped          []Drop            `json:"dropped,omitempty"`
 	Acknowledgements []Acknowledgement `json:"acknowledgements,omitempty"`
 }

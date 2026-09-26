@@ -20,7 +20,7 @@ import (
 
 const engineeringPromptVersion = "engineering-9"
 
-const engineeringPrompt = `Engineering assessment, version 9.
+const engineeringPrompt = `Engineering assessment.
 A request can contain several assessment tasks. Assess every listed design focus
 with the supplied related evidence. A slop_only task requests a whole-source slop
 assessment, not completion of a design unit. Source excerpts omit other lines;

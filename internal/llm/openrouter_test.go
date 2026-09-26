@@ -61,7 +61,6 @@ func TestOpenRouterBuildsWithOnlyItsOwnKey(t *testing.T) {
 // api.openai.com to openrouter.ai, and report the wrong variable when it was
 // rejected.
 func TestOpenRouterMissingKeyIsNamed(t *testing.T) {
-	stubKeyring(t, map[string]string{KeyringService + "/openrouter": "operator-test-key"}, nil)
 	clearModelEnv(t)
 	t.Setenv("OPENAI_API_KEY", "sk-openai-must-not-be-used")
 
@@ -181,7 +180,7 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 	}
 
 	if gotAuth != "Bearer sk-or-test" {
-		t.Error("Authorization did not carry the configured test credential")
+		t.Errorf("Authorization = %q, want the configured test credential", gotAuth)
 	}
 	if !strings.HasSuffix(gotPath, "/chat/completions") {
 		t.Errorf("path = %q, want the OpenAI-compatible chat completions route", gotPath)
