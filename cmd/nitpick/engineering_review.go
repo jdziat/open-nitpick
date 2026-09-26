@@ -37,6 +37,12 @@ func (p *engineeringReviewPolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref
 	if cfg == nil {
 		cfg = p.loaded
 	}
+	// BasePolicy answers (nil, false, nil) for an untouched config file. When
+	// loaded is also nil there is no profile to read; returning nil keeps the
+	// "no engineering scope" answer without panicking on cfg.Practices.
+	if cfg == nil {
+		return nil, false, nil
+	}
 	if !p.explicit && cfg.Practices.Profile != "engineering" {
 		if !modified {
 			return nil, false, nil
@@ -52,9 +58,16 @@ func (p *engineeringReviewPolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref
 }
 
 func assessReviewPractices(ctx context.Context, root string, cfg *config.Config, ref vcs.Ref, pr *vcs.PullRequest, reviewReport *review.Report, provider vcs.Provider) *practices.Report {
-	data, _ := json.Marshal(config.PracticePolicy{Practices: cfg.Practices, Standards: cfg.Standards, Review: cfg.Review, Linters: cfg.Linters})
-	digest := sha256.Sum256(data)
-	r := &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: reviewReport.Head, PolicySource: cfg.Policy.String(), PolicyDigest: hex.EncodeToString(digest[:]), ModelUsage: reviewReport.ModelUsage}
+	data, err := json.Marshal(config.PracticePolicy{Practices: cfg.Practices, Standards: cfg.Standards, Review: cfg.Review, Linters: cfg.Linters})
+	// On marshal failure leave digest empty. Hashing a nil buffer would still
+	// produce sha256("") and look like proven policy matching; Problems()
+	// refuses an empty digest as missing provenance instead.
+	digest := ""
+	if err == nil {
+		sum := sha256.Sum256(data)
+		digest = hex.EncodeToString(sum[:])
+	}
+	r := &practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: reviewReport.Head, PolicySource: cfg.Policy.String(), PolicyDigest: digest, ModelUsage: reviewReport.ModelUsage}
 	var files []standards.File
 	var failed []string
 	reviewed := map[string]string{}
@@ -104,7 +117,10 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 			continue
 		}
 		if prior, ok := reviewed[file.Path]; ok && !bytes.Equal(body, []byte(prior)) {
+			// The model reviewed a different body. Measuring the fresh bytes
+			// would report standards over a file the snapshot says was omitted.
 			failed = append(failed, file.Path)
+			continue
 		}
 		files = append(files, standards.File{Path: file.Path, Src: body})
 	}
@@ -144,6 +160,15 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 	conventions := conventionCheck(files, measured, cfg.Practices.RequiredConventions)
 	if status.State != review.StandardsActive {
 		conventions.State, conventions.Reason = practices.Partial, "accepted convention measurement unavailable: "+status.Reason
+	}
+	if pinErr != nil {
+		conventions.State = practices.Partial
+		note := "base revision unpinned: " + pinErr.Error()
+		if conventions.Reason == "" {
+			conventions.Reason = note
+		} else {
+			conventions.Reason += "; " + note
+		}
 	}
 	r.Checks = append(r.Checks, conventions)
 	var inventoryFiles []standards.File

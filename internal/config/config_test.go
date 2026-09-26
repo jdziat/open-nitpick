@@ -222,6 +222,92 @@ func TestValidateAllowsFailOnNone(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsResidualWithoutApprove(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.Approve.Residual.Enabled = true
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "review.approve.residual.enabled requires review.approve.enabled") {
+		t.Fatalf("want residual-requires-approve error, got %v", err)
+	}
+}
+
+func TestValidateRejectsResidualMaxSeverityCritical(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.Residual.Enabled = true
+	cfg.Review.Approve.Residual.MaxSeverity = SeverityCritical
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "max_severity") {
+		t.Fatalf("want max_severity rejection, got %v", err)
+	}
+}
+
+func TestValidateRejectsResidualMaxSeverityTypo(t *testing.T) {
+	// normalized() only lowercases; it does not map unknowns to info. A typo
+	// must fail validation rather than silently widen the residual floor.
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.Approve.Residual.MaxSeverity = "warn"
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "max_severity") {
+		t.Fatalf("want max_severity rejection for typo, got %v", err)
+	}
+}
+
+func TestValidateRejectsResidualFloorBelowMinSeverity(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.MinSeverity = SeverityInfo
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.Residual.Enabled = true
+	cfg.Review.Approve.Residual.MaxSeverity = SeverityNit
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "below review.min_severity") {
+		t.Fatalf("want residual floor below min rejection, got %v", err)
+	}
+}
+
+func TestValidateRejectsResidualFloorAtOrAboveFailOn(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.FailOn = SeverityInfo
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.Residual.Enabled = true
+	cfg.Review.Approve.Residual.MaxSeverity = SeverityInfo
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "review.fail_on") {
+		t.Fatalf("want residual floor vs fail_on rejection, got %v", err)
+	}
+}
+
+func TestValidateAllowsResidualFloorBelowFailOn(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.FailOn = SeverityWarning
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.Residual.Enabled = true
+	cfg.Review.Approve.Residual.MaxSeverity = SeverityInfo
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("info floor below fail_on warning: %v", err)
+	}
+}
+
+func TestValidateAllowsResidualInfoFloor(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
+	cfg.Review.Approve.Enabled = true
+	cfg.Review.Approve.Residual.Enabled = true
+	cfg.Review.Approve.Residual.MaxSeverity = SeverityInfo
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("residual with info floor: %v", err)
+	}
+}
+
 func TestSeverityOrderingRespectsThresholds(t *testing.T) {
 	if !SeverityError.AtLeast(SeverityWarning) {
 		t.Error("error should outrank warning")
@@ -456,6 +542,36 @@ func TestTheFixModelDoesNotFallBackToTheReviewer(t *testing.T) {
 	}
 	if spec.Provider != "openai" || spec.Model != "an-editing-model" {
 		t.Errorf("spec = %s/%s", spec.Provider, spec.Model)
+	}
+}
+
+func TestResolveSecurityFallsBackToReviewThenDefault(t *testing.T) {
+	m := Models{Default: ModelSpec{Provider: "openai", Model: "default-model"}}
+	got := m.ResolveSecurity()
+	if got.Model != "default-model" || got.Provider != "openai" {
+		t.Errorf("unset security = %s/%s, want default", got.Provider, got.Model)
+	}
+
+	m.Review = &ModelSpec{Model: "review-model"}
+	got = m.ResolveSecurity()
+	if got.Model != "review-model" {
+		t.Errorf("security with review only = %q, want review-model", got.Model)
+	}
+
+	m.Security = &ModelSpec{Model: "security-model"}
+	got = m.ResolveSecurity()
+	if got.Model != "security-model" || got.Provider != "openai" {
+		t.Errorf("named security = %s/%s", got.Provider, got.Model)
+	}
+}
+
+func TestSecurityModelRequiresAName(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "m"}
+	cfg.Models.Security = &ModelSpec{}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "models.security") {
+		t.Fatalf("empty models.security: %v", err)
 	}
 }
 

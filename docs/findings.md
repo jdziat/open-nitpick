@@ -284,7 +284,7 @@ being the thing this project has gotten wrong most often.
 ## The incumbent's baseline, on the full corpus
 
 Incumbent was re-collected over all 30 fixtures after the corpus grew, because
-its cached reviews covered only the original 15 (the set the prompt had been
+its cached reviews covered only the first 15 fixtures (the set the prompt was
 tuned against for seven rounds). Scored deterministically, no judge:
 
 | | detection | findings | unexplained | precision |
@@ -931,7 +931,7 @@ Read the run dumps first; most of the noise was ours.
   mode) were found by the pinned run within an hour of each other.
 - **Raw control characters inside JSON strings** are now escaped by the
   lenient decoder. Without a response format, gemma emits them on most
-  replies; with one, the provider had been hiding the habit.
+  replies; with one, the provider hides the habit.
 
 ## Routing and ensembles (2026-09-05)
 
@@ -2129,7 +2129,7 @@ contributes no denominator whatever the code does.
 
 Correcting it changed a verdict, which is the arithmetic doing its job: revive
 read 95.5% clean over 396 files when markdown, JSON and YAML were in its
-denominator, and 94.1% over the 290 files an analyzer actually read. Same
+denominator, and 94.1% over the 290 files an analyzer read. Same
 violations, correct denominator, standard becomes contested.
 
 ### A conformity ruleset, separate from the review's (2026-09-10)
@@ -2311,7 +2311,7 @@ provider configuration, so its zero findings do not validate model-catalog claim
 That trial also found an applicability bug: a skipped Python analyzer made a
 Go-only assessment incomplete. Coverage now requires input claims before a
 skipped analyzer can count as missing work. Its control retains failure when the
-skipped analyzer actually has an applicable input.
+skipped analyzer has an applicable input.
 
 Twelve targeted mutations were killed by their named guard tests: inheriting a
 parent module after malformed nested metadata, counting a source snapshot as an
@@ -2378,9 +2378,8 @@ this pair demonstrates one lost-failure mechanism, not comprehensive design reca
 Four further mutations were killed by the intended assertions: dropping expert
 failure stages, dropping duplicate-check detection, overwriting an existing
 snapshot during capture, and omitting practices from full configuration
-validation. The duplicate-check fixture previously failed for having no substantive
-assessment before duplication; a valid-control assertion exposed and corrected
-that weakness. These controls establish those four guards, not general test quality.
+validation. The duplicate-check control requires a substantive assessment
+before duplication. These controls establish those four guards, not general test quality.
 
 The subsequent deterministic self-assessment examined 332 convention/analyzer
 file targets and found zero violations. It examined 584 text targets, retained
@@ -2440,3 +2439,161 @@ rejected the invalid title with `commits.subject-format`;
 [run 34656158969](https://github.com/jdziat/open-nitpick/actions/runs/34656158969)
 passed after the valid title was restored on the same commit. Those edits
 started two commit-policy runs and no new main CI run.
+
+## Security persona bake-off (2026-09-18)
+
+Which chat model should drive `nitpick security`'s optional model pass.
+
+**Instrument.** `make eval-security`: `NITPICK_EVAL_SECURITY=1` applies the
+same instruction the command injects (`internal/security.Instruction`). Corpus
+is seven security-class plants plus `clean-refactor` and `style-only` (Rule 10
+silence). Eight contenders, two runs each, with and without related context, one
+within-run table (Rule 2). Linters off so the score is the model. Harness limit:
+review and triage are the same weights (not the shipped luna+glm pairing).
+
+**Dump.** `internal/evals/.eval-runs/multifile-mixed-20260918T125032Z-2476545.jsonl`.
+
+**Tuning (shared coverage, every row 18 reviews, 0 lost):**
+
+| contender | RECALL | NOISE | $/REVIEW | $/LOCATED |
+|---|---:|---:|---:|---:|
+| z-ai/glm-5.3-flash +ctx | 0.83 | 0.06 | $0.0016 | $0.0020 |
+| anthropic/claude-opus-5 | 0.78 | 0.06 | $0.1383 | $0.1778 |
+| anthropic/claude-sonnet-4.6 +ctx | 0.72 | 0.00 | $0.0186 | $0.0258 |
+| openai/gpt-5.6-luna | 0.72 | 0.00 | $0.0003 | $0.0004 |
+| anthropic/claude-opus-5 +ctx | 0.72 | 0.06 | $0.0458 | $0.0635 |
+| google/gemini-3.5-flash (+ctx same) | 0.67 | 0.00 | ~$0.02 | ~$0.03 |
+| openai/gpt-5.6-luna +ctx | 0.67 | 0.11 | $0.0003 | $0.0004 |
+| openai/gpt-5.6-terra (±ctx) | 0.61 | 0.06 | ~$0.002 | ~$0.003 |
+| moonshotai/kimi-k2.7-code | 0.39–0.50 | 0.06 | ~$0.006 | ~$0.01–0.015 |
+
+Silence controls stayed clean for every contender. `php-forbidden-vs-404` (info
+band) and `multi-defect` were the main separators.
+
+**Held-out spend (once):** `removed-guard`, `bash-fixed-temp-path`,
+`clean-sql-allowlist`: three fixtures, top contenders only.
+
+| contender | RECALL | NOISE | $/REVIEW |
+|---|---:|---:|---:|
+| openai/gpt-5.6-luna (±ctx) | 1.00 | 0.00 | ~$0.0004 |
+| anthropic/claude-sonnet-4.6 (±ctx) | 1.00 | 0.00 | ~$0.18 |
+| z-ai/glm-5.3-flash | 1.00 | 0.00 | $0.0011 |
+| z-ai/glm-5.3-flash +ctx | 0.75 | 0.00 | $0.0011 |
+
+glm's tuning lead did not hold under +ctx on held-out (missed one
+`removed-guard` run). luna and sonnet stayed perfect; luna is ~400× cheaper than
+sonnet on that spend.
+
+**Call.** Pin `models.security` to `openai/gpt-5.6-luna` (done in
+`.nitpick.openrouter.yaml`). Leave `models.review` as luna for PR review; the
+security role exists so a later bake-off can diverge without forcing every
+review onto security-tuned weights. Rule 8: single-file/multifile fixtures are
+not PRs; this ranks the security *persona* on planted defects, not tree-scan
+completeness (scanners are separate).
+
+## Hard security corpus (2026-09-18)
+
+The bake-off above hit RECALL 1.00 on held-out because that spend was only two
+plants plus one silence. Under Rule 7 those three fixtures
+(`removed-guard`, `bash-fixed-temp-path`, `clean-sql-allowlist`) are **spent**
+for security-persona generalization and must not be re-spent as
+`SECURITY_HELD_OUT`.
+
+**Tuning (`make eval-security`, `SECURITY`):** easy sinks, medium plants,
+promoted spent hard plants, `go-idor-wrong-principal` (authz present, wrong
+principal), silence including `clean-sql-allowlist` and
+`php-clean-404-on-forbidden`. Goal: RECALL 1.00 should be rare on tuning alone.
+
+**Fresh held-out (`make eval-security-heldout`, `SECURITY_HELD_OUT`, spend once):**
+`python-expired-token-accepted`, `python-hmac-unbound-compare`,
+`python-hmac-bound-clean`. Distinct from global `HELD_OUT`.
+
+Do not treat the 2026-09-18 three-fixture held-out 1.00 as the bar for the next
+model pick.
+
+**Smoke (tuning only, before any held-out spend):**
+`make eval-security MODELS=z-ai/glm-5.3-flash RUNS=1` gives RECALL **0.83**
+(no ctx) / **0.92** (+ctx). Misses without ctx: `removed-guard`, one plant in
+`multi-defect`. Not 1.00; corpus is hard enough to rank without spending
+`SECURITY_HELD_OUT` yet.
+
+**Label check (2026-09-19):** that smoke's header said MIXED (10 tuning + 3
+held-out + 1 multi-file) because `removed-guard`, `bash-fixed-temp-path`, and
+`clean-sql-allowlist` are still in global `HeldOutFixtures`. The security
+battery is now labeled `SECURITY tuning` and the dump token is `security`,
+not `mixed`. A one-fixture subset does not inherit that label.
+
+**Pinned-model check, same corpus, RUNS=1, held-out not spent:**
+`make eval-security MODELS=openai/gpt-5.6-luna RUNS=1` gives RECALL **0.75** /
+**0.83** (+ctx). Header: `SECURITY tuning corpus (14 fixture(s))`. Silence
+stayed silent (`clean-refactor`, `style-only`, `clean-sql-allowlist`,
+`php-clean-404-on-forbidden` all 0/0). `go-idor-wrong-principal` was located
+both ways. Under the then-unscoped scorer, `multi-defect` was 1/3 because the
+race and descriptor leak are not `ClassSecurity` and
+`security.Instruction` forbids reporting them.
+
+**Persona scoring layer (keep `multi-defect`):** under `NITPICK_EVAL_SECURITY`,
+`ScoreDetectionForEval` / `ScoreSeverityForEval` count only `ClassSecurity`
+plants. Findings that match a non-security plant on the same fixture are out
+of scope (not noise). Raw `ScoreDetection` stays unscoped for non-security
+batteries.
+
+**Re-score of the luna dump with that layer (no new spend):**
+`NITPICK_EVAL_SECURITY=1` over
+`multifile-security-20260919T011046Z-500927.jsonl` gives luna **9/10** (0.90),
+luna +ctx **10/10** (1.00). The old 0.75/0.83 was the unscoped denominator.
+
+**Live end-to-end with the layer (2026-09-19):**
+`make eval-security MODELS=openai/gpt-5.6-luna RUNS=1` gives RECALL **0.90** /
+**1.00** (+ctx); `multi-defect` **1/1** (not 1/3); severity error band **2/2**
+(not 2/4); header `SECURITY tuning`. Matches the dump re-score. With +ctx
+already at 1.00 on tuning, do not spend `SECURITY_HELD_OUT` to pick a model
+until a ranking that is not already saturated exists (harder plants, or rank
+the no-ctx arm).
+
+## Security prompt depth A/B (2026-09-19)
+
+Does luna vs glm-5.3-flash move with light / deep / extreme security prompts?
+Tuning corpus, RUNS=1, persona scoring on, held-out not spent.
+`DEPTH=` selects `NITPICK_EVAL_SECURITY_DEPTH` (`InstructionLight` / shipped
+`Instruction` / `InstructionExtreme`). Eval-only; shipped `nitpick security`
+still uses `Instruction` (deep).
+
+| depth | luna | luna +ctx | glm | glm +ctx |
+|---|---:|---:|---:|---:|
+| light | 0.90 / 0.00 | 0.70 / 0.07 | 0.90 / 0.00 | 0.90 / 0.00 |
+| deep | **1.00 / 0.00** | 0.90 / 0.07 | 0.90 / 0.14 | **1.00 / 0.07** |
+| extreme | 1.00 / **0.36** | 0.90 / 0.14 | 0.90 / 0.14 | 1.00 / **0.21** |
+
+Cells are RECALL / NOISE. Fixture signal: light left `php-forbidden-vs-404`
+at 0/1 for every arm; deep/extreme recovered it on some arms. Extreme put
+`+1n` on `php-clean-404-on-forbidden` for every arm (the silence twin). Luna
+no-ctx is already perfect and silent on deep; extreme adds noise without
+recall. Call: keep shipped depth at deep; do not promote extreme.
+
+## Full-review health pass (2026-09-19)
+
+Branch `chore/full-review-health`. First pass: `nitpick repo-score -budget 120000
+cmd internal` (raw report:
+`docs/full-review-health-2026-09-19-cmd-internal.txt`).
+
+**Coverage:** 30 of 50 files in the budget window answered; 20 model-batch
+failures (not silence); 481 files past the budget. Rates below are over the
+answered files only.
+
+**Score (weighted findings / 1k lines; critical 8, error 4, warning 2, info 1):**
+
+| language | files | lines | slop | bugs | security |
+|---|---:|---:|---:|---:|---:|
+| go | 29 | 7548 | 0.26 | 6.09 | 0.00 |
+| all | 30 | 7594 | 0.26 | 6.06 | 0.00 |
+
+26 findings: 2 error, 16 warning, 8 info. No security class hits in the window.
+Slop under the 2.0 / 1k threshold.
+
+**Remediation on this branch:** nil `cfg` in `engineeringReviewPolicy`; practices digest marshal; nil tree/report on `securityScan`; empty benchrepo titles; discarded manifest marshal; `prNumbers` refuses a 1000-cap truncation; drifted files are omitted from measurement; `improve` reads the prior review before the model pass and fails closed when that read errors; `security.Failed` is independent of roster completeness; `init` walk honors cancellation and a chmod failure no longer drops a validated config; workflow-overwrite and whole-tree standards tests now fail if the guard they name is deleted; `captureStdout` joins its reader on cleanup so a panic inside the test cannot leak the pipe.
+
+**Left as designed:** publish failure stays a warning so a fork PR is still gated (`review.go`); respond re-parses the mention against resolved policy on purpose; `designContextFiles` returns problems, not a discarded error; `wired` only rejects a literal `nil` suffix because the enginewiring guard is a source scan of the form `fullreview.go` uses, not a type system. `Roles.Build` lock is blocked: `internal/llm/client.go` is claimed by another agent.
+
+**Still open:** the 20 model-batch failures and the 481 files past the 120000-token budget.
+

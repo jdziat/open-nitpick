@@ -1,6 +1,8 @@
 package vcs
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -103,10 +105,34 @@ func completionMarker(sha string) string {
 
 // stripMarkers keeps model-authored prose from supplying persisted review state.
 func stripMarkers(body string) string {
-	for _, pattern := range []*regexp.Regexp{headPattern, spendPattern, fingerprintPattern, completionPattern} {
+	for _, pattern := range []*regexp.Regexp{headPattern, spendPattern, fingerprintPattern, completionPattern, progressPattern} {
 		body = pattern.ReplaceAllString(body, "")
 	}
 	return body
 }
 
 var completionPattern = regexp.MustCompile(`<!-- open-nitpick complete:([0-9a-fA-F]+) -->`)
+
+// MaxProgressBytes bounds persisted results before base64 encoding.
+const MaxProgressBytes = 24000
+
+var progressPattern = regexp.MustCompile(`<!-- open-nitpick progress:([A-Za-z0-9+/=]+) -->`)
+
+func progressMarker(data json.RawMessage) string {
+	if len(data) == 0 || len(data) > MaxProgressBytes || !json.Valid(data) {
+		return ""
+	}
+	return "<!-- open-nitpick progress:" + base64.StdEncoding.EncodeToString(data) + " -->"
+}
+
+func parseProgress(body string) json.RawMessage {
+	matches := progressPattern.FindAllStringSubmatch(body, 2)
+	if len(matches) != 1 || len(matches[0][1]) > base64.StdEncoding.EncodedLen(MaxProgressBytes) {
+		return nil
+	}
+	data, err := base64.StdEncoding.DecodeString(matches[0][1])
+	if err != nil || !json.Valid(data) {
+		return nil
+	}
+	return data
+}

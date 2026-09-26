@@ -46,6 +46,9 @@ type Config struct {
 	// Practices selects engineering checks and their explicit requirements.
 	Practices Practices `yaml:"practices"`
 
+	// Security configures the tree security scan (`nitpick security`).
+	Security Security `yaml:"security"`
+
 	// Source records where the configuration was loaded from. It is empty when
 	// only built-in defaults were used.
 	Source string `yaml:"-"`
@@ -219,6 +222,17 @@ type ModelSpec struct {
 	// OpenRouter's fifteen endpoints for it, and a pin names the one that
 	// answers.
 	Providers []string `yaml:"providers"`
+	// ServiceTier routes an OpenRouter request to a capacity grade: "default"
+	// for the standard tier, "flex" for discounted capacity that trades
+	// latency and availability for price, "priority" (alias "fast") for
+	// premium capacity at a higher rate. Empty is the provider's own default
+	// and sends no field.
+	//
+	// Flex never falls back to a standard endpoint: a capacity failure
+	// surfaces as an error, so a tier is a request, not a guarantee. A model
+	// with no flex endpoint at all routes normally at standard rates.
+	// OpenRouter only; other providers ignore it.
+	ServiceTier string `yaml:"service_tier"`
 }
 
 // StructuredMode selects a structured-output strategy.
@@ -265,6 +279,13 @@ type Models struct {
 	// can produce a change that compiles. Falling back to models.default would
 	// ship an unmeasured capability under a measured model's name.
 	Fix *ModelSpec `yaml:"fix"`
+
+	// Security is the model the nitpick security / security_scan model pass
+	// uses. Optional: when unset, ResolveSecurity falls back to the review
+	// model (unlike Fix/Embed), because a security pass is still a review and
+	// the bake-off pins a measured winner here without forcing all PR reviews
+	// onto those weights.
+	Security *ModelSpec `yaml:"security"`
 
 	// Embed is the model that turns text into vectors for knowledge
 	// retrieval. It has no default and no fallback to Default, because an
@@ -420,6 +441,19 @@ func (m Models) ResolveFix() (ModelSpec, bool) {
 	return m.Default.overlay(*m.Fix), true
 }
 
+// ResolveSecurity returns the model for the security command's model pass.
+//
+// When models.security is unset it falls back to the review model (then
+// default), so an operator who has only named models.review still gets a
+// security pass. A named models.security overlays Default the way other
+// optional roles do.
+func (m Models) ResolveSecurity() ModelSpec {
+	if m.Security == nil {
+		return m.ResolveModel(RoleReview)
+	}
+	return m.Default.overlay(*m.Security)
+}
+
 // ResolveRouter returns the router spec, overlaid on Default, and whether
 // one is configured.
 func (m Models) ResolveRouter() (ModelSpec, bool) {
@@ -432,7 +466,7 @@ func (m Models) ResolveRouter() (ModelSpec, bool) {
 // Key identifies a spec for client caching: the fields that change which
 // endpoint or weights answer, and nothing that only shapes the request.
 func (s ModelSpec) Key() string {
-	return strings.Join(append([]string{s.Provider, s.Model, s.BaseURL}, s.Providers...), "|")
+	return strings.Join(append([]string{s.Provider, s.Model, s.BaseURL, s.ServiceTier, fmt.Sprint(s.Extra)}, s.Providers...), "|")
 }
 
 func intersects(a, b []string) bool {
@@ -485,8 +519,8 @@ type Review struct {
 	Summary bool `yaml:"summary"`
 
 	// Mention is the handle a comment uses to talk to the reviewer:
-	// "@open-nitpick review" reviews again, "@open-nitpick resolve" closes the
-	// thread, anything else is a question answered in the thread.
+	// "@open-nitpick review" resumes, "@open-nitpick restart-review" starts fresh,
+	// "@open-nitpick resolve" closes the thread; anything else is a question.
 	Mention string `yaml:"mention"`
 
 	// SkipMarkers are phrases that, in a pull request's title, body or head
@@ -494,11 +528,10 @@ type Review struct {
 	// posts nothing. Matched case-insensitively.
 	SkipMarkers []string `yaml:"skip_markers"`
 
-	// Incremental makes a run on a pull request this tool has reviewed before
-	// read only the files changed since that review, and withhold findings it
-	// has already posted. It has no effect on a first review, on a local
-	// review, or when the earlier revision is no longer reachable, a force
-	// push reviews the whole change again.
+	// Incremental reuses successful model requests from the previous PR review
+	// when their prompts, context, model and policy still match. Failed work
+	// retries; analyzers, triage, validation and approval run again. False
+	// disables reuse. Local reviews have no persisted progress.
 	Incremental bool `yaml:"incremental"`
 
 	// ResolveSuperseded lets an incremental run resolve its own earlier
@@ -521,6 +554,25 @@ type Review struct {
 	// separate switch, and off unless asked for. It does nothing unless
 	// RelatedContext is on.
 	RelatedContextCallers bool `yaml:"related_context_callers"`
+
+	// RelatedContextPreamble replaces the sentence bundle.Render writes above
+	// every attached definition. The shipped sentence says the context is
+	// reference only and is not under review, which is the right default for
+	// a model that treats additional code as more surface to comment on, and
+	// the wrong one for a model that reads the same context as license to
+	// override a finding the diff alone justified. Tuning the phrasing is
+	// how the second behaviour is measured against the first.
+	//
+	// Empty keeps the shipped sentence.
+	RelatedContextPreamble string `yaml:"related_context_preamble"`
+
+	// RelatedContextRerank sorts attached definitions by how much of their
+	// snippet overlaps the change's added text, and drops ones whose only
+	// overlap is the name that already selected them. The default orders by
+	// use count, which attaches a frequently-named helper even when its body
+	// has nothing in common with the change. Off until a measurement says
+	// otherwise; see docs/experiment-context-framing.md.
+	RelatedContextRerank bool `yaml:"related_context_rerank"`
 
 	// Knowledge attaches entries from the shipped corpus that the change
 	// resembles: antipatterns and standard-library contracts a model may not
@@ -656,6 +708,40 @@ type Approve struct {
 	// it on, an analyzer recorded as skipped or failed, or any entry in the
 	// coverage list, holds the review at a comment.
 	RequireAnalyzers bool `yaml:"require_analyzers"`
+
+	// Residual optionally allows APPROVE when only low-severity findings remain.
+	// See ApproveResidual. Requires Enabled; residual.enabled alone fails Validate.
+	Residual ApproveResidual `yaml:"residual"`
+}
+
+// ApproveResidual is the near-clean path under review.approve.
+//
+// Off by default. When on, published findings whose severity is at most
+// MaxSeverity may still earn APPROVE after a triage-model judge confirms they
+// are non-blocking at the configured nitpick level. Findings above the floor,
+// incomplete runs, and standing threads still force a comment.
+type ApproveResidual struct {
+	// Enabled turns on the residual path. review.approve.enabled must also be
+	// true; residual alone never approves.
+	Enabled bool `yaml:"enabled"`
+
+	// MaxSeverity is the highest published severity still eligible for the
+	// residual judge. One of: nit, info, warning. Default info.
+	MaxSeverity Severity `yaml:"max_severity"`
+}
+
+// MaxSeverityValues reports what review.approve.residual.max_severity accepts.
+func (a ApproveResidual) MaxSeverityValues() []string {
+	return ResidualMaxSeverities()
+}
+
+// ResidualMaxSeverityDefault is the residual floor when max_severity is unset.
+const ResidualMaxSeverityDefault = SeverityInfo
+
+// ResidualMaxSeverities is the residual floor set, shared by validation and
+// the generated reference.
+func ResidualMaxSeverities() []string {
+	return []string{string(SeverityNit), string(SeverityInfo), string(SeverityWarning)}
 }
 
 // Standards controls how conventions are measured and how much evidence one
@@ -836,6 +922,11 @@ type Linters struct {
 	// refused by default. Name one here only where every change reviewed
 	// comes from people who could already run code in this CI job.
 	Trusted []string `yaml:"trusted"`
+
+	// ForceGosec asks golangci-lint to enable gosec for this run. Set only by
+	// the security command; it is not a YAML key, so a repository cannot opt
+	// into or out of the overlay through .nitpick.yaml.
+	ForceGosec bool `yaml:"-"`
 }
 
 // AutoDetects reports whether catalog analyzers run without being named.
@@ -1224,6 +1315,9 @@ func (s ModelSpec) overlay(over ModelSpec) ModelSpec {
 	}
 	if over.Reasoning != "" {
 		out.Reasoning = over.Reasoning
+	}
+	if over.ServiceTier != "" {
+		out.ServiceTier = over.ServiceTier
 	}
 	if over.MaxRetries != nil {
 		out.MaxRetries = over.MaxRetries

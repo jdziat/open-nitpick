@@ -91,6 +91,15 @@ func assembleRelated(t *testing.T, cfg *config.Config, tree fakeTree, withLister
 }
 
 func relatedNames(plan *Plan) []string {
+	out := relatedNamesInOrder(plan)
+	sort.Strings(out)
+	return out
+}
+
+// relatedNamesInOrder lists attached definitions in plan order, so a test
+// can pin the sort collect chose rather than the alphabetical order
+// relatedNames returns for set comparisons.
+func relatedNamesInOrder(plan *Plan) []string {
 	var out []string
 	for _, b := range plan.Batches {
 		for _, e := range b.Entries {
@@ -99,7 +108,6 @@ func relatedNames(plan *Plan) []string {
 			}
 		}
 	}
-	sort.Strings(out)
 	return out
 }
 
@@ -333,6 +341,95 @@ func TestRelatedDefaultsAttachDefinitionsButNotCallersAndAreBudgeted(t *testing.
 	if n := len(relatedNames(plan)); n != 0 {
 		t.Errorf("related context attached %d definitions over a budget of one token", n)
 	}
+}
+
+func TestRelatedPreambleReplacesTheShippedSentence(t *testing.T) {
+	// An empty preamble keeps the shipped sentence; a configured one replaces
+	// it verbatim. A preamble that does not reach the prompt is the bug this
+	// test exists for: the config key would then be a control the numbers
+	// cannot see.
+	tree := fakeTree{"a.ts": "import { f } from \"./b\";\nf();\n", "b.ts": "export function f() {}\n"}
+
+	shipped := assembleRelated(t, config.Defaults(), tree, true, "a.ts")
+	shippedText := bundleRender(shipped)
+	if !strings.Contains(shippedText, "Context only. These files are not under review") {
+		t.Errorf("shipped preamble absent from the rendered entry: %s", shippedText)
+	}
+
+	cfg := config.Defaults()
+	cfg.Review.RelatedContextPreamble = "The definitions below are REFERENCE, not review targets."
+	custom := assembleRelated(t, cfg, tree, true, "a.ts")
+	customText := bundleRender(custom)
+	if !strings.Contains(customText, "REFERENCE, not review targets") {
+		t.Errorf("configured preamble did not reach the prompt: %s", customText)
+	}
+	if strings.Contains(customText, "Context only. These files are not under review") {
+		t.Errorf("shipped preamble appears beside a configured one: %s", customText)
+	}
+}
+
+func TestRelatedRerankPrefersSnippetOverlapOverUseCount(t *testing.T) {
+	// Without rerank, the three calls to often win the sort. With it on, rare
+	// wins because its body shares deadlineMs with the change and often's
+	// body shares nothing beyond its name. Preferring the wrong one under
+	// either setting is the bug this test exists for: the knob would then
+	// reorder nothing the numbers can see.
+	tree := fakeTree{
+		"a.ts": "" +
+			"import { often, rare } from \"./helpers\";\n" +
+			"often();\n" +
+			"often();\n" +
+			"often();\n" +
+			"const deadline = rare(deadlineMs);\n",
+		"helpers.ts": "" +
+			"export function often() { return Math.random(); }\n" +
+			"export function rare(deadlineMs: number) { return deadlineMs + 1; }\n",
+	}
+
+	byUses := assembleRelated(t, config.Defaults(), tree, true, "a.ts")
+	if got := relatedNamesInOrder(byUses); len(got) < 2 || got[0] != "helpers.ts:often" {
+		t.Errorf("use-count order attached %v first; want helpers.ts:often ahead of rare", got)
+	}
+
+	cfg := config.Defaults()
+	cfg.Review.RelatedContextRerank = true
+	byScore := assembleRelated(t, cfg, tree, true, "a.ts")
+	if got := relatedNamesInOrder(byScore); len(got) == 0 || got[0] != "helpers.ts:rare" {
+		t.Errorf("rerank attached %v first; want helpers.ts:rare ahead of often", got)
+	}
+}
+
+func TestRelatedRerankDropsDefinitionsWithOnlyNameOverlap(t *testing.T) {
+	// The change names f, so use-count attachment keeps it. Rerank scores the
+	// snippet against the added text with f itself excluded, and the body
+	// shares nothing else, so the plan attaches nothing. Empty Related under
+	// rerank must mean "no content overlap", not "the collector never ran".
+	tree := fakeTree{
+		"a.ts": "import { f } from \"./b\";\nf();\n",
+		"b.ts": "export function f() { return 42; }\n",
+	}
+
+	kept := assembleRelated(t, config.Defaults(), tree, true, "a.ts")
+	if got := relatedNames(kept); strings.Join(got, ",") != "b.ts:f" {
+		t.Errorf("without rerank attached %v, want b.ts:f", got)
+	}
+
+	cfg := config.Defaults()
+	cfg.Review.RelatedContextRerank = true
+	dropped := assembleRelated(t, cfg, tree, true, "a.ts")
+	if got := relatedNames(dropped); len(got) != 0 {
+		t.Errorf("rerank attached %v; a definition whose only shared token is its name must be dropped", got)
+	}
+}
+
+func bundleRender(plan *Plan) string {
+	var b strings.Builder
+	for _, batch := range plan.Batches {
+		for _, entry := range batch.Entries {
+			b.WriteString(Render(entry))
+		}
+	}
+	return b.String()
 }
 
 func TestRelatedNeverReadsOutsideTheTree(t *testing.T) {

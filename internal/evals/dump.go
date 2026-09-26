@@ -50,6 +50,11 @@ type DumpRecord struct {
 	// distinction has to be in the data rather than in the filename.
 	HeldOut bool `json:"held_out,omitempty"`
 
+	// SecurityPersona is true when the review ran under NITPICK_EVAL_SECURITY.
+	// Report-from-dump scoring must use this field rather than the caller's
+	// environment, or the same dump re-derives different RECALL values.
+	SecurityPersona bool `json:"security_persona,omitempty"`
+
 	// Variant names the persona configuration under test, empty for the model
 	// benchmark where the persona is held constant.
 	//
@@ -357,6 +362,11 @@ const dumpPartialSuffix = ".partial"
 // TestARetainedRunRefusesToOverwriteAnEarlierOne covers the residual.
 func runDumpName(battery string, fixtures []Fixture, now time.Time, pid int) string {
 	corpus := "empty"
+	if token := securityCorpusToken(fixtures); token != "" {
+		corpus = token
+		return fmt.Sprintf("%s-%s-%s-%d.jsonl",
+			sanitizeDumpName(battery), corpus, now.UTC().Format("20060102T150405Z"), pid)
+	}
 	kinds := map[string]int{}
 	for _, f := range fixtures {
 		switch {
@@ -438,7 +448,7 @@ func (d *Dump) Record(s DumpSample) error {
 		calls[c.FindingIndex] = append(calls[c.FindingIndex], c)
 	}
 
-	heldOut := HeldOut(s.Fixture.Name)
+	heldOut := HeldOut(s.Fixture.Name) || securityHeldOut(s.Fixture.Name)
 
 	var rawVerdicts int
 	if s.Judged != nil {
@@ -450,14 +460,15 @@ func (d *Dump) Record(s DumpSample) error {
 	// reader that filters it with grep or jq keeps whole lines, and a header
 	// record would not survive the filtering the format exists to allow.
 	sample := DumpRecord{
-		Model:       s.Model,
-		Fixture:     s.Fixture.Name,
-		HeldOut:     heldOut,
-		Run:         s.Run,
-		Variant:     s.Variant,
-		Findings:    len(s.Findings),
-		Verdicts:    rawVerdicts,
-		FixtureHash: fixtureFingerprint(s.Fixture),
+		Model:           s.Model,
+		Fixture:         s.Fixture.Name,
+		HeldOut:         heldOut,
+		SecurityPersona: securityPersonaActive(),
+		Run:             s.Run,
+		Variant:         s.Variant,
+		Findings:        len(s.Findings),
+		Verdicts:        rawVerdicts,
+		FixtureHash:     fixtureFingerprint(s.Fixture),
 	}
 
 	d.mu.Lock()

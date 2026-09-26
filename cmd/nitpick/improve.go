@@ -120,6 +120,12 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, repo string, cfg *config.Co
 		// what is already on the pull request.
 	}
 
+	// Before Review: fail-closed must not discard a completed pass.
+	prior, err := gh.PriorReview(ctx, ref)
+	if err != nil {
+		return fmt.Errorf("read the prior review before posting: %w", err)
+	}
+
 	report, err := engine.Review(ctx, ref)
 	if err != nil {
 		return err
@@ -138,13 +144,6 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, repo string, cfg *config.Co
 		findings = scoped
 	}
 
-	// A failure to read what is already published is not a failure of the
-	// pass: the worst outcome is repeating something already said, and losing
-	// the whole answer to avoid that is the worse trade.
-	prior, err := gh.PriorReview(ctx, ref)
-	if err != nil {
-		log.Warn("could not read the prior review, so this pass may repeat a published finding", "error", err)
-	}
 	findings = dropPublished(findings, prior)
 
 	body := improveComment(findings, ev, len(report.Findings))

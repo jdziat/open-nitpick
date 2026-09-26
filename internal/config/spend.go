@@ -129,12 +129,12 @@ func (r Respond) Allows(assoc string) bool {
 	}
 
 	for _, want := range r.EffectiveFrom() {
-		if want == got {
+		if Association(strings.ToLower(strings.TrimSpace(string(want)))) == got {
 			return true
 		}
 		// "none" is the forge's word for a stranger, so allowing it is the
 		// operator saying anyone may.
-		if want == AssocNone {
+		if Association(strings.ToLower(strings.TrimSpace(string(want)))) == AssocNone {
 			return true
 		}
 	}

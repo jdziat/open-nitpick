@@ -1,0 +1,16 @@
+---
+# golangci-lint configuration for `nitpick security` only.
+#
+# Same containment story as golangci.yml: embedded, written outside the tree,
+# exclusions.generated disabled so a header in the change cannot skip the file.
+# The difference is gosec: `default: standard` does not enable it, and a
+# security scan that reports golangci as ran without gosec is incomplete.
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - gosec
+
+  exclusions:
+    generated: disable

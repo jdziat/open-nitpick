@@ -19,6 +19,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/review"
+	securitypkg "github.com/jdziat/open-nitpick/internal/security"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
@@ -29,6 +30,10 @@ const (
 
 	// EnvModels overrides the model list (comma-separated OpenRouter ids).
 	EnvModels = "NITPICK_EVAL_MODELS"
+	// EnvServiceTier sets the capacity grade a run routes to.
+	// "flex" asks for discounted capacity on providers that sell it;
+	// empty is the provider default. Applies to every role in the run.
+	EnvServiceTier = "NITPICK_EVAL_SERVICE_TIER"
 
 	// EnvRuns sets how many times each fixture is reviewed, which is what makes
 	// a stability column possible.
@@ -58,10 +63,30 @@ const (
 	// off. Any non-empty value other than "0" or "false" enables it.
 	EnvRelatedContext = "NITPICK_EVAL_RELATED_CONTEXT"
 
+	// EnvRelatedContextPreamble replaces the sentence bundle.Render writes
+	// above every attached definition, so an experiment can tune the phrasing
+	// without editing fixtures. Empty keeps the shipped sentence.
+	EnvRelatedContextPreamble = "NITPICK_EVAL_RELATED_CONTEXT_PREAMBLE"
+
+	// EnvRelatedContextRerank switches review.related_context_rerank on so an
+	// experiment can measure relevance-sorted attachments against the use-count
+	// order without editing fixtures. Any non-empty value other than "0" or
+	// "false" enables it.
+	EnvRelatedContextRerank = "NITPICK_EVAL_RELATED_CONTEXT_RERANK"
+
 	// EnvSlop switches review.slop on for every review in the run, which the
 	// slop corpus needs: its plants are in a class the default never asks
 	// for. Any non-empty value other than "0" or "false" enables it.
 	EnvSlop = "NITPICK_EVAL_SLOP"
+
+	// EnvSecurity applies the nitpick security model instruction for every
+	// review in the run, so the bake-off measures that persona rather than a
+	// generic review on security-class fixtures.
+	EnvSecurity = "NITPICK_EVAL_SECURITY"
+
+	// EnvSecurityDepth selects light | deep | extreme when EnvSecurity is on.
+	// Empty or deep is the shipped Instruction.
+	EnvSecurityDepth = "NITPICK_EVAL_SECURITY_DEPTH"
 
 	// EnvKnowledge switches review.knowledge, which is the arm of the
 	// knowledge corpus measurement. Off unless the run asks, whatever the
@@ -426,17 +451,36 @@ func OptionsFromEnv() (Options, error) {
 	}
 	opts.Prices = prices
 
+	// Validate security depth at setup so a mistyped DEPTH cannot silently
+	// measure the shipped deep instruction.
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvSecurity))) {
+	case "", "0", "false", "off":
+	default:
+		if _, err := securitypkg.InstructionForDepth(os.Getenv(EnvSecurityDepth)); err != nil {
+			return opts, fmt.Errorf("%s: %w", EnvSecurityDepth, err)
+		}
+	}
+
 	return opts, nil
 }
 
-// HeldOut reports whether a fixture belongs to the held-out corpus.
-//
-// Exported so a report can LABEL the corpus it measured. A held-out table and a
-// tuning table were textually identical, which meant the one number the
-// held-out set exists to produce could not be told apart from a training score
-// after the fact, not by a reader, and not by whoever kept the artifact.
+// HeldOut reports whether a fixture belongs to the global prompt held-out
+// corpus (HeldOutFixtures / HELD_OUT). Security-persona held-out is separate:
+// see securityHeldOut. Dump records OR the two so a security spend is still
+// marked held_out without making a multi-file plant that shares a name look
+// like it left the multi-file corpus.
 func HeldOut(fixture string) bool {
 	for _, f := range HeldOutFixtures() {
+		if f.Name == fixture {
+			return true
+		}
+	}
+	return false
+}
+
+// securityHeldOut reports whether a fixture belongs to SecurityHeldOutFixtures.
+func securityHeldOut(fixture string) bool {
+	for _, f := range SecurityHeldOutFixtures() {
 		if f.Name == fixture {
 			return true
 		}
@@ -448,6 +492,12 @@ func HeldOut(fixture string) bool {
 // header. A mixed selection is called out as mixed rather than rounded to
 // whichever half is larger.
 func CorpusLabel(fixtures []Fixture) string {
+	switch securityCorpusToken(fixtures) {
+	case "security":
+		return fmt.Sprintf("SECURITY tuning corpus (%d fixture(s)) — persona ranking, not a generalization claim", len(fixtures))
+	case "security-heldout":
+		return fmt.Sprintf("SECURITY HELD-OUT corpus (%d fixture(s)) — spent once; a gain measured here is a security-persona generalization claim", len(fixtures))
+	}
 	var held, tuning, multi, info, callers, slop int
 	for _, f := range fixtures {
 		switch {
@@ -799,9 +849,10 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		// shipped pairing, in particular a model annotated in DefaultModels as
 		// good value was ranked as a REVIEWER and has never been measured
 		// triaging another model's findings.
-		Roles:    roles,
-		Provider: provider,
-		Log:      cmpLogger(opts.Log),
+		Roles:       roles,
+		Provider:    provider,
+		Log:         cmpLogger(opts.Log),
+		Instruction: securityPersonaInstruction(),
 	}
 
 	// Retrieval, when the arm asks for it. A failure to build it fails the run
@@ -915,6 +966,9 @@ func applyRouteFile(cfg *config.Config, path string) error {
 		if spec.Timeout == 0 {
 			spec.Timeout = baseline.Timeout
 		}
+		if spec.ServiceTier == "" {
+			spec.ServiceTier = baseline.ServiceTier
+		}
 		if spec.StructuredOutput == "" {
 			spec.StructuredOutput = baseline.StructuredOutput
 		}
@@ -926,6 +980,11 @@ func applyRouteFile(cfg *config.Config, path string) error {
 	for _, spec := range []*config.ModelSpec{rf.Models.Review, rf.Models.Triage, rf.Models.Validate, rf.Models.Router} {
 		if spec != nil && spec.Provider == "" && spec.Model == "" {
 			continue
+		}
+	}
+	for _, spec := range []*config.ModelSpec{rf.Models.Review, rf.Models.Triage, rf.Models.Validate, rf.Models.Router} {
+		if spec != nil {
+			fill(spec)
 		}
 	}
 	for i := range rf.Models.Routes {
@@ -985,6 +1044,9 @@ func evalConfig(model Model) *config.Config {
 		// Auto exercises the real negotiation: schema first, JSON fallback for
 		// providers that reject it. That path is the point of the matrix.
 		StructuredOutput: config.StructuredAuto,
+		// ServiceTier routes this run through the capacity grade set
+		// by NITPICK_EVAL_SERVICE_TIER. Empty is the provider default.
+		ServiceTier: strings.TrimSpace(os.Getenv(EnvServiceTier)),
 	}
 
 	if model.RouteFile != "" {
@@ -1017,6 +1079,14 @@ func evalConfig(model Model) *config.Config {
 	default:
 		cfg.Review.RelatedContext = true
 		cfg.Review.RelatedContextCallers = true
+	}
+	if preamble := strings.TrimSpace(os.Getenv(EnvRelatedContextPreamble)); preamble != "" {
+		cfg.Review.RelatedContextPreamble = preamble
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvRelatedContextRerank))) {
+	case "", "0", "false", "off":
+	default:
+		cfg.Review.RelatedContextRerank = true
 	}
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvValidation))) {
 	case "", "0", "false", "off":
@@ -1058,6 +1128,25 @@ func ourSeverityScale(cfg *config.Config) SeverityScale {
 		return UndeclaredSeverityScale
 	}
 	return OurSeverityScale
+}
+
+// securityPersonaInstruction returns the security command's model instruction
+// when NITPICK_EVAL_SECURITY is on, otherwise empty. Depth comes from
+// NITPICK_EVAL_SECURITY_DEPTH (light | deep | extreme). Mutation: drop the env
+// check and the bake-off would measure a generic review on security fixtures.
+func securityPersonaInstruction() string {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(EnvSecurity))) {
+	case "", "0", "false", "off":
+		return ""
+	default:
+		text, err := securitypkg.InstructionForDepth(os.Getenv(EnvSecurityDepth))
+		if err != nil {
+			// OptionsFromEnv validates depth before any review; a late failure
+			// here is a programming error, not an operator typo.
+			panic(err)
+		}
+		return text
+	}
 }
 
 func floatPtr(v float64) *float64 { return &v }

@@ -76,6 +76,11 @@ func isAutoDetected(r Runner) bool {
 	return ok && t.detected
 }
 
+// gosecForcer is the optional capability a golangci-lint runner exposes when
+// it forced gosec on for the security roster. Named so a rename fails to
+// compile at the call site rather than silently leaving GosecEnabled false.
+type gosecForcer interface{ GosecForced() bool }
+
 // errNoTargets is Detect's answer when nothing this analyzer reads survived
 // the review's file selection. Only "it could not run" is a degradation: ruff
 // sitting out a Go-only change is not a Python review that went missing. It
@@ -158,7 +163,10 @@ func New(repoRoot string, cfg *config.Config, log *slog.Logger) *Set {
 // Detect refuse a runner whose configuration was rejected.
 func builtins(repoRoot string, cfg *config.Config) []Runner {
 	runners := []Runner{
-		&golangciLint{cfg: fileConfig(repoRoot, cfg.Linters.GolangciConfig)},
+		&golangciLint{
+			cfg:        fileConfig(repoRoot, cfg.Linters.GolangciConfig),
+			ForceGosec: cfg.Linters.ForceGosec,
+		},
 		&ruff{cfg: fileConfig(repoRoot, cfg.Linters.RuffConfig)},
 		&eslint{cfg: fileConfig(repoRoot, cfg.Linters.ESLintConfig)},
 		&semgrep{cfg: semgrepConfig(repoRoot, cfg.Linters.SemgrepConfig)},
@@ -250,15 +258,11 @@ func (s *Set) Uncovered() []review.LinterUncovered {
 }
 
 // record stores one analyzer's outcome for Statuses.
-func (s *Set) record(linter string, outcome review.LinterOutcome, state string) {
+func (s *Set) record(st review.LinterStatus) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.statuses = append(s.statuses, review.LinterStatus{
-		Linter:  linter,
-		Outcome: outcome,
-		State:   state,
-	})
+	s.statuses = append(s.statuses, st)
 }
 
 // state describes a runner's configuration, for runners that have one.
@@ -327,7 +331,9 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 				// strict mode: an analyzer with nothing to read has not gone
 				// missing, and treating it as missing would make strict mode
 				// unusable in every repository that is not polyglot.
-				s.record(r.Name(), review.LinterSkipped, reason)
+				s.record(review.LinterStatus{
+					Linter: r.Name(), Outcome: review.LinterSkipped, State: reason, NoTargets: true,
+				})
 
 				// But "nothing to read" and "nothing to say" are different
 				// claims, and this arm used to publish the first while meaning
@@ -348,7 +354,7 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 				continue
 			}
 
-			s.record(r.Name(), review.LinterFailed, reason)
+			s.record(review.LinterStatus{Linter: r.Name(), Outcome: review.LinterFailed, State: reason})
 
 			if s.cfg.Linters.Mode == config.LinterStrict {
 				mu.Lock()
@@ -389,7 +395,7 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 			defer mu.Unlock()
 
 			if err != nil {
-				s.record(r.Name(), review.LinterFailed, oneLine(err.Error()))
+				s.record(review.LinterStatus{Linter: r.Name(), Outcome: review.LinterFailed, State: oneLine(err.Error())})
 				s.log.Warn("linter failed", "linter", r.Name(), "error", err)
 				if s.cfg.Linters.Mode == config.LinterStrict {
 					errs = append(errs, fmt.Errorf("linter %s: %w", r.Name(), err))
@@ -397,7 +403,11 @@ func (s *Set) Run(ctx context.Context, files diff.Files) ([]review.Finding, erro
 				return
 			}
 
-			s.record(r.Name(), review.LinterRan, state(r))
+			ran := review.LinterStatus{Linter: r.Name(), Outcome: review.LinterRan, State: state(r)}
+			if g, ok := r.(gosecForcer); ok && g.GosecForced() {
+				ran.GosecEnabled = true
+			}
+			s.record(ran)
 			s.log.Debug("linter finished", "linter", r.Name(), "findings", len(found))
 			s.uncover(gaps)
 
@@ -639,14 +649,17 @@ func classForRule(rule string) config.Class {
 		return config.ClassSecurity
 
 	case strings.Contains(r, "gosec"), strings.Contains(r, "semgrep"),
-		strings.Contains(r, "security"), strings.Contains(r, "bandit"),
-		strings.Contains(r, "injection"), strings.Contains(r, "crypto"):
+		strings.Contains(r, "gitleaks"), strings.Contains(r, "security"),
+		strings.Contains(r, "bandit"), strings.Contains(r, "injection"),
+		strings.Contains(r, "crypto"):
 		return config.ClassSecurity
 
 	case strings.Contains(r, "race"), strings.Contains(r, "concurren"),
 		strings.Contains(r, "atomic"), strings.Contains(r, "sync"):
 		return config.ClassConcurrency
 
+	// gitleaks is matched as security above. A bare "leak" here still
+	// covers memleak, goleak, and similar resource-handle rules.
 	case strings.Contains(r, "bodyclose"), strings.Contains(r, "sqlclosecheck"),
 		strings.Contains(r, "rowserr"), strings.Contains(r, "leak"),
 		strings.Contains(r, "close"):

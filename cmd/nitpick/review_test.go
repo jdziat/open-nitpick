@@ -383,7 +383,9 @@ func TestFirstNonEmpty(t *testing.T) {
 }
 
 // captureStdout runs fn with os.Stdout redirected and returns what it printed.
-func captureStdout(t *testing.T, fn func()) string {
+// The reader goroutine is joined on return and on cleanup, so a panic inside
+// fn does not leak the pipe.
+func captureStdout(t *testing.T, fn func()) (out string) {
 	t.Helper()
 
 	r, w, err := os.Pipe()
@@ -393,7 +395,6 @@ func captureStdout(t *testing.T, fn func()) string {
 
 	saved := os.Stdout
 	os.Stdout = w
-	defer func() { os.Stdout = saved }()
 
 	done := make(chan string, 1)
 	go func() {
@@ -402,10 +403,27 @@ func captureStdout(t *testing.T, fn func()) string {
 		done <- buf.String()
 	}()
 
-	fn()
+	closed := false
+	closeWrite := func() {
+		if closed {
+			return
+		}
+		closed = true
+		_ = w.Close()
+	}
+	t.Cleanup(func() {
+		os.Stdout = saved
+		closeWrite()
+		<-done
+		_ = r.Close()
+	})
 
-	_ = w.Close()
-	return <-done
+	fn()
+	closeWrite()
+	out = <-done
+	// The cleanup receive must not block: hand it the value we already took.
+	done <- out
+	return out
 }
 
 // TestExplainConfigNamesDiscardedKeys covers the command's answer to the

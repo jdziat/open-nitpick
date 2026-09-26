@@ -112,6 +112,11 @@ type relatedCollector struct {
 	// change redefines (callers.go); review.related_context_callers.
 	callers bool
 
+	// rerank sorts definitions by snippet overlap with the change's added
+	// text and drops ones whose only shared token is the name that selected
+	// them; review.related_context_rerank.
+	rerank bool
+
 	// maxBytes refuses a file larger than this after fetching it, so the
 	// caller walk cannot scan a generated bundle that escaped
 	// callerSkipDirs. It applies to every read the collector makes,
@@ -224,9 +229,18 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 		return 0
 	}
 	wants := c.definitionWants(e)
+	if c.rerank {
+		wants = c.scoreDefinitions(wants, addedText(e.File))
+	}
 
-	// Most-used first, so the cap keeps the definitions the change leans on.
+	// Most-used first by default, so the cap keeps the definitions the
+	// change leans on. With rerank on, content overlap with the change
+	// decides instead: a helper named once whose body shares tokens with
+	// the added lines beats a frequently-named helper whose body does not.
 	sort.SliceStable(wants, func(i, j int) bool {
+		if c.rerank && wants[i].score != wants[j].score {
+			return wants[i].score > wants[j].score
+		}
 		if wants[i].uses != wants[j].uses {
 			return wants[i].uses > wants[j].uses
 		}
@@ -256,6 +270,63 @@ func (c *relatedCollector) collect(e *Entry, budget int, est *llms.TokenEstimato
 	}
 
 	return c.attach(e, wants, budget, est)
+}
+
+// scoreDefinitions fills each want's relevance score from how much of its
+// snippet overlaps the change's added text, and drops wants whose only
+// shared token is the name that already selected them. A definition the
+// extractor cannot find is dropped too: it could not be attached anyway.
+func (c *relatedCollector) scoreDefinitions(wants []want, added string) []want {
+	scored := make([]want, 0, len(wants))
+	for _, w := range wants {
+		content, ok := c.read(w.file)
+		if !ok {
+			continue
+		}
+		def, ok := w.extract(content, w.name)
+		if !ok {
+			continue
+		}
+		w.score = relevanceScore(def.Snippet, added, w.name)
+		if w.score == 0 {
+			continue
+		}
+		scored = append(scored, w)
+	}
+	return scored
+}
+
+// relevanceScore counts distinct identifier tokens that appear in both the
+// definition snippet and the change's added text, ignoring the definition's
+// own name. The name is always in the added text (that is why the want
+// exists), so counting it would give every candidate a non-zero score and
+// make the filter a no-op.
+func relevanceScore(snippet, added, name string) int {
+	addedWords := identifierSet(added)
+	delete(addedWords, strings.ToLower(name))
+	if len(addedWords) == 0 {
+		return 0
+	}
+	hits := 0
+	seen := map[string]bool{}
+	for w := range identifierSet(snippet) {
+		if w == strings.ToLower(name) || seen[w] || !addedWords[w] {
+			continue
+		}
+		seen[w] = true
+		hits++
+	}
+	return hits
+}
+
+var identifierToken = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
+
+func identifierSet(text string) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range identifierToken.FindAllString(text, -1) {
+		out[strings.ToLower(m)] = true
+	}
+	return out
 }
 
 // minCallerBudget is the fewest tokens worth walking the tree for: one
@@ -355,6 +426,7 @@ type want struct {
 	file    string
 	name    string
 	uses    int
+	score   int // snippet overlap with added text; set only when reranking
 	extract func(content, name string) (Related, bool)
 
 	// calls is set on a caller want: the redefined symbol the snippet calls.

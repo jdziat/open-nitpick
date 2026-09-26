@@ -225,7 +225,7 @@ Protocol on stdio, and logs its progress to stderr as the command line
 does (each batch as it starts and returns, with elapsed time, then triage,
 validation and publishing): `review` (a change), `full_review` and `repo_score` (a
 tree, with the remediation plan and the coverage notice), `code_smell` and
-`ai_slop` (the tree review filtered to those classes), and `explain_config`. Every tool returns text and structured findings with
+`ai_slop` (the tree review filtered to those classes), `security_scan` (required scanners plus optional security-class model pass), and `explain_config`. Every tool returns text and structured findings with
 path, line, severity, class, rationale and suggestion; nothing is
 published, and the session decides what to do with what comes back. The
 plugin under [plugins/nitpick](https://github.com/jdziat/open-nitpick/tree/main/plugins/nitpick) registers the server and
@@ -284,6 +284,7 @@ much each would remove. The tells need no model and run first.
 | `oversized-doc-comment` | a doc comment longer than what it documents |
 | `triplet-rhythm` | three adjectives of praise in a row |
 | `antithesis` | "not a nicety, it is a correctness matter" |
+| `essay-comment` | "because X is worse than Y" / "would defeat that" |
 | `shouting-emphasis` | capitals doing a sentence's work: NOT, MUST, WHOLE |
 | `changelog-comment` | a comment narrating what the code used to do |
 | `prose-cadence` | a file written in one rhythm, measured over the file |
@@ -297,6 +298,23 @@ listed rather than dropped, since they were paid for. `-fail-over N`
 exits 1 when the tells exceed N per thousand lines, for a CI gate on
 prose. The MCP tool `ai_slop` returns the same result, with `no_model`
 for the free pass.
+
+## Security scan
+
+```bash
+nitpick security -no-model         # required scanners only
+nitpick security -fail-on warning  # default gate; none needs -allow-clean-with-no-gate
+nitpick security -json             # roster + findings for a script
+```
+
+Required deterministic scanners always run (`osv-scanner`, `gitleaks`, and
+catalog-applicable tools including `golangci-lint` with gosec forced on).
+`complete=false` when a required scanner skips or fails is not a clean tree
+(Rule 10). There is no `-budget` and no `-no-linters`. The optional model pass
+uses `models.security` when set, otherwise `models.review` / `models.default`
+(see the bake-off in `docs/findings.md`). The MCP tool `security_scan` is the
+same engine; absolute `repo` paths are trusted-operator-only. See
+`docs/plans/2026-09-17-security-command.md`.
 
 ## The slop class
 
@@ -430,3 +448,11 @@ provider failures stay visible, and a passing policy gate does not mean these
 assessments completed. The paired controls in `docs/findings.md` do not justify
 blocking merges on model judgments. Deterministic prose tells also remain
 advisory while their existing findings are assessed.
+
+### Resume or restart a pull request review
+
+Comment `@open-nitpick review` to retry unfinished work and reuse successful
+model requests whose inputs still match. With no previous review, it starts a
+new one. Comment `@open-nitpick restart-review` to start fresh, or use
+`nitpick review -owner OWNER -repo-name REPO -pr NUMBER -full` from the CLI.
+See [incremental review](ci.md#incremental-review) for reuse and approval rules.

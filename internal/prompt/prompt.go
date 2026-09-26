@@ -17,9 +17,10 @@ var templates embed.FS
 
 // Names of the built-in prompts.
 const (
-	NameReview = "review"
-	NameTriage = "triage"
-	NameRoute  = "route"
+	NameReview          = "review"
+	NameTriage          = "triage"
+	NameRoute           = "route"
+	NameApproveResidual = "approve_residual"
 )
 
 // Layer names, in the order they are applied. Later layers appear later in the

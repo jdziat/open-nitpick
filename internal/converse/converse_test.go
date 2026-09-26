@@ -41,7 +41,10 @@ func TestCommandReadsTheMention(t *testing.T) {
 		ok   bool
 	}{
 		{"@open-nitpick review", KindReview, "review", true},
-		{"please @Open-NitPick re-review this", KindReview, "re-review this", true},
+		{"@open-nitpick restart-review", KindRestartReview, "restart-review", true},
+		{"@open-nitpick rereview", KindRestartReview, "rereview", true},
+		{"@open-nitpick restart-reviewing", KindAsk, "restart-reviewing", true},
+		{"please @Open-NitPick re-review this", KindRestartReview, "re-review this", true},
 		{"@open-nitpick resolve", KindResolve, "resolve", true},
 		{"@open-nitpick: fixed in the last push", KindResolve, "fixed in the last push", true},
 		{"@open-nitpick improve", KindImprove, "improve", true},

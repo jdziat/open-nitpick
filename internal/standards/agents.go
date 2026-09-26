@@ -46,10 +46,24 @@ func (r Report) Block() string {
 		return b.String()
 	}
 
-	// Fit the rules to the budget, counting the lines already written and the
-	// two the closing needs.
+	// Collect contested probes first so their 2-line paragraph can be
+	// accounted for in the listing budget.
+	var contested []Result
+	for _, res := range r.Results {
+		if res.Standing == StandingContested {
+			contested = append(contested, res)
+		}
+	}
+
+	// Fit the rules to the budget: count lines already written, reserve 2 for
+	// the closing (blank + EndMarker), 2 more if the contested paragraph will
+	// be written, and 2 for the dropped-count notice if any truncation occurs.
 	head := strings.Count(b.String(), "\n")
-	room := agentsMaxLines - head - 4
+	contestedLines := 0
+	if len(contested) > 0 {
+		contestedLines = 2
+	}
+	room := agentsMaxLines - head - 4 - contestedLines
 	listed := standards
 	if room < len(listed) {
 		if room < 0 {
@@ -67,12 +81,6 @@ func (r Report) Block() string {
 	// following it, which is the property this design rests on, and a retirement
 	// nobody sees is a convention eroding with a green build over it. The line
 	// costs one row and turns a deletion into a decision.
-	var contested []Result
-	for _, res := range r.Results {
-		if res.Standing == StandingContested {
-			contested = append(contested, res)
-		}
-	}
 	if len(contested) > 0 {
 		fmt.Fprintf(&b, "\n%d probe(s) have sites here and do not clear the floor, so they are not "+
 			"rules: %s. `nitpick standards` has their counts.\n", len(contested), ids(contested))

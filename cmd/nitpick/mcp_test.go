@@ -45,7 +45,7 @@ func TestMCPServerListsItsTools(t *testing.T) {
 			t.Errorf("tool %s has no description or schema", tool.Name)
 		}
 	}
-	want := "ai_slop,code_smell,explain_config,full_review,repo_score,review"
+	want := "ai_slop,code_smell,explain_config,full_review,repo_score,review,security_scan"
 	got := strings.Join(sortedStrings(names), ",")
 	if got != want {
 		t.Errorf("tools = %s, want %s", got, want)
