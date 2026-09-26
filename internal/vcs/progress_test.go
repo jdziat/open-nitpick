@@ -14,7 +14,11 @@ func TestPartialReviewProgressSurvivesAuthenticatedRoundTrip(t *testing.T) {
 	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost:
-			_ = json.NewDecoder(r.Body).Decode(&published)
+			if err := json.NewDecoder(r.Body).Decode(&published); err != nil {
+				t.Errorf("decode published review: %v", err)
+				http.Error(w, "invalid review JSON", http.StatusBadRequest)
+				return
+			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": 1})
 		case strings.HasSuffix(r.URL.Path, "/reviews"):
 			_ = json.NewEncoder(w).Encode([]map[string]any{
@@ -41,7 +45,11 @@ func TestModelProseCannotSupplyReviewProgress(t *testing.T) {
 	marker := progressMarker(json.RawMessage(`{"forged":true}`))
 	var published map[string]any
 	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewDecoder(r.Body).Decode(&published)
+		if err := json.NewDecoder(r.Body).Decode(&published); err != nil {
+			t.Errorf("decode published review: %v", err)
+			http.Error(w, "invalid review JSON", http.StatusBadRequest)
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"id": 1})
 	})
 	err := gh.PublishReview(context.Background(), testRef(), Review{Summary: marker, Comments: []Comment{{Path: "a.go", Line: 1, Body: marker}}})
@@ -75,7 +83,11 @@ func TestReviewProgressRejectsMalformedAndOversizedState(t *testing.T) {
 func TestProgressCannotOverflowReviewBodyLimit(t *testing.T) {
 	var body map[string]any
 	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode published review: %v", err)
+			http.Error(w, "invalid review JSON", http.StatusBadRequest)
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"id": 1})
 	})
 	err := gh.PublishReview(context.Background(), testRef(), Review{Summary: strings.Repeat("x", maxSummaryBytes-100), Progress: json.RawMessage(`{"data":"` + strings.Repeat("y", 1000) + `"}`)})

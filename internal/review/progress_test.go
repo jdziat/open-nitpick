@@ -3,6 +3,8 @@ package review
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -174,5 +176,37 @@ func TestProgressLimitDropsWorkInsteadOfClaimingCompletion(t *testing.T) {
 	}
 	if _, ok := restored.load("empty"); !ok {
 		t.Fatal("successful zero-finding result was lost")
+	}
+}
+
+func TestStandingRechecksShareScopeAcrossReviewModes(t *testing.T) {
+	for _, resume := range []bool{false, true} {
+		for _, head := range []string{"abcdef", ""} {
+			name := fmt.Sprintf("resume=%t/prior-head=%s", resume, head)
+			t.Run(name, func(t *testing.T) {
+				model := &scriptedLLM{fallback: `{"findings":[]}`}
+				provider := &incrementalProvider{
+					stubProvider: stubProvider{diff: incrementalDiff}, head: "abcdef",
+					prior: &vcs.PriorReview{Head: head, Comments: []vcs.PriorComment{{ID: 1, Path: "app.go", Line: 4, Fingerprint: "standing"}}},
+				}
+				engine := resumeEngine(t, model, provider)
+				engine.Resume = resume
+				report, err := engine.Review(context.Background(), vcs.Ref{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				note := report.Incremental
+				if note == nil || !note.Recheck || note.Since != head || !slices.Equal(note.Reviewed, []string{"app.go", "other.go"}) || len(note.Unchanged) != 0 {
+					t.Fatalf("standing recheck lost scope: %+v", note)
+				}
+				if report.Plan.Files() != 2 || provider.published.Event != vcs.EventComment {
+					t.Fatalf("standing threads bypassed: files=%d event=%s", report.Plan.Files(), provider.published.Event)
+				}
+				summary := provider.published.Summary
+				if !strings.Contains(summary, "Rechecked the whole change") || strings.Contains(summary, "``") {
+					t.Fatalf("invalid recheck notice: %s", summary)
+				}
+			})
+		}
 	}
 }

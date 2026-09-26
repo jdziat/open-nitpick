@@ -746,13 +746,10 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// Resume keeps the full plan for downstream checks; model requests reuse
 	// matching results later. A residual-only prior read must not shrink it.
 	narrowPrior := prior
-	if e.Resume || !e.Config.Review.Incremental || e.Full {
+	if !e.Resume && (!e.Config.Review.Incremental || e.Full) {
 		narrowPrior = nil
 	}
 	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, narrowPrior)
-	if e.Resume && prior != nil && prior.Head != "" && len(prior.Comments) > 0 {
-		report.Incremental = &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true}
-	}
 	report.Files = files
 
 	fetch := func(ctx context.Context, path string) ([]byte, error) {
@@ -1112,14 +1109,9 @@ func (e *Engine) readPriorReviewResult(ctx context.Context, ref vcs.Ref) (*vcs.P
 	return prior, nil
 }
 
-// narrowToChangedSince restricts a diff to the files that moved since the last
-// run this tool made on the pull request.
-//
-// It returns the files unchanged, and no note, whenever the question cannot be
-// answered: no earlier run, an earlier run that did not record its head, the
-// same head as before, a provider that cannot compare, or a force push that
-// made the earlier head unreachable. Every one of those is a full review, and
-// the note is what tells the reader the difference.
+// narrowToChangedSince keeps full scope for standing findings and request-level
+// resume. Otherwise it narrows to changed files when the prior revision can be
+// compared; missing history or an unreachable revision keeps the full diff.
 func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, files diff.Files, prior *vcs.PriorReview) (diff.Files, *Incremental) {
 	if prior == nil || pr == nil {
 		return files, nil
@@ -1130,7 +1122,7 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 	if len(prior.Comments) > 0 {
 		return files, &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true}
 	}
-	if prior.Head == "" {
+	if e.Resume || prior.Head == "" {
 		return files, nil
 	}
 	if prior.Head == pr.HeadSHA {
