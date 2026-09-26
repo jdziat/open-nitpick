@@ -150,7 +150,7 @@ type LinterDiscard struct {
 // They are separate values rather than one string because a reader has to sort
 // this repository's own publication policy from something having gone wrong, and
 // the counts are published together. Two of these are policy working exactly as
-// configured; the third is not a policy outcome at all.
+// configured; the other two are not a policy outcome at all.
 type DiscardReason string
 
 // The reasons an analyzer finding is not published.

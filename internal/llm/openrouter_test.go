@@ -193,8 +193,8 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 // sanitize() strips base_url and api_key_env from an untrusted config, so a
 // default built on those keys would work only for whoever exported
 // NITPICK_TRUST_CONFIG_ENDPOINTS. This asserts the committed default needs
-// neither: nothing is dropped, and both roles build with only OPENROUTER_API_KEY
-// in the environment.
+// neither: nothing is dropped, and both roles build with only
+// envSyntheticAPIKey in the environment.
 //
 // What it does not assert: that the endpoint is unreachable by any means. An
 // operator who exports LLM_BASE_URL still redirects it, because applyEnv fills
