@@ -709,6 +709,40 @@ type Approve struct {
 	// it on, an analyzer recorded as skipped or failed, or any entry in the
 	// coverage list, holds the review at a comment.
 	RequireAnalyzers bool `yaml:"require_analyzers"`
+
+	// Residual optionally allows APPROVE when only low-severity findings remain.
+	// See ApproveResidual. Requires Enabled; residual.enabled alone fails Validate.
+	Residual ApproveResidual `yaml:"residual"`
+}
+
+// ApproveResidual is the near-clean path under review.approve.
+//
+// Off by default. When on, published findings whose severity is at most
+// MaxSeverity may still earn APPROVE after a triage-model judge confirms they
+// are non-blocking at the configured nitpick level. Findings above the floor,
+// incomplete runs, and standing threads still force a comment.
+type ApproveResidual struct {
+	// Enabled turns on the residual path. review.approve.enabled must also be
+	// true; residual alone never approves.
+	Enabled bool `yaml:"enabled"`
+
+	// MaxSeverity is the highest published severity still eligible for the
+	// residual judge. One of: nit, info, warning. Default info.
+	MaxSeverity Severity `yaml:"max_severity"`
+}
+
+// MaxSeverityValues reports what review.approve.residual.max_severity accepts.
+func (a ApproveResidual) MaxSeverityValues() []string {
+	return ResidualMaxSeverities()
+}
+
+// ResidualMaxSeverityDefault is the residual floor when max_severity is unset.
+const ResidualMaxSeverityDefault = SeverityInfo
+
+// ResidualMaxSeverities is the residual floor set, shared by validation and
+// the generated reference.
+func ResidualMaxSeverities() []string {
+	return []string{string(SeverityNit), string(SeverityInfo), string(SeverityWarning)}
 }
 
 // Standards controls how conventions are measured and how much evidence one

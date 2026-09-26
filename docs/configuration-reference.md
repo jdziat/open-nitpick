@@ -1217,6 +1217,16 @@ Enabled submits APPROVE when the review published no findings and reviewed every
 boolean, default `false`.
 RequireAnalyzers additionally demands that every enabled analyzer ran and covered the change, so an approval means the deterministic half happened rather than that it was absent.
 
+### `review.approve.residual.enabled`
+
+boolean, default `false`.
+Enabled turns on the residual path. review.approve.enabled must also be true; residual alone never approves.
+
+### `review.approve.residual.max_severity`
+
+string, default `info`.
+MaxSeverity is the highest published severity still eligible for the residual judge. One of: nit, info, warning.
+
 ### `review.budget.completion_ratio`
 
 number, default `0.25`.

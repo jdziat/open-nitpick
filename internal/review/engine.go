@@ -75,6 +75,11 @@ type Engine struct {
 	// into the Report.
 	routeDecisions []RouteDecision
 
+	// priorReadErr is the last PriorReview failure from this run, so residual
+	// can hold COMMENT without a second forge round trip after incremental
+	// already paid for a failed read.
+	priorReadErr error
+
 	// Linters supplies deterministic findings to merge with the model's.
 	//
 	// It is a constructor rather than a runner because the policy a review runs
@@ -504,6 +509,24 @@ type Report struct {
 	// how many, so a push whose only defects were already on the pull request
 	// does not read as a push that introduced none.
 	AlreadyReported []Finding
+
+	// ResidualApprove is set when the residual judge allows APPROVE despite
+	// published low-severity findings. reviewEvent reads it; it never calls
+	// the model.
+	ResidualApprove bool
+
+	// ResidualReason is the judge's short rationale, for logs only.
+	ResidualReason string
+
+	// prior is the earlier review. Incremental narrowing may load it first;
+	// residual approve loads it when incremental is off so withhold and
+	// standing-thread gates see the same prior.
+	prior *vcs.PriorReview
+
+	// priorReadFailed is set when residual needed the prior and the provider
+	// that can answer PriorReview returned an error. Residual must hold
+	// COMMENT rather than retrying after the judge and greenwashing a miss.
+	priorReadFailed bool
 }
 
 // Incremental describes a run that reviewed part of a change because an
@@ -684,10 +707,36 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// and the whole change is reviewed, which is also what happens on a first
 	// run.
 	prior := e.priorReview(ctx, ref)
+	// Residual approve still needs the prior when incremental is off: without
+	// it, withholdAlreadyReported cannot see recurrences and standing threads
+	// are invisible until after the judge has already run.
+	if prior == nil && e.Config.Review.Approve.Enabled && e.Config.Review.Approve.Residual.Enabled {
+		if e.Config.Review.Incremental && !e.Full {
+			// priorReview already attempted the read; reuse its failure.
+			if e.priorReadErr != nil {
+				report.priorReadFailed = true
+			}
+		} else {
+			loaded, err := e.readPriorReviewResult(ctx, ref)
+			if err != nil {
+				e.log().Warn("could not read earlier reviews for residual approve", "error", err)
+				report.priorReadFailed = true
+			} else {
+				prior = loaded
+			}
+		}
+	}
+	report.prior = prior
 	if prior != nil {
 		report.PriorComments = len(prior.Comments)
 	}
-	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, prior)
+	// Narrowing still follows review.incremental: a residual-only prior read
+	// must not shrink the change.
+	narrowPrior := prior
+	if !e.Config.Review.Incremental || e.Full {
+		narrowPrior = nil
+	}
+	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, narrowPrior)
 	report.Files = files
 
 	fetch := func(ctx context.Context, path string) ([]byte, error) {
@@ -710,6 +759,8 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		e.log().Debug("skipped file", "path", s.Path, "reason", s.Reason)
 	}
 
+	// prior, not narrowPrior: pull-request budget scope needs prior spend even
+	// when residual loaded the prior without enabling incremental narrowing.
 	if fit, trimmed, err := e.applyBudget(ctx, ref, prior, plan, files, fetch); err != nil {
 		return nil, err
 	} else if fit != nil {
@@ -989,16 +1040,60 @@ func (e *Engine) priorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview 
 	if e.Full || !e.Config.Review.Incremental {
 		return nil
 	}
-	reader, ok := e.Provider.(vcs.PriorReviewer)
-	if !ok {
-		return nil
+	return e.readPriorReview(ctx, ref)
+}
+
+// priorForResidualResolve returns the earlier review for residual thread
+// resolve. Reuses report.prior (filled by Review from incremental or the
+// residual early load); otherwise reads once.
+//
+// ok is false when the provider can answer PriorReview but the read failed,
+// or when the early residual load already failed: residual must hold COMMENT
+// rather than treat the failure as "no comments".
+func (e *Engine) priorForResidualResolve(ctx context.Context, ref vcs.Ref, report *Report) (prior *vcs.PriorReview, ok bool) {
+	if report != nil && report.priorReadFailed {
+		return nil, false
 	}
-	prior, err := reader.PriorReview(ctx, ref)
+	if report != nil && report.prior != nil {
+		return report.prior, true
+	}
+	prior, err := e.readPriorReviewResult(ctx, ref)
+	if err != nil {
+		e.log().Warn("could not read earlier reviews for residual resolve", "error", err)
+		return nil, false
+	}
+	if report != nil {
+		report.prior = prior
+		// Incremental off never set PriorComments; residual still needs the
+		// count so standing threads refuse APPROVE after a judge yes.
+		if prior != nil && report.PriorComments == 0 {
+			report.PriorComments = len(prior.Comments)
+		}
+	}
+	return prior, true
+}
+
+func (e *Engine) readPriorReview(ctx context.Context, ref vcs.Ref) *vcs.PriorReview {
+	prior, err := e.readPriorReviewResult(ctx, ref)
 	if err != nil {
 		e.log().Warn("could not read earlier reviews; reviewing the whole change", "error", err)
 		return nil
 	}
 	return prior
+}
+
+func (e *Engine) readPriorReviewResult(ctx context.Context, ref vcs.Ref) (*vcs.PriorReview, error) {
+	reader, ok := e.Provider.(vcs.PriorReviewer)
+	if !ok {
+		e.priorReadErr = nil
+		return nil, nil
+	}
+	prior, err := reader.PriorReview(ctx, ref)
+	e.priorReadErr = err
+	if err != nil {
+		return nil, err
+	}
+	return prior, nil
 }
 
 // narrowToChangedSince restricts a diff to the files that moved since the last
@@ -1145,7 +1240,17 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 	if e.Config == nil || !e.Config.Review.Approve.Enabled || prior == nil || report == nil {
 		return nil
 	}
-	if len(findings) > 0 || len(report.AlreadyReported) > 0 || !report.Complete() {
+	residual := report.ResidualApprove
+	if len(report.AlreadyReported) > 0 || !report.Complete() || !report.PipelineComplete() {
+		return nil
+	}
+	if residual {
+		// ResidualApprove is set only after the floor gate, but resolve must
+		// not close threads if that invariant ever fails.
+		if !residualWithinFloor(findings, residualMaxSeverity(e.Config)) {
+			return nil
+		}
+	} else if len(findings) > 0 {
 		return nil
 	}
 	resolver, ok := e.Provider.(vcs.ThreadResolver)
@@ -1160,21 +1265,22 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 	for _, skip := range skipped {
 		excluded[skip.Path] = true
 	}
-	reread := map[string]bool{}
-	if report.Incremental != nil {
-		for _, p := range report.Incremental.Reviewed {
-			reread[p] = true
-		}
-	}
+	reread := residualReread(report)
 	var candidates []vcs.PriorComment
 	var ids []int64
 	for _, c := range prior.Comments {
 		if c.ID == 0 || done[c.ID] || excluded[c.Path] {
 			continue
 		}
-		// Same eligibility as superseded: only close what this run re-read, or
-		// a comment the forge no longer places on the diff.
-		if c.Line != 0 && !reread[c.Path] {
+		// Clean approve may close a comment the forge no longer places, even
+		// off the reread set: nothing remains to re-check. Residual must not:
+		// that would clear a prior warning the judge never saw on a file this
+		// run did not read.
+		if residual {
+			if !reread[c.Path] {
+				continue
+			}
+		} else if c.Line != 0 && !reread[c.Path] {
 			continue
 		}
 		candidates = append(candidates, c)
@@ -1184,6 +1290,9 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 		return nil
 	}
 	reply := "Resolved by open-nitpick: the change was reviewed again and no findings remain."
+	if residual {
+		reply = "Resolved by open-nitpick: the change was reviewed again; remaining findings are within the residual approve floor."
+	}
 	resolved, err := resolver.ResolveThreads(ctx, ref, ids, reply)
 	if err != nil {
 		e.log().Warn("could not resolve comments before approval", "error", err, "resolved", len(resolved), "of", len(ids))
@@ -1200,6 +1309,54 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 	}
 	if len(out) > 0 {
 		e.log().Info("resolved comments before approval", "count", len(out))
+	}
+	return out
+}
+
+// residualReread is the set of paths this run actually reviewed, for residual
+// thread close and for what the judge is shown as standing leftovers.
+func residualReread(report *Report) map[string]bool {
+	reread := map[string]bool{}
+	if report == nil {
+		return reread
+	}
+	if report.Incremental != nil {
+		for _, p := range report.Incremental.Reviewed {
+			reread[p] = true
+		}
+		return reread
+	}
+	for _, p := range report.Files.Paths() {
+		reread[p] = true
+	}
+	return reread
+}
+
+// residualStandingForJudge lists earlier comments residual would close after a
+// yes: on a path this run re-read, not plan-skipped, and not already superseded.
+// The set must match resolveClearedForApprove's residual candidates so the
+// judge is not shown threads publish will leave open.
+func residualStandingForJudge(report *Report) []vcs.PriorComment {
+	if report == nil || report.prior == nil {
+		return nil
+	}
+	reread := residualReread(report)
+	done := map[int64]bool{}
+	for _, c := range report.Superseded {
+		done[c.ID] = true
+	}
+	excluded := map[string]bool{}
+	if report.Plan != nil {
+		for _, skip := range report.Plan.Skipped {
+			excluded[skip.Path] = true
+		}
+	}
+	var out []vcs.PriorComment
+	for _, c := range report.prior.Comments {
+		if c.ID == 0 || done[c.ID] || excluded[c.Path] || !reread[c.Path] {
+			continue
+		}
+		out = append(out, c)
 	}
 	return out
 }
@@ -2027,6 +2184,39 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	}
 	if e.AssessPractices != nil {
 		report.Practices = e.AssessPractices(ctx, ref, report.PullRequest, report)
+	}
+	// Failures stay COMMENT: ResidualApprove is set only on a parsed yes.
+	judgeRan := residualJudgeEligible(report, e.Config)
+	e.judgeResidualApprove(ctx, report)
+	if report.ResidualApprove {
+		// priorReview hides the prior when incremental is off; residual still
+		// needs it to close standing threads after a yes.
+		prior, priorOK := e.priorForResidualResolve(ctx, ref, report)
+		if !priorOK {
+			e.log().Warn("residual approve held; could not read earlier reviews")
+			report.ResidualApprove = false
+			report.ResidualReason = ""
+		} else if prior != nil {
+			var skipped []bundle.Skip
+			if report.Plan != nil {
+				skipped = report.Plan.Skipped
+			}
+			if more := e.resolveClearedForApprove(ctx, ref, prior, report, report.Findings, skipped); len(more) > 0 {
+				report.Superseded = append(report.Superseded, more...)
+			}
+		}
+		// reviewEvent still refuses APPROVE while threads stand; clear the
+		// flag so a granted log does not outlive a held event.
+		if report.ResidualApprove && standingThreadsRemain(report) {
+			e.log().Info("residual approve held; standing threads remain",
+				"prior", report.PriorComments, "superseded", len(report.Superseded))
+			report.ResidualApprove = false
+			report.ResidualReason = ""
+		}
+	}
+	// Refresh only when the judge could have added usage; the meter is cumulative.
+	if judgeRan && e.ModelUsage != nil {
+		report.ModelUsage = e.ModelUsage()
 	}
 	e.log().Info("publishing", "findings", len(report.Findings), "provider", e.Provider.Name())
 	review := Render(report, files, e.Config)
