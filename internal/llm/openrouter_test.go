@@ -17,7 +17,9 @@ import (
 // clearModelEnv isolates credential and endpoint tests from operator settings.
 func clearModelEnv(t *testing.T) {
 	t.Helper()
-	stubKeyring(t, nil, errors.New("test keystore is empty"))
+	// Keep developer keystore entries from supplying credentials behind the
+	// test's back. The tests below exercise environment precedence explicitly.
+	stubKeyring(t, nil, errors.New("test keyring unavailable"))
 	for _, name := range []string{
 		envOpenRouterAPIKey, "OPENAI_API_KEY", llms.EnvLLMAPIKey,
 		config.EnvBaseURL, config.EnvProvider, config.EnvModel,
@@ -232,5 +234,45 @@ func TestDefaultConfigSurvivesSanitize(t *testing.T) {
 
 	if _, err := BuildRoles(cfg); err != nil {
 		t.Fatalf("the shipped default must build with only %s set: %v", envSyntheticAPIKey, err)
+	}
+}
+
+// TestCallOptionsServiceTier pins the wire shape: a configured tier rides the
+// extra body as service_tier, and no tier sends nothing.
+func TestCallOptionsServiceTier(t *testing.T) {
+	tests := []struct {
+		name string
+		tier string
+		want string
+	}{
+		{"empty sends nothing", "", ""},
+		{"flex", "flex", "flex"},
+		{"priority", "priority", "priority"},
+		{"whitespace is trimmed", "  flex  ", "flex"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Client{Spec: config.ModelSpec{ServiceTier: tt.tier}}
+			var got map[string]any
+			for _, opt := range c.CallOptions() {
+				o := llms.CallOptions{}
+				opt(&o)
+				if v, ok := o.ExtraBody["service_tier"]; ok {
+					if got == nil {
+						got = map[string]any{}
+					}
+					got["service_tier"] = v
+				}
+			}
+			if tt.want == "" {
+				if got != nil {
+					t.Errorf("service_tier = %v, want none", got["service_tier"])
+				}
+				return
+			}
+			if got["service_tier"] != tt.want {
+				t.Errorf("service_tier = %v, want %q", got["service_tier"], tt.want)
+			}
+		})
 	}
 }

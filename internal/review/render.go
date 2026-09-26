@@ -54,6 +54,7 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 		Event:      reviewEvent(report, cfg),
 		Comments:   make([]vcs.Comment, 0, len(report.Findings)),
 		Head:       report.Head,
+		Progress:   report.Progress,
 		Incomplete: !report.reusableCoverage(),
 	}
 
@@ -400,6 +401,9 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// what was reviewed is a fact about coverage, and review.summary turning
 	// the walkthrough off must not turn it into a silent trim.
 	b.WriteString(budgetNote(report))
+	if report.ReusedRequests > 0 {
+		fmt.Fprintf(&b, "Reused %d completed model request(s) from the previous review. Downstream checks ran again.\n\n", report.ReusedRequests)
+	}
 	// Same rule, same reason. A stage that did not run is a fact about what
 	// the findings below have been through, and review.summary is a setting
 	// about prose.
@@ -461,6 +465,8 @@ func incrementalNotice(report *Report) string {
 			since = since[:7]
 		}
 		switch {
+		case inc.Recheck && since == "":
+			b.WriteString("**Rechecked the whole change because earlier findings remain.**\n")
 		case inc.Recheck:
 			fmt.Fprintf(&b, "**Rechecked the whole change because findings from the review at `%s` remain.**\n", since)
 		case len(inc.Reviewed) == 0:
@@ -1099,7 +1105,11 @@ func groupByReason(skips []bundle.Skip, omit string) string {
 
 	var b strings.Builder
 	for _, reason := range order {
-		fmt.Fprintf(&b, "- %s: %s\n", reason, strings.Join(byReason[reason], ", "))
+		paths := make([]string, len(byReason[reason]))
+		for i, p := range byReason[reason] {
+			paths[i] = inline(p)
+		}
+		fmt.Fprintf(&b, "- %s: %s\n", inline(reason), strings.Join(paths, ", "))
 	}
 	return b.String()
 }

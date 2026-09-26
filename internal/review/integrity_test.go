@@ -166,7 +166,10 @@ func TestIgnoredFilesKeepTheirThreadsWithoutBlockingReviewedThreads(t *testing.T
 			{ID: 2, Path: "other.go", Line: 3, Fingerprint: "beef"},
 		}},
 	}}
-	e := newEngine(t, &scriptedLLM{fallback: `{"findings":[]}`}, p, func(c *config.Config) { c.Review.Ignore = []string{"other.go"} })
+	e := newEngine(t, &scriptedLLM{fallback: `{"findings":[]}`}, p, func(c *config.Config) {
+		c.Review.Ignore = []string{"other.go"}
+		c.Review.Approve.Enabled = true
+	})
 	r, err := e.Review(context.Background(), vcs.Ref{})
 	if err != nil {
 		t.Fatal(err)
@@ -179,5 +182,9 @@ func TestIgnoredFilesKeepTheirThreadsWithoutBlockingReviewedThreads(t *testing.T
 	}
 	if p.published.Incomplete {
 		t.Fatal("ignored file prevented baseline reuse")
+	}
+	// The ignored thread still stands, so approval must not fire beside it.
+	if p.published.Event == vcs.EventApprove {
+		t.Fatal("approved while an ignored file still carries an open thread")
 	}
 }

@@ -99,8 +99,9 @@ func (e *Engine) applyVerdict(f *Finding, v Verdict) {
 	if strings.TrimSpace(v.Rationale) != "" {
 		f.Rationale = v.Rationale
 	}
-	// Leading whitespace affects both patch application and no-op detection.
-	if strings.TrimSpace(v.Suggestion) != "" {
+	// Suggestion text keeps its leading whitespace (it is part of the patch).
+	// Skip when the anchor moved: moveAnchor already cleared Suggestion.
+	if strings.TrimSpace(v.Suggestion) != "" && v.Line == f.Line {
 		f.Suggestion = v.Suggestion
 	}
 }

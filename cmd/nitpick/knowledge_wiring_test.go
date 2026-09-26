@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"testing"
 
@@ -25,30 +26,33 @@ import (
 // came back, and no test of the four that exist today would have caught it.
 func TestEveryEngineWiresRetrieval(t *testing.T) {
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", nil, 0)
+	entries, err := os.ReadDir(".")
 	if err != nil {
-		t.Fatalf("parse the command package: %v", err)
+		t.Fatalf("read the command package: %v", err)
 	}
-
-	for _, pkg := range pkgs {
-		for name, file := range pkg.Files {
-			if strings.HasSuffix(name, "_test.go") {
+	// Check all build variants, including handlers excluded on this platform.
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", name, err)
+		}
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
 				continue
 			}
-			for _, decl := range file.Decls {
-				fn, ok := decl.(*ast.FuncDecl)
-				if !ok || fn.Body == nil {
-					continue
-				}
-				if !buildsAnEngine(fn) {
-					continue
-				}
-				if !wiresKnowledge(fn) {
-					t.Errorf("%s builds a review.Engine and never sets Knowledge (%s). "+
-						"Build it through newEngine, or set Knowledge from review.BuildKnowledge: "+
-						"an engine without it reviews with retrieval off however the config reads.",
-						fn.Name.Name, fset.Position(fn.Pos()))
-				}
+			if !buildsAnEngine(fn) {
+				continue
+			}
+			if !wiresKnowledge(fn) {
+				t.Errorf("%s builds a review.Engine and never sets Knowledge (%s). "+
+					"Build it through newEngine, or set Knowledge from review.BuildKnowledge: "+
+					"an engine without it reviews with retrieval off however the config reads.",
+					fn.Name.Name, fset.Position(fn.Pos()))
 			}
 		}
 	}

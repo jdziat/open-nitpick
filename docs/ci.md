@@ -69,7 +69,9 @@ jobs:
           api-key: ${{ secrets.SYNTHETIC_API_KEY }}
 ```
 
-`@open-nitpick review` reviews the whole change again, not the increment.
+`@open-nitpick review` resumes the previous review, or starts one if none exists.
+`@open-nitpick restart-review` reviews the whole PR afresh. The older `re-review`
+and `rereview` aliases also restart.
 `@open-nitpick resolve` on an inline thread resolves it with a reply naming who
 asked. `@open-nitpick improve` runs the wider pass, below. Anything else is a
 question, answered in the same thread by the
@@ -238,13 +240,22 @@ saying so is more use than a workaround that leaks the key.
 
 ### Incremental review
 
-After a completed review with no standing findings, a later push is reviewed
-incrementally: only files changed since that review are read. While earlier
-findings remain, the whole change is rechecked. Confirmed findings affect the
-failure gate even when their comments are withheld from reposting. The review says which files it read and how many
-findings it withheld. A force push that makes the earlier revision
-unreachable reviews the whole change again. `review.incremental: false`
-reviews the whole change on every push.
+A review reuses successful model requests from its latest published review when
+the prompts, code and related context, model settings, and resolved policy still
+match. Failed requests retry. New commits rerun affected batches; unchanged
+batches keep their results. Changing one file can invalidate its whole batch or
+another batch that includes it as context.
+
+Analyzers, triage, validation, and approval run again over the combined results.
+Earlier findings still count, and unresolved threads still prevent approval.
+The summary reports how many model requests were reused. `review.incremental:
+false` disables reuse; `nitpick review -full` and `@open-nitpick restart-review`
+bypass it for one run.
+
+Progress is stored in the review on GitHub, so a new Actions runner can resume.
+Legacy reviews without these records start fresh. Records are bounded to fit
+GitHub's review body limit; omitted results are reviewed again. A run that never
+publishes a review does not save new progress.
 
 How a finding is recognised as already posted: every comment carries a
 fingerprint of its path, class and title, and a review carries the revision it

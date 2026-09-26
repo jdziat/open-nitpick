@@ -337,6 +337,9 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	}
 
 	body := stripMarkers(review.Summary)
+	if body == "" && len(review.Progress) > 0 {
+		body = defaultReviewBody(len(comments), "")
+	}
 	if truncated > 0 {
 		body += fmt.Sprintf("\n\n_%d further finding(s) were omitted to keep this review readable._", truncated)
 	}
@@ -353,6 +356,10 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 		body += "\n" + completionMarker(review.Head)
 	}
 	if marker := spendMarker(review.Spend); marker != "" {
+		body += "\n" + marker
+	}
+
+	if marker := progressMarker(review.Progress); marker != "" && len(body)+len(marker)+1 <= maxSummaryBytes {
 		body += "\n" + marker
 	}
 
@@ -495,6 +502,7 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 			}
 			latestID = r.GetID()
 			out.Head = ""
+			out.Progress = parseProgress(body)
 			if ok && strings.Contains(body, completionMarker(head)) {
 				out.Head = head
 			}

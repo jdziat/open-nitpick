@@ -140,6 +140,12 @@ model can produce a change that compiles, so falling back to `models.default`
 would ship an unmeasured capability under a measured model's name. Without
 `models.fix` the command refuses and says why.
 
+`models.security` is the optional model for `nitpick security` / `security_scan`.
+When unset, the security model pass falls back to `models.review` (then
+`models.default`). Unlike `models.fix`, that fallback is deliberate: a security
+pass is still a review, and the bake-off in `docs/findings.md` pins a measured
+winner here without forcing every PR review onto those weights.
+
 **Nothing is compiled, run, tested, formatted or linted before the pull request
 opens.** There is no checkout: the change is written through the forge's data
 API. The body says so, and the checks on the fix pull request are the only
@@ -294,9 +300,11 @@ models:
 review:
   fail_on: none                    # default: advisory. Set to error/critical to gate CI.
   min_severity: info               # drop anything below this entirely
-  incremental: true                # on a re-run, read only what changed since the last review
+  incremental: true                # reuse successful model requests whose inputs still match
   related_context: true            # default: attach imported definitions used on changed lines (see below)
   related_context_callers: false   # default: also walk the repository for callers of what the change redefines
+  related_context_preamble: ""     # default: the shipped "Context only" sentence; replace to tune how a model treats attached context
+  related_context_rerank: false    # default: order by use count; set true to prefer definitions whose body overlaps the change
   slop: false                      # default: also report the slop class (see "The slop class" below)
   max_files: 60
   token_budget_per_request: 60000  # per model CALL; raise it for large-context models
@@ -1073,9 +1081,12 @@ review:
   approve:
     enabled: true
     require_analyzers: false   # the default
+    residual:
+      enabled: false           # the default
+      max_severity: info       # nit, info, or warning
 ```
 
-Two conditions always hold, whatever else is configured:
+Two conditions always hold for a clean approval, whatever else is configured:
 
 - **No findings were published.** A finding filtered out by
   `review.min_severity` or the nitpick level is not a finding for this
@@ -1083,7 +1094,13 @@ Two conditions always hold, whatever else is configured:
 - **Every planned file was reviewed.** A run whose batches partly failed
   published no findings for the files it never read, and reading that as
   clean is how an approval comes to mean less than nothing. The files are
-  listed under "Reviewed from the diff only" and its neighbours.
+  listed under "Reviewed from the diff only" and its neighbours. File
+  coverage is required even when an engineering practices profile would
+  otherwise call the pipeline complete on deterministic checks alone.
+
+When those hold, earlier comment threads this tool left on the pull request
+are resolved first (via `review.resolve_superseded`) so the approval is not
+held back by findings the clean run already closed.
 
 `review.approve.require_analyzers` (default off) adds a third: every enabled
 analyzer ran, and none of them reported a coverage gap. Off by default because
@@ -1092,6 +1109,21 @@ wants the deterministic half counted says so. With it on, an analyzer that was
 skipped or failed holds the review at a comment, and so does a file
 `golangci-lint` read without checking, such as one a build constraint excluded
 or one the change suppressed.
+
+### Residual findings
+
+`review.approve.residual.enabled` (default off) is a second path under the
+same hard gates. When the clean path does not apply because published findings
+remain, but every published finding is at most
+`review.approve.residual.max_severity` (default `info`; allowed: `nit`,
+`info`, `warning`), the triage model judges whether those residuals are still
+non-blocking at the configured `persona.nitpick` level. A yes becomes APPROVE;
+a no, a model error, or any finding above the floor stays a comment. Residual
+cannot be enabled without `review.approve.enabled`. The floor must be at
+least `review.min_severity` or Validate refuses it as unreachable, and when
+`review.fail_on` is a finding severity the floor must sit strictly below it
+so residual cannot APPROVE a run that still fails the gate. The engine
+path is `judgeResidualApprove` in package `review`.
 
 The GitHub App or token needs Pull requests write, which posting reviews
 already needs. A GitHub App cannot approve a pull request it opened itself, so

@@ -16,15 +16,18 @@ func nitFixtures() []Fixture {
 }
 
 // redundantSnapshotCopyNitFixture copies a slice that is already a copy,
-// across
-// two files.
+// across two files.
 //
 // The note behind it is in docs/harness-notes.md#redundantsnapshotcopynitfixture.
 func redundantSnapshotCopyNitFixture() Fixture {
-	return Fixture{
-		Name: "cross-file-copy-nit",
-		Base: map[string]string{
-			"store/store.go": `package store
+	// Snapshot already copies in Base. Head only clarifies that contract in a
+	// doc comment (the same move as cross-file-sort-nit) and adds a caller that
+	// copies again. The caller's justifying comment was removed: with the
+	// contract visible, models read "Keep our own copy so the store cannot
+	// change this" as intentional defensive programming and return no finding,
+	// which is how the plant went dark under every preamble. Without that
+	// cover, the second allocation is just wasted work the contract rules out.
+	storeBase := `package store
 
 import "sync"
 
@@ -46,10 +49,19 @@ func (s *Store) Add(e Event) {
 	defer s.mu.Unlock()
 	s.events = append(s.events, e)
 }
-`,
-		},
-		Head: map[string]string{
-			"store/store.go": `package store
+
+// Snapshot returns the events recorded so far.
+func (s *Store) Snapshot() []Event {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	out := make([]Event, len(s.events))
+	copy(out, s.events)
+	return out
+}
+`
+
+	storeHead := `package store
 
 import "sync"
 
@@ -85,8 +97,12 @@ func (s *Store) Snapshot() []Event {
 	copy(out, s.events)
 	return out
 }
-`,
-			"report/summary.go": `package report
+`
+
+	// summaryPadding keeps the planted line outside the noise-tolerance radius
+	// of every other line, the same reason rosterHeading exists on
+	// cross-file-sort-nit.
+	summaryHead := `package report
 
 import "example.com/app/store"
 
@@ -100,31 +116,57 @@ type Summary struct {
 func Build(s *store.Store) Summary {
 	events := s.Snapshot()
 
-	// Keep our own copy so nothing the store does later can change what this
-	// request already rendered.
 	own := make([]store.Event, len(events))
 	copy(own, events)
 
 	return Summary{Events: own, Total: len(own)}
 }
-`,
+
+// SummaryTitle is the line shown above the event list.
+func SummaryTitle(name string, count int) string {
+	if count == 1 {
+		return name + ": 1 event"
+	}
+	if count == 0 {
+		return name + ": no events"
+	}
+	return name + ": several events"
+}
+`
+
+	return Fixture{
+		Name: "cross-file-copy-nit",
+		Base: map[string]string{
+			"store/store.go": storeBase,
+		},
+		Head: map[string]string{
+			"store/store.go":    storeHead,
+			"report/summary.go": summaryHead,
 		},
 		Extra: map[string]string{
 			"go.mod": "module example.com/app\n\ngo 1.25\n",
 		},
 		Defects: []Defect{{
 			Path: "report/summary.go",
-			Line: 17, // the make() that allocates the second slice
+			Line: 15, // the make() that allocates the second slice
 			// Not "copy": the change contains `copy(own, events)` and
 			// store.go's own `copy(out, s.events)`, so any comment that quotes
 			// either line would score as a detection of a redundancy it never
 			// noticed. Not "race", "concurrent" or "stale" either: those are
 			// the words of the objection this fixture exists to refuse.
 			Keywords: []string{
+				// Not "caller owns" / "the caller owns": those sit in Snapshot's
+				// added doc comment, and TestKeywordsAreNotTokensOfTheirOwnChange
+				// refuses them. Phrases below name the redundancy without quoting
+				// that comment; "re-copies" and "duplicates the …" are what the
+				// redesigned plant's first +ctx runs wrote.
 				"already returns a copy", "already a copy", "already returns a fresh",
-				"already returns its own", "copy of a copy", "copies it again",
-				"copied twice", "second copy", "redundant copy", "unnecessary copy",
-				"needless copy", "no need to copy", "allocates a second slice",
+				"already returns its own", "already returns caller-owned", "caller-owned",
+				"copy of a copy", "copies it again", "copying it again",
+				"copied twice", "second copy", "re-copies", "recopies",
+				"redundant copy", "unnecessary copy", "needless copy", "no need to copy",
+				"allocates a second slice", "second make", "duplicates the whole",
+				"duplicates the entire", "already allocates a fresh",
 			},
 			// resource is the least-wrong box, exactly as it is for
 			// capacity-hint-nit: the class means "leaks and unbounded growth"
@@ -134,15 +176,16 @@ func Build(s *store.Store) Summary {
 			Class:        config.ClassResource,
 			WantSeverity: config.SeverityNit,
 			SeverityNote: "nit under \"minor and optional\" — " +
-				"Snapshot's contract is in the same change, so the second slice defends against nothing " +
-				"and no input makes Build answer differently. Not info: \"a defensible concern the author " +
-				"should consciously accept or reject\" needs a trade-off to weigh, and a copy that buys " +
-				"nothing is not a position anyone holds. Not warning: there is no \"genuine hazard under " +
-				"plausible conditions\" — the hazard the comment names is the one Snapshot already " +
-				"removed. It shares the resource class with multi-defect's descriptor leak (error) and " +
-				"retry-no-backoff (warning) and differs from both in that nothing accumulates: the extra " +
-				"slice dies with the request.",
-			Why: "Snapshot already returns a slice the caller owns, so copying it again allocates and fills a second slice of the same length on every request",
+				"Snapshot's ownership contract is in the same pull request, so the second slice " +
+				"defends against nothing and no input makes Build answer differently. Not info: " +
+				"\"a defensible concern the author should consciously accept or reject\" needs a " +
+				"trade-off to weigh, and a copy that buys nothing is not a position anyone holds. " +
+				"Not warning: there is no \"genuine hazard under plausible conditions\" — the hazard " +
+				"a shared-buffer reading would name is the one Snapshot already removed. It shares " +
+				"the resource class with multi-defect's descriptor leak (error) and retry-no-backoff " +
+				"(warning) and differs from both in that nothing accumulates: the extra slice dies " +
+				"with the request.",
+			Why: "Snapshot already returns a copy, so copying it again allocates and fills a second slice of the same length on every request",
 		}},
 	}
 }

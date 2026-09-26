@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/practices"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
@@ -27,6 +28,12 @@ func TestApprovalIsOffUntilItIsAskedFor(t *testing.T) {
 	}
 	if cfg.Review.Approve.RequireAnalyzers {
 		t.Error("review.approve.require_analyzers defaults to true; the documented default is a clean review alone")
+	}
+	if cfg.Review.Approve.Residual.Enabled {
+		t.Fatal("review.approve.residual.enabled defaults to true; upgrading would start residual approving")
+	}
+	if cfg.Review.Approve.Residual.MaxSeverity != config.SeverityInfo {
+		t.Errorf("residual max_severity = %q, want info", cfg.Review.Approve.Residual.MaxSeverity)
 	}
 	if got := reviewEvent(&Report{}, cfg); got != vcs.EventComment {
 		t.Errorf("event on a clean review with approval off = %q, want %q", got, vcs.EventComment)
@@ -58,6 +65,37 @@ func TestAPartlyFailedRunIsNotApproved(t *testing.T) {
 	r := &Report{Incomplete: []string{"unreviewed.go"}}
 	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
 		t.Errorf("event on an incomplete run = %q, want %q: an unreviewed file is not a clean one", got, vcs.EventComment)
+	}
+}
+
+// TestIncompleteFilesBlockApprovalEvenWhenPracticesAreGreen pins the
+// engineering-profile hole: PipelineComplete follows practices.ExitCode, and
+// that can be 0 while model batches still failed. Complete() is what refuses
+// the approval the practices green light would otherwise permit.
+func TestIncompleteFilesBlockApprovalEvenWhenPracticesAreGreen(t *testing.T) {
+	target := practices.Target{Kind: practices.FileTarget, ID: "a.go"}
+	r := &Report{
+		Incomplete: []string{"unreviewed.go"},
+		Practices: &practices.Report{
+			SchemaVersion: practices.SchemaVersion,
+			Profile:       "engineering",
+			Revision:      "head",
+			PolicySource:  "operator",
+			PolicyDigest:  "digest",
+			Checks: []practices.Check{{
+				ID: "conventions", Version: "1", Instrument: practices.Deterministic,
+				State: practices.Completed, Planned: []practices.Target{target}, Examined: []practices.Target{target},
+			}},
+		},
+	}
+	if !r.PipelineComplete() {
+		t.Fatalf("setup: PipelineComplete must be true under a green practices report; problems=%v", r.Practices.Problems())
+	}
+	if r.Complete() {
+		t.Fatal("setup: Complete must be false while Incomplete is set")
+	}
+	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
+		t.Errorf("event = %q, want %q: practices green must not approve unread files", got, vcs.EventComment)
 	}
 }
 
@@ -224,5 +262,127 @@ func TestADegradedRunIsNotApproved(t *testing.T) {
 	r := &Report{Stages: []StageStatus{{Stage: "triage", Reason: "rate-limited"}}}
 	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
 		t.Errorf("event = %q, want %q on a degraded run", got, vcs.EventComment)
+	}
+}
+
+func residualApproving(max config.Severity) *config.Config {
+	cfg := approving(false)
+	cfg.Review.Approve.Residual.Enabled = true
+	if max != "" {
+		cfg.Review.Approve.Residual.MaxSeverity = max
+	}
+	return cfg
+}
+
+// TestResidualOffLeavesFindingsAsComments is today's behavior with residual
+// disabled: any published finding holds the review at COMMENT.
+func TestResidualOffLeavesFindingsAsComments(t *testing.T) {
+	r := &Report{
+		Findings:        []Finding{{Path: "a.go", Line: 1, Severity: "info", Title: "nit"}},
+		ResidualApprove: true, // even if a judge ran somehow
+	}
+	if got := reviewEvent(r, approving(false)); got != vcs.EventComment {
+		t.Errorf("event = %q, want comment when residual is off", got)
+	}
+}
+
+// TestResidualFloorBlocksWarningEvenWhenJudgeApproves is the deterministic
+// half of residual approve: the floor must refuse before the judge matters.
+func TestResidualFloorBlocksWarningEvenWhenJudgeApproves(t *testing.T) {
+	r := &Report{
+		Findings: []Finding{
+			{Path: "a.go", Line: 1, Severity: "info", Title: "doc"},
+			{Path: "b.go", Line: 2, Severity: "warning", Title: "real"},
+		},
+		ResidualApprove: true,
+	}
+	if got := reviewEvent(r, residualApproving(config.SeverityInfo)); got != vcs.EventComment {
+		t.Errorf("event = %q, want comment: warning exceeds max_severity info", got)
+	}
+}
+
+// TestResidualJudgeApproveSubmitsApproval covers the happy near-clean path.
+func TestResidualJudgeApproveSubmitsApproval(t *testing.T) {
+	r := &Report{
+		Findings:        []Finding{{Path: "a.go", Line: 1, Severity: "info", Title: "doc"}},
+		ResidualApprove: true,
+	}
+	if got := reviewEvent(r, residualApproving(config.SeverityInfo)); got != vcs.EventApprove {
+		t.Errorf("event = %q, want APPROVE for residual info with judge yes", got)
+	}
+}
+
+// TestResidualJudgeRefuseHoldsAtComment covers the judge saying no.
+func TestResidualJudgeRefuseHoldsAtComment(t *testing.T) {
+	r := &Report{
+		Findings:        []Finding{{Path: "a.go", Line: 1, Severity: "info", Title: "doc"}},
+		ResidualApprove: false,
+	}
+	if got := reviewEvent(r, residualApproving(config.SeverityInfo)); got != vcs.EventComment {
+		t.Errorf("event = %q, want comment when the residual judge refuses", got)
+	}
+}
+
+// TestResidualEmptyMaxSeverityFloorsAtInfo pins that an unset floor still
+// means info at comparison time, matching Defaults.
+func TestResidualEmptyMaxSeverityFloorsAtInfo(t *testing.T) {
+	cfg := residualApproving("")
+	cfg.Review.Approve.Residual.MaxSeverity = ""
+	if got := residualMaxSeverity(cfg); got != config.SeverityInfo {
+		t.Fatalf("empty max_severity = %q, want info", got)
+	}
+	if !residualWithinFloor([]Finding{{Severity: "info"}}, residualMaxSeverity(cfg)) {
+		t.Fatal("info must pass an empty-configured floor")
+	}
+	if residualWithinFloor([]Finding{{Severity: "warning"}}, residualMaxSeverity(cfg)) {
+		t.Fatal("warning must fail an empty-configured floor")
+	}
+}
+
+// TestResidualInvalidMaxSeverityFloorsAtInfo pins that a value validate would
+// reject cannot widen the residual floor at runtime.
+func TestResidualInvalidMaxSeverityFloorsAtInfo(t *testing.T) {
+	cfg := residualApproving(config.SeverityInfo)
+	cfg.Review.Approve.Residual.MaxSeverity = config.SeverityCritical
+	if got := residualMaxSeverity(cfg); got != config.SeverityInfo {
+		t.Fatalf("critical max_severity = %q, want info", got)
+	}
+	if residualWithinFloor([]Finding{{Severity: "warning"}}, residualMaxSeverity(cfg)) {
+		t.Fatal("warning must fail when an invalid floor collapses to info")
+	}
+}
+
+// TestResidualUnknownFindingSeverityFailsFloor pins that Rank's info fallback
+// cannot greenwash an unrecognized severity into residual approve.
+func TestResidualUnknownFindingSeverityFailsFloor(t *testing.T) {
+	if residualWithinFloor([]Finding{{Severity: "mystery"}}, config.SeverityInfo) {
+		t.Fatal("unknown finding severity must fail the residual floor")
+	}
+}
+
+// TestResidualEligibleRequiresNonEmptyFindingsWithinFloor pins when the
+// judge and the event path may approve.
+func TestResidualEligibleRequiresNonEmptyFindingsWithinFloor(t *testing.T) {
+	cfg := residualApproving(config.SeverityInfo)
+	if residualEligible(&Report{}, cfg) {
+		t.Error("empty findings must use the clean path, not residualEligible")
+	}
+	if residualEligible(&Report{Findings: []Finding{{Severity: "warning"}}}, cfg) {
+		t.Error("warning above info floor must not be residualEligible")
+	}
+	if !residualEligible(&Report{Findings: []Finding{{Severity: "info"}}}, cfg) {
+		t.Error("info within floor must be residualEligible")
+	}
+	if residualEligible(&Report{Findings: []Finding{{Severity: "info"}}, Incomplete: []string{"x.go"}}, cfg) {
+		t.Error("incomplete run must not be residualEligible")
+	}
+	if !residualJudgeEligible(&Report{Findings: []Finding{{Severity: "info"}}, PriorComments: 2}, cfg) {
+		t.Error("judge eligibility must not require cleared standing threads")
+	}
+	if residualJudgeEligible(&Report{Findings: []Finding{{Severity: "info"}}, AlreadyReported: []Finding{{Severity: "info"}}}, cfg) {
+		t.Error("judge eligibility must refuse when findings already stand on the pull request")
+	}
+	if residualEligible(&Report{Findings: []Finding{{Severity: "info"}}, PriorComments: 2}, cfg) {
+		t.Error("residualEligible must still require cleared standing threads")
 	}
 }

@@ -241,6 +241,29 @@ func TestShoutingIsWordsNotShape(t *testing.T) {
 	}
 }
 
+// TestEssayCommentsAreFound pins the stacked-justification tell: a
+// because-clause ending in a comparative, or a defeat counterfactual. A bare
+// comparative that only states the constraint must stay silent.
+func TestEssayCommentsAreFound(t *testing.T) {
+	for _, src := range []string{
+		"package p\n\n// Skip the suggestion because a patch on the wrong line is worse than none.\nif true {}\n",
+		"package p\n\n// Reattaching triage's suggestion would defeat that.\nif true {}\n",
+		// Comparative halves on consecutive lines of one block.
+		"package p\n\n// Keep the clear because a cost column that is sometimes\n// measured and sometimes guessed is worse than no column.\nif true {}\n",
+		// The three-line stacked form that prompted the rule.
+		"package p\n\n// A relocated finding has no suggestion: moveAnchor already cleared it\n// because a patch over the wrong line is worse than no patch. Reattaching\n// triage's own suggestion would defeat that.\nif true {}\n",
+	} {
+		if got := Scan("a.go", src); !strings.Contains(rules(got), "essay-comment") {
+			t.Errorf("not flagged: %q -> %s", src, rules(got))
+		}
+	}
+
+	// A bare comparative stating the constraint is not the essay.
+	if got := Scan("a.go", "package p\n\n// A wrong line is worse than none.\nif true {}\n"); strings.Contains(rules(got), "essay-comment") {
+		t.Errorf("a bare comparative was flagged: %+v", got)
+	}
+}
+
 // A comment that narrates its own history is a commit message living past the
 // commit that carried it.
 func TestChangelogCommentsAreFound(t *testing.T) {

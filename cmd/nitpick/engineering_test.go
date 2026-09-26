@@ -462,12 +462,12 @@ func TestReviewBoundaryApplicabilityKeepsMissingGoInputsIncomplete(t *testing.T)
 	}
 }
 
-func TestEngineeringScopeRetainsFileLimitAndMarksSelectedProfile(t *testing.T) {
+func TestEngineeringScopeLiftsFileCapAndMarksSelectedProfile(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Review.MaxFiles = 3
 	applyEngineeringScope(cfg)
-	if cfg.Practices.Profile != "engineering" || cfg.Review.MaxFiles != 3 {
-		t.Fatalf("profile selection lost the explicit scope: profile=%q files=%d", cfg.Practices.Profile, cfg.Review.MaxFiles)
+	if cfg.Practices.Profile != "engineering" || cfg.Review.MaxFiles != 1<<30 {
+		t.Fatalf("engineering scope kept a file cap or lost the profile: profile=%q files=%d", cfg.Practices.Profile, cfg.Review.MaxFiles)
 	}
 }
 
@@ -629,5 +629,67 @@ func TestFocusedDesignCompletionDoesNotInventWholeFileSlopCoverage(t *testing.T)
 	got = checks()
 	if got[0].State != practices.Completed || len(got[0].Examined) != 1 || len(got[1].Examined) != 2 || len(got[1].Tasks) != 2 || !slices.Contains(got[1].Context, practices.Target{Kind: practices.FileTarget, ID: "app.go"}) {
 		t.Fatalf("whole-source pass lost slop or inflated design coverage: %+v", got)
+	}
+}
+
+type fixedContent struct{ body []byte }
+
+func (fixedContent) Name() string { return "fixture" }
+func (fixedContent) PullRequest(context.Context, vcs.Ref) (*vcs.PullRequest, error) {
+	return &vcs.PullRequest{}, nil
+}
+func (fixedContent) Diff(context.Context, vcs.Ref) ([]byte, error)            { return nil, nil }
+func (fixedContent) PublishReview(context.Context, vcs.Ref, vcs.Review) error { return nil }
+func (p fixedContent) FileContent(context.Context, vcs.Ref, string) ([]byte, error) {
+	return p.body, nil
+}
+
+func TestDriftedReviewedFileIsNotMeasured(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "-q")
+	git(t, root, "commit", "--allow-empty", "-qm", "feat: initial")
+	cfg := config.Defaults()
+	report := &review.Report{
+		Head:  "HEAD",
+		Files: diff.Files{{Path: "a.go"}},
+		Plan: &bundle.Plan{Batches: []bundle.Batch{{Entries: []bundle.Entry{{
+			File: &diff.File{Path: "a.go"}, Content: "package a",
+		}}}}},
+	}
+	result := assessReviewPractices(t.Context(), root, cfg, vcs.Ref{Base: "HEAD", Head: "HEAD"}, nil, report, fixedContent{body: []byte("package b")})
+	var sawSnapshot bool
+	for _, c := range result.Checks {
+		switch c.ID {
+		case "snapshot":
+			sawSnapshot = true
+			if len(c.Omitted) != 1 || c.Omitted[0].Target.ID != "a.go" {
+				t.Fatalf("snapshot omitted = %+v", c.Omitted)
+			}
+		case "slop", "design":
+			for _, planned := range c.Planned {
+				if planned.ID == "a.go" {
+					t.Fatalf("%s still measures the drifted file", c.ID)
+				}
+			}
+		}
+	}
+	if !sawSnapshot {
+		t.Fatal("drift was not recorded")
+	}
+}
+
+// nilPolicy answers the BasePolicy "untouched config" tuple: nil cfg, not modified.
+type nilPolicy struct{}
+
+func (nilPolicy) ResolvePolicy(context.Context, vcs.Ref, *vcs.PullRequest, []string) (*config.Config, bool, error) {
+	return nil, false, nil
+}
+
+func TestEngineeringReviewPolicySurvivesNilSourceAndLoaded(t *testing.T) {
+	// Mutation: drop the cfg-nil guard and this panics on cfg.Practices.
+	p := &engineeringReviewPolicy{source: nilPolicy{}, loaded: nil}
+	cfg, modified, err := p.ResolvePolicy(context.Background(), vcs.Ref{}, nil, nil)
+	if err != nil || cfg != nil || modified {
+		t.Fatalf("got cfg=%v modified=%v err=%v, want nil/false/nil", cfg, modified, err)
 	}
 }

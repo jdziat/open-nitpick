@@ -33,6 +33,7 @@ func TestEveryReviewingEngineResolvesItsPolicy(t *testing.T) {
 	// reviews fixtures with no forge behind them.
 	exempt := map[string]string{
 		filepath.Join(root, "cmd", "nitpick", "fullreview.go"): "a tree review, whose operator wrote the policy",
+		filepath.Join(root, "cmd", "nitpick", "security.go"):   "a tree security scan, whose operator wrote the policy",
 		filepath.Join(root, "internal", "evals", "harness.go"): "fixtures, with no forge and no base revision",
 	}
 	used := map[string]bool{}

@@ -122,6 +122,11 @@ func Defaults() *Config {
 			// notes/plan-full-review.md, section 2.
 			Slop:                 false,
 			RelatedContextTokens: 16000,
+			Approve: Approve{
+				// Residual max_severity is stated so an operator who turns
+				// residual on without naming a floor gets info, not zero.
+				Residual: ApproveResidual{MaxSeverity: ResidualMaxSeverityDefault},
+			},
 		},
 		Persona: DefaultPersona(),
 		// Stated rather than left to the zero value, because "off" here is a
@@ -140,6 +145,11 @@ func Defaults() *Config {
 			// want semgrep, or a line in someone's .golangci.yml, deciding its
 			// gate says so.
 			MaxSeverity: SeverityCritical,
+		},
+		Security: Security{
+			// Warning, not none: a security scan that never fails is theater.
+			FailOn: SeverityWarning,
+			Model:  ptr(true),
 		},
 	}
 }

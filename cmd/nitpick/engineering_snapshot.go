@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -16,7 +17,7 @@ func readEngineeringTree(ctx context.Context, root string, policy config.Practic
 	tree := vcs.NewTree(vcs.NewLocal(root, nil), nil)
 	tree.MaxBytes, tree.Capture = policy.Review.MaxFileBytes, true
 	if _, err := tree.Diff(ctx, vcs.Ref{}); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("read engineering tree %s: %w", root, err)
 	}
 	cfg := &config.Config{Review: policy.Review, Practices: policy.Practices}
 	cfg.Review.Ignore = append(slices.Clone(cfg.Review.Ignore), policy.Practices.Ignore...)

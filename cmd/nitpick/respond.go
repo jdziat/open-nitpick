@@ -41,7 +41,7 @@ func runRespond(ctx context.Context, args []string) error {
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
 	fs.StringVar(&f.logFormat, "log-format", "text", "log format: text or json")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: nitpick respond [flags]\n\nAnswers a pull request comment that mentions the reviewer: \"@open-nitpick review\" reviews the whole change again,\n\"@open-nitpick resolve\" on a thread resolves it, anything else is a question answered in the thread.\nRuns inside GitHub Actions on issue_comment and pull_request_review_comment events.\n\nFlags:")
+		fmt.Fprintln(os.Stderr, "Usage: nitpick respond [flags]\n\nAnswers a pull request comment that mentions the reviewer: \"@open-nitpick review\" resumes the review,\n\"@open-nitpick restart-review\" starts a fresh review,\n\"@open-nitpick resolve\" on a thread resolves it, anything else is a question answered in the thread.\nRuns inside GitHub Actions on issue_comment and pull_request_review_comment events.\n\nFlags:")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -154,13 +154,8 @@ func runRespond(ctx context.Context, args []string) error {
 	}
 
 	switch kind {
-	case converse.KindReview:
-		// The whole change, not the increment: a person asking for a review
-		// wants everything looked at again.
-		reviewArgs := []string{"-repo", f.repo, "-owner", ref.Owner, "-repo-name", ref.Repo, "-pr", strconv.Itoa(ref.Number), "-full"}
-		if f.configPath != "" {
-			reviewArgs = append(reviewArgs, "-config", f.configPath)
-		}
+	case converse.KindReview, converse.KindRestartReview:
+		reviewArgs := mentionReviewArgs(f, ref, kind)
 		err := runReview(ctx, reviewArgs)
 		if err != nil && !errors.Is(err, errFindings) {
 			_ = gh.React(ctx, ref, ev.CommentID, ev.Inline, "confused")
@@ -307,4 +302,15 @@ func respondPolicy(ctx context.Context, provider vcs.Provider, repo string, cfg 
 	log.Warn("the change modifies the configuration; the version in the change was not applied",
 		"policy", resolved.Policy.String())
 	return resolved, raw, nil
+}
+
+func mentionReviewArgs(f reviewFlags, ref vcs.Ref, kind converse.Kind) []string {
+	args := []string{"-repo", f.repo, "-owner", ref.Owner, "-repo-name", ref.Repo, "-pr", strconv.Itoa(ref.Number)}
+	if kind == converse.KindRestartReview {
+		args = append(args, "-full")
+	}
+	if f.configPath != "" {
+		args = append(args, "-config", f.configPath)
+	}
+	return args
 }

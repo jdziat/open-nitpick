@@ -1,0 +1,501 @@
+<details>
+<summary>Deterministic analyzers: 2 ran, 1 skipped</summary>
+
+Analyzer configuration is policy, and a change may not supply the policy it is
+reviewed under, so no analyzer read this repository's own lint settings.
+
+- gitleaks: ran: isolated: open-nitpick&#39;s own analyzer config
+- golangci-lint: ran: isolated: open-nitpick&#39;s own analyzer config
+- osv-scanner: skipped: no files it analyzes were selected for review
+
+</details>
+Read 50 changed files. 26 findings: 2 error, 16 warning, 8 info. Analyzers: gitleaks, golangci-lint. 20 files could not be reviewed.
+
+**Findings:** 2 error, 16 warning, 8 info
+
+> **This review is incomplete.** 20 file(s) could not be reviewed, so the absence of findings for them means nothing:
+>
+> - `cmd/nitpick/commits.go`
+> - `cmd/nitpick/commits_test.go`
+> - `cmd/nitpick/configref.go`
+> - `cmd/nitpick/configref_test.go`
+> - `cmd/nitpick/engineering.go`
+> - `cmd/nitpick/engineering_model.go`
+> - `cmd/nitpick/mcp.go`
+> - `cmd/nitpick/mcp_test.go`
+> - `cmd/nitpick/mcpinstall.go`
+> - `cmd/nitpick/mcpinstall_test.go`
+> - `cmd/nitpick/queue_test.go`
+> - `cmd/nitpick/repo_standards.go`
+> - `cmd/nitpick/security_test.go`
+> - `cmd/nitpick/slop.go`
+> - `cmd/nitpick/slop_test.go`
+> - `cmd/nitpick/standards.go`
+> - `cmd/nitpick/standards_test.go`
+> - `internal/bundle/bundle.go`
+> - `internal/bundle/bundle_test.go`
+> - `internal/bundle/callers.go`
+
+
+<details><summary>Engineering practices</summary>
+
+<pre>Engineering practices (engineering):
+  Policy: /home/jdziat/Code/jdziat/open-nitpick/.nitpick.yaml
+  slop-tells: completed; 50/50 targets examined, 1 findings
+    slop.filler-qualifier [file; advisory] cmd/nitpick/fix.go:35: filler-qualifier
+      And the one that is actually about writing. An association says how th...
+      Suggested correction: delete the word; if the sentence loses meaning, say the meaning
+  conventions: completed; 49/49 targets examined, 0 findings
+  design-boundaries: completed; 49/49 targets examined, 0 findings
+  commits: unavailable; 0/0 targets examined, 0 findings
+    commit range unavailable; supply -base
+  slop: partial; 30/50 targets examined, 1 findings
+    required model context or stages did not complete
+    model.slop [file; advisory] cmd/nitpick/engineering_review.go:55: Policy digest computed from discarded marshal error
+      The json.Marshal error is dropped, so a marshal failure produces a digest that does not match the policy. The digest is the evidence that the reviewed policy is the accepted one.
+  design: partial; 30/50 targets examined, 25 findings
+    required model context or stages did not complete
+    model.correctness [file; advisory] cmd/nitpick/engineering_review.go:40: Nil cfg dereferenced when source returns no config
+      When p.source.ResolvePolicy returns (nil, false, nil) and p.loaded is nil, cfg stays nil and line 40 reads cfg.Practices.Profile. BasePolicy.ResolvePolicy returns that tuple for an untouched config file, so the panic is reachable without a loaded config.
+    model.correctness [file; advisory] cmd/nitpick/security.go:217: Nil tree dereference when model pass fails
+      securityTreeReview returns a nil tree with an error when newEngine or engine.Review fails, and securityScan checks err only after the switch. The tree.Skipped loop dereferences the nil tree, replacing the intended error return with a panic.
+    model.correctness [file; advisory] cmd/benchrepo/main.go:93: Presentation panics on empty fixture title
+      A fixture name that reduces to an empty title makes title[:1] panic. The panic aborts the whole corpus instead of skipping one fixture.
+      Suggested correction: 	title = strings.NewReplacer(&#34;-nit&#34;, &#34;&#34;, &#34;-&#34;, &#34; &#34;).Replace(f.Name)
+	if title == &#34;&#34; {
+		return f.Name, &#34;Small change; see the diff.&#34;
+	}
+	return strings.ToUpper(title[:1]) + title[1:], &#34;Small change; see the diff.&#34;
+    model.correctness [file; advisory] cmd/benchrepo/main.go:321: Manifest marshal error discarded
+      The json.MarshalIndent error is dropped and the result is written unconditionally. If marshalling fails, an empty manifest is written and later runs fail with a misleading parse error.
+      Suggested correction: 	blob, err := json.MarshalIndent(manifest, &#34;&#34;, &#34;  &#34;)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(manifestPath(repo)), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(manifestPath(repo), append(blob, &#39;\n&#39;), 0o644)
+    model.correctness [file; advisory] cmd/benchrepo/main.go:374: prNumbers truncates at 200 pull requests
+      gh pr list --limit 200 silently omits PRs beyond the limit. Once the benchmark repository exceeds 200 PRs, trigger skips those fixtures and score reports no PR for them.
+      Suggested correction: 	raw, err := gh(&#34;pr&#34;, &#34;list&#34;, &#34;--repo&#34;, repo, &#34;--state&#34;, &#34;all&#34;, &#34;--limit&#34;, &#34;1000&#34;, &#34;--json&#34;, &#34;number,headRefName&#34;)
+    model.correctness [file; advisory] cmd/nitpick/engineering_review.go:87: Drifted file is still measured
+      When the on-disk body differs from the reviewed content, the fresh body is still added to the measured set. Standards and slop checks then run over bytes the model did not review while the snapshot reports the file as omitted.
+    model.correctness [file; advisory] cmd/nitpick/engineering_review.go:130: designContextFiles error return ignored
+      The function&#39;s error return is discarded even though metadataErrors is used. A failure not also reported through metadataErrors is lost, and the boundaries check can report Completed over incomplete metadata.
+    model.concurrency [file; advisory] cmd/nitpick/engineering_usage.go:46: Roles.Build updated without the usage lock
+      attach writes roles.Build after roles.Each has metered existing clients, while Roles.For reads it under r.mu. A concurrent For can observe a nil or stale Build and create an unmetered client.
+    model.tests [file; advisory] cmd/nitpick/enginewiring_test.go:172: wired treats any non-nil prefix as a wired field
+      wired returns true for any text after the field name that does not start with nil, so `Policy: someUnsetVar` or a field set to a zero value reads as wired. The scan is the only guard against an engine built without a resolver, and this makes it pass for the exact case it exists to catch.
+    model.correctness [file; advisory] cmd/nitpick/improve.go:144: Failed prior review read reposts all findings
+      When gh.PriorReview fails, prior is nil and dropPublished returns the findings unchanged. The pass then republishes findings already on the pull request.
+    model.resource [file; advisory] cmd/nitpick/init.go:193: scanRepo walks entire tree without cancellation
+      filepath.WalkDir descends every directory except the skip list, with no depth bound or context. A deep or huge checkout makes init read the entire filesystem before writing anything.
+    model.tests [file; advisory] cmd/nitpick/init_test.go:287: Workflow overwrite guard is untested
+      The first runInitIn writes.nitpick.yaml, so the second runInit fails for the existing config before reaching the workflow check. Deleting the workflow-overwrite guard would leave the assertion passing.
+    model.tests [file; advisory] cmd/nitpick/repo_standards_test.go:70: Whole-tree test does not prove the tree was walked
+      The assertion only checks that the fixture saw two files, and the fixture appends every file it receives. The test passes whether the command passed the whole tree or any two paths.
+    model.correctness [file; advisory] cmd/nitpick/respond.go:111: Mention re-parse can accept a different handle
+      When the change edits.nitpick.yaml, the command is re-parsed against the resolved policy mention instead of the loaded config mention. If the two handles differ, the second parse can accept a comment the first gate did not authorize.
+    model.resource [file; advisory] cmd/nitpick/review.go:235: Publish failure leaves CI exit status green
+      A publish failure is logged only as a warning and the exit status is driven by the gate, so a CI job that cannot post can finish green. The review is visible only in the log.
+    model.tests [file; advisory] cmd/nitpick/review_test.go:386: captureStdout leaks goroutine on early return
+      The pipe reader goroutine is joined only at the end. If fn panics or the test fails before that receive, the goroutine and pipe file descriptors are not released.
+    model.correctness [file; advisory] cmd/nitpick/security.go:238: Incomplete security run reports a clean gate
+      out.Failed is computed only when roster.Complete is true, so a missing scanner or oversized skipped file leaves Failed false even with a critical finding. Consumers reading the JSON failed field see a clean gate.
+    model.correctness [file; advisory] cmd/nitpick/engineering_review.go:111: CommitSHA error swallowed and base unpinned
+      A failure to resolve the base revision is discarded and pinnedBase becomes empty. Baseline standing values are then attributed to the change without indicating that the base could not be named.
+    model.correctness [file; advisory] cmd/nitpick/engineering_snapshot.go:18: Tree.Diff error returned without context
+      The error is returned bare, so a caller cannot tell which root or policy produced it. The tree review path already wraps errors with the failing path.
+    model.correctness [file; advisory] cmd/nitpick/fullreview.go:147: Nil report publish error uses a different path
+      An ErrPublish with a nil report is returned as a hard error, while the caller returns errIncomplete only when the report is non-nil. The two paths report different failures for the same underlying condition.
+    model.contract [file; advisory] cmd/nitpick/improve.go:151: Improve posts a comment when it found nothing
+      The body is posted unconditionally, so a clean pass still adds a comment and a +1 reaction. A caller asking for a wider pass on a clean change gets a notification with no content.
+    model.correctness [file; advisory] cmd/nitpick/init.go:464: Chmod failure leaves no config after validation
+      The temp file is created 0600 and chmodded to 0644 after validation. If chmod fails, the user gets an error for an otherwise valid config and no file is written.
+    model.correctness [file; advisory] cmd/nitpick/respond.go:93: Bot marker check can ignore a human comment
+      Any comment containing the bot login is treated as the reviewer&#39;s own, so a human quoting the marker is silently ignored. The check also runs after command parsing, so a matching comment can be dropped without the explanatory log line.
+    model.maintainability [file; advisory] cmd/nitpick/review.go:329: Selected callback mutates engine fields set directly
+      The selected closure writes engine.Instruction and engine.Full, which are also set directly. The effective values depend on whether the policy resolver invokes selected and in what order relative to the direct assignments.
+    model.correctness [file; advisory] cmd/nitpick/security.go:381: Security pass disables the policy resolver
+      Setting engine.Policy to nil makes the security pass review the working tree under the configuration on disk, including a.nitpick.yaml supplied by the tree. The exposure is limited to a local run, but the comment does not explain why the resolver is dropped.
+  linters: completed; 50/50 targets examined, 0 findings
+  security: not_selected; 0/0 targets examined, 0 findings
+    no separate security assessment selected
+Model usage is a provider-reported lower bound; SDK retries may add usage and no monetary tariff is assumed.
+  openrouter/deepseek/deepseek-v4.1-flash: 426209 prompt tokens, 428731 completion tokens; 30 calls with usage, 0 without usage, 23 failed
+  synthetic/hf:Qwen/Qwen3.8-27B: 6849 prompt tokens, 17308 completion tokens; 1 calls with usage, 0 without usage, 0 failed
+Design scope: Go import graph only; dynamic calls and external dependency implementations are not resolved
+Design scope: package inventory is not proof of complete architecture review
+Design scope: imports include all selected Go sources regardless of build constraints
+Incomplete: commits: required check is unavailable
+</pre>
+
+</details>
+
+<sub>Reviewed by open-nitpick.</sub>
+
+cmd/nitpick/engineering_review.go:40
+  **🟠 error · correctness**
+  
+  Nil cfg dereferenced when source returns no config
+  
+  When p.source.ResolvePolicy returns (nil, false, nil) and p.loaded is nil, cfg stays nil and line 40 reads cfg.Practices.Profile. BasePolicy.ResolvePolicy returns that tuple for an untouched config file, so the panic is reachable without a loaded config.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/security.go:217
+  **🟠 error · correctness**
+  
+  Nil tree dereference when model pass fails
+  
+  securityTreeReview returns a nil tree with an error when newEngine or engine.Review fails, and securityScan checks err only after the switch. The tree.Skipped loop dereferences the nil tree, replacing the intended error return with a panic.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/benchrepo/main.go:93
+  **🟡 warning · correctness**
+  
+  Presentation panics on empty fixture title
+  
+  A fixture name that reduces to an empty title makes title[:1] panic. The panic aborts the whole corpus instead of skipping one fixture.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+  
+  Suggested change:
+  
+  ```
+  	title = strings.NewReplacer("-nit", "", "-", " ").Replace(f.Name)
+  	if title == "" {
+  		return f.Name, "Small change; see the diff."
+  	}
+  	return strings.ToUpper(title[:1]) + title[1:], "Small change; see the diff."
+  ```
+
+cmd/benchrepo/main.go:321
+  **🟡 warning · error-handling**
+  
+  Manifest marshal error discarded
+  
+  The json.MarshalIndent error is dropped and the result is written unconditionally. If marshalling fails, an empty manifest is written and later runs fail with a misleading parse error.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+  
+  Suggested change:
+  
+  ```
+  	blob, err := json.MarshalIndent(manifest, "", "  ")
+  	if err != nil {
+  		return err
+  	}
+  	if err := os.MkdirAll(filepath.Dir(manifestPath(repo)), 0o755); err != nil {
+  		return err
+  	}
+  	return os.WriteFile(manifestPath(repo), append(blob, '\n'), 0o644)
+  ```
+
+cmd/benchrepo/main.go:374
+  **🟡 warning · correctness**
+  
+  prNumbers truncates at 200 pull requests
+  
+  gh pr list --limit 200 silently omits PRs beyond the limit. Once the benchmark repository exceeds 200 PRs, trigger skips those fixtures and score reports no PR for them.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+  
+  ```suggestion
+  	raw, err := gh("pr", "list", "--repo", repo, "--state", "all", "--limit", "1000", "--json", "number,headRefName")
+  ```
+
+cmd/nitpick/engineering_review.go:55
+  **🟡 warning · error-handling**
+  
+  Policy digest computed from discarded marshal error
+  
+  The json.Marshal error is dropped, so a marshal failure produces a digest that does not match the policy. The digest is the evidence that the reviewed policy is the accepted one.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/engineering_review.go:87
+  **🟡 warning · correctness**
+  
+  Drifted file is still measured
+  
+  When the on-disk body differs from the reviewed content, the fresh body is still added to the measured set. Standards and slop checks then run over bytes the model did not review while the snapshot reports the file as omitted.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/engineering_review.go:130
+  **🟡 warning · error-handling**
+  
+  designContextFiles error return ignored
+  
+  The function's error return is discarded even though metadataErrors is used. A failure not also reported through metadataErrors is lost, and the boundaries check can report Completed over incomplete metadata.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/engineering_usage.go:46
+  **🟡 warning · concurrency**
+  
+  Roles.Build updated without the usage lock
+  
+  attach writes roles.Build after roles.Each has metered existing clients, while Roles.For reads it under r.mu. A concurrent For can observe a nil or stale Build and create an unmetered client.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/enginewiring_test.go:172
+  **🟡 warning · tests**
+  
+  wired treats any non-nil prefix as a wired field
+  
+  wired returns true for any text after the field name that does not start with nil, so `Policy: someUnsetVar` or a field set to a zero value reads as wired. The scan is the only guard against an engine built without a resolver, and this makes it pass for the exact case it exists to catch.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/improve.go:144
+  **🟡 warning · correctness**
+  
+  Failed prior review read reposts all findings
+  
+  When gh.PriorReview fails, prior is nil and dropPublished returns the findings unchanged. The pass then republishes findings already on the pull request.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/init.go:193
+  **🟡 warning · resource**
+  
+  scanRepo walks entire tree without cancellation
+  
+  filepath.WalkDir descends every directory except the skip list, with no depth bound or context. A deep or huge checkout makes init read the entire filesystem before writing anything.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/init_test.go:287
+  **🟡 warning · tests**
+  
+  Workflow overwrite guard is untested
+  
+  The first runInitIn writes.nitpick.yaml, so the second runInit fails for the existing config before reaching the workflow check. Deleting the workflow-overwrite guard would leave the assertion passing.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/repo_standards_test.go:70
+  **🟡 warning · tests**
+  
+  Whole-tree test does not prove the tree was walked
+  
+  The assertion only checks that the fixture saw two files, and the fixture appends every file it receives. The test passes whether the command passed the whole tree or any two paths.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/respond.go:111
+  **🟡 warning · security**
+  
+  Mention re-parse can accept a different handle
+  
+  When the change edits.nitpick.yaml, the command is re-parsed against the resolved policy mention instead of the loaded config mention. If the two handles differ, the second parse can accept a comment the first gate did not authorize.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/review.go:235
+  **🟡 warning · resource**
+  
+  Publish failure leaves CI exit status green
+  
+  A publish failure is logged only as a warning and the exit status is driven by the gate, so a CI job that cannot post can finish green. The review is visible only in the log.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/review_test.go:386
+  **🟡 warning · tests**
+  
+  captureStdout leaks goroutine on early return
+  
+  The pipe reader goroutine is joined only at the end. If fn panics or the test fails before that receive, the goroutine and pipe file descriptors are not released.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/security.go:238
+  **🟡 warning · correctness**
+  
+  Incomplete security run reports a clean gate
+  
+  out.Failed is computed only when roster.Complete is true, so a missing scanner or oversized skipped file leaves Failed false even with a critical finding. Consumers reading the JSON failed field see a clean gate.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/engineering_review.go:111
+  **🔵 info · error-handling**
+  
+  CommitSHA error swallowed and base unpinned
+  
+  A failure to resolve the base revision is discarded and pinnedBase becomes empty. Baseline standing values are then attributed to the change without indicating that the base could not be named.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/engineering_snapshot.go:18
+  **🔵 info · correctness**
+  
+  Tree.Diff error returned without context
+  
+  The error is returned bare, so a caller cannot tell which root or policy produced it. The tree review path already wraps errors with the failing path.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/fullreview.go:147
+  **🔵 info · correctness**
+  
+  Nil report publish error uses a different path
+  
+  An ErrPublish with a nil report is returned as a hard error, while the caller returns errIncomplete only when the report is non-nil. The two paths report different failures for the same underlying condition.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/improve.go:151
+  **🔵 info · contract**
+  
+  Improve posts a comment when it found nothing
+  
+  The body is posted unconditionally, so a clean pass still adds a comment and a +1 reaction. A caller asking for a wider pass on a clean change gets a notification with no content.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/init.go:464
+  **🔵 info · correctness**
+  
+  Chmod failure leaves no config after validation
+  
+  The temp file is created 0600 and chmodded to 0644 after validation. If chmod fails, the user gets an error for an otherwise valid config and no file is written.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/respond.go:93
+  **🔵 info · correctness**
+  
+  Bot marker check can ignore a human comment
+  
+  Any comment containing the bot login is treated as the reviewer's own, so a human quoting the marker is silently ignored. The check also runs after command parsing, so a matching comment can be dropped without the explanatory log line.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/review.go:329
+  **🔵 info · maintainability**
+  
+  Selected callback mutates engine fields set directly
+  
+  The selected closure writes engine.Instruction and engine.Full, which are also set directly. The effective values depend on whether the policy resolver invokes selected and in what order relative to the direct assignments.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+cmd/nitpick/security.go:381
+  **🔵 info · correctness**
+  
+  Security pass disables the policy resolver
+  
+  Setting engine.Policy to nil makes the security pass review the working tree under the configuration on disk, including a.nitpick.yaml supplied by the tree. The exposure is limited to a local run, but the comment does not explain why the resolver is dropped.
+  
+  <sub>flagged by openrouter/deepseek/deepseek-v4.1-flash · triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>
+
+
+Known advisories (from the dependency scanner; not judged by the model):
+  none reported. If osv-scanner is not installed, no lockfile was scanned; see the analyzer roster above.
+
+Security risks:
+  none reported.
+
+Bugs:
+  [error/correctness] cmd/nitpick/engineering_review.go:40  Nil cfg dereferenced when source returns no config
+  [error/correctness] cmd/nitpick/security.go:217  Nil tree dereference when model pass fails
+  [warning/correctness] cmd/benchrepo/main.go:93  Presentation panics on empty fixture title
+  [warning/correctness] cmd/benchrepo/main.go:321  Manifest marshal error discarded
+  [warning/correctness] cmd/benchrepo/main.go:374  prNumbers truncates at 200 pull requests
+  [warning/correctness] cmd/nitpick/engineering_review.go:87  Drifted file is still measured
+  [warning/correctness] cmd/nitpick/engineering_review.go:130  designContextFiles error return ignored
+  [warning/concurrency] cmd/nitpick/engineering_usage.go:46  Roles.Build updated without the usage lock
+  [warning/tests] cmd/nitpick/enginewiring_test.go:172  wired treats any non-nil prefix as a wired field
+  [warning/correctness] cmd/nitpick/improve.go:144  Failed prior review read reposts all findings
+  [warning/resource] cmd/nitpick/init.go:193  scanRepo walks entire tree without cancellation
+  [warning/tests] cmd/nitpick/init_test.go:287  Workflow overwrite guard is untested
+  [warning/tests] cmd/nitpick/repo_standards_test.go:70  Whole-tree test does not prove the tree was walked
+  [warning/correctness] cmd/nitpick/respond.go:111  Mention re-parse can accept a different handle
+  [warning/resource] cmd/nitpick/review.go:235  Publish failure leaves CI exit status green
+  [warning/tests] cmd/nitpick/review_test.go:386  captureStdout leaks goroutine on early return
+  [warning/correctness] cmd/nitpick/security.go:238  Incomplete security run reports a clean gate
+  [info/correctness] cmd/nitpick/engineering_review.go:111  CommitSHA error swallowed and base unpinned
+  [info/correctness] cmd/nitpick/engineering_snapshot.go:18  Tree.Diff error returned without context
+  [info/correctness] cmd/nitpick/fullreview.go:147  Nil report publish error uses a different path
+  [info/contract] cmd/nitpick/improve.go:151  Improve posts a comment when it found nothing
+  [info/correctness] cmd/nitpick/init.go:464  Chmod failure leaves no config after validation
+  [info/correctness] cmd/nitpick/respond.go:93  Bot marker check can ignore a human comment
+  [info/maintainability] cmd/nitpick/review.go:329  Selected callback mutates engine fields set directly
+  [info/correctness] cmd/nitpick/security.go:381  Security pass disables the policy resolver
+
+AI slop (rule by rule; see the slop layer of the prompt):
+  [warning/slop] cmd/nitpick/engineering_review.go:55  Policy digest computed from discarded marshal error
+
+Remediation plan, most severe first; findings that share a fix are grouped:
+  1. [error/correctness] Nil cfg dereferenced when source returns no config
+     1 finding(s) in 1 file(s): cmd/nitpick/engineering_review.go
+  2. [error/correctness] Nil tree dereference when model pass fails
+     1 finding(s) in 1 file(s): cmd/nitpick/security.go
+  3. [warning/correctness] Presentation panics on empty fixture title
+     1 finding(s) in 1 file(s): cmd/benchrepo/main.go
+  4. [warning/correctness] Manifest marshal error discarded
+     1 finding(s) in 1 file(s): cmd/benchrepo/main.go
+  5. [warning/correctness] prNumbers truncates at 200 pull requests
+     1 finding(s) in 1 file(s): cmd/benchrepo/main.go
+  6. [warning/correctness] Drifted file is still measured
+     1 finding(s) in 1 file(s): cmd/nitpick/engineering_review.go
+  7. [warning/correctness] designContextFiles error return ignored
+     1 finding(s) in 1 file(s): cmd/nitpick/engineering_review.go
+  8. [warning/correctness] Failed prior review read reposts all findings
+     1 finding(s) in 1 file(s): cmd/nitpick/improve.go
+  9. [warning/correctness] Mention re-parse can accept a different handle
+     1 finding(s) in 1 file(s): cmd/nitpick/respond.go
+ 10. [warning/correctness] Incomplete security run reports a clean gate
+     1 finding(s) in 1 file(s): cmd/nitpick/security.go
+ 11. [warning/concurrency] Roles.Build updated without the usage lock
+     1 finding(s) in 1 file(s): cmd/nitpick/engineering_usage.go
+ 12. [warning/resource] scanRepo walks entire tree without cancellation
+     1 finding(s) in 1 file(s): cmd/nitpick/init.go
+ 13. [warning/resource] Publish failure leaves CI exit status green
+     1 finding(s) in 1 file(s): cmd/nitpick/review.go
+ 14. [warning/tests] wired treats any non-nil prefix as a wired field
+     1 finding(s) in 1 file(s): cmd/nitpick/enginewiring_test.go
+ 15. [warning/tests] Workflow overwrite guard is untested
+     1 finding(s) in 1 file(s): cmd/nitpick/init_test.go
+ 16. [warning/tests] Whole-tree test does not prove the tree was walked
+     1 finding(s) in 1 file(s): cmd/nitpick/repo_standards_test.go
+ 17. [warning/tests] captureStdout leaks goroutine on early return
+     1 finding(s) in 1 file(s): cmd/nitpick/review_test.go
+ 18. [warning/slop] Policy digest computed from discarded marshal error
+     1 finding(s) in 1 file(s): cmd/nitpick/engineering_review.go
+ 19. [info/correctness] CommitSHA error swallowed and base unpinned
+     1 finding(s) in 1 file(s): cmd/nitpick/engineering_review.go
+ 20. [info/correctness] Tree.Diff error returned without context
+     1 finding(s) in 1 file(s): cmd/nitpick/engineering_snapshot.go
+ 21. [info/correctness] Nil report publish error uses a different path
+     1 finding(s) in 1 file(s): cmd/nitpick/fullreview.go
+ 22. [info/correctness] Chmod failure leaves no config after validation
+     1 finding(s) in 1 file(s): cmd/nitpick/init.go
+ 23. [info/correctness] Bot marker check can ignore a human comment
+     1 finding(s) in 1 file(s): cmd/nitpick/respond.go
+ 24. [info/correctness] Security pass disables the policy resolver
+     1 finding(s) in 1 file(s): cmd/nitpick/security.go
+ 25. [info/contract] Improve posts a comment when it found nothing
+     1 finding(s) in 1 file(s): cmd/nitpick/improve.go
+ 26. [info/maintainability] Selected callback mutates engine fields set directly
+     1 finding(s) in 1 file(s): cmd/nitpick/review.go
+
+Reviewed 30 of 50 file(s).
+Not reviewed, the model call for their batch failed (20 file(s)): cmd/nitpick/commits.go, cmd/nitpick/commits_test.go, cmd/nitpick/configref.go, cmd/nitpick/configref_test.go, cmd/nitpick/engineering.go, cmd/nitpick/engineering_model.go, cmd/nitpick/mcp.go, cmd/nitpick/mcp_test.go, cmd/nitpick/mcpinstall.go, cmd/nitpick/mcpinstall_test.go, cmd/nitpick/queue_test.go, cmd/nitpick/repo_standards.go, cmd/nitpick/security_test.go, cmd/nitpick/slop.go, cmd/nitpick/slop_test.go, cmd/nitpick/standards.go, cmd/nitpick/standards_test.go, internal/bundle/bundle.go, internal/bundle/bundle_test.go, internal/bundle/callers.go
+Not reviewed, the budget ran out first (481 file(s)): internal/bundle/callers_test.go, internal/bundle/content.go, internal/bundle/dedup_test.go, internal/bundle/language.go, internal/bundle/language_test.go, internal/bundle/packing_test.go, internal/bundle/promptsafe.go, internal/bundle/promptsafe_test.go, internal/bundle/related.go, internal/bundle/related_deep.go, internal/bundle/related_deep_test.go, internal/bundle/related_langs.go, internal/bundle/related_langs_test.go, internal/bundle/related_test.go, internal/bundle/removals_test.go, internal/bundle/reserve_test.go, internal/bundle/window_test.go, internal/commits/commits.go, internal/commits/commits_test.go, internal/config/basepolicy.go, internal/config/budget.go, internal/config/class.go, internal/config/class_test.go, internal/config/config.go, internal/config/config_test.go, internal/config/defaults.go, internal/config/docgen/docgen.go, internal/config/docgen/docgen_test.go, internal/config/endpoint.go, internal/config/env.go, internal/config/glob.go, internal/config/lintergate_test.go, internal/config/persona.go, internal/config/persona_test.go, internal/config/policy.go, internal/config/policy_test.go, internal/config/practices.go, internal/config/practices_test.go, internal/config/route_test.go, internal/config/security.go, internal/config/security_test.go, internal/config/severity.go, internal/config/severity_gate_test.go, internal/config/spend.go, internal/config/spend_test.go, internal/config/trust.go, internal/config/trust_test.go, internal/config/unknown_test.go, internal/config/untrusted_elsewhere_test.go, internal/config/user.go, internal/config/user_test.go, internal/config/validate.go, internal/config/validation.go, internal/config/validation_test.go, internal/converse/converse.go, internal/converse/converse_test.go, internal/diff/diff.go, internal/diff/golden_test.go, internal/diff/parse.go, internal/diff/parse_test.go, internal/diff/pseudoheader_test.go, internal/diff/removals_test.go, internal/diff/testdata/git-mixed.diff, internal/diff/testdata/pseudo-headers.diff, internal/diff/testdata/removals.diff, internal/evals/1, internal/evals/bigpr_eval_test.go, internal/evals/callers_test.go, internal/evals/claims_test.go, internal/evals/composite_cost_test.go, internal/evals/cost.go, internal/evals/cost_test.go, internal/evals/crossjudge_test.go, internal/evals/detection_test.go, internal/evals/docs_counts_test.go, internal/evals/dump.go, internal/evals/eval_test.go, internal/evals/findings_dumps_test.go, internal/evals/fixtures.go, internal/evals/fixtures_callers.go, internal/evals/fixtures_dedup.go, internal/evals/fixtures_dedup_test.go, internal/evals/fixtures_fullreview.go, internal/evals/fixtures_info.go, internal/evals/fixtures_infocorpus.go, internal/evals/fixtures_knowledge.go, internal/evals/fixtures_knowledge2.go, internal/evals/fixtures_knowledge3.go, internal/evals/fixtures_multifile.go, internal/evals/fixtures_multifile_deep.go, internal/evals/fixtures_nit.go, internal/evals/fixtures_security.go, internal/evals/fixtures_slop.go, internal/evals/fixtures_warning.go, internal/evals/fullreview_eval_test.go, internal/evals/groundtruth_test.go, internal/evals/harness.go, internal/evals/harness_pin_test.go, internal/evals/incumbent.go, internal/evals/incumbent_test.go, internal/evals/infocorpus_test.go, internal/evals/judge.go, internal/evals/knowledge_live_test.go, internal/evals/knowledge_prereg.go, internal/evals/knowledge_prereg_test.go, internal/evals/knowledge_test.go, internal/evals/multifile_eval_test.go, internal/evals/multifile_test.go, internal/evals/priorknn_eval_test.go, internal/evals/probe_eval_test.go, internal/evals/promptcollision_test.go, internal/evals/rejudge.go, internal/evals/rejudge_eval_test.go, internal/evals/rejudge_test.go, internal/evals/report_dump_test.go, internal/evals/rundump_test.go, internal/evals/score.go, internal/evals/score_span_test.go, internal/evals/security_eval_test.go, internal/evals/separability_eval_test.go, internal/evals/severity_test.go, internal/evals/slop_test.go, internal/evals/testdata/findings-dumps/README.md, internal/evals/testdata/findings-dumps/multifile-callers-20260905T154530Z.jsonl, internal/evals/testdata/findings-dumps/multifile-callers-20260905T155517Z.jsonl, internal/evals/testdata/findings-dumps/multifile-callers-20260905T160208Z.jsonl, internal/evals/testdata/findings-dumps/multifile-callers-20260905T163816Z.jsonl, internal/evals/testdata/findings-dumps/multifile-callers-20260905T164614Z.jsonl, internal/evals/testdata/findings-dumps/multifile-callers-20260905T170221Z.jsonl, internal/evals/testdata/findings-dumps/multifile-multifile-20260905T170442Z.jsonl, internal/evals/testdata/findings-dumps/multifile-multifile-20260905T170918Z.jsonl, internal/evals/testdata/incumbent/bash-fixed-temp-path.json, internal/evals/testdata/incumbent/capacity-hint-nit.json, internal/evals/testdata/incumbent/clean-refactor.json, internal/evals/testdata/incumbent/clean-sql-allowlist.json, internal/evals/testdata/incumbent/contract-break.json, internal/evals/testdata/incumbent/cross-file-copy-nit.json, internal/evals/testdata/incumbent/cross-file-sort-nit.json, internal/evals/testdata/incumbent/csharp-client-per-request.json, internal/evals/testdata/incumbent/data-loss-migration.json, internal/evals/testdata/incumbent/defensive-copy-nit.json, internal/evals/testdata/incumbent/duplicate-test-case-nit.json, internal/evals/testdata/incumbent/go-cache-get-unchecked.json, internal/evals/testdata/incumbent/go-cancel-goroutine-leak.json, internal/evals/testdata/incumbent/go-clean-real-guard.json, internal/evals/testdata/incumbent/go-clean-why-comments.json, internal/evals/testdata/incumbent/go-clean-wrapped-sentinel.json, internal/evals/testdata/incumbent/go-empty-filter-deletes-all.json, internal/evals/testdata/incumbent/go-empty-slug-path.json, internal/evals/testdata/incumbent/go-error-identity-changed.json, internal/evals/testdata/incumbent/go-hardcoded-secret.json, internal/evals/testdata/incumbent/go-nil-deref.json, internal/evals/testdata/incumbent/go-package-singleton.json, internal/evals/testdata/incumbent/go-query-without-deadline.json, internal/evals/testdata/incumbent/go-return-units-changed.json, internal/evals/testdata/incumbent/go-slop-restating-comments.json, internal/evals/testdata/incumbent/go-slop-type-excluded-check.json, internal/evals/testdata/incumbent/go-sql-injection.json, internal/evals/testdata/incumbent/info-bash-hardcoded-region.json, internal/evals/testdata/incumbent/info-clean-go-named-constant.json, internal/evals/testdata/incumbent/info-clean-python-logging.json, internal/evals/testdata/incumbent/info-go-close-error-on-write.json, internal/evals/testdata/incumbent/info-go-context-string-key.json, internal/evals/testdata/incumbent/info-go-timeout-halved.json, internal/evals/testdata/incumbent/info-java-mutable-constant.json, internal/evals/testdata/incumbent/info-python-pin-loosened.json, internal/evals/testdata/incumbent/info-python-print-diagnostics.json, internal/evals/testdata/incumbent/info-sql-column-unindexed.json, internal/evals/testdata/incumbent/info-ts-any-widening.json, internal/evals/testdata/incumbent/info-ts-magic-duration.json, internal/evals/testdata/incumbent/kotlin-widened-input.json, internal/evals/testdata/incumbent/multi-defect.json, internal/evals/testdata/incumbent/php-forbidden-vs-404.json, internal/evals/testdata/incumbent/python-clean-contract.json, internal/evals/testdata/incumbent/python-clean-logged-and-reraised.json, internal/evals/testdata/incumbent/python-clean-precondition-satisfied.json, internal/evals/testdata/incumbent/python-clean-test-asserts.json, internal/evals/testdata/incumbent/python-command-injection.json, internal/evals/testdata/incumbent/python-expired-token-accepted.json, internal/evals/testdata/incumbent/python-overwrite-through-package.json, internal/evals/testdata/incumbent/python-precondition-added.json, internal/evals/testdata/incumbent/python-retry-nonidempotent.json, internal/evals/testdata/incumbent/python-secret-to-audit-log.json, internal/evals/testdata/incumbent/python-slop-swallowed-exception.json, internal/evals/testdata/incumbent/python-slop-test-asserts-nothing.json, internal/evals/testdata/incumbent/python-timing-unsafe-hmac.json, internal/evals/testdata/incumbent/removed-guard.json, internal/evals/testdata/incumbent/retry-no-backoff.json, internal/evals/testdata/incumbent/ruby-default-page-size.json, internal/evals/testdata/incumbent/ruby-mailer-in-transaction.json, internal/evals/testdata/incumbent/rust-crate-for-one-call.json, internal/evals/testdata/incumbent/sorted-for-min-nit.json, internal/evals/testdata/incumbent/style-only.json, internal/evals/testdata/incumbent/timezone-boundary.json, internal/evals/testdata/incumbent/ts-clean-contract.json, internal/evals/testdata/incumbent/ts-clean-doc-comment.json, internal/evals/testdata/incumbent/ts-client-per-request.json, internal/evals/testdata/incumbent/ts-duration-units-through-barrel.json, internal/evals/testdata/incumbent/ts-money-units.json, internal/evals/testdata/incumbent/ts-return-units-changed.json, internal/evals/testdata/incumbent/ts-slop-chat-prose.json, internal/evals/testdata/incumbent/ts-unawaited-async.json, internal/evals/testdata/incumbent/ts-unbounded-memo-key.json, internal/evals/testdata/knowledge-eval/preregistration.yaml, internal/evals/testdata/knowledge-eval/selection.yaml, internal/evals/testdata/plaintext-sample.txt, internal/evals/testdata/pricing-source.json, internal/evals/testdata/pricing.yaml, internal/evals/testdata/routes/ensemble-cheap-kimi.yaml, internal/evals/testdata/routes/ensemble-cheap-opus.yaml, internal/evals/testdata/routes/ensemble-cheap-sonnet.yaml, internal/evals/testdata/routes/ensemble-cheap.yaml, internal/evals/testdata/routes/glm-kimi.yaml, internal/evals/testdata/routes/qwen-glm.yaml, internal/evals/testdata/routes/routed-kimi.yaml, internal/evals/testdata/routes/routed-opus.yaml, internal/evals/testdata/routes/routed-sonnet.yaml, internal/evals/testdata/routes/routed.yaml, internal/evals/tune_test.go, internal/fence/fence.go, internal/fence/fence_test.go, internal/fix/fix.go, internal/fix/fix_test.go, internal/fullreview/report.go, internal/fullreview/report_test.go, internal/fullreview/score.go, internal/fullreview/score_test.go, internal/gomod/gomod.go, internal/gomod/gomod_test.go, internal/gomod/versionsfor_test.go, internal/knowledge/applies.go, internal/knowledge/applies_test.go, internal/knowledge/bundle.go, internal/knowledge/bundle_test.go, internal/knowledge/corpus.go, internal/knowledge/corpus/go-context-in-struct.md, internal/knowledge/corpus/go-defer-in-loop.md, internal/knowledge/corpus/go-errgroup-wait-discards.md, internal/knowledge/corpus/go-nil-map-write.md, internal/knowledge/corpus/go-slice-append-aliases.md, internal/knowledge/corpus/go-time-after-leak.md, internal/knowledge/corpus/http-body-close-leak.md, internal/knowledge/corpus/js-array-sort-mutates.md, internal/knowledge/corpus/py-except-swallows-cancel.md, internal/knowledge/corpus/python-mutable-default.md, internal/knowledge/corpus/rust-mem-forget-leak.md, internal/knowledge/corpus/sh-set-e-pipeline.md, internal/knowledge/corpus/sql-rows-err-unchecked.md, internal/knowledge/corpus/ts-json-parse-any.md, internal/knowledge/corpus_test.go, internal/knowledge/entry.go, internal/knowledge/index.go, internal/knowledge/index_test.go, internal/knowledge/indexes/openrouter-openai-text-embedding-3-small.json, internal/knowledge/indexes/openrouter-qwen-qwen3-embedding-8b.json, internal/knowledge/indexes/openrouter-voyageai-voyage-code-4.json, internal/knowledge/indexes/synthetic-hf-nomic-ai-nomic-embed-text-v1.5.json, internal/knowledge/live_helper_test.go, internal/knowledge/retrieve.go, internal/knowledge/retrieve_live_test.go, internal/knowledge/routing_test.go, internal/linters/catalog.go, internal/linters/catalog_test.go, internal/linters/configs/.htmlhintrc, internal/linters/configs/.markdownlint.json, internal/linters/configs/.oxlintrc.json, internal/linters/configs/.rubocop.yml, internal/linters/configs/.swiftlint.yml, internal/linters/configs/.tflint.hcl, internal/linters/configs/actionlint.yaml, internal/linters/configs/biome.json, internal/linters/configs/brakeman.yml, internal/linters/configs/buf.yaml, internal/linters/configs/checkmake.ini, internal/linters/configs/checkov.yaml, internal/linters/configs/detekt.yml, internal/linters/configs/eslint-conventions.mjs, internal/linters/configs/gitleaks.toml, internal/linters/configs/hadolint.yaml, internal/linters/configs/osv-scanner.toml, internal/linters/configs/pmd-conventions.xml, internal/linters/configs/pmd-ruleset.xml, internal/linters/configs/pylintrc, internal/linters/configs/rubocop-conventions.yml, internal/linters/configs/ruff-conventions.toml, internal/linters/configs/sqlfluff.cfg, internal/linters/configs/yamllint.yaml, internal/linters/configs/zizmor.yml, internal/linters/containment_test.go, internal/linters/gate_test.go, internal/linters/golangci-conventions.yml, internal/linters/golangci-security.yml, internal/linters/golangci.yml, internal/linters/golangci_security_test.go, internal/linters/integrity_test.go, internal/linters/linters.go, internal/linters/linters_test.go, internal/linters/policy_channels_test.go, internal/linters/runners.go, internal/linters/security_test.go, internal/linters/standards.go, internal/linters/standards_languages_test.go, internal/linters/suggest.go, internal/linters/suggest_test.go, internal/linters/tools.go, internal/llm/capability.go, internal/llm/client.go, internal/llm/client_pin_test.go, internal/llm/credential.go, internal/llm/credential_test.go, internal/llm/embed.go, internal/llm/embed_live_test.go, internal/llm/maxtokens_test.go, internal/llm/openrouter.go, internal/llm/openrouter_test.go, internal/llm/reasoning_test.go, internal/llm/retrylog.go, internal/llm/retrylog_test.go, internal/llm/roles_test.go, internal/llm/silentzero_test.go, internal/llm/structured.go, internal/llm/structured_test.go, internal/llm/synthetic.go, internal/llm/synthetic_test.go, internal/llm/waiting.go, internal/llm/waiting_test.go, internal/practices/architecture.go, internal/practices/architecture_test.go, internal/practices/commits.go, internal/practices/exceptions.go, internal/practices/exceptions_test.go, internal/practices/packing.go, internal/practices/packing_test.go, internal/practices/planner.go, internal/practices/planner_test.go, internal/practices/policy.go, internal/practices/report.go, internal/practices/report_test.go, internal/practices/testdata/failure-propagation/README.md, internal/practices/testdata/failure-propagation/bad/go.mod.txt, internal/practices/testdata/failure-propagation/bad/service.go.txt, internal/practices/testdata/failure-propagation/bad/store.go.txt, internal/practices/testdata/failure-propagation/good/go.mod.txt, internal/practices/testdata/failure-propagation/good/service.go.txt, internal/practices/testdata/failure-propagation/good/store.go.txt, internal/practices/testdata/lifecycle/README.md, internal/practices/testdata/lifecycle/bad/cache.go.txt, internal/practices/testdata/lifecycle/bad/go.mod.txt, internal/practices/testdata/lifecycle/bad/service.go.txt, internal/practices/testdata/lifecycle/good/cache.go.txt, internal/practices/testdata/lifecycle/good/go.mod.txt, internal/practices/testdata/lifecycle/good/service.go.txt, internal/prompt/expert.go, internal/prompt/expert_test.go, internal/prompt/model.go, internal/prompt/model_test.go, internal/prompt/persona.go, internal/prompt/persona_test.go, internal/prompt/prompt.go, internal/prompt/prompt_test.go, internal/prompt/slop.go, internal/prompt/templates/experts/api.md, internal/prompt/templates/experts/appsec.md, internal/prompt/templates/experts/authz.md, internal/prompt/templates/experts/concurrency.md, internal/prompt/templates/experts/correctness.md, internal/prompt/templates/experts/crypto.md, internal/prompt/templates/experts/design.md, internal/prompt/templates/experts/durability.md, internal/prompt/templates/experts/generalist.md, internal/prompt/templates/experts/resource.md, internal/prompt/templates/experts/secrets.md, internal/prompt/templates/experts/slop.md, internal/prompt/templates/experts/sql.md, internal/prompt/templates/experts/style.md, internal/prompt/templates/experts/tests.md, internal/prompt/templates/review.md, internal/prompt/templates/route.md, internal/prompt/templates/triage.md, internal/prompt/templates/triage_summary.md, internal/prompt/voice.go, internal/review/approve.go, internal/review/approve_test.go, internal/review/budget.go, internal/review/budget_apply.go, internal/review/budget_test.go, internal/review/callerwalknotice_test.go, internal/review/classfilter_test.go, internal/review/complexity.go, internal/review/discardnotice_test.go, internal/review/engine.go, internal/review/engine_test.go, internal/review/evidence.go, internal/review/evidence_test.go, internal/review/finding.go, internal/review/fingerprint.go, internal/review/gitpolicy_test.go, internal/review/incomplete_test.go, internal/review/incremental_test.go, internal/review/integrity_test.go, internal/review/knowledge.go, internal/review/knowledge_build.go, internal/review/knowledge_shape_test.go, internal/review/knowledge_status.go, internal/review/knowledge_status_test.go, internal/review/knowledge_test.go, internal/review/linternotice_test.go, internal/review/noclaims_test.go, internal/review/paths.go, internal/review/paths_test.go, internal/review/policy.go, internal/review/policy_test.go, internal/review/practices_test.go, internal/review/priorspend_test.go, internal/review/receipt.go, internal/review/receipt_test.go, internal/review/removals_test.go, internal/review/render.go, internal/review/render_agentprompt_test.go, internal/review/render_windowed_test.go, internal/review/route.go, internal/review/route_test.go, internal/review/schema.go, internal/review/scrub.go, internal/review/scrub_test.go, internal/review/stage.go, internal/review/stage_test.go, internal/review/standards.go, internal/review/standards_test.go, internal/review/suggestion_test.go, internal/review/targeted_test.go, internal/review/triageskip_test.go, internal/review/unknownkey_test.go, internal/review/validate.go, internal/review/validate_test.go, internal/review/verdict.go, internal/review/verdict_test.go, internal/security/completeness.go, internal/security/completeness_test.go, internal/security/instruction.go, internal/security/redact.go, internal/security/redact_test.go, internal/security/required.go, internal/security/required_test.go, internal/security/roster.go, internal/security/roster_test.go, internal/slop/tells.go, internal/slop/tells_test.go, internal/standards/agents.go, internal/standards/agents_test.go, internal/standards/cancellation_test.go, internal/standards/conformity.go, internal/standards/measure.go, internal/standards/measure_test.go, internal/standards/probe.go, internal/standards/probes_go.go, internal/standards/probes_go_test.go, internal/standards/probes_languages.go, internal/standards/probes_languages_test.go, internal/standards/report.go, internal/standards/source.go, internal/standards/source_test.go, internal/vcs/base_test.go, internal/vcs/commits.go, internal/vcs/commits_test.go, internal/vcs/containment_test.go, internal/vcs/github.go, internal/vcs/github_test.go, internal/vcs/identity.go, internal/vcs/incremental_test.go, internal/vcs/integrity_test.go, internal/vcs/local.go, internal/vcs/local_test.go, internal/vcs/marker.go, internal/vcs/propose.go, internal/vcs/propose_test.go, internal/vcs/snapshot_test.go, internal/vcs/spendmarker_test.go, internal/vcs/tree.go, internal/vcs/tree_test.go, internal/vcs/vcs.go
+
+Repository score (weighted findings per thousand lines reviewed; critical 8, error 4, warning 2, info 1, nit 0.5):
+  language      files    lines   slop                   bugs                   security              
+  go               29     7548    0.26 (1, 2.0 wt)       6.09 (25, 46.0 wt)     0.00 (0, 0.0 wt)     
+  config/docs       1       46    0.00 (0, 0.0 wt)       0.00 (0, 0.0 wt)       0.00 (0, 0.0 wt)     
+  all              30     7594    0.26 (1, 2.0 wt)       6.06 (25, 46.0 wt)     0.00 (0, 0.0 wt)     
+  slop per thousand lines is below the threshold of 2.0.
+  INCOMPLETE: the rates above are over the files a model answered for, not the tree.
+  20 file(s) whose batch failed are in no denominator: cmd/nitpick/commits.go, cmd/nitpick/commits_test.go, cmd/nitpick/configref.go, cmd/nitpick/configref_test.go, cmd/nitpick/engineering.go, cmd/nitpick/engineering_model.go, cmd/nitpick/mcp.go, cmd/nitpick/mcp_test.go, cmd/nitpick/mcpinstall.go, cmd/nitpick/mcpinstall_test.go, cmd/nitpick/queue_test.go, cmd/nitpick/repo_standards.go, cmd/nitpick/security_test.go, cmd/nitpick/slop.go, cmd/nitpick/slop_test.go, cmd/nitpick/standards.go, cmd/nitpick/standards_test.go, internal/bundle/bundle.go, internal/bundle/bundle_test.go, internal/bundle/callers.go

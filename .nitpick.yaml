@@ -25,6 +25,10 @@ review:
   fail_on: none
   min_severity: info
   concurrency: 4
+  # A clean completed review closes its own earlier threads and submits
+  # APPROVE, so a green review check is also a green review disposition.
+  approve:
+    enabled: true
   # A million-token model can read far more than 60k tokens per request; the
   # budget is about how much one call is asked to judge at once, not what
   # the model can hold. Raised here, where the reviewer is a frontier model.

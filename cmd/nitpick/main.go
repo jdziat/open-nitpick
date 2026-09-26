@@ -65,6 +65,8 @@ func run() int {
 		err = runStandards(ctx, os.Args[2:])
 	case "slop":
 		err = runSlop(ctx, os.Args[2:])
+	case "security":
+		err = runSecurity(ctx, os.Args[2:])
 	case "respond":
 		err = runRespond(ctx, os.Args[2:])
 	case "mcp":
@@ -72,7 +74,7 @@ func run() int {
 	case "auth":
 		err = runAuth(os.Args[2:], os.Stdin, os.Stdout)
 	case "init":
-		err = runInit(os.Args[2:], os.Stdout)
+		err = runInit(ctx, os.Args[2:], os.Stdout)
 	case "explain-config":
 		err = runExplainConfig(os.Args[2:])
 	case "linters":
@@ -137,6 +139,8 @@ Usage:
   nitpick commits [flags]          Validate commit subjects against accepted policy
   nitpick improve [flags]          The wider pass: the classes a normal review filters out
   nitpick slop [flags] [path...]   AI slop only: the tells without a model, the model's slop rules, a score, and fixes
+  nitpick security [flags] [path...]
+                                   Security scan: required scanners (osv, gitleaks, …), optional model, roster proves completeness
   nitpick respond [flags]          Answer an @open-nitpick comment on a pull request (review again, resolve, or a question)
   nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
   nitpick mcp install <client>     Register that server with an agent client (claude-code, cursor, opencode, codex, ...)

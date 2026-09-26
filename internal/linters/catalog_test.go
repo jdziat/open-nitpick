@@ -345,6 +345,21 @@ func TestOSVScannerKeepsAdvisoriesWithoutARegion(t *testing.T) {
 	}
 }
 
+func TestGitleaksRuleClassIsSecurityNotResource(t *testing.T) {
+	// Mutation: matching "leak" before gitleaks classed gitleaks(…) as
+	// resource, so partitionSecurityFindings hid every credential finding.
+	got := classForRule(prefixRule("gitleaks", "private-key"))
+	if got != config.ClassSecurity {
+		t.Fatalf("gitleaks rule class = %s, want security", got)
+	}
+	if got := classForRule("memleak"); got != config.ClassResource {
+		t.Fatalf("memleak class = %s, want resource", got)
+	}
+	if got := classForRule("goleak"); got != config.ClassResource {
+		t.Fatalf("goleak class = %s, want resource", got)
+	}
+}
+
 func TestGitleaksNeverReportsTheSecret(t *testing.T) {
 	inv := invocation{repoRoot: "/repo", tmpDir: t.TempDir(), files: []string{"config.yaml"}}
 	report := `[{"Description":"AWS Access Key","StartLine":4,"Secret":"AKIAIOSFODNN7EXAMPLE","Match":"AKIAIOSFODNN7EXAMPLE","File":"config.yaml","RuleID":"aws-access-token"}]`

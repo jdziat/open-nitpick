@@ -36,6 +36,7 @@ type fakeLLM struct {
 
 type turn struct {
 	content string
+	finish  llms.FinishReason
 	err     error
 }
 
@@ -61,7 +62,7 @@ func (f *fakeLLM) GenerateContent(_ context.Context, msgs []llms.Message, opts .
 	if next.err != nil {
 		return nil, next.err
 	}
-	return &llms.Response{Content: next.content}, nil
+	return &llms.Response{Content: next.content, FinishReason: next.finish}, nil
 }
 
 func (f *fakeLLM) Stream(context.Context, []llms.Message, ...llms.CallOption) (<-chan llms.StreamChunk, error) {
@@ -272,6 +273,47 @@ func TestExtractEmptyResponseIsAnError(t *testing.T) {
 
 	if _, err := Extract[result](context.Background(), client, nil); err == nil {
 		t.Fatal("empty content should be an error, not an empty result")
+	}
+}
+
+// TestExtractRetriesEmptyContentAtLengthCap pins the laguna full-review failure:
+// finish_reason=length with content "" is a budget the model spent on reasoning,
+// not a clean empty answer, so the next attempt disables reasoning and raises a
+// tight max_tokens rather than repairing an empty string.
+func TestExtractRetriesEmptyContentAtLengthCap(t *testing.T) {
+	emptyCut := turn{content: "", finish: llms.FinishReasonLength}
+	fake := newFakeLLM(emptyCut, turn{content: validJSON})
+	client := newTestClient(fake, config.StructuredJSON)
+
+	got, err := Extract[result](context.Background(), client, nil, llms.WithMaxTokens(8192))
+	if err != nil {
+		t.Fatalf("Extract: %v", err)
+	}
+	assertOneFinding(t, got)
+	if fake.callCount() != 2 {
+		t.Fatalf("calls = %d, want 2: one empty length-cap then one answer", fake.callCount())
+	}
+	retry := fake.call(1).opts
+	if retry.Reasoning == nil || retry.Reasoning.Enabled == nil || *retry.Reasoning.Enabled {
+		t.Errorf("retry must disable reasoning, got %+v", retry.Reasoning)
+	}
+	if retry.MaxTokens == nil || *retry.MaxTokens != creditCappedMaxTokens {
+		t.Errorf("retry max_tokens = %v, want floor %d (caller had 8192)", retry.MaxTokens, creditCappedMaxTokens)
+	}
+
+	// A blank stop is the model's answer: do not burn the stall budget on a
+	// length-cap retry. The JSON repair path still runs once.
+	fake = newFakeLLM(turn{content: "", finish: llms.FinishReasonStop}, turn{content: "  "})
+	if _, err := Extract[result](context.Background(), newTestClient(fake, config.StructuredJSON), nil); err == nil {
+		t.Fatal("empty stop must still fail after repair")
+	}
+	if fake.callCount() != 2 {
+		t.Fatalf("empty stop: calls = %d, want original+repair only", fake.callCount())
+	}
+	for i := 0; i < fake.callCount(); i++ {
+		if o := fake.call(i).opts; o.Reasoning != nil && o.Reasoning.Enabled != nil && !*o.Reasoning.Enabled {
+			t.Errorf("call %d disabled reasoning; empty stop must not use the length-cap retry", i)
+		}
 	}
 }
 

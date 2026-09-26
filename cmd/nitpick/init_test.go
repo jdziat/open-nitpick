@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -30,7 +31,7 @@ func initRepo(t *testing.T, names ...string) string {
 func runInitIn(t *testing.T, args ...string) (string, string) {
 	t.Helper()
 	var out bytes.Buffer
-	if err := runInit(args, &out); err != nil {
+	if err := runInit(context.Background(), args, &out); err != nil {
 		t.Fatalf("nitpick init %v: %v\n%s", args, err, out.String())
 	}
 	return out.String(), ""
@@ -195,7 +196,7 @@ func TestInitRefusesToOverwriteWithoutForce(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	err := runInit([]string{"-repo", root, "-provider", "openai", "-model", "gpt-4o"}, &out)
+	err := runInit(context.Background(), []string{"-repo", root, "-provider", "openai", "-model", "gpt-4o"}, &out)
 	if err == nil {
 		t.Fatal("init overwrote an existing config")
 	}
@@ -283,9 +284,13 @@ func TestInitWritesAWorkflowPinnedToAMajorTag(t *testing.T) {
 		}
 	}
 
+	if err := os.Remove(filepath.Join(root, config.FileName)); err != nil {
+		t.Fatal(err)
+	}
 	var out bytes.Buffer
-	if err := runInit([]string{"-repo", root, "-provider", "synthetic", "-model", "m", "-workflow"}, &out); err == nil {
-		t.Error("the workflow was overwritten without -force")
+	err := runInit(context.Background(), []string{"-repo", root, "-provider", "synthetic", "-model", "m", "-workflow"}, &out)
+	if err == nil || !strings.Contains(err.Error(), "nitpick.yml") {
+		t.Fatalf("workflow overwrite guard: err=%v out=%s", err, out.String())
 	}
 }
 
