@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/jdziat/open-nitpick/compare/v2.2.0...v2.3.0) (2026-09-26)
+
+
+### Features
+
+* **review:** approve near-clean PRs via residual judge ([#138](https://github.com/jdziat/open-nitpick/issues/138)) ([0958057](https://github.com/jdziat/open-nitpick/commit/095805747a28ed76f6f7bd4446cebd4af77c0482))
+
 ## [2.2.0](https://github.com/jdziat/open-nitpick/compare/v2.1.0...v2.2.0) (2026-09-19)
 
 
