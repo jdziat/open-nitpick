@@ -88,6 +88,9 @@ type Validator struct {
 	// Concurrency bounds in-flight validation calls.
 	Concurrency int
 
+	// PromptTokenLimit bounds complete design evidence without truncating it.
+	PromptTokenLimit int
+
 	// Log receives the verdicts; a nil logger discards them.
 	Log *slog.Logger
 
@@ -146,7 +149,11 @@ func (v *Validator) validateWithCoverage(ctx context.Context, findings []Finding
 				return
 			}
 
-			outcomes[i] = v.check(ctx, f, code[f.Path])
+			source := code[f.Path]
+			if f.TaskContext != nil {
+				source = f.TaskContext.Text
+			}
+			outcomes[i] = v.check(ctx, f, source)
 		}(i, f)
 	}
 
@@ -304,6 +311,19 @@ func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
 		{Role: llms.RoleUser, Content: validationRequest(f, code, shown)},
 	}
 
+	if f.TaskContext != nil && v.PromptTokenLimit > 0 {
+		schemaJSON, err := validationSchema()
+		if err != nil {
+			keep.failure = "validation schema unavailable"
+			return keep
+		}
+		estimator := llms.DefaultTokenEstimator()
+		tokens := estimator.EstimateTokens(msgs[0].Content) + estimator.EstimateTokens(msgs[1].Content) + estimator.EstimateTokens(string(schemaJSON)) + 128
+		if tokens > v.PromptTokenLimit {
+			keep.failure = "complete design evidence exceeds expert prompt token limit"
+			return keep
+		}
+	}
 	result, err := llm.Extract[validationResult](ctx, v.Client, msgs, schema)
 	if err != nil {
 		// An outage must not silently empty a review. Losing a validation is a

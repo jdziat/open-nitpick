@@ -1,0 +1,289 @@
+{
+  "admitted_tasks": 4181,
+  "errors": null,
+  "kind": "deterministic sizing only; no model assessment; elevated file limits; Go and go.mod sources only",
+  "limits": {
+    "files_per_request": 10000,
+    "framing_reserve": 0,
+    "tokens": 120000,
+    "total_files": 10000
+  },
+  "omission_reasons": {
+    "complete design task exceeds review.token_budget_per_request after framing": 211
+  },
+  "omitted_tasks": 211,
+  "planned_tasks": 4392,
+  "requests": 713,
+  "source_digest": "5edf85dc5c4975073403083373c62da85d47df0d573c50a47d18a7fb550859a1",
+  "source_files": 358,
+  "source_tokens": 54109078,
+  "largest_batches": [
+    {
+      "ID": "declaration:internal/linters/gate_test.go:20",
+      "TaskIDs": [
+        "declaration:internal/linters/gate_test.go:20",
+        "declaration:internal/linters/gate_test.go:21",
+        "declaration:internal/linters/gate_test.go:22"
+      ],
+      "Files": 61,
+      "Tokens": 119986
+    },
+    {
+      "ID": "declaration:cmd/nitpick/improve.go:2",
+      "TaskIDs": [
+        "declaration:cmd/nitpick/improve.go:2",
+        "declaration:cmd/nitpick/improve.go:3",
+        "declaration:cmd/nitpick/improve.go:4"
+      ],
+      "Files": 79,
+      "Tokens": 119961
+    },
+    {
+      "ID": "declaration:internal/review/render.go:1",
+      "TaskIDs": [
+        "declaration:internal/review/render.go:1",
+        "declaration:internal/review/render.go:10",
+        "declaration:internal/review/render.go:11",
+        "declaration:internal/review/render.go:12",
+        "declaration:internal/review/render.go:13",
+        "declaration:internal/review/render.go:15",
+        "declaration:internal/review/render.go:16",
+        "declaration:internal/review/render.go:17",
+        "declaration:internal/review/render.go:18",
+        "declaration:internal/review/render.go:19",
+        "declaration:internal/review/render.go:2",
+        "declaration:internal/review/render.go:20"
+      ],
+      "Files": 49,
+      "Tokens": 119955
+    },
+    {
+      "ID": "declaration:internal/evals/severity_test.go:53",
+      "TaskIDs": [
+        "declaration:internal/evals/severity_test.go:53",
+        "declaration:internal/evals/severity_test.go:54",
+        "declaration:internal/evals/severity_test.go:55",
+        "declaration:internal/evals/severity_test.go:56",
+        "declaration:internal/evals/severity_test.go:57",
+        "declaration:internal/evals/severity_test.go:58"
+      ],
+      "Files": 27,
+      "Tokens": 119946
+    },
+    {
+      "ID": "declaration:internal/linters/linters.go:1",
+      "TaskIDs": [
+        "declaration:internal/linters/linters.go:1",
+        "declaration:internal/linters/linters.go:10",
+        "declaration:internal/linters/linters.go:11",
+        "declaration:internal/linters/linters.go:12",
+        "declaration:internal/linters/linters.go:13",
+        "declaration:internal/linters/linters.go:14",
+        "declaration:internal/linters/linters.go:15",
+        "declaration:internal/linters/linters.go:16",
+        "declaration:internal/linters/linters.go:17",
+        "declaration:internal/linters/linters.go:18"
+      ],
+      "Files": 48,
+      "Tokens": 119938
+    },
+    {
+      "ID": "declaration:internal/evals/harness.go:29",
+      "TaskIDs": [
+        "declaration:internal/evals/harness.go:29",
+        "declaration:internal/evals/harness.go:3",
+        "declaration:internal/evals/harness.go:30"
+      ],
+      "Files": 65,
+      "Tokens": 119928
+    },
+    {
+      "ID": "declaration:cmd/nitpick/mcp.go:3",
+      "TaskIDs": [
+        "declaration:cmd/nitpick/mcp.go:3",
+        "declaration:cmd/nitpick/mcp.go:4",
+        "declaration:cmd/nitpick/mcp.go:5",
+        "declaration:cmd/nitpick/mcp.go:6",
+        "declaration:cmd/nitpick/mcp.go:7",
+        "declaration:cmd/nitpick/mcp.go:8",
+        "declaration:cmd/nitpick/mcp.go:9"
+      ],
+      "Files": 89,
+      "Tokens": 119881
+    },
+    {
+      "ID": "declaration:internal/bundle/callers_test.go:1",
+      "TaskIDs": [
+        "declaration:internal/bundle/callers_test.go:1",
+        "declaration:internal/bundle/callers_test.go:10",
+        "declaration:internal/bundle/callers_test.go:11",
+        "declaration:internal/bundle/callers_test.go:12",
+        "declaration:internal/bundle/callers_test.go:13",
+        "declaration:internal/bundle/callers_test.go:14",
+        "declaration:internal/bundle/callers_test.go:15",
+        "declaration:internal/bundle/callers_test.go:16",
+        "declaration:internal/bundle/callers_test.go:17",
+        "declaration:internal/bundle/callers_test.go:18",
+        "declaration:internal/bundle/callers_test.go:19",
+        "declaration:internal/bundle/callers_test.go:2",
+        "declaration:internal/bundle/callers_test.go:20",
+        "declaration:internal/bundle/callers_test.go:21",
+        "declaration:internal/bundle/callers_test.go:22"
+      ],
+      "Files": 29,
+      "Tokens": 119870
+    },
+    {
+      "ID": "declaration:internal/linters/catalog_test.go:1",
+      "TaskIDs": [
+        "declaration:internal/linters/catalog_test.go:1",
+        "declaration:internal/linters/catalog_test.go:10",
+        "declaration:internal/linters/catalog_test.go:11",
+        "declaration:internal/linters/catalog_test.go:12"
+      ],
+      "Files": 49,
+      "Tokens": 119803
+    },
+    {
+      "ID": "declaration:internal/evals/fixtures_infocorpus.go:1",
+      "TaskIDs": [
+        "declaration:internal/evals/fixtures_infocorpus.go:1",
+        "declaration:internal/evals/fixtures_infocorpus.go:10",
+        "declaration:internal/evals/fixtures_infocorpus.go:11",
+        "declaration:internal/evals/fixtures_infocorpus.go:12",
+        "declaration:internal/evals/fixtures_infocorpus.go:13",
+        "declaration:internal/evals/fixtures_infocorpus.go:14",
+        "declaration:internal/evals/fixtures_infocorpus.go:2",
+        "declaration:internal/evals/fixtures_infocorpus.go:3",
+        "declaration:internal/evals/fixtures_infocorpus.go:4",
+        "declaration:internal/evals/fixtures_infocorpus.go:5",
+        "declaration:internal/evals/fixtures_infocorpus.go:6"
+      ],
+      "Files": 48,
+      "Tokens": 119784
+    },
+    {
+      "ID": "declaration:internal/evals/harness.go:12",
+      "TaskIDs": [
+        "declaration:internal/evals/harness.go:12",
+        "declaration:internal/evals/harness.go:13",
+        "declaration:internal/evals/harness.go:14",
+        "declaration:internal/evals/harness.go:15",
+        "declaration:internal/evals/harness.go:16",
+        "declaration:internal/evals/harness.go:17"
+      ],
+      "Files": 48,
+      "Tokens": 119663
+    },
+    {
+      "ID": "declaration:internal/evals/cost.go:108",
+      "TaskIDs": [
+        "declaration:internal/evals/cost.go:108",
+        "declaration:internal/evals/cost.go:11",
+        "declaration:internal/evals/cost.go:12",
+        "declaration:internal/evals/cost.go:13",
+        "declaration:internal/evals/cost.go:14",
+        "declaration:internal/evals/cost.go:15",
+        "declaration:internal/evals/cost.go:16",
+        "declaration:internal/evals/cost.go:17",
+        "declaration:internal/evals/cost.go:18",
+        "declaration:internal/evals/cost.go:19",
+        "declaration:internal/evals/cost.go:2",
+        "declaration:internal/evals/cost.go:20"
+      ],
+      "Files": 50,
+      "Tokens": 119643
+    },
+    {
+      "ID": "declaration:internal/evals/rejudge_test.go:10",
+      "TaskIDs": [
+        "declaration:internal/evals/rejudge_test.go:10",
+        "declaration:internal/evals/rejudge_test.go:11",
+        "declaration:internal/evals/rejudge_test.go:12",
+        "declaration:internal/evals/rejudge_test.go:13",
+        "declaration:internal/evals/rejudge_test.go:14"
+      ],
+      "Files": 68,
+      "Tokens": 119639
+    },
+    {
+      "ID": "declaration:internal/evals/groundtruth_test.go:49",
+      "TaskIDs": [
+        "declaration:internal/evals/groundtruth_test.go:49",
+        "declaration:internal/evals/groundtruth_test.go:5",
+        "declaration:internal/evals/groundtruth_test.go:50",
+        "declaration:internal/evals/groundtruth_test.go:52"
+      ],
+      "Files": 44,
+      "Tokens": 119613
+    },
+    {
+      "ID": "declaration:internal/linters/catalog_test.go:13",
+      "TaskIDs": [
+        "declaration:internal/linters/catalog_test.go:13",
+        "declaration:internal/linters/catalog_test.go:14",
+        "declaration:internal/linters/catalog_test.go:15",
+        "declaration:internal/linters/catalog_test.go:16",
+        "declaration:internal/linters/catalog_test.go:17"
+      ],
+      "Files": 51,
+      "Tokens": 119577
+    },
+    {
+      "ID": "declaration:internal/evals/rundump_test.go:8",
+      "TaskIDs": [
+        "declaration:internal/evals/rundump_test.go:8",
+        "declaration:internal/evals/rundump_test.go:9"
+      ],
+      "Files": 70,
+      "Tokens": 119487
+    },
+    {
+      "ID": "declaration:internal/evals/detection_test.go:13",
+      "TaskIDs": [
+        "declaration:internal/evals/detection_test.go:13",
+        "declaration:internal/evals/detection_test.go:14",
+        "declaration:internal/evals/detection_test.go:15",
+        "declaration:internal/evals/detection_test.go:16",
+        "declaration:internal/evals/detection_test.go:17"
+      ],
+      "Files": 49,
+      "Tokens": 119471
+    },
+    {
+      "ID": "declaration:internal/evals/rejudge.go:16",
+      "TaskIDs": [
+        "declaration:internal/evals/rejudge.go:16",
+        "declaration:internal/evals/rejudge.go:17",
+        "declaration:internal/evals/rejudge.go:18",
+        "declaration:internal/evals/rejudge.go:19",
+        "declaration:internal/evals/rejudge.go:2"
+      ],
+      "Files": 66,
+      "Tokens": 119434
+    },
+    {
+      "ID": "declaration:internal/evals/severity_test.go:59",
+      "TaskIDs": [
+        "declaration:internal/evals/severity_test.go:59",
+        "declaration:internal/evals/severity_test.go:60",
+        "declaration:internal/evals/severity_test.go:61",
+        "declaration:internal/evals/severity_test.go:62",
+        "declaration:internal/evals/severity_test.go:63"
+      ],
+      "Files": 28,
+      "Tokens": 119395
+    },
+    {
+      "ID": "declaration:internal/review/evidence_test.go:5",
+      "TaskIDs": [
+        "declaration:internal/review/evidence_test.go:5",
+        "declaration:internal/review/evidence_test.go:6",
+        "declaration:internal/review/evidence_test.go:7"
+      ],
+      "Files": 88,
+      "Tokens": 119379
+    }
+  ],
+  "retained_rows": "Twenty largest requests only; totals include every planned task and packed request."
+}

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/jdziat/open-nitpick/internal/bundle"
 )
 
 // State describes execution, independently of the findings a check produced.
@@ -73,12 +75,35 @@ type Finding struct {
 	Uncertainty string   `json:"uncertainty,omitempty"`
 }
 
+// ContextSpan records the exact supporting source supplied for a task.
+type ContextSpan struct {
+	Path string `json:"path"`
+	bundle.SourceSpan
+}
+
+// DesignInteraction names a caller obligation assigned to a review task.
+type DesignInteraction struct {
+	Caller Target `json:"caller"`
+	Callee Target `json:"callee"`
+}
+
 // DesignTask links a bounded design assessment to its source and context.
 type DesignTask struct {
-	ID      string   `json:"id"`
-	Source  Target   `json:"source"`
-	Purpose string   `json:"purpose"`
-	Context []Target `json:"context,omitempty"`
+	ID string `json:"id"`
+	// Package identifies the inventory unit, not a claim of package completion.
+	Package      string              `json:"package,omitempty"`
+	Interactions []DesignInteraction `json:"interactions,omitempty"`
+	// SlopOnly reserves a whole-source assessment without claiming a design unit.
+	SlopOnly bool `json:"slop_only,omitempty"`
+	// SourceSpans narrows primary source; absent paths are supplied whole.
+	SourceSpans []ContextSpan `json:"source_spans,omitempty"`
+	// Focus names the declaration assessed with its required context.
+	Focus   []ContextSpan `json:"focus,omitempty"`
+	Source  Target        `json:"source"`
+	Purpose string        `json:"purpose"`
+	Context []Target      `json:"context,omitempty"`
+	// ContextSpans narrows named context files; absent paths are supplied whole.
+	ContextSpans []ContextSpan `json:"context_spans,omitempty"`
 	// Sources lists the primary source files intended for this task.
 	Sources []Target `json:"sources,omitempty"`
 	// Omitted records required source or graph context unavailable to the task.
@@ -121,6 +146,7 @@ type Check struct {
 	Signals       []Finding    `json:"signals,omitempty"`
 	Decisions     []Decision   `json:"decisions,omitempty"`
 	FailedStages  []string     `json:"failed_stages,omitempty"`
+	Limitations   []string     `json:"limitations,omitempty"`
 	Tool          string       `json:"tool,omitempty"`
 	PromptVersion string       `json:"prompt_version,omitempty"`
 	ModelRuns     []ModelRun   `json:"model_runs,omitempty"`
@@ -201,18 +227,39 @@ func (r Report) Problems() []string {
 		for _, target := range c.Context {
 			evidence[normalize(target)] = true
 		}
+		spanEvidence := map[Target][]bundle.SourceSpan{}
 		taskIDs := map[string]bool{}
 		for _, task := range c.Tasks {
 			if taskIDs[task.ID] {
 				bad("duplicate design task")
 			}
 			taskIDs[task.ID] = true
+			ranges, rangeErr := task.contextRanges()
+			if rangeErr != nil {
+				bad(rangeErr.Error())
+			}
 			sourceTargets := map[Target]bool{}
 			for _, source := range task.Sources {
 				if source.Kind != FileTarget || !source.valid() || sourceTargets[source] {
 					bad("design task has invalid or duplicate source")
 				}
 				sourceTargets[source] = true
+			}
+			for _, focus := range task.Focus {
+				if !sourceTargets[Target{Kind: FileTarget, ID: focus.Path}] || focus.Start < 1 || focus.End < focus.Start || (len(ranges[focus.Path]) > 0 && !bundle.ContainsSourceRange(ranges[focus.Path], focus.Start, focus.End)) {
+					bad("design focus lies outside its primary source")
+				}
+			}
+			seenInteractions := map[DesignInteraction]bool{}
+			for _, relation := range task.Interactions {
+				caller := normalize(relation.Caller)
+				if relation.Caller.Kind != FileTarget || !relation.Caller.valid() || !sourceTargets[caller] || !relation.Callee.valid() || (relation.Callee.Kind != FileTarget && relation.Callee.Kind != UnitTarget) || seenInteractions[relation] {
+					bad("design task has invalid or duplicate caller obligation")
+				}
+				if relation.Callee.Kind == FileTarget && !sourceTargets[normalize(relation.Callee)] && !slices.Contains(task.Context, normalize(relation.Callee)) {
+					bad("design task omits its declared callee context")
+				}
+				seenInteractions[relation] = true
 			}
 			if len(task.Sources) == 0 {
 				bad("design task has no source scope")
@@ -246,18 +293,19 @@ func (r Report) Problems() []string {
 						bad("examined design task lacks a source digest")
 					}
 				}
-				for _, source := range task.Sources {
-					evidence[normalize(source)] = true
-				}
-				evidence[normalize(task.Source)] = true
-				for _, target := range task.Context {
+				for _, target := range append(slices.Clone(task.Sources), task.Context...) {
+					if spans := ranges[target.ID]; len(spans) > 0 {
+						key := normalize(target)
+						spanEvidence[key] = append(spanEvidence[key], spans...)
+						continue
+					}
 					evidence[normalize(target)] = true
 				}
 			}
 		}
 		for _, finding := range c.Findings {
 			for _, target := range append([]Target{finding.Target}, finding.AlsoAt...) {
-				if !target.valid() || (c.State == Completed && !evidence[normalize(target)]) {
+				if !target.valid() || (c.State == Completed && !evidence[normalize(target)] && !slices.ContainsFunc(spanEvidence[normalize(target)], func(span bundle.SourceSpan) bool { return target.Line >= span.Start && target.Line <= span.End })) {
 					bad("finding has an invalid target or lacks examined evidence")
 				}
 			}
@@ -341,6 +389,9 @@ func (r Report) Text() string {
 		fmt.Fprintf(&b, "  %s: %s; %d/%d targets examined, %d findings\n", c.ID, c.State, len(c.Examined), len(c.Planned), len(c.Findings))
 		if c.Reason != "" {
 			fmt.Fprintf(&b, "    %s\n", c.Reason)
+		}
+		for _, limitation := range c.Limitations {
+			fmt.Fprintf(&b, "    Scope limit: %s\n", limitation)
 		}
 		for _, signal := range c.Signals {
 			fmt.Fprintf(&b, "    Advisory model signal (%s): %s\n", signal.Rule, signal.Title)

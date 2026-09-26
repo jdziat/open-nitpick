@@ -92,7 +92,7 @@ func TestGitHubPullRequest(t *testing.T) {
 			"draft":  true,
 			"user":   map[string]any{"login": "alice"},
 			"base":   map[string]any{"ref": "main"},
-			"head":   map[string]any{"ref": "feature", "sha": "abc123"},
+			"head":   map[string]any{"ref": "feature", "sha": "abc123", "repo": map[string]any{"html_url": "https://forge.example/fork/repo"}},
 		})
 	})
 
@@ -103,6 +103,9 @@ func TestGitHubPullRequest(t *testing.T) {
 
 	if pr.Title != "Add retry" || pr.Author != "alice" || pr.HeadSHA != "abc123" {
 		t.Errorf("pull request = %+v", pr)
+	}
+	if pr.SourceBaseURL != "https://forge.example/fork/repo/blob/abc123" {
+		t.Fatalf("source URL did not preserve forge, fork and revision: %q", pr.SourceBaseURL)
 	}
 	if !pr.Draft {
 		t.Error("Draft should be carried through")

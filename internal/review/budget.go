@@ -45,7 +45,11 @@ func EstimatePlan(cfg *config.Config, plan *bundle.Plan) Estimate {
 	reviewers := maxReviewers(cfg)
 	est := Estimate{Reviewers: reviewers}
 	for _, batch := range plan.Batches {
-		est.PromptTokens += batch.Tokens * reviewers
+		tokens := batch.Tokens
+		if batch.DesignTask != "" {
+			tokens += plan.FramingReserved
+		}
+		est.PromptTokens += tokens * reviewers
 	}
 	est.CompletionTokens = int(float64(est.PromptTokens) * b.EffectiveCompletionRatio())
 	est.Dollars = dollars(b, est.PromptTokens, est.CompletionTokens)

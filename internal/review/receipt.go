@@ -32,7 +32,16 @@ func receipt(report *Report) string {
 
 	reviewed, changed := 0, len(report.Files)
 	if report.Plan != nil {
-		reviewed = report.Plan.Files()
+		plan := *report.Plan
+		if report.DesignExecution != nil {
+			plan.Batches = nil
+			for _, batch := range report.Plan.Batches {
+				if batch.DesignAssessed(report.AssessedDesignTasks) {
+					plan.Batches = append(plan.Batches, batch)
+				}
+			}
+		}
+		reviewed = plan.Files()
 	}
 	switch {
 	case changed == 0:
