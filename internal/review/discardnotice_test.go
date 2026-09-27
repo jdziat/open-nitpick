@@ -13,8 +13,9 @@ import (
 )
 
 // discards is the ledger of a run where an analyzer produced six findings and
-// the review published none of them: four for reasons that are this
-// repository's own policy, and two for a path that does not exist here.
+// the review published none of them: three for reasons that are this
+// repository's own policy, one for a line the diff does not carry, and two
+// for a path that does not exist here.
 func discards() []LinterDiscard {
 	return []LinterDiscard{
 		{Rule: "golangci-lint(errcheck)", Path: "sibling.go", Line: 4, Reason: DiscardNotInChange},

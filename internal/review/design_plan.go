@@ -19,11 +19,13 @@ type DesignExecution struct {
 	practices.DesignPacking
 	Sources  []standards.File
 	Excluded []bundle.Skip
-	// Omitted names a go.mod path the repository walk discovered but could
-	// not read (too large, unreadable, path-limited). frozenDesignContext
-	// uses this, not Design.Errors, to decide which directories have an
-	// unresolved module: an unrelated error elsewhere in the snapshot must
-	// not poison every directory's module identity.
+	// Omitted holds every source this pass could not include: an unreadable
+	// go.mod (too large, unreadable, path-limited) alongside an added file
+	// whose diff did not match the frozen source. frozenDesignContext reads
+	// this, not Design.Errors, to decide which directories have an
+	// unresolved module, and only its go.mod-path entries apply: an
+	// unrelated error elsewhere in the snapshot must not poison every
+	// directory's module identity.
 	Omitted []bundle.Skip
 }
 

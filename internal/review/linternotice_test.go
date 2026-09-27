@@ -15,7 +15,7 @@ func statuses() []LinterStatus {
 	return []LinterStatus{
 		{Linter: "golangci-lint", Outcome: LinterFailed,
 			State: "golangci-lint did not analyze the code it was given: typechecking error"},
-		{Linter: "ruff", Outcome: LinterSkipped, State: "the change contains no files it analyzes"},
+		{Linter: "ruff", Outcome: LinterSkipped, NoTargets: true, State: "the change contains no files it analyzes"},
 		{Linter: "semgrep", Outcome: LinterRan, State: "operator config /etc/nitpick/rules.yml"},
 	}
 }
