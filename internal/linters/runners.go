@@ -326,14 +326,12 @@ func (g *golangciLint) Name() string { return "golangci-lint" }
 func (g *golangciLint) GosecForced() bool { return g.ForceGosec }
 
 // matchContext is the build.Context Uncovered matches a file's constraints
-// against. It is build.Default plus BuildTags, so a file this run actually
-// passes to golangci-lint with --build-tags is not also reported as excluded
-// from that same build; see BuildTags and golangciLint.Run.
-func (g *golangciLint) matchContext() *build.Context {
-	if len(g.BuildTags) == 0 {
-		return &build.Default
-	}
+// against: this run's BuildTags, and the child's CgoEnabled from goEnv
+// rather than this process's own, which //go:build cgo needs and the
+// separate, import-scanning cgoExcluded check does not cover.
+func (g *golangciLint) matchContext(cgoEnabled bool) *build.Context {
 	ctx := build.Default
+	ctx.CgoEnabled = cgoEnabled
 	ctx.BuildTags = g.BuildTags
 	return &ctx
 }
@@ -815,8 +813,9 @@ func parseGoEnv(out []byte) (goBuildContext, bool) {
 // grammar are the toolchain's, and an approximation of them is a list of the
 // cases somebody thought of.
 //
-// GOOS/GOARCH come from this process, which golangci-lint inherits with no
-// build tags on top, so MatchFile answers the constraint question the run
+// GOOS/GOARCH come from this process, which golangci-lint inherits, and the
+// build tags it is given are the same ones MatchFile applies (see
+// matchContext), so MatchFile answers the constraint question the run
 // depends on. It cannot answer the cgo one: with cgo off the go tool drops a
 // file importing "C" from the package and MatchFile still matches it, reading
 // build constraints and filename suffixes but never the import list. A
@@ -913,7 +912,7 @@ func (g *golangciLint) Uncovered(ctx context.Context, repoRoot string, files []s
 		// (false, err) is a file we could not read, which is not the same claim
 		// as a file the build excludes; golangci-lint reports its own read
 		// failures and inventing one here would be a guess.
-		switch match, err := g.matchContext().MatchFile(filepath.Dir(full), filepath.Base(full)); {
+		switch match, err := g.matchContext(goEnv.CgoEnabled).MatchFile(filepath.Dir(full), filepath.Base(full)); {
 		case err != nil:
 			continue
 		case !match:

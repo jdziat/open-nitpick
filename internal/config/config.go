@@ -919,8 +919,8 @@ type Linters struct {
 	// BuildTags are added to golangci-lint's own invocation (--build-tags)
 	// and to the build-constraint matcher golangciLint.Uncovered uses to
 	// decide whether a file went unread. A file gated behind a tag not
-	// listed here is genuinely unread and reported so; a file gated behind a
-	// tag listed here is linted and matched the same way, so the two do not
+	// listed here is unread and reported so; a file gated behind a tag
+	// listed here is linted and matched the same way, so the two do not
 	// collapse into the same "excluded from this build" notice. Empty is the
 	// default: only GOOS/GOARCH constraints are considered, matching a plain
 	// `go build`.
