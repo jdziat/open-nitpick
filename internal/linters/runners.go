@@ -312,12 +312,31 @@ type golangciLint struct {
 	// operator supplied no config, and `--enable=gosec` on every invocation so
 	// an operator config that disables it cannot greenwash the security roster.
 	ForceGosec bool
+
+	// BuildTags are passed to golangci-lint as --build-tags and to the
+	// build-constraint matcher Uncovered uses, so a file gated behind one of
+	// them is both linted and not reported as excluded from this build. See
+	// config.Linters.BuildTags.
+	BuildTags []string
 }
 
 func (g *golangciLint) Name() string { return "golangci-lint" }
 
 // GosecForced reports whether this runner enables gosec for the security roster.
 func (g *golangciLint) GosecForced() bool { return g.ForceGosec }
+
+// matchContext is the build.Context Uncovered matches a file's constraints
+// against. It is build.Default plus BuildTags, so a file this run actually
+// passes to golangci-lint with --build-tags is not also reported as excluded
+// from that same build; see BuildTags and golangciLint.Run.
+func (g *golangciLint) matchContext() *build.Context {
+	if len(g.BuildTags) == 0 {
+		return &build.Default
+	}
+	ctx := build.Default
+	ctx.BuildTags = g.BuildTags
+	return &ctx
+}
 
 // Detect reports why golangci-lint will not run, and nil when it will.
 //
@@ -463,6 +482,9 @@ func (g *golangciLint) Run(ctx context.Context, repoRoot string, files []string)
 	for _, t := range targets {
 		args := []string{"run", "--config", configRef}
 		args = append(args, golangciReportArgs...)
+		if len(g.BuildTags) > 0 {
+			args = append(args, "--build-tags", strings.Join(g.BuildTags, ","))
+		}
 		// Always, including when the operator supplied golangci_config: a file
 		// with default: none or gosec disabled must not report ran without it.
 		if g.ForceGosec {
@@ -891,7 +913,7 @@ func (g *golangciLint) Uncovered(ctx context.Context, repoRoot string, files []s
 		// (false, err) is a file we could not read, which is not the same claim
 		// as a file the build excludes; golangci-lint reports its own read
 		// failures and inventing one here would be a guess.
-		switch match, err := build.Default.MatchFile(filepath.Dir(full), filepath.Base(full)); {
+		switch match, err := g.matchContext().MatchFile(filepath.Dir(full), filepath.Base(full)); {
 		case err != nil:
 			continue
 		case !match:
