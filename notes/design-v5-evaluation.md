@@ -47,12 +47,14 @@ classifying an existing test as ineffective slop.
 ## Follow-up
 
 Version 6 adds explicit acknowledgement decisions and keeps unaccounted claims.
-Its scripted safeguards passed ten mutation controls. The first live mixed-entry
-control passed one of three input orders; the other two retained acknowledgements.
-All six substantive or structurally protected entries survived each order.
-The implementation is not qualified yet; a raw response omitted the acknowledgement array. Version 7 requires it,
-and all three new input orders pass. This is a protocol control, not a
-general precision claim.
+Its scripted safeguards passed ten of the eleven mutation controls now on
+record; the eleventh, an explicit acknowledgements array, was added after this
+evaluation and is not part of this count. The first live mixed-entry control
+passed one of three input orders; the other two retained acknowledgements. All
+six substantive or structurally protected entries survived each order. The
+implementation is not qualified yet; a raw response omitted the acknowledgement
+array. Version 7 requires it, and all three new input orders pass. This is a
+protocol control, not a general precision claim.
 
 Keep the original lifecycle and boundary fixtures and their disagreements. Do
 not relabel an ambiguous API or a misleading comment as a clean repository.
