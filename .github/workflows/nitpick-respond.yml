@@ -60,11 +60,19 @@ jobs:
           app-id: ${{ env.NITPICK_APP_ID }}
           private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
 
-      - uses: ./
+      # Build the checkout, not the released Action binary: a response reads the
+      # base policy, so it must understand every key the base branch accepts.
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          command: respond
-          bot-login: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
-          github-token: ${{ steps.app.outputs.token || github.token }}
-          provider: synthetic
-          model: hf:zai-org/GLM-5.3-Flash
-          api-key: ${{ secrets.SYNTHETIC_API_KEY }}
+          go-version-file: go.mod
+      - name: Install golangci-lint
+        working-directory: tools
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+      - name: Respond with the current source
+        env:
+          GITHUB_TOKEN: ${{ steps.app.outputs.token || github.token }}
+          NITPICK_BOT_LOGIN: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
+          LLM_PROVIDER: synthetic
+          LLM_MODEL: hf:zai-org/GLM-5.3-Flash
+          LLM_API_KEY: ${{ secrets.SYNTHETIC_API_KEY }}
+        run: go run ./cmd/nitpick respond
