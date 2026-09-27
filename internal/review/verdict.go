@@ -29,6 +29,12 @@ type Verdict struct {
 	Title      string `json:"title,omitempty"`
 	Rationale  string `json:"rationale,omitempty"`
 	Suggestion string `json:"suggestion,omitempty"`
+
+	// FixEndLine is the last line Suggestion replaces, read only alongside a
+	// replacement Suggestion. A held-over Suggestion from the reviewer keeps
+	// its own FixEndLine; applyVerdict must not let the reviewer's range
+	// outlive a shorter replacement written for the anchored line alone.
+	FixEndLine int `json:"fix_end_line,omitempty"`
 }
 
 // Acknowledgement identifies a model nit that reports successful assessment
@@ -103,6 +109,11 @@ func (e *Engine) applyVerdict(f *Finding, v Verdict) {
 	// Skip when the anchor moved: moveAnchor already cleared Suggestion.
 	if strings.TrimSpace(v.Suggestion) != "" && v.Line == f.Line {
 		f.Suggestion = v.Suggestion
+		// A replacement written for the anchored line alone must not inherit
+		// a wider range the reviewer's own suggestion covered: a shorter
+		// triage rewrite under a stale FixEndLine would delete lines outside
+		// what the model was ever shown.
+		f.FixEndLine = v.FixEndLine
 	}
 }
 
