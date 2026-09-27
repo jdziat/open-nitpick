@@ -149,7 +149,7 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 				"items": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"number": map[string]any{"type": "integer"},
+						"number": map[string]any{"type": "integer", "description": "The finding's number in the list you were given."},
 						"quote":  map[string]any{"type": "string", "description": "Copy the entire original rationale exactly, not an excerpt."},
 						"reason": map[string]any{"type": "string", "description": "Explain why the original title and rationale allege no defect, risk, missing coverage, or requested change."},
 					},

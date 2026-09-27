@@ -1623,7 +1623,6 @@ func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bu
 	return out, nil
 }
 
-// analyzeBatch reviews one batch.
 // analyzeBatch reviews a batch with the default review client.
 func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bundle.Batch, style bool) ([]Finding, error) {
 	return e.analyzeBatchWith(ctx, e.Roles.Review, base, prContext, b, style)
