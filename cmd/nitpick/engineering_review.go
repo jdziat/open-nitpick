@@ -101,7 +101,13 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 		var body []byte
 		var err error
 		if execution := reviewReport.DesignExecution; execution != nil {
-			if frozenExcluded(file.Path, execution.Excluded) {
+			if frozenExcluded(file.Path, execution.Excluded) || frozenOmitted(file.Path, execution.Omitted) {
+				// A file dropped for a disclosed reason (too large, unreadable,
+				// path-limited) is already reported through the design
+				// inventory; that omission is not the drift or unavailability
+				// this check exists to catch, and re-flagging it here would
+				// fail the required snapshot check for every oversized or
+				// unreadable file the design pass already accounted for.
 				continue
 			}
 			var ok bool
@@ -278,7 +284,17 @@ func reviewAnalyzerCheck(files []standards.File, report *review.Report, cfg *con
 		c.Findings = append(c.Findings, practices.Finding{Rule: finding.Source, Target: practices.Target{Kind: practices.FileTarget, ID: finding.Path, Line: finding.Line}, Title: finding.Title,
 			Rationale: finding.Rationale, Remedy: finding.Suggestion, Severity: finding.Severity, Blocking: true, Sources: []string{finding.Source}})
 	}
-	if report.Plan != nil {
+	// report.Plan.Skipped tracks the review batching plan's own omissions.
+	// In the engineering profile report.Plan is always the design-task
+	// packing plan (assembleDesign sets it whenever DesignExecution is
+	// non-nil), and its Skipped entries are design-task packing limits like
+	// "exceeds review.max_files_per_request": about what the model's design
+	// pass could read, not about golangci-lint or yamllint, which run over
+	// every changed file directly. Reading that packing limit as analyzer
+	// coverage made linters partial on every design task that did not fit a
+	// batch, regardless of whether the file was linted. Analyzer coverage
+	// gaps are already reported precisely through report.Uncovered above.
+	if report.Plan != nil && report.DesignExecution == nil {
 		for _, skip := range report.Plan.Skipped {
 			if skip.Reason != bundle.ReasonIgnored && skip.Reason != bundle.ReasonDeleted {
 				c.State, c.Reason = practices.Partial, skip.Reason
@@ -356,7 +372,13 @@ func frozenDesignContext(files []standards.File, execution *review.DesignExecuti
 			seen[file.Path] = true
 		}
 	}
-	problems := slices.Clone(execution.Design.Errors)
+	// Design.Errors is the whole design pass's problem list, most of which
+	// (an oversized evidence file, an unrelated unreadable source) says
+	// nothing about whether any directory's go.mod could be identified.
+	// Seeding this check's problems from it made design-boundaries partial
+	// on every unrelated design-packing failure; only the module-resolution
+	// problems the walk below finds belong here.
+	var problems []string
 	for _, file := range files {
 		if path.Ext(file.Path) != ".go" {
 			continue
