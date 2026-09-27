@@ -363,7 +363,13 @@ func frozenDesignContext(files []standards.File, execution *review.DesignExecuti
 		}
 		for dir := path.Dir(file.Path); ; dir = path.Dir(dir) {
 			name := path.Join(dir, "go.mod")
-			if !seen[name] && (len(execution.Design.Errors) > 0 || frozenExcluded(name, execution.Excluded)) {
+			// The walk marks a directory's module unresolved only when the
+			// snapshot itself named its go.mod unreadable or excluded. An
+			// unrelated file failing elsewhere in the snapshot (Design.Errors)
+			// says nothing about whether this directory has a nested module at
+			// all; treating it as if it did invented a "module unavailable"
+			// placeholder at every changed directory in the tree.
+			if !seen[name] && (frozenOmitted(name, execution.Omitted) || frozenExcluded(name, execution.Excluded)) {
 				// An unknown nested module must not inherit an outer module's identity.
 				out = append(out, standards.File{Path: name})
 				seen[name] = true
@@ -375,4 +381,13 @@ func frozenDesignContext(files []standards.File, execution *review.DesignExecuti
 		}
 	}
 	return out, problems
+}
+
+func frozenOmitted(name string, omitted []bundle.Skip) bool {
+	for _, skip := range omitted {
+		if skip.Path == name {
+			return true
+		}
+	}
+	return false
 }

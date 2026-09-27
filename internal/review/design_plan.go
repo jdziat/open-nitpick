@@ -19,6 +19,12 @@ type DesignExecution struct {
 	practices.DesignPacking
 	Sources  []standards.File
 	Excluded []bundle.Skip
+	// Omitted names a go.mod path the repository walk discovered but could
+	// not read (too large, unreadable, path-limited). frozenDesignContext
+	// uses this, not Design.Errors, to decide which directories have an
+	// unresolved module: an unrelated error elsewhere in the snapshot must
+	// not poison every directory's module identity.
+	Omitted []bundle.Skip
 }
 
 // assembleDesign captures one bounded source view before package planning.
@@ -91,7 +97,7 @@ func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Fil
 	plan := practices.PlanDesignInteractions(ctx, inventory, source, changed)
 	packed := practices.PackDesign(ctx, e.Config, plan, source, files, reserve)
 	packed.Plan.Skipped = append(packed.Plan.Skipped, view.Excluded...)
-	return DesignExecution{DesignPacking: packed, Sources: source, Excluded: view.Excluded}
+	return DesignExecution{DesignPacking: packed, Sources: source, Excluded: view.Excluded, Omitted: view.Omitted}
 }
 
 func additionMatchesSource(file *diff.File, source string) bool {

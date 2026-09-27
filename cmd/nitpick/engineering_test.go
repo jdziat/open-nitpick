@@ -539,18 +539,33 @@ func (p *assessmentReadTrap) FileContent(context.Context, vcs.Ref, string) ([]by
 }
 
 func TestFrozenMetadataDoesNotInventAnOuterModuleIdentity(t *testing.T) {
-	for _, excluded := range []bool{false, true} {
+	for _, omitted := range []bool{false, true} {
 		execution := &review.DesignExecution{Sources: []standards.File{{Path: "go.mod", Src: []byte("module example.com/outer\n")}}}
-		if excluded {
-			execution.Excluded = []bundle.Skip{{Path: "nested/go.mod", Reason: bundle.ReasonIgnored}}
+		if omitted {
+			execution.Omitted = []bundle.Skip{{Path: "nested/go.mod", Reason: bundle.ReasonUnavailable}}
 		} else {
-			execution.Design.Errors = []string{"nested/go.mod: unavailable"}
+			execution.Excluded = []bundle.Skip{{Path: "nested/go.mod", Reason: bundle.ReasonIgnored}}
 		}
 		files, problems := frozenDesignContext([]standards.File{{Path: "nested/a.go", Src: []byte("package nested\n")}}, execution)
 		inventory, _ := practices.InspectDesign(files, nil)
 		if len(problems) == 0 || len(inventory.Errors) == 0 || len(inventory.Units) != 0 {
 			t.Fatalf("missing metadata invented a package: %+v; %v", inventory, problems)
 		}
+	}
+}
+
+func TestFrozenMetadataDoesNotPoisonUnrelatedDirectoriesFromAnUnrelatedError(t *testing.T) {
+	execution := &review.DesignExecution{
+		Sources:       []standards.File{{Path: "go.mod", Src: []byte("module example.com/outer\n")}},
+		DesignPacking: practices.DesignPacking{Design: practices.DesignPlan{Errors: []string{"unrelated/oversized.json: exceeded review.max_file_bytes"}}},
+	}
+	files, problems := frozenDesignContext([]standards.File{{Path: "nested/a.go", Src: []byte("package nested\n")}}, execution)
+	inventory, _ := practices.InspectDesign(files, nil)
+	if len(problems) != len(execution.Design.Errors) {
+		t.Fatalf("an unrelated snapshot error invented a module placeholder: %+v; %v", inventory, problems)
+	}
+	if len(inventory.Units) != 1 || inventory.Units[0].ID != "example.com/outer/nested" {
+		t.Fatalf("unrelated directory lost its outer module identity: %+v", inventory)
 	}
 }
 
