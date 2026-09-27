@@ -209,7 +209,7 @@ runs:
 
     - name: Set up Go
       if: steps.install.outputs.source == 'build'
-      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: stable
         cache: false
@@ -282,7 +282,7 @@ runs:
 
     - name: Set up Go for analyzers
       if: inputs.analyzers != '' && contains(steps.analyzers.outputs.want, 'golangci-lint')
-      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: stable
         cache: false
