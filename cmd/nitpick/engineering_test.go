@@ -528,6 +528,54 @@ func TestEngineeringAssessmentUsesFrozenSourceWithoutProviderReads(t *testing.T)
 	}
 }
 
+// TestEngineeringAssessmentIgnoresUnrelatedPackingLimits pins the shape that
+// kept design-boundaries and linters permanently partial on any change with
+// an oversized, unrelated evidence file the design pass could not pack,
+// alongside a design task another file exceeded
+// review.max_files_per_request for: neither check's own coverage failed, so
+// neither should report one.
+func TestEngineeringAssessmentIgnoresUnrelatedPackingLimits(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "-q", "-b", "main")
+	write(t, root, "go.mod", "module example.com/frozen\n\ngo 1.25\n")
+	write(t, root, "a.go", "package frozen\n")
+	git(t, root, "add", ".")
+	git(t, root, "commit", "-qm", "feat: initial")
+	provider := vcs.NewLocal(root, nil)
+	report := &review.Report{
+		Files: diff.Files{&diff.File{Path: "a.go"}, &diff.File{Path: "notes/evidence/big.json"}},
+		Plan: &bundle.Plan{Skipped: []bundle.Skip{
+			{Path: "declaration:cmd/nitpick/other.go", Reason: "complete design task exceeds review.max_files_per_request"},
+		}},
+		Linters: []review.LinterStatus{{Linter: "golangci-lint", Outcome: review.LinterRan}},
+		DesignExecution: &review.DesignExecution{
+			DesignPacking: practices.DesignPacking{Design: practices.DesignPlan{
+				Errors: []string{"notes/evidence/big.json: exceeded review.max_file_bytes"},
+			}},
+			Sources: []standards.File{
+				{Path: "a.go", Src: []byte("package frozen\n")},
+				{Path: "go.mod", Src: []byte("module example.com/frozen\n")},
+			},
+		},
+	}
+	cfg := config.Defaults()
+	cfg.Linters.Enabled = []string{"golangci-lint"}
+	cfg.Practices.Boundaries = []config.PracticeBoundary{{From: "*", Forbid: []string{"forbidden"}}}
+	result := assessReviewPractices(t.Context(), root, cfg, vcs.Ref{Base: "main", Head: vcs.Worktree}, nil, report, provider)
+	for _, check := range result.Checks {
+		switch check.ID {
+		case "design-boundaries":
+			if check.State != practices.Completed {
+				t.Fatalf("an unrelated oversized file left design-boundaries %s: %+v", check.State, check)
+			}
+		case "linters":
+			if check.State != practices.Completed {
+				t.Fatalf("an unrelated design-task packing limit left linters %s: %+v", check.State, check)
+			}
+		}
+	}
+}
+
 type assessmentReadTrap struct {
 	vcs.Provider
 	reads int
