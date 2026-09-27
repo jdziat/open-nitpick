@@ -222,6 +222,14 @@ func modelCheckResults(checks []practices.Check, report *review.Report) []practi
 			}
 			checks[i].Decisions = append(checks[i].Decisions, practices.Decision{Finding: practiceModelFinding(decision.Finding), Expert: decision.Expert, Reason: decision.Reason})
 		}
+		if report.Plan != nil {
+			for _, name := range report.Plan.RelatedFiles {
+				target := practices.Target{Kind: practices.FileTarget, ID: name}
+				if !slices.Contains(checks[i].Context, target) {
+					checks[i].Context = append(checks[i].Context, target)
+				}
+			}
+		}
 		if checks[i].ID == "design" {
 			if report.DesignExecution != nil {
 				applyPackageCoverage(&checks[i], report)
@@ -244,11 +252,6 @@ func modelCheckResults(checks []practices.Check, report *review.Report) []practi
 			for j := range checks[i].Omitted {
 				checks[i].Omitted[j].Target.Kind = practices.UnitTarget
 				checks[i].Omitted[j].Target.ID = "source:" + checks[i].Omitted[j].Target.ID
-			}
-			if report.Plan != nil {
-				for _, name := range report.Plan.RelatedFiles {
-					checks[i].Context = append(checks[i].Context, practices.Target{Kind: practices.FileTarget, ID: name})
-				}
 			}
 			for j := range checks[i].Tasks {
 				checks[i].Tasks[j].Context = slices.Clone(contexts[checks[i].Tasks[j].Source.ID])

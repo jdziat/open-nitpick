@@ -49,6 +49,11 @@ Prompt is appended to the review prompt for a matching file.
 boolean, default `true`.
 AutoDetect runs the catalog analyzers marked auto, each installed, isolated from the tree, and executing nothing from it, whenever the change contains files it reads and without being named in Enabled; `nitpick linters` says which those are.
 
+### `linters.build_tags`
+
+list of string, default `none`.
+BuildTags are added to golangci-lint's own invocation (--build-tags) and to the build-constraint matcher golangciLint.Uncovered uses to decide whether a file went unread.
+
 ### `linters.configs`
 
 map of string, default `none`.

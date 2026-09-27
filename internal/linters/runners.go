@@ -312,12 +312,29 @@ type golangciLint struct {
 	// operator supplied no config, and `--enable=gosec` on every invocation so
 	// an operator config that disables it cannot greenwash the security roster.
 	ForceGosec bool
+
+	// BuildTags are passed to golangci-lint as --build-tags and to the
+	// build-constraint matcher Uncovered uses, so a file gated behind one of
+	// them is both linted and not reported as excluded from this build. See
+	// config.Linters.BuildTags.
+	BuildTags []string
 }
 
 func (g *golangciLint) Name() string { return "golangci-lint" }
 
 // GosecForced reports whether this runner enables gosec for the security roster.
 func (g *golangciLint) GosecForced() bool { return g.ForceGosec }
+
+// matchContext is the build.Context Uncovered matches a file's constraints
+// against: this run's BuildTags, and the child's CgoEnabled from goEnv
+// rather than this process's own, which //go:build cgo needs and the
+// separate, import-scanning cgoExcluded check does not cover.
+func (g *golangciLint) matchContext(cgoEnabled bool) *build.Context {
+	ctx := build.Default
+	ctx.CgoEnabled = cgoEnabled
+	ctx.BuildTags = g.BuildTags
+	return &ctx
+}
 
 // Detect reports why golangci-lint will not run, and nil when it will.
 //
@@ -463,6 +480,9 @@ func (g *golangciLint) Run(ctx context.Context, repoRoot string, files []string)
 	for _, t := range targets {
 		args := []string{"run", "--config", configRef}
 		args = append(args, golangciReportArgs...)
+		if len(g.BuildTags) > 0 {
+			args = append(args, "--build-tags", strings.Join(g.BuildTags, ","))
+		}
 		// Always, including when the operator supplied golangci_config: a file
 		// with default: none or gosec disabled must not report ran without it.
 		if g.ForceGosec {
@@ -793,8 +813,9 @@ func parseGoEnv(out []byte) (goBuildContext, bool) {
 // grammar are the toolchain's, and an approximation of them is a list of the
 // cases somebody thought of.
 //
-// GOOS/GOARCH come from this process, which golangci-lint inherits with no
-// build tags on top, so MatchFile answers the constraint question the run
+// GOOS/GOARCH come from this process, which golangci-lint inherits, and the
+// build tags it is given are the same ones MatchFile applies (see
+// matchContext), so MatchFile answers the constraint question the run
 // depends on. It cannot answer the cgo one: with cgo off the go tool drops a
 // file importing "C" from the package and MatchFile still matches it, reading
 // build constraints and filename suffixes but never the import list. A
@@ -891,7 +912,7 @@ func (g *golangciLint) Uncovered(ctx context.Context, repoRoot string, files []s
 		// (false, err) is a file we could not read, which is not the same claim
 		// as a file the build excludes; golangci-lint reports its own read
 		// failures and inventing one here would be a guess.
-		switch match, err := build.Default.MatchFile(filepath.Dir(full), filepath.Base(full)); {
+		switch match, err := g.matchContext(goEnv.CgoEnabled).MatchFile(filepath.Dir(full), filepath.Base(full)); {
 		case err != nil:
 			continue
 		case !match:

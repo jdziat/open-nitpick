@@ -916,6 +916,16 @@ type Linters struct {
 	// one here is how to make its absence fail the run. Defaults to on.
 	AutoDetect *bool `yaml:"auto_detect"`
 
+	// BuildTags are added to golangci-lint's own invocation (--build-tags)
+	// and to the build-constraint matcher golangciLint.Uncovered uses to
+	// decide whether a file went unread. A file gated behind a tag not
+	// listed here is unread and reported so; a file gated behind a tag
+	// listed here is linted and matched the same way, so the two do not
+	// collapse into the same "excluded from this build" notice. Empty is the
+	// default: only GOOS/GOARCH constraints are considered, matching a plain
+	// `go build`.
+	BuildTags []string `yaml:"build_tags"`
+
 	// Trusted names analyzers that EXECUTE the tree's own code in order to
 	// analyze it, cargo clippy runs build scripts and procedural macros,
 	// phpstan loads the project's autoloader, and that are therefore
