@@ -43,8 +43,9 @@ Refute only when you can name the mechanism, in this code:
 - the property the claim says is unasserted is asserted, at a line you can point
   to;
 - an existing test covers the branch, and you can name it;
-- the test explicitly protects absence of a panic, exercises the named path and
-  lets a panic fail the test; a wrong return value does not break that contract;
+- the test explicitly protects absence of a panic, exercises the named path,
+  does not swallow a panic with recover, and lets a panic fail the test; a
+  wrong return value does not break that contract;
 - the branch the claim wants covered is unreachable, or is a pure delegation
   with no behavior of its own;
 - the test the claim calls flaky is deterministic, because the source of

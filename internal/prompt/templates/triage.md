@@ -31,10 +31,11 @@ as a finding.
    of the finding you merged it into. A finding you
    neither publish nor list is restored unchanged, so leaving one out is not a
    way to remove it.
-   Exception: an original model `nit` with no suggested patch whose title and
-   rationale only acknowledge successful assessment (for example, "No defect
-   found") belongs in `acknowledgements`. Copy its entire original rationale
-   exactly into `quote`, give its original `number`, and explain in `reason`
+   Exception: an original model finding of any severity, with no suggested
+   patch, whose title and rationale only acknowledge successful assessment
+   (for example, "No defect found") belongs in `acknowledgements`. Copy its
+   entire original rationale exactly into `quote`, give its original `number`,
+   and explain in `reason`
    why it alleges no defect. Do not also judge or merge that entry. These entries
    remain visible as review decisions. Never use this for analyzer findings,
    uncertain or disputed claims, missing coverage, suggestions for improvement,
