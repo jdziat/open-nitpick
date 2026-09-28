@@ -166,6 +166,7 @@ func builtins(repoRoot string, cfg *config.Config) []Runner {
 		&golangciLint{
 			cfg:        fileConfig(repoRoot, cfg.Linters.GolangciConfig),
 			ForceGosec: cfg.Linters.ForceGosec,
+			BuildTags:  cfg.Linters.BuildTags,
 		},
 		&ruff{cfg: fileConfig(repoRoot, cfg.Linters.RuffConfig)},
 		&eslint{cfg: fileConfig(repoRoot, cfg.Linters.ESLintConfig)},

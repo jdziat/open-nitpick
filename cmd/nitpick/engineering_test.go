@@ -660,6 +660,19 @@ func TestSlopCoverageKeepsSuccessfulReadsAcrossSharedTaskFailures(t *testing.T) 
 	}
 }
 
+func TestSlopFindingOnRelatedContextFileHasExaminedEvidence(t *testing.T) {
+	changed := practices.Target{Kind: practices.FileTarget, ID: "app.go"}
+	report := &review.Report{
+		Plan:     &bundle.Plan{RelatedFiles: []string{"helper.go"}, Batches: []bundle.Batch{{Entries: []bundle.Entry{{File: &diff.File{Path: changed.ID}, Content: "package app"}}}}},
+		Findings: []review.Finding{{Path: "helper.go", Line: 3, Class: string(config.ClassSlop), Title: "unrelated context finding"}},
+	}
+	checks := modelCheckResults([]practices.Check{{ID: "slop", Version: "1", Instrument: practices.Model, Planned: []practices.Target{changed}}}, report)
+	slopReport := practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: checks}
+	if problems := slopReport.Problems(); len(problems) != 0 {
+		t.Fatalf("a slop finding on a related, unplanned file was rejected as unexamined: %v", problems)
+	}
+}
+
 func TestFocusedDesignCompletionDoesNotInventWholeFileSlopCoverage(t *testing.T) {
 	files := []standards.File{{Path: "go.mod", Src: []byte("module example.com/app\n")}, {Path: "app.go", Src: []byte("package app\nfunc First(){}\nfunc Second(){}\n")}}
 	inventory, _ := practices.InspectDesign(files, nil)

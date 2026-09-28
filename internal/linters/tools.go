@@ -405,7 +405,7 @@ func normalizePath(repoRoot, p string) string {
 		return relative(repoRoot, p)
 	}
 	p = filepath.ToSlash(filepath.Clean(p))
-	return strings.TrimPrefix(p, "./")
+	return p
 }
 
 // --- Shared parsers -----------------------------------------------------------

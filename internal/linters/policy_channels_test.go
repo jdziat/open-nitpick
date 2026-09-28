@@ -782,6 +782,103 @@ func TestAFileTheBuildIncludesIsNotReportedAsUncovered(t *testing.T) {
 	}
 }
 
+// TestAConfiguredBuildTagIsLintedNotReportedUncovered closes the gap a
+// `//go:build eval` file opened on every pull request that added one: with no
+// build tag configured, golangci-lint's own invocation never sees the file
+// (--build-tags defaults to none), so it is legitimately unread and
+// UncoveredBuildExcluded is correct about it. linters.build_tags names the
+// tags this repository's own review considers part of its default build, so
+// they reach the invocation that reads the file and the matcher that decides
+// whether it was excluded together, and the two cannot disagree the way they
+// did when only one of them knew about the tag.
+func TestAConfiguredBuildTagIsLintedNotReportedUncovered(t *testing.T) {
+	requireTool(t, "golangci-lint")
+
+	source := "//go:build probetag\n\n" + goSource("", uncheckedError("F"))
+	repo, files := goProbe(t, source)
+	writeFile(t, repo, "sibling.go", "package probe\n\nfunc Sibling() int { return 1 }\n")
+
+	cfg := baseConfig()
+	cfg.Linters.Enabled = []string{"golangci-lint"}
+	cfg.Linters.BuildTags = []string{"probetag"}
+
+	set := New(repo, cfg, nil)
+	published, err := set.Run(context.Background(), files)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(published) != 1 {
+		t.Fatalf("the fixture no longer exercises the tagged file being linted; findings = %+v", published)
+	}
+	if gaps := set.Uncovered(); len(gaps) != 0 {
+		t.Errorf("a file linted under its own configured build tag was reported uncovered: %+v", gaps)
+	}
+}
+
+// TestAnUnconfiguredBuildTagIsStillReportedUncovered guards the other side of
+// the same fix: a tag absent from linters.build_tags must still be named. Naming
+// every tag the tree happens to use, rather than only the ones the operator
+// declared as part of their own build, would let an unread file, evaluated by
+// nobody's build, not even this repository's own, pass as covered.
+func TestAnUnconfiguredBuildTagIsStillReportedUncovered(t *testing.T) {
+	requireTool(t, "golangci-lint")
+
+	source := "//go:build othertag\n\n" + goSource("", uncheckedError("F"))
+	repo, files := goProbe(t, source)
+	writeFile(t, repo, "sibling.go", "package probe\n\nfunc Sibling() int { return 1 }\n")
+
+	cfg := baseConfig()
+	cfg.Linters.Enabled = []string{"golangci-lint"}
+	cfg.Linters.BuildTags = []string{"probetag"}
+
+	set := New(repo, cfg, nil)
+	if _, err := set.Run(context.Background(), files); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	gaps := set.Uncovered()
+	if len(gaps) != 1 || gaps[0].Path != "app.go" || gaps[0].Reason != review.UncoveredBuildExcluded {
+		t.Fatalf("uncovered = %+v, want app.go named as excluded from this build", gaps)
+	}
+}
+
+// TestAGoBuildCgoDirectiveIsUnreadWhenCgoIsOffAndIsNamed guards matchContext's
+// CgoEnabled, not cgoExcluded's import "C" scan: a file gated by //go:build cgo
+// carries no "C" import for cgoExcluded to find, so build.Default's own
+// CgoEnabled, snapshotted at process start rather than asked of the child's
+// CGO_ENABLED, is the only thing standing between this file and being matched
+// and linted as though the build it names ran.
+func TestAGoBuildCgoDirectiveIsUnreadWhenCgoIsOffAndIsNamed(t *testing.T) {
+	requireTool(t, "golangci-lint")
+
+	if !build.Default.CgoEnabled {
+		t.Skip("this test binary started with cgo off, so build.Default already agrees with CGO_ENABLED=0 " +
+			"and the row cannot tell the two detectors apart")
+	}
+
+	source := "//go:build cgo\n\n" + goSource("", uncheckedError("F"))
+	repo, files := goProbe(t, source)
+	writeFile(t, repo, "sibling.go", "package probe\n\nfunc Sibling() int { return 1 }\n")
+
+	t.Setenv("CGO_ENABLED", "0")
+
+	cfg := baseConfig()
+	cfg.Linters.Enabled = []string{"golangci-lint"}
+	cfg.Linters.Mode = config.LinterStrict
+
+	set := New(repo, cfg, nil)
+	published, err := set.Run(context.Background(), files)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(published) != 0 {
+		t.Fatalf("findings = %+v, want none: a //go:build cgo file with cgo off is not part of the child's build", published)
+	}
+	gaps := uncoveredFor(set.Uncovered(), review.UncoveredBuildExcluded)
+	if len(gaps) != 1 || gaps[0].Path != "app.go" {
+		t.Fatalf("uncovered = %+v, want app.go named as excluded from this build", set.Uncovered())
+	}
+}
+
 // TestACgoFileIsUnreadWhenCgoIsOffAndIsNamed is the build-exclusion gap through
 // the one door go/build's matcher cannot see, and it is the COMMON case rather
 // than an exotic one: CGO_ENABLED=0 is the default in most Go CI images.

@@ -323,6 +323,7 @@ linters:
   auto_detect: true                # also run any installed catalog analyzer (see the table below)
   only_changed_lines: true
   max_severity: critical           # ceiling on findings attributed to an analyzer
+  build_tags: []                   # tags golangci-lint's own invocation and coverage matching both honor
 
   # Analyzer configuration. Every one of these must resolve OUTSIDE the
   # repository under review; a path inside it is refused. Empty is the default.
