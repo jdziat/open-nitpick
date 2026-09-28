@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "source_commit": "bf03e53c0a7b33e98270a2f0b8cab8cc43a0fbf0",
+    "state": "jobs finished; results require adjudication",
+    "jobs": [
+      {
+        "name": "acknowledgement-controls",
+        "command": [
+          "/tmp/nitpick-ack-controls-v7.test",
+          "-test.run=TestLiveTriageSeparatesAcknowledgementsFromWeakClaims",
+          "-test.v",
+          "-test.count=1",
+          "-test.timeout=20m"
+        ],
+        "exit": 0,
+        "seconds": 214.02
+      },
+      {
+        "name": "implementation-review",
+        "command": [
+          "/tmp/nitpick-engineering-v7",
+          "review",
+          "-repo",
+          "/tmp/nitpick-design-controls",
+          "-base",
+          "c8cef1e",
+          "-head",
+          "bf03e53c0a7b33e98270a2f0b8cab8cc43a0fbf0",
+          "-config",
+          "/tmp/nitpick-new-model-review.yaml",
+          "-dry-run",
+          "-instruction",
+          "Paired testdata fixtures intentionally include buggy and correct source. Review the harness and its assertions; distinguish seeded fixture defects from production defects."
+        ],
+        "exit": 0,
+        "seconds": 416.94
+      }
+    ],
+    "nitpick-ack-controls-v7.test_sha256": "70af8e83bfc0a6853a3db64c94a74c1f6566899933c36d7fe57f9de317297bbb",
+    "nitpick-engineering-v7_sha256": "1f23ed4d0b9ceaa6e7e7c0f86e68fbdd58a2d1a487e32876113a12b148673304"
+  },
+  "report": "<details>\n<summary>Deterministic analyzers: 1 ran</summary>\n\nAnalyzer configuration is policy, and a change may not supply the policy it is\nreviewed under, so no analyzer read this repository's own lint settings.\n\n- golangci-lint \u2014 ran: isolated: open-nitpick&#39;s own analyzer config\n\n</details>\n\n<details>\n<summary>Analyzed less than it ran over: 1 file(s) the analyzers did not fully cover</summary>\n\nThe analyzers did not fully cover these parts of the change. That is not the same as reporting them clean.\n\n- excluded from this build, so no analyzer read it\n  - `internal/review/acknowledgement_eval_test.go` (`golangci-lint`)\n\n</details>\nRead 49 changed files. 2 findings: 1 error, 1 warning. Analyzers: golangci-lint.\n\n**Findings:** 1 error, 1 warning\n\n<sub>Reviewed by open-nitpick.</sub>\n\ninternal/practices/testdata/ineffective-tests/README.md:3\n  **\ud83d\udfe0 error \u00b7 correctness**\n  \n  Good fixture lacks the tests the README describes\n  \n  The good fixture contains no test files, so the README's described good-case tests cannot run and the evaluation only exercises the bad case. This makes the ineffective-tests pair unable to distinguish a valid good fixture from a bad one. Add the missing good tests or remove the README claim.\n  \n  <sub>flagged by synthetic/hf:zai-org/GLM-5.3-Flash \u00b7 triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>\n\ninternal/practices/mechanisms_test.go:21\n  **\ud83d\udfe1 warning \u00b7 missing-test-coverage**\n  \n  Indirection fixtures get no behavioral assertion\n  \n  The indirection pair is only materialized and build-checked, with no oracle or structural assertion in the switch. If the bad fixture stops failing or the good fixture regresses, the test still passes and the harness validates an unvalidated control. Add an assertion that pins the bad/good distinction.\n  \n  <sub>flagged by synthetic/hf:zai-org/GLM-5.3-Flash \u00b7 triaged by synthetic/hf:Qwen/Qwen3.8-27B</sub>\n\n",
+  "report_sha256": "01605479fc22e07a6d1e2ebfc47fdb2bcf049e2dc7db4bad1df376bc13414d6f"
+}

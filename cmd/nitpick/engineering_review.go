@@ -101,7 +101,13 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 		var body []byte
 		var err error
 		if execution := reviewReport.DesignExecution; execution != nil {
-			if frozenExcluded(file.Path, execution.Excluded) {
+			if frozenExcluded(file.Path, execution.Excluded) || frozenOmitted(file.Path, execution.Omitted) {
+				// A file dropped for a disclosed reason (too large, unreadable,
+				// path-limited) is already reported through the design
+				// inventory; that omission is not the drift or unavailability
+				// this check exists to catch, and re-flagging it here would
+				// fail the required snapshot check for every oversized or
+				// unreadable file the design pass already accounted for.
 				continue
 			}
 			var ok bool
@@ -205,7 +211,7 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 			r.Checks = append(r.Checks, practices.Check{ID: "commit-title", Version: "1", Instrument: practices.Deterministic, State: practices.Unavailable, Reason: "no forge PR title available"})
 		}
 	}
-	checks := []practices.Check{{ID: "slop", Version: "1", Instrument: practices.Model, PromptVersion: "engineering-4"}, {ID: "design", Version: "1", Instrument: practices.Model, PromptVersion: "engineering-4"}}
+	checks := []practices.Check{{ID: "slop", Version: "1", Instrument: practices.Model, PromptVersion: engineeringPromptVersion}, {ID: "design", Version: "1", Instrument: practices.Model, PromptVersion: engineeringPromptVersion}}
 	for i := range checks {
 		for _, file := range files {
 			checks[i].Planned = append(checks[i].Planned, practices.Target{Kind: practices.FileTarget, ID: file.Path})
@@ -379,7 +385,13 @@ func frozenDesignContext(files []standards.File, execution *review.DesignExecuti
 		}
 		for dir := path.Dir(file.Path); ; dir = path.Dir(dir) {
 			name := path.Join(dir, "go.mod")
-			if !seen[name] && (len(execution.Design.Errors) > 0 || frozenExcluded(name, execution.Excluded)) {
+			// The walk marks a directory's module unresolved only when the
+			// snapshot itself named its go.mod unreadable or excluded. An
+			// unrelated file failing elsewhere in the snapshot (Design.Errors)
+			// says nothing about whether this directory has a nested module at
+			// all; treating it as if it did invented a "module unavailable"
+			// placeholder at every changed directory in the tree.
+			if !seen[name] && (frozenOmitted(name, execution.Omitted) || frozenExcluded(name, execution.Excluded)) {
 				// An unknown nested module must not inherit an outer module's identity.
 				out = append(out, standards.File{Path: name})
 				seen[name] = true
@@ -391,4 +403,13 @@ func frozenDesignContext(files []standards.File, execution *review.DesignExecuti
 		}
 	}
 	return out, problems
+}
+
+func frozenOmitted(name string, omitted []bundle.Skip) bool {
+	for _, skip := range omitted {
+		if skip.Path == name {
+			return true
+		}
+	}
+	return false
 }

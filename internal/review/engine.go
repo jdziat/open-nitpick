@@ -159,7 +159,7 @@ type LinterDiscard struct {
 // They are separate values rather than one string because a reader has to sort
 // this repository's own publication policy from something having gone wrong, and
 // the counts are published together. Two of these are policy working exactly as
-// configured; the third is not a policy outcome at all.
+// configured; the other two are not a policy outcome at all.
 type DiscardReason string
 
 // The reasons an analyzer finding is not published.
@@ -1623,7 +1623,6 @@ func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bu
 	return out, nil
 }
 
-// analyzeBatch reviews one batch.
 // analyzeBatch reviews a batch with the default review client.
 func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bundle.Batch, style bool) ([]Finding, error) {
 	return e.analyzeBatchWith(ctx, e.Roles.Review, base, prContext, b, style)
@@ -2000,10 +1999,12 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		delete(mergedInto, number)
 	}
 
+	acknowledgements := acknowledgementDecisions(findings, result, judged)
+
 	// The merges first, in their own pass. A survivor absorbs what was merged
 	// into it before anything publishes: folded in afterwards, the survivor has
 	// already been copied and the union lands on a value nobody reads.
-	var merged []Overruled
+	var withheld []Overruled
 	for i := range findings {
 		d, ok := mergedInto[i+1]
 		if !ok {
@@ -2013,7 +2014,7 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		// true sentence about a defect two reviewers reported names both of
 		// them, and picking one destroys half of it.
 		absorb(&findings[d.DuplicateOf-1], findings[i])
-		merged = append(merged, Overruled{
+		withheld = append(withheld, Overruled{
 			Finding: findings[i],
 			Expert:  "triage (" + e.Roles.Triage.String() + ")",
 			Reason: fmt.Sprintf("merged into the finding at %s:%d: %s",
@@ -2029,6 +2030,14 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		}
 
 		f := findings[i]
+		if a, ok := acknowledgements[number]; ok {
+			withheld = append(withheld, Overruled{
+				Finding: f,
+				Expert:  "triage (" + e.Roles.Triage.String() + ")",
+				Reason:  fmt.Sprintf("assessment acknowledgement: %s; original rationale: %q", strings.TrimSpace(a.Reason), a.Quote),
+			})
+			continue
+		}
 		if v, ok := judged[number]; ok {
 			e.applyVerdict(&f, v)
 		} else {
@@ -2042,7 +2051,6 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		f.Triager = e.Roles.Triage.String()
 		kept = append(kept, f)
 	}
-	withheld := merged
 
 	return strings.TrimSpace(result.Summary), kept, withheld, nil
 }

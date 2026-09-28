@@ -1,0 +1,390 @@
+{
+  "source_commit": "bf03e53c0a7b33e98270a2f0b8cab8cc43a0fbf0",
+  "jobs": [
+    {
+      "name": "acknowledgement-controls",
+      "command": [
+        "/tmp/nitpick-ack-controls-v7.test",
+        "-test.run=TestLiveTriageSeparatesAcknowledgementsFromWeakClaims",
+        "-test.v",
+        "-test.count=1",
+        "-test.timeout=20m"
+      ],
+      "exit": 0,
+      "seconds": 214.02
+    }
+  ],
+  "nitpick-ack-controls-v7.test_sha256": "70af8e83bfc0a6853a3db64c94a74c1f6566899933c36d7fe57f9de317297bbb",
+  "nitpick-engineering-v7_sha256": "1f23ed4d0b9ceaa6e7e7c0f86e68fbdd58a2d1a487e32876113a12b148673304",
+  "scope": "Three ordered synthetic triage controls; not general semantic precision or engineering-profile acceptance",
+  "controls": [
+    {
+      "order": "order_1",
+      "seconds": 22.18,
+      "result": {
+        "kept": [
+          {
+            "path": "weak.go",
+            "line": 3,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "An unseen caller might pass nil",
+            "rationale": "An external caller might pass nil and panic. No such caller is shown, so the consequence depends on unavailable context.",
+            "suggestion": ""
+          },
+          {
+            "path": "mixed.go",
+            "line": 9,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No defect found on the happy path; failure handling may lose data",
+            "rationale": "The successful path is correct. If a caller passes a failing writer, its error is discarded and the record may be lost.",
+            "suggestion": ""
+          },
+          {
+            "path": "coverage.go",
+            "line": 5,
+            "severity": "nit",
+            "category": "",
+            "class": "tests",
+            "title": "Equality boundary has no assertion",
+            "rationale": "The shown tests check rejection after expiry but omit equality; changing the comparison to <= would pass them.",
+            "suggestion": ""
+          },
+          {
+            "path": "analyzer.go",
+            "line": 8,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "Analyzer reports no issue",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "warning.go",
+            "line": 2,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "patch.go",
+            "line": 6,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": "return err"
+          }
+        ],
+        "decisions": [
+          {
+            "Finding": {
+              "path": "ack.go",
+              "line": 7,
+              "severity": "nit",
+              "category": "",
+              "class": "correctness",
+              "title": "No defect found in records package",
+              "rationale": "Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: The title and rationale state only that the code is correct; no defect is alleged.; original rationale: \"Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.\"",
+            "Revised": "",
+            "Cited": ""
+          },
+          {
+            "Finding": {
+              "path": "success.go",
+              "line": 4,
+              "severity": "nit",
+              "category": "",
+              "class": "correctness",
+              "title": "Shipping boundary matches contract",
+              "rationale": "The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: The title and rationale confirm the implementation matches the documented contract and allege no defect.; original rationale: \"The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.\"",
+            "Revised": "",
+            "Cited": ""
+          },
+          {
+            "Finding": {
+              "path": "slop.go",
+              "line": 1,
+              "severity": "nit",
+              "category": "",
+              "class": "slop",
+              "title": "No slop findings in service.go",
+              "rationale": "This is a negative check result, not a defect. It names no consequence and has no action.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: The entry explicitly identifies itself as a negative result with no consequence or action.; original rationale: \"This is a negative check result, not a defect. It names no consequence and has no action.\"",
+            "Revised": "",
+            "Cited": ""
+          }
+        ]
+      }
+    },
+    {
+      "order": "order_2",
+      "seconds": 102.3,
+      "result": {
+        "kept": [
+          {
+            "path": "patch.go",
+            "line": 6,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": "return err"
+          },
+          {
+            "path": "warning.go",
+            "line": 2,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "analyzer.go",
+            "line": 8,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "Analyzer reports no issue",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "coverage.go",
+            "line": 5,
+            "severity": "nit",
+            "category": "",
+            "class": "tests",
+            "title": "Equality boundary has no assertion",
+            "rationale": "The shown tests check rejection after expiry but omit equality; changing the comparison to <= would pass them.",
+            "suggestion": ""
+          },
+          {
+            "path": "mixed.go",
+            "line": 9,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No defect found on the happy path; failure handling may lose data",
+            "rationale": "The successful path is correct. If a caller passes a failing writer, its error is discarded and the record may be lost.",
+            "suggestion": ""
+          },
+          {
+            "path": "weak.go",
+            "line": 3,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "An unseen caller might pass nil",
+            "rationale": "An external caller might pass nil and panic. No such caller is shown, so the consequence depends on unavailable context.",
+            "suggestion": ""
+          }
+        ],
+        "decisions": [
+          {
+            "Finding": {
+              "path": "slop.go",
+              "line": 1,
+              "severity": "nit",
+              "category": "",
+              "class": "slop",
+              "title": "No slop findings in service.go",
+              "rationale": "This is a negative check result, not a defect. It names no consequence and has no action.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: It reports a clean negative check and names no code consequence or action.; original rationale: \"This is a negative check result, not a defect. It names no consequence and has no action.\"",
+            "Revised": "",
+            "Cited": ""
+          },
+          {
+            "Finding": {
+              "path": "success.go",
+              "line": 4,
+              "severity": "nit",
+              "category": "",
+              "class": "correctness",
+              "title": "Shipping boundary matches contract",
+              "rationale": "The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: It states the documented boundary is satisfied and names no defect.; original rationale: \"The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.\"",
+            "Revised": "",
+            "Cited": ""
+          },
+          {
+            "Finding": {
+              "path": "ack.go",
+              "line": 7,
+              "severity": "nit",
+              "category": "",
+              "class": "correctness",
+              "title": "No defect found in records package",
+              "rationale": "Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: It asserts the persistence contract is met and gives no defect claim.; original rationale: \"Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.\"",
+            "Revised": "",
+            "Cited": ""
+          }
+        ]
+      }
+    },
+    {
+      "order": "order_3",
+      "seconds": 89.5,
+      "result": {
+        "kept": [
+          {
+            "path": "weak.go",
+            "line": 3,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "An unseen caller might pass nil",
+            "rationale": "An external caller might pass nil and panic. No such caller is shown, so the consequence depends on unavailable context.",
+            "suggestion": ""
+          },
+          {
+            "path": "mixed.go",
+            "line": 9,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No defect found on the happy path; failure handling may lose data",
+            "rationale": "The successful path is correct. If a caller passes a failing writer, its error is discarded and the record may be lost.",
+            "suggestion": ""
+          },
+          {
+            "path": "coverage.go",
+            "line": 5,
+            "severity": "nit",
+            "category": "",
+            "class": "tests",
+            "title": "Equality boundary has no assertion",
+            "rationale": "The shown tests check rejection after expiry but omit equality; changing the comparison to <= would pass them.",
+            "suggestion": ""
+          },
+          {
+            "path": "analyzer.go",
+            "line": 8,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "Analyzer reports no issue",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "warning.go",
+            "line": 2,
+            "severity": "warning",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": ""
+          },
+          {
+            "path": "patch.go",
+            "line": 6,
+            "severity": "nit",
+            "category": "",
+            "class": "correctness",
+            "title": "No issue found",
+            "rationale": "No issue was found.",
+            "suggestion": "return err"
+          }
+        ],
+        "decisions": [
+          {
+            "Finding": {
+              "path": "ack.go",
+              "line": 7,
+              "severity": "nit",
+              "category": "",
+              "class": "correctness",
+              "title": "No defect found in records package",
+              "rationale": "Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: It confirms the persistence contract is met and states no test is required, alleging no defect.; original rationale: \"Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.\"",
+            "Revised": "",
+            "Cited": ""
+          },
+          {
+            "Finding": {
+              "path": "success.go",
+              "line": 4,
+              "severity": "nit",
+              "category": "",
+              "class": "correctness",
+              "title": "Shipping boundary matches contract",
+              "rationale": "The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: It confirms the shipping boundary matches the documented contract and alleges no defect.; original rationale: \"The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.\"",
+            "Revised": "",
+            "Cited": ""
+          },
+          {
+            "Finding": {
+              "path": "slop.go",
+              "line": 1,
+              "severity": "nit",
+              "category": "",
+              "class": "slop",
+              "title": "No slop findings in service.go",
+              "rationale": "This is a negative check result, not a defect. It names no consequence and has no action.",
+              "suggestion": ""
+            },
+            "Expert": "triage (synthetic/hf:Qwen/Qwen3.8-27B)",
+            "Reason": "assessment acknowledgement: It explicitly states the entry is a negative check result with no consequence or action.; original rationale: \"This is a negative check result, not a defect. It names no consequence and has no action.\"",
+            "Revised": "",
+            "Cited": ""
+          }
+        ]
+      }
+    }
+  ],
+  "raw_responses": [
+    "{\"acknowledgements\":[{\"number\":1,\"quote\":\"Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.\",\"reason\":\"The title and rationale state only that the code is correct; no defect is alleged.\"},{\"number\":2,\"quote\":\"The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.\",\"reason\":\"The title and rationale confirm the implementation matches the documented contract and allege no defect.\"},{\"number\":3,\"quote\":\"This is a negative check result, not a defect. It names no consequence and has no action.\",\"reason\":\"The entry explicitly identifies itself as a negative result with no consequence or action.\"}],\"dropped\":[],\"findings\":[{\"class\":\"correctness\",\"number\":9,\"rationale\":\"The suggestion 'return err' identifies an error variable that is discarded instead of returned, so the caller cannot detect the failure. The title and rationale ('No issue found') contradict the attached suggestion; the suggestion is the operative finding.\",\"severity\":\"nit\",\"title\":\"Error value discarded instead of returned\"},{\"class\":\"correctness\",\"number\":5,\"rationale\":\"When the writer passed by the caller fails, the returned error is discarded and the record is silently lost. The consequence is conditional on the caller supplying a failing writer, so the impact is bounded by that assumption.\",\"severity\":\"nit\",\"title\":\"Writer failure path discards error and may lose record\"},{\"class\":\"tests\",\"number\":6,\"rationale\":\"The test suite asserts rejection after expiry but not the equality boundary; changing the comparison from < to <= would still pass every shown assertion, so the boundary is unguarded.\",\"severity\":\"nit\",\"title\":\"Equality boundary has no test assertion\"},{\"class\":\"correctness\",\"number\":4,\"rationale\":\"An external caller passing nil would panic, but no such caller is shown in the change. The claim rests entirely on unseen call sites.\",\"severity\":\"nit\",\"title\":\"Unseen caller might pass nil and trigger panic\"},{\"class\":\"correctness\",\"number\":7,\"rationale\":\"golangci-lint (gosec) scanned analyzer.go:8 and reported no issue. This is a negative analyzer result, not a defect; it is published here because analyzer findings cannot be moved to acknowledgements.\",\"severity\":\"nit\",\"title\":\"Analyzer reports no issue\"},{\"class\":\"correctness\",\"number\":8,\"rationale\":\"The entry alleges no defect and names no consequence. Re-rated from warning to nit because the rationale contains no claim about broken behaviour.\",\"severity\":\"nit\",\"title\":\"No issue found\"}],\"summary\":\"Three pure-acknowledgement entries moved out. Six findings remain, all at nit level. The most actionable item is finding 9 (patch.go:6), where the attached suggestion 'return err' reveals a discarded error that the title and rationale miss. Findings 7 and 8 are negative results with no actionable content; they are published only because the rules preclude dropping or acknowledging them.\"}",
+    "{\n  \"acknowledgements\": [\n    {\n      \"number\": 7,\n      \"quote\": \"This is a negative check result, not a defect. It names no consequence and has no action.\",\n      \"reason\": \"It reports a clean negative check and names no code consequence or action.\"\n    },\n    {\n      \"number\": 8,\n      \"quote\": \"The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.\",\n      \"reason\": \"It states the documented boundary is satisfied and names no defect.\"\n    },\n    {\n      \"number\": 9,\n      \"quote\": \"Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.\",\n      \"reason\": \"It asserts the persistence contract is met and gives no defect claim.\"\n    }\n  ],\n  \"dropped\": [],\n  \"findings\": [\n    {\n      \"class\": \"correctness\",\n      \"number\": 5,\n      \"rationale\": \"A failing writer can cause the error to be discarded and the record to be lost. No shown caller demonstrates the failing path.\",\n      \"severity\": \"nit\",\n      \"title\": \"Failing writer error can drop record\"\n    },\n    {\n      \"class\": \"tests\",\n      \"number\": 4,\n      \"rationale\": \"The tests reject only after expiry. A change to `<=` would still pass, so the exact boundary is not pinned.\",\n      \"severity\": \"nit\",\n      \"title\": \"Expiry equality boundary lacks test assertion\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 6,\n      \"rationale\": \"An external caller can pass nil and panic. No shown caller demonstrates that.\",\n      \"severity\": \"nit\",\n      \"title\": \"Unseen caller can pass nil\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 1,\n      \"rationale\": \"A proposed err return is present, but no failure condition or consequence is named.\",\n      \"severity\": \"nit\",\n      \"title\": \"Proposed err return has no stated consequence\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 2,\n      \"rationale\": \"The warning states a clean assessment, but no code consequence is named.\",\n      \"severity\": \"nit\",\n      \"title\": \"Warning reports no code consequence\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 3,\n      \"rationale\": \"The linter result is a clean check, but no code consequence is named.\",\n      \"severity\": \"nit\",\n      \"title\": \"Analyzer reports no code consequence\"\n    }\n  ]\n    ,\n  \"summary\": \"\"\n}",
+    "{\n  \"acknowledgements\": [\n    {\n      \"number\": 5,\n      \"quote\": \"No issue was found.\",\n      \"reason\": \"The entry only reports that no issue was found and alleges no defect.\"\n    },\n    {\n      \"number\": 7,\n      \"quote\": \"Register returns the encoder error from save, so the documented persistence contract is met. The shown code has no branching, state, or second caller that would create a hidden rule. No test is required for the shown non-branching path.\",\n      \"reason\": \"It confirms the persistence contract is met and states no test is required, alleging no defect.\"\n    },\n    {\n      \"number\": 8,\n      \"quote\": \"The boundary returns zero at 5000 cents as documented. All shown paths satisfy the contract.\",\n      \"reason\": \"It confirms the shipping boundary matches the documented contract and alleges no defect.\"\n    },\n    {\n      \"number\": 9,\n      \"quote\": \"This is a negative check result, not a defect. It names no consequence and has no action.\",\n      \"reason\": \"It explicitly states the entry is a negative check result with no consequence or action.\"\n    }\n  ],\n  \"dropped\": [],\n  \"findings\": [\n    {\n      \"class\": \"correctness\",\n      \"number\": 2,\n      \"rationale\": \"A failing writer passed by a caller can have its error discarded, losing the record. The shown path does not demonstrate such a caller, so the consequence rests on caller behavior.\",\n      \"severity\": \"nit\",\n      \"title\": \"Failing writer error can be discarded\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 6,\n      \"rationale\": \"The suggested return err implies an error is not returned. The entry does not show the surrounding behavior, so the consequence depends on unseen context.\",\n      \"severity\": \"nit\",\n      \"title\": \"Suggested return err implies swallowed error\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 1,\n      \"rationale\": \"A nil argument from an unseen caller would panic. No shown caller passes nil, so the consequence depends on unavailable context.\",\n      \"severity\": \"nit\",\n      \"title\": \"Nil argument from unseen caller can panic\"\n    },\n    {\n      \"class\": \"tests\",\n      \"number\": 3,\n      \"rationale\": \"The tests omit the equality boundary for expiry. Changing the comparison to <= would still pass the shown tests.\",\n      \"severity\": \"nit\",\n      \"title\": \"Expiry equality boundary lacks a test\"\n    },\n    {\n      \"class\": \"correctness\",\n      \"number\": 4,\n      \"rationale\": \"The analyzer result contains no defect claim. It remains here because analyzer negative results are not treated as acknowledgements.\",\n      \"severity\": \"nit\",\n      \"title\": \"Negative gosec result retained\"\n    }\n  ]\n    ,\n  \"summary\": \"Retained five thin or negative correctness entries, acknowledged four successful assessment entries, and dropped none.\"\n}"
+  ],
+  "model": "synthetic/hf:Qwen/Qwen3.8-27B",
+  "prompt_sha256": "1e1ea254f134e0bb11e79f3e945d3855396174ca8ac48a3129c56178a45476b2",
+  "schema_sha256": "1ef8ccb1623797bd67aa5e9fe675d36f8d43a7067985d12a373f7f661f55781f",
+  "policy": {
+    "triage_no_new_claims": true,
+    "slop": true,
+    "temperature": "unspecified; provider default",
+    "assessment": "triage-only synthetic protocol controls"
+  }
+}

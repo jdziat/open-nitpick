@@ -1,0 +1,174 @@
+{
+  "source_commit": "6c8864a040121489b0bfed2c55609ffa5873e80c",
+  "checks": [
+    {
+      "name": "race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-p",
+        "1",
+        "./..."
+      ],
+      "exit": 0,
+      "seconds": 122.27,
+      "log_sha256": "b9183f98101f16dec8e944cd5dab5aaa0a2fd5736d07d05cb66a0edc16e01f9e"
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-tags=eval",
+        "./..."
+      ],
+      "exit": 0,
+      "seconds": 1.27,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "lint",
+      "command": [
+        "golangci-lint",
+        "run",
+        "./..."
+      ],
+      "exit": 0,
+      "seconds": 4.0,
+      "log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+    },
+    {
+      "name": "standards",
+      "command": [
+        "go",
+        "run",
+        "./cmd/nitpick",
+        "repo-standards",
+        "-check"
+      ],
+      "exit": 0,
+      "seconds": 6.59,
+      "log_sha256": "8fb466acc8238aaa7dc5e16bc2bb7ad5aaddadecb7a8720a6e9735aadd11482b"
+    },
+    {
+      "name": "docs",
+      "command": [
+        "make",
+        "docs"
+      ],
+      "exit": 0,
+      "seconds": 2.04,
+      "log_sha256": "ea09d7223b77c5e43ec2d6ac88d75a85b9388215510d14e1c673631cec6adb9a"
+    },
+    {
+      "name": "agents",
+      "command": [
+        "make",
+        "agents"
+      ],
+      "exit": 0,
+      "seconds": 0.78,
+      "log_sha256": "40b83147c6e79b3e80865232136e7c0f6df89b744bfb4009550f993c1552ec42"
+    },
+    {
+      "name": "slop",
+      "command": [
+        "go",
+        "run",
+        "./cmd/nitpick",
+        "slop",
+        "-no-model",
+        "cmd/nitpick/engineering_model.go",
+        "cmd/nitpick/engineering_review.go",
+        "internal/llm/openrouter_test.go",
+        "internal/practices/mechanisms_test.go",
+        "internal/practices/testdata/boundaries/README.md",
+        "internal/practices/testdata/boundaries/bad/go.mod.txt",
+        "internal/practices/testdata/boundaries/bad/service/service.go.txt",
+        "internal/practices/testdata/boundaries/bad/storage/storage.go.txt",
+        "internal/practices/testdata/boundaries/bad/ui/ui.go.txt",
+        "internal/practices/testdata/boundaries/good/go.mod.txt",
+        "internal/practices/testdata/boundaries/good/service/service.go.txt",
+        "internal/practices/testdata/boundaries/good/storage/storage.go.txt",
+        "internal/practices/testdata/boundaries/good/ui/ui.go.txt",
+        "internal/practices/testdata/contracts/README.md",
+        "internal/practices/testdata/contracts/bad/go.mod.txt",
+        "internal/practices/testdata/contracts/bad/store.go.txt",
+        "internal/practices/testdata/contracts/good/go.mod.txt",
+        "internal/practices/testdata/contracts/good/store.go.txt",
+        "internal/practices/testdata/coupled-duplication/README.md",
+        "internal/practices/testdata/coupled-duplication/bad/checkout.go.txt",
+        "internal/practices/testdata/coupled-duplication/bad/go.mod.txt",
+        "internal/practices/testdata/coupled-duplication/bad/preview.go.txt",
+        "internal/practices/testdata/coupled-duplication/good/checkout.go.txt",
+        "internal/practices/testdata/coupled-duplication/good/go.mod.txt",
+        "internal/practices/testdata/coupled-duplication/good/preview.go.txt",
+        "internal/practices/testdata/indirection/README.md",
+        "internal/practices/testdata/indirection/bad/go.mod.txt",
+        "internal/practices/testdata/indirection/bad/service.go.txt",
+        "internal/practices/testdata/indirection/good/go.mod.txt",
+        "internal/practices/testdata/indirection/good/service.go.txt",
+        "internal/practices/testdata/indirection/good/service_test.go.txt",
+        "internal/practices/testdata/ineffective-tests/README.md",
+        "internal/practices/testdata/ineffective-tests/bad/go.mod.txt",
+        "internal/practices/testdata/ineffective-tests/bad/session.go.txt",
+        "internal/practices/testdata/ineffective-tests/bad/session_test.go.txt",
+        "internal/practices/testdata/ineffective-tests/good/go.mod.txt",
+        "internal/practices/testdata/ineffective-tests/good/session.go.txt",
+        "internal/practices/testdata/ineffective-tests/good/session_test.go.txt",
+        "internal/prompt/templates/experts/tests.md",
+        "internal/prompt/templates/triage.md",
+        "internal/review/acknowledgement_eval_test.go",
+        "internal/review/acknowledgement_test.go",
+        "internal/review/engine.go",
+        "internal/review/schema.go",
+        "internal/review/validate.go",
+        "internal/review/validate_test.go",
+        "internal/review/validation_contract_eval_test.go",
+        "internal/review/verdict.go",
+        "notes/design-v5-evaluation.md",
+        "notes/engineering-acceptance-audit.md",
+        "notes/engineering-implementation-review.md",
+        "notes/evidence/credential-test-isolation-mutation.json",
+        "notes/evidence/design-v4-retired-adjudication.json",
+        "notes/evidence/design-v4-retired-trials.json",
+        "notes/evidence/design-v5-adjudication.json",
+        "notes/evidence/design-v5-policy.yaml",
+        "notes/evidence/design-v5-trials.json",
+        "notes/evidence/implementation-v7-review.json",
+        "notes/evidence/implementation-v9-review.json",
+        "notes/evidence/indirection-control-mutations.json",
+        "notes/evidence/triage-acknowledgement-mutations.json",
+        "notes/evidence/triage-acknowledgement-v6-trials.json",
+        "notes/evidence/triage-acknowledgement-v7-trials.json",
+        "notes/evidence/validation-contract-replays.json",
+        "notes/evidence/validation-order-mutation.json",
+        "notes/triage-acknowledgements.md"
+      ],
+      "exit": 0,
+      "seconds": 0.52,
+      "log_sha256": "a273c26e164c28b4a70462eb1d158e1a6156b10824aa2b0af5104cf0b53b4644"
+    },
+    {
+      "name": "commits",
+      "command": [
+        "./scripts/check-commits.sh"
+      ],
+      "exit": 0,
+      "seconds": 0.51,
+      "log_sha256": "209c250227decba72523aacb8ef2036803cb165303afa1a5b4c5c76aa61dd400"
+    }
+  ],
+  "limitations": "Slop returned eight tells and omitted the oversized raw version-5 trial JSON. No full engineering model assessment in these gates.",
+  "first_attempt": {
+    "source_commit": "67c154d",
+    "exit": 1,
+    "failures": [
+      "golangci-lint lock contention",
+      "OpenRouter tests read operator keystore"
+    ],
+    "log_redacted": true,
+    "resolution": "Retry after lock released; isolate test keystore and remove credential header from failure message."
+  }
+}

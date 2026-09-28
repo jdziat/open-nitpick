@@ -1,0 +1,9 @@
+package fixture
+
+import "testing"
+
+func TestExpiredSessionIsRejected(t *testing.T) {
+	if ValidSession(200, 100) {
+		t.Log("expired session should be rejected")
+	}
+}

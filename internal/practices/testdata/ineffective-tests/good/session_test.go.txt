@@ -1,0 +1,13 @@
+package fixture
+
+import "testing"
+
+func TestExpiredSessionIsRejected(t *testing.T) {
+	if ValidSession(200, 100) {
+		t.Fatal("expired session accepted")
+	}
+}
+
+func TestSessionCheckDoesNotPanicAtIntegerLimits(t *testing.T) {
+	ValidSession(-1<<63, 1<<63-1)
+}

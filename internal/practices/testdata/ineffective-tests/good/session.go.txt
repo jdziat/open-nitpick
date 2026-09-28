@@ -1,0 +1,4 @@
+package fixture
+
+// ValidSession accepts sessions strictly before their expiration time.
+func ValidSession(now, expires int64) bool { return now < expires }

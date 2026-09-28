@@ -1,0 +1,106 @@
+# Engineering-profile acceptance checkpoint
+
+Decision: needs revision. This is a checkpoint against
+[the coverage contract](best-practice-coverage.md), not CTO acceptance.
+Execution candidate: `c8cef1e`, draft PR #119. Protocol candidate: `74d46f5`,
+prompt `engineering-9`. The retired evaluation used planner 4 and prompt `engineering-4` with Kimi-K3
+review and GLM-5.3-Flash triage. The user changed model roles after its first full
+cycle; 15 completed reports are retained in
+`evidence/design-v4-retired-trials.json`, including one report recovered after
+the controller stopped. Its process exit and exact duration were not collected.
+These are incomplete repeated trials, not acceptance evidence for the new roles.
+
+| Contract area | Current evidence | Remaining acceptance work |
+| --- | --- | --- |
+| Explicit scope and states | Typed targets, omissions, failed stages and policy aggregation; local gates pass | Audit final real-repository report for completeness |
+| Commits | Shared validator and pinned range enumeration; 20 branch commits passed the accepted policy at `74d46f5` | Preserve commit-range evidence in the internal profile run |
+| Slop | Deterministic tells and semantic assessment; full-source completion separate from design excerpts | Version-7 protocol controls pass; finish real-source review |
+| Design execution | Focused declarations/callers, exact excerpts, shared request IDs, cancellation evidence; 20 final mutations killed | Finish implementation review and measure full-repository execution |
+| Accepted boundaries | Bad boundary trial fails the deterministic policy; matching good boundary check passes | Distinguish unrelated slop findings in that good control |
+| Incremental reuse | Engineering scope disables incremental narrowing | No cached-result speedup is being claimed |
+| Language coverage | Go graph, source tasks for other languages, explicit graph limitations | Wider language graph support remains a separate change |
+| Internal adoption | Repository CI requires deterministic checks and reports model-disabled coverage | Require model completion only after practical full-profile execution |
+| Security and operations | Existing configured analyzer evidence remains distinct from model review | Trusted CI receipts and wider operational claims are separate work |
+
+## Blocking acceptance gaps
+
+The version-5 seven-mechanism evaluation finished all 42 trials; 40 completed
+their required model assessments and two were partial. The
+[adjudicated results](design-v5-evaluation.md) retain acknowledgement noise,
+unsupported assumptions, a reversed shipping diagnosis, and fixture ambiguities.
+Counts of returned findings cannot substitute for identifying the seeded defect. The first
+intended-good lifecycle trial flagged an exported cache's zero-value behavior:
+the supplied caller constructs it correctly, but the public contract does not
+say whether other construction is supported. Retain the disagreement and the
+original fixture; do not relabel this as a clean control.
+
+The first good boundary trial reported a storage comment that describes
+persistence while its implementation returns a constant. That is separate from
+its compliant import structure. Score the boundary and slop results separately.
+
+The full repository sizing probe fits the selected scope only under enlarged
+operator limits and estimates 19.7 million source tokens. It is not a completed
+model assessment, a dollar cost, or evidence that those limits are practical.
+The source digest and exact limits are retained in the execution evidence.
+
+Deleted Go source currently yields unavailable-source evidence; the planner does
+not yet assess its base-revision body. It must not turn that absence into a clean
+change review. Dynamic dispatch and deeper callers are also outside the reported
+lexical scope.
+
+The repository still requires only conventions, linters, commits and slop tells
+in `.nitpick.yaml`; CI's engineering-report step uses `-no-model`. Therefore green
+CI does not establish required design/slop model completion or internal adoption.
+Keep the execution PR draft while these acceptance decisions are pending.
+
+## Follow-up from the test control
+
+The intended-good no-panic test received an ineffective-test finding despite its
+explicitly named purpose. The test expert had claimed error checks and running
+code provide no protection beyond compilation, contradicting the slop exclusion.
+Prompt version 5 distinguishes runtime error and no-panic contracts from missing
+value coverage, in both engineering instructions and the test expert. The fixture
+harness now injects a panic and runs only that no-panic test to prove it fails.
+New live trials must use GLM-5.3-Flash review and Qwen3.8-27B triage. Those trials
+change both policy and prompt, so they cannot establish either change's isolated
+effect. Kimi-K3 remains the fix model.
+
+## Validation response contract
+
+Both incomplete version-5 trials selected a severity verdict without a usable
+revised level. Version 8 clarified the conditional requirement, but the lifecycle
+replay still omitted the level. Version 9 places the verdict before its conditional
+severity in the response schema. Both selected claims then returned usable levels.
+The [retained replays](evidence/validation-contract-replays.json) include the
+failed trial, raw responses, schemas, source digests and binary hashes. These use
+full fixture source instead of the original focused excerpts; two passing cases
+do not establish a general protocol failure rate or isolate the cause of improvement.
+Unusable expert answers still retain the finding and mark the stage incomplete.
+
+At `74d46f5`, serialized race tests, eval-tag vet, lint, repo-standards, docs,
+agents generation, touched-file slop and commit checks all exited successfully.
+The slop scan retained eight prose tells; its successful exit does not mean zero
+findings. The [implementation adjudication](engineering-implementation-review.md)
+records the earlier review's false missing-test claim and repaired indirection
+control. Follow-up source review returned five nits: two duplicate false claims
+and three addressed suggestions. An additional expert refutation relied on
+incomplete context; its stale-documentation issue was already corrected. The
+full internal model assessment remains pending.
+
+## Internal profile execution result
+
+The first unbounded internal run planned 200 requests over 657 files and was
+stopped after 40 requests because the operator policy had no total review budget.
+A cost-capped retry selected 11 requests over 184 files under a `$2` ceiling
+using explicitly supplied placeholder rates; three requests completed before
+repeated GLM provider 500/502 responses and a stalled request forced an
+interruption. A smaller 60,000-token/64-file retry selected 25 requests over 202
+files; two completed before the same provider failure pattern. The [retained
+run evidence](evidence/internal-profile-runs.json) records logs and hashes.
+
+These runs establish practical execution limits and unavailable-provider
+behavior. They do not establish full repository quality, model precision, or
+required engineering-profile completion. The profile remains partial and its
+model checks remain advisory. Do not merge or require model completion in CI
+until a healthy provider run completes the selected coverage or the policy
+explicitly accepts bounded partial coverage.

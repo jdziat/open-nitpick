@@ -528,12 +528,11 @@ func TestEngineeringAssessmentUsesFrozenSourceWithoutProviderReads(t *testing.T)
 	}
 }
 
-// TestEngineeringAssessmentIgnoresUnrelatedPackingLimits pins the shape that
-// kept design-boundaries and linters permanently partial on any change with
-// an oversized, unrelated evidence file the design pass could not pack,
-// alongside a design task another file exceeded
-// review.max_files_per_request for: neither check's own coverage failed, so
-// neither should report one.
+// TestEngineeringAssessmentIgnoresUnrelatedPackingLimits pins PR 121's own
+// failure: an oversized, unrelated evidence file the design pass could not
+// pack, plus a design task another file exceeded review.max_files_per_request
+// for, must not fail design-boundaries, linters or snapshot for a change
+// whose own Go source and boundaries were fully examined.
 func TestEngineeringAssessmentIgnoresUnrelatedPackingLimits(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "-q", "-b", "main")
@@ -556,6 +555,7 @@ func TestEngineeringAssessmentIgnoresUnrelatedPackingLimits(t *testing.T) {
 				{Path: "a.go", Src: []byte("package frozen\n")},
 				{Path: "go.mod", Src: []byte("module example.com/frozen\n")},
 			},
+			Omitted: []bundle.Skip{{Path: "notes/evidence/big.json", Reason: bundle.ReasonTooLarge}},
 		},
 	}
 	cfg := config.Defaults()
@@ -572,6 +572,8 @@ func TestEngineeringAssessmentIgnoresUnrelatedPackingLimits(t *testing.T) {
 			if check.State != practices.Completed {
 				t.Fatalf("an unrelated design-task packing limit left linters %s: %+v", check.State, check)
 			}
+		case "snapshot":
+			t.Fatalf("a disclosed, too-large omission was reported as an unexplained snapshot failure: %+v", check)
 		}
 	}
 }
@@ -587,18 +589,33 @@ func (p *assessmentReadTrap) FileContent(context.Context, vcs.Ref, string) ([]by
 }
 
 func TestFrozenMetadataDoesNotInventAnOuterModuleIdentity(t *testing.T) {
-	for _, excluded := range []bool{false, true} {
+	for _, omitted := range []bool{false, true} {
 		execution := &review.DesignExecution{Sources: []standards.File{{Path: "go.mod", Src: []byte("module example.com/outer\n")}}}
-		if excluded {
-			execution.Excluded = []bundle.Skip{{Path: "nested/go.mod", Reason: bundle.ReasonIgnored}}
+		if omitted {
+			execution.Omitted = []bundle.Skip{{Path: "nested/go.mod", Reason: bundle.ReasonUnavailable}}
 		} else {
-			execution.Design.Errors = []string{"nested/go.mod: unavailable"}
+			execution.Excluded = []bundle.Skip{{Path: "nested/go.mod", Reason: bundle.ReasonIgnored}}
 		}
 		files, problems := frozenDesignContext([]standards.File{{Path: "nested/a.go", Src: []byte("package nested\n")}}, execution)
 		inventory, _ := practices.InspectDesign(files, nil)
 		if len(problems) == 0 || len(inventory.Errors) == 0 || len(inventory.Units) != 0 {
 			t.Fatalf("missing metadata invented a package: %+v; %v", inventory, problems)
 		}
+	}
+}
+
+func TestFrozenMetadataDoesNotPoisonUnrelatedDirectoriesFromAnUnrelatedError(t *testing.T) {
+	execution := &review.DesignExecution{
+		Sources:       []standards.File{{Path: "go.mod", Src: []byte("module example.com/outer\n")}},
+		DesignPacking: practices.DesignPacking{Design: practices.DesignPlan{Errors: []string{"unrelated/oversized.json: exceeded review.max_file_bytes"}}},
+	}
+	files, problems := frozenDesignContext([]standards.File{{Path: "nested/a.go", Src: []byte("package nested\n")}}, execution)
+	inventory, _ := practices.InspectDesign(files, nil)
+	if len(problems) != 0 {
+		t.Fatalf("an unrelated snapshot error invented a module placeholder: %+v; %v", inventory, problems)
+	}
+	if len(inventory.Units) != 1 || inventory.Units[0].ID != "example.com/outer/nested" {
+		t.Fatalf("unrelated directory lost its outer module identity: %+v", inventory)
 	}
 }
 

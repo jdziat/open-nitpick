@@ -1,0 +1,9 @@
+package storage
+
+// Load reads one persisted display name; the empty identifier has no record.
+func Load(id string) string {
+	if id == "" {
+		return ""
+	}
+	return "Ada"
+}

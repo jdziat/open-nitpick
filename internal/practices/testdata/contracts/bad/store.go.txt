@@ -1,0 +1,24 @@
+package fixture
+
+import "encoding/json"
+
+// Encode writes the current persisted account format. Existing version-1 records
+// contain {"version":1,"name":"Ada"} and must remain readable after upgrade.
+func Encode(name string) ([]byte, error) {
+	return json.Marshal(struct {
+		Version     int    `json:"version"`
+		DisplayName string `json:"display_name"`
+	}{2, name})
+}
+
+// Decode returns the name from either supported persisted version.
+func Decode(data []byte) (string, error) {
+	var record struct {
+		Version     int    `json:"version"`
+		DisplayName string `json:"display_name"`
+	}
+	if err := json.Unmarshal(data, &record); err != nil {
+		return "", err
+	}
+	return record.DisplayName, nil
+}

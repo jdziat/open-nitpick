@@ -1,0 +1,29 @@
+{
+  "scope": "Guarding the paired fixture mechanisms; not model design judgment",
+  "results": [
+    {
+      "mutation": "bypass-proxy",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestDesignMechanismFixturesBuildAndPinBehavior (1.46s)\n    --- FAIL: TestDesignMechanismFixturesBuildAndPinBehavior/indirection/bad (0.62s)\n        mechanisms_test.go:69: fixture pass=false, wanted true: exit status 1\n            --- FAIL: TestProfileNameTraversesAllForwardingLayers (0.00s)\n                oracle_test.go:16: name=\"Ada\" layers=[adapter bridge]\n            FAIL\n            FAIL\texample.com/fixture\t0.006s\n            FAIL\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/practices\t1.477s\nFAIL\n"
+    },
+    {
+      "mutation": "bypass-two-layers",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestDesignMechanismFixturesBuildAndPinBehavior (1.48s)\n    --- FAIL: TestDesignMechanismFixturesBuildAndPinBehavior/indirection/bad (0.59s)\n        mechanisms_test.go:69: fixture pass=false, wanted true: exit status 1\n            --- FAIL: TestProfileNameTraversesAllForwardingLayers (0.00s)\n                oracle_test.go:16: name=\"Ada\" layers=[adapter]\n            FAIL\n            FAIL\texample.com/fixture\t0.006s\n            FAIL\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/practices\t1.497s\nFAIL\n"
+    },
+    {
+      "mutation": "forwarder-gains-behavior",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestDesignMechanismFixturesBuildAndPinBehavior (1.00s)\n    --- FAIL: TestDesignMechanismFixturesBuildAndPinBehavior/indirection/bad (0.19s)\n        mechanisms_test.go:69: bad forwarding layer acquired behavior outside its return\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/practices\t1.018s\nFAIL\n"
+    },
+    {
+      "mutation": "substitution-test-becomes-logging",
+      "killed": true,
+      "exit": 1,
+      "output": "--- FAIL: TestDesignMechanismFixturesBuildAndPinBehavior (1.48s)\n    --- FAIL: TestDesignMechanismFixturesBuildAndPinBehavior/indirection/good (0.88s)\n        mechanisms_test.go:69: fixture pass=true, wanted false: <nil>\n            ok  \texample.com/fixture\t0.006s\nFAIL\nFAIL\tgithub.com/jdziat/open-nitpick/internal/practices\t1.503s\nFAIL\n"
+    }
+  ]
+}

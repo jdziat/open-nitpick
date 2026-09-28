@@ -1,0 +1,9 @@
+package fixture
+
+// PreviewShipping quotes the same retail shipping policy shown at checkout.
+func PreviewShipping(subtotal int) int {
+	if subtotal >= 6000 {
+		return 0
+	}
+	return 500
+}

@@ -1,0 +1,6 @@
+package ui
+
+import "example.com/fixture/storage"
+
+// Label resolves a label for a known identifier.
+func Label(id string) string { return storage.Load(id) }

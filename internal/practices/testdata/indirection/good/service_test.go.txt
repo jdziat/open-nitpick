@@ -1,0 +1,13 @@
+package fixture
+
+import "testing"
+
+type fakeNames map[string]string
+
+func (f fakeNames) Name(id string) string { return f[id] }
+
+func TestProfileNameUsesProvidedStorage(t *testing.T) {
+	if got := ProfileName(fakeNames{"42": "Grace"}, "42"); got != "Grace" {
+		t.Fatalf("name = %q", got)
+	}
+}

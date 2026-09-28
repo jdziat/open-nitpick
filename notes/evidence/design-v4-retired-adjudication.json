@@ -1,0 +1,172 @@
+{
+  "status": "provisional manual adjudication of retired v4 cohort; incomplete repeated evaluation",
+  "first_cycle": [
+    {
+      "mechanism": "lifecycle",
+      "variant": "bad",
+      "required_model_checks_completed": true,
+      "findings": [
+        {
+          "check": "design",
+          "title": "Ready returns true before initialization, defeating its documented gate"
+        },
+        {
+          "check": "design",
+          "title": "Start panics with a nil map write when called before Configure"
+        },
+        {
+          "check": "design",
+          "title": "Cache map has no synchronization or stated thread-safety contract"
+        }
+      ],
+      "seeded_mechanism_detected": true
+    },
+    {
+      "mechanism": "lifecycle",
+      "variant": "good",
+      "required_model_checks_completed": true,
+      "findings": [
+        {
+          "check": "design",
+          "title": "Put panics on a zero-value Cache"
+        }
+      ],
+      "intended_mechanism_false_alarm": "disputed: public zero-value contract is ambiguous"
+    },
+    {
+      "mechanism": "failure-propagation",
+      "variant": "bad",
+      "required_model_checks_completed": true,
+      "findings": [
+        {
+          "check": "design",
+          "title": "save discards marshal and write errors, silently dropping records"
+        }
+      ],
+      "seeded_mechanism_detected": true
+    },
+    {
+      "mechanism": "failure-propagation",
+      "variant": "good",
+      "required_model_checks_completed": true,
+      "findings": [],
+      "intended_mechanism_false_alarm": false
+    },
+    {
+      "mechanism": "boundaries",
+      "variant": "bad",
+      "required_model_checks_completed": true,
+      "findings": [
+        {
+          "check": "design-boundaries",
+          "title": "example.com/fixture/ui imports forbidden dependency example.com/fixture/storage"
+        }
+      ],
+      "seeded_mechanism_detected": true
+    },
+    {
+      "mechanism": "boundaries",
+      "variant": "good",
+      "required_model_checks_completed": true,
+      "findings": [
+        {
+          "check": "slop",
+          "title": "Docstring promises persisted per-id reads, Load returns constant"
+        }
+      ],
+      "intended_mechanism_false_alarm": false
+    },
+    {
+      "mechanism": "coupled-duplication",
+      "variant": "bad",
+      "required_model_checks_completed": true,
+      "findings": [
+        {
+          "check": "design",
+          "title": "Preview and checkout shipping thresholds disagree (6000 vs 5000 cents)"
+        }
+      ],
+      "seeded_mechanism_detected": true
+    },
+    {
+      "mechanism": "coupled-duplication",
+      "variant": "good",
+      "required_model_checks_completed": true,
+      "findings": [],
+      "intended_mechanism_false_alarm": false
+    },
+    {
+      "mechanism": "indirection",
+      "variant": "bad",
+      "required_model_checks_completed": true,
+      "findings": [
+        {
+          "check": "design",
+          "title": "Three forwarding layers add indirection with no behavior"
+        }
+      ],
+      "seeded_mechanism_detected": true
+    },
+    {
+      "mechanism": "indirection",
+      "variant": "good",
+      "required_model_checks_completed": true,
+      "findings": [],
+      "intended_mechanism_false_alarm": false
+    },
+    {
+      "mechanism": "contracts",
+      "variant": "bad",
+      "required_model_checks_completed": true,
+      "findings": [
+        {
+          "check": "design",
+          "title": "Decode drops the v1 name field, silently losing persisted names"
+        }
+      ],
+      "seeded_mechanism_detected": true
+    },
+    {
+      "mechanism": "contracts",
+      "variant": "good",
+      "required_model_checks_completed": true,
+      "findings": [],
+      "intended_mechanism_false_alarm": false
+    },
+    {
+      "mechanism": "ineffective-tests",
+      "variant": "bad",
+      "required_model_checks_completed": true,
+      "findings": [
+        {
+          "check": "design",
+          "title": "Session expiry test asserts nothing and can never fail"
+        }
+      ],
+      "seeded_mechanism_detected": true
+    },
+    {
+      "mechanism": "ineffective-tests",
+      "variant": "good",
+      "required_model_checks_completed": true,
+      "findings": [
+        {
+          "check": "design",
+          "title": "No test pins the exact expiry boundary"
+        },
+        {
+          "check": "design",
+          "title": "Integer-limit test asserts nothing and cannot fail"
+        }
+      ],
+      "intended_mechanism_false_alarm": true
+    }
+  ],
+  "disagreements": [
+    "Lifecycle good: zero-value cache warning; supplied caller constructs correctly, public construction contract ambiguous.",
+    "Lifecycle bad: concurrency warning has no supplied concurrent caller; do not count this as seeded lifecycle detection.",
+    "Boundary good: misleading Load storage comment is a separate supported slop finding, not a boundary violation.",
+    "Ineffective tests good: exact-expiry test case missing is a separate coverage gap; no-panic test being ineffective is a false alarm under the explicit exclusion.",
+    "Indirection bad: chain navigation cost is visible, but not every internal implementation change requires editing every forwarder; qualify the finding rationale."
+  ]
+}

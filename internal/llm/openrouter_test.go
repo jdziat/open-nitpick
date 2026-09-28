@@ -14,15 +14,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
-// clearModelEnv empties every variable that can supply a model's credential or
-// its endpoint, so a test claiming "only OPENROUTER_API_KEY is set" is telling
-// the truth on a developer machine that has the others exported.
-//
-// LLM_BASE_URL is in the list because config.LoadFile calls applyEnv after
-// sanitize, and applyEnv fills Models.Default.BaseURL whenever it is empty,
-// which is exactly the post-sanitize state of the shipped config. Without this,
-// TestDefaultConfigSurvivesSanitize passed or failed according to the
-// developer's shell rather than according to the code.
+// clearModelEnv isolates credential and endpoint tests from operator settings.
 func clearModelEnv(t *testing.T) {
 	t.Helper()
 	// Keep developer keystore entries from supplying credentials behind the
@@ -190,7 +182,7 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 	}
 
 	if gotAuth != "Bearer sk-or-test" {
-		t.Errorf("Authorization = %q, want the OpenRouter key as a bearer token", gotAuth)
+		t.Errorf("Authorization = %q, want the configured test credential", gotAuth)
 	}
 	if !strings.HasSuffix(gotPath, "/chat/completions") {
 		t.Errorf("path = %q, want the OpenAI-compatible chat completions route", gotPath)
@@ -203,8 +195,8 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 // sanitize() strips base_url and api_key_env from an untrusted config, so a
 // default built on those keys would work only for whoever exported
 // NITPICK_TRUST_CONFIG_ENDPOINTS. This asserts the committed default needs
-// neither: nothing is dropped, and both roles build with only OPENROUTER_API_KEY
-// in the environment.
+// neither: nothing is dropped, and both roles build with only
+// envSyntheticAPIKey in the environment.
 //
 // What it does not assert: that the endpoint is unreachable by any means. An
 // operator who exports LLM_BASE_URL still redirects it, because applyEnv fills
