@@ -153,15 +153,16 @@ func TestStandingFindingsAreRecheckedWithoutDuplicateComments(t *testing.T) {
 	}
 }
 
-// TestStandingCommentDoesNotWidenScopeToUntouchedFiles: a third file that
-// neither changed since the prior push nor carries a standing comment of its
-// own stays out of scope, even though a standing comment on a different file
-// widens the read to include that file.
+// TestStandingCommentDoesNotWidenScopeToUntouchedFiles: a push that changes
+// one file while a standing comment sits on a second, untouched file reads
+// both, the changed file and the one carrying the comment, and leaves a
+// third file that is neither changed nor commented on out of scope entirely.
 func TestStandingCommentDoesNotWidenScopeToUntouchedFiles(t *testing.T) {
 	appFinding := Finding{
 		Path: "app.go", Line: 4, Severity: "error", Category: "correctness", Class: "correctness",
 		Title: "Ignored error from http.Get", Rationale: "resp may be nil, so the deferred Close panics.",
 	}
+	thirdFinding := Finding{Path: "third.go", Line: 4, Class: "style", Title: "Old style nit on third.go"}
 	model := &scriptedLLM{byPrompt: map[string]string{
 		"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor([]Finding{appFinding})}),
 		"Review the following changes": mustJSON(t, Result{Findings: []Finding{appFinding}}),
@@ -171,6 +172,7 @@ func TestStandingCommentDoesNotWidenScopeToUntouchedFiles(t *testing.T) {
 		head:         "new",
 		prior: &vcs.PriorReview{Head: "old", Comments: []vcs.PriorComment{
 			{Path: "app.go", Line: 4, Fingerprint: Fingerprint(appFinding), Class: "correctness"},
+			{Path: "third.go", Line: 4, Fingerprint: Fingerprint(thirdFinding), Class: "style"},
 		}},
 		changed: []string{"app.go"},
 		ok:      true,
@@ -181,14 +183,14 @@ func TestStandingCommentDoesNotWidenScopeToUntouchedFiles(t *testing.T) {
 		t.Fatalf("Review: %v", err)
 	}
 
-	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go" {
-		t.Errorf("reviewed = %q, want only app.go: it changed and carries the standing comment", got)
+	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go,third.go" {
+		t.Errorf("reviewed = %q, want app.go (changed) and third.go (standing comment, unchanged)", got)
 	}
-	if got := strings.Join(report.Incremental.Unchanged, ","); got != "other.go,third.go" {
-		t.Errorf("unread files = %q, want other.go and third.go left out: neither changed nor carries a standing comment", got)
+	if got := strings.Join(report.Incremental.Unchanged, ","); got != "other.go" {
+		t.Errorf("unread files = %q, want only other.go left out: it neither changed nor carries a standing comment", got)
 	}
-	if report.Plan.Files() != 1 {
-		t.Errorf("planned %d file(s), want the single narrowed file sent to the model", report.Plan.Files())
+	if report.Plan.Files() != 2 {
+		t.Errorf("planned %d file(s), want the two narrowed files sent to the model", report.Plan.Files())
 	}
 }
 

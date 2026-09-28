@@ -1150,11 +1150,13 @@ func (e *Engine) readPriorReviewResult(ctx context.Context, ref vcs.Ref) (*vcs.P
 // thread on a file this run never looked at.
 //
 // Full scope remains the answer whenever narrowing itself is unavailable: no
-// earlier head, the same head reviewed again (Resume retries a failed batch
-// and reuses a successful one there, and both need every file walked, not
-// just what changed since a push that hasn't happened), no provider that can
-// answer ChangedSince, or a revision comparison can no longer reach (a force
-// push). Beyond those cases, request-level Resume does not force full scope:
+// earlier head, the same head reviewed again under Resume (a retry needs
+// every file walked so a failed batch can be retried and a successful one
+// reused, since nothing has changed to narrow against yet), no provider that
+// can answer ChangedSince, or a revision comparison can no longer reach (a
+// force push). A same-head re-run outside Resume with no standing comments
+// reads nothing: the earlier review already covered this exact revision.
+// Beyond the cases above, request-level Resume does not force full scope:
 // Resume reuses completed model requests inside a batch, but narrowing
 // decides which files are bundled into a batch in the first place, and a
 // push that touches one file on a large pull request should not re-bundle,
