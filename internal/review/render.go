@@ -467,8 +467,11 @@ func incrementalNotice(report *Report) string {
 		switch {
 		case inc.Recheck && since == "":
 			b.WriteString("**Rechecked the whole change because earlier findings remain.**\n")
-		case inc.Recheck:
+		case inc.Recheck && len(inc.Unchanged) == 0:
 			fmt.Fprintf(&b, "**Rechecked the whole change because findings from the review at `%s` remain.**\n", since)
+		case inc.Recheck:
+			fmt.Fprintf(&b, "**Reviewed the %d file(s) changed since the review at `%s`, or still carrying findings from it.**\n",
+				len(inc.Reviewed), since)
 		case len(inc.Reviewed) == 0:
 			fmt.Fprintf(&b, "**Nothing in this change has moved since the review at `%s`.**\n", since)
 		default:

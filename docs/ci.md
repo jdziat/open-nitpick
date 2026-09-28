@@ -246,6 +246,15 @@ match. Failed requests retry. New commits rerun affected batches; unchanged
 batches keep their results. Changing one file can invalidate its whole batch or
 another batch that includes it as context.
 
+A push is also scoped before batching: only the files that changed since the
+last reviewed head are read, widened to include any file still carrying an
+unresolved comment from an earlier run, so that comment can still be verified
+or closed. A file that neither changed nor carries a standing comment is left
+alone; its earlier findings still stand. Scoping falls back to the whole
+change whenever the comparison itself is unavailable: no earlier head, no
+provider that can answer it, or a force push that made the earlier head
+unreachable.
+
 Analyzers, triage, validation, and approval run again over the combined results.
 Earlier findings still count, and unresolved threads still prevent approval.
 The summary reports how many model requests were reused. `review.incremental:
@@ -298,7 +307,8 @@ authenticated user. A comment's HTML markers alone establish no identity.
 
 Only completed reviews carrying the completion marker can be reused. Legacy
 reviews and failed runs trigger a full review. While earlier findings remain,
-the whole change is rechecked; confirmed findings still affect `fail_on` even
+the files that carry them are rechecked alongside whatever changed; confirmed
+findings still affect `fail_on` even
 when their comments are not posted twice. Strict analyzer failures exit 2.
 
 On `merge_group`, the Action reviews the event's base/head SHAs as a local
