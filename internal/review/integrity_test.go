@@ -158,6 +158,20 @@ func TestIntentionalExclusionsPreserveReusableCoverage(t *testing.T) {
 	}
 }
 
+func TestDesignTaskPackingLimitsDoNotBlockCoverage(t *testing.T) {
+	// Pins #150: assembleDesign assigns r.Plan the design-task packing plan
+	// whenever DesignExecution is non-nil, so a design task's own
+	// "exceeds review.max_files_per_request" budget decision must not read
+	// as a file the plain code review left unreviewed the way an unscoped
+	// unknown reason does below.
+	r := &Report{DesignExecution: &DesignExecution{}, Plan: &bundle.Plan{Skipped: []bundle.Skip{
+		{Path: "declaration:big.go", Reason: "some-task: complete design task exceeds review.max_files_per_request"},
+	}}}
+	if got := Render(r, nil, config.Defaults()).Incomplete; got {
+		t.Fatalf("incomplete=%v, want false: a design task's own packing limit blocked the completion marker", got)
+	}
+}
+
 func TestIgnoredFilesKeepTheirThreadsWithoutBlockingReviewedThreads(t *testing.T) {
 	p := &resolvingProvider{incrementalProvider: incrementalProvider{
 		stubProvider: stubProvider{diff: incrementalDiff}, head: "beef02",

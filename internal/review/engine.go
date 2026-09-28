@@ -592,11 +592,21 @@ func (r *Report) PipelineComplete() bool {
 }
 
 // reusableCoverage requires completed work for every file the policy included.
+//
+// r.Plan.Skipped is read only when DesignExecution is nil. Under the
+// engineering profile, assembleDesign assigns r.Plan the design-task packing
+// plan built by PackDesign, and its Skipped entries name a design task's own
+// budget decision ("exceeds review.max_files_per_request") rather than a file
+// the plain code review left unread. Treating that as unreviewed repeated the
+// bug #143 fixed in reviewAnalyzerCheck: a single skipped design task made
+// this withhold the completion marker and block superseded and
+// resolveClearedForApprove from resolving threads for a run whose actual file
+// coverage completed.
 func (r *Report) reusableCoverage() bool {
 	if !r.PipelineComplete() {
 		return false
 	}
-	if r.Plan != nil {
+	if r.Plan != nil && r.DesignExecution == nil {
 		for _, skip := range r.Plan.Skipped {
 			switch skip.Reason {
 			case bundle.ReasonIgnored, bundle.ReasonGenerated, bundle.ReasonBinary, bundle.ReasonDeleted, bundle.ReasonNoChanges:
