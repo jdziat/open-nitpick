@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	github.com/alecthomas/chroma/v2 v2.27.0
-	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/google/go-github/v74 v74.0.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/nocturnium/llm-go-sdk/v6 v6.9.0
