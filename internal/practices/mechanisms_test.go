@@ -47,7 +47,11 @@ func TestLegacyNameSurvivesUpgrade(t *testing.T) {
  if err != nil || name != "Ada" { t.Fatalf("name=%q error=%v", name, err) }
 }
 `)
-					runMechanism(t, root, variant == "good")
+					if variant == "good" {
+						runMechanismExpectingExecution(t, root)
+					} else {
+						runMechanism(t, root, false)
+					}
 				case "coupled-duplication":
 					body := `package fixture
 import "testing"
@@ -64,7 +68,11 @@ func TestSeparateContractsKeepTheirOwnThresholds(t *testing.T) {
 `
 					}
 					writeMechanism(t, root, "oracle_test.go", body)
-					runMechanism(t, root, variant == "good")
+					if variant == "good" {
+						runMechanismExpectingExecution(t, root)
+					} else {
+						runMechanism(t, root, false)
+					}
 				case "indirection":
 					pinIndirectionMechanism(t, root, variant)
 				case "ineffective-tests":
@@ -77,7 +85,11 @@ func TestSeparateContractsKeepTheirOwnThresholds(t *testing.T) {
 						t.Fatal("expiration mutation no longer applies")
 					}
 					writeMechanism(t, root, "session.go", mutated)
-					runMechanism(t, root, variant == "bad")
+					if variant == "bad" {
+						runMechanismExpectingExecution(t, root)
+					} else {
+						runMechanism(t, root, false)
+					}
 					if variant == "good" {
 						panicking := strings.Replace(string(source), "return now < expires", `panic("seeded panic")`, 1)
 						writeMechanism(t, root, "session.go", panicking)
@@ -141,6 +153,24 @@ func runMechanism(t *testing.T, root string, wantPass bool, args ...string) {
 	}
 }
 
+// runMechanismExpectingExecution is runMechanism for a pin whose pass branch
+// certifies that a specific defect was exercised and rejected. go test exits
+// 0 for a package with no matching test, the same as a package that ran the
+// pin's test and passed, so an unqualified pass hides a fixture that stopped
+// carrying its test file. This guards the pass branch with proof a test ran.
+func runMechanismExpectingExecution(t *testing.T, root string, args ...string) {
+	t.Helper()
+	cmd := exec.CommandContext(t.Context(), "go", append([]string{"test", "-v", "./..."}, args...)...)
+	cmd.Dir = root
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("fixture pass=false, wanted true: %v\n%s", err, output)
+	}
+	if !strings.Contains(string(output), "--- PASS: Test") {
+		t.Fatalf("fixture passed without executing a test: %v\n%s", err, output)
+	}
+}
+
 func pinIndirectionMechanism(t *testing.T, root, variant string) {
 	t.Helper()
 	body, err := os.ReadFile(filepath.Join(root, "service.go"))
@@ -200,5 +230,5 @@ func TestProfileNameTraversesAllForwardingLayers(t *testing.T) {
  }
 }
 `)
-	runMechanism(t, root, true)
+	runMechanismExpectingExecution(t, root)
 }
