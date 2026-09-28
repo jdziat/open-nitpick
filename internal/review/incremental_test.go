@@ -43,6 +43,20 @@ index 111..222 100644
  func Other() {}
 `
 
+// threeFileDiff adds a third file to incrementalDiff, so a test can prove a
+// file that neither changed nor carries a standing comment is left out of
+// scope even while another file's standing comment widens the read.
+const threeFileDiff = incrementalDiff + `diff --git a/third.go b/third.go
+index 111..222 100644
+--- a/third.go
++++ b/third.go
+@@ -1,3 +1,4 @@
+ package app
+
++var AlsoUnused = 1
+ func Third() {}
+`
+
 func TestFingerprintIgnoresLineAndPunctuation(t *testing.T) {
 	a := Finding{Path: "a.go", Line: 4, Class: "correctness", Title: "Ignored error from http.Get"}
 	b := Finding{Path: "a.go", Line: 9, Class: "correctness", Title: "ignored error from http get!"}
@@ -80,6 +94,10 @@ func TestAlreadyReportedMatchesByFingerprintOrPlace(t *testing.T) {
 	}
 }
 
+// TestStandingFindingsAreRecheckedWithoutDuplicateComments: a push that
+// changes one file while an earlier finding stands elsewhere re-reads only
+// the changed file and the file carrying the standing comment, and still
+// withholds the finding as already posted.
 func TestStandingFindingsAreRecheckedWithoutDuplicateComments(t *testing.T) {
 	appFinding := Finding{
 		Path: "app.go", Line: 4, Severity: "error", Category: "correctness", Class: "correctness",
@@ -107,11 +125,14 @@ func TestStandingFindingsAreRecheckedWithoutDuplicateComments(t *testing.T) {
 	if report.Incremental == nil {
 		t.Fatal("expected an incremental note")
 	}
-	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go,other.go" {
-		t.Errorf("reviewed = %q, want the whole change while prior findings stand", got)
+	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go" {
+		t.Errorf("reviewed = %q, want only the changed file that also carries the standing comment", got)
 	}
-	if len(report.Incremental.Unchanged) != 0 {
-		t.Errorf("unread files = %v", report.Incremental.Unchanged)
+	if got := strings.Join(report.Incremental.Unchanged, ","); got != "other.go" {
+		t.Errorf("unread files = %v, want other.go left out: it neither changed nor carries a standing comment", got)
+	}
+	if !report.Incremental.Recheck {
+		t.Error("expected Recheck: a standing comment widened the scope")
 	}
 
 	if len(report.Findings) != 0 || len(report.AlreadyReported) != 1 {
@@ -124,11 +145,50 @@ func TestStandingFindingsAreRecheckedWithoutDuplicateComments(t *testing.T) {
 		t.Errorf("published head = %q", provider.published.Head)
 	}
 	if !strings.Contains(provider.published.Summary, "already posted") ||
-		!strings.Contains(provider.published.Summary, "Rechecked the whole change") {
+		!strings.Contains(provider.published.Summary, "or still carrying findings from it") {
 		t.Errorf("summary does not disclose the incremental review:\n%s", provider.published.Summary)
 	}
 	if len(provider.published.Comments) != 0 {
 		t.Errorf("comments = %d, want none re-posted", len(provider.published.Comments))
+	}
+}
+
+// TestStandingCommentDoesNotWidenScopeToUntouchedFiles: a third file that
+// neither changed since the prior push nor carries a standing comment of its
+// own stays out of scope, even though a standing comment on a different file
+// widens the read to include that file.
+func TestStandingCommentDoesNotWidenScopeToUntouchedFiles(t *testing.T) {
+	appFinding := Finding{
+		Path: "app.go", Line: 4, Severity: "error", Category: "correctness", Class: "correctness",
+		Title: "Ignored error from http.Get", Rationale: "resp may be nil, so the deferred Close panics.",
+	}
+	model := &scriptedLLM{byPrompt: map[string]string{
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor([]Finding{appFinding})}),
+		"Review the following changes": mustJSON(t, Result{Findings: []Finding{appFinding}}),
+	}}
+	provider := &incrementalProvider{
+		stubProvider: stubProvider{diff: threeFileDiff},
+		head:         "new",
+		prior: &vcs.PriorReview{Head: "old", Comments: []vcs.PriorComment{
+			{Path: "app.go", Line: 4, Fingerprint: Fingerprint(appFinding), Class: "correctness"},
+		}},
+		changed: []string{"app.go"},
+		ok:      true,
+	}
+
+	report, err := newEngine(t, model, provider, nil).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+
+	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go" {
+		t.Errorf("reviewed = %q, want only app.go: it changed and carries the standing comment", got)
+	}
+	if got := strings.Join(report.Incremental.Unchanged, ","); got != "other.go,third.go" {
+		t.Errorf("unread files = %q, want other.go and third.go left out: neither changed nor carries a standing comment", got)
+	}
+	if report.Plan.Files() != 1 {
+		t.Errorf("planned %d file(s), want the single narrowed file sent to the model", report.Plan.Files())
 	}
 }
 

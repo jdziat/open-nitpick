@@ -551,12 +551,16 @@ type Incremental struct {
 	// Since is the revision the earlier review looked at.
 	Since string
 
-	// Reviewed and Unchanged are the changed files this run read and the
-	// ones it did not, because nothing in them moved since Since.
+	// Reviewed and Unchanged are the files this run read and the ones it did
+	// not. Reviewed holds every file that changed since Since, plus any file
+	// that did not but still carries a comment from an earlier run (Recheck).
 	Reviewed  []string
 	Unchanged []string
 
-	// Recheck means standing findings required another review of the whole change.
+	// Recheck means an earlier run's comments are still standing, so Reviewed
+	// was widened to include the files carrying them. Reviewed may still be
+	// smaller than the whole change; Unchanged says what, if anything, that
+	// widening left out.
 	Recheck bool
 }
 
@@ -1140,55 +1144,90 @@ func (e *Engine) readPriorReviewResult(ctx context.Context, ref vcs.Ref) (*vcs.P
 	return prior, nil
 }
 
-// narrowToChangedSince keeps full scope for standing findings and request-level
-// resume. Otherwise it narrows to changed files when the prior revision can be
-// compared; missing history or an unreachable revision keeps the full diff.
+// narrowToChangedSince re-reads the files that changed since the prior head,
+// widened to include every file still carrying a standing comment: without
+// that, superseded and resolveClearedForApprove cannot verify or close a
+// thread on a file this run never looked at.
+//
+// Full scope remains the answer whenever narrowing itself is unavailable: no
+// earlier head, the same head reviewed again (Resume retries a failed batch
+// and reuses a successful one there, and both need every file walked, not
+// just what changed since a push that hasn't happened), no provider that can
+// answer ChangedSince, or a revision comparison can no longer reach (a force
+// push). Beyond those cases, request-level Resume does not force full scope:
+// Resume reuses completed model requests inside a batch, but narrowing
+// decides which files are bundled into a batch in the first place, and a
+// push that touches one file on a large pull request should not re-bundle,
+// re-lint, and re-send every other file to get that reuse.
 func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, files diff.Files, prior *vcs.PriorReview) (diff.Files, *Incremental) {
 	if prior == nil || pr == nil {
 		return files, nil
 	}
-	// Standing findings force a full re-read even when the earlier run left no
-	// head to compare against: without that, superseded cannot close them and
-	// an approval would be held forever beside threads nothing re-checked.
-	if len(prior.Comments) > 0 {
-		return files, &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true}
-	}
-	if e.Resume || prior.Head == "" {
+	standing := len(prior.Comments) > 0
+	fullRecheck := func() (diff.Files, *Incremental) {
+		if standing {
+			return files, &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true}
+		}
 		return files, nil
+	}
+	if prior.Head == "" {
+		return fullRecheck()
 	}
 	if prior.Head == pr.HeadSHA {
-		// The same commit reviewed again (a reopen, or a re-run). Nothing
-		// moved, so nothing is re-read: the run stops at the empty batch
-		// with this note as its only output, and the earlier review stands.
+		if standing {
+			return fullRecheck()
+		}
+		if e.Resume {
+			// A retry of the same push: nothing to compare against yet, and a
+			// batch the last attempt failed has to be walked again to be
+			// retried at all. The progress cache decides what is reused.
+			return files, nil
+		}
+		// The same commit reviewed again outside Resume (a reopen, or a
+		// re-run). Nothing moved, so nothing is re-read: the run stops at
+		// the empty batch with this note as its only output, and the
+		// earlier review stands.
 		return nil, &Incremental{Since: prior.Head, Unchanged: files.Paths()}
 	}
+
+	// A new push. Narrowed regardless of Resume: Resume's cache handles
+	// request-level reuse inside whatever batches this assembles, which is
+	// smaller work the narrower this scope is.
 	differ, ok := e.Provider.(vcs.IncrementalDiffer)
 	if !ok {
-		return files, nil
+		return fullRecheck()
 	}
 
 	changed, ok, err := differ.ChangedSince(ctx, ref, prior.Head)
 	if err != nil {
 		e.log().Warn("could not compare against the earlier review; reviewing the whole change",
 			"since", prior.Head, "error", err)
-		return files, nil
+		return fullRecheck()
 	}
 	if !ok {
 		e.log().Info("earlier reviewed revision is not an ancestor of this one; reviewing the whole change",
 			"since", prior.Head)
-		return files, nil
+		return fullRecheck()
 	}
 
 	moved := make(map[string]bool, len(changed))
 	for _, p := range changed {
 		moved[p] = true
 	}
+	// Widened so superseded and resolveClearedForApprove can still verify and
+	// close a standing thread on a file this push did not itself touch.
+	standingPaths := map[string]bool{}
+	if standing {
+		for _, c := range prior.Comments {
+			standingPaths[c.Path] = true
+		}
+	}
 
-	note := &Incremental{Since: prior.Head}
+	note := &Incremental{Since: prior.Head, Recheck: standing}
 	var kept diff.Files
 	for _, f := range files {
 		// A rename since the last review shows up under either name.
-		if moved[f.Path] || (f.OldPath != "" && moved[f.OldPath]) {
+		if moved[f.Path] || (f.OldPath != "" && moved[f.OldPath]) || standingPaths[f.Path] {
 			kept = append(kept, f)
 			note.Reviewed = append(note.Reviewed, f.Path)
 			continue
@@ -1197,7 +1236,7 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 	}
 
 	e.log().Info("incremental review", "since", prior.Head,
-		"files", len(kept), "unchanged", len(note.Unchanged))
+		"files", len(kept), "unchanged", len(note.Unchanged), "standing", standing)
 	return kept, note
 }
 
