@@ -30,7 +30,7 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 	if cfg.Practices.Profile != "" || cfg.Review.Knowledge || cfg.Review.Standards || cfg.Validation.Enabled || cfg.Review.Approve.Enabled {
 		t.Error("fast review retained an optional deep stage")
 	}
-	if cfg.Models.Default.Timeout != 55*time.Second || cfg.Models.Default.MaxTokens != 4096 || len(cfg.Models.Routes) != 0 || len(cfg.Models.Ensemble) != 0 {
+	if cfg.Models.Default.Timeout != 55*time.Second || cfg.Models.Default.MaxTokens != 4096 || cfg.Models.Default.Reasoning != config.ReasoningOff || len(cfg.Models.Routes) != 0 || len(cfg.Models.Ensemble) != 0 {
 		t.Error("fast review did not bound every selected model request")
 	}
 }

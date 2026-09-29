@@ -47,10 +47,12 @@ func applyFastReviewScope(cfg *config.Config) {
 	cfg.Validation.Enabled = false
 	cfg.Review.Incremental = false
 	cfg.Review.Approve.Enabled = false
-	// A bounded pass must also bound generation. Without a cap the provider's
-	// own output maximum applies, and the model can spend the whole deadline
-	// still writing. 4096 is enough for two diffs' worth of findings.
+	// A bounded pass must also bound generation and reasoning. Without a cap
+	// the provider's own output maximum applies, and a reasoning model can
+	// spend the whole deadline thinking. 4096 is enough for two diffs' worth
+	// of findings; reasoning off keeps the cap answering rather than thinking.
 	cfg.Models.Default.MaxTokens = 4096
+	cfg.Models.Default.Reasoning = config.ReasoningOff
 	cfg.Models.Default.Timeout = 55 * time.Second
 	cfg.Models.Routes = nil
 	cfg.Models.Ensemble = nil
@@ -58,6 +60,7 @@ func applyFastReviewScope(cfg *config.Config) {
 		reviewModel := *cfg.Models.Review
 		reviewModel.Timeout = 55 * time.Second
 		reviewModel.MaxTokens = 4096
+		reviewModel.Reasoning = config.ReasoningOff
 		cfg.Models.Review = &reviewModel
 	}
 }
