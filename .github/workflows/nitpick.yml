@@ -65,7 +65,7 @@ jobs:
       # found nothing. The toolchain comes from go.mod and the analyzer from
       # tools/go.mod, the pair ci.yml uses, because a golangci-lint built with
       # an older Go refuses a go.mod that targets a newer one.
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - name: Install golangci-lint
