@@ -218,6 +218,12 @@ func resultFor(report *review.Report, gate config.Severity) actionResult {
 	if !report.PipelineComplete() {
 		return resultError
 	}
+	// The fast command deliberately stops after a small changed-file set. Its
+	// receipt names every omitted file, but an Actions result of clean would
+	// still turn that bounded pass into a green coverage claim.
+	if report.FastReview && !report.ReusableCoverage() {
+		return resultError
+	}
 	if report.Practices != nil && report.Practices.ExitCode() == 1 {
 		return resultFindings
 	}

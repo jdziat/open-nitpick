@@ -32,6 +32,18 @@ import (
 // Engine reviews changes. It is the library the CLI drives, and the same one a
 // future webhook server would drive.
 type Engine struct {
+	// FastLimit caps published findings for a bounded first pass. Zero keeps
+	// every finding, which is the ordinary review contract.
+	FastLimit int
+
+	// SkipTriage keeps a fast pass to one model request per selected file.
+	// The report records the omitted stage rather than treating it as a failure.
+	SkipTriage bool
+
+	// RequestTimeout bounds one model request independently of the caller's
+	// overall context. Zero leaves the configured client timeout in control.
+	RequestTimeout time.Duration
+
 	// AssessPractices attaches engineering evidence before rendering and gating.
 	// Nil leaves the existing review policy in control.
 	AssessPractices func(context.Context, vcs.Ref, *vcs.PullRequest, *Report) *practices.Report
@@ -380,6 +392,13 @@ const (
 
 // Report is the outcome of a review.
 type Report struct {
+	// FastReview identifies a bounded diff-only pass. Its receipt names the
+	// omitted stages and any files its fixed ceiling left unread.
+	FastReview bool
+
+	// OmittedFindings counts findings that ranked below FastLimit.
+	OmittedFindings int
+
 	// UnpublishedModelFindings retains claims whose source locations were unsupported.
 	UnpublishedModelFindings []Finding
 	// DesignExecution binds package assessment to its frozen source and task plan.
@@ -618,6 +637,11 @@ func (r *Report) reusableCoverage() bool {
 	return true
 }
 
+// ReusableCoverage reports whether this result can act as coverage for a later
+// review. It is exported for command surfaces that must distinguish a bounded
+// fast pass from a clean full review.
+func (r *Report) ReusableCoverage() bool { return r.reusableCoverage() }
+
 // FailedStages names the stages that did not complete, for an output that
 // carries one line.
 func (r *Report) FailedStages() []string {
@@ -728,7 +752,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	}
 	e = next
 
-	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr}
+	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr, FastReview: e.SkipTriage}
 	defer func() { report.Routes = e.routeDecisions }()
 
 	// What an earlier run left on the pull request, read after the policy is
@@ -924,7 +948,15 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings, advisories := holdAdvisories(dedupe(findings))
 
 	beforeTriage := findings
-	summary, findings, withheldByTriage, err := e.triage(ctx, pr, findings)
+	var summary string
+	var withheldByTriage []Overruled
+	if e.SkipTriage {
+		// Findings are already locally deduplicated below. A fast pass spends
+		// its request budget on changed files, and says it omitted model triage.
+		findings = dedupe(findings)
+	} else {
+		summary, findings, withheldByTriage, err = e.triage(ctx, pr, findings)
+	}
 	switch {
 	case errors.Is(err, errStageDegraded):
 		// Usable output behind a failed stage. The findings publish and the
@@ -988,6 +1020,10 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings = validateSuggestions(findings, files)
 	findings = e.applyGate(findings)
 	sortFindings(findings)
+	if e.FastLimit > 0 && len(findings) > e.FastLimit {
+		report.OmittedFindings = len(findings) - e.FastLimit
+		findings = findings[:e.FastLimit]
+	}
 
 	// After the gate, so what is counted as "already posted" is what would
 	// otherwise have been posted, and nothing below min_severity is.
@@ -1731,7 +1767,13 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	if reused {
 		e.log().Info("reusing completed model review", "files", b.Paths(), "model", client.String())
 	} else {
-		result, err = llm.Extract[Result](ctx, client, msgs, schema)
+		callCtx := ctx
+		var cancel context.CancelFunc
+		if e.RequestTimeout > 0 {
+			callCtx, cancel = context.WithTimeout(ctx, e.RequestTimeout)
+			defer cancel()
+		}
+		result, err = llm.Extract[Result](callCtx, client, msgs, schema)
 		if err != nil {
 			return nil, err
 		}

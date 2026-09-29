@@ -46,17 +46,12 @@ type reviewFlags struct {
 }
 
 func runReview(ctx context.Context, args []string) error {
-	return reviewWithScope(ctx, "review", args, nil)
+	return reviewWithScope(ctx, "review", args, nil, nil)
 }
 
-// reviewWithScope is runReview with an optional widening applied to the
-// configuration after it is loaded.
-//
-// One code path rather than two: `nitpick improve` differs from `nitpick
-// review` in the scope it generates at and nothing else, so a second
-// implementation would be two things to keep in step. scope is nil for
-// review.
-func reviewWithScope(ctx context.Context, name string, args []string, scope func(*config.Config)) error {
+// reviewWithScope runs review commands whose configuration differs only after
+// the operator's file has loaded.
+func reviewWithScope(ctx context.Context, name string, args []string, scope func(*config.Config), configure func(*review.Engine)) error {
 	var f reviewFlags
 	var level string
 	var slop bool
@@ -82,15 +77,18 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	// improve only. review generates at config.GenerationLevel whatever the
 	// configured level says, so a level flag there would name something the
 	// command cannot honour.
-	if scope != nil {
+	if name == "improve" {
 		fs.StringVar(&level, "level", string(config.NitpickPedantic), "how wide to generate: minimal, normal, pedantic")
 		fs.BoolVar(&slop, "slop", true, "include the slop class")
 	}
 
 	fs.Usage = func() {
-		if scope != nil {
+		switch name {
+		case "improve":
 			fmt.Fprintln(os.Stderr, "Usage: nitpick improve [flags]\n\nThe wider pass: the classes a normal review filters out. Reviews the working tree by default.\n\nFlags:")
-		} else {
+		case "fast-review":
+			fmt.Fprintln(os.Stderr, "Usage: nitpick fast-review [flags]\n\nReviews up to ten changed files concurrently, with diff-only context and a per-request deadline.\n\nFlags:")
+		default:
 			fmt.Fprintln(os.Stderr, "Usage: nitpick review [flags]\n\nReviews the working tree by default.\n\nFlags:")
 		}
 		fs.PrintDefaults()
@@ -113,7 +111,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 
 	// Before the config is read, so a mistyped flag is answered as a mistyped
 	// flag rather than as whatever the configuration happens to be missing.
-	if scope != nil {
+	if name == "improve" {
 		switch config.NitpickLevel(level) {
 		case config.NitpickMinimal, config.NitpickNormal, config.NitpickPedantic:
 		default:
@@ -147,8 +145,16 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	}
 	if scope != nil {
 		scope(cfg)
+	}
+	if name == "improve" {
 		cfg.Persona.Nitpick = config.NitpickLevel(level)
 		cfg.Review.Slop = slop
+	}
+	if name == "fast-review" {
+		// Fast review is a bounded diff pass. Linters may read packages beyond
+		// the selected files and can outlast the model deadline, so their
+		// absence is recorded with the other intentionally omitted stages.
+		f.noLinters = true
 	}
 
 	log := newLogger(f.verbose, f.logFormat)
@@ -193,7 +199,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	// selectProvider falls back to vcs.RefFromEnv, so improve run with no
 	// flags inside a pull-request Actions job would otherwise pass the check
 	// above and publish through the GitHub provider.
-	if scope != nil {
+	if name == "improve" {
 		if err := refusePublishing(&f, ref); err != nil {
 			return err
 		}
@@ -206,6 +212,9 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	engine, err := newEngine(ctx, &f, repo, cfg, provider, ref, log)
 	if err != nil {
 		return err
+	}
+	if configure != nil {
+		configure(engine)
 	}
 
 	report, err := engine.Review(ctx, ref)

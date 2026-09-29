@@ -90,13 +90,14 @@ inputs:
 
   command:
     description: >-
-      What to run: "review" (the default) reviews the pull request; "respond"
+      What to run: "review" (the default) reviews the pull request; "fast-review"
+      runs the bounded changed-files pass; "respond"
       answers a comment that mentioned the reviewer, for a workflow on
       issue_comment and pull_request_review_comment events.
     required: false
     default: review
   args:
-    description: Additional flags passed verbatim to "nitpick review".
+    description: Additional flags passed verbatim to the selected command.
     required: false
 
 outputs:
@@ -419,6 +420,12 @@ runs:
           echo "result=clean" >> "$GITHUB_OUTPUT"
           exit 0
         fi
+        case "$NITPICK_COMMAND" in
+          review|fast-review) ;;
+          *) echo "::error::open-nitpick: command must be review, fast-review, or respond"
+             echo "result=error" >> "$GITHUB_OUTPUT"
+             exit 2 ;;
+        esac
 
         # What to review depends on the event. A pull request event names its
         # pull request through the environment; a dispatch or a comment names
@@ -470,7 +477,7 @@ runs:
         # The CLI writes result, findings and the per-severity counts to
         # GITHUB_OUTPUT itself, and the review to GITHUB_STEP_SUMMARY.
         set +e
-        nitpick review "${flags[@]}" ${extra+"${extra[@]}"}
+        nitpick "$NITPICK_COMMAND" "${flags[@]}" ${extra+"${extra[@]}"}
         status=$?
         set -e
 

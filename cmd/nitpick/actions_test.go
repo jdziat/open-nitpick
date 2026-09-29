@@ -76,6 +76,18 @@ func TestResultForFollowsTheGate(t *testing.T) {
 	}
 }
 
+func TestFastReviewWithSkippedFilesIsNotClean(t *testing.T) {
+	report := &review.Report{
+		FastReview: true,
+		Plan: &bundle.Plan{
+			Skipped: []bundle.Skip{{Path: "later.go", Reason: bundle.ReasonFileLimit}},
+		},
+	}
+	if got := resultFor(report, config.SeverityNone); got != resultError {
+		t.Fatalf("fast review result = %q, want error when a changed file was omitted", got)
+	}
+}
+
 // The classification the issue was filed for. A report with findings below the
 // gate and a stage that never ran is not clean, whatever fail-on says: the
 // question fail-on answers is what to do about the code, and no part of this

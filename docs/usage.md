@@ -58,12 +58,19 @@ line reporting `model: none`, and the file it wrote is not yet runnable.
 nitpick review                          # uncommitted changes
 nitpick review -base main               # working tree against main
 nitpick review -base main -head feature # a committed branch
+nitpick fast-review                     # up to ten changed files, diff-only, bounded requests
 nitpick explain-config -path src/db.go  # what would be sent, and why
 nitpick providers                       # available model providers
 ```
 
 Local reviews print to stdout as `path:line`, which most terminals and editors
 turn into a clickable link.
+
+`nitpick fast-review` is the quick first pass: it reviews at most ten changed files,
+one diff per model request, with up to ten requests in parallel and a 55-second
+deadline for the whole pass. It skips repository context, linters, validation and model
+triage. Its receipt names those omissions and any changed files beyond the
+limit; use `nitpick review` for a complete review.
 
 ## Evaluate repository standards
 

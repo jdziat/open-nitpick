@@ -1,0 +1,35 @@
+package main
+
+import (
+	"testing"
+	"time"
+
+	"github.com/jdziat/open-nitpick/internal/config"
+)
+
+func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Practices.Profile = "engineering"
+	cfg.Review.RelatedContext = true
+	cfg.Review.Knowledge = true
+	cfg.Review.Standards = true
+	cfg.Validation.Enabled = true
+	cfg.Review.Approve.Enabled = true
+	cfg.Models.Routes = []config.Route{{Name: "special"}}
+	cfg.Models.Ensemble = []config.ModelSpec{{Model: "second"}}
+
+	applyFastReviewScope(cfg)
+
+	if cfg.Review.MaxFiles != fastReviewLimit || cfg.Review.MaxFilesPerRequest != 1 || cfg.Review.Concurrency != fastReviewLimit {
+		t.Fatalf("fast bounds = files:%d batch:%d concurrency:%d", cfg.Review.MaxFiles, cfg.Review.MaxFilesPerRequest, cfg.Review.Concurrency)
+	}
+	if cfg.Review.IncludeFullFiles || cfg.Review.RelatedContext || cfg.Review.RelatedContextCallers {
+		t.Error("fast review must send changed diffs without repository context")
+	}
+	if cfg.Practices.Profile != "" || cfg.Review.Knowledge || cfg.Review.Standards || cfg.Validation.Enabled || cfg.Review.Approve.Enabled {
+		t.Error("fast review retained an optional deep stage")
+	}
+	if cfg.Models.Default.Timeout != 40*time.Second || len(cfg.Models.Routes) != 0 || len(cfg.Models.Ensemble) != 0 {
+		t.Error("fast review did not bound every selected model request")
+	}
+}

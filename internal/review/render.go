@@ -390,6 +390,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// findings, these skips and these budgets are the product of a policy that
 	// is not the one in the change.
 	b.WriteString(policyNotice(report))
+	b.WriteString(fastReviewNotice(report))
 	b.WriteString(unknownKeyNotice(report))
 	b.WriteString(incrementalNotice(report))
 	b.WriteString(nothingReviewedNotice(report))
@@ -443,6 +444,19 @@ func renderSummary(report *Report, cfg *config.Config) string {
 		return ""
 	}
 	return out + "\n\n<sub>Reviewed by open-nitpick.</sub>"
+}
+
+// fastReviewNotice states the deliberate limits of the bounded command.
+func fastReviewNotice(report *Report) string {
+	if report == nil || !report.FastReview {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("**Fast review:** changed-file diffs only; related context, analyzers, validation, and model triage were not run.\n")
+	if report.OmittedFindings > 0 {
+		fmt.Fprintf(&b, "Showing the 10 highest-ranked findings; %d lower-ranked finding(s) were omitted. Run `nitpick review` for the full result.\n", report.OmittedFindings)
+	}
+	return blockquote(b.String())
 }
 
 // incrementalNotice states that this run read only part of the change, and
