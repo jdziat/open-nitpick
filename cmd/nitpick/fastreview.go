@@ -63,7 +63,7 @@ func applyFastReviewScope(cfg *config.Config) {
 		// ordinary default has repeatedly failed to meet.
 		fastModel := config.ModelSpec{
 			Provider:    "synthetic",
-			Model:       "deepseek/deepseek-v4.1-flash",
+			Model:       "hf:deepseek/deepseek-v4.1-flash",
 			Temperature: new(float64),
 			MaxTokens:   4096,
 			Reasoning:   config.ReasoningOff,
