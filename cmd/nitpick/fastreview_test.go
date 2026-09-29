@@ -18,8 +18,6 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 	cfg.Review.Approve.Enabled = true
 	cfg.Models.Routes = []config.Route{{Name: "special"}}
 	cfg.Models.Ensemble = []config.ModelSpec{{Model: "second"}}
-	cfg.Models.Review = nil
-
 	applyFastReviewScope(cfg)
 
 	if cfg.Review.MaxFiles != fastReviewLimit || cfg.Review.MaxFilesPerRequest != fastReviewFilesPerRequest || cfg.Review.Concurrency != fastReviewConcurrency {
@@ -34,8 +32,8 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 	if cfg.Models.Default.Timeout != 55*time.Second || cfg.Models.Default.MaxTokens != 4096 || cfg.Models.Default.Reasoning != config.ReasoningOff || len(cfg.Models.Routes) != 0 || len(cfg.Models.Ensemble) != 0 {
 		t.Error("fast review did not bound every selected model request")
 	}
-	if cfg.Models.Review == nil || cfg.Models.Review.Model != "hf:deepseek/deepseek-v4.1-flash" {
-		t.Error("fast review did not select the measured fast reviewer")
+	if cfg.Models.Review != nil {
+		t.Error("fast review must not fabricate a review role; the default role bounds it")
 	}
 }
 

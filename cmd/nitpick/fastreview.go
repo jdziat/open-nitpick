@@ -56,22 +56,6 @@ func applyFastReviewScope(cfg *config.Config) {
 	cfg.Models.Default.Timeout = 55 * time.Second
 	cfg.Models.Routes = nil
 	cfg.Models.Ensemble = nil
-	if cfg.Models.Review == nil {
-		// The measured fast reviewer: docs/model-breakdown.md's battery puts
-		// deepseek-v4.1-flash first on recall at the lowest cost of its
-		// contenders, and its answers return inside the bounded deadline the
-		// ordinary default has repeatedly failed to meet.
-		fastModel := config.ModelSpec{
-			Provider:    "synthetic",
-			Model:       "hf:deepseek/deepseek-v4.1-flash",
-			Temperature: new(float64),
-			MaxTokens:   4096,
-			Reasoning:   config.ReasoningOff,
-			Timeout:     55 * time.Second,
-		}
-		*fastModel.Temperature = 0
-		cfg.Models.Review = &fastModel
-	}
 	if cfg.Models.Review != nil {
 		reviewModel := *cfg.Models.Review
 		reviewModel.Timeout = 55 * time.Second
