@@ -399,6 +399,8 @@ type Report struct {
 	// FastReview identifies a bounded diff-only pass. Its receipt names the
 	// omitted stages and any files its fixed ceiling left unread.
 	FastReview bool
+	// FastLimit records the finding ceiling used for the bounded pass.
+	FastLimit int
 
 	// OmittedFindings counts findings that ranked below FastLimit.
 	OmittedFindings int
@@ -762,7 +764,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	}
 	e = next
 
-	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr, FastReview: e.FastReview}
+	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr, FastReview: e.FastReview, FastLimit: e.FastLimit}
 	defer func() { report.Routes = e.routeDecisions }()
 
 	// What an earlier run left on the pull request, read after the policy is

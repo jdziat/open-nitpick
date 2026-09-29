@@ -83,6 +83,15 @@ func TestFastReviewThatReadEveryFileCanBeClean(t *testing.T) {
 	}
 }
 
+func TestFastReviewIgnoresExpectedGeneratedFileSkips(t *testing.T) {
+	report := &review.Report{FastReview: true, Plan: &bundle.Plan{
+		Skipped: []bundle.Skip{{Path: "generated.go", Reason: bundle.ReasonGenerated}},
+	}}
+	if got := resultFor(report, config.SeverityNone); got != resultClean {
+		t.Fatalf("fast review result = %q, want clean for an expected generated-file skip", got)
+	}
+}
+
 func TestFastReviewWithSkippedFilesIsNotClean(t *testing.T) {
 	report := &review.Report{
 		FastReview: true,

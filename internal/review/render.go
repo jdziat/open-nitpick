@@ -454,7 +454,11 @@ func fastReviewNotice(report *Report) string {
 	var b strings.Builder
 	b.WriteString("**Fast review:** changed-file diffs only; related context, analyzers, validation, and model triage were not run.\n")
 	if report.OmittedFindings > 0 {
-		fmt.Fprintf(&b, "Showing the 10 highest-ranked findings; %d lower-ranked finding(s) were omitted. Run `nitpick review` for the full result.\n", report.OmittedFindings)
+		limit := report.FastLimit
+		if limit <= 0 {
+			limit = 10
+		}
+		fmt.Fprintf(&b, "Showing the %d highest-ranked findings; %d lower-ranked finding(s) were omitted. Run `nitpick review` for the full result.\n", limit, report.OmittedFindings)
 	}
 	return blockquote(b.String())
 }

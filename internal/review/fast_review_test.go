@@ -43,9 +43,10 @@ func TestFastReviewLimitsFindingsAndDisclosesWhatItOmitted(t *testing.T) {
 
 func TestFastReviewMakesAFileLimitIncomplete(t *testing.T) {
 	var raw strings.Builder
-	for i := 0; i < 11; i++ {
+	for i := 0; i < 10; i++ {
 		fmt.Fprintf(&raw, "diff --git a/f%02d.go b/f%02d.go\n--- a/f%02d.go\n+++ b/f%02d.go\n@@ -0,0 +1,2 @@\n+package fast\n+var V%d = %d\n", i, i, i, i, i, i)
 	}
+	raw.WriteString("diff --git a/internal/auth/session.go b/internal/auth/session.go\n--- a/internal/auth/session.go\n+++ b/internal/auth/session.go\n@@ -0,0 +1,3 @@\n+package auth\n+func Session(v int) int { if v > 0 { return v }; return 0 }\n+var Current = 1\n")
 	model := &scriptedLLM{fallback: `{"findings":[]}`}
 	cfg := config.Defaults()
 	cfg.Models.Default = config.ModelSpec{Provider: "openai", Model: "test"}
@@ -73,10 +74,22 @@ func TestFastReviewMakesAFileLimitIncomplete(t *testing.T) {
 func TestFastReviewRanksFilesBeforeApplyingItsLimit(t *testing.T) {
 	plain := file("a_plain.go", 2, 0)
 	risky := file("internal/auth/session.go", 2, 2)
-	ordered := rankFiles([]*diff.File{plain, risky})
+	files := []*diff.File{plain}
+	for i := 0; i < 9; i++ {
+		files = append(files, file(fmt.Sprintf("plain_%d.go", i), 2, 0))
+	}
+	files = append(files, risky)
+	ordered := rankFiles(files)
 	if got := ordered[0].Path; got != risky.Path {
 		t.Fatalf("first ranked path = %q, want %q", got, risky.Path)
 	}
+	selected := ordered[:10]
+	for _, f := range selected {
+		if f.Path == risky.Path {
+			return
+		}
+	}
+	t.Fatal("risk-ranked file was cut by the binding ten-file limit")
 }
 
 func TestFastReviewNeverProvidesReusableCoverageOrClearsThreads(t *testing.T) {

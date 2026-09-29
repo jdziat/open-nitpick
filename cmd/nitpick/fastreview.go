@@ -24,7 +24,7 @@ func runFastReview(ctx context.Context, args []string) error {
 		engine.FastReview = true
 		engine.FastLimit = fastReviewLimit
 		engine.SkipTriage = true
-		engine.RequestTimeout = 55 * time.Second
+		engine.RequestTimeout = fastReviewDeadline
 		engine.Policy = fastReviewScoped{inner: engine.Policy}
 	})
 }

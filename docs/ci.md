@@ -171,7 +171,7 @@ step sets outputs a later step can read:
 
 | output | value |
 |---|---|
-| `result` | `clean`, `findings` (the gate was tripped), `skipped` (a draft), or `error` (the review could not run or fast-review left changed files unread) |
+| `result` | `clean`, `findings` (the gate was tripped), `skipped` (a draft), or `error` (the review could not run or fast-review left changed files unread). Completeness errors take precedence over the severity gate. |
 | `findings`, `critical`, `error`, `warning` | counts of what was published |
 | `files` | files reviewed |
 | `withheld` | findings an earlier review had already posted |

@@ -422,8 +422,7 @@ runs:
         fi
         case "$NITPICK_COMMAND" in
           review|fast-review) ;;
-          *) echo "::error::open-nitpick: command must be review, fast-review,
-             or respond"
+          *) echo "::error::open-nitpick: command must be review, fast-review, or respond"
              echo "result=error" >> "$GITHUB_OUTPUT"
              exit 2 ;;
         esac
