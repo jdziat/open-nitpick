@@ -24,7 +24,7 @@ func runFastReview(ctx context.Context, args []string) error {
 		engine.FastReview = true
 		engine.FastLimit = fastReviewLimit
 		engine.SkipTriage = true
-		engine.RequestTimeout = 40 * time.Second
+		engine.RequestTimeout = 55 * time.Second
 		engine.Policy = fastReviewScoped{inner: engine.Policy}
 	})
 }
@@ -47,12 +47,12 @@ func applyFastReviewScope(cfg *config.Config) {
 	cfg.Validation.Enabled = false
 	cfg.Review.Incremental = false
 	cfg.Review.Approve.Enabled = false
-	cfg.Models.Default.Timeout = 40 * time.Second
+	cfg.Models.Default.Timeout = 55 * time.Second
 	cfg.Models.Routes = nil
 	cfg.Models.Ensemble = nil
 	if cfg.Models.Review != nil {
 		reviewModel := *cfg.Models.Review
-		reviewModel.Timeout = 40 * time.Second
+		reviewModel.Timeout = 55 * time.Second
 		cfg.Models.Review = &reviewModel
 	}
 }
