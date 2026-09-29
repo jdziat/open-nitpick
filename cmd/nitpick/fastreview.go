@@ -15,6 +15,8 @@ const fastReviewConcurrency = 4
 
 const fastReviewDeadline = 55 * time.Second
 
+const fastReviewModel = "deepseek/deepseek-v4.1-flash"
+
 // runFastReview gives a change a bounded first pass. It is intentionally not
 // an approval path: the receipt names files and stages the fast pass omitted.
 func runFastReview(ctx context.Context, args []string) error {
@@ -55,17 +57,22 @@ func applyFastReviewScope(cfg *config.Config) {
 	cfg.Models.Default.Reasoning = config.ReasoningOff
 	cfg.Models.Default.StructuredOutput = config.StructuredText
 	cfg.Models.Default.Provider = "synthetic"
-	cfg.Models.Default.Model = "hf:Qwen/Qwen3.8-27B"
+	cfg.Models.Default.Model = fastReviewModel
 	cfg.Models.Default.Timeout = 55 * time.Second
 	cfg.Models.Routes = nil
 	cfg.Models.Ensemble = nil
-	if cfg.Models.Review != nil {
-		reviewModel := *cfg.Models.Review
-		reviewModel.Timeout = 55 * time.Second
-		reviewModel.MaxTokens = 4096
-		reviewModel.Reasoning = config.ReasoningOff
-		cfg.Models.Review = &reviewModel
+	// The review role is explicit so a slow operator default cannot defeat the
+	// command's one-minute contract. This model is the measured responsive
+	// Synthetic reviewer; the ordinary review configuration remains untouched.
+	reviewModel := config.ModelSpec{
+		Provider:         "synthetic",
+		Model:            fastReviewModel,
+		MaxTokens:        4096,
+		Reasoning:        config.ReasoningOff,
+		StructuredOutput: config.StructuredText,
+		Timeout:          fastReviewDeadline,
 	}
+	cfg.Models.Review = &reviewModel
 }
 
 // fastReviewScoped reapplies the command scope after policy substitution.

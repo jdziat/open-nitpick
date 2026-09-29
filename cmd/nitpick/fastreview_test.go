@@ -30,11 +30,11 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 	if cfg.Practices.Profile != "" || cfg.Review.Knowledge || cfg.Review.Standards || cfg.Validation.Enabled || cfg.Review.Approve.Enabled {
 		t.Error("fast review retained an optional deep stage")
 	}
-	if cfg.Models.Default.Model != "hf:Qwen/Qwen3.8-27B" || cfg.Models.Default.Timeout != 55*time.Second || cfg.Models.Default.MaxTokens != 4096 || cfg.Models.Default.Reasoning != config.ReasoningOff || cfg.Models.Default.StructuredOutput != config.StructuredText || len(cfg.Models.Routes) != 0 || len(cfg.Models.Ensemble) != 0 {
+	if cfg.Models.Default.Model != fastReviewModel || cfg.Models.Default.Timeout != 55*time.Second || cfg.Models.Default.MaxTokens != 4096 || cfg.Models.Default.Reasoning != config.ReasoningOff || cfg.Models.Default.StructuredOutput != config.StructuredText || len(cfg.Models.Routes) != 0 || len(cfg.Models.Ensemble) != 0 {
 		t.Error("fast review did not bound every selected model request")
 	}
-	if cfg.Models.Review != nil {
-		t.Error("fast review must not fabricate a review role; the default role bounds it")
+	if cfg.Models.Review == nil || cfg.Models.Review.Model != fastReviewModel || cfg.Models.Review.Timeout != fastReviewDeadline {
+		t.Error("fast review did not select its measured responsive review model")
 	}
 }
 
