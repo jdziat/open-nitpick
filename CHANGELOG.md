@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.3.0](https://github.com/jdziat/open-nitpick/compare/v2.2.0...v2.3.0) (2026-09-29)
+
+
+### Features
+
+* assess design interactions with explicit coverage ([e2e2492](https://github.com/jdziat/open-nitpick/commit/e2e2492d66c0fde93aeb2dbf0fd0dd00e7f55cd5))
+* **review:** approve near-clean PRs via residual judge ([#138](https://github.com/jdziat/open-nitpick/issues/138)) ([0958057](https://github.com/jdziat/open-nitpick/commit/095805747a28ed76f6f7bd4446cebd4af77c0482))
+* **review:** resume unfinished reviews and add an explicit restart ([#141](https://github.com/jdziat/open-nitpick/issues/141)) ([9984889](https://github.com/jdziat/open-nitpick/commit/9984889c96c701ce75dd8ce707c8f600795d46ce))
+
+
+### Fixes
+
+* **actions:** run comment responses from current source ([#144](https://github.com/jdziat/open-nitpick/issues/144)) ([dd4d658](https://github.com/jdziat/open-nitpick/commit/dd4d6586436465f6aff49d2fd2b4fc8838c4ca7b))
+* **linters:** let golangci-lint cover build-tagged files ([#142](https://github.com/jdziat/open-nitpick/issues/142)) ([08a6b1f](https://github.com/jdziat/open-nitpick/commit/08a6b1fdb27754f90add92442cc17bd47b74a84a))
+* **review:** narrow standing-comment rereads to changed and standing files ([#149](https://github.com/jdziat/open-nitpick/issues/149)) ([0518fb6](https://github.com/jdziat/open-nitpick/commit/0518fb6312942453d091ec3a3314bedc0453ea52))
+* **review:** stop design-task limits from blocking completion ([#151](https://github.com/jdziat/open-nitpick/issues/151)) ([9548008](https://github.com/jdziat/open-nitpick/commit/9548008b060ca9b5279b61666e061825a29857f1))
+* **review:** stop unrelated packing limits from failing gates ([#143](https://github.com/jdziat/open-nitpick/issues/143)) ([6f5f9be](https://github.com/jdziat/open-nitpick/commit/6f5f9beaa62fdf0c95ef6b712dc0b92614f0c40c))
+
 ## [2.2.0](https://github.com/jdziat/open-nitpick/compare/v2.1.0...v2.2.0) (2026-09-19)
 
 
