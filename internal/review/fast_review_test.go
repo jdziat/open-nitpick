@@ -2,15 +2,52 @@ package review
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
+	llms "github.com/nocturnium/llm-go-sdk/v6"
+
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
+
+type deadlineLLM struct{}
+
+func (deadlineLLM) GenerateContent(ctx context.Context, _ []llms.Message, _ ...llms.CallOption) (*llms.Response, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (deadlineLLM) Stream(context.Context, []llms.Message, ...llms.CallOption) (<-chan llms.StreamChunk, error) {
+	return nil, errors.New("stream unsupported")
+}
+
+func (deadlineLLM) Provider() llms.Provider { return "deadline" }
+func (deadlineLLM) Model() string           { return "deadline" }
+
+func TestFastReviewBoundsEachModelRequest(t *testing.T) {
+	const requestLimit = 20 * time.Millisecond
+	cfg := config.Defaults()
+	cfg.Models.Default = config.ModelSpec{Provider: "deadline", Model: "deadline"}
+	client := llm.NewClientForTest(deadlineLLM{}, cfg.Models.Default)
+	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client}, RequestTimeout: requestLimit}
+	batch := bundle.Batch{Entries: []bundle.Entry{{File: file("one.go", 2, 0)}}}
+
+	started := time.Now()
+	_, err := engine.analyzeBatchWith(context.Background(), client, "review", "", batch, false)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("bounded request error = %v, want deadline exceeded", err)
+	}
+	if elapsed := time.Since(started); elapsed > 500*time.Millisecond {
+		t.Fatalf("bounded request took %s, want it to stop promptly", elapsed)
+	}
+}
 
 func TestFastReviewLimitsFindingsAndDisclosesWhatItOmitted(t *testing.T) {
 	findings := make([]Finding, 0, 12)
