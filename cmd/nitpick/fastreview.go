@@ -47,12 +47,17 @@ func applyFastReviewScope(cfg *config.Config) {
 	cfg.Validation.Enabled = false
 	cfg.Review.Incremental = false
 	cfg.Review.Approve.Enabled = false
+	// A bounded pass must also bound generation. Without a cap the provider's
+	// own output maximum applies, and the model can spend the whole deadline
+	// still writing. 4096 is enough for two diffs' worth of findings.
+	cfg.Models.Default.MaxTokens = 4096
 	cfg.Models.Default.Timeout = 55 * time.Second
 	cfg.Models.Routes = nil
 	cfg.Models.Ensemble = nil
 	if cfg.Models.Review != nil {
 		reviewModel := *cfg.Models.Review
 		reviewModel.Timeout = 55 * time.Second
+		reviewModel.MaxTokens = 4096
 		cfg.Models.Review = &reviewModel
 	}
 }
