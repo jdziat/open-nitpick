@@ -53,6 +53,7 @@ func applyFastReviewScope(cfg *config.Config) {
 	// of findings; reasoning off keeps the cap answering rather than thinking.
 	cfg.Models.Default.MaxTokens = 4096
 	cfg.Models.Default.Reasoning = config.ReasoningOff
+	cfg.Models.Default.StructuredOutput = config.StructuredText
 	cfg.Models.Default.Provider = "synthetic"
 	cfg.Models.Default.Model = "hf:Qwen/Qwen3.8-27B"
 	cfg.Models.Default.Timeout = 55 * time.Second
