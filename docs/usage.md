@@ -69,8 +69,10 @@ turn into a clickable link.
 `nitpick fast-review` is the quick first pass: it reviews at most ten changed files,
 one diff per model request, with up to ten requests in parallel and a 55-second
 deadline for the whole pass. It skips repository context, linters, validation and model
-triage. Its receipt names those omissions and any changed files beyond the
-limit; use `nitpick review` for a complete review.
+triage, and it refuses the engineering profile. Its receipt names those omissions
+and any changed files beyond the limit. It never supplies an incremental baseline,
+closes earlier threads, or approves a pull request; use `nitpick review` for a
+complete review.
 
 ## Evaluate repository standards
 

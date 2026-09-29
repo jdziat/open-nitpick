@@ -66,6 +66,9 @@ func standingThreadsRemain(report *Report) bool {
 // approveCompletenessGates are the non-standing checks shared by the event
 // path and the residual judge.
 func approveCompletenessGates(report *Report, cfg *config.Config) bool {
+	if report.FastReview {
+		return false
+	}
 	if report.Practices != nil && report.Practices.ExitCode() != 0 {
 		return false
 	}

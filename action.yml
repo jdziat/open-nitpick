@@ -90,14 +90,14 @@ inputs:
 
   command:
     description: >-
-      What to run: "review" (the default) reviews the pull request; "fast-review"
-      runs the bounded changed-files pass; "respond"
+      What to run: "review" (the default), "fast-review" for the bounded
+      changed-files pass, or "respond"
       answers a comment that mentioned the reviewer, for a workflow on
       issue_comment and pull_request_review_comment events.
     required: false
     default: review
   args:
-    description: Additional flags passed verbatim to the selected command.
+    description: Additional flags passed verbatim to review and fast-review.
     required: false
 
 outputs:
@@ -422,7 +422,8 @@ runs:
         fi
         case "$NITPICK_COMMAND" in
           review|fast-review) ;;
-          *) echo "::error::open-nitpick: command must be review, fast-review, or respond"
+          *) echo "::error::open-nitpick: command must be review, fast-review,
+             or respond"
              echo "result=error" >> "$GITHUB_OUTPUT"
              exit 2 ;;
         esac

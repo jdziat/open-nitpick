@@ -622,6 +622,12 @@ func (r *Report) PipelineComplete() bool {
 // resolveClearedForApprove from resolving threads for a run whose actual file
 // coverage completed.
 func (r *Report) reusableCoverage() bool {
+	// Fast review is an intentionally reduced first pass. It may be useful
+	// immediately, but must never stand in for a complete review on a later
+	// push or authorize closing an earlier finding.
+	if r.FastReview {
+		return false
+	}
 	if !r.PipelineComplete() {
 		return false
 	}
@@ -1076,16 +1082,13 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 // planner preserves its input order when review.max_files binds, so ranking
 // here makes the ceiling select risk rather than lexical diff order.
 func rankFiles(files diff.Files) diff.Files {
-	ranked := Rank(files)
-	byPath := make(map[string]*diff.File, len(files))
-	for _, file := range files {
-		byPath[file.Path] = file
-	}
-	out := make(diff.Files, 0, len(files))
-	for _, score := range ranked {
-		out = append(out, byPath[score.Path])
-	}
-	return out
+	return slices.SortedFunc(slices.Values(files), func(a, b *diff.File) int {
+		left, right := Score(a), Score(b)
+		if byScore := cmp.Compare(right.Score, left.Score); byScore != 0 {
+			return byScore
+		}
+		return cmp.Compare(left.Path, right.Path)
+	})
 }
 
 // ErrPublish marks a review that completed and could not be delivered. The

@@ -156,8 +156,8 @@ than the repository root.
 | `skip-drafts` | `false` | do nothing on a draft pull request |
 | `version` | `latest` | a release tag such as `v1.0.0`, or `latest`. See the paragraph below for what happens when no release matches |
 | `analyzers` | empty | catalog names to install on the runner before the review, comma separated, or `auto` for the ones the change's languages call for. Empty installs nothing and the review runs whatever the runner already has |
-| `command` | `review` | `review` reviews the pull request; `fast-review` runs the bounded changed-files pass; `respond` answers a comment that mentioned the reviewer |
-| `args` | none | flags passed verbatim to the selected command, for anything with no input of its own |
+| `command` | `review` | `review` reviews the pull request; `fast-review` runs the bounded changed-files pass and refuses the engineering profile; `respond` answers a comment that mentioned the reviewer |
+| `args` | none | flags passed verbatim to `review` and `fast-review`, for anything with no input of its own |
 
 ### What a run does
 
@@ -171,13 +171,13 @@ step sets outputs a later step can read:
 
 | output | value |
 |---|---|
-| `result` | `clean`, `findings` (the gate was tripped), `skipped` (a draft), or `error` (the review could not run) |
+| `result` | `clean`, `findings` (the gate was tripped), `skipped` (a draft), or `error` (the review could not run or fast-review left changed files unread) |
 | `findings`, `critical`, `error`, `warning` | counts of what was published |
 | `files` | files reviewed |
 | `withheld` | findings an earlier review had already posted |
 
 Exit codes: `0` clean, `1` findings at or above `fail_on`, `2` the review could
-not run. CI can tell "this change has problems" apart from "the reviewer
+not run or fast-review left changed files unread. CI can tell "this change has problems" apart from "the reviewer
 broke", and `result` says which without parsing the log.
 
 ### Analyzers on the runner

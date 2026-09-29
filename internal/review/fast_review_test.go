@@ -78,3 +78,43 @@ func TestFastReviewRanksFilesBeforeApplyingItsLimit(t *testing.T) {
 		t.Fatalf("first ranked path = %q, want %q", got, risky.Path)
 	}
 }
+
+func TestFastReviewNeverProvidesReusableCoverageOrClearsThreads(t *testing.T) {
+	provider := &resolvingProvider{incrementalProvider: incrementalProvider{
+		stubProvider: stubProvider{diff: engineDiff},
+		head:         "beef02",
+		prior: &vcs.PriorReview{Head: "beef01", Comments: []vcs.PriorComment{
+			{ID: 9, Path: "app.go", Line: 4, Fingerprint: "prior", Class: "correctness"},
+		}},
+	}}
+	model := &scriptedLLM{fallback: `{"findings":[]}`}
+	cfg := config.Defaults()
+	cfg.Models.Default = config.ModelSpec{Provider: "openai", Model: "test"}
+	cfg.Review.IncludeFullFiles = false
+	cfg.Review.RelatedContext = false
+	cfg.Review.Approve.Enabled = true
+	client := llm.NewClientForTest(model, cfg.Models.Default)
+	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, SkipTriage: true}
+
+	report, err := engine.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.ReusableCoverage() {
+		t.Fatal("fast review must not provide an incremental baseline")
+	}
+	if len(provider.resolved) != 0 {
+		t.Fatalf("fast review resolved standing threads: %v", provider.resolved)
+	}
+	if provider.published == nil || provider.published.Event != vcs.EventComment {
+		t.Fatalf("fast review event = %+v, want COMMENT", provider.published)
+	}
+}
+
+func TestFastReviewKeepsDuplicateDiffEntries(t *testing.T) {
+	file := file("same.go", 2, 1)
+	ordered := rankFiles([]*diff.File{file, file})
+	if len(ordered) != 2 || ordered[0] != file || ordered[1] != file {
+		t.Fatalf("ranked files = %#v, want both duplicate entries", ordered)
+	}
+}
