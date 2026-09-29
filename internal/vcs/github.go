@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -72,25 +73,89 @@ const DefaultBotMarker = "<!-- open-nitpick -->"
 // that a ceiling exists, not where it sits.
 const requestTimeout = 2 * time.Minute
 
+// retryOnAbuse re-sends a request the forge refused as abuse detection.
+// Installation tokens start with an empty history, and a review's first
+// seconds fire a dozen reads plus a publish into that fresh identity,
+// which GitHub answers 429; a static token accumulates slowly enough that
+// this never fired for it, so the retry lives with the client either way.
+// The header is honored when GitHub sends one, and the backoff stays short
+// because a review run that waits minutes to publish is failing anyway.
+type retryOnAbuse struct {
+	next http.RoundTripper
+}
+
+// bearerTransport sets the Authorization header for a static token; it sits
+// under retryOnAbuse so the retry re-sends with credentials on every attempt.
+type bearerTransport struct {
+	token string
+}
+
+func (b bearerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	clone := req.Clone(req.Context())
+	clone.Header.Set("Authorization", "Bearer "+b.token)
+	return http.DefaultTransport.RoundTrip(clone)
+}
+
+// timeSleep is the clock the abuse retry waits on; tests replace it.
+var timeSleep = time.Sleep
+
+func (r *retryOnAbuse) RoundTrip(req *http.Request) (*http.Response, error) {
+	for attempt := 0; ; attempt++ {
+		resp, err := r.next.RoundTrip(req)
+		if err == nil && resp.StatusCode != http.StatusTooManyRequests {
+			return resp, err
+		}
+		if err != nil || attempt == 2 {
+			return resp, err
+		}
+		// Drain the body so the connection returns to the pool before
+		// the retry re-uses it.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
+		_ = resp.Body.Close()
+		wait := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+		if after := resp.Header.Get("Retry-After"); after != "" {
+			if secs, err := strconv.Atoi(after); err == nil && secs > 0 {
+				wait = min(wait, time.Duration(secs)*time.Second)
+			}
+		}
+		timeSleep(wait)
+	}
+}
+
 // NewGitHub builds a GitHub provider.
 func NewGitHub(opts GitHubOptions) (*GitHub, error) {
-	base := http.Client{Timeout: requestTimeout}
-	client := github.NewClient(&base)
-	if base := strings.TrimSpace(opts.BaseURL); base != "" {
-		var err error
-		client, err = client.WithEnterpriseURLs(base, base)
+	// The credential transport is attached before NewClient because go-github
+	// copies the client it is given: a transport attached later lands on a
+	// discarded copy, which is how the retry once silently disappeared.
+	base := &http.Client{Timeout: requestTimeout}
+	var client *github.Client
+	var enterpriseURL *url.URL
+
+	if raw := strings.TrimSpace(opts.BaseURL); raw != "" {
+		parsed, err := url.Parse(raw)
 		if err != nil {
 			return nil, fmt.Errorf("github: enterprise base url: %w", err)
 		}
+		// Mirror WithEnterpriseURLs: ensure the trailing slash and the
+		// /api/v3/ suffix the API paths expect.
+		if !strings.HasSuffix(parsed.Path, "/") {
+			parsed.Path += "/"
+		}
+		if !strings.HasSuffix(parsed.Path, "/api/v3/") &&
+			!strings.HasPrefix(parsed.Host, "api.") &&
+			!strings.Contains(parsed.Host, ".api.") {
+			parsed.Path += "api/v3/"
+		}
+		enterpriseURL = parsed
 	}
 
 	if opts.Installations != nil {
 		// Self-refreshing installation credentials own the Authorization
 		// header; the transport minted the token and renews it before it
-		// expires, so no static token is required or used here. Assigned
-		// after WithEnterpriseURLs because that call copies the client and
-		// would otherwise leave the transport on the discarded copy.
-		client.Client().Transport = opts.Installations
+		// expires, so no static token is required or used here.
+		base.Transport = &retryOnAbuse{next: opts.Installations}
+		client = github.NewClient(base)
+		client.BaseURL = enterpriseURL
 		// Token minting and file reads both count against the installation's
 		// 60-request-per-hour ceiling, and go-github remembers the rate
 		// response it saw. When a burst drained that ceiling, later calls
@@ -103,7 +168,9 @@ func NewGitHub(opts GitHubOptions) (*GitHub, error) {
 		if token == "" {
 			return nil, errors.New("github: a token is required (set GITHUB_TOKEN)")
 		}
-		client = client.WithAuthToken(token)
+		base.Transport = &retryOnAbuse{next: bearerTransport{token: token}}
+		client = github.NewClient(base)
+		client.BaseURL = enterpriseURL
 	}
 
 	bot := opts.Bot
