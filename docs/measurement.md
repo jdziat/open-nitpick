@@ -649,12 +649,3 @@ checks anchors, self-credit, and that no keyword is a token of the change, and
 nothing more. A number from it is a measurement of this corpus by this
 instrument, and the sentence that reports it should say so. Its first spend is
 recorded in [Findings](findings.md#related-context-on-the-multi-file-corpus).
-
-
-
-## Notes from the harness
-
-The doc comments the eval harness carries, one section each, are in
-[Notes from the harness](harness-notes.md). They are commentary on
-`internal/evals` rather than rules a number has to satisfy, and they were 83%
-of this page.

@@ -247,8 +247,6 @@ func TestKeywordsAdmitOnlyRealDetections(t *testing.T) {
 // one
 // must be the only keyword crediting some hit probe, so deleting it turns a
 // green test red.
-//
-// The note behind it is in docs/harness-notes.md#solecreditors.
 func soleCreditors() map[string][]string {
 	return map[string][]string{
 		"kotlin-widened-input":   {"what summarize accepts", "parameter is wider"},
@@ -2279,8 +2277,6 @@ func checkWitnessCredits(t *testing.T, key, reason string, d Defect, keyword str
 // substringHazardLength is where TestShortKeywordsAreSubstringHazards draws
 // its
 // line.
-//
-// The note behind it is in docs/harness-notes.md#substringhazardlength.
 const substringHazardLength = 4
 
 // TestShortKeywordsAreSubstringHazards asks the question no list can answer.

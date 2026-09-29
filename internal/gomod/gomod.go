@@ -18,15 +18,11 @@ import (
 
 // AssumedLanguage is what the go tool assumes for a module whose go.mod
 // carries no `go` directive at all.
-//
-// The note behind it is in docs/runner-notes.md#assumedlanguage.
 const AssumedLanguage = "1.16"
 
 // BelowAnalyzed reports whether a module's declared Go language version is
 // below the toolchain analyzing it, so that version-gated checks this run
 // could have applied were not applied to it.
-//
-// The note behind it is in docs/runner-notes.md#belowanalyzed.
 func BelowAnalyzed(declared, ceiling string) bool {
 	v := "go" + declared
 	if !version.IsValid(v) || !version.IsValid(ceiling) {
@@ -37,8 +33,6 @@ func BelowAnalyzed(declared, ceiling string) bool {
 
 // LanguageVersion reads the Go language version a go.mod declares, with the
 // 1-based line of the `go` directive.
-//
-// The note behind it is in docs/runner-notes.md#languageversion.
 func LanguageVersion(modFile string) (declared string, line int, ok bool) {
 	f, ok := scanMod(modFile)
 	switch {
@@ -142,7 +136,6 @@ func Versions(repoRoot string) map[string]string {
 	// A file with no `module` directive is not a loadable module, whatever else
 	// it holds. LanguageVersion still answers for it, because the go tool's
 	// assumed version is what the linter roster's coverage note needs and that
-	// reading is measured (docs/runner-notes.md#assumedlanguage). Here the
 	// question is different: an entry bounded to a version must not be judged
 	// against a number read out of a file the go tool would refuse, so this
 	// abstains and the caller keeps every entry.

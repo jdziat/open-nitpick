@@ -3,8 +3,6 @@ package evals
 import "github.com/jdziat/open-nitpick/internal/config"
 
 // nitFixtures are the corpus's nit-level plants.
-//
-// The note behind it is in docs/harness-notes.md#nitfixtures.
 func nitFixtures() []Fixture {
 	return []Fixture{
 		redundantSnapshotCopyNitFixture(),
@@ -17,8 +15,6 @@ func nitFixtures() []Fixture {
 
 // redundantSnapshotCopyNitFixture copies a slice that is already a copy,
 // across two files.
-//
-// The note behind it is in docs/harness-notes.md#redundantsnapshotcopynitfixture.
 func redundantSnapshotCopyNitFixture() Fixture {
 	// Snapshot already copies in Base. Head only clarifies that contract in a
 	// doc comment (the same move as cross-file-sort-nit) and adds a caller that
@@ -192,8 +188,6 @@ func SummaryTitle(name string, count int) string {
 
 // redundantSortNitFixture sorts an array the callee already sorted, in
 // TypeScript.
-//
-// The note behind it is in docs/harness-notes.md#redundantsortnitfixture.
 func redundantSortNitFixture() Fixture {
 	return Fixture{
 		Name: "cross-file-sort-nit",
@@ -390,8 +384,6 @@ def coldest(readings):
 }
 
 // duplicateTestCaseNitFixture adds a table case that is already in the table.
-//
-// The note behind it is in docs/harness-notes.md#duplicatetestcasenitfixture.
 func duplicateTestCaseNitFixture() Fixture {
 	return Fixture{
 		Name: "duplicate-test-case-nit",
@@ -521,8 +513,6 @@ func TestSlug(t *testing.T) {
 
 // defensiveCopyOfLocalNitFixture copies a list that nothing else can reach, in
 // Java.
-//
-// The note behind it is in docs/harness-notes.md#defensivecopyoflocalnitfixture.
 func defensiveCopyOfLocalNitFixture() Fixture {
 	return Fixture{
 		Name: "defensive-copy-nit",

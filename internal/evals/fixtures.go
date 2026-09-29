@@ -190,8 +190,6 @@ func Fixtures() []Fixture {
 
 // HeldOutFixtures is a second corpus the prompt tuning never sees, which
 // TestHeldOutCorpusStaysHeldOut checks by intersecting the two accessors.
-//
-// The note behind it is in docs/harness-notes.md#heldoutfixtures.
 func HeldOutFixtures() []Fixture {
 	return []Fixture{
 		contractBreakFixture(),
@@ -254,8 +252,6 @@ func GroundTruthFixtures() []Fixture {
 }
 
 // EveryFixture is AllFixtures plus the multi-file corpus, for name lookup.
-//
-// The note behind it is in docs/harness-notes.md#everyfixture.
 func EveryFixture() []Fixture {
 	all := AllFixtures()
 	all = append(all, MultiFileFixtures()...)

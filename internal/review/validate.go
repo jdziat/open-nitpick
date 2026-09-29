@@ -744,7 +744,6 @@ var nullish = map[string]bool{
 //
 // Only a single token counts, because an id is one word: a sentence in this
 // field is an answer in the wrong form rather than a claimed source. See
-// docs/harness-notes.md#naming-a-citation for what that gates and why the
 // alternative, deciding whether a sentence means nothing, is not decidable
 // from the string.
 func namesSomething(said string) bool {

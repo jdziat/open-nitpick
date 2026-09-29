@@ -3,8 +3,6 @@ package evals
 import "github.com/jdziat/open-nitpick/internal/config"
 
 // infoFixtures are the corpus's info-level plants.
-//
-// The note behind it is in docs/harness-notes.md#infofixtures.
 func infoFixtures() []Fixture {
 	return []Fixture{
 		rustCrateForOneCallFixture(),
@@ -16,8 +14,6 @@ func infoFixtures() []Fixture {
 }
 
 // rustCrateForOneCallFixture adds a crate to format one string.
-//
-// The note behind it is in docs/harness-notes.md#rustcrateforonecallfixture.
 func rustCrateForOneCallFixture() Fixture {
 	return Fixture{
 		Name: "rust-crate-for-one-call",
@@ -158,8 +154,6 @@ pub fn render(jobs: &[Job]) -> String {
 
 // kotlinWidenedInputFixture lifts an exported function off the type it was
 // written for.
-//
-// The note behind it is in docs/harness-notes.md#kotlinwidenedinputfixture.
 func kotlinWidenedInputFixture() Fixture {
 	return Fixture{
 		Name: "kotlin-widened-input",
@@ -526,8 +520,6 @@ end
 
 // phpForbiddenVsNotFoundFixture chooses which of two correct answers to give a
 // caller who may not read something.
-//
-// The note behind it is in docs/harness-notes.md#phpforbiddenvsnotfoundfixture.
 func phpForbiddenVsNotFoundFixture() Fixture {
 	return Fixture{
 		Name: "php-forbidden-vs-404",
@@ -674,8 +666,6 @@ final class ProjectController
 // goPackageSingletonFixture adds a process-wide value and the helpers that
 // read
 // it.
-//
-// The note behind it is in docs/harness-notes.md#gopackagesingletonfixture.
 func goPackageSingletonFixture() Fixture {
 	return Fixture{
 		Name: "go-package-singleton",

@@ -22,13 +22,9 @@ import (
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
-// TestFullReviewFixture is the acceptance test for `nitpick full-review`,
-// section 1 of notes/plan-full-review.md: the fixture repository reviewed
-// whole finds the planted bug and the planted secret, says nothing about the
+// TestFullReviewFixture verifies that `nitpick full-review` finds the planted bug and the planted secret, says nothing about the
 // clean file, lists the known advisory when osv-scanner is installed, and puts
 // the secret first in the remediation plan.
-//
-// The note behind it is in docs/harness-notes.md#advisoryid.
 var advisoryID = regexp.MustCompile(`(?m)^\s+osv-scanner\((GHSA-|CVE-|GO-20)[^)]*\)\s+go\.mod:\d+ `)
 
 func TestFullReviewFixture(t *testing.T) {
