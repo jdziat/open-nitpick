@@ -100,6 +100,9 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	if f.profile != "" && f.profile != "engineering" {
 		return fmt.Errorf("unknown profile %q", f.profile)
 	}
+	if name == "fast-review" && f.profile != "" {
+		return errors.New("fast-review does not support -profile engineering; run review -profile engineering for the full assessment")
+	}
 
 	// Go's flag package stops at the first non-flag argument and leaves the
 	// rest unread. Silently ignoring them means a misplaced flag, or an

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -31,5 +32,12 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 	}
 	if cfg.Models.Default.Timeout != 40*time.Second || len(cfg.Models.Routes) != 0 || len(cfg.Models.Ensemble) != 0 {
 		t.Error("fast review did not bound every selected model request")
+	}
+}
+
+func TestFastReviewRejectsEngineeringProfile(t *testing.T) {
+	err := runFastReview(t.Context(), []string{"-profile", "engineering"})
+	if err == nil || !strings.Contains(err.Error(), "does not support") {
+		t.Fatalf("fast-review engineering profile error = %v", err)
 	}
 }

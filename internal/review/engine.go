@@ -795,6 +795,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		narrowPrior = nil
 	}
 	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, narrowPrior)
+	if e.FastLimit > 0 {
+		files = rankFiles(files)
+	}
 	report.Files = files
 
 	fetch := func(ctx context.Context, path string) ([]byte, error) {
@@ -1067,6 +1070,22 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		return report, err
 	}
 	return report, nil
+}
+
+// rankFiles puts the changed files a bounded review will read first. The
+// planner preserves its input order when review.max_files binds, so ranking
+// here makes the ceiling select risk rather than lexical diff order.
+func rankFiles(files diff.Files) diff.Files {
+	ranked := Rank(files)
+	byPath := make(map[string]*diff.File, len(files))
+	for _, file := range files {
+		byPath[file.Path] = file
+	}
+	out := make(diff.Files, 0, len(files))
+	for _, score := range ranked {
+		out = append(out, byPath[score.Path])
+	}
+	return out
 }
 
 // ErrPublish marks a review that completed and could not be delivered. The

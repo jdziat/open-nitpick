@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
@@ -66,5 +67,14 @@ func TestFastReviewMakesAFileLimitIncomplete(t *testing.T) {
 	}
 	if provider.published == nil || !strings.Contains(provider.published.Summary, "Read 10 of 11 changed files") || !strings.Contains(provider.published.Summary, "exceeded review.max_files") {
 		t.Fatalf("file-limit receipt missing: %+v", provider.published)
+	}
+}
+
+func TestFastReviewRanksFilesBeforeApplyingItsLimit(t *testing.T) {
+	plain := file("a_plain.go", 2, 0)
+	risky := file("internal/auth/session.go", 2, 2)
+	ordered := rankFiles([]*diff.File{plain, risky})
+	if got := ordered[0].Path; got != risky.Path {
+		t.Fatalf("first ranked path = %q, want %q", got, risky.Path)
 	}
 }
