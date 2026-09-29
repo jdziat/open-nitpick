@@ -21,7 +21,7 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 
 	applyFastReviewScope(cfg)
 
-	if cfg.Review.MaxFiles != fastReviewLimit || cfg.Review.MaxFilesPerRequest != 1 || cfg.Review.Concurrency != fastReviewLimit {
+	if cfg.Review.MaxFiles != fastReviewLimit || cfg.Review.MaxFilesPerRequest != fastReviewFilesPerRequest || cfg.Review.Concurrency != fastReviewConcurrency {
 		t.Fatalf("fast bounds = files:%d batch:%d concurrency:%d", cfg.Review.MaxFiles, cfg.Review.MaxFilesPerRequest, cfg.Review.Concurrency)
 	}
 	if cfg.Review.IncludeFullFiles || cfg.Review.RelatedContext || cfg.Review.RelatedContextCallers {

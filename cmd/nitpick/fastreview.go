@@ -10,6 +10,8 @@ import (
 )
 
 const fastReviewLimit = 10
+const fastReviewFilesPerRequest = 2
+const fastReviewConcurrency = 4
 
 const fastReviewDeadline = 55 * time.Second
 
@@ -33,8 +35,10 @@ func applyFastReviewScope(cfg *config.Config) {
 	cfg.Practices.Profile = ""
 	cfg.Persona.Nitpick = config.NitpickNormal
 	cfg.Review.MaxFiles = fastReviewLimit
-	cfg.Review.MaxFilesPerRequest = 1
-	cfg.Review.Concurrency = fastReviewLimit
+	// Five small requests stay below the provider concurrency that the regular
+	// review already uses, while still covering ten changed files in one pass.
+	cfg.Review.MaxFilesPerRequest = fastReviewFilesPerRequest
+	cfg.Review.Concurrency = fastReviewConcurrency
 	cfg.Review.IncludeFullFiles = false
 	cfg.Review.RelatedContext = false
 	cfg.Review.RelatedContextCallers = false
