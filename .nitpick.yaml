@@ -8,12 +8,6 @@ models:
     provider: synthetic
     model: hf:zai-org/GLM-5.3-Flash
 
-  review:
-    # The review role defaults to this repository's own fast reviewer. The
-    # default model cannot answer inside fast-review's bounded deadline.
-    model: hf:Qwen/Qwen3.8-27B
-    temperature: 0
-
   triage:
     provider: synthetic
     model: hf:Qwen/Qwen3.8-27B
