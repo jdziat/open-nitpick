@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // newFakeGitHub serves a stub API and returns a provider pointed at it.
@@ -574,4 +575,45 @@ func TestGitHubNonFileCannotBecomeEmptySource(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestRateLimitMemoryIsPerCredential: a refreshing transport mints new
+// tokens with fresh quota, so a 60-requests-drained memory from the old
+// token must not refuse locally what the forge would now allow (#153's
+// review job lost its publish to exactly this). A static token keeps the
+// check: its quota really is one pool.
+func TestRateLimitMemoryIsPerCredential(t *testing.T) {
+	served := 0
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		served++
+		w.Header().Set("X-RateLimit-Limit", "60")
+		w.Header().Set("X-RateLimit-Remaining", "0")
+		w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(time.Hour).Unix()))
+		_, _ = w.Write([]byte("{}"))
+	}))
+	t.Cleanup(service.Close)
+
+	gh, err := NewGitHub(GitHubOptions{Installations: &staticTransport{}, BaseURL: service.URL + "/"})
+	if err != nil {
+		t.Fatalf("NewGitHub: %v", err)
+	}
+	if !gh.client.DisableRateLimitCheck {
+		t.Fatal("a refreshing transport must not trust a remembered rate window across token renewals")
+	}
+
+	static, err := NewGitHub(GitHubOptions{Token: "t", BaseURL: service.URL + "/"})
+	if err != nil {
+		t.Fatalf("NewGitHub: %v", err)
+	}
+	if static.client.DisableRateLimitCheck {
+		t.Fatal("a static token keeps the local rate check; its quota really is one pool")
+	}
+	_ = served
+}
+
+type staticTransport struct{ used bool }
+
+func (s *staticTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	s.used = true
+	return http.DefaultTransport.RoundTrip(r)
 }

@@ -43,6 +43,13 @@ type GitHubOptions struct {
 	// Token authenticates the API. Required.
 	Token string
 
+	// Installations, when set, replaces Token as the API's credential source:
+	// it mints fresh installation tokens as the current one nears expiry, so
+	// a run that outlives the hour a minted token lasts still publishes. The
+	// workflows mint one token per job, and PR #121's restart-review lost its
+	// review and every later file re-read when that hour ended mid-run.
+	Installations http.RoundTripper
+
 	// BaseURL points at a GitHub Enterprise instance. Empty uses github.com.
 	BaseURL string
 
@@ -67,19 +74,36 @@ const requestTimeout = 2 * time.Minute
 
 // NewGitHub builds a GitHub provider.
 func NewGitHub(opts GitHubOptions) (*GitHub, error) {
-	token := strings.TrimSpace(opts.Token)
-	if token == "" {
-		return nil, errors.New("github: a token is required (set GITHUB_TOKEN)")
-	}
-
-	client := github.NewClient(&http.Client{Timeout: requestTimeout}).WithAuthToken(token)
-
+	base := http.Client{Timeout: requestTimeout}
+	client := github.NewClient(&base)
 	if base := strings.TrimSpace(opts.BaseURL); base != "" {
 		var err error
 		client, err = client.WithEnterpriseURLs(base, base)
 		if err != nil {
 			return nil, fmt.Errorf("github: enterprise base url: %w", err)
 		}
+	}
+
+	if opts.Installations != nil {
+		// Self-refreshing installation credentials own the Authorization
+		// header; the transport minted the token and renews it before it
+		// expires, so no static token is required or used here. Assigned
+		// after WithEnterpriseURLs because that call copies the client and
+		// would otherwise leave the transport on the discarded copy.
+		client.Client().Transport = opts.Installations
+		// Token minting and file reads both count against the installation's
+		// 60-request-per-hour ceiling, and go-github remembers the rate
+		// response it saw. When a burst drained that ceiling, later calls
+		// were refused locally until the remembered reset time even though
+		// the token had since been renewed against fresh quota; disabling
+		// the check sends every request to the forge and lets it decide.
+		client.DisableRateLimitCheck = true
+	} else {
+		token := strings.TrimSpace(opts.Token)
+		if token == "" {
+			return nil, errors.New("github: a token is required (set GITHUB_TOKEN)")
+		}
+		client = client.WithAuthToken(token)
 	}
 
 	bot := opts.Bot

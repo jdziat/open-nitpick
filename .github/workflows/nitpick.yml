@@ -76,6 +76,8 @@ jobs:
       - name: Review with the current source
         env:
           GITHUB_TOKEN: ${{ steps.app.outputs.token || github.token }}
+          NITPICK_APP_INSTALLATION_ID: ${{ steps.app.outputs.installation-id }}
+          NITPICK_APP_PRIVATE_KEY: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
           NITPICK_BOT_LOGIN: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
           SYNTHETIC_API_KEY: ${{ secrets.SYNTHETIC_API_KEY }}
         run: go run ./cmd/nitpick review -skip-draft -fail-on none
