@@ -35,18 +35,35 @@ func TestDesignPackingAdmitsOversizedTaskWithTrimmedContext(t *testing.T) {
 		t.Fatalf("oversized task produced no request: %+v", packed.Plan)
 	}
 	batch := packed.Plan.Batches[0]
+	// The change surface must include one of the context files so the
+	// changed-first sort has something to reorder; without it the comparator
+	// is a no-op and this test cannot fail if the sort is deleted.
+	packed = PackDesign(t.Context(), cfg, design, files,
+		diff.Files{&diff.File{Path: source.ID}, &diff.File{Path: context[6].ID}}, bundle.Reserve{})
+	if len(packed.Plan.Batches) != 1 {
+		t.Fatalf("changed-context run produced no request: %+v", packed.Plan)
+	}
+	batch = packed.Plan.Batches[0]
+	// Six requests slots: the source plus five contexts. The changed file
+	// sorts first, so it must survive; the last unchanged file is cut.
+	for _, kept := range context[:4] {
+		if !slices.Contains(batch.Paths(), kept.ID) {
+			t.Fatalf("dropped unchanged context %s while slots remained", kept.ID)
+		}
+	}
+	if !slices.Contains(batch.Paths(), context[6].ID) {
+		t.Fatalf("changed context file %s was trimmed before its unchanged peers", context[6].ID)
+	}
+	if slices.Contains(batch.Paths(), context[5].ID) {
+		t.Fatalf("kept unchanged context %s beyond the cap while a changed file was present", context[5].ID)
+	}
 	if len(batch.Entries) != cfg.Review.MaxFilesPerRequest || !slices.Contains(batch.Paths(), source.ID) {
 		t.Fatalf("request lost its source or ignored the file cap: %+v", batch.Entries)
 	}
-	for _, kept := range context[:5] {
-		if !slices.Contains(batch.Paths(), kept.ID) {
-			t.Fatalf("dropped a changed companion %s before context-only support", kept.ID)
-		}
-	}
-	for _, dropped := range context[5:] {
-		if slices.Contains(batch.Paths(), dropped.ID) {
-			t.Fatalf("kept context beyond the cap: %s", dropped.ID)
-		}
+	// Only the unchanged file the changed one displaced is missing now;
+	// the changed file itself is back in its sorted position.
+	if slices.Contains(batch.Paths(), context[7].ID) {
+		t.Fatalf("kept unchanged context %s beyond the cap", context[7].ID)
 	}
 	if len(packed.Design.Tasks[0].Omitted) != 0 {
 		t.Fatalf("optional context made the task incomplete: %+v", packed.Design.Tasks[0].Omitted)

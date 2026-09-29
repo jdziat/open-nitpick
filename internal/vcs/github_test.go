@@ -82,7 +82,7 @@ func TestGitHubPullRequest(t *testing.T) {
 		if !strings.HasSuffix(r.URL.Path, "/repos/o/r/pulls/7") {
 			t.Errorf("unexpected path %q", r.URL.Path)
 		}
-		if got := r.Header.Get("Authorization"); !strings.Contains(got, "t") {
+		if got := r.Header.Get("Authorization"); got != "Bearer test-token" {
 			t.Errorf("Authorization = %q, want the token", got)
 		}
 

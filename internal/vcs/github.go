@@ -155,7 +155,11 @@ func NewGitHub(opts GitHubOptions) (*GitHub, error) {
 		// expires, so no static token is required or used here.
 		base.Transport = &retryOnAbuse{next: opts.Installations}
 		client = github.NewClient(base)
-		client.BaseURL = enterpriseURL
+		if enterpriseURL != nil {
+			// Assigning nil would overwrite the default BaseURL that
+			// NewClient set, and the first REST call would dereference it.
+			client.BaseURL = enterpriseURL
+		}
 		// Token minting and file reads both count against the installation's
 		// 60-request-per-hour ceiling, and go-github remembers the rate
 		// response it saw. When a burst drained that ceiling, later calls
@@ -170,7 +174,9 @@ func NewGitHub(opts GitHubOptions) (*GitHub, error) {
 		}
 		base.Transport = &retryOnAbuse{next: bearerTransport{token: token}}
 		client = github.NewClient(base)
-		client.BaseURL = enterpriseURL
+		if enterpriseURL != nil {
+			client.BaseURL = enterpriseURL
+		}
 	}
 
 	bot := opts.Bot
