@@ -61,8 +61,6 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 			}
 		} else if len(task.Omitted) > 0 {
 			earlyReason = "intended design source or context is unavailable"
-		} else if len(task.Sources)+len(task.Context) > cfg.Review.MaxFilesPerRequest {
-			earlyReason = "complete design task exceeds review.max_files_per_request"
 		}
 		if earlyReason != "" {
 			reason := earlyReason
@@ -92,6 +90,29 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 		}
 		ranges, _ := task.contextRanges()
 		batch := bundle.Batch{DesignTask: task.ID}
+		if len(task.Sources) > cfg.Review.MaxFilesPerRequest ||
+			(len(task.Interactions) > 0 && len(task.Sources)+len(task.Context) > cfg.Review.MaxFilesPerRequest) {
+			reason := "complete design task exceeds review.max_files_per_request"
+			task.Omitted = append(task.Omitted, Omission{Target: Target{Kind: UnitTarget, ID: task.ID}, Reason: reason})
+			out.Plan.Skipped = append(out.Plan.Skipped, bundle.Skip{Path: task.Source.ID, Reason: fmt.Sprintf("%s: %s", task.ID, reason)})
+			continue
+		}
+		if len(task.Sources)+len(task.Context) > cfg.Review.MaxFilesPerRequest {
+			budget := cfg.Review.MaxFilesPerRequest - len(task.Sources)
+			context := slices.Clone(task.Context)
+			slices.SortStableFunc(context, func(a, b Target) int {
+				aChanged, bChanged := changed[a.ID] != nil, changed[b.ID] != nil
+				if aChanged != bChanged {
+					if aChanged {
+						return -1
+					}
+					return 1
+				}
+				return 0
+			})
+			task.Context = context[:budget]
+			bindDesignSource(ctx, task, sources)
+		}
 		requestTask := *task
 		// Excerpts already carry their source lines; retain the range index in the report.
 		requestTask.ContextSpans = nil
