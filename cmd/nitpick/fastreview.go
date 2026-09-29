@@ -15,7 +15,7 @@ const fastReviewConcurrency = 4
 
 const fastReviewDeadline = 55 * time.Second
 
-const fastReviewModel = "deepseek/deepseek-v4.1-flash"
+const fastReviewModel = "hf:deepseek/deepseek-v4.1-flash"
 
 // runFastReview gives a change a bounded first pass. It is intentionally not
 // an approval path: the receipt names files and stages the fast pass omitted.
