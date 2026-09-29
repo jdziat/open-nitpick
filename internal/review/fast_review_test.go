@@ -24,7 +24,7 @@ func TestFastReviewLimitsFindingsAndDisclosesWhatItOmitted(t *testing.T) {
 	cfg.Review.RelatedContext = false
 	client := llm.NewClientForTest(model, cfg.Models.Default)
 	provider := &stubProvider{diff: "diff --git a/one.go b/one.go\n--- a/one.go\n+++ b/one.go\n@@ -0,0 +1,2 @@\n+package one\n+var Value = 1\n"}
-	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, FastLimit: 10, SkipTriage: true}
+	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, FastReview: true, FastLimit: 10, SkipTriage: true}
 
 	report, err := engine.Review(context.Background(), vcs.Ref{})
 	if err != nil {
@@ -56,7 +56,7 @@ func TestFastReviewMakesAFileLimitIncomplete(t *testing.T) {
 	cfg.Review.RelatedContext = false
 	client := llm.NewClientForTest(model, cfg.Models.Default)
 	provider := &stubProvider{diff: raw.String()}
-	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, SkipTriage: true}
+	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, FastReview: true, SkipTriage: true}
 
 	report, err := engine.Review(context.Background(), vcs.Ref{})
 	if err != nil {
@@ -94,7 +94,7 @@ func TestFastReviewNeverProvidesReusableCoverageOrClearsThreads(t *testing.T) {
 	cfg.Review.RelatedContext = false
 	cfg.Review.Approve.Enabled = true
 	client := llm.NewClientForTest(model, cfg.Models.Default)
-	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, SkipTriage: true}
+	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, FastReview: true, SkipTriage: true}
 
 	report, err := engine.Review(context.Background(), vcs.Ref{})
 	if err != nil {

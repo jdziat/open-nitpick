@@ -19,6 +19,7 @@ func runFastReview(ctx context.Context, args []string) error {
 	fastCtx, cancel := context.WithTimeout(ctx, fastReviewDeadline)
 	defer cancel()
 	return reviewWithScope(fastCtx, "fast-review", args, applyFastReviewScope, func(engine *review.Engine) {
+		engine.FastReview = true
 		engine.FastLimit = fastReviewLimit
 		engine.SkipTriage = true
 		engine.RequestTimeout = 40 * time.Second

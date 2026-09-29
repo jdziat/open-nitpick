@@ -36,6 +36,10 @@ type Engine struct {
 	// every finding, which is the ordinary review contract.
 	FastLimit int
 
+	// FastReview marks a bounded first pass. It does not provide reusable
+	// coverage, resolve prior threads, or approve a pull request.
+	FastReview bool
+
 	// SkipTriage keeps a fast pass to one model request per selected file.
 	// The report records the omitted stage rather than treating it as a failure.
 	SkipTriage bool
@@ -758,7 +762,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	}
 	e = next
 
-	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr, FastReview: e.SkipTriage}
+	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr, FastReview: e.FastReview}
 	defer func() { report.Routes = e.routeDecisions }()
 
 	// What an earlier run left on the pull request, read after the policy is

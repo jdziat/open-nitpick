@@ -76,6 +76,13 @@ func TestResultForFollowsTheGate(t *testing.T) {
 	}
 }
 
+func TestFastReviewThatReadEveryFileCanBeClean(t *testing.T) {
+	report := &review.Report{FastReview: true, Plan: &bundle.Plan{}}
+	if got := resultFor(report, config.SeverityNone); got != resultClean {
+		t.Fatalf("fast review result = %q, want clean after reading every changed file", got)
+	}
+}
+
 func TestFastReviewWithSkippedFilesIsNotClean(t *testing.T) {
 	report := &review.Report{
 		FastReview: true,
