@@ -59,16 +59,23 @@ jobs:
           app-id: ${{ env.NITPICK_APP_ID }}
           private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
 
-      # Build the checkout with the Go version the command requires. Fast review
-      # intentionally skips linters, so it needs no analyzer installation.
+      # Without these the review's deterministic half is absent: the reviewer
+      # reports "golangci-lint is not on PATH" and posts model findings alone,
+      # on every pull request, which reads the same as an analyzer that ran and
+      # found nothing. The toolchain comes from go.mod and the analyzer from
+      # tools/go.mod, the pair ci.yml uses, because a golangci-lint built with
+      # an older Go refuses a go.mod that targets a newer one.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - name: Install golangci-lint
+        working-directory: tools
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 
-      # Run the bounded pull-request pass against this checkout.
-      - name: Fast review with the current source
+      # Build this checkout so the review exercises the policy implementation in CI.
+      - name: Review with the current source
         env:
           GITHUB_TOKEN: ${{ steps.app.outputs.token || github.token }}
           NITPICK_BOT_LOGIN: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
           SYNTHETIC_API_KEY: ${{ secrets.SYNTHETIC_API_KEY }}
-        run: go run ./cmd/nitpick fast-review -skip-draft -fail-on none
+        run: go run ./cmd/nitpick review -skip-draft -fail-on none
