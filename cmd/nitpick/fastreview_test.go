@@ -18,6 +18,7 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 	cfg.Review.Approve.Enabled = true
 	cfg.Models.Routes = []config.Route{{Name: "special"}}
 	cfg.Models.Ensemble = []config.ModelSpec{{Model: "second"}}
+	cfg.Models.Default = config.ModelSpec{Provider: "openai", Model: "test"}
 	applyFastReviewScope(cfg)
 
 	if cfg.Review.MaxFiles != fastReviewLimit || cfg.Review.MaxFilesPerRequest != fastReviewFilesPerRequest || cfg.Review.Concurrency != fastReviewConcurrency {
@@ -29,7 +30,7 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 	if cfg.Practices.Profile != "" || cfg.Review.Knowledge || cfg.Review.Standards || cfg.Validation.Enabled || cfg.Review.Approve.Enabled {
 		t.Error("fast review retained an optional deep stage")
 	}
-	if cfg.Models.Default.Timeout != 55*time.Second || cfg.Models.Default.MaxTokens != 4096 || cfg.Models.Default.Reasoning != config.ReasoningOff || len(cfg.Models.Routes) != 0 || len(cfg.Models.Ensemble) != 0 {
+	if cfg.Models.Default.Model != "hf:Qwen/Qwen3.8-27B" || cfg.Models.Default.Timeout != 55*time.Second || cfg.Models.Default.MaxTokens != 4096 || cfg.Models.Default.Reasoning != config.ReasoningOff || len(cfg.Models.Routes) != 0 || len(cfg.Models.Ensemble) != 0 {
 		t.Error("fast review did not bound every selected model request")
 	}
 	if cfg.Models.Review != nil {
