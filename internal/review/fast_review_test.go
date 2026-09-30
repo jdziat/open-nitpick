@@ -82,6 +82,38 @@ func TestFastReviewLimitsFindingsAndDisclosesWhatItOmitted(t *testing.T) {
 	}
 }
 
+func TestFastReviewLimitCountsOnlyFreshFindings(t *testing.T) {
+	// A bounded re-review must not spend its slots on findings an earlier run
+	// already posted. Without withholding first, the standing finding below
+	// consumes one of the two slots and the fresh finding is reported omitted.
+	standing := Finding{Path: "app.go", Line: 4, Severity: "critical", Class: "correctness", Title: "standing defect", Rationale: "The changed value is wrong."}
+	fresh := Finding{Path: "app.go", Line: 7, Severity: "warning", Class: "correctness", Title: "fresh defect", Rationale: "The changed value is wrong."}
+	prior := &vcs.PriorReview{Head: "beef01", Comments: []vcs.PriorComment{{ID: 7, Path: standing.Path, Line: standing.Line, Class: standing.Class, Body: "standing defect", Fingerprint: Fingerprint(standing)}}}
+	model := &scriptedLLM{fallback: mustJSON(t, Result{Findings: []Finding{standing, fresh}}), byPrompt: map[string]string{"Check these untrusted candidate findings": mustJSON(t, Result{Findings: []Finding{standing, fresh}})}}
+	cfg := config.Defaults()
+	cfg.Models.Default = config.ModelSpec{Provider: "openai", Model: "test"}
+	cfg.Review.IncludeFullFiles = false
+	cfg.Review.RelatedContext = false
+	cfg.Review.Incremental = true
+	client := llm.NewClientForTest(model, cfg.Models.Default)
+	provider := &incrementalProvider{stubProvider: stubProvider{diff: engineDiff}, head: "beef02", prior: prior}
+	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, FastReview: true, FastLimit: 1, SkipTriage: true}
+
+	report, err := engine.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].Title != fresh.Title {
+		t.Fatalf("published findings = %+v, want only the fresh finding", report.Findings)
+	}
+	if len(report.AlreadyReported) != 1 || report.AlreadyReported[0].Title != standing.Title {
+		t.Fatalf("withheld findings = %+v, want the standing finding", report.AlreadyReported)
+	}
+	if report.OmittedFindings != 0 {
+		t.Fatalf("omitted=%d, want 0: the standing finding is withheld, not omitted", report.OmittedFindings)
+	}
+}
+
 func TestFastReviewMakesAFileLimitIncomplete(t *testing.T) {
 	var raw strings.Builder
 	for i := 0; i < 10; i++ {

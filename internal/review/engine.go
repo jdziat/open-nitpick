@@ -1043,14 +1043,19 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings = validateSuggestions(findings, files)
 	findings = e.applyGate(findings)
 	sortFindings(findings)
-	if e.FastLimit > 0 && len(findings) > e.FastLimit {
-		report.OmittedFindings = len(findings) - e.FastLimit
-		findings = findings[:e.FastLimit]
-	}
 
 	// After the gate, so what is counted as "already posted" is what would
 	// otherwise have been posted, and nothing below min_severity is.
 	findings, report.AlreadyReported = withholdAlreadyReported(findings, prior)
+	// The bound applies to what this run would publish, so a finding an earlier
+	// run already posted must not consume one of the bounded slots. Applied the
+	// other way around, an incremental re-review of a file whose findings did
+	// not change fills FastLimit with withheld recurrences and reports the fresh
+	// findings below them as omitted.
+	if e.FastLimit > 0 && len(findings) > e.FastLimit {
+		report.OmittedFindings = len(findings) - e.FastLimit
+		findings = findings[:e.FastLimit]
+	}
 	if report.reusableCoverage() {
 		report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported, plan.Skipped)
 		// A clean completed run under review.approve must not leave its own

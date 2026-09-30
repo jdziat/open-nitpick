@@ -70,6 +70,21 @@ func TestFastReviewSuppliesAMeasuredFallbackModel(t *testing.T) {
 	}
 }
 
+func TestFastReviewFallbackModelStaysWithItsProvider(t *testing.T) {
+	// The model fallback applies only where the provider is also falling back,
+	// so a named provider keeps a model it serves (here: none, which internal/llm
+	// rejects) instead of an OpenRouter slug.
+	cfg := config.Defaults()
+	cfg.Models.Default = config.ModelSpec{Provider: "ollama", Model: ""}
+	applyFastReviewScope(cfg)
+	if cfg.Models.Default.Provider != "ollama" || cfg.Models.Default.Model != "" {
+		t.Fatalf("provider-only spec became %s/%s, want ollama and no model", cfg.Models.Default.Provider, cfg.Models.Default.Model)
+	}
+	if cfg.Models.Review == nil || cfg.Models.Review.Provider != "ollama" || cfg.Models.Review.Model != "" {
+		t.Fatalf("review role = %+v, want the named provider and no model", cfg.Models.Review)
+	}
+}
+
 func TestFastReviewSelectsConcurrencyForEachProvider(t *testing.T) {
 	for _, tc := range []struct {
 		provider string

@@ -52,12 +52,16 @@ func applyFastReviewScope(cfg *config.Config) {
 	cfg.Validation.Enabled = false
 	cfg.Review.Incremental = false
 	cfg.Review.Approve.Enabled = false
-	// OpenRouter is the fallback only when neither config nor environment names a model.
+	// The fallback model belongs to OpenRouter, so it is set only when the
+	// provider is also falling back. A config that names a provider without a
+	// model must be left for internal/llm to reject: substituting an OpenRouter
+	// slug here would turn that rejection into a request the named provider
+	// cannot serve.
 	if cfg.Models.Default.Provider == "" {
 		cfg.Models.Default.Provider = "openrouter"
-	}
-	if cfg.Models.Default.Model == "" {
-		cfg.Models.Default.Model = fastReviewFallbackModel
+		if cfg.Models.Default.Model == "" {
+			cfg.Models.Default.Model = fastReviewFallbackModel
+		}
 	}
 	// A small output cap and disabled reasoning keep the pass responsive
 	// without cancelling a provider that needs longer to finish.
