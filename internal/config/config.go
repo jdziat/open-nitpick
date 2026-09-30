@@ -964,6 +964,24 @@ func (l Linters) CapSeverity(s Severity) Severity {
 }
 
 // LinterMode selects linter execution behavior.
+
+// UnresolvedModelError reports configuration that named no model. A command
+// that supplies its own fallback (fast-review) inspects for this type;
+// everything else treats it as the configuration error it is.
+type UnresolvedModelError struct {
+	Err error
+	// Config is the partial configuration the error came from. Fast-review
+	// reads it to apply its own model fallback.
+	Config *Config
+}
+
+// Error and Unwrap make UnresolvedModelError usable with errors.As and
+// errors.Is at the call sites that can recover from it.
+func (e *UnresolvedModelError) Error() string { return e.Err.Error() }
+
+func (e *UnresolvedModelError) Unwrap() error { return e.Err }
+
+// LinterMode selects linter execution behavior.
 type LinterMode string
 
 // Supported linter modes.
@@ -986,9 +1004,17 @@ func LoadFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		cfg, err := defaultConfig()
-		if err != nil {
-			return nil, fmt.Errorf("no %s found and environment is incomplete: %w", FileName, err)
+		cfg, cfgErr := defaultConfig()
+		if cfgErr != nil {
+			// The environment named no model either. A command that supplies
+			// its own model below the config layer (fast-review) still needs
+			// the defaults, so hand back the unvalidated config with the
+			// validation error attached.
+			partial := &Config{Missing: path}
+			return partial, &UnresolvedModelError{
+				Err:    fmt.Errorf("no %s found and environment is incomplete: %w", FileName, cfgErr),
+				Config: partial,
+			}
 		}
 		cfg.Missing = path
 		return cfg, nil

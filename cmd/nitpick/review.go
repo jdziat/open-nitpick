@@ -131,9 +131,24 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		return fmt.Errorf("resolve repo path: %w", err)
 	}
 
-	cfg, err := loadConfig(repo, f.configPath)
-	if err != nil {
-		return err
+	var cfg *config.Config
+	if name == "fast-review" && f.configPath == "" {
+		// Fast review must run with no repository config at all. A missing
+		// file yields defaults that name no model, and the fast scope below
+		// supplies the measured fallback, so load the defaults directly.
+		cfg, err = config.LoadFile(filepath.Join(repo, config.FileName))
+		if err != nil {
+			var unresolved *config.UnresolvedModelError
+			if !errors.As(err, &unresolved) {
+				return err
+			}
+			cfg = unresolved.Config
+		}
+	} else {
+		cfg, err = loadConfig(repo, f.configPath)
+		if err != nil {
+			return err
+		}
 	}
 
 	if f.failOn != "" {

@@ -372,6 +372,18 @@ func (c *Client) CallOptions() []llms.CallOption {
 	if r, ok := reasoningOption(c.Spec.Reasoning); ok {
 		opts = append(opts, r)
 	}
+	if strings.EqualFold(c.Spec.Provider, "openrouter") {
+		// OpenRouter routes each request to whichever endpoint it likes, and
+		// many ignore parameters they do not support. require_parameters
+		// makes the router pick an endpoint that honours reasoning and
+		// max_tokens, so a caller who asked for no reasoning gets a provider
+		// that obeys instead of one that thinks for minutes and answers in
+		// truncated prose. It is set before a provider pin so the pin,
+		// applied later, wins the same key.
+		opts = append(opts, llms.WithExtraBodyParam("provider", map[string]any{
+			"require_parameters": true,
+		}))
+	}
 	if len(c.Spec.Providers) > 0 {
 		// OpenRouter's provider routing. "only" restricts the candidate set;
 		// "order" ranks whatever set the other filters leave, which is not the
@@ -405,7 +417,6 @@ func (c *Client) CallOptions() []llms.CallOption {
 	if tier := strings.TrimSpace(c.Spec.ServiceTier); tier != "" {
 		opts = append(opts, llms.WithExtraBodyParam("service_tier", tier))
 	}
-
 	return opts
 }
 

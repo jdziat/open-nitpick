@@ -39,6 +39,17 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 	}
 }
 
+func TestFastReviewSuppliesAMeasuredFallbackModel(t *testing.T) {
+	cfg := config.Defaults()
+	applyFastReviewScope(cfg)
+	if cfg.Models.Default.Provider != "openrouter" || cfg.Models.Default.Model != fastReviewFallbackModel || cfg.Models.Default.Timeout != 2*time.Minute {
+		t.Fatalf("fallback model = %s/%s timeout %s", cfg.Models.Default.Provider, cfg.Models.Default.Model, cfg.Models.Default.Timeout)
+	}
+	if cfg.Models.Review == nil || cfg.Models.Review.Provider != "openrouter" || cfg.Models.Review.Model != fastReviewFallbackModel {
+		t.Fatal("fast review did not select the fallback for the review role")
+	}
+}
+
 func TestFastReviewRejectsEngineeringProfile(t *testing.T) {
 	err := runFastReview(t.Context(), []string{"-profile", "engineering"})
 	if err == nil || !strings.Contains(err.Error(), "does not support") {

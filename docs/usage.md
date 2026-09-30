@@ -68,7 +68,9 @@ turn into a clickable link.
 
 `nitpick fast-review` is the quick first pass: it reviews at most ten changed files,
 up to two diffs per model request, and uses the selected provider's configured
-concurrency and timeout. It targets a sub-minute response through its small diff-only
+concurrency and timeout. With no configuration it runs the measured fastest cheap
+reviewer (`deepseek/deepseek-v4.1-flash` over OpenRouter, needing only
+`OPENROUTER_API_KEY`). It targets a sub-minute response through its small diff-only
 requests, disabled reasoning, and 4096-token output cap. It skips repository context, linters, validation and model
 triage, and it refuses the engineering profile. Its receipt names those omissions
 and any changed files beyond the limit. It never supplies an incremental baseline,

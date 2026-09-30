@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/review"
@@ -10,6 +11,11 @@ import (
 
 const fastReviewLimit = 10
 const fastReviewFilesPerRequest = 2
+
+// fastReviewFallbackModel is the measured fastest cheap reviewer on the
+// tuning corpus (2026-09-29 OpenRouter battery: 2/2 recall, zero noise,
+// 1-4 s per single-file request, ~$0.0007/review).
+const fastReviewFallbackModel = "deepseek/deepseek-v4.1-flash"
 
 // runFastReview gives a change a bounded first pass. It is intentionally not
 // an approval path: the receipt names files and stages the fast pass omitted.
@@ -37,6 +43,17 @@ func applyFastReviewScope(cfg *config.Config) {
 	cfg.Validation.Enabled = false
 	cfg.Review.Incremental = false
 	cfg.Review.Approve.Enabled = false
+	// With no configuration at all the run still has to start: the fallback
+	// is the measured fast OpenRouter reviewer, and OPENROUTER_API_KEY is the
+	// key the operator already has for everything else.
+	if cfg.Models.Default.Provider == "" {
+		cfg.Models.Default.Provider = "openrouter"
+	}
+	if cfg.Models.Default.Model == "" {
+		cfg.Models.Default.Model = fastReviewFallbackModel
+		cfg.Models.Default.Timeout = 2 * time.Minute
+		cfg.Models.Review = nil
+	}
 	// A small output cap and disabled reasoning keep the pass responsive
 	// without cancelling a provider that needs longer to finish.
 	cfg.Models.Default.MaxTokens = 4096

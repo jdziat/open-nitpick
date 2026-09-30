@@ -32,7 +32,7 @@ func TestProvidersPinRestrictsRatherThanRanks(t *testing.T) {
 	}
 
 	c = &Client{Spec: config.ModelSpec{Provider: "openrouter", Model: "x"}}
-	if _, ok := llms.ApplyOptions(c.CallOptions()...).ExtraBody["provider"]; ok {
-		t.Error("no providers, no routing object")
+	if routing, ok := llms.ApplyOptions(c.CallOptions()...).ExtraBody["provider"].(map[string]any); ok && len(routing) > 1 {
+		t.Errorf("an unpinned spec sent routing beyond require_parameters: %v", routing)
 	}
 }
