@@ -85,7 +85,7 @@ func TestFastReviewLimitsFindingsAndDisclosesWhatItOmitted(t *testing.T) {
 func TestFastReviewLimitCountsOnlyFreshFindings(t *testing.T) {
 	// A bounded re-review must not spend its slots on findings an earlier run
 	// already posted. Without withholding first, the standing finding below
-	// consumes one of the two slots and the fresh finding is reported omitted.
+	// consumes the single slot and the fresh finding is reported omitted.
 	standing := Finding{Path: "app.go", Line: 4, Severity: "critical", Class: "correctness", Title: "standing defect", Rationale: "The changed value is wrong."}
 	fresh := Finding{Path: "app.go", Line: 7, Severity: "warning", Class: "correctness", Title: "fresh defect", Rationale: "The changed value is wrong."}
 	prior := &vcs.PriorReview{Head: "beef01", Comments: []vcs.PriorComment{{ID: 7, Path: standing.Path, Line: standing.Line, Class: standing.Class, Body: "standing defect", Fingerprint: Fingerprint(standing)}}}
