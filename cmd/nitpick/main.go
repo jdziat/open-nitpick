@@ -133,7 +133,7 @@ func usage() {
 
 Usage:
   nitpick review [flags]           Review a change
-  nitpick fast-review [flags]      Review up to ten changed files in parallel, with a bounded fast path
+  nitpick fast-review [flags]      Review changed diffs in parallel and show the top ten findings
   nitpick full-review [flags] [path...]
                                    Review the whole tree, or the paths given, with a remediation plan
   nitpick repo-score [flags] [path...]

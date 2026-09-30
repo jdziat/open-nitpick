@@ -963,8 +963,6 @@ func (l Linters) CapSeverity(s Severity) Severity {
 	return s
 }
 
-// LinterMode selects linter execution behavior.
-
 // UnresolvedModelError reports configuration that named no model. A command
 // that supplies its own fallback (fast-review) inspects for this type;
 // everything else treats it as the configuration error it is.
@@ -975,10 +973,10 @@ type UnresolvedModelError struct {
 	Config *Config
 }
 
-// Error and Unwrap make UnresolvedModelError usable with errors.As and
-// errors.Is at the call sites that can recover from it.
+// Error returns the model configuration error.
 func (e *UnresolvedModelError) Error() string { return e.Err.Error() }
 
+// Unwrap exposes the model configuration error for errors.Is and errors.As.
 func (e *UnresolvedModelError) Unwrap() error { return e.Err }
 
 // LinterMode selects linter execution behavior.
@@ -1006,15 +1004,11 @@ func LoadFile(path string) (*Config, error) {
 	case errors.Is(err, os.ErrNotExist):
 		cfg, cfgErr := defaultConfig()
 		if cfgErr != nil {
-			// The environment named no model either. A command that supplies
-			// its own model below the config layer (fast-review) still needs
-			// the defaults, so hand back the unvalidated config with the
-			// validation error attached.
-			partial := &Config{Missing: path}
-			return partial, &UnresolvedModelError{
-				Err:    fmt.Errorf("no %s found and environment is incomplete: %w", FileName, cfgErr),
-				Config: partial,
+			var unresolved *UnresolvedModelError
+			if errors.As(cfgErr, &unresolved) && unresolved.Config != nil {
+				unresolved.Config.Missing = path
 			}
+			return cfg, fmt.Errorf("no %s found: %w", FileName, cfgErr)
 		}
 		cfg.Missing = path
 		return cfg, nil
@@ -1110,6 +1104,9 @@ func defaultConfig() (*Config, error) {
 	cfg.Policy = Policy{Origin: OriginCheckout}
 
 	if err := cfg.Validate(); err != nil {
+		if onlyNoModel(err) {
+			return cfg, &UnresolvedModelError{Err: err, Config: cfg}
+		}
 		return nil, err
 	}
 	return cfg, nil

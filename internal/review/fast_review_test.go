@@ -54,6 +54,7 @@ func TestFastReviewLimitsFindingsAndDisclosesWhatItOmitted(t *testing.T) {
 	for i := 0; i < 12; i++ {
 		findings = append(findings, Finding{Path: "one.go", Line: 2, Severity: "warning", Class: "correctness", Title: fmt.Sprintf("finding %02d", i), Rationale: "The changed value is wrong."})
 	}
+	findings[11].Severity = "critical"
 	model := &scriptedLLM{fallback: mustJSON(t, Result{Findings: findings})}
 	cfg := config.Defaults()
 	cfg.Models.Default = config.ModelSpec{Provider: "openai", Model: "test"}
@@ -70,8 +71,11 @@ func TestFastReviewLimitsFindingsAndDisclosesWhatItOmitted(t *testing.T) {
 	if len(report.Findings) != 10 || report.OmittedFindings != 2 {
 		t.Fatalf("findings=%d omitted=%d, want 10 and 2", len(report.Findings), report.OmittedFindings)
 	}
-	if calls := model.callCount(); calls != 1 {
-		t.Fatalf("model calls=%d, want one review request and no triage", calls)
+	if report.Findings[0].Severity != "critical" {
+		t.Fatal("finding cap dropped the highest-severity finding")
+	}
+	if calls := model.callCount(); calls != 2 {
+		t.Fatalf("model calls=%d, want candidate generation and verification", calls)
 	}
 	if provider.published == nil || !strings.Contains(provider.published.Summary, "Fast review") || !strings.Contains(provider.published.Summary, "2 lower-ranked") {
 		t.Fatalf("fast-review receipt missing: %+v", provider.published)
@@ -166,5 +170,63 @@ func TestFastReviewKeepsDuplicateDiffEntries(t *testing.T) {
 	ordered := rankFiles([]*diff.File{file, file})
 	if len(ordered) != 2 || ordered[0] != file || ordered[1] != file {
 		t.Fatalf("ranked files = %#v, want both duplicate entries", ordered)
+	}
+}
+
+func TestSkippedReviewNeverProvidesReusableCoverage(t *testing.T) {
+	if (&Report{Skipped: "draft pull request"}).ReusableCoverage() {
+		t.Fatal("a skipped review claimed reusable coverage")
+	}
+}
+
+func TestFastReviewVerifiesCandidatesAgainstVisibleDiff(t *testing.T) {
+	candidate := Finding{Path: "one.go", Line: 2, Severity: "warning", Class: "correctness", Title: "invented defect", Rationale: "An unseen caller might fail."}
+	model := &scriptedLLM{fallback: mustJSON(t, Result{Findings: []Finding{candidate}}), byPrompt: map[string]string{"Check these untrusted candidate findings": "{\"findings\":[]}"}}
+	cfg := config.Defaults()
+	cfg.Models.Default = config.ModelSpec{Provider: "openai", Model: "test"}
+	cfg.Review.IncludeFullFiles = false
+	cfg.Review.RelatedContext = false
+	client := llm.NewClientForTest(model, cfg.Models.Default)
+	provider := &stubProvider{diff: "diff --git a/one.go b/one.go\n--- a/one.go\n+++ b/one.go\n@@ -0,0 +1,2 @@\n+package one\n+var Value = 1\n"}
+	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, FastReview: true, SkipTriage: true}
+	report, err := engine.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Findings) != 0 || model.callCount() != 2 || !report.PipelineComplete() {
+		t.Fatalf("candidate verification: findings=%d calls=%d complete=%v", len(report.Findings), model.callCount(), report.PipelineComplete())
+	}
+}
+
+func TestFastReviewReadsMoreThanTenChangedFiles(t *testing.T) {
+	var raw strings.Builder
+	for i := 0; i < 10; i++ {
+		fmt.Fprintf(&raw, "diff --git a/f%02d.go b/f%02d.go\n--- a/f%02d.go\n+++ b/f%02d.go\n@@ -0,0 +1,2 @@\n+package fast\n+var V%d = %d\n", i, i, i, i, i, i)
+	}
+	raw.WriteString("diff --git a/internal/auth/session.go b/internal/auth/session.go\n--- a/internal/auth/session.go\n+++ b/internal/auth/session.go\n@@ -0,0 +1,3 @@\n+package auth\n+func Session(v int) int { if v > 0 { return v }; return 0 }\n+var Current = 1\n")
+	model := &scriptedLLM{fallback: `{"findings":[]}`}
+	cfg := config.Defaults()
+	cfg.Models.Default = config.ModelSpec{Provider: "openai", Model: "test"}
+	cfg.Review.MaxFiles = 1 << 30
+	cfg.Review.MaxFilesPerRequest = 1
+	cfg.Review.Concurrency = 10
+	cfg.Review.IncludeFullFiles = false
+	cfg.Review.RelatedContext = false
+	client := llm.NewClientForTest(model, cfg.Models.Default)
+	provider := &stubProvider{diff: raw.String()}
+	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, FastReview: true, SkipTriage: true}
+
+	report, err := engine.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Plan.Files() != 11 || model.callCount() != 11 {
+		t.Fatalf("reviewed %d files with %d calls, want 11", report.Plan.Files(), model.callCount())
+	}
+	if report.ReusableCoverage() {
+		t.Fatal("a fast review with an omitted changed file claimed reusable coverage")
+	}
+	if provider.published == nil || !strings.Contains(provider.published.Summary, "Read 11 changed files") {
+		t.Fatalf("whole-change receipt missing: %+v", provider.published)
 	}
 }

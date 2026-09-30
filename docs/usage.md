@@ -58,7 +58,7 @@ line reporting `model: none`, and the file it wrote is not yet runnable.
 nitpick review                          # uncommitted changes
 nitpick review -base main               # working tree against main
 nitpick review -base main -head feature # a committed branch
-nitpick fast-review                     # up to ten changed files, diff-only, bounded requests
+nitpick fast-review                     # changed diffs, top ten findings
 nitpick explain-config -path src/db.go  # what would be sent, and why
 nitpick providers                       # available model providers
 ```
@@ -66,16 +66,21 @@ nitpick providers                       # available model providers
 Local reviews print to stdout as `path:line`, which most terminals and editors
 turn into a clickable link.
 
-`nitpick fast-review` is the quick first pass: it reviews at most ten changed files,
-up to two diffs per model request, and uses the selected provider's configured
-concurrency and timeout. With no configuration it runs the measured fastest cheap
-reviewer (`deepseek/deepseek-v4.1-flash` over OpenRouter, needing only
-`OPENROUTER_API_KEY`). It targets a sub-minute response through its small diff-only
-requests, disabled reasoning, and 4096-token output cap. It skips repository context, linters, validation and model
-triage, and it refuses the engineering profile. Its receipt names those omissions
-and any changed files beyond the limit. It never supplies an incremental baseline,
-closes earlier threads, or approves a pull request; use `nitpick review` for a
-complete review.
+Fast review reads every eligible changed-file diff and publishes up to ten
+findings, ranked by severity. Requests carry up to four diffs, and concurrency
+is selected by provider: eight for OpenRouter, six for DeepSeek, Fireworks,
+Together AI, Groq and Cerebras, four for other hosted providers, and two for
+Ollama and llama.cpp. Account-specific rate limits can be lower.
+
+With no model configured it selects `deepseek/deepseek-v4.1-flash` over
+OpenRouter, needing `OPENROUTER_API_KEY`. It aims for feedback in under a minute
+through parallel diff-only requests, disabled reasoning, and a 4096-token
+output cap. There is no hard wall-clock ceiling; provider timeouts still apply.
+It skips related repository context, linters, validation and model triage,
+and refuses the engineering profile. Its receipt discloses omissions and
+lower-ranked findings withheld from the top ten. It never supplies an
+incremental baseline, closes earlier threads, or approves a pull request;
+use `nitpick review` for a complete review.
 
 ## Evaluate repository standards
 

@@ -9,6 +9,32 @@ import (
 	"strings"
 )
 
+// ErrNoModel distinguishes missing model settings from invalid configuration.
+var ErrNoModel = errors.New("no reviewer model configured")
+
+// onlyNoModel reports whether every validation error is missing model settings.
+func onlyNoModel(err error) bool {
+	if err == nil {
+		return false
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		children := joined.Unwrap()
+		if len(children) == 0 {
+			return false
+		}
+		for _, child := range children {
+			if !onlyNoModel(child) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		return onlyNoModel(wrapped.Unwrap())
+	}
+	return errors.Is(err, ErrNoModel)
+}
+
 // Validate checks the configuration for structural errors. It deliberately runs
 // before any client is constructed or any token is spent.
 //
@@ -120,10 +146,10 @@ func (s ModelSpec) validate(required bool) []error {
 
 	if required {
 		if strings.TrimSpace(s.Provider) == "" {
-			errs = append(errs, errors.New("provider is required"))
+			errs = append(errs, fmt.Errorf("provider is required: %w", ErrNoModel))
 		}
 		if strings.TrimSpace(s.Model) == "" {
-			errs = append(errs, errors.New("model is required"))
+			errs = append(errs, fmt.Errorf("model is required: %w", ErrNoModel))
 		}
 	}
 

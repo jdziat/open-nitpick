@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
@@ -49,8 +50,7 @@ func runReview(ctx context.Context, args []string) error {
 	return reviewWithScope(ctx, "review", args, nil, nil)
 }
 
-// reviewWithScope runs review commands whose configuration differs only after
-// the operator's file has loaded.
+// reviewWithScope loads operator settings and applies a command-specific scope.
 func reviewWithScope(ctx context.Context, name string, args []string, scope func(*config.Config), configure func(*review.Engine)) error {
 	var f reviewFlags
 	var level string
@@ -87,7 +87,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		case "improve":
 			fmt.Fprintln(os.Stderr, "Usage: nitpick improve [flags]\n\nThe wider pass: the classes a normal review filters out. Reviews the working tree by default.\n\nFlags:")
 		case "fast-review":
-			fmt.Fprintln(os.Stderr, "Usage: nitpick fast-review [flags]\n\nReviews up to ten changed files concurrently, with diff-only context and provider-configured limits.\n\nFlags:")
+			fmt.Fprintln(os.Stderr, "Usage: nitpick fast-review [flags]\n\nReviews changed diffs concurrently and reports the ten highest-ranked findings.\n\nFlags:")
 		default:
 			fmt.Fprintln(os.Stderr, "Usage: nitpick review [flags]\n\nReviews the working tree by default.\n\nFlags:")
 		}
@@ -131,24 +131,14 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		return fmt.Errorf("resolve repo path: %w", err)
 	}
 
-	var cfg *config.Config
-	if name == "fast-review" && f.configPath == "" {
-		// Fast review must run with no repository config at all. A missing
-		// file yields defaults that name no model, and the fast scope below
-		// supplies the measured fallback, so load the defaults directly.
-		cfg, err = config.LoadFile(filepath.Join(repo, config.FileName))
-		if err != nil {
-			var unresolved *config.UnresolvedModelError
-			if !errors.As(err, &unresolved) {
-				return err
-			}
-			cfg = unresolved.Config
-		}
-	} else {
-		cfg, err = loadConfig(repo, f.configPath)
-		if err != nil {
+	cfg, err := loadConfig(repo, f.configPath)
+	if err != nil {
+		var unresolved *config.UnresolvedModelError
+		if name != "fast-review" || !errors.As(err, &unresolved) {
 			return err
 		}
+		cfg = unresolved.Config
+		newLogger(f.verbose, f.logFormat).Info("using fast-review fallback for missing model", "reason", err)
 	}
 
 	if f.failOn != "" {
@@ -170,7 +160,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	}
 	if name == "fast-review" {
 		// Fast review is a bounded diff pass. Linters may read packages beyond
-		// the selected files and can outlast the model deadline, so their
+		// the selected files and can delay feedback, so their
 		// absence is recorded with the other intentionally omitted stages.
 		f.noLinters = true
 	}
@@ -269,6 +259,9 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	}
 
 	fmt.Fprintf(os.Stderr, "\nReviewed %d file(s): %s\n", report.Plan.Files(), report.Counts)
+	if report.FastReview {
+		fmt.Fprintf(os.Stderr, "Fast review finished in %s; showing up to %d findings.\n", report.Elapsed.Round(time.Millisecond), report.FastLimit)
+	}
 	printPolicy(report)
 	printLinters(report)
 	printOverruled(report)

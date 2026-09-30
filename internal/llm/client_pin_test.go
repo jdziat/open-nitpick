@@ -27,6 +27,9 @@ func TestProvidersPinRestrictsRatherThanRanks(t *testing.T) {
 	if _, ranked := routing["order"]; ranked {
 		t.Error("the pin was sent as order, which ranks a set rather than restricting it")
 	}
+	if supported, _ := routing["require_parameters"].(bool); !supported {
+		t.Fatal("provider pin removed the requirement to honor generation parameters")
+	}
 	if fb, _ := routing["allow_fallbacks"].(bool); fb {
 		t.Error("a pin with fallbacks allowed is a preference, not a pin")
 	}
@@ -34,5 +37,14 @@ func TestProvidersPinRestrictsRatherThanRanks(t *testing.T) {
 	c = &Client{Spec: config.ModelSpec{Provider: "openrouter", Model: "x"}}
 	if routing, ok := llms.ApplyOptions(c.CallOptions()...).ExtraBody["provider"].(map[string]any); ok && len(routing) > 1 {
 		t.Errorf("an unpinned spec sent routing beyond require_parameters: %v", routing)
+	}
+}
+
+func TestOpenRouterDisablesReasoningInRouterParameters(t *testing.T) {
+	c := &Client{Spec: config.ModelSpec{Provider: "openrouter", Model: "deepseek/test", Reasoning: config.ReasoningOff}}
+	options := llms.ApplyOptions(c.CallOptions()...)
+	reasoning, ok := options.ExtraBody["reasoning"].(map[string]any)
+	if !ok || reasoning["enabled"] != false {
+		t.Fatalf("OpenRouter reasoning switch: %v", options.ExtraBody)
 	}
 }

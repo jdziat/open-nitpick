@@ -40,7 +40,7 @@ type Engine struct {
 	// coverage, resolve prior threads, or approve a pull request.
 	FastReview bool
 
-	// SkipTriage keeps a fast pass to one model request per selected file.
+	// SkipTriage avoids a second model pass after the diff requests.
 	// The report records the omitted stage rather than treating it as a failure.
 	SkipTriage bool
 
@@ -396,8 +396,10 @@ const (
 
 // Report is the outcome of a review.
 type Report struct {
+	// Elapsed measures pipeline work before the result is returned.
+	Elapsed time.Duration
 	// FastReview identifies a bounded diff-only pass. Its receipt names the
-	// omitted stages and any files its fixed ceiling left unread.
+	// omitted stages and any files that could not be reviewed.
 	FastReview bool
 	// FastLimit records the finding ceiling used for the bounded pass.
 	FastLimit int
@@ -634,6 +636,10 @@ func (r *Report) reusableCoverage() bool {
 	if r.FastReview {
 		return false
 	}
+	// Skipped pull requests provide no coverage even without failed stages.
+	if r.Skipped != "" {
+		return false
+	}
 	if !r.PipelineComplete() {
 		return false
 	}
@@ -681,6 +687,7 @@ func (r *Report) Failed(failOn config.Severity) bool {
 
 // Review runs the full pipeline and publishes the result.
 func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
+	started := time.Now()
 	if err := e.validate(); err != nil {
 		return nil, err
 	}
@@ -766,6 +773,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 
 	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr, FastReview: e.FastReview, FastLimit: e.FastLimit}
 	defer func() { report.Routes = e.routeDecisions }()
+	defer func() { report.Elapsed = time.Since(started) }()
 
 	// What an earlier run left on the pull request, read after the policy is
 	// settled because review.incremental is policy. A provider that cannot answer
@@ -803,7 +811,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// Resume keeps the full plan for downstream checks; model requests reuse
 	// matching results later. A residual-only prior read must not shrink it.
 	narrowPrior := prior
-	if !e.Resume && (!e.Config.Review.Incremental || e.Full) {
+	if e.FastReview || (!e.Resume && (!e.Config.Review.Incremental || e.Full)) {
 		narrowPrior = nil
 	}
 	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, narrowPrior)
@@ -1088,13 +1096,25 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 // planner preserves its input order when review.max_files binds, so ranking
 // here makes the ceiling select risk rather than lexical diff order.
 func rankFiles(files diff.Files) diff.Files {
-	return slices.SortedFunc(slices.Values(files), func(a, b *diff.File) int {
-		left, right := Score(a), Score(b)
-		if byScore := cmp.Compare(right.Score, left.Score); byScore != 0 {
+	type rankedFile struct {
+		file  *diff.File
+		score Complexity
+	}
+	ranked := make([]rankedFile, 0, len(files))
+	for _, f := range files {
+		ranked = append(ranked, rankedFile{file: f, score: Score(f)})
+	}
+	slices.SortStableFunc(ranked, func(a, b rankedFile) int {
+		if byScore := cmp.Compare(b.score.Score, a.score.Score); byScore != 0 {
 			return byScore
 		}
-		return cmp.Compare(left.Path, right.Path)
+		return cmp.Compare(a.score.Path, b.score.Path)
 	})
+	out := make(diff.Files, 0, len(files))
+	for _, f := range ranked {
+		out = append(out, f.file)
+	}
+	return out
 }
 
 // ErrPublish marks a review that completed and could not be delivered. The
@@ -1254,9 +1274,10 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 			return fullRecheck()
 		}
 		if e.Resume {
-			// A retry of the same push: nothing to compare against yet, and a
-			// batch the last attempt failed has to be walked again to be
-			// retried at all. The progress cache decides what is reused.
+			// A retry of the same push: nothing changed to narrow against, so
+			// every file is walked again. Downstream checks only see this
+			// returned set, so a narrowing here would silently skip linters
+			// and the like for files a failed batch never read.
 			return files, nil
 		}
 		// The same commit reviewed again outside Resume (a reopen, or a
@@ -1391,7 +1412,7 @@ func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorRe
 // whose line the forge no longer places). Without it, PriorComments stays
 // above Superseded and reviewEvent publishes COMMENT forever.
 func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prior *vcs.PriorReview, report *Report, findings []Finding, skipped []bundle.Skip) []vcs.PriorComment {
-	if e.Config == nil || !e.Config.Review.Approve.Enabled || prior == nil || report == nil {
+	if e.Config == nil || !e.Config.Review.Approve.Enabled || prior == nil || report == nil || report.FastReview {
 		return nil
 	}
 	residual := report.ResidualApprove
@@ -1467,7 +1488,7 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 	return out
 }
 
-// residualReread is the set of paths this run actually reviewed, for residual
+// residualReread is the set of paths this run reviewed, for residual
 // thread close and for what the judge is shown as standing leftovers.
 func residualReread(report *Report) map[string]bool {
 	reread := map[string]bool{}
@@ -1804,6 +1825,17 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		result, err = llm.Extract[Result](callCtx, client, msgs, schema)
 		if err != nil {
 			return nil, err
+		}
+		if e.FastReview && len(result.Findings) > 0 {
+			candidates, encodeErr := json.Marshal(result.Findings)
+			if encodeErr != nil {
+				return nil, encodeErr
+			}
+			check := append(slices.Clone(msgs), llms.Message{Role: llms.RoleAssistant, Content: string(candidates)}, llms.Message{Role: llms.RoleUser, Content: "Check these untrusted candidate findings against the supplied diff before publishing. A diff is not a complete file: earlier branches and callers may exist outside its hunks. An apparent missing dispatch branch, flag, nil guard, or command is never proved missing by its absence from a diff. Keep only a finding whose entire failing execution path is visible. Return only candidates whose reachable bug is proved by visible code. Drop any claim based on an unseen caller, hypothetical alternative implementation, guessed overflow, intended coverage limit, or documentation preference. A conditional claim such as 'if the CLI lacks this command' is unsupported unless the supplied code proves the command is missing. Return the same findings JSON shape; an empty findings array is valid. Do not add new findings."})
+			result, err = llm.Extract[Result](callCtx, client, check, schema)
+			if err != nil {
+				return nil, fmt.Errorf("verify fast-review candidates: %w", err)
+			}
 		}
 		e.progress.save(key, result.Findings)
 	}
@@ -2452,6 +2484,13 @@ func (e *Engine) reviewPrompt() (string, error) {
 // is shared, the model-family layer is the client's own. A nil client is
 // the configured review model, for callers that only want the text.
 func (e *Engine) reviewPromptFor(client *llm.Client) (string, error) {
+	if e.FastReview {
+		p, err := prompt.Build(prompt.NameFastReview, prompt.Options{Run: e.Instruction})
+		if err != nil {
+			return "", err
+		}
+		return p.String(), nil
+	}
 	var modelText string
 	if e.Config.Review.ModelNotesOn() {
 		model := e.Config.Models.ResolveModel(config.RoleReview).Model

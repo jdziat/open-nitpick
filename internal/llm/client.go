@@ -373,18 +373,27 @@ func (c *Client) CallOptions() []llms.CallOption {
 		opts = append(opts, r)
 	}
 	if strings.EqualFold(c.Spec.Provider, "openrouter") {
+		if c.Spec.Reasoning == config.ReasoningOff {
+			// The SDK's neutral switch emits thinking.type, while OpenRouter
+			// routes its own reasoning.enabled field to upstream providers.
+			opts = append(opts, llms.WithExtraBodyParam("reasoning", map[string]any{"enabled": false}))
+		}
 		// OpenRouter routes each request to whichever endpoint it likes, and
 		// many ignore parameters they do not support. require_parameters
 		// makes the router pick an endpoint that honours reasoning and
 		// max_tokens, so a caller who asked for no reasoning gets a provider
 		// that obeys instead of one that thinks for minutes and answers in
-		// truncated prose. It is set before a provider pin so the pin,
-		// applied later, wins the same key.
-		opts = append(opts, llms.WithExtraBodyParam("provider", map[string]any{
+		// truncated prose. Pins restrict the same routing request.
+		routing := map[string]any{
 			"require_parameters": true,
-		}))
+		}
+		if len(c.Spec.Providers) > 0 {
+			routing["only"] = append([]string(nil), c.Spec.Providers...)
+			routing["allow_fallbacks"] = false
+		}
+		opts = append(opts, llms.WithExtraBodyParam("provider", routing))
 	}
-	if len(c.Spec.Providers) > 0 {
+	if len(c.Spec.Providers) > 0 && !strings.EqualFold(c.Spec.Provider, "openrouter") {
 		// OpenRouter's provider routing. "only" restricts the candidate set;
 		// "order" ranks whatever set the other filters leave, which is not the
 		// same thing and was the bug. With order plus allow_fallbacks false,

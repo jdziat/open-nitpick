@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
 func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
@@ -22,7 +24,7 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 	cfg.Review.Concurrency = 7
 	applyFastReviewScope(cfg)
 
-	if cfg.Review.MaxFiles != fastReviewLimit || cfg.Review.MaxFilesPerRequest != fastReviewFilesPerRequest || cfg.Review.Concurrency != 7 {
+	if cfg.Review.MaxFiles != 1<<30 || cfg.Review.MaxFilesPerRequest != fastReviewBatchFiles || cfg.Review.Concurrency != 8 {
 		t.Fatalf("fast bounds = files:%d batch:%d concurrency:%d", cfg.Review.MaxFiles, cfg.Review.MaxFilesPerRequest, cfg.Review.Concurrency)
 	}
 	if cfg.Review.IncludeFullFiles || cfg.Review.RelatedContext || cfg.Review.RelatedContextCallers {
@@ -39,14 +41,48 @@ func TestFastReviewScopeBoundsTheModelWork(t *testing.T) {
 	}
 }
 
+func TestFastReviewScopesSubstitutedPolicyWithoutMutation(t *testing.T) {
+	base := config.Defaults()
+	base.Practices.Profile = "engineering"
+	base.Review.Approve.Enabled = true
+	base.Models.Default = config.ModelSpec{Provider: "ollama", Model: "local"}
+	scoped := fastReviewScoped{inner: fixedPolicy{cfg: base}}
+	got, modified, err := scoped.ResolvePolicy(context.Background(), vcs.Ref{}, nil, []string{config.FileName})
+	if err != nil || !modified {
+		t.Fatalf("substitution: modified=%v err=%v", modified, err)
+	}
+	if got.Review.MaxFiles != 1<<30 || got.Review.Concurrency != 2 || got.Review.Approve.Enabled || got.Practices.Profile != "" {
+		t.Fatalf("unscoped substituted policy: %+v", got.Review)
+	}
+	if !base.Review.Approve.Enabled || base.Practices.Profile != "engineering" || base.Review.MaxFiles != config.Defaults().Review.MaxFiles {
+		t.Fatal("scoping mutated the accepted policy")
+	}
+}
+
 func TestFastReviewSuppliesAMeasuredFallbackModel(t *testing.T) {
 	cfg := config.Defaults()
 	applyFastReviewScope(cfg)
-	if cfg.Models.Default.Provider != "openrouter" || cfg.Models.Default.Model != fastReviewFallbackModel || cfg.Models.Default.Timeout != 2*time.Minute {
+	if cfg.Models.Default.Provider != "openrouter" || cfg.Models.Default.Model != fastReviewFallbackModel || cfg.Models.Default.Timeout != config.Defaults().Models.Default.Timeout {
 		t.Fatalf("fallback model = %s/%s timeout %s", cfg.Models.Default.Provider, cfg.Models.Default.Model, cfg.Models.Default.Timeout)
 	}
 	if cfg.Models.Review == nil || cfg.Models.Review.Provider != "openrouter" || cfg.Models.Review.Model != fastReviewFallbackModel {
 		t.Fatal("fast review did not select the fallback for the review role")
+	}
+}
+
+func TestFastReviewSelectsConcurrencyForEachProvider(t *testing.T) {
+	for _, tc := range []struct {
+		provider string
+		want     int
+	}{{"openrouter", 8}, {"deepseek", 6}, {"openai", 4}, {"ollama", 2}, {"llamacpp", 2}, {"unknown", 4}, {" OpenRouter ", 8}} {
+		t.Run(tc.provider, func(t *testing.T) {
+			cfg := config.Defaults()
+			cfg.Models.Default.Provider = tc.provider
+			applyFastReviewScope(cfg)
+			if cfg.Review.Concurrency != tc.want {
+				t.Fatalf("concurrency=%d, want %d", cfg.Review.Concurrency, tc.want)
+			}
+		})
 	}
 }
 
