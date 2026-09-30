@@ -67,8 +67,9 @@ Local reviews print to stdout as `path:line`, which most terminals and editors
 turn into a clickable link.
 
 `nitpick fast-review` is the quick first pass: it reviews at most ten changed files,
-up to two diffs per model request, with up to four requests in parallel and a 55-second
-deadline for the whole pass. It skips repository context, linters, validation and model
+up to two diffs per model request, and uses the selected provider's configured
+concurrency and timeout. It targets a sub-minute response through its small diff-only
+requests, disabled reasoning, and 4096-token output cap. It skips repository context, linters, validation and model
 triage, and it refuses the engineering profile. Its receipt names those omissions
 and any changed files beyond the limit. It never supplies an incremental baseline,
 closes earlier threads, or approves a pull request; use `nitpick review` for a

@@ -87,7 +87,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		case "improve":
 			fmt.Fprintln(os.Stderr, "Usage: nitpick improve [flags]\n\nThe wider pass: the classes a normal review filters out. Reviews the working tree by default.\n\nFlags:")
 		case "fast-review":
-			fmt.Fprintln(os.Stderr, "Usage: nitpick fast-review [flags]\n\nReviews up to ten changed files concurrently, with diff-only context and a per-request deadline.\n\nFlags:")
+			fmt.Fprintln(os.Stderr, "Usage: nitpick fast-review [flags]\n\nReviews up to ten changed files concurrently, with diff-only context and provider-configured limits.\n\nFlags:")
 		default:
 			fmt.Fprintln(os.Stderr, "Usage: nitpick review [flags]\n\nReviews the working tree by default.\n\nFlags:")
 		}
