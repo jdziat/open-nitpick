@@ -40,8 +40,8 @@ type Engine struct {
 	// coverage, resolve prior threads, or approve a pull request.
 	FastReview bool
 
-	// SkipTriage avoids a second model pass after the diff requests.
-	// The report records the omitted stage rather than treating it as a failure.
+	// SkipTriage avoids the model triage pass. With FastReview the receipt
+	// names the omission; on its own it publishes untriaged findings silently.
 	SkipTriage bool
 
 	// RequestTimeout bounds one model request independently of the caller's
@@ -1826,13 +1826,19 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		if err != nil {
 			return nil, err
 		}
-		if e.FastReview && len(result.Findings) > 0 {
+		if e.FastReview && !style && len(result.Findings) > 0 {
 			candidates, encodeErr := json.Marshal(result.Findings)
 			if encodeErr != nil {
 				return nil, encodeErr
 			}
 			check := append(slices.Clone(msgs), llms.Message{Role: llms.RoleAssistant, Content: string(candidates)}, llms.Message{Role: llms.RoleUser, Content: "Check these untrusted candidate findings against the supplied diff before publishing. A diff is not a complete file: earlier branches and callers may exist outside its hunks. An apparent missing dispatch branch, flag, nil guard, or command is never proved missing by its absence from a diff. Keep only a finding whose entire failing execution path is visible. Return only candidates whose reachable bug is proved by visible code. Drop any claim based on an unseen caller, hypothetical alternative implementation, guessed overflow, intended coverage limit, or documentation preference. A conditional claim such as 'if the CLI lacks this command' is unsupported unless the supplied code proves the command is missing. Return the same findings JSON shape; an empty findings array is valid. Do not add new findings."})
-			result, err = llm.Extract[Result](callCtx, client, check, schema)
+			verifyCtx := ctx
+			if e.RequestTimeout > 0 {
+				var verifyCancel context.CancelFunc
+				verifyCtx, verifyCancel = context.WithTimeout(ctx, e.RequestTimeout)
+				defer verifyCancel()
+			}
+			result, err = llm.Extract[Result](verifyCtx, client, check, schema)
 			if err != nil {
 				return nil, fmt.Errorf("verify fast-review candidates: %w", err)
 			}

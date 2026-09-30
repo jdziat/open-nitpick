@@ -306,8 +306,13 @@ func suggestionIsApplicable(s string) bool {
 // but code almost always does.
 var codeSignals = []string{
 	"(", ")", "{", "}", "[", "]", ";", "=", "<", ">", ":=", "->", "=>", "::",
-	".", "_", "\"", "'", "`", "*", "&", "|", "!", "/", "\\", "%", "+",
+	"_", "\"", "`", "*", "&", "|", "!", "/", "\\", "%", "+",
 }
+
+// codeSignalsTight are code markers that also appear in ordinary prose. A
+// sentence ends in a period and a contraction carries an apostrophe, so these
+// count only when the line has no whitespace to separate words.
+var codeSignalsTight = []string{".", "'"}
 
 // looksLikeCode is a deliberately conservative heuristic: when in doubt it says
 // no, because a wrongly-applicable suggestion corrupts a file while a wrongly-
@@ -321,6 +326,13 @@ func looksLikeCode(s string) bool {
 	for _, signal := range codeSignals {
 		if strings.Contains(trimmed, signal) {
 			return true
+		}
+	}
+	if !strings.ContainsAny(trimmed, " \t") {
+		for _, signal := range codeSignalsTight {
+			if strings.Contains(trimmed, signal) {
+				return true
+			}
 		}
 	}
 

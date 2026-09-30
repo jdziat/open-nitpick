@@ -997,7 +997,10 @@ func Load(repoRoot string) (*Config, error) {
 }
 
 // LoadFile loads configuration from an explicit path. A missing file yields
-// validated defaults; any other read or parse failure is returned.
+// validated defaults. A configuration that is valid except for naming no model
+// returns an *UnresolvedModelError carrying those defaults, which a command
+// with its own fallback may use; every other read, parse, or validation failure
+// returns no config.
 func LoadFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	switch {
@@ -1067,6 +1070,9 @@ func loadBytes(data []byte, source string) (*Config, error) {
 	cfg.Policy = Policy{Origin: OriginCheckout, Path: source}
 
 	if err := cfg.Validate(); err != nil {
+		if onlyNoModel(err) {
+			return cfg, &UnresolvedModelError{Err: fmt.Errorf("invalid config %s: %w", source, err), Config: cfg}
+		}
 		return nil, fmt.Errorf("invalid config %s: %w", source, err)
 	}
 	return cfg, nil

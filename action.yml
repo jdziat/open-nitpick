@@ -482,7 +482,7 @@ runs:
         status=$?
         set -e
 
-        # Exit 1 indicates findings; other nonzero exits indicate a failed review.
+        # Exit 1 indicates findings; other nonzero exits mean review failed.
         case "$status" in
           0|1) ;;
           *) echo "::error::open-nitpick failed to run (exit $status)"

@@ -299,3 +299,18 @@ func TestSlopIsOfferedInTheSchemaOnlyWhenSwitchedOn(t *testing.T) {
 		t.Error("the other classes must stay offered")
 	}
 }
+
+func TestProseWithPeriodIsNotCode(t *testing.T) {
+	// An ordinary sentence carries a period, and a contraction carries an
+	// apostrophe. Either must not turn prose into a one-click replacement
+	// that overwrites the line it is anchored to.
+	for _, s := range []string{
+		"Validate the input before using it in the query.",
+		"The caller's error should be returned here.",
+		"A context should carry a deadline.",
+	} {
+		if looksLikeCode(s) {
+			t.Errorf("looksLikeCode(%q) = true, want false", s)
+		}
+	}
+}

@@ -48,3 +48,21 @@ func TestInvalidUserConfigIsNotRecoveredAsMissingModel(t *testing.T) {
 		t.Fatalf("invalid user config recovery: cfg=%v err=%v", cfg, err)
 	}
 }
+
+func TestPresentButModellessConfigIsRecoverable(t *testing.T) {
+	t.Setenv(EnvNoUserConfig, "true")
+	path := filepath.Join(t.TempDir(), FileName)
+	// A repository config that names no model: valid apart from the missing
+	// model, so fast-review's own fallback still applies.
+	if err := os.WriteFile(path, []byte("review:\n  concurrency: 3\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadFile(path)
+	var unresolved *UnresolvedModelError
+	if !errors.As(err, &unresolved) || cfg != unresolved.Config {
+		t.Fatalf("present modelless config: cfg=%v err=%v", cfg, err)
+	}
+	if cfg.Review.Concurrency != 3 {
+		t.Fatalf("recovery dropped the file's settings: concurrency=%d", cfg.Review.Concurrency)
+	}
+}
