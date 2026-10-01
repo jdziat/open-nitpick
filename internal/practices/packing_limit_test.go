@@ -72,3 +72,44 @@ func TestDesignPackingAdmitsOversizedTaskWithTrimmedContext(t *testing.T) {
 		t.Fatalf("a trimmed request was still recorded as unread: %+v", skip)
 	}
 }
+
+// TestTrimmedContextLeavesNoStaleSpans pins that a packed task's ContextSpans
+// index exactly the context it still carries. A span left behind by the trim
+// names a file the task dropped, which Problems() reads as context the task
+// claims but does not hold, so a review that finished every required check
+// still exits 2.
+func TestTrimmedContextLeavesNoStaleSpans(t *testing.T) {
+	source := Target{Kind: FileTarget, ID: "hub.go"}
+	var context []Target
+	var spans []ContextSpan
+	for i := range 8 {
+		name := string(rune('a'+i)) + ".go"
+		context = append(context, Target{Kind: FileTarget, ID: name})
+		spans = append(spans, ContextSpan{Path: name, SourceSpan: bundle.SourceSpan{Start: 1, End: 1}})
+	}
+	task := DesignTask{ID: "declaration:hub", Source: source, Sources: []Target{source}, Context: context,
+		ContextSpans: spans, Purpose: "hub contracts"}
+	sourceText := map[string][]byte{source.ID: []byte("package hub\n")}
+	files := []standards.File{{Path: source.ID, Src: []byte("package hub\n")}}
+	for _, target := range context {
+		sourceText[target.ID] = []byte("package hub\n")
+		files = append(files, standards.File{Path: target.ID, Src: []byte("package hub\n")})
+	}
+	bindDesignSource(t.Context(), &task, sourceText)
+	cfg := config.Defaults()
+	cfg.Review.MaxFilesPerRequest = 6
+	packed := PackDesign(t.Context(), cfg, DesignPlan{Tasks: []DesignTask{task}}, files, diff.Files{&diff.File{Path: source.ID}}, bundle.Reserve{})
+	if len(packed.Plan.Batches) != 1 {
+		t.Fatalf("oversized task produced no request: %+v", packed.Plan)
+	}
+	packedTask := packed.Design.Tasks[0]
+	if len(packedTask.Context) >= len(context) {
+		t.Fatalf("context was not trimmed: kept %d of %d", len(packedTask.Context), len(context))
+	}
+	unit := Target{Kind: UnitTarget, ID: packedTask.ID}
+	report := fixtureReport(Check{ID: "design", Version: "1", Instrument: Model, State: Completed,
+		Planned: []Target{unit}, Examined: []Target{unit}, Tasks: []DesignTask{packedTask}})
+	if problems := report.Problems(); len(problems) > 0 {
+		t.Fatalf("packed design task does not satisfy Problems(): %v", problems)
+	}
+}

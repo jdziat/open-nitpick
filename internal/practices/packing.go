@@ -111,6 +111,14 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 				return 0
 			})
 			task.Context = context[:budget]
+			// The span index has to survive the same trim: a span naming a file
+			// the task no longer carries reads as context the task claims but
+			// does not have, which Problems() rejects and fails the run.
+			kept := make(map[string]bool, len(task.Context))
+			for _, target := range task.Context {
+				kept[target.ID] = true
+			}
+			task.ContextSpans = slices.DeleteFunc(task.ContextSpans, func(span ContextSpan) bool { return !kept[span.Path] })
 			bindDesignSource(ctx, task, sources)
 		}
 		requestTask := *task
