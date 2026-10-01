@@ -165,6 +165,55 @@ func TestFastReviewRanksFilesBeforeApplyingItsLimit(t *testing.T) {
 	t.Fatal("risk-ranked file was cut by the binding ten-file limit")
 }
 
+func TestFastReviewSendsTheRankedFilesInThePrompt(t *testing.T) {
+	// The unit test above pins rankFiles' output order. This one pins the
+	// wiring: it fails if Review drops the rankFiles call or moves it after the
+	// plan is built, because the binding cap would then select diff order and
+	// the risky file would never reach the model.
+	var raw strings.Builder
+	// Eleven plain files come first in diff order, so a cap applied before
+	// ranking would keep these and cut the risky file that sorts last by path.
+	for i := 0; i < 11; i++ {
+		fmt.Fprintf(&raw, "diff --git a/plain_%02d.go b/plain_%02d.go\n--- a/plain_%02d.go\n+++ b/plain_%02d.go\n@@ -0,0 +1,2 @@\n+package fast\n+var V%d = %d\n", i, i, i, i, i, i)
+	}
+	raw.WriteString("diff --git a/internal/auth/session.go b/internal/auth/session.go\n--- a/internal/auth/session.go\n+++ b/internal/auth/session.go\n@@ -0,0 +1,3 @@\n+package auth\n+func Session(v int) int { if v > 0 { return v }; return 0 }\n+var Current = 1\n")
+
+	model := &scriptedLLM{fallback: `{"findings":[]}`}
+
+	cfg := config.Defaults()
+	cfg.Models.Default = config.ModelSpec{Provider: "openai", Model: "test"}
+	cfg.Review.MaxFiles = 10
+	cfg.Review.MaxFilesPerRequest = 1
+	cfg.Review.Concurrency = 10
+	cfg.Review.IncludeFullFiles = false
+	cfg.Review.RelatedContext = false
+	client := llm.NewClientForTest(model, cfg.Models.Default)
+	provider := &stubProvider{diff: raw.String()}
+	engine := &Engine{Config: cfg, Roles: &llm.Roles{Review: client, Triage: client}, Provider: provider, FastReview: true, FastLimit: 10, SkipTriage: true}
+
+	report, err := engine.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Plan.Files() != 10 {
+		t.Fatalf("planned %d files, want the binding ten-file cap", report.Plan.Files())
+	}
+	var sentRisky bool
+	for _, prompt := range model.prompts() {
+		if strings.Contains(prompt, "internal/auth/session.go") {
+			sentRisky = true
+		}
+	}
+	if !sentRisky {
+		t.Fatal("the risk-ranked file was not sent to the model; ranking did not reach the plan")
+	}
+	for _, prompt := range model.prompts() {
+		if strings.Contains(prompt, "plain_10.go") {
+			t.Fatal("a file the ranking cut was still sent to the model")
+		}
+	}
+}
+
 func TestFastReviewNeverProvidesReusableCoverageOrClearsThreads(t *testing.T) {
 	provider := &resolvingProvider{incrementalProvider: incrementalProvider{
 		stubProvider: stubProvider{diff: engineDiff},
