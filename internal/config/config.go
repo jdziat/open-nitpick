@@ -963,6 +963,22 @@ func (l Linters) CapSeverity(s Severity) Severity {
 	return s
 }
 
+// UnresolvedModelError reports configuration that named no model. A command
+// that supplies its own fallback (fast-review) inspects for this type;
+// everything else treats it as the configuration error it is.
+type UnresolvedModelError struct {
+	Err error
+	// Config is the partial configuration the error came from. Fast-review
+	// reads it to apply its own model fallback.
+	Config *Config
+}
+
+// Error returns the model configuration error.
+func (e *UnresolvedModelError) Error() string { return e.Err.Error() }
+
+// Unwrap exposes the model configuration error for errors.Is and errors.As.
+func (e *UnresolvedModelError) Unwrap() error { return e.Err }
+
 // LinterMode selects linter execution behavior.
 type LinterMode string
 
@@ -981,14 +997,21 @@ func Load(repoRoot string) (*Config, error) {
 }
 
 // LoadFile loads configuration from an explicit path. A missing file yields
-// validated defaults; any other read or parse failure is returned.
+// validated defaults. A configuration that is valid except for naming no model
+// returns an *UnresolvedModelError carrying those defaults, which a command
+// with its own fallback may use; every other read, parse, or validation failure
+// returns no config.
 func LoadFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		cfg, err := defaultConfig()
-		if err != nil {
-			return nil, fmt.Errorf("no %s found and environment is incomplete: %w", FileName, err)
+		cfg, cfgErr := defaultConfig()
+		if cfgErr != nil {
+			var unresolved *UnresolvedModelError
+			if errors.As(cfgErr, &unresolved) && unresolved.Config != nil {
+				unresolved.Config.Missing = path
+			}
+			return cfg, fmt.Errorf("no %s found: %w", FileName, cfgErr)
 		}
 		cfg.Missing = path
 		return cfg, nil
@@ -1047,6 +1070,9 @@ func loadBytes(data []byte, source string) (*Config, error) {
 	cfg.Policy = Policy{Origin: OriginCheckout, Path: source}
 
 	if err := cfg.Validate(); err != nil {
+		if onlyNoModel(err) {
+			return cfg, &UnresolvedModelError{Err: fmt.Errorf("invalid config %s: %w", source, err), Config: cfg}
+		}
 		return nil, fmt.Errorf("invalid config %s: %w", source, err)
 	}
 	return cfg, nil
@@ -1084,6 +1110,9 @@ func defaultConfig() (*Config, error) {
 	cfg.Policy = Policy{Origin: OriginCheckout}
 
 	if err := cfg.Validate(); err != nil {
+		if onlyNoModel(err) {
+			return cfg, &UnresolvedModelError{Err: err, Config: cfg}
+		}
 		return nil, err
 	}
 	return cfg, nil

@@ -80,7 +80,7 @@ inputs:
 
   analyzers:
     description: >-
-      Deterministic analyzers to install on the runner before the review, as
+      Deterministic analyzers to install before a full review, as
       a comma-separated list of catalog names (run "nitpick linters" for
       them), or "auto" to install the ones for the languages the change
       touches. Empty installs nothing: the review then runs whatever the
@@ -90,13 +90,14 @@ inputs:
 
   command:
     description: >-
-      What to run: "review" (the default) reviews the pull request; "respond"
+      What to run: "review" (the default), "fast-review" for a quick
+      changed-diff pass, or "respond"
       answers a comment that mentioned the reviewer, for a workflow on
       issue_comment and pull_request_review_comment events.
     required: false
     default: review
   args:
-    description: Additional flags passed verbatim to "nitpick review".
+    description: Additional flags passed verbatim to review and fast-review.
     required: false
 
 outputs:
@@ -214,9 +215,7 @@ runs:
         go-version: stable
         cache: false
 
-    # The Action's own files are on the runner at the ref the workflow named,
-    # so the binary can be built from them without fetching the module — which
-    # is what makes the Action usable from a private copy of this repository.
+    # Private forks may have no reachable release, so build from this checkout.
     - name: Build open-nitpick from the Action's checkout
       if: steps.install.outputs.source == 'build'
       shell: bash
@@ -237,7 +236,7 @@ runs:
     # own release or package index at a pinned version, and put on PATH.
     - name: Decide which analyzers to install
       id: analyzers
-      if: inputs.analyzers != ''
+      if: inputs.command == 'review' && inputs.analyzers != ''
       shell: bash
       env:
         WANT: ${{ inputs.analyzers }}
@@ -281,21 +280,23 @@ runs:
         echo "installing analyzers: ${want:-none}"
 
     - name: Set up Go for analyzers
-      if: inputs.analyzers != '' && contains(steps.analyzers.outputs.want, 'golangci-lint')
+      if: >-
+        inputs.command == 'review' && inputs.analyzers != '' &&
+        contains(steps.analyzers.outputs.want, 'golangci-lint')
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: stable
         cache: false
 
     - name: Cache analyzer binaries
-      if: inputs.analyzers != ''
+      if: inputs.command == 'review' && inputs.analyzers != ''
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.nitpick-analyzers
         key: nitpick-analyzers-${{ runner.os }}-${{ runner.arch }}-v1-${{ steps.analyzers.outputs.key }}
 
     - name: Install analyzers
-      if: inputs.analyzers != ''
+      if: inputs.command == 'review' && inputs.analyzers != ''
       shell: bash
       env:
         WANT: ${{ steps.analyzers.outputs.want }}
@@ -419,6 +420,13 @@ runs:
           echo "result=clean" >> "$GITHUB_OUTPUT"
           exit 0
         fi
+        case "$NITPICK_COMMAND" in
+          review|fast-review) ;;
+          *) message="command must be review, fast-review, or respond"
+             echo "::error::open-nitpick: $message"
+             echo "result=error" >> "$GITHUB_OUTPUT"
+             exit 2 ;;
+        esac
 
         # What to review depends on the event. A pull request event names its
         # pull request through the environment; a dispatch or a comment names
@@ -470,13 +478,11 @@ runs:
         # The CLI writes result, findings and the per-severity counts to
         # GITHUB_OUTPUT itself, and the review to GITHUB_STEP_SUMMARY.
         set +e
-        nitpick review "${flags[@]}" ${extra+"${extra[@]}"}
+        nitpick "$NITPICK_COMMAND" "${flags[@]}" ${extra+"${extra[@]}"}
         status=$?
         set -e
 
-        # Exit 1 means the review ran and tripped the configured gate, which
-        # should fail the job. Exit 2 means the review could not run at all —
-        # a materially different outcome that must not read as "found issues".
+        # Exit 1 indicates findings; other nonzero exits mean review failed.
         case "$status" in
           0|1) ;;
           *) echo "::error::open-nitpick failed to run (exit $status)"

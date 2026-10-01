@@ -38,6 +38,7 @@ export SYNTHETIC_API_KEY=syn_...
 
 nitpick init            # writes .nitpick.yaml for this repository
 nitpick review          # reviews your uncommitted changes
+nitpick fast-review     # changed diffs, top ten findings
 ```
 
 Verifying that download is one command and

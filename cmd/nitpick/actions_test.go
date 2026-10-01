@@ -76,6 +76,34 @@ func TestResultForFollowsTheGate(t *testing.T) {
 	}
 }
 
+func TestFastReviewThatReadEveryFileCanBeClean(t *testing.T) {
+	report := &review.Report{FastReview: true, Plan: &bundle.Plan{}}
+	if got := resultFor(report, config.SeverityNone); got != resultClean {
+		t.Fatalf("fast review result = %q, want clean after reading every changed file", got)
+	}
+}
+
+func TestFastReviewIgnoresExpectedGeneratedFileSkips(t *testing.T) {
+	report := &review.Report{FastReview: true, Plan: &bundle.Plan{
+		Skipped: []bundle.Skip{{Path: "generated.go", Reason: bundle.ReasonGenerated}},
+	}}
+	if got := resultFor(report, config.SeverityNone); got != resultClean {
+		t.Fatalf("fast review result = %q, want clean for an expected generated-file skip", got)
+	}
+}
+
+func TestFastReviewWithSkippedFilesIsNotClean(t *testing.T) {
+	report := &review.Report{
+		FastReview: true,
+		Plan: &bundle.Plan{
+			Skipped: []bundle.Skip{{Path: "later.go", Reason: bundle.ReasonFileLimit}},
+		},
+	}
+	if got := resultFor(report, config.SeverityNone); got != resultError {
+		t.Fatalf("fast review result = %q, want error when a changed file was omitted", got)
+	}
+}
+
 // The classification the issue was filed for. A report with findings below the
 // gate and a stage that never ran is not clean, whatever fail-on says: the
 // question fail-on answers is what to do about the code, and no part of this

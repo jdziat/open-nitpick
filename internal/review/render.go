@@ -306,8 +306,13 @@ func suggestionIsApplicable(s string) bool {
 // but code almost always does.
 var codeSignals = []string{
 	"(", ")", "{", "}", "[", "]", ";", "=", "<", ">", ":=", "->", "=>", "::",
-	".", "_", "\"", "'", "`", "*", "&", "|", "!", "/", "\\", "%", "+",
+	"_", "\"", "`", "*", "&", "|", "!", "/", "\\", "%", "+",
 }
+
+// codeSignalsTight are code markers that also appear in ordinary prose. A
+// sentence ends in a period and a contraction carries an apostrophe, so these
+// count only when the line has no whitespace to separate words.
+var codeSignalsTight = []string{".", "'"}
 
 // looksLikeCode is a deliberately conservative heuristic: when in doubt it says
 // no, because a wrongly-applicable suggestion corrupts a file while a wrongly-
@@ -321,6 +326,13 @@ func looksLikeCode(s string) bool {
 	for _, signal := range codeSignals {
 		if strings.Contains(trimmed, signal) {
 			return true
+		}
+	}
+	if !strings.ContainsAny(trimmed, " \t") {
+		for _, signal := range codeSignalsTight {
+			if strings.Contains(trimmed, signal) {
+				return true
+			}
 		}
 	}
 
@@ -390,6 +402,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// findings, these skips and these budgets are the product of a policy that
 	// is not the one in the change.
 	b.WriteString(policyNotice(report))
+	b.WriteString(fastReviewNotice(report))
 	b.WriteString(unknownKeyNotice(report))
 	b.WriteString(incrementalNotice(report))
 	b.WriteString(nothingReviewedNotice(report))
@@ -443,6 +456,23 @@ func renderSummary(report *Report, cfg *config.Config) string {
 		return ""
 	}
 	return out + "\n\n<sub>Reviewed by open-nitpick.</sub>"
+}
+
+// fastReviewNotice states the deliberate limits of the bounded command.
+func fastReviewNotice(report *Report) string {
+	if report == nil || !report.FastReview {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("**Fast review:** changed-file diffs only; related context, analyzers, validation, and model triage were not run.\n")
+	if report.OmittedFindings > 0 {
+		limit := report.FastLimit
+		if limit <= 0 {
+			limit = 10
+		}
+		fmt.Fprintf(&b, "Showing the %d highest-ranked findings; %d lower-ranked finding(s) were omitted. Run `nitpick review` for the full result.\n", limit, report.OmittedFindings)
+	}
+	return blockquote(b.String())
 }
 
 // incrementalNotice states that this run read only part of the change, and

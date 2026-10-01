@@ -155,9 +155,9 @@ than the repository root.
 | `dry-run` | `false` | print the review to the log and the job summary instead of publishing it |
 | `skip-drafts` | `false` | do nothing on a draft pull request |
 | `version` | `latest` | a release tag such as `v1.0.0`, or `latest`. See the paragraph below for what happens when no release matches |
-| `analyzers` | empty | catalog names to install on the runner before the review, comma separated, or `auto` for the ones the change's languages call for. Empty installs nothing and the review runs whatever the runner already has |
-| `command` | `review` | `review` reviews the pull request; `respond` answers a comment that mentioned the reviewer |
-| `args` | none | flags passed verbatim to `nitpick review`, for anything with no input of its own |
+| `analyzers` | empty | catalog names to install before `review`, comma separated, or `auto` for the ones the change's languages call for. Fast review skips analyzer setup because it does not run analyzers |
+| `command` | `review` | `review` reviews the pull request; `fast-review` reads eligible changed diffs and reports up to ten findings; `respond` answers a comment that mentioned the reviewer |
+| `args` | none | flags passed verbatim to `review` and `fast-review`, for anything with no input of its own |
 
 ### What a run does
 
@@ -171,7 +171,7 @@ step sets outputs a later step can read:
 
 | output | value |
 |---|---|
-| `result` | `clean`, `findings` (the gate was tripped), `skipped` (a draft), or `error` (the review could not run) |
+| `result` | `clean`, `findings` (the gate was tripped), `skipped` (a draft), or `error` (the review could not run). Completeness errors take precedence over the severity gate. |
 | `findings`, `critical`, `error`, `warning` | counts of what was published |
 | `files` | files reviewed |
 | `withheld` | findings an earlier review had already posted |

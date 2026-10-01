@@ -22,7 +22,7 @@ type Complexity struct {
 	Path  string
 	Score float64
 
-	// Why names the components that contributed, largest first, so a report
+	// Why names the components that contributed, so a report
 	// can say why a file was reviewed ahead of another.
 	Why []string
 }

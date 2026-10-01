@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
@@ -204,6 +205,22 @@ func mdCell(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
+// fastReviewSkippedFiles reports whether the bounded plan left a changed file
+// unread. Ordinary planner exclusions cannot name reviewable change coverage.
+func fastReviewSkippedFiles(report *review.Report) bool {
+	if report == nil || report.Plan == nil {
+		return false
+	}
+	for _, skip := range report.Plan.Skipped {
+		switch skip.Reason {
+		case bundle.ReasonIgnored, bundle.ReasonGenerated, bundle.ReasonBinary, bundle.ReasonDeleted, bundle.ReasonNoChanges:
+		default:
+			return true
+		}
+	}
+	return false
+}
+
 // resultFor classifies a finished review the way the Action's outputs do.
 //
 // Completeness is asked before severity, and it is not subject to fail-on. A
@@ -216,6 +233,12 @@ func resultFor(report *review.Report, gate config.Severity) actionResult {
 		return resultError
 	}
 	if !report.PipelineComplete() {
+		return resultError
+	}
+	// A bounded fast review is clean only when it read every changed file. It
+	// is never reusable as a full-review baseline, but that must not turn a
+	// complete fast pass into an Action error.
+	if report.FastReview && fastReviewSkippedFiles(report) {
 		return resultError
 	}
 	if report.Practices != nil && report.Practices.ExitCode() == 1 {

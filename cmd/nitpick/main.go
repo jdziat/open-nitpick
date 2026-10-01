@@ -51,6 +51,8 @@ func run() int {
 	switch cmd := os.Args[1]; cmd {
 	case "review":
 		err = runReview(ctx, os.Args[2:])
+	case "fast-review":
+		err = runFastReview(ctx, os.Args[2:])
 	case "full-review":
 		err = runFullReview(ctx, os.Args[2:])
 	case "repo-score":
@@ -131,6 +133,7 @@ func usage() {
 
 Usage:
   nitpick review [flags]           Review a change
+  nitpick fast-review [flags]      Review changed diffs in parallel and show the top ten findings
   nitpick full-review [flags] [path...]
                                    Review the whole tree, or the paths given, with a remediation plan
   nitpick repo-score [flags] [path...]
