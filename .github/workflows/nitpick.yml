@@ -77,5 +77,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app.outputs.token || github.token }}
           NITPICK_BOT_LOGIN: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
-          SYNTHETIC_API_KEY: ${{ secrets.SYNTHETIC_API_KEY }}
+          # Runner-owned models apply after policy resolution, so a pull
+          # request cannot select the service that reviews it.
+          NITPICK_REVIEW_PROVIDER: openrouter
+          NITPICK_REVIEW_MODEL: moonshotai/kimi-k3
+          NITPICK_TRIAGE_MODEL: qwen/qwen3.8-27b
+          OPENROUTER_API_KEY: >-
+            ${{ secrets.OPENROUTER_API_KEY || secrets.LLM_API_KEY }}
         run: go run ./cmd/nitpick review -skip-draft -fail-on none

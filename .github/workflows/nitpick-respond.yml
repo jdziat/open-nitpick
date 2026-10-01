@@ -76,7 +76,7 @@ jobs:
           NITPICK_BOT_LOGIN: >-
             ${{ steps.app.outputs.app-slug && format('{0}[bot]',
               steps.app.outputs.app-slug) || 'github-actions[bot]' }}
-          LLM_PROVIDER: synthetic
-          LLM_MODEL: hf:zai-org/GLM-5.3-Flash
-          LLM_API_KEY: ${{ secrets.SYNTHETIC_API_KEY }}
+          LLM_PROVIDER: openrouter
+          LLM_MODEL: z-ai/glm-5.3-flash
+          LLM_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.LLM_API_KEY }}
         run: go run ./cmd/nitpick respond

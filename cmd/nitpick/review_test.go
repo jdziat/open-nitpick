@@ -56,6 +56,12 @@ func TestResolvePullRequestIntent(t *testing.T) {
 			wantErr:  true,
 			errNames: []string{"-repo-name", "-pr"},
 		},
+		{
+			name:     "repo without owner or pr",
+			flags:    reviewFlags{repoName: "widgets"},
+			wantErr:  true,
+			errNames: []string{"-owner", "-pr"},
+		},
 	}
 
 	for _, tc := range cases {
@@ -343,7 +349,7 @@ func TestExplainConfigDoesNotPromiseSubstitutionForAnOutsideConfig(t *testing.T)
 		}
 	})
 
-	if strings.Contains(out, "base revision") {
+	if strings.Contains(strings.ReplaceAll(out, "\n", " "), "base revision") {
 		t.Errorf("a config outside the repository is never substituted away, but the command says it is:\n%s", out)
 	}
 	if !strings.Contains(out, "always") {
@@ -438,6 +444,7 @@ func captureStdout(t *testing.T, fn func()) (out string) {
 func TestExplainConfigNamesDiscardedKeys(t *testing.T) {
 	// Untrusted: this is the CI default and the case that strips keys.
 	t.Setenv(config.EnvTrustConfigEndpoints, "")
+	t.Setenv(config.EnvIgnoreUnknownKeys, "")
 
 	write := func(t *testing.T, body string) string {
 		t.Helper()
@@ -484,11 +491,11 @@ models:
 			}
 		})
 
-		if strings.Contains(out, "Ignored (untrusted config") {
+		if strings.Contains(out, "Ignored (an untrusted config file") {
 			t.Errorf("this repository's own config depends on keys an untrusted config cannot supply:\n%s", out)
 		}
-		if !strings.Contains(out, "synthetic/") {
-			t.Errorf("the default no longer resolves to synthetic:\n%s", out)
+		if !strings.Contains(out, "openrouter/") {
+			t.Errorf("the default no longer resolves to OpenRouter:\n%s", out)
 		}
 	})
 }
@@ -533,7 +540,7 @@ func TestRefForEventUsesTheEventNumberAndTheRepositoryEnv(t *testing.T) {
 		t.Errorf("ref = %+v, %v", ref, err)
 	}
 	ref, err = refForEvent(&reviewFlags{owner: "a", repoName: "b"}, &converse.Event{Number: 2})
-	if err != nil || ref.Owner != "a" || ref.Repo != "b" {
+	if err != nil || ref.Owner != "a" || ref.Repo != "b" || ref.Number != 2 {
 		t.Errorf("flags should win: %+v, %v", ref, err)
 	}
 	t.Setenv("GITHUB_REPOSITORY", "")

@@ -579,8 +579,7 @@ func TestSecurityModelRequiresAName(t *testing.T) {
 //
 // A field added to ModelSpec and forgotten here is set in the file, accepted by
 // the validator, and silently dropped: models.fix lost its credential keys that
-// way for a release. Read off the struct rather than listed, so the next field
-// is covered by existing.
+// way for a release. Keep this literal list in step with ModelSpec.
 func TestOverlayCarriesEveryRequestShapingField(t *testing.T) {
 	base := ModelSpec{Provider: "p", Model: "m"}
 	over := ModelSpec{
@@ -610,3 +609,22 @@ func TestOverlayCarriesEveryRequestShapingField(t *testing.T) {
 }
 
 func ptrTo[T any](v T) *T { return &v }
+
+func TestReviewModelOverridesUseRunnerChoices(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "synthetic", Model: "hf:review"}
+	cfg.Models.Triage = &ModelSpec{Provider: "synthetic", Model: "hf:triage"}
+	cfg.Models.Validate = &ModelSpec{Provider: "synthetic", Model: "hf:validate"}
+	values := map[string]string{
+		EnvReviewProvider: "openrouter",
+		EnvReviewModel:    "z-ai/glm-5.3-flash",
+		EnvTriageModel:    "qwen/qwen3.8-27b",
+	}
+	got := WithReviewModelOverrides(cfg, func(name string) string { return values[name] })
+	if cfg.Models.Default.Provider != "synthetic" || got.Models.Default.Provider != "openrouter" {
+		t.Fatalf("default provider = %q, original = %q", got.Models.Default.Provider, cfg.Models.Default.Provider)
+	}
+	if got.Models.Default.Model != "z-ai/glm-5.3-flash" || got.Models.Triage.Model != "qwen/qwen3.8-27b" || got.Models.Validate.Provider != "openrouter" {
+		t.Errorf("models = %+v", got.Models)
+	}
+}
