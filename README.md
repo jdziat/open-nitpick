@@ -8,10 +8,6 @@
 
 Self-hosted, model-agnostic pull request review.
 
-Referral link: [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR) is
-the route this project recommends and the link pays the author referral credit.
-[Below](#quick-start) says what that is worth and what the plain link is.
-
 Documentation: <https://jdziat.github.io/open-nitpick/>
 
 open-nitpick reads a pull request, reviews it with a model you choose, and posts
@@ -33,8 +29,8 @@ os=$(uname -s | tr 'A-Z' 'a-z'); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch6
 curl -fsSLo nitpick "https://github.com/jdziat/open-nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
 chmod +x nitpick && sudo mv nitpick /usr/local/bin/
 
-export LLM_PROVIDER=synthetic LLM_MODEL=hf:zai-org/GLM-5.3-Flash
-export SYNTHETIC_API_KEY=syn_...
+export LLM_PROVIDER=openrouter LLM_MODEL=z-ai/glm-5.3-flash
+export OPENROUTER_API_KEY=sk-or-...
 
 nitpick init            # writes .nitpick.yaml for this repository
 nitpick review          # reviews your uncommitted changes
@@ -60,12 +56,9 @@ the shipped default is both, and under `mode: strict` that list is the one
 whose absence fails a run. It refuses to overwrite an existing file without
 `-force`, and `-workflow` writes the Actions workflow beside it.
 
-The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR),
-which serves open-weight models on a flat subscription. Their pricing page read
-$30 a month for one pack on 2026-09-05, so a review costs nothing per token.
-That link carries the author's referral code and pays the author referral credit
-if you sign up through it. Plain <https://synthetic.new> is the same service at
-the same price.
+The quickstart uses OpenRouter with GLM-5.3-Flash, the reviewer this repository uses
+in CI. One OpenRouter key can also select a different supported model when its
+cost, latency, or data-handling terms better suit your repository.
 
 You can spend nothing first. `nitpick explain-config` prints what a review would
 send without sending it, and `LLM_PROVIDER=ollama` runs against a local model.
@@ -104,7 +97,7 @@ with a prompt you cannot read. This one is built the other way round.
 | [Configuration](docs/configuration.md) | `.nitpick.yaml`: models per role, budget, related context, personality and instructions, model-family notes, severities |
 | [Configuration reference](docs/configuration-reference.md) | every key the loader accepts, with its type and shipped default, generated from the binary |
 | [Analyzers](docs/analyzers.md) | the 33 deterministic tools, how they are detected, isolated and fed to the model as evidence, and what strict mode means |
-| [Providers and models](docs/providers.md) | Synthetic, OpenRouter, choosing a model by price, routing and ensembles, pinning an upstream, stalls, other gateways, local models |
+| [Providers and models](docs/providers.md) | OpenRouter, Synthetic, choosing a model by price, routing and ensembles, pinning an upstream, stalls, other gateways, local models |
 | [Trust model](docs/trust-model.md) | what a pull request can and cannot change about its own review, and why |
 | [How a review runs](docs/how-a-review-runs.md) | the pipeline from diff to posted comments |
 | [Development](docs/development.md) | tests, commits and releases, iterating cheaply, and evaluating prompts against real models |

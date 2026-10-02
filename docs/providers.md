@@ -205,9 +205,9 @@ models:
 config for the reason `api_key_env` is: one chooses which stored secret is read,
 the other runs a program in the job holding your credentials.
 
-## Synthetic (recommended)
+## Synthetic
 
-[Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR) hosts open-weight
+[Synthetic](https://synthetic.new) hosts open-weight
 models (Kimi-K3, GLM-5.3-Flash, Qwen3.8-27B and others) behind an
 OpenAI-compatible endpoint on a flat subscription rather than per-token
 billing: $30 a month for one pack, 500 requests per five hours, one concurrent
@@ -228,14 +228,9 @@ a claim that Kimi-K3 is the best reviewer measured; `qwen/qwen3.8-27b` and
 `openai/gpt-5.6-luna` are, per dollar on metered pricing, and the table says
 so.
 
-The link above carries the author's referral code, and the author receives
-referral credit if you sign up through it. <https://synthetic.new> without it
-is the same service at the same price.
-
 `synthetic` is a provider with a compiled-in endpoint, so a committed config
-can name it and nothing else is needed. This repository uses GLM-5.3-Flash
-for review, Qwen3.8-27B for triage and Kimi-K3 for fixes. That role selection is
-operator policy, not a new evaluation result:
+can name it and nothing else is needed. A Synthetic setup can use
+GLM-5.3-Flash for review, Qwen3.8-27B for triage and GLM-5.3-Flash for fixes:
 
 ```yaml
 models:
@@ -248,7 +243,7 @@ models:
     temperature: 0
   fix:
     provider: synthetic
-    model: hf:moonshotai/Kimi-K3
+    model: hf:zai-org/GLM-5.3-Flash
     temperature: 0
 ```
 
@@ -274,7 +269,7 @@ transcribed into `internal/evals/testdata/pricing.yaml` from the vendor's
 pricing page; on the subscription tier the column is what the same tokens
 would cost when paying per token.
 
-## OpenRouter
+## OpenRouter (recommended)
 
 `openrouter` reaches the rest of the catalogue (the frontier closed models
 among them) on one key. It is a provider in its own right, so it needs a key
@@ -284,7 +279,11 @@ and nothing else:
 models:
   default:
     provider: openrouter
-    model: anthropic/claude-sonnet-4.6
+    model: z-ai/glm-5.3-flash
+  triage:
+    provider: openrouter
+    model: qwen/qwen3.8-27b
+    temperature: 0
 ```
 
 ```bash
@@ -293,10 +292,9 @@ export OPENROUTER_API_KEY=sk-or-...
 
 Like `synthetic`, its endpoint is compiled into the binary, so a committed
 config can name it. The eval harness reaches every model in the sweep through
-it. This repository's own policy on OpenRouter is
-[.nitpick.openrouter.yaml](https://github.com/jdziat/open-nitpick/blob/main/.nitpick.openrouter.yaml): the same reviewer and
-triage models as `.nitpick.yaml` under their OpenRouter ids, with the policy
-block kept identical, for `nitpick review -config .nitpick.openrouter.yaml`.
+it. This repository uses GLM-5.3-Flash for review and Qwen3.8-27B for triage through
+OpenRouter; its current policy is
+[.nitpick.yaml](https://github.com/jdziat/open-nitpick/blob/main/.nitpick.yaml).
 
 `LLM_API_KEY` is accepted as a fallback, which is how the GitHub Action's
 `api-key` input arrives. `OPENROUTER_API_KEY` wins when both are set, so a
@@ -412,11 +410,8 @@ models:
 
 Slugs are OpenRouter's, with an endpoint suffix where one exists. The
 setting is only accepted with the `openrouter` provider. This repository's
-own OpenRouter config pins kimi-k3 to `moonshotai/mxfp4` with `fireworks`
-and `together` as fallbacks: unpinned, the router's cheapest-first order
-sent one review to an fp4 quantisation that stalled for ten minutes, ran
-past the output cap on the retry, and answered invalid JSON on the third;
-pinned, the same review returned in one attempt. `curl
+own configuration can pin a model to specific upstreams when its ordinary
+route stalls or returns invalid structured output. `curl
 https://openrouter.ai/api/v1/models/<model>/endpoints` lists a model's
 upstreams with their tags and which support structured output. It is also a
 trust decision: a pull request that edits `.nitpick.yaml` can change it,

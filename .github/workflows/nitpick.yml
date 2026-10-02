@@ -82,7 +82,7 @@ jobs:
           # Runner-owned models apply after policy resolution, so a pull
           # request cannot select the service that reviews it.
           NITPICK_REVIEW_PROVIDER: openrouter
-          NITPICK_REVIEW_MODEL: moonshotai/kimi-k3
+          NITPICK_REVIEW_MODEL: z-ai/glm-5.3-flash
           NITPICK_TRIAGE_MODEL: qwen/qwen3.8-27b
           OPENROUTER_API_KEY: >-
             ${{ secrets.OPENROUTER_API_KEY || secrets.LLM_API_KEY }}

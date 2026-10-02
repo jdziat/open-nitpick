@@ -75,5 +75,5 @@ jobs:
           bot-login: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}
           github-token: ${{ steps.app.outputs.token }}
           provider: openrouter
-          model: moonshotai/kimi-k3
+          model: z-ai/glm-5.3-flash
           api-key: ${{ secrets.OPENROUTER_API_KEY || secrets.LLM_API_KEY }}

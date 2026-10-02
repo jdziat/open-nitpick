@@ -7,7 +7,7 @@ models:
   # ends. Set OPENROUTER_API_KEY in the environment or keystore.
   default:
     provider: openrouter
-    model: moonshotai/kimi-k3
+    model: z-ai/glm-5.3-flash
 
   triage:
     provider: openrouter
@@ -18,7 +18,7 @@ models:
   # Editing quality has not been measured; fixes still require review and CI.
   fix:
     provider: openrouter
-    model: moonshotai/kimi-k3
+    model: z-ai/glm-5.3-flash
     temperature: 0
 
 review:
@@ -31,9 +31,9 @@ review:
   # APPROVE, so a green review check is also a green review disposition.
   approve:
     enabled: true
-  # A million-token model can read far more than 60k tokens per request; the
-  # budget is about how much one call is asked to judge at once, not what
-  # the model can hold. Raised here, where the reviewer is a frontier model.
+  # The default budget is conservative; a model with a large context window
+  # can judge far more than 60k tokens in one call. Raised here, since this
+  # repository's own reviews batch many files per request.
   token_budget_per_request: 120000
   # Definitions the change imports are attached by default. The caller
   # walk, which reads files the change never named, is off by default and
