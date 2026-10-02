@@ -31,9 +31,9 @@ jobs:
           fetch-depth: 0        # the reviewer needs history to diff against base
       - uses: jdziat/open-nitpick@v1
         with:
-          provider: synthetic
-          model: hf:moonshotai/Kimi-K3
-          api-key: ${{ secrets.SYNTHETIC_API_KEY }}
+          provider: openrouter
+          model: z-ai/glm-5.3-flash
+          api-key: ${{ secrets.OPENROUTER_API_KEY }}
           # Omit fail-on (or set it to none) until you have seen how the model
           # behaves on your codebase. A reviewer that blocks merges on its first
           # false positive is a reviewer the team switches off.
@@ -64,9 +64,9 @@ jobs:
       - uses: jdziat/open-nitpick@v1
         with:
           command: respond
-          provider: synthetic
-          model: hf:moonshotai/Kimi-K3
-          api-key: ${{ secrets.SYNTHETIC_API_KEY }}
+          provider: openrouter
+          model: z-ai/glm-5.3-flash
+          api-key: ${{ secrets.OPENROUTER_API_KEY }}
 ```
 
 `@open-nitpick review` resumes the previous review, or starts one if none exists.

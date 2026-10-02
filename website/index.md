@@ -34,9 +34,9 @@ os=$(uname -s | tr 'A-Z' 'a-z'); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch6
 curl -fsSLo nitpick "https://github.com/jdziat/open-nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
 chmod +x nitpick && sudo mv nitpick /usr/local/bin/
 
-export LLM_PROVIDER=synthetic
-export LLM_MODEL=hf:moonshotai/Kimi-K3
-export SYNTHETIC_API_KEY=syn_...
+export LLM_PROVIDER=openrouter
+export LLM_MODEL=z-ai/glm-5.3-flash
+export OPENROUTER_API_KEY=sk-or-...
 
 nitpick review          # reviews your uncommitted changes
 ```
@@ -89,6 +89,6 @@ Five corpora and a judge-free harness. The findings document records the instrum
 
 [The full walkthrough&nbsp;→](docs/how-a-review-runs.md)
 
-<p class="np-fine" markdown>The quickstart uses [Synthetic](https://synthetic.new/?referral=KBc4DHaHWcig6zR), which serves open-weight models on a flat subscription. Their pricing page read $30 a month for one pack on 2026-09-05. That link carries the author's referral code and pays the author referral credit if you sign up through it. [synthetic.new](https://synthetic.new) without the code is the same service at the same price. You can spend nothing first: `nitpick explain-config` prints what a review would send without sending it, and `LLM_PROVIDER=ollama` runs against a local model. [Why, and the alternatives&nbsp;→](docs/providers.md#synthetic-recommended)</p>
+<p class="np-fine" markdown>The quickstart uses OpenRouter with GLM-5.3-Flash, the reviewer this repository uses in CI. You can spend nothing first: `nitpick explain-config` prints what a review would send without sending it, and `LLM_PROVIDER=ollama` runs against a local model. [Why, and the alternatives&nbsp;→](docs/providers.md#openrouter-recommended)</p>
 
 </div>
