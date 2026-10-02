@@ -338,7 +338,7 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	buildModels := engine.Models
 	engine.Models = func(policy *config.Config) (*llm.Roles, error) {
 		usage.reset()
-		roles, err := buildModels(policy)
+		roles, err := buildModels(config.WithReviewModelOverrides(policy, nil))
 		if err == nil && (f.profile == "engineering" || policy.Practices.Profile == "engineering") {
 			usage.attach(roles)
 		}

@@ -159,7 +159,9 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 		gotAuth = r.Header.Get("Authorization")
 		gotPath = r.URL.Path
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"1","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`))
+		if _, err := w.Write([]byte(`{"id":"1","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`)); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer srv.Close()
 
@@ -196,7 +198,7 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 // default built on those keys would work only for whoever exported
 // NITPICK_TRUST_CONFIG_ENDPOINTS. This asserts the committed default needs
 // neither: nothing is dropped, and both roles build with only
-// envSyntheticAPIKey in the environment.
+// envOpenRouterAPIKey in the environment.
 //
 // What it does not assert: that the endpoint is unreachable by any means. An
 // operator who exports LLM_BASE_URL still redirects it, because applyEnv fills
@@ -207,7 +209,8 @@ func TestOpenRouterSendsResolvedKey(t *testing.T) {
 func TestDefaultConfigSurvivesSanitize(t *testing.T) {
 	clearModelEnv(t)
 	t.Setenv(config.EnvTrustConfigEndpoints, "")
-	t.Setenv(envSyntheticAPIKey, "syn_test")
+	t.Setenv(config.EnvIgnoreUnknownKeys, "")
+	t.Setenv(envOpenRouterAPIKey, "sk-or-test")
 
 	// Relative to the package directory, where go test runs.
 	cfg, err := config.LoadFile("../../.nitpick.yaml")
@@ -222,8 +225,8 @@ func TestDefaultConfigSurvivesSanitize(t *testing.T) {
 
 	for _, role := range []config.Role{config.RoleReview, config.RoleTriage} {
 		spec := cfg.Models.ResolveModel(role)
-		if spec.Provider != ProviderSynthetic {
-			t.Errorf("%s provider = %q, want %q", role, spec.Provider, ProviderSynthetic)
+		if spec.Provider != ProviderOpenRouter {
+			t.Errorf("%s provider = %q, want %q", role, spec.Provider, ProviderOpenRouter)
 		}
 		if spec.BaseURL != "" || spec.APIKeyEnv != "" {
 			t.Errorf("%s names base_url=%q api_key_env=%q; the compiled-in endpoint is "+
@@ -233,7 +236,7 @@ func TestDefaultConfigSurvivesSanitize(t *testing.T) {
 	}
 
 	if _, err := BuildRoles(cfg); err != nil {
-		t.Fatalf("the shipped default must build with only %s set: %v", envSyntheticAPIKey, err)
+		t.Fatalf("the shipped default must build with only %s set: %v", envOpenRouterAPIKey, err)
 	}
 }
 

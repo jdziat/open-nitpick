@@ -2,21 +2,23 @@
 # README points at, so it stays readable rather than exhaustive.
 
 models:
-  # Synthetic's built-in endpoint lets committed policy select models without
-  # storing credentials. Set SYNTHETIC_API_KEY in the environment or keystore.
+  # OpenRouter rather than Synthetic: a review of this repository is long
+  # enough that Synthetic's queue latency, not the model, decides when the job
+  # ends. Set OPENROUTER_API_KEY in the environment or keystore.
   default:
-    provider: synthetic
-    model: hf:zai-org/GLM-5.3-Flash
+    provider: openrouter
+    model: moonshotai/kimi-k3
 
   triage:
-    provider: synthetic
-    model: hf:Qwen/Qwen3.8-27B
+    provider: openrouter
+    model: qwen/qwen3.8-27b
     temperature: 0
+    reasoning: "off"
 
   # Editing quality has not been measured; fixes still require review and CI.
   fix:
-    provider: synthetic
-    model: hf:moonshotai/Kimi-K3
+    provider: openrouter
+    model: moonshotai/kimi-k3
     temperature: 0
 
 review:
