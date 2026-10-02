@@ -25,8 +25,6 @@ const EnvPrices = "NITPICK_EVAL_PRICES"
 
 // staleAfterDays is when a price stops being reported as merely dated and
 // starts being reported as STALE.
-//
-// The note behind it is in docs/harness-notes.md#staleafterdays.
 const staleAfterDays = 30
 
 // shippedPrices is the price table compiled in, so cost reporting works from
@@ -1426,8 +1424,6 @@ func (l *CostLedger) rowsAt(in map[string]*modelSpend, now time.Time) []CostRow 
 // be ranked against the others, in two parts: the largest fixture SET any row
 // was priced on, and the DEPTH, priced runs per fixture, the most thorough row
 // reached on each of them.
-//
-// The note behind it is in docs/harness-notes.md#referencecorpus.
 func (l *CostLedger) referenceCorpus(in map[string]*modelSpend) (fixtures []string, depth map[string]int) {
 	depth = map[string]int{}
 
@@ -1499,8 +1495,6 @@ func (s ShortFixture) String() string {
 // every
 // fixture but measured some of them fewer times than the standard it is held
 // to.
-//
-// The note behind it is in docs/harness-notes.md#shallowsamplewarning.
 func ShallowSampleWarning(model, standard, dropped, readings string, short []ShortFixture) string {
 	if len(short) == 0 {
 		return ""
@@ -1607,8 +1601,6 @@ func (r CostRow) Comparable() bool {
 }
 
 // Recall is the share of planted defects this row's MEASURED reviews found.
-//
-// The note behind it is in docs/harness-notes.md#recall.
 func (r CostRow) Recall() (float64, bool) {
 	if r.Planted == 0 {
 		return 0, false
@@ -1754,8 +1746,6 @@ func (r CostRow) PerReview() Cost {
 }
 
 // PerDefect is what this model costs per planted defect it found.
-//
-// The note behind it is in docs/harness-notes.md#perdefect.
 func (r CostRow) PerDefect() Cost {
 	total := r.Total()
 	if !total.Known {
@@ -1907,8 +1897,6 @@ func PublishedCostReadings() []CostReading {
 
 // DescriptiveCostColumns identify a row, state how much measurement is behind
 // it, or disclose a limit on it. None of them is a score.
-//
-// The note behind it is in docs/harness-notes.md#descriptivecostcolumns.
 func DescriptiveCostColumns() []string {
 	return []string{
 		"MODEL", "REVIEWS", "PRICED", "COV", "FAILED", "DEFECTS", "TOKENS", "COST", "SPREAD", "AGE",
@@ -2061,8 +2049,6 @@ func (l *CostLedger) OrderingNotes() []string {
 }
 
 // CostTableHeader is the cost block's header.
-//
-// The note behind it is in docs/harness-notes.md#costtableheader.
 const CostTableHeader = "MODEL                                REVIEWS  PRICED  COV  FAILED  DEFECTS  TOKENS     COST        $/REVIEW    RECALL      NOISE  ANCHOR  $/DEFECT     SPREAD     AGE"
 
 // CostReadingLegend is printed under the cost table, for the same reason

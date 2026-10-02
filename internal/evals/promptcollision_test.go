@@ -76,8 +76,6 @@ import (
 
 // shippedPromptTexts renders the prompt text a review is generated from, keyed
 // by a stable source label.
-//
-// The note behind it is in docs/harness-notes.md#shippedprompttexts.
 func shippedPromptTexts(t *testing.T) map[string]string {
 	t.Helper()
 
@@ -143,8 +141,6 @@ func shippedPromptTexts(t *testing.T) map[string]string {
 // asRendered reduces prompt text to what a reader of it reads: every
 // run of whitespace collapsed to one space, and markdown's emphasis markers
 // dropped.
-//
-// The note behind it is in docs/harness-notes.md#asrendered.
 func asRendered(s string) string {
 	s = strings.Map(func(r rune) rune {
 		switch r {

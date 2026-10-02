@@ -67,6 +67,9 @@ jobs:
           private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
 
       - uses: ./
+        env:
+          NITPICK_APP_INSTALLATION_ID: ${{ steps.app.outputs.installation-id }}
+          NITPICK_APP_PRIVATE_KEY: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
         with:
           command: respond
           bot-login: ${{ steps.app.outputs.app-slug && format('{0}[bot]', steps.app.outputs.app-slug) || 'github-actions[bot]' }}

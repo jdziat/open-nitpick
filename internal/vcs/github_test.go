@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // newFakeGitHub serves a stub API and returns a provider pointed at it.
@@ -81,7 +82,7 @@ func TestGitHubPullRequest(t *testing.T) {
 		if !strings.HasSuffix(r.URL.Path, "/repos/o/r/pulls/7") {
 			t.Errorf("unexpected path %q", r.URL.Path)
 		}
-		if got := r.Header.Get("Authorization"); !strings.Contains(got, "test-token") {
+		if got := r.Header.Get("Authorization"); got != "Bearer test-token" {
 			t.Errorf("Authorization = %q, want the token", got)
 		}
 
@@ -573,5 +574,122 @@ func TestGitHubNonFileCannotBecomeEmptySource(t *testing.T) {
 				t.Fatalf("known submodule became source or absence: %q %v", body, err)
 			}
 		})
+	}
+}
+
+// TestRateLimitMemoryIsPerCredential: a refreshing transport mints new
+// tokens with fresh quota, so a 60-requests-drained memory from the old
+// token must not refuse locally what the forge would now allow (#153's
+// review job lost its publish to exactly this). A static token keeps the
+// check: its quota really is one pool.
+func TestRateLimitMemoryIsPerCredential(t *testing.T) {
+	served := 0
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		served++
+		w.Header().Set("X-RateLimit-Limit", "60")
+		w.Header().Set("X-RateLimit-Remaining", "0")
+		w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(time.Hour).Unix()))
+		_, _ = w.Write([]byte("{}"))
+	}))
+	t.Cleanup(service.Close)
+
+	gh, err := NewGitHub(GitHubOptions{Installations: &staticTransport{}, BaseURL: service.URL + "/"})
+	if err != nil {
+		t.Fatalf("NewGitHub: %v", err)
+	}
+	if !gh.client.DisableRateLimitCheck {
+		t.Fatal("a refreshing transport must not trust a remembered rate window across token renewals")
+	}
+
+	static, err := NewGitHub(GitHubOptions{Token: "t", BaseURL: service.URL + "/"})
+	if err != nil {
+		t.Fatalf("NewGitHub: %v", err)
+	}
+	if static.client.DisableRateLimitCheck {
+		t.Fatal("a static token keeps the local rate check; its quota really is one pool")
+	}
+	_ = served
+}
+
+type staticTransport struct{ used bool }
+
+func (s *staticTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	s.used = true
+	return http.DefaultTransport.RoundTrip(r)
+}
+
+// TestAbuseRetrySendsAgain: the forge answers a fresh installation token's
+// first burst with 429 abuse detection, so the client must wait and send
+// the same request again rather than fail a run that would have passed on
+// the second try (#153's review lost its publish to exactly this).
+func TestAbuseRetrySendsAgain(t *testing.T) {
+	var pauses []time.Duration
+	served := 0
+	authorized := 0
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/repos/o/r/pulls/7") {
+			// The head commit fetch that follows a successful PR read is a
+			// different request; the retry counts only the refused endpoint.
+			return
+		}
+		served++
+		if got := r.Header.Get("Authorization"); got == "Bearer t" {
+			authorized++
+		}
+		if served <= 2 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = io.WriteString(w, "abuse detected")
+			return
+		}
+		_, _ = w.Write([]byte("{}"))
+	}))
+	t.Cleanup(service.Close)
+
+	gh, err := NewGitHub(GitHubOptions{Token: "t", BaseURL: service.URL + "/"})
+	if err != nil {
+		t.Fatalf("NewGitHub: %v", err)
+	}
+	timeSleep = func(d time.Duration) { pauses = append(pauses, d) }
+	t.Cleanup(func() { timeSleep = time.Sleep })
+
+	_, err = gh.PullRequest(t.Context(), testRef())
+	if err != nil {
+		t.Fatalf("PullRequest after two 429s: %v", err)
+	}
+	if served != 3 {
+		t.Fatalf("served %d requests, want 3 (two refused, one allowed)", served)
+	}
+	if authorized != 3 {
+		t.Fatalf("authorized %d of %d, want every retry to carry the token", authorized, served)
+	}
+	if len(pauses) != 2 || pauses[0] != time.Second || pauses[1] != time.Second {
+		t.Fatalf("backoff waits %v, want two 1s pauses honoring Retry-After", pauses)
+	}
+}
+
+// TestAbuseRetryGivesUpAfterThree: a forge that keeps refusing must have its
+// last answer surface, not a client spinning until the run dies silently.
+func TestAbuseRetryGivesUpAfterThree(t *testing.T) {
+	served := 0
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		served++
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	t.Cleanup(service.Close)
+
+	gh, err := NewGitHub(GitHubOptions{Token: "t", BaseURL: service.URL + "/"})
+	if err != nil {
+		t.Fatalf("NewGitHub: %v", err)
+	}
+	timeSleep = func(time.Duration) {}
+	t.Cleanup(func() { timeSleep = time.Sleep })
+
+	_, err = gh.PullRequest(t.Context(), Ref{Owner: "o", Repo: "r", Number: 7, Head: "abc", Base: "main"})
+	if err == nil || !strings.Contains(err.Error(), "429") {
+		t.Fatalf("persistent 429 surfaced as %v, want the forge's 429", err)
+	}
+	if served != 3 {
+		t.Fatalf("served %d requests, want 3 attempts then give up", served)
 	}
 }

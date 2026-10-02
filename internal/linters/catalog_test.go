@@ -94,7 +94,7 @@ func TestCatalogToolsSelectTheRightFiles(t *testing.T) {
 				t.Errorf("%s does not select %s", name, f)
 			}
 		}
-		for _, f := range []string{"photo.png", "notes/todo"} {
+		for _, f := range []string{"photo.png", "docs/todo"} {
 			if s.matches(f) {
 				t.Errorf("%s selects %s", name, f)
 			}

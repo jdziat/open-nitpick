@@ -264,10 +264,3 @@ two are complementary and neither substitutes for the other.
 Unknown keys are rejected at load time, so a typo fails immediately instead of
 being silently ignored. A key from a newer nitpick is refused the same way; see
 the configuration page for the opt-in that ignores one.
-
-
-## Notes from the runners
-
-The doc comments `internal/linters/runners.go` carries, one section each, are
-in [Notes from the runners](runner-notes.md): an attack, a measurement against
-a named analyzer version, or a reason a flag is passed the way it is.

@@ -19,6 +19,19 @@ inputs:
     required: false
     default: ${{ github.token }}
 
+  app-installation-id:
+    description: >-
+      GitHub App installation ID. When set with app-private-key, the review
+      mints its own tokens as the current one nears expiry, so a run that
+      outlives the roughly one hour a minted token lasts still publishes.
+    required: false
+
+  app-private-key:
+    description: >-
+      GitHub App private key, matching app-installation-id. Pass the secret;
+      never a literal.
+    required: false
+
   config:
     description: Path to the configuration file, relative to the workspace.
     required: false
@@ -362,6 +375,8 @@ runs:
       # arbitrary commands in this step.
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
+        NITPICK_APP_INSTALLATION_ID: ${{ inputs.app-installation-id }}
+        NITPICK_APP_PRIVATE_KEY: ${{ inputs.app-private-key }}
         NITPICK_BOT_LOGIN: ${{ inputs.bot-login }}
         LLM_PROVIDER: ${{ inputs.provider }}
         LLM_MODEL: ${{ inputs.model }}

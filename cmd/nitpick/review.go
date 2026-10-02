@@ -539,18 +539,23 @@ func selectProvider(f *reviewFlags, repo string) (vcs.Provider, vcs.Ref, error) 
 	return gh, ref, nil
 }
 
-// githubProvider builds the GitHub provider from the environment.
+// githubProvider builds the GitHub provider from the environment. App
+// credentials win when configured: their tokens refresh themselves, where a
+// minted GITHUB_TOKEN dies about an hour into a long review.
 func githubProvider(repo string) (*vcs.GitHub, error) {
-	token := firstNonEmpty(os.Getenv("NITPICK_GITHUB_TOKEN"), os.Getenv("GITHUB_TOKEN"))
-	if token == "" {
-		return nil, errors.New("reviewing a pull request requires GITHUB_TOKEN")
+	app, err := appCredentialsFromEnv()
+	if err != nil {
+		return nil, err
 	}
-
-	gh, err := vcs.NewGitHub(vcs.GitHubOptions{
-		Token:    token,
-		BaseURL:  os.Getenv("GITHUB_API_URL"),
-		BotLogin: os.Getenv("NITPICK_BOT_LOGIN"),
-	})
+	opts, _, err := app.providerOptions(
+		os.Getenv("GITHUB_API_URL"),
+		firstNonEmpty(os.Getenv("NITPICK_GITHUB_TOKEN"), os.Getenv("GITHUB_TOKEN")),
+		os.Getenv("NITPICK_BOT_LOGIN"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	gh, err := vcs.NewGitHub(opts)
 	if err != nil {
 		return nil, err
 	}

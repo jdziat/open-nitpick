@@ -148,8 +148,6 @@ func TestTunePersonaMeasuresFilterEffects(t *testing.T) {
 
 // runLevels reviews each fixture once and derives every level from that
 // corpus.
-//
-// The note behind it is in docs/harness-notes.md#runlevels.
 func runLevels(
 	t *testing.T, judge *Judge, model Model, levels []config.NitpickLevel, opts Options, dump *Dump,
 ) ([]scored, []DumpSample) {
@@ -635,8 +633,6 @@ func TestJudgeModelsScoresFixtureReviews(t *testing.T) {
 
 // corroborate scores the same judged reviews again with a second judge from a
 // vendor no contender shares, and returns the panel the report renders from.
-//
-// The note behind it is in docs/harness-notes.md#corroborate.
 func corroborate(
 	ctx context.Context,
 	t *testing.T,
@@ -827,7 +823,6 @@ func reportJudgedModels(
 
 	// WHETHER THE ORDER SURVIVES THE OTHER JUDGE.
 	//
-	// The note behind it is in docs/harness-notes.md#mismatched.
 	var mismatched []string
 	for _, r := range rows {
 		if r.cross.HaveSecond && !r.cross.SameStimulus() {
@@ -875,7 +870,6 @@ func reportJudgedModels(
 
 	// Every RATE IN THE TABLE ABOVE, AS THE COUNTS IT CAME FROM.
 	//
-	// The note behind it is in docs/harness-notes.md#counts.
 	var counts strings.Builder
 	counts.WriteString("DENOMINATORS — every rate above, as the counts it was computed from:\n")
 	for _, r := range rows {
@@ -1196,7 +1190,6 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 		// pure functions of (findings, fixture), so recording it after the judge
 		// lets a judge failure discard the one artifact that needs no judge.
 		//
-		// The note behind it is in docs/harness-notes.md#judged.
 		var judged *JudgeResult
 		defer func() {
 			if derr := dump.Record(DumpSample{
@@ -1451,8 +1444,6 @@ func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options, dump *D
 
 // corroborateVariants runs the second judge over a persona axis and folds its
 // complaints back onto the rows they belong to.
-//
-// The note behind it is in docs/harness-notes.md#corroboratevariants.
 func corroborateVariants(
 	t *testing.T, judge *Judge, results []scored, samples []DumpSample, personas map[string]config.Persona,
 ) JudgePanel {

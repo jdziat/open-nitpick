@@ -542,20 +542,20 @@ func TestEngineeringAssessmentIgnoresUnrelatedPackingLimits(t *testing.T) {
 	git(t, root, "commit", "-qm", "feat: initial")
 	provider := vcs.NewLocal(root, nil)
 	report := &review.Report{
-		Files: diff.Files{&diff.File{Path: "a.go"}, &diff.File{Path: "notes/evidence/big.json"}},
+		Files: diff.Files{&diff.File{Path: "a.go"}, &diff.File{Path: "fixtures/big.json"}},
 		Plan: &bundle.Plan{Skipped: []bundle.Skip{
 			{Path: "declaration:cmd/nitpick/other.go", Reason: "complete design task exceeds review.max_files_per_request"},
 		}},
 		Linters: []review.LinterStatus{{Linter: "golangci-lint", Outcome: review.LinterRan}},
 		DesignExecution: &review.DesignExecution{
 			DesignPacking: practices.DesignPacking{Design: practices.DesignPlan{
-				Errors: []string{"notes/evidence/big.json: exceeded review.max_file_bytes"},
+				Errors: []string{"fixtures/big.json: exceeded review.max_file_bytes"},
 			}},
 			Sources: []standards.File{
 				{Path: "a.go", Src: []byte("package frozen\n")},
 				{Path: "go.mod", Src: []byte("module example.com/frozen\n")},
 			},
-			Omitted: []bundle.Skip{{Path: "notes/evidence/big.json", Reason: bundle.ReasonTooLarge}},
+			Omitted: []bundle.Skip{{Path: "fixtures/big.json", Reason: bundle.ReasonTooLarge}},
 		},
 	}
 	cfg := config.Defaults()

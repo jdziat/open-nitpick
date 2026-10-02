@@ -5,8 +5,6 @@ import "github.com/jdziat/open-nitpick/internal/config"
 // CallerFixtures is the callers corpus: the change IS the contract, and the
 // file it breaks is
 // one the change does not touch.
-//
-// The note behind it is in docs/harness-notes.md#callerfixtures.
 func CallerFixtures() []Fixture {
 	return []Fixture{
 		goErrorIdentityChangedFixture(),

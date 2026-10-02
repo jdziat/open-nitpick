@@ -3,8 +3,6 @@ package evals
 import "github.com/jdziat/open-nitpick/internal/config"
 
 // warningFixtures are the corpus's warning-level plants.
-//
-// The note behind it is in docs/harness-notes.md#warningfixtures.
 func warningFixtures() []Fixture {
 	return []Fixture{
 		tsUnboundedMemoKeyFixture(),
@@ -17,8 +15,6 @@ func warningFixtures() []Fixture {
 
 // tsUnboundedMemoKeyFixture feeds a process-lifetime memo table with request
 // text, across two files.
-//
-// The note behind it is in docs/harness-notes.md#tsunboundedmemokeyfixture.
 func tsUnboundedMemoKeyFixture() Fixture {
 	return Fixture{
 		Name: "ts-unbounded-memo-key",
@@ -193,8 +189,6 @@ export interface Plan {
 
 // goCancelGoroutineLeakFixture sends a lookup result on an unbuffered channel
 // that nobody is left to receive.
-//
-// The note behind it is in docs/harness-notes.md#gocancelgoroutineleakfixture.
 func goCancelGoroutineLeakFixture() Fixture {
 	return Fixture{
 		Name: "go-cancel-goroutine-leak",

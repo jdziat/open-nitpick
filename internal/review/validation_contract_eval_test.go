@@ -23,7 +23,7 @@ func TestLiveValidationReturnsCompleteVerdicts(t *testing.T) {
 	if os.Getenv("NITPICK_EVAL_VALIDATION_CONTRACT") != "1" {
 		t.Skip("set NITPICK_EVAL_VALIDATION_CONTRACT=1 for live validation calls")
 	}
-	data, err := os.ReadFile("../../notes/evidence/design-v5-trials.json")
+	data, err := os.ReadFile("testdata/design-v5-trials.json")
 	if err != nil {
 		t.Fatal(err)
 	}

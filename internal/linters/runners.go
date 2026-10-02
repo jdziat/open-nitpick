@@ -226,8 +226,6 @@ func resolveConfig(path, repoRoot string) (string, error) {
 
 // golangciDefaults is the golangci-lint configuration open-nitpick owns.
 //
-// The note behind it is in docs/runner-notes.md#golangcidefaults.
-//
 //go:embed golangci.yml
 var golangciDefaults []byte
 
@@ -520,8 +518,6 @@ func (g *golangciLint) Run(ctx context.Context, repoRoot string, files []string)
 }
 
 // findings converts one golangci-lint report into findings.
-//
-// The note behind it is in docs/runner-notes.md#findings.
 func (g *golangciLint) findings(out []byte, exit int) ([]Finding, error) {
 	var parsed golangciOutput
 	if err := decodeJSON(out, &parsed); err != nil {
@@ -565,8 +561,6 @@ func (g *golangciLint) findings(out []byte, exit int) ([]Finding, error) {
 
 // golangciReportArgs are the flags that decide how much of golangci-lint's
 // report reaches this process, and how its positions are spelled.
-//
-// The note behind it is in docs/runner-notes.md#golangcireportargs.
 var golangciReportArgs = []string{
 	"--output.json.path", "stdout",
 	"--issues-exit-code", "0",
@@ -645,8 +639,6 @@ func goDirectiveLine(name string, src []byte) int {
 // positionsRewritten reports why golangci-lint's output cannot be anchored,
 // scanning the packages that are about to be analyzed, and returns "" when it
 // can.
-//
-// The note behind it is in docs/runner-notes.md#positionsrewritten.
 func positionsRewritten(repoRoot string, targets []goTarget) string {
 	for _, t := range targets {
 		for _, d := range t.Dirs {
@@ -691,8 +683,6 @@ func positionsRewritten(repoRoot string, targets []goTarget) string {
 
 // covering is a runner that can name the parts of the change it did not
 // analyze, for an analyzer that otherwise ran and reported.
-//
-// The note behind it is in docs/runner-notes.md#covering.
 type covering interface {
 	Uncovered(ctx context.Context, repoRoot string, files []string, diffs diff.Files) []review.LinterUncovered
 }
@@ -1026,8 +1016,6 @@ func (g *golangciLint) notSelected(repoRoot string, files []string, diffs diff.F
 
 // cgoExcluded reports whether the go tool drops this file from its package
 // because it imports "C" while cgo is off.
-//
-// The note behind it is in docs/runner-notes.md#cgoexcluded.
 func cgoExcluded(file string, cgoEnabled bool) bool {
 	if cgoEnabled {
 		return false
@@ -1219,8 +1207,6 @@ func parentDir(d string) string {
 
 // repoPath turns a path an analyzer printed relative to its own working
 // directory back into one relative to the repository.
-//
-// The note behind it is in docs/runner-notes.md#repopath.
 func repoPath(repoRoot, module, reported string) string {
 	if filepath.IsAbs(reported) {
 		return relative(repoRoot, reported)
@@ -1327,8 +1313,6 @@ type eslint struct{ cfg analyzerConfig }
 func (e *eslint) Name() string { return "eslint" }
 
 // Detect requires an operator-supplied config, so eslint is OFF by default.
-//
-// The note behind it is in docs/runner-notes.md#detect.
 func (e *eslint) Detect(_ context.Context, repoRoot string, files []string) error {
 	if e.cfg.Err != nil {
 		return e.cfg.Err
@@ -1554,8 +1538,6 @@ func (s *semgrep) findings(out []byte, exit int) ([]Finding, error) {
 }
 
 // mapSeverity translates an analyzer's severity vocabulary to ours.
-//
-// The note behind it is in docs/runner-notes.md#mapseverity.
 func mapSeverity(s string) config.Severity {
 	switch strings.ToUpper(strings.TrimSpace(s)) {
 	case "CRITICAL":
@@ -1636,8 +1618,6 @@ func relativeTo(root, path string) (string, bool) {
 // decodeJSON decodes an analyzer's JSON payload out of its stdout, and
 // REQUIRES
 // one.
-//
-// The note behind it is in docs/runner-notes.md#decodejson.
 func decodeJSON(out []byte, target any) error {
 	trimmed := trimToJSON(out)
 	if len(trimmed) == 0 {

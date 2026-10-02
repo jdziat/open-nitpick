@@ -183,7 +183,6 @@ The plant went dark under every preamble because two things stacked:
   doc-comment move as cross-file-sort-nit) and adds the caller.
 - Justifying comment removed.
 - Keywords expanded; Why rewritten to phrases the list admits.
-- `docs/harness-notes.md` updated.
 
 ### Measurement (deepseek-v4.1-flash, RUNS=2, this fixture only)
 

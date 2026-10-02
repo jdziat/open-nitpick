@@ -652,8 +652,6 @@ func RejudgeInputProblem(input, writing string) string {
 // sameFinding reports whether two records describe the same finding, ignoring
 // the ground-truth fields that legitimately differ between the duplicate lines
 // one finding gets when it is credited with several planted defects.
-//
-// The note behind it is in docs/harness-notes.md#samefinding.
 func sameFinding(a, b DumpRecord) bool {
 	return a.Path == b.Path && a.Line == b.Line && a.EndLine == b.EndLine &&
 		slices.Equal(a.AlsoAt, b.AlsoAt) &&
@@ -662,8 +660,6 @@ func sameFinding(a, b DumpRecord) bool {
 }
 
 // findingFromRecord rebuilds the finding a dump line was written from.
-//
-// The note behind it is in docs/harness-notes.md#findingfromrecord.
 func findingFromRecord(r DumpRecord) review.Finding {
 	return review.Finding{
 		Path:               r.Path,
@@ -692,8 +688,6 @@ type RejudgeOutcome struct {
 }
 
 // rejudger is the one call Rejudge makes, named so it can be substituted.
-//
-// The note behind it is in docs/harness-notes.md#rejudger.
 type rejudger interface {
 	Judge(ctx context.Context, f Fixture, persona config.Persona, findings []review.Finding) (*JudgeResult, error)
 }
@@ -811,8 +805,6 @@ func CorroborationGroups(samples []DumpSample) []RejudgeGroup {
 
 // Corroborate scores groups with a second judge and folds the answer into one
 // Aggregate per contender, keyed the way the report keys its rows.
-//
-// The note behind it is in docs/harness-notes.md#corroborate.
 func Corroborate(
 	ctx context.Context,
 	judge rejudger,
