@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.4.0](https://github.com/jdziat/open-nitpick/compare/v2.3.0...v2.4.0) (2026-10-03)
+
+
+### Features
+
+* **review:** make fast-review cover every changed diff ([#154](https://github.com/jdziat/open-nitpick/issues/154)) ([941832c](https://github.com/jdziat/open-nitpick/commit/941832c54ba10e790e410f110d3df31296111df5))
+* **vcs:** let the GitHub client refresh its own App tokens ([#153](https://github.com/jdziat/open-nitpick/issues/153)) ([0af0be5](https://github.com/jdziat/open-nitpick/commit/0af0be5ac754d8afaf83d4e8347f22665b8fcf16))
+
+
+### Documentation
+
+* overhaul the guide and CLI documentation ([#158](https://github.com/jdziat/open-nitpick/issues/158)) ([758fc07](https://github.com/jdziat/open-nitpick/commit/758fc07a6e0f4dcc250e415204944643dc54d7f2))
+* recommend OpenRouter and remove referrals ([#157](https://github.com/jdziat/open-nitpick/issues/157)) ([00b6fd2](https://github.com/jdziat/open-nitpick/commit/00b6fd2f6181ea85c07dba922fc29367b11718dd))
+
 ## [2.3.0](https://github.com/jdziat/open-nitpick/compare/v2.2.0...v2.3.0) (2026-09-29)
 
 
