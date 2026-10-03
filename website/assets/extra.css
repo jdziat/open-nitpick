@@ -359,6 +359,20 @@ body, .md-main { background-color: var(--np-page); }
   text-align: left;
 }
 
+/* On wide screens, align both text and tables with the document rail. */
+@media screen and (min-width: 76.25em) {
+  [dir] .md-sidebar--primary:not([hidden]) ~ .md-content > .md-content__inner,
+  [dir] .md-sidebar--secondary:not([hidden]) ~ .md-content > .md-content__inner {
+    margin-inline: 2rem auto;
+  }
+  .md-content__inner:not(:has(.np-hero)) .md-typeset__scrollwrap,
+  .md-content__inner:not(:has(.np-hero)) > table:not([class]) {
+    width: 100%;
+    margin-inline: 0;
+  }
+  .md-typeset__scrollwrap { text-align: left; }
+}
+
 /* Below 76.25em the drawer is off-canvas and Material leaves every link in it
    in the tab order. Walking the tab order at 390x844 on /docs/usage/ gives 59
    stops, 28 of them at x=-242 or zero-size with the toggle unchecked, and a
