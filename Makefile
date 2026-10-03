@@ -67,6 +67,7 @@ docs-reference:
 	go run ./cmd/nitpick config-reference -o docs/configuration-reference.md
 
 docs: docs-reference
+	./scripts/check-cli-reference.sh
 	rm -rf .website && mkdir -p .website/docs
 	cp website/index.md .website/index.md
 	# Rejected logo concepts are not documentation and were reachable in
@@ -85,7 +86,7 @@ docs: docs-reference
 	# badge is the third statement of what the footer already carries as
 	# "Apache-2.0". README.md on GitHub keeps all four lines.
 	sed -E 's/^# open-nitpick$$/# Guide/; /^<p align="center"><img src="website\/assets\/logo\.svg"/d; /^\[!\[/d; /^Documentation: <https:\/\/jdziat\.github\.io/d; /^The same documents are published at/d' README.md >> .website/guide.md
-	cp docs/*.md .website/docs/
+	cp -R docs/. .website/docs/
 	cp docs/configuration-reference.md .website/docs/configuration-reference.md
 	# SECURITY.md sits at the repository root, so its links are docs/-relative;
 	# staged beside the pages it points at, that prefix has to go.
@@ -94,7 +95,7 @@ docs: docs-reference
 	# names no file on the site, where the same document is staged as guide.md.
 	# Written the other way round it is the repository copy that breaks, and
 	# these pages are read in both places.
-	for f in .website/docs/*.md; do sed -E -e 's#\]\(\.\./(internal|cmd|action|notes|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' -e 's#\]\(\.\./README\.md#](../guide.md#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
+	for f in $$(find .website/docs -name '*.md'); do sed -E -e 's#\]\(\.\./(internal|cmd|action|notes|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' -e 's#\]\(\.\./README\.md#](../guide.md#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
 	sed -E 's#\]\((internal|cmd|action|notes|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' .website/guide.md > .website/guide.md.tmp && mv .website/guide.md.tmp .website/guide.md
 	mkdocs build
 

@@ -11,7 +11,8 @@ hide:
 <p class="np-lede">open-nitpick reads a pull request, reviews it with a model you choose, and posts inline comments. Run it as a GitHub Action, as a CLI in any CI, or against your working tree before the pull request exists. Nothing is hosted, nothing is priced per seat, and your code stays with you.</p>
 
 <div class="np-actions" markdown>
-[Get started](docs/usage.md){ .md-button .md-button--primary }
+[Get started](docs/getting-started.md){ .md-button .md-button--primary }
+[CLI reference](docs/reference/cli.md){ .md-button }
 [Read the measurements](docs/findings.md){ .md-button }
 [Source on GitHub](https://github.com/jdziat/open-nitpick){ .md-button }
 </div>

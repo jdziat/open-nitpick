@@ -99,24 +99,30 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Guide:
-      - Overview: guide.md
-      - Usage: docs/usage.md
+  - Get started:
+      - First review: docs/getting-started.md
       - GitHub Actions and other CI: docs/ci.md
+  - Guide:
+      - Overview: docs/guide.md
+      - Review a change: docs/guide/reviewing-changes.md
+      - Agents and MCP: docs/guide/agents-and-mcp.md
       - Configuration: docs/configuration.md
-      - Configuration reference: docs/configuration-reference.md
-      - Analyzers: docs/analyzers.md
       - Providers and models: docs/providers.md
+      - How a review runs: docs/how-a-review-runs.md
       - Trust model: docs/trust-model.md
       - Security policy: docs/security.md
-      - How a review runs: docs/how-a-review-runs.md
+  - CLI reference:
+      - All commands: docs/reference/cli.md
+      - Configuration reference: docs/configuration-reference.md
+      - Analyzers: docs/analyzers.md
+  - Project:
       - Development: docs/development.md
-  - Measurement:
-      - Rules: docs/measurement.md
+      - Measurement rules: docs/measurement.md
       - Findings: docs/findings.md
       - Model breakdown: docs/model-breakdown.md
       - Against Incumbent: docs/comparison.md
       - Remediation: docs/remediation.md
+
 extra:
   generator: false
   social:
