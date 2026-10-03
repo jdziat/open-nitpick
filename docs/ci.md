@@ -126,9 +126,10 @@ it a one-hour static token, which can expire before a long review publishes:
           api-key: ${{ secrets.OPENROUTER_API_KEY }}
 ```
 
-Set `NITPICK_APP_ID` as a repository variable and both App inputs as secrets.
-The current action reads that environment variable to enable its refreshable
-App credentials. `bot-login` must be the App slug followed by `[bot]`, and lets
+Set `NITPICK_APP_ID` and `NITPICK_APP_SLUG` as repository variables and both App
+inputs as secrets. The current action reads `NITPICK_APP_ID` to enable its
+refreshable App credentials, and the example builds `bot-login` from
+`NITPICK_APP_SLUG`. `bot-login` must be the App slug followed by `[bot]`, and lets
 the reviewer recognize its own earlier work. Use the default `github-token`
 instead when an App identity is not needed. The job’s `permissions` still
 control the default token; the App token uses the App’s installation permissions.
@@ -306,8 +307,8 @@ pull request number are detected automatically.
 ### Review identity and retries
 
 The Action's `bot-login` input identifies the account whose review history may
-be reused. For an App token, set it to the app slug followed by `[bot]`, for
-example `${{ format('{0}[bot]', steps.app.outputs.app-slug) }}`. For the CLI,
+be reused. For an App token, set it to the app slug followed by `[bot]`, as the
+App example above does with `${{ vars.NITPICK_APP_SLUG }}[bot]`. For the CLI,
 set `NITPICK_BOT_LOGIN`; personal tokens can leave it unset to resolve their
 authenticated user. A comment's HTML markers alone establish no identity.
 

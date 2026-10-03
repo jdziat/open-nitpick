@@ -159,22 +159,23 @@ named agent-instructions file. `-agents` cannot be combined with `-base` or
 ## `improve`
 
 ```sh
-nitpick improve -base origin/main -dry-run
+nitpick improve -base origin/main
 ```
 
 Runs a wider, pedantic review over the working tree by default and prints its
 result; it does not publish GitHub findings. Use `@open-nitpick improve` in a
 pull-request comment for the conversational version. It shares the revision,
 configuration, instruction, linter, failure, logging, and narrowing controls
-from [`review`](#review), but rejects pull-request publishing coordinates. It
-also accepts the following local-only controls.
+from [`review`](#review), but rejects pull-request publishing coordinates:
+passing `-pr`, `-owner`, or `-repo-name`, or running in an Actions pull-request
+job, exits with an error instead of posting. So `-dry-run` and `-skip-draft`
+have nothing to act on here; every `improve` run prints locally. It also accepts
+the following local-only controls.
 
 | Extra flag | Meaning |
 | --- | --- |
 | `-level` | Review level: `minimal`, `normal`, or `pedantic` (the default). |
-| `-dry-run` | Print the result instead of attempting to publish it. Improve does not publish from the CLI. |
 | `-profile` | Select an optional assessment profile; use `engineering` for the engineering checks. |
-| `-skip-draft` | Skip a draft pull request when a pull-request target is supplied. |
 | `-slop` | Include slop findings (default `true`). Set `-slop=false` to leave them out. |
 
 ## `slop`

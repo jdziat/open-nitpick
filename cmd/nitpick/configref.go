@@ -113,11 +113,13 @@ For a working starting configuration and common changes, use the
 [configuration guide](configuration.md). To see the settings and prompts your
 checkout will use, run ` + "`nitpick explain-config`" + `.
 
-Find a key with site search or your browser's Find command. Sections group keys
-by purpose: [models](#models), [persona](#persona), [review](#review),
-[linters](#linters), and [security](#security). Model settings include provider
-credentials and routing;
-review settings control scope, concurrency, findings, and merge gates.
+Find a key with site search or your browser's Find command. The page is a run
+of sections in alphabetical order: [instructions](#instructions),
+[linters](#linters), [models](#models), [persona](#persona),
+[practices](#practices), [review](#review), [security](#security),
+[standards](#standards), and [validation](#validation). Model settings include
+provider credentials and routing; review settings control scope, concurrency,
+findings, and merge gates.
 
 ` + "`[]`" + ` marks a list whose entries carry the keys beneath it,
 ` + "`<name>`" + ` a map whose keys you choose, and ` + "`same keys as …`" + ` a block

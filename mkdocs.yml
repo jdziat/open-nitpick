@@ -73,8 +73,9 @@ plugins:
   - search:
       separator: '[\s\-.]+'
 
-# edit_uri is resolved against the staged path, and three pages are staged under
-# a name they do not have in the repository.
+# edit_uri is resolved against the staged path, and two pages are staged under
+# a name they do not have in the repository; check-view-source.py proves every
+# rewritten link resolves.
 hooks:
   - website/hooks/page_sources.py
 
