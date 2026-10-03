@@ -16,9 +16,9 @@ hide:
 [Set up CI](docs/ci.md){ .md-button }
 </div>
 
-<p class="np-fine"><a href="docs/guide/reviewing-changes.md">Review changes</a> · <a href="docs/configuration.md">Configure models and policy</a> · <a href="docs/guide/agents-and-mcp.md">Use from an agent</a> · <a href="docs/usage.md">All workflows</a> · <a href="docs/trust-model.md">Trust model</a></p>
+<p class="np-fine"><a href="docs/guide/reviewing-changes/">Review changes</a> · <a href="docs/configuration/">Configure models and policy</a> · <a href="docs/guide/agents-and-mcp/">Use from an agent</a> · <a href="docs/usage/">All workflows</a> · <a href="docs/trust-model/">Trust model</a></p>
 
-<p class="np-fine">Read the <a href="docs/providers.md">provider guidance</a> before selecting a hosted endpoint, inspect the <a href="docs/findings.md">measurements</a>, or read the <a href="https://github.com/jdziat/open-nitpick">source on GitHub</a>.</p>
+<p class="np-fine">Read the <a href="docs/providers/">provider guidance</a> before selecting a hosted endpoint, inspect the <a href="docs/findings/">measurements</a>, or read the <a href="https://github.com/jdziat/open-nitpick">source on GitHub</a>.</p>
 
 </div>
 
@@ -54,12 +54,12 @@ Path-scoped instructions live next to the code they describe. `nitpick explain-c
 
 <div class="np-card" markdown>
 <p class="np-card-title">Context in both directions</p>
-The definitions a changed line calls are attached by default. So are the untouched callers of anything a change redefines, behind a switch of their own, since that walk reads files the change never named. [Related context&nbsp;→](docs/configuration.md#related-context)
+Reviews include the functions and types used by changed code. You can also enable caller context to check code that depends on your changes. [Related context&nbsp;→](docs/configuration.md#related-context)
 </div>
 
 <div class="np-card" markdown>
 <p class="np-card-title">A trust model, written down</p>
-A change cannot supply the policy it is reviewed under. Policy is read from the base revision. Analyzer configuration never comes from the tree, and endpoint keys are stripped from a config the change could have written. [Trust model&nbsp;→](docs/trust-model.md)
+The reviewer reads policy from the base revision and uses trusted linter settings. By default, pull-request configuration cannot override provider endpoints or credentials. [Trust model&nbsp;→](docs/trust-model.md)
 </div>
 
 <div class="np-card" markdown>
