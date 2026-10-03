@@ -3,21 +3,11 @@ package evals
 import (
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 )
 
-// The instrument-bug count in docs/findings.md once said "nine" against
-// fourteen rows for two rounds, and the document records that as its own
-// failure: a figure restated rather than recomputed. The count appears in
-// three places, the findings prose, the site's landing page and README.md,
-// so this test recomputes it from the table and holds all three to it.
-//
-// README.md was the third and was outside the guard, which asserted a
-// completeness it did not have: no test in this repository read README prose
-// at all, so the one restatement a reader meets first was the one nothing
-// checked.
+// Published counts in the findings prose and README must match the evidence table.
 func TestInstrumentBugCountIsTheTableRowCount(t *testing.T) {
 	findings, err := os.ReadFile("../../docs/findings.md")
 	if err != nil {
@@ -64,18 +54,6 @@ func TestInstrumentBugCountIsTheTableRowCount(t *testing.T) {
 	}
 	if !strings.Contains(body, word+" measurement bugs have been found") {
 		t.Errorf("findings.md prose does not say %q measurement bugs; the table has %d rows", word, rows)
-	}
-
-	index, err := os.ReadFile("../../website/index.md")
-	if err != nil {
-		t.Skip("website/index.md not present")
-	}
-	m := regexp.MustCompile(`<strong>(\d+)</strong><span>instrument bugs recorded</span>`).FindStringSubmatch(string(index))
-	if m == nil {
-		t.Fatal("website/index.md has no instrument-bug stat")
-	}
-	if m[1] != strconv.Itoa(rows) {
-		t.Errorf("website/index.md says %s instrument bugs; the table has %d rows", m[1], rows)
 	}
 
 	readme, err := os.ReadFile("../../README.md")

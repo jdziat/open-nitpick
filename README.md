@@ -40,8 +40,7 @@ nitpick fast-review     # changed diffs, top ten findings
 Verifying that download is one command and
 [Development](docs/development.md#releases) has it. Building from source
 instead is `go install github.com/jdziat/open-nitpick/cmd/nitpick@latest`,
-which needs Go 1.25.5 or newer: the `go` directive in `go.mod` is a
-patch-level floor, so 1.25.4 refuses.
+which needs Go 1.26.0 or newer, as required by `go.mod`.
 
 `init` is optional: with those two variables set, a review runs with no config
 file at all. What it buys is a file that names the model, the analyzers this
@@ -92,7 +91,9 @@ with a prompt you cannot read. This one is built the other way round.
 
 | page | what it covers |
 |---|---|
-| [Usage](docs/usage.md) | reviewing a change or a whole repository, the remediation plan and score, the slop class, and the MCP server for agent sessions |
+| [Get started](docs/getting-started.md) | install, choose a model, and run a first review |
+| [Guide](docs/guide.md) | reviewing a change, CI, configuration, agents, and understanding results |
+| [CLI reference](docs/reference/cli.md) | every command and subcommand, with flags, examples, outputs, and side effects |
 | [GitHub Actions and other CI](docs/ci.md) | the Action, its inputs and permissions, incremental review, forks, and running the CLI in any other CI |
 | [Configuration](docs/configuration.md) | `.nitpick.yaml`: models per role, budget, related context, personality and instructions, model-family notes, severities |
 | [Configuration reference](docs/configuration-reference.md) | every key the loader accepts, with its type and shipped default, generated from the binary |

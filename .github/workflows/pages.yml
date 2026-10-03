@@ -9,6 +9,8 @@ on:
       - website/**
       - mkdocs.yml
       - Makefile
+      - scripts/check-cli-reference.sh
+      - scripts/check-cli-reference.py
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -32,6 +34,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install mkdocs-material==9.7.6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
       - run: make docs
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

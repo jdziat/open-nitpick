@@ -8,7 +8,7 @@ Start anywhere in it. `nitpick init` comes first here because a repository is
 usually set up once, but it is optional: a review runs with no config file at
 all as long as `LLM_PROVIDER` and `LLM_MODEL` are set, and every command below
 works that way. All of them assume `nitpick` is on your PATH; the
-[Quick start](../README.md#quick-start) has the one-line install, and
+[Quick start](getting-started.md#1-install-the-cli) has the one-line install, and
 [Providers and models](providers.md) covers what to set those two variables to.
 
 ## Starting a repository off

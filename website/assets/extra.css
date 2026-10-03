@@ -185,7 +185,7 @@ body, .md-main { background-color: var(--np-page); }
   box-decoration-break: slice;
 }
 .md-typeset table:not([class]) code { word-break: normal; overflow-wrap: break-word; }
-.md-typeset pre code, .md-typeset .highlight code { border: 0; padding: 0; }
+.md-typeset pre code { border: 0; padding: 0.8rem 2.4rem 0.8rem 0.8rem; }
 /* Material paints the copy button at --md-default-fg-color--lightest until
    the block is hovered, and lightest is rgba(0,0,0,0.07) in light and
    rgba(226,228,233,0.12) in dark: over the fill those blocks composite to,
@@ -286,7 +286,7 @@ body, .md-main { background-color: var(--np-page); }
    from 720 to 841 at 1440 and left the 404 off-centre against a blank rail. */
 .md-sidebar--secondary:not(:has(.md-nav__list)) { visibility: hidden; }
 
-/* The column the article actually gets: the grid, less whichever rails
+/* The column available to the article: the grid, less whichever rails
    Material has put in flow at this width. The secondary rail appears at 60em
    and the primary at 76.25em, both 12.1rem, and both are the breakpoints
    Material's own sheet uses. Everything below measures against this rather
@@ -296,23 +296,8 @@ body, .md-main { background-color: var(--np-page); }
 @media screen and (min-width: 60em) { :root { --np-rails: 12.1rem; } }
 @media screen and (min-width: 76.25em) { :root { --np-rails: 24.2rem; } }
 
-/* About 74 characters, and the arithmetic is in px because rem is not 16px
-   here: Material sets html to 125%, so 1rem is 20px and .md-typeset is 16px.
-   28rem is 560px, and body copy on this site measures 7.36-7.72px per
-   character (canvas measureText over the first 400 characters of five
-   paragraphs on the trust-model page), which is 73 to 76 characters.
-   The first attempt capped at 46rem, which never applied: the two 12.1rem
-   rails and the margins leave 45.4rem of a 72rem grid, so the cap sat above the
-   width it was meant to cut. The second capped at 36rem and did apply, but
-   36rem is 720px, which measures 93 to 96 characters: above the 45-75 range
-   and above the 80 WCAG 1.4.8 asks for. Evidence gets the width back below,
-   rather than the prose keeping it.
-   The cap is also the gutter. `margin-inline: auto` replaces Material's
-   `margin: 0 .8rem 1.2rem`, and neither .md-content nor .md-main carries
-   horizontal padding of its own, so a bare cap left every phone reading body
-   text flush to both edges of the glass. Capping at the column as well leaves
-   the auto margins something to divide. */
-.md-content__inner { max-width: min(28rem, var(--np-column) - 1.6rem); margin-inline: auto; }
+/* Keep examples and prose on one readable measure, with room for phone gutters. */
+.md-content__inner { max-width: min(34rem, var(--np-column) - 1.6rem); margin-inline: auto; }
 /* The landing page hides both rails and its cards are laid out across the
    whole grid, so it keeps the width and takes the gutter only. --np-column
    subtracts rails this page does not have, which is why it is not used here. */
@@ -327,20 +312,8 @@ body, .md-main { background-color: var(--np-page); }
   margin-inline: auto;
 }
 
-/* Tables and code are the reason the page is wide. They break the measure on
-   purpose, centred on it, and stop at the column the rails leave.
-   Material puts both classes on one element, `<article class="md-content__inner
-   md-typeset">`, so a descendant step between them matches nothing and only the
-   scrollwrap branch was ever live: the child combinator is what reaches code.
-   The target is the column rather than a constant, because 45.4rem is the room
-   a 72rem grid has left over and no narrower viewport has it. Measured at
-   45.4rem, a table hung 102px off the left of a 960px window with
-   html{overflow-x:hidden} clipping rather than scrolling it, and 70px under the
-   navigation rail at 1440. The clamp at 0 is for the other end, where the
-   column is narrower than the measure and the pull-out would become an indent
-   of up to 224px on a 320px screen. */
+/* Wide reference tables can use the space between the navigation rails. */
 .md-content__inner:not(:has(.np-hero)) .md-typeset__scrollwrap,
-.md-content__inner:not(:has(.np-hero)) > .highlight,
 .md-content__inner:not(:has(.np-hero)) > table:not([class]) {
   width: max(100%, min(45.4rem, var(--np-column) - 1.6rem));
   margin-inline: min(0px, calc((100% - min(45.4rem, var(--np-column) - 1.6rem)) / 2));
@@ -384,6 +357,20 @@ body, .md-main { background-color: var(--np-page); }
   display: inline-block;
   max-width: none;
   text-align: left;
+}
+
+/* On wide screens, align both text and tables with the document rail. */
+@media screen and (min-width: 76.25em) {
+  [dir] .md-sidebar--primary:not([hidden]) ~ .md-content > .md-content__inner,
+  [dir] .md-sidebar--secondary:not([hidden]) ~ .md-content > .md-content__inner {
+    margin-inline: 2rem auto;
+  }
+  .md-content__inner:not(:has(.np-hero)) .md-typeset__scrollwrap,
+  .md-content__inner:not(:has(.np-hero)) > table:not([class]) {
+    width: 100%;
+    margin-inline: 0;
+  }
+  .md-typeset__scrollwrap { text-align: left; }
 }
 
 /* Below 76.25em the drawer is off-canvas and Material leaves every link in it
@@ -496,6 +483,17 @@ body, .md-main { background-color: var(--np-page); }
   letter-spacing: -0.005em;
   color: var(--np-ink);
 }
+/* Keep the configuration rail usable; individual keys remain searchable. */
+.md-main:has(#configuration-reference) .md-nav--secondary .md-nav {
+  display: none;
+}
+.md-typeset .np-table-scroll-hint {
+  margin: 0.35rem 0;
+  color: var(--np-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.np-table-scroll-hint[hidden] { display: none; }
 .md-typeset table:not([class]) { font-size: 0.72rem; }
 /* The key is what a reference is scanned by, and it was the one column that
    could not be read: at 149px, 197 of the reference's 199 key cells broke

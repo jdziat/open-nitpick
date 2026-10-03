@@ -38,8 +38,12 @@ jobs:
           # behaves on your codebase. A reviewer that blocks merges on its first
           # false positive is a reviewer the team switches off.
           fail-on: none
+          dry-run: true  # inspect the summary before allowing publication
           skip-drafts: true
 ```
+
+The first run is intentionally non-publishing. Inspect the job summary, then
+remove `dry-run: true` when the configuration and results are ready to publish.
 
 ### Talking to it
 
@@ -101,38 +105,34 @@ own.
 
 ### Posting as your own GitHub App
 
-With the job token the review is posted
-by `github-actions[bot]`. A GitHub App gives it a name and an avatar of your
-choosing, its own permissions, and reviews that count as a reviewer's in
-the pull request sidebar. Create one under your account or organisation
-(Settings, Developer settings, GitHub Apps): no webhook, repository
-permissions Contents read, Metadata read, Pull requests read and write;
-install it on the repositories to review; generate a private key. Save the
-App ID as a repository secret `NITPICK_APP_ID` and the key file's
-contents as a secret `NITPICK_APP_PRIVATE_KEY` (GitHub refuses secret names
-that start with `GITHUB_`). Then mint the token in the job and hand it to
-the Action:
+With the job token the review is posted by `github-actions[bot]`. A GitHub App
+has its own identity and repository permissions. Create and install an App with
+Contents read, Metadata read, and Pull requests read and write; it does not need
+a webhook. Save its **installation ID** and private key as repository secrets.
+
+The Action can mint and refresh its own installation tokens. This avoids handing
+it a one-hour static token, which can expire before a long review publishes:
 
 ```yaml
-    env:
-      NITPICK_APP_ID: ${{ secrets.NITPICK_APP_ID }}   # a step's if cannot read secrets, only env
-    steps:
-      - name: Token for the review app
-        id: app
-        if: env.NITPICK_APP_ID != ''
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ env.NITPICK_APP_ID }}
-          private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
       - uses: jdziat/open-nitpick@v1
+        env:
+          NITPICK_APP_ID: ${{ vars.NITPICK_APP_ID }}
         with:
-          github-token: ${{ steps.app.outputs.token || github.token }}
+          app-installation-id: ${{ secrets.NITPICK_APP_INSTALLATION_ID }}
+          app-private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
+          bot-login: ${{ vars.NITPICK_APP_SLUG }}[bot]
+          provider: openrouter
+          model: z-ai/glm-5.3-flash
+          api-key: ${{ secrets.OPENROUTER_API_KEY }}
 ```
 
-The `if` and the `||` make the App optional: a repository without the
-secret posts with the job token as before. The token the step mints
-lasts an hour and is scoped to the installation, so the workflow's
-`permissions` block still governs only the default token.
+Set `NITPICK_APP_ID` and `NITPICK_APP_SLUG` as repository variables and both App
+inputs as secrets. The current action reads `NITPICK_APP_ID` to enable its
+refreshable App credentials, and the example builds `bot-login` from
+`NITPICK_APP_SLUG`. `bot-login` must be the App slug followed by `[bot]`, and lets
+the reviewer recognize its own earlier work. Use the default `github-token`
+instead when an App identity is not needed. The job’s `permissions` still
+control the default token; the App token uses the App’s installation permissions.
 
 ### Inputs
 
@@ -143,21 +143,23 @@ than the repository root.
 
 | input | default | what it does |
 |---|---|---|
-| `github-token` | `${{ github.token }}` | reads the pull request and publishes the review. Needs `pull-requests: write`. On a pull request from a fork it is read-only, so nothing is posted; see [Forks](#forks) for what a fork run does and does not do |
-| `config` | `.nitpick.yaml` | path to the configuration file, relative to the workspace |
-| `provider` | from the config file | overrides `models.default.provider`; `nitpick providers` prints the list |
-| `model` | from the config file | overrides `models.default.model` |
-| `bot-login` | `github-actions[bot]` | trusted posting account; set `<app-slug>[bot]` for an App token, or the account name for a personal token |
-| `api-key` | none | the provider's key. Pass a secret, never a literal. Ignored where the provider reads its own conventional variable |
-| `fail-on` | from `review.fail_on` | lowest severity that fails the job: `nit`, `info`, `warning`, `error`, `critical`, or `none` |
-| `instruction` | none | one extra instruction, applied to this run only |
-| `pr-number` | the triggering pull request | set it on `workflow_dispatch` and `issue_comment` runs |
-| `dry-run` | `false` | print the review to the log and the job summary instead of publishing it |
-| `skip-drafts` | `false` | do nothing on a draft pull request |
-| `version` | `latest` | a release tag such as `v1.0.0`, or `latest`. See the paragraph below for what happens when no release matches |
-| `analyzers` | empty | catalog names to install before `review`, comma separated, or `auto` for the ones the change's languages call for. Fast review skips analyzer setup because it does not run analyzers |
-| `command` | `review` | `review` reviews the pull request; `fast-review` reads eligible changed diffs and reports up to ten findings; `respond` answers a comment that mentioned the reviewer |
-| `args` | none | flags passed verbatim to `review` and `fast-review`, for anything with no input of its own |
+| `bot-login` | `github-actions[bot]` | account whose earlier reviews may be reused; use `<app-slug>[bot]` with App credentials |
+| `github-token` | `${{ github.token }}` | reads the pull request and publishes the review. Needs `pull-requests: write`; fork tokens cannot publish |
+| `app-installation-id` | none | GitHub App installation ID. With `app-private-key` and `NITPICK_APP_ID` in the calling step environment, mints replacement tokens before expiry during a long run |
+| `app-private-key` | none | GitHub App private key. Set only with `app-installation-id`, as a secret |
+| `config` | `.nitpick.yaml` | configuration path relative to the workspace |
+| `provider` | config | overrides `models.default.provider`; `nitpick providers` lists providers |
+| `model` | config | overrides `models.default.model` |
+| `api-key` | none | provider key; pass a secret, never a literal |
+| `fail-on` | `review.fail_on` | lowest severity that fails: `nit`, `info`, `warning`, `error`, `critical`, or `none` |
+| `instruction` | none | one extra instruction for this run |
+| `pr-number` | triggering pull request | set for `workflow_dispatch` and comment events |
+| `dry-run` | `false` | writes to log and job summary without publishing |
+| `skip-drafts` | `false` | skips draft pull requests |
+| `version` | `latest` | release tag or `latest`; falls back to building the Action checkout when its release is unavailable |
+| `analyzers` | empty | catalog names to install, comma separated; `auto` selects ones for changed languages; empty uses runner tools |
+| `command` | `review` | `review`, `fast-review`, or `respond` |
+| `args` | none | flags passed to `review` and `fast-review` |
 
 ### What a run does
 
@@ -171,10 +173,16 @@ step sets outputs a later step can read:
 
 | output | value |
 |---|---|
-| `result` | `clean`, `findings` (the gate was tripped), `skipped` (a draft), or `error` (the review could not run). Completeness errors take precedence over the severity gate. |
-| `findings`, `critical`, `error`, `warning` | counts of what was published |
+| `result` | `clean`, `findings`, `skipped`, or `error`. A completeness failure is `error`, not a clean review. |
+| `findings` | number of findings published |
+| `practice_findings` | practice-report findings, including advisory findings and accepted exceptions; may overlap inline findings |
+| `practice_blocking` | engineering-policy violations without an accepted exception or unresolved uncertainty |
+| `critical`, `error`, `warning` | findings at each severity |
 | `files` | files reviewed |
-| `withheld` | findings an earlier review had already posted |
+| `withheld` | findings not republished because an earlier review already posted them |
+| `complete` | whether the selected policy’s required assessment completed |
+| `failed_stages` | comma-separated model stages that did not complete; empty when none did |
+
 
 Exit codes: `0` clean, `1` findings at or above `fail_on`, `2` the review could
 not run. CI can tell "this change has problems" apart from "the reviewer
@@ -202,8 +210,7 @@ the hosted reviewers do implicitly; here it is a line in the workflow.
 ### Try it first
 
 `dry-run: true` prints the review to the log and the job
-summary and posts nothing. `nitpick explain-config` shows the prompt a path
-would get before a token is spent.
+summary and posts nothing. `nitpick explain-config` shows the resolved configuration for a path without running a model.
 
 ### Events
 
@@ -300,8 +307,8 @@ pull request number are detected automatically.
 ### Review identity and retries
 
 The Action's `bot-login` input identifies the account whose review history may
-be reused. For an App token, set it to the app slug followed by `[bot]`, for
-example `${{ format('{0}[bot]', steps.app.outputs.app-slug) }}`. For the CLI,
+be reused. For an App token, set it to the app slug followed by `[bot]`, as the
+App example above does with `${{ vars.NITPICK_APP_SLUG }}[bot]`. For the CLI,
 set `NITPICK_BOT_LOGIN`; personal tokens can leave it unset to resolve their
 authenticated user. A comment's HTML markers alone establish no identity.
 

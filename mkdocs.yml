@@ -5,9 +5,8 @@ repo_url: https://github.com/jdziat/open-nitpick
 repo_name: jdziat/open-nitpick
 edit_uri: blob/main/
 
-# The docs directory is staged by `make docs`: README.md becomes guide.md and
-# docs/*.md are copied under docs/, so every relative link in the repository
-# resolves unchanged on the site. website/ holds only what the site adds.
+# `make docs` stages the docs tree under docs/ recursively and website/index.md
+# as the landing page. website/ holds the site assets and templates.
 docs_dir: .website
 site_dir: public
 strict: true
@@ -74,13 +73,16 @@ plugins:
   - search:
       separator: '[\s\-.]+'
 
-# edit_uri is resolved against the staged path, and three pages are staged under
-# a name they do not have in the repository.
+# edit_uri is resolved against the staged path, and two pages are staged under
+# a name they do not have in the repository. The hook rewrites those; the
+# check-view-source step fails the build if any rewritten link is dead.
 hooks:
   - website/hooks/page_sources.py
 
 extra_css:
   - assets/extra.css
+extra_javascript:
+  - assets/navigation.js
 
 markdown_extensions:
   - admonition
@@ -99,24 +101,31 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Guide:
-      - Overview: guide.md
-      - Usage: docs/usage.md
+  - Get started:
+      - First review: docs/getting-started.md
       - GitHub Actions and other CI: docs/ci.md
+  - Guide:
+      - Overview: docs/guide.md
+      - Review a change: docs/guide/reviewing-changes.md
+      - Agents and MCP: docs/guide/agents-and-mcp.md
       - Configuration: docs/configuration.md
-      - Configuration reference: docs/configuration-reference.md
-      - Analyzers: docs/analyzers.md
       - Providers and models: docs/providers.md
+      - How a review runs: docs/how-a-review-runs.md
       - Trust model: docs/trust-model.md
       - Security policy: docs/security.md
-      - How a review runs: docs/how-a-review-runs.md
+      - All workflows: docs/usage.md
+  - CLI reference:
+      - All commands: docs/reference/cli.md
+      - Configuration reference: docs/configuration-reference.md
+      - Analyzers: docs/analyzers.md
+  - Project:
       - Development: docs/development.md
-  - Measurement:
-      - Rules: docs/measurement.md
+      - Measurement rules: docs/measurement.md
       - Findings: docs/findings.md
       - Model breakdown: docs/model-breakdown.md
       - Against Incumbent: docs/comparison.md
       - Remediation: docs/remediation.md
+
 extra:
   generator: false
   social:
