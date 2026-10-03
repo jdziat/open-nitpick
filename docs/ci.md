@@ -120,7 +120,7 @@ it a one-hour static token, which can expire before a long review publishes:
         with:
           app-installation-id: ${{ secrets.NITPICK_APP_INSTALLATION_ID }}
           app-private-key: ${{ secrets.NITPICK_APP_PRIVATE_KEY }}
-          bot-login: my-review-app[bot]
+          bot-login: ${{ vars.NITPICK_APP_SLUG }}[bot]
           provider: openrouter
           model: z-ai/glm-5.3-flash
           api-key: ${{ secrets.OPENROUTER_API_KEY }}

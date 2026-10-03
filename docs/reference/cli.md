@@ -172,6 +172,9 @@ also accepts the following local-only controls.
 | Extra flag | Meaning |
 | --- | --- |
 | `-level` | Review level: `minimal`, `normal`, or `pedantic` (the default). |
+| `-dry-run` | Print the result instead of attempting to publish it. Improve does not publish from the CLI. |
+| `-profile` | Select an optional assessment profile; use `engineering` for the engineering checks. |
+| `-skip-draft` | Skip a draft pull request when a pull-request target is supplied. |
 | `-slop` | Include slop findings (default `true`). Set `-slop=false` to leave them out. |
 
 ## `slop`

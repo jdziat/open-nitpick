@@ -14,7 +14,9 @@ sections = {
 }
 source = Path('cmd/nitpick/main.go').read_text()
 commands = set(re.findall(r'^\s*case "([a-z][a-z-]+)"', source, re.M)) - {'help'}
-commands.update({'mcp install', 'mcp clients', 'auth set', 'auth delete', 'auth list'})
+for prefix, path in (('mcp', 'cmd/nitpick/mcp.go'), ('auth', 'cmd/nitpick/auth.go')):
+    subcommands = re.findall(r'^\s*case \"([a-z][a-z-]+)\"', Path(path).read_text(), re.M)
+    commands.update(f'{prefix} {subcommand}' for subcommand in subcommands)
 inherits = {'fast-review': 'review', 'improve': 'review', 'repo-score': 'full-review'}
 errors = []
 for command in sorted(commands):
@@ -27,7 +29,8 @@ for command in sorted(commands):
     result = subprocess.run([binary, *command.split(), '-h'], stdin=subprocess.DEVNULL,
                             capture_output=True, text=True, timeout=15)
     if result.returncode:
-        errors.append(f'{command}: help exited {result.returncode}')
+        detail = next((line.strip() for line in result.stderr.splitlines() if line.strip()), '')
+        errors.append(f'{command}: help exited {result.returncode}: {detail}')
         continue
     flags = set(re.findall(r'^  (-[a-z][a-z0-9-]*)(?=\s|$)', result.stdout + result.stderr, re.M))
     section = sections[command]

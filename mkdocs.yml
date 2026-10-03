@@ -5,9 +5,8 @@ repo_url: https://github.com/jdziat/open-nitpick
 repo_name: jdziat/open-nitpick
 edit_uri: blob/main/
 
-# The docs directory is staged by `make docs`: README.md becomes guide.md and
-# docs/*.md are copied under docs/, so every relative link in the repository
-# resolves unchanged on the site. website/ holds only what the site adds.
+# `make docs` stages docs/*.md under docs/ and website/index.md as the landing
+# page. website/ holds the site assets and templates.
 docs_dir: .website
 site_dir: public
 strict: true
