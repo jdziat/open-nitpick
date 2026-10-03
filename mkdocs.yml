@@ -5,8 +5,8 @@ repo_url: https://github.com/jdziat/open-nitpick
 repo_name: jdziat/open-nitpick
 edit_uri: blob/main/
 
-# `make docs` stages docs/*.md under docs/ and website/index.md as the landing
-# page. website/ holds the site assets and templates.
+# `make docs` stages the docs tree under docs/ recursively and website/index.md
+# as the landing page. website/ holds the site assets and templates.
 docs_dir: .website
 site_dir: public
 strict: true
@@ -74,8 +74,8 @@ plugins:
       separator: '[\s\-.]+'
 
 # edit_uri is resolved against the staged path, and two pages are staged under
-# a name they do not have in the repository; check-view-source.py proves every
-# rewritten link resolves.
+# a name they do not have in the repository. The hook rewrites those; the
+# check-view-source step fails the build if any rewritten link is dead.
 hooks:
   - website/hooks/page_sources.py
 

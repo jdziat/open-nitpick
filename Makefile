@@ -75,8 +75,8 @@ docs: docs-reference
 	for f in $$(find .website/docs -name '*.md'); do sed -E -e 's#\]\(\.\./(internal|cmd|action|notes|\.github)/#](https://github.com/jdziat/open-nitpick/blob/main/\1/#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
 	mkdocs build
 	# edit_uri is resolved against the staged path, so a page staged under a
-	# name the repository does not have ships a dead View source link. The
-	# hook rewrites the ones that differ; this proves the rewrites are complete.
+	# name the repository does not have ships a dead View source link. This
+	# scans every built page's link and fails on a target that is not a file.
 	./scripts/check-view-source.py
 
 docs-serve: docs

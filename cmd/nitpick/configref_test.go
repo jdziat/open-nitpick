@@ -33,3 +33,29 @@ func TestConfigReferenceSupportsStandaloneSourcesAndOptionalCommitDocs(t *testin
 		t.Fatalf("supplemental documentation was lost: %v", err)
 	}
 }
+
+// The index is generated from the same walk that emits the sections. If it
+// ever fell back to a hand-written list, a new top-level key would add a `##`
+// heading the index does not name, and `git diff --exit-code` cannot see it
+// because the header is part of the generated output.
+func TestConfigReferenceIndexNamesEverySection(t *testing.T) {
+	var out bytes.Buffer
+	if err := runConfigRef([]string{"-src", "../../internal/config"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	page := out.String()
+	headings := map[string]bool{}
+	for _, line := range strings.Split(page, "\n") {
+		if name, ok := strings.CutPrefix(line, "## "); ok {
+			headings[name] = true
+		}
+	}
+	if len(headings) < 2 {
+		t.Fatalf("expected several sections, found %d", len(headings))
+	}
+	for name := range headings {
+		if !strings.Contains(page, "["+name+"](#"+name+")") {
+			t.Errorf("section %q has no entry in the index", name)
+		}
+	}
+}
