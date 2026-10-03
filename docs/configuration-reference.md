@@ -16,6 +16,15 @@ through its sections in alphabetical order:
 [persona](#persona), [practices](#practices), [review](#review),
 [security](#security), [standards](#standards) and [validation](#validation).
 
+Regenerate with `nitpick config-reference -o docs/configuration-reference.md`,
+which `make docs` runs and CI checks. That check diffs this file against
+what the generator produces now, so a key the generator reaches cannot drift
+from its entry. It says nothing about a key the generator never walks to, and
+nothing fails when it stops short. One field it cannot walk into is
+`fallback`, a model block inside a model block: walking it does not
+terminate, so it is emitted as a `same keys as …` entry naming the block
+whose keys it repeats.
+
 Model settings include provider credentials and routing; review settings
 control scope, concurrency, findings, and merge gates.
 
