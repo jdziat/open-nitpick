@@ -1,55 +1,90 @@
-# Review a change
+# Review changes
 
-Choose the smallest pass that answers your question. All review commands accept
-`-base`, `-head`, `-config`, `-instruction`, `-dry-run`, `-fail-on`, and
-`-log-format` unless their [CLI reference](../reference/cli.md) says otherwise.
+Choose a pass by the question you need answered. The exact accepted flags vary
+by command; the [CLI reference](../reference/cli.md) is the command contract.
+
+## Choose a pass
+
+### Review the change you are about to commit
+
+`nitpick review` examines uncommitted changes by default, or a range with
+`-base` and `-head`. It prints locally and can publish when supplied
+pull-request flags and GitHub credentials.
+
+### Get a quick first pass
+
+`nitpick fast-review` examines eligible changed diffs and ranks at most ten
+findings. It prints locally and can publish when supplied pull-request flags
+and GitHub credentials.
+
+### Assess a repository or focused directory
+
+`nitpick full-review [paths...]` inspects the whole tree by default, or the
+paths you name, and writes the broader assessment and remediation plan. It
+prints locally.
+
+`nitpick repo-score [paths...]` runs the same wider assessment and adds a
+scorecard for comparing the same repository over time. It prints locally.
+
+### Ask for improvement feedback on a pull request
+
+`@open-nitpick improve` reviews naming, documentation, structure, idiom, and
+slop after the normal review. It replies on GitHub and does not block a merge.
 
 ## Normal review
 
+Run a normal review from a repository with uncommitted changes:
+
 ```bash
-nitpick review                         # uncommitted changes
-nitpick review -base origin/main -head HEAD
+nitpick review -dry-run
 ```
 
-Use this for ordinary pull requests. The engine narrows later runs to work not
-already completed when `review.incremental` is enabled. Add `-full` when you
-need to discard that reuse for one run.
+Add `-base main -head HEAD` when you want an explicit range. `-dry-run` keeps a
+GitHub-capable review from publishing. The result includes a walkthrough,
+findings, coverage, and incomplete stages when planned work did not finish.
+Do not read zero findings as an approval until completion is true.
 
 ## Fast review
 
 ```bash
-nitpick fast-review -base origin/main -head HEAD
+nitpick fast-review -dry-run
 ```
 
-Use this while iterating. It prioritizes the highest-value findings and returns
-quickly; it is intentionally not evidence that every changed file was reviewed.
-Use normal review before merging.
+Fast review examines eligible changed diffs and returns the ten highest-ranked
+findings. Use it for an early signal; use a normal review when the merge
+workflow needs its full configured assessment. `-full` bypasses incremental
+narrowing for this run.
 
-## Whole-repository review
+## Whole-tree review and score
 
 ```bash
-nitpick full-review -repo .
-nitpick repo-score -repo .
+nitpick full-review ./internal ./cmd
+nitpick repo-score
 ```
 
-`full-review` reads the whole tree rather than a diff. `repo-score` adds a
-scorecard and remediation plan. These runs can be expensive because every
-eligible source file is in scope; use them for a baseline, release review, or
-large refactor rather than every commit.
+The full pass reviews every eligible file in the named paths, or the repository
+when paths are omitted. It can be expensive because it includes model work over
+the selected tree. `repo-score` adds a scorecard; use it for comparing the same
+repository over time, not as a judgment of a project.
 
-## Wider suggestions
+## Ask for improvement feedback on a pull request
 
-```bash
-nitpick improve -level pedantic -base origin/main -head HEAD
+On a pull request, mention the reviewer in a conversation comment or inline
+thread:
+
+```text
+@open-nitpick improve
 ```
 
-`improve` includes categories a normal review filters out. Use it to find
-broader design or maintainability opportunities. Treat its suggestions as a
-backlog, not a merge gate, unless you deliberately override `-fail-on`.
+It reviews naming, documentation, structure, idiom, and slop. An inline request
+covers that file; a conversation request covers the change. It replies with a
+single comment and does not create findings that block a merge.
 
-## Read the coverage before acting
+## Incremental reviews
 
-A completed run lists files examined, files skipped and why, analyzers that ran,
-and analyzers that did not. Investigate incomplete coverage before treating an
-empty report as approval. See [how a review runs](../how-a-review-runs.md) for
-the stages and [CLI reference](../reference/cli.md#review-commands) for flags.
+A GitHub review can reuse completed model work when its code, context, model,
+and policy still match. New commits rerun affected work; unresolved commented
+files are rechecked so their threads can be confirmed or closed. Use
+`nitpick review -full` or `@open-nitpick restart-review` to inspect the whole
+change again. [CI incremental review](../ci.md#incremental-review) explains the
+stored progress and fallbacks.

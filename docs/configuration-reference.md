@@ -1,17 +1,14 @@
 # Configuration reference
 
-Every key `.nitpick.yaml` accepts, generated from the configuration the
-binary was built with. [Configuration](configuration.md) is the same settings
-argued for rather than listed; this page is the index.
+Look up the type, default, and meaning of a `.nitpick.yaml` key.
+For a working starting configuration and common changes, use the
+[configuration guide](configuration.md). To see the settings and prompts your
+checkout will actually use, run `nitpick explain-config`.
 
-Regenerate with `nitpick config-reference -o docs/configuration-reference.md`,
-which `make docs` runs and CI checks. That check diffs this file against
-what the generator produces now, so a key the generator reaches cannot drift
-from its entry. It says nothing about a key the generator never walks to, and
-nothing fails when it stops short. One field it cannot walk into is
-`fallback`, a model block inside a model block: walking it does not
-terminate, so it is emitted as a `same keys as …` entry naming the block
-whose keys it repeats.
+Find a key with site search or your browser's Find command. Sections group keys
+by purpose: [models](#models), [review](#review), [linters](#linters), and
+[security](#security). Model settings include provider credentials and routing;
+review settings control scope, concurrency, findings, and merge gates.
 
 `[]` marks a list whose entries carry the keys beneath it,
 `<name>` a map whose keys you choose, and `same keys as …` a block

@@ -8,28 +8,24 @@ hide:
 
 # Pull request review you can read the source of.
 
-<p class="np-lede">open-nitpick reads a pull request, reviews it with a model you choose, and posts inline comments. Run it as a GitHub Action, as a CLI in any CI, or against your working tree before the pull request exists. Nothing is hosted, nothing is priced per seat, and your code stays with you.</p>
+<p class="np-lede">open-nitpick reviews pull requests with the model provider you choose and can post inline comments. Run it as a GitHub Action, in any CI system, from an agent, or against local changes before a pull request exists. The reviewer is self-hosted; review input is sent to the model provider you configure. Choose a local provider to keep review input on your machine.</p>
 
 <div class="np-actions" markdown>
 [Get started](docs/getting-started.md){ .md-button .md-button--primary }
 [CLI reference](docs/reference/cli.md){ .md-button }
-[Read the measurements](docs/findings.md){ .md-button }
-[Source on GitHub](https://github.com/jdziat/open-nitpick){ .md-button }
+[Set up CI](docs/ci.md){ .md-button }
 </div>
 
-<div class="np-stat" markdown>
-<div markdown><strong>5</strong><span>corpora, four re-runnable</span></div>
-<div markdown><strong>20</strong><span>instrument bugs recorded</span></div>
-<div markdown><strong>1</strong><span>published claim retracted</span></div>
-</div>
-<p class="np-fine">Corpora and the retraction as of 2026-09-05. The instrument-bug count is the number of rows in <a href="docs/findings/">the findings</a> table, and a test holds this figure to it.</p>
+<p class="np-fine"><a href="docs/guide/reviewing-changes.md">Review changes</a> · <a href="docs/configuration.md">Configure models and policy</a> · <a href="docs/guide/agents-and-mcp.md">Use from an agent</a> · <a href="docs/usage.md">All workflows</a> · <a href="docs/trust-model.md">Trust model</a></p>
+
+<p class="np-fine">Read the <a href="docs/providers.md">provider guidance</a> before selecting a hosted endpoint, inspect the <a href="docs/findings.md">measurements</a>, or read the <a href="https://github.com/jdziat/open-nitpick">source on GitHub</a>.</p>
 
 </div>
 
 <div class="np-prose" markdown>
 
 ```bash
-# A signed binary, or `go install …/cmd/nitpick@latest` with Go 1.25.5.
+# A release binary, or `go install …/cmd/nitpick@latest` with Go 1.26.0.
 v=$(gh release view --repo jdziat/open-nitpick --json tagName -q .tagName)
 os=$(uname -s | tr 'A-Z' 'a-z'); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
 curl -fsSLo nitpick "https://github.com/jdziat/open-nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"

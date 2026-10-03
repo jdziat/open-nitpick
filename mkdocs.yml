@@ -81,6 +81,8 @@ hooks:
 
 extra_css:
   - assets/extra.css
+extra_javascript:
+  - assets/navigation.js
 
 markdown_extensions:
   - admonition
@@ -111,6 +113,7 @@ nav:
       - How a review runs: docs/how-a-review-runs.md
       - Trust model: docs/trust-model.md
       - Security policy: docs/security.md
+      - All workflows: docs/usage.md
   - CLI reference:
       - All commands: docs/reference/cli.md
       - Configuration reference: docs/configuration-reference.md
