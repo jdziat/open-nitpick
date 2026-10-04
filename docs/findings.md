@@ -2610,3 +2610,5 @@ for each changed file; trimming that remains open.
 
 Limits: one change, one model. The recall table is two runs per fixture and uses
 the harness's deterministic columns; no judge was used.
+
+The first CI review under reasoning: low is run on this change; its wall clock is recorded in the pull request.
