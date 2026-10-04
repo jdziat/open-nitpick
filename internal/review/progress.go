@@ -20,6 +20,7 @@ const progressVersion = 1
 type reviewProgress struct {
 	mu      sync.Mutex
 	policy  string
+	head    string
 	prior   map[string]json.RawMessage
 	current map[string]json.RawMessage
 	reused  int
@@ -48,10 +49,24 @@ func (e *Engine) startProgress(pr *vcs.PullRequest, prior *vcs.PriorReview) {
 	if !e.Full && prior != nil {
 		var record progressRecord
 		if json.Unmarshal(prior.Progress, &record) == nil && record.Version == progressVersion {
+			p.head = record.Head
 			p.prior = record.Results
 		}
 	}
 	e.progress = p
+}
+
+// savedHead is the revision the earlier attempt's checkpoint was taken at,
+// empty when no checkpoint was read. It can name a head the forge has no
+// completion marker for, which is the case that matters here: a run that
+// crashed after saving progress left files this one can trust as unchanged.
+func (p *reviewProgress) savedHead() string {
+	if p == nil {
+		return ""
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.head
 }
 
 func (p *reviewProgress) key(client *llm.Client, base, body string) string {
@@ -66,6 +81,9 @@ func (p *reviewProgress) key(client *llm.Client, base, body string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// load answers cache hits. An empty key never matches: the standing-only
+// recheck clears the key to force a live call, and every key a real batch
+// renders is a hash of content that cannot be empty.
 func (p *reviewProgress) load(key string) ([]Finding, bool) {
 	if p == nil || key == "" {
 		return nil, false
@@ -85,6 +103,7 @@ func (p *reviewProgress) load(key string) ([]Finding, bool) {
 	return result, true
 }
 
+// save records a batch's findings under the same key contract load reads.
 func (p *reviewProgress) save(key string, findings []Finding) {
 	if p == nil || key == "" {
 		return

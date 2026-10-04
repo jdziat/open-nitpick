@@ -192,6 +192,66 @@ func TestStandingCommentDoesNotWidenScopeToUntouchedFiles(t *testing.T) {
 	if report.Plan.Files() != 2 {
 		t.Errorf("planned %d file(s), want the two narrowed files sent to the model", report.Plan.Files())
 	}
+	if len(report.Incremental.StandingOnly) != 1 || !report.Incremental.StandingOnly["third.go"] {
+		t.Errorf("standing-only = %v, want only third.go: app.go changed, so the cache may answer for it", report.Incremental.StandingOnly)
+	}
+}
+
+// StandingOnly says a file was read on content that did not change, so a
+// full walk that cannot compare revisions must not claim it: without the
+// comparison there is no way to separate a standing comment's file from one
+// this push rewrote, and a rewritten file misses the cache by key anyway.
+func TestFullRecheckWithoutComparisonClaimsNoUnchangedContent(t *testing.T) {
+	appFinding := Finding{Path: "app.go", Line: 4, Class: "correctness", Title: "Ignored error from http.Get"}
+	model := &scriptedLLM{fallback: mustJSON(t, Result{Findings: []Finding{appFinding}})}
+	provider := &incrementalProvider{
+		stubProvider: stubProvider{diff: threeFileDiff},
+		head:         "new",
+		prior: &vcs.PriorReview{Head: "old", Comments: []vcs.PriorComment{
+			{Path: "third.go", Line: 4, Class: "style", Fingerprint: "deadbeef"},
+		}},
+		ok: false,
+	}
+
+	report, err := newEngine(t, model, provider, nil).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go,other.go,third.go" {
+		t.Errorf("reviewed = %q, want the whole diff when narrowing is unavailable", got)
+	}
+	if len(report.Incremental.StandingOnly) != 0 {
+		t.Errorf("standing-only = %v, want empty: no comparison established unchanged content", report.Incremental.StandingOnly)
+	}
+	if !report.Incremental.Recheck {
+		t.Error("recheck = false, want true: a standing comment still forced the full walk")
+	}
+}
+
+// Comments outlive the diff they were placed on: a later push can drop a file
+// while an older comment on it stays open, and the latest review's head is
+// then the head of this run. StandingOnly must still name only files this
+// run read, so the dropped path is not reported as rechecked content.
+func TestSameHeadStandingCommentOnARemovedFileStaysOutOfReviewed(t *testing.T) {
+	model := &scriptedLLM{fallback: mustJSON(t, Result{})}
+	provider := &incrementalProvider{
+		stubProvider: stubProvider{diff: incrementalDiff},
+		head:         "new",
+		prior: &vcs.PriorReview{Head: "new", Comments: []vcs.PriorComment{
+			{Path: "gone.go", Line: 3, Class: "style", Fingerprint: "deadbeef"},
+		}},
+	}
+
+	report, err := newEngine(t, model, provider, nil).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go,other.go" {
+		t.Errorf("reviewed = %q, want the diff; gone.go was not read", got)
+	}
+	if len(report.Incremental.StandingOnly) != 0 {
+		t.Errorf("standing-only = %v, want empty: gone.go is not in the diff", report.Incremental.StandingOnly)
+	}
 }
 
 func TestIncrementalFallsBackToFullReviewAfterForcePush(t *testing.T) {
