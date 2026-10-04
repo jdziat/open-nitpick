@@ -2621,5 +2621,5 @@ Confirmed in CI after the config merged (the review job, one run each):
 The same kind of change took 12m55s and 14m on the previous config. Of the
 2m48s on the one-file change, about 64s passed between the models being ready
 and the batch starting, which is fixed cost that does not shrink with the diff.
-Validation took about 20s to 40s. Time now moves little with change size, and
+On the five-file change triage took 20s and validation 22s. Time now moves little with change size, and
 the fixed pre-batch step is the next thing to measure.
