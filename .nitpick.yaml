@@ -8,6 +8,13 @@ models:
   default:
     provider: openrouter
     model: z-ai/glm-5.3-flash
+    # Batches of 8 to 13 files answered in two minutes on this model; the one
+    # that did not answer in ten (run 37223195160, 55k tokens) never would
+    # have. A call that has not finished in four is handed to the fallback
+    # instead of holding the job for the default ten.
+    timeout: 4m
+    fallback:
+      model: qwen/qwen3.8-27b
 
   triage:
     provider: openrouter

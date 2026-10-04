@@ -701,11 +701,37 @@ func TestExtractStopsRetryingOnceOneTimeoutOfWallClockIsSpent(t *testing.T) {
 		t.Fatalf("a stall that used the whole timeout: calls = %d, err = %v; want 1 call and an error", fake.callCount(), err)
 	}
 
-	// Under budget the retry still happens, so the bound is not simply "no retries".
+	// Under budget the retry still happens, so the bound is a time limit and retries still happen.
 	fake = newFakeLLM(stall(), turn{content: validJSON})
 	got, err := Extract[result](context.Background(), newClient(fake, time.Second), nil)
 	if err != nil || fake.callCount() != 2 {
 		t.Fatalf("a quick stall: calls = %d, err = %v; want 2 calls and an answer", fake.callCount(), err)
 	}
 	assertOneFinding(t, got)
+}
+
+// A request that stalled past the retry budget is the model's batch to lose
+// elsewhere: the route had its chance, a different model is the only thing
+// left. A caller that cancelled is not a stall, and neither is a bare error.
+func TestAStallThatExhaustedItsRetriesEscalates(t *testing.T) {
+	stall := func() turn { return turn{err: fmt.Errorf("openai: generate content: %w", stallErr{})} }
+	for _, mode := range []config.StructuredMode{config.StructuredSchema, config.StructuredJSON} {
+		fake := newFakeLLM(stall())
+		client := newTestClient(fake, mode)
+		client.Spec.Timeout = time.Minute
+		var at time.Time
+		client.clock = func() time.Time { at = at.Add(2 * time.Minute); return at }
+
+		_, err := Extract[result](context.Background(), client, nil)
+		if err == nil || !ShouldEscalate(err) {
+			t.Errorf("%s: err = %v; a stall that used its budget must reach the fallback", mode, err)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	fake := newFakeLLM(stall())
+	if _, err := Extract[result](ctx, newTestClient(fake, config.StructuredSchema), nil); ShouldEscalate(err) {
+		t.Errorf("a cancelled caller escalated: %v", err)
+	}
 }

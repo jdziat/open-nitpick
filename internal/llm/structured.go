@@ -134,7 +134,7 @@ func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, c
 			continue
 		}
 		c.logRetryOutcome(attempt, err)
-		return value, raw, err
+		return value, raw, markStalled(ctx, err)
 	}
 }
 
@@ -153,8 +153,25 @@ func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call [
 			continue
 		}
 		c.logRetryOutcome(attempt, err)
-		return resp, err
+		return resp, markStalled(ctx, err)
 	}
+}
+
+// stalledError is a request that timed out and was not, or could not be,
+// answered by sending it again. Nothing about the transport is left to try on
+// this model, so a different one is the only remaining option. It keeps the
+// original error text and chain.
+type stalledError struct{ err error }
+
+func (e *stalledError) Error() string { return e.err.Error() }
+func (e *stalledError) Unwrap() error { return e.err }
+
+// markStalled tags err when it is a stall that the retry loop gave up on.
+func markStalled(ctx context.Context, err error) error {
+	if stalled(ctx, err) {
+		return &stalledError{err: err}
+	}
+	return err
 }
 
 // retryAfter decides whether an attempt is sent again and with what options.
@@ -922,18 +939,24 @@ func (c *Client) Fallback() *Client {
 // ShouldEscalate reports whether a failure is one a different model might
 // answer.
 //
-// One class, and it is about the model rather than the transport: structured
-// output that never parsed, which is what a runaway generation comes back as
-// once the cap has cut it mid-JSON.
+// Two classes. Structured output that never parsed, which is what a runaway
+// generation comes back as once the cap has cut it mid-JSON. And a request that
+// stalled past its retries: the same model on the same route has already had
+// its chance, and on a 55k-token batch that chance is a whole call timeout
+// (issue #161 spent 10 minutes on one, then failed the batch with no fallback).
 //
 // Not a bare truncation. A first attempt cut at a cap the caller chose never
 // reaches the re-sampling in retryAfter, and the fallback overlays its parent
 // and inherits that same cap, so escalating there would spend a second budget
-// to be cut in the same place. A timeout, a refused credential or a cancelled
-// context are none of a second model's business.
+// to be cut in the same place. A refused credential or a cancelled context
+// are none of a second model's business.
 func ShouldEscalate(err error) bool {
 	if err == nil {
 		return false
+	}
+	var st *stalledError
+	if errors.As(err, &st) {
+		return true
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
