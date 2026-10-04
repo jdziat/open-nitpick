@@ -51,7 +51,11 @@ func combineDesignBatches(first, next bundle.Batch, maxFiles, maxTokens int) (bu
 		prior.Tokens = llms.DefaultTokenEstimator().EstimateTokens(bundle.Render(prior))
 		combined.Entries[at] = prior
 	}
-	if len(combined.Entries) > maxFiles {
+	// maxFiles <= 0 is read as "no file-count ceiling," matching the
+	// convention review.max_files (config.go) uses for the same shape of
+	// value: a design-pass merge call that wants only the token budget to
+	// bind passes 0 here rather than a magic sentinel.
+	if maxFiles > 0 && len(combined.Entries) > maxFiles {
 		return bundle.Batch{}, false
 	}
 	combined.Tokens = llms.DefaultTokenEstimator().EstimateTokens(bundle.RenderBatch(combined))
