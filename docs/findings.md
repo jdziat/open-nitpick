@@ -2610,3 +2610,16 @@ for each changed file; trimming that remains open.
 
 Limits: one change, one model. The recall table is two runs per fixture and uses
 the harness's deterministic columns; no judge was used.
+
+Confirmed in CI after the config merged (the review job, one run each):
+
+| change | review job | batches | longest batch |
+|---|---:|---|---:|
+| 1 file (docs/findings.md, 42k tokens) | 2m48s | 1 | 37s |
+| 5 files (the #161 change, 3 batches up to 55k tokens) | 3m39s | 3 | 30s |
+
+The same kind of change took 12m55s and 14m on the previous config. Of the
+2m48s on the one-file change, about 64s passed between the models being ready
+and the batch starting, which is fixed cost that does not shrink with the diff.
+On the five-file change triage took 20s and validation 22s. Time now moves little with change size, and
+the fixed pre-batch step is the next thing to measure.
