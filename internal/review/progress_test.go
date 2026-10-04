@@ -87,6 +87,14 @@ func TestResumeRetriesFailedBatchAndProvesEmptyCoverage(t *testing.T) {
 	}
 }
 
+// TestResumeRetainsFindingsAndStandingThreads pins the fix for threads that
+// never closed: a file in scope only because a comment stands on it must get
+// a live model call on every resumed run, even though its content, and so
+// its batch hash, did not change. Reusing the cached verdict here would mean
+// the finding "recurs" because it was never asked about again, not because
+// the model reaffirmed it, and superseded would then never see it stop
+// recurring. The finding is still withheld as already-reported, by
+// fingerprint match against the standing comment rather than by cache reuse.
 func TestResumeRetainsFindingsAndStandingThreads(t *testing.T) {
 	finding := Finding{Path: "app.go", Line: 4, Severity: "error", Class: "correctness", Category: "correctness", Title: "Ignored response error", Rationale: "The response may be nil."}
 	model := &scriptedLLM{fallback: mustJSON(t, Result{Findings: []Finding{finding}})}
@@ -101,11 +109,45 @@ func TestResumeRetainsFindingsAndStandingThreads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.ReusedRequests != 1 || len(report.AlreadyReported) != 1 || len(provider.published.Comments) != 0 || provider.published.Event != vcs.EventComment {
+	if report.ReusedRequests != 0 || len(report.AlreadyReported) != 1 || len(provider.published.Comments) != 0 || provider.published.Event != vcs.EventComment {
 		t.Fatalf("resume lost standing finding: reused=%d already=%v event=%s", report.ReusedRequests, report.AlreadyReported, provider.published.Event)
 	}
 	if !strings.Contains(strings.Join(model.prompts(), "\n"), "triaging findings") {
 		t.Fatal("combined findings bypassed triage")
+	}
+	if !strings.Contains(strings.Join(model.prompts(), "\n"), "Review the following changes") {
+		t.Fatal("standing comment's file answered from the progress cache instead of a live call")
+	}
+}
+
+// TestStandingOnlyScopeDoesNotOutliveTheRun pins the other half of the same
+// fix: Review can be called more than once on one Engine, so the standing-only
+// map is per-run. A run with no Incremental note must not inherit the previous
+// run's map and exempt files from the progress cache forever.
+func TestStandingOnlyScopeDoesNotOutliveTheRun(t *testing.T) {
+	finding := Finding{Path: "app.go", Line: 4, Severity: "error", Class: "correctness", Category: "correctness", Title: "Ignored response error", Rationale: "The response may be nil."}
+	model := &scriptedLLM{fallback: mustJSON(t, Result{Findings: []Finding{finding}})}
+	provider := &incrementalProvider{stubProvider: stubProvider{diff: engineDiff}, head: "abcdef"}
+	e := resumeEngine(t, model, provider)
+	if _, err := e.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatal(err)
+	}
+
+	provider.prior = &vcs.PriorReview{Progress: provider.published.Progress, Comments: []vcs.PriorComment{{ID: 1, Path: finding.Path, Line: finding.Line, Fingerprint: Fingerprint(finding), Class: finding.Class}}}
+	if _, err := e.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.standingOnly) == 0 {
+		t.Fatal("standing recheck did not mark its file, so nothing exercised the per-run reset")
+	}
+
+	// The comment is gone, so this run has no standing files at all.
+	provider.prior = &vcs.PriorReview{Progress: provider.published.Progress}
+	if _, err := e.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.standingOnly) != 0 {
+		t.Fatalf("standing-only scope outlived its comment: %v", e.standingOnly)
 	}
 }
 

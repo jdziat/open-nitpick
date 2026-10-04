@@ -202,3 +202,29 @@ func TestIgnoredFilesKeepTheirThreadsWithoutBlockingReviewedThreads(t *testing.T
 		t.Fatal("approved while an ignored file still carries an open thread")
 	}
 }
+
+// TestDesignTaskSkipDoesNotExcludeItsOwnFileFromThreadResolution pins the
+// sibling of #150's fix, one level later in the same pipeline: superseded and
+// resolveClearedForApprove both exclude every path named anywhere in a skip
+// list from thread resolution, and under the engineering profile that skip
+// list is the design-task packing plan's own Skipped, keyed by a task's
+// "exceeds review.max_files_per_request" budget decision rather than a file
+// the plain code review left unread (see reusableCoverage's comment). Feeding
+// that list in unfiltered, the way the two callers did before
+// unreadFileSkips existed, would make a design-task skip permanently block
+// its own file's standing threads even though the file was read.
+func TestDesignTaskSkipDoesNotExcludeItsOwnFileFromThreadResolution(t *testing.T) {
+	r := &Report{DesignExecution: &DesignExecution{}, Plan: &bundle.Plan{Skipped: []bundle.Skip{
+		{Path: "app.go", Reason: "package:app: complete design task exceeds review.max_files_per_request"},
+	}}}
+	if got := r.unreadFileSkips(); len(got) != 0 {
+		t.Fatalf("unreadFileSkips = %+v, want none: a design task's own budget skip is not missing code-review coverage", got)
+	}
+
+	// The same skip under the plain (non-engineering) profile names a file
+	// the review could not read, and must still exclude it.
+	r2 := &Report{Plan: &bundle.Plan{Skipped: []bundle.Skip{{Path: "big.go", Reason: bundle.ReasonIgnored}}}}
+	if got := r2.unreadFileSkips(); len(got) != 1 || got[0].Path != "big.go" {
+		t.Fatalf("unreadFileSkips = %+v, want [big.go]: a plain-profile skip is a real coverage gap", got)
+	}
+}

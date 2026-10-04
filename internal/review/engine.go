@@ -125,6 +125,12 @@ type Engine struct {
 	// Resume reuses successful model requests while rerunning downstream checks.
 	Resume   bool
 	progress *reviewProgress
+
+	// standingOnly names files pulled into this run's scope solely to
+	// recheck an open comment, set from Incremental.StandingOnly right after
+	// narrowing. analyzeBatchWith reads it to keep the progress cache from
+	// answering for a batch holding one of them.
+	standingOnly map[string]bool
 }
 
 // LinterRunner produces deterministic findings for the changed files.
@@ -589,6 +595,18 @@ type Incremental struct {
 	// smaller than the whole change; Unchanged says what, if anything, that
 	// widening left out.
 	Recheck bool
+
+	// StandingOnly is the subset of Reviewed pulled into scope solely to
+	// recheck an open comment, on content that did not itself change: empty
+	// means either no recheck ran or the run could not compare revisions, so
+	// it cannot say any file's content was unchanged. The
+	// progress cache must not answer for these: its key is a hash of the
+	// batch's rendered content, which an unchanged file reproduces exactly,
+	// so a cache hit here would replay the same verdict the open comment
+	// already carries rather than asking the model again. superseded and
+	// resolveClearedForApprove can then never see a finding stop recurring,
+	// and the thread stays open regardless of whether it still applies.
+	StandingOnly map[string]bool
 }
 
 // StageStatus records a required stage that did not complete.
@@ -653,6 +671,18 @@ func (r *Report) reusableCoverage() bool {
 		}
 	}
 	return true
+}
+
+// unreadFileSkips answers the same question as reusableCoverage's loop above,
+// for superseded and resolveClearedForApprove to withhold from thread
+// resolution: it excludes a design-task packing skip the same way, since
+// that names a task's own budget decision, not a file the review left
+// unread.
+func (r *Report) unreadFileSkips() []bundle.Skip {
+	if r.Plan == nil || r.DesignExecution != nil {
+		return nil
+	}
+	return r.Plan.Skipped
 }
 
 // ReusableCoverage reports whether this result can act as coverage for a later
@@ -815,6 +845,13 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		narrowPrior = nil
 	}
 	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, narrowPrior)
+	// Cleared per run: Review may be called more than once on one Engine, and a
+	// stale map would exempt files from the progress cache after the comments
+	// that justified it were closed.
+	e.standingOnly = nil
+	if report.Incremental != nil {
+		e.standingOnly = report.Incremental.StandingOnly
+	}
 	if e.FastLimit > 0 {
 		files = rankFiles(files)
 	}
@@ -1057,12 +1094,12 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		findings = findings[:e.FastLimit]
 	}
 	if report.reusableCoverage() {
-		report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported, plan.Skipped)
+		report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported, report.unreadFileSkips())
 		// A clean completed run under review.approve must not leave its own
 		// earlier threads open: reviewEvent refuses APPROVE while any stand,
 		// and a reader who sees COMMENT beside "0 findings" has no reason to
 		// trust the next push will close them either.
-		if more := e.resolveClearedForApprove(ctx, ref, prior, report, findings, plan.Skipped); len(more) > 0 {
+		if more := e.resolveClearedForApprove(ctx, ref, prior, report, findings, report.unreadFileSkips()); len(more) > 0 {
 			report.Superseded = append(report.Superseded, more...)
 		}
 	}
@@ -1265,11 +1302,35 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 		return files, nil
 	}
 	standing := len(prior.Comments) > 0
-	fullRecheck := func() (diff.Files, *Incremental) {
-		if standing {
-			return files, &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true}
+	// A standing comment can name a file this push no longer carries, so the
+	// set is filtered to the diff: StandingOnly is a subset of Reviewed, and
+	// an absent file was never read.
+	present := map[string]bool{}
+	for _, f := range files {
+		present[f.Path] = true
+	}
+	standingPaths := map[string]bool{}
+	for _, c := range prior.Comments {
+		if present[c.Path] {
+			standingPaths[c.Path] = true
 		}
-		return files, nil
+	}
+	// Only a same-head run can claim its standing comment files were checked
+	// on unchanged content: every other fallback reaches this point because
+	// the earlier head could not be compared, so nothing established that a
+	// standing file's content stayed put. A checkpoint from a failed attempt
+	// at this same push carries the head even though the forge has no
+	// completion marker for it, which is the retry case Resume exists for.
+	sameHead := pr.HeadSHA != "" && (prior.Head == pr.HeadSHA || e.progress.savedHead() == pr.HeadSHA)
+	fullRecheck := func() (diff.Files, *Incremental) {
+		if !standing {
+			return files, nil
+		}
+		note := &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true, StandingOnly: map[string]bool{}}
+		if sameHead {
+			note.StandingOnly = standingPaths
+		}
+		return files, note
 	}
 	if prior.Head == "" {
 		return fullRecheck()
@@ -1316,22 +1377,20 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 	for _, p := range changed {
 		moved[p] = true
 	}
-	// Widened so superseded and resolveClearedForApprove can still verify and
-	// close a standing thread on a file this push did not itself touch.
-	standingPaths := map[string]bool{}
-	if standing {
-		for _, c := range prior.Comments {
-			standingPaths[c.Path] = true
-		}
-	}
-
-	note := &Incremental{Since: prior.Head, Recheck: standing}
+	note := &Incremental{Since: prior.Head, Recheck: standing, StandingOnly: map[string]bool{}}
 	var kept diff.Files
 	for _, f := range files {
 		// A rename since the last review shows up under either name.
-		if moved[f.Path] || (f.OldPath != "" && moved[f.OldPath]) || standingPaths[f.Path] {
+		changedHere := moved[f.Path] || (f.OldPath != "" && moved[f.OldPath])
+		if changedHere || standingPaths[f.Path] {
 			kept = append(kept, f)
 			note.Reviewed = append(note.Reviewed, f.Path)
+			if !changedHere && standingPaths[f.Path] {
+				// In scope only because a comment is standing on it, not
+				// because this push touched it: the progress cache must not
+				// answer for this file (see StandingOnly's doc comment).
+				note.StandingOnly[f.Path] = true
+			}
 			continue
 		}
 		note.Unchanged = append(note.Unchanged, f.Path)
@@ -1816,6 +1875,19 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	}
 
 	key := e.progress.key(client, base, body.String())
+	if e.standingOnly != nil {
+		for _, p := range b.Paths() {
+			if e.standingOnly[p] {
+				// This batch holds a file in scope only to recheck an open
+				// comment on content that did not change: a cache hit would
+				// replay the same verdict the open comment already carries,
+				// not a fresh check of whether it still holds. See
+				// Incremental.StandingOnly.
+				key = ""
+				break
+			}
+		}
+	}
 	cached, reused := e.progress.load(key)
 	result := Result{Findings: cached}
 	if reused {
@@ -2439,11 +2511,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 			report.ResidualApprove = false
 			report.ResidualReason = ""
 		} else if prior != nil {
-			var skipped []bundle.Skip
-			if report.Plan != nil {
-				skipped = report.Plan.Skipped
-			}
-			if more := e.resolveClearedForApprove(ctx, ref, prior, report, report.Findings, skipped); len(more) > 0 {
+			if more := e.resolveClearedForApprove(ctx, ref, prior, report, report.Findings, report.unreadFileSkips()); len(more) > 0 {
 				report.Superseded = append(report.Superseded, more...)
 			}
 		}
