@@ -2567,3 +2567,47 @@ at 0/1 for every arm; deep/extreme recovered it on some arms. Extreme put
 no-ctx is already perfect and silent on deep; extreme adds noise without
 recall. Call: keep shipped depth at deep; do not promote extreme.
 
+
+## Review wall clock: reasoning effort, not batch size (2026-10-04)
+
+Issue #161 asked why a 2-file change took 14 to 35 minutes. Most of the time was
+the model thinking. glm-5.3-flash reasons by default, and OpenRouter rejects
+`reasoning: off` for it (`400: Reasoning is mandatory for this endpoint`), so
+the lowest setting available is `low`.
+
+Planted-defect fixtures (10 fixtures, 2 runs each, Together pinned so the host
+is held constant), default against `reasoning: low`:
+
+| | runs | planted found | unexplained findings | mean seconds per review |
+|---|---:|---:|---:|---:|
+| default | 20 | 18/20 | 6 | 57 |
+| low | 20 | 17/20 | 7 | 6 |
+
+Both arms missed `sorted-for-min-nit` in both runs. `low` also missed
+`cross-file-copy-nit` once. One defect out of 20 is a gap these 20 runs cannot
+tell apart from no gap, so this shows that the corpus did not expose a recall
+loss at `low`, not that there is none.
+
+The 6-file change from #161, reviewed whole and dry-run (4 batches of 1, 7, 11
+and 13 entries, up to 55k tokens), from start to the publish step:
+
+| | reviewing batches | to publish | batches that reached the 4 minute timeout |
+|---|---:|---:|---:|
+| default, Fireworks pinned | 7m26s | 8m32s | 2 of 4, both escalated |
+| default, Together pinned | over 8m, 1 batch failed | 10m40s | 2 of 4, one then failed |
+| low, Together pinned | 1m16s | 1m43s | 0 of 4 |
+| low, unpinned | 2m9s | 5m34s | 0 of 4 |
+
+One run each, so these show an order of magnitude and no more. In the unpinned
+`low` run, validation took 3m06s of the 5m34s. That stage uses the same model
+and was not measured here.
+
+Batch size is unchanged: the 55k-token batch answered in 1m16s to 2m9s at
+`low`. Smaller batches did not help at the default. A 20k-token request budget
+made 10 requests, and 5 of them timed out together, so provider saturation
+replaced request size as the limit. The design pass still sends whole packages
+for each changed file; trimming that remains open.
+
+Limits: one change, one model. The recall table is two runs per fixture and uses
+the harness's deterministic columns; no judge was used.
+
