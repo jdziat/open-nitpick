@@ -673,6 +673,18 @@ func (r *Report) reusableCoverage() bool {
 	return true
 }
 
+// unreadFileSkips answers the same question as reusableCoverage's loop above,
+// for superseded and resolveClearedForApprove to withhold from thread
+// resolution: it excludes a design-task packing skip the same way, since
+// that names a task's own budget decision, not a file the review left
+// unread.
+func (r *Report) unreadFileSkips() []bundle.Skip {
+	if r.Plan == nil || r.DesignExecution != nil {
+		return nil
+	}
+	return r.Plan.Skipped
+}
+
 // ReusableCoverage reports whether this result can act as coverage for a later
 // review. It is exported for command surfaces that must distinguish a bounded
 // fast pass from a clean full review.
@@ -1082,12 +1094,12 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		findings = findings[:e.FastLimit]
 	}
 	if report.reusableCoverage() {
-		report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported, plan.Skipped)
+		report.Superseded = e.superseded(ctx, ref, prior, report.Incremental, findings, report.AlreadyReported, report.unreadFileSkips())
 		// A clean completed run under review.approve must not leave its own
 		// earlier threads open: reviewEvent refuses APPROVE while any stand,
 		// and a reader who sees COMMENT beside "0 findings" has no reason to
 		// trust the next push will close them either.
-		if more := e.resolveClearedForApprove(ctx, ref, prior, report, findings, plan.Skipped); len(more) > 0 {
+		if more := e.resolveClearedForApprove(ctx, ref, prior, report, findings, report.unreadFileSkips()); len(more) > 0 {
 			report.Superseded = append(report.Superseded, more...)
 		}
 	}
@@ -2499,11 +2511,7 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 			report.ResidualApprove = false
 			report.ResidualReason = ""
 		} else if prior != nil {
-			var skipped []bundle.Skip
-			if report.Plan != nil {
-				skipped = report.Plan.Skipped
-			}
-			if more := e.resolveClearedForApprove(ctx, ref, prior, report, report.Findings, skipped); len(more) > 0 {
+			if more := e.resolveClearedForApprove(ctx, ref, prior, report, report.Findings, report.unreadFileSkips()); len(more) > 0 {
 				report.Superseded = append(report.Superseded, more...)
 			}
 		}
