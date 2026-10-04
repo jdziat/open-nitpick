@@ -75,7 +75,7 @@ func matchesCapabilitySignal(msg string) bool {
 	// client for every remaining batch of the run, the exact outcome the
 	// comment above says must not happen. Checked first, because the signal
 	// list cannot be made narrow enough to exclude it.
-	if strings.Contains(lower, sdkSchemaParseFailure) {
+	if isSDKDecodeFailure(lower) {
 		return false
 	}
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
@@ -643,5 +644,94 @@ func TestASliceCallerKeepsItsArray(t *testing.T) {
 	}
 	if got := unwrapSingleElement[object](body); got != `{"name":"only"}` {
 		t.Errorf("unwrap for an object schema = %q", got)
+	}
+}
+
+// A second empty answer at the length cap is the model's answer: the re-ask
+// already had reasoning off and a raised cap. Retrying until max_retries cost
+// one CI batch 35 minutes (issue #161).
+func TestExtractStopsAfterOneEmptyLengthCapRetry(t *testing.T) {
+	emptyCut := func() turn { return turn{content: "", finish: llms.FinishReasonLength} }
+	for _, mode := range []config.StructuredMode{config.StructuredSchema, config.StructuredJSON} {
+		fake := newFakeLLM(emptyCut(), emptyCut(), emptyCut(), emptyCut(), turn{content: validJSON})
+		client := newTestClient(fake, mode)
+
+		_, err := Extract[result](context.Background(), client, nil, llms.WithMaxTokens(8192))
+		if err == nil {
+			t.Fatalf("%s: two empty length-cap answers are a failure, got none", mode)
+		}
+		if got := fake.callCount(); got != 2 {
+			t.Errorf("%s: calls = %d, want 2: the first answer and one reasoning-off re-ask", mode, got)
+		}
+	}
+}
+
+// The failure that ends the loop above has to reach the fallback. It is the
+// SDK's v6.9.5 decode wording, which an earlier release spelled differently.
+func TestAnEmptyAnswerAtTheLengthCapEscalates(t *testing.T) {
+	emptyCut := func() turn { return turn{content: "", finish: llms.FinishReasonLength} }
+	for _, mode := range []config.StructuredMode{config.StructuredSchema, config.StructuredJSON} {
+		fake := newFakeLLM(emptyCut(), emptyCut())
+		client := newTestClient(fake, mode)
+
+		_, err := Extract[result](context.Background(), client, nil, llms.WithMaxTokens(8192))
+		if err == nil || !ShouldEscalate(err) {
+			t.Fatalf("%s: err = %v; an answer that never parsed must be one a second model is asked", mode, err)
+		}
+	}
+}
+
+// Attempts are bounded by count, but a stalled attempt lasts the whole call
+// timeout, so the count alone allowed max_retries+1 timeouts on one batch.
+func TestExtractStopsRetryingOnceOneTimeoutOfWallClockIsSpent(t *testing.T) {
+	stall := func() turn { return turn{err: fmt.Errorf("openai: generate content: %w", stallErr{})} }
+
+	newClient := func(fake *fakeLLM, step time.Duration) *Client {
+		client := newTestClient(fake, config.StructuredSchema)
+		client.Spec.Timeout = 10 * time.Minute
+		// Every look at the clock is one step later, so the first attempt
+		// "takes" step and no test sleeps.
+		var at time.Time
+		client.clock = func() time.Time { at = at.Add(step); return at }
+		return client
+	}
+
+	fake := newFakeLLM(stall(), turn{content: validJSON})
+	if _, err := Extract[result](context.Background(), newClient(fake, 11*time.Minute), nil); err == nil || fake.callCount() != 1 {
+		t.Fatalf("a stall that used the whole timeout: calls = %d, err = %v; want 1 call and an error", fake.callCount(), err)
+	}
+
+	// Under budget the retry still happens, so the bound is a time limit and retries still happen.
+	fake = newFakeLLM(stall(), turn{content: validJSON})
+	got, err := Extract[result](context.Background(), newClient(fake, time.Second), nil)
+	if err != nil || fake.callCount() != 2 {
+		t.Fatalf("a quick stall: calls = %d, err = %v; want 2 calls and an answer", fake.callCount(), err)
+	}
+	assertOneFinding(t, got)
+}
+
+// A request that stalled past the retry budget is the model's batch to lose
+// elsewhere: the route had its chance, a different model is the only thing
+// left. A caller that cancelled is not a stall, and neither is a bare error.
+func TestAStallThatExhaustedItsRetriesEscalates(t *testing.T) {
+	stall := func() turn { return turn{err: fmt.Errorf("openai: generate content: %w", stallErr{})} }
+	for _, mode := range []config.StructuredMode{config.StructuredSchema, config.StructuredJSON} {
+		fake := newFakeLLM(stall())
+		client := newTestClient(fake, mode)
+		client.Spec.Timeout = time.Minute
+		var at time.Time
+		client.clock = func() time.Time { at = at.Add(2 * time.Minute); return at }
+
+		_, err := Extract[result](context.Background(), client, nil)
+		if err == nil || !ShouldEscalate(err) {
+			t.Errorf("%s: err = %v; a stall that used its budget must reach the fallback", mode, err)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	fake := newFakeLLM(stall())
+	if _, err := Extract[result](ctx, newTestClient(fake, config.StructuredSchema), nil); ShouldEscalate(err) {
+		t.Errorf("a cancelled caller escalated: %v", err)
 	}
 }
