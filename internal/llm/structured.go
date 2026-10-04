@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
@@ -125,9 +126,10 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 // the signal to sample at a small temperature rather than zero, which the log
 // records because such a review will not reproduce. Budget is max_retries.
 func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (T, *llms.Response, error) {
+	started := c.now()
 	for attempt := 0; ; attempt++ {
 		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
-		if next, ok := c.retryAfter(ctx, attempt, call, raw, err); ok {
+		if next, ok := c.retryAfter(ctx, attempt, started, call, raw, err); ok {
 			call = next
 			continue
 		}
@@ -138,6 +140,7 @@ func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, c
 
 // generateContent is GenerateContent with generateTyped's retries.
 func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (*llms.Response, error) {
+	started := c.now()
 	for attempt := 0; ; attempt++ {
 		var resp *llms.Response
 		err := whileWaiting(ctx, c.Log, "model call", c.String(), waitInterval, func() error {
@@ -145,7 +148,7 @@ func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call [
 			resp, err = c.LLM.GenerateContent(ctx, msgs, call...)
 			return err
 		})
-		if next, ok := c.retryAfter(ctx, attempt, call, resp, err); ok {
+		if next, ok := c.retryAfter(ctx, attempt, started, call, resp, err); ok {
 			call = next
 			continue
 		}
@@ -155,8 +158,17 @@ func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call [
 }
 
 // retryAfter decides whether an attempt is sent again and with what options.
-func (c *Client) retryAfter(ctx context.Context, attempt int, call []llms.CallOption, resp *llms.Response, err error) ([]llms.CallOption, bool) {
+// started is when the first attempt began; see retryBudgetSpent.
+func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time, call []llms.CallOption, resp *llms.Response, err error) ([]llms.CallOption, bool) {
 	if attempt >= c.stallRetries {
+		return nil, false
+	}
+	if c.retryBudgetSpent(started) {
+		c.logger().Warn("retry budget spent; not sending again",
+			"model", c.String(),
+			"attempts", attempt+1,
+			"elapsed", c.now().Sub(started).Round(time.Second),
+			"budget", c.Timeout())
 		return nil, false
 	}
 	switch {
@@ -178,6 +190,16 @@ func (c *Client) retryAfter(ctx context.Context, attempt int, call []llms.CallOp
 		// a floor on the cap so the next attempt has room for an answer.
 		// Deliberately not the same as truncated(): a first attempt cut mid-
 		// JSON at a cap the caller chose is still theirs (see below).
+		//
+		// Once only. glm-5.3-flash on a 75k-token batch answered attempt 1 and
+		// its reasoning-off re-ask the same way, and the loop spent four
+		// attempts and 35 minutes on one batch (issue #161). The second empty
+		// length-cap answer is the model saying it cannot fit an answer in the
+		// budget, which another identical attempt does not change; it is
+		// surfaced for escalation instead.
+		if attempt > 0 {
+			return nil, false
+		}
 		next := emptyAnswerRetryOptions(call)
 		c.logger().Warn("model hit the output cap with empty content; sending again with reasoning off",
 			"model", c.String(),
@@ -196,6 +218,27 @@ func (c *Client) retryAfter(ctx context.Context, attempt int, call []llms.CallOp
 		return append(append([]llms.CallOption(nil), call...), llms.WithTemperature(runawayRetryTemperature)), true
 	}
 	return nil, false
+}
+
+// retryBudgetSpent reports whether a request has already used one call
+// timeout of wall clock, counting every attempt. The attempt count alone
+// bounds how many calls are made and says nothing about how long they take: a
+// stalled attempt lasts the whole timeout, so max_retries of 3 on a 10 minute
+// timeout is 40 minutes for one batch (issue #161). A request that has not
+// answered in the time one call is allowed has told us what another identical
+// call will do. Zero timeout means the spec set none, so nothing bounds it.
+func (c *Client) retryBudgetSpent(started time.Time) bool {
+	budget := c.Timeout()
+	return budget > 0 && c.now().Sub(started) >= budget
+}
+
+// now is the client's clock. A field, so a test can move time without
+// sleeping through a timeout.
+func (c *Client) now() time.Time {
+	if c.clock != nil {
+		return c.clock()
+	}
+	return time.Now()
 }
 
 // emptyAtLengthCap reports a response that hit the output budget without
@@ -338,12 +381,30 @@ func schemaNotEnforced(err error) bool {
 		return false
 	}
 	return errors.Is(err, errSchemaNotEnforced) ||
-		strings.Contains(strings.ToLower(err.Error()), sdkSchemaParseFailure)
+		isSDKDecodeFailure(err.Error())
 }
 
-// sdkSchemaParseFailure is the SDK's wording for "GenerateTyped could not
-// unmarshal what came back" (llms: structured output is not valid JSON: ...).
-const sdkSchemaParseFailure = "structured output is not valid json"
+// sdkDecodeFailures are the SDK's wordings for "GenerateTyped could not
+// unmarshal what came back". It has used both: older releases said
+// "structured output is not valid JSON", v6.9.5 says "structured output does
+// not match the schema". Matching only the first let the second through
+// every check that exists to recognise it, and CI spent 35 minutes on one
+// batch that no escalation ever picked up (issue #161).
+var sdkDecodeFailures = []string{
+	"structured output is not valid json",
+	"structured output does not match the schema",
+}
+
+// isSDKDecodeFailure reports whether msg is the SDK's decode failure.
+func isSDKDecodeFailure(msg string) bool {
+	lower := strings.ToLower(msg)
+	for _, sign := range sdkDecodeFailures {
+		if strings.Contains(lower, sign) {
+			return true
+		}
+	}
+	return false
+}
 
 // extractJSON asks for JSON mode with the target schema described in the
 // prompt, then parses leniently. Providers in this path do not enforce the
@@ -398,6 +459,13 @@ func extractJSON[T any](ctx context.Context, c *Client, msgs []llms.Message, opt
 	}
 	if ctx.Err() != nil {
 		return zero, parseErr
+	}
+
+	// An empty answer at the length cap has nothing to repair, and generateContent
+	// has already re-asked it with reasoning off. Repairing would show the model
+	// its own empty reply and spend two more calls on the same wall (issue #161).
+	if emptyAtLengthCap(resp) {
+		return zero, fmt.Errorf("%s: structured output is not valid JSON: the model hit the output cap with no content: %w", c, parseErr)
 	}
 
 	// Repair: show the model its own output and the parse error.
@@ -862,7 +930,7 @@ func (c *Client) Fallback() *Client {
 // reaches the re-sampling in retryAfter, and the fallback overlays its parent
 // and inherits that same cap, so escalating there would spend a second budget
 // to be cut in the same place. A timeout, a refused credential or a cancelled
-// context are none of a second model's business either.
+// context are none of a second model's business.
 func ShouldEscalate(err error) bool {
 	if err == nil {
 		return false
@@ -871,9 +939,12 @@ func ShouldEscalate(err error) bool {
 		return false
 	}
 
+	if isSDKDecodeFailure(err.Error()) {
+		return true
+	}
+
 	msg := strings.ToLower(err.Error())
 	for _, sign := range []string{
-		sdkSchemaParseFailure,
 		"was not valid json after one repair attempt",
 		"no json object in the response matched the expected shape",
 		"no json object found in response",

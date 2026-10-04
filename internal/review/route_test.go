@@ -203,10 +203,12 @@ func sortStrings(s []string) {
 // fallback, so a test can drive the escalation without a model.
 func TestShouldEscalateSeparatesTheModelsFailuresFromTheTransports(t *testing.T) {
 	for msg, want := range map[string]bool{
-		"llms: structured output is not valid json: x":                  true,
-		"response was not valid JSON after one repair attempt: x":       true,
-		"no JSON object in the response matched the expected shape (x)": true,
-		"no JSON object found in response (x)":                          true,
+		"llms: structured output is not valid json: x": true,
+		// The SDK's v6.9.5 spelling of the same failure; issue #161.
+		"llms: structured output invalid after 1 attempt(s): llms: structured output does not match the schema: unexpected end of JSON input": true,
+		"response was not valid JSON after one repair attempt: x":                                                                             true,
+		"no JSON object in the response matched the expected shape (x)":                                                                       true,
+		"no JSON object found in response (x)":                                                                                                true,
 		// A bare truncation is the retry path's business, not a second
 		// model's: the fallback overlays its parent and inherits the same
 		// output cap, so it would be cut in the same place.
