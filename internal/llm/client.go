@@ -53,9 +53,6 @@ type Client struct {
 	// batch, and a config that lowers one has no reason to want the other.
 	stallRetries int
 
-	// clock replaces time.Now for the retry budget. Nil outside tests.
-	clock func() time.Time
-
 	// fallback is the client a caller escalates to when this one cannot
 	// answer. Nil when the spec names none. See ShouldEscalate.
 	fallback *Client
