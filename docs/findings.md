@@ -2591,7 +2591,7 @@ loss at `low`, not that there is none.
 The 6-file change from #161, reviewed whole and dry-run (4 batches of 1, 7, 11
 and 13 entries, up to 55k tokens), from start to the publish step:
 
-| | reviewing batches | to publish | batches that reached the 4 minute timeout |
+| | last batch done | to publish | batches that reached the 4 minute timeout |
 |---|---:|---:|---:|
 | default, Fireworks pinned | 7m26s | 8m32s | 2 of 4, both escalated |
 | default, Together pinned | over 8m, 1 batch failed | 10m40s | 2 of 4, one then failed |
@@ -2602,12 +2602,11 @@ One run each, so these show an order of magnitude and no more. In the unpinned
 `low` run, validation took 3m06s of the 5m34s. That stage uses the same model
 and was not measured here.
 
-Batch size is unchanged: the 55k-token batch answered in 1m16s to 2m9s at
-`low`. Smaller batches did not help at the default. A 20k-token request budget
+Batch size is unchanged. At `low` the 55k-token batch was the last to finish, in
+1m16s and 2m9s. Smaller batches did not help at the default. A 20k-token request budget
 made 10 requests, and 5 of them timed out together, so provider saturation
 replaced request size as the limit. The design pass still sends whole packages
 for each changed file; trimming that remains open.
 
 Limits: one change, one model. The recall table is two runs per fixture and uses
 the harness's deterministic columns; no judge was used.
-
