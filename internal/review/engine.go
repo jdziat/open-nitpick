@@ -125,6 +125,12 @@ type Engine struct {
 	// Resume reuses successful model requests while rerunning downstream checks.
 	Resume   bool
 	progress *reviewProgress
+
+	// standingOnly names files pulled into this run's scope solely to
+	// recheck an open comment, set from Incremental.StandingOnly right after
+	// narrowing. analyzeBatchWith reads it to keep the progress cache from
+	// answering for a batch holding one of them.
+	standingOnly map[string]bool
 }
 
 // LinterRunner produces deterministic findings for the changed files.
@@ -589,6 +595,16 @@ type Incremental struct {
 	// smaller than the whole change; Unchanged says what, if anything, that
 	// widening left out.
 	Recheck bool
+
+	// StandingOnly is the subset of Reviewed pulled into scope solely to
+	// recheck an open comment, on content that did not itself change. The
+	// progress cache must not answer for these: its key is a hash of the
+	// batch's rendered content, which an unchanged file reproduces exactly,
+	// so a cache hit here would replay the same verdict the open comment
+	// already carries rather than asking the model again. superseded and
+	// resolveClearedForApprove can then never see a finding stop recurring,
+	// and the thread stays open regardless of whether it still applies.
+	StandingOnly map[string]bool
 }
 
 // StageStatus records a required stage that did not complete.
@@ -815,6 +831,13 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		narrowPrior = nil
 	}
 	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, narrowPrior)
+	// Cleared per run: Review may be called more than once on one Engine, and a
+	// stale map would exempt files from the progress cache after the comments
+	// that justified it were closed.
+	e.standingOnly = nil
+	if report.Incremental != nil {
+		e.standingOnly = report.Incremental.StandingOnly
+	}
 	if e.FastLimit > 0 {
 		files = rankFiles(files)
 	}
@@ -1265,9 +1288,18 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 		return files, nil
 	}
 	standing := len(prior.Comments) > 0
+	// Every file a standing comment names, for fullRecheck's StandingOnly:
+	// whenever this run cannot narrow and walks every file, the ones already
+	// carrying an open finding still must not answer from the progress cache
+	// (see Incremental.StandingOnly). The rest of a full walk reuses it as
+	// before; only the files under an open thread need a live call.
+	standingPaths := map[string]bool{}
+	for _, c := range prior.Comments {
+		standingPaths[c.Path] = true
+	}
 	fullRecheck := func() (diff.Files, *Incremental) {
 		if standing {
-			return files, &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true}
+			return files, &Incremental{Since: prior.Head, Reviewed: files.Paths(), Recheck: true, StandingOnly: standingPaths}
 		}
 		return files, nil
 	}
@@ -1316,22 +1348,20 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 	for _, p := range changed {
 		moved[p] = true
 	}
-	// Widened so superseded and resolveClearedForApprove can still verify and
-	// close a standing thread on a file this push did not itself touch.
-	standingPaths := map[string]bool{}
-	if standing {
-		for _, c := range prior.Comments {
-			standingPaths[c.Path] = true
-		}
-	}
-
-	note := &Incremental{Since: prior.Head, Recheck: standing}
+	note := &Incremental{Since: prior.Head, Recheck: standing, StandingOnly: map[string]bool{}}
 	var kept diff.Files
 	for _, f := range files {
 		// A rename since the last review shows up under either name.
-		if moved[f.Path] || (f.OldPath != "" && moved[f.OldPath]) || standingPaths[f.Path] {
+		changedHere := moved[f.Path] || (f.OldPath != "" && moved[f.OldPath])
+		if changedHere || standingPaths[f.Path] {
 			kept = append(kept, f)
 			note.Reviewed = append(note.Reviewed, f.Path)
+			if !changedHere && standingPaths[f.Path] {
+				// In scope only because a comment is standing on it, not
+				// because this push touched it: the progress cache must not
+				// answer for this file (see StandingOnly's doc comment).
+				note.StandingOnly[f.Path] = true
+			}
 			continue
 		}
 		note.Unchanged = append(note.Unchanged, f.Path)
@@ -1816,6 +1846,19 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	}
 
 	key := e.progress.key(client, base, body.String())
+	if e.standingOnly != nil {
+		for _, p := range b.Paths() {
+			if e.standingOnly[p] {
+				// This batch holds a file in scope only to recheck an open
+				// comment on content that did not change: a cache hit would
+				// replay the same verdict the open comment already carries,
+				// not a fresh check of whether it still holds. See
+				// Incremental.StandingOnly.
+				key = ""
+				break
+			}
+		}
+	}
 	cached, reused := e.progress.load(key)
 	result := Result{Findings: cached}
 	if reused {
