@@ -8,10 +8,14 @@ models:
   default:
     provider: openrouter
     model: z-ai/glm-5.3-flash
-    # Batches of 8 to 13 files answered in two minutes on this model; the one
-    # that did not answer in ten (run 37223195160, 55k tokens) never would
-    # have. A call that has not finished in four is handed to the fallback
-    # instead of holding the job for the default ten.
+    # glm-5.3-flash reasons by default and cannot be told not to, so a review
+    # spent its time thinking: 57s mean on the planted-defect fixtures against
+    # 6s at low, and a 55k-token batch that never answered in ten minutes
+    # (run 37223195160). Recall was 18/20 at the default and 17/20 at low;
+    # docs/findings.md has the table and what it can resolve.
+    reasoning: low
+    # A call still silent after four minutes goes to the fallback instead of
+    # holding the job for the default ten.
     timeout: 4m
     fallback:
       model: qwen/qwen3.8-27b
