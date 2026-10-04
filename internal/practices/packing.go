@@ -193,7 +193,16 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 				group = "source:" + path.Dir(task.Source.ID)
 			}
 			if previous, ok := lastFocusBatch[group]; ok {
-				combined, fits := combineDesignBatches(out.Plan.Batches[previous], batch, cfg.Review.MaxFilesPerRequest, out.Plan.BudgetPerBatch)
+				// No file-count ceiling on the merge itself: each task was
+				// already admitted and trimmed against
+				// review.max_files_per_request above, so every batch being
+				// merged here already respects that cap on its own. Reusing
+				// the same cap as a ceiling on the *merged* file count forced
+				// one request per declaration on a file with many callers,
+				// turning a 2-file diff into dozens of batches even though
+				// the token budget below had room to spare, and that budget
+				// is the limit that bounds one request's size.
+				combined, fits := combineDesignBatches(out.Plan.Batches[previous], batch, 0, out.Plan.BudgetPerBatch)
 				if fits {
 					out.Plan.Batches[previous] = combined
 					continue
