@@ -2632,8 +2632,8 @@ each read was a separate forge request, made one at a time. The same tree holds
 the answers, so the requests did not depend on each other.
 
 Listing the tree and reading its files now overlap, at most eight requests in
-flight. Across the nine CI runs after the change the same tree, all 93
-directories and 396 files, reads in a median of 15.2s against 1m6s before, with
+flight. Across the ten CI runs after the change the same tree, all 93
+directories and 396 files, reads in a median of 15.8s against 1m6s before, with
 a spread from 7.3s to 22.2s that tracks how loaded the runner is. `design
 assembled`, which is this read plus the graph work over its contents, follows
 the same shape. The range is the honest number: the step no longer dominates
