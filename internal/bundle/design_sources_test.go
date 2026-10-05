@@ -112,23 +112,50 @@ func TestDesignSourceCaptureExcludesRepositoryMetadataBeforeWalking(t *testing.T
 // slowRepo is a repository whose every request costs delay, the way a forge
 // does. It records how many requests were in flight at once.
 type slowRepo struct {
-	delay   time.Duration
-	dirs    map[string][]string
-	files   map[string]string
-	mu      sync.Mutex
-	active  int
-	peak    int
-	fActive int
-	fPeak   int
-	lActive int
-	lPeak   int
-	gate    int
-	gateFor int
-	gateSet time.Duration
-	latch   chan struct{}
-	latchOn sync.Once
-	listed  []string
-	fetched []string
+	delay    time.Duration
+	dirs     map[string][]string
+	files    map[string]string
+	mu       sync.Mutex
+	active   int
+	peak     int
+	fActive  int
+	fPeak    int
+	lActive  int
+	lPeak    int
+	listGate *gate
+	readGate *gate
+	listed   []string
+	fetched  []string
+}
+
+// gate holds the first size calls of one kind open until size of them are
+// running together, or set elapses. Listings and reads take separate gates so
+// one cannot spend the other's budget, which is what the read-overlap test
+// needs: the walk's listings must not consume the gate fetches rely on.
+type gate struct {
+	size      int
+	remaining int
+	set       time.Duration
+	latch     chan struct{}
+	once      sync.Once
+}
+
+func (g *gate) wait(ctx context.Context, active int) {
+	if g == nil {
+		return
+	}
+	if g.remaining <= 0 {
+		return
+	}
+	g.remaining--
+	if active >= g.size {
+		g.once.Do(func() { close(g.latch) })
+	}
+	select {
+	case <-g.latch:
+	case <-time.After(g.set):
+	case <-ctx.Done():
+	}
 }
 
 func (r *slowRepo) enter() func() {
@@ -146,21 +173,10 @@ func (r *slowRepo) list(ctx context.Context, dir string) ([]string, error) {
 	r.listed = append(r.listed, dir)
 	r.lActive++
 	r.lPeak = max(r.lPeak, r.lActive)
-	wait := r.latch != nil && r.gateFor > 0
-	if wait {
-		r.gateFor--
-		if r.lActive >= r.gate {
-			r.latchOn.Do(func() { close(r.latch) })
-		}
-	}
+	active := r.lActive
+	g := r.listGate
 	r.mu.Unlock()
-	if wait {
-		select {
-		case <-r.latch:
-		case <-time.After(r.gateSet):
-		case <-ctx.Done():
-		}
-	}
+	g.wait(ctx, active)
 	defer func() { r.mu.Lock(); r.lActive--; r.mu.Unlock() }()
 	entries, ok := r.dirs[dir]
 	if !ok {
@@ -183,21 +199,10 @@ func (r *slowRepo) fetch(ctx context.Context, name string) ([]byte, error) {
 	r.fetched = append(r.fetched, name)
 	r.fActive++
 	r.fPeak = max(r.fPeak, r.fActive)
-	wait := r.latch != nil && r.gateFor > 0
-	if wait {
-		r.gateFor--
-		if r.fActive >= r.gate {
-			r.latchOn.Do(func() { close(r.latch) })
-		}
-	}
+	active := r.fActive
+	g := r.readGate
 	r.mu.Unlock()
-	if wait {
-		select {
-		case <-r.latch:
-		case <-time.After(r.gateSet):
-		case <-ctx.Done():
-		}
-	}
+	g.wait(ctx, active)
 	defer func() { r.mu.Lock(); r.fActive--; r.mu.Unlock() }()
 	body, ok := r.files[name]
 	if !ok {
@@ -233,10 +238,7 @@ func TestDesignSourceCaptureOverlapsRequestsAndStaysWithinTheLimit(t *testing.T)
 	// Hold the first reads open until a second coexists. A serial reader hits
 	// the deadline with only one active and fails the peak check below; a
 	// concurrent one clears the gate immediately.
-	repo.gate = 2
-	repo.gateFor = 2
-	repo.gateSet = time.Second
-	repo.latch = make(chan struct{})
+	repo.readGate = &gate{size: 2, remaining: 2, set: time.Second, latch: make(chan struct{})}
 
 	view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: 4096, Bytes: 1 << 20})
 
@@ -301,12 +303,9 @@ func TestInParallelStopsQueuedWorkWhenTheContextIsCancelled(t *testing.T) {
 // outstanding across two windows, however fast it runs.
 func TestDesignSourceCaptureListingsOverlapWithoutWindowBarriers(t *testing.T) {
 	repo := wideRepo(0, 30, 3)
-	repo.gate = 2
-	repo.gateFor = 2
 	// Short: the root is listed alone, so it waits this out, but 50ms is
 	// plenty for the next eight listings of the root's children to overlap it.
-	repo.gateSet = 50 * time.Millisecond
-	repo.latch = make(chan struct{})
+	repo.listGate = &gate{size: 2, remaining: 2, set: 50 * time.Millisecond, latch: make(chan struct{})}
 
 	view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: 4096, Bytes: 1 << 20})
 	if len(view.Errors) != 0 || len(view.Content) != 90 {
