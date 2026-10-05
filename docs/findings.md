@@ -2640,6 +2640,17 @@ widely, 4s to 2m7s over the same runs with a median near 1m25s, so it is still
 the larger part of a review. What is left to measure is the fixed pre-batch
 step as a whole, not this read alone.
 
+The read still cost one forge request per file and directory, about 490, plus
+two more per file because a read that named no revision fetched the pull
+request and its head commit first. The Action already holds the history, so
+the provider now answers from the checkout when it has the reviewed commit:
+file contents from the commit's objects, listings from one `git ls-tree`, the
+head commit once per pull request. Two CI runs of the same tree, 93
+directories and 398 files, read in 290ms and 285ms, against 16.6s in the
+concurrent run before it and 1m6s before that. `design assembled` fell from
+17.1s to 0.9s. Two runs are not a distribution; the range from the earlier
+thirteen is why 16s was reported as a median and not a best case.
+
 `TestDesignSourceCaptureOverlapsRequestsAndStaysWithinTheLimit` pins the
 overlap as peak requests in flight rather than wall clock, so a loaded runner
 cannot fail it without a regression. Three siblings pin what the overlap must
