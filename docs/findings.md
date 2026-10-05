@@ -2623,3 +2623,26 @@ The same kind of change took 12m55s and 14m on the previous config. Of the
 and the batch starting, which is fixed cost that does not shrink with the diff.
 On the five-file change triage took 20s and validation 22s. Time now moves little with change size, and
 the fixed pre-batch step is the next thing to measure.
+
+### The design source read was the fixed step (2026-10-05)
+
+Timing the pre-batch window on a one-file change put the 64s in one place:
+`design sources read elapsed=1m6s directories=93 files=396`. Each listing and
+each read was a separate forge request, made one at a time. The same tree holds
+the answers, so the requests did not depend on each other.
+
+Listing the tree and reading its files now overlap, at most eight requests in
+flight. In CI the step reads the same tree, all 93 directories and 396 files,
+in 7.3s instead of 1m6s, so 59s leave the front of every review. The end of
+`design assembled`, which is this read plus the graph work over its contents,
+moves from 1m9s to 8s. Model batch time does not change and still dominates.
+
+`TestDesignSourceCaptureOverlapsRequestsAndStaysWithinTheLimit` pins the
+overlap as peak requests in flight rather than wall clock, so a loaded runner
+cannot fail it without a regression. Three siblings pin what the overlap must
+not change: the files kept under the path limit, the omission reasons, and one
+error per failed request. Each fails when the concurrency it guards is removed.
+
+The read is bounded, not just overlapped: the prefetch holds at most eight
+answers, so a large path limit with a small byte budget no longer fetches the
+whole inventory before cutting it off.
