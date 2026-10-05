@@ -248,18 +248,26 @@ type fetched struct {
 const readConcurrency = 8
 
 // inParallel runs fn for each index below n, at most readConcurrency at once,
-// and returns when all have finished. fn is not started once ctx is done.
+// and returns when all have finished. No fn starts after ctx is done: the loop
+// watches ctx while it waits for a slot and re-checks after taking one, so a
+// cancellation is not overtaken by a slot freeing.
 func inParallel(ctx context.Context, n int, fn func(i int)) {
 	if n == 0 {
 		return
 	}
 	var wg sync.WaitGroup
 	slots := make(chan struct{}, readConcurrency)
+spawn:
 	for i := 0; i < n; i++ {
+		select {
+		case slots <- struct{}{}:
+		case <-ctx.Done():
+			break spawn
+		}
 		if ctx.Err() != nil {
+			<-slots
 			break
 		}
-		slots <- struct{}{}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
