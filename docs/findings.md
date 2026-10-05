@@ -2632,13 +2632,13 @@ each read was a separate forge request, made one at a time. The same tree holds
 the answers, so the requests did not depend on each other.
 
 Listing the tree and reading its files now overlap, at most eight requests in
-flight. Across the ten CI runs after the change the same tree, all 93
-directories and 396 files, reads in a median of 15.8s against 1m6s before, with
-a spread from 7.3s to 22.2s that tracks how loaded the runner is. `design
-assembled`, which is this read plus the graph work over its contents, follows
-the same shape. The range is the honest number: the step no longer dominates
-the window, but a single run's figure is not a stable one to quote. Model batch
-time is unchanged and still the larger part of the review.
+flight. Across the thirteen CI runs after the change the same tree, all 93
+directories and 396 files, reads in a median of 16.0s, from 7.3s to 40.5s. The
+widest values land on the most loaded runners, so the range is the number to
+keep; the baseline is the one pre-change run at 1m6s. Model batch time swings as
+widely, 4s to 2m7s over the same runs with a median near 1m25s, so it is still
+the larger part of a review. What is left to measure is the fixed pre-batch
+step as a whole, not this read alone.
 
 `TestDesignSourceCaptureOverlapsRequestsAndStaysWithinTheLimit` pins the
 overlap as peak requests in flight rather than wall clock, so a loaded runner
