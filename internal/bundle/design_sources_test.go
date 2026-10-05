@@ -133,6 +133,7 @@ type slowRepo struct {
 // one cannot spend the other's budget, which is what the read-overlap test
 // needs: the walk's listings must not consume the gate fetches rely on.
 type gate struct {
+	mu        sync.Mutex
 	size      int
 	remaining int
 	set       time.Duration
@@ -144,13 +145,16 @@ func (g *gate) wait(ctx context.Context, active int) {
 	if g == nil {
 		return
 	}
+	g.mu.Lock()
 	if g.remaining <= 0 {
+		g.mu.Unlock()
 		return
 	}
 	g.remaining--
 	if active >= g.size {
 		g.once.Do(func() { close(g.latch) })
 	}
+	g.mu.Unlock()
 	select {
 	case <-g.latch:
 	case <-time.After(g.set):
