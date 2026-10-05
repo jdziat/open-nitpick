@@ -140,24 +140,18 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 	cursor := 0
 
 	used, reads := 0, 0
+	missed := false
 	for _, name := range ordered {
-		if designMetadataPath(name) {
-			exclude(name, "repository metadata")
+		verdict, reason := designCandidate(cfg, name, denied)
+		if verdict == candidateExclude {
+			exclude(name, reason)
 			continue
-		}
-		reason := denied[name]
-		if invalidSourcePath(name) {
-			reason = "invalid source path"
 		}
 		if reason == "" && limits.Paths > 0 && reads >= limits.Paths {
 			reason = "design inventory path limit reached"
 		}
 		if reason == "" && ctx.Err() != nil {
 			reason = ctx.Err().Error()
-		}
-		if cfg.Ignored(name) {
-			exclude(name, ReasonIgnored)
-			continue
 		}
 		if reason == "" && limits.Bytes > 0 && used >= limits.Bytes {
 			reason = "design inventory byte limit reached"
@@ -177,7 +171,9 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 		)
 		// The stream yields candidates in ordered order. Names the loop
 		// omitted never reached here, so skip past them, then take this
-		// name's answer. A name the stream never queued is fetched now.
+		// name's answer. designCandidate is the only thing that admits or
+		// skips a name, so the stream cannot disagree with the loop above;
+		// if it ever does, say so instead of quietly reading serially.
 		for cursor < len(want) && want[cursor] != name {
 			cursor++
 			stream.discard()
@@ -190,6 +186,10 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 				source, err = nil, fmt.Errorf("design source stream closed at %s", name)
 			}
 		} else {
+			if !missed {
+				view.Errors = append(view.Errors, fmt.Sprintf("design source prefetch missed %s", name))
+				missed = true
+			}
 			source, err = fetch(ctx, name)
 		}
 		switch {
@@ -278,15 +278,40 @@ spawn:
 	wg.Wait()
 }
 
+// candidateVerdict is what the ordered pass and the prefetch both decide with.
+type candidateVerdict int
+
+const (
+	candidateRead candidateVerdict = iota
+	candidateExclude
+	candidateOmit
+)
+
+// designCandidate is the one predicate for whether an ordered name is read,
+// excluded outright, or omitted with a reason. CaptureDesignSources and the
+// prefetch both call it, so they cannot disagree about what will be read.
+func designCandidate(cfg *config.Config, name string, denied map[string]string) (candidateVerdict, string) {
+	if designMetadataPath(name) {
+		return candidateExclude, "repository metadata"
+	}
+	if cfg.Ignored(name) {
+		return candidateExclude, ReasonIgnored
+	}
+	if invalidSourcePath(name) {
+		return candidateOmit, "invalid source path"
+	}
+	if denied[name] != "" {
+		return candidateOmit, denied[name]
+	}
+	return candidateRead, ""
+}
+
 // designReadNames lists, in order, the files CaptureDesignSources will try to
-// read: those that pass its path checks, up to the path limit.
+// read: those that pass designCandidate, up to the path limit.
 func designReadNames(cfg *config.Config, ordered []string, denied map[string]string, limits SourceLimits) []string {
 	var want []string
 	for _, name := range ordered {
-		if designMetadataPath(name) || denied[name] != "" || cfg.Ignored(name) {
-			continue
-		}
-		if invalidSourcePath(name) {
+		if verdict, _ := designCandidate(cfg, name, denied); verdict != candidateRead {
 			continue
 		}
 		if limits.Paths > 0 && len(want) >= limits.Paths {
