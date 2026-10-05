@@ -111,3 +111,24 @@ func TestGitHubFallsBackToTheAPIWhenTheCheckoutCannotAnswer(t *testing.T) {
 		t.Fatalf("contents asked %d times with a commit the checkout lacks, want 2", contents2.Load())
 	}
 }
+
+// The contents API types a symlink as a file, measured against git/git's
+// RelNotes. A directory must list the same names whichever side answers.
+func TestGitHubListsASymlinkWhetherTheCheckoutOrTheAPIAnswers(t *testing.T) {
+	dir := newRepo(t)
+	if err := os.Symlink("a.go", filepath.Join(dir, "link.go")); err != nil {
+		t.Skip("symlinks unavailable")
+	}
+	gitIn(t, dir, "add", "-A")
+	gitIn(t, dir, "commit", "-qm", "link")
+	var pulls, contents atomic.Int64
+	gh := countingGitHub(t, headOf(t, dir), &pulls, &contents)
+	gh.Checkout = dir
+
+	names, err := gh.ListDir(context.Background(), testRef(), "")
+	if err != nil || !slices.Equal(names, []string{"a.go", "link.go"}) {
+		t.Fatalf("ListDir = %v, %v, want the symlink listed beside its target", names, err)
+	}
+}
+
+// A checkout that lacks the commit, or a file the checkout cannot serve as

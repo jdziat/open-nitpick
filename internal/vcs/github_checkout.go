@@ -18,6 +18,10 @@ type checkoutTree struct {
 }
 
 // checkoutIndex holds the trees read so far, keyed by commit.
+//
+// The lock guards the maps only. A tree is built outside it and then
+// published, so one slow git call does not stall reads of other commits; two
+// callers racing on an uncached commit read it twice and keep one.
 type checkoutIndex struct {
 	mu    sync.Mutex
 	trees map[string]*checkoutTree
@@ -34,18 +38,25 @@ func (g *GitHub) checkoutTree(ctx context.Context, sha string) *checkoutTree {
 		return nil
 	}
 	g.index.mu.Lock()
-	defer g.index.mu.Unlock()
-	if t, seen := g.index.trees[sha]; seen {
+	t, seen := g.index.trees[sha]
+	g.index.mu.Unlock()
+	if seen {
 		return t
+	}
+	t = readCheckoutTree(ctx, g.Checkout, sha)
+	// A failure caused by a cancelled run is not a fact about the checkout.
+	if t == nil && ctx.Err() != nil {
+		return nil
+	}
+	g.index.mu.Lock()
+	defer g.index.mu.Unlock()
+	if kept, raced := g.index.trees[sha]; raced {
+		return kept
 	}
 	if g.index.trees == nil {
 		g.index.trees = map[string]*checkoutTree{}
 	}
-	t := readCheckoutTree(ctx, g.Checkout, sha)
-	// A failure caused by a cancelled run is not a fact about the checkout.
-	if t != nil || ctx.Err() == nil {
-		g.index.trees[sha] = t
-	}
+	g.index.trees[sha] = t
 	return t
 }
 
@@ -81,10 +92,9 @@ func readCheckoutTree(ctx context.Context, dir, sha string) *checkoutTree {
 			}
 		case "blob":
 			t.modes[name] = fields[0]
-			// Symlinks are left out of listings, as the API leaves them out.
-			if fields[0] == "100644" || fields[0] == "100755" {
-				t.dirs[parent] = append(t.dirs[parent], base)
-			}
+			// The contents API types a symlink as a file, so it is listed here
+			// too. Only reading one is refused, in regular below.
+			t.dirs[parent] = append(t.dirs[parent], base)
 		}
 	}
 	for _, names := range t.dirs {
