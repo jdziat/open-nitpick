@@ -230,6 +230,44 @@ func TestDesignSourceCaptureOverlapsRequestsAndStaysWithinTheLimit(t *testing.T)
 	}
 }
 
+// A cancelled walk does not start work it queued. The callbacks hold every
+// slot open, so the only way past them is for the loop to watch ctx; the old
+// loop instead waited on a slot and started one more callback once a worker
+// freed, which is what the count of readConcurrency pins here.
+func TestInParallelStopsQueuedWorkWhenTheContextIsCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	release := make(chan struct{})
+	var mu sync.Mutex
+	var count int
+	blocked := make(chan struct{})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		inParallel(ctx, 1000, func(i int) {
+			mu.Lock()
+			count++
+			running := count
+			mu.Unlock()
+			if running == readConcurrency {
+				close(blocked)
+			}
+			<-release
+		})
+	}()
+
+	<-blocked
+	cancel()
+	close(release)
+	<-done
+
+	mu.Lock()
+	defer mu.Unlock()
+	if count != readConcurrency {
+		t.Errorf("started %d callbacks, want exactly %d: no work should start after cancellation", count, readConcurrency)
+	}
+}
+
 // The stream reads ahead but hands answers back in order, whatever order the
 // bytes arrive in.
 func TestFetchStreamDeliversInOrderDespiteSlowFirstRead(t *testing.T) {
