@@ -348,6 +348,25 @@ func TestDesignSourceCaptureBoundsListingsPastThePathLimit(t *testing.T) {
 	}
 }
 
+// The prefetch stream must never report a miss. It is built from every name
+// designCandidate admits, so it stays a superset of what the loop reads no
+// matter how the path and byte limits interleave. This sweeps those
+// combinations: a byte budget that drops a name before any read, a path limit
+// that stops the loop, and both together.
+func TestDesignSourceCaptureNeverReportsAPrefetchMissUnderEitherLimit(t *testing.T) {
+	for _, paths := range []int{0, 1, 3, 7} {
+		for _, bytes := range []int{0, 5, 40, 4000} {
+			repo := wideRepo(0, 4, 6)
+			view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: paths, Bytes: bytes})
+			for _, err := range view.Errors {
+				if strings.Contains(err, "prefetch missed") {
+					t.Fatalf("paths=%d bytes=%d: %s", paths, bytes, err)
+				}
+			}
+		}
+	}
+}
+
 // A failed request is reported against its own directory and file, and does
 // not stop the others.
 func TestDesignSourceCaptureReportsEachFailedRequestOnce(t *testing.T) {

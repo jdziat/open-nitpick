@@ -316,8 +316,11 @@ func designCandidate(cfg *config.Config, name string, denied map[string]string) 
 	return candidateRead, ""
 }
 
-// designReadNames lists, in order, the files CaptureDesignSources will try to
-// read: those that pass designCandidate, up to the path limit.
+// designReadNames lists, in order, the files CaptureDesignSources will read:
+// those designCandidate admits, up to the path limit. The loop cannot read past
+// the limit, and its only pre-read omission of an admitted name is the byte
+// budget, which fires only once used has reached it and therefore suppresses
+// every later read too, so this list is exactly what the loop can consume.
 func designReadNames(cfg *config.Config, ordered []string, denied map[string]string, limits SourceLimits) []string {
 	var want []string
 	for _, name := range ordered {
