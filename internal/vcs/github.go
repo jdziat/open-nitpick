@@ -37,6 +37,9 @@ type GitHub struct {
 	// more than 300 files; with a checkout the diff is taken from git
 	// instead, which has no such limit.
 	Checkout string
+
+	// index caches each commit's tree read from Checkout.
+	index checkoutIndex
 }
 
 // GitHubOptions configure the provider.
@@ -299,11 +302,16 @@ func (g *GitHub) FileContent(ctx context.Context, ref Ref, path string) ([]byte,
 
 	sha := ref.Head
 	if sha == "" {
-		pr, err := g.PullRequest(ctx, ref)
-		if err != nil {
+		var err error
+		if sha, err = g.headSHA(ctx, ref); err != nil {
 			return nil, err
 		}
-		sha = pr.HeadSHA
+	}
+
+	if tree := g.checkoutTree(ctx, sha); tree != nil && tree.regular(path) {
+		if data, err := (&Local{Dir: g.Checkout}).FileContent(ctx, Ref{Head: sha}, path); err == nil {
+			return data, nil
+		}
 	}
 
 	// DownloadContents falls back to listing the parent even after a file 404,
@@ -361,11 +369,16 @@ func (g *GitHub) ListDir(ctx context.Context, ref Ref, dir string) ([]string, er
 
 	sha := ref.Head
 	if sha == "" {
-		pr, err := g.PullRequest(ctx, ref)
-		if err != nil {
+		var err error
+		if sha, err = g.headSHA(ctx, ref); err != nil {
 			return nil, err
 		}
-		sha = pr.HeadSHA
+	}
+
+	if tree := g.checkoutTree(ctx, sha); tree != nil {
+		if names, ok := tree.dirs[strings.Trim(dir, "/")]; ok {
+			return append([]string(nil), names...), nil
+		}
 	}
 
 	file, entries, resp, err := g.client.Repositories.GetContents(ctx, ref.Owner, ref.Repo, strings.Trim(dir, "/"),
