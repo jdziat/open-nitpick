@@ -60,78 +60,79 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 		view.Errors = append(view.Errors, "repository listing unavailable; caller inventory is incomplete")
 		dirs = nil
 	}
-	for len(dirs) > 0 {
+	queue := dirs
+	var inflight []*pendingListing
+	var listings sync.WaitGroup
+	stop := false
+	for !stop && (len(queue) > 0 || len(inflight) > 0) {
+		// Refill as each answer is consumed, not a level or a window at a
+		// time. A barrier there cost a full forge round trip per window: 93
+		// directories in windows of 8 is twelve waits, which showed up as the
+		// design read taking 13.6s instead of 7.3s. Once the path limit is
+		// reached no further listing starts, so the directories past it are
+		// never requested; the readConcurrency already in flight finish and
+		// are dropped.
+		for len(queue) > 0 && len(inflight) < readConcurrency {
+			p := &pendingListing{dir: queue[0], done: make(chan struct{})}
+			queue = queue[1:]
+			inflight = append(inflight, p)
+			listings.Add(1)
+			go func() {
+				defer close(p.done)
+				defer listings.Done()
+				p.entries, p.err = list(ctx, p.dir)
+			}()
+		}
+		if len(inflight) == 0 {
+			break
+		}
+		p := inflight[0]
+		inflight = inflight[1:]
+		<-p.done
 		if err := ctx.Err(); err != nil {
 			view.Errors = append(view.Errors, err.Error())
 			break
 		}
-		// Listings are taken a window at a time and their entries read in
-		// queue order, so what the path limit cuts off and the order callers
-		// are found in are what the serial walk gave. The window keeps the
-		// forge requests overlapped without listing directories the limit has
-		// already put out of reach: past the window, later directories are
-		// never requested. At most readConcurrency-1 listings can be in
-		// flight when the limit is reached.
-		window := dirs
-		if len(window) > readConcurrency {
-			window = window[:readConcurrency]
+		if p.err != nil {
+			view.Errors = append(view.Errors, fmt.Sprintf("%s: directory listing unavailable", p.dir))
+			continue
 		}
-		dirs = dirs[len(window):]
-		listed := make([]listing, len(window))
-		inParallel(ctx, len(window), func(i int) {
-			listed[i].entries, listed[i].err = list(ctx, window[i])
-		})
-		stop := false
-		for i, dir := range window {
-			if err := ctx.Err(); err != nil {
-				view.Errors = append(view.Errors, err.Error())
+		entries := p.entries
+		slices.Sort(entries)
+		for _, entry := range entries {
+			visited++
+			if limits.Paths > 0 && visited > limits.Paths {
+				view.Errors = append(view.Errors, "design inventory path limit reached; callers may be missing")
 				stop = true
 				break
 			}
-			entries, err := listed[i].entries, listed[i].err
-			if err != nil {
-				view.Errors = append(view.Errors, fmt.Sprintf("%s: directory listing unavailable", dir))
+			base := strings.TrimSuffix(entry, "/")
+			if base == "" || base == "." || base == ".." || strings.ContainsAny(base, "/\\") {
+				view.Errors = append(view.Errors, "repository listing contained an invalid entry")
 				continue
 			}
-			slices.Sort(entries)
-			for _, entry := range entries {
-				visited++
-				if limits.Paths > 0 && visited > limits.Paths {
-					view.Errors = append(view.Errors, "design inventory path limit reached; callers may be missing")
-					stop = true
-					break
-				}
-				base := strings.TrimSuffix(entry, "/")
-				if base == "" || base == "." || base == ".." || strings.ContainsAny(base, "/\\") {
-					view.Errors = append(view.Errors, "repository listing contained an invalid entry")
-					continue
-				}
-				name := path.Join(dir, base)
-				if designMetadataPath(name) {
-					exclude(name, "repository metadata")
-					continue
-				}
-				if cfg.Ignored(name) || cfg.Ignored(name+"/") {
-					exclude(name, ReasonIgnored)
-					continue
-				}
-				if strings.HasSuffix(entry, "/") {
-					dirs = append(dirs, name)
-					continue
-				}
-				if wanted[name] || path.Ext(name) == ".go" || base == "go.mod" || base == "go.work" {
-					names[name] = true
-				}
+			name := path.Join(p.dir, base)
+			if designMetadataPath(name) {
+				exclude(name, "repository metadata")
+				continue
 			}
-			if stop {
-				break
+			if cfg.Ignored(name) || cfg.Ignored(name+"/") {
+				exclude(name, ReasonIgnored)
+				continue
 			}
-		}
-		if stop {
-			dirs = nil
-			break
+			if strings.HasSuffix(entry, "/") {
+				queue = append(queue, name)
+				continue
+			}
+			if wanted[name] || path.Ext(name) == ".go" || base == "go.mod" || base == "go.work" {
+				names[name] = true
+			}
 		}
 	}
+	// A stopped walk leaves up to readConcurrency listings running. Wait for
+	// them so no goroutine outlives the call; they are the ones the limit
+	// overtook, and their answers are dropped.
+	listings.Wait()
 	ordered := make([]string, 0, len(names))
 	for name := range names {
 		ordered = append(ordered, name)
@@ -240,16 +241,18 @@ func designMetadataPath(name string) bool {
 	return false
 }
 
-// listing is one directory's answer, held until its level has been listed.
-type listing struct {
-	entries []string
-	err     error
-}
-
 // fetched is one file's answer, held until the ordered pass reaches it.
 type fetched struct {
 	content []byte
 	err     error
+}
+
+// pendingListing is one directory listing in flight during the walk.
+type pendingListing struct {
+	dir     string
+	entries []string
+	err     error
+	done    chan struct{}
 }
 
 // readConcurrency bounds requests in flight against a forge. Enough that a

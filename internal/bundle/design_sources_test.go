@@ -120,6 +120,8 @@ type slowRepo struct {
 	peak    int
 	fActive int
 	fPeak   int
+	lActive int
+	lPeak   int
 	gate    int
 	gateFor int
 	gateSet time.Duration
@@ -138,16 +140,41 @@ func (r *slowRepo) enter() func() {
 	return func() { r.mu.Lock(); r.active--; r.mu.Unlock() }
 }
 
-func (r *slowRepo) list(_ context.Context, dir string) ([]string, error) {
+func (r *slowRepo) list(ctx context.Context, dir string) ([]string, error) {
 	defer r.enter()()
 	r.mu.Lock()
 	r.listed = append(r.listed, dir)
+	r.lActive++
+	r.lPeak = max(r.lPeak, r.lActive)
+	wait := r.latch != nil && r.gateFor > 0
+	if wait {
+		r.gateFor--
+		if r.lActive >= r.gate {
+			r.latchOn.Do(func() { close(r.latch) })
+		}
+	}
 	r.mu.Unlock()
+	if wait {
+		select {
+		case <-r.latch:
+		case <-time.After(r.gateSet):
+		case <-ctx.Done():
+		}
+	}
+	defer func() { r.mu.Lock(); r.lActive--; r.mu.Unlock() }()
 	entries, ok := r.dirs[dir]
 	if !ok {
 		return nil, errors.New("no such directory")
 	}
 	return slices.Clone(entries), nil
+}
+
+// counts reports how many listings and reads the repo served, under the lock
+// the goroutines append with.
+func (r *slowRepo) counts() (listed, fetched int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.listed), len(r.fetched)
 }
 
 func (r *slowRepo) fetch(ctx context.Context, name string) ([]byte, error) {
@@ -268,6 +295,28 @@ func TestInParallelStopsQueuedWorkWhenTheContextIsCancelled(t *testing.T) {
 	}
 }
 
+// The walk refills listings as answers arrive instead of waiting for a whole
+// window. Pinning that as peak listings in flight rather than wall clock keeps
+// the test honest on a loaded runner: a barrier walk never has a listing
+// outstanding across two windows, however fast it runs.
+func TestDesignSourceCaptureListingsOverlapWithoutWindowBarriers(t *testing.T) {
+	repo := wideRepo(0, 30, 3)
+	repo.gate = 2
+	repo.gateFor = 2
+	// Short: the root is listed alone, so it waits this out, but 50ms is
+	// plenty for the next eight listings of the root's children to overlap it.
+	repo.gateSet = 50 * time.Millisecond
+	repo.latch = make(chan struct{})
+
+	view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: 4096, Bytes: 1 << 20})
+	if len(view.Errors) != 0 || len(view.Content) != 90 {
+		t.Fatalf("read %d files, errors %v", len(view.Content), view.Errors)
+	}
+	if repo.lPeak < 2 {
+		t.Errorf("peak listings in flight = %d, want overlap", repo.lPeak)
+	}
+}
+
 // The stream reads ahead but hands answers back in order, whatever order the
 // bytes arrive in.
 func TestFetchStreamDeliversInOrderDespiteSlowFirstRead(t *testing.T) {
@@ -340,11 +389,16 @@ func TestDesignSourceCaptureBoundsListingsPastThePathLimit(t *testing.T) {
 	if !slices.Contains(view.Errors, "design inventory path limit reached; callers may be missing") {
 		t.Fatalf("path limit was not reported: %v", view.Errors)
 	}
-	if len(repo.listed) > 1+readConcurrency {
-		t.Errorf("listed %d directories, want at most %d: the limit must stop the walk, not just the reads", len(repo.listed), 1+readConcurrency)
+	listed, fetched := repo.counts()
+	// The walk keeps readConcurrency listings in flight and starts one more
+	// each time it consumes an answer, so a limit hit after the first
+	// directory leaves at most two windows started. Listing the whole level
+	// first would show all 20.
+	if listed > 2*readConcurrency {
+		t.Errorf("listed %d directories, want at most %d: the limit must stop the walk, not just the reads", listed, 2*readConcurrency)
 	}
-	if len(repo.fetched) > paths {
-		t.Errorf("fetched %d files past the %d-path limit", len(repo.fetched), paths)
+	if fetched > paths {
+		t.Errorf("fetched %d files past the %d-path limit", fetched, paths)
 	}
 }
 
