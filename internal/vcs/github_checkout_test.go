@@ -131,4 +131,22 @@ func TestGitHubListsASymlinkWhetherTheCheckoutOrTheAPIAnswers(t *testing.T) {
 	}
 }
 
-// A checkout that lacks the commit, or a file the checkout cannot serve as
+// The contents API types a submodule as a file, measured against apache/arrow's
+// cpp/submodules/parquet-testing. The checkout must list it and must not claim
+// to read it, since there is no blob behind it.
+func TestGitHubListsASubmoduleButDoesNotReadIt(t *testing.T) {
+	dir := newRepo(t)
+	gitIn(t, dir, "update-index", "--add", "--cacheinfo", "160000,"+headOf(t, dir)+",vendor")
+	gitIn(t, dir, "commit", "-qm", "submodule")
+	var pulls, contents atomic.Int64
+	gh := countingGitHub(t, headOf(t, dir), &pulls, &contents)
+	gh.Checkout = dir
+
+	names, err := gh.ListDir(context.Background(), testRef(), "")
+	if err != nil || !slices.Equal(names, []string{"a.go", "vendor"}) {
+		t.Fatalf("ListDir = %v, %v, want the submodule listed as a file", names, err)
+	}
+	if _, err := gh.FileContent(context.Background(), testRef(), "vendor"); err == nil || contents.Load() != 1 {
+		t.Fatalf("FileContent = %v after %d API reads, want the API to answer and refuse", err, contents.Load())
+	}
+}

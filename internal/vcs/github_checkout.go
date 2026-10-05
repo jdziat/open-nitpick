@@ -3,6 +3,7 @@ package vcs
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"sort"
 	"strings"
 	"sync"
@@ -47,6 +48,12 @@ func (g *GitHub) checkoutTree(ctx context.Context, sha string) *checkoutTree {
 	// A failure caused by a cancelled run is not a fact about the checkout.
 	if t == nil && ctx.Err() != nil {
 		return nil
+	}
+	if t == nil {
+		// Once per commit, because the miss is cached below. Without it a wrong
+		// Checkout path looks like a slow review, not a misconfiguration.
+		slog.Warn("checkout does not hold the reviewed commit; reading it through the API",
+			"checkout", g.Checkout, "commit", short(sha))
 	}
 	g.index.mu.Lock()
 	defer g.index.mu.Unlock()
@@ -95,6 +102,11 @@ func readCheckoutTree(ctx context.Context, dir, sha string) *checkoutTree {
 			// The contents API types a symlink as a file, so it is listed here
 			// too. Only reading one is refused, in regular below.
 			t.dirs[parent] = append(t.dirs[parent], base)
+		case "commit":
+			// A submodule is typed as a file by the contents API as well, and has
+			// no blob here to read.
+			t.modes[name] = fields[0]
+			t.dirs[parent] = append(t.dirs[parent], base)
 		}
 	}
 	for _, names := range t.dirs {
@@ -111,6 +123,9 @@ func (t *checkoutTree) regular(path string) bool {
 }
 
 // headSHA is the pull request's head commit, asked for once per pull request.
+// It serves file and directory reads only. The approval check, Propose and its
+// final re-read call PullRequest themselves, so a push during the run is still
+// caught there.
 //
 // A read that names no revision used to fetch the pull request and its head
 // commit again for every file, so a review reading four hundred files made
