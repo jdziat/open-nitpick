@@ -21,7 +21,9 @@ import (
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
-// ContentFetcher reads a file's full contents at the reviewed revision.
+// ContentFetcher reads a file's full contents at the reviewed revision. It may
+// be called from several goroutines at once, so implementations must be safe
+// for concurrent use.
 type ContentFetcher func(ctx context.Context, path string) ([]byte, error)
 
 // Entry is one file prepared for review.

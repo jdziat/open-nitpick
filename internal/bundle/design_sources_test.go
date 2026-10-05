@@ -118,6 +118,13 @@ type slowRepo struct {
 	mu      sync.Mutex
 	active  int
 	peak    int
+	fActive int
+	fPeak   int
+	gate    int
+	gateFor int
+	gateSet time.Duration
+	latch   chan struct{}
+	latchOn sync.Once
 	listed  []string
 	fetched []string
 }
@@ -143,11 +150,28 @@ func (r *slowRepo) list(_ context.Context, dir string) ([]string, error) {
 	return slices.Clone(entries), nil
 }
 
-func (r *slowRepo) fetch(_ context.Context, name string) ([]byte, error) {
+func (r *slowRepo) fetch(ctx context.Context, name string) ([]byte, error) {
 	defer r.enter()()
 	r.mu.Lock()
 	r.fetched = append(r.fetched, name)
+	r.fActive++
+	r.fPeak = max(r.fPeak, r.fActive)
+	wait := r.latch != nil && r.gateFor > 0
+	if wait {
+		r.gateFor--
+		if r.fActive >= r.gate {
+			r.latchOn.Do(func() { close(r.latch) })
+		}
+	}
 	r.mu.Unlock()
+	if wait {
+		select {
+		case <-r.latch:
+		case <-time.After(r.gateSet):
+		case <-ctx.Done():
+		}
+	}
+	defer func() { r.mu.Lock(); r.fActive--; r.mu.Unlock() }()
 	body, ok := r.files[name]
 	if !ok {
 		return nil, errors.New("no such file")
@@ -178,24 +202,51 @@ func wideRepo(delay time.Duration, dirs, files int) *slowRepo {
 // repository one request at a time spent a minute before the first model call
 // in CI (issue #167); requests that do not depend on one another overlap.
 func TestDesignSourceCaptureOverlapsRequestsAndStaysWithinTheLimit(t *testing.T) {
-	repo := wideRepo(20*time.Millisecond, 20, 10)
+	repo := wideRepo(0, 20, 10)
+	// Hold the first reads open until a second coexists. A serial reader hits
+	// the deadline with only one active and fails the peak check below; a
+	// concurrent one clears the gate immediately.
+	repo.gate = 2
+	repo.gateFor = 2
+	repo.gateSet = time.Second
+	repo.latch = make(chan struct{})
 
-	start := time.Now()
 	view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: 4096, Bytes: 1 << 20})
-	elapsed := time.Since(start)
 
 	if len(view.Content) != 200 || len(view.Errors) != 0 {
 		t.Fatalf("read %d of 200 files, errors %v", len(view.Content), view.Errors)
 	}
-	// 221 requests at 20ms is 4.4s one at a time.
-	if elapsed > 1500*time.Millisecond {
-		t.Errorf("221 requests took %v; they were not overlapped", elapsed)
+	// Peak reads in flight, not wall clock, proves overlap: serial reads never
+	// have two bodies outstanding, however fast the runner is. Listing overlap
+	// is checked by repo.peak, which concurrent fetches must not be doing alone.
+	if repo.fPeak < 2 {
+		t.Errorf("peak reads in flight = %d, want overlap", repo.fPeak)
 	}
 	if repo.peak < 2 {
 		t.Errorf("peak requests in flight = %d, want overlap", repo.peak)
 	}
 	if repo.peak > readConcurrency {
 		t.Errorf("peak requests in flight = %d, over the limit of %d", repo.peak, readConcurrency)
+	}
+}
+
+// The stream reads ahead but hands answers back in order, whatever order the
+// bytes arrive in.
+func TestFetchStreamDeliversInOrderDespiteSlowFirstRead(t *testing.T) {
+	want := []string{"a", "b", "c", "d"}
+	fetch := func(_ context.Context, name string) ([]byte, error) {
+		if name == "a" {
+			time.Sleep(30 * time.Millisecond)
+		}
+		return []byte(name), nil
+	}
+	s := newFetchStream(t.Context(), want, 4, fetch)
+	defer s.stop()
+	for _, name := range want {
+		got, ok := s.next()
+		if !ok || string(got.content) != name {
+			t.Fatalf("next() = %q ok=%v, want %q", got.content, ok, name)
+		}
 	}
 }
 

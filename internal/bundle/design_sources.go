@@ -128,12 +128,16 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 	}
 	slices.Sort(ordered)
 
-	// The reads the loop below will make, fetched together first. The loop
+	// The reads the loop below will make, fetched ahead in order. The loop
 	// stays serial because its limits (paths, bytes) are decided in order, and
-	// it takes each answer from here, so what is kept and what is cut off is
-	// what a serial read produced. Only the byte limit cannot be known ahead,
-	// so a repository that hits it fetches a few files it then drops.
-	prefetched := prefetchSources(ctx, cfg, ordered, denied, fetch, limits)
+	// it takes each answer from the stream, so what is kept and what is cut
+	// off is what a serial read produced. The stream holds readConcurrency
+	// answers at most, so a repository with a large path limit and a small
+	// byte budget does not fetch the whole inventory before dropping it.
+	want := designReadNames(cfg, ordered, denied, limits)
+	stream := newFetchStream(ctx, want, readConcurrency, fetch)
+	defer stream.stop()
+	cursor := 0
 
 	used, reads := 0, 0
 	for _, name := range ordered {
@@ -171,8 +175,20 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 			source []byte
 			err    error
 		)
-		if got, ok := prefetched[name]; ok {
-			source, err = got.content, got.err
+		// The stream yields candidates in ordered order. Names the loop
+		// omitted never reached here, so skip past them, then take this
+		// name's answer. A name the stream never queued is fetched now.
+		for cursor < len(want) && want[cursor] != name {
+			cursor++
+			stream.discard()
+		}
+		if cursor < len(want) && want[cursor] == name {
+			cursor++
+			if got, ok := stream.next(); ok {
+				source, err = got.content, got.err
+			} else {
+				source, err = nil, fmt.Errorf("design source stream closed at %s", name)
+			}
 		} else {
 			source, err = fetch(ctx, name)
 		}
@@ -254,12 +270,9 @@ func inParallel(ctx context.Context, n int, fn func(i int)) {
 	wg.Wait()
 }
 
-// prefetchSources reads, concurrently, the files CaptureDesignSources will
-// ask for in order: those that pass its path checks, up to the path limit.
-func prefetchSources(ctx context.Context, cfg *config.Config, ordered []string, denied map[string]string, fetch ContentFetcher, limits SourceLimits) map[string]fetched {
-	if fetch == nil {
-		return nil
-	}
+// designReadNames lists, in order, the files CaptureDesignSources will try to
+// read: those that pass its path checks, up to the path limit.
+func designReadNames(cfg *config.Config, ordered []string, denied map[string]string, limits SourceLimits) []string {
 	var want []string
 	for _, name := range ordered {
 		if designMetadataPath(name) || denied[name] != "" || cfg.Ignored(name) {
@@ -273,15 +286,105 @@ func prefetchSources(ctx context.Context, cfg *config.Config, ordered []string, 
 		}
 		want = append(want, name)
 	}
-	got := make([]fetched, len(want))
-	inParallel(ctx, len(want), func(i int) {
-		got[i].content, got[i].err = fetch(ctx, want[i])
-	})
-	out := make(map[string]fetched, len(want))
-	for i, name := range want {
-		out[name] = got[i]
+	return want
+}
+
+// fetchStream reads want concurrently but delivers it in order, a window of
+// reads ahead of the caller. CaptureDesignSources decides what to keep in
+// order but must not fetch the whole inventory before it knows the byte budget
+// will cut it off: holding a window of bodies is a bounded cost, the whole
+// inventory is not. A worker holds its answer until the caller consumes it, so
+// at most window bodies exist at once. next returns answers in want order;
+// discard drops one the loop omitted.
+type fetchStream struct {
+	ctx      context.Context
+	want     []string
+	fetch    ContentFetcher
+	results  []fetched
+	done     []chan struct{}
+	consumed []chan struct{}
+	todo     chan int
+	stopCh   chan struct{}
+	cursor   int
+	stopped  bool
+	once     sync.Once
+}
+
+func newFetchStream(ctx context.Context, want []string, window int, fetch ContentFetcher) *fetchStream {
+	if window < 1 {
+		window = 1
 	}
-	return out
+	s := &fetchStream{ctx: ctx, want: want, fetch: fetch, stopCh: make(chan struct{})}
+	if fetch == nil || len(want) == 0 {
+		s.stopped = true
+		return s
+	}
+	s.results = make([]fetched, len(want))
+	s.done = make([]chan struct{}, len(want))
+	s.consumed = make([]chan struct{}, len(want))
+	s.todo = make(chan int, len(want))
+	for i := range want {
+		s.done[i] = make(chan struct{})
+		s.consumed[i] = make(chan struct{})
+		s.todo <- i
+	}
+	close(s.todo)
+	for w := 0; w < window; w++ {
+		go s.worker()
+	}
+	return s
+}
+
+// worker fetches one index at a time and does not take another until the caller
+// has consumed the last, so the number of held bodies never exceeds the pool.
+func (s *fetchStream) worker() {
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case i, ok := <-s.todo:
+			if !ok {
+				return
+			}
+			content, err := s.fetch(s.ctx, s.want[i])
+			s.results[i] = fetched{content: content, err: err}
+			close(s.done[i])
+			select {
+			case <-s.consumed[i]:
+			case <-s.stopCh:
+				return
+			}
+		}
+	}
+}
+
+func (s *fetchStream) next() (fetched, bool) {
+	if s.stopped || s.cursor >= len(s.want) {
+		return fetched{}, false
+	}
+	i := s.cursor
+	s.cursor++
+	select {
+	case <-s.done[i]:
+		got := s.results[i]
+		s.results[i] = fetched{}
+		close(s.consumed[i])
+		return got, true
+	case <-s.stopCh:
+		return fetched{}, false
+	}
+}
+
+// discard drops one queued answer the ordered pass will not use.
+func (s *fetchStream) discard() {
+	s.next()
+}
+
+func (s *fetchStream) stop() {
+	s.once.Do(func() {
+		s.stopped = true
+		close(s.stopCh)
+	})
 }
 
 // invalidSourcePath reports a name that must not be read: not canonical, or
