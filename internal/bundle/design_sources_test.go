@@ -327,6 +327,27 @@ func TestDesignSourceCaptureKeepsTheSameFilesAtThePathLimit(t *testing.T) {
 	}
 }
 
+// A wide level is where the path limit has to stop the walk and not just the
+// reads. The root's 20 directories are under the limit, so the limit is spent
+// inside the next level; listing that level one window at a time leaves at
+// most readConcurrency-1 directories listed and then discarded, where listing
+// the whole level first would request all 20.
+func TestDesignSourceCaptureBoundsListingsPastThePathLimit(t *testing.T) {
+	const dirs, files, paths = 20, 30, 50
+	repo := wideRepo(0, dirs, files)
+	view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: paths, Bytes: 1 << 20})
+
+	if !slices.Contains(view.Errors, "design inventory path limit reached; callers may be missing") {
+		t.Fatalf("path limit was not reported: %v", view.Errors)
+	}
+	if len(repo.listed) > 1+readConcurrency {
+		t.Errorf("listed %d directories, want at most %d: the limit must stop the walk, not just the reads", len(repo.listed), 1+readConcurrency)
+	}
+	if len(repo.fetched) > paths {
+		t.Errorf("fetched %d files past the %d-path limit", len(repo.fetched), paths)
+	}
+}
+
 // A failed request is reported against its own directory and file, and does
 // not stop the others.
 func TestDesignSourceCaptureReportsEachFailedRequestOnce(t *testing.T) {

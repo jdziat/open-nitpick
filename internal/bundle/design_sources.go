@@ -65,21 +65,27 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 			view.Errors = append(view.Errors, err.Error())
 			break
 		}
-		// One directory level at a time, listed together. A forge answers each
-		// listing with a request, and a serial walk of a repository with a
-		// hundred directories spent a minute before the first model call. The
-		// level is then read in queue order, so what the path limit cuts off
-		// and the order callers are found in are what the serial walk gave.
-		level := dirs
-		dirs = nil
-		listed := make([]listing, len(level))
-		inParallel(ctx, len(level), func(i int) {
-			listed[i].entries, listed[i].err = list(ctx, level[i])
+		// Listings are taken a window at a time and their entries read in
+		// queue order, so what the path limit cuts off and the order callers
+		// are found in are what the serial walk gave. The window keeps the
+		// forge requests overlapped without listing directories the limit has
+		// already put out of reach: past the window, later directories are
+		// never requested. At most readConcurrency-1 listings can be in
+		// flight when the limit is reached.
+		window := dirs
+		if len(window) > readConcurrency {
+			window = window[:readConcurrency]
+		}
+		dirs = dirs[len(window):]
+		listed := make([]listing, len(window))
+		inParallel(ctx, len(window), func(i int) {
+			listed[i].entries, listed[i].err = list(ctx, window[i])
 		})
-		for i, dir := range level {
+		stop := false
+		for i, dir := range window {
 			if err := ctx.Err(); err != nil {
 				view.Errors = append(view.Errors, err.Error())
-				dirs = nil
+				stop = true
 				break
 			}
 			entries, err := listed[i].entries, listed[i].err
@@ -92,7 +98,7 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 				visited++
 				if limits.Paths > 0 && visited > limits.Paths {
 					view.Errors = append(view.Errors, "design inventory path limit reached; callers may be missing")
-					dirs = nil
+					stop = true
 					break
 				}
 				base := strings.TrimSuffix(entry, "/")
@@ -117,9 +123,13 @@ func CaptureDesignSources(ctx context.Context, cfg *config.Config, changed []str
 					names[name] = true
 				}
 			}
-			if limits.Paths > 0 && visited > limits.Paths {
+			if stop {
 				break
 			}
+		}
+		if stop {
+			dirs = nil
+			break
 		}
 	}
 	ordered := make([]string, 0, len(names))
