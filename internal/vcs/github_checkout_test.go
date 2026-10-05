@@ -76,9 +76,42 @@ func TestGitHubCheckoutReadsIgnoreTheWorkingTree(t *testing.T) {
 	if err != nil || strings.Contains(string(got), "edited") {
 		t.Fatalf("read %q, %v: the working tree leaked into the review", got, err)
 	}
-	names, _ := gh.ListDir(context.Background(), testRef(), "")
+	names, err := gh.ListDir(context.Background(), testRef(), "")
+	if err != nil || contents.Load() != 0 {
+		t.Fatalf("ListDir = %v, %v after %d API reads: the checkout did not answer, so the isolation below proves nothing", names, err, contents.Load())
+	}
 	if slices.Contains(names, "untracked.go") {
 		t.Fatalf("ListDir = %v, want only what the commit holds", names)
+	}
+}
+
+// A git failure after the commit was found may be transient, so it must not be
+// remembered. The tree object is hidden for one read and put back; the second
+// read has to come from the checkout, not stay on the API for the rest of the
+// run.
+func TestGitHubRetriesTheCheckoutAfterATransientFailure(t *testing.T) {
+	dir := newRepo(t)
+	sha := headOf(t, dir)
+	tree := strings.TrimSpace(gitIn(t, dir, "rev-parse", sha+"^{tree}"))
+	object := filepath.Join(dir, ".git", "objects", tree[:2], tree[2:])
+	hidden := object + ".hidden"
+	if err := os.Rename(object, hidden); err != nil {
+		t.Skipf("tree object is not loose: %v", err)
+	}
+	var pulls, contents atomic.Int64
+	gh := countingGitHub(t, sha, &pulls, &contents)
+	gh.Checkout = dir
+
+	_, _ = gh.ListDir(context.Background(), testRef(), "")
+	if contents.Load() != 1 {
+		t.Fatalf("API asked %d times while the checkout was broken, want 1", contents.Load())
+	}
+	if err := os.Rename(hidden, object); err != nil {
+		t.Fatal(err)
+	}
+	names, err := gh.ListDir(context.Background(), testRef(), "")
+	if err != nil || !slices.Equal(names, []string{"a.go"}) || contents.Load() != 1 {
+		t.Fatalf("ListDir = %v, %v after %d API reads, want the recovered checkout to answer", names, err, contents.Load())
 	}
 }
 

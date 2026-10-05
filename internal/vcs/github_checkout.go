@@ -3,6 +3,7 @@ package vcs
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log/slog"
 	"sort"
 	"strings"
@@ -27,10 +28,18 @@ type checkoutIndex struct {
 	mu    sync.Mutex
 	trees map[string]*checkoutTree
 	heads map[string]string
+	// warned holds the commits already reported, so a checkout that keeps
+	// failing logs once and not once per file.
+	warned map[string]bool
 }
 
-// tree returns the commit's tree from the checkout, or nil when the checkout
-// does not hold the commit. A nil answer sends the caller to the API.
+// checkoutTree returns the commit's tree from the checkout, or nil when the
+// checkout cannot supply it. A nil answer sends the caller to the API.
+//
+// A commit the checkout does not hold is remembered, because asking again
+// cannot change the answer. A git call that failed after the commit was found
+// is not remembered: it may be transient, and caching it would send every
+// later read of the commit through the API.
 //
 // The commit is read from git objects and never the working tree: the review
 // is of the commit named, and the checkout may have something else out.
@@ -44,16 +53,15 @@ func (g *GitHub) checkoutTree(ctx context.Context, sha string) *checkoutTree {
 	if seen {
 		return t
 	}
-	t = readCheckoutTree(ctx, g.Checkout, sha)
-	// A failure caused by a cancelled run is not a fact about the checkout.
-	if t == nil && ctx.Err() != nil {
-		return nil
-	}
-	if t == nil {
-		// Once per commit, because the miss is cached below. Without it a wrong
-		// Checkout path looks like a slow review, not a misconfiguration.
-		slog.Warn("checkout does not hold the reviewed commit; reading it through the API",
-			"checkout", g.Checkout, "commit", short(sha))
+	t, held, err := readCheckoutTree(ctx, g.Checkout, sha)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
+		g.warnOnce(sha, "checkout could not be read; reading through the API", err)
+		if held {
+			return nil
+		}
 	}
 	g.index.mu.Lock()
 	defer g.index.mu.Unlock()
@@ -67,16 +75,33 @@ func (g *GitHub) checkoutTree(ctx context.Context, sha string) *checkoutTree {
 	return t
 }
 
-func readCheckoutTree(ctx context.Context, dir, sha string) *checkoutTree {
+// warnOnce logs a checkout problem the first time it is seen for a commit.
+func (g *GitHub) warnOnce(sha, msg string, err error) {
+	g.index.mu.Lock()
+	seen := g.index.warned[sha]
+	if g.index.warned == nil {
+		g.index.warned = map[string]bool{}
+	}
+	g.index.warned[sha] = true
+	g.index.mu.Unlock()
+	if !seen {
+		slog.Warn(msg, "checkout", g.Checkout, "commit", short(sha), "err", err)
+	}
+}
+
+// readCheckoutTree reads one commit's tree. held reports whether the checkout
+// has the commit: false with an error is a miss to remember, true with an
+// error is a failure that should be retried.
+func readCheckoutTree(ctx context.Context, dir, sha string) (t *checkoutTree, held bool, err error) {
 	local := &Local{Dir: dir}
 	if _, err := local.gitRaw(ctx, "cat-file", "-e", sha+"^{commit}"); err != nil {
-		return nil
+		return nil, false, fmt.Errorf("commit not in checkout: %w", err)
 	}
 	out, err := local.gitRaw(ctx, "ls-tree", "-r", "-t", "-z", sha)
 	if err != nil {
-		return nil
+		return nil, true, fmt.Errorf("list tree: %w", err)
 	}
-	t := &checkoutTree{modes: map[string]string{}, dirs: map[string][]string{}}
+	t = &checkoutTree{modes: map[string]string{}, dirs: map[string][]string{}}
 	for _, rec := range bytes.Split(out, []byte{0}) {
 		meta, name, ok := strings.Cut(string(rec), "\t")
 		if !ok || name == "" {
@@ -112,7 +137,7 @@ func readCheckoutTree(ctx context.Context, dir, sha string) *checkoutTree {
 	for _, names := range t.dirs {
 		sort.Strings(names)
 	}
-	return t
+	return t, true, nil
 }
 
 // regular reports whether path is a regular file in the tree. A symlink or a
