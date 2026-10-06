@@ -831,6 +831,14 @@ func prNumberFromEnv(getenv func(string) string) (int, error) {
 // Threads are a GraphQL notion: the REST comment id is matched to its thread
 // through the thread's first comment, and a thread already resolved, or one
 // this tool cannot find, is left alone and not reported as resolved.
+//
+// A thread counts as resolved only when the mutation says so. Accepting the
+// mutation without reading its answer counted a thread as closed while it was
+// still open, and the approval gate trusts this list, so it would approve
+// beside its own standing comment. A reply is posted before the mutation, so
+// an answer of isResolved:false leaves a reply that names a resolution that
+// did not happen; that is the same shape a reader sees when someone opens a
+// resolved thread again, and it is reported rather than hidden.
 func (g *GitHub) ResolveThreads(ctx context.Context, ref Ref, commentIDs []int64, reply string) ([]int64, error) {
 	if err := validateRef(ref); err != nil {
 		return nil, err
@@ -853,8 +861,18 @@ func (g *GitHub) ResolveThreads(ctx context.Context, ref Ref, commentIDs []int64
 				return resolved, fmt.Errorf("github: reply to comment %d on %s: %w", id, ref, err)
 			}
 		}
-		if err := g.graphql(ctx, `mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { isResolved } } }`, map[string]any{"id": th.id}, nil); err != nil {
+		var out struct {
+			ResolveReviewThread struct {
+				Thread struct {
+					IsResolved bool `json:"isResolved"`
+				} `json:"thread"`
+			} `json:"resolveReviewThread"`
+		}
+		if err := g.graphql(ctx, `mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { isResolved } } }`, map[string]any{"id": th.id}, &out); err != nil {
 			return resolved, fmt.Errorf("github: resolve thread of comment %d on %s: %w", id, ref, err)
+		}
+		if !out.ResolveReviewThread.Thread.IsResolved {
+			return resolved, fmt.Errorf("github: resolve thread of comment %d on %s: the forge left it open", id, ref)
 		}
 		resolved = append(resolved, id)
 	}
