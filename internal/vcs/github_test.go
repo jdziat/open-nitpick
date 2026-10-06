@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -35,6 +36,49 @@ func newFakeGitHub(t *testing.T, handler http.HandlerFunc) *GitHub {
 }
 
 func testRef() Ref { return Ref{Owner: "o", Repo: "r", Number: 7} }
+
+// TestGitHubFileAndDirReadsAreConcurrencySafe: the design pass lists
+// directories and reads files from several goroutines at once, on one
+// provider. The audit of go-github says the client is a value receiver over an
+// http.Client, and this provider's only mutable state is the identity cache
+// behind a mutex; this runs the real paths under -race so that stays true.
+func TestGitHubFileAndDirReadsAreConcurrencySafe(t *testing.T) {
+	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/v3/repos/o/r/contents/")
+		switch {
+		case strings.Contains(r.URL.Path, "/pulls/7"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"number": 7, "head": map[string]any{"sha": "abc123"}})
+		case !strings.Contains(path, ".go"):
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"name": "a.go", "type": "file"}, {"name": "sub", "type": "dir"},
+			})
+		default:
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"name": "a.go", "path": path, "type": "file",
+				"encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte("package a\n")),
+			})
+		}
+	})
+
+	var wg sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			name := fmt.Sprintf("pkg%02d/a.go", i)
+			if _, err := gh.FileContent(context.Background(), testRef(), name); err != nil {
+				t.Errorf("FileContent: %v", err)
+			}
+			if _, err := gh.ListDir(context.Background(), testRef(), fmt.Sprintf("pkg%02d", i)); err != nil {
+				t.Errorf("ListDir: %v", err)
+			}
+			if _, err := gh.postingActor(context.Background()); err != nil {
+				t.Errorf("postingActor: %v", err)
+			}
+		}(i)
+	}
+	wg.Wait()
+}
 
 func TestGitHubRequiresToken(t *testing.T) {
 	if _, err := NewGitHub(GitHubOptions{}); err == nil {

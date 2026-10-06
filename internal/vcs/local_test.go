@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -221,7 +224,36 @@ func TestLocalDiffAgainstBaseUsesMergeBase(t *testing.T) {
 }
 
 func TestLocalNameIdentifiesProvider(t *testing.T) {
+	t.Parallel()
 	if got := NewLocal(".", nil).Name(); got != "local" {
 		t.Errorf("Name = %q, want local", got)
 	}
+}
+
+// TestLocalFileAndDirReadsAreConcurrencySafe runs the design pass's real call
+// pattern, many reads and listings at once, under -race. Local holds only its
+// root and runs a git subprocess per call, so this guards the contract
+// ContentFetcher and DirLister now document rather than a cache being missed.
+func TestLocalFileAndDirReadsAreConcurrencySafe(t *testing.T) {
+	dir := newRepo(t)
+	for i := 0; i < 8; i++ {
+		write(t, dir, fmt.Sprintf("pkg%02d/b.go", i), "package b\n")
+	}
+	local := NewLocal(dir, io.Discard)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			ref := Ref{Head: Worktree}
+			if _, err := local.FileContent(context.Background(), ref, "a.go"); err != nil {
+				t.Errorf("FileContent: %v", err)
+			}
+			if _, err := local.ListDir(context.Background(), ref, fmt.Sprintf("pkg%02d", i%8)); err != nil {
+				t.Errorf("ListDir: %v", err)
+			}
+		}(i)
+	}
+	wg.Wait()
 }

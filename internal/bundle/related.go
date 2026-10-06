@@ -68,6 +68,9 @@ type Related struct {
 // trailing slash on subdirectories. Nil means directories cannot be listed,
 // which rules out Go (a package is a directory), and makes the other two probe
 // for files by name instead.
+//
+// It may be called from several goroutines at once, so implementations must be
+// safe for concurrent use.
 type DirLister func(ctx context.Context, dir string) ([]string, error)
 
 // maxDefinitionLines caps one attached definition. Past this a snippet is cut

@@ -3,9 +3,12 @@ package bundle
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/jdziat/open-nitpick/internal/config"
 )
@@ -14,7 +17,13 @@ func TestDesignSourceCaptureKeepsBudgetOmissionsOutOfContext(t *testing.T) {
 	cfg := config.Defaults()
 	reads := map[string]int{}
 	source := []byte("package visible\n")
-	fetch := func(_ context.Context, name string) ([]byte, error) { reads[name]++; return source, nil }
+	var mu sync.Mutex
+	fetch := func(_ context.Context, name string) ([]byte, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		reads[name]++
+		return source, nil
+	}
 	list := func(_ context.Context, dir string) ([]string, error) {
 		if dir != "" {
 			return nil, errors.New("unexpected directory")
@@ -49,7 +58,10 @@ func TestDesignSourceCapturePreservesExclusionsAndUnreadableFiles(t *testing.T) 
 	cfg := config.Defaults()
 	cfg.Review.Ignore = append(cfg.Review.Ignore, "private.go")
 	var reads []string
+	var mu sync.Mutex
 	fetch := func(_ context.Context, name string) ([]byte, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		reads = append(reads, name)
 		if name == "missing.go" {
 			return nil, errors.New("unreadable")
@@ -94,5 +106,344 @@ func TestDesignSourceCaptureExcludesRepositoryMetadataBeforeWalking(t *testing.T
 	view := CaptureDesignSources(t.Context(), config.Defaults(), []string{"app.go", ".git/hidden.go"}, fetch, list, nil, SourceLimits{Paths: 4, Bytes: 1024})
 	if len(view.Errors) != 0 || len(view.Content) != 2 || len(view.Excluded) != 2 {
 		t.Fatalf("metadata consumed source inventory or disappeared without an exclusion: %+v", view)
+	}
+}
+
+// slowRepo is a repository whose every request costs delay, the way a forge
+// does. It records how many requests were in flight at once.
+type slowRepo struct {
+	delay    time.Duration
+	dirs     map[string][]string
+	files    map[string]string
+	mu       sync.Mutex
+	active   int
+	peak     int
+	fActive  int
+	fPeak    int
+	lActive  int
+	lPeak    int
+	listGate *gate
+	readGate *gate
+	listed   []string
+	fetched  []string
+}
+
+// gate holds the first size calls of one kind open until size of them are
+// running together, or set elapses. Listings and reads take separate gates so
+// one cannot spend the other's budget, which is what the read-overlap test
+// needs: the walk's listings must not consume the gate fetches rely on.
+type gate struct {
+	mu        sync.Mutex
+	size      int
+	remaining int
+	set       time.Duration
+	latch     chan struct{}
+	once      sync.Once
+}
+
+func (g *gate) wait(ctx context.Context, active int) {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	if g.remaining <= 0 {
+		g.mu.Unlock()
+		return
+	}
+	g.remaining--
+	if active >= g.size {
+		g.once.Do(func() { close(g.latch) })
+	}
+	g.mu.Unlock()
+	select {
+	case <-g.latch:
+	case <-time.After(g.set):
+	case <-ctx.Done():
+	}
+}
+
+func (r *slowRepo) enter() func() {
+	r.mu.Lock()
+	r.active++
+	r.peak = max(r.peak, r.active)
+	r.mu.Unlock()
+	time.Sleep(r.delay)
+	return func() { r.mu.Lock(); r.active--; r.mu.Unlock() }
+}
+
+func (r *slowRepo) list(ctx context.Context, dir string) ([]string, error) {
+	defer r.enter()()
+	r.mu.Lock()
+	r.listed = append(r.listed, dir)
+	r.lActive++
+	r.lPeak = max(r.lPeak, r.lActive)
+	active := r.lActive
+	g := r.listGate
+	r.mu.Unlock()
+	g.wait(ctx, active)
+	defer func() { r.mu.Lock(); r.lActive--; r.mu.Unlock() }()
+	entries, ok := r.dirs[dir]
+	if !ok {
+		return nil, errors.New("no such directory")
+	}
+	return slices.Clone(entries), nil
+}
+
+// counts reports how many listings and reads the repo served, under the lock
+// the goroutines append with.
+func (r *slowRepo) counts() (listed, fetched int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.listed), len(r.fetched)
+}
+
+func (r *slowRepo) fetch(ctx context.Context, name string) ([]byte, error) {
+	defer r.enter()()
+	r.mu.Lock()
+	r.fetched = append(r.fetched, name)
+	r.fActive++
+	r.fPeak = max(r.fPeak, r.fActive)
+	active := r.fActive
+	g := r.readGate
+	r.mu.Unlock()
+	g.wait(ctx, active)
+	defer func() { r.mu.Lock(); r.fActive--; r.mu.Unlock() }()
+	body, ok := r.files[name]
+	if !ok {
+		return nil, errors.New("no such file")
+	}
+	return []byte(body), nil
+}
+
+// wideRepo has dirs directories of files Go files each.
+func wideRepo(delay time.Duration, dirs, files int) *slowRepo {
+	r := &slowRepo{delay: delay, dirs: map[string][]string{}, files: map[string]string{}}
+	var top []string
+	for d := range dirs {
+		dir := fmt.Sprintf("pkg%02d", d)
+		top = append(top, dir+"/")
+		var entries []string
+		for f := range files {
+			name := fmt.Sprintf("f%02d.go", f)
+			entries = append(entries, name)
+			r.files[dir+"/"+name] = "package " + dir + "\n"
+		}
+		r.dirs[dir] = entries
+	}
+	r.dirs[""] = top
+	return r
+}
+
+// A forge answers each listing and each read with a request. Reading a
+// repository one request at a time spent a minute before the first model call
+// in CI (issue #167); requests that do not depend on one another overlap.
+func TestDesignSourceCaptureOverlapsRequestsAndStaysWithinTheLimit(t *testing.T) {
+	repo := wideRepo(0, 20, 10)
+	// Hold the first reads open until a second coexists. A serial reader hits
+	// the deadline with only one active and fails the peak check below; a
+	// concurrent one clears the gate immediately.
+	repo.readGate = &gate{size: 2, remaining: 2, set: time.Second, latch: make(chan struct{})}
+
+	view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: 4096, Bytes: 1 << 20})
+
+	if len(view.Content) != 200 || len(view.Errors) != 0 {
+		t.Fatalf("read %d of 200 files, errors %v", len(view.Content), view.Errors)
+	}
+	// Peak reads in flight, not wall clock, proves overlap: serial reads never
+	// have two bodies outstanding, however fast the runner is. Listing overlap
+	// is checked by repo.peak, which concurrent fetches must not be doing alone.
+	if repo.fPeak < 2 {
+		t.Errorf("peak reads in flight = %d, want overlap", repo.fPeak)
+	}
+	if repo.peak < 2 {
+		t.Errorf("peak requests in flight = %d, want overlap", repo.peak)
+	}
+	if repo.peak > readConcurrency {
+		t.Errorf("peak requests in flight = %d, over the limit of %d", repo.peak, readConcurrency)
+	}
+}
+
+// A cancelled walk does not start work it queued. The callbacks hold every
+// slot open, so the only way past them is for the loop to watch ctx; the old
+// loop instead waited on a slot and started one more callback once a worker
+// freed, which is what the count of readConcurrency pins here.
+func TestInParallelStopsQueuedWorkWhenTheContextIsCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	release := make(chan struct{})
+	var mu sync.Mutex
+	var count int
+	blocked := make(chan struct{})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		inParallel(ctx, 1000, func(i int) {
+			mu.Lock()
+			count++
+			running := count
+			mu.Unlock()
+			if running == readConcurrency {
+				close(blocked)
+			}
+			<-release
+		})
+	}()
+
+	<-blocked
+	cancel()
+	close(release)
+	<-done
+
+	mu.Lock()
+	defer mu.Unlock()
+	if count != readConcurrency {
+		t.Errorf("started %d callbacks, want exactly %d: no work should start after cancellation", count, readConcurrency)
+	}
+}
+
+// The walk refills listings as answers arrive instead of waiting for a whole
+// window. Pinning that as peak listings in flight rather than wall clock keeps
+// the test honest on a loaded runner: a barrier walk never has a listing
+// outstanding across two windows, however fast it runs.
+func TestDesignSourceCaptureListingsOverlapWithoutWindowBarriers(t *testing.T) {
+	repo := wideRepo(0, 30, 3)
+	// Short: the root is listed alone, so it waits this out, but 50ms is
+	// plenty for the next eight listings of the root's children to overlap it.
+	repo.listGate = &gate{size: 2, remaining: 2, set: 50 * time.Millisecond, latch: make(chan struct{})}
+
+	view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: 4096, Bytes: 1 << 20})
+	if len(view.Errors) != 0 || len(view.Content) != 90 {
+		t.Fatalf("read %d files, errors %v", len(view.Content), view.Errors)
+	}
+	if repo.lPeak < 2 {
+		t.Errorf("peak listings in flight = %d, want overlap", repo.lPeak)
+	}
+}
+
+// The stream reads ahead but hands answers back in order, whatever order the
+// bytes arrive in.
+func TestFetchStreamDeliversInOrderDespiteSlowFirstRead(t *testing.T) {
+	want := []string{"a", "b", "c", "d"}
+	fetch := func(_ context.Context, name string) ([]byte, error) {
+		if name == "a" {
+			time.Sleep(30 * time.Millisecond)
+		}
+		return []byte(name), nil
+	}
+	s := newFetchStream(t.Context(), want, 4, fetch)
+	defer s.stop()
+	for _, name := range want {
+		got, ok := s.next()
+		if !ok || string(got.content) != name {
+			t.Fatalf("next() = %q ok=%v, want %q", got.content, ok, name)
+		}
+	}
+}
+
+// Overlap changes when requests are made and not what is kept: the path limit
+// cuts the same files off, and the same files are read, as in a serial walk.
+func TestDesignSourceCaptureKeepsTheSameFilesAtThePathLimit(t *testing.T) {
+	serial := wideRepo(0, 6, 5)
+	limits := SourceLimits{Paths: 17, Bytes: 1 << 20}
+	got := CaptureDesignSources(t.Context(), config.Defaults(), nil, serial.fetch, serial.list, nil, limits)
+
+	var keep []string
+	for name := range got.Content {
+		keep = append(keep, name)
+	}
+	slices.Sort(keep)
+
+	// The walk visits "" first, then pkg00, pkg01, ... in sorted order, so the
+	// 17 paths are the 6 directories and the first 11 files of the first three.
+	want := []string{
+		"pkg00/f00.go", "pkg00/f01.go", "pkg00/f02.go", "pkg00/f03.go", "pkg00/f04.go",
+		"pkg01/f00.go", "pkg01/f01.go", "pkg01/f02.go", "pkg01/f03.go", "pkg01/f04.go",
+		"pkg02/f00.go",
+	}
+	if !slices.Equal(keep, want) {
+		t.Fatalf("kept %v, want %v", keep, want)
+	}
+	if !slices.Contains(got.Errors, "design inventory path limit reached; callers may be missing") {
+		t.Errorf("hitting the limit was not reported: %v", got.Errors)
+	}
+	slices.Sort(serial.fetched)
+	if !slices.Equal(serial.fetched, want) {
+		t.Errorf("fetched %v, want exactly the kept files %v", serial.fetched, want)
+	}
+	// Prefetching stays inside the same bound: files the ordered pass would cut
+	// off are never requested, so overlap cannot turn the limit into a wider read.
+	for _, name := range serial.fetched {
+		if strings.HasPrefix(name, "pkg04/") || strings.HasPrefix(name, "pkg05/") {
+			t.Errorf("fetched %s beyond the path limit", name)
+		}
+	}
+}
+
+// A wide level is where the path limit has to stop the walk and not just the
+// reads. The root's 20 directories are under the limit, so the limit is spent
+// inside the next level; listing that level one window at a time leaves at
+// most readConcurrency-1 directories listed and then discarded, where listing
+// the whole level first would request all 20.
+func TestDesignSourceCaptureBoundsListingsPastThePathLimit(t *testing.T) {
+	const dirs, files, paths = 20, 30, 50
+	repo := wideRepo(0, dirs, files)
+	view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: paths, Bytes: 1 << 20})
+
+	if !slices.Contains(view.Errors, "design inventory path limit reached; callers may be missing") {
+		t.Fatalf("path limit was not reported: %v", view.Errors)
+	}
+	listed, fetched := repo.counts()
+	// The walk keeps readConcurrency listings in flight and starts one more
+	// each time it consumes an answer, so a limit hit after the first
+	// directory leaves at most two windows started. Listing the whole level
+	// first would show all 20.
+	if listed > 2*readConcurrency {
+		t.Errorf("listed %d directories, want at most %d: the limit must stop the walk, not just the reads", listed, 2*readConcurrency)
+	}
+	if fetched > paths {
+		t.Errorf("fetched %d files past the %d-path limit", fetched, paths)
+	}
+}
+
+// The prefetch stream must never report a miss. It is built from every name
+// designCandidate admits, so it stays a superset of what the loop reads no
+// matter how the path and byte limits interleave. This sweeps those
+// combinations: a byte budget that drops a name before any read, a path limit
+// that stops the loop, and both together.
+func TestDesignSourceCaptureNeverReportsAPrefetchMissUnderEitherLimit(t *testing.T) {
+	for _, paths := range []int{0, 1, 3, 7} {
+		for _, bytes := range []int{0, 5, 40, 4000} {
+			repo := wideRepo(0, 4, 6)
+			view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: paths, Bytes: bytes})
+			for _, err := range view.Errors {
+				if strings.Contains(err, "prefetch missed") {
+					t.Fatalf("paths=%d bytes=%d: %s", paths, bytes, err)
+				}
+			}
+		}
+	}
+}
+
+// A failed request is reported against its own directory and file, and does
+// not stop the others.
+func TestDesignSourceCaptureReportsEachFailedRequestOnce(t *testing.T) {
+	repo := wideRepo(0, 4, 3)
+	delete(repo.dirs, "pkg01")
+	delete(repo.files, "pkg02/f01.go")
+
+	view := CaptureDesignSources(t.Context(), config.Defaults(), nil, repo.fetch, repo.list, nil, SourceLimits{Paths: 100, Bytes: 1 << 20})
+
+	if len(view.Content) != 8 {
+		t.Errorf("read %d files, want 8 (3 directories of 3, minus one file)", len(view.Content))
+	}
+	if !slices.Contains(view.Errors, "pkg01: directory listing unavailable") {
+		t.Errorf("the failed listing was not reported: %v", view.Errors)
+	}
+	var gone []string
+	for _, o := range view.Omitted {
+		gone = append(gone, o.Path)
+	}
+	if !slices.Equal(gone, []string{"pkg02/f01.go"}) {
+		t.Errorf("omitted %v, want only pkg02/f01.go", gone)
 	}
 }

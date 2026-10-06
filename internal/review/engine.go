@@ -810,7 +810,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// (the local one, every test double that does not opt in) leaves prior nil
 	// and the whole change is reviewed, which is also what happens on a first
 	// run.
+	priorStart := time.Now()
 	prior := e.priorReview(ctx, ref)
+	e.log().Info("earlier review read", "elapsed", time.Since(priorStart).Round(time.Millisecond))
 	if e.Resume && e.priorReadErr != nil {
 		report.priorReadFailed = true
 	}
@@ -844,7 +846,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	if e.FastReview || (!e.Resume && (!e.Config.Review.Incremental || e.Full)) {
 		narrowPrior = nil
 	}
+	narrowStart := time.Now()
 	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, narrowPrior)
+	e.log().Info("narrowed to changes since the last review", "elapsed", time.Since(narrowStart).Round(time.Millisecond))
 	// Cleared per run: Review may be called more than once on one Engine, and a
 	// stale map would exempt files from the progress cache after the comments
 	// that justified it were closed.
@@ -867,7 +871,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// 24,852 tokens reach the provider at 32,653.
 	var plan *bundle.Plan
 	if e.Config.Practices.Profile == "engineering" {
+		designStart := time.Now()
 		execution := e.assembleDesign(ctx, ref, files, bundle.Reserve{Tokens: e.framingTokens(pr)})
+		e.log().Info("design assembled", "elapsed", time.Since(designStart).Round(time.Millisecond))
 		report.DesignExecution = &execution
 		plan = execution.Plan
 	} else {
@@ -887,7 +893,9 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// prior, not narrowPrior: pull-request budget scope needs prior spend even
 	// when residual loaded the prior without enabling incremental narrowing.
 	if report.DesignExecution != nil {
+		budgetStart := time.Now()
 		report.Budget = e.applyDesignBudget(ctx, ref, prior, &report.DesignExecution.DesignPacking, files)
+		e.log().Info("design budget applied", "elapsed", time.Since(budgetStart).Round(time.Millisecond))
 	} else if fit, trimmed, err := e.applyBudget(ctx, ref, prior, plan, files, fetch); err != nil {
 		return nil, err
 	} else if fit != nil {

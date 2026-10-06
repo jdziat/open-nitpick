@@ -6,6 +6,8 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/diff"
@@ -51,8 +53,23 @@ func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Fil
 			changed = append(changed, file.Path)
 		}
 	}
-	fetch := func(ctx context.Context, name string) ([]byte, error) { return e.Provider.FileContent(ctx, ref, name) }
-	view := bundle.CaptureDesignSources(ctx, e.Config, changed, fetch, bundle.ListerFrom(e.Provider, ref), blocked, bundle.SourceLimits{Paths: 4096, Bytes: 32 << 20})
+	var listCalls, fetchCalls atomic.Int64
+	fetch := func(ctx context.Context, name string) ([]byte, error) {
+		fetchCalls.Add(1)
+		return e.Provider.FileContent(ctx, ref, name)
+	}
+	list := bundle.ListerFrom(e.Provider, ref)
+	if list != nil {
+		inner := list
+		list = func(ctx context.Context, dir string) ([]string, error) {
+			listCalls.Add(1)
+			return inner(ctx, dir)
+		}
+	}
+	captured := time.Now()
+	view := bundle.CaptureDesignSources(ctx, e.Config, changed, fetch, list, blocked, bundle.SourceLimits{Paths: 4096, Bytes: 32 << 20})
+	e.log().Info("design sources read", "elapsed", time.Since(captured).Round(time.Millisecond),
+		"directories", listCalls.Load(), "files", fetchCalls.Load(), "read", len(view.Content))
 	view.Omitted = slices.DeleteFunc(view.Omitted, func(skip bundle.Skip) bool {
 		if reason, ok := routine[skip.Path]; ok && reason == skip.Reason {
 			view.Excluded = append(view.Excluded, skip)
