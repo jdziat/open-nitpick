@@ -2632,10 +2632,10 @@ each read was a separate forge request, made one at a time. The same tree holds
 the answers, so the requests did not depend on each other.
 
 Listing the tree and reading its files now overlap, at most eight requests in
-flight. Across the thirteen CI runs after the change the same tree, all 93
-directories and 396 files, reads in a median of 16.0s, from 7.3s to 40.5s. The
-widest values land on the most loaded runners, so the range is the number to
-keep; the baseline is the one pre-change run at 1m6s. Model batch time swings as
+flight. Across the thirteen CI runs after the change the same 93 directories
+read in a median of 16.0s, from 7.3s to 40.5s. The widest values land on the
+most loaded runners, so the range is the number to keep; the baseline is the
+one pre-change run at 1m6s. Model batch time swings as
 widely, 4s to 2m7s over the same runs with a median near 1m25s, so it is still
 the larger part of a review. What is left to measure is the fixed pre-batch
 step as a whole, not this read alone.
@@ -2645,11 +2645,14 @@ two more per file because a read that named no revision fetched the pull
 request and its head commit first. The Action already holds the history, so
 the provider now answers from the checkout when it has the reviewed commit:
 file contents from the commit's objects, listings from one `git ls-tree`, the
-head commit once per pull request. Two CI runs of the same tree, 93
-directories and 398 files, read in 290ms and 285ms, against 16.6s in the
-concurrent run before it and 1m6s before that. `design assembled` fell from
-17.1s to 0.9s. Two runs are not a distribution; the range from the earlier
-thirteen is why 16s was reported as a median and not a best case.
+head commit once per pull request. The read covers whatever the reviewed
+commit holds, so the file count rises as this branch adds tests: the
+concurrent runs held 396 or 397 files, the checkout runs 398 or 399. Those
+five reads covered all 93 directories in 290ms, 196ms, 277ms, 285ms and
+165ms, against 16.6s in the concurrent run before it and 1m6s before that.
+`design assembled` fell from 17.1s to a median near 0.9s. Five runs are not a
+distribution; the range from the earlier thirteen is why 16s was reported as a
+median and not a best case.
 
 `TestDesignSourceCaptureOverlapsRequestsAndStaysWithinTheLimit` pins the
 overlap as peak requests in flight rather than wall clock, so a loaded runner
