@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -241,6 +242,47 @@ func TestResolvedHistoryIsExcludedOnlyWhenConfirmed(t *testing.T) {
 		}
 		if !unavailable && (prior.Comments[0].ID != 2 || prior.Comments[1].ID != 3) {
 			t.Fatalf("lost open or unknown thread: %+v", prior.Comments)
+		}
+	}
+}
+
+// TestResolveThreadsTrustsOnlyConfirmedResolutions pins the post-condition the
+// approval gate leans on. resolveClearedForApprove counts a thread closed
+// because ResolveThreads listed it, then approves; a mutation the forge accepts
+// but does not apply must therefore not be reported as resolved, or the run
+// approves beside a comment it just replied to.
+func TestResolveThreadsTrustsOnlyConfirmedResolutions(t *testing.T) {
+	for _, confirmed := range []bool{true, false} {
+		gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.URL.Path == "/api/graphql":
+				var body struct {
+					Query string `json:"query"`
+				}
+				_ = json.NewDecoder(r.Body).Decode(&body)
+				if strings.Contains(body.Query, "reviewThreads") {
+					_, _ = w.Write([]byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"T1","isResolved":false,"comments":{"nodes":[{"databaseId":1}]}}],"pageInfo":{"hasNextPage":false}}}}}}`))
+					return
+				}
+				_, _ = w.Write([]byte(`{"data":{"resolveReviewThread":{"thread":{"id":"T1","isResolved":` + strconv.FormatBool(confirmed) + `}}}}`))
+			case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/pulls/7/comments"):
+				_, _ = w.Write([]byte(`{"id":999}`))
+			default:
+				_, _ = w.Write([]byte(`{}`))
+			}
+		})
+		resolved, err := gh.ResolveThreads(context.Background(), testRef(), []int64{1}, "Resolved by open-nitpick: test")
+		if confirmed {
+			if err != nil || len(resolved) != 1 {
+				t.Fatalf("confirmed resolve reported err=%v resolved=%v", err, resolved)
+			}
+			continue
+		}
+		if err == nil {
+			t.Fatalf("unconfirmed mutation reported success, resolved=%v", resolved)
+		}
+		if len(resolved) != 0 {
+			t.Fatalf("unconfirmed mutation listed %v as resolved", resolved)
 		}
 	}
 }
