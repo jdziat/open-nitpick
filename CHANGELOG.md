@@ -1,5 +1,37 @@
 # Changelog
 
+## [2.4.0](https://github.com/jdziat/open-nitpick/compare/v2.3.0...v2.4.0) (2026-10-06)
+
+
+### Features
+
+* **review:** make fast-review cover every changed diff ([#154](https://github.com/jdziat/open-nitpick/issues/154)) ([941832c](https://github.com/jdziat/open-nitpick/commit/941832c54ba10e790e410f110d3df31296111df5))
+* **vcs:** let the GitHub client refresh its own App tokens ([#153](https://github.com/jdziat/open-nitpick/issues/153)) ([0af0be5](https://github.com/jdziat/open-nitpick/commit/0af0be5ac754d8afaf83d4e8347f22665b8fcf16))
+
+
+### Fixes
+
+* **llm:** bound failing-batch retries and escalate them ([#162](https://github.com/jdziat/open-nitpick/issues/162)) ([ea3f2fc](https://github.com/jdziat/open-nitpick/commit/ea3f2fcb7e82bc467a7cba7d4cbfd20e3194182a)), closes [#161](https://github.com/jdziat/open-nitpick/issues/161)
+* **review:** close threads a standing recheck kept alive ([e779ec6](https://github.com/jdziat/open-nitpick/commit/e779ec6ce40de9bc886d1896f75c5b8069e6c733))
+* **review:** keep a standing recheck off the progress cache ([f884e0b](https://github.com/jdziat/open-nitpick/commit/f884e0b9f27b9ba546c31bb9f6210e56a11e2946))
+* **review:** keep standing-only to files this run read ([08420a2](https://github.com/jdziat/open-nitpick/commit/08420a2d153ba5c70f8ec99102d0c54a8d2943be))
+* **review:** let design-pass batches merge past the per-diff file cap ([#160](https://github.com/jdziat/open-nitpick/issues/160)) ([6b4d87e](https://github.com/jdziat/open-nitpick/commit/6b4d87e96b5a531a8af9a2d1c708e86663928188))
+* **review:** stop design-task skips from blocking thread resolution ([2f37a4e](https://github.com/jdziat/open-nitpick/commit/2f37a4e57851a01cbaf79836da837e02113d873b))
+* **vcs:** verify a thread closed before reporting it resolved ([#173](https://github.com/jdziat/open-nitpick/issues/173)) ([2191591](https://github.com/jdziat/open-nitpick/commit/219159137cf257379ba97ba049bc7e775978f60d))
+
+
+### Performance
+
+* **bundle:** read design sources concurrently ([#169](https://github.com/jdziat/open-nitpick/issues/169)) ([be8c8c2](https://github.com/jdziat/open-nitpick/commit/be8c8c23fb9009aa5c4d0444782b68f355b18c37))
+* **config:** review with glm-5.3-flash at low reasoning ([#163](https://github.com/jdziat/open-nitpick/issues/163)) ([aeedd8b](https://github.com/jdziat/open-nitpick/commit/aeedd8bc4b53c1f378efff778bb61106a88ce6d8)), closes [#161](https://github.com/jdziat/open-nitpick/issues/161)
+
+
+### Documentation
+
+* **findings:** record the CI timings under low reasoning ([#166](https://github.com/jdziat/open-nitpick/issues/166)) ([3ac13d1](https://github.com/jdziat/open-nitpick/commit/3ac13d1fa9cf4c7bae8dcbc47da47411c21359d1)), closes [#161](https://github.com/jdziat/open-nitpick/issues/161)
+* overhaul the guide and CLI documentation ([#158](https://github.com/jdziat/open-nitpick/issues/158)) ([758fc07](https://github.com/jdziat/open-nitpick/commit/758fc07a6e0f4dcc250e415204944643dc54d7f2))
+* recommend OpenRouter and remove referrals ([#157](https://github.com/jdziat/open-nitpick/issues/157)) ([00b6fd2](https://github.com/jdziat/open-nitpick/commit/00b6fd2f6181ea85c07dba922fc29367b11718dd))
+
 ## [2.3.0](https://github.com/jdziat/open-nitpick/compare/v2.2.0...v2.3.0) (2026-09-29)
 
 
