@@ -189,7 +189,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.default.reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.default.service_tier`
 
@@ -274,7 +274,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.embed.reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.embed.service_tier`
 
@@ -359,7 +359,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.ensemble[].reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.ensemble[].service_tier`
 
@@ -444,7 +444,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.fix.reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.fix.service_tier`
 
@@ -529,7 +529,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.review.reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.review.service_tier`
 
@@ -614,7 +614,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.router.reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.router.service_tier`
 
@@ -699,7 +699,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.routes[].ensemble[].reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.routes[].ensemble[].service_tier`
 
@@ -809,7 +809,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.routes[].review.reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.routes[].review.service_tier`
 
@@ -894,7 +894,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.security.reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.security.service_tier`
 
@@ -979,7 +979,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.triage.reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.triage.service_tier`
 
@@ -1064,7 +1064,7 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 ### `models.validate.reasoning`
 
 string, default `none`.
-Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
 ### `models.validate.service_tier`
 

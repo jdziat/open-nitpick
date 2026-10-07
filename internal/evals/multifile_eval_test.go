@@ -64,6 +64,11 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		near     int
 		usd      float64
 		priced   int                        // reviews whose cost is known
+		seconds  float64                    // wall time over the reviews that finished
+		timed    int                        // reviews that carry a duration
+		reason   int                        // provider-reported reasoning tokens
+		complete int                        // provider-reported completion tokens, reasoning included
+		metered  int                        // reviews whose every call reported usage
 		byBand   map[config.Severity][2]int // located, plants
 		perFix   map[string]string          // keyed by fixture, "located/plants (noise)"
 	}
@@ -71,7 +76,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		mu   sync.Mutex
 		rows = map[string]*row{}
 	)
-	record := func(name string, f Fixture, findings []review.Finding, runErr error, cost Cost) {
+	record := func(name string, f Fixture, findings []review.Finding, runErr error, cost Cost, res RunResult) {
 		mu.Lock()
 		defer mu.Unlock()
 		r, ok := rows[name]
@@ -85,6 +90,15 @@ func TestBenchmarkMultiFile(t *testing.T) {
 			return
 		}
 		r.reviews++
+		if res.Duration > 0 {
+			r.timed++
+			r.seconds += res.Duration.Seconds()
+		}
+		if res.Usage.Complete() {
+			r.metered++
+			r.reason += res.Usage.Reasoning()
+			r.complete += res.Usage.Completion()
+		}
 		if cost.Known {
 			r.usd += cost.USD
 			r.priced++
@@ -151,10 +165,10 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		for _, f := range opts.Fixtures {
 			findings, ok := inc.cached(inc.cacheDir, f)
 			if !ok {
-				record(inc.name, f, nil, fmt.Errorf("no review"), Cost{})
+				record(inc.name, f, nil, fmt.Errorf("no review"), Cost{}, RunResult{})
 				continue
 			}
-			record(inc.name, f, findings, nil, Cost{})
+			record(inc.name, f, findings, nil, Cost{}, RunResult{})
 			_ = dump.Record(DumpSample{Model: inc.name, Fixture: f, Run: 0, Findings: findings})
 		}
 	}
@@ -202,7 +216,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 						if res.Report != nil && len(res.Report.Routes) > 0 {
 							routing.note(name, res.Report.Routes)
 						}
-						record(name, f, findings, res.Err, cost)
+						record(name, f, findings, res.Err, cost, res)
 						if res.Err != nil {
 							t.Logf("%s on %s run %d: %v", name, f.Name, i, res.Err)
 							return
@@ -235,6 +249,7 @@ func TestBenchmarkMultiFile(t *testing.T) {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "\n%-42s %7s %7s %5s %7s %6s %6s %9s %10s  %s\n", "contender", "RECALL", "NOISE", "NEAR", "ANCHOR", "REV", "LOST", "$/REVIEW", "$/LOCATED", "critical/error/warning/info/nit")
+	fmt.Fprintf(&b, "%-42s %7s %9s %9s\n", "", "SEC/REV", "THINK/REV", "OUT/REV")
 	for _, n := range names {
 		r := rows[n]
 		bands := make([]string, 0, 5)
@@ -255,8 +270,18 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		}
 		fmt.Fprintf(&b, "%-42s %7s %7s %5d %7d %6d %6d %9s %10s  %s\n", n,
 			ratio(r.located, r.plants), ratio(r.noise, r.reviews), r.near, r.anchor, r.reviews, r.lost, perReview, perLocated, strings.Join(bands, " "))
+		sec, think, out := "n/a", "n/a", "n/a"
+		if r.timed > 0 {
+			sec = fmt.Sprintf("%.1f", r.seconds/float64(r.timed))
+		}
+		if r.metered > 0 {
+			think = fmt.Sprintf("%d", r.reason/r.metered)
+			out = fmt.Sprintf("%d", r.complete/r.metered)
+		}
+		fmt.Fprintf(&b, "%-42s %7s %9s %9s\n", "", sec, think, out)
 	}
 	b.WriteString("\nRECALL = located/plants over every review; NOISE = findings explaining no plant, per review; NEAR = of those, findings naming a plant's keywords in its file beyond the anchor tolerance; ANCHOR = widest anchor in lines.\n")
+	b.WriteString("SEC/REV is wall time per finished review; THINK/REV and OUT/REV are provider-reported reasoning and completion tokens per review (reasoning is a subset of completion), over reviews whose every call reported usage.\n")
 	b.WriteString("$/REVIEW is the provider-reported spend per review at the shipped rate table; $/LOCATED divides the run's spend by the plants it located, and is n/a when any review went unpriced.\n")
 	b.WriteString("Our side is listed once per model without related context and once with it (+ctx).\n\n")
 

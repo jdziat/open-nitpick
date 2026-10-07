@@ -273,6 +273,7 @@ BASELINE ?=
 eval:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
 	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
+	$(if $(REASONING),NITPICK_EVAL_REASONING='$(REASONING)') \
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(CAPTURE),NITPICK_EVAL_CAPTURE='$(CAPTURE)') \
 	$(if $(RELATED),NITPICK_EVAL_RELATED_CONTEXT='$(RELATED)') \
@@ -311,6 +312,7 @@ benchmark:
 	$(if $(JUDGE),NITPICK_EVAL_JUDGE='$(JUDGE)') \
 	$(if $(JUDGE2),NITPICK_EVAL_JUDGE2='$(JUDGE2)') \
 	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
+	$(if $(REASONING),NITPICK_EVAL_REASONING='$(REASONING)') \
 	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
 	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
 	go test -tags=eval -count=1 -timeout=90m -v -run TestBenchmarkAgainstIncumbent ./internal/evals/
@@ -380,6 +382,7 @@ benchmark-multifile:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
+	$(if $(REASONING),NITPICK_EVAL_REASONING='$(REASONING)') \
 	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
 	$(if $(ENGINE_LOG),NITPICK_EVAL_ENGINE_LOG='$(ENGINE_LOG)') \
 	go test -tags=eval -count=1 -timeout=300m -v -run TestBenchmarkMultiFile ./internal/evals/

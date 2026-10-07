@@ -157,14 +157,18 @@ type ModelSpec struct {
 	StructuredOutput StructuredMode `yaml:"structured_output"`
 
 	// Reasoning bounds how much a reasoning model thinks before it answers:
-	// "minimal", "low", "medium", "high", or "off" to ask for none.
+	// "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for
+	// none. Unset leaves the model's own default, which is the shipped
+	// behaviour and the only setting any measurement here was taken under. A
+	// review that spent 21,423 reasoning tokens to produce 443 tokens of
+	// findings is the case this exists for, and the tradeoff is visible rather
+	// than chosen for an operator: less reasoning is faster and cheaper, and
+	// nothing here has measured what it costs in recall.
 	//
-	// Unset leaves the model's own default, which is the shipped behaviour and
-	// the only setting any measurement here was taken under. A review that
-	// spent 21,423 reasoning tokens to produce 443 tokens of findings is the
-	// case this exists for, and the tradeoff is visible rather than chosen for
-	// an operator: less reasoning is faster and cheaper, and nothing here has
-	// measured what it costs in recall.
+	// The list is the union of what the providers spell, and each level travels
+	// as the word it is. A model advertises the subset it is tuned for, but a
+	// router fronting several models accepts a level the model does not list
+	// and rounds it, so the accepted set is wider than any one model's.
 	//
 	// Providers differ in what they can honour. One that takes a token budget
 	// gets one derived from the level, one with a boolean switch gets the
@@ -1403,6 +1407,8 @@ const (
 	ReasoningLow     ReasoningLevel = "low"
 	ReasoningMedium  ReasoningLevel = "medium"
 	ReasoningHigh    ReasoningLevel = "high"
+	ReasoningXHigh   ReasoningLevel = "xhigh"
+	ReasoningMax     ReasoningLevel = "max"
 	ReasoningOff     ReasoningLevel = "off"
 )
 
@@ -1411,7 +1417,7 @@ const (
 func ReasoningLevels() []string {
 	return []string{
 		string(ReasoningMinimal), string(ReasoningLow), string(ReasoningMedium),
-		string(ReasoningHigh), string(ReasoningOff),
+		string(ReasoningHigh), string(ReasoningXHigh), string(ReasoningMax), string(ReasoningOff),
 	}
 }
 

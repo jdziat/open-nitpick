@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +35,13 @@ const (
 	// "flex" asks for discounted capacity on providers that sell it;
 	// empty is the provider default. Applies to every role in the run.
 	EnvServiceTier = "NITPICK_EVAL_SERVICE_TIER"
+
+	// EnvReasoning sets models.default.reasoning for every role in the run, so
+	// a level can be measured against the unset default on one corpus. Empty
+	// leaves the model's own default, which is what every earlier number here
+	// was taken under. A name config does not accept fails at setup rather than
+	// measuring the default under a label it did not earn.
+	EnvReasoning = "NITPICK_EVAL_REASONING"
 
 	// EnvRuns sets how many times each fixture is reviewed, which is what makes
 	// a stability column possible.
@@ -450,6 +458,10 @@ func OptionsFromEnv() (Options, error) {
 		return opts, err
 	}
 	opts.Prices = prices
+
+	if raw := strings.TrimSpace(os.Getenv(EnvReasoning)); raw != "" && !slices.Contains(config.ReasoningLevels(), raw) {
+		return opts, fmt.Errorf("%s=%q: want one of %s", EnvReasoning, raw, strings.Join(config.ReasoningLevels(), ", "))
+	}
 
 	// Validate security depth at setup so a mistyped DEPTH cannot silently
 	// measure the shipped deep instruction.
@@ -972,6 +984,9 @@ func applyRouteFile(cfg *config.Config, path string) error {
 		if spec.StructuredOutput == "" {
 			spec.StructuredOutput = baseline.StructuredOutput
 		}
+		if spec.Reasoning == "" {
+			spec.Reasoning = baseline.Reasoning
+		}
 	}
 	fill(&rf.Models.Default)
 	if rf.Models.Default.Model == "" {
@@ -1047,6 +1062,7 @@ func evalConfig(model Model) *config.Config {
 		// ServiceTier routes this run through the capacity grade set
 		// by NITPICK_EVAL_SERVICE_TIER. Empty is the provider default.
 		ServiceTier: strings.TrimSpace(os.Getenv(EnvServiceTier)),
+		Reasoning:   config.ReasoningLevel(strings.TrimSpace(os.Getenv(EnvReasoning))),
 	}
 
 	if model.RouteFile != "" {

@@ -22,11 +22,16 @@ func TestNoReasoningLevelSendsNothing(t *testing.T) {
 // Each level reaches the SDK as the effort it names, and "off" as a switch
 // rather than an effort, because a provider with a boolean is the only one
 // that can be told not to think at all.
+//
+// The list comes from config.ReasoningLevels rather than being written out
+// here, so a level added to the configuration cannot be accepted, documented
+// and then dropped on the floor without this failing.
 func TestEachReasoningLevelReachesTheProvider(t *testing.T) {
-	for _, level := range []config.ReasoningLevel{
-		config.ReasoningMinimal, config.ReasoningLow,
-		config.ReasoningMedium, config.ReasoningHigh,
-	} {
+	for _, name := range config.ReasoningLevels() {
+		if name == string(config.ReasoningOff) {
+			continue
+		}
+		level := config.ReasoningLevel(name)
 		opt, ok := reasoningOption(level)
 		if !ok {
 			t.Fatalf("%s produced no option", level)

@@ -132,3 +132,37 @@ models:
 		}
 	}
 }
+
+// TestEveryAdvertisedReasoningLevelIsAccepted pins the two lists that have to
+// agree: ReasoningLevels, which the generated reference and the error message
+// print, and the switch in ModelSpec.validate, which decides. A level added to
+// one and not the other is either documented and rejected or accepted and
+// undocumented, and both mistakes read as a typo in the operator's config.
+func TestEveryAdvertisedReasoningLevelIsAccepted(t *testing.T) {
+	for _, name := range ReasoningLevels() {
+		spec := ModelSpec{Provider: "openrouter", Model: "m", Reasoning: ReasoningLevel(name)}
+		if errs := spec.validate(true); len(errs) != 0 {
+			t.Errorf("ReasoningLevels advertises %q and validate rejects it: %v", name, errs)
+		}
+	}
+}
+
+// TestReasoningLevelsAreDistinctAndComplete guards the ends of the range. The
+// providers spell a set from "none" to "max", and a level that reaches the
+// client under a name no provider uses is a setting that silently does
+// nothing, which is the failure mode this config surface exists to avoid.
+func TestReasoningLevelsAreDistinctAndComplete(t *testing.T) {
+	levels := ReasoningLevels()
+	seen := map[string]bool{}
+	for _, l := range levels {
+		if seen[l] {
+			t.Errorf("ReasoningLevels lists %q twice", l)
+		}
+		seen[l] = true
+	}
+	for _, want := range []ReasoningLevel{ReasoningMinimal, ReasoningLow, ReasoningMedium, ReasoningHigh, ReasoningXHigh, ReasoningMax, ReasoningOff} {
+		if !seen[string(want)] {
+			t.Errorf("ReasoningLevels omits %q, so a config naming it is rejected", want)
+		}
+	}
+}

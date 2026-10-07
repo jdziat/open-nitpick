@@ -459,7 +459,7 @@ models:
   default:
     provider: synthetic
     model: hf:moonshotai/Kimi-K3
-    reasoning: low     # minimal, low, medium, high, or off
+    reasoning: low     # minimal, low, medium, high, xhigh, max, or off
 ```
 
 Unset is the shipped behaviour and the only setting anything in

@@ -209,7 +209,7 @@ func (s ModelSpec) validate(required bool) []error {
 	}
 
 	switch s.Reasoning {
-	case "", ReasoningMinimal, ReasoningLow, ReasoningMedium, ReasoningHigh, ReasoningOff:
+	case "", ReasoningMinimal, ReasoningLow, ReasoningMedium, ReasoningHigh, ReasoningXHigh, ReasoningMax, ReasoningOff:
 	default:
 		errs = append(errs, fmt.Errorf("unknown reasoning %q (want %s)",
 			s.Reasoning, strings.Join(ReasoningLevels(), ", ")))
