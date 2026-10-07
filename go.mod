@@ -8,7 +8,7 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/nocturnium/llm-go-sdk/v6 v6.9.5
+	github.com/nocturnium/llm-go-sdk/v6 v6.11.1
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/mod v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
