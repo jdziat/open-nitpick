@@ -221,6 +221,46 @@ func (f failingReader) Read([]byte) (int, error) {
 	return 0, io.EOF
 }
 
+// TestSetupReplansAfterApproval holds the edit-race closed: another editor may
+// add an MCP server while the user reads the list and decides to answer yes.
+func TestSetupReplansAfterApproval(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake executables are shell scripts")
+	}
+	isolateClients(t, "claude")
+	repo := t.TempDir()
+	in := &approveAfterEdit{edit: func() {
+		path := filepath.Join(repo, ".mcp.json")
+		if err := os.WriteFile(path, []byte(`{"mcpServers":{"other":{"command":"other"}}}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}}
+	var out bytes.Buffer
+	if err := runSetup([]string{"-repo", repo}, in, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := readJSON(t, filepath.Join(repo, ".mcp.json"))
+	servers := got["mcpServers"].(map[string]any)
+	if servers["other"] == nil || servers["nitpick"] == nil {
+		t.Errorf("replanned config lost a server: %v", servers)
+	}
+}
+
+type approveAfterEdit struct {
+	edit func()
+	done bool
+}
+
+func (r *approveAfterEdit) Read(p []byte) (int, error) {
+	if !r.done {
+		r.done = true
+		r.edit()
+		copy(p, "y\n")
+		return 2, nil
+	}
+	return 0, io.EOF
+}
+
 func TestSetupReportsWhatIsAlreadyInstalledAndDoesNotAsk(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fake executables are shell scripts")

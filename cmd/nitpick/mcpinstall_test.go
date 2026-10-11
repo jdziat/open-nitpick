@@ -131,6 +131,18 @@ func TestMCPInstallPrintDoesNotWriteAndRefusesUnknownClients(t *testing.T) {
 	if !strings.Contains(out.String(), `"nitpick"`) {
 		t.Errorf("-print output: %s", out.String())
 	}
+	// A preview remains a preview after installation: scripts use its JSON,
+	// while an ordinary install is the one that reports "already registered".
+	if err := runMCPInstall([]string{"-repo", repo, "cursor"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := runMCPInstall([]string{"-repo", repo, "-print", "cursor"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"nitpick"`) {
+		t.Errorf("current -print output: %s", out.String())
+	}
 	if err := runMCPInstall([]string{"-repo", repo, "zed"}, &out); err == nil || !strings.Contains(err.Error(), "unknown client") {
 		t.Errorf("unknown client err = %v", err)
 	}

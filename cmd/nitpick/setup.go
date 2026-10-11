@@ -131,6 +131,17 @@ func runSetup(args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(projectFiles) > 0 && !dryRun && !yes {
 		approved = confirmProjectWrites(stdin, stdout, repo, projectFiles)
 	}
+	if approved && !dryRun {
+		// The person may spend time reading the list before answering. Plan
+		// again after that wait, so an edit made while they decide is merged
+		// into the server file and an already-current skill is not rewritten.
+		for _, s := range steps {
+			s.mcp, s.mcpErr = planMCP(s.client, s.req)
+			if !noSkill && s.mcpErr == nil {
+				s.skills, s.skillEr = planSkills(s.client, s.req)
+			}
+		}
+	}
 
 	var failed []string
 	for _, s := range steps {

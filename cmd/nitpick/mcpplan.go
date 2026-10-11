@@ -86,10 +86,6 @@ func (p mcpPlan) apply(req mcpInstall, stdout io.Writer) error {
 		say("%s", p.manual)
 		return nil
 	}
-	if p.current {
-		say("server already registered in %s\n", p.path)
-		return nil
-	}
 	if req.dryRun {
 		if req.terse {
 			// A user file can hold credentials for unrelated servers, so a
@@ -99,6 +95,10 @@ func (p mcpPlan) apply(req mcpInstall, stdout io.Writer) error {
 			return nil
 		}
 		say("%s:\n%s", p.path, p.content)
+		return nil
+	}
+	if p.current {
+		say("server already registered in %s\n", p.path)
 		return nil
 	}
 	if err := os.MkdirAll(filepath.Dir(p.path), 0o755); err != nil {
