@@ -269,6 +269,35 @@ their configuration locations.
 
 Lists supported MCP clients and their configuration locations. It takes no flags.
 
+## `setup`
+
+```sh
+nitpick setup
+nitpick setup -dry-run
+nitpick setup -client codex,opencode -user
+```
+
+Finds the agent clients installed on this machine and registers the MCP server
+with each, as `mcp install` would. A client counts as installed when its
+executable is on PATH or its configuration directory exists in your home
+directory. Clients with a project file (Claude Code, Cursor, VS Code, OpenCode,
+Gemini CLI) get that file; clients with only a user file (Claude Desktop,
+Windsurf, Codex) get the user file. `-user` sends every client to its user
+file. `-client` names clients to set up whether or not they are detected.
+`-dry-run` lists the files it would write without printing their contents.
+Each client also gets the nitpick skills (`nitpick-review-change`,
+`nitpick-full-review`, `nitpick-code-smell`, `nitpick-ai-slop`,
+`nitpick-security`) in the folder it reads skills from: `.claude/skills`,
+`.cursor/skills`, `.windsurf/skills`, `.github/skills`, `.opencode/skills`
+or `.gemini/skills` in the project, and `.agents/skills` for Codex. With
+`-user` they go to the matching folder under your home directory. A client
+with no skills folder in that scope is skipped, and `-no-skills` installs the
+MCP server alone. Rerunning replaces nitpick's own folders and leaves your other
+skills alone.
+`-command` and `-repo` behave as they do for `mcp install`. A client that
+fails is reported and the rest are still configured; the exit status is then
+non-zero.
+
 ## `auth`
 
 ```sh

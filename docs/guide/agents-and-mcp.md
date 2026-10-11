@@ -25,6 +25,9 @@ Then write it:
 nitpick mcp install claude-code
 ```
 
+To register the server with every client found on this machine at once, run
+`nitpick setup` (`nitpick setup -dry-run` lists the files first).
+
 `-print` writes nothing. Project entries vary by client: Claude Code uses `.mcp.json`, Cursor uses
 `.cursor/mcp.json`, VS Code uses `.vscode/mcp.json`, OpenCode uses
 `opencode.json`, and Gemini CLI uses `.gemini/settings.json`. Claude Desktop,

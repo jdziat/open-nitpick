@@ -75,6 +75,8 @@ func run() int {
 		err = runMCP(ctx, os.Args[2:])
 	case "auth":
 		err = runAuth(os.Args[2:], os.Stdin, os.Stdout)
+	case "setup":
+		err = runSetup(os.Args[2:], os.Stdout)
 	case "init":
 		err = runInit(ctx, os.Args[2:], os.Stdout)
 	case "explain-config":
@@ -147,6 +149,7 @@ Usage:
   nitpick respond [flags]          Answer an @open-nitpick comment on a pull request (review again, resolve, or a question)
   nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
   nitpick mcp install <client>     Register that server with an agent client (claude-code, cursor, opencode, codex, ...)
+  nitpick setup [flags]            Register the MCP server with every agent client found here (claude-code, codex, opencode, ...)
   nitpick init [flags]             Write a .nitpick.yaml for this repository
   nitpick auth set <provider>      Store a provider credential in the OS keystore
   nitpick explain-config [flags]   Show the resolved configuration and prompts

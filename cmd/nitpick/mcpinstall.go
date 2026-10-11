@@ -19,19 +19,23 @@ import (
 // has a project-scoped file, a user-scoped file, or both, and a shape the
 // file expects; what is written is the same server in that shape.
 type mcpClient struct {
-	name    string
-	note    string
-	project string                                                  // repository-relative path, or ""
-	user    func() (string, error)                                  // absolute path, or ""
-	write   func(cfg map[string]any, command string, args []string) // JSON clients
-	toml    bool                                                    // Codex: a TOML file, appended to
+	name          string
+	note          string
+	project       string                                                  // repository-relative path, or ""
+	user          func() (string, error)                                  // absolute path, or ""
+	write         func(cfg map[string]any, command string, args []string) // JSON clients
+	toml          bool                                                    // Codex: a TOML file, appended to
+	bins          []string                                                // executables on PATH that mean the client is installed
+	dir           []string                                                // home-relative directory that means it, for a client with no user file to look beside
+	skillsProject []string                                                // repository-relative folder the client reads skills from, or nil
+	skillsUser    []string                                                // home-relative folder, or nil
 }
 
 // The shapes below were read from each client's own documentation on
 // 2026-09-06; a client that changes its file will need this table changed.
 var mcpClients = []mcpClient{
 	{
-		name: "claude-code", note: "project: .mcp.json at the repository root; user: `claude mcp add --scope user nitpick -- nitpick mcp` (printed, not run)",
+		name: "claude-code", skillsProject: []string{".claude", "skills"}, skillsUser: []string{".claude", "skills"}, bins: []string{"claude"}, dir: []string{".claude"}, note: "project: .mcp.json at the repository root; user: `claude mcp add --scope user nitpick -- nitpick mcp` (printed, not run)",
 		project: ".mcp.json",
 		write:   writeMCPServers,
 	},
@@ -53,18 +57,18 @@ var mcpClients = []mcpClient{
 		write: writeMCPServers,
 	},
 	{
-		name: "cursor", note: "project: .cursor/mcp.json; user: ~/.cursor/mcp.json",
+		name: "cursor", skillsProject: []string{".cursor", "skills"}, skillsUser: []string{".cursor", "skills"}, bins: []string{"cursor"}, note: "project: .cursor/mcp.json; user: ~/.cursor/mcp.json",
 		project: filepath.Join(".cursor", "mcp.json"),
 		user:    func() (string, error) { return homePath(".cursor", "mcp.json") },
 		write:   writeMCPServers,
 	},
 	{
-		name: "windsurf", note: "user only: ~/.codeium/windsurf/mcp_config.json",
+		name: "windsurf", skillsProject: []string{".windsurf", "skills"}, skillsUser: []string{".codeium", "windsurf", "skills"}, bins: []string{"windsurf"}, note: "user only: ~/.codeium/windsurf/mcp_config.json",
 		user:  func() (string, error) { return homePath(".codeium", "windsurf", "mcp_config.json") },
 		write: writeMCPServers,
 	},
 	{
-		name: "vscode", note: "project: .vscode/mcp.json (Copilot agent mode)",
+		name: "vscode", skillsProject: []string{".github", "skills"}, skillsUser: []string{}, bins: []string{"code"}, note: "project: .vscode/mcp.json (Copilot agent mode)",
 		project: filepath.Join(".vscode", "mcp.json"),
 		write: func(cfg map[string]any, command string, args []string) {
 			servers := sub(cfg, "servers")
@@ -72,7 +76,7 @@ var mcpClients = []mcpClient{
 		},
 	},
 	{
-		name: "opencode", note: "project: opencode.json; user: ~/.config/opencode/opencode.json",
+		name: "opencode", skillsProject: []string{".opencode", "skills"}, skillsUser: []string{".config", "opencode", "skills"}, bins: []string{"opencode"}, note: "project: opencode.json; user: ~/.config/opencode/opencode.json",
 		project: "opencode.json",
 		user:    func() (string, error) { return homePath(".config", "opencode", "opencode.json") },
 		write: func(cfg map[string]any, command string, args []string) {
@@ -85,13 +89,13 @@ var mcpClients = []mcpClient{
 		},
 	},
 	{
-		name: "gemini-cli", note: "project: .gemini/settings.json; user: ~/.gemini/settings.json",
+		name: "gemini-cli", skillsProject: []string{".gemini", "skills"}, skillsUser: []string{".gemini", "skills"}, bins: []string{"gemini"}, note: "project: .gemini/settings.json; user: ~/.gemini/settings.json",
 		project: filepath.Join(".gemini", "settings.json"),
 		user:    func() (string, error) { return homePath(".gemini", "settings.json") },
 		write:   writeMCPServers,
 	},
 	{
-		name: "codex", note: "user only: ~/.codex/config.toml, appended to",
+		name: "codex", skillsProject: []string{".agents", "skills"}, skillsUser: []string{".agents", "skills"}, bins: []string{"codex"}, note: "user only: ~/.codex/config.toml, appended to",
 		user: func() (string, error) { return homePath(".codex", "config.toml") },
 		toml: true,
 	},
@@ -137,7 +141,6 @@ func runMCPInstall(args []string, stdout io.Writer) error {
 		command string
 		repo    string
 	)
-	say := func(format string, a ...any) { _, _ = fmt.Fprintf(stdout, format, a...) }
 	fs := flag.NewFlagSet("mcp install", flag.ContinueOnError)
 	fs.BoolVar(&global, "user", false, "write the user-wide configuration rather than the project's")
 	fs.BoolVar(&show, "print", false, "print what would be written and write nothing")
@@ -177,6 +180,25 @@ func runMCPInstall(args []string, stdout io.Writer) error {
 		return fmt.Errorf("unknown client %q; run nitpick mcp install -h for the list", clients[0])
 	}
 
+	return installMCP(client, mcpInstall{user: global, dryRun: show, command: command, repo: repo}, stdout)
+}
+
+// mcpInstall is one request to register the server with one client.
+type mcpInstall struct {
+	user    bool
+	dryRun  bool
+	terse   bool   // with dryRun, name the file instead of printing it
+	command string // "" picks the default for the scope
+	repo    string
+}
+
+// installMCP writes, or with dryRun shows, the nitpick server in one client's
+// configuration. mcp install and setup both end here, so a client is written
+// the same way whichever command asked.
+func installMCP(client mcpClient, req mcpInstall, stdout io.Writer) error {
+	say := func(format string, a ...any) { _, _ = fmt.Fprintf(stdout, format, a...) }
+	global, command := req.user, req.command
+
 	// A project file is shared through version control, so it names the
 	// command a teammate will have on PATH; a user file is this machine's,
 	// so it names the binary that is here, whether or not PATH finds it.
@@ -205,7 +227,7 @@ func runMCPInstall(args []string, stdout io.Writer) error {
 		}
 		return fmt.Errorf("%s has no user-wide file this command knows; drop -user", client.name)
 	case client.project != "":
-		root, err := filepath.Abs(repo)
+		root, err := filepath.Abs(req.repo)
 		if err != nil {
 			return err
 		}
@@ -224,7 +246,14 @@ func runMCPInstall(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if show {
+	if req.dryRun {
+		if req.terse {
+			// A user file can hold credentials for unrelated servers, so a
+			// preview across every client names the file and leaves its
+			// contents alone.
+			say("would write %s (server nitpick: %s %s)\n", path, command, strings.Join(serverArgs, " "))
+			return nil
+		}
 		say("%s:\n%s", path, content)
 		return nil
 	}
