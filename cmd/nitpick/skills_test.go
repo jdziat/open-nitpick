@@ -50,7 +50,7 @@ func TestSetupInstallsSkillsWhereEachClientReadsThemAndLeavesOthersAlone(t *test
 
 	var out bytes.Buffer
 	for range 2 { // a second run replaces its own copy rather than failing or duplicating
-		if err := runSetup([]string{"-repo", repo}, &out); err != nil {
+		if err := runSetup([]string{"-repo", repo}, strings.NewReader("y\n"), &out); err != nil {
 			t.Fatalf("%v\n%s", err, out.String())
 		}
 	}
@@ -76,7 +76,7 @@ func TestSetupNoSkillsAndDryRunInstallNoSkills(t *testing.T) {
 	repo := t.TempDir()
 	var out bytes.Buffer
 	for _, args := range [][]string{{"-no-skills"}, {"-dry-run"}} {
-		if err := runSetup(append([]string{"-repo", repo}, args...), &out); err != nil {
+		if err := runSetup(append([]string{"-repo", repo}, args...), strings.NewReader("y\n"), &out); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := os.Stat(filepath.Join(repo, ".claude", "skills")); err == nil {

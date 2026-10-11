@@ -76,7 +76,7 @@ func run() int {
 	case "auth":
 		err = runAuth(os.Args[2:], os.Stdin, os.Stdout)
 	case "setup":
-		err = runSetup(os.Args[2:], os.Stdout)
+		err = runSetup(os.Args[2:], os.Stdin, os.Stdout)
 	case "init":
 		err = runInit(ctx, os.Args[2:], os.Stdout)
 	case "explain-config":

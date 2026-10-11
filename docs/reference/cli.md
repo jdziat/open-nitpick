@@ -275,6 +275,7 @@ Lists supported MCP clients and their configuration locations. It takes no flags
 nitpick setup
 nitpick setup -dry-run
 nitpick setup -client codex,opencode -user
+nitpick setup -yes
 ```
 
 Finds the agent clients installed on this machine and registers the MCP server
@@ -294,6 +295,16 @@ or `.gemini/skills` in the project, and `.agents/skills` for Codex. With
 with no skills folder in that scope is skipped, and `-no-skills` installs the
 MCP server alone. Rerunning replaces nitpick's own folders and leaves your other
 skills alone.
+
+Setup works out what each client already has before it writes anything, and
+reports the servers and skills that are in place and current. A skill whose
+files differ from the bundled ones is rewritten and counted as updated. Before it
+creates or changes a file in the repository it lists the files and asks
+`Write them? [y/N]`; anything but yes writes nothing. `-yes` skips the question,
+and with no input to answer on (stdin closed or /dev/null), project files are skipped, so a script has to
+pass `-yes`. Files in your home directory (`-user`, and the clients that only
+have a user file) are written without asking, and `-dry-run` never writes or
+asks.
 `-command` and `-repo` behave as they do for `mcp install`. A client that
 fails is reported and the rest are still configured; the exit status is then
 non-zero.

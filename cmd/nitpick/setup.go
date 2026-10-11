@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
@@ -55,8 +56,9 @@ func isDir(p string) bool {
 // this machine. A client that keeps a project file gets that file, so the
 // setup is shared with the team through version control; a client that has
 // only a user file gets the user file. -user sends every client to its user
-// file instead.
-func runSetup(args []string, stdout io.Writer) error {
+// file instead. Before it writes into the repository it lists the files and
+// asks; anything already in place is reported and left alone.
+func runSetup(args []string, stdin io.Reader, stdout io.Writer) error {
 	var (
 		user    bool
 		dryRun  bool
@@ -64,6 +66,7 @@ func runSetup(args []string, stdout io.Writer) error {
 		repo    string
 		only    string
 		noSkill bool
+		yes     bool
 	)
 	fs := flag.NewFlagSet("setup", flag.ContinueOnError)
 	fs.BoolVar(&user, "user", false, "write every client's user-wide configuration rather than the project's")
@@ -71,6 +74,7 @@ func runSetup(args []string, stdout io.Writer) error {
 	fs.StringVar(&command, "command", "", "the command the clients run (default: nitpick for a project file, this binary's absolute path for a user file)")
 	fs.StringVar(&repo, "repo", ".", "repository root, for project files")
 	fs.StringVar(&only, "client", "", "comma-separated clients to set up, detected or not (default: every client detected here)")
+	fs.BoolVar(&yes, "yes", false, "write project files without asking")
 	fs.BoolVar(&noSkill, "no-skills", false, "register the MCP server only; do not install the nitpick skills")
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: nitpick setup [flags]\n\nFinds the agent clients installed on this machine (%s) and registers the\nnitpick MCP server with each: the project file where the client has one, the\nuser file where it does not. Existing entries for other servers are kept. The\nnitpick skills (nitpick-review-change and the rest) go into the folder each\nclient reads skills from.\n\nFlags:\n", strings.Join(mcpClientNames(), ", "))
@@ -93,27 +97,124 @@ func runSetup(args []string, stdout io.Writer) error {
 		return nil
 	}
 
-	var failed []string
+	// Plan everything first: what each client would get, and which of it is
+	// not already in place. Nothing is written until the project files, the
+	// ones that end up in someone's git status, have been approved.
+	type step struct {
+		client  mcpClient
+		req     mcpInstall
+		mcp     mcpPlan
+		mcpErr  error
+		skills  skillPlan
+		skillEr error
+	}
+	var steps []*step
+	var projectFiles []string
 	for _, c := range targets {
-		req := mcpInstall{user: user || c.project == "", dryRun: dryRun, terse: true, command: command, repo: repo}
-		_, _ = fmt.Fprintf(stdout, "%s:\n", c.name)
-		if err := installMCP(c, req, stdout); err != nil {
+		s := &step{client: c, req: mcpInstall{user: user || c.project == "", dryRun: dryRun, terse: true, command: command, repo: repo}}
+		s.mcp, s.mcpErr = planMCP(c, s.req)
+		if !noSkill && s.mcpErr == nil {
+			s.skills, s.skillEr = planSkills(c, s.req)
+		}
+		if !s.req.user {
+			if s.mcpErr == nil && s.mcp.path != "" && !s.mcp.current {
+				projectFiles = append(projectFiles, s.mcp.path)
+			}
+			if s.skillEr == nil && len(s.skills.pending) > 0 {
+				projectFiles = append(projectFiles, s.skills.dir+string(filepath.Separator)+skillPrefix+"*")
+			}
+		}
+		steps = append(steps, s)
+	}
+
+	approved := true
+	if len(projectFiles) > 0 && !dryRun && !yes {
+		approved = confirmProjectWrites(stdin, stdout, repo, projectFiles)
+	}
+
+	var failed []string
+	for _, s := range steps {
+		_, _ = fmt.Fprintf(stdout, "%s:\n", s.client.name)
+		if s.mcpErr != nil {
+			_, _ = fmt.Fprintf(stdout, "  failed: %v\n", s.mcpErr)
+			failed = append(failed, s.client.name)
+			continue
+		}
+		if !s.req.user && !approved && (!s.mcp.current || len(s.skills.pending) > 0) {
+			_, _ = fmt.Fprintf(stdout, "  project files not written; rerun with -yes, or -user for your home directory\n")
+			continue
+		}
+		if err := s.mcp.apply(s.req, stdout); err != nil {
 			_, _ = fmt.Fprintf(stdout, "  failed: %v\n", err)
-			failed = append(failed, c.name)
+			failed = append(failed, s.client.name)
 			continue
 		}
 		if noSkill {
 			continue
 		}
-		if err := installSkills(c, req, stdout); err != nil {
+		if s.skillEr != nil {
+			_, _ = fmt.Fprintf(stdout, "  skills failed: %v\n", s.skillEr)
+			failed = append(failed, s.client.name)
+			continue
+		}
+		if err := s.skills.apply(s.client, s.req, stdout); err != nil {
 			_, _ = fmt.Fprintf(stdout, "  skills failed: %v\n", err)
-			failed = append(failed, c.name)
+			failed = append(failed, s.client.name)
 		}
 	}
 	if len(failed) > 0 {
 		return fmt.Errorf("setup failed for %s", strings.Join(failed, ", "))
 	}
 	return nil
+}
+
+// confirmProjectWrites lists the files setup is about to create or change in
+// the repository and asks once. Project files are the ones that show up in
+// the next git status, so they are not written on an assumption. An input
+// that is not a terminal cannot answer, which counts as no: a script opts in
+// with -yes.
+func confirmProjectWrites(stdin io.Reader, stdout io.Writer, repo string, files []string) bool {
+	root, err := filepath.Abs(repo)
+	if err != nil {
+		root = repo
+	}
+	_, _ = fmt.Fprintf(stdout, "setup will create or change these files in %s:\n", root)
+	for _, f := range files {
+		rel, err := filepath.Rel(root, f)
+		if err != nil {
+			rel = f
+		}
+		_, _ = fmt.Fprintf(stdout, "  %s\n", rel)
+	}
+	if !canPrompt(stdin) {
+		_, _ = fmt.Fprintln(stdout, "nothing to ask on (stdin is closed); skipping them")
+		return false
+	}
+	_, _ = fmt.Fprint(stdout, "Write them? [y/N] ")
+	line, _ := bufio.NewReader(stdin).ReadString('\n')
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "y", "yes":
+		return true
+	}
+	return false
+}
+
+// canPrompt reports whether r can answer a question. A pipe can, so
+// `echo y | nitpick setup` works; an empty one reads as no. /dev/null is the
+// stdin of a script or CI step, where nobody is behind it.
+func canPrompt(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	if !ok {
+		return r != nil
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	if null, err := os.Stat(os.DevNull); err == nil && os.SameFile(fi, null) {
+		return false
+	}
+	return true
 }
 
 // setupTargets resolves -client, or falls back to detection.

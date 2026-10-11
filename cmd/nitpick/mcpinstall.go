@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -190,84 +189,6 @@ type mcpInstall struct {
 	terse   bool   // with dryRun, name the file instead of printing it
 	command string // "" picks the default for the scope
 	repo    string
-}
-
-// installMCP writes, or with dryRun shows, the nitpick server in one client's
-// configuration. mcp install and setup both end here, so a client is written
-// the same way whichever command asked.
-func installMCP(client mcpClient, req mcpInstall, stdout io.Writer) error {
-	say := func(format string, a ...any) { _, _ = fmt.Fprintf(stdout, format, a...) }
-	global, command := req.user, req.command
-
-	// A project file is shared through version control, so it names the
-	// command a teammate will have on PATH; a user file is this machine's,
-	// so it names the binary that is here, whether or not PATH finds it.
-	if command == "" {
-		command = "nitpick"
-		if global {
-			if exe, err := os.Executable(); err == nil {
-				command = exe
-			}
-		}
-	}
-	serverArgs := []string{"mcp"}
-
-	var path string
-	switch {
-	case global && client.user != nil:
-		p, err := client.user()
-		if err != nil {
-			return err
-		}
-		path = p
-	case global:
-		if client.name == "claude-code" {
-			say("Claude Code keeps user-scoped servers in its own store; run:\n\n  claude mcp add --scope user nitpick -- %s mcp\n", command)
-			return nil
-		}
-		return fmt.Errorf("%s has no user-wide file this command knows; drop -user", client.name)
-	case client.project != "":
-		root, err := filepath.Abs(req.repo)
-		if err != nil {
-			return err
-		}
-		path = filepath.Join(root, client.project)
-	default:
-		return fmt.Errorf("%s has no project file; pass -user", client.name)
-	}
-
-	var content []byte
-	var err error
-	if client.toml {
-		content, err = mergeTOML(path, command, serverArgs)
-	} else {
-		content, err = mergeJSON(path, command, serverArgs, client.write)
-	}
-	if err != nil {
-		return err
-	}
-	if req.dryRun {
-		if req.terse {
-			// A user file can hold credentials for unrelated servers, so a
-			// preview across every client names the file and leaves its
-			// contents alone.
-			say("would write %s (server nitpick: %s %s)\n", path, command, strings.Join(serverArgs, " "))
-			return nil
-		}
-		say("%s:\n%s", path, content)
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(path, content, 0o644); err != nil {
-		return err
-	}
-	say("wrote %s (server nitpick: %s %s)\n", path, command, strings.Join(serverArgs, " "))
-	if _, err := exec.LookPath(command); err != nil && !filepath.IsAbs(command) {
-		say("note: %q is not on PATH here; the client needs it on PATH, or pass -command with the binary's path\n", command)
-	}
-	return nil
 }
 
 func findClient(name string) (mcpClient, bool) {
