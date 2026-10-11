@@ -301,3 +301,48 @@ func TestSetupReportsWhatIsAlreadyInstalledAndDoesNotAsk(t *testing.T) {
 		t.Error("the outdated skill was left as edited")
 	}
 }
+
+// TestSetupDoesNotExpandTheApprovedWriteSet holds the consent boundary: a skill
+// that another process edits while the prompt is open was current when listed,
+// so answering yes for the missing server does not authorize replacing it.
+func TestSetupDoesNotExpandTheApprovedWriteSet(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake executables are shell scripts")
+	}
+	isolateClients(t, "claude")
+	repo := t.TempDir()
+	var out bytes.Buffer
+	if err := runSetup([]string{"-repo", repo, "-yes"}, failingReader{t}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(repo, ".mcp.json")); err != nil {
+		t.Fatal(err)
+	}
+	skill := filepath.Join(repo, ".claude", "skills", "nitpick-security", "SKILL.md")
+	in := &approveAfterEdit{edit: func() {
+		if err := os.WriteFile(skill, []byte("edited while waiting"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}}
+	out.Reset()
+	if err := runSetup([]string{"-repo", repo}, in, &out); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(skill); string(got) != "edited while waiting" {
+		t.Error("setup rewrote a skill that was not in the approved write set")
+	}
+}
+
+// TestCanPromptRefusesOpenPipes pins the noninteractive contract: a pipe may
+// have no writer, where ReadString would wait forever.
+func TestCanPromptRefusesOpenPipes(t *testing.T) {
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer read.Close()
+	defer write.Close()
+	if canPrompt(read) {
+		t.Error("an open pipe is not an interactive prompt")
+	}
+}

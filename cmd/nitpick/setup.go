@@ -133,12 +133,12 @@ func runSetup(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	if approved && !dryRun {
 		// The person may spend time reading the list before answering. Plan
-		// again after that wait, so an edit made while they decide is merged
-		// into the server file and an already-current skill is not rewritten.
+		// again only for a server file that was listed for approval. An edit
+		// made while they decide is then merged into that server file without
+		// expanding the approved write set to a new skill or server path.
 		for _, s := range steps {
-			s.mcp, s.mcpErr = planMCP(s.client, s.req)
-			if !noSkill && s.mcpErr == nil {
-				s.skills, s.skillEr = planSkills(s.client, s.req)
+			if !s.mcp.current {
+				s.mcp, s.mcpErr = planMCP(s.client, s.req)
 			}
 		}
 	}
@@ -210,9 +210,9 @@ func confirmProjectWrites(stdin io.Reader, stdout io.Writer, repo string, files 
 	return false
 }
 
-// canPrompt reports whether r can answer a question. A pipe can, so
-// `echo y | nitpick setup` works; an empty one reads as no. /dev/null is the
-// stdin of a script or CI step, where nobody is behind it.
+// canPrompt reports whether r is an interactive terminal. A pipe can remain
+// open with no writer, so blocking on one would hang a script or CI step; it
+// opts in with -yes instead.
 func canPrompt(r io.Reader) bool {
 	f, ok := r.(*os.File)
 	if !ok {
@@ -222,10 +222,7 @@ func canPrompt(r io.Reader) bool {
 	if err != nil {
 		return false
 	}
-	if null, err := os.Stat(os.DevNull); err == nil && os.SameFile(fi, null) {
-		return false
-	}
-	return true
+	return fi.Mode()&os.ModeCharDevice != 0
 }
 
 // setupTargets resolves -client, or falls back to detection.

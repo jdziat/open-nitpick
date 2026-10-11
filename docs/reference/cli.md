@@ -301,7 +301,7 @@ reports the servers and skills that are in place and current. A skill whose
 files differ from the bundled ones is rewritten and counted as updated. Before it
 creates or changes a file in the repository it lists the files and asks
 `Write them? [y/N]`; anything but yes writes nothing. `-yes` skips the question,
-and with no input to answer on (stdin closed or /dev/null), project files are skipped, so a script has to
+and without an interactive terminal project files are skipped, so a script has to
 pass `-yes`. Files in your home directory (`-user`, and the clients that only
 have a user file) are written without asking, and `-dry-run` never writes or
 asks.
