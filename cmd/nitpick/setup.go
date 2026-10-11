@@ -101,13 +101,14 @@ func runSetup(args []string, stdin io.Reader, stdout io.Writer) error {
 	// not already in place. Nothing is written until the project files, the
 	// ones that end up in someone's git status, have been approved.
 	type step struct {
-		client  mcpClient
-		req     mcpInstall
-		mcp     mcpPlan
-		mcpErr  error
-		mcpSkip bool // changed after the consent list was shown
-		skills  skillPlan
-		skillEr error
+		client    mcpClient
+		req       mcpInstall
+		mcp       mcpPlan
+		mcpErr    error
+		mcpSkip   bool // changed after the consent list was shown
+		skills    skillPlan
+		skillEr   error
+		skillSkip bool // changed after the consent list was shown
 	}
 	var steps []*step
 	var projectFiles []string
@@ -138,10 +139,31 @@ func runSetup(args []string, stdin io.Reader, stdout io.Writer) error {
 		// changed too; notice it rather than claiming it still is. It is not
 		// overwritten, since its path was absent from the consent list.
 		for _, s := range steps {
-			wasCurrent := s.mcp.current
 			if s.mcp.path != "" {
-				s.mcp, s.mcpErr = planMCP(s.client, s.req)
-				s.mcpSkip = wasCurrent && s.mcpErr == nil && !s.mcp.current
+				old := s.mcp
+				next, err := planMCP(s.client, s.req)
+				switch {
+				case err != nil && old.current:
+					s.mcpSkip = true
+				case err != nil:
+					s.mcpErr = err
+				default:
+					s.mcp = next
+					s.mcpSkip = !yes && old.current && !next.current
+				}
+			}
+			if !noSkill && s.skillEr == nil {
+				old := s.skills
+				next, err := planSkills(s.client, s.req)
+				switch {
+				case err != nil && old.current > 0:
+					s.skillSkip = true
+				case err != nil:
+					s.skillEr = err
+				default:
+					s.skills = next
+					s.skillSkip = !yes && old.current > 0 && len(next.pending) > 0
+				}
 			}
 		}
 	}
@@ -171,6 +193,10 @@ func runSetup(args []string, stdin io.Reader, stdout io.Writer) error {
 		if s.skillEr != nil {
 			_, _ = fmt.Fprintf(stdout, "  skills failed: %v\n", s.skillEr)
 			failed = append(failed, s.client.name)
+			continue
+		}
+		if s.skillSkip {
+			_, _ = fmt.Fprintf(stdout, "  skills changed after approval; not overwriting %s without a new confirmation\n", s.skills.dir)
 			continue
 		}
 		if err := s.skills.apply(s.client, s.req, stdout); err != nil {
