@@ -212,6 +212,17 @@ func (e *Engine) reviewWith(ctx context.Context, r reviewers, prContext string, 
 					}
 				}
 
+				// Nothing left to ask but the same model with less to read. A
+				// batch whose answer never fit (empty at the output cap, or a
+				// stall) is usually too much input for this model, and a
+				// second identical request does not change that. Halves do.
+				if err != nil && llm.ShouldEscalate(err) && splittable(b) {
+					var split []Finding
+					if split, err = e.reviewHalves(ctx, c, prContext, b); err == nil {
+						out, blamed = split, c
+					}
+				}
+
 				mu.Lock()
 				findings = append(findings, out...)
 				mu.Unlock()

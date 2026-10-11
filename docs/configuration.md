@@ -204,6 +204,13 @@ early, so the same weights on another host reproduce it. Shrinking
 Escalation is one step. A fallback naming its own fallback is a config error,
 so a misconfiguration cannot walk a batch through every model in the file.
 
+When no model can answer a batch of several files, the primary reviews it as
+two halves, and a half that fails the same way is halved in
+turn, down to single files. This is the last resort and not the first, because
+a model that loops is not helped by less input; it is for the batch whose
+answer simply did not fit. A single file or a design assessment that still
+fails is reported as unreviewed, as before.
+
 The run says when it happened, in the log and in the published review:
 
 ```
