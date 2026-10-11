@@ -105,6 +105,7 @@ func runSetup(args []string, stdin io.Reader, stdout io.Writer) error {
 		req     mcpInstall
 		mcp     mcpPlan
 		mcpErr  error
+		mcpSkip bool // changed after the consent list was shown
 		skills  skillPlan
 		skillEr error
 	}
@@ -133,12 +134,14 @@ func runSetup(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	if approved && !dryRun {
 		// The person may spend time reading the list before answering. Plan
-		// again only for a server file that was listed for approval. An edit
-		// made while they decide is then merged into that server file without
-		// expanding the approved write set to a new skill or server path.
+		// again after that wait. A server that was already current can have
+		// changed too; notice it rather than claiming it still is. It is not
+		// overwritten, since its path was absent from the consent list.
 		for _, s := range steps {
-			if !s.mcp.current {
+			wasCurrent := s.mcp.current
+			if s.mcp.path != "" {
 				s.mcp, s.mcpErr = planMCP(s.client, s.req)
+				s.mcpSkip = wasCurrent && s.mcpErr == nil && !s.mcp.current
 			}
 		}
 	}
@@ -155,7 +158,9 @@ func runSetup(args []string, stdin io.Reader, stdout io.Writer) error {
 			_, _ = fmt.Fprintf(stdout, "  project files not written; rerun with -yes, or -user for your home directory\n")
 			continue
 		}
-		if err := s.mcp.apply(s.req, stdout); err != nil {
+		if s.mcpSkip {
+			_, _ = fmt.Fprintf(stdout, "  server changed after approval; not overwriting %s without a new confirmation\n", s.mcp.path)
+		} else if err := s.mcp.apply(s.req, stdout); err != nil {
 			_, _ = fmt.Fprintf(stdout, "  failed: %v\n", err)
 			failed = append(failed, s.client.name)
 			continue
@@ -220,6 +225,9 @@ func canPrompt(r io.Reader) bool {
 	}
 	fi, err := f.Stat()
 	if err != nil {
+		return false
+	}
+	if null, err := os.Stat(os.DevNull); err == nil && os.SameFile(fi, null) {
 		return false
 	}
 	return fi.Mode()&os.ModeCharDevice != 0

@@ -340,9 +340,66 @@ func TestCanPromptRefusesOpenPipes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer read.Close()
-	defer write.Close()
+	t.Cleanup(func() {
+		if err := read.Close(); err != nil {
+			t.Error(err)
+		}
+		if err := write.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 	if canPrompt(read) {
 		t.Error("an open pipe is not an interactive prompt")
+	}
+}
+
+// TestSetupDoesNotOverwriteAServerChangedAfterItsCurrentPlan was current when
+// the consent list was made. A skill update keeps the prompt open long enough
+// to model a concurrent editor changing the server file.
+func TestSetupDoesNotOverwriteAServerChangedAfterItsCurrentPlan(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake executables are shell scripts")
+	}
+	isolateClients(t, "claude")
+	repo := t.TempDir()
+	var out bytes.Buffer
+	if err := runSetup([]string{"-repo", repo, "-yes"}, failingReader{t}, &out); err != nil {
+		t.Fatal(err)
+	}
+	skill := filepath.Join(repo, ".claude", "skills", "nitpick-security", "SKILL.md")
+	if err := os.WriteFile(skill, []byte("needs update"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	in := &approveAfterEdit{edit: func() {
+		path := filepath.Join(repo, ".mcp.json")
+		if err := os.WriteFile(path, []byte(`{"mcpServers":{"other":{"command":"other"}}}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}}
+	out.Reset()
+	if err := runSetup([]string{"-repo", repo}, in, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "server changed after approval") {
+		t.Errorf("changed current server was not reported:\n%s", out.String())
+	}
+	servers := readJSON(t, filepath.Join(repo, ".mcp.json"))["mcpServers"].(map[string]any)
+	if servers["nitpick"] != nil || servers["other"] == nil {
+		t.Errorf("setup overwrote an unapproved server edit: %v", servers)
+	}
+}
+
+func TestCanPromptRefusesDevNull(t *testing.T) {
+	f, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := f.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	if canPrompt(f) {
+		t.Error("/dev/null cannot answer an interactive prompt")
 	}
 }
