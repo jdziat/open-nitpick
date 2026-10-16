@@ -35,6 +35,18 @@ Windsurf, and Codex have user entries only. Use `-user` where a client supports
 a user-scoped entry. `nitpick mcp install <client> -h` is the current source of
 truth for each location and limitation.
 
+Reinstalling updates Nitpick's command and arguments while preserving custom
+server settings, including environment variables, timeouts, and disabled state.
+Other servers and settings are kept.
+
+For Codex, installation adds `tool_timeout_sec = 3600` when the Nitpick entry has
+no explicit timeout. Reinstalling keeps your configured value and TOML comments
+outside the values it updates. Restart the client to load the new settings.
+The client timeout limits the whole tool call; Nitpick's model timeout limits
+each model request, and a review can make several requests. Increase the client
+timeout for longer reviews, or run `nitpick review -dry-run` in a tracked local
+process to avoid the MCP wait limit.
+
 ## Tools and returned data
 
 The server exposes `review`, `full_review`, `repo_score`, `code_smell`,

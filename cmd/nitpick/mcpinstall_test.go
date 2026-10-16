@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 func readJSON(t *testing.T, path string) map[string]any {
@@ -87,8 +90,7 @@ func TestMCPInstallUserScopeUsesTheHomeAndThisBinary(t *testing.T) {
 		t.Errorf("user-scoped command = %v, want this binary %s", got, exe)
 	}
 
-	// Codex is TOML, appended to, and replaced on a second install rather
-	// than duplicated.
+	// Reinstalling must keep the environment used to authenticate providers.
 	if err := os.MkdirAll(filepath.Join(home, ".codex"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -100,12 +102,17 @@ func TestMCPInstallUserScopeUsesTheHomeAndThisBinary(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	toml, _ := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
-	got := string(toml)
-	if strings.Count(got, "[mcp_servers.nitpick]") != 1 || !strings.Contains(got, "model = \"o3\"") || !strings.Contains(got, "[mcp_servers.other]") || strings.Contains(got, "\"old\"") || strings.Contains(got, "[mcp_servers.nitpick.env]") {
+	codexData, _ := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
+	got := string(codexData)
+	if strings.Count(got, "[mcp_servers.nitpick]") != 1 || !strings.Contains(got, "model = \"o3\"") || !strings.Contains(got, "[mcp_servers.other]") || strings.Contains(got, "\"old\"") || !strings.Contains(got, "[mcp_servers.nitpick.env]") {
 		t.Errorf("codex config:\n%s", got)
 	}
-	if !strings.Contains(got, "command = \"nitpick\"\nargs = [\"mcp\"]") {
+	var cfg map[string]any
+	if err := toml.Unmarshal(codexData, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	server := cfg["mcp_servers"].(map[string]any)["nitpick"].(map[string]any)
+	if server["command"] != "nitpick" || !reflect.DeepEqual(server["args"], []any{"mcp"}) || server["tool_timeout_sec"] != int64(3600) {
 		t.Errorf("codex server block:\n%s", got)
 	}
 

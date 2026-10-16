@@ -71,7 +71,8 @@ var mcpClients = []mcpClient{
 		project: filepath.Join(".vscode", "mcp.json"),
 		write: func(cfg map[string]any, command string, args []string) {
 			servers := sub(cfg, "servers")
-			servers["nitpick"] = map[string]any{"type": "stdio", "command": command, "args": args}
+			server := sub(servers, "nitpick")
+			server["type"], server["command"], server["args"] = "stdio", command, args
 		},
 	},
 	{
@@ -84,7 +85,11 @@ var mcpClients = []mcpClient{
 			}
 			servers := sub(cfg, "mcp")
 			cmd := append([]any{command}, toAny(args)...)
-			servers["nitpick"] = map[string]any{"type": "local", "command": cmd, "enabled": true}
+			server := sub(servers, "nitpick")
+			server["type"], server["command"] = "local", cmd
+			if _, ok := server["enabled"]; !ok {
+				server["enabled"] = true
+			}
 		},
 	},
 	{
@@ -111,7 +116,8 @@ func homePath(parts ...string) (string, error) {
 // writeMCPServers is the shape most clients share: mcpServers.<name>.
 func writeMCPServers(cfg map[string]any, command string, args []string) {
 	servers := sub(cfg, "mcpServers")
-	servers["nitpick"] = map[string]any{"command": command, "args": args}
+	server := sub(servers, "nitpick")
+	server["command"], server["args"] = command, args
 }
 
 // sub returns cfg[key] as a map, creating it when absent or of another type.
@@ -220,38 +226,6 @@ func mergeJSON(path, command string, args []string, write func(map[string]any, s
 		return nil, err
 	}
 	return append(out, '\n'), nil
-}
-
-// mergeTOML appends the server table to a TOML file, or replaces the one
-// already there, without parsing the rest: Codex's file holds settings this
-// command has no business rewriting.
-func mergeTOML(path, command string, args []string) ([]byte, error) {
-	data, err := os.ReadFile(path)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	}
-	quoted := make([]string, len(args))
-	for i, a := range args {
-		quoted[i] = fmt.Sprintf("%q", a)
-	}
-	block := fmt.Sprintf("[mcp_servers.nitpick]\ncommand = %q\nargs = [%s]\n", command, strings.Join(quoted, ", "))
-	lines := strings.Split(string(data), "\n")
-	var kept []string
-	skipping := false
-	for _, line := range lines {
-		t := strings.TrimSpace(line)
-		if strings.HasPrefix(t, "[") {
-			skipping = t == "[mcp_servers.nitpick]" || strings.HasPrefix(t, "[mcp_servers.nitpick.")
-		}
-		if !skipping {
-			kept = append(kept, line)
-		}
-	}
-	text := strings.TrimRight(strings.Join(kept, "\n"), "\n")
-	if text != "" {
-		text += "\n\n"
-	}
-	return []byte(text + block), nil
 }
 
 // mcpClientNames lists the clients, for help text and tests.
