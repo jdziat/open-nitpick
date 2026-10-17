@@ -223,8 +223,8 @@ func TestBuildDrawsARouteWithItsHandlersInOrderAndTheDatabaseItReaches(t *testin
 		}
 	}
 	slices.Sort(chain)
-	if !slices.Equal(chain, []int{1, 2}) {
-		t.Fatalf("route handler orders = %v, want 1 and 2", chain)
+	if !slices.Equal(chain, []int{1, 2, 3}) {
+		t.Fatalf("route handler orders = %v, want the Use middleware, auth and list as 1 to 3", chain)
 	}
 }
 
@@ -239,15 +239,76 @@ func TestBuildNumbersEveryHandlerInARoutesChain(t *testing.T) {
 			orders[c.To] = c.Order
 		}
 	}
-	if orders["internal/api.auth"] != 1 || orders["internal/api.list"] != 2 {
-		t.Fatalf("handler order = %v, want auth then list", orders)
+	if orders["internal/api.auth"] != 2 || orders["internal/api.list"] != 3 {
+		t.Fatalf("handler order = %v, want auth then list after the Use middleware", orders)
 	}
 }
 
-func TestBuildSaysThatMiddlewareAddedWithUseIsNotDrawn(t *testing.T) {
+func TestBuildPutsNamedMiddlewareAheadOfARoutesHandlers(t *testing.T) {
 	d := Build(web(), edit("internal/api/api.go", 13, 13))
-	if d == nil || !strings.Contains(strings.Join(d.Limits, " "), "Middleware added with Use") {
-		t.Fatalf("limits = %+v, want the Use limit", d)
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	orders := map[string]int{}
+	for _, c := range d.Calls {
+		if c.From == "GET /users" {
+			orders[c.To] = c.Order
+		}
+	}
+	if orders["internal/api.logging"] != 1 || orders["internal/api.auth"] != 2 || orders["internal/api.list"] != 3 {
+		t.Fatalf("chain = %v, want Use middleware first, then the route's own handlers", orders)
+	}
+	if len(d.Limits) != 0 {
+		t.Fatalf("named middleware was also reported as hidden: %v", d.Limits)
+	}
+}
+
+func groups(register string) []standards.File {
+	return []standards.File{
+		src("go.mod", "module example.com/web\n"),
+		src("p/p.go", "package p\n\nfunc Register(r Router) {\n"+register+"}\n\nfunc logging() {}\n\nfunc admin() {}\n\nfunc list() {}\n\nfunc stats() {}\n"),
+	}
+}
+
+func routeOrders(d *Diagram, route string) map[string]int {
+	orders := map[string]int{}
+	for _, c := range d.Calls {
+		if c.From == route {
+			orders[c.To] = c.Order
+		}
+	}
+	return orders
+}
+
+func TestBuildGivesAGroupItsParentsMiddlewareAndItsOwn(t *testing.T) {
+	d := Build(groups("\tr.Use(logging)\n\tg := r.Group(\"/admin\")\n\tg.Use(admin)\n\tg.Get(\"/stats\", stats)\n\tr.Get(\"/list\", list)\n"), edit("p/p.go", 11, 11))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	got := routeOrders(d, "GET /stats")
+	if got["p.logging"] != 1 || got["p.admin"] != 2 || got["p.stats"] != 3 {
+		t.Fatalf("group route chain = %v, want parent middleware, group middleware, handler", got)
+	}
+}
+
+func TestBuildDoesNotLeakAGroupsMiddlewareToItsParentsRoutes(t *testing.T) {
+	d := Build(groups("\tr.Use(logging)\n\tg := r.Group(\"/admin\")\n\tg.Use(admin)\n\tg.Get(\"/stats\", stats)\n\tr.Get(\"/list\", list)\n"), edit("p/p.go", 15, 15))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	got := routeOrders(d, "GET /list")
+	if _, leaked := got["p.admin"]; leaked || got["p.logging"] != 1 || got["p.list"] != 2 {
+		t.Fatalf("parent route chain = %v, want logging then list and no admin", got)
+	}
+}
+
+func TestBuildStillReportsMiddlewareItCouldNotName(t *testing.T) {
+	d := Build(groups("\tr.Use(middlewares()...)\n\tr.Get(\"/list\", list)\n"), edit("p/p.go", 12, 12))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	if !strings.Contains(strings.Join(d.Limits, " "), "could not name") {
+		t.Fatalf("limits = %v, want unnamed middleware reported", d.Limits)
 	}
 }
 

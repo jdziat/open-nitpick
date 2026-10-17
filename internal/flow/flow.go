@@ -291,16 +291,39 @@ func parse(sources []standards.File) *graph {
 				}
 				return "", false, false
 			}
+			// middleware[x] is what a call to x.Use has attached so far, in
+			// order. A route registered on x runs it first. A group made from
+			// x starts with a copy, so it inherits what x had at that point.
+			middleware := map[string][]string{}
 			var visit func(ast.Node) bool
 			visit = func(node ast.Node) bool {
 				switch node := node.(type) {
+				case *ast.AssignStmt:
+					if len(node.Lhs) == 1 && len(node.Rhs) == 1 {
+						target, ok := node.Lhs[0].(*ast.Ident)
+						call, isCall := node.Rhs[0].(*ast.CallExpr)
+						if ok && isCall {
+							if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Group" {
+								if parent, ok := sel.X.(*ast.Ident); ok {
+									middleware[target.Name] = slices.Clone(middleware[parent.Name])
+								}
+							}
+						}
+					}
 				case *ast.CallExpr:
 					sel, ok := node.Fun.(*ast.SelectorExpr)
 					if !ok {
 						break
 					}
+					receiver, _ := sel.X.(*ast.Ident)
 					if sel.Sel.Name == "Use" {
-						fn.usesMiddleware = true
+						for _, arg := range node.Args {
+							if key, _, ok := resolve(arg); ok && receiver != nil {
+								middleware[receiver.Name] = append(middleware[receiver.Name], key)
+								continue
+							}
+							fn.usesMiddleware = true
+						}
 					}
 					label, ok := routeLabel(sel.Sel.Name, node.Args)
 					if !ok {
@@ -312,6 +335,14 @@ func parse(sources []standards.File) *graph {
 						calls: map[string]site{}, external: map[string]site{}, ambiguous: map[string]int{}}
 					var rest []ast.Expr
 					unnamed := false
+					if receiver != nil {
+						for _, key := range middleware[receiver.Name] {
+							if _, dup := route.calls[key]; !dup {
+								route.calls[key] = site{line: line, order: len(route.calls) + 1}
+							}
+						}
+					}
+					attached := len(route.calls)
 					// A wrapper such as auth(list) runs the wrapper and then
 					// the handler it wraps, so both join the chain, in that order.
 					var chain func(ast.Expr)
@@ -336,10 +367,10 @@ func parse(sources []standards.File) *graph {
 					for _, arg := range node.Args[1:] {
 						chain(arg)
 					}
-					if unnamed || len(route.calls) == 0 {
+					if unnamed || len(route.calls) == attached {
 						fn.unresolvedRoutes++
 					}
-					if len(route.calls) == 0 {
+					if len(route.calls) == attached {
 						break
 					}
 					g.funcs[route.key] = route
@@ -820,7 +851,7 @@ func (g *graph) limits(drawn []string, edges map[edge]edgeInfo) []string {
 		out = append(out, fmt.Sprintf("%d route registration(s) in the drawn functions have handlers the graph could not name, so those handlers are missing from their chains.", unresolvedRoutes))
 	}
 	if len(middleware) > 0 {
-		out = append(out, "Middleware added with Use runs on routes at run time and is not drawn: "+listSome(middleware)+".")
+		out = append(out, "Middleware passed to Use that the graph could not name is not drawn: "+listSome(middleware)+".")
 	}
 	if len(generated) > 0 {
 		out = append(out, "Generated code is drawn like any other, but its source of truth is elsewhere: "+listSome(generated)+".")

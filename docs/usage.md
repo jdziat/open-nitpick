@@ -217,9 +217,11 @@ drawn as a green box whose arrows run to its handlers, numbered in the order
 they run, so a change to a handler shows the chain it sits in. Calls that write
 to the filesystem or reach a database package such as database/sql are pink.
 Because the graph has no types, a database-shaped method name like Query in a
-file that imports one is drawn as inferred. Middleware added with Use is
-attached to routes at run time, so the diagram lists it as a limit and does not
-draw it.
+file that imports one is drawn as inferred. Middleware named in a Use call
+runs first in the chain of every route registered on that router afterwards. A
+group made with Group starts with the middleware its parent had at that point,
+and what the group adds stays in the group. Middleware passed to Use in a form
+the graph cannot name, and handlers it cannot name, are listed as limits.
 
 The graph is built from Go source by name, without type checking. A call
 through an interface or a package-level table is not drawn, so a missing arrow
