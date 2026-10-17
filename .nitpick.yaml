@@ -60,6 +60,11 @@ review:
     # it does not fail to be worth reviewing, it fails to be reviewable, and
     # the batch that tried it failed the run.
     - "internal/knowledge/indexes/**"
+    # Checksums written by `go mod tidy`. A dependency bump rewrites hundreds of
+    # lines of them, tools/go.sum alone runs to 56k tokens, and the slop stage
+    # reports "partial" on them, which fails the review job on a change with
+    # nothing in it a person would read.
+    - "**/go.sum"
 
 instructions:
   - path: "**/*.go"
