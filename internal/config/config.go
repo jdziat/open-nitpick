@@ -604,6 +604,16 @@ type Review struct {
 	// says so rather than measuring something else.
 	Standards bool `yaml:"standards"`
 
+	// Flow draws, in the walkthrough, how the functions a change edits are
+	// reached and what they reach: the callers up to an entry point and the
+	// callees down to effects on the outside world, from Go source only.
+	//
+	// Off by default. It reads the repository's Go files, which the engineering
+	// profile already does and every other profile otherwise does not, and the
+	// graph follows names without type checking, so a reader should opt in
+	// knowing it is an approximation.
+	Flow bool `yaml:"flow"`
+
 	// KnowledgeQuery is what gets embedded to retrieve against: "batch", the
 	// changed lines of the whole batch as one query, or "file", one query per
 	// changed file whose results are merged.

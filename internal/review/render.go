@@ -436,6 +436,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	b.WriteString(uncoveredNotice(report))
 	b.WriteString(discardNotice(report))
 	b.WriteString(callerWalkNotice(report))
+	b.WriteString(flowNotice(report))
 	// With the others, and NOT inside the walkthrough: a ceiling that changed
 	// what was reviewed is a fact about coverage, and review.summary turning
 	// the walkthrough off must not turn it into a silent trim.

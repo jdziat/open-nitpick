@@ -193,6 +193,21 @@ in, and needs a base revision to read. Without either the run says which and
 reviews without it, and the report records that rather than leaving an absent
 section to be read as a repository with no conventions.
 
+## Flow diagrams
+
+Setting `review.flow: true` adds a collapsed Mermaid diagram to the
+walkthrough showing how the functions a change edits are reached and what they
+reach: callers up to four hops, as far as an entry point such as a command's
+main function, and callees down two hops, ending at calls into the operating
+system, the network or a third-party package. Edited functions, entry points
+and external effects are coloured apart.
+
+The graph is built from Go source by name, without type checking. A call
+through an interface or a package-level table is not drawn, so a missing arrow
+does not prove there is no call. A diagram stops at 30 nodes and says so. It is
+off by default, appears even with `review.summary: false`, and covers Go only;
+HTTP framework adapters and links to source lines are not built yet.
+
 A language no probe reads is named in the report rather than left out of it.
 Six probes read Go today and nothing reads anything else, so a TypeScript tree
 reports that it was not measured instead of reporting that it passed.

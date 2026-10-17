@@ -1292,6 +1292,11 @@ Concurrency bounds in-flight model calls.
 string, default `none`.
 FailOn is the lowest severity that makes the run exit non-zero. "none" disables this finding threshold, not required stages or practice policy. One of: none, nit, info, warning, error, critical.
 
+### `review.flow`
+
+boolean, default `false`.
+Flow draws, in the walkthrough, how the functions a change edits are reached and what they reach: the callers up to an entry point and the callees down to effects on the outside world, from Go source only.
+
 ### `review.ignore`
 
 list of string, default `[**/vendor/** **/node_modules/** **/testdata/** **/dist/** **/build/** **/*.pb.go **/*.gen.go **/*_generated.go **/*.min.js **/*.map **/go.sum **/package-lock.json **/pnpm-lock.yaml **/yarn.lock **/Cargo.lock **/poetry.lock **/*.snap **/*.svg **/*.png **/*.jpg **/*.gif **/*.ico **/*.pdf]`.

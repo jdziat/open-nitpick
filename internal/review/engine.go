@@ -23,6 +23,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
 	"github.com/jdziat/open-nitpick/internal/fence"
+	"github.com/jdziat/open-nitpick/internal/flow"
 	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/practices"
 	"github.com/jdziat/open-nitpick/internal/prompt"
@@ -484,6 +485,10 @@ type Report struct {
 	// active or skipped, with a reason.
 	Standards StandardsStatus
 
+	// Flow is the call-flow diagram for the edited functions, nil when
+	// review.flow is off or nothing connected was found.
+	Flow *flow.Diagram
+
 	// Escalated records the batches a fallback model reviewed after the
 	// primary could not, so a reader can tell which findings came from which
 	// model. Silence here would put a weaker model's findings beside a
@@ -888,6 +893,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 			return nil, fmt.Errorf("assemble review: %w", err)
 		}
 	}
+	report.Flow = e.flowDiagram(ctx, ref, files, report.DesignExecution)
 	if plan.RelatedDefinitions > 0 {
 		e.log().Info("attached related context", "definitions", plan.RelatedDefinitions, "files", len(plan.RelatedFiles))
 	}
