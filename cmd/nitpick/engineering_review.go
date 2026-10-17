@@ -340,10 +340,23 @@ func designContextFiles(ctx context.Context, provider vcs.Provider, ref vcs.Ref,
 	return out, problems
 }
 
+// goBoundaryChange reports whether the change can move a Go package edge. A
+// manifest counts only when practices.ManifestChangesPackages says so: a
+// dependency bump edits go.mod and go.sum and nothing else, and counting it
+// left the required design-boundaries check unavailable, so every such pull
+// request exited as an incomplete review.
 func goBoundaryChange(files diff.Files) bool {
 	for _, file := range files {
-		for _, name := range []string{file.Path, file.OldPath} {
-			if path.Ext(name) == ".go" || path.Base(name) == "go.mod" || path.Base(name) == "go.work" {
+		if path.Ext(file.Path) == ".go" || path.Ext(file.OldPath) == ".go" {
+			return true
+		}
+		if practices.ManifestChangesPackages(file) {
+			return true
+		}
+		// A renamed or deleted manifest moves a boundary even when the new
+		// path is not a manifest; ManifestChangesPackages reads only Path.
+		if file.OldPath != "" && file.OldPath != file.Path {
+			if base := path.Base(file.OldPath); base == "go.mod" || base == "go.work" {
 				return true
 			}
 		}
